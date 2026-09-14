@@ -1121,6 +1121,74 @@ body.cl-drawer-open .cl-sidebar {
     color: var(--cl-ink-3);
 }
 
+/* Notification bell in the top bar. The top bar sits outside Bulma's .content, so no .cl-page prefix is needed. */
+.cl-notifications {
+    position: relative;
+}
+
+.cl-bell {
+    position: relative;
+}
+
+.cl-bell-badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 9px;
+    background: var(--cl-warn);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 18px;
+    text-align: center;
+}
+
+.cl-notifications-pop {
+    position: absolute;
+    right: 0;
+    top: 42px;
+    z-index: var(--cl-z-pop);
+    width: 360px;
+    max-height: 70vh;
+    overflow-y: auto;
+    background: var(--cl-surface);
+    border: 1px solid var(--cl-line);
+    border-radius: 10px;
+    box-shadow: var(--cl-shadow);
+}
+
+.cl-notifications-pop[hidden],
+.cl-notifications-status[hidden] {
+    display: none;
+}
+
+.cl-notifications-status {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 14px;
+    font-size: 13.5px;
+    color: var(--cl-ink-2);
+}
+
+.cl-notifications-status a {
+    font-weight: 600;
+    color: var(--cl-accent-ink);
+}
+
+@media screen and (max-width: 719px) {
+    .cl-notifications-pop {
+        position: fixed;
+        top: calc(var(--cl-topbar-height) + 4px);
+        left: 8px;
+        right: 8px;
+        width: auto;
+    }
+}
+
 /* Print: the shell chrome (rail column, fixed sidebar, sticky topbar) has no place on paper. */
 @page {
     margin: 15mm;

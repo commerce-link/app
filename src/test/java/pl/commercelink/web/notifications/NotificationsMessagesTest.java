@@ -21,6 +21,9 @@ class NotificationsMessagesTest {
             "notifications.select.item", "notifications.markRead", "notifications.markUnread",
             "notifications.unreadBadge", "notifications.unread.sr", "notifications.pagination.label");
 
+    private static final List<String> BELL_KEYS = List.of(
+            "notifications.bell.aria", "notifications.loading", "notifications.loadError");
+
     private static void assertTranslated(List<String> keys) {
         for (String language : List.of("pl", "en")) {
             // given
@@ -41,5 +44,11 @@ class NotificationsMessagesTest {
     void translatesThePageAndDropdownTextsInBothLanguages() {
         // when / then
         assertTranslated(PAGE_KEYS);
+    }
+
+    @Test
+    void translatesTheBellTextsInBothLanguages() {
+        // when / then
+        assertTranslated(BELL_KEYS);
     }
 }
