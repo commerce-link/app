@@ -42,11 +42,15 @@ public class StoreInventoryProvider {
     }
 
     public InventoryIndex ownIndex(Store store) {
+        return ownInventory(store).index();
+    }
+
+    public StoreInventory ownInventory(Store store) {
         if (store == null || !store.hasOwnOrManualSupplierConnections()) {
-            return InventoryIndex.of(List.of());
+            return new StoreInventory(InventoryIndex.of(List.of()), null);
         }
         String storeId = store.getStoreId();
-        return cache.get(storeId).orElseGet(() -> buildAndCache(store, storeId)).index();
+        return cache.get(storeId).orElseGet(() -> buildAndCache(store, storeId));
     }
 
     private StoreInventory buildAndCache(Store store, String storeId) {
