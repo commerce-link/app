@@ -11,7 +11,6 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.invoicing.InvoicingProviderFactory;
 import pl.commercelink.inventory.supplier.StoreSupplierConnectionService;
-import pl.commercelink.inventory.supplier.SupplierConnectionView;
 import pl.commercelink.inventory.supplier.SupplierConnectionViewFactory;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.provider.api.ProviderField;
@@ -447,13 +446,10 @@ public class StoreController {
                 ? "/dashboard/store/" + storeId
                 : "/dashboard/store");
 
+        // A supplier type may be connected several times (one per label), so the Add dropdown no
+        // longer removes already-connected types -- it always offers every registered type.
         List<String> allSupplierNames = supplierRegistry.getExternalSupplierNames();
-        Set<String> connected = views.external().stream()
-                .map(SupplierConnectionView::identity)
-                .collect(Collectors.toCollection(() -> new TreeSet<>(String.CASE_INSENSITIVE_ORDER)));
-        model.addAttribute("availableSuppliers", allSupplierNames.stream()
-                .filter(name -> !connected.contains(name))
-                .toList());
+        model.addAttribute("availableSuppliers", allSupplierNames);
         // Rendered once as a data attribute on the stable section container so the page script can
         // recompute the Add dropdown after an async swap without a second request.
         model.addAttribute("allSupplierNames", allSupplierNames);

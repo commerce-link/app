@@ -304,6 +304,16 @@
                                 </div>
                             </div>
                             <input type="hidden" name="supplierName" id="supplier-name-hidden" disabled />
+                            <input type="hidden" name="identity" id="supplier-identity" disabled />
+                            <p class="help" id="supplier-type-note" th:attr="data-template=#{store.supplier.column.type} + ': {0}'"></p>
+
+                            <div class="field" id="supplier-label-wrap">
+                                <label class="label" th:text="#{store.supplier.label}"></label>
+                                <div class="control">
+                                    <input class="input" type="text" name="label" id="supplier-label" maxlength="60" />
+                                </div>
+                                <p class="help" th:text="#{store.supplier.label.help}"></p>
+                            </div>
 
                             <!-- Always rendered (not gated by a page-load th:if any more): the
                                  fulfilment settings modal can flip canUseGlobalSuppliers from a
@@ -345,6 +355,14 @@
                                            th:placeholder="#{store.supplier.external.id.placeholder}" />
                                 </div>
                                 <p class="help" th:text="#{store.supplier.external.id.description}"></p>
+                            </div>
+
+                            <div class="field" id="supplier-billing-wrap">
+                                <label class="label" th:text="#{store.supplier.billing.shortcut}"></label>
+                                <div class="control">
+                                    <input class="input" type="text" name="billingShortcut" id="supplier-billing-shortcut" />
+                                </div>
+                                <p class="help" th:text="#{store.supplier.billing.shortcut.help}"></p>
                             </div>
 
                             <div th:each="entry : ${supplierFields}"
@@ -415,6 +433,12 @@
                     var select = document.getElementById('supplier-select');
                     var selectWrap = document.getElementById('supplier-select-wrap');
                     var hiddenName = document.getElementById('supplier-name-hidden');
+                    var identityInput = document.getElementById('supplier-identity');
+                    var typeNote = document.getElementById('supplier-type-note');
+                    var labelInput = document.getElementById('supplier-label');
+                    var labelWrap = document.getElementById('supplier-label-wrap');
+                    var billingInput = document.getElementById('supplier-billing-shortcut');
+                    var billingWrap = document.getElementById('supplier-billing-wrap');
                     var mode = document.getElementById('supplier-mode');
                     var modeWrap = document.getElementById('supplier-mode-wrap');
                     var warning = document.getElementById('supplier-mode-warning');
@@ -429,6 +453,11 @@
                     var selectPlaceholder = /*[[#{general.select}]]*/ '';
                     var scheduleIncompleteMessage = /*[[#{schedule.at.nohours}]]*/ '';
                     var submitInFlight = false;
+                    // Whether the connection currently being edited may still switch mode (a
+                    // tokened own identity cannot become GLOBAL) -- read by refreshModeVisibility()
+                    // alongside canUseGlobalSuppliers, since the mode select is set (not disabled)
+                    // even when hidden, see the note in open() below.
+                    var currentRowCanSwitchMode = true;
 
                     // Reads the row data straight out of the (possibly just-swapped) table instead
                     // of a JS array snapshotted at page load, which would go stale after any swap.
@@ -453,10 +482,16 @@
                             includeInFulfilment: tr.dataset.includeFulfilment === 'true',
                             // absent attribute (a blank schedule) means the platform default
                             feedSchedule: tr.dataset.feedSchedule || '',
-                            externalSupplierId: tr.dataset.externalSupplierId || ''
+                            externalSupplierId: tr.dataset.externalSupplierId || '',
+                            providerName: tr.dataset.providerName || '',
+                            label: tr.dataset.label || '',
+                            billingShortcut: tr.dataset.billingShortcut || '',
+                            canSwitchMode: tr.dataset.canSwitchMode !== 'false'
                         };
                     }
 
+                    // hiddenName now carries the supplier *type* (not the identity) once a row is
+                    // being edited, since the select is hidden and disabled in that case.
                     function activeName() {
                         return selectWrap.classList.contains('is-hidden') ? hiddenName.value : select.value;
                     }
@@ -468,12 +503,17 @@
                     function refreshModeVisibility() {
                         var root = externalSection.firstElementChild;
                         var showMode = !!(root && root.getAttribute('data-show-mode') === 'true');
-                        modeWrap.classList.toggle('is-hidden', !showMode);
+                        // A tokened own identity cannot switch to GLOBAL: hidden (never disabled --
+                        // see the note in open()) so the select still submits its current value.
+                        modeWrap.classList.toggle('is-hidden', !showMode || !currentRowCanSwitchMode);
                     }
 
                     function refreshFields() {
                         var name = activeName();
                         var isOwn = mode.value === 'OWN';
+                        labelWrap.classList.toggle('is-hidden', !isOwn);
+                        labelInput.required = isOwn;
+                        billingWrap.classList.toggle('is-hidden', !isOwn);
                         // Read fresh off the (possibly just-swapped) section root, the same idiom as
                         // refreshModeVisibility above: a save can be the very thing that puts this
                         // supplier's identity into this list, and the modal is never re-rendered by
@@ -517,25 +557,17 @@
                     }
 
                     // The full provider list is rendered once (data-all-suppliers, set at page
-                    // load and never touched by a swap); only the connected identities need to be
-                    // re-read after each swap, straight from the freshly-rendered table -- no
-                    // second request for the option list.
+                    // load and never touched by a swap). A supplier type may be connected several
+                    // times (one per label), so the option list is never filtered by what is
+                    // already connected -- it always offers every registered type.
                     function refreshAvailableOptions() {
                         var all = (externalSection.dataset.allSuppliers || '').split(';').filter(function (s) { return s.length > 0; });
-                        var connected = [];
-                        externalSection.querySelectorAll('[data-configure-supplier]').forEach(function (button) {
-                            // the server's "already connected" set is case-insensitive (TreeSet with
-                            // CASE_INSENSITIVE_ORDER), so this comparison must be too, or a supplier
-                            // whose case differs from data-all-suppliers would show up twice
-                            connected.push(button.getAttribute('data-configure-supplier').toLowerCase());
-                        });
-                        var available = all.filter(function (name) { return connected.indexOf(name.toLowerCase()) === -1; });
                         select.innerHTML = '';
                         var placeholder = document.createElement('option');
                         placeholder.value = '';
                         placeholder.textContent = selectPlaceholder;
                         select.appendChild(placeholder);
-                        available.forEach(function (name) {
+                        all.forEach(function (name) {
                             var option = document.createElement('option');
                             option.value = name;
                             option.textContent = name;
@@ -550,18 +582,33 @@
                         select.disabled = !!row;
                         hiddenName.disabled = !row;
                         clearFormError();
+                        currentRowCanSwitchMode = row ? row.canSwitchMode : true;
+                        identityInput.disabled = !row;
                         if (row) {
-                            hiddenName.value = row.identity;
+                            // hiddenName now carries the connection's *type* (row.providerName),
+                            // not the identity -- the service ignores it on edit (the identity
+                            // hidden field is authoritative), but activeName() still needs it to
+                            // pick the right supplier-fields-{type} group.
+                            hiddenName.value = row.providerName;
+                            identityInput.value = row.identity;
                             mode.value = row.mode;
                             pricing.checked = row.includeInPricing;
                             fulfilment.checked = row.includeInFulfilment;
                             externalId.value = row.externalSupplierId;
+                            labelInput.value = row.label;
+                            billingInput.value = row.billingShortcut;
+                            typeNote.textContent = typeNote.dataset.template.replace('{0}', row.providerName);
+                            typeNote.classList.remove('is-hidden');
                         } else {
                             select.value = identity || '';
+                            identityInput.value = '';
                             mode.value = 'OWN';
                             pricing.checked = true;
                             fulfilment.checked = true;
                             externalId.value = '';
+                            labelInput.value = '';
+                            billingInput.value = '';
+                            typeNote.classList.add('is-hidden');
                         }
                         // One modal serves every supplier, so the schedule builder has to be
                         // re-read from this row rather than parsed once at page load -- otherwise
@@ -721,6 +768,12 @@
                             <h2 class="subtitle" id="manual-config-title"></h2>
                             <div id="manual-config-save-error"></div>
                             <div class="field">
+                                <label class="label" th:text="#{store.supplier.label}"></label>
+                                <div class="control">
+                                    <input class="input" type="text" name="label" id="manual-config-label" maxlength="60" required />
+                                </div>
+                            </div>
+                            <div class="field">
                                 <label class="checkbox">
                                     <input type="checkbox" name="enabled" value="true"
                                            class="manual-enabled" id="manual-config-enabled" />
@@ -801,6 +854,7 @@
                     var configForm = document.getElementById('manual-config-form');
                     var configTitle = document.getElementById('manual-config-title');
                     var configSaveError = document.getElementById('manual-config-save-error');
+                    var configLabel = document.getElementById('manual-config-label');
                     var configEnabled = document.getElementById('manual-config-enabled');
                     var configHint = document.getElementById('manual-config-hint');
                     var configPricing = document.getElementById('manual-config-pricing');
@@ -974,6 +1028,7 @@
                         configTitle.textContent = row.label;
                         configForm.action = basePath + '/fulfilment/manual-supplier/' + encodeURIComponent(identity);
                         configSaveError.innerHTML = '';
+                        configLabel.value = row.label;
                         configEnabled.checked = row.enabled;
                         // applySelections forces enabled back to false without a feed, so the
                         // checkbox must not let the operator tick something the server undoes

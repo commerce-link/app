@@ -152,4 +152,16 @@ class SupplierTableFragmentTest {
         assertThat(html).contains("data-external-supplier-id=${row.externalSupplierId()}");
         assertThat(html).contains("#{store.supplier.column.externalId}");
     }
+
+    @Test
+    void carriesTheProviderTypeAndModeSwitchabilityForTheEditModalAndShowsTheTypeTagOnExternalRows() throws Exception {
+        // a supplier type can now be connected several times under different labels, so the row
+        // keeps the underlying type (and whether the modal may still switch its mode) available for
+        // the edit modal, and shows the type as a tag next to the label so rows with the same label
+        // pattern stay distinguishable
+        String html = fragment();
+        assertThat(html).contains("data-provider-name=${row.providerName()}");
+        assertThat(html).contains("data-can-switch-mode=${row.canSwitchMode()}");
+        assertThat(html).contains("th:unless=\"${manual}\" th:text=\"${row.providerName()}\"");
+    }
 }

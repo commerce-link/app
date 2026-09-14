@@ -3,7 +3,6 @@ package pl.commercelink.web;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.ui.Model;
-import pl.commercelink.inventory.supplier.SupplierConnectionView;
 import pl.commercelink.inventory.supplier.SupplierConnectionViewFactory;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.starter.security.CustomSecurityContext;
@@ -11,8 +10,6 @@ import pl.commercelink.stores.Store;
 
 import java.util.List;
 import java.util.Set;
-import java.util.TreeSet;
-import java.util.stream.Collectors;
 
 /**
  * Renders the external and manual supplier sections of the store fulfilment screen as Thymeleaf
@@ -41,12 +38,9 @@ public final class SupplierSectionModel {
                                                Set<String> suppliersWithStoredConfig,
                                                String successMessage, Model model) {
         SupplierConnectionViewFactory.SupplierConnectionViews views = supplierConnectionViewFactory.views(store);
-        Set<String> connected = views.external().stream()
-                .map(SupplierConnectionView::identity)
-                .collect(Collectors.toCollection(() -> new TreeSet<>(String.CASE_INSENSITIVE_ORDER)));
-        List<String> availableSuppliers = supplierRegistry.getExternalSupplierNames().stream()
-                .filter(name -> !connected.contains(name))
-                .toList();
+        // A supplier type may be connected several times (one per label), so the Add dropdown no
+        // longer removes already-connected types -- it always offers every registered type.
+        List<String> availableSuppliers = supplierRegistry.getExternalSupplierNames();
         model.addAttribute("sectionRows", views.external());
         model.addAttribute("sectionShowMode", store.canUseGlobalSuppliers());
         model.addAttribute("sectionAvailableSuppliers", availableSuppliers);

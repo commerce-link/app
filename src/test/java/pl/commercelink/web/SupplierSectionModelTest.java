@@ -84,8 +84,9 @@ class SupplierSectionModelTest {
             assertThat(view).doesNotContain("(");
             assertThat(model.getAttribute("sectionRows")).isEqualTo(List.of(elko));
             assertThat(model.getAttribute("sectionShowMode")).isEqualTo(true);
-            // Elko is already connected, so only Acme is left to offer in the Add dropdown
-            assertThat(model.getAttribute("sectionAvailableSuppliers")).isEqualTo(List.of("Acme"));
+            // A supplier type can be connected several times under different labels, so Elko
+            // stays in the Add dropdown even though it is already connected
+            assertThat(model.getAttribute("sectionAvailableSuppliers")).isEqualTo(List.of("Elko", "Acme"));
             assertThat(model.getAttribute("sectionSuccessMessage")).isEqualTo("Saved.");
             assertThat(model.getAttribute("sectionSuppliersWithStoredConfig")).isEqualTo("Elko");
         }

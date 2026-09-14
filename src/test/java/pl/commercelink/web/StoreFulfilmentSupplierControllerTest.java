@@ -13,6 +13,8 @@ import org.springframework.ui.ConcurrentModel;
 import pl.commercelink.inventory.supplier.ErrorMessage;
 import pl.commercelink.inventory.supplier.StoreSupplierConnectionService;
 import pl.commercelink.inventory.supplier.SupplierConnectionViewFactory;
+import pl.commercelink.inventory.supplier.SupplierLabelMap;
+import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.stores.ConnectionMode;
@@ -31,6 +33,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -50,6 +53,8 @@ class StoreFulfilmentSupplierControllerTest {
     private SupplierRegistry supplierRegistry;
     @Mock
     private MessageSource messageSource;
+    @Mock
+    private SupplierLabels supplierLabels;
 
     @InjectMocks
     private StoreFulfilmentSupplierController controller;
@@ -83,6 +88,7 @@ class StoreFulfilmentSupplierControllerTest {
         when(storeSupplierConnectionService.connectOrUpdate(any(), any(), anyMap()))
                 .thenReturn(new StoreSupplierConnectionService.ConnectionUpdateResult(List.of(), null, Set.of(), Set.of(), Set.of()));
         when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenReturn("ok");
+        when(supplierLabels.forStore(any())).thenReturn(mock(SupplierLabelMap.class));
         stubEmptyViews();
         SupplierConnectionForm form = form();
         form.setFeedSchedule("0 5,17 * * ? *");
@@ -108,6 +114,7 @@ class StoreFulfilmentSupplierControllerTest {
         when(storeSupplierConnectionService.connectOrUpdate(any(), any(), anyMap()))
                 .thenReturn(new StoreSupplierConnectionService.ConnectionUpdateResult(List.of(), null, Set.of(), Set.of(), Set.of()));
         when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenReturn("ok");
+        when(supplierLabels.forStore(any())).thenReturn(mock(SupplierLabelMap.class));
         stubEmptyViews();
         SupplierConnectionForm form = form();
         form.setExternalSupplierId("12345");
@@ -133,6 +140,7 @@ class StoreFulfilmentSupplierControllerTest {
         when(storeSupplierConnectionService.connectOrUpdate(any(), any(), anyMap()))
                 .thenReturn(new StoreSupplierConnectionService.ConnectionUpdateResult(List.of(), null, Set.of("Elko"), Set.of(), Set.of()));
         when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenReturn("ok");
+        when(supplierLabels.forStore(any())).thenReturn(mock(SupplierLabelMap.class));
         stubEmptyViews();
         ConcurrentModel model = new ConcurrentModel();
         MockHttpServletResponse response = new MockHttpServletResponse();
@@ -150,6 +158,41 @@ class StoreFulfilmentSupplierControllerTest {
             assertThat(response.getStatus()).isEqualTo(200);
             assertThat(model.getAttribute("sectionSuccessMessage")).isEqualTo("ok");
             verify(storeSupplierConnectionService).connectOrUpdate(any(), any(), eq(Map.of("login", "u")));
+        }
+    }
+
+    @Test
+    void saveForwardsIdentityLabelAndBillingShortcutAndReportsTheLabel() {
+        // given
+        Store store = store();
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        SupplierConnectionForm form = form();
+        form.setIdentity("Elko-k7f3a9c2");
+        form.setLabel("Elko B2B");
+        form.setBillingShortcut("ELKO-B");
+        when(storeSupplierConnectionService.connectOrUpdate(eq(store), any(), anyMap()))
+                .thenReturn(new StoreSupplierConnectionService.ConnectionUpdateResult(List.of(), "Elko-k7f3a9c2", Set.of(), Set.of(), Set.of()));
+        SupplierLabelMap labels = mock(SupplierLabelMap.class);
+        when(supplierLabels.forStore(store)).thenReturn(labels);
+        when(labels.of("Elko-k7f3a9c2")).thenReturn("Elko B2B");
+        when(messageSource.getMessage(eq("store.fulfilment.supplier.saved"), any(), any(Locale.class))).thenReturn("saved Elko B2B");
+        when(supplierConnectionViewFactory.views(store)).thenReturn(new SupplierConnectionViewFactory.SupplierConnectionViews(List.of(), List.of()));
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(false);
+            ConcurrentModel model = new ConcurrentModel();
+
+            // when
+            controller.save(form, Locale.ENGLISH, model, new MockHttpServletResponse());
+
+            // then
+            ArgumentCaptor<SupplierSelectionForm> selection = ArgumentCaptor.forClass(SupplierSelectionForm.class);
+            verify(storeSupplierConnectionService).connectOrUpdate(eq(store), selection.capture(), anyMap());
+            assertThat(selection.getValue().getIdentity()).isEqualTo("Elko-k7f3a9c2");
+            assertThat(selection.getValue().getLabel()).isEqualTo("Elko B2B");
+            assertThat(selection.getValue().getBillingShortcut()).isEqualTo("ELKO-B");
+            verify(messageSource).getMessage(eq("store.fulfilment.supplier.saved"), eq(new Object[]{"Elko B2B"}), any(Locale.class));
         }
     }
 
@@ -186,6 +229,7 @@ class StoreFulfilmentSupplierControllerTest {
         when(storeSupplierConnectionService.disconnect(any(), eq("Elko")))
                 .thenReturn(new StoreSupplierConnectionService.ConnectionUpdateResult(List.of(), null, Set.of(), Set.of("Elko"), Set.of()));
         when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenReturn("ok");
+        when(supplierLabels.forStore(any())).thenReturn(mock(SupplierLabelMap.class));
         stubEmptyViews();
         ConcurrentModel model = new ConcurrentModel();
         MockHttpServletResponse response = new MockHttpServletResponse();
@@ -210,6 +254,7 @@ class StoreFulfilmentSupplierControllerTest {
         when(storeSupplierConnectionService.connectOrUpdate(any(), any(), anyMap()))
                 .thenReturn(new StoreSupplierConnectionService.ConnectionUpdateResult(List.of(), null, Set.of("Elko"), Set.of(), Set.of()));
         when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenReturn("ok");
+        when(supplierLabels.forStore(any())).thenReturn(mock(SupplierLabelMap.class));
         stubEmptyViews();
         ConcurrentModel model = new ConcurrentModel();
         MockHttpServletResponse response = new MockHttpServletResponse();
@@ -237,6 +282,7 @@ class StoreFulfilmentSupplierControllerTest {
         when(storeSupplierConnectionService.disconnect(any(), eq("Elko")))
                 .thenReturn(new StoreSupplierConnectionService.ConnectionUpdateResult(List.of(), null, Set.of(), Set.of("Elko"), Set.of()));
         when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenReturn("ok");
+        when(supplierLabels.forStore(any())).thenReturn(mock(SupplierLabelMap.class));
         stubEmptyViews();
         ConcurrentModel model = new ConcurrentModel();
         MockHttpServletResponse response = new MockHttpServletResponse();
