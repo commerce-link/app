@@ -418,7 +418,6 @@ public class StoreController {
 
         StoreForm form = new StoreForm(store);
         Map<String, Map<String, String>> configurations = storeSupplierConnectionService.configurationsForUI(store);
-        form.setSupplierConfiguration(configurations);
 
         model.addAttribute("form", form);
         model.addAttribute("settings", FulfilmentSettingsForm.from(store));

@@ -890,6 +890,28 @@ class OrdersControllerTest {
     }
 
     @Test
+    void assignSupplierRefusesADisabledConnection() {
+        // given
+        OrderItem item = existingOrderItem("Laptopy", false);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(routedOrder(null));
+        when(orderItemsRepository.findById(ORDER_ID, item.getItemId())).thenReturn(item);
+        Store store = storeRouting("Acme", "2");
+        store.getSupplierConnections().get(0).setEnabled(false);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(messageSource.getMessage(eq("order.item.assign.supplier.unknown"), any(), any(Locale.class))).thenReturn("unknown");
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        ordersController.assignSupplier(ORDER_ID, item.getItemId(), "MFN-1", 10.0, "Acme",
+                new ExtendedModelMap(), redirect, Locale.ENGLISH);
+
+        // then
+        assertThat(redirect.getFlashAttributes().get("errorMessage")).isEqualTo("unknown");
+        assertThat(item.getDeliveryId()).isNull();
+        verify(orderItemsRepository, never()).save(any());
+    }
+
+    @Test
     @DisplayName("updateOrderInfo rejects a fulfilment type change once a product item is allocated")
     void updateOrderInfoRejectsFulfilmentTypeChangeWhenAnItemIsAllocated() {
         // given

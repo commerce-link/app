@@ -86,10 +86,6 @@ public class ProviderFactory<D extends ProviderDescriptor<T>, T> {
         return descriptor.create(config, context);
     }
 
-    protected Map<String, Object> buildContext(Store store, D descriptor) {
-        return buildContext(store, descriptor, resolveCredentialName(descriptor));
-    }
-
     protected Map<String, Object> buildContext(Store store, D descriptor, String credentialName) {
         return switch (descriptor.authConfig()) {
             case AuthConfig.None none -> Map.of();
@@ -112,10 +108,6 @@ public class ProviderFactory<D extends ProviderDescriptor<T>, T> {
                 () -> authService.renewAccessToken(store.getStoreId()));
 
         return Map.of("restApi", restApiWithRetry);
-    }
-
-    ConfigurableOAuth2AuthorizationService createAuthService(Store store, D descriptor, AuthConfig.OAuth2 oauth2) {
-        return createAuthService(store, descriptor, oauth2, resolveCredentialName(descriptor));
     }
 
     ConfigurableOAuth2AuthorizationService createAuthService(Store store, D descriptor, AuthConfig.OAuth2 oauth2,

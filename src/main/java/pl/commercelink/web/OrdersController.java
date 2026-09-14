@@ -694,7 +694,11 @@ public class OrdersController extends BaseController {
         }
 
         Store store = storesRepository.findById(getStoreId());
-        if (!store.getEnabledProviders().contains(supplier)) {
+        // getEnabledProviders() returns every connection regardless of its enabled flag, so the
+        // flag is checked here: a disabled connection must not take new assignments.
+        boolean assignable = store.getSupplierConnections().stream()
+                .anyMatch(connection -> connection.isEnabled() && connection.getSupplierName().equals(supplier));
+        if (!assignable) {
             redirectAttributes.addFlashAttribute("errorMessage",
                     messageSource.getMessage("order.item.assign.supplier.unknown", null, locale));
             return "redirect:/dashboard/orders/" + orderId;

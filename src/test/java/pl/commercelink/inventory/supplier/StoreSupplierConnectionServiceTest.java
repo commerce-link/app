@@ -398,6 +398,21 @@ class StoreSupplierConnectionServiceTest {
     }
 
     @Test
+    void creatingAGlobalConnectionOverALegacyOwnConnectionPointsAtTheOwnConnection() {
+        // given -- a legacy OWN connection under the bare type name, not a GLOBAL one
+        Store store = storeWith(true, new StoreSupplierConnection("Stub", ConnectionMode.OWN, true, true));
+        registryHas("Stub");
+
+        // when
+        StoreSupplierConnectionService.ConnectionUpdateResult result = service.connectOrUpdate(store,
+                new SupplierSelectionForm("Stub", ConnectionMode.GLOBAL, true, true), Map.of());
+
+        // then
+        assertThat(result.errors().get(0).code()).isEqualTo("store.supplier.connection.error.global.own.exists");
+        verify(persister, never()).persist(any(), any(), anyMap());
+    }
+
+    @Test
     void globalAndOwnOfTheSameTypeMayCoexist() {
         // given
         Store store = storeWith(true, new StoreSupplierConnection("Stub", ConnectionMode.GLOBAL, true, true));

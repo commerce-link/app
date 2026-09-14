@@ -510,9 +510,11 @@
                     // whether a secret already exists, which row the modal belongs to -- is keyed by
                     // this, not by the type: one type may be connected several times, and keying by
                     // type made an edit render the other instance's values and post them back over
-                    // this instance's secret.
+                    // this instance's secret. While ADDING there is no identity yet -- falling back
+                    // to the selected type here made a new instance borrow the legacy row of the
+                    // same type (its stored secret and a false "leaving OWN" warning).
                     function activeIdentity() {
-                        return identityInput.value || select.value;
+                        return identityInput.value;
                     }
 
                     // Fills the active type's credential group with the values of ONE connection.
@@ -555,7 +557,7 @@
                         var root = externalSection.firstElementChild;
                         var storedConfigSuppliers = (root && root.getAttribute('data-suppliers-with-stored-config') || '')
                                 .split(';').filter(function (s) { return s.length > 0; });
-                        var hasStoredConfig = storedConfigSuppliers.indexOf(identity) !== -1;
+                        var hasStoredConfig = identity !== '' && storedConfigSuppliers.indexOf(identity) !== -1;
                         document.querySelectorAll('.supplier-fields').forEach(function (group) {
                             var active = group.id === 'supplier-fields-' + name && isOwn;
                             group.style.display = active ? '' : 'none';
@@ -570,7 +572,7 @@
                             });
                         });
                         scheduleWrap.classList.toggle('is-hidden', !isOwn);
-                        var row = rowFor(identity);
+                        var row = identity ? rowFor(identity) : null;
                         var leavingOwn = row && row.mode === 'OWN' && mode.value === 'GLOBAL';
                         warning.classList.toggle('is-hidden', !leavingOwn);
                     }

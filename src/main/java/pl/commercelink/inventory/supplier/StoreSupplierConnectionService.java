@@ -143,9 +143,17 @@ public class StoreSupplierConnectionService {
             return Resolved.fail("store.supplier.connection.error.unknown.supplier", String.valueOf(type));
         }
         if (mode == ConnectionMode.GLOBAL) {
-            boolean taken = existingConfiguration(existingStore).getSupplierConnections().stream()
-                    .anyMatch(connection -> connection.getSupplierName().equalsIgnoreCase(type));
-            return taken ? Resolved.fail("store.supplier.connection.error.global.duplicate", type) : Resolved.ok(type);
+            StoreSupplierConnection sameName = existingConfiguration(existingStore).getSupplierConnections().stream()
+                    .filter(connection -> connection.getSupplierName().equalsIgnoreCase(type))
+                    .findFirst().orElse(null);
+            if (sameName == null) {
+                return Resolved.ok(type);
+            }
+            // Legacy stores connect a supplier as OWN under its bare type name; telling them it is
+            // "already connected in global mode" would point them at the wrong screen.
+            return sameName.getMode() == ConnectionMode.OWN
+                    ? Resolved.fail("store.supplier.connection.error.global.own.exists", type)
+                    : Resolved.fail("store.supplier.connection.error.global.duplicate", type);
         }
         Set<String> used = new HashSet<>();
         for (StoreSupplierConnection connection : existingConfiguration(existingStore).getSupplierConnections()) {

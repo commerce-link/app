@@ -209,7 +209,9 @@ public class WebController {
         model.addAttribute("taxonomyFileName", taxonomyCache.getFileName());
         model.addAttribute("taxonomySize", taxonomyCache.size());
         model.addAttribute("pimIndexSize", pimCatalog.findAll().size());
-        model.addAttribute("supplierLabels", supplierLabels.forStoreId(getStoreId()));
+        // `store` is already loaded (and null-guarded) above; forStoreId(getStoreId()) only worked
+        // for the super admin because findById(null) happens to return null.
+        model.addAttribute("supplierLabels", supplierLabels.forStore(store));
 
         return "inventory";
     }
