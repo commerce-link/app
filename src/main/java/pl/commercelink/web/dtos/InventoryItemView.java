@@ -1,6 +1,6 @@
 package pl.commercelink.web.dtos;
 
-import pl.commercelink.inventory.supplier.manual.ManualSupplierInfos;
+import pl.commercelink.inventory.supplier.SupplierIdentity;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
 import pl.commercelink.invoicing.api.Price;
@@ -20,7 +20,7 @@ public record InventoryItemView(
     public static InventoryItemView from(InventoryItem item) {
         return new InventoryItemView(
                 item.supplier(),
-                ManualSupplierInfos.label(item.supplier()),
+                SupplierIdentity.legacyLabel(item.supplier()),
                 item.ean(),
                 item.mfn(),
                 Price.fromNet(item.netPrice()).grossValue(),
@@ -32,7 +32,7 @@ public record InventoryItemView(
     public static InventoryItemView from(WarehouseItemView item) {
         return new InventoryItemView(
                 SupplierRegistry.WAREHOUSE,
-                ManualSupplierInfos.label(SupplierRegistry.WAREHOUSE),
+                SupplierIdentity.legacyLabel(SupplierRegistry.WAREHOUSE),
                 item.getEan(),
                 item.getMfn(),
                 item.getPrice().grossValue(),

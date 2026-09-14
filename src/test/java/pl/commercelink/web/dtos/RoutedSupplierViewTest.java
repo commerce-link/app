@@ -99,4 +99,21 @@ class RoutedSupplierViewTest {
 
         assertThat(view.isMatched()).isFalse();
     }
+
+    @Test
+    @DisplayName("a labelled connection shows its label and provider type")
+    void showsTheStoredLabelAndProviderType() {
+        // given
+        when(supplierRegistry.get("Kosatec-k7f3a9c2")).thenReturn(info("Kosatec-k7f3a9c2"));
+        StoreSupplierConnection kosatec = connection("Kosatec-k7f3a9c2", ConnectionMode.OWN, "7");
+        kosatec.setLabel("Kosatec B2B");
+        Store store = storeWith(kosatec);
+
+        // when
+        RoutedSupplierView view = RoutedSupplierView.from(order("7"), store, supplierRegistry);
+
+        // then
+        assertThat(view.supplierName()).isEqualTo("Kosatec B2B");
+        assertThat(view.providerType()).isEqualTo("Kosatec");
+    }
 }

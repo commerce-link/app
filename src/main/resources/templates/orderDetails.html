@@ -159,6 +159,7 @@
                 <p class="heading" th:text="#{order.routed.supplier}"></p>
                 <p class="title is-5 mb-1" th:if="${routedSupplier.matched}">
                     <span th:text="${routedSupplier.supplierName}"></span>
+                    <span class="tag is-light ml-1" th:if="${routedSupplier.providerType != null and routedSupplier.providerType != 'manual'}" th:text="${routedSupplier.providerType}"></span>
                     <span class="is-size-6 has-text-grey" th:text="' (' + #{${routedSupplier.modeKey}} + ')'"></span>
                 </p>
                 <p class="title is-5 mb-1 has-text-danger" th:unless="${routedSupplier.matched}" th:text="#{order.routed.supplier.unmatched}"></p>
