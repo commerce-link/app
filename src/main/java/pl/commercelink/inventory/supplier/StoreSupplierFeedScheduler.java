@@ -16,6 +16,7 @@ public class StoreSupplierFeedScheduler {
 
     private static final String FEED_IMPORT_QUEUE = "supplier-feed-import-queue";
     private static final int CONFIGURATION_RETRY_DELAY_SECONDS = 10;
+    private static final int FLEXIBLE_WINDOW_MINUTES = 1;
 
     private final String feedImportQueueArn;
     private final EventBridgeSchedules schedules;
@@ -34,7 +35,8 @@ public class StoreSupplierFeedScheduler {
                 scheduleName(storeId, supplierName),
                 PollingSchedule.storedOrRandomNightly(feedSchedule).awsExpression(),
                 feedImportQueueArn,
-                ConversionUtil.toJson(feedImportRequest(storeId, supplierName)));
+                ConversionUtil.toJson(feedImportRequest(storeId, supplierName)),
+                FLEXIBLE_WINDOW_MINUTES);
     }
 
     public void deleteSchedule(String storeId, String supplierName) {
@@ -48,7 +50,7 @@ public class StoreSupplierFeedScheduler {
     public void restore(String storeId, String supplierName, Optional<String> snapshot) {
         String name = scheduleName(storeId, supplierName);
         if (snapshot.isPresent()) {
-            schedules.put(name, snapshot.get(), feedImportQueueArn, ConversionUtil.toJson(feedImportRequest(storeId, supplierName)));
+            schedules.put(name, snapshot.get(), feedImportQueueArn, ConversionUtil.toJson(feedImportRequest(storeId, supplierName)), FLEXIBLE_WINDOW_MINUTES);
         } else {
             schedules.delete(name);
         }

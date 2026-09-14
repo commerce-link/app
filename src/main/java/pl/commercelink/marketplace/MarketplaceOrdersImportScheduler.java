@@ -14,6 +14,8 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
 @Component
 public class MarketplaceOrdersImportScheduler {
 
+    private static final int FLEXIBLE_WINDOW_MINUTES = 1;
+
     private final String ordersImportQueueArn;
     private final EventBridgeSchedules schedules;
 
@@ -32,7 +34,8 @@ public class MarketplaceOrdersImportScheduler {
                 scheduleName(storeId, marketplace),
                 PollingSchedule.stored(ordersImportSchedule).awsExpression(),
                 ordersImportQueueArn,
-                ConversionUtil.toJson(importRequest(storeId, marketplace)));
+                ConversionUtil.toJson(importRequest(storeId, marketplace)),
+                FLEXIBLE_WINDOW_MINUTES);
     }
 
     public void delete(String storeId, String marketplace) {

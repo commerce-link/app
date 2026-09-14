@@ -8,6 +8,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.scheduling.EventBridgeSchedules;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -37,7 +38,7 @@ class MarketplaceOrdersImportSchedulerTest {
                 "orders-import-store-1-cscartmultivendor",
                 "cron(0/15 * * * ? *)",
                 QUEUE_ARN,
-                "{\"marketplace\":\"CsCartMultiVendor\",\"storeId\":\"store-1\"}");
+                "{\"marketplace\":\"CsCartMultiVendor\",\"storeId\":\"store-1\"}", 1);
     }
 
     @Test
@@ -47,7 +48,7 @@ class MarketplaceOrdersImportSchedulerTest {
 
         // then
         verify(schedules).delete("orders-import-store-1-allegro");
-        verify(schedules, never()).put(anyString(), anyString(), anyString(), any());
+        verify(schedules, never()).put(anyString(), anyString(), anyString(), any(), anyInt());
     }
 
     @Test
