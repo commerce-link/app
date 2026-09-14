@@ -74,21 +74,11 @@
     </div>
 
     <p class="schedule-timezone is-size-7 has-text-grey" th:text="#{schedule.timezone}"></p>
-    <p class="schedule-unsupported is-size-7 has-text-warning-dark" th:text="#{schedule.advanced.only}"></p>
-
-    <div class="schedule-advanced">
-        <a class="is-size-7 schedule-advanced-toggle" href="#">
-            <span class="schedule-advanced-caret">▸</span> <span th:text="#{schedule.advanced}"></span>
-        </a>
-        <div class="schedule-advanced-body mt-1">
-            <input class="input is-small schedule-input" type="text" autocomplete="off" spellcheck="false"
-                   th:name="${inputName}" th:value="${value}" th:placeholder="#{schedule.placeholder}">
-            <p class="help" th:text="#{schedule.description(${minInterval})}"></p>
-        </div>
-    </div>
+    <p class="schedule-unsupported is-size-7 has-text-warning-dark"></p>
+    <input type="hidden" class="schedule-input" th:name="${inputName}" th:value="${value}">
 </div>
 
-<script th:fragment="script">
+<script th:fragment="script" th:inline="javascript">
     (function () {
         var EVERY_VALUES = { minutes: [5, 10, 15, 20, 30], hours: [1, 2, 3, 4, 6, 8, 12], days: [2, 3, 7, 14] };
         var DAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
@@ -120,8 +110,7 @@
             var exactDay = q('.schedule-exact-day');
             var conflict = q('.schedule-exact-conflict');
             var unsupported = q('.schedule-unsupported');
-            var advancedBody = q('.schedule-advanced-body');
-            var caret = q('.schedule-advanced-caret');
+            var unsupportedText = /*[[#{schedule.unsupported}]]*/ 'Zapisany harmonogram ({0}) nie pasuje do kreatora.';
             var everyBox = q('.schedule-every');
             var exactBox = q('.schedule-exact');
             var timezoneNote = q('.schedule-timezone');
@@ -183,14 +172,6 @@
 
             function mode() { var r = modes.filter(function (x) { return x.checked; })[0]; return r ? r.value : 'default'; }
             function setMode(m) { modes.forEach(function (r) { r.checked = r.value === m; }); }
-
-            var advancedOpen = false;
-            function setAdvanced(open) {
-                advancedOpen = open;
-                advancedBody.style.display = open ? '' : 'none';
-                caret.textContent = open ? '▾' : '▸';
-            }
-            q('.schedule-advanced-toggle').addEventListener('click', function (e) { e.preventDefault(); setAdvanced(!advancedOpen); });
 
             function build() {
                 var m = mode();
@@ -260,30 +241,23 @@
                 everyBox.style.display = m === 'every' ? '' : 'none';
                 exactBox.style.display = m === 'exact' ? '' : 'none';
                 unsupported.style.display = supported ? 'none' : '';
-                modes.forEach(function (r) { r.disabled = !supported; });
+                if (!supported) { unsupported.textContent = unsupportedText.replace('{0}', input.value); }
             }
 
             function fromBuilder() {
                 var cron = build();
-                conflict.style.display = cron === null ? '' : 'none';
-                if (cron !== null) { input.value = cron; }
+                var conflicting = cron === null;
+                conflict.style.display = conflicting ? '' : 'none';
+                exactDay.setCustomValidity(conflicting ? conflict.textContent : '');
+                if (!conflicting) { input.value = cron; }
                 refresh(true);
-            }
-            function fromInput() {
-                var ok = parse(input.value);
-                if (!ok) { modes.forEach(function (r) { r.checked = false; }); }
-                conflict.style.display = 'none';
-                refresh(ok);
             }
 
             modes.forEach(function (r) { r.addEventListener('change', fromBuilder); });
             everyUnit.addEventListener('change', function () { fillEveryValues(everyUnit.value); fromBuilder(); });
             [everyValue, exactDay].forEach(function (el) { el.addEventListener('change', fromBuilder); });
-            input.addEventListener('input', fromInput);
-
             setTimes([ [5, 0] ]);
             var supported = parse(input.value);
-            setAdvanced(!supported);
             conflict.style.display = 'none';
             refresh(supported);
         }
