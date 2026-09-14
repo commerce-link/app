@@ -26,7 +26,9 @@ import pl.commercelink.products.PimCategoryOptions;
 import pl.commercelink.shipping.ShippingProviderFactory;
 import pl.commercelink.shipping.api.Carrier;
 import pl.commercelink.shipping.api.ShippingProviderDescriptor;
+import pl.commercelink.starter.security.UserRole;
 import pl.commercelink.stores.*;
+import pl.commercelink.web.settings.StoreSettingsOverviewFactory;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.web.dtos.CarrierSelectionForm;
 import pl.commercelink.web.dtos.ConnectedIntegration;
@@ -83,6 +85,9 @@ public class StoreController {
     @Autowired
     private PimCategoryOptions pimCategoryOptions;
 
+    @Autowired
+    private StoreSettingsOverviewFactory storeSettingsOverviewFactory;
+
     @GetMapping("/dashboard/store")
     @PreAuthorize("hasRole('ADMIN')")
     public String store(Model model) {
@@ -91,6 +96,7 @@ public class StoreController {
         StoreForm form = new StoreForm(store);
         model.addAttribute("form", form);
         model.addAttribute("isSuperAdmin", false);
+        model.addAttribute("overview", storeSettingsOverviewFactory.build(store, UserRole.ADMIN));
         return "store";
     }
 
