@@ -586,6 +586,10 @@ body.cl-drawer-open .cl-sidebar {
     max-width: 1200px;
 }
 
+.cl-page-body.is-wide {
+    max-width: 1440px;
+}
+
 .cl-page .cl-page-header {
     margin-bottom: 20px;
 }
@@ -681,7 +685,9 @@ body.cl-drawer-open .cl-sidebar {
     margin: 0;
     padding: 0;
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(17.5rem, 100%), 1fr));
+    /* Minimum is the larger of the phone-safe 17.5rem-or-full-width and a third of
+       the row (minus two 16px gaps), so the grid never forms a fourth column. */
+    grid-template-columns: repeat(auto-fill, minmax(max(min(17.5rem, 100%), calc((100% - 32px) / 3)), 1fr));
     gap: 16px;
 }
 

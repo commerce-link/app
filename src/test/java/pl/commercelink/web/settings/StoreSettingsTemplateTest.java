@@ -99,13 +99,28 @@ class StoreSettingsTemplateTest {
     }
 
     @Test
-    void keepsTheTileColumnNoWiderThanAPhonesContentBoxSoTilesDoNotOverflowOnNarrowScreens() throws Exception {
+    void keepsTheTileColumnNoWiderThanAPhonesContentBoxAndNeverFormsAFourthColumnOnWideScreens() throws Exception {
         // when
         String css = Files.readString(Path.of("src/main/resources/static/css/commercelink.css"), StandardCharsets.UTF_8);
 
         // then
-        assertThat(css).contains("minmax(min(17.5rem, 100%), 1fr)");
+        // The minimum tile width must both fit a phone's content box (17.5rem, or full
+        // width below that) and never drop under a third of the row, otherwise a wide
+        // screen fits a fourth column and every section is left half-empty.
+        assertThat(css).contains("minmax(max(min(17.5rem, 100%), calc((100% - 32px) / 3)), 1fr)");
         assertThat(css).doesNotContain("minmax(17.5rem, 1fr)");
+        assertThat(css).doesNotContain("minmax(min(17.5rem, 100%), 1fr)");
+    }
+
+    @Test
+    void widensThePageBodyOnTheSettingsHomePageOnlySoWideScreensFitAThirdTileColumn() throws Exception {
+        // given
+        String template = Files.readString(Path.of("src/main/resources/templates/store.html"), StandardCharsets.UTF_8);
+        String css = Files.readString(Path.of("src/main/resources/static/css/commercelink.css"), StandardCharsets.UTF_8);
+
+        // then
+        assertThat(template).contains("cl-page-body is-wide");
+        assertThat(css).contains(".cl-page-body.is-wide {").contains("max-width: 1440px;");
     }
 
     @Test
