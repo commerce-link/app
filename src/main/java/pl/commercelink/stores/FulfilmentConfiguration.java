@@ -125,4 +125,25 @@ public class FulfilmentConfiguration {
     public void setClientShippingAddressChangeEnabled(boolean clientShippingAddressChangeEnabled) {
         this.clientShippingAddressChangeEnabled = clientShippingAddressChangeEnabled;
     }
+
+    /**
+     * Returns a copy carrying the given connection list. Used by the per-supplier save paths: the
+     * persister computes what changed by comparing the store's current configuration against the
+     * submitted one, so the submitted one must be a separate object.
+     */
+    public FulfilmentConfiguration withConnections(List<StoreSupplierConnection> connections) {
+        FulfilmentConfiguration copy = new FulfilmentConfiguration();
+        copy.setOrderAssemblyDays(orderAssemblyDays);
+        copy.setOrderRealizationDays(orderRealizationDays);
+        copy.setAutomatedFulfilment(automatedFulfilment);
+        copy.setDefaultFulfilmentType(defaultFulfilmentType);
+        copy.setEnabledProductGroups(enabledProductGroups);
+        copy.setEnabledCategories(enabledCategories);
+        copy.setCanUseGlobalSuppliers(canUseGlobalSuppliers);
+        copy.setInventoryCacheTtlMinutes(inventoryCacheTtlMinutes);
+        copy.setClientOrderPageEnabled(clientOrderPageEnabled);
+        copy.setClientShippingAddressChangeEnabled(clientShippingAddressChangeEnabled);
+        copy.setSupplierConnections(new ArrayList<>(connections));
+        return copy;
+    }
 }
