@@ -82,7 +82,9 @@ public class OrderAllocationsManager {
      * order receives the confirmed date.
      *
      * <p>The date may be missing: a confirmation without one still orders the items, because the purchase
-     * did happen. The assembly-date update is a no-op for a null date.
+     * did happen. Such a call leaves the assembly date alone but still re-derives the shipping date from the
+     * date the order already has - a leg confirmed without a date can be the one that puts a warehouse stop
+     * on the order, and nothing else would repair the handling time it owes.
      */
     public void markClaimedAsOrdered(String storeId, String deliveryId, LocalDate estimatedDeliveryAt) {
         Map<String, Map<String, Double>> claimedByOrderId = new HashMap<>();
