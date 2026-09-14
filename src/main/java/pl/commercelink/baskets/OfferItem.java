@@ -65,28 +65,32 @@ public class OfferItem {
         return basketItem == null ? 0 : basketItem.getUnitPrice();
     }
 
-    public String getCostRangeDistribution() {
+    public String getCostRange() {
         if (basketItem.isService()) {
             return "";
         }
 
-        return String.format("%.2f zł (min) → %.2f zł (med)", lowestCost, medianCost);
+        return String.format("%.2f → %.2f zł", lowestCost, medianCost);
     }
 
-    public String getQtyDistribution() {
+    public String getQtyRange() {
         if (basketItem.isService()) {
             return "";
         }
 
-        return String.format("%d szt. (min) • %d szt. (med) • %d szt. (total)", lowestCostQty, medianCostQty, totalQty);
+        return String.format("%d · %d · %d szt.", lowestCostQty, medianCostQty, totalQty);
     }
 
-    public String getSuppliersDistribution() {
-        if (basketItem.isService()) {
-            return "";
-        }
+    public String getMedianCostProviders() {
+        return basketItem.isService() ? "" : medianCostProviders;
+    }
 
-        return String.format("%s | %s", medianCostProviders, remainingProviders);
+    public String getRemainingProviders() {
+        return basketItem.isService() ? "" : remainingProviders;
+    }
+
+    public String getVariantGroupId() {
+        return basketItem == null ? null : basketItem.getVariantGroupId();
     }
 
     public boolean isExistInInventory() { return existInInventory; }

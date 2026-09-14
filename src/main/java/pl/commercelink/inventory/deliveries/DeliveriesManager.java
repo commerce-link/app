@@ -35,6 +35,8 @@ public class DeliveriesManager {
     private OrderAllocationsManager orderAllocationsManager;
     @Autowired
     private WarehouseAllocationsManager warehouseAllocationsManager;
+    @Autowired
+    private DropshipItemLookup dropshipItemLookup;
 
     public void deleteAllocations(String storeId, String deliveryId, List<Allocation> allocations) {
         List<Allocation> active = allocations.stream().filter(Allocation::isInAllocation).toList();
@@ -42,15 +44,22 @@ public class DeliveriesManager {
             return;
         }
 
+        double totalRemovedCost = 0;
+
         for (Allocation allocation : active) {
             if (allocation.getType() == AllocationType.Warehouse) {
                 warehouseAllocationsManager.remove(storeId, allocation.getKey().getItemId());
+                totalRemovedCost += allocation.getTotalCost();
             } else if (allocation.getType() == AllocationType.Order) {
-                orderAllocationsManager.remove(storeId, allocation.getKey().getOrderId(), allocation.getKey().getItemId());
+                // this delivery owns the claim on its own items, so it may give them back: on a failed
+                // purchase this is the operator's only way out of a delivery they do not want to retry
+                boolean removed = orderAllocationsManager.remove(
+                        storeId, allocation.getKey().getOrderId(), allocation.getKey().getItemId(), deliveryId);
+                if (removed) {
+                    totalRemovedCost += allocation.getTotalCost();
+                }
             }
         }
-
-        double totalRemovedCost = active.stream().mapToDouble(Allocation::getTotalCost).sum();
 
         Delivery delivery = deliveriesRepository.findById(storeId, deliveryId);
         delivery.decreaseTotalCost(totalRemovedCost);
@@ -172,8 +181,12 @@ public class DeliveriesManager {
                 .filter(order -> !order.hasOneOfStatuses(OrderStatus.Completed, OrderStatus.Cancelled))
                 .forEach(order -> {
                     LocalDate oldAssemblyDate = order.getEstimatedAssemblyAt();
+                    // Whether the realization days apply is a property of the whole order, not of the
+                    // delivery whose date just moved: the order may have another leg through our warehouse.
+                    boolean shippedBySupplier = dropshipItemLookup.isEntirelyDropship(
+                            storeId, orderItemsRepository.findByOrderId(order.getOrderId()));
                     LocalDate newAssemblyDate = order.updateEstimatedAssemblyAt(
-                            delivery.getEstimatedDeliveryAt()
+                            delivery.getEstimatedDeliveryAt(), shippedBySupplier
                     );
 
                     if (oldAssemblyDate != null && !Objects.equals(oldAssemblyDate, newAssemblyDate)) {

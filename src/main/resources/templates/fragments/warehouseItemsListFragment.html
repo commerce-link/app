@@ -6,64 +6,66 @@
         <h3 th:text="${title}"></h3>
 
         <form method="post" th:id="'warehouseItemBatchForm_' + ${status.name()}" action="#">
-            <table class="table is-fullwidth is-striped">
-                <thead>
-                    <tr>
-                        <th style="width: 60px;"><span th:text="#{warehouse.select}"></span></th>
-                        <th style="width: 80px;" th:text="#{warehouse.item.id}">ID</th>
-                        <th th:text="#{warehouse.item.category}"></th>
-                        <th th:text="#{warehouse.item.ean}"></th>
-                        <th th:text="#{warehouse.item.manufacturer.code}"></th>
-                        <th th:text="#{warehouse.item.name}"></th>
-                        <th th:text="#{warehouse.item.quantity}"></th>
-                        <th th:text="#{warehouse.item.cost.net}"></th>
-                        <th th:text="#{warehouse.item.cost.gross}"></th>
-                        <th th:text="#{general.delivery.id}"></th>
-                        <th th:text="#{warehouse.item.serial.no}"></th>
-                        <th th:text="#{warehouse.item.status}"></th>
-                        <th th:text="#{warehouse.item.comment}"></th>
-                        <th th:text="#{warehouse.item.destroyed.at}" th:if="${status.name() == 'Destroyed'}"></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr th:each="item : ${items}" th:data-item-id="${item.itemId}" th:data-item-name="${item.name}" th:data-item-qty="${item.qty}">
-                        <td style="width: 60px;">
-                            <input th:if="${isActionable}" type="checkbox" class="item-checkbox"
-                                   th:value="${item.itemId}" th:data-qty="${item.qty}" th:data-name="${item.name}"/>
-                            <span th:unless="${isActionable}">&nbsp;</span></td>
-                        <td>
-                            <a th:href="@{/dashboard/warehouse/items/{itemId}(itemId=${item.itemId})}"
-                               th:text="${#strings.substring(item.itemId, 0, 8)}"></a>
-                        </td>
-                        <td th:text="${item.category}"></td>
-                        <td th:text="${item.ean}"></td>
-                        <td th:text="${item.manufacturerCode}"></td>
-                        <td>
-                            <span th:text="${item.name}"></span>
-                            <span class="tag ml-1" th:unless="${item.sealed}"
-                                  th:classappend="${item.condition.name() == 'Damaged'} ? 'is-danger' : 'is-warning'"
-                                  th:text="${enumI18n.localize(item.condition)}"></span>
-                        </td>
-                        <td th:text="${item.qty}"></td>
-                        <td th:text="${item.unitCost.netValue}"></td>
-                        <td>
-                            <span th:text="${item.unitCost.grossValue}"></span>
-                            <span class="has-text-info cl-tooltip" th:if="${item.hasUnitSystemCost()}"
-                                  style="font-size: 0.7em; vertical-align: middle; margin-left: 0.4em;"
-                                  th:attr="data-tooltip=#{warehouse.item.system.cost.tooltip(${item.systemCost.netValue}, ${item.systemCost.grossValue})}">
-                                <i class="fas fa-tag"></i>
-                            </span>
-                        </td>
-                        <td>
-                            <a th:href="@{${@deliveryRedirectResolver.resolveFor(item)}}" th:text="${item.shortenedDeliveryId}"></a>
-                        </td>
-                        <td th:text="${item.serialNo}"></td>
-                        <td th:text="${enumI18n.localize(item.status)}"></td>
-                        <td th:text="${item.comment}"></td>
-                        <td th:text="${item.destroyedAt}" th:if="${status.name() == 'Destroyed'}"></td>
-                    </tr>
-                </tbody>
-            </table>
+            <div class="table-container">
+                <table class="table is-fullwidth is-striped">
+                    <thead>
+                        <tr>
+                            <th style="width: 60px;"><span th:text="#{warehouse.select}"></span></th>
+                            <th style="width: 80px;" th:text="#{warehouse.item.id}">ID</th>
+                            <th th:text="#{warehouse.item.category}"></th>
+                            <th th:text="#{warehouse.item.ean}"></th>
+                            <th th:text="#{warehouse.item.manufacturer.code}"></th>
+                            <th th:text="#{warehouse.item.name}"></th>
+                            <th th:text="#{warehouse.item.quantity}"></th>
+                            <th th:text="#{warehouse.item.cost.net}"></th>
+                            <th th:text="#{warehouse.item.cost.gross}"></th>
+                            <th th:text="#{general.delivery.id}"></th>
+                            <th th:text="#{warehouse.item.serial.no}"></th>
+                            <th th:text="#{warehouse.item.status}"></th>
+                            <th th:text="#{warehouse.item.comment}"></th>
+                            <th th:text="#{warehouse.item.destroyed.at}" th:if="${status.name() == 'Destroyed'}"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="item : ${items}" th:data-item-id="${item.itemId}" th:data-item-name="${item.name}" th:data-item-qty="${item.qty}">
+                            <td style="width: 60px;">
+                                <input th:if="${isActionable}" type="checkbox" class="item-checkbox"
+                                       th:value="${item.itemId}" th:data-qty="${item.qty}" th:data-name="${item.name}"/>
+                                <span th:unless="${isActionable}">&nbsp;</span></td>
+                            <td>
+                                <a th:href="@{/dashboard/warehouse/items/{itemId}(itemId=${item.itemId})}"
+                                   th:text="${#strings.substring(item.itemId, 0, 8)}"></a>
+                            </td>
+                            <td th:text="${item.category}"></td>
+                            <td th:text="${item.ean}"></td>
+                            <td th:text="${item.manufacturerCode}"></td>
+                            <td>
+                                <span th:text="${item.name}"></span>
+                                <span class="tag ml-1" th:unless="${item.sealed}"
+                                      th:classappend="${item.condition.name() == 'Damaged'} ? 'is-danger' : 'is-warning'"
+                                      th:text="${enumI18n.localize(item.condition)}"></span>
+                            </td>
+                            <td th:text="${item.qty}"></td>
+                            <td th:text="${item.unitCost.netValue}"></td>
+                            <td>
+                                <span th:text="${item.unitCost.grossValue}"></span>
+                                <span class="has-text-info cl-tooltip" th:if="${item.hasUnitSystemCost()}"
+                                      style="font-size: 0.7em; vertical-align: middle; margin-left: 0.4em;"
+                                      th:attr="data-tooltip=#{warehouse.item.system.cost.tooltip(${item.systemCost.netValue}, ${item.systemCost.grossValue})}">
+                                    <i class="fas fa-tag"></i>
+                                </span>
+                            </td>
+                            <td>
+                                <a th:href="@{${@deliveryRedirectResolver.resolveFor(item)}}" th:text="${item.shortenedDeliveryId}"></a>
+                            </td>
+                            <td th:text="${item.serialNo}"></td>
+                            <td th:text="${enumI18n.localize(item.status)}"></td>
+                            <td th:text="${item.comment}"></td>
+                            <td th:text="${item.destroyedAt}" th:if="${status.name() == 'Destroyed'}"></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
             <div class="field is-grouped mb-3" th:if="${isActionable}">
                 <div class="control">
                     <div class="select is-small">

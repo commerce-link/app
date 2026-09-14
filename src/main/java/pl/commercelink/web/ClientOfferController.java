@@ -26,6 +26,7 @@ import pl.commercelink.stores.PaymentIntegration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.dtos.ClientDataDto;
+import pl.commercelink.web.dtos.ClientOfferLine;
 import pl.commercelink.web.dtos.PaymentOptionView;
 
 import java.util.List;
@@ -82,6 +83,7 @@ public class ClientOfferController {
         DeliveryOption deliveryOption = existingOffer.resolveDeliveryOption(store).orElse(null);
         double totalPrice = existingOffer.getTotalPrice() + existingOffer.getDeliveryPrice(store);
         model.addAttribute("offer", existingOffer);
+        model.addAttribute("offerLines", ClientOfferLine.from(existingOffer));
         model.addAttribute("offerPath", existingOffer.createOfferUrl(""));
         model.addAttribute("deliveryOption", deliveryOption);
         model.addAttribute("totalPrice", totalPrice);
@@ -129,6 +131,20 @@ public class ClientOfferController {
 
         basket.setBillingDetails(clientDataDto.getBillingDetails());
         basket.setShippingDetails(clientDataDto.getShippingDetails());
+
+        basketsRepository.save(basket);
+        return "redirect:" + basket.createOfferUrl("");
+    }
+
+    @PostMapping("/select-variant")
+    public String selectVariant(@PathVariable("storeId") String storeId,
+                                @PathVariable("offerId") String offerId,
+                                @RequestParam String groupId,
+                                @RequestParam int position) {
+        Basket basket = basketsRepository.findById(storeId, offerId)
+                .orElseThrow(() -> new IllegalArgumentException("Offer not found: " + offerId));
+
+        basket.selectVariant(groupId, position);
 
         basketsRepository.save(basket);
         return "redirect:" + basket.createOfferUrl("");

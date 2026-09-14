@@ -134,6 +134,70 @@
             border-bottom: 1px solid #edf0f3;
         }
         .date-row:last-of-type { border-bottom: 0; }
+        .address-panel {
+            margin-top: 0.75rem;
+            padding: 1rem 1.25rem 1.25rem;
+            border: 1px solid #dbdbdb;
+            border-radius: 6px;
+            background: #fff;
+        }
+        .address-panel .panel-title {
+            font-weight: 600;
+            color: #363636;
+            margin-bottom: 0.25rem;
+        }
+        .address-panel .panel-hint {
+            font-size: 0.8125rem;
+            color: #7a7a7a;
+            margin-bottom: 1rem;
+        }
+        .address-panel .label {
+            font-size: 0.8125rem;
+            font-weight: 500;
+            color: #7a7a7a;
+            margin-bottom: 0.25rem;
+        }
+        .address-panel .input {
+            border-color: #dbdbdb;
+            border-radius: 6px;
+            box-shadow: none;
+        }
+        .address-panel .input:focus {
+            border-color: var(--client-primary-color, #485fc7);
+            box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.06);
+        }
+        .address-panel .input[disabled] {
+            background: #f5f5f5;
+            color: #7a7a7a;
+        }
+        .address-panel .columns.is-multiline { margin-bottom: 0; }
+        .address-panel .columns.is-multiline .column { padding-bottom: 0.25rem; }
+        .address-panel .button.is-light { background: #f5f5f5; }
+        .address-panel .resend {
+            margin-top: 0.75rem;
+            font-size: 0.8125rem;
+            color: #7a7a7a;
+        }
+        .address-panel .resend .button.is-text {
+            font-size: inherit;
+            height: auto;
+            padding: 0 0.25rem;
+            text-decoration: underline;
+            color: var(--client-primary-color, #485fc7);
+        }
+        .code-input {
+            width: 8.5rem;
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.25em;
+            font-weight: 600;
+            text-align: center;
+        }
+        .code-input::placeholder {
+            text-transform: none;
+            letter-spacing: normal;
+            font-weight: 400;
+        }
         @media screen and (max-width: 768px) {
             .client-order-id { text-align: left; }
             .content .stepper { grid-template-columns: 1fr; gap: 0.25rem; }
@@ -242,6 +306,13 @@
                 <section class="box">
                     <div class="client-order-section-head">
                         <h2 class="title is-5 mb-0" th:text="#{client.order.delivery}"></h2>
+                        <form th:if="${view.shippingAddressEditable and addressStep == null}" method="post"
+                              th:action="@{/store/{storeId}/client/order/{orderId}/address/request-code(storeId=${store.storeId},orderId=${view.orderId})}">
+                            <button type="submit" class="button is-small is-light">
+                                <span class="icon is-small"><i class="fas fa-pencil-alt"></i></span>
+                                <span th:text="#{client.order.address.change}"></span>
+                            </button>
+                        </form>
                     </div>
                     <dl class="kv">
                         <dt th:text="#{client.order.delivery.method}"></dt>
@@ -270,14 +341,126 @@
                         <th:block th:if="${!view.personalCollection and !view.pickupPoint and view.shippingDetails != null}">
                             <dt th:text="#{client.order.delivery.address}"></dt>
                             <dd>
-                                <span th:replace="~{fragments/masked-field :: masked(${view.shippingDetails.displayName})}"></span><br>
-                                <span th:replace="~{fragments/masked-field :: masked(${view.shippingDetails.streetAndNumber})}"></span><br>
-                                <span th:text="${view.shippingDetails.postalCode + ' ' + view.shippingDetails.city + ', ' + view.shippingDetails.country}"></span><br>
-                                <span class="is-size-7 has-text-grey">
-                                    <span th:replace="~{fragments/masked-field :: masked(${view.shippingDetails.phone})}"></span>
-                                    <span> · </span>
-                                    <span th:replace="~{fragments/masked-field :: masked(${view.shippingDetails.email})}"></span>
-                                </span>
+                                <th:block th:unless="${addressStep == 'edit'}">
+                                    <span th:replace="~{fragments/masked-field :: masked(${view.shippingDetails.displayName})}"></span><br>
+                                    <span th:replace="~{fragments/masked-field :: masked(${view.shippingDetails.streetAndNumber})}"></span><br>
+                                    <span th:text="${view.shippingDetails.postalCode + ' ' + view.shippingDetails.city + ', ' + view.shippingDetails.country}"></span><br>
+                                    <span class="is-size-7 has-text-grey">
+                                        <span th:replace="~{fragments/masked-field :: masked(${view.shippingDetails.phone})}"></span>
+                                        <span> · </span>
+                                        <span th:replace="~{fragments/masked-field :: masked(${view.shippingDetails.email})}"></span>
+                                    </span>
+                                    <p th:if="${view.shippingAddressEditable and addressStep == null}" class="is-size-7 has-text-grey mt-2" th:text="#{client.order.address.change.hint}"></p>
+                                </th:block>
+
+                                <div class="address-panel" th:if="${addressStep == 'code'}">
+                                    <p class="panel-title" th:text="#{client.order.address.code.title}"></p>
+                                    <p class="panel-hint" th:text="#{client.order.address.code.sent(${maskedEmail}, ${codeValidityMinutes})}"></p>
+                                    <form method="post"
+                                          th:action="@{/store/{storeId}/client/order/{orderId}/address/confirm-code(storeId=${store.storeId},orderId=${view.orderId})}">
+                                        <input type="hidden" name="v" th:value="${verificationId}">
+                                        <div class="field is-grouped is-grouped-multiline">
+                                            <div class="control">
+                                                <input id="code" name="code" class="input is-small code-input" type="text" maxlength="6"
+                                                       th:placeholder="#{client.order.address.code.label}"
+                                                       autocomplete="one-time-code" autocapitalize="characters" spellcheck="false"
+                                                       required autofocus>
+                                            </div>
+                                            <div class="control">
+                                                <button type="submit" class="button is-primary is-small"
+                                                        th:style="${#strings.isEmpty(branding.primaryColor)} ? null : 'background-color:' + ${branding.primaryColor} + ' !important; color: #fff;'"
+                                                        th:text="#{client.order.address.code.submit}"></button>
+                                            </div>
+                                            <div class="control">
+                                                <a class="button is-light is-small"
+                                                   th:href="@{/store/{storeId}/client/order/{orderId}(storeId=${store.storeId},orderId=${view.orderId})}"
+                                                   th:text="#{general.cancel}"></a>
+                                            </div>
+                                        </div>
+                                    </form>
+                                    <form method="post" class="resend"
+                                          th:action="@{/store/{storeId}/client/order/{orderId}/address/request-code(storeId=${store.storeId},orderId=${view.orderId})}">
+                                        <span th:text="#{client.order.address.code.resend.hint}"></span>
+                                        <button type="submit" class="button is-text" th:text="#{client.order.address.code.resend}"></button>
+                                    </form>
+                                </div>
+
+                                <div class="address-panel" th:if="${addressStep == 'edit'}">
+                                    <p class="panel-title" th:text="#{client.order.address.edit.title}"></p>
+                                    <p class="panel-hint" th:text="#{client.order.address.edit.hint(${editTokenValidityMinutes})}"></p>
+                                    <form method="post" th:object="${form}"
+                                          th:action="@{/store/{storeId}/client/order/{orderId}/address(storeId=${store.storeId},orderId=${view.orderId})}">
+                                        <input type="hidden" name="t" th:value="${editToken}">
+                                        <div class="columns is-multiline is-variable is-2">
+                                            <div class="column is-half">
+                                                <div class="field">
+                                                    <label class="label" th:text="#{person.name}"></label>
+                                                    <input class="input" type="text" th:field="*{name}" maxlength="100">
+                                                </div>
+                                            </div>
+                                            <div class="column is-half">
+                                                <div class="field">
+                                                    <label class="label" th:text="#{person.surname}"></label>
+                                                    <input class="input" type="text" th:field="*{surname}" maxlength="100">
+                                                </div>
+                                            </div>
+                                            <div class="column is-full">
+                                                <div class="field">
+                                                    <label class="label" th:text="#{company.name}"></label>
+                                                    <input class="input" type="text" th:field="*{companyName}" maxlength="100">
+                                                </div>
+                                            </div>
+                                            <div class="column is-full">
+                                                <div class="field">
+                                                    <label class="label" th:text="#{address.street}"></label>
+                                                    <input class="input" type="text" th:field="*{streetAndNumber}" maxlength="100" required>
+                                                </div>
+                                            </div>
+                                            <div class="column is-one-third">
+                                                <div class="field">
+                                                    <label class="label" th:text="#{address.postal.code}"></label>
+                                                    <input class="input" type="text" th:field="*{postalCode}" maxlength="100" required>
+                                                </div>
+                                            </div>
+                                            <div class="column is-one-third">
+                                                <div class="field">
+                                                    <label class="label" th:text="#{address.city}"></label>
+                                                    <input class="input" type="text" th:field="*{city}" maxlength="100" required>
+                                                </div>
+                                            </div>
+                                            <div class="column is-one-third">
+                                                <div class="field">
+                                                    <label class="label" th:text="#{address.country}"></label>
+                                                    <input class="input" type="text" th:value="*{country}" disabled>
+                                                </div>
+                                            </div>
+                                            <div class="column is-half">
+                                                <div class="field">
+                                                    <label class="label" th:text="#{person.email}"></label>
+                                                    <input class="input" type="email" th:field="*{email}" maxlength="100" required>
+                                                </div>
+                                            </div>
+                                            <div class="column is-half">
+                                                <div class="field">
+                                                    <label class="label" th:text="#{person.phone}"></label>
+                                                    <input class="input" type="tel" th:field="*{phone}" maxlength="100" required>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="field is-grouped mt-2">
+                                            <div class="control">
+                                                <button type="submit" class="button is-primary"
+                                                        th:style="${#strings.isEmpty(branding.primaryColor)} ? null : 'background-color:' + ${branding.primaryColor} + ' !important; color: #fff;'"
+                                                        th:text="#{client.order.address.edit.submit}"></button>
+                                            </div>
+                                            <div class="control">
+                                                <a class="button is-light"
+                                                   th:href="@{/store/{storeId}/client/order/{orderId}(storeId=${store.storeId},orderId=${view.orderId})}"
+                                                   th:text="#{general.cancel}"></a>
+                                            </div>
+                                        </div>
+                                    </form>
+                                </div>
                             </dd>
                         </th:block>
 

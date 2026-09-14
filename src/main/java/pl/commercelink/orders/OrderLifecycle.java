@@ -1,11 +1,9 @@
 package pl.commercelink.orders;
 
 import jakarta.annotation.Nullable;
-import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import pl.commercelink.documents.DocumentType;
-import pl.commercelink.inventory.deliveries.DeliveriesRepository;
 import pl.commercelink.inventory.deliveries.Delivery;
 import pl.commercelink.inventory.deliveries.DropshipItemLookup;
 import pl.commercelink.invoicing.InvoiceCreationEventPublisher;
@@ -36,8 +34,6 @@ public class OrderLifecycle {
     private OrderLifecycleEventPublisher orderLifecycleEventPublisher;
     @Autowired
     private OrderNotificationsEventPublisher notificationEventPublisher;
-    @Autowired
-    private DeliveriesRepository deliveriesRepository;
     @Autowired
     private InvoiceCreationEventPublisher invoiceCreationEventPublisher;
     @Autowired
@@ -74,11 +70,21 @@ public class OrderLifecycle {
 
             if (hasAllOrderItemsDelivered) {
                 order.setStatus(OrderStatus.Assembled);
-                order.updateEstimatedAssemblyAt(LocalDate.now());
+                // The goods are in hand today, but the route still decides whether there is any in-house
+                // handling left to pay for: a dropship parcel is already on its way to the customer.
+                order.updateEstimatedAssemblyAt(LocalDate.now(),
+                        dropshipItemLookup.isEntirelyDropship(order.getStoreId(), orderItems));
             } else if (hasAllOrderItemsOrdered) {
+                boolean justCompleted = order.getStatus() != OrderStatus.Assembly;
                 order.setStatus(OrderStatus.Assembly);
-                if (order.getEstimatedAssemblyAt() == null) {
-                    order.updateEstimatedAssemblyAt(calculateEstimatedDeliveryDate(order, orderItems));
+                // Asked whenever the order has just become complete, not only when it still has no date: the
+                // last leg to land is often the one that adds a warehouse stop, and it does not always arrive
+                // through the supplier confirmation that would otherwise recompute the dates - fulfilment
+                // from stock gets here carrying the dates an earlier, dropship-only leg already stamped.
+                // An order that was already complete has a settled route, so it does not pay for the reads.
+                if (justCompleted || order.getEstimatedAssemblyAt() == null) {
+                    DropshipItemLookup.GoodsRoute route = dropshipItemLookup.routeOf(order.getStoreId(), orderItems);
+                    order.updateEstimatedAssemblyAt(latestDeliveryDate(route.deliveries()), route.entirelyDropship());
                 }
             }
         }
@@ -158,15 +164,7 @@ public class OrderLifecycle {
         }
     }
 
-    private LocalDate calculateEstimatedDeliveryDate(Order order, List<OrderItem> orderItems) {
-        List<Delivery> deliveries = orderItems.stream()
-                .map(OrderItem::getDeliveryId)
-                .filter(StringUtils::isNotBlank)
-                .distinct()
-                .map(deliveryId -> deliveriesRepository.findById(order.getStoreId(), deliveryId))
-                .filter(Objects::nonNull)
-                .toList();
-
+    private LocalDate latestDeliveryDate(List<Delivery> deliveries) {
         return deliveries.stream()
                 .map(Delivery::getEstimatedDeliveryAt)
                 .filter(Objects::nonNull)
