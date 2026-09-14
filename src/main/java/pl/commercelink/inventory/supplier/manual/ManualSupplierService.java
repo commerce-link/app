@@ -5,7 +5,8 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import pl.commercelink.inventory.StoreInventoryCache;
 import pl.commercelink.inventory.supplier.StoreFeedRepository;
-import pl.commercelink.inventory.supplier.SupplierRegistry;
+import pl.commercelink.inventory.supplier.SupplierIdentity;
+import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.inventory.supplier.api.CsvRowParser;
 import pl.commercelink.starter.csv.CSVLoader;
 import pl.commercelink.stores.ConnectionMode;
@@ -20,31 +21,33 @@ import java.io.Reader;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.regex.Pattern;
 
 @Service
 @RequiredArgsConstructor
 public class ManualSupplierService {
 
-    private static final Pattern VALID_LABEL = Pattern.compile("^[A-Za-z0-9 _-]{1,60}$");
+    private static final int MAX_LABEL_LENGTH = 60;
 
     private final StoresRepository storesRepository;
     private final StoreFeedRepository storeFeedRepository;
-    private final SupplierRegistry supplierRegistry;
     private final StoreInventoryCache storeInventoryCache;
 
-    public record Result(boolean ok, String messageCode) {
+    public record Result(boolean ok, String messageCode, String identity) {
         public static Result success() {
-            return new Result(true, null);
+            return new Result(true, null, null);
+        }
+
+        public static Result created(String identity) {
+            return new Result(true, null, identity);
         }
 
         public static Result error(String messageCode) {
-            return new Result(false, messageCode);
+            return new Result(false, messageCode, null);
         }
     }
 
     public record ManualSelection(String identity, boolean enabled, boolean includeInPricing,
-                                  boolean includeInFulfilment, String externalSupplierId) {
+                                  boolean includeInFulfilment, String externalSupplierId, String label) {
     }
 
     public Result create(String storeId, String label) {
@@ -53,19 +56,31 @@ public class ManualSupplierService {
             return Result.error("store.manual.error.store.notfound");
         }
         String trimmed = label == null ? "" : label.trim();
-        if (!VALID_LABEL.matcher(trimmed).matches()) {
+        if (trimmed.isEmpty() || trimmed.length() > MAX_LABEL_LENGTH) {
             return Result.error("store.manual.error.name.invalid");
         }
-        String identity = ManualSupplierInfos.identityFor(trimmed);
-        if (collidesWithStatic(trimmed) || alreadyExists(store, identity)) {
+        if (labelTaken(store, trimmed, null)) {
             return Result.error("store.manual.error.name.taken");
         }
+        String identity = SupplierIdentity.newInstance(SupplierIdentity.MANUAL_TYPE);
+        while (alreadyExists(store, identity)) {
+            identity = SupplierIdentity.newInstance(SupplierIdentity.MANUAL_TYPE);
+        }
         StoreSupplierConnection connection = new StoreSupplierConnection(identity, ConnectionMode.MANUAL, true, true);
+        connection.setLabel(trimmed);
         connection.setEnabled(false);
         connections(store).add(connection);
         storesRepository.save(store);
         storeInventoryCache.evict(storeId);
-        return Result.success();
+        return Result.created(identity);
+    }
+
+    // Labels are unique across every connection of the store, whatever its mode, so the operator
+    // never sees two rows with the same name.
+    private boolean labelTaken(Store store, String label, String exceptIdentity) {
+        return connections(store).stream()
+                .filter(connection -> !connection.getSupplierName().equals(exceptIdentity))
+                .anyMatch(connection -> SupplierLabels.labelOf(connection).equalsIgnoreCase(label));
     }
 
     public Result delete(String storeId, String identity) {
@@ -111,15 +126,16 @@ public class ManualSupplierService {
                     connection.setIncludeInPricing(selection.includeInPricing());
                     connection.setIncludeInFulfilment(selection.includeInFulfilment());
                     connection.setExternalSupplierId(StringUtils.trimToNull(selection.externalSupplierId()));
+                    String label = selection.label() == null ? null : selection.label().trim();
+                    if (label != null && !label.isEmpty() && label.length() <= MAX_LABEL_LENGTH
+                            && !labelTaken(store, label, connection.getSupplierName())) {
+                        connection.setLabel(label);
+                    }
                 }
             }
         }
         storesRepository.save(store);
         storeInventoryCache.evict(storeId);
-    }
-
-    private boolean collidesWithStatic(String label) {
-        return supplierRegistry.getAllSupplierNames().stream().anyMatch(label::equalsIgnoreCase);
     }
 
     private boolean alreadyExists(Store store, String identity) {

@@ -7,6 +7,7 @@ import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.MessageSource;
+import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.ui.ConcurrentModel;
 import pl.commercelink.inventory.supplier.SupplierConnectionViewFactory;
@@ -17,6 +18,7 @@ import pl.commercelink.stores.StoresRepository;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -56,6 +58,27 @@ class ManualSupplierControllerTest {
     }
 
     @Test
+    void create() {
+        // given
+        when(manualSupplierService.create(STORE_ID, "Hurtownia X"))
+                .thenReturn(ManualSupplierService.Result.created("manual-k7f3a9c2"));
+
+        try (MockedStatic<CustomSecurityContext> context = mockStatic(CustomSecurityContext.class)) {
+            context.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+
+            // when
+            ResponseEntity<Map<String, Object>> response = controller.create("Hurtownia X", Locale.ENGLISH);
+
+            // then
+            assertThat(response.getStatusCode().value()).isEqualTo(200);
+            assertThat(response.getBody())
+                    .containsEntry("ok", true)
+                    .containsEntry("identity", "manual-k7f3a9c2")
+                    .containsEntry("label", "Hurtownia X");
+        }
+    }
+
+    @Test
     void savingOneManualSupplierPassesASingleSelectionAndReturnsTheManualSectionFragment() {
         // given
         when(storesRepository.findById(STORE_ID)).thenReturn(store());
@@ -69,7 +92,7 @@ class ManualSupplierControllerTest {
             context.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(false);
 
             // when
-            String view = controller.saveSelection(IDENTITY, true, true, false, null, Locale.ENGLISH, model, response);
+            String view = controller.saveSelection(IDENTITY, true, true, false, null, null, Locale.ENGLISH, model, response);
 
             // then -- a no-argument view name: ThymeleafView rejects a view name carrying
             // positional fragment parameters, so a regression back to that shape is caught here
@@ -78,7 +101,7 @@ class ManualSupplierControllerTest {
             assertThat(response.getStatus()).isEqualTo(200);
             assertThat(model.getAttribute("sectionSuccessMessage")).isEqualTo("ok");
             verify(manualSupplierService).applySelections(eq(STORE_ID),
-                    eq(List.of(new ManualSupplierService.ManualSelection(IDENTITY, true, true, false, null))));
+                    eq(List.of(new ManualSupplierService.ManualSelection(IDENTITY, true, true, false, null, null))));
         }
     }
 
@@ -96,11 +119,33 @@ class ManualSupplierControllerTest {
             context.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(false);
 
             // when
-            controller.saveSelection(IDENTITY, true, true, false, "12345", Locale.ENGLISH, model, response);
+            controller.saveSelection(IDENTITY, true, true, false, "12345", null, Locale.ENGLISH, model, response);
 
             // then
             verify(manualSupplierService).applySelections(eq(STORE_ID),
-                    eq(List.of(new ManualSupplierService.ManualSelection(IDENTITY, true, true, false, "12345"))));
+                    eq(List.of(new ManualSupplierService.ManualSelection(IDENTITY, true, true, false, "12345", null))));
+        }
+    }
+
+    @Test
+    void theSubmittedLabelReachesTheManualSelection() {
+        // given
+        when(storesRepository.findById(STORE_ID)).thenReturn(store());
+        when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenReturn("ok");
+        stubEmptyViews();
+        ConcurrentModel model = new ConcurrentModel();
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        try (MockedStatic<CustomSecurityContext> context = mockStatic(CustomSecurityContext.class)) {
+            context.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            context.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(false);
+
+            // when
+            controller.saveSelection(IDENTITY, true, true, false, null, "Nowa nazwa", Locale.ENGLISH, model, response);
+
+            // then
+            verify(manualSupplierService).applySelections(eq(STORE_ID),
+                    eq(List.of(new ManualSupplierService.ManualSelection(IDENTITY, true, true, false, null, "Nowa nazwa"))));
         }
     }
 
@@ -118,14 +163,14 @@ class ManualSupplierControllerTest {
 
             // when
             String view = controller.saveSelectionForStore(STORE_ID, IDENTITY, false, true, true,
-                    null,
+                    null, null,
                     Locale.ENGLISH, model, response);
 
             // then
             assertThat(view).isEqualTo("fragments/supplier-section :: manualSection");
             assertThat(view).doesNotContain("(");
             verify(manualSupplierService).applySelections(eq(STORE_ID),
-                    eq(List.of(new ManualSupplierService.ManualSelection(IDENTITY, false, true, true, null))));
+                    eq(List.of(new ManualSupplierService.ManualSelection(IDENTITY, false, true, true, null, null))));
         }
     }
 
@@ -142,7 +187,7 @@ class ManualSupplierControllerTest {
             context.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(false);
 
             // when
-            String view = controller.saveSelection(IDENTITY, true, true, true, null, Locale.ENGLISH, model, response);
+            String view = controller.saveSelection(IDENTITY, true, true, true, null, null, Locale.ENGLISH, model, response);
 
             // then
             assertThat(view).isEqualTo("fragments/supplier-section :: sectionError");
