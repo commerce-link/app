@@ -13,7 +13,9 @@ class SupplierSectionFragmentTest {
     private static final Path FRAGMENT = Path.of("src/main/resources/templates/fragments/supplier-section.html");
 
     private String fragment() throws Exception {
-        return Files.readString(FRAGMENT, StandardCharsets.UTF_8);
+        // normalize line endings so assertions on multi-line fragments don't depend on the
+        // checkout's line-ending config (CRLF vs LF)
+        return Files.readString(FRAGMENT, StandardCharsets.UTF_8).replace("\r\n", "\n");
     }
 
     @Test
