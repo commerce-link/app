@@ -31,16 +31,22 @@ public final class SupplierIdentity {
         if (identity.startsWith(LEGACY_MANUAL_PREFIX)) {
             return MANUAL_TYPE;
         }
-        int separator = identity.indexOf(SEPARATOR);
-        return separator < 0 ? identity : identity.substring(0, separator);
+        return hasToken(identity) ? identity.substring(0, identity.indexOf(SEPARATOR)) : identity;
     }
 
     public static boolean isManual(String identity) {
         return identity != null && MANUAL_TYPE.equalsIgnoreCase(typeOf(identity));
     }
 
+    // A dash suffix counts as a token only in the generated shape: legacy provider names may carry
+    // a dash themselves ("ACME-FV") and must stay whole, or the registry would hand back another
+    // type's policies for them.
     public static boolean hasToken(String identity) {
-        return identity != null && !identity.startsWith(LEGACY_MANUAL_PREFIX) && identity.indexOf(SEPARATOR) >= 0;
+        if (identity == null || identity.startsWith(LEGACY_MANUAL_PREFIX)) {
+            return false;
+        }
+        int separator = identity.indexOf(SEPARATOR);
+        return separator >= 0 && TOKEN.matcher(identity.substring(separator + 1)).matches();
     }
 
     public static String newInstance(String type) {

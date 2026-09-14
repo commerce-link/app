@@ -21,6 +21,13 @@ class SupplierIdentityTest {
     }
 
     @Test
+    void typeOfKeepsALegacyNameWithADashWhole() {
+        // when / then -- a dash suffix counts as a token only when it has the generated shape
+        assertThat(SupplierIdentity.typeOf("ACME-FV")).isEqualTo("ACME-FV");
+        assertThat(SupplierIdentity.typeOf("Elko-Serwis")).isEqualTo("Elko-Serwis");
+    }
+
+    @Test
     void typeOfLegacyManualIdentityIsManualEvenWhenTheLabelContainsDashes() {
         // when / then
         assertThat(SupplierIdentity.typeOf("manual:Asus")).isEqualTo("manual");
@@ -42,6 +49,8 @@ class SupplierIdentityTest {
         assertThat(SupplierIdentity.hasToken("Kosatec-k7f3a9c2")).isTrue();
         assertThat(SupplierIdentity.hasToken("Kosatec")).isFalse();
         assertThat(SupplierIdentity.hasToken("manual:Hurtownia-A")).isFalse();
+        assertThat(SupplierIdentity.hasToken("Elko-Serwis")).isFalse();
+        assertThat(SupplierIdentity.hasToken("ACME-FV")).isFalse();
     }
 
     @Test

@@ -88,6 +88,8 @@ public class StoreFulfilmentSupplierController {
                     .collect(Collectors.joining(" "));
             return SupplierSectionModel.renderErrorFragment(message, model, response);
         }
+        // Works because the persister mutates this `store` instance in place; a re-read would
+        // otherwise be needed to see the just-saved connection.
         String savedLabel = supplierLabels.forStore(store).of(result.identity());
         String successMessage = messageSource.getMessage(
                 "store.fulfilment.supplier.saved", new Object[]{savedLabel}, locale);
