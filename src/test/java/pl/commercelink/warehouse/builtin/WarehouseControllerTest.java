@@ -12,13 +12,16 @@ import org.mockito.quality.Strictness;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
 import pl.commercelink.inventory.deliveries.DeliveredPredicate;
+import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.orders.FulfilmentStatus;
+import pl.commercelink.orders.fulfilment.FulfilmentForm;
 import pl.commercelink.orders.fulfilment.ManualWarehouseFulfilment;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.stores.IntegrationType;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
+import pl.commercelink.warehouse.RestockScope;
 import pl.commercelink.warehouse.RestockSuggestionService;
 import pl.commercelink.warehouse.api.Warehouse;
 
@@ -27,6 +30,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
@@ -63,6 +67,8 @@ class WarehouseControllerTest {
     private WarehouseInternalReservationService warehouseInternalReservationService;
     @Mock
     private WarehouseAllocationsManager warehouseAllocationsManager;
+    @Mock
+    private SupplierLabels supplierLabels;
 
     @InjectMocks
     private WarehouseController warehouseController;
@@ -96,6 +102,31 @@ class WarehouseControllerTest {
             assertThat(view).isEqualTo("warehouse");
             List<WarehouseItem> deliveredItems = (List<WarehouseItem>) model.getAttribute("deliveredItems");
             assertThat(deliveredItems).containsExactly(withoutCategory, withCategory);
+        }
+    }
+
+    @Test
+    @DisplayName("restock exposes supplierLabels so fulfilment.html can resolve connection labels")
+    void restockExposesSupplierLabelsForTheFulfilmentScreen() {
+        // given
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+
+            when(restockSuggestionService.suggestForRestock(eq(STORE_ID), anyString(), isNull(),
+                    eq(RestockScope.WholeCatalog), eq(false), isNull()))
+                    .thenReturn(Collections.emptyList());
+            when(manualWarehouseFulfilment.init(eq(STORE_ID), anyList())).thenReturn(new FulfilmentForm());
+            var labels = new SupplierLabels(mock(StoresRepository.class)).forStore(null);
+            when(supplierLabels.forStoreId(STORE_ID)).thenReturn(labels);
+
+            Model model = new ConcurrentModel();
+
+            // when
+            String view = warehouseController.restock("catalog-1", null, RestockScope.WholeCatalog, null, false, model);
+
+            // then
+            assertThat(view).isEqualTo("fulfilment");
+            assertThat(model.getAttribute("supplierLabels")).isSameAs(labels);
         }
     }
 

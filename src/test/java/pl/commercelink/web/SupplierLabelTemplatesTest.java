@@ -16,6 +16,7 @@ class SupplierLabelTemplatesTest {
 
     @Test
     void deliveryScreensShowLabelsNotIdentities() throws Exception {
+        // when / then
         assertThat(template("deliveries.html")).contains("supplierLabels.of(delivery.storeId, delivery.provider)")
                 .doesNotContain("th:text=\"${delivery.provider}\"");
         assertThat(template("deliveriesPreview.html")).contains("supplierLabels.of(candidate.provider)")
@@ -32,7 +33,10 @@ class SupplierLabelTemplatesTest {
 
     @Test
     void fulfilmentCardsKeepTheIdentityAsDataAndShowTheLabel() throws Exception {
+        // when
         String html = template("fulfilment.html");
+
+        // then
         assertThat(html).contains("th:data-provider=\"${entry.source.provider}\"");
         assertThat(html).contains("supplierLabels.of(entry.source.provider)");
     }

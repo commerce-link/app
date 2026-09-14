@@ -333,6 +333,12 @@
     <script>
         const fmt = n => n.toLocaleString('pl-PL', {minimumFractionDigits: 2, maximumFractionDigits: 2});
         const cards = () => Array.from(document.querySelectorAll('.group-card'));
+        /* Identity (posted/compared) -> display label, derived once per call from the rendered cards. */
+        function providerLabels() {
+            const map = {};
+            cards().forEach(c => { map[c.dataset.provider] = c.dataset.providerLabel; });
+            return map;
+        }
         let activeOrder = null;
         let activeProviders = new Set();
         let activeVariant = null;
@@ -354,7 +360,10 @@
         function setAll(v) { cards().forEach(c => { if (!c.classList.contains('is-hidden')) setAccept(c, v); }); markCustomVariant(); render(); }
 
         function supplierCountLabel(n) { return n + ' ' + (n === 1 ? MSG.supplierOne : MSG.supplierMany); }
-        function variantChip(p) { return '<span class="provider-chip" style="--accent:' + provColor(p) + ';">' + p + '</span>'; }
+        function variantChip(p) {
+            const label = providerLabels()[p] || p;
+            return '<span class="provider-chip" style="--accent:' + provColor(p) + ';">' + label + '</span>';
+        }
 
         function variantMatchesCurrent(v) {
             const acceptedIds = cards().filter(isAccepted).map(c => c.dataset.groupid).sort();
@@ -454,11 +463,8 @@
             const bar = document.getElementById('providerFilter');
             if (!bar) return;
             const counts = {};
-            const labels = {};
-            cards().forEach(c => {
-                counts[c.dataset.provider] = (counts[c.dataset.provider] || 0) + 1;
-                labels[c.dataset.provider] = c.dataset.providerLabel;
-            });
+            const labels = providerLabels();
+            cards().forEach(c => { counts[c.dataset.provider] = (counts[c.dataset.provider] || 0) + 1; });
             bar.innerHTML = '';
             Object.keys(counts).sort().forEach(p => {
                 const chip = document.createElement('span');
@@ -658,11 +664,11 @@
         }
 
         function recalcFooter() {
-            let total = 0, totalProfit = 0; const byProv = {}; const labels = {};
+            let total = 0, totalProfit = 0; const byProv = {};
+            const labels = providerLabels();
             Object.keys(COMMITTED_SUPPLIERS).forEach(p => { byProv[p] = COMMITTED_SUPPLIERS[p]; });
             cards().forEach(c => {
                 const v = parseFloat(c.dataset.effvalue || 0);
-                labels[c.dataset.provider] = c.dataset.providerLabel;
                 if (isAccepted(c) && v > 0) {
                     total += v;
                     totalProfit += parseFloat(c.dataset.effprofit || 0);

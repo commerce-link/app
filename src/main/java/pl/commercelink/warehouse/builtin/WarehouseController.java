@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.documents.DocumentReason;
 import pl.commercelink.inventory.deliveries.DeliveredPredicate;
+import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.OrderItem;
@@ -74,6 +75,9 @@ class WarehouseController {
 
     @Autowired
     private WarehouseAllocationsManager warehouseAllocationsManager;
+
+    @Autowired
+    private SupplierLabels supplierLabels;
 
     @GetMapping("/dashboard/warehouse")
     String warehouseItems(@RequestParam(required = false) List<String> categories,
@@ -315,6 +319,7 @@ class WarehouseController {
         FulfilmentForm fulfilmentForm = manualWarehouseFulfilment.init(getStoreId(), orderItems);
 
         model.addAttribute("form", fulfilmentForm);
+        model.addAttribute("supplierLabels", supplierLabels.forStoreId(getStoreId()));
 
         return "fulfilment";
     }
