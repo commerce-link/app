@@ -35,6 +35,8 @@ public class DeliveriesManager {
     private OrderAllocationsManager orderAllocationsManager;
     @Autowired
     private WarehouseAllocationsManager warehouseAllocationsManager;
+    @Autowired
+    private DropshipItemLookup dropshipItemLookup;
 
     public void deleteAllocations(String storeId, String deliveryId, List<Allocation> allocations) {
         List<Allocation> active = allocations.stream().filter(Allocation::isInAllocation).toList();
@@ -179,8 +181,12 @@ public class DeliveriesManager {
                 .filter(order -> !order.hasOneOfStatuses(OrderStatus.Completed, OrderStatus.Cancelled))
                 .forEach(order -> {
                     LocalDate oldAssemblyDate = order.getEstimatedAssemblyAt();
+                    // Whether the realization days apply is a property of the whole order, not of the
+                    // delivery whose date just moved: the order may have another leg through our warehouse.
+                    boolean shippedBySupplier = dropshipItemLookup.isEntirelyDropship(
+                            storeId, orderItemsRepository.findByOrderId(order.getOrderId()));
                     LocalDate newAssemblyDate = order.updateEstimatedAssemblyAt(
-                            delivery.getEstimatedDeliveryAt()
+                            delivery.getEstimatedDeliveryAt(), shippedBySupplier
                     );
 
                     if (oldAssemblyDate != null && !Objects.equals(oldAssemblyDate, newAssemblyDate)) {

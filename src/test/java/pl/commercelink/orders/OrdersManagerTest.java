@@ -855,7 +855,7 @@ class OrdersManagerTest {
         Order order = orderWithTotalPrice(100.0);
         order.setStatus(OrderStatus.Assembly);
         order.setOrderRealizationDays(1);
-        order.updateEstimatedAssemblyAt(LocalDate.of(2026, 9, 11));
+        order.updateEstimatedAssemblyAt(LocalDate.of(2026, 9, 11), false);
         OrderItem item = orderItemInAllocation("item-1");
         item.markAsClaimed("delivery-1");
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
@@ -894,7 +894,7 @@ class OrdersManagerTest {
         Order order = orderWithTotalPrice(100.0);
         order.setStatus(OrderStatus.New);
         order.setOrderRealizationDays(1);
-        order.updateEstimatedAssemblyAt(LocalDate.of(2026, 9, 11));
+        order.updateEstimatedAssemblyAt(LocalDate.of(2026, 9, 11), false);
         OrderItem item = orderItemInAllocation("item-1");
         item.markAsClaimed("delivery-1");
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
@@ -905,6 +905,156 @@ class OrdersManagerTest {
 
         // then
         verify(notificationEventPublisher, never()).publishAssemblyDateChanged(any(), any());
+    }
+
+    @Test
+    @DisplayName("a dropship delivery stamps the same day as assembly and shipping")
+    void marksOrderedWithTheDropshipDateRule() {
+        // given
+        Order order = orderWithTotalPrice(100.0);
+        order.setStatus(OrderStatus.New);
+        order.setOrderRealizationDays(3);
+        OrderItem item = orderItemInAllocation("item-1");
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item));
+        when(dropshipItemLookup.isEntirelyDropship(eq(STORE_ID), any())).thenReturn(true);
+
+        // when
+        ordersManager.markOrderItemsAsOrdered(STORE_ID, ORDER_ID, "d1", Map.of("item-1", 10.0), LocalDate.of(2026, 9, 14));
+
+        // then
+        assertThat(order.getEstimatedAssemblyAt()).isEqualTo(LocalDate.of(2026, 9, 14));
+        assertThat(order.getEstimatedShippingAt()).isEqualTo(LocalDate.of(2026, 9, 14));
+    }
+
+    @Test
+    @DisplayName("a warehouse delivery adds the realization days to the shipping date")
+    void marksOrderedWithTheWarehouseDateRule() {
+        // given
+        Order order = orderWithTotalPrice(100.0);
+        order.setStatus(OrderStatus.New);
+        order.setOrderRealizationDays(3);
+        OrderItem item = orderItemInAllocation("item-1");
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item));
+        when(dropshipItemLookup.isEntirelyDropship(eq(STORE_ID), any())).thenReturn(false);
+
+        // when
+        ordersManager.markOrderItemsAsOrdered(STORE_ID, ORDER_ID, "d1", Map.of("item-1", 10.0), LocalDate.of(2026, 9, 14));
+
+        // then
+        assertThat(order.getEstimatedAssemblyAt()).isEqualTo(LocalDate.of(2026, 9, 14));
+        assertThat(order.getEstimatedShippingAt()).isEqualTo(LocalDate.of(2026, 9, 17));
+    }
+
+    @Test
+    @DisplayName("a mixed order keeps its realization days when the dropship leg carries the later date")
+    void marksOrderedKeepsRealizationDaysWhenOnlyOneLegTravelsByDropship() {
+        // given: item-1 already ordered on a warehouse delivery, item-2 now ordered on a later dropship one
+        Order order = orderWithTotalPrice(100.0);
+        order.setStatus(OrderStatus.New);
+        order.setOrderRealizationDays(3);
+        OrderItem warehouseItem = orderItemInAllocation("item-1");
+        warehouseItem.markAsOrdered("d-warehouse", 10.0);
+        OrderItem dropshipItem = orderItemInAllocation("item-2");
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(warehouseItem, dropshipItem));
+        when(dropshipItemLookup.isEntirelyDropship(eq(STORE_ID), any())).thenReturn(false);
+
+        // when
+        ordersManager.markOrderItemsAsOrdered(STORE_ID, ORDER_ID, "d-dropship", Map.of("item-2", 10.0), LocalDate.of(2026, 9, 20));
+
+        // then: the later dropship date moves assembly, but item-1 still has to be forwarded by hand
+        assertThat(order.getEstimatedAssemblyAt()).isEqualTo(LocalDate.of(2026, 9, 20));
+        assertThat(order.getEstimatedShippingAt()).isEqualTo(LocalDate.of(2026, 9, 23));
+        ArgumentCaptor<List<OrderItem>> askedWith = ArgumentCaptor.forClass(List.class);
+        verify(dropshipItemLookup).isEntirelyDropship(eq(STORE_ID), askedWith.capture());
+        assertThat(askedWith.getValue()).containsExactly(warehouseItem, dropshipItem);
+    }
+
+    @Test
+    @DisplayName("a warehouse leg confirmed after the dropship one still puts the realization days back")
+    void marksOrderedAddsRealizationDaysWhenAnEarlierWarehouseLegFollowsTheDropshipOne() {
+        // given: the dropship leg is confirmed first, while the other item is not on a delivery yet
+        Order order = orderWithTotalPrice(100.0);
+        order.setStatus(OrderStatus.New);
+        order.setOrderRealizationDays(3);
+        OrderItem dropshipItem = orderItemInAllocation("item-1");
+        OrderItem warehouseItem = orderItemInAllocation("item-2");
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(dropshipItem, warehouseItem));
+        when(dropshipItemLookup.isEntirelyDropship(eq(STORE_ID), any())).thenReturn(true, false);
+
+        // when: the warehouse leg follows with an earlier date
+        ordersManager.markOrderItemsAsOrdered(STORE_ID, ORDER_ID, "d-dropship", Map.of("item-1", 10.0), LocalDate.of(2026, 9, 20));
+        ordersManager.markOrderItemsAsOrdered(STORE_ID, ORDER_ID, "d-warehouse", Map.of("item-2", 10.0), LocalDate.of(2026, 9, 16));
+
+        // then: the earlier date leaves assembly alone but the warehouse stop earns its handling time
+        assertThat(order.getEstimatedAssemblyAt()).isEqualTo(LocalDate.of(2026, 9, 20));
+        assertThat(order.getEstimatedShippingAt()).isEqualTo(LocalDate.of(2026, 9, 23));
+    }
+
+    @Test
+    @DisplayName("a dateless confirmation still puts the realization days back on an order that has a date")
+    void marksOrderedReDerivesTheShippingDateForADatelessConfirmation() {
+        // given: the dropship leg landed first and left both dates on the same day, and the leg confirmed
+        // now - the one that adds the warehouse stop - carries no date of its own
+        Order order = orderWithTotalPrice(100.0);
+        order.setStatus(OrderStatus.New);
+        order.setOrderRealizationDays(3);
+        order.setEstimatedAssemblyAt(LocalDate.of(2026, 9, 14));
+        order.setEstimatedShippingAt(LocalDate.of(2026, 9, 14));
+        OrderItem item = orderItemInAllocation("item-1");
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item));
+        when(dropshipItemLookup.isEntirelyDropship(eq(STORE_ID), any())).thenReturn(false);
+
+        // when
+        ordersManager.markOrderItemsAsOrdered(STORE_ID, ORDER_ID, "d1", Map.of("item-1", 10.0), null);
+
+        // then
+        assertThat(order.getEstimatedAssemblyAt()).isEqualTo(LocalDate.of(2026, 9, 14));
+        assertThat(order.getEstimatedShippingAt()).isEqualTo(LocalDate.of(2026, 9, 17));
+    }
+
+    @Test
+    @DisplayName("a dateless confirmation on an all-dropship order does not invent handling time")
+    void marksOrderedKeepsTheDropshipRuleForADatelessConfirmation() {
+        // given: an order whose every leg is a dropship one, already stamped with both dates on the same day
+        Order order = orderWithTotalPrice(100.0);
+        order.setStatus(OrderStatus.New);
+        order.setOrderRealizationDays(3);
+        order.setEstimatedAssemblyAt(LocalDate.of(2026, 9, 14));
+        order.setEstimatedShippingAt(LocalDate.of(2026, 9, 14));
+        OrderItem item = orderItemInAllocation("item-1");
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item));
+        when(dropshipItemLookup.isEntirelyDropship(eq(STORE_ID), any())).thenReturn(true);
+
+        // when: the second dropship leg is confirmed without a date of its own
+        ordersManager.markOrderItemsAsOrdered(STORE_ID, ORDER_ID, "d2", Map.of("item-1", 10.0), null);
+
+        // then: the route still says the goods never reach us, so no handling time is added
+        assertThat(order.getEstimatedAssemblyAt()).isEqualTo(LocalDate.of(2026, 9, 14));
+        assertThat(order.getEstimatedShippingAt()).isEqualTo(LocalDate.of(2026, 9, 14));
+    }
+
+    @Test
+    @DisplayName("a confirmation with no date, on an order with no date, does not pay for the route lookup")
+    void marksOrderedSkipsTheRouteLookupWhenThereIsNothingToDeriveFrom() {
+        // given
+        Order order = orderWithTotalPrice(100.0);
+        order.setStatus(OrderStatus.New);
+        OrderItem item = orderItemInAllocation("item-1");
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item));
+
+        // when
+        ordersManager.markOrderItemsAsOrdered(STORE_ID, ORDER_ID, "d1", Map.of("item-1", 10.0), null);
+
+        // then
+        assertThat(item.getStatus()).isEqualTo(FulfilmentStatus.Ordered);
+        verify(dropshipItemLookup, never()).isEntirelyDropship(any(), any());
     }
 
     private OrderItem orderItemInAllocation(String itemId) {

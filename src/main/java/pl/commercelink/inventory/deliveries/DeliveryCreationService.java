@@ -50,12 +50,11 @@ public class DeliveryCreationService {
 
     public void claimAllocations(String storeId, Delivery delivery, DeliveryCreationForm form) {
         prepareForm(storeId, form);
-        if (delivery.isDropship()) {
-            // dropship goods never reach the warehouse: claim and price exactly the selected order allocations,
-            // whatever quantity a stale or tampered form asked for
-            form.getItems().forEach(item -> item.setRequestedQty(item.getMinQty()));
-        }
+        clampDropshipQuantities(delivery, form);
         delivery.increaseTotalCost(allocationsCost(form));
+        // The delivery has to exist before the items start pointing at it: the ordering step asks the
+        // deliveries behind the order's items how the goods travel, and an unsaved delivery reads as none.
+        deliveriesRepository.save(delivery);
         orderAllocationsManager.commit(storeId, delivery.getDeliveryId(), form.getEstimatedDeliveryAt(), form.getItems());
         if (!delivery.isDropship()) {
             warehouseAllocationsManager.commit(storeId, delivery.getDeliveryId(), form.getProvider(), form.getItems());
@@ -69,11 +68,25 @@ public class DeliveryCreationService {
      */
     public void claimAllocationsForPurchase(String storeId, Delivery delivery, DeliveryCreationForm form) {
         prepareForm(storeId, form);
+        clampDropshipQuantities(delivery, form);
         delivery.increaseTotalCost(allocationsCost(form));
+        // The delivery has to exist before the items start pointing at it. A claim is written onto the items
+        // themselves and hides them from the allocation screen: saved the other way round, a failed save
+        // would leave them reserved for a delivery that does not exist, with no screen left to release them
+        // from. The caller must not save again - whatever it sets on the delivery has to be set before this.
+        deliveriesRepository.save(delivery);
         orderAllocationsManager.claim(storeId, delivery.getDeliveryId(), form.getItems());
         if (!delivery.isDropship()) {
             // dropship goods never reach the warehouse, so they must not leave a reserved row behind
             warehouseAllocationsManager.claim(storeId, delivery.getDeliveryId(), form.getProvider(), form.getItems());
+        }
+    }
+
+    private void clampDropshipQuantities(Delivery delivery, DeliveryCreationForm form) {
+        if (delivery.isDropship()) {
+            // dropship goods never reach the warehouse: claim and price exactly the selected order allocations,
+            // whatever quantity a stale or tampered form asked for
+            form.getItems().forEach(item -> item.setRequestedQty(item.getMinQty()));
         }
     }
 
@@ -90,23 +103,21 @@ public class DeliveryCreationService {
     public void completePending(String storeId, Delivery delivery, DeliveryCreationForm form) {
         delivery.setExternalDeliveryId(form.getExternalDeliveryId());
         delivery.setEstimatedDeliveryAt(form.getEstimatedDeliveryAt());
-        delivery.updateShippingCost(form.getShippingCost());
-        delivery.updatePaymentCost(form.getPaymentCost());
-        delivery.setPaymentTerms(form.getPaymentTerms());
-        delivery.setTax(form.getTax());
+        if (!delivery.isDropship()) {
+            // A dropship delivery carries no freight of ours: the supplier ships to the customer, so the
+            // shipping, payment and tax terms of a warehouse delivery do not apply and must not be
+            // overwritten by the purchase form.
+            delivery.updateShippingCost(form.getShippingCost());
+            delivery.updatePaymentCost(form.getPaymentCost());
+            delivery.setPaymentTerms(form.getPaymentTerms());
+            delivery.setTax(form.getTax());
+        }
         delivery.setOrderStatus(null);
 
         delivery.increaseTotalCost(deliveryCostSync.apply(storeId, delivery.getDeliveryId(), confirmedUnitCosts(form)));
         deliveriesRepository.save(delivery);
 
         markClaimedAsOrdered(storeId, delivery, form.getEstimatedDeliveryAt());
-    }
-
-    public void completeDropshipPending(String storeId, Delivery delivery, DeliveryCreationForm form) {
-        delivery.setExternalDeliveryId(form.getExternalDeliveryId());
-        delivery.setOrderStatus(null);
-        delivery.increaseTotalCost(deliveryCostSync.apply(storeId, delivery.getDeliveryId(), confirmedUnitCosts(form)));
-        deliveriesRepository.save(delivery);
     }
 
     /**
