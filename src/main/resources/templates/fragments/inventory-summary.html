@@ -1,0 +1,119 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<div th:fragment="summary" class="cl-inv-summary" data-inventory-fragment="summary">
+    <ul class="cl-inv-tiles">
+        <li class="cl-inv-tile">
+            <span class="cl-inv-eyebrow" th:text="#{inventory.tile.products}"></span>
+            <span class="cl-inv-number" th:text="${#numbers.formatInteger(statistics.distinctProducts(), 1, 'WHITESPACE')}"></span>
+            <span class="cl-inv-hint" th:text="#{inventory.tile.products.hint}"></span>
+        </li>
+        <li class="cl-inv-tile">
+            <span class="cl-inv-eyebrow" th:text="#{inventory.tile.inStock}"></span>
+            <span class="cl-inv-number" th:text="${#numbers.formatInteger(statistics.productsInStock(), 1, 'WHITESPACE')}"></span>
+            <span class="cl-inv-hint" th:text="#{inventory.tile.inStock.hint(${statistics.inStockPercent()})}"></span>
+        </li>
+        <li class="cl-inv-tile">
+            <span class="cl-inv-eyebrow" th:text="#{inventory.tile.suppliers}"></span>
+            <span class="cl-inv-number">
+                <span th:text="${sources.activeSupplierCount()}"></span>
+                <small class="cl-inv-number-of" th:text="#{inventory.tile.suppliers.of(${sources.connectedSupplierCount()})}"></small>
+            </span>
+        </li>
+        <li class="cl-inv-tile" data-inventory-slot="warehouse" aria-busy="true">
+            <span class="cl-inv-eyebrow" th:text="#{inventory.tile.warehouse}"></span>
+            <span class="cl-inv-skeleton cl-inv-skeleton-number" aria-hidden="true"></span>
+            <span class="cl-inv-skeleton cl-inv-skeleton-hint" aria-hidden="true"></span>
+        </li>
+    </ul>
+
+    <section class="cl-inv-sources" aria-labelledby="inventory-sources-title">
+        <div class="cl-inv-sources-bar">
+            <h2 class="cl-inv-eyebrow" id="inventory-sources-title" th:text="#{inventory.sources.title}"></h2>
+            <span class="cl-inv-muted" th:text="#{inventory.sources.count(${sources.activeSupplierCount()})}"></span>
+            <span th:if="${!sources.hasSuppliers()}" class="cl-status is-neutral" th:text="#{inventory.sources.none}"></span>
+            <span th:if="${sources.hasSuppliers() and !sources.hasIssues()}" class="cl-status is-ok" th:text="#{inventory.sources.ok}"></span>
+            <th:block th:if="${sources.hasIssues()}">
+                <span class="cl-status is-warn" th:text="#{inventory.sources.attention(${sources.attention().size()})}"></span>
+                <span class="cl-inv-issues">
+                    <th:block th:each="issue, stat : ${sources.collapsedIssues()}">
+                        <strong th:text="${issue.label()}"></strong>
+                        <span th:text="'— ' + #{inventory.sources.nofile}"></span><span th:unless="${stat.last}" aria-hidden="true"> · </span>
+                    </th:block>
+                    <span th:if="${sources.moreIssues() > 0}" class="cl-inv-more" th:text="#{inventory.sources.more(${sources.moreIssues()})}"></span>
+                </span>
+            </th:block>
+            <span class="cl-inv-sources-actions">
+                <button type="button" class="cl-inv-toggle" data-inventory-sources-toggle aria-expanded="false"
+                        aria-controls="inventory-sources-list">
+                    <span data-when-collapsed th:text="#{inventory.sources.show}"></span>
+                    <span data-when-expanded hidden th:text="#{inventory.sources.hide}"></span>
+                    <i class="fas fa-chevron-down" aria-hidden="true"></i>
+                </button>
+                <a th:if="${canManageSuppliers}" class="cl-inv-iconbtn" th:href="${manageSuppliersUrl}"
+                   th:title="#{inventory.sources.manage}" th:attr="aria-label=#{inventory.sources.manage}">
+                    <i class="fas fa-cog" aria-hidden="true"></i>
+                </a>
+            </span>
+        </div>
+
+        <div id="inventory-sources-list" class="cl-inv-sources-list" hidden>
+            <th:block th:if="${sources.hasIssues()}">
+                <h3 class="cl-inv-group-title" th:text="#{inventory.sources.group.attention}"></h3>
+                <ul class="cl-inv-source-rows">
+                    <th:block th:each="row : ${sources.attention()}">
+                        <li th:replace="~{fragments/inventory-summary :: sourceRow(${row})}"></li>
+                    </th:block>
+                </ul>
+            </th:block>
+            <h3 class="cl-inv-group-title" th:text="#{inventory.sources.group.working}"></h3>
+            <ul class="cl-inv-source-rows">
+                <li class="cl-inv-source-row">
+                    <span class="cl-inv-source-name"
+                          th:text="${sources.externalWarehouse()} ? #{inventory.sources.warehouse.external} : #{inventory.sources.warehouse}"></span>
+                    <span class="cl-inv-source-meta">
+                        <a class="cl-inv-link" th:href="${warehouseUrl}" th:text="#{inventory.sources.warehouse.open}"></a>
+                    </span>
+                </li>
+                <th:block th:each="row : ${sources.working()}">
+                    <li th:replace="~{fragments/inventory-summary :: sourceRow(${row})}"></li>
+                </th:block>
+            </ul>
+            <div th:if="${canManageSuppliers}" class="cl-inv-sources-footer">
+                <a class="cl-inv-button" th:href="${manageSuppliersUrl}">
+                    <i class="fas fa-cog" aria-hidden="true"></i>
+                    <span th:text="#{inventory.sources.manage}"></span>
+                </a>
+            </div>
+        </div>
+    </section>
+</div>
+
+<li th:fragment="sourceRow(row)" class="cl-inv-source-row">
+    <span class="cl-inv-source-name" th:text="${row.label()}"></span>
+    <span class="cl-inv-mode" th:text="#{${'inventory.mode.' + row.mode().name()}}"></span>
+    <span class="cl-inv-source-meta">
+        <span th:unless="${row.needsAttention()}" th:text="#{inventory.sources.products(${row.products()})}"></span>
+        <span th:if="${row.needsAttention()}" class="cl-status is-warn" th:text="#{inventory.sources.nofile}"></span>
+        <span th:if="${row.feedAge() != null}" class="cl-status is-neutral"
+              th:title="${row.feedLastModified().toString().replace('T', ' ')}"
+              th:text="#{inventory.sources.feed(${#messages.msgWithParams(row.feedAge().messageKey(), row.feedAge().args())})}"></span>
+    </span>
+</li>
+
+<li th:fragment="warehouseTile" class="cl-inv-tile" data-inventory-fragment="warehouse">
+    <span class="cl-inv-eyebrow" th:text="#{inventory.tile.warehouse}"></span>
+    <th:block th:if="${externalWarehouse}">
+        <span class="cl-inv-tile-text" th:text="#{inventory.tile.warehouse.external}"></span>
+        <a class="cl-inv-link" th:href="${warehouseUrl}" th:text="#{inventory.tile.warehouse.open}"></a>
+    </th:block>
+    <th:block th:unless="${externalWarehouse}">
+        <span class="cl-inv-number" th:text="${#numbers.formatInteger(warehouseSummary.products(), 1, 'WHITESPACE')}"></span>
+        <span class="cl-inv-hint"
+              th:text="#{inventory.tile.warehouse.hint(${warehouseSummary.inStockQty()}, ${warehouseSummary.inDeliveryQty()})}"></span>
+    </th:block>
+</li>
+
+</body>
+</html>
