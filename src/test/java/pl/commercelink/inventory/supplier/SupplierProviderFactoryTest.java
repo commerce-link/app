@@ -7,7 +7,10 @@ import pl.commercelink.starter.secrets.SecretsManager;
 import pl.commercelink.stores.Store;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -53,6 +56,39 @@ class SupplierProviderFactoryTest {
         assertThat(supplier).isNotNull();
         assertThat(new String(supplier.download().orElseThrow().data())).isEqualTo("feed-b");
         assertThat(factory.getDescriptor("Stub-k7f3a9c2")).isSameAs(factory.getDescriptor("Stub"));
+    }
+
+    @Test
+    void deleteConfigurationRemovesTheSecretOfTheIdentityNotOfTheType() {
+        // given -- two instances of one type share the descriptor but never the secret
+        SecretsManager secrets = mock(SecretsManager.class);
+        Store store = storeWithId("store-1");
+        when(secrets.exists("store-1-stub-k7f3a9c2")).thenReturn(true);
+        SupplierProviderFactory factory = new SupplierProviderFactory(new ProviderConfigurationManager(secrets));
+
+        // when
+        factory.deleteConfiguration(store, "Stub-k7f3a9c2");
+
+        // then
+        verify(secrets).deleteSecret("store-1-stub-k7f3a9c2");
+        verify(secrets, never()).deleteSecret("store-1-stub");
+    }
+
+    @Test
+    void saveConfigurationWritesTheSecretOfTheIdentityNotOfTheType() {
+        // given
+        SecretsManager secrets = mock(SecretsManager.class);
+        Store store = storeWithId("store-1");
+        when(secrets.exists("store-1-stub-k7f3a9c2")).thenReturn(false);
+        SupplierProviderFactory factory = new SupplierProviderFactory(new ProviderConfigurationManager(secrets));
+        java.util.Map<String, String> config = java.util.Map.of("url", "feed-b");
+
+        // when
+        factory.saveConfiguration(store, "Stub-k7f3a9c2", config);
+
+        // then
+        verify(secrets).createSecret("store-1-stub-k7f3a9c2", config);
+        verify(secrets, never()).createSecret(eq("store-1-stub"), any());
     }
 
     @Test

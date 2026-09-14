@@ -173,11 +173,11 @@ public class ProviderFactory<D extends ProviderDescriptor<T>, T> {
 
     public Map<String, String> loadConfigurationForUI(Store store) {
         String providerName = store.getConfigurationValue(integrationType);
-        D descriptor = descriptors.get(providerName);
+        D descriptor = getDescriptor(providerName);
         if (descriptor == null) {
             return new HashMap<>();
         }
-        String configName = resolveCredentialName(descriptor);
+        String configName = credentialNameFor(providerName, descriptor);
         return configurationManager.getConfigurationForUI(store, configName, descriptor);
     }
 
@@ -224,14 +224,14 @@ public class ProviderFactory<D extends ProviderDescriptor<T>, T> {
     }
 
     public void seedRefreshToken(Store store, String providerName, String refreshToken) {
-        D descriptor = descriptors.get(providerName);
+        D descriptor = getDescriptor(providerName);
         if (descriptor == null || refreshToken == null || refreshToken.isBlank()) {
             return;
         }
         if (!(descriptor.authConfig() instanceof AuthConfig.OAuth2 oauth2) || tokenStore == null) {
             return;
         }
-        storeRefreshToken(store, resolveCredentialName(descriptor), oauth2, refreshToken);
+        storeRefreshToken(store, credentialNameFor(providerName, descriptor), oauth2, refreshToken);
     }
 
     public List<String> deviceAuthProviders() {

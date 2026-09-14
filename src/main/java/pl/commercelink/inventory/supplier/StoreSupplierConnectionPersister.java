@@ -1,6 +1,7 @@
 package pl.commercelink.inventory.supplier;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import pl.commercelink.inventory.StoreInventoryCache;
 import pl.commercelink.inventory.supplier.api.SupplierProviderDescriptor;
@@ -21,6 +22,7 @@ import java.util.Optional;
 import java.util.Set;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class StoreSupplierConnectionPersister {
 
@@ -118,8 +120,7 @@ public class StoreSupplierConnectionPersister {
             try {
                 feedScheduler.triggerImmediateImport(changes.storeId(), supplier);
             } catch (RuntimeException e) {
-                System.err.println("Failed to trigger immediate feed import for "
-                        + changes.storeId() + "/" + supplier + ": " + e.getMessage());
+                log.error("Failed to trigger immediate feed import for {}/{}", changes.storeId(), supplier, e);
             }
         }
     }
@@ -129,8 +130,7 @@ public class StoreSupplierConnectionPersister {
             try {
                 storeFeedRepository.delete(changes.storeId(), supplier);
             } catch (RuntimeException e) {
-                System.err.println("Failed to delete feed for removed supplier "
-                        + changes.storeId() + "/" + supplier + ": " + e.getMessage());
+                log.error("Failed to delete feed for removed supplier {}/{}", changes.storeId(), supplier, e);
             }
         }
     }
