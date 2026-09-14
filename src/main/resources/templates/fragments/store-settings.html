@@ -1,0 +1,41 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<div th:fragment="alerts(alerts)" th:if="${!#lists.isEmpty(alerts)}" class="cl-alerts" role="region"
+     th:attr="aria-label=#{store.notification.alerts.aria}">
+    <div th:each="alert : ${alerts}" class="cl-alert" th:classappend="${alert.cssClass()}">
+        <span class="cl-alert-icon icon" aria-hidden="true"><i class="fas" th:classappend="${alert.icon()}"></i></span>
+        <div class="cl-alert-body">
+            <div class="cl-alert-title" th:text="#{${alert.titleKey()}}"></div>
+            <div class="cl-alert-message" th:if="${alert.message() != null}" th:text="${alert.message()}"></div>
+        </div>
+        <a th:if="${alert.actionHref() != null}" class="cl-alert-action" th:href="@{${alert.actionHref()}}">
+            <span th:text="#{${alert.actionKey()}}"></span>
+            <span class="icon is-small" aria-hidden="true"><i class="fas fa-chevron-right"></i></span>
+        </a>
+    </div>
+</div>
+
+<th:block th:fragment="sections(sections)">
+    <section th:each="section : ${sections}" class="cl-settings-section"
+             th:attr="aria-labelledby=${'settings-group-' + sectionStat.index}">
+        <h2 class="cl-settings-section-title" th:id="${'settings-group-' + sectionStat.index}"
+            th:text="#{${section.messageKey()}}"></h2>
+        <ul class="cl-tile-grid">
+            <li th:each="item : ${section.tiles()}">
+                <a class="cl-tile" th:href="@{${item.href()}}">
+                    <span class="cl-tile-icon" aria-hidden="true"><i class="fas" th:classappend="${item.tile().icon()}"></i></span>
+                    <span class="cl-tile-chevron" aria-hidden="true"><i class="fas fa-chevron-right"></i></span>
+                    <span class="cl-tile-title" th:text="#{${item.tile().titleKey()}}"></span>
+                    <span class="cl-tile-desc" th:text="#{${item.tile().descriptionKey()}}"></span>
+                    <span th:if="${item.status() != null}" class="cl-status" th:classappend="${item.status().cssClass()}"
+                          th:text="${#messages.msgWithParams(item.status().messageKey(), item.status().argsArray())}"></span>
+                </a>
+            </li>
+        </ul>
+    </section>
+</th:block>
+
+</body>
+</html>
