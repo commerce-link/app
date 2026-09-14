@@ -13,7 +13,7 @@
 
             <div th:replace="~{fragments/integration-panel :: panel(${connectedIntegrations}, ${availableProviders}, ${selectedProviderName}, #{store.marketplace.name}, ${form.providerConfiguration}, 'marketplace', ${form.store.storeId}, false)}"></div>
 
-            <div class="box" th:if="${!importSchedules.isEmpty()}">
+            <div class="box" th:if="${importSchedules != null and !importSchedules.isEmpty()}">
                 <h2 class="title is-5" th:text="#{store.marketplaces.import.schedule.title}"></h2>
                 <p class="mb-4" th:text="#{store.marketplaces.import.schedule.description}"></p>
                 <form th:each="entry : ${importSchedules}" th:action="@{/dashboard/store/marketplaces/schedule}" method="post"
