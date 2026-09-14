@@ -17,6 +17,7 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
+import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 @DynamoDBTable(tableName = "Orders")
 public class Order {
@@ -558,6 +559,33 @@ public class Order {
     @DynamoDBIgnore
     public boolean hasTrackedShipments() {
         return shipments.stream().anyMatch(Shipment::hasTrackingSubscription);
+    }
+
+    @DynamoDBIgnore
+    public boolean hasShippingLabel() {
+        return shipments.stream().anyMatch(Shipment::hasLabel);
+    }
+
+    @DynamoDBIgnore
+    public boolean isCourierDelivery() {
+        return !isPersonalCollection() && firstShipment()
+                .map(shipment -> shipment.getType() == ShipmentType.Courier && !shipment.isDeliveredToCollectionPoint())
+                .orElse(true);
+    }
+
+    @DynamoDBIgnore
+    public boolean hasBillingEmail() {
+        return billingDetails != null && isNotBlank(billingDetails.getEmail());
+    }
+
+    @DynamoDBIgnore
+    public boolean canChangeShippingAddress() {
+        return shippingDetails != null
+                && isCourierDelivery()
+                && hasOneOfStatuses(OrderStatus.New, OrderStatus.Blocked, OrderStatus.Assembly, OrderStatus.Assembled, OrderStatus.Realization)
+                && !hasShippingLabel()
+                && !isMarketplaceOrder()
+                && hasBillingEmail();
     }
 
     public List<Document> getDocuments() {

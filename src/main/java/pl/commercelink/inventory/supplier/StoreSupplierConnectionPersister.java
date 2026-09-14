@@ -83,6 +83,10 @@ public class StoreSupplierConnectionPersister {
 
     private void saveStore(Store existingStore, FulfilmentConfiguration submitted) {
         existingStore.setFulfilmentConfiguration(submitted);
+        // Turning the feature on without its two e-mail types enabled would leave a button that can never send a code.
+        if (submitted.isClientShippingAddressChangeEnabled()) {
+            existingStore.enableClientShippingAddressChangeNotifications();
+        }
         storesRepository.save(existingStore);
     }
 

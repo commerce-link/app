@@ -311,46 +311,48 @@
                  th:text="#{deliveries.dropship.tracking.notice.givenUp}"></div>
 
             <div class="box" th:with="itemQtyEditable=${(isAdmin or isSuperAdmin) and !delivery.dropship and delivery.isWaitingForCollection() and delivery.documents.isEmpty() and (!delivery.awaitingApproval or isSuperAdmin)}">
-                <table class="table">
-                    <thead>
-                    <tr>
-                        <th th:text="#{general.name}"></th>
-                        <th th:text="#{deliveries.orderedQty}"></th>
-                        <th th:text="#{deliveries.receivedQty}"></th>
-                        <th th:text="#{deliveries.reservedQty}"></th>
-                        <th th:text="#{deliveries.availableQty}"></th>
-                        <th th:text="#{general.ean}"></th>
-                        <th th:text="#{general.manufacturer.code}"></th>
-                        <th th:text="#{general.net.cost}"></th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    <tr th:each="item : ${delivery.items}">
-                        <td th:text="${item.name}"></td>
-                        <td>
-                            <span th:text="${item.orderedQty}"></span>
-                            <button type="button" class="button is-small is-white ml-1"
-                                    th:if="${itemQtyEditable and item.receivedQty < item.orderedQty}"
-                                    th:attr="data-name=${item.name},data-ean=${item.ean},data-mfn=${item.mfn},data-qty=${item.orderedQty},data-min-qty=${item.minOrderedQty}"
-                                    th:title="#{deliveries.editOrderedQty.title}"
-                                    onclick="openEditItemQtyModal(this)">
-                                <span class="icon is-small has-text-grey"><i class="fas fa-pencil-alt"></i></span>
-                            </button>
-                        </td>
-                        <td th:text="${item.receivedQty}"></td>
-                        <td th:text="${item.reservedQty}"></td>
-                        <td th:text="${item.availableQty}"></td>
-                        <td th:text="${item.ean}"></td>
-                        <td>
-                            <a th:unless="${isSuperAdmin}"
-                               th:href="@{/dashboard/warehouse-documents/delivery-mfn-history(deliveryId=${delivery.deliveryId}, mfn=${item.mfn})}"
-                               th:text="${item.mfn}"></a>
-                            <span th:if="${isSuperAdmin}" th:text="${item.mfn}"></span>
-                        </td>
-                        <td th:text="${item.unitCost}"></td>
-                    </tr>
-                    </tbody>
-                </table>
+                <div class="table-container">
+                    <table class="table">
+                        <thead>
+                        <tr>
+                            <th th:text="#{general.name}"></th>
+                            <th th:text="#{deliveries.orderedQty}"></th>
+                            <th th:text="#{deliveries.receivedQty}"></th>
+                            <th th:text="#{deliveries.reservedQty}"></th>
+                            <th th:text="#{deliveries.availableQty}"></th>
+                            <th th:text="#{general.ean}"></th>
+                            <th th:text="#{general.manufacturer.code}"></th>
+                            <th th:text="#{general.net.cost}"></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="item : ${delivery.items}">
+                            <td th:text="${item.name}"></td>
+                            <td>
+                                <span th:text="${item.orderedQty}"></span>
+                                <button type="button" class="button is-small is-white ml-1"
+                                        th:if="${itemQtyEditable and item.receivedQty < item.orderedQty}"
+                                        th:attr="data-name=${item.name},data-ean=${item.ean},data-mfn=${item.mfn},data-qty=${item.orderedQty},data-min-qty=${item.minOrderedQty}"
+                                        th:title="#{deliveries.editOrderedQty.title}"
+                                        onclick="openEditItemQtyModal(this)">
+                                    <span class="icon is-small has-text-grey"><i class="fas fa-pencil-alt"></i></span>
+                                </button>
+                            </td>
+                            <td th:text="${item.receivedQty}"></td>
+                            <td th:text="${item.reservedQty}"></td>
+                            <td th:text="${item.availableQty}"></td>
+                            <td th:text="${item.ean}"></td>
+                            <td>
+                                <a th:unless="${isSuperAdmin}"
+                                   th:href="@{/dashboard/warehouse-documents/delivery-mfn-history(deliveryId=${delivery.deliveryId}, mfn=${item.mfn})}"
+                                   th:text="${item.mfn}"></a>
+                                <span th:if="${isSuperAdmin}" th:text="${item.mfn}"></span>
+                            </td>
+                            <td th:text="${item.unitCost}"></td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
             <h2 th:text="#{deliveries.allocations}"></h2>
