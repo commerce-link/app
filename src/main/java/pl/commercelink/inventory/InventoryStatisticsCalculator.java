@@ -3,8 +3,10 @@ package pl.commercelink.inventory;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -18,6 +20,9 @@ final class InventoryStatisticsCalculator {
     static InventoryStatistics calculate(InventoryIndex globalIndex, Predicate<String> enabledGlobalSupplier, InventoryIndex ownIndex) {
         Tally tally = new Tally();
         boolean hasOwn = !ownIndex.all().isEmpty();
+        // an own group's key unions the eans/mfns of all its items, so it can match several global groups;
+        // it must join only the first one it matches, or it is counted into bySupplier more than once
+        Set<MatchedInventory> claimedOwnGroups = Collections.newSetFromMap(new IdentityHashMap<>());
         for (MatchedInventory group : globalIndex.all()) {
             List<InventoryItem> items = new ArrayList<>();
             for (InventoryItem item : group.getInventoryItems()) {
@@ -26,8 +31,11 @@ final class InventoryStatisticsCalculator {
                 }
             }
             if (hasOwn) {
-                // own offers for a product the platform already knows join that product instead of counting as a new one
-                ownIndex.findMatching(group.getInventoryKey()).forEach(own -> items.addAll(own.getInventoryItems()));
+                for (MatchedInventory own : ownIndex.findMatching(group.getInventoryKey())) {
+                    if (claimedOwnGroups.add(own)) {
+                        items.addAll(own.getInventoryItems());
+                    }
+                }
             }
             tally.add(items);
         }

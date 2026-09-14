@@ -64,6 +64,23 @@ class InventoryStatisticsCalculatorTest {
     }
 
     @Test
+    void ownGroupMatchingTwoGlobalGroupsJoinsOnlyTheFirstOne() {
+        // given
+        InventoryIndex global = InventoryIndex.of(List.of(
+                group("5900000000001", "A", item("5900000000001", "A", "Elko", 5)),
+                group("5900000000002", "B", item("5900000000002", "B", "Elko", 5))));
+        InventoryIndex own = InventoryIndex.of(List.of(
+                group("5900000000001", "B", item("5900000000001", "B", "Kosatec", 3))));
+
+        // when
+        InventoryStatistics stats = InventoryStatisticsCalculator.calculate(global, Set.of("Elko")::contains, own);
+
+        // then
+        assertThat(stats.distinctProducts()).isEqualTo(2);
+        assertThat(stats.bySupplier().get("Kosatec")).isEqualTo(new SupplierOfferStats(1, 1));
+    }
+
+    @Test
     void emptyIndexesGiveZeroes() {
         // when
         InventoryStatistics stats = InventoryStatisticsCalculator.calculate(
