@@ -13,8 +13,8 @@
   the operator staring at a conflict they cannot act on. A stored expression the builder cannot
   show is named in a note and kept as the value until the operator picks a new schedule.
 -->
-<div th:fragment="input(inputName, value, minInterval)" class="schedule-field"
-     th:attr="data-min-interval=${minInterval}">
+<div th:fragment="input(inputName, value, minInterval, defaultTextKey, units)" class="schedule-field"
+     th:attr="data-min-interval=${minInterval},data-default-text=#{${defaultTextKey}},data-units=${units}">
 
     <div class="tabs is-toggle is-small schedule-modes mb-2">
         <ul>
@@ -115,6 +115,8 @@
 
         function controller(field) {
             var minInterval = parseInt(field.getAttribute('data-min-interval'), 10) || 1;
+            var defaultText = field.getAttribute('data-default-text') || TEXT['default'];
+            var units = (field.getAttribute('data-units') || 'minutes,hours,days').split(',');
             var q = function (selector) { return field.querySelector(selector); };
             var input = q('.schedule-input');
             var tabs = Array.prototype.slice.call(field.querySelectorAll('.schedule-modes li'));
@@ -129,6 +131,9 @@
             var mode = 'default';
             var supported = true;
 
+            Array.prototype.slice.call(everyUnit.options).forEach(function (option) {
+                if (units.indexOf(option.value) < 0) { option.remove(); }
+            });
             fill(minute, MINUTES, pad);
             for (var hour = 0; hour < 24; hour++) {
                 var button = document.createElement('button');
@@ -186,7 +191,7 @@
             }
 
             function describe() {
-                if (mode === 'default') { return TEXT['default']; }
+                if (mode === 'default') { return defaultText; }
                 if (mode === 'every') {
                     return format(TEXT['every.' + everyUnit.value], everyValue.value) + '. ' + TEXT.timezone;
                 }
@@ -216,6 +221,10 @@
                 render();
             }
 
+            function offers(unit, value) {
+                return units.indexOf(unit) >= 0 && EVERY_VALUES[unit].indexOf(parseInt(value, 10)) >= 0;
+            }
+
             function parse(expression) {
                 var value = String(expression || '').trim().replace(/\s+/g, ' ').toUpperCase();
                 if (value === '') { setMode('default'); return true; }
@@ -223,22 +232,23 @@
                 if (f.length !== 6 || f[3] !== '*' || f[5] !== '*') { return false; }
                 if (f[2] === '*' && f[4] === '?') {
                     if ((m = /^0\/(\d{1,2})$/.exec(f[0])) && f[1] === '*') {
-                        if (EVERY_VALUES.minutes.indexOf(parseInt(m[1], 10)) < 0) { return false; }
+                        if (!offers('minutes', m[1])) { return false; }
                         setMode('every'); everyUnit.value = 'minutes'; everyOptions('minutes', m[1]);
                         return everyValue.value === m[1];
                     }
                     if (f[0] === '0' && f[1] === '*') {
+                        if (!offers('hours', '1')) { return false; }
                         setMode('every'); everyUnit.value = 'hours'; everyOptions('hours', '1');
                         return true;
                     }
                     if (f[0] === '0' && (m = /^0\/(\d{1,2})$/.exec(f[1]))) {
-                        if (EVERY_VALUES.hours.indexOf(parseInt(m[1], 10)) < 0) { return false; }
+                        if (!offers('hours', m[1])) { return false; }
                         setMode('every'); everyUnit.value = 'hours'; everyOptions('hours', m[1]);
                         return everyValue.value === m[1];
                     }
                 }
                 if (f[0] === '0' && f[1] === '0' && (m = /^1\/(\d{1,2})$/.exec(f[2])) && f[4] === '?') {
-                    if (EVERY_VALUES.days.indexOf(parseInt(m[1], 10)) < 0) { return false; }
+                    if (!offers('days', m[1])) { return false; }
                     setMode('every'); everyUnit.value = 'days'; everyOptions('days', m[1]);
                     return everyValue.value === m[1];
                 }

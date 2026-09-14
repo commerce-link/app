@@ -8,6 +8,8 @@ import pl.commercelink.starter.dynamodb.DynamoDbLocalDateTimeConverter;
 
 import java.time.LocalDateTime;
 
+import static org.apache.commons.lang3.StringUtils.isNotBlank;
+
 @DynamoDBDocument
 public class MarketplaceIntegration {
 
@@ -60,5 +62,9 @@ public class MarketplaceIntegration {
 
     public void setOrdersImportSchedule(String ordersImportSchedule) {
         this.ordersImportSchedule = ordersImportSchedule;
+    }
+
+    public boolean hasOwnOrdersImportSchedule() {
+        return isNotBlank(ordersImportSchedule);
     }
 }

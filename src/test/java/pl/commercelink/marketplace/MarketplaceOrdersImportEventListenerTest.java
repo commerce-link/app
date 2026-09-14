@@ -119,6 +119,40 @@ class MarketplaceOrdersImportEventListenerTest {
     }
 
     @Test
+    void theGlobalScheduleLeavesStoresWithTheirOwnScheduleToThatSchedule() {
+        // given
+        Store global = storeWithIntegration("store-1", "Allegro", true);
+        Store ownSchedule = storeWithIntegration("store-2", "Allegro", true);
+        ownSchedule.getMarketplaceIntegration("Allegro").setOrdersImportSchedule("0/15 * * * ? *");
+        when(storesRepository.findAll()).thenReturn(List.of(global, ownSchedule));
+        when(providerFactory.get(global, "Allegro")).thenReturn(provider);
+        when(provider.fetchOrders()).thenReturn(List.of(order));
+
+        // when
+        listener.handleMessage(new MarketplaceOrdersImportEventListener.MarketplaceOrderPayload("Allegro", null));
+
+        // then
+        verify(marketplaceOrderImporter).importOrder(global, "Allegro", order);
+        verify(providerFactory, never()).get(ownSchedule, "Allegro");
+    }
+
+    @Test
+    void aStoreWithItsOwnScheduleIsStillImportedWhenAddressedByIt() {
+        // given
+        Store ownSchedule = storeWithIntegration("store-2", "Allegro", true);
+        ownSchedule.getMarketplaceIntegration("Allegro").setOrdersImportSchedule("0/15 * * * ? *");
+        when(storesRepository.findById("store-2")).thenReturn(ownSchedule);
+        when(providerFactory.get(ownSchedule, "Allegro")).thenReturn(provider);
+        when(provider.fetchOrders()).thenReturn(List.of(order));
+
+        // when
+        listener.handleMessage(new MarketplaceOrdersImportEventListener.MarketplaceOrderPayload("Allegro", "store-2"));
+
+        // then
+        verify(marketplaceOrderImporter).importOrder(ownSchedule, "Allegro", order);
+    }
+
+    @Test
     void schedulerPayloadWithoutStoreIdImportsEveryActiveStoreAndAdvancesTheMarker() throws Exception {
         // given
         Store store = storeWithIntegration("store-1", "Allegro", true);

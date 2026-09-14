@@ -374,7 +374,7 @@
                                  as the credential fields above. -->
                             <div class="field" id="supplier-schedule-wrap">
                                 <label class="label" th:text="#{store.supplier.feed.schedule}"></label>
-                                <div th:replace="~{fragments/schedule-field :: input('feedSchedule', '', ${scheduleMinIntervalMinutes})}"></div>
+                                <div th:replace="~{fragments/schedule-field :: input('feedSchedule', '', ${scheduleMinIntervalMinutes}, 'store.supplier.schedule.summary.default', 'minutes,hours,days')}"></div>
                             </div>
 
                             <div class="field is-grouped mt-4">

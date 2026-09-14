@@ -20,7 +20,6 @@ import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.dtos.IntegrationCredentialsForm;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -52,7 +51,6 @@ class StoreIntegrationsControllerTest {
     @Mock
     private MessageSource messageSource;
 
-    @Mock
     private Store store;
 
     private MockedStatic<CustomSecurityContext> securityStub;
@@ -63,8 +61,9 @@ class StoreIntegrationsControllerTest {
     void setUp() {
         securityStub = mockStatic(CustomSecurityContext.class);
         securityStub.when(CustomSecurityContext::getStoreId).thenReturn("store-1");
+        store = new Store();
+        store.setStoreId("store-1");
         when(storesRepository.findById("store-1")).thenReturn(store);
-        lenient().when(store.getStoreId()).thenReturn("store-1");
         lenient().when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenReturn("ok");
         controller = new StoreIntegrationsController(storesRepository, shippingProviderFactory,
                 invoicingProviderFactory, paymentProviderFactory, marketplaceProviderFactory, ordersImportScheduler, messageSource);
@@ -87,16 +86,13 @@ class StoreIntegrationsControllerTest {
     void savedDeviceFlowMarketplaceStartsAsRequiringAuthorization() {
         // given
         when(marketplaceProviderFactory.deviceAuthProviders()).thenReturn(List.of("Allegro"));
-        when(store.getMarketplaceIntegration("Allegro")).thenReturn(null);
-        List<MarketplaceIntegration> marketplaces = new ArrayList<>();
-        when(store.getMarketplaces()).thenReturn(marketplaces);
 
         // when
         controller.saveIntegrationCredentials(marketplaceForm("Allegro"), Locale.getDefault(), new RedirectAttributesModelMap());
 
         // then
-        assertEquals(1, marketplaces.size());
-        assertFalse(marketplaces.get(0).isLoggedIn());
+        assertEquals(1, store.getMarketplaces().size());
+        assertFalse(store.getMarketplaces().get(0).isLoggedIn());
         verify(storesRepository).save(store);
     }
 
@@ -104,28 +100,28 @@ class StoreIntegrationsControllerTest {
     void savedManualTokenMarketplaceStartsConnected() {
         // given
         when(marketplaceProviderFactory.deviceAuthProviders()).thenReturn(List.of());
-        when(store.getMarketplaceIntegration("Morele")).thenReturn(null);
-        List<MarketplaceIntegration> marketplaces = new ArrayList<>();
-        when(store.getMarketplaces()).thenReturn(marketplaces);
 
         // when
         controller.saveIntegrationCredentials(marketplaceForm("Morele"), Locale.getDefault(), new RedirectAttributesModelMap());
 
         // then
-        assertTrue(marketplaces.get(0).isLoggedIn());
+        assertTrue(store.getMarketplaces().get(0).isLoggedIn());
     }
 
     @Test
     void resavingCredentialsForDeviceFlowProviderDoesNotFakeRestoredConnection() {
         // given
         when(marketplaceProviderFactory.deviceAuthProviders()).thenReturn(List.of("Allegro"));
-        when(store.getMarketplaceIntegration("Allegro")).thenReturn(new MarketplaceIntegration("Allegro"));
+        MarketplaceIntegration lost = new MarketplaceIntegration("Allegro");
+        lost.setLoggedIn(false);
+        store.getMarketplaces().add(lost);
 
         // when
         controller.saveIntegrationCredentials(marketplaceForm("Allegro"), Locale.getDefault(), new RedirectAttributesModelMap());
 
         // then
-        verify(store, never()).markConnectionAsRestored("Allegro");
+        assertFalse(lost.isLoggedIn());
+        assertEquals(1, store.getMarketplaces().size());
         verify(storesRepository).save(store);
     }
 
@@ -133,18 +129,21 @@ class StoreIntegrationsControllerTest {
     void resavingCredentialsForManualTokenProviderRestoresConnection() {
         // given
         when(marketplaceProviderFactory.deviceAuthProviders()).thenReturn(List.of());
-        when(store.getMarketplaceIntegration("Morele")).thenReturn(new MarketplaceIntegration("Morele"));
+        MarketplaceIntegration lost = new MarketplaceIntegration("Morele");
+        lost.setLoggedIn(false);
+        store.getMarketplaces().add(lost);
 
         // when
         controller.saveIntegrationCredentials(marketplaceForm("Morele"), Locale.getDefault(), new RedirectAttributesModelMap());
 
         // then
-        verify(store).markConnectionAsRestored("Morele");
+        assertTrue(lost.isLoggedIn());
     }
 
     @Test
     void disconnectingMarketplaceRemovesItsOrdersImportSchedule() {
         // given
+        store.getMarketplaces().add(new MarketplaceIntegration("Allegro"));
         IntegrationCredentialsForm form = new IntegrationCredentialsForm();
         form.setProviderType("marketplace");
         form.setProviderName("Allegro");
@@ -153,7 +152,7 @@ class StoreIntegrationsControllerTest {
         controller.disconnectIntegration(form, Locale.getDefault(), new RedirectAttributesModelMap());
 
         // then
-        verify(store).removeMarketplaceIntegration("Allegro");
+        assertTrue(store.getMarketplaces().isEmpty());
         verify(ordersImportScheduler).delete("store-1", "Allegro");
         verify(storesRepository).save(store);
     }

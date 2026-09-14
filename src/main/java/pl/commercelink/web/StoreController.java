@@ -16,7 +16,7 @@ import pl.commercelink.inventory.supplier.SupplierConnectionViewFactory;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.provider.api.ProviderField;
 import pl.commercelink.stores.ConnectionMode;
-import pl.commercelink.marketplace.MarketplaceOrdersImportScheduler;
+import pl.commercelink.marketplace.MarketplaceConnectionService;
 import pl.commercelink.marketplace.MarketplaceProviderFactory;
 import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
@@ -27,8 +27,6 @@ import pl.commercelink.products.PimCategoryOptions;
 import pl.commercelink.shipping.ShippingProviderFactory;
 import pl.commercelink.shipping.api.Carrier;
 import pl.commercelink.shipping.api.ShippingProviderDescriptor;
-import pl.commercelink.scheduling.InvalidScheduleException;
-import pl.commercelink.scheduling.PollingSchedule;
 import pl.commercelink.stores.*;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.web.dtos.CarrierSelectionForm;
@@ -48,7 +46,7 @@ public class StoreController {
     private int scheduleMinIntervalMinutes;
 
     @Autowired
-    private MarketplaceOrdersImportScheduler ordersImportScheduler;
+    private MarketplaceConnectionService marketplaceConnectionService;
 
     @Autowired
     private StoresRepository storesRepository;
@@ -581,73 +579,15 @@ public class StoreController {
             return "error";
         }
 
-        StoreForm form = new StoreForm(store);
-        form.setProviderConfiguration(new HashMap<>());
-
-        List<String> deviceAuthProviders = marketplaceProviderFactory.deviceAuthProviders();
-        List<ConnectedIntegration> integrations = store.getMarketplaces().stream()
-                .map(m -> new ConnectedIntegration(m.getName(), m.isLoggedIn(), false,
-                        deviceAuthProviders.contains(m.getName())))
-                .toList();
-
-        model.addAttribute("form", form);
-        model.addAttribute("availableProviders", marketplaceProviderFactory.availableProviders());
-        model.addAttribute("selectedProviderName", form.getMarketplace());
-        model.addAttribute("connectedIntegrations", integrations);
-        model.addAttribute("deviceAuthProviders", deviceAuthProviders);
+        MarketplaceSectionModel.render(marketplaceConnectionService, store, null, model);
+        model.addAttribute("basePath", SupplierSectionModel.basePath(storeId));
         model.addAttribute("isSuperAdmin", isSuperAdmin());
-        model.addAttribute("importSchedules", store.getMarketplaces().stream()
-                .collect(Collectors.toMap(MarketplaceIntegration::getName,
-                        m -> m.getOrdersImportSchedule() == null ? "" : m.getOrdersImportSchedule(),
-                        (first, second) -> first, LinkedHashMap::new)));
-        model.addAttribute("scheduleMinIntervalMinutes", scheduleMinIntervalMinutes);
+        model.addAttribute("allMarketplaces", marketplaceProviderFactory.availableProviders());
+        model.addAttribute("marketplaceConfigurations", marketplaceConnectionService.configurationsForUI(store));
+        model.addAttribute("marketplacesWithStoredConfig", marketplaceConnectionService.marketplacesWithStoredConfiguration(store));
+        model.addAttribute("scheduleMinIntervalMinutes", marketplaceConnectionService.minIntervalMinutes());
 
         return "store-marketplaces";
-    }
-
-    @PostMapping("/dashboard/store/marketplaces/schedule")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
-    public String updateMarketplaceOrdersImportSchedule(@RequestParam String storeId,
-                                                        @RequestParam String marketplace,
-                                                        @RequestParam(required = false) String schedule,
-                                                        Locale locale,
-                                                        RedirectAttributes redirectAttributes) {
-        String targetStoreId = isSuperAdmin() ? storeId : getStoreId();
-        Store store = storesRepository.findById(targetStoreId);
-        MarketplaceIntegration integration = store != null ? store.getMarketplaceIntegration(marketplace) : null;
-        if (integration == null) {
-            redirectAttributes.addFlashAttribute("errorMessage",
-                    messageSource.getMessage("store.marketplaces.import.schedule.error.missing", new Object[]{marketplace}, locale));
-            return redirectToMarketplaces(targetStoreId);
-        }
-        String normalized = PollingSchedule.normalizeOrNull(schedule);
-        if (normalized != null) {
-            try {
-                PollingSchedule.parse(normalized, scheduleMinIntervalMinutes);
-            } catch (InvalidScheduleException e) {
-                String code = e.getReason() == InvalidScheduleException.Reason.TOO_FREQUENT
-                        ? "store.marketplaces.import.schedule.error.too.frequent"
-                        : "store.marketplaces.import.schedule.error.invalid";
-                redirectAttributes.addFlashAttribute("errorMessage",
-                        messageSource.getMessage(code, new Object[]{marketplace, normalized, scheduleMinIntervalMinutes}, locale));
-                return redirectToMarketplaces(targetStoreId);
-            }
-        }
-        ordersImportScheduler.apply(targetStoreId, marketplace, normalized);
-        integration.setOrdersImportSchedule(normalized);
-        storesRepository.save(store);
-        String code = normalized != null
-                ? "store.marketplaces.import.schedule.updated"
-                : "store.marketplaces.import.schedule.cleared";
-        redirectAttributes.addFlashAttribute("successMessage",
-                messageSource.getMessage(code, new Object[]{marketplace}, locale));
-        return redirectToMarketplaces(targetStoreId);
-    }
-
-    private String redirectToMarketplaces(String storeId) {
-        return isSuperAdmin()
-                ? String.format("redirect:/dashboard/store/%s/marketplaces", storeId)
-                : "redirect:/dashboard/store/marketplaces";
     }
 
     @GetMapping("/dashboard/store/company-details")

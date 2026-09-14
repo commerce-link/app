@@ -71,17 +71,8 @@ public class StoreIntegrationsController {
             case "shipping" -> store.setConfigurationValue(IntegrationType.SHIPPING_PROVIDER, providerName);
             case "invoicing" -> store.setConfigurationValue(IntegrationType.INVOICING_PROVIDER, providerName);
             case "payments" -> store.addPaymentIntegration(providerName);
-            case "marketplace" -> {
-                MarketplaceIntegration integration = store.getMarketplaceIntegration(providerName);
-                boolean requiresDeviceAuth = marketplaceProviderFactory.deviceAuthProviders().contains(providerName);
-                if (integration == null) {
-                    MarketplaceIntegration created = new MarketplaceIntegration(providerName);
-                    created.setLoggedIn(!requiresDeviceAuth);
-                    store.getMarketplaces().add(created);
-                } else if (!requiresDeviceAuth) {
-                    store.markConnectionAsRestored(providerName);
-                }
-            }
+            case "marketplace" -> store.connectMarketplace(providerName,
+                    marketplaceProviderFactory.deviceAuthProviders().contains(providerName));
         }
 
         storesRepository.save(store);

@@ -20,7 +20,7 @@ class ScheduleFieldFragmentTest {
     @Test
     void theInputFragmentSubmitsUnderTheNameTheSupplierFormExpects() {
         // when
-        String html = render("input('feedSchedule', '0 5 * * ? *', 5)");
+        String html = render("input('feedSchedule', '0 5 * * ? *', 5, 'store.supplier.schedule.summary.default', 'minutes,hours,days')");
 
         // then
         assertThat(html).contains("name=\"feedSchedule\"");
@@ -31,7 +31,7 @@ class ScheduleFieldFragmentTest {
     @Test
     void theInputFragmentResolvesEveryMessageItUses() {
         // when
-        String html = render("input('feedSchedule', '', 5)");
+        String html = render("input('feedSchedule', '', 5, 'store.supplier.schedule.summary.default', 'minutes,hours,days')");
 
         // then
         assertThat(html).doesNotContain("??");
@@ -41,7 +41,7 @@ class ScheduleFieldFragmentTest {
     @Test
     void theExpressionTravelsInAHiddenFieldWithNoCronInputForTheOperator() {
         // the builder is the only way to set a schedule; a raw cron field was dropped on purpose
-        String html = render("input('feedSchedule', '0 5 * * ? *', 5)");
+        String html = render("input('feedSchedule', '0 5 * * ? *', 5, 'store.supplier.schedule.summary.default', 'minutes,hours,days')");
 
         // then
         assertThat(html).containsPattern("<input type=\"hidden\" class=\"schedule-input\"[^>]*name=\"feedSchedule\"");
@@ -52,7 +52,7 @@ class ScheduleFieldFragmentTest {
     @Test
     void theInputFragmentOffersThreeModesAndNoConflictWarning() {
         // when
-        String html = render("input('feedSchedule', '', 5)");
+        String html = render("input('feedSchedule', '', 5, 'store.supplier.schedule.summary.default', 'minutes,hours,days')");
 
         // then
         assertThat(html).contains("data-mode=\"default\"");
@@ -61,6 +61,29 @@ class ScheduleFieldFragmentTest {
         // "at" schedules pick hours plus one minute, so the unrepresentable combination the old
         // builder warned about cannot be reached any more
         assertThat(html).doesNotContain("schedule-exact-conflict");
+    }
+
+    @Test
+    void theInputFragmentCarriesTheDefaultTextAndUnitsItWasGiven() {
+        // when
+        String html = render("input('schedule', '', 5, 'store.marketplaces.schedule.summary.default', 'minutes,hours')");
+
+        // then
+        assertThat(html).contains("data-default-text=\"Default — every 10 min\"");
+        assertThat(html).contains("data-units=\"minutes,hours\"");
+        assertThat(html).doesNotContain("once a day");
+    }
+
+    @Test
+    void theScriptReadsTheDefaultTextAndUnitsOffTheFieldInsteadOfHardCodingThem() {
+        // when
+        String html = render("script");
+
+        // then
+        assertThat(html).contains("field.getAttribute('data-default-text')");
+        assertThat(html).contains("field.getAttribute('data-units')");
+        assertThat(html).contains("if (units.indexOf(option.value) < 0) { option.remove(); }");
+        assertThat(html).contains("function offers(unit, value)");
     }
 
     @Test

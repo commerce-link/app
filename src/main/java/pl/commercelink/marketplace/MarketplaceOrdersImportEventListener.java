@@ -37,7 +37,7 @@ public class MarketplaceOrdersImportEventListener {
                 ? addressedStore(payload.getStoreId(), marketplace)
                 : storesRepository.findAll()
                         .stream()
-                        .filter(s -> s.hasActiveMarketplaceIntegration(marketplace))
+                        .filter(s -> s.importsOrdersOnGlobalSchedule(marketplace))
                         .toList();
 
         log.info("Marketplace {} orders import started: stores={}", marketplace, stores.size());
@@ -84,7 +84,6 @@ public class MarketplaceOrdersImportEventListener {
                 fetchDurationInMs, elapsed.inMillis());
     }
 
-    /** Scheduler payload: {"marketplace":"Allegro"} from the global schedule, plus "storeId" from a per-store one. */
     public static class MarketplaceOrderPayload {
 
         private String marketplace;

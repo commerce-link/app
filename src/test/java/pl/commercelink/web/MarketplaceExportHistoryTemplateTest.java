@@ -15,6 +15,7 @@ import org.thymeleaf.web.IWebExchange;
 import org.thymeleaf.web.servlet.JakartaServletWebApplication;
 import pl.commercelink.marketplace.MarketplaceExportRunHeader;
 import pl.commercelink.marketplace.MarketplaceExportRunId;
+import pl.commercelink.marketplace.MarketplaceIntegrationView;
 import pl.commercelink.marketplace.MarketplaceOfferSnapshot;
 import pl.commercelink.web.dtos.ConnectedIntegration;
 
@@ -330,10 +331,16 @@ class MarketplaceExportHistoryTemplateTest {
 
     private String renderMarketplacesPage() {
         WebContext context = webContext();
-        context.setVariable("connectedIntegrations", List.of(new ConnectedIntegration("allegro", true)));
-        context.setVariable("availableProviders", List.of());
-        context.setVariable("selectedProviderName", "allegro");
-        context.setVariable("form", new StubStoreForm());
+        context.setVariable("sectionRows", List.of(
+                new MarketplaceIntegrationView("allegro", "Allegro", true, true, null, null)));
+        context.setVariable("sectionAddDisabled", false);
+        context.setVariable("sectionSuccessMessage", null);
+        context.setVariable("sectionMarketplacesWithStoredConfig", "allegro");
+        context.setVariable("sectionBasePath", "/dashboard/store");
+        context.setVariable("basePath", "/dashboard/store");
+        context.setVariable("allMarketplaces", List.of());
+        context.setVariable("marketplaceConfigurations", Map.of());
+        context.setVariable("scheduleMinIntervalMinutes", 5);
         context.setVariable("isSuperAdmin", false);
         return templateEngine().process("store-marketplaces", context);
     }
@@ -401,24 +408,6 @@ class MarketplaceExportHistoryTemplateTest {
         engine.setTemplateResolver(resolver);
         engine.setMessageResolver(new PolishMessages());
         return engine;
-    }
-
-    public static class StubStoreForm {
-
-        public Map<String, String> getProviderConfiguration() {
-            return Map.of();
-        }
-
-        public StubStore getStore() {
-            return new StubStore();
-        }
-    }
-
-    public static class StubStore {
-
-        public String getStoreId() {
-            return "store-1";
-        }
     }
 
     private static class PolishMessages implements IMessageResolver {
