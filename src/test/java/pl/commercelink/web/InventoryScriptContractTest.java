@@ -55,4 +55,13 @@ class InventoryScriptContractTest {
         // when / then
         assertThat(css).contains(".cl-status.is-info").contains("var(--cl-info)").contains("--cl-ok-tint");
     }
+
+    @Test
+    void styleSheetForcesHiddenElementsToStayHidden() throws Exception {
+        // given
+        String css = read("src/main/resources/static/css/inventory.css");
+
+        // when / then
+        assertThat(css).contains(".cl-inv-page [hidden]");
+    }
 }

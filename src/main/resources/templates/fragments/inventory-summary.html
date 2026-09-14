@@ -110,8 +110,9 @@
     </th:block>
     <th:block th:unless="${externalWarehouse}">
         <span class="cl-inv-number" th:text="${#numbers.formatInteger(warehouseSummary.products(), 1, 'WHITESPACE')}"></span>
-        <span class="cl-inv-hint"
-              th:text="#{inventory.tile.warehouse.hint(${warehouseSummary.inStockQty()}, ${warehouseSummary.inDeliveryQty()})}"></span>
+        <span class="cl-inv-hint"><span th:text="#{inventory.tile.warehouse.hint(${warehouseSummary.inStockQty()})}"></span><span
+                th:if="${warehouseSummary.inDeliveryQty() > 0}"
+                th:text="#{inventory.tile.warehouse.inDelivery(${warehouseSummary.inDeliveryQty()})}"></span></span>
     </th:block>
 </li>
 

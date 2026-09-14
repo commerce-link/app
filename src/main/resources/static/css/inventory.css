@@ -15,6 +15,13 @@
     --cl-ok-tint: #f3f8f5;
 }
 
+/* Several rules below (.cl-inv-errorbar, .cl-inv-load-error, ...) set their own `display`, which beats
+   the UA [hidden] rule at equal specificity once the source order tips their way; JS relies on toggling
+   the `hidden` attribute to hide/show these elements, so pin it here with higher specificity. */
+.cl-inv-page [hidden] {
+    display: none !important;
+}
+
 .cl-status {
     display: inline-flex;
     align-items: center;
@@ -749,13 +756,14 @@
 .cl-inv-link:focus-visible,
 .cl-inv-iconbtn:focus-visible,
 .cl-inv-clear:focus-visible,
-.cl-inv-sort:focus-visible,
-.cl-inv-page [data-inventory-results-heading]:focus-visible {
+.cl-inv-sort:focus-visible {
     outline: 2px solid var(--cl-accent);
     outline-offset: 2px;
 }
 
-.cl-inv-page [data-inventory-results-heading]:focus:not(:focus-visible) {
+/* Results headings are non-interactive focus targets (script moves focus there after a search purely
+   for screen-reader announcement), so they never get the interactive-element outline treatment. */
+.cl-inv-page [data-inventory-results-heading]:focus {
     outline: none;
 }
 

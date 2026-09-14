@@ -108,4 +108,18 @@ class InventorySummaryRenderingTest {
         assertThat(externalHtml).contains("External warehouse").contains("href=\"/dashboard/warehouse\"");
         assertThat(countedHtml + externalHtml).doesNotContain("??");
     }
+
+    @Test
+    void warehouseTileHidesTheInTransitNoteWhenNothingIsInDelivery() {
+        // given
+        Context noneInDelivery = context(InventorySourcesView.EMPTY, true);
+        noneInDelivery.setVariable("externalWarehouse", false);
+        noneInDelivery.setVariable("warehouseSummary", new StockSummary(184, 612, 0));
+
+        // when
+        String html = engine.process(WAREHOUSE, noneInDelivery);
+
+        // then
+        assertThat(html).contains("612 pcs in stock").doesNotContain("in transit");
+    }
 }
