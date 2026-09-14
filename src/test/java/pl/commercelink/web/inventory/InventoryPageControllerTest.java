@@ -221,8 +221,23 @@ class InventoryPageControllerTest {
     @Test
     void legacyCheckPriceMfnLinksRedirectToTheNewQuery() {
         // when / then
+        // URLEncoder encodes a space as '+'; the servlet container decodes '+' back to a space in a query string
         assertThat(controller.legacyCheckPrice("MFN 1", "5901234123457", null))
-                .isEqualTo("redirect:/dashboard/inventory?q=MFN%201");
+                .isEqualTo("redirect:/dashboard/inventory?q=MFN+1");
+    }
+
+    @Test
+    void legacyCheckPriceEncodesAPlusSoItIsNotDecodedAsASpace() {
+        // when / then
+        assertThat(controller.legacyCheckPrice("A+B", "5901234123457", null))
+                .isEqualTo("redirect:/dashboard/inventory?q=A%2BB");
+    }
+
+    @Test
+    void legacyCheckPriceEncodesCurlyBracesSoTheyAreNotTreatedAsAUriTemplateVariable() {
+        // when / then
+        assertThat(controller.legacyCheckPrice("{x}", "5901234123457", null))
+                .isEqualTo("redirect:/dashboard/inventory?q=%7Bx%7D");
     }
 
     @Test

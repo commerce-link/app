@@ -7,7 +7,6 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.util.UriComponentsBuilder;
 import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.InventoryStatistics;
 import pl.commercelink.inventory.search.InventorySearch;
@@ -17,6 +16,8 @@ import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.warehouse.api.StockSummary;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.stream.Stream;
 
@@ -97,7 +98,9 @@ public class InventoryPageController {
                 .map(InventoryPageController::normalize)
                 .filter(value -> !value.isEmpty())
                 .findFirst()
-                .map(query -> "redirect:" + UriComponentsBuilder.fromPath(PAGE_PATH).queryParam("q", query).encode().build().toUriString())
+                // UriComponentsBuilder#encode() leaves '+' unencoded (decoded as a space) and turns "{x}" into
+                // a URI template variable that RedirectView then fails to resolve
+                .map(query -> "redirect:" + PAGE_PATH + "?q=" + URLEncoder.encode(query, StandardCharsets.UTF_8))
                 .orElse("redirect:" + PAGE_PATH);
     }
 
