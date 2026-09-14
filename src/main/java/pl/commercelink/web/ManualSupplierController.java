@@ -141,9 +141,10 @@ public class ManualSupplierController {
                                 @RequestParam(name = "includeInFulfilment", defaultValue = "false") boolean includeInFulfilment,
                                 @RequestParam(name = "externalSupplierId", required = false) String externalSupplierId,
                                 @RequestParam(name = "label", required = false) String label,
+                                @RequestParam(name = "billingShortcut", required = false) String billingShortcut,
                                 Locale locale, Model model, HttpServletResponse response) {
         return doSaveSelection(currentStoreId(), identity, enabled, includeInPricing, includeInFulfilment,
-                externalSupplierId, label, locale, model, response);
+                externalSupplierId, label, billingShortcut, locale, model, response);
     }
 
     @PostMapping("/dashboard/store/{storeId}/fulfilment/manual-supplier/{identity}")
@@ -154,14 +155,16 @@ public class ManualSupplierController {
                                         @RequestParam(name = "includeInFulfilment", defaultValue = "false") boolean includeInFulfilment,
                                         @RequestParam(name = "externalSupplierId", required = false) String externalSupplierId,
                                         @RequestParam(name = "label", required = false) String label,
+                                        @RequestParam(name = "billingShortcut", required = false) String billingShortcut,
                                         Locale locale, Model model, HttpServletResponse response) {
         return doSaveSelection(storeId, identity, enabled, includeInPricing, includeInFulfilment, externalSupplierId,
-                label, locale, model, response);
+                label, billingShortcut, locale, model, response);
     }
 
     private String doSaveSelection(String storeId, String identity, boolean enabled,
                                    boolean includeInPricing, boolean includeInFulfilment, String externalSupplierId,
-                                   String label, Locale locale, Model model, HttpServletResponse response) {
+                                   String label, String billingShortcut, Locale locale, Model model,
+                                   HttpServletResponse response) {
         Store store = storesRepository.findById(storeId);
         if (store == null) {
             return SupplierSectionModel.renderErrorFragment(
@@ -169,7 +172,7 @@ public class ManualSupplierController {
         }
         ManualSupplierService.Result result = manualSupplierService.applySelections(storeId, List.of(
                 new ManualSupplierService.ManualSelection(identity, enabled, includeInPricing, includeInFulfilment,
-                        externalSupplierId, label)));
+                        externalSupplierId, label, billingShortcut)));
         if (!result.ok()) {
             return SupplierSectionModel.renderErrorFragment(
                     messageSource.getMessage(result.messageCode(), null, locale), model, response);

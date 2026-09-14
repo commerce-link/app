@@ -843,6 +843,13 @@
                                 <p class="help" th:text="#{store.supplier.external.id.description}"></p>
                             </div>
                             <div class="field">
+                                <label class="label" th:text="#{store.supplier.billing.shortcut}"></label>
+                                <div class="control">
+                                    <input class="input" type="text" name="billingShortcut" id="manual-config-billing-shortcut" />
+                                </div>
+                                <p class="help" th:text="#{store.supplier.billing.shortcut.help}"></p>
+                            </div>
+                            <div class="field">
                                 <button type="button" class="button is-link is-light is-small"
                                         id="manual-config-upload" th:text="#{store.manual.upload.open}"></button>
                                 <span class="icon has-text-grey ml-1 cl-tooltip"
@@ -900,6 +907,7 @@
                     var configPricing = document.getElementById('manual-config-pricing');
                     var configFulfilment = document.getElementById('manual-config-fulfilment');
                     var configExternalId = document.getElementById('manual-config-external-id');
+                    var configBillingShortcut = document.getElementById('manual-config-billing-shortcut');
                     var configUpload = document.getElementById('manual-config-upload');
                     var configFile = document.getElementById('manual-config-file');
                     var configFileInput = document.getElementById('manual-config-file-input');
@@ -927,7 +935,8 @@
                             includeInPricing: tr.dataset.includePricing === 'true',
                             includeInFulfilment: tr.dataset.includeFulfilment === 'true',
                             feedLastModified: tr.dataset.feedLastModified || null,
-                            externalSupplierId: tr.dataset.externalSupplierId || ''
+                            externalSupplierId: tr.dataset.externalSupplierId || '',
+                            billingShortcut: tr.dataset.billingShortcut || ''
                         };
                     }
 
@@ -1077,6 +1086,7 @@
                         configPricing.checked = row.includeInPricing;
                         configFulfilment.checked = row.includeInFulfilment;
                         configExternalId.value = row.externalSupplierId;
+                        configBillingShortcut.value = row.billingShortcut;
                         configFile.textContent = fileUploaded ? feedPresentLabel : feedMissingLabel;
                         configFileInput.value = '';
                         configError.classList.add('is-hidden');

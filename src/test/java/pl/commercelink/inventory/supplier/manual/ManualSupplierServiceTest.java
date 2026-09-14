@@ -99,11 +99,33 @@ class ManualSupplierServiceTest {
 
         // when
         ManualSupplierService.Result result = service.applySelections("store-1", List.of(
-                new ManualSupplierService.ManualSelection("manual-k7f3a9c2", true, true, true, null, "warehouse")));
+                new ManualSupplierService.ManualSelection("manual-k7f3a9c2", true, true, true, null, "warehouse", null)));
 
         // then
         assertEquals("store.supplier.connection.error.label.reserved", result.messageCode());
         verify(storesRepository, never()).save(any());
+    }
+
+    @Test
+    void applySelectionsStoresTheBillingShortcut() {
+        // given
+        StoreSupplierConnection connection = new StoreSupplierConnection("manual-k7f3a9c2", ConnectionMode.MANUAL, true, true);
+        Store store = storeWith(connection);
+        when(storesRepository.findById("store-1")).thenReturn(store);
+
+        // when
+        service.applySelections("store-1", List.of(
+                new ManualSupplierService.ManualSelection("manual-k7f3a9c2", false, true, true, null, null, "  HURT-A  ")));
+
+        // then
+        assertEquals("HURT-A", connection.getBillingShortcut());
+
+        // when -- a blank submission clears the shortcut instead of storing whitespace
+        service.applySelections("store-1", List.of(
+                new ManualSupplierService.ManualSelection("manual-k7f3a9c2", false, true, true, null, null, "   ")));
+
+        // then
+        assertEquals(null, connection.getBillingShortcut());
     }
 
     @Test
@@ -180,7 +202,7 @@ class ManualSupplierServiceTest {
         when(storesRepository.findById("store-1")).thenReturn(store);
         lenient().when(storeFeedRepository.canRead("store-1", "manual:Hurtownia A", "csv")).thenReturn(true);
         ManualSupplierService.ManualSelection selection =
-                new ManualSupplierService.ManualSelection("manual:Hurtownia A", false, false, true, " 2 ", null);
+                new ManualSupplierService.ManualSelection("manual:Hurtownia A", false, false, true, " 2 ", null, null);
 
         // when
         service.applySelections("store-1", List.of(selection));
@@ -201,7 +223,7 @@ class ManualSupplierServiceTest {
         when(storesRepository.findById("store-1")).thenReturn(store);
         when(storeFeedRepository.canRead("store-1", "manual:Hurtownia A", "csv")).thenReturn(false);
         ManualSupplierService.ManualSelection selection =
-                new ManualSupplierService.ManualSelection("manual:Hurtownia A", true, true, true, null, null);
+                new ManualSupplierService.ManualSelection("manual:Hurtownia A", true, true, true, null, null, null);
 
         // when
         service.applySelections("store-1", List.of(selection));
@@ -219,7 +241,7 @@ class ManualSupplierServiceTest {
         when(storesRepository.findById("store-1")).thenReturn(store);
         when(storeFeedRepository.canRead("store-1", "manual:Hurtownia A", "csv")).thenReturn(true);
         ManualSupplierService.ManualSelection selection =
-                new ManualSupplierService.ManualSelection("manual:Hurtownia A", true, true, true, null, null);
+                new ManualSupplierService.ManualSelection("manual:Hurtownia A", true, true, true, null, null, null);
 
         // when
         service.applySelections("store-1", List.of(selection));
@@ -241,7 +263,7 @@ class ManualSupplierServiceTest {
 
         // when
         service.applySelections("store-1", List.of(
-                new ManualSupplierService.ManualSelection("manual-k7f3a9c2", true, true, true, null, "Nowa")));
+                new ManualSupplierService.ManualSelection("manual-k7f3a9c2", true, true, true, null, "Nowa", null)));
 
         // then
         assertEquals("Nowa", connection.getLabel());
@@ -279,7 +301,7 @@ class ManualSupplierServiceTest {
 
         // when
         ManualSupplierService.Result result = service.applySelections("store-1", List.of(
-                new ManualSupplierService.ManualSelection("manual-k7f3a9c2", true, true, true, null, "   ")));
+                new ManualSupplierService.ManualSelection("manual-k7f3a9c2", true, true, true, null, "   ", null)));
 
         // then -- nothing is written and the caller learns why
         assertFalse(result.ok());
@@ -300,7 +322,7 @@ class ManualSupplierServiceTest {
 
         // when
         ManualSupplierService.Result result = service.applySelections("store-1", List.of(
-                new ManualSupplierService.ManualSelection("manual-k7f3a9c2", true, true, true, null, "hurtownia a")));
+                new ManualSupplierService.ManualSelection("manual-k7f3a9c2", true, true, true, null, "hurtownia a", null)));
 
         // then
         assertFalse(result.ok());
@@ -394,7 +416,7 @@ class ManualSupplierServiceTest {
 
         // when
         service.applySelections("store-1",
-                List.of(new ManualSupplierService.ManualSelection("manual:Hurtownia A", true, true, true, null, null)));
+                List.of(new ManualSupplierService.ManualSelection("manual:Hurtownia A", true, true, true, null, null, null)));
 
         // then
         verify(storeInventoryCache).evict("store-1");

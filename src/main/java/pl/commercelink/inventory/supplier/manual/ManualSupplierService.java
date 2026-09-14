@@ -50,7 +50,8 @@ public class ManualSupplierService {
     }
 
     public record ManualSelection(String identity, boolean enabled, boolean includeInPricing,
-                                  boolean includeInFulfilment, String externalSupplierId, String label) {
+                                  boolean includeInFulfilment, String externalSupplierId, String label,
+                                  String billingShortcut) {
     }
 
     public Result create(String storeId, String label) {
@@ -160,6 +161,7 @@ public class ManualSupplierService {
                     connection.setIncludeInPricing(selection.includeInPricing());
                     connection.setIncludeInFulfilment(selection.includeInFulfilment());
                     connection.setExternalSupplierId(StringUtils.trimToNull(selection.externalSupplierId()));
+                    connection.setBillingShortcut(StringUtils.trimToNull(selection.billingShortcut()));
                     String label = submittedLabel(selection);
                     if (label != null) {
                         connection.setLabel(label);
