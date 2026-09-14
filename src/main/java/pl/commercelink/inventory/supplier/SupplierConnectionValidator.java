@@ -9,6 +9,7 @@ import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.StoreSupplierConnection;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -40,7 +41,7 @@ public class SupplierConnectionValidator {
                 continue;
             }
             if (connection.getMode() == ConnectionMode.OWN) {
-                List<ProviderField> fields = supplierFields.getOrDefault(name, List.of());
+                List<ProviderField> fields = supplierFields.getOrDefault(SupplierIdentity.typeOf(name), List.of());
                 Map<String, String> config = submittedConfig.getOrDefault(name, Map.of());
                 boolean hasStored = suppliersWithStoredConfig.contains(name);
                 for (ProviderField field : fields) {
@@ -55,6 +56,21 @@ public class SupplierConnectionValidator {
                 }
                 validateSchedule(name, connection.getFeedSchedule(), errors);
             }
+        }
+        return errors;
+    }
+
+    public List<ErrorMessage> validateLabel(String label, ConnectionMode mode, Collection<String> otherLabels) {
+        List<ErrorMessage> errors = new ArrayList<>();
+        if (mode == ConnectionMode.GLOBAL) {
+            return errors;
+        }
+        if (isBlank(label)) {
+            errors.add(ErrorMessage.of("store.supplier.connection.error.label.required"));
+        } else if (label.trim().length() > 60) {
+            errors.add(ErrorMessage.of("store.supplier.connection.error.label.too.long"));
+        } else if (otherLabels.stream().anyMatch(other -> other != null && other.equalsIgnoreCase(label.trim()))) {
+            errors.add(ErrorMessage.of("store.supplier.connection.error.label.taken", label.trim()));
         }
         return errors;
     }

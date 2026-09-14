@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -156,5 +157,37 @@ class SupplierConnectionValidatorTest {
 
         // then
         assertTrue(errors.isEmpty());
+    }
+
+    @Test
+    void labelIsRequiredUniqueAndBoundedForOwnConnections() {
+        // given
+        SupplierConnectionValidator validator = new SupplierConnectionValidator(15);
+
+        // when / then
+        assertThat(validator.validateLabel(" ", ConnectionMode.OWN, List.of())).extracting(ErrorMessage::code)
+                .containsExactly("store.supplier.connection.error.label.required");
+        assertThat(validator.validateLabel("x".repeat(61), ConnectionMode.OWN, List.of())).extracting(ErrorMessage::code)
+                .containsExactly("store.supplier.connection.error.label.too.long");
+        assertThat(validator.validateLabel("Kosatec", ConnectionMode.OWN, List.of("kosatec"))).extracting(ErrorMessage::code)
+                .containsExactly("store.supplier.connection.error.label.taken");
+        assertThat(validator.validateLabel(null, ConnectionMode.GLOBAL, List.of())).isEmpty();
+        assertThat(validator.validateLabel("Fine", ConnectionMode.OWN, List.of("Other"))).isEmpty();
+    }
+
+    @Test
+    void requiredFieldsAreLookedUpByTheTypeOfATokenedIdentity() {
+        // given
+        SupplierConnectionValidator validator = new SupplierConnectionValidator(15);
+        StoreSupplierConnection connection = new StoreSupplierConnection("Kosatec-k7f3a9c2", ConnectionMode.OWN, true, true);
+        Map<String, List<ProviderField>> fields = Map.of("Kosatec",
+                List.of(new ProviderField("cid", "CID", ProviderField.FieldType.TEXT, true, null)));
+
+        // when
+        List<ErrorMessage> errors = validator.validate(true, List.of(connection), fields,
+                Map.of("Kosatec-k7f3a9c2", Map.of()), Set.of());
+
+        // then
+        assertThat(errors).extracting(ErrorMessage::code).containsExactly("store.supplier.connection.error.requires.field");
     }
 }

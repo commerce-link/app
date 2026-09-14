@@ -138,12 +138,10 @@ public class StoreSupplierConnectionPersister {
     void persistConfigurations(Store existingStore, FulfilmentConfiguration submitted, Map<String, Map<String, String>> submittedConfig) {
         Set<String> newOwnSuppliers = ownFeedSchedules(submitted).keySet();
 
-        for (SupplierProviderDescriptor descriptor : supplierProviderFactory.availableProviders()) {
-            String name = descriptor.supplierInfo().name();
-            if (newOwnSuppliers.contains(name) && !descriptor.configurationFields().isEmpty()
-                    && submittedConfig.containsKey(name)) {
-                Map<String, String> config = submittedConfig.getOrDefault(name, Map.of());
-                configurationManager.saveConfiguration(existingStore, name, descriptor, config);
+        for (String identity : newOwnSuppliers) {
+            SupplierProviderDescriptor descriptor = supplierProviderFactory.getDescriptor(identity);
+            if (descriptor != null && !descriptor.configurationFields().isEmpty() && submittedConfig.containsKey(identity)) {
+                configurationManager.saveConfiguration(existingStore, identity, descriptor, submittedConfig.get(identity));
             }
         }
 

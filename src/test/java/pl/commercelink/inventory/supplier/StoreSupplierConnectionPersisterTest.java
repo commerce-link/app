@@ -128,7 +128,7 @@ class StoreSupplierConnectionPersisterTest {
         Store existing = storeWith(true);
         FulfilmentConfiguration submitted = configWith(true, new StoreSupplierConnection("Acme", ConnectionMode.OWN));
         SupplierProviderDescriptor acme = descriptor("Acme", true);
-        when(supplierProviderFactory.availableProviders()).thenReturn(List.of(acme));
+        when(supplierProviderFactory.getDescriptor("Acme")).thenReturn(acme);
 
         // when
         StoreSupplierConnectionPersister.PersistOutcome outcome = persister.persist(existing, submitted, Map.of("Acme", Map.of("url", "https://feed")));
@@ -149,7 +149,7 @@ class StoreSupplierConnectionPersisterTest {
         Store existing = storeWith(true, new StoreSupplierConnection("Acme", ConnectionMode.OWN));
         FulfilmentConfiguration submitted = configWith(true);
         SupplierProviderDescriptor acme = descriptor("Acme", true);
-        when(supplierProviderFactory.availableProviders()).thenReturn(List.of(acme));
+        when(supplierProviderFactory.getDescriptor("Acme")).thenReturn(acme);
 
         // when
         StoreSupplierConnectionPersister.PersistOutcome outcome = persister.persist(existing, submitted, Map.of());
@@ -169,7 +169,7 @@ class StoreSupplierConnectionPersisterTest {
         Store existing = storeWith(true);
         FulfilmentConfiguration submitted = configWith(true, new StoreSupplierConnection("Acme", ConnectionMode.OWN));
         SupplierProviderDescriptor acme = descriptor("Acme", true);
-        when(supplierProviderFactory.availableProviders()).thenReturn(List.of(acme));
+        when(supplierProviderFactory.getDescriptor("Acme")).thenReturn(acme);
         when(configurationManager.snapshot(existing, "Acme"))
                 .thenReturn(new ProviderConfigurationManager.SecretSnapshot(false, null));
         doThrow(new RuntimeException("eventbridge down")).when(feedScheduler).schedule("store-1", "Acme", null);
@@ -192,7 +192,7 @@ class StoreSupplierConnectionPersisterTest {
         Store existing = storeWith(true);
         FulfilmentConfiguration submitted = configWith(true, new StoreSupplierConnection("Acme", ConnectionMode.OWN));
         SupplierProviderDescriptor acme = descriptor("Acme", true);
-        when(supplierProviderFactory.availableProviders()).thenReturn(List.of(acme));
+        when(supplierProviderFactory.getDescriptor("Acme")).thenReturn(acme);
         Map<String, Map<String, String>> submittedConfig = Map.of("Acme", Map.of("url", "https://feed"));
 
         // when
@@ -215,7 +215,8 @@ class StoreSupplierConnectionPersisterTest {
                 new StoreSupplierConnection("Kosatec", ConnectionMode.OWN));
         SupplierProviderDescriptor acme = descriptor("Acme", true);
         SupplierProviderDescriptor kosatec = descriptor("Kosatec", true);
-        when(supplierProviderFactory.availableProviders()).thenReturn(List.of(acme, kosatec));
+        when(supplierProviderFactory.getDescriptor("Acme")).thenReturn(acme);
+        when(supplierProviderFactory.getDescriptor("Kosatec")).thenReturn(kosatec);
         Map<String, Map<String, String>> submittedConfig = Map.of("Acme", Map.of("url", "https://feed"));
 
         // when
@@ -233,7 +234,7 @@ class StoreSupplierConnectionPersisterTest {
         Store existing = storeWith(true, new StoreSupplierConnection("Acme", ConnectionMode.OWN));
         FulfilmentConfiguration submitted = configWith(true, new StoreSupplierConnection("Acme", ConnectionMode.GLOBAL));
         SupplierProviderDescriptor acme = descriptor("Acme", true);
-        when(supplierProviderFactory.availableProviders()).thenReturn(List.of(acme));
+        when(supplierProviderFactory.getDescriptor("Acme")).thenReturn(acme);
 
         // when
         persister.persistConfigurations(existing, submitted, Map.of());
@@ -248,7 +249,6 @@ class StoreSupplierConnectionPersisterTest {
         // given
         Store existing = storeWith(true, new StoreSupplierConnection("Old", ConnectionMode.OWN));
         FulfilmentConfiguration submitted = configWith(true, new StoreSupplierConnection("New", ConnectionMode.OWN));
-        when(supplierProviderFactory.availableProviders()).thenReturn(List.of());
         when(feedScheduler.snapshot("store-1", "Old")).thenReturn(Optional.of("cron(37 2 * * ? *)"));
         when(feedScheduler.snapshot("store-1", "New")).thenReturn(Optional.empty());
         doThrow(new RuntimeException("dynamo down")).when(storesRepository).save(any());
@@ -275,7 +275,7 @@ class StoreSupplierConnectionPersisterTest {
         Store existing = storeWith(true);
         FulfilmentConfiguration submitted = configWith(true, new StoreSupplierConnection("Acme", ConnectionMode.OWN));
         SupplierProviderDescriptor acme = descriptor("Acme", true);
-        when(supplierProviderFactory.availableProviders()).thenReturn(List.of(acme));
+        when(supplierProviderFactory.getDescriptor("Acme")).thenReturn(acme);
         doThrow(new RuntimeException("import boom")).when(feedScheduler).triggerImmediateImport(any(), any());
 
         // when
@@ -293,7 +293,6 @@ class StoreSupplierConnectionPersisterTest {
         // given
         Store existing = storeWith(true, new StoreSupplierConnection("Old", ConnectionMode.OWN));
         FulfilmentConfiguration submitted = configWith(true, new StoreSupplierConnection("New", ConnectionMode.OWN));
-        when(supplierProviderFactory.availableProviders()).thenReturn(List.of());
 
         // when
         StoreSupplierConnectionPersister.PersistOutcome outcome = persister.persist(existing, submitted, Map.of());
@@ -313,7 +312,7 @@ class StoreSupplierConnectionPersisterTest {
         Store existing = storeWith(true);
         FulfilmentConfiguration submitted = configWith(true, new StoreSupplierConnection("Acme", ConnectionMode.OWN));
         SupplierProviderDescriptor acme = descriptor("Acme", true);
-        when(supplierProviderFactory.availableProviders()).thenReturn(List.of(acme));
+        when(supplierProviderFactory.getDescriptor("Acme")).thenReturn(acme);
 
         // when
         persister.persist(existing, submitted, Map.of("Acme", Map.of("url", "https://feed")));
@@ -328,7 +327,7 @@ class StoreSupplierConnectionPersisterTest {
         Store existing = storeWith(true);
         FulfilmentConfiguration submitted = configWith(true, new StoreSupplierConnection("Acme", ConnectionMode.OWN));
         SupplierProviderDescriptor acme = descriptor("Acme", true);
-        when(supplierProviderFactory.availableProviders()).thenReturn(List.of(acme));
+        when(supplierProviderFactory.getDescriptor("Acme")).thenReturn(acme);
         when(configurationManager.snapshot(existing, "Acme"))
                 .thenReturn(new ProviderConfigurationManager.SecretSnapshot(false, null));
         doThrow(new RuntimeException("eventbridge down")).when(feedScheduler).schedule("store-1", "Acme", null);
@@ -347,7 +346,6 @@ class StoreSupplierConnectionPersisterTest {
         FulfilmentConfiguration submitted = configWith(true,
                 new StoreSupplierConnection("A", ConnectionMode.OWN),
                 new StoreSupplierConnection("B", ConnectionMode.OWN));
-        when(supplierProviderFactory.availableProviders()).thenReturn(List.of());
 
         // when
         StoreSupplierConnectionPersister.PersistOutcome outcome =
@@ -370,7 +368,6 @@ class StoreSupplierConnectionPersisterTest {
         // given
         Store existing = storeWith(true);
         FulfilmentConfiguration submitted = configWith(true, ownWithSchedule("Acme", "0/30 9-17 * * ? *"));
-        when(supplierProviderFactory.availableProviders()).thenReturn(List.of());
 
         // when
         StoreSupplierConnectionPersister.PersistOutcome outcome = persister.persist(existing, submitted, Map.of());
@@ -386,7 +383,6 @@ class StoreSupplierConnectionPersisterTest {
         // given
         Store existing = storeWith(true, ownWithSchedule("Acme", "0 5 * * ? *"));
         FulfilmentConfiguration submitted = configWith(true, ownWithSchedule("Acme", "0/30 * * * ? *"));
-        when(supplierProviderFactory.availableProviders()).thenReturn(List.of());
 
         // when
         StoreSupplierConnectionPersister.PersistOutcome outcome = persister.persist(existing, submitted, Map.of());
@@ -406,7 +402,6 @@ class StoreSupplierConnectionPersisterTest {
         // given
         Store existing = storeWith(true, ownWithSchedule("Acme", "0 5 * * ? *"));
         FulfilmentConfiguration submitted = configWith(true, ownWithSchedule("Acme", null));
-        when(supplierProviderFactory.availableProviders()).thenReturn(List.of());
 
         // when
         StoreSupplierConnectionPersister.PersistOutcome outcome = persister.persist(existing, submitted, Map.of());
@@ -421,7 +416,6 @@ class StoreSupplierConnectionPersisterTest {
         // given
         Store existing = storeWith(true, ownWithSchedule("Acme", "0 5 * * ? *"));
         FulfilmentConfiguration submitted = configWith(true, ownWithSchedule("Acme", "0/30 * * * ? *"));
-        when(supplierProviderFactory.availableProviders()).thenReturn(List.of());
         when(feedScheduler.snapshot("store-1", "Acme")).thenReturn(Optional.of("cron(0 5 * * ? *)"));
         doThrow(new RuntimeException("dynamo down")).when(storesRepository).save(any());
 
@@ -440,7 +434,6 @@ class StoreSupplierConnectionPersisterTest {
         // given
         Store existing = storeWith(true, new StoreSupplierConnection("Old", ConnectionMode.OWN));
         FulfilmentConfiguration submitted = configWith(true);
-        when(supplierProviderFactory.availableProviders()).thenReturn(List.of());
         when(feedScheduler.snapshot("store-1", "Old")).thenReturn(Optional.of("cron(12 3 * * ? *)"));
         doThrow(new RuntimeException("dynamo down")).when(storesRepository).save(any());
 
@@ -450,5 +443,48 @@ class StoreSupplierConnectionPersisterTest {
         // then
         verify(feedScheduler).restore("store-1", "Old", Optional.of("cron(12 3 * * ? *)"));
         verify(feedScheduler, never()).schedule(anyString(), anyString(), any());
+    }
+
+    @Test
+    void twoInstancesOfOneTypeGetSeparateSecretsAndSchedules() {
+        // given
+        Store existing = storeWith(true, new StoreSupplierConnection("Stub", ConnectionMode.OWN, true, true));
+        StoreSupplierConnection second = new StoreSupplierConnection("Stub-k7f3a9c2", ConnectionMode.OWN, true, true);
+        FulfilmentConfiguration submitted = configWith(true,
+                new StoreSupplierConnection("Stub", ConnectionMode.OWN, true, true), second);
+        SupplierProviderDescriptor descriptor = mock(SupplierProviderDescriptor.class);
+        when(descriptor.configurationFields()).thenReturn(List.of(
+                new ProviderField("url", "URL", ProviderField.FieldType.URL, true, null)));
+        when(supplierProviderFactory.getDescriptor(anyString())).thenReturn(descriptor);
+
+        // when
+        persister.persist(existing, submitted, Map.of("Stub-k7f3a9c2", Map.of("url", "b")));
+
+        // then
+        verify(configurationManager).saveConfiguration(existing, "Stub-k7f3a9c2", descriptor, Map.of("url", "b"));
+        verify(configurationManager, never()).saveConfiguration(eq(existing), eq("Stub"), any(), any());
+        verify(configurationManager, never()).deleteConfiguration(any(), anyString());
+        verify(feedScheduler).schedule("store-1", "Stub-k7f3a9c2", null);
+        verify(feedScheduler, never()).deleteSchedule(anyString(), anyString());
+        verify(feedScheduler).triggerImmediateImport("store-1", "Stub-k7f3a9c2");
+    }
+
+    @Test
+    void removingOneInstanceLeavesTheOtherUntouched() {
+        // given
+        Store existing = storeWith(true,
+                new StoreSupplierConnection("Stub", ConnectionMode.OWN, true, true),
+                new StoreSupplierConnection("Stub-k7f3a9c2", ConnectionMode.OWN, true, true));
+        FulfilmentConfiguration submitted = configWith(true, new StoreSupplierConnection("Stub", ConnectionMode.OWN, true, true));
+
+        // when
+        persister.persist(existing, submitted, Map.of());
+
+        // then
+        verify(configurationManager).deleteConfiguration(existing, "Stub-k7f3a9c2");
+        verify(configurationManager, never()).deleteConfiguration(existing, "Stub");
+        verify(feedScheduler).deleteSchedule("store-1", "Stub-k7f3a9c2");
+        verify(storeFeedRepository).delete("store-1", "Stub-k7f3a9c2");
+        verify(storeFeedRepository, never()).delete("store-1", "Stub");
     }
 }

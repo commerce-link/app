@@ -8,8 +8,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
-import pl.commercelink.inventory.supplier.api.SupplierInfo;
-import pl.commercelink.inventory.supplier.api.SupplierType;
+import pl.commercelink.inventory.supplier.api.SupplierProviderDescriptor;
 import pl.commercelink.provider.ProviderConfigurationManager;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.FulfilmentConfiguration;
@@ -32,6 +31,8 @@ import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anySet;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -68,6 +69,20 @@ class StoreSupplierConnectionServiceTest {
         config.setCanUseGlobalSuppliers(canUseGlobal);
         config.setSupplierConnections(new ArrayList<>(List.of(connections)));
         return config;
+    }
+
+    // Registers the type both bare (for create/GLOBAL) and with any token suffix (for the
+    // freshly minted "Type-xxxxxxxx" identities that OWN connections get on create).
+    private void registryHas(String type) {
+        SupplierProviderDescriptor descriptor = new StubSupplierDescriptor();
+        when(supplierProviderFactory.getDescriptor(type)).thenReturn(descriptor);
+        when(supplierProviderFactory.getDescriptor(argThat(name -> name != null && name.startsWith(type + "-")))).thenReturn(descriptor);
+    }
+
+    private SupplierSelectionForm ownSelection(String type, String label) {
+        SupplierSelectionForm form = new SupplierSelectionForm(type, ConnectionMode.OWN, true, true);
+        form.setLabel(label);
+        return form;
     }
 
     @Test
@@ -135,39 +150,46 @@ class StoreSupplierConnectionServiceTest {
 
     @Test
     void connectOrUpdateKeepsEveryOtherConnectionIncludingManualOnes() {
-        // given
+        // given: connecting "Kosatec" now mints a tokened identity instead of reusing the bare type
         Store store = storeWith(true,
                 new StoreSupplierConnection("Elko", ConnectionMode.OWN, true, true),
                 new StoreSupplierConnection("manual:Hurtownia X", ConnectionMode.MANUAL, true, true));
+        registryHas("Kosatec");
         when(validator.validate(anyBoolean(), anyList(), anyMap(), anyMap(), anySet())).thenReturn(List.of());
+        when(validator.validateLabel(any(), any(), any())).thenReturn(List.of());
         when(persister.persist(any(), any(), anyMap()))
                 .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of("Kosatec"), Set.of(), Set.of()));
+        SupplierSelectionForm form = ownSelection("Kosatec", "Kosatec");
 
         // when
-        service.connectOrUpdate(store,
-                new SupplierSelectionForm("Kosatec", ConnectionMode.OWN, true, true),
-                Map.of("login", "u"));
+        service.connectOrUpdate(store, form, Map.of("login", "u"));
 
         // then
         ArgumentCaptor<FulfilmentConfiguration> captor = ArgumentCaptor.forClass(FulfilmentConfiguration.class);
         verify(persister).persist(any(), captor.capture(), anyMap());
         assertThat(captor.getValue().getSupplierConnections())
                 .extracting(StoreSupplierConnection::getSupplierName)
-                .containsExactlyInAnyOrder("Elko", "manual:Hurtownia X", "Kosatec");
+                .hasSize(3)
+                .contains("Elko", "manual:Hurtownia X")
+                .anyMatch(name -> name.startsWith("Kosatec-"));
     }
 
     @Test
     void connectOrUpdateReplacesTheEntryOfAnAlreadyConnectedSupplier() {
-        // given
+        // given: editing an existing connection carries its identity, so it is replaced in place
+        // instead of minting a second instance
         Store store = storeWith(true, new StoreSupplierConnection("Elko", ConnectionMode.OWN, true, true));
+        registryHas("Elko");
         when(validator.validate(anyBoolean(), anyList(), anyMap(), anyMap(), anySet())).thenReturn(List.of());
+        when(validator.validateLabel(any(), any(), any())).thenReturn(List.of());
         when(persister.persist(any(), any(), anyMap()))
                 .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of(), Set.of(), Set.of()));
+        SupplierSelectionForm edit = new SupplierSelectionForm("Elko", ConnectionMode.OWN, false, true);
+        edit.setIdentity("Elko");
+        edit.setLabel("Elko");
 
         // when
-        service.connectOrUpdate(store,
-                new SupplierSelectionForm("Elko", ConnectionMode.OWN, false, true),
-                Map.of());
+        service.connectOrUpdate(store, edit, Map.of());
 
         // then
         ArgumentCaptor<FulfilmentConfiguration> captor = ArgumentCaptor.forClass(FulfilmentConfiguration.class);
@@ -180,14 +202,16 @@ class StoreSupplierConnectionServiceTest {
     void connectOrUpdateForcesOwnModeWhenTheStoreCannotUseGlobalSuppliers() {
         // given
         Store store = storeWith(false);
+        registryHas("Elko");
         when(validator.validate(anyBoolean(), anyList(), anyMap(), anyMap(), anySet())).thenReturn(List.of());
+        when(validator.validateLabel(any(), any(), any())).thenReturn(List.of());
         when(persister.persist(any(), any(), anyMap()))
                 .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of("Elko"), Set.of(), Set.of()));
+        SupplierSelectionForm form = new SupplierSelectionForm("Elko", ConnectionMode.GLOBAL, true, true);
+        form.setLabel("Elko");
 
         // when
-        service.connectOrUpdate(store,
-                new SupplierSelectionForm("Elko", ConnectionMode.GLOBAL, true, true),
-                Map.of("login", "u"));
+        service.connectOrUpdate(store, form, Map.of("login", "u"));
 
         // then
         ArgumentCaptor<FulfilmentConfiguration> captor = ArgumentCaptor.forClass(FulfilmentConfiguration.class);
@@ -199,13 +223,17 @@ class StoreSupplierConnectionServiceTest {
     void connectOrUpdateStoresTheTrimmedExternalSupplierIdAndDropsABlankOne() {
         // given
         Store store = storeWith(true);
+        registryHas("Elko");
         when(validator.validate(anyBoolean(), anyList(), anyMap(), anyMap(), anySet())).thenReturn(List.of());
+        when(validator.validateLabel(any(), any(), any())).thenReturn(List.of());
         when(persister.persist(any(), any(), anyMap()))
                 .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of("Elko"), Set.of(), Set.of()));
         SupplierSelectionForm withId = new SupplierSelectionForm("Elko", ConnectionMode.OWN, true, true);
         withId.setExternalSupplierId(" 2 ");
+        withId.setLabel("Elko");
         SupplierSelectionForm blankId = new SupplierSelectionForm("Elko", ConnectionMode.OWN, true, true);
         blankId.setExternalSupplierId("   ");
+        blankId.setLabel("Elko");
 
         // when
         service.connectOrUpdate(store, withId, Map.of("login", "u"));
@@ -223,34 +251,34 @@ class StoreSupplierConnectionServiceTest {
         // given a second supplier whose stored credentials are broken must not block this edit
         Store store = storeWith(true,
                 new StoreSupplierConnection("Broken", ConnectionMode.OWN, true, true));
+        registryHas("Elko");
         when(validator.validate(anyBoolean(), anyList(), anyMap(), anyMap(), anySet())).thenReturn(List.of());
+        when(validator.validateLabel(any(), any(), any())).thenReturn(List.of());
         when(persister.persist(any(), any(), anyMap()))
                 .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of("Elko"), Set.of(), Set.of()));
 
         // when
-        service.connectOrUpdate(store,
-                new SupplierSelectionForm("Elko", ConnectionMode.OWN, true, true),
-                Map.of("login", "u"));
+        service.connectOrUpdate(store, ownSelection("Elko", "Elko"), Map.of("login", "u"));
 
         // then
         ArgumentCaptor<List<StoreSupplierConnection>> captor = ArgumentCaptor.forClass(List.class);
         verify(validator).validate(anyBoolean(), captor.capture(), anyMap(), anyMap(), anySet());
-        assertThat(captor.getValue())
-                .extracting(StoreSupplierConnection::getSupplierName)
-                .containsExactly("Elko");
+        assertThat(captor.getValue()).hasSize(1);
+        assertThat(captor.getValue().get(0).getSupplierName()).startsWith("Elko-");
     }
 
     @Test
     void connectOrUpdateReturnsValidationErrorsWithoutPersisting() {
         // given
         Store store = storeWith(true);
+        registryHas("Elko");
+        when(validator.validateLabel(any(), any(), any())).thenReturn(List.of());
         when(validator.validate(anyBoolean(), anyList(), anyMap(), anyMap(), anySet()))
                 .thenReturn(List.of(ErrorMessage.of("store.supplier.connection.error.requires.field", "Elko", "Login")));
 
         // when
-        StoreSupplierConnectionService.ConnectionUpdateResult result = service.connectOrUpdate(store,
-                new SupplierSelectionForm("Elko", ConnectionMode.OWN, true, true),
-                Map.of());
+        StoreSupplierConnectionService.ConnectionUpdateResult result =
+                service.connectOrUpdate(store, ownSelection("Elko", "Elko"), Map.of());
 
         // then
         assertTrue(result.hasErrors());
@@ -263,22 +291,22 @@ class StoreSupplierConnectionServiceTest {
         // configuration saved before must not throw a NullPointerException.
         Store store = new Store();
         store.setStoreId("store-1");
+        registryHas("Elko");
         when(validator.validate(anyBoolean(), anyList(), anyMap(), anyMap(), anySet())).thenReturn(List.of());
+        when(validator.validateLabel(any(), any(), any())).thenReturn(List.of());
         when(persister.persist(any(), any(), anyMap()))
                 .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of("Elko"), Set.of(), Set.of()));
 
         // when
-        StoreSupplierConnectionService.ConnectionUpdateResult result = service.connectOrUpdate(store,
-                new SupplierSelectionForm("Elko", ConnectionMode.OWN, true, true),
-                Map.of("login", "u"));
+        StoreSupplierConnectionService.ConnectionUpdateResult result =
+                service.connectOrUpdate(store, ownSelection("Elko", "Elko"), Map.of("login", "u"));
 
         // then
         assertFalse(result.hasErrors());
         ArgumentCaptor<FulfilmentConfiguration> captor = ArgumentCaptor.forClass(FulfilmentConfiguration.class);
         verify(persister).persist(any(), captor.capture(), anyMap());
-        assertThat(captor.getValue().getSupplierConnections())
-                .extracting(StoreSupplierConnection::getSupplierName)
-                .containsExactly("Elko");
+        assertThat(captor.getValue().getSupplierConnections()).hasSize(1);
+        assertThat(captor.getValue().getSupplierConnections().get(0).getSupplierName()).startsWith("Elko-");
     }
 
     @Test
@@ -289,13 +317,14 @@ class StoreSupplierConnectionServiceTest {
         Store store = storeWith(true, new StoreSupplierConnection("Elko", ConnectionMode.OWN, true, true));
         when(configurationManager.loadConfiguration(store, "Elko")).thenReturn(Map.of("login", "u"));
         when(validator.validate(anyBoolean(), anyList(), anyMap(), anyMap(), anySet())).thenReturn(List.of());
+        when(validator.validateLabel(any(), any(), any())).thenReturn(List.of());
         when(persister.persist(any(), any(), anyMap()))
                 .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of(), Set.of(), Set.of()));
+        SupplierSelectionForm edit = ownSelection("Elko", "Elko");
+        edit.setIdentity("Elko");
 
         // when: re-saving with a blank password, as the "leave blank to keep the current value" field does
-        service.connectOrUpdate(store,
-                new SupplierSelectionForm("Elko", ConnectionMode.OWN, true, true),
-                Map.of("password", ""));
+        service.connectOrUpdate(store, edit, Map.of("password", ""));
 
         // then
         ArgumentCaptor<Set<String>> storedConfigCaptor = ArgumentCaptor.forClass(Set.class);
@@ -309,13 +338,14 @@ class StoreSupplierConnectionServiceTest {
         // provider's configuration manager holds for this supplier
         Store store = storeWith(true, new StoreSupplierConnection("Elko", ConnectionMode.GLOBAL, true, true));
         when(validator.validate(anyBoolean(), anyList(), anyMap(), anyMap(), anySet())).thenReturn(List.of());
+        when(validator.validateLabel(any(), any(), any())).thenReturn(List.of());
         when(persister.persist(any(), any(), anyMap()))
                 .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of(), Set.of(), Set.of()));
+        SupplierSelectionForm edit = new SupplierSelectionForm("Elko", ConnectionMode.GLOBAL, true, true);
+        edit.setIdentity("Elko");
 
         // when
-        service.connectOrUpdate(store,
-                new SupplierSelectionForm("Elko", ConnectionMode.GLOBAL, true, true),
-                Map.of("password", ""));
+        service.connectOrUpdate(store, edit, Map.of("password", ""));
 
         // then
         ArgumentCaptor<Set<String>> storedConfigCaptor = ArgumentCaptor.forClass(Set.class);
@@ -324,31 +354,169 @@ class StoreSupplierConnectionServiceTest {
     }
 
     @Test
-    void suppliersWithStoredConfigurationReportsOnlyProvidersThatHaveASecretSaved() {
-        // given: two registered providers, only one of them with a saved configuration -- the
-        // template uses this to decide whether a blank required password field means "missing"
-        // or "keep the current value", so it must reflect the secret's existence, not the
-        // connection mode or whether the supplier is even connected
-        when(supplierProviderFactory.availableProviders())
-                .thenReturn(List.of(new StubSupplierDescriptor(), new OtherStubSupplierDescriptor()));
-        Store store = new Store();
-        store.setStoreId("store-1");
-        when(configurationManager.loadConfiguration(store, "Stub")).thenReturn(Map.of("login", "u"));
-        when(configurationManager.loadConfiguration(store, "Other")).thenReturn(Map.of());
+    void creatingAnOwnConnectionGeneratesATokenedIdentityAndKeepsTheLabel() {
+        // given
+        Store store = storeWith(true, new StoreSupplierConnection("Stub", ConnectionMode.OWN, true, true));
+        registryHas("Stub");
+        when(validator.validate(anyBoolean(), anyList(), anyMap(), anyMap(), anySet())).thenReturn(List.of());
+        when(validator.validateLabel(any(), any(), any())).thenReturn(List.of());
+        when(persister.persist(any(), any(), anyMap()))
+                .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of(), Set.of(), Set.of()));
 
         // when
-        Set<String> result = service.suppliersWithStoredConfiguration(store);
+        StoreSupplierConnectionService.ConnectionUpdateResult result =
+                service.connectOrUpdate(store, ownSelection("Stub", "Stub konto B"), Map.of("url", "u"));
 
         // then
-        assertThat(result).containsExactly("Stub");
+        assertFalse(result.hasErrors());
+        assertThat(result.identity()).matches("^Stub-[a-z0-9]{8}$");
+        ArgumentCaptor<FulfilmentConfiguration> saved = ArgumentCaptor.forClass(FulfilmentConfiguration.class);
+        ArgumentCaptor<Map<String, Map<String, String>>> config = ArgumentCaptor.forClass(Map.class);
+        verify(persister).persist(eq(store), saved.capture(), config.capture());
+        assertThat(saved.getValue().getSupplierConnections()).extracting(StoreSupplierConnection::getSupplierName)
+                .containsExactlyInAnyOrder("Stub", result.identity());
+        StoreSupplierConnection created = saved.getValue().getSupplierConnections().stream()
+                .filter(c -> c.getSupplierName().equals(result.identity())).findFirst().orElseThrow();
+        assertThat(created.getLabel()).isEqualTo("Stub konto B");
+        assertThat(config.getValue()).containsOnlyKeys(result.identity());
     }
 
-    private static class OtherStubSupplierDescriptor extends StubSupplierDescriptor {
-        @Override
-        public SupplierInfo supplierInfo() {
-            return new SupplierInfo("Other", SupplierType.Distributor, 1, "PL",
-                    StubSupplierDescriptor.INFO.shippingPolicy());
-        }
+    @Test
+    void creatingAGlobalConnectionUsesTheTypeAsIdentityAndRefusesADuplicate() {
+        // given
+        Store store = storeWith(true, new StoreSupplierConnection("Stub", ConnectionMode.GLOBAL, true, true));
+        registryHas("Stub");
+
+        // when
+        StoreSupplierConnectionService.ConnectionUpdateResult result = service.connectOrUpdate(store,
+                new SupplierSelectionForm("Stub", ConnectionMode.GLOBAL, true, true), Map.of());
+
+        // then
+        assertTrue(result.hasErrors());
+        assertThat(result.errors().get(0).code()).isEqualTo("store.supplier.connection.error.global.duplicate");
+        verify(persister, never()).persist(any(), any(), anyMap());
+    }
+
+    @Test
+    void globalAndOwnOfTheSameTypeMayCoexist() {
+        // given
+        Store store = storeWith(true, new StoreSupplierConnection("Stub", ConnectionMode.GLOBAL, true, true));
+        registryHas("Stub");
+        when(validator.validate(anyBoolean(), anyList(), anyMap(), anyMap(), anySet())).thenReturn(List.of());
+        when(validator.validateLabel(any(), any(), any())).thenReturn(List.of());
+        when(persister.persist(any(), any(), anyMap()))
+                .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of(), Set.of(), Set.of()));
+
+        // when
+        StoreSupplierConnectionService.ConnectionUpdateResult result =
+                service.connectOrUpdate(store, ownSelection("Stub", "Własne konto"), Map.of("url", "u"));
+
+        // then
+        assertFalse(result.hasErrors());
+        ArgumentCaptor<FulfilmentConfiguration> saved = ArgumentCaptor.forClass(FulfilmentConfiguration.class);
+        verify(persister).persist(eq(store), saved.capture(), anyMap());
+        assertThat(saved.getValue().getSupplierConnections()).hasSize(2);
+    }
+
+    @Test
+    void editingKeepsTheIdentityAndUpdatesTheLabel() {
+        // given
+        StoreSupplierConnection existing = new StoreSupplierConnection("Stub-k7f3a9c2", ConnectionMode.OWN, true, true);
+        existing.setLabel("Stare");
+        Store store = storeWith(true, existing);
+        registryHas("Stub");
+        when(validator.validate(anyBoolean(), anyList(), anyMap(), anyMap(), anySet())).thenReturn(List.of());
+        when(validator.validateLabel(any(), any(), any())).thenReturn(List.of());
+        when(persister.persist(any(), any(), anyMap()))
+                .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of(), Set.of(), Set.of()));
+        SupplierSelectionForm edit = ownSelection("Stub", "Nowe");
+        edit.setIdentity("Stub-k7f3a9c2");
+
+        // when
+        StoreSupplierConnectionService.ConnectionUpdateResult result = service.connectOrUpdate(store, edit, Map.of("url", "u"));
+
+        // then
+        assertThat(result.identity()).isEqualTo("Stub-k7f3a9c2");
+        ArgumentCaptor<FulfilmentConfiguration> saved = ArgumentCaptor.forClass(FulfilmentConfiguration.class);
+        verify(persister).persist(eq(store), saved.capture(), anyMap());
+        assertThat(saved.getValue().getSupplierConnections()).hasSize(1);
+        assertThat(saved.getValue().getSupplierConnections().get(0).getLabel()).isEqualTo("Nowe");
+    }
+
+    @Test
+    void editingATokenedConnectionIntoGlobalIsRefused() {
+        // given
+        Store store = storeWith(true, new StoreSupplierConnection("Stub-k7f3a9c2", ConnectionMode.OWN, true, true));
+        registryHas("Stub");
+        SupplierSelectionForm edit = new SupplierSelectionForm("Stub", ConnectionMode.GLOBAL, true, true);
+        edit.setIdentity("Stub-k7f3a9c2");
+
+        // when
+        StoreSupplierConnectionService.ConnectionUpdateResult result = service.connectOrUpdate(store, edit, Map.of());
+
+        // then
+        assertThat(result.errors().get(0).code()).isEqualTo("store.supplier.connection.error.mode.locked");
+    }
+
+    @Test
+    void editingAnUnknownIdentityIsRefused() {
+        // given
+        Store store = storeWith(true);
+        registryHas("Stub");
+        SupplierSelectionForm edit = ownSelection("Stub", "x");
+        edit.setIdentity("Stub-nope0000");
+
+        // when
+        StoreSupplierConnectionService.ConnectionUpdateResult result = service.connectOrUpdate(store, edit, Map.of());
+
+        // then
+        assertThat(result.errors().get(0).code()).isEqualTo("store.supplier.connection.error.not.found");
+    }
+
+    @Test
+    void creatingAnUnknownTypeIsRefused() {
+        // given
+        Store store = storeWith(true);
+
+        // when
+        StoreSupplierConnectionService.ConnectionUpdateResult result =
+                service.connectOrUpdate(store, ownSelection("Nope", "x"), Map.of());
+
+        // then
+        assertThat(result.errors().get(0).code()).isEqualTo("store.supplier.connection.error.unknown.supplier");
+    }
+
+    @Test
+    void labelErrorsFromTheValidatorBlockTheSave() {
+        // given
+        Store store = storeWith(true);
+        registryHas("Stub");
+        when(validator.validateLabel(eq("x"), eq(ConnectionMode.OWN), any()))
+                .thenReturn(List.of(ErrorMessage.of("store.supplier.connection.error.label.taken", "x")));
+
+        // when
+        StoreSupplierConnectionService.ConnectionUpdateResult result =
+                service.connectOrUpdate(store, ownSelection("Stub", "x"), Map.of());
+
+        // then
+        assertTrue(result.hasErrors());
+        verify(persister, never()).persist(any(), any(), anyMap());
+    }
+
+    @Test
+    void storedConfigurationSetIsKeyedByConnectionIdentity() {
+        // given: an OWN connection whose type also has a GLOBAL connection, plus a second OWN
+        // instance of the same type -- the stored-configuration set must be keyed by connection
+        // identity, not by supplier type, so each instance's secret is looked up separately
+        Store store = storeWith(true,
+                new StoreSupplierConnection("Stub", ConnectionMode.OWN, true, true),
+                new StoreSupplierConnection("Stub-k7f3a9c2", ConnectionMode.OWN, true, true),
+                new StoreSupplierConnection("Stub", ConnectionMode.GLOBAL, true, true));
+        when(configurationManager.loadConfiguration(store, "Stub")).thenReturn(Map.of("url", "a"));
+        when(configurationManager.loadConfiguration(store, "Stub-k7f3a9c2")).thenReturn(Map.of());
+
+        // when / then
+        assertThat(service.suppliersWithStoredConfiguration(store)).containsExactly("Stub");
     }
 
     @Test
@@ -476,7 +644,9 @@ class StoreSupplierConnectionServiceTest {
     void connectOrUpdateKeepsNormalizedScheduleForOwnMode() {
         // given
         Store store = storeWith(true);
+        registryHas("Acme");
         SupplierSelectionForm selection = new SupplierSelectionForm("Acme", ConnectionMode.OWN, true, true, "  0/30  9-17 * * ? * ");
+        selection.setLabel("Acme");
         whenPersistSucceeds();
 
         // when
@@ -490,6 +660,7 @@ class StoreSupplierConnectionServiceTest {
     void connectOrUpdateDropsScheduleForGlobalMode() {
         // given
         Store store = storeWith(true);
+        registryHas("Acme");
         SupplierSelectionForm selection = new SupplierSelectionForm("Acme", ConnectionMode.GLOBAL, true, true, "0 5 * * ? *");
         whenPersistSucceeds();
 
@@ -504,7 +675,9 @@ class StoreSupplierConnectionServiceTest {
     void connectOrUpdateStoresNullForBlankSchedule() {
         // given
         Store store = storeWith(true);
+        registryHas("Acme");
         SupplierSelectionForm selection = new SupplierSelectionForm("Acme", ConnectionMode.OWN, true, true, "   ");
+        selection.setLabel("Acme");
         whenPersistSucceeds();
 
         // when
@@ -522,7 +695,10 @@ class StoreSupplierConnectionServiceTest {
         StoreSupplierConnection stored = new StoreSupplierConnection("Elko", ConnectionMode.OWN, true, true);
         stored.setFeedSchedule("0 5 * * ? *");
         Store store = storeWith(true, stored);
+        registryHas("Elko");
         SupplierSelectionForm selection = new SupplierSelectionForm("Elko", ConnectionMode.OWN, true, true, "0 7 * * ? *");
+        selection.setIdentity("Elko");
+        selection.setLabel("Elko");
         whenPersistSucceeds();
 
         // when
@@ -539,11 +715,13 @@ class StoreSupplierConnectionServiceTest {
                 .thenReturn(new StoreSupplierConnectionPersister.PersistOutcome(true, Set.of(), Set.of(), Set.of()));
     }
 
-    private StoreSupplierConnection persistedConnection(String supplierName) {
+    // Matched by type rather than exact identity: a freshly created OWN connection carries a
+    // tokened identity ("Acme-xxxxxxxx"), not the bare type the test submitted.
+    private StoreSupplierConnection persistedConnection(String supplierType) {
         ArgumentCaptor<FulfilmentConfiguration> captor = ArgumentCaptor.forClass(FulfilmentConfiguration.class);
         verify(persister).persist(any(), captor.capture(), anyMap());
         return captor.getValue().getSupplierConnections().stream()
-                .filter(connection -> connection.getSupplierName().equals(supplierName))
+                .filter(connection -> SupplierIdentity.typeOf(connection.getSupplierName()).equals(supplierType))
                 .findFirst()
                 .orElseThrow();
     }
