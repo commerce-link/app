@@ -36,9 +36,17 @@ class ScheduleFieldFragmentTest {
         // then
         assertThat(html).doesNotContain("??");
         assertThat(html).contains("Hours");
-        assertThat(html).contains("Advanced: cron expression");
-        // the minimum interval reaches the help text as a message argument, not as literal {0}
-        assertThat(html).contains("5 minutes apart");
+    }
+
+    @Test
+    void theExpressionTravelsInAHiddenFieldWithNoCronInputForTheOperator() {
+        // the builder is the only way to set a schedule; a raw cron field was dropped on purpose
+        String html = render("input('feedSchedule', '0 5 * * ? *', 5)");
+
+        // then
+        assertThat(html).containsPattern("<input type=\"hidden\" class=\"schedule-input\"[^>]*name=\"feedSchedule\"");
+        assertThat(html).doesNotContain("type=\"text\"");
+        assertThat(html).doesNotContain("schedule-advanced");
     }
 
     @Test
@@ -78,6 +86,8 @@ class ScheduleFieldFragmentTest {
         assertThat(html).contains("Default \\u2014 once a night");
         assertThat(html).contains("Every {0} min");
         assertThat(html).contains("On weekdays at {0}");
+        // a stored expression the builder cannot show is named, with the expression itself
+        assertThat(html).contains("The stored schedule ({0}) does not fit the builder.");
         assertThat(html).contains("window.scheduleField");
     }
 }

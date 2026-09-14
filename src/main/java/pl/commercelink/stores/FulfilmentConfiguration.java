@@ -30,6 +30,10 @@ public class FulfilmentConfiguration {
     private List<StoreSupplierConnection> supplierConnections = new ArrayList<>();
     @DynamoDBAttribute(attributeName = "inventoryCacheTtlMinutes")
     private Integer inventoryCacheTtlMinutes;
+    @DynamoDBAttribute(attributeName = "clientOrderPageEnabled")
+    private boolean clientOrderPageEnabled = false;
+    @DynamoDBAttribute(attributeName = "clientShippingAddressChangeEnabled")
+    private boolean clientShippingAddressChangeEnabled = false;
 
     public FulfilmentConfiguration() {
     }
@@ -106,6 +110,22 @@ public class FulfilmentConfiguration {
         this.inventoryCacheTtlMinutes = inventoryCacheTtlMinutes;
     }
 
+    public boolean isClientOrderPageEnabled() {
+        return clientOrderPageEnabled;
+    }
+
+    public void setClientOrderPageEnabled(boolean clientOrderPageEnabled) {
+        this.clientOrderPageEnabled = clientOrderPageEnabled;
+    }
+
+    public boolean isClientShippingAddressChangeEnabled() {
+        return clientShippingAddressChangeEnabled;
+    }
+
+    public void setClientShippingAddressChangeEnabled(boolean clientShippingAddressChangeEnabled) {
+        this.clientShippingAddressChangeEnabled = clientShippingAddressChangeEnabled;
+    }
+
     /**
      * Returns a copy carrying the given connection list. Used by the per-supplier save paths: the
      * persister computes what changed by comparing the store's current configuration against the
@@ -121,6 +141,8 @@ public class FulfilmentConfiguration {
         copy.setEnabledCategories(enabledCategories);
         copy.setCanUseGlobalSuppliers(canUseGlobalSuppliers);
         copy.setInventoryCacheTtlMinutes(inventoryCacheTtlMinutes);
+        copy.setClientOrderPageEnabled(clientOrderPageEnabled);
+        copy.setClientShippingAddressChangeEnabled(clientShippingAddressChangeEnabled);
         copy.setSupplierConnections(new ArrayList<>(connections));
         return copy;
     }

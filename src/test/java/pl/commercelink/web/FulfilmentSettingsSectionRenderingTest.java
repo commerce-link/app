@@ -31,6 +31,8 @@ class FulfilmentSettingsSectionRenderingTest {
         settings.setDefaultFulfilmentType(FulfilmentType.WarehouseFulfilment);
         settings.setCanUseGlobalSuppliers(true);
         settings.setInventoryCacheTtlMinutes(30);
+        settings.setClientOrderPageEnabled(true);
+        settings.setClientShippingAddressChangeEnabled(false);
         return settings;
     }
 
@@ -57,6 +59,12 @@ class FulfilmentSettingsSectionRenderingTest {
         assertThat(html).contains("data-automated-fulfilment=\"true\"");
         assertThat(html).contains("data-can-use-global-suppliers=\"true\"");
         assertThat(html).contains("data-inventory-cache-ttl-minutes=\"30\"");
+        // the two client-facing switches added on main live in this read-only list and its data
+        // attributes too, so the edit modal can read them fresh after a save
+        assertThat(html).contains("data-client-order-page-enabled=\"true\"");
+        assertThat(html).contains("data-client-shipping-address-change-enabled=\"false\"");
+        assertThat(html).contains("Enable public client order page");
+        assertThat(html).contains("Enable client shipping address change");
         assertThat(html).contains("Use Global Supplier Settings"); // store.use.global.suppliers
         assertThat(html).contains("Inventory cache TTL (min)"); // store.inventory.cache.ttl
     }

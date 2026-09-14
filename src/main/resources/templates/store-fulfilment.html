@@ -52,6 +52,24 @@
                             </div>
 
                             <div class="field">
+                                <label class="checkbox">
+                                    <input type="checkbox" name="clientOrderPageEnabled" value="true"
+                                           id="fulfilment-settings-client-order-page">
+                                    <strong th:text="#{store.enable.client.order.page}"></strong>
+                                </label>
+                                <p th:text="#{store.enable.client.order.page.description}"></p>
+                            </div>
+
+                            <div class="field">
+                                <label class="checkbox">
+                                    <input type="checkbox" name="clientShippingAddressChangeEnabled" value="true"
+                                           id="fulfilment-settings-client-shipping-address-change">
+                                    <strong th:text="#{store.enable.client.shipping.address.change}"></strong>
+                                </label>
+                                <p th:text="#{store.enable.client.shipping.address.change.description}"></p>
+                            </div>
+
+                            <div class="field">
                                 <label class="label" th:text="#{store.fulfilment.default.type}"></label>
                                 <div class="control">
                                     <div class="select">
@@ -182,6 +200,8 @@
                     var assemblyDays = document.getElementById('fulfilment-settings-assembly-days');
                     var realizationDays = document.getElementById('fulfilment-settings-realization-days');
                     var automatedFulfilment = document.getElementById('fulfilment-settings-automated-fulfilment');
+                    var clientOrderPage = document.getElementById('fulfilment-settings-client-order-page');
+                    var clientShippingAddressChange = document.getElementById('fulfilment-settings-client-shipping-address-change');
                     var defaultType = document.getElementById('fulfilment-settings-default-type');
                     var canUseGlobalSuppliers = document.getElementById('fulfilment-settings-can-use-global-suppliers');
                     var cacheTtl = document.getElementById('fulfilment-settings-cache-ttl');
@@ -197,6 +217,8 @@
                         assemblyDays.value = current.orderAssemblyDays;
                         realizationDays.value = current.orderRealizationDays;
                         automatedFulfilment.checked = current.automatedFulfilment === 'true';
+                        clientOrderPage.checked = current.clientOrderPageEnabled === 'true';
+                        clientShippingAddressChange.checked = current.clientShippingAddressChangeEnabled === 'true';
                         if (current.defaultFulfilmentType) { defaultType.value = current.defaultFulfilmentType; }
                         if (canUseGlobalSuppliers) { canUseGlobalSuppliers.checked = current.canUseGlobalSuppliers === 'true'; }
                         if (cacheTtl) { cacheTtl.value = current.inventoryCacheTtlMinutes || ''; }

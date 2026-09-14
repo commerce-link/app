@@ -20,6 +20,8 @@ class FulfilmentSettingsFormTest {
         config.setDefaultFulfilmentType(FulfilmentType.WarehouseFulfilment);
         config.setCanUseGlobalSuppliers(true);
         config.setInventoryCacheTtlMinutes(20);
+        config.setClientOrderPageEnabled(true);
+        config.setClientShippingAddressChangeEnabled(true);
         store.setFulfilmentConfiguration(config);
 
         // when
@@ -32,6 +34,8 @@ class FulfilmentSettingsFormTest {
         assertThat(form.getDefaultFulfilmentType()).isEqualTo(FulfilmentType.WarehouseFulfilment);
         assertThat(form.isCanUseGlobalSuppliers()).isTrue();
         assertThat(form.getInventoryCacheTtlMinutes()).isEqualTo(20);
+        assertThat(form.isClientOrderPageEnabled()).isTrue();
+        assertThat(form.isClientShippingAddressChangeEnabled()).isTrue();
     }
 
     @Test
@@ -61,6 +65,8 @@ class FulfilmentSettingsFormTest {
         form.setDefaultFulfilmentType(FulfilmentType.WarehouseFulfilment);
         form.setCanUseGlobalSuppliers(true);
         form.setInventoryCacheTtlMinutes(10);
+        form.setClientOrderPageEnabled(true);
+        form.setClientShippingAddressChangeEnabled(true);
 
         // when
         FulfilmentConfiguration config = form.toFulfilmentConfiguration();
@@ -72,6 +78,8 @@ class FulfilmentSettingsFormTest {
         assertThat(config.getDefaultFulfilmentType()).isEqualTo(FulfilmentType.WarehouseFulfilment);
         assertThat(config.isCanUseGlobalSuppliers()).isTrue();
         assertThat(config.getInventoryCacheTtlMinutes()).isEqualTo(10);
+        assertThat(config.isClientOrderPageEnabled()).isTrue();
+        assertThat(config.isClientShippingAddressChangeEnabled()).isTrue();
         // supplier connections/enabled product groups/categories are not this form's concern --
         // applyStoreSettings fills those in from the existing configuration
         assertThat(config.getSupplierConnections()).isEmpty();

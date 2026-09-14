@@ -20,7 +20,9 @@ public enum EmailNotificationType {
     RMA_ITEMS_RECEIVED("RMAItemsReceivedTemplate", Arrays.asList("rmaId", "orderId")),
     RMA_PROCESSING_STARTED("RMAProcessingStartedTemplate", Arrays.asList("rmaId", "orderId")),
     RMA_ITEMS_ACCEPTED("RMAItemsAcceptedTemplate", Arrays.asList("rmaId", "orderId", "rmaItems")),
-    RMA_ITEMS_SEND_TO_CLIENT("RMAItemsSendToClient", Arrays.asList("rmaId", "orderId", "rmaItems", "shipments"));
+    RMA_ITEMS_SEND_TO_CLIENT("RMAItemsSendToClient", Arrays.asList("rmaId", "orderId", "rmaItems", "shipments")),
+    CLIENT_VERIFICATION_CODE("ClientVerificationCodeTemplate", Arrays.asList("code", "expiresInMinutes", "orderId", "rmaId")),
+    ORDER_SHIPPING_ADDRESS_CHANGED("OrderShippingAddressChangedTemplate", Arrays.asList("orderId", "orderStatusLink", "previousShippingDetails", "newShippingDetails", "changedAt", "contactEmail"));
 
     private final String templateName;
     private final List<String> parameters;

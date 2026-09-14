@@ -40,6 +40,8 @@
               data-order-realization-days=${settings.orderRealizationDays},
               data-automated-fulfilment=${settings.automatedFulfilment},
               data-default-fulfilment-type=${settings.defaultFulfilmentType},
+              data-client-order-page-enabled=${settings.clientOrderPageEnabled},
+              data-client-shipping-address-change-enabled=${settings.clientShippingAddressChangeEnabled},
               data-can-use-global-suppliers=${isSuperAdmin} ? ${settings.canUseGlobalSuppliers} : null,
               data-inventory-cache-ttl-minutes=${isSuperAdmin} ? ${settings.inventoryCacheTtlMinutes} : null">
     <div class="is-flex is-justify-content-space-between is-align-items-center mb-3">
@@ -60,6 +62,14 @@
             <tr>
                 <th th:text="#{store.enable.automated.fulfilment}"></th>
                 <td th:text="${settings.automatedFulfilment} ? #{store.supplier.flag.yes} : #{store.supplier.flag.no}"></td>
+            </tr>
+            <tr>
+                <th th:text="#{store.enable.client.order.page}"></th>
+                <td th:text="${settings.clientOrderPageEnabled} ? #{store.supplier.flag.yes} : #{store.supplier.flag.no}"></td>
+            </tr>
+            <tr>
+                <th th:text="#{store.enable.client.shipping.address.change}"></th>
+                <td th:text="${settings.clientShippingAddressChangeEnabled} ? #{store.supplier.flag.yes} : #{store.supplier.flag.no}"></td>
             </tr>
             <tr>
                 <th th:text="#{store.fulfilment.default.type}"></th>

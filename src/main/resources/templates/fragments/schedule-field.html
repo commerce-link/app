@@ -10,8 +10,8 @@
   The builder can only produce expressions that are valid by construction. "At" schedules pick a
   set of hours and one minute, never a set of both: a cron's minute and hour fields are a cross
   product, so allowing both would make combinations like 05:00 + 06:30 unrepresentable and leave
-  the operator staring at a conflict they cannot act on. Anything outside what the builder covers
-  stays reachable through the advanced expression below.
+  the operator staring at a conflict they cannot act on. A stored expression the builder cannot
+  show is named in a note and kept as the value until the operator picks a new schedule.
 -->
 <div th:fragment="input(inputName, value, minInterval)" class="schedule-field"
      th:attr="data-min-interval=${minInterval}">
@@ -66,18 +66,8 @@
 
     <!-- The one thing the operator should read instead of the expression itself. -->
     <p class="schedule-summary is-size-7 mt-2"></p>
-    <p class="schedule-unsupported is-size-7 has-text-warning-dark" th:text="#{schedule.advanced.only}"></p>
-
-    <div class="schedule-advanced mt-2">
-        <a class="is-size-7 schedule-advanced-toggle" href="#">
-            <span class="schedule-advanced-caret">&#9656;</span> <span th:text="#{schedule.advanced}"></span>
-        </a>
-        <div class="schedule-advanced-body mt-1">
-            <input class="input is-small schedule-input" type="text" autocomplete="off" spellcheck="false"
-                   th:name="${inputName}" th:value="${value}" th:placeholder="#{schedule.placeholder}">
-            <p class="help" th:text="#{schedule.description(${minInterval})}"></p>
-        </div>
-    </div>
+    <p class="schedule-unsupported is-size-7 has-text-warning-dark mt-2"></p>
+    <input type="hidden" class="schedule-input" th:name="${inputName}" th:value="${value}">
 </div>
 
 <script th:fragment="script" th:inline="javascript">
@@ -90,7 +80,6 @@
         // so the summary shown while editing and the one shown in the row cannot disagree.
         var TEXT = {
             'default': /*[[#{store.supplier.schedule.summary.default}]]*/ '',
-            custom: /*[[#{store.supplier.schedule.summary.custom}]]*/ '',
             'every.minutes': /*[[#{store.supplier.schedule.summary.every.minutes}]]*/ '',
             'every.hours': /*[[#{store.supplier.schedule.summary.every.hours}]]*/ '',
             'every.days': /*[[#{store.supplier.schedule.summary.every.days}]]*/ '',
@@ -104,6 +93,7 @@
             'at.SAT': /*[[#{store.supplier.schedule.summary.at.SAT}]]*/ '',
             'at.SUN': /*[[#{store.supplier.schedule.summary.at.SUN}]]*/ '',
             timezone: /*[[#{schedule.timezone}]]*/ '',
+            unsupported: /*[[#{schedule.unsupported}]]*/ '',
             noHours: /*[[#{schedule.at.nohours}]]*/ ''
         };
 
@@ -136,8 +126,6 @@
             var day = q('.schedule-day');
             var summary = q('.schedule-summary');
             var unsupported = q('.schedule-unsupported');
-            var advancedBody = q('.schedule-advanced-body');
-            var caret = q('.schedule-advanced-caret');
             var mode = 'default';
             var supported = true;
 
@@ -179,8 +167,8 @@
             // Returns null only when the operator has cleared every hour, which is the single
             // invalid state the builder can reach; the caller blocks the save on it.
             function build() {
-                // No mode is selected while the operator is writing an advanced expression by
-                // hand; that expression is the value, and only the server judges it.
+                // No mode is selected while a stored expression the builder cannot show is kept;
+                // it stays the value until the operator picks a new schedule.
                 if (mode === null) { return input.value; }
                 if (mode === 'default') { return ''; }
                 if (mode === 'every') {
@@ -198,7 +186,6 @@
             }
 
             function describe() {
-                if (!supported) { return TEXT.custom; }
                 if (mode === 'default') { return TEXT['default']; }
                 if (mode === 'every') {
                     return format(TEXT['every.' + everyUnit.value], everyValue.value) + '. ' + TEXT.timezone;
@@ -211,11 +198,16 @@
             }
 
             function render() {
+                unsupported.hidden = supported;
+                summary.hidden = !supported;
+                if (!supported) {
+                    unsupported.textContent = format(TEXT.unsupported, input.value);
+                    return;
+                }
                 var text = describe();
                 summary.textContent = text === null ? TEXT.noHours : text;
                 summary.classList.toggle('has-text-danger', text === null);
                 summary.classList.toggle('has-text-grey', text !== null);
-                unsupported.hidden = supported;
             }
 
             function fromBuilder() {
@@ -251,7 +243,7 @@
                     return everyValue.value === m[1];
                 }
                 // A single minute and a list of hours: the only "at" shape this builder writes.
-                // Anything wider (several minutes, ranges, steps) belongs to the advanced field.
+                // Anything wider (several minutes, ranges, steps) is reported as unsupported.
                 if (!/^\d{1,2}$/.test(f[0]) || !/^\d{1,2}(,\d{1,2})*$/.test(f[1])) { return false; }
                 var chosenDay = null;
                 if (f[2] === '*' && f[4] === '?') { chosenDay = 'every'; }
@@ -266,11 +258,6 @@
                 return true;
             }
 
-            function setAdvanced(open) {
-                advancedBody.hidden = !open;
-                caret.textContent = open ? '▾' : '▸';
-            }
-
             function sync(value) {
                 input.value = value || '';
                 setHours([5]);
@@ -280,7 +267,6 @@
                 everyOptions('minutes');
                 supported = parse(input.value);
                 if (!supported) { setMode(null); }
-                setAdvanced(!supported);
                 render();
             }
 
@@ -300,15 +286,6 @@
             });
             everyUnit.addEventListener('change', function () { everyOptions(everyUnit.value); fromBuilder(); });
             [everyValue, minute, day].forEach(function (el) { el.addEventListener('change', fromBuilder); });
-            input.addEventListener('input', function () {
-                supported = parse(input.value);
-                if (!supported) { setMode(null); }
-                render();
-            });
-            q('.schedule-advanced-toggle').addEventListener('click', function (event) {
-                event.preventDefault();
-                setAdvanced(advancedBody.hidden);
-            });
 
             sync(input.value);
             return {

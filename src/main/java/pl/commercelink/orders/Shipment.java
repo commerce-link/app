@@ -137,6 +137,11 @@ public class Shipment {
     }
 
     @DynamoDBIgnore
+    public boolean hasLabel() {
+        return isNotBlank(externalId) || isNotBlank(trackingNo);
+    }
+
+    @DynamoDBIgnore
     public boolean hasShippingData() {
         // a blank tracking number normalizes to an empty string, which is not a valid DynamoDB index key
         return isCarrierShipment() && isNotBlank(carrier) && isNotBlank(trackingNo) && shippedAt != null;

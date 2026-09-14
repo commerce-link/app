@@ -12,6 +12,7 @@ import org.mockito.quality.Strictness;
 import org.springframework.context.MessageSource;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 import pl.commercelink.baskets.Basket;
+import pl.commercelink.baskets.BasketItem;
 import pl.commercelink.baskets.BasketsRepository;
 import pl.commercelink.checkout.Checkout;
 import pl.commercelink.invoicing.InvoicingService;
@@ -21,6 +22,7 @@ import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.dtos.ClientDataDto;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 
@@ -135,6 +137,33 @@ class ClientOfferControllerTest {
 
         // then
         assertThat(view).isEqualTo("redirect:/store/store-1/client/offer/offer-1");
+    }
+
+    @Test
+    @DisplayName("selectVariant marks the chosen item within its group, saves the basket and redirects back to the offer")
+    void selectVariantMarksChosenItemSavesAndRedirects() {
+        // given
+        Basket basket = basketBase();
+        basket.setCreatedAt(LocalDateTime.of(2026, 9, 12, 8, 0));
+        BasketItem ssd1 = variant("MFN-SSD-1");
+        BasketItem ssd2 = variant("MFN-SSD-2");
+        basket.setBasketItems(List.of(ssd1, ssd2));
+        when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));
+
+        // when
+        String view = clientOfferController.selectVariant(STORE_ID, OFFER_ID, "SSD", ssd2.getPosition());
+
+        // then
+        verify(basketsRepository).save(basket);
+        assertThat(ssd1.isVariantSelected()).isFalse();
+        assertThat(ssd2.isVariantSelected()).isTrue();
+        assertThat(view).isEqualTo("redirect:/store/store-1/client/offer/offer-1");
+    }
+
+    private BasketItem variant(String mfn) {
+        BasketItem item = new BasketItem("pim-1", "SSD " + mfn, mfn, "SSD", 100.0, 0, 1, null, 3, false);
+        item.setVariantGroupId("SSD");
+        return item;
     }
 
     private Basket basketBase() {

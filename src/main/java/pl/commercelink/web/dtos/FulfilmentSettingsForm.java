@@ -21,6 +21,8 @@ public class FulfilmentSettingsForm {
     private int orderRealizationDays;
     private boolean automatedFulfilment;
     private FulfilmentType defaultFulfilmentType;
+    private boolean clientOrderPageEnabled;
+    private boolean clientShippingAddressChangeEnabled;
     private boolean canUseGlobalSuppliers;
     private Integer inventoryCacheTtlMinutes;
 
@@ -32,6 +34,8 @@ public class FulfilmentSettingsForm {
         form.setOrderRealizationDays(config.getOrderRealizationDays());
         form.setAutomatedFulfilment(config.isAutomatedFulfilment());
         form.setDefaultFulfilmentType(config.getDefaultFulfilmentType());
+        form.setClientOrderPageEnabled(config.isClientOrderPageEnabled());
+        form.setClientShippingAddressChangeEnabled(config.isClientShippingAddressChangeEnabled());
         // The two super-admin-only fields are read off the store's own resolving accessors
         // (rather than the raw configuration) so a store without any fulfilment configuration yet
         // still reports its real defaults instead of false/null.
@@ -53,6 +57,8 @@ public class FulfilmentSettingsForm {
         config.setOrderRealizationDays(orderRealizationDays);
         config.setAutomatedFulfilment(automatedFulfilment);
         config.setDefaultFulfilmentType(defaultFulfilmentType);
+        config.setClientOrderPageEnabled(clientOrderPageEnabled);
+        config.setClientShippingAddressChangeEnabled(clientShippingAddressChangeEnabled);
         config.setCanUseGlobalSuppliers(canUseGlobalSuppliers);
         config.setInventoryCacheTtlMinutes(inventoryCacheTtlMinutes);
         return config;

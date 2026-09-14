@@ -80,6 +80,18 @@ class StoreFulfilmentTemplateTest {
     }
 
     @Test
+    void editsTheClientFacingSwitchesInTheSettingsModalAndRefillsThemOnOpen() throws Exception {
+        // added on main to the page-level form this screen replaced; they now travel through the
+        // settings modal like every other setting, re-read from the section on each open
+        String html = template();
+        assertThat(html).contains("name=\"clientOrderPageEnabled\"");
+        assertThat(html).contains("name=\"clientShippingAddressChangeEnabled\"");
+        assertThat(html).contains("clientOrderPage.checked = current.clientOrderPageEnabled === 'true'");
+        assertThat(html).contains(
+                "clientShippingAddressChange.checked = current.clientShippingAddressChangeEnabled === 'true'");
+    }
+
+    @Test
     void postsTheFulfilmentSettingsModalToItsOwnAsyncEndpoint() throws Exception {
         assertThat(template()).contains("th:action=\"@{${basePath} + '/fulfilment/settings'}\"");
     }
