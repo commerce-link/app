@@ -27,7 +27,10 @@ import static pl.commercelink.notifications.StoreNotificationRecord.UNREAD_INDEX
 public class StoreNotificationsRepository extends DynamoDbRepository<StoreNotificationRecord> {
 
     private static final DynamoDbLocalDateTimeConverter DATE_TIME = new DynamoDbLocalDateTimeConverter();
-    private static final String RECORD_EXISTS = "attribute_exists(notificationId)";
+    // guards against re-marking a record already in the target state, which would otherwise reset readAt / extend
+    // the 90-day retention (markRead) or re-add it to the unread index (markUnread) for no real state change
+    private static final String NOT_YET_READ = "attribute_exists(unreadStoreId)";
+    private static final String NOT_YET_UNREAD = "attribute_exists(notificationId) AND attribute_not_exists(unreadStoreId)";
 
     public StoreNotificationsRepository(AmazonDynamoDB amazonDynamoDB) {
         super(amazonDynamoDB);
@@ -92,7 +95,7 @@ public class StoreNotificationsRepository extends DynamoDbRepository<StoreNotifi
                 .withTableName(TABLE_NAME)
                 .withKey(key(storeId, notificationId))
                 .withUpdateExpression("SET readAt = :readAt REMOVE unreadStoreId")
-                .withConditionExpression(RECORD_EXISTS)
+                .withConditionExpression(NOT_YET_READ)
                 .withExpressionAttributeValues(Map.of(":readAt", new AttributeValue(DATE_TIME.convert(readAt)))));
     }
 
@@ -101,7 +104,7 @@ public class StoreNotificationsRepository extends DynamoDbRepository<StoreNotifi
                 .withTableName(TABLE_NAME)
                 .withKey(key(storeId, notificationId))
                 .withUpdateExpression("SET unreadStoreId = :storeId REMOVE readAt")
-                .withConditionExpression(RECORD_EXISTS)
+                .withConditionExpression(NOT_YET_UNREAD)
                 .withExpressionAttributeValues(Map.of(":storeId", new AttributeValue(storeId))));
     }
 

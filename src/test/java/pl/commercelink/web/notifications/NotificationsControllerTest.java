@@ -190,6 +190,22 @@ class NotificationsControllerTest {
     }
 
     @Test
+    void openingAnAlreadyReadNotificationStillFollowsItsAction() {
+        // given
+        StoreNotificationRecord record = record("store-1", StoreNotificationType.UNAUTHENTICATED, "allegro_marketplace");
+        record.setReadAt(LocalDateTime.of(2026, 9, 10, 8, 0));
+        when(notificationService.find("store-1", "UNAUTHENTICATED:allegro_marketplace")).thenReturn(Optional.of(record));
+        // markRead returns 0: the repository's conditional update is a no-op for an already-read record
+        when(notificationService.markRead("store-1", List.of("UNAUTHENTICATED:allegro_marketplace"))).thenReturn(0);
+
+        // when
+        String redirect = controller.open("UNAUTHENTICATED:allegro_marketplace");
+
+        // then
+        assertThat(redirect).isEqualTo("redirect:/dashboard/store/marketplaces");
+    }
+
+    @Test
     void openingANotificationWithoutAnActionLeadsToAllNotifications() {
         // given
         when(notificationService.find("store-9", "MARKETPLACE_RETURN_REFUNDED:rma-7"))

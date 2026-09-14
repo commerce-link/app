@@ -183,7 +183,7 @@ class StoreNotificationsRepositoryTest {
         assertThat(request.getValue().getTableName()).isEqualTo("StoreNotifications");
         assertThat(request.getValue().getKey()).isEqualTo(key("A:1"));
         assertThat(request.getValue().getUpdateExpression()).isEqualTo("SET readAt = :readAt REMOVE unreadStoreId");
-        assertThat(request.getValue().getConditionExpression()).isEqualTo("attribute_exists(notificationId)");
+        assertThat(request.getValue().getConditionExpression()).isEqualTo("attribute_exists(unreadStoreId)");
         assertThat(request.getValue().getExpressionAttributeValues().get(":readAt").getS()).isEqualTo("2026-09-14T15:30:00");
     }
 
@@ -209,7 +209,8 @@ class StoreNotificationsRepositoryTest {
         verify(amazonDynamoDB).updateItem(request.capture());
         assertThat(request.getValue().getKey()).isEqualTo(key("A:1"));
         assertThat(request.getValue().getUpdateExpression()).isEqualTo("SET unreadStoreId = :storeId REMOVE readAt");
-        assertThat(request.getValue().getConditionExpression()).isEqualTo("attribute_exists(notificationId)");
+        assertThat(request.getValue().getConditionExpression())
+                .isEqualTo("attribute_exists(notificationId) AND attribute_not_exists(unreadStoreId)");
         assertThat(request.getValue().getExpressionAttributeValues().get(":storeId").getS()).isEqualTo("store-1");
     }
 
