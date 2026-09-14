@@ -98,7 +98,7 @@ class InventoryResultsRenderingTest {
         String html = engine.process(RESULTS, context);
 
         // then
-        assertThat(html).contains("Enter at least 3 characters.").doesNotContain("??");
+        assertThat(html).contains("Enter at least 3 characters.").contains("data-inventory-results-heading").doesNotContain("??");
     }
 
     @Test

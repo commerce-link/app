@@ -26,7 +26,7 @@
 <div th:fragment="results" class="cl-inv-results" data-inventory-fragment="results">
 
     <div th:if="${validationError}" class="cl-inv-state" th:attr="data-announce=#{inventory.search.tooShort}">
-        <p class="cl-inv-field-error" role="alert">
+        <p class="cl-inv-field-error" role="alert" tabindex="-1" data-inventory-results-heading>
             <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
             <span th:text="#{inventory.search.tooShort}"></span>
         </p>

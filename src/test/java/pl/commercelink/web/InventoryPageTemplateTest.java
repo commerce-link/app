@@ -17,17 +17,21 @@ class InventoryPageTemplateTest {
 
     @Test
     void searchFormWorksWithoutJavaScriptAsAPlainGet() throws Exception {
-        assertThat(page()).contains("th:action=\"@{/dashboard/inventory}\"").contains("method=\"get\"").contains("name=\"q\"");
+        // when / then
+        assertThat(page()).contains("th:action=\"@{/dashboard/inventory}\"").contains("method=\"get\"").contains("name=\"q\"")
+                .doesNotContain("th:disabled");
     }
 
     @Test
     void exposesTheHooksTheScriptSwapsFragmentsInto() throws Exception {
+        // when / then
         assertThat(page()).contains("data-inventory-page").contains("data-inventory-summary").contains("id=\"inventory-results\"")
                 .contains("aria-live=\"polite\"").contains("data-inventory-search-error");
     }
 
     @Test
     void loadsThePageStylesAndScript() throws Exception {
+        // when / then
         assertThat(page()).contains("@{/css/inventory.css}").contains("@{/js/inventory.js}");
     }
 }
