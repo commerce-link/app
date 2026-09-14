@@ -2,28 +2,20 @@
 <html xmlns:th="http://www.thymeleaf.org"
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
       layout:decorate="~{layout}">
+<head>
+    <!-- Must live in <head>: the layout dialect merges only <head>, a <style> in <body> outside the fragment is dropped. -->
+    <style>
+        @media print {
+            .input {
+                border-radius: 0;
+                border: 0;
+                border-bottom: 1px solid #000;
+                box-shadow: none;
+            }
+        }
+    </style>
+</head>
 <body>
-
-<style>
-    body {
-        font-size: 12px;
-    }
-    .container {
-        padding: 10px;
-    }
-    .field {
-        margin-bottom: 5px;
-    }
-    .label {
-        font-size: 10px;
-    }
-    .input {
-        font-size: 10px;
-    }
-    .table {
-        font-size: 10px;
-    }
-</style>
 
 <div layout:fragment="content" class="container">
 
