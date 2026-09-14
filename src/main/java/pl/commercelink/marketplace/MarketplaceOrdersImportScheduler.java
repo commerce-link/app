@@ -1,9 +1,9 @@
 package pl.commercelink.marketplace;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import pl.commercelink.scheduling.EventBridgeSchedules;
+import pl.commercelink.scheduling.PollingSchedule;
 import pl.commercelink.starter.util.ConversionUtil;
 
 import java.util.LinkedHashMap;
@@ -14,11 +14,14 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
 @Component
 public class MarketplaceOrdersImportScheduler {
 
-    @Value("${sqs.orders-import.queue.arn}")
-    private String ordersImportQueueArn;
+    private final String ordersImportQueueArn;
+    private final EventBridgeSchedules schedules;
 
-    @Autowired
-    private EventBridgeSchedules schedules;
+    public MarketplaceOrdersImportScheduler(@Value("${sqs.orders-import.queue.arn}") String ordersImportQueueArn,
+                                            EventBridgeSchedules schedules) {
+        this.ordersImportQueueArn = ordersImportQueueArn;
+        this.schedules = schedules;
+    }
 
     public void apply(String storeId, String marketplace, String ordersImportSchedule) {
         if (isBlank(ordersImportSchedule)) {
@@ -27,7 +30,7 @@ public class MarketplaceOrdersImportScheduler {
         }
         schedules.put(
                 scheduleName(storeId, marketplace),
-                "cron(" + ordersImportSchedule.trim() + ")",
+                PollingSchedule.stored(ordersImportSchedule).awsExpression(),
                 ordersImportQueueArn,
                 ConversionUtil.toJson(importRequest(storeId, marketplace)));
     }

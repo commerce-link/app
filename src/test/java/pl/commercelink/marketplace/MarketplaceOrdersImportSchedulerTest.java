@@ -3,10 +3,8 @@ package pl.commercelink.marketplace;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
 import pl.commercelink.scheduling.EventBridgeSchedules;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -22,18 +20,17 @@ class MarketplaceOrdersImportSchedulerTest {
     @Mock
     private EventBridgeSchedules schedules;
 
-    @InjectMocks
     private MarketplaceOrdersImportScheduler scheduler;
 
     @BeforeEach
     void setUp() {
-        ReflectionTestUtils.setField(scheduler, "ordersImportQueueArn", QUEUE_ARN);
+        scheduler = new MarketplaceOrdersImportScheduler(QUEUE_ARN, schedules);
     }
 
     @Test
     void appliesCronAsPerStoreScheduleCarryingTheStoreId() {
         // when
-        scheduler.apply("store-1", "CsCartMultiVendor", " 0/15 * * * ? * ");
+        scheduler.apply("store-1", "CsCartMultiVendor", "0/15 * * * ? *");
 
         // then
         verify(schedules).put(

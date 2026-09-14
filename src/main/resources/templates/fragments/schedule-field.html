@@ -8,7 +8,7 @@
     <div class="field mb-1">
         <label class="radio is-size-7">
             <input type="radio" class="schedule-mode" value="default">
-            <span th:text="#{schedule.mode.default}"></span>
+            <span th:text="${scheduleDefaultLabel} ?: #{schedule.mode.default}"></span>
         </label>
     </div>
 

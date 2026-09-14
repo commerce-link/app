@@ -61,8 +61,12 @@ public final class PollingSchedule {
         return new PollingSchedule(String.format("%d %d * * ? *", minute, hour));
     }
 
+    public static PollingSchedule stored(String expression) {
+        return new PollingSchedule(expression);
+    }
+
     public static PollingSchedule storedOrRandomNightly(String stored) {
-        return isBlank(stored) ? randomNightly() : new PollingSchedule(stored);
+        return isBlank(stored) ? randomNightly() : stored(stored);
     }
 
     public static String normalizeOrNull(String expression) {
