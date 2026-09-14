@@ -39,6 +39,10 @@
                                     <option value="" th:text="#{deliveries.provider.all}"></option>
                                     <option th:each="option : ${providerOptions}" th:value="${option.identity()}"
                                             th:text="${option.label()}" th:selected="${option.identity() == searchParams.provider}"></option>
+                                    <!-- a filter on a disconnected instance still narrows the list server-side,
+                                         so keep it visible as the selected option instead of showing "all" -->
+                                    <option th:if="${!#strings.isEmpty(searchParams.provider) and !#lists.contains(providerOptions.![identity()], searchParams.provider)}"
+                                            th:value="${searchParams.provider}" th:text="${supplierLabels.of(searchParams.provider)}" selected></option>
                                 </select>
                             </div>
                         </div>

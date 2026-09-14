@@ -38,12 +38,14 @@ import pl.commercelink.web.dtos.RoutedOrderView;
 import pl.commercelink.web.dtos.RoutedSupplierView;
 import pl.commercelink.web.dtos.SuggestedDeliveryItem;
 import pl.commercelink.web.dtos.SupplierOrderChoicesParams;
+import pl.commercelink.inventory.supplier.SupplierLabelMap;
 import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.SupplierDeliveryAddress;
 
 import java.time.LocalDate;
 import pl.commercelink.inventory.deliveries.DropshipCandidate;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
@@ -186,10 +188,19 @@ public class DeliveriesController {
         model.addAttribute("isAdmin", isAdmin());
 
         List<String> storeIds = paginatedDeliveries.stream().map(Delivery::getStoreId).distinct().toList();
-        model.addAttribute("supplierLabels", isSuperAdmin() ? supplierLabels.forStoreIds(storeIds) : supplierLabels.forStoreId(getStoreId()));
-        model.addAttribute("providerOptions", isSuperAdmin() ? List.of() : supplierLabels.forStoreId(getStoreId()).options());
+        SupplierLabelMap labels = isSuperAdmin() ? supplierLabels.forStoreIds(storeIds) : supplierLabels.forStoreId(getStoreId());
+        model.addAttribute("supplierLabels", labels);
+        model.addAttribute("providerOptions", isSuperAdmin() ? List.of() : providerFilterOptions(labels));
 
         return "deliveries";
+    }
+
+    // Deliveries can also sit on the internal warehouse, so the filter offers it next to the
+    // store's connections (spec: the deliveries filter lists connections plus Warehouse).
+    static List<SupplierLabelMap.Option> providerFilterOptions(SupplierLabelMap labels) {
+        List<SupplierLabelMap.Option> options = new ArrayList<>(labels.options());
+        options.add(new SupplierLabelMap.Option(SupplierRegistry.WAREHOUSE, SupplierRegistry.WAREHOUSE));
+        return options;
     }
 
     @PostMapping("/dashboard/deliveries/{deliveryId}/addPayment")

@@ -50,7 +50,11 @@ class SupplierLabelTemplatesTest {
                 .contains("th:each=\"option : ${assignableSuppliers}\"")
                 .doesNotContain("type=\"text\" id=\"quickAssignSupplier\"");
         assertThat(template("deliveries.html")).contains("<select name=\"provider\"")
-                .contains("th:each=\"option : ${providerOptions}\"");
+                .contains("th:each=\"option : ${providerOptions}\"")
+                // a filter value outside the options (e.g. a disconnected instance) must stay
+                // visible as the selected option instead of silently showing "all"
+                .contains("!#lists.contains(providerOptions.![identity()], searchParams.provider)")
+                .contains("supplierLabels.of(searchParams.provider)");
         assertThat(template("rma-center-form.html")).contains("th:each=\"option : ${providerOptions}\"");
         assertThat(template("rma-centers.html")).contains("supplierLabels.of(center.provider)");
         assertThat(template("warehouse.html")).contains("<select id=\"quickAddSupplier\" name=\"supplier\"")
