@@ -104,7 +104,7 @@ class NotificationsTemplateTest {
         assertThat(html).contains("href=\"/dashboard/notifications?filter=unread\"").contains("href=\"/dashboard/notifications?filter=all\"");
         assertThat(html.split("aria-current=\"page\"", -1)).hasSize(2);
         assertThat(html).contains("value=\"MARKETPLACE_RETURN_UNMATCHED\"").contains("Nieprzypisany zwrot z marketplace");
-        assertThat(html).contains("Wszystkie typy").contains("Filtruj");
+        assertThat(html).contains("Wszystkie typy").contains("data-filter-auto-submit").doesNotContain("Filtruj");
         assertThat(html).doesNotContain("??");
     }
 

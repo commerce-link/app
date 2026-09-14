@@ -38,13 +38,12 @@
                 <form method="get" class="cl-notifications-type" th:action="@{${basePath}}">
                     <input type="hidden" name="filter" th:value="${unreadOnly} ? 'unread' : 'all'">
                     <label for="notificationType" th:text="#{notifications.filter.type}"></label>
-                    <select id="notificationType" name="type">
+                    <select id="notificationType" name="type" data-filter-auto-submit>
                         <option value="" th:text="#{notifications.filter.allTypes}"></option>
                         <option th:each="type : ${types}" th:value="${type.name()}"
                                 th:selected="${type.name() == selectedType}"
                                 th:text="#{${'store.notification.type.' + type.name()}}"></option>
                     </select>
-                    <button type="submit" class="cl-button" th:text="#{notifications.filter.apply}"></button>
                 </form>
             </div>
 
@@ -111,6 +110,12 @@
 
             <script>
                 (function () {
+                    var typeFilter = document.querySelector('[data-filter-auto-submit]');
+                    if (typeFilter) {
+                        typeFilter.addEventListener('change', function () {
+                            typeFilter.form.submit();
+                        });
+                    }
                     var selectAll = document.querySelector('[data-select-all]');
                     if (!selectAll) {
                         return;

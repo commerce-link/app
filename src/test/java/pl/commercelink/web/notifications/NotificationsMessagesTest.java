@@ -17,7 +17,7 @@ class NotificationsMessagesTest {
             "notifications.title", "notifications.markAllRead", "notifications.markAllRead.short", "notifications.viewAll",
             "notifications.empty.all", "notifications.empty.unread", "notifications.filter.aria",
             "notifications.filter.unread", "notifications.filter.all", "notifications.filter.type",
-            "notifications.filter.allTypes", "notifications.filter.apply", "notifications.selectAll",
+            "notifications.filter.allTypes", "notifications.selectAll",
             "notifications.select.item", "notifications.markRead", "notifications.markUnread",
             "notifications.unreadBadge", "notifications.unread.sr", "notifications.pagination.label");
 
