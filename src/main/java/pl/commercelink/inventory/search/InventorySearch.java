@@ -67,15 +67,16 @@ public class InventorySearch {
         if (match == null && warehouseItems.isEmpty()) {
             return known(query);
         }
-        List<OfferRow> offers = match == null ? List.of() : offers(match.inventory(), modeOf);
-        List<WarehouseRow> rows = warehouseRows(warehouseItems);
-        return new InventorySearchResult.Found(
-                match == null ? MatchedBy.MFN : match.by(),
-                match == null ? warehouseHeader(query, warehouseItems) : header(match.inventory()),
-                offers,
-                rows,
-                prices(offers, rows),
-                stock != null);
+        MatchedBy matchedBy = match == null ? MatchedBy.MFN : match.by();
+        List<InventoryItem> items = match == null ? List.of() : match.inventory().getInventoryItems();
+        ProductCodes codes = ProductCodes.resolve(matchedBy, query,
+                items.isEmpty() ? warehouseItems.stream().map(WarehouseItemView::getEan).toList() : items.stream().map(InventoryItem::ean).toList(),
+                items.isEmpty() ? warehouseItems.stream().map(WarehouseItemView::getMfn).toList() : items.stream().map(InventoryItem::mfn).toList());
+        ProductHeader product = match == null ? warehouseHeader(query, codes) : header(match.inventory(), codes);
+        ProductCodes anchor = new ProductCodes(product.ean(), product.mfn());
+        List<OfferRow> offers = offers(items, modeOf, anchor);
+        List<WarehouseRow> rows = warehouseRows(warehouseItems, anchor);
+        return new InventorySearchResult.Found(matchedBy, product, offers, rows, prices(offers, rows), stock != null);
     }
 
     private Match firstMatch(String query, InventoryView view) {
@@ -106,11 +107,13 @@ public class InventorySearch {
         return mfn == null ? List.of() : List.of(mfn);
     }
 
-    private List<OfferRow> offers(MatchedInventory matched, Function<String, ConnectionMode> modeOf) {
-        List<InventoryItem> items = matched.getInventoryItems();
-        double lowestNet = items.stream().mapToDouble(InventoryItem::netPrice).filter(price -> price > 0).min().orElse(0);
+    private List<OfferRow> offers(List<InventoryItem> items, Function<String, ConnectionMode> modeOf, ProductCodes product) {
+        // an offer nobody can deliver is not a price anyone can buy at, so it neither wins nor leads the list
+        double lowestNet = items.stream().filter(item -> item.qty() > 0)
+                .mapToDouble(InventoryItem::netPrice).filter(price -> price > 0).min().orElse(0);
         return items.stream()
-                .sorted(Comparator.comparing((InventoryItem item) -> item.netPrice() <= 0)
+                .sorted(Comparator.comparing((InventoryItem item) -> item.qty() <= 0)
+                        .thenComparing(item -> item.netPrice() <= 0)
                         .thenComparingDouble(InventoryItem::netPrice))
                 .map(item -> new OfferRow(
                         item.supplier(),
@@ -120,38 +123,39 @@ public class InventorySearch {
                         item.mfn(),
                         Price.fromNet(item.netPrice()).grossValue(),
                         item.qty(),
-                        item.netPrice() > 0 && item.netPrice() == lowestNet))
+                        item.qty() > 0 && item.netPrice() > 0 && item.netPrice() == lowestNet,
+                        CodeMatch.of(product, item.ean(), item.mfn())))
                 .toList();
     }
 
-    private static List<WarehouseRow> warehouseRows(List<WarehouseItemView> items) {
+    private static List<WarehouseRow> warehouseRows(List<WarehouseItemView> items, ProductCodes product) {
         return items.stream()
                 .sorted(Comparator.comparing(WarehouseItemView::isInDelivery))
                 .map(item -> new WarehouseRow(item.getEan(), item.getMfn(), item.getPrice().grossValue(), item.getQty(),
-                        item.isInDelivery(), item.getCondition()))
+                        item.isInDelivery(), item.getCondition(), CodeMatch.of(product, item.getEan(), item.getMfn())))
                 .toList();
     }
 
     private static PriceSummary prices(List<OfferRow> offers, List<WarehouseRow> rows) {
         int inStock = rows.stream().filter(row -> !row.inDelivery()).mapToInt(WarehouseRow::qty).sum();
         int inDelivery = rows.stream().filter(WarehouseRow::inDelivery).mapToInt(WarehouseRow::qty).sum();
+        List<Double> pricesInStock = offers.stream()
+                .filter(offer -> offer.hasStock() && offer.hasPrice())
+                .map(OfferRow::grossPrice)
+                .sorted()
+                .toList();
         return new PriceSummary(
-                offers.stream().filter(OfferRow::cheapest).mapToDouble(OfferRow::grossPrice).findFirst().orElse(0),
-                medianGross(offers),
-                offers.size(),
+                pricesInStock.isEmpty() ? 0 : pricesInStock.get(0),
+                median(pricesInStock),
+                pricesInStock.size(),
                 offers.stream().mapToLong(OfferRow::qty).sum(),
                 inStock,
                 inDelivery);
     }
 
-    private static double medianGross(List<OfferRow> offers) {
-        // listed offers, not warehouse stock, drive the summary price; MatchedInventory's own
-        // lowest/median can disagree with the cheapest row (skips qty==1) or blow up on an all-zero-price match
-        List<Double> pricedOffers = offers.stream()
-                .filter(OfferRow::hasPrice)
-                .map(OfferRow::grossPrice)
-                .sorted()
-                .toList();
+    // listed offers, not warehouse stock, drive the summary price; MatchedInventory's own
+    // lowest/median can disagree with the cheapest row (skips qty==1) or blow up on an all-zero-price match
+    private static double median(List<Double> pricedOffers) {
         if (pricedOffers.isEmpty()) {
             return 0;
         }
@@ -161,26 +165,25 @@ public class InventorySearch {
                 : pricedOffers.get(size / 2);
     }
 
-    private ProductHeader header(MatchedInventory matched) {
+    private ProductHeader header(MatchedInventory matched, ProductCodes codes) {
         InventoryKey key = matched.getInventoryKey();
-        String ean = first(key.getProductEans());
-        String mfn = first(key.getProductCodes());
         Taxonomy taxonomy = matched.getTaxonomy();
         if (taxonomy != null && taxonomy != Taxonomy.EMPTY) {
-            return new ProductHeader(taxonomy.name(), taxonomy.brand(), ean != null ? ean : taxonomy.ean(), mfn != null ? mfn : taxonomy.mfn());
+            ProductCodes shown = codes.orElse(taxonomy.ean(), taxonomy.mfn());
+            return new ProductHeader(taxonomy.name(), taxonomy.brand(), shown.ean(), shown.code());
         }
         Optional<PimEntry> pimEntry = key.getId() == null ? Optional.empty() : pimCatalog.findByPimId(key.getId());
-        return new ProductHeader(pimEntry.map(PimEntry::name).orElse(null), pimEntry.map(PimEntry::brand).orElse(null), ean, mfn);
+        return new ProductHeader(pimEntry.map(PimEntry::name).orElse(null), pimEntry.map(PimEntry::brand).orElse(null), codes.ean(), codes.code());
     }
 
-    private ProductHeader warehouseHeader(String query, List<WarehouseItemView> items) {
+    private ProductHeader warehouseHeader(String query, ProductCodes codes) {
         String mfn = unifyMfn(query);
         Taxonomy taxonomy = mfn == null ? null : taxonomyCache.findByMfn(mfn);
         if (taxonomy != null) {
-            return new ProductHeader(taxonomy.name(), taxonomy.brand(), taxonomy.ean(), taxonomy.mfn());
+            ProductCodes shown = codes.orElse(taxonomy.ean(), taxonomy.mfn());
+            return new ProductHeader(taxonomy.name(), taxonomy.brand(), shown.ean(), shown.code());
         }
-        WarehouseItemView item = items.get(0);
-        return new ProductHeader(null, null, item.getEan(), item.getMfn());
+        return new ProductHeader(null, null, codes.ean(), codes.code());
     }
 
     private InventorySearchResult known(String query) {

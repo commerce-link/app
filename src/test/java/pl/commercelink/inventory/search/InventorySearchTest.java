@@ -104,7 +104,11 @@ class InventorySearchTest {
     }
 
     private InventoryItem offer(String supplier, double netPrice, int qty) {
-        return new InventoryItem(EAN, MFN, netPrice, "PLN", qty, 1, supplier);
+        return offer(supplier, EAN, MFN, netPrice, qty);
+    }
+
+    private InventoryItem offer(String supplier, String ean, String mfn, double netPrice, int qty) {
+        return new InventoryItem(ean, mfn, netPrice, "PLN", qty, 1, supplier);
     }
 
     private WarehouseItemView warehouseItem(double netCost, int qty, FulfilmentStatus status, ItemCondition condition) {
@@ -194,7 +198,9 @@ class InventorySearchTest {
         assertThat(found.matchedBy()).isEqualTo(MatchedBy.MFN);
         assertThat(found.supplierOffers()).isEmpty();
         assertThat(found.prices().warehouseInStockQty()).isEqualTo(3);
-        assertThat(found.prices().hasSupplierOffers()).isFalse();
+        assertThat(found.prices().hasLowestPrice()).isFalse();
+        assertThat(found.product().mfn()).isEqualTo(MFN);
+        assertThat(found.warehouseRows()).extracting(WarehouseRow::codeMatch).containsExactly(CodeMatch.SAME);
     }
 
     @Test
@@ -299,6 +305,89 @@ class InventorySearchTest {
         // then
         assertThat(found.prices().medianGross())
                 .isCloseTo((Price.fromNet(110.0).grossValue() + Price.fromNet(120.0).grossValue()) / 2, within(0.001));
+        assertThat(found.prices().showsMedian()).isTrue();
+    }
+
+    @Test
+    void medianIsHiddenBelowFourPricedOffersInStock() {
+        // given
+        when(view.findByEan(EAN)).thenReturn(offers(
+                offer("A", 100.0, 1), offer("B", 110.0, 1), offer("C", 120.0, 1), offer("D", 90.0, 0)));
+
+        // when
+        InventorySearchResult.Found found = (InventorySearchResult.Found) search.search(STORE_ID, EAN);
+
+        // then
+        assertThat(found.prices().pricedOffersInStock()).isEqualTo(3);
+        assertThat(found.prices().showsMedian()).isFalse();
+    }
+
+    @Test
+    void cheapestOfferIsChosenOnlyAmongOffersInStockAndOffersWithoutStockCloseTheList() {
+        // given
+        when(view.findByEan(EAN)).thenReturn(offers(
+                offer("Elko", 90.0, 0), offer("Kosatec", 110.0, 3), offer("AB", 100.0, 5)));
+
+        // when
+        InventorySearchResult.Found found = (InventorySearchResult.Found) search.search(STORE_ID, EAN);
+
+        // then
+        assertThat(found.supplierOffers()).extracting(OfferRow::supplier).containsExactly("AB", "Kosatec", "Elko");
+        assertThat(found.supplierOffers()).extracting(OfferRow::cheapest).containsExactly(true, false, false);
+        assertThat(found.prices().lowestGross()).isEqualTo(Price.fromNet(100.0).grossValue());
+        assertThat(found.prices().supplierQty()).isEqualTo(8);
+    }
+
+    @Test
+    void flagsOffersWhoseCodesDifferFromTheSearchedProduct() {
+        // given
+        when(view.findByEan(EAN)).thenReturn(offers(
+                offer("Elko", "05901234123457", MFN, 100.0, 5),
+                offer("AB", "5903000000000", MFN, 101.0, 5),
+                offer("Kosatec", EAN, "910-OTHER", 102.0, 5),
+                offer("Nowak", "5900000000099", "MXM3S-BOX", 103.0, 5),
+                offer("Action", null, " 910-006559 ", 104.0, 5)));
+
+        // when
+        InventorySearchResult.Found found = (InventorySearchResult.Found) search.search(STORE_ID, EAN);
+
+        // then
+        assertThat(found.supplierOffers()).extracting(OfferRow::codeMatch).containsExactly(
+                CodeMatch.SAME, CodeMatch.EAN_DIFFERS, CodeMatch.CODE_DIFFERS, CodeMatch.BOTH_DIFFER, CodeMatch.SAME);
+        assertThat(found.supplierOffers()).extracting(offer -> offer.codeMatch().isInfo()).containsExactly(false, true, true, false, false);
+        assertThat(found.supplierOffers().get(3).codeMatch().isWarning()).isTrue();
+    }
+
+    @Test
+    void productHeaderShowsTheSearchedEanAndTheCodeMostOffersCarry() {
+        // given
+        when(view.findByEan(EAN)).thenReturn(offers(
+                offer("Elko", EAN, "ALT-1", 100.0, 5),
+                offer("AB", EAN, MFN, 101.0, 5),
+                offer("Kosatec", EAN, MFN, 102.0, 5)));
+
+        // when
+        InventorySearchResult.Found found = (InventorySearchResult.Found) search.search(STORE_ID, EAN);
+
+        // then
+        assertThat(found.product().ean()).isEqualTo(EAN);
+        assertThat(found.product().mfn()).isEqualTo(MFN);
+        assertThat(found.supplierOffers()).extracting(OfferRow::codeMatch)
+                .containsExactly(CodeMatch.CODE_DIFFERS, CodeMatch.SAME, CodeMatch.SAME);
+    }
+
+    @Test
+    void productHeaderCodesDoNotDependOnOfferOrderWhenCountsTie() {
+        // given
+        when(view.findByProductCode(MFN)).thenReturn(offers(offer("Elko", "5900000000002", MFN, 100.0, 5), offer("AB", "5900000000001", MFN, 101.0, 5)));
+
+        // when
+        InventorySearchResult.Found first = (InventorySearchResult.Found) search.search(STORE_ID, MFN);
+        when(view.findByProductCode(MFN)).thenReturn(offers(offer("AB", "5900000000001", MFN, 101.0, 5), offer("Elko", "5900000000002", MFN, 100.0, 5)));
+        InventorySearchResult.Found second = (InventorySearchResult.Found) search.search(STORE_ID, MFN);
+
+        // then
+        assertThat(first.product().ean()).isEqualTo("5900000000001").isEqualTo(second.product().ean());
     }
 
     @Test

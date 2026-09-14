@@ -685,43 +685,38 @@
     overflow-wrap: anywhere;
 }
 
-.cl-inv-page .cl-inv-figures {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    border-top: 1px solid var(--cl-line);
+.cl-inv-page .cl-inv-found .cl-inv-product {
+    padding-bottom: 4px;
 }
 
-.cl-inv-figure {
+.cl-inv-page .cl-inv-price-summary {
     display: flex;
     flex-wrap: wrap;
-    align-items: baseline;
-    column-gap: 8px;
-    min-width: 0;
-    padding: 8px 16px;
-    border-left: 1px solid var(--cl-line);
-}
-
-.cl-inv-figure dt {
-    flex-basis: 100%;
-}
-
-.cl-inv-figure dd {
+    row-gap: 2px;
     margin: 0;
+    padding: 0 16px 12px;
+    font-size: 14px;
+    color: var(--cl-ink-2);
 }
 
-.cl-inv-figure:first-child {
-    border-left: 0;
+.cl-inv-price-summary > span {
+    white-space: nowrap;
 }
 
-.cl-inv-figure-value {
-    font-size: 18px;
-    line-height: 1.3;
+/* the separator trails an item instead of leading the next one, so a wrapped line never starts with a dot */
+.cl-inv-price-summary > span:not(:last-child)::after {
+    content: "\00B7";
+    margin: 0 10px;
+    color: var(--cl-ink-3);
+}
+
+.cl-inv-price-summary b {
     font-weight: 650;
     font-variant-numeric: tabular-nums;
     color: var(--cl-ink);
 }
 
-.cl-inv-figure-value.is-ok {
+.cl-inv-price-summary b.is-ok {
     color: var(--cl-ok);
 }
 
@@ -843,27 +838,77 @@
     table-layout: fixed;
 }
 
-.cl-inv-col-ean {
-    width: 150px;
-}
-
-.cl-inv-col-code {
-    width: 180px;
-}
-
 .cl-inv-col-price {
-    width: 140px;
+    width: 190px;
 }
 
 .cl-inv-col-qty {
-    width: 90px;
+    width: 130px;
+}
+
+.cl-inv-page .cl-inv-offers thead th {
+    font-size: 12.5px;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--cl-ink-2);
+    white-space: nowrap;
+}
+
+.cl-inv-page .cl-inv-offers td {
+    vertical-align: top;
+}
+
+.cl-inv-page .cl-inv-offers td.is-numeric {
+    white-space: nowrap;
 }
 
 .cl-inv-page .cl-inv-table .cl-inv-code {
+    padding: 0;
+    background: none;
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    font-size: 13px;
+    font-size: 12px;
+    font-weight: 400;
     color: var(--cl-ink-2);
     overflow-wrap: anywhere;
+}
+
+.cl-inv-code-info {
+    display: block;
+    margin-top: 3px;
+    font-size: 12.5px;
+    color: var(--cl-ink-3);
+}
+
+.cl-inv-page .cl-inv-code-warning {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    margin-top: 4px;
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--cl-warn);
+    overflow-wrap: anywhere;
+}
+
+.cl-inv-page .cl-inv-code-warning .cl-inv-code {
+    color: var(--cl-warn);
+}
+
+.cl-inv-code-warning svg {
+    flex: 0 0 auto;
+}
+
+.cl-inv-check {
+    display: inline-grid;
+    place-items: center;
+    width: 16px;
+    height: 16px;
+    margin-right: 6px;
+    border-radius: 50%;
+    background: var(--cl-ok);
+    color: #fff;
+    font-size: 9px;
+    vertical-align: 1px;
 }
 
 .cl-inv-page .cl-inv-offers tbody tr.cl-inv-offer:hover td {
@@ -884,6 +929,11 @@
 
 .cl-inv-page .cl-inv-offer.is-cheapest td {
     background: var(--cl-ok-tint);
+}
+
+.cl-inv-page .cl-inv-offer.is-cheapest .cl-inv-price {
+    font-weight: 700;
+    color: var(--cl-ok);
 }
 
 .cl-inv-page .cl-inv-offer.is-dim td,
@@ -925,17 +975,8 @@
 }
 
 @media screen and (max-width: 1023px) {
-    .cl-inv-page .cl-inv-tiles,
-    .cl-inv-page .cl-inv-figures {
+    .cl-inv-page .cl-inv-tiles {
         grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    .cl-inv-figure:nth-child(3) {
-        border-left: 0;
-    }
-
-    .cl-inv-figure:nth-child(n + 3) {
-        border-top: 1px solid var(--cl-line);
     }
 
     .cl-inv-button,
@@ -953,20 +994,12 @@
         height: 44px;
     }
 
-    .cl-inv-col-ean {
-        width: 125px;
-    }
-
-    .cl-inv-col-code {
-        width: 130px;
-    }
-
     .cl-inv-col-price {
-        width: 115px;
+        width: 175px;
     }
 
     .cl-inv-col-qty {
-        width: 75px;
+        width: 110px;
     }
 
     .cl-inv-clear {
@@ -1012,27 +1045,56 @@
         flex-basis: 100%;
     }
 
-    .cl-inv-figure-value {
-        font-size: 16px;
+    .cl-inv-price-summary > span {
+        flex-basis: 100%;
+    }
+
+    .cl-inv-price-summary > span:not(:last-child)::after {
+        content: none;
     }
 }
 
-/* the offers table stops being readable on narrow tablets, so offers switch to cards below 900px */
+/* below 900px offers become cards: source and price on the first line, quantity under the price, code notes across
+   the whole card; the header stays as a slim sort bar because cards have no column headers of their own */
 @media screen and (max-width: 899px) {
-    .cl-inv-page .cl-inv-offers thead {
-        position: absolute;
-        width: 1px;
-        height: 1px;
-        overflow: hidden;
-        visibility: hidden;
-        clip: rect(0 0 0 0);
-    }
-
     .cl-inv-page .cl-inv-offers,
+    .cl-inv-page .cl-inv-offers thead,
     .cl-inv-page .cl-inv-offers tbody,
     .cl-inv-page .cl-inv-offers tr {
         display: block;
         width: 100%;
+    }
+
+    .cl-inv-page .cl-inv-offers colgroup {
+        display: none;
+    }
+
+    .cl-inv-page .cl-inv-offers thead tr {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        background: var(--cl-surface-2);
+        border-top: 1px solid var(--cl-line);
+    }
+
+    .cl-inv-page .cl-inv-offers thead th {
+        display: block;
+        padding: 0;
+        border: 0;
+        background: none;
+    }
+
+    .cl-inv-page .cl-inv-offers thead th:first-child {
+        flex: 1 1 auto;
+        padding: 10px 0 10px 16px;
+    }
+
+    .cl-inv-page .cl-inv-offers thead th:last-child {
+        padding-right: 16px;
+    }
+
+    .cl-inv-page .cl-inv-offers thead .cl-inv-sort {
+        min-height: 44px;
     }
 
     .cl-inv-page .cl-inv-offers tr.cl-inv-offer {
@@ -1048,29 +1110,35 @@
         padding: 0;
         border: 0;
         background: none;
-        text-align: left;
+    }
+
+    .cl-inv-page .cl-inv-offers tr.cl-inv-offer td.cl-inv-source-cell {
+        display: contents;
+    }
+
+    .cl-inv-page .cl-inv-offers .cl-inv-source-name {
+        grid-column: 1;
+        grid-row: 1 / span 2;
+    }
+
+    .cl-inv-page .cl-inv-offers .cl-inv-code-info,
+    .cl-inv-page .cl-inv-offers .cl-inv-code-warning {
+        grid-column: 1 / -1;
+        grid-row: 3;
+    }
+
+    .cl-inv-page .cl-inv-offers tr.cl-inv-offer td.cl-inv-price-cell {
+        grid-column: 2;
+        grid-row: 1;
+    }
+
+    .cl-inv-page .cl-inv-offers tr.cl-inv-offer td.cl-inv-qty-cell {
+        grid-column: 2;
+        grid-row: 2;
     }
 
     .cl-inv-page .cl-inv-offers tr.cl-inv-offer.is-cheapest {
         background: var(--cl-ok-tint);
-    }
-
-    .cl-inv-page .cl-inv-offers tr.cl-inv-offer td:nth-child(1) {
-        grid-column: 1 / -1;
-    }
-
-    .cl-inv-page .cl-inv-offers tr.cl-inv-offer td:nth-child(4) {
-        grid-column: 2;
-        grid-row: 2 / span 3;
-        text-align: right;
-    }
-
-    .cl-inv-page .cl-inv-offers tr.cl-inv-offer td:nth-child(2)::before,
-    .cl-inv-page .cl-inv-offers tr.cl-inv-offer td:nth-child(3)::before,
-    .cl-inv-page .cl-inv-offers tr.cl-inv-offer td:nth-child(5)::before {
-        content: attr(data-label) ": ";
-        color: var(--cl-ink-3);
-        font-size: 12px;
     }
 }
 

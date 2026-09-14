@@ -23,6 +23,21 @@
     <span class="cl-status is-info" th:text="#{${'inventory.matchedBy.' + matchedBy.name()}}"></span>
 </div>
 
+<th:block th:fragment="codeMatch(match, ean, code)">
+    <span th:if="${match.name() == 'EAN_DIFFERS'}" class="cl-inv-code-info">
+        <span th:text="#{inventory.table.eanDiffers}"></span> <code class="cl-inv-code" th:text="${ean}"></code>
+    </span>
+    <span th:if="${match.name() == 'CODE_DIFFERS'}" class="cl-inv-code-info">
+        <span th:text="#{inventory.table.codeDiffers}"></span> <code class="cl-inv-code" th:text="${code}"></code>
+    </span>
+    <span th:if="${match.isWarning()}" class="cl-inv-code-warning">
+        <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
+        <span><span th:text="#{inventory.table.bothDiffer}"></span>
+            <code class="cl-inv-code" th:text="${ean}"></code> · <code class="cl-inv-code" th:text="${code}"></code>
+            — <span th:text="#{inventory.table.checkMatch}"></span></span>
+    </span>
+</th:block>
+
 <div th:fragment="results" class="cl-inv-results" data-inventory-fragment="results">
 
     <div th:if="${validationError}" class="cl-inv-state" th:attr="data-announce=#{inventory.search.tooShort}">
@@ -63,99 +78,94 @@
          th:attr="data-announce=#{inventory.results.announce(${result.supplierOffers().size()})}">
         <div th:replace="~{fragments/inventory-results :: productHeader(${result.product()}, ${result.matchedBy()})}"></div>
 
-        <dl class="cl-inv-figures">
-            <div class="cl-inv-figure">
-                <dt class="cl-inv-eyebrow" th:text="#{inventory.figure.lowest}"></dt>
-                <dd class="cl-inv-figure-value is-ok"
-                    th:text="${prices.hasSupplierOffers()} ? (${#numbers.formatDecimal(prices.lowestGross(), 1, 'WHITESPACE', 2, 'COMMA')} + ' PLN') : '—'"></dd>
-            </div>
-            <div class="cl-inv-figure">
-                <dt class="cl-inv-eyebrow" th:text="#{inventory.figure.median}"></dt>
-                <dd class="cl-inv-figure-value"
-                    th:text="${prices.hasSupplierOffers()} ? (${#numbers.formatDecimal(prices.medianGross(), 1, 'WHITESPACE', 2, 'COMMA')} + ' PLN') : '—'"></dd>
-                <dd class="cl-inv-hint" th:text="#{inventory.figure.median.hint(${prices.offerCount()})}"></dd>
-            </div>
-            <div class="cl-inv-figure">
-                <dt class="cl-inv-eyebrow" th:text="#{inventory.figure.available}"></dt>
-                <dd class="cl-inv-figure-value" th:text="#{inventory.figure.available.value(${prices.supplierQty()})}"></dd>
-            </div>
-            <div class="cl-inv-figure" th:if="${!superAdmin and result.warehouseChecked()}">
-                <dt class="cl-inv-eyebrow" th:text="#{inventory.figure.warehouse}"></dt>
-                <dd class="cl-inv-figure-value" th:text="#{inventory.figure.available.value(${prices.warehouseInStockQty()})}"></dd>
-                <dd class="cl-inv-hint" th:if="${prices.warehouseInDeliveryQty() > 0}"
-                    th:text="#{inventory.figure.warehouse.hint(${prices.warehouseInDeliveryQty()})}"></dd>
-            </div>
-        </dl>
+        <p class="cl-inv-price-summary" data-inventory-price-summary>
+            <span th:if="${prices.hasLowestPrice()}">
+                <span th:text="#{inventory.summary.lowest.prefix}"></span>
+                <b class="is-ok" th:text="${#numbers.formatDecimal(prices.lowestGross(), 1, 'WHITESPACE', 2, 'COMMA')} + ' PLN'"></b>
+                <span th:text="#{inventory.summary.atSuppliers}"></span>
+            </span>
+            <span th:unless="${prices.hasLowestPrice()}" th:text="#{inventory.summary.noSupplierStock}"></span>
+            <span th:if="${prices.showsMedian()}">
+                <span th:text="#{inventory.summary.median}"></span>
+                <b th:text="${#numbers.formatDecimal(prices.medianGross(), 1, 'WHITESPACE', 2, 'COMMA')} + ' PLN'"></b>
+            </span>
+            <span th:if="${prices.supplierQty() > 0}">
+                <b th:text="#{inventory.table.qtyValue(${prices.supplierQty()})}"></b>
+                <span th:text="#{inventory.summary.atSuppliers}"></span>
+            </span>
+            <span th:if="${!superAdmin and result.warehouseChecked()}">
+                <b th:text="#{inventory.table.qtyValue(${prices.warehouseInStockQty()})}"></b>
+                <span th:text="#{inventory.summary.inWarehouse}"></span><th:block th:if="${prices.warehouseInDeliveryQty() > 0}">,
+                <b th:text="#{inventory.table.qtyValue(${prices.warehouseInDeliveryQty()})}"></b>
+                <span th:text="#{inventory.summary.inTransit}"></span></th:block>
+            </span>
+        </p>
 
         <div class="cl-inv-table-wrap">
             <table class="cl-inv-table cl-inv-offers" data-inventory-offers>
                 <caption class="cl-inv-visually-hidden" th:text="#{inventory.table.caption}"></caption>
                 <colgroup>
                     <col class="cl-inv-col-source">
-                    <col class="cl-inv-col-ean">
-                    <col class="cl-inv-col-code">
                     <col class="cl-inv-col-price">
                     <col class="cl-inv-col-qty">
                 </colgroup>
                 <thead>
                 <tr>
-                    <th scope="col" aria-sort="none">
-                        <button type="button" class="cl-inv-sort" data-sort-key="source" th:text="#{inventory.table.source}"></button>
-                    </th>
-                    <th scope="col" th:text="#{inventory.table.ean}"></th>
-                    <th scope="col" th:text="#{inventory.table.code}"></th>
+                    <th scope="col" th:text="#{inventory.table.source}"></th>
                     <th scope="col" class="is-numeric" aria-sort="none">
-                        <button type="button" class="cl-inv-sort" data-sort-key="price" th:text="#{inventory.table.price}"></button>
+                        <button type="button" class="cl-inv-sort" data-sort-key="price" th:text="#{inventory.table.purchasePrice}"></button>
                     </th>
                     <th scope="col" class="is-numeric" aria-sort="none">
-                        <button type="button" class="cl-inv-sort" data-sort-key="qty" th:text="#{inventory.table.qty}"></button>
+                        <button type="button" class="cl-inv-sort" data-sort-key="qty" th:text="#{inventory.table.available}"></button>
                     </th>
                 </tr>
                 </thead>
 
                 <tbody data-inventory-sortable>
                 <tr th:each="row : ${result.warehouseRows()}" class="cl-inv-offer is-warehouse"
-                    th:data-sort-source="#{inventory.table.warehouse}"
                     th:data-sort-price="${row.grossUnitCost() > 0 ? row.grossUnitCost() : 999999999}"
                     th:data-sort-qty="${row.qty()}">
-                    <td th:attr="data-label=#{inventory.table.source}">
-                        <strong th:text="#{inventory.table.warehouse}"></strong>
-                        <span th:if="${row.inDelivery()}" class="cl-status is-info" th:text="#{inventory.table.inDelivery}"></span>
-                        <span th:if="${row.hasSpecialCondition()}" class="cl-status is-warn"
-                              th:text="#{${'ItemCondition.' + row.condition().name()}}"></span>
+                    <td class="cl-inv-source-cell">
+                        <span class="cl-inv-source-name">
+                            <strong th:text="#{inventory.table.warehouse}"></strong>
+                            <span th:if="${row.inDelivery()}" class="cl-status is-info" th:text="#{inventory.table.inDelivery}"></span>
+                            <span th:if="${row.hasSpecialCondition()}" class="cl-status is-warn"
+                                  th:text="#{${'ItemCondition.' + row.condition().name()}}"></span>
+                        </span>
+                        <span th:replace="~{fragments/inventory-results :: codeMatch(${row.codeMatch()}, ${row.productEan()}, ${row.productCode()})}"></span>
                     </td>
-                    <td th:attr="data-label=#{inventory.table.ean}"><span class="cl-inv-code" th:text="${row.productEan()}"></span></td>
-                    <td th:attr="data-label=#{inventory.table.code}"><span class="cl-inv-code" th:text="${row.productCode()}"></span></td>
-                    <td class="is-numeric" th:attr="data-label=#{inventory.table.price}">
+                    <td class="is-numeric cl-inv-price-cell">
                         <span class="cl-inv-price" th:text="${#numbers.formatDecimal(row.grossUnitCost(), 1, 'WHITESPACE', 2, 'COMMA')} + ' PLN'"></span>
-                        <span class="cl-inv-hint" th:text="#{inventory.table.purchaseCost}"></span>
                     </td>
-                    <td class="is-numeric" th:attr="data-label=#{inventory.table.qty}"
-                        th:text="#{inventory.table.qtyValue(${row.qty()})}"></td>
+                    <td class="is-numeric cl-inv-qty-cell" th:text="#{inventory.table.qtyValue(${row.qty()})}"></td>
                 </tr>
                 <tr th:each="offer : ${result.supplierOffers()}" class="cl-inv-offer"
                     th:classappend="${offer.cheapest() ? 'is-cheapest' : ''} + ' ' + ${offer.hasStock() ? '' : 'is-dim'}"
-                    th:data-sort-source="${offer.supplierLabel()}"
                     th:data-sort-price="${offer.hasPrice() ? offer.grossPrice() : 999999999}"
                     th:data-sort-qty="${offer.qty()}">
-                    <td th:attr="data-label=#{inventory.table.source}">
-                        <strong th:text="${offer.supplierLabel()}"></strong>
-                        <span th:if="${offer.mode() != null}" class="cl-inv-mode"
-                              th:text="#{${'inventory.mode.' + offer.mode().name()}}"></span>
+                    <td class="cl-inv-source-cell">
+                        <span class="cl-inv-source-name">
+                            <strong th:text="${offer.supplierLabel()}"></strong>
+                            <span th:if="${offer.mode() != null}" class="cl-inv-mode"
+                                  th:text="#{${'inventory.mode.' + offer.mode().name()}}"></span>
+                        </span>
+                        <span th:replace="~{fragments/inventory-results :: codeMatch(${offer.codeMatch()}, ${offer.productEan()}, ${offer.productCode()})}"></span>
                     </td>
-                    <td th:attr="data-label=#{inventory.table.ean}"><span class="cl-inv-code" th:text="${offer.productEan()}"></span></td>
-                    <td th:attr="data-label=#{inventory.table.code}"><span class="cl-inv-code" th:text="${offer.productCode()}"></span></td>
-                    <td class="is-numeric" th:attr="data-label=#{inventory.table.price}">
-                        <span th:if="${offer.hasPrice()}" class="cl-inv-price" th:text="${#numbers.formatDecimal(offer.grossPrice(), 1, 'WHITESPACE', 2, 'COMMA')} + ' PLN'"></span>
+                    <td class="is-numeric cl-inv-price-cell">
+                        <th:block th:if="${offer.hasPrice()}">
+                            <span th:if="${offer.cheapest()}" class="cl-inv-check" aria-hidden="true"><i class="fas fa-check"></i></span>
+                            <span th:if="${offer.cheapest()}" class="cl-inv-visually-hidden" th:text="#{inventory.table.cheapest}"></span>
+                            <span class="cl-inv-price" th:text="${#numbers.formatDecimal(offer.grossPrice(), 1, 'WHITESPACE', 2, 'COMMA')} + ' PLN'"></span>
+                        </th:block>
                         <span th:unless="${offer.hasPrice()}" class="cl-inv-muted" th:text="#{inventory.table.noPrice}"></span>
                     </td>
-                    <td class="is-numeric" th:attr="data-label=#{inventory.table.qty}">
+                    <td class="is-numeric cl-inv-qty-cell">
                         <span th:if="${offer.hasStock()}" th:text="#{inventory.table.qtyValue(${offer.qty()})}"></span>
                         <span th:unless="${offer.hasStock()}" class="cl-status is-neutral" th:text="#{inventory.table.noStock}"></span>
                     </td>
                 </tr>
                 <tr th:if="${result.supplierOffers().isEmpty()}">
-                    <td colspan="5" class="cl-inv-muted" th:text="#{inventory.table.noOffers}"></td>
+                    <td colspan="3" class="cl-inv-muted" th:text="#{inventory.table.noOffers}"></td>
                 </tr>
                 </tbody>
             </table>

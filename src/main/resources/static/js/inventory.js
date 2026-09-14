@@ -248,9 +248,7 @@
         rows.sort((left, right) => {
             const a = left.getAttribute(attribute);
             const b = right.getAttribute(attribute);
-            const order = attribute === 'data-sort-source'
-                ? a.localeCompare(b, undefined, {sensitivity: 'base'})
-                : parseFloat(a) - parseFloat(b);
+            const order = parseFloat(a) - parseFloat(b);
             return ascending ? order : -order;
         });
         rows.forEach(row => body.appendChild(row));

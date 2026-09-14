@@ -72,7 +72,7 @@ class InventoryScriptContractTest {
         String css = read("src/main/resources/static/css/inventory.css");
 
         // when / then
-        assertThat(css).contains(".cl-inv-col-code {").contains("position: sticky").contains("top: var(--cl-topbar-height)")
+        assertThat(css).contains(".cl-inv-col-price {").contains("position: sticky").contains("top: var(--cl-topbar-height)")
                 .contains("th[aria-sort=\"ascending\"] .cl-inv-sort::after").contains("tr.cl-inv-offer:hover td");
     }
 

@@ -3,6 +3,7 @@ package pl.commercelink.web;
 import org.junit.jupiter.api.Test;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
+import pl.commercelink.inventory.search.CodeMatch;
 import pl.commercelink.inventory.search.InventorySearchResult;
 import pl.commercelink.inventory.search.MatchedBy;
 import pl.commercelink.inventory.search.OfferRow;
@@ -39,12 +40,13 @@ class InventoryResultsRenderingTest {
 
     private InventorySearchResult.Found found(boolean warehouseChecked) {
         return new InventorySearchResult.Found(MatchedBy.EAN, PRODUCT,
-                List.of(new OfferRow("Elko", "Elko", ConnectionMode.GLOBAL, "5901234123457", "910-006559", 389.0, 58, true),
-                        new OfferRow("AB", "AB", ConnectionMode.GLOBAL, "5901234123457", "910-006559", 405.0, 80, false),
-                        new OfferRow("manual-nowak", "Hurtownia Nowak", ConnectionMode.MANUAL, "5901234123457", "910-006559", 439.9, 0, false)),
-                List.of(new WarehouseRow("5901234123457", "910-006559", 355.2, 3, false, ItemCondition.Sealed),
-                        new WarehouseRow("5901234123457", "910-006559", 349.0, 2, true, ItemCondition.Damaged)),
-                new PriceSummary(389.0, 405.0, 3, 138, 3, 2),
+                List.of(new OfferRow("manual-nowak", "Hurtownia Nowak", ConnectionMode.MANUAL, "5903000000000", "910-006559", 389.0, 12, true, CodeMatch.EAN_DIFFERS),
+                        new OfferRow("AB", "AB", ConnectionMode.GLOBAL, "5901234123457", "910-006559", 405.0, 80, false, CodeMatch.SAME),
+                        new OfferRow("HurtPol", "Hurt-Pol", ConnectionMode.MANUAL, "5900000000099", "MXM3S-BOX", 412.0, 4, false, CodeMatch.BOTH_DIFFER),
+                        new OfferRow("Elko", "Elko", ConnectionMode.GLOBAL, "5901234123457", "910-OTHER", 379.0, 0, false, CodeMatch.CODE_DIFFERS)),
+                List.of(new WarehouseRow("5901234123457", "910-006559", 355.2, 3, false, ItemCondition.Sealed, CodeMatch.SAME),
+                        new WarehouseRow("5901234123457", "910-006559", 349.0, 2, true, ItemCondition.Damaged, CodeMatch.SAME)),
+                new PriceSummary(389.0, 405.0, 3, 96, 3, 2),
                 warehouseChecked);
     }
 
@@ -55,42 +57,96 @@ class InventoryResultsRenderingTest {
 
         // then
         assertThat(html).doesNotContain("??");
-        assertThat(html).contains("data-inventory-fragment=\"results\"").contains("data-announce=\"Offers found: 3\"");
+        assertThat(html).contains("data-inventory-fragment=\"results\"").contains("data-announce=\"Offers found: 4\"");
         assertThat(html).contains("Logitech MX Master 3S").contains("Matched by: EAN");
-        assertThat(html).contains("389,00 PLN").contains("405,00 PLN").contains("355,20 PLN").contains("+2 in transit");
         assertThat(html.split("data-inventory-sortable", -1)).hasSize(2);
         assertThat(html.split("<tbody", -1)).hasSize(2);
-        assertThat(html.indexOf("is-warehouse")).isLessThan(html.indexOf("data-sort-source=\"Elko\""));
-        assertThat(html).contains("data-sort-source=\"Warehouse\"").contains("data-sort-price=\"355.2\"").contains("data-sort-qty=\"3\"");
-        assertThat(html).doesNotContain("Your warehouse").doesNotContain(">Suppliers<").doesNotContain("PLN gross").doesNotContain("%");
-        assertThat(html).doesNotContain("Delivery").doesNotContain("data-sort-delivery").doesNotContain("Cheapest")
-                .doesNotContain("at 2 of 3").doesNotContain("in stock");
-        assertThat(html).contains("purchase cost").contains("in transit").contains("Damaged");
-        assertThat(html.split("is-cheapest", -1)).hasSize(2);
-        assertThat(html).contains("Gross price").contains("Manufacturer code").contains(">EAN<")
-                .contains("58 pcs").contains("cl-status is-neutral\">none<");
-        assertThat(html).doesNotContain("fa-sort").contains("<colgroup>").doesNotContain("cl-inv-col-delivery");
+        assertThat(html.indexOf("is-warehouse")).isLessThan(html.indexOf("Hurtownia Nowak"));
+        assertThat(html).contains("data-sort-price=\"355.2\"").contains("data-sort-qty=\"3\"").doesNotContain("data-sort-source");
+        assertThat(html).contains("Source</th>").contains("Gross purchase price").contains(">Available<");
+        assertThat(html).doesNotContain("Your warehouse").doesNotContain("Delivery").doesNotContain("purchase cost")
+                .doesNotContain("Manufacturer code").doesNotContain("%");
+        assertThat(html).contains("in transit").contains("Damaged").contains("355,20 PLN").contains("80 pcs")
+                .contains("cl-status is-neutral\">none<");
+        assertThat(html).contains("<colgroup>").doesNotContain("cl-inv-figure");
         assertThat(html).contains("global").contains("manual");
     }
 
     @Test
-    void lowestPriceFigureOmitsTheSupplierName() {
+    void cheapestOfferCarriesACheckWithScreenReaderTextButNoVisibleLabel() {
         // when
         String html = engine.process(RESULTS, context(found(), true));
 
         // then
-        String lowestFigure = html.substring(html.indexOf("Lowest price"), html.indexOf("Median"));
-        assertThat(lowestFigure).contains("389,00 PLN").doesNotContain("Elko");
+        assertThat(html.split("is-cheapest", -1)).hasSize(2);
+        assertThat(html.split("cl-inv-check", -1)).hasSize(2);
+        assertThat(html).contains("cl-inv-visually-hidden\">lowest price<").doesNotContain("Cheapest");
     }
 
     @Test
-    void omitsTheWarehouseFigureWhenTheBuiltInWarehouseWasNotQueried() {
+    void summaryLineReplacesTheFiguresAndOmitsTheSupplierName() {
+        // when
+        String html = engine.process(RESULTS, context(found(), true));
+
+        // then
+        String summary = html.substring(html.indexOf("data-inventory-price-summary"), html.indexOf("data-inventory-offers"));
+        assertThat(summary).contains("From").contains("389,00 PLN").contains("at suppliers").contains("96 pcs")
+                .contains("3 pcs").contains("in the warehouse").contains("2 pcs").contains("in transit")
+                .doesNotContain("Nowak").doesNotContain("median");
+    }
+
+    @Test
+    void summaryShowsTheMedianFromFourOffersAndNoPriceWhenNothingIsInStock() {
+        // given
+        InventorySearchResult.Found withMedian = new InventorySearchResult.Found(MatchedBy.EAN, PRODUCT, List.of(), List.of(),
+                new PriceSummary(389.0, 410.5, 4, 40, 0, 0), true);
+        InventorySearchResult.Found withoutStock = new InventorySearchResult.Found(MatchedBy.EAN, PRODUCT, List.of(), List.of(),
+                new PriceSummary(0, 0, 0, 0, 0, 0), true);
+
+        // when
+        String median = engine.process(RESULTS, context(withMedian, true));
+        String empty = engine.process(RESULTS, context(withoutStock, true));
+
+        // then
+        assertThat(median).contains("median").contains("410,50 PLN");
+        assertThat(empty).contains("No supplier offers in stock").doesNotContain("From").doesNotContain("at suppliers");
+    }
+
+    @Test
+    void codeNotesAppearOnlyForRowsWhoseCodesDiffer() {
+        // when
+        String html = engine.process(RESULTS, context(found(), true));
+
+        // then
+        assertThat(html).contains("Source EAN:").contains("5903000000000")
+                .contains("Source code:").contains("910-OTHER")
+                .contains("Different EAN and code at source:").contains("5900000000099").contains("MXM3S-BOX")
+                .contains("check it is the same product");
+        assertThat(html.split("cl-inv-code-info", -1)).hasSize(3);
+        assertThat(html.split("cl-inv-code-warning", -1)).hasSize(2);
+        assertThat(html).doesNotContain(">5901234123457</code>");
+    }
+
+    @Test
+    void globalSearchSummaryLeavesOutTheWarehouse() {
+        // given
+        Context context = context(found(true), true);
+        context.setVariable("superAdmin", true);
+
+        // when
+        String html = engine.process(RESULTS, context);
+
+        // then
+        assertThat(html).doesNotContain("in the warehouse");
+    }
+
+    @Test
+    void summaryLeavesOutTheWarehouseWhenTheBuiltInWarehouseWasNotQueried() {
         // when
         String html = engine.process(RESULTS, context(found(false), true));
 
         // then
-        assertThat(html).doesNotContain("??");
-        assertThat(html).doesNotContain("In warehouse").doesNotContain("+2 in transit");
+        assertThat(html).doesNotContain("??").doesNotContain("in the warehouse");
     }
 
     @Test
