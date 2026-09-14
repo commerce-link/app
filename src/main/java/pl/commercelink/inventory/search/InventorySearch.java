@@ -74,7 +74,7 @@ public class InventorySearch {
                 match == null ? warehouseHeader(query, warehouseItems) : header(match.inventory()),
                 offers,
                 rows,
-                prices(match, offers, rows));
+                prices(offers, rows));
     }
 
     private Match firstMatch(String query, InventoryView view) {
@@ -139,23 +139,40 @@ public class InventorySearch {
                 .toList();
     }
 
-    private static PriceSummary prices(Match match, List<OfferRow> offers, List<WarehouseRow> rows) {
+    private static PriceSummary prices(List<OfferRow> offers, List<WarehouseRow> rows) {
         int inStock = rows.stream().filter(row -> !row.inDelivery()).mapToInt(WarehouseRow::qty).sum();
         int inDelivery = rows.stream().filter(WarehouseRow::inDelivery).mapToInt(WarehouseRow::qty).sum();
-        if (match == null) {
-            return new PriceSummary(0, null, 0, 0, 0, 0, 0, inStock, inDelivery);
-        }
-        MatchedInventory matched = match.inventory();
         return new PriceSummary(
-                matched.getLowestPrice().grossValue(),
+                lowestGross(offers),
                 offers.stream().filter(OfferRow::cheapest).map(OfferRow::supplierLabel).findFirst().orElse(null),
-                matched.getMedianPrice().grossValue(),
+                medianGross(offers),
                 offers.size(),
                 offers.stream().mapToLong(OfferRow::qty).sum(),
                 (int) offers.stream().filter(OfferRow::hasStock).map(OfferRow::supplier).distinct().count(),
                 (int) offers.stream().map(OfferRow::supplier).distinct().count(),
                 inStock,
                 inDelivery);
+    }
+
+    private static double lowestGross(List<OfferRow> offers) {
+        return offers.stream().filter(OfferRow::cheapest).mapToDouble(OfferRow::grossPrice).findFirst().orElse(0);
+    }
+
+    private static double medianGross(List<OfferRow> offers) {
+        // listed offers, not warehouse stock, drive the summary price; MatchedInventory's own
+        // lowest/median can disagree with the cheapest row (skips qty==1) or blow up on an all-zero-price match
+        List<Double> pricedOffers = offers.stream()
+                .filter(OfferRow::hasPrice)
+                .map(OfferRow::grossPrice)
+                .sorted()
+                .toList();
+        if (pricedOffers.isEmpty()) {
+            return 0;
+        }
+        int size = pricedOffers.size();
+        return size % 2 == 0
+                ? (pricedOffers.get(size / 2 - 1) + pricedOffers.get(size / 2)) / 2.0
+                : pricedOffers.get(size / 2);
     }
 
     private ProductHeader header(MatchedInventory matched) {

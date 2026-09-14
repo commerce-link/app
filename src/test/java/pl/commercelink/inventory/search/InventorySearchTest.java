@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -66,9 +67,12 @@ class InventorySearchTest {
     @InjectMocks
     private InventorySearch search;
 
-    private final SupplierRegistry supplierRegistry = mock(SupplierRegistry.class);
-    private final InventoryView view = mock(InventoryView.class);
-    private final StockQueryService stock = mock(StockQueryService.class);
+    @Mock
+    private SupplierRegistry supplierRegistry;
+    @Mock
+    private InventoryView view;
+    @Mock
+    private StockQueryService stock;
     private Store store;
 
     @BeforeEach
@@ -256,5 +260,46 @@ class InventorySearchTest {
 
         // then
         verify(warehouse, never()).stockQueryService(anyString());
+    }
+
+    @Test
+    void lowestPriceMatchesTheCheapestRowEvenForASingleUnitOffer() {
+        // given
+        when(view.findByEan(EAN)).thenReturn(offers(offer("Elko", 100.0, 1), offer("AB", 110.0, 5)));
+
+        // when
+        InventorySearchResult.Found found = (InventorySearchResult.Found) search.search(STORE_ID, EAN);
+
+        // then
+        assertThat(found.prices().lowestGross()).isEqualTo(Price.fromNet(100.0).grossValue());
+        assertThat(found.supplierOffers()).filteredOn(OfferRow::cheapest).extracting(OfferRow::supplier).containsExactly("Elko");
+    }
+
+    @Test
+    void offersWithoutPricesDoNotBreakTheSummary() {
+        // given
+        when(view.findByEan(EAN)).thenReturn(offers(offer("Elko", 0.0, 5), offer("AB", 0.0, 5)));
+
+        // when
+        InventorySearchResult.Found found = (InventorySearchResult.Found) search.search(STORE_ID, EAN);
+
+        // then
+        assertThat(found.prices().lowestGross()).isEqualTo(0.0);
+        assertThat(found.prices().medianGross()).isEqualTo(0.0);
+        assertThat(found.supplierOffers()).extracting(OfferRow::cheapest).containsExactly(false, false);
+    }
+
+    @Test
+    void medianIsTheMeanOfTheTwoMiddlePricesForAnEvenCount() {
+        // given
+        when(view.findByEan(EAN)).thenReturn(offers(
+                offer("A", 100.0, 1), offer("B", 110.0, 1), offer("C", 120.0, 1), offer("D", 130.0, 1)));
+
+        // when
+        InventorySearchResult.Found found = (InventorySearchResult.Found) search.search(STORE_ID, EAN);
+
+        // then
+        assertThat(found.prices().medianGross())
+                .isCloseTo((Price.fromNet(110.0).grossValue() + Price.fromNet(120.0).grossValue()) / 2, within(0.001));
     }
 }
