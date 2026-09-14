@@ -9,8 +9,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.invoicing.InvoicingProviderFactory;
-import pl.commercelink.marketplace.MarketplaceOrdersImportScheduler;
-import pl.commercelink.marketplace.MarketplaceProviderFactory;
 import pl.commercelink.payments.PaymentProviderFactory;
 import pl.commercelink.provider.ProviderFactory;
 import pl.commercelink.shipping.ShippingProviderFactory;
@@ -28,23 +26,17 @@ public class StoreIntegrationsController {
     private final ShippingProviderFactory shippingProviderFactory;
     private final InvoicingProviderFactory invoicingProviderFactory;
     private final PaymentProviderFactory paymentProviderFactory;
-    private final MarketplaceProviderFactory marketplaceProviderFactory;
-    private final MarketplaceOrdersImportScheduler ordersImportScheduler;
     private final MessageSource messageSource;
 
     public StoreIntegrationsController(StoresRepository storesRepository,
                                        ShippingProviderFactory shippingProviderFactory,
                                        InvoicingProviderFactory invoicingProviderFactory,
                                        PaymentProviderFactory paymentProviderFactory,
-                                       MarketplaceProviderFactory marketplaceProviderFactory,
-                                       MarketplaceOrdersImportScheduler ordersImportScheduler,
                                        MessageSource messageSource) {
         this.storesRepository = storesRepository;
         this.shippingProviderFactory = shippingProviderFactory;
         this.invoicingProviderFactory = invoicingProviderFactory;
         this.paymentProviderFactory = paymentProviderFactory;
-        this.marketplaceProviderFactory = marketplaceProviderFactory;
-        this.ordersImportScheduler = ordersImportScheduler;
         this.messageSource = messageSource;
     }
 
@@ -71,8 +63,6 @@ public class StoreIntegrationsController {
             case "shipping" -> store.setConfigurationValue(IntegrationType.SHIPPING_PROVIDER, providerName);
             case "invoicing" -> store.setConfigurationValue(IntegrationType.INVOICING_PROVIDER, providerName);
             case "payments" -> store.addPaymentIntegration(providerName);
-            case "marketplace" -> store.connectMarketplace(providerName,
-                    marketplaceProviderFactory.deviceAuthProviders().contains(providerName));
         }
 
         storesRepository.save(store);
@@ -103,10 +93,6 @@ public class StoreIntegrationsController {
             case "shipping" -> store.removeIntegration(IntegrationType.SHIPPING_PROVIDER);
             case "invoicing" -> store.removeIntegration(IntegrationType.INVOICING_PROVIDER);
             case "payments" -> store.removePaymentIntegration(providerName);
-            case "marketplace" -> {
-                store.removeMarketplaceIntegration(providerName);
-                ordersImportScheduler.delete(store.getStoreId(), providerName);
-            }
         }
 
         storesRepository.save(store);
@@ -139,7 +125,6 @@ public class StoreIntegrationsController {
             case "shipping" -> shippingProviderFactory;
             case "invoicing" -> invoicingProviderFactory;
             case "payments" -> paymentProviderFactory;
-            case "marketplace" -> marketplaceProviderFactory;
             default -> throw new IllegalArgumentException("Unknown provider type: " + providerType);
         };
     }
@@ -149,7 +134,6 @@ public class StoreIntegrationsController {
             case "shipping" -> "shipping";
             case "invoicing" -> "invoicing";
             case "payments" -> "payments";
-            case "marketplace" -> "marketplaces";
             default -> throw new IllegalArgumentException("Unknown provider type: " + providerType);
         };
         return CustomSecurityContext.hasRole("SUPER_ADMIN")

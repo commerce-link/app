@@ -89,6 +89,9 @@
 
     <script th:replace="~{fragments/schedule-field :: script}"></script>
     <style th:replace="~{fragments/schedule-field :: style}"></style>
+    <style>
+        .marketplace-actions .dropdown-item.button { width: 100%; text-decoration: none; }
+    </style>
 
     <script th:inline="javascript">
         (function () {
@@ -210,7 +213,25 @@
                     });
             }
 
+            function closeDropdowns(except) {
+                section.querySelectorAll('.marketplace-actions.is-active').forEach(function (dropdown) {
+                    if (dropdown !== except) { dropdown.classList.remove('is-active'); }
+                });
+            }
+
+            document.addEventListener('click', function (event) {
+                if (!event.target.closest('.marketplace-actions')) { closeDropdowns(null); }
+            });
+
             section.addEventListener('click', function (event) {
+                var trigger = event.target.closest('.marketplace-actions .dropdown-trigger');
+                if (trigger) {
+                    var dropdown = trigger.closest('.marketplace-actions');
+                    closeDropdowns(dropdown);
+                    dropdown.classList.toggle('is-active');
+                    return;
+                }
+                closeDropdowns(null);
                 if (event.target.closest('#marketplace-add-button')) { open(null); return; }
                 var configureButton = event.target.closest('[data-configure-marketplace]');
                 if (configureButton) { open(configureButton.getAttribute('data-configure-marketplace')); return; }

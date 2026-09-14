@@ -63,6 +63,28 @@ class MarketplaceSectionRenderingTest {
         assertThat(html).contains("data-provider=\"Allegro\"");
         assertThat(html).contains("href=\"/dashboard/store/marketplaces/exports/Empik\"");
         assertThat(html).contains("data-identity=\"Empik\"");
+        assertThat(html).contains("class=\"dropdown is-right marketplace-actions\"");
+        assertThat(html).contains("dropdown-trigger");
+        assertThat(html).doesNotContain("device-auth-row-connect\" data-provider=\"Empik\"");
+        assertThat(html).contains("class=\"is-hidden-mobile\"");
+    }
+
+    @Test
+    void everyActionLivesInsideTheRowDropdown() {
+        // given
+        MarketplaceIntegrationView empik = new MarketplaceIntegrationView("Empik", "EmpikPlace", true, false, null, null);
+
+        // when
+        String html = EnglishFragmentTemplateEngine.create().process(WRAPPER, context(List.of(empik)));
+
+        // then
+        int menuStart = html.indexOf("dropdown-menu");
+        int menuEnd = html.indexOf("</td>", menuStart);
+        String menu = html.substring(menuStart, menuEnd);
+        assertThat(menu).contains("data-configure-marketplace=\"Empik\"");
+        assertThat(menu).contains("marketplaces/exports/Empik");
+        assertThat(menu).contains("marketplace-disconnect-button");
+        assertThat(html.substring(0, menuStart)).doesNotContain("data-configure-marketplace");
     }
 
     @Test

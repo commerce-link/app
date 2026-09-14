@@ -1,5 +1,6 @@
 package pl.commercelink.marketplace;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import pl.commercelink.inventory.supplier.ErrorMessage;
@@ -12,18 +13,25 @@ import pl.commercelink.stores.MarketplaceIntegration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
 @Service
+@Slf4j
 public class MarketplaceConnectionService {
+
+    private static final List<ErrorMessage> UPDATE_FAILED =
+            List.of(ErrorMessage.of("store.marketplaces.error.update.failed"));
 
     private final StoresRepository storesRepository;
     private final MarketplaceProviderFactory providerFactory;
@@ -100,14 +108,24 @@ public class MarketplaceConnectionService {
             return ConnectionUpdateResult.errors(errors);
         }
 
-        providerFactory.saveConfiguration(store, marketplace, submitted);
-        MarketplaceIntegration integration = store.connectMarketplace(
-                marketplace, providerFactory.deviceAuthProviders().contains(marketplace));
-        if (!Objects.equals(normalizedSchedule, integration.getOrdersImportSchedule())) {
-            ordersImportScheduler.apply(store.getStoreId(), marketplace, normalizedSchedule);
-            integration.setOrdersImportSchedule(normalizedSchedule);
+        Deque<Runnable> compensations = new ArrayDeque<>();
+        try {
+            rememberSecret(store, descriptor, compensations);
+            providerFactory.saveConfiguration(store, marketplace, submitted);
+            MarketplaceIntegration integration = store.connectMarketplace(
+                    marketplace, providerFactory.deviceAuthProviders().contains(marketplace));
+            if (!Objects.equals(normalizedSchedule, integration.getOrdersImportSchedule())) {
+                rememberSchedule(store.getStoreId(), marketplace, compensations);
+                ordersImportScheduler.apply(store.getStoreId(), marketplace, normalizedSchedule);
+                integration.setOrdersImportSchedule(normalizedSchedule);
+            }
+            storesRepository.save(store);
+        } catch (RuntimeException e) {
+            log.error("Saving marketplace {} for store {} failed, restoring the previous state",
+                    marketplace, store.getStoreId(), e);
+            compensate(compensations);
+            return ConnectionUpdateResult.errors(UPDATE_FAILED);
         }
-        storesRepository.save(store);
         return ConnectionUpdateResult.ok();
     }
 
@@ -116,11 +134,45 @@ public class MarketplaceConnectionService {
             return ConnectionUpdateResult.errors(
                     List.of(ErrorMessage.of("store.marketplaces.import.schedule.error.missing", marketplace)));
         }
-        providerFactory.deleteConfiguration(store, marketplace);
-        store.removeMarketplaceIntegration(marketplace);
-        ordersImportScheduler.delete(store.getStoreId(), marketplace);
-        storesRepository.save(store);
+        Deque<Runnable> compensations = new ArrayDeque<>();
+        try {
+            MarketplaceProviderDescriptor descriptor = providerFactory.getDescriptor(marketplace);
+            if (descriptor != null) {
+                rememberSecret(store, descriptor, compensations);
+            }
+            providerFactory.deleteConfiguration(store, marketplace);
+            rememberSchedule(store.getStoreId(), marketplace, compensations);
+            ordersImportScheduler.delete(store.getStoreId(), marketplace);
+            store.removeMarketplaceIntegration(marketplace);
+            storesRepository.save(store);
+        } catch (RuntimeException e) {
+            log.error("Disconnecting marketplace {} from store {} failed, restoring the previous state",
+                    marketplace, store.getStoreId(), e);
+            compensate(compensations);
+            return ConnectionUpdateResult.errors(UPDATE_FAILED);
+        }
         return ConnectionUpdateResult.ok();
+    }
+
+    private void rememberSecret(Store store, MarketplaceProviderDescriptor descriptor, Deque<Runnable> compensations) {
+        String credentialName = providerFactory.resolveCredentialName(descriptor);
+        ProviderConfigurationManager.SecretSnapshot snapshot = configurationManager.snapshot(store, credentialName);
+        compensations.push(() -> configurationManager.restore(store, credentialName, snapshot));
+    }
+
+    private void rememberSchedule(String storeId, String marketplace, Deque<Runnable> compensations) {
+        Optional<String> before = ordersImportScheduler.snapshot(storeId, marketplace);
+        compensations.push(() -> ordersImportScheduler.restore(storeId, marketplace, before));
+    }
+
+    private void compensate(Deque<Runnable> compensations) {
+        while (!compensations.isEmpty()) {
+            try {
+                compensations.pop().run();
+            } catch (RuntimeException e) {
+                log.error("Compensation step failed", e);
+            }
+        }
     }
 
     private void validateRequiredFields(Store store, MarketplaceProviderDescriptor descriptor,

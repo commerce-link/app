@@ -8,6 +8,7 @@ import pl.commercelink.starter.util.ConversionUtil;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
@@ -40,6 +41,20 @@ public class MarketplaceOrdersImportScheduler {
 
     public void delete(String storeId, String marketplace) {
         schedules.delete(scheduleName(storeId, marketplace));
+    }
+
+    public Optional<String> snapshot(String storeId, String marketplace) {
+        return schedules.expressionOf(scheduleName(storeId, marketplace));
+    }
+
+    public void restore(String storeId, String marketplace, Optional<String> snapshot) {
+        String name = scheduleName(storeId, marketplace);
+        if (snapshot.isPresent()) {
+            schedules.put(name, snapshot.get(), ordersImportQueueArn,
+                    ConversionUtil.toJson(importRequest(storeId, marketplace)), FLEXIBLE_WINDOW_MINUTES);
+        } else {
+            schedules.delete(name);
+        }
     }
 
     private Map<String, String> importRequest(String storeId, String marketplace) {

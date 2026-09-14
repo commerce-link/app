@@ -7,11 +7,15 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.scheduling.EventBridgeSchedules;
 
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class MarketplaceOrdersImportSchedulerTest {
@@ -45,6 +49,35 @@ class MarketplaceOrdersImportSchedulerTest {
     void blankScheduleRemovesTheStoreSchedule() {
         // when
         scheduler.apply("store-1", "Allegro", "  ");
+
+        // then
+        verify(schedules).delete("orders-import-store-1-allegro");
+        verify(schedules, never()).put(anyString(), anyString(), anyString(), any(), anyInt());
+    }
+
+    @Test
+    void snapshotReadsTheLiveExpressionOfTheStoreSchedule() {
+        // given
+        when(schedules.expressionOf("orders-import-store-1-allegro")).thenReturn(Optional.of("cron(0/15 * * * ? *)"));
+
+        // when / then
+        assertThat(scheduler.snapshot("store-1", "Allegro")).contains("cron(0/15 * * * ? *)");
+    }
+
+    @Test
+    void restoringAPresentSnapshotPutsTheOldExpressionBackWithTheSameTarget() {
+        // when
+        scheduler.restore("store-1", "Allegro", Optional.of("cron(0 9 * * ? *)"));
+
+        // then
+        verify(schedules).put("orders-import-store-1-allegro", "cron(0 9 * * ? *)", QUEUE_ARN,
+                "{\"marketplace\":\"Allegro\",\"storeId\":\"store-1\"}", 1);
+    }
+
+    @Test
+    void restoringAnEmptySnapshotRemovesWhateverWasCreatedMeanwhile() {
+        // when
+        scheduler.restore("store-1", "Allegro", Optional.empty());
 
         // then
         verify(schedules).delete("orders-import-store-1-allegro");

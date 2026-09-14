@@ -17,7 +17,6 @@ import pl.commercelink.marketplace.MarketplaceExportRunHeader;
 import pl.commercelink.marketplace.MarketplaceExportRunId;
 import pl.commercelink.marketplace.MarketplaceIntegrationView;
 import pl.commercelink.marketplace.MarketplaceOfferSnapshot;
-import pl.commercelink.web.dtos.ConnectedIntegration;
 
 import java.text.MessageFormat;
 import java.util.ArrayList;
@@ -132,38 +131,6 @@ class MarketplaceExportHistoryTemplateTest {
         assertThat(html).contains("is-hidden");
         assertThat(html).doesNotContain("??");
         assertThat(html.indexOf("exportRowsSearch")).isLessThan(html.indexOf("<table"));
-    }
-
-    @Test
-    void linksToTheMarketplaceExportHistoryPageNextToTheDisconnectButtonOfTheMarketplacePanel() {
-        // when
-        String html = renderIntegrationPanel("marketplace", false);
-
-        // then
-        assertThat(html).contains("Zobacz historię eksportu");
-        assertThat(html).contains("href=\"/dashboard/store/marketplaces/exports/allegro\"");
-        assertThat(html).doesNotContain("#marketplace-export-history");
-        assertThat(html).contains("Rozłącz");
-        assertThat(html).doesNotContain("??");
-    }
-
-    @Test
-    void linksToTheExportHistoryOfTheViewedStoreForASuperAdmin() {
-        // when
-        String html = renderIntegrationPanel("marketplace", true);
-
-        // then
-        assertThat(html).contains("href=\"/dashboard/store/store-1/marketplaces/exports/allegro\"");
-        assertThat(html).doesNotContain("??");
-    }
-
-    @Test
-    void hidesTheExportHistoryLinkOnPanelsOtherThanMarketplace() {
-        // when / then
-        assertThat(renderIntegrationPanel("shipping", false)).doesNotContain("Zobacz historię eksportu");
-        assertThat(renderIntegrationPanel("payments", false)).doesNotContain("Zobacz historię eksportu");
-        assertThat(renderIntegrationPanel("invoicing", false)).doesNotContain("Zobacz historię eksportu");
-        assertThat(renderIntegrationPanel("printing", false)).doesNotContain("Zobacz historię eksportu");
     }
 
     @Test
@@ -371,19 +338,6 @@ class MarketplaceExportHistoryTemplateTest {
         return context;
     }
 
-    private String renderIntegrationPanel(String providerType, boolean superAdmin) {
-        WebContext context = webContext();
-        context.setVariable("isSuperAdmin", superAdmin);
-        context.setVariable("connectedIntegrations", List.of(new ConnectedIntegration("allegro", true)));
-        context.setVariable("providers", List.of());
-        context.setVariable("selectedProviderName", "allegro");
-        context.setVariable("selectLabel", "Marketplace");
-        context.setVariable("providerConfiguration", Map.of());
-        context.setVariable("providerType", providerType);
-        context.setVariable("storeId", "store-1");
-        context.setVariable("showDefault", false);
-        return templateEngine().process("fragments/integration-panel", context);
-    }
 
     private List<MarketplaceOfferSnapshot> rows(int count) {
         List<MarketplaceOfferSnapshot> rows = new ArrayList<>();
