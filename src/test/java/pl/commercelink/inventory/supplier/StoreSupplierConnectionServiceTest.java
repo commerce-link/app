@@ -487,6 +487,38 @@ class StoreSupplierConnectionServiceTest {
     }
 
     @Test
+    void creatingWithATokenedTypeNameIsRefusedForAnOwnConnection() {
+        // given -- getDescriptor() resolves "Stub-evil" through typeOf(), so only the shape check
+        // stops a forged identity from being created
+        Store store = storeWith(true);
+        registryHas("Stub");
+
+        // when
+        StoreSupplierConnectionService.ConnectionUpdateResult result =
+                service.connectOrUpdate(store, ownSelection("Stub-evil", "x"), Map.of());
+
+        // then
+        assertThat(result.errors().get(0).code()).isEqualTo("store.supplier.connection.error.unknown.supplier");
+        verify(persister, never()).persist(any(), any(), anyMap());
+    }
+
+    @Test
+    void creatingWithATokenedTypeNameIsRefusedForAGlobalConnection() {
+        // given
+        Store store = storeWith(true);
+        registryHas("Stub");
+        SupplierSelectionForm global = new SupplierSelectionForm("Stub-evil", ConnectionMode.GLOBAL, true, true);
+
+        // when
+        StoreSupplierConnectionService.ConnectionUpdateResult result =
+                service.connectOrUpdate(store, global, Map.of());
+
+        // then -- without the check this would have succeeded with the identity "Stub-evil"
+        assertThat(result.errors().get(0).code()).isEqualTo("store.supplier.connection.error.unknown.supplier");
+        verify(persister, never()).persist(any(), any(), anyMap());
+    }
+
+    @Test
     void labelErrorsFromTheValidatorBlockTheSave() {
         // given
         Store store = storeWith(true);

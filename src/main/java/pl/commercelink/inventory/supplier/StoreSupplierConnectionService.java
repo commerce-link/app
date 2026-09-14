@@ -132,7 +132,7 @@ public class StoreSupplierConnectionService {
             return Resolved.ok(identity);
         }
         String type = StringUtils.trimToNull(selection.getSupplierName());
-        if (type == null || supplierProviderFactory.getDescriptor(type) == null) {
+        if (!isRegisteredType(type)) {
             return Resolved.fail("store.supplier.connection.error.unknown.supplier", String.valueOf(type));
         }
         if (mode == ConnectionMode.GLOBAL) {
@@ -149,6 +149,14 @@ public class StoreSupplierConnectionService {
             candidate = SupplierIdentity.newInstance(type);
         }
         return Resolved.ok(candidate);
+    }
+
+    // getDescriptor() resolves its argument through SupplierIdentity.typeOf, so "Kosatec-evil" would
+    // hand back the Kosatec descriptor and let the operator forge an identity (GLOBAL) or blow up on
+    // newInstance() (OWN). The shape check comes first; once the name is a bare type, the registry
+    // lookup that follows is an exact hit, so the two together are the membership test.
+    private boolean isRegisteredType(String type) {
+        return SupplierIdentity.isValidTypeName(type) && supplierProviderFactory.getDescriptor(type) != null;
     }
 
     public ConnectionUpdateResult disconnect(Store existingStore, String identity) {
