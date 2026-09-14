@@ -9,6 +9,7 @@ import com.amazonaws.services.dynamodbv2.model.DescribeTableResult;
 import com.amazonaws.services.dynamodbv2.model.GlobalSecondaryIndex;
 import com.amazonaws.services.dynamodbv2.model.GlobalSecondaryIndexDescription;
 import com.amazonaws.services.dynamodbv2.model.KeySchemaElement;
+import com.amazonaws.services.dynamodbv2.model.KeyType;
 import com.amazonaws.services.dynamodbv2.model.PutItemRequest;
 import com.amazonaws.services.dynamodbv2.model.PutItemResult;
 import com.amazonaws.services.dynamodbv2.model.ResourceNotFoundException;
@@ -110,7 +111,8 @@ class V013_MoveStoreNotificationsToTableTest {
                 .withTableStatus(tableStatus)
                 .withGlobalSecondaryIndexes(new GlobalSecondaryIndexDescription()
                         .withIndexName("UnreadByStore")
-                        .withIndexStatus(indexStatus));
+                        .withIndexStatus(indexStatus)
+                        .withKeySchema(new KeySchemaElement("unreadStoreId", KeyType.HASH)));
     }
 
     @Test
@@ -180,6 +182,7 @@ class V013_MoveStoreNotificationsToTableTest {
         assertThat(update.getValue().getTableName()).isEqualTo("Stores");
         assertThat(update.getValue().getKey()).isEqualTo(Map.of("storeId", string("store-1")));
         assertThat(update.getValue().getUpdateExpression()).isEqualTo("REMOVE notifications");
+        assertThat(update.getValue().getConditionExpression()).isEqualTo("attribute_exists(storeId)");
     }
 
     @Test
@@ -285,5 +288,52 @@ class V013_MoveStoreNotificationsToTableTest {
         assertThatThrownBy(migrationWithFastDeadline::execute)
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("did not become active");
+    }
+
+    @Test
+    void failsFastWhenAnExistingActiveTableIsMissingTheUnreadIndex() {
+        // given
+        when(dynamoDB.describeTable("StoreNotifications"))
+                .thenReturn(new DescribeTableResult().withTable(new TableDescription().withTableStatus("ACTIVE")));
+
+        // when / then
+        assertThatThrownBy(migration::execute)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("StoreNotifications")
+                .hasMessageContaining("UnreadByStore");
+    }
+
+    @Test
+    void keepsAStalePartialMatchWarningApartFromTheNewlyIdentifiedOne() {
+        // given
+        Map<String, AttributeValue> store = store(
+                notification("WARNING", "MARKETPLACE_RETURN_UNMATCHED", "r-1",
+                        "Allegro return AL-1 could not be matched to an order in the application - handle it in the marketplace panel"),
+                notification("WARNING", "MARKETPLACE_RETURN_UNMATCHED", "r-1",
+                        "Allegro return AL-1 only partially matched an order - an RMA was created for the matched "
+                                + "items, but the rest could not be matched and needs a manual refund in the marketplace panel"));
+        ArgumentCaptor<PutItemRequest> puts = ArgumentCaptor.forClass(PutItemRequest.class);
+
+        // when
+        migration.moveNotifications(store, MIGRATED_AT);
+
+        // then
+        verify(dynamoDB, times(2)).putItem(puts.capture());
+        assertThat(puts.getAllValues()).extracting(put -> put.getItem().get("notificationId").getS())
+                .containsExactly("MARKETPLACE_RETURN_UNMATCHED:r-1", "MARKETPLACE_RETURN_UNMATCHED:r-1:partial");
+        assertThat(puts.getAllValues().get(1).getItem().get("object").getS()).isEqualTo("r-1:partial");
+    }
+
+    @Test
+    void skipsRemovingTheListWhenTheStoreWasDeletedDuringTheScan() {
+        // given
+        when(dynamoDB.updateItem(any(UpdateItemRequest.class))).thenThrow(new ConditionalCheckFailedException("gone"));
+        Map<String, AttributeValue> store = store(notification("WARNING", "UNAUTHENTICATED", "allegro_marketplace", "Expired"));
+
+        // when
+        migration.moveNotifications(store, MIGRATED_AT);
+
+        // then
+        verify(dynamoDB).putItem(any(PutItemRequest.class));
     }
 }

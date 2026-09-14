@@ -159,10 +159,19 @@ public class MarketplaceReturnImporter {
         rma.setExternalReturnStatus(ret.status());
     }
 
+    // the distinctive wording of the partial-match warning, shared with V013 so the migration can tell a
+    // partial-match entry apart from the plain "unmatched" one in the pre-migration embedded notification list,
+    // which has no other field that distinguishes them
+    public static final String PARTIAL_MATCH_MARKER = "only partially matched an order";
+
+    public static boolean isPartialMatchMessage(String message) {
+        return message != null && message.contains(PARTIAL_MATCH_MARKER);
+    }
+
     private void notifyUnmatched(Store store, String marketplace, MarketplaceReturn ret, boolean partiallyMatched) {
         String message = partiallyMatched
-                ? marketplace + " return " + referenceOf(ret)
-                        + " only partially matched an order — an RMA was created for the matched items, but the "
+                ? marketplace + " return " + referenceOf(ret) + " " + PARTIAL_MATCH_MARKER
+                        + " — an RMA was created for the matched items, but the "
                         + "rest could not be matched and needs a manual refund in the marketplace panel"
                 : marketplace + " return " + referenceOf(ret)
                         + " could not be matched to an order in the application — handle it in the marketplace panel";

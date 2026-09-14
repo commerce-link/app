@@ -6,17 +6,22 @@ import com.amazonaws.services.dynamodbv2.model.BillingMode;
 import com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException;
 import com.amazonaws.services.dynamodbv2.model.CreateTableRequest;
 import com.amazonaws.services.dynamodbv2.model.GlobalSecondaryIndex;
+import com.amazonaws.services.dynamodbv2.model.GlobalSecondaryIndexDescription;
+import com.amazonaws.services.dynamodbv2.model.KeySchemaElement;
+import com.amazonaws.services.dynamodbv2.model.KeyType;
 import com.amazonaws.services.dynamodbv2.model.Projection;
 import com.amazonaws.services.dynamodbv2.model.ProjectionType;
 import com.amazonaws.services.dynamodbv2.model.PutItemRequest;
 import com.amazonaws.services.dynamodbv2.model.ResourceNotFoundException;
 import com.amazonaws.services.dynamodbv2.model.TableDescription;
+import com.amazonaws.services.dynamodbv2.model.UpdateItemRequest;
 import io.mongock.api.annotations.ChangeUnit;
 import io.mongock.api.annotations.Execution;
 import io.mongock.api.annotations.RollbackExecution;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import pl.commercelink.marketplace.MarketplaceReturnImporter;
 import pl.commercelink.notifications.StoreNotificationIds;
 import pl.commercelink.starter.dynamodb.DynamoDbLocalDateTimeConverter;
 import pl.commercelink.stores.StoreNotificationSeverity;
@@ -33,7 +38,6 @@ import java.util.Map;
 import java.util.function.LongConsumer;
 
 import static pl.commercelink.starter.migration.DynamoDbMigrationSupport.createTableIfAbsent;
-import static pl.commercelink.starter.migration.DynamoDbMigrationSupport.executeUpdate;
 import static pl.commercelink.starter.migration.DynamoDbMigrationSupport.hashKey;
 import static pl.commercelink.starter.migration.DynamoDbMigrationSupport.rangeKey;
 import static pl.commercelink.starter.migration.DynamoDbMigrationSupport.scanAndProcess;
@@ -105,13 +109,40 @@ public class V013_MoveStoreNotificationsToTable {
                 putIfAbsent(item);
             }
         }
-        executeUpdate(dynamoDB, STORES, Map.of("storeId", storeId), "REMOVE notifications", null, null);
+        removeEmbeddedList(storeId);
+    }
+
+    private void removeEmbeddedList(AttributeValue storeId) {
+        try {
+            dynamoDB.updateItem(new UpdateItemRequest()
+                    .withTableName(STORES)
+                    .withKey(Map.of("storeId", storeId))
+                    .withUpdateExpression("REMOVE notifications")
+                    .withConditionExpression("attribute_exists(storeId)"));
+        } catch (ConditionalCheckFailedException e) {
+            // the store was deleted between the scan reading it and this update, so there is nothing left to clean up
+            log.warn("Store {} was deleted during the notifications migration, skipping the list removal", storeId.getS());
+        }
     }
 
     static boolean isActive(TableDescription table) {
         boolean indexesActive = table.getGlobalSecondaryIndexes() == null || table.getGlobalSecondaryIndexes().stream()
                 .allMatch(index -> ACTIVE.equals(index.getIndexStatus()));
         return ACTIVE.equals(table.getTableStatus()) && indexesActive;
+    }
+
+    static void requireUnreadIndex(TableDescription table) {
+        List<GlobalSecondaryIndexDescription> indexes = table.getGlobalSecondaryIndexes();
+        boolean present = indexes != null && indexes.stream().anyMatch(V013_MoveStoreNotificationsToTable::isUnreadIndex);
+        if (!present) {
+            throw new IllegalStateException("DynamoDB table " + TABLE_NAME + " is missing the required GSI " + UNREAD_INDEX);
+        }
+    }
+
+    private static boolean isUnreadIndex(GlobalSecondaryIndexDescription index) {
+        return UNREAD_INDEX.equals(index.getIndexName()) && index.getKeySchema() != null
+                && index.getKeySchema().stream().anyMatch(element ->
+                        "unreadStoreId".equals(element.getAttributeName()) && KeyType.HASH.toString().equals(element.getKeyType()));
     }
 
     private static Map<String, AttributeValue> recordItem(String storeId, AttributeValue entry, LocalDateTime createdAt) {
@@ -128,6 +159,14 @@ public class V013_MoveStoreNotificationsToTable {
         StoreNotificationSeverity severity = enumValue(StoreNotificationSeverity.class, stringValue(fields.get("severity")));
         String object = stringValue(fields.get("object"));
         String message = stringValue(fields.get("message"));
+        if (type == StoreNotificationType.MARKETPLACE_RETURN_UNMATCHED && StringUtils.isNotBlank(object)
+                && MarketplaceReturnImporter.isPartialMatchMessage(message)) {
+            // pre-migration, both the plain "could not be matched" warning and the newer "partially matched" one for
+            // the same return share the same object (the externalReturnId), so without this they collide on one
+            // notificationId and only the older, now-stale entry survives; give the partial-match one the same
+            // ":partial" suffix the importer already uses when publishing this warning going forward
+            object = object + ":partial";
+        }
 
         Map<String, AttributeValue> item = new HashMap<>();
         item.put("storeId", new AttributeValue(storeId));
@@ -154,27 +193,33 @@ public class V013_MoveStoreNotificationsToTable {
                     .withItem(item)
                     .withConditionExpression("attribute_not_exists(notificationId)"));
         } catch (ConditionalCheckFailedException e) {
-            log.warn("Store notification {} is already in {}, skipping", item.get("notificationId").getS(), TABLE_NAME);
+            log.warn("Store {} has a duplicate embedded notification {}, skipping", item.get("storeId").getS(),
+                    item.get("notificationId").getS());
         }
     }
 
     private void waitUntilActive() {
         // for a brand-new table the whole table (not just its index) starts out CREATING and rejects writes
         Instant deadline = Instant.now(clock).plus(ACTIVE_TIMEOUT);
-        while (!isTableActive()) {
+        TableDescription table;
+        while ((table = activeTableOrNull()) == null) {
             if (Instant.now(clock).isAfter(deadline)) {
                 throw new IllegalStateException("DynamoDB table " + TABLE_NAME + " did not become active within " + ACTIVE_TIMEOUT);
             }
             pause.accept(POLL_INTERVAL.toMillis());
         }
+        // an existing table on which this migration never ran (e.g. restored, or created outside Mongock) would
+        // otherwise silently miss the GSI every notification read/write below depends on
+        requireUnreadIndex(table);
     }
 
-    private boolean isTableActive() {
+    private TableDescription activeTableOrNull() {
         try {
-            return isActive(dynamoDB.describeTable(TABLE_NAME).getTable());
+            TableDescription table = dynamoDB.describeTable(TABLE_NAME).getTable();
+            return isActive(table) ? table : null;
         } catch (ResourceNotFoundException e) {
             // DescribeTable is eventually consistent right after CreateTable and may not see the new table yet
-            return false;
+            return null;
         }
     }
 
