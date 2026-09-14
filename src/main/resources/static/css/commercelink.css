@@ -45,6 +45,16 @@
     grid-template-columns: 1fr;
 }
 
+/* Progressive enhancement: browsers without cross-document view transitions navigate as before.
+   Naming the shell parts keeps sidebar, topbar and settings navigation visually still while the
+   rest of the page content cross-fades between navigations. */
+@view-transition { navigation: auto; }
+.cl-sidebar { view-transition-name: cl-sidebar; }
+.cl-topbar { view-transition-name: cl-topbar; }
+.cl-settings-nav { view-transition-name: cl-settings-nav; }
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: 150ms; }
+@media (prefers-reduced-motion: reduce) { @view-transition { navigation: none; } }
+
 .cl-sidebar {
     position: fixed;
     inset-block: 0;
