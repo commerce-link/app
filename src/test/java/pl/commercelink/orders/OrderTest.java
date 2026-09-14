@@ -230,4 +230,81 @@ class OrderTest {
         order.setStatus(OrderStatus.New);
         return order;
     }
+
+    @Test
+    @DisplayName("goods shipped by the supplier leave on the delivery day, with no in-house handling added")
+    void shipsOnTheDeliveryDayWhenTheSupplierShipsToTheCustomer() {
+        // given
+        Order order = new Order("store-1");
+        order.setOrderRealizationDays(3);
+
+        // when
+        order.updateEstimatedAssemblyAt(java.time.LocalDate.of(2026, 9, 14), true);
+
+        // then
+        assertThat(order.getEstimatedAssemblyAt()).isEqualTo(java.time.LocalDate.of(2026, 9, 14));
+        assertThat(order.getEstimatedShippingAt()).isEqualTo(java.time.LocalDate.of(2026, 9, 14));
+    }
+
+    @Test
+    @DisplayName("goods passing through the warehouse still add the realization days as working days")
+    void addsRealizationDaysWhenTheGoodsPassThroughTheWarehouse() {
+        // given
+        Order order = new Order("store-1");
+        order.setOrderRealizationDays(3);
+
+        // when
+        order.updateEstimatedAssemblyAt(java.time.LocalDate.of(2026, 9, 14), false);
+
+        // then
+        assertThat(order.getEstimatedAssemblyAt()).isEqualTo(java.time.LocalDate.of(2026, 9, 14));
+        assertThat(order.getEstimatedShippingAt()).isEqualTo(java.time.LocalDate.of(2026, 9, 17));
+    }
+
+    @Test
+    @DisplayName("a later leg that does not move the assembly date still puts the handling time back")
+    void recomputesTheShippingDateWhenTheAssemblyDateDoesNotMove() {
+        // given: the dropship leg was confirmed first, for a date later than the warehouse one
+        Order order = new Order("store-1");
+        order.setOrderRealizationDays(3);
+        order.updateEstimatedAssemblyAt(java.time.LocalDate.of(2026, 9, 20), true);
+
+        // when
+        order.updateEstimatedAssemblyAt(java.time.LocalDate.of(2026, 9, 16), false);
+
+        // then
+        assertThat(order.getEstimatedAssemblyAt()).isEqualTo(java.time.LocalDate.of(2026, 9, 20));
+        assertThat(order.getEstimatedShippingAt()).isEqualTo(java.time.LocalDate.of(2026, 9, 23));
+    }
+
+    @Test
+    @DisplayName("a confirmation carrying no date still re-derives the shipping date from the assembly date")
+    void reDerivesTheShippingDateWhenTheConfirmationCarriesNoDate() {
+        // given: a dropship leg landed first and left both dates on the same day
+        Order order = new Order("store-1");
+        order.setOrderRealizationDays(3);
+        order.updateEstimatedAssemblyAt(java.time.LocalDate.of(2026, 9, 14), true);
+
+        // when: the leg that adds a warehouse stop is confirmed without a date of its own
+        order.updateEstimatedAssemblyAt(null, false);
+
+        // then
+        assertThat(order.getEstimatedAssemblyAt()).isEqualTo(java.time.LocalDate.of(2026, 9, 14));
+        assertThat(order.getEstimatedShippingAt()).isEqualTo(java.time.LocalDate.of(2026, 9, 17));
+    }
+
+    @Test
+    @DisplayName("an order with no date at all is left alone by a confirmation carrying no date")
+    void leavesAnOrderWithoutAnyDateAlone() {
+        // given
+        Order order = new Order("store-1");
+        order.setOrderRealizationDays(3);
+
+        // when
+        order.updateEstimatedAssemblyAt(null, false);
+
+        // then
+        assertThat(order.getEstimatedAssemblyAt()).isNull();
+        assertThat(order.getEstimatedShippingAt()).isNull();
+    }
 }

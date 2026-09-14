@@ -7,6 +7,7 @@ import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTable;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBVersionAttribute;
 import pl.commercelink.orders.BillingDetails;
 import pl.commercelink.orders.ShippingDetails;
+import pl.commercelink.orders.notifications.EmailNotificationType;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 
 import java.time.Instant;
@@ -440,6 +441,47 @@ public class Store {
         return Optional.ofNullable(fulfilmentConfiguration)
                 .map(FulfilmentConfiguration::getDefaultFulfilmentType)
                 .orElse(FulfilmentType.WarehouseFulfilment);
+    }
+
+    @DynamoDBIgnore
+    public boolean supportsNotification(EmailNotificationType type) {
+        return clientNotificationsConfiguration != null && clientNotificationsConfiguration.supports(type);
+    }
+
+    public void enableClientShippingAddressChangeNotifications() {
+        if (clientNotificationsConfiguration == null) {
+            clientNotificationsConfiguration = new ClientNotificationsConfiguration();
+        }
+        for (EmailNotificationType type : List.of(EmailNotificationType.CLIENT_VERIFICATION_CODE, EmailNotificationType.ORDER_SHIPPING_ADDRESS_CHANGED)) {
+            if (!clientNotificationsConfiguration.supports(type)) {
+                clientNotificationsConfiguration.enableNotification(type, type.getTemplateName());
+            }
+        }
+    }
+
+    @DynamoDBIgnore
+    public String getClientContactEmail() {
+        if (clientNotificationsConfiguration != null && !isBlank(clientNotificationsConfiguration.getReplyToEmail())) {
+            return clientNotificationsConfiguration.getReplyToEmail();
+        }
+        if (billingDetails != null && !isBlank(billingDetails.getEmail())) {
+            return billingDetails.getEmail();
+        }
+        return null;
+    }
+
+    @DynamoDBIgnore
+    public boolean isClientOrderPageEnabled() {
+        return Optional.ofNullable(fulfilmentConfiguration)
+                .map(FulfilmentConfiguration::isClientOrderPageEnabled)
+                .orElse(false);
+    }
+
+    @DynamoDBIgnore
+    public boolean isClientShippingAddressChangeEnabled() {
+        return isClientOrderPageEnabled() && Optional.ofNullable(fulfilmentConfiguration)
+                .map(FulfilmentConfiguration::isClientShippingAddressChangeEnabled)
+                .orElse(false);
     }
 
     @DynamoDBIgnore

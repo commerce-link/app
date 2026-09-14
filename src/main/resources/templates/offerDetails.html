@@ -4,6 +4,37 @@
       layout:decorate="~{layout}">
 <body>
 <div layout:fragment="content">
+    <style>
+        #offerTable td.qty { width: 72px; }
+        #offerTable td.price, #offerTable td.cost { width: 110px; }
+        #offerTable td.qty .input, #offerTable td.price .input, #offerTable td.cost .input { text-align: right; font-variant-numeric: tabular-nums; padding-inline: 0.5em; }
+        #offerTable td.dist { white-space: nowrap; font-size: 0.74rem; line-height: 1.25; }
+        #offerTable td.dist span { display: block; font-variant-numeric: tabular-nums; }
+        #offerTable td.dist small { display: block; font-size: 0.64rem; color: #7a7a7a; letter-spacing: 0.02em; }
+        #offerTable td.dist.missing span { color: #f14668; }
+        #offerTable th.dist-h { font-size: 0.78rem; font-weight: 600; color: #7a7a7a; }
+        #offerTable tr.in-group td { background: #f9fafc; }
+        #offerTable tr.in-group td.name { padding-left: 2.2em; position: relative; }
+        #offerTable tr.in-group td.name::before { content: ""; position: absolute; left: 0.9em; top: 0; width: 12px; height: 55%; border-left: 2px solid #b5b5b5; border-bottom: 2px solid #b5b5b5; border-bottom-left-radius: 4px; }
+        #offerTable tr.in-group td.catcell .select { display: none; }
+        #offerTable tr.group-head td { background: #eef3fb; border-top: 2px solid #b5b5b5; border-bottom: 1px solid #d5e0f2; padding-top: 0.45em; padding-bottom: 0.45em; }
+        #offerTable tr.group-head .drag-handle { color: #296fa8; }
+        #offerTable tr.group-foot td { background: #f9fafc; border-bottom: 2px solid #b5b5b5; padding: 0; height: 4px; font-size: 0.62rem; color: #296fa8; letter-spacing: 0.06em; text-transform: uppercase; line-height: 1.4; }
+        #offerTable tr.group-foot td span { display: none; }
+        #offerTable tr.group-head + tr.group-foot td, body.is-dragging-row #offerTable tr.group-foot td { padding: 0.1em 0.75em 0.15em; height: auto; }
+        #offerTable tr.group-head + tr.group-foot td .drop-hint { display: inline; }
+        body.is-dragging-row #offerTable tr.group-foot td .end-hint { display: inline; }
+        body.is-dragging-row #offerTable tr.group-head + tr.group-foot td .end-hint { display: none; }
+        .group-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .group-bar .gname { width: 220px; font-weight: 600; }
+        .group-bar .gwarn { font-size: 0.75rem; color: #f14668; display: none; }
+        .group-bar .gname.is-danger ~ .gwarn { display: inline; }
+        .group-bar .gmeta { font-size: 0.78rem; color: #7a7a7a; }
+        .group-bar .gmeta strong { color: #363636; }
+        .group-bar .gactions { margin-left: auto; }
+        .default-tag { margin-top: 4px; }
+        .sortable-ghost td { background: #eef5ff !important; }
+    </style>
     <h1 class="title"
         th:text="${mode == 'EDIT'} ? #{general.edit} + ' ' + (${offer.type == T(pl.commercelink.baskets.BasketType).Offer} ? #{offers.title} : #{offers.template}) : #{general.create} + ' ' + (${offer.type == T(pl.commercelink.baskets.BasketType).Offer} ? #{offers.title} : #{offers.template})">
     </h1>
@@ -121,10 +152,10 @@
             </div>
         </div>
 
-        <h4 th:text="${offer.type == T(pl.commercelink.baskets.BasketType).Offer} ? #{offers.title} + ' ' + #{offers.items} : #{offers.template} + ' ' + #{offers.items}"></h4>
+        <h4 th:text="#{offers.items}"></h4>
         <div class="box">
             <div class="table-container">
-                <table class="table is-fullwidth is-striped">
+                <table class="table is-fullwidth" id="offerTable">
                     <thead>
                     <tr>
                         <th></th>
@@ -134,23 +165,36 @@
                         <th th:text="#{offers.quantity}"></th>
                         <th th:text="#{offers.price}"></th>
                         <th th:text="#{offers.cost}"></th>
-                        <th th:text="#{offers.costs.distribution}"></th>
-                        <th th:text="#{offers.availability.distribution}"></th>
-                        <th th:text="#{offers.providers.distribution}"></th>
+                        <th class="dist-h" th:text="#{offers.costs.distribution}"></th>
+                        <th class="dist-h" th:text="#{offers.availability.distribution}"></th>
+                        <th class="dist-h" th:text="#{offers.providers.distribution}"></th>
                         <th th:text="#{offers.item.consolidated}"></th>
                         <th th:text="#{general.actions}"></th>
                     </tr>
                     </thead>
                     <tbody id="offerRows">
-                    <tr th:each="offerItem, rowStat : ${offerItems}"
-                        th:attr="data-band=${offerItem.basketItem != null && offerItem.basketItem.isService()} ? 'service' : 'product'">
-                        <input class="input" type="hidden" th:field="*{basketItems[__${offerItem.sequenceNumber}__].id}" />
-                        <input class="input" type="hidden" th:field="*{basketItems[__${offerItem.sequenceNumber}__].catalogId}" />
-                        <input class="input" type="hidden" th:field="*{basketItems[__${offerItem.sequenceNumber}__].estimatedDeliveryDays}" />
-                        <input class="input" type="hidden" th:field="*{basketItems[__${offerItem.sequenceNumber}__].service}" />
-                        <td><span class="drag-handle" style="cursor:grab; padding:0 .4rem; color:#7a8290;" th:title="#{offers.item.drag.hint}"><i class="fas fa-arrows-alt"></i></span></td>
-                        <td>
-                            <div class="select">
+                    <th:block th:each="row : ${offerRows}">
+                    <tr th:if="${row.isGroupHead()}" class="group-head" th:attr="data-group=${row.groupId()}">
+                        <td class="handle"><span class="drag-handle" style="cursor:grab; padding:0 .4rem;" th:title="#{offers.group.drag.hint}"><i class="fas fa-arrows-alt"></i></span></td>
+                        <td colspan="11">
+                            <div class="group-bar">
+                                <input class="input is-small gname" type="text" th:value="${row.groupId()}" th:placeholder="#{offers.group.name}" th:attr="aria-label=#{offers.group.name}" oninput="refreshGroups()" />
+                                <span class="gwarn" th:text="#{offers.group.name.duplicate}"></span>
+                                <span class="gmeta"><span th:text="#{offers.group.picks}"></span> <strong class="gcount" th:text="${row.groupSize()}"></strong></span>
+                                <span class="gactions"><button class="button is-small is-light" type="button" onclick="ungroup(this)" th:text="#{offers.group.ungroup}"></button></span>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr th:if="${row.isItem()}" th:with="offerItem=${row.item()}" class="item" th:classappend="${row.groupId() != null} ? 'in-group'" th:attr="data-group=${row.groupId()}">
+                        <input type="hidden" th:field="*{basketItems[__${offerItem.sequenceNumber}__].id}" />
+                        <input type="hidden" th:field="*{basketItems[__${offerItem.sequenceNumber}__].catalogId}" />
+                        <input type="hidden" th:field="*{basketItems[__${offerItem.sequenceNumber}__].estimatedDeliveryDays}" />
+                        <input type="hidden" th:field="*{basketItems[__${offerItem.sequenceNumber}__].service}" />
+                        <input type="hidden" class="variant-group" th:field="*{basketItems[__${offerItem.sequenceNumber}__].variantGroupId}" />
+                        <input type="hidden" th:field="*{basketItems[__${offerItem.sequenceNumber}__].variantSelected}" />
+                        <td class="handle"><span class="drag-handle" style="cursor:grab; padding:0 .4rem; color:#7a8290;" th:title="#{offers.item.drag.hint}"><i class="fas fa-arrows-alt"></i></span></td>
+                        <td class="catcell">
+                            <div class="select is-small">
                                 <select th:field="*{basketItems[__${offerItem.sequenceNumber}__].category}">
                                     <option value=""></option>
                                     <option th:if="${offerItem.basketItem != null && !#strings.isEmpty(offerItem.basketItem.category) && !productCategories.contains(offerItem.basketItem.category)}"
@@ -161,38 +205,55 @@
                                 </select>
                             </div>
                         </td>
-                        <td style="min-width: 200px;">
-                            <input class="input" type="text" th:field="*{basketItems[__${offerItem.sequenceNumber}__].name}" />
+                        <td class="name" style="min-width: 220px;">
+                            <input class="input is-small" type="text" th:field="*{basketItems[__${offerItem.sequenceNumber}__].name}" />
+                            <span class="tag is-success is-light default-tag" th:if="${row.groupId() != null && offerItem.basketItem != null && offerItem.basketItem.variantSelected}" th:text="#{offers.group.default}"></span>
                         </td>
-                        <td style="min-width: 180px;">
-                            <input class="input" type="text" th:field="*{basketItems[__${offerItem.sequenceNumber}__].mfn}" />
+                        <td class="mfn" style="min-width: 150px;">
+                            <input class="input is-small" type="text" th:field="*{basketItems[__${offerItem.sequenceNumber}__].mfn}" />
                         </td>
-                        <td style="min-width: 140px;">
-                            <input class="input" type="number" th:field="*{basketItems[__${offerItem.sequenceNumber}__].qty}" min="0" onblur="if(this.value===''){this.value='0';}" />
+                        <td class="qty">
+                            <input class="input is-small" type="number" th:field="*{basketItems[__${offerItem.sequenceNumber}__].qty}" min="0" onblur="if(this.value===''){this.value='0';}" />
                         </td>
-                        <td style="min-width: 140px;">
-                            <input class="input" type="number" step="0.01" th:field="*{basketItems[__${offerItem.sequenceNumber}__].unitPrice}" min="0" onblur="if(this.value===''){this.value='0';}" />
+                        <td class="price">
+                            <input class="input is-small" type="number" step="0.01" th:field="*{basketItems[__${offerItem.sequenceNumber}__].unitPrice}" min="0" onblur="if(this.value===''){this.value='0';}" />
                         </td>
-                        <td style="min-width: 140px;">
-                            <input class="input" type="number" step="0.01" th:field="*{basketItems[__${offerItem.sequenceNumber}__].unitCost}" min="0" onblur="if(this.value===''){this.value='0';}" />
+                        <td class="cost">
+                            <input class="input is-small" type="number" step="0.01" th:field="*{basketItems[__${offerItem.sequenceNumber}__].unitCost}" min="0" onblur="if(this.value===''){this.value='0';}" />
                         </td>
-                        <td th:style="${offerItem.existInInventory} ? 'min-width:140px;' : 'min-width:140px; color:red;'" th:text="${offerItem.costRangeDistribution}"></td>
-                        <td th:style="${offerItem.existInInventory} ? 'min-width:140px;' : 'min-width:140px; color:red;'" th:text="${offerItem.qtyDistribution}"></td>
-                        <td th:style="${offerItem.existInInventory} ? 'min-width:140px;' : 'min-width:140px; color:red;'" th:text="${offerItem.suppliersDistribution}"></td>
+                        <td class="dist" th:classappend="${!offerItem.existInInventory} ? 'missing'">
+                            <span th:text="${offerItem.costRange}"></span>
+                            <small th:unless="${#strings.isEmpty(offerItem.costRange)}" th:text="#{offers.dist.cost.caption}"></small>
+                        </td>
+                        <td class="dist" th:classappend="${!offerItem.existInInventory} ? 'missing'">
+                            <span th:text="${offerItem.qtyRange}"></span>
+                            <small th:unless="${#strings.isEmpty(offerItem.qtyRange)}" th:text="#{offers.dist.qty.caption}"></small>
+                        </td>
+                        <td class="dist" th:classappend="${!offerItem.existInInventory} ? 'missing'">
+                            <span th:text="${offerItem.medianCostProviders}"></span>
+                            <small th:text="${offerItem.remainingProviders}"></small>
+                        </td>
                         <td>
                             <input type="checkbox" th:field="*{basketItems[__${offerItem.sequenceNumber}__].consolidated}" />
                         </td>
                         <td>
                             <button class="button is-small is-danger" type="button"
-                                    th:onclick="|submitRemoveItem(event, ${rowStat.index})|"
+                                    th:onclick="|submitRemoveItem(event, ${offerItem.sequenceNumber})|"
                                     th:text="#{general.delete}">
                             </button>
                         </td>
                     </tr>
+                    <tr th:if="${row.isGroupFoot()}" class="group-foot" th:attr="data-group=${row.groupId()}">
+                        <td colspan="12"><span class="drop-hint" th:text="#{offers.group.drop.empty}"></span><span class="end-hint" th:text="#{offers.group.drop.hint}"></span></td>
+                    </tr>
+                    </th:block>
                     </tbody>
                 </table>
             </div>
-            <button class="button is-info is-small" type="button" onclick="toggleOfferItemModal(true)" th:text="#{offers.add.items}"></button>
+            <div class="buttons">
+                <button class="button is-info is-small" type="button" onclick="toggleOfferItemModal(true)" th:text="#{offers.add.items}"></button>
+                <button class="button is-info is-light is-small" type="button" onclick="addGroup()" th:text="#{offers.group.add}"></button>
+            </div>
             <div th:replace="~{fragments/item-add-modal :: itemAddModal(entityId=${offer.basketId}, actionPrefix='/dashboard/offer')}"></div>
         </div>
 
@@ -216,6 +277,9 @@
             </div>
             <div class="field">
                 <label class="label" th:text="#{offers.our.profit.net} + ': ' + ${totalProfitNet}"></label>
+            </div>
+            <div class="field" th:if="${hasVariantGroups}">
+                <p class="is-size-7 has-text-grey" th:text="#{offers.summary.variants.note}"></p>
             </div>
         </fieldset>
 
@@ -273,19 +337,171 @@
     </script>
 
     <script th:inline="javascript">
+        const GROUP_NEW_NAME = /*[[#{offers.group.new}]]*/ 'Nowa grupa';
+        const GROUP_NAME_REQUIRED = /*[[#{offers.group.name.required}]]*/ '';
+        const GROUP_NAME_DUPLICATE = /*[[#{offers.group.name.duplicate}]]*/ '';
+        const GROUP_NAME_LABEL = /*[[#{offers.group.name}]]*/ '';
+        const GROUP_PICKS = /*[[#{offers.group.picks}]]*/ '';
+        const GROUP_UNGROUP = /*[[#{offers.group.ungroup}]]*/ '';
+        const GROUP_DRAG_HINT = /*[[#{offers.group.drag.hint}]]*/ '';
+        const GROUP_DROP_EMPTY = /*[[#{offers.group.drop.empty}]]*/ '';
+        const GROUP_DROP_HINT = /*[[#{offers.group.drop.hint}]]*/ '';
+
+        function escapeHtml(text) {
+            return text.replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+        }
+
+        function groupRowsHtml(name) {
+            return `
+                <tr class="group-head" data-group="${escapeHtml(name)}">
+                    <td class="handle"><span class="drag-handle" style="cursor:grab; padding:0 .4rem;" title="${escapeHtml(GROUP_DRAG_HINT)}"><i class="fas fa-arrows-alt"></i></span></td>
+                    <td colspan="11">
+                        <div class="group-bar">
+                            <input class="input is-small gname" type="text" value="${escapeHtml(name)}" placeholder="${escapeHtml(GROUP_NAME_LABEL)}" aria-label="${escapeHtml(GROUP_NAME_LABEL)}" oninput="refreshGroups()" />
+                            <span class="gwarn">${escapeHtml(GROUP_NAME_DUPLICATE)}</span>
+                            <span class="gmeta"><span>${escapeHtml(GROUP_PICKS)}</span> <strong class="gcount">0</strong></span>
+                            <span class="gactions"><button class="button is-small is-light" type="button" onclick="ungroup(this)">${escapeHtml(GROUP_UNGROUP)}</button></span>
+                        </div>
+                    </td>
+                </tr>
+                <tr class="group-foot" data-group="${escapeHtml(name)}">
+                    <td colspan="12"><span class="drop-hint">${escapeHtml(GROUP_DROP_EMPTY)}</span><span class="end-hint">${escapeHtml(GROUP_DROP_HINT)}</span></td>
+                </tr>`;
+        }
+
+        const offerRows = () => [...document.getElementById('offerRows').children];
+        const isHead = row => row.classList.contains('group-head');
+        const isFoot = row => row.classList.contains('group-foot');
+
+        function groupMembers(head) {
+            const members = [];
+            let row = head.nextElementSibling;
+            while (row && !isFoot(row)) {
+                members.push(row);
+                row = row.nextElementSibling;
+            }
+            return { members, foot: row };
+        }
+
+        function refreshGroups() {
+            let current = null;
+            offerRows().forEach(row => {
+                if (isHead(row)) {
+                    current = row.querySelector('.gname').value.trim();
+                    row.dataset.group = current;
+                    return;
+                }
+                if (isFoot(row)) {
+                    row.dataset.group = current ?? '';
+                    current = null;
+                    return;
+                }
+                row.classList.toggle('in-group', current !== null);
+                row.querySelector('.variant-group').value = current ?? '';
+            });
+            offerRows().filter(isHead).forEach(head => {
+                head.querySelector('.gcount').textContent = groupMembers(head).members.length;
+            });
+            validateGroupNames();
+        }
+
+        function validateGroupNames() {
+            const inputs = offerRows().filter(isHead).map(head => head.querySelector('.gname'));
+            const counts = {};
+            inputs.forEach(input => {
+                const key = input.value.trim().toLowerCase();
+                counts[key] = (counts[key] || 0) + 1;
+            });
+            inputs.forEach(input => {
+                const key = input.value.trim().toLowerCase();
+                input.classList.toggle('is-danger', key === '' || counts[key] > 1);
+            });
+            return inputs.every(input => !input.classList.contains('is-danger'));
+        }
+
+        function groupsAreValid() {
+            const inputs = offerRows().filter(isHead).map(head => head.querySelector('.gname'));
+            if (inputs.some(input => input.value.trim() === '')) {
+                alert(GROUP_NAME_REQUIRED);
+                return false;
+            }
+            if (!validateGroupNames()) {
+                alert(GROUP_NAME_DUPLICATE);
+                return false;
+            }
+            return true;
+        }
+
+        function insideGroup(related, willInsertAfter) {
+            if (related.classList.contains('in-group')) return true;
+            if (isHead(related)) return willInsertAfter;
+            if (isFoot(related)) return !willInsertAfter;
+            return false;
+        }
+
+        function uniqueGroupName(base) {
+            const taken = new Set(offerRows().filter(isHead).map(head => head.querySelector('.gname').value.trim().toLowerCase()));
+            if (!taken.has(base.toLowerCase())) return base;
+            let n = 2;
+            while (taken.has((base + ' ' + n).toLowerCase())) n++;
+            return base + ' ' + n;
+        }
+
+        function addGroup() {
+            document.getElementById('offerRows').insertAdjacentHTML('beforeend', groupRowsHtml(uniqueGroupName(GROUP_NEW_NAME)));
+            refreshGroups();
+            const head = offerRows().filter(isHead).pop();
+            head.scrollIntoView({ block: 'nearest' });
+            head.querySelector('.gname').focus();
+            head.querySelector('.gname').select();
+        }
+
+        function ungroup(button) {
+            const head = button.closest('tr');
+            const { foot } = groupMembers(head);
+            head.remove();
+            if (foot) foot.remove();
+            refreshGroups();
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
+            refreshGroups();
             new Sortable(document.getElementById('offerRows'), {
                 handle: '.drag-handle',
+                draggable: 'tr',
+                filter: '.group-foot',
                 animation: 150,
-                onMove: (evt) => evt.dragged.dataset.band === evt.related.dataset.band
+                onStart: (evt) => {
+                    document.body.classList.add('is-dragging-row');
+                    if (!isHead(evt.item)) return;
+                    const { members, foot } = groupMembers(evt.item);
+                    [...members, foot].forEach(row => row.classList.add('is-hidden'));
+                },
+                onMove: (evt) => isHead(evt.dragged) ? !insideGroup(evt.related, evt.willInsertAfter) : true,
+                onEnd: (evt) => {
+                    document.body.classList.remove('is-dragging-row');
+                    if (isHead(evt.item)) {
+                        let anchor = evt.item;
+                        offerRows().filter(row => row.classList.contains('is-hidden')).forEach(row => {
+                            row.classList.remove('is-hidden');
+                            anchor.after(row);
+                            anchor = row;
+                        });
+                    }
+                    refreshGroups();
+                }
             });
         });
 
         function renumberOfferRows() {
-            document.querySelectorAll('#offerRows tr').forEach((row, i) => {
+            refreshGroups();
+            let index = 0;
+            offerRows().forEach(row => {
+                if (!row.classList.contains('item')) return;
                 row.querySelectorAll('input, select').forEach(el => {
-                    if (el.name) el.name = el.name.replace(/basketItems\[\d+\]/, 'basketItems[' + i + ']');
+                    if (el.name) el.name = el.name.replace(/basketItems\[\d+\]/, 'basketItems[' + index + ']');
                 });
+                index++;
             });
         }
         function submitForm(actionType) {
@@ -297,11 +513,11 @@
                 form.action = `/dashboard/offer/${offerId}/recalculate`;
             } else if (actionType === 'save') {
                 const isOfferNameValid = validateInputField('input[name="name"]', [[#{offers.name.required}]]);
-                if (!isOfferNameValid) return;
+                if (!isOfferNameValid || !groupsAreValid()) return;
                 form.action = `/dashboard/offer/${offerId}`;
             } else if (actionType === 'saveAsTemplate') {
                 const isTemplateNameValid = validateInputField('input[name="name"]', [[#{offers.name.required}]]);
-                if (!isTemplateNameValid) return;
+                if (!isTemplateNameValid || !groupsAreValid()) return;
                 form.action = `/dashboard/offer/${offerId}/saveAsTemplate`;
             } else if (actionType === 'createProformaInvoice') {
                 form.action = `/dashboard/offer/${offerId}/createProformaInvoice`;
@@ -322,7 +538,7 @@
             const form = document.getElementById('offerForm');
             const offerId = /*[[${offer.basketId}]]*/ '';
 
-            const items = document.querySelectorAll('#offerRows tr');
+            const items = document.querySelectorAll('#offerRows tr.item');
             if (items.length <= 1) {
                 alert([[#{offers.min.items.error}]]);
                 return;

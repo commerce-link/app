@@ -78,7 +78,7 @@ class OrderNotificationsServiceTest {
     void sendDispatchesQualifyingOrderAssemblyEmailAndPersistsEvent() {
         // given
         Order order = orderBase(OrderStatus.Assembly);
-        order.updateEstimatedAssemblyAt(LocalDate.now().plusDays(2));
+        order.updateEstimatedAssemblyAt(LocalDate.now().plusDays(2), false);
         when(orderEventsRepository.hasEvent(eq(ORDER_ID), eq(EventType.email), anyString())).thenReturn(false);
         when(emailClient.send(eq(STORE_ID), eq(EmailNotificationType.ORDER_ASSEMBLY), any(EmailNotification.class)))
                 .thenReturn(true);
@@ -165,6 +165,41 @@ class OrderNotificationsServiceTest {
         // then
         verify(orderEventsRepository, times(1)).save(any(OrderEvent.class));
         verify(ordersRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("the assembly date changed e-mail is skipped when the customer never got the assembly e-mail")
+    void theAssemblyDateChangedEmailIsSkippedWhenTheCustomerNeverGotTheAssemblyEmail() {
+        // given
+        Order order = orderBase(OrderStatus.Assembly);
+        order.setOrderRealizationDays(1);
+        order.updateEstimatedAssemblyAt(LocalDate.of(2026, 9, 18), false);
+        when(orderEventsRepository.hasEvent(ORDER_ID, EventType.email, EmailNotificationType.ORDER_ASSEMBLY.name()))
+                .thenReturn(false);
+
+        // when
+        orderNotificationsService.sendOrderAssemblyDateChangedEmailNotification(order, LocalDate.of(2026, 9, 11));
+
+        // then
+        verify(emailClient, never()).send(any(), eq(EmailNotificationType.ORDER_ASSEMBLY_DATE_CHANGED), any());
+    }
+
+    @Test
+    @DisplayName("the assembly date changed e-mail is sent when the customer already got the assembly e-mail")
+    void theAssemblyDateChangedEmailIsSentWhenTheCustomerAlreadyGotTheAssemblyEmail() {
+        // given
+        Order order = orderBase(OrderStatus.Assembly);
+        order.setOrderRealizationDays(1);
+        order.updateEstimatedAssemblyAt(LocalDate.of(2026, 9, 18), false);
+        when(orderEventsRepository.hasEvent(ORDER_ID, EventType.email, EmailNotificationType.ORDER_ASSEMBLY.name()))
+                .thenReturn(true);
+        when(emailClient.send(any(), eq(EmailNotificationType.ORDER_ASSEMBLY_DATE_CHANGED), any())).thenReturn(true);
+
+        // when
+        orderNotificationsService.sendOrderAssemblyDateChangedEmailNotification(order, LocalDate.of(2026, 9, 11));
+
+        // then
+        verify(emailClient).send(any(), eq(EmailNotificationType.ORDER_ASSEMBLY_DATE_CHANGED), any());
     }
 
     private Order orderBase(OrderStatus status) {

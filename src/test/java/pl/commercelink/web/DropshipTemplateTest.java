@@ -41,6 +41,16 @@ class DropshipTemplateTest {
     }
 
     @Test
+    void confirmationNoLongerCarriesTheEstimatedDeliveryDate() throws Exception {
+        // when: the server always drops the typed date on submit, so posting one back is pointless
+        // and, if reintroduced, would stamp a stale date onto the dropship delivery header
+        String html = read("dropshipConfirmation.html");
+
+        // then
+        assertThat(html).doesNotContain("*{estimatedDeliveryAt}");
+    }
+
+    @Test
     void approvalScreenReplacesTheAddressPanelForDropshipDeliveries() throws Exception {
         // when
         String html = read("deliveryApproval.html");

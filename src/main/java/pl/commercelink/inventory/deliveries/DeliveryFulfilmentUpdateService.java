@@ -28,19 +28,27 @@ public class DeliveryFulfilmentUpdateService {
 
         int requested = form.getAllocations().size() + form.getWarehouseItemIds().size();
         int updated = 0;
+        boolean anyClaimed = false;
         for (DeliveryFulfilmentUpdateForm.AllocationRef ref : form.getAllocations()) {
             if (orderAllocationsManager.updateFulfilment(storeId, provider, ref.getOrderId(), ref.getItemId(), ean, mfn, form.getUnitCost())) {
                 updated++;
+            } else if (orderAllocationsManager.isClaimed(ref.getOrderId(), ref.getItemId())) {
+                anyClaimed = true;
             }
         }
         for (String warehouseItemId : form.getWarehouseItemIds()) {
             if (warehouseAllocationsManager.updateFulfilment(storeId, provider, warehouseItemId, ean, mfn, form.getUnitCost())) {
                 updated++;
+            } else if (warehouseAllocationsManager.isClaimed(storeId, warehouseItemId)) {
+                anyClaimed = true;
             }
         }
 
         if (updated == 0) {
-            return OperationResult.failure("error.message.delivery.fulfilment.not.editable");
+            // a claimed item is still in Allocation - the generic "no longer in allocation" message would be misleading
+            return OperationResult.failure(anyClaimed
+                    ? "deliveries.allocation.edit.claimed"
+                    : "error.message.delivery.fulfilment.not.editable");
         }
         if (updated < requested) {
             return OperationResult.failure("error.message.delivery.fulfilment.partial");
