@@ -12,19 +12,24 @@ import org.mockito.quality.Strictness;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
 import pl.commercelink.inventory.deliveries.DeliveredPredicate;
+import pl.commercelink.inventory.supplier.SupplierLabelMap;
 import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.fulfilment.FulfilmentForm;
 import pl.commercelink.orders.fulfilment.ManualWarehouseFulfilment;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.starter.security.CustomSecurityContext;
+import pl.commercelink.stores.ConnectionMode;
+import pl.commercelink.stores.FulfilmentConfiguration;
 import pl.commercelink.stores.IntegrationType;
 import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoreSupplierConnection;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.warehouse.RestockScope;
 import pl.commercelink.warehouse.RestockSuggestionService;
 import pl.commercelink.warehouse.api.Warehouse;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -92,6 +97,7 @@ class WarehouseControllerTest {
                     .thenReturn(List.of(withCategory, withoutCategory));
             when(warehouseRepository.findAllCategories(STORE_ID)).thenReturn(Collections.emptySet());
             when(productCatalogRepository.findAll(STORE_ID)).thenReturn(Collections.emptyList());
+            when(supplierLabels.forStoreId(STORE_ID)).thenReturn(labelsOfOneConnection());
 
             Model model = new ConcurrentModel();
 
@@ -102,6 +108,11 @@ class WarehouseControllerTest {
             assertThat(view).isEqualTo("warehouse");
             List<WarehouseItem> deliveredItems = (List<WarehouseItem>) model.getAttribute("deliveredItems");
             assertThat(deliveredItems).containsExactly(withoutCategory, withCategory);
+            // Quick-add posts a connection identity now, so the screen has to be handed the options
+            // -- the store's connections plus the two built-in entities the free-text field allowed.
+            assertThat((List<SupplierLabelMap.Option>) model.getAttribute("providerOptions"))
+                    .extracting(SupplierLabelMap.Option::identity)
+                    .containsExactly("AcmeB-k7f3a9c2", "Warehouse", "Other");
         }
     }
 
@@ -128,6 +139,18 @@ class WarehouseControllerTest {
             assertThat(view).isEqualTo("fulfilment");
             assertThat(model.getAttribute("supplierLabels")).isSameAs(labels);
         }
+    }
+
+    private SupplierLabelMap labelsOfOneConnection() {
+        StoreSupplierConnection connection =
+                new StoreSupplierConnection("AcmeB-k7f3a9c2", ConnectionMode.OWN, true, true);
+        connection.setLabel("AcmeB drugie konto");
+        FulfilmentConfiguration config = new FulfilmentConfiguration();
+        config.setSupplierConnections(new ArrayList<>(List.of(connection)));
+        Store store = new Store();
+        store.setStoreId(STORE_ID);
+        store.setFulfilmentConfiguration(config);
+        return new SupplierLabels(mock(StoresRepository.class)).forStore(store);
     }
 
     private WarehouseItem deliveredItem(String categoryKey, String name) {
