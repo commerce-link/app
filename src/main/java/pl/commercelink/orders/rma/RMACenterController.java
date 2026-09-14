@@ -5,6 +5,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
+import pl.commercelink.inventory.supplier.SupplierIdentity;
 import pl.commercelink.inventory.supplier.SupplierLabelMap;
 import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
@@ -41,10 +42,14 @@ public class RMACenterController {
 
         if (CustomSecurityContext.hasRole("ADMIN")) {
             Store store = storesRepository.findById(CustomSecurityContext.getStoreId());
+            // Platform-wide centres are keyed by supplier type while store connections carry
+            // tokened identities, so a type match on any connection also reveals the centre.
             centers = centers.stream()
                     .filter(c -> !supplierRegistry.exists(c.getProvider())
                             || SupplierRegistry.OTHER.equalsIgnoreCase(c.getProvider())
-                            || store.getEnabledProviders().contains(c.getProvider()))
+                            || store.getEnabledProviders().contains(c.getProvider())
+                            || store.getEnabledProviders().stream()
+                                    .anyMatch(name -> SupplierIdentity.typeOf(name).equals(c.getProvider())))
                     .toList();
         }
 
