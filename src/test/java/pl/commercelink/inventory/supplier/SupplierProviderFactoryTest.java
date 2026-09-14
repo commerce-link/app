@@ -8,6 +8,7 @@ import pl.commercelink.stores.Store;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class SupplierProviderFactoryTest {
@@ -34,5 +35,38 @@ class SupplierProviderFactoryTest {
         // then
         assertThat(supplier).isNotNull();
         assertThat(new String(supplier.download().orElseThrow().data())).isEqualTo("feed");
+    }
+
+    @Test
+    void getResolvesTheDescriptorByTypeAndTheSecretByIdentity() throws Exception {
+        // given
+        SecretsManager secrets = mock(SecretsManager.class);
+        Store store = storeWithId("store-1");
+        when(secrets.exists("store-1-stub-k7f3a9c2")).thenReturn(true);
+        when(secrets.getSecret("store-1-stub-k7f3a9c2", java.util.Map.class)).thenReturn(java.util.Map.of("url", "feed-b"));
+        SupplierProviderFactory factory = new SupplierProviderFactory(new ProviderConfigurationManager(secrets));
+
+        // when
+        SupplierProvider supplier = factory.get(store, "Stub-k7f3a9c2");
+
+        // then
+        assertThat(supplier).isNotNull();
+        assertThat(new String(supplier.download().orElseThrow().data())).isEqualTo("feed-b");
+        assertThat(factory.getDescriptor("Stub-k7f3a9c2")).isSameAs(factory.getDescriptor("Stub"));
+    }
+
+    @Test
+    void loadConfigurationOfAnUnknownTypeFallsBackToTheRawName() {
+        // given
+        SecretsManager secrets = mock(SecretsManager.class);
+        Store store = storeWithId("store-1");
+        SupplierProviderFactory factory = new SupplierProviderFactory(new ProviderConfigurationManager(secrets));
+
+        // when
+        java.util.Map<String, String> config = factory.loadConfiguration(store, "Nope-k7f3a9c2");
+
+        // then
+        assertThat(config).isEmpty();
+        verify(secrets).exists("store-1-nope-k7f3a9c2");
     }
 }
