@@ -21,6 +21,7 @@ import java.util.Collection;
 import java.util.function.Predicate;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
@@ -42,7 +43,7 @@ public class Inventory {
 
     private final Cache<StatisticsKey, InventoryStatistics> statisticsCache = Caffeine.newBuilder()
             .maximumSize(1_000)
-            .expireAfterWrite(Duration.ofMinutes(10))
+            .expireAfterWrite(Duration.ofMinutes(2))
             .build();
 
     void init(List<List<InventoryItem>> rawFeeds) {
@@ -153,11 +154,23 @@ public class Inventory {
         if (store == null) {
             return InventoryStatistics.EMPTY;
         }
-        StoreInventory own = storeInventoryProvider.ownInventory(store);
-        Set<String> enabledGlobal = Set.copyOf(store.getGlobalSupplierNames());
-        StatisticsKey key = new StatisticsKey(storeId, globalInventory.version(), own.builtAt(), enabledGlobal);
-        return statisticsCache.get(key, k ->
-                InventoryStatisticsCalculator.calculate(globalInventory.index(), enabledGlobal::contains, own.index()));
+        Set<String> enabledGlobal = store.getGlobalSupplierNames().stream()
+                .filter(Objects::nonNull)
+                .collect(Collectors.toUnmodifiableSet());
+        List<String> ownFingerprint = ownConnectionFingerprint(store);
+        StatisticsKey key = new StatisticsKey(storeId, globalInventory.version(), enabledGlobal, ownFingerprint);
+        // ownInventory() decodes the whole Redis-cached own feed, so it must run only on a cache miss
+        return statisticsCache.get(key, k -> {
+            StoreInventory own = storeInventoryProvider.ownInventory(store);
+            return InventoryStatisticsCalculator.calculate(globalInventory.index(), enabledGlobal::contains, own.index());
+        });
+    }
+
+    private static List<String> ownConnectionFingerprint(Store store) {
+        return store.getOwnAndManualConnections().stream()
+                .map(connection -> connection.getSupplierName() + ":" + connection.getMode() + ":" + connection.isEnabled())
+                .sorted()
+                .toList();
     }
 
     public int size() {
@@ -172,6 +185,6 @@ public class Inventory {
         return lastUpdateDateBySupplier.keySet();
     }
 
-    private record StatisticsKey(String storeId, long globalVersion, LocalDateTime ownBuiltAt, Set<String> enabledGlobalSuppliers) {
+    private record StatisticsKey(String storeId, long globalVersion, Set<String> enabledGlobalSuppliers, List<String> ownConnectionFingerprint) {
     }
 }

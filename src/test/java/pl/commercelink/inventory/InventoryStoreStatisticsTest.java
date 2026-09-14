@@ -9,15 +9,19 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
+import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoreSupplierConnection;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.taxonomy.TaxonomyCache;
 import pl.commercelink.warehouse.api.Warehouse;
 
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -85,6 +89,42 @@ class InventoryStoreStatisticsTest {
 
         // then
         verify(globalInventory, times(1)).index();
+        verify(storeInventoryProvider, times(1)).ownInventory(store);
+    }
+
+    @Test
+    void changedOwnOrManualConnectionIsRecounted() {
+        // given
+        storeWithElkoOffer(1);
+        StoreSupplierConnection manual = mock(StoreSupplierConnection.class);
+        when(manual.getSupplierName()).thenReturn("Nowak");
+        when(manual.getMode()).thenReturn(ConnectionMode.MANUAL);
+        when(manual.isEnabled()).thenReturn(true);
+        when(store.getOwnAndManualConnections()).thenReturn(List.of(manual));
+        inventory.storeStatistics(STORE_ID);
+
+        // when
+        when(manual.isEnabled()).thenReturn(false);
+        inventory.storeStatistics(STORE_ID);
+
+        // then
+        verify(globalInventory, times(2)).index();
+        verify(storeInventoryProvider, times(2)).ownInventory(store);
+    }
+
+    @Test
+    void nullEntryInGlobalSupplierNamesIsIgnored() {
+        // given
+        store = mock(Store.class);
+        when(store.getGlobalSupplierNames()).thenReturn(Arrays.asList("Elko", null));
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(storeInventoryProvider.ownInventory(store))
+                .thenReturn(new StoreInventory(InventoryIndex.of(List.of()), LocalDateTime.of(2026, 9, 14, 10, 0)));
+        when(globalInventory.index()).thenReturn(InventoryIndex.of(List.of()));
+        when(globalInventory.version()).thenReturn(1L);
+
+        // when / then
+        assertThatCode(() -> inventory.storeStatistics(STORE_ID)).doesNotThrowAnyException();
     }
 
     @Test
