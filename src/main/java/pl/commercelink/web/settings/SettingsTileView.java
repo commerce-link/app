@@ -1,4 +1,4 @@
 package pl.commercelink.web.settings;
 
-public record SettingsTileView(SettingsTile tile, String href, TileStatus status) {
+public record SettingsTileView(SettingsTile tile, String href) {
 }

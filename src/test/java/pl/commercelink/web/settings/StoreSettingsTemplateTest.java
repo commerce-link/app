@@ -17,19 +17,17 @@ class StoreSettingsTemplateTest {
 
     private static final String SECTIONS = "<div th:replace=\"~{fragments/store-settings :: sections(${sections})}\"></div>";
 
-    private SettingsTileView view(String relativePath, String href, TileStatus status) {
-        return new SettingsTileView(StoreSettingsCatalog.tileAt(relativePath).orElseThrow(), href, status);
+    private SettingsTileView view(String relativePath, String href) {
+        return new SettingsTileView(StoreSettingsCatalog.tileAt(relativePath).orElseThrow(), href);
     }
 
     private List<SettingsSectionView> sections() {
         return List.of(
                 new SettingsSectionView("store.settings.group.finance", List.of(
-                        view("/invoicing", "/dashboard/store/invoicing",
-                                TileStatus.ok("store.settings.status.connected", "Fakturownia")),
-                        view("/payments", "/dashboard/store/payments",
-                                TileStatus.neutral("store.settings.status.payments.none")))),
+                        view("/invoicing", "/dashboard/store/invoicing"),
+                        view("/payments", "/dashboard/store/payments"))),
                 new SettingsSectionView("store.settings.group.returns", List.of(
-                        view("/rma-centers", "/dashboard/store/rma-centers", null))));
+                        view("/rma-centers", "/dashboard/store/rma-centers"))));
     }
 
     @Test
@@ -47,16 +45,12 @@ class StoreSettingsTemplateTest {
     }
 
     @Test
-    void showsTheTranslatedStatusInThePillOfItsTone() {
+    void rendersTilesWithoutAnyConfigurationStatusLabel() {
         // when
         String html = SettingsTemplateRenderer.render(SECTIONS, Map.of("sections", sections()));
 
         // then
-        assertThat(html).contains("class=\"cl-status is-ok\"");
-        assertThat(html).contains("Połączono: Fakturownia");
-        assertThat(html).contains("class=\"cl-status is-neutral\"");
-        assertThat(html).contains("Brak bramki");
-        assertThat(html.split("class=\"cl-status ", -1)).hasSize(3);
+        assertThat(html).doesNotContain("cl-status");
     }
 
     @Test

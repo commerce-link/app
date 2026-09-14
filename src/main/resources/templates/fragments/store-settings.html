@@ -14,8 +14,6 @@
                     <span class="cl-tile-chevron" aria-hidden="true"><i class="fas fa-chevron-right"></i></span>
                     <span class="cl-tile-title" th:text="#{${item.tile().titleKey()}}"></span>
                     <span class="cl-tile-desc" th:text="#{${item.tile().descriptionKey()}}"></span>
-                    <span th:if="${item.status() != null}" class="cl-status" th:classappend="${item.status().cssClass()}"
-                          th:text="${#messages.msgWithParams(item.status().messageKey(), item.status().argsArray())}"></span>
                 </a>
             </li>
         </ul>
