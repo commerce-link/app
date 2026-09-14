@@ -112,10 +112,21 @@ public class ManualSupplierService {
         return Result.success();
     }
 
-    public void applySelections(String storeId, List<ManualSelection> selections) {
+    /**
+     * Every rename is validated before anything is written: a label the operator cannot have is a
+     * rejected save, not a silently dropped field. Validation runs over the whole batch first so a
+     * bad label in one selection never leaves the others half-applied.
+     */
+    public Result applySelections(String storeId, List<ManualSelection> selections) {
         Store store = storesRepository.findById(storeId);
         if (store == null) {
-            return;
+            return Result.error("store.manual.error.store.notfound");
+        }
+        for (ManualSelection selection : selections) {
+            Result rejected = rejectLabel(store, selection);
+            if (rejected != null) {
+                return rejected;
+            }
         }
         for (ManualSelection selection : selections) {
             for (StoreSupplierConnection connection : connections(store)) {
@@ -126,9 +137,8 @@ public class ManualSupplierService {
                     connection.setIncludeInPricing(selection.includeInPricing());
                     connection.setIncludeInFulfilment(selection.includeInFulfilment());
                     connection.setExternalSupplierId(StringUtils.trimToNull(selection.externalSupplierId()));
-                    String label = selection.label() == null ? null : selection.label().trim();
-                    if (label != null && !label.isEmpty() && label.length() <= MAX_LABEL_LENGTH
-                            && !labelTaken(store, label, connection.getSupplierName())) {
+                    String label = submittedLabel(selection);
+                    if (label != null) {
                         connection.setLabel(label);
                     }
                 }
@@ -136,6 +146,26 @@ public class ManualSupplierService {
         }
         storesRepository.save(store);
         storeInventoryCache.evict(storeId);
+        return Result.success();
+    }
+
+    // An absent label field means "leave the name alone"; a present but unusable one is an error.
+    private Result rejectLabel(Store store, ManualSelection selection) {
+        if (selection.label() == null) {
+            return null;
+        }
+        String label = submittedLabel(selection);
+        if (label == null || label.length() > MAX_LABEL_LENGTH) {
+            return Result.error("store.manual.error.name.invalid");
+        }
+        if (labelTaken(store, label, selection.identity())) {
+            return Result.error("store.manual.error.name.taken");
+        }
+        return null;
+    }
+
+    private String submittedLabel(ManualSelection selection) {
+        return StringUtils.trimToNull(selection.label());
     }
 
     private boolean alreadyExists(Store store, String identity) {

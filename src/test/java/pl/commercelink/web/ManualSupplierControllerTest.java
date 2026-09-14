@@ -82,6 +82,7 @@ class ManualSupplierControllerTest {
     void savingOneManualSupplierPassesASingleSelectionAndReturnsTheManualSectionFragment() {
         // given
         when(storesRepository.findById(STORE_ID)).thenReturn(store());
+        when(manualSupplierService.applySelections(eq(STORE_ID), any())).thenReturn(ManualSupplierService.Result.success());
         when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenReturn("ok");
         stubEmptyViews();
         ConcurrentModel model = new ConcurrentModel();
@@ -109,6 +110,7 @@ class ManualSupplierControllerTest {
     void theSubmittedExternalSupplierIdReachesTheManualSelection() {
         // given
         when(storesRepository.findById(STORE_ID)).thenReturn(store());
+        when(manualSupplierService.applySelections(eq(STORE_ID), any())).thenReturn(ManualSupplierService.Result.success());
         when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenReturn("ok");
         stubEmptyViews();
         ConcurrentModel model = new ConcurrentModel();
@@ -131,6 +133,7 @@ class ManualSupplierControllerTest {
     void theSubmittedLabelReachesTheManualSelection() {
         // given
         when(storesRepository.findById(STORE_ID)).thenReturn(store());
+        when(manualSupplierService.applySelections(eq(STORE_ID), any())).thenReturn(ManualSupplierService.Result.success());
         when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenReturn("ok");
         stubEmptyViews();
         ConcurrentModel model = new ConcurrentModel();
@@ -153,6 +156,7 @@ class ManualSupplierControllerTest {
     void theSuperAdminSaveVariantRendersTheSectionForTheStoreFromThePath() {
         // given
         when(storesRepository.findById(STORE_ID)).thenReturn(store());
+        when(manualSupplierService.applySelections(eq(STORE_ID), any())).thenReturn(ManualSupplierService.Result.success());
         when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenReturn("ok");
         stubEmptyViews();
         ConcurrentModel model = new ConcurrentModel();
@@ -171,6 +175,31 @@ class ManualSupplierControllerTest {
             assertThat(view).doesNotContain("(");
             verify(manualSupplierService).applySelections(eq(STORE_ID),
                     eq(List.of(new ManualSupplierService.ManualSelection(IDENTITY, false, true, true, null, null))));
+        }
+    }
+
+    @Test
+    void aRejectedRenameRendersTheErrorFragmentInsteadOfReportingSuccess() {
+        // given -- the operator typed a name another connection already uses
+        when(storesRepository.findById(STORE_ID)).thenReturn(store());
+        when(manualSupplierService.applySelections(eq(STORE_ID), any()))
+                .thenReturn(ManualSupplierService.Result.error("store.manual.error.name.taken"));
+        when(messageSource.getMessage(eq("store.manual.error.name.taken"), any(), any(Locale.class)))
+                .thenReturn("That name is already taken.");
+        ConcurrentModel model = new ConcurrentModel();
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        try (MockedStatic<CustomSecurityContext> context = mockStatic(CustomSecurityContext.class)) {
+            context.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+
+            // when
+            String view = controller.saveSelection(IDENTITY, true, true, false, null, "Hurtownia A",
+                    Locale.ENGLISH, model, response);
+
+            // then
+            assertThat(view).isEqualTo("fragments/supplier-section :: sectionError");
+            assertThat(response.getStatus()).isEqualTo(400);
+            assertThat(model.getAttribute("errorMessage")).isEqualTo("That name is already taken.");
         }
     }
 

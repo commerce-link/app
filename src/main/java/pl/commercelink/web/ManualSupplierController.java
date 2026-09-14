@@ -167,9 +167,13 @@ public class ManualSupplierController {
             return SupplierSectionModel.renderErrorFragment(
                     messageSource.getMessage("store.manual.error.store.notfound", null, locale), model, response);
         }
-        manualSupplierService.applySelections(storeId, List.of(
+        ManualSupplierService.Result result = manualSupplierService.applySelections(storeId, List.of(
                 new ManualSupplierService.ManualSelection(identity, enabled, includeInPricing, includeInFulfilment,
                         externalSupplierId, label)));
+        if (!result.ok()) {
+            return SupplierSectionModel.renderErrorFragment(
+                    messageSource.getMessage(result.messageCode(), null, locale), model, response);
+        }
         Store updated = storesRepository.findById(storeId);
         String successMessage = messageSource.getMessage(
                 "store.fulfilment.supplier.saved", new Object[]{labelFor(updated, identity)}, locale);

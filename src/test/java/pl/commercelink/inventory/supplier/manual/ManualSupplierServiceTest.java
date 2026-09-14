@@ -219,6 +219,46 @@ class ManualSupplierServiceTest {
     }
 
     @Test
+    void applySelectionsRejectsAnInvalidLabelInsteadOfDroppingIt() {
+        // given
+        StoreSupplierConnection connection = new StoreSupplierConnection("manual-k7f3a9c2", ConnectionMode.MANUAL, true, true);
+        connection.setLabel("Stara");
+        Store store = storeWith(connection);
+        when(storesRepository.findById("store-1")).thenReturn(store);
+
+        // when
+        ManualSupplierService.Result result = service.applySelections("store-1", List.of(
+                new ManualSupplierService.ManualSelection("manual-k7f3a9c2", true, true, true, null, "   ")));
+
+        // then -- nothing is written and the caller learns why
+        assertFalse(result.ok());
+        assertEquals("store.manual.error.name.invalid", result.messageCode());
+        assertEquals("Stara", connection.getLabel());
+        verify(storesRepository, never()).save(store);
+    }
+
+    @Test
+    void applySelectionsRejectsALabelAnotherConnectionAlreadyUses() {
+        // given
+        StoreSupplierConnection renamed = new StoreSupplierConnection("manual-k7f3a9c2", ConnectionMode.MANUAL, true, true);
+        renamed.setLabel("Stara");
+        StoreSupplierConnection other = new StoreSupplierConnection("manual-9x2pq0ab", ConnectionMode.MANUAL, true, true);
+        other.setLabel("Hurtownia A");
+        Store store = storeWith(renamed, other);
+        when(storesRepository.findById("store-1")).thenReturn(store);
+
+        // when
+        ManualSupplierService.Result result = service.applySelections("store-1", List.of(
+                new ManualSupplierService.ManualSelection("manual-k7f3a9c2", true, true, true, null, "hurtownia a")));
+
+        // then
+        assertFalse(result.ok());
+        assertEquals("store.manual.error.name.taken", result.messageCode());
+        assertEquals("Stara", renamed.getLabel());
+        verify(storesRepository, never()).save(store);
+    }
+
+    @Test
     void uploadFeedStoresValidCsv() {
         // given
         Store store = storeWith(new StoreSupplierConnection("manual:Hurtownia A", ConnectionMode.MANUAL, true, true));
