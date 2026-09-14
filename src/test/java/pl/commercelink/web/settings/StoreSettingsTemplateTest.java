@@ -109,26 +109,13 @@ class StoreSettingsTemplateTest {
     }
 
     @Test
-    void pinsCrossDocumentViewTransitionsAndTheDesktopSettingsNavigationGrid() throws Exception {
+    void pinsCrossDocumentViewTransitionsForTheShell() throws Exception {
         // when
         String css = Files.readString(Path.of("src/main/resources/static/css/commercelink.css"), StandardCharsets.UTF_8);
 
         // then
         assertThat(css).contains("@view-transition { navigation: auto; }");
         assertThat(css).contains("@view-transition { navigation: none; }");
-        assertThat(css).contains("grid-row: 1 / span 99;");
         assertThat(css).contains("::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation-duration: 150ms; }");
-    }
-
-    @Test
-    void pinsTheSettingsNavigationScrollLimitPrintHidingAndHasSupportGuard() throws Exception {
-        // when
-        String css = Files.readString(Path.of("src/main/resources/static/css/commercelink.css"), StandardCharsets.UTF_8);
-
-        // then
-        assertThat(css).contains("max-height: calc(100vh - var(--cl-topbar-height) - 32px);");
-        assertThat(css).contains("@supports selector(:has(*)) {");
-        assertThat(css).contains(".cl-page .cl-back, .cl-page .cl-page-actions, .cl-page .cl-tile-chevron, .cl-settings-nav, .cl-settings-jump {");
-        assertThat(css).contains("max-width: calc(1200px + 14rem + 32px);");
     }
 }

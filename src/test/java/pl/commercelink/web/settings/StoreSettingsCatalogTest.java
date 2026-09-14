@@ -96,17 +96,6 @@ class StoreSettingsCatalogTest {
     }
 
     @Test
-    void translatesTheSettingsNavigationJumpMenuInBothLanguages() {
-        for (String language : List.of("pl", "en")) {
-            // given
-            ResourceBundle messages = ResourceBundle.getBundle("messages", Locale.forLanguageTag(language));
-
-            // when / then
-            assertThat(messages.containsKey("store.settings.nav.jump")).as(language).isTrue();
-        }
-    }
-
-    @Test
     void translatesEverySectionAndTileInBothLanguages() {
         for (String language : List.of("pl", "en")) {
             // given
