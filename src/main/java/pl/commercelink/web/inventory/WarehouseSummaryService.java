@@ -11,7 +11,7 @@ import java.time.Duration;
 @Component
 public class WarehouseSummaryService {
 
-    // the built-in warehouse can only be counted with a full table scan, so a page refresh must not repeat it
+    // counting the built-in warehouse loads every available item of the store, so a page refresh must not repeat it
     private final Cache<String, StockSummary> summaries = Caffeine.newBuilder()
             .expireAfterWrite(Duration.ofMinutes(5))
             .maximumSize(10_000)
