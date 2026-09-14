@@ -20,9 +20,12 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
 public class SupplierConnectionValidator {
 
     private final int minIntervalMinutes;
+    private final SupplierRegistry supplierRegistry;
 
-    public SupplierConnectionValidator(@Value("${scheduling.min-interval-minutes}") int minIntervalMinutes) {
+    public SupplierConnectionValidator(@Value("${scheduling.min-interval-minutes}") int minIntervalMinutes,
+                                       SupplierRegistry supplierRegistry) {
         this.minIntervalMinutes = minIntervalMinutes;
+        this.supplierRegistry = supplierRegistry;
     }
 
     public List<ErrorMessage> validate(boolean canUseGlobalSuppliers,
@@ -60,19 +63,43 @@ public class SupplierConnectionValidator {
         return errors;
     }
 
-    public List<ErrorMessage> validateLabel(String label, ConnectionMode mode, Collection<String> otherLabels) {
+    public List<ErrorMessage> validateLabel(StoreSupplierConnection edited, Collection<String> otherLabels) {
         List<ErrorMessage> errors = new ArrayList<>();
-        if (mode == ConnectionMode.GLOBAL) {
+        if (edited.getMode() == ConnectionMode.GLOBAL) {
+            // A GLOBAL connection has no label of its own -- it is always shown under its type
+            // name, so only a collision with another connection's label can go wrong here.
+            String effective = SupplierLabels.labelOf(edited);
+            if (taken(effective, otherLabels)) {
+                errors.add(ErrorMessage.of("store.supplier.connection.error.label.taken", effective));
+            }
             return errors;
         }
+        String label = edited.getLabel();
         if (isBlank(label)) {
             errors.add(ErrorMessage.of("store.supplier.connection.error.label.required"));
         } else if (label.trim().length() > 60) {
             errors.add(ErrorMessage.of("store.supplier.connection.error.label.too.long"));
-        } else if (otherLabels.stream().anyMatch(other -> other != null && other.equalsIgnoreCase(label.trim()))) {
+        } else if (isReservedFor(edited, label.trim())) {
+            errors.add(ErrorMessage.of("store.supplier.connection.error.label.reserved"));
+        } else if (taken(label.trim(), otherLabels)) {
             errors.add(ErrorMessage.of("store.supplier.connection.error.label.taken", label.trim()));
         }
         return errors;
+    }
+
+    private static boolean taken(String label, Collection<String> otherLabels) {
+        return otherLabels.stream().anyMatch(other -> other != null && other.equalsIgnoreCase(label));
+    }
+
+    // Built-in registry entries (Warehouse, Amazon, Other) and other adapters' type names would
+    // make the label ambiguous in every supplier select. The connection's own type stays allowed:
+    // legacy OWN connections (identity = type) already carry it and the modal suggests it for the
+    // first tokened instance.
+    private boolean isReservedFor(StoreSupplierConnection edited, String label) {
+        String ownType = SupplierIdentity.typeOf(edited.getSupplierName());
+        return supplierRegistry.getAllSupplierNames().stream()
+                .filter(name -> !name.equalsIgnoreCase(ownType))
+                .anyMatch(name -> name.equalsIgnoreCase(label));
     }
 
     private void validateSchedule(String supplierName, String feedSchedule, List<ErrorMessage> errors) {

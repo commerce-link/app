@@ -7,6 +7,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.inventory.StoreInventoryCache;
 import pl.commercelink.inventory.supplier.StoreFeedRepository;
+import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.FulfilmentConfiguration;
 import pl.commercelink.stores.Store;
@@ -33,6 +34,7 @@ class ManualSupplierServiceTest {
     @Mock StoresRepository storesRepository;
     @Mock StoreFeedRepository storeFeedRepository;
     @Mock StoreInventoryCache storeInventoryCache;
+    @Mock SupplierRegistry supplierRegistry;
     @InjectMocks ManualSupplierService service;
 
     private Store storeWith(StoreSupplierConnection... connections) {
@@ -75,6 +77,33 @@ class ManualSupplierServiceTest {
         // when / then
         assertEquals("store.manual.error.name.taken", service.create("store-1", "asus").messageCode());
         assertEquals("store.manual.error.name.taken", service.create("store-1", "kosatec").messageCode());
+    }
+
+    @Test
+    void createRefusesABuiltInOrTypeName() {
+        // given
+        when(storesRepository.findById("store-1")).thenReturn(storeWith());
+        when(supplierRegistry.getAllSupplierNames()).thenReturn(List.of("Amazon", "Warehouse", "Other", "Kosatec"));
+
+        // when / then
+        assertEquals("store.supplier.connection.error.label.reserved", service.create("store-1", "Warehouse").messageCode());
+        assertEquals("store.supplier.connection.error.label.reserved", service.create("store-1", "kosatec").messageCode());
+    }
+
+    @Test
+    void renameRefusesABuiltInOrTypeName() {
+        // given
+        Store store = storeWith(new StoreSupplierConnection("manual-k7f3a9c2", ConnectionMode.MANUAL, true, true));
+        when(storesRepository.findById("store-1")).thenReturn(store);
+        when(supplierRegistry.getAllSupplierNames()).thenReturn(List.of("Amazon", "Warehouse", "Other", "Kosatec"));
+
+        // when
+        ManualSupplierService.Result result = service.applySelections("store-1", List.of(
+                new ManualSupplierService.ManualSelection("manual-k7f3a9c2", true, true, true, null, "warehouse")));
+
+        // then
+        assertEquals("store.supplier.connection.error.label.reserved", result.messageCode());
+        verify(storesRepository, never()).save(any());
     }
 
     @Test
@@ -224,7 +253,7 @@ class ManualSupplierServiceTest {
         Store store = storeWith(new StoreSupplierConnection("manual-aaaaaaaa", ConnectionMode.MANUAL, true, true));
         when(storesRepository.findById("store-1")).thenReturn(store);
         ManualSupplierService colliding = new ManualSupplierService(
-                storesRepository, storeFeedRepository, storeInventoryCache) {
+                storesRepository, storeFeedRepository, storeInventoryCache, supplierRegistry) {
             @Override
             String newIdentity() {
                 return "manual-aaaaaaaa";

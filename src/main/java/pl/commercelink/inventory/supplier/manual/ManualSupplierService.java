@@ -7,6 +7,7 @@ import pl.commercelink.inventory.StoreInventoryCache;
 import pl.commercelink.inventory.supplier.StoreFeedRepository;
 import pl.commercelink.inventory.supplier.SupplierIdentity;
 import pl.commercelink.inventory.supplier.SupplierLabels;
+import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.CsvRowParser;
 import pl.commercelink.starter.csv.CSVLoader;
 import pl.commercelink.stores.ConnectionMode;
@@ -32,6 +33,7 @@ public class ManualSupplierService {
     private final StoresRepository storesRepository;
     private final StoreFeedRepository storeFeedRepository;
     private final StoreInventoryCache storeInventoryCache;
+    private final SupplierRegistry supplierRegistry;
 
     public record Result(boolean ok, String messageCode, String identity) {
         public static Result success() {
@@ -59,6 +61,9 @@ public class ManualSupplierService {
         String trimmed = label == null ? "" : label.trim();
         if (trimmed.isEmpty() || trimmed.length() > MAX_LABEL_LENGTH) {
             return Result.error("store.manual.error.name.invalid");
+        }
+        if (reservedName(trimmed)) {
+            return Result.error("store.supplier.connection.error.label.reserved");
         }
         if (labelTaken(store, trimmed, null)) {
             return Result.error("store.manual.error.name.taken");
@@ -176,10 +181,19 @@ public class ManualSupplierService {
         if (label == null || label.length() > MAX_LABEL_LENGTH) {
             return Result.error("store.manual.error.name.invalid");
         }
+        if (reservedName(label)) {
+            return Result.error("store.supplier.connection.error.label.reserved");
+        }
         if (labelTaken(store, label, selection.identity())) {
             return Result.error("store.manual.error.name.taken");
         }
         return null;
+    }
+
+    // A manual supplier named like a built-in entry or an external supplier type would show up as
+    // a duplicate row in every supplier select, so every registry name is off limits here.
+    private boolean reservedName(String label) {
+        return supplierRegistry.getAllSupplierNames().stream().anyMatch(name -> name.equalsIgnoreCase(label));
     }
 
     private String submittedLabel(ManualSelection selection) {

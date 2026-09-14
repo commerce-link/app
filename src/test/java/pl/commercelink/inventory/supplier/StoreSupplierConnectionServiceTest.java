@@ -156,7 +156,7 @@ class StoreSupplierConnectionServiceTest {
                 new StoreSupplierConnection("manual:Hurtownia X", ConnectionMode.MANUAL, true, true));
         registryHas("Kosatec");
         when(validator.validate(anyBoolean(), anyList(), anyMap(), anyMap(), anySet())).thenReturn(List.of());
-        when(validator.validateLabel(any(), any(), any())).thenReturn(List.of());
+        when(validator.validateLabel(any(), any())).thenReturn(List.of());
         when(persister.persist(any(), any(), anyMap()))
                 .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of("Kosatec"), Set.of(), Set.of()));
         SupplierSelectionForm form = ownSelection("Kosatec", "Kosatec");
@@ -181,7 +181,7 @@ class StoreSupplierConnectionServiceTest {
         Store store = storeWith(true, new StoreSupplierConnection("Elko", ConnectionMode.OWN, true, true));
         registryHas("Elko");
         when(validator.validate(anyBoolean(), anyList(), anyMap(), anyMap(), anySet())).thenReturn(List.of());
-        when(validator.validateLabel(any(), any(), any())).thenReturn(List.of());
+        when(validator.validateLabel(any(), any())).thenReturn(List.of());
         when(persister.persist(any(), any(), anyMap()))
                 .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of(), Set.of(), Set.of()));
         SupplierSelectionForm edit = new SupplierSelectionForm("Elko", ConnectionMode.OWN, false, true);
@@ -204,7 +204,7 @@ class StoreSupplierConnectionServiceTest {
         Store store = storeWith(false);
         registryHas("Elko");
         when(validator.validate(anyBoolean(), anyList(), anyMap(), anyMap(), anySet())).thenReturn(List.of());
-        when(validator.validateLabel(any(), any(), any())).thenReturn(List.of());
+        when(validator.validateLabel(any(), any())).thenReturn(List.of());
         when(persister.persist(any(), any(), anyMap()))
                 .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of("Elko"), Set.of(), Set.of()));
         SupplierSelectionForm form = new SupplierSelectionForm("Elko", ConnectionMode.GLOBAL, true, true);
@@ -225,7 +225,7 @@ class StoreSupplierConnectionServiceTest {
         Store store = storeWith(true);
         registryHas("Elko");
         when(validator.validate(anyBoolean(), anyList(), anyMap(), anyMap(), anySet())).thenReturn(List.of());
-        when(validator.validateLabel(any(), any(), any())).thenReturn(List.of());
+        when(validator.validateLabel(any(), any())).thenReturn(List.of());
         when(persister.persist(any(), any(), anyMap()))
                 .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of("Elko"), Set.of(), Set.of()));
         SupplierSelectionForm withId = new SupplierSelectionForm("Elko", ConnectionMode.OWN, true, true);
@@ -253,7 +253,7 @@ class StoreSupplierConnectionServiceTest {
                 new StoreSupplierConnection("Broken", ConnectionMode.OWN, true, true));
         registryHas("Elko");
         when(validator.validate(anyBoolean(), anyList(), anyMap(), anyMap(), anySet())).thenReturn(List.of());
-        when(validator.validateLabel(any(), any(), any())).thenReturn(List.of());
+        when(validator.validateLabel(any(), any())).thenReturn(List.of());
         when(persister.persist(any(), any(), anyMap()))
                 .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of("Elko"), Set.of(), Set.of()));
 
@@ -272,7 +272,7 @@ class StoreSupplierConnectionServiceTest {
         // given
         Store store = storeWith(true);
         registryHas("Elko");
-        when(validator.validateLabel(any(), any(), any())).thenReturn(List.of());
+        when(validator.validateLabel(any(), any())).thenReturn(List.of());
         when(validator.validate(anyBoolean(), anyList(), anyMap(), anyMap(), anySet()))
                 .thenReturn(List.of(ErrorMessage.of("store.supplier.connection.error.requires.field", "Elko", "Login")));
 
@@ -293,7 +293,7 @@ class StoreSupplierConnectionServiceTest {
         store.setStoreId("store-1");
         registryHas("Elko");
         when(validator.validate(anyBoolean(), anyList(), anyMap(), anyMap(), anySet())).thenReturn(List.of());
-        when(validator.validateLabel(any(), any(), any())).thenReturn(List.of());
+        when(validator.validateLabel(any(), any())).thenReturn(List.of());
         when(persister.persist(any(), any(), anyMap()))
                 .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of("Elko"), Set.of(), Set.of()));
 
@@ -317,7 +317,7 @@ class StoreSupplierConnectionServiceTest {
         Store store = storeWith(true, new StoreSupplierConnection("Elko", ConnectionMode.OWN, true, true));
         when(configurationManager.loadConfiguration(store, "Elko")).thenReturn(Map.of("login", "u"));
         when(validator.validate(anyBoolean(), anyList(), anyMap(), anyMap(), anySet())).thenReturn(List.of());
-        when(validator.validateLabel(any(), any(), any())).thenReturn(List.of());
+        when(validator.validateLabel(any(), any())).thenReturn(List.of());
         when(persister.persist(any(), any(), anyMap()))
                 .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of(), Set.of(), Set.of()));
         SupplierSelectionForm edit = ownSelection("Elko", "Elko");
@@ -338,7 +338,7 @@ class StoreSupplierConnectionServiceTest {
         // provider's configuration manager holds for this supplier
         Store store = storeWith(true, new StoreSupplierConnection("Elko", ConnectionMode.GLOBAL, true, true));
         when(validator.validate(anyBoolean(), anyList(), anyMap(), anyMap(), anySet())).thenReturn(List.of());
-        when(validator.validateLabel(any(), any(), any())).thenReturn(List.of());
+        when(validator.validateLabel(any(), any())).thenReturn(List.of());
         when(persister.persist(any(), any(), anyMap()))
                 .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of(), Set.of(), Set.of()));
         SupplierSelectionForm edit = new SupplierSelectionForm("Elko", ConnectionMode.GLOBAL, true, true);
@@ -359,7 +359,7 @@ class StoreSupplierConnectionServiceTest {
         Store store = storeWith(true, new StoreSupplierConnection("Stub", ConnectionMode.OWN, true, true));
         registryHas("Stub");
         when(validator.validate(anyBoolean(), anyList(), anyMap(), anyMap(), anySet())).thenReturn(List.of());
-        when(validator.validateLabel(any(), any(), any())).thenReturn(List.of());
+        when(validator.validateLabel(any(), any())).thenReturn(List.of());
         when(persister.persist(any(), any(), anyMap()))
                 .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of(), Set.of(), Set.of()));
 
@@ -403,7 +403,7 @@ class StoreSupplierConnectionServiceTest {
         Store store = storeWith(true, new StoreSupplierConnection("Stub", ConnectionMode.GLOBAL, true, true));
         registryHas("Stub");
         when(validator.validate(anyBoolean(), anyList(), anyMap(), anyMap(), anySet())).thenReturn(List.of());
-        when(validator.validateLabel(any(), any(), any())).thenReturn(List.of());
+        when(validator.validateLabel(any(), any())).thenReturn(List.of());
         when(persister.persist(any(), any(), anyMap()))
                 .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of(), Set.of(), Set.of()));
 
@@ -426,7 +426,7 @@ class StoreSupplierConnectionServiceTest {
         Store store = storeWith(true, existing);
         registryHas("Stub");
         when(validator.validate(anyBoolean(), anyList(), anyMap(), anyMap(), anySet())).thenReturn(List.of());
-        when(validator.validateLabel(any(), any(), any())).thenReturn(List.of());
+        when(validator.validateLabel(any(), any())).thenReturn(List.of());
         when(persister.persist(any(), any(), anyMap()))
                 .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of(), Set.of(), Set.of()));
         SupplierSelectionForm edit = ownSelection("Stub", "Nowe");
@@ -478,6 +478,26 @@ class StoreSupplierConnectionServiceTest {
         assertThat(ownResult.errors().get(0).code()).isEqualTo("store.supplier.connection.error.manual.locked");
         assertThat(globalResult.errors().get(0).code()).isEqualTo("store.supplier.connection.error.manual.locked");
         verify(persister, never()).persist(any(), any(), anyMap());
+    }
+
+    @Test
+    void creatingAGlobalConnectionRefusesATypeNameAlreadyUsedAsALabel() {
+        // given
+        StoreSupplierConnection own = new StoreSupplierConnection("Stub-k7f3a9c2", ConnectionMode.OWN, true, true);
+        own.setLabel("Stub");
+        Store store = storeWith(true, own);
+        registryHas("Stub");
+        when(validator.validateLabel(argThat(edited -> edited != null && edited.getMode() == ConnectionMode.GLOBAL), any()))
+                .thenReturn(List.of(ErrorMessage.of("store.supplier.connection.error.label.taken", "Stub")));
+
+        // when
+        StoreSupplierConnectionService.ConnectionUpdateResult result = service.connectOrUpdate(
+                store, new SupplierSelectionForm("Stub", ConnectionMode.GLOBAL, true, true), Map.of());
+
+        // then
+        assertThat(result.errors().get(0).code()).isEqualTo("store.supplier.connection.error.label.taken");
+        verify(persister, never()).persist(any(), any(), anyMap());
+        verify(validator).validateLabel(argThat(edited -> "Stub".equals(edited.getSupplierName())), eq(List.of("Stub")));
     }
 
     @Test
@@ -568,7 +588,7 @@ class StoreSupplierConnectionServiceTest {
         // given
         Store store = storeWith(true);
         registryHas("Stub");
-        when(validator.validateLabel(eq("x"), eq(ConnectionMode.OWN), any()))
+        when(validator.validateLabel(argThat(edited -> edited != null && "x".equals(edited.getLabel())), any()))
                 .thenReturn(List.of(ErrorMessage.of("store.supplier.connection.error.label.taken", "x")));
 
         // when

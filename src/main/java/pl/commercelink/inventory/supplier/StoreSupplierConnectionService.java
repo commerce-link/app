@@ -92,7 +92,7 @@ public class StoreSupplierConnectionService {
 
         List<StoreSupplierConnection> others = connectionsWithout(existingStore, identity);
         List<ErrorMessage> errors = new ArrayList<>(validator.validateLabel(
-                edited.getLabel(), mode, others.stream().map(SupplierLabels::labelOf).toList()));
+                edited, others.stream().map(SupplierLabels::labelOf).toList()));
         Map<String, Map<String, String>> config = Map.of(identity, submittedConfig);
         // Only the edited connection is validated: a broken entry belonging to another supplier
         // must not block this one.
