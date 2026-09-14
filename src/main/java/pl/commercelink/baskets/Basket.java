@@ -16,11 +16,12 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -117,27 +118,100 @@ public class Basket {
 
     @DynamoDBIgnore
     public List<BasketItem> getBasketItemsForProducts() {
-        return basketItems.stream().filter(BasketItem::isProduct).collect(Collectors.toList());
+        return getEffectiveBasketItems().stream().filter(BasketItem::isProduct).collect(Collectors.toList());
     }
 
     @DynamoDBIgnore
     public List<BasketItem> getBasketItemsForServices() {
-        return basketItems.stream().filter(i -> i.isService()).collect(Collectors.toList());
+        return getEffectiveBasketItems().stream().filter(BasketItem::isService).collect(Collectors.toList());
+    }
+
+    @DynamoDBIgnore
+    public List<BasketItem> getEffectiveBasketItems() {
+        Set<String> resolvedGroups = new HashSet<>();
+        List<BasketItem> effective = new LinkedList<>();
+        for (BasketItem item : basketItems) {
+            if (!item.isInVariantGroup()) {
+                effective.add(item);
+            } else if (resolvedGroups.add(item.getVariantGroupId())) {
+                effective.add(chosenVariant(item.getVariantGroupId()));
+            }
+        }
+        return effective;
+    }
+
+    @DynamoDBIgnore
+    public List<BasketItem> getVariantGroup(String groupId) {
+        return basketItems.stream().filter(i -> i.isInVariantGroup(groupId)).toList();
+    }
+
+    @DynamoDBIgnore
+    public boolean hasVariantGroups() {
+        return basketItems.stream().anyMatch(BasketItem::isInVariantGroup);
+    }
+
+    private BasketItem chosenVariant(String groupId) {
+        List<BasketItem> group = getVariantGroup(groupId);
+        return group.stream().filter(BasketItem::isVariantSelected).findFirst().orElse(group.get(0));
+    }
+
+    public void selectVariant(String groupId, int position) {
+        List<BasketItem> group = getVariantGroup(groupId);
+        if (group.stream().noneMatch(i -> i.getPosition() == position)) {
+            throw new IllegalArgumentException("No variant at position " + position + " in group " + groupId);
+        }
+        group.forEach(i -> i.setVariantSelected(i.getPosition() == position));
     }
 
     public void setBasketItems(List<BasketItem> basketItems) {
-        this.basketItems = basketItems.stream()
+        this.basketItems = joinVariantGroups(basketItems.stream()
                 .peek(i -> {
                     var unifiedMfn = UnifiedProductIdentifiers.unifyMfn(i.getMfn());
                     i.setMfn(unifiedMfn);
-                }).collect(Collectors.toList());
+                }).toList());
         reindexPositions();
+    }
+
+    private static List<BasketItem> joinVariantGroups(List<BasketItem> items) {
+        List<BasketItem> ordered = new LinkedList<>();
+        for (BasketItem item : items) {
+            ordered.add(insertionIndexWithinGroup(ordered, item), item);
+        }
+        normalizeVariantSelection(ordered);
+        return ordered;
+    }
+
+    private static void normalizeVariantSelection(List<BasketItem> items) {
+        Set<String> groupsWithSelection = new HashSet<>();
+        for (BasketItem item : items) {
+            if (!item.isInVariantGroup()) {
+                item.setVariantSelected(false);
+            } else if (item.isVariantSelected() && !groupsWithSelection.add(item.getVariantGroupId())) {
+                item.setVariantSelected(false);
+            }
+        }
+        for (BasketItem item : items) {
+            if (item.isInVariantGroup() && groupsWithSelection.add(item.getVariantGroupId())) {
+                item.setVariantSelected(true);
+            }
+        }
+    }
+
+    private static int insertionIndexWithinGroup(List<BasketItem> ordered, BasketItem item) {
+        if (item.isInVariantGroup()) {
+            for (int i = ordered.size() - 1; i >= 0; i--) {
+                if (ordered.get(i).isInVariantGroup(item.getVariantGroupId())) {
+                    return i + 1;
+                }
+            }
+        }
+        return ordered.size();
     }
 
     public void addBasketItem(BasketItem basketItem) {
         int lastSameCategoryIndex = lastIndexOfCategory(basketItem.getCategory());
         if (lastSameCategoryIndex >= 0) {
-            basketItems.add(lastSameCategoryIndex + 1, basketItem);
+            basketItems.add(indexAfterVariantGroup(lastSameCategoryIndex), basketItem);
             reindexPositions();
             return;
         }
@@ -188,11 +262,17 @@ public class Basket {
         return -1;
     }
 
+    private int indexAfterVariantGroup(int index) {
+        String groupId = basketItems.get(index).getVariantGroupId();
+        int next = index + 1;
+        while (groupId != null && next < basketItems.size() && basketItems.get(next).isInVariantGroup(groupId)) {
+            next++;
+        }
+        return next;
+    }
+
     public void removeBasketItem(int index) {
-        List<BasketItem> byPosition = basketItems.stream()
-                .sorted(Comparator.comparingInt(BasketItem::getPosition))
-                .toList();
-        basketItems.remove(byPosition.get(index));
+        basketItems.remove(index);
     }
 
     private void reindexPositions() {
@@ -314,8 +394,15 @@ public class Basket {
 
     @DynamoDBIgnore
     public double getTotalPrice() {
-        return basketItems.stream()
+        return getEffectiveBasketItems().stream()
                 .mapToDouble(BasketItem::getTotalPrice)
+                .sum();
+    }
+
+    @DynamoDBIgnore
+    public double getTotalCost() {
+        return getEffectiveBasketItems().stream()
+                .mapToDouble(BasketItem::getTotalCost)
                 .sum();
     }
 

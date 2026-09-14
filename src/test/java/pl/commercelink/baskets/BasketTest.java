@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class BasketTest {
 
@@ -186,8 +187,8 @@ class BasketTest {
     }
 
     @Test
-    @DisplayName("removeBasketItem removes the item by position order even when the list order differs")
-    void removeBasketItemRemovesItemByPositionOrderWhenListOrderDiffers() {
+    @DisplayName("removeBasketItem removes the item at the list index regardless of positions")
+    void removeBasketItemRemovesItemAtListIndexRegardlessOfPositions() {
         // given
         Basket basket = new Basket();
         BasketItem first = basketItem("MFN-A");
@@ -200,7 +201,135 @@ class BasketTest {
         basket.removeBasketItem(0);
 
         // then
-        assertThat(basket.getBasketItems()).extracting(BasketItem::getMfn).containsExactly("MFN-A");
+        assertThat(basket.getBasketItems()).extracting(BasketItem::getMfn).containsExactly("MFN-B");
+    }
+
+    @Test
+    @DisplayName("effective basket items take the first item of a variant group when the client has not chosen yet")
+    void effectiveBasketItemsTakeFirstItemOfVariantGroupByDefault() {
+        // given
+        Basket basket = new Basket();
+        basket.setBasketItems(List.of(basketItem("MFN-CPU", "CPU"), variant("MFN-SSD-1", "SSD"), variant("MFN-SSD-2", "SSD")));
+
+        // when
+        List<BasketItem> effective = basket.getEffectiveBasketItems();
+
+        // then
+        assertThat(effective).extracting(BasketItem::getMfn).containsExactly("MFN-CPU", "MFN-SSD-1");
+    }
+
+    @Test
+    @DisplayName("selectVariant switches the effective item of the group and the total price")
+    void selectVariantSwitchesEffectiveItemAndTotalPrice() {
+        // given
+        Basket basket = new Basket();
+        BasketItem ssd1 = variant("MFN-SSD-1", "SSD");
+        BasketItem ssd2 = variant("MFN-SSD-2", "SSD");
+        ssd2.setUnitPrice(300.0);
+        basket.setBasketItems(List.of(basketItem("MFN-CPU", "CPU"), ssd1, ssd2));
+
+        // when
+        basket.selectVariant("SSD", ssd2.getPosition());
+
+        // then
+        assertThat(basket.getEffectiveBasketItems()).extracting(BasketItem::getMfn).containsExactly("MFN-CPU", "MFN-SSD-2");
+        assertThat(ssd1.isVariantSelected()).isFalse();
+        assertThat(ssd2.isVariantSelected()).isTrue();
+        assertThat(basket.getTotalPrice()).isEqualTo(400.0);
+    }
+
+    @Test
+    @DisplayName("selectVariant rejects a position that does not belong to the group")
+    void selectVariantRejectsPositionOutsideTheGroup() {
+        // given
+        Basket basket = new Basket();
+        BasketItem cpu = basketItem("MFN-CPU", "CPU");
+        basket.setBasketItems(List.of(cpu, variant("MFN-SSD-1", "SSD"), variant("MFN-SSD-2", "SSD")));
+
+        // when / then
+        assertThatThrownBy(() -> basket.selectVariant("SSD", cpu.getPosition()))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @DisplayName("setBasketItems pulls split fragments of a variant group together behind its first item")
+    void setBasketItemsJoinsSplitVariantGroupFragments() {
+        // given
+        Basket basket = new Basket();
+
+        // when
+        basket.setBasketItems(List.of(variant("MFN-SSD-1", "SSD"), basketItem("MFN-CPU", "CPU"), variant("MFN-SSD-2", "SSD")));
+
+        // then
+        assertThat(basket.getBasketItems()).extracting(BasketItem::getMfn).containsExactly("MFN-SSD-1", "MFN-SSD-2", "MFN-CPU");
+        assertThat(basket.getBasketItems()).extracting(BasketItem::getPosition).containsExactly(0, 1, 2);
+    }
+
+    @Test
+    @DisplayName("setBasketItems marks the first item of each variant group as selected when nothing is selected yet")
+    void setBasketItemsMarksFirstItemOfEachGroupAsSelectedByDefault() {
+        // given
+        Basket basket = new Basket();
+        BasketItem ssd1 = variant("MFN-SSD-1", "SSD");
+        BasketItem ssd2 = variant("MFN-SSD-2", "SSD");
+        BasketItem gpu1 = variant("MFN-GPU-1", "GPU");
+
+        // when
+        basket.setBasketItems(List.of(ssd1, ssd2, gpu1));
+
+        // then
+        assertThat(ssd1.isVariantSelected()).isTrue();
+        assertThat(ssd2.isVariantSelected()).isFalse();
+        assertThat(gpu1.isVariantSelected()).isTrue();
+    }
+
+    @Test
+    @DisplayName("setBasketItems keeps the client's selection even when it is no longer the first item of the group")
+    void setBasketItemsKeepsExistingSelectionRegardlessOfOrder() {
+        // given
+        Basket basket = new Basket();
+        BasketItem ssd1 = variant("MFN-SSD-1", "SSD");
+        BasketItem ssd2 = variant("MFN-SSD-2", "SSD");
+        ssd2.setVariantSelected(true);
+
+        // when
+        basket.setBasketItems(List.of(ssd1, ssd2));
+
+        // then
+        assertThat(ssd1.isVariantSelected()).isFalse();
+        assertThat(ssd2.isVariantSelected()).isTrue();
+        assertThat(basket.getEffectiveBasketItems()).extracting(BasketItem::getMfn).containsExactly("MFN-SSD-2");
+    }
+
+    @Test
+    @DisplayName("setBasketItems clears a stale selection flag on an item that left its group")
+    void setBasketItemsClearsSelectionOnUngroupedItem() {
+        // given
+        Basket basket = new Basket();
+        BasketItem loose = basketItem("MFN-A");
+        loose.setVariantSelected(true);
+
+        // when
+        basket.setBasketItems(List.of(loose));
+
+        // then
+        assertThat(loose.isVariantSelected()).isFalse();
+    }
+
+    @Test
+    @DisplayName("addBasketItem inserts a same-category item after the whole variant group instead of inside it")
+    void addBasketItemInsertsAfterWholeVariantGroup() {
+        // given
+        Basket basket = new Basket();
+        basket.setBasketItems(List.of(variant("MFN-SSD-1", "SSD"), variant("MFN-SSD-2", "SSD"), basketItem("MFN-CPU", "CPU")));
+        BasketItem loose = basketItem("MFN-SSD-3");
+
+        // when
+        basket.addBasketItem(loose);
+
+        // then
+        assertThat(basket.getBasketItems()).extracting(BasketItem::getMfn).containsExactly("MFN-SSD-1", "MFN-SSD-2", "MFN-SSD-3", "MFN-CPU");
+        assertThat(loose.isInVariantGroup()).isFalse();
     }
 
     @Test
@@ -321,5 +450,11 @@ class BasketTest {
     private BasketItem basketItem(String mfn, String category) {
         return new BasketItem("pim-1", "Product", mfn,
                 category, 100.0, 0, 1, null, 3, false);
+    }
+
+    private BasketItem variant(String mfn, String groupId) {
+        BasketItem item = basketItem(mfn);
+        item.setVariantGroupId(groupId);
+        return item;
     }
 }

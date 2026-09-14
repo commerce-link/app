@@ -241,6 +241,10 @@ class OrderNotificationsService {
         if (order.getEstimatedAssemblyAt() == null) {
             return;
         }
+        // Telling a customer the date "changed" only makes sense if they were given the first one.
+        if (!orderEventsRepository.hasEvent(order.getOrderId(), EventType.email, EmailNotificationType.ORDER_ASSEMBLY.name())) {
+            return;
+        }
 
         EmailNotification msg = new OrderAssemblyDateChangedEmailNotification(
                 getRecipientEmail(order),
