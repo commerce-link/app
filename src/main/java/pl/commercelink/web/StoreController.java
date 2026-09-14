@@ -537,8 +537,12 @@ public class StoreController {
             return "error";
         }
 
-        store.getCheckoutConfiguration().getDeliveryOptions().add(new DeliveryOption());
-        store.getCheckoutConfiguration().getDeliveryOptions().add(new DeliveryOption());
+        // a store created by StoreCreationService has no checkout configuration until this page is saved once
+        CheckoutConfiguration checkoutConfiguration = Objects.requireNonNullElseGet(
+                store.getCheckoutConfiguration(), CheckoutConfiguration::new);
+        store.setCheckoutConfiguration(checkoutConfiguration);
+        checkoutConfiguration.getDeliveryOptions().add(new DeliveryOption());
+        checkoutConfiguration.getDeliveryOptions().add(new DeliveryOption());
 
         StoreForm form = new StoreForm(store);
         form.setProviderConfiguration(new HashMap<>());
