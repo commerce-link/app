@@ -20,9 +20,6 @@ import pl.commercelink.stores.RMAConfiguration;
 import pl.commercelink.stores.ReportingConfiguration;
 import pl.commercelink.stores.ShippingConfiguration;
 import pl.commercelink.stores.Store;
-import pl.commercelink.stores.StoreNotification;
-import pl.commercelink.stores.StoreNotificationSeverity;
-import pl.commercelink.stores.StoreNotificationType;
 import pl.commercelink.stores.WarehouseConfiguration;
 
 import java.util.Arrays;
@@ -50,30 +47,7 @@ public class StoreSettingsOverviewFactory {
                         .toList()))
                 .filter(section -> !section.tiles().isEmpty())
                 .toList();
-        return new StoreSettingsOverview(sections, alerts(store, role, homeHref));
-    }
-
-    private List<StoreAlert> alerts(Store store, UserRole role, String homeHref) {
-        return orEmpty(store.getNotifications()).stream()
-                .map(notification -> toAlert(notification, role, homeHref))
-                .toList();
-    }
-
-    private StoreAlert toAlert(StoreNotification notification, UserRole role, String homeHref) {
-        boolean warning = notification.getSeverity() == StoreNotificationSeverity.WARNING;
-        StoreNotificationType type = notification.getType();
-        String titleKey = type == null ? "store.notification.type.default" : "store.notification.type." + type.name();
-        if (type == StoreNotificationType.UNAUTHENTICATED) {
-            return new StoreAlert(warning, titleKey, notification.getMessage(), homeHref + "/marketplaces",
-                    "store.notification.action.reconnect");
-        }
-        // the RMA screen resolves the store from the logged-in admin, so only the store admin gets the link
-        if (type == StoreNotificationType.MARKETPLACE_RETURN_REFUNDED && role == UserRole.ADMIN
-                && StringUtils.isNotBlank(notification.getObject())) {
-            return new StoreAlert(warning, titleKey, notification.getMessage(), "/dashboard/rma/" + notification.getObject(),
-                    "store.notification.action.viewReturn");
-        }
-        return new StoreAlert(warning, titleKey, notification.getMessage(), null, null);
+        return new StoreSettingsOverview(sections);
     }
 
     private TileStatus statusOf(SettingsTile tile, Store store) {

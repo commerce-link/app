@@ -16,7 +16,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 class StoreSettingsTemplateTest {
 
     private static final String SECTIONS = "<div th:replace=\"~{fragments/store-settings :: sections(${sections})}\"></div>";
-    private static final String ALERTS = "<div th:replace=\"~{fragments/store-settings :: alerts(${alerts})}\"></div>";
 
     private SettingsTileView view(String relativePath, String href, TileStatus status) {
         return new SettingsTileView(StoreSettingsCatalog.tileAt(relativePath).orElseThrow(), href, status);
@@ -71,34 +70,6 @@ class StoreSettingsTemplateTest {
     }
 
     @Test
-    void rendersNoAlertRegionWithoutNotifications() {
-        // when
-        String html = SettingsTemplateRenderer.render(ALERTS, Map.of("alerts", List.of()));
-
-        // then
-        assertThat(html).doesNotContain("cl-alert");
-    }
-
-    @Test
-    void rendersEachAlertWithTitleOriginalMessageAndAction() {
-        // given
-        List<StoreAlert> alerts = List.of(
-                new StoreAlert(true, "store.notification.type.UNAUTHENTICATED", "Your connection to Allegro expired",
-                        "/dashboard/store/marketplaces", "store.notification.action.reconnect"),
-                new StoreAlert(false, "store.notification.type.WELCOME", "Hello", null, null));
-
-        // when
-        String html = SettingsTemplateRenderer.render(ALERTS, Map.of("alerts", alerts));
-
-        // then
-        assertThat(html).contains("role=\"region\"").contains("aria-label=\"Powiadomienia sklepu\"");
-        assertThat(html).contains("class=\"cl-alert is-warn\"").contains("class=\"cl-alert is-info\"");
-        assertThat(html).contains("Wygasło połączenie z marketplace").contains("Your connection to Allegro expired");
-        assertThat(html).contains("href=\"/dashboard/store/marketplaces\"").contains("Połącz ponownie");
-        assertThat(html.split("cl-alert-action", -1)).hasSize(2);
-    }
-
-    @Test
     void rendersTheWholeSuperAdminPageInsideTheLayout() {
         // given
         Store store = new Store();
@@ -107,7 +78,7 @@ class StoreSettingsTemplateTest {
         Map<String, Object> variables = new HashMap<>();
         variables.put("form", new StoreForm(store));
         variables.put("isSuperAdmin", true);
-        variables.put("overview", new StoreSettingsOverview(sections(), List.of()));
+        variables.put("overview", new StoreSettingsOverview(sections()));
         variables.put("navigation", null);
 
         // when
@@ -128,7 +99,8 @@ class StoreSettingsTemplateTest {
         // then
         assertThat(template).doesNotContain("button is-primary").doesNotContain("card-content")
                 .doesNotContain("fa-palette").doesNotContain("fa-file-invoice").doesNotContain("fa-store")
-                .doesNotContain("store.notification.severity");
+                .doesNotContain("store.notification.severity")
+                .doesNotContain("store-settings :: alerts");
         assertThat(template).contains("fragments/screen-intro :: panel('store', 'fas fa-cog')");
     }
 

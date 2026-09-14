@@ -2,21 +2,6 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
 
-<div th:fragment="alerts(alerts)" th:if="${!#lists.isEmpty(alerts)}" class="cl-alerts" role="region"
-     th:attr="aria-label=#{store.notification.alerts.aria}">
-    <div th:each="alert : ${alerts}" class="cl-alert" th:classappend="${alert.cssClass()}">
-        <span class="cl-alert-icon icon" aria-hidden="true"><i class="fas" th:classappend="${alert.icon()}"></i></span>
-        <div class="cl-alert-body">
-            <div class="cl-alert-title" th:text="#{${alert.titleKey()}}"></div>
-            <div class="cl-alert-message" th:if="${alert.message() != null}" th:text="${alert.message()}"></div>
-        </div>
-        <a th:if="${alert.actionHref() != null}" class="cl-alert-action" th:href="@{${alert.actionHref()}}">
-            <span th:text="#{${alert.actionKey()}}"></span>
-            <span class="icon is-small" aria-hidden="true"><i class="fas fa-chevron-right"></i></span>
-        </a>
-    </div>
-</div>
-
 <th:block th:fragment="sections(sections)">
     <section th:each="section : ${sections}" class="cl-settings-section"
              th:attr="aria-labelledby=${'settings-group-' + sectionStat.index}">

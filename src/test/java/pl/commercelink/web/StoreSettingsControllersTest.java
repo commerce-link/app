@@ -45,7 +45,7 @@ class StoreSettingsControllersTest {
     @InjectMocks
     private SuperAdminController superAdminController;
 
-    private final StoreSettingsOverview overview = new StoreSettingsOverview(List.of(), List.of());
+    private final StoreSettingsOverview overview = new StoreSettingsOverview(List.of());
 
     @AfterEach
     void clearSecurityContext() {
