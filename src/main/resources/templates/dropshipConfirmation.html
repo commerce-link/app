@@ -9,7 +9,7 @@
     <section class="section">
         <div class="container">
             <h1 class="title" th:text="#{orders.dropship.confirm.title}">Dropship order confirmation</h1>
-            <h2 class="subtitle" th:text="${form.provider}">Supplier</h2>
+            <h2 class="subtitle" th:text="${supplierLabels.of(form.provider)}">Supplier</h2>
 
 
             <div th:replace="~{fragments/consignee-address :: consigneeAddress(${consignee}, ${pickupShipment})}"></div>

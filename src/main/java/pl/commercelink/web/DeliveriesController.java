@@ -38,6 +38,7 @@ import pl.commercelink.web.dtos.RoutedOrderView;
 import pl.commercelink.web.dtos.RoutedSupplierView;
 import pl.commercelink.web.dtos.SuggestedDeliveryItem;
 import pl.commercelink.web.dtos.SupplierOrderChoicesParams;
+import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.SupplierDeliveryAddress;
 
@@ -137,6 +138,9 @@ public class DeliveriesController {
     @Autowired
     private DropshipTrackingService dropshipTrackingService;
 
+    @Autowired
+    private SupplierLabels supplierLabels;
+
     private static final int DELIVERY_PAGE_SIZE = 25;
 
     @GetMapping("/dashboard/deliveries")
@@ -180,6 +184,9 @@ public class DeliveriesController {
         model.addAttribute("searchParams", searchParams);
         model.addAttribute("isSuperAdmin", isSuperAdmin());
         model.addAttribute("isAdmin", isAdmin());
+
+        List<String> storeIds = paginatedDeliveries.stream().map(Delivery::getStoreId).distinct().toList();
+        model.addAttribute("supplierLabels", isSuperAdmin() ? supplierLabels.forStoreIds(storeIds) : supplierLabels.forStoreId(getStoreId()));
 
         return "deliveries";
     }
@@ -509,6 +516,7 @@ public class DeliveriesController {
         model.addAttribute("dropshipCandidates", planning.dropshipCandidates());
         model.addAttribute("storeId", storeId);
         model.addAttribute("isSuperAdmin", isSuperAdmin());
+        model.addAttribute("supplierLabels", supplierLabels.forStoreId(storeId));
 
         return "deliveriesPreview";
     }
@@ -554,6 +562,7 @@ public class DeliveriesController {
         model.addAttribute("delivery", delivery);
         model.addAttribute("isSuperAdmin", isSuperAdmin());
         model.addAttribute("purchaseAvailable", supplierPurchaseService.isOrderingAvailable(storeId, provider));
+        model.addAttribute("supplierLabels", supplierLabels.forStoreId(storeId));
 
         return "deliveryCreate";
     }
@@ -692,6 +701,7 @@ public class DeliveriesController {
         model.addAttribute("form", form);
         model.addAttribute("purchaseRef", UUID.randomUUID().toString());
         model.addAttribute("isSuperAdmin", isSuperAdmin());
+        model.addAttribute("supplierLabels", supplierLabels.forStoreId(storeId));
         addDeliveryAddresses(storeId, provider, form, model);
         if (!supplierPurchaseService.requiresApproval(storeId, provider)) {
             OrderOptionsModel.addOrderOptions(supplierPurchaseService, storeId, provider,
@@ -794,6 +804,7 @@ public class DeliveriesController {
             model.addAttribute("form", form);
             model.addAttribute("purchaseRef", purchaseRef);
             model.addAttribute("isSuperAdmin", isSuperAdmin());
+            model.addAttribute("supplierLabels", supplierLabels.forStoreId(storeId));
             model.addAttribute("errorMessage", messageSource.getMessage(result.getMessage(), null, locale));
             addDeliveryAddresses(storeId, provider, form, model);
             if (!supplierPurchaseService.requiresApproval(storeId, provider)) {
@@ -842,6 +853,7 @@ public class DeliveriesController {
         model.addAttribute("routedOrders", routedOrdersOf(storeId, delivery, dropshipOrder));
         OrderOptionsModel.addOrderOptions(supplierPurchaseService, storeId, delivery.getProvider(),
                 optionsContext, delivery.getSupplierOrderChoices(), model);
+        model.addAttribute("supplierLabels", supplierLabels.forStoreId(storeId));
         return "deliveryApproval";
     }
 
@@ -1161,6 +1173,7 @@ public class DeliveriesController {
         if (delivery.isOrderFailed() || delivery.isOrderDispatched()) {
             model.addAttribute("suggestedEstimatedDeliveryAt", supplierPurchaseService.suggestEstimatedDeliveryAt(delivery));
         }
+        model.addAttribute("supplierLabels", supplierLabels.forStoreId(storeId));
         return "deliveryDetails";
     }
 

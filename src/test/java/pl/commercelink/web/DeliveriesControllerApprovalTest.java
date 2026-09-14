@@ -1,5 +1,6 @@
 package pl.commercelink.web;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -27,6 +28,7 @@ import pl.commercelink.inventory.deliveries.DeliveryTaxResolver;
 import pl.commercelink.inventory.deliveries.DeliveryType;
 import pl.commercelink.inventory.deliveries.DropshipOrderLocator;
 import pl.commercelink.inventory.deliveries.SupplierPurchaseService;
+import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.SupplierDeliveryAddress;
 import pl.commercelink.inventory.supplier.api.SupplierInfo;
@@ -64,6 +66,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
@@ -124,8 +127,17 @@ class DeliveriesControllerApprovalTest {
     @Mock
     private SupplierRegistry supplierRegistry;
 
+    @Mock
+    private SupplierLabels supplierLabels;
+
     @InjectMocks
     private DeliveriesController deliveriesController;
+
+    @BeforeEach
+    void setUpSupplierLabels() {
+        lenient().when(supplierLabels.forStoreId(any()))
+                .thenReturn(new SupplierLabels(mock(StoresRepository.class)).forStore(null));
+    }
 
     @Test
     void approvingRedirectsBackToTheStoreScopedDeliveryDetails() {
