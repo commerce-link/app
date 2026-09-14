@@ -459,6 +459,28 @@ class StoreSupplierConnectionServiceTest {
     }
 
     @Test
+    void editingAManualConnectionThroughTheExternalEndpointIsRefused() {
+        // given
+        Store store = storeWith(true,
+                new StoreSupplierConnection("manual:Asus", ConnectionMode.MANUAL, true, true),
+                new StoreSupplierConnection("manual-k7f3a9c2", ConnectionMode.MANUAL, true, true));
+        registryHas("Stub");
+        SupplierSelectionForm toOwn = ownSelection("Stub", "Asus");
+        toOwn.setIdentity("manual:Asus");
+        SupplierSelectionForm toGlobal = new SupplierSelectionForm("Stub", ConnectionMode.GLOBAL, true, true);
+        toGlobal.setIdentity("manual-k7f3a9c2");
+
+        // when
+        StoreSupplierConnectionService.ConnectionUpdateResult ownResult = service.connectOrUpdate(store, toOwn, Map.of());
+        StoreSupplierConnectionService.ConnectionUpdateResult globalResult = service.connectOrUpdate(store, toGlobal, Map.of());
+
+        // then
+        assertThat(ownResult.errors().get(0).code()).isEqualTo("store.supplier.connection.error.manual.locked");
+        assertThat(globalResult.errors().get(0).code()).isEqualTo("store.supplier.connection.error.manual.locked");
+        verify(persister, never()).persist(any(), any(), anyMap());
+    }
+
+    @Test
     void editingAnUnknownIdentityIsRefused() {
         // given
         Store store = storeWith(true);

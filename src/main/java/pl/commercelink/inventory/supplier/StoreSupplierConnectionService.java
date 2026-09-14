@@ -122,10 +122,16 @@ public class StoreSupplierConnectionService {
     private Resolved resolveIdentity(Store existingStore, SupplierSelectionForm selection, ConnectionMode mode) {
         String identity = StringUtils.trimToNull(selection.getIdentity());
         if (identity != null) {
-            boolean known = existingConfiguration(existingStore).getSupplierConnections().stream()
-                    .anyMatch(connection -> connection.getSupplierName().equals(identity));
-            if (!known) {
+            StoreSupplierConnection existing = existingConfiguration(existingStore).getSupplierConnections().stream()
+                    .filter(connection -> connection.getSupplierName().equals(identity))
+                    .findFirst().orElse(null);
+            if (existing == null) {
                 return Resolved.fail("store.supplier.connection.error.not.found", identity);
+            }
+            // SupplierConnectionView.canSwitchMode() knows this rule only on the client side; the
+            // server must enforce it too, because the endpoint is reachable without the modal.
+            if (existing.getMode() == ConnectionMode.MANUAL) {
+                return Resolved.fail("store.supplier.connection.error.manual.locked");
             }
             if (mode == ConnectionMode.GLOBAL && SupplierIdentity.hasToken(identity)) {
                 return Resolved.fail("store.supplier.connection.error.mode.locked");
