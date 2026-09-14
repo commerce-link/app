@@ -135,6 +135,18 @@ class NotificationBellAdviceTest {
     }
 
     @Test
+    void hidesTheBellForAPostEvenWithAnHtmlAccept() {
+        // given
+        loggedInAs(Map.of("role", "ADMIN", "storeId", "store-1"));
+        MockHttpServletRequest post = new MockHttpServletRequest("POST", "/dashboard/notifications/mark-all-read");
+        post.addHeader(HttpHeaders.ACCEPT, BROWSER_ACCEPT);
+
+        // when / then
+        assertThat(advice.notificationBell(post)).isNull();
+        verifyNoInteractions(notificationService);
+    }
+
+    @Test
     void rendersThePageWithoutTheBellWhenTheCountFails() {
         // given
         loggedInAs(Map.of("role", "ADMIN", "storeId", "store-1"));

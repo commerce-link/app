@@ -109,10 +109,14 @@
         });
     }
 
+    let notificationsRequestId = 0;
+
     function loadNotifications(menu) {
         const loading = menu.querySelector('[data-notifications-loading]');
         const failure = menu.querySelector('[data-notifications-error]');
         const body = menu.querySelector('[data-notifications-body]');
+        // a request counter so a slow, superseded response cannot overwrite what a later open already rendered
+        const requestId = ++notificationsRequestId;
         loading.hidden = false;
         failure.hidden = true;
         body.replaceChildren();
@@ -124,10 +128,12 @@
                 return response.text();
             })
             .then(function (html) {
-                const container = document.createElement('div');
-                container.innerHTML = html;
+                if (requestId !== notificationsRequestId) {
+                    return;
+                }
+                const doc = new DOMParser().parseFromString(html, 'text/html');
                 // an expired session answers with the login page, which must not end up inside the panel
-                const panel = container.querySelector('[data-notifications-dropdown]');
+                const panel = doc.querySelector('[data-notifications-dropdown]');
                 if (!panel) {
                     throw new Error('Notifications dropdown answered with an unexpected page');
                 }
@@ -139,7 +145,11 @@
                 body.replaceChildren(panel);
             })
             .catch(function () {
+                if (requestId !== notificationsRequestId) {
+                    return;
+                }
                 loading.hidden = true;
+                body.replaceChildren();
                 failure.hidden = false;
             });
     }

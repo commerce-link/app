@@ -48,8 +48,12 @@ public class NotificationBellAdvice {
         return null;
     }
 
-    // model attributes are computed for every handler, JSON and fetch calls included, but only a page shows the bell
+    // model attributes are computed for every handler, JSON and fetch calls included, but only a page view (a
+    // browser navigation, never a form POST) shows the bell
     private static boolean rendersAPage(HttpServletRequest request) {
+        if (!"GET".equalsIgnoreCase(request.getMethod())) {
+            return false;
+        }
         String accept = request.getHeader(HttpHeaders.ACCEPT);
         return accept != null && accept.contains("text/html");
     }
