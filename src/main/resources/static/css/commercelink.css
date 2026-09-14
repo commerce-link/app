@@ -559,3 +559,96 @@ body.cl-drawer-open .cl-sidebar {
 .cl-toast.is-danger { background: #f14668; }
 .cl-toast.is-info { background: #3e8ed0; }
 .cl-toast.is-warning { background: #ffdd57; color: rgba(0, 0, 0, 0.7); }
+
+/* Print: the shell chrome (rail column, fixed sidebar, sticky topbar) has no place on paper. */
+@page {
+    margin: 15mm;
+}
+
+@media print {
+    .cl-skip,
+    .cl-sidebar,
+    .cl-topbar,
+    .cl-scrim,
+    .cl-toast,
+    .modal,
+    .notification {
+        display: none !important;
+    }
+
+    html,
+    body {
+        background: #fff;
+    }
+
+    .cl-shell,
+    html.cl-nav-collapsed .cl-shell {
+        display: block;
+        min-height: 0;
+    }
+
+    .cl-main {
+        display: block;
+    }
+
+    .cl-content .section {
+        padding: 0;
+    }
+
+    .cl-content .container.is-fluid {
+        padding: 0;
+        max-width: none;
+    }
+
+    .box {
+        box-shadow: none;
+        border: 0;
+        padding: 0;
+    }
+
+    body {
+        font-size: 12px;
+    }
+
+    .title {
+        font-size: 1.5rem;
+        margin-bottom: 0.75rem;
+    }
+
+    .field:not(:last-child) {
+        margin-bottom: 5px;
+    }
+
+    .label,
+    .input,
+    .table {
+        font-size: 10px;
+    }
+
+    .table td,
+    .table th {
+        padding: 0.25em 0.5em;
+    }
+
+    a,
+    a:visited {
+        color: inherit;
+        text-decoration: none;
+    }
+
+    .table,
+    .textarea,
+    .input {
+        color: #000;
+    }
+
+    .table thead th {
+        color: #000;
+        border-bottom: 1px solid #000;
+    }
+
+    tr,
+    img {
+        page-break-inside: avoid;
+    }
+}
