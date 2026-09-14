@@ -332,6 +332,12 @@
 
     <script>
         const fmt = n => n.toLocaleString('pl-PL', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        /* Connection labels and product names are operator-supplied free text that reaches this
+           screen through innerHTML string builds below, so every one of them is escaped here at
+           the sink -- SupplierLabelTemplatesTest fails the build if one is concatenated raw. */
+        const esc = s => String(s == null ? '' : s)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
         const cards = () => Array.from(document.querySelectorAll('.group-card'));
         /* Identity (posted/compared) -> display label, derived once per call from the rendered cards. */
         function providerLabels() {
@@ -361,7 +367,7 @@
 
         function supplierCountLabel(n) { return n + ' ' + (n === 1 ? MSG.supplierOne : MSG.supplierMany); }
         function variantChip(p) {
-            const label = providerLabels()[p] || p;
+            const label = esc(providerLabels()[p] || p);
             return '<span class="provider-chip" style="--accent:' + provColor(p) + ';">' + label + '</span>';
         }
 
@@ -471,7 +477,7 @@
                 chip.className = 'prov-chip-btn' + (activeProviders.has(p) ? ' active' : (activeProviders.size ? ' inactive' : ''));
                 chip.style.setProperty('--accent', provColor(p));
                 chip.onclick = () => focusProvider(p);
-                chip.innerHTML = '<i class="fas fa-truck"></i>' + labels[p] + '<span class="cnt">' + counts[p] + '</span>';
+                chip.innerHTML = '<i class="fas fa-truck"></i>' + esc(labels[p]) + '<span class="cnt">' + counts[p] + '</span>';
                 bar.appendChild(chip);
             });
         }
@@ -528,7 +534,7 @@
                 if (coveredAway.length) {
                     const by = {};
                     coveredAway.forEach(x => { by[x.by] = (by[x.by] || 0) + x.qty; });
-                    const txt = Object.keys(by).map(p => p + ' (' + by[p] + ' ' + MSG.unit + ')').join(', ');
+                    const txt = Object.keys(by).map(p => esc(p) + ' (' + by[p] + ' ' + MSG.unit + ')').join(', ');
                     const note = document.createElement('div');
                     note.className = 'covered-note';
                     note.innerHTML = '<span class="icon is-small"><i class="fas fa-arrow-right"></i></span> ' +
@@ -620,11 +626,12 @@
                 c.classList.toggle('is-mini', redundant);
                 if (redundant) {
                     const winnerProv = coveredAway.length ? coveredAway[0].by : '';
+                    const coveredByText = winnerProv ? MSG.coveredBy + ' ' + esc(winnerProv) : '';
                     mini.innerHTML =
-                        '<span class="mini-title">' + c.dataset.name + '</span>' +
-                        '<span class="provider-chip" style="--accent:' + provColor(c.dataset.provider) + ';"><i class="fas fa-truck"></i>' + c.dataset.providerLabel + '</span>' +
+                        '<span class="mini-title">' + esc(c.dataset.name) + '</span>' +
+                        '<span class="provider-chip" style="--accent:' + provColor(c.dataset.provider) + ';"><i class="fas fa-truck"></i>' + esc(c.dataset.providerLabel) + '</span>' +
                         '<span class="tag is-light">' + MSG.margin + ' ' + (allMarginPct >= 0 ? '+' : '−') + Math.abs(allMarginPct * 100).toFixed(0) + '%</span>' +
-                        '<span class="mini-state">' + (winnerProv ? MSG.coveredBy + ' ' + winnerProv : '') + '</span>';
+                        '<span class="mini-state">' + coveredByText + '</span>';
                 }
             });
 
@@ -681,7 +688,7 @@
             Object.keys(byProv).sort().forEach(p => {
                 const el = document.createElement('span');
                 el.className = 'prov-pill'; el.style.setProperty('--accent', provColor(p));
-                el.innerHTML = '<strong>' + (labels[p] || p) + '</strong> ' + fmt(byProv[p]); bd.appendChild(el);
+                el.innerHTML = '<strong>' + esc(labels[p] || p) + '</strong> ' + fmt(byProv[p]); bd.appendChild(el);
             });
             if (!Object.keys(byProv).length) bd.innerHTML = '<span class="has-text-grey is-size-7">' + MSG.nothingSelected + '</span>';
         }
