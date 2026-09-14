@@ -572,7 +572,7 @@ body.cl-drawer-open .cl-sidebar {
 }
 
 .cl-page {
-    padding: 24px 0 40px;
+    padding: 0 0 40px;
 }
 
 .cl-page-body {
@@ -830,7 +830,7 @@ body.cl-drawer-open .cl-sidebar {
     gap: 6px;
     max-width: 100%;
     padding: 2px 9px;
-    border-radius: 999px;
+    border-radius: 12px;
     font-size: 12px;
     font-weight: 600;
     line-height: 1.5;
@@ -859,18 +859,6 @@ body.cl-drawer-open .cl-sidebar {
 .cl-status.is-warn {
     color: var(--cl-warn);
     background: var(--cl-warn-soft);
-}
-
-@media screen and (min-width: 720px) {
-    .cl-page {
-        padding-inline: 24px;
-    }
-}
-
-@media screen and (min-width: 1216px) {
-    .cl-page {
-        padding-inline: 32px;
-    }
 }
 
 @media screen and (max-width: 1023px) {
@@ -923,6 +911,10 @@ body.cl-drawer-open .cl-sidebar {
 
     .cl-content .cl-page {
         padding: 0;
+    }
+
+    .cl-page .cl-back, .cl-page .cl-page-actions, .cl-page .cl-tile-chevron {
+        display: none !important;
     }
 
     .cl-content .container.is-fluid {

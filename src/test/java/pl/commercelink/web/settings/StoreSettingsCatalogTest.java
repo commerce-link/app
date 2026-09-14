@@ -2,6 +2,7 @@ package pl.commercelink.web.settings;
 
 import org.junit.jupiter.api.Test;
 import pl.commercelink.starter.security.UserRole;
+import pl.commercelink.web.nav.StorePath;
 
 import java.util.List;
 import java.util.Locale;
@@ -61,6 +62,15 @@ class StoreSettingsCatalogTest {
         // when / then
         assertThat(StoreSettingsCatalog.homeHref(UserRole.ADMIN, "store-1")).isEqualTo("/dashboard/store");
         assertThat(StoreSettingsCatalog.homeHref(UserRole.SUPER_ADMIN, "store-1")).isEqualTo("/dashboard/store/store-1");
+    }
+
+    @Test
+    void everyTilePathIsReservedInStorePathSoItIsNeverMistakenForAStoreId() {
+        // when / then: a tile whose first path segment is not reserved would be read as a store id
+        // by StorePath.storeIdIn, and the super admin's settings page for it would lose its header
+        allTiles().forEach(tile -> assertThat(StorePath.storeIdIn(StoreSettingsCatalog.HOME_PATH + tile.relativePath()))
+                .as(tile.key())
+                .isNull());
     }
 
     @Test
