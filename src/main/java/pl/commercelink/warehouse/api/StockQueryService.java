@@ -14,4 +14,8 @@ public interface StockQueryService {
     WarehouseItemView findBySerialNo(String storeId, String serialNo);
 
     WarehouseItemView findById(String storeId, String itemId);
+
+    List<WarehouseItemView> searchAllAvailableByMfns(String storeId, Collection<String> mfns);
+
+    StockSummary summarizeAvailable(String storeId);
 }
