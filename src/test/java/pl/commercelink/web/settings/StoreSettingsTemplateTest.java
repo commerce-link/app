@@ -131,4 +131,14 @@ class StoreSettingsTemplateTest {
                 .doesNotContain("store.notification.severity");
         assertThat(template).contains("fragments/screen-intro :: panel('store', 'fas fa-cog')");
     }
+
+    @Test
+    void keepsTheTileColumnNoWiderThanAPhonesContentBoxSoTilesDoNotOverflowOnNarrowScreens() throws Exception {
+        // when
+        String css = Files.readString(Path.of("src/main/resources/static/css/commercelink.css"), StandardCharsets.UTF_8);
+
+        // then
+        assertThat(css).contains("minmax(min(17.5rem, 100%), 1fr)");
+        assertThat(css).doesNotContain("minmax(17.5rem, 1fr)");
+    }
 }
