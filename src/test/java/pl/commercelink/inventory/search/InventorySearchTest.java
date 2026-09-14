@@ -14,6 +14,8 @@ import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
+import pl.commercelink.inventory.supplier.api.ShippingTerms;
+import pl.commercelink.inventory.supplier.api.SupplierInfo;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.pim.api.PimCatalog;
@@ -77,6 +79,9 @@ class InventorySearchTest {
 
     @BeforeEach
     void setUp() {
+        SupplierInfo supplierInfo = mock(SupplierInfo.class);
+        when(supplierInfo.shippingTermsFor("PL")).thenReturn(new ShippingTerms(2, null));
+        when(supplierRegistry.get(anyString())).thenReturn(supplierInfo);
         store = mock(Store.class);
         StoreSupplierConnection elko = mock(StoreSupplierConnection.class);
         when(elko.getSupplierName()).thenReturn("Elko");
@@ -227,6 +232,10 @@ class InventorySearchTest {
         assertThat(found.supplierOffers()).extracting(OfferRow::cheapest).containsExactly(true, false, false);
         assertThat(found.supplierOffers()).extracting(OfferRow::percentAboveCheapest).containsExactly(null, 10.0, null);
         assertThat(found.prices().lowestGross()).isEqualTo(Price.fromNet(100.0).grossValue());
+        assertThat(found.prices().lowestNet()).isEqualTo(100.0);
+        assertThat(found.supplierOffers().get(0).netPrice()).isEqualTo(100.0);
+        assertThat(found.supplierOffers().get(0).deliveryDays()).isEqualTo(3);
+        assertThat(found.warehouseRows().get(0).netUnitCost()).isEqualTo(50.0);
         assertThat(found.prices().lowestSupplierLabel()).isEqualTo("Elko");
         assertThat(found.prices().suppliersWithStock()).isEqualTo(2);
         assertThat(found.prices().supplierCount()).isEqualTo(3);

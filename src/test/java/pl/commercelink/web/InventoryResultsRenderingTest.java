@@ -39,12 +39,12 @@ class InventoryResultsRenderingTest {
 
     private InventorySearchResult.Found found(boolean warehouseChecked) {
         return new InventorySearchResult.Found(MatchedBy.EAN, PRODUCT,
-                List.of(new OfferRow("Elko", "Elko", ConnectionMode.GLOBAL, "5901234123457", "910-006559", 389.0, 58, true, null),
-                        new OfferRow("AB", "AB", ConnectionMode.GLOBAL, "5901234123457", "910-006559", 405.0, 80, false, 4.1),
-                        new OfferRow("manual-nowak", "Hurtownia Nowak", ConnectionMode.MANUAL, "5901234123457", "910-006559", 439.9, 0, false, 13.1)),
-                List.of(new WarehouseRow("5901234123457", "910-006559", 355.2, 3, false, ItemCondition.Sealed),
-                        new WarehouseRow("5901234123457", "910-006559", 349.0, 2, true, ItemCondition.Damaged)),
-                new PriceSummary(389.0, "Elko", 412.5, 3, 138, 2, 3, 3, 2),
+                List.of(new OfferRow("Elko", "Elko", ConnectionMode.GLOBAL, "5901234123457", "910-006559", 316.26, 389.0, 58, 3, true, null),
+                        new OfferRow("AB", "AB", ConnectionMode.GLOBAL, "5901234123457", "910-006559", 329.27, 405.0, 80, 1, false, 4.1),
+                        new OfferRow("manual-nowak", "Hurtownia Nowak", ConnectionMode.MANUAL, "5901234123457", "910-006559", 357.64, 439.9, 0, 0, false, 13.1)),
+                List.of(new WarehouseRow("5901234123457", "910-006559", 288.78, 355.2, 3, false, ItemCondition.Sealed),
+                        new WarehouseRow("5901234123457", "910-006559", 283.74, 349.0, 2, true, ItemCondition.Damaged)),
+                new PriceSummary(316.26, 389.0, "Elko", 329.27, 405.0, 3, 138, 2, 3, 3, 2),
                 warehouseChecked);
     }
 
@@ -57,12 +57,17 @@ class InventoryResultsRenderingTest {
         assertThat(html).doesNotContain("??");
         assertThat(html).contains("data-inventory-fragment=\"results\"").contains("data-announce=\"Offers found: 3\"");
         assertThat(html).contains("Logitech MX Master 3S").contains("Matched by: EAN");
-        assertThat(html).contains("389,00 PLN").contains("412,50 PLN").contains("at 2 of 3").contains("+2 in transit");
-        assertThat(html.indexOf("Your warehouse")).isLessThan(html.indexOf("Suppliers · cheapest first"));
+        assertThat(html).contains("316,26 PLN").contains("389,00 PLN gross").contains("329,27 PLN").contains("405,00 PLN gross")
+                .contains("at 2 of 3").contains("+2 in transit");
+        assertThat(html.indexOf("Your warehouse")).isLessThan(html.indexOf(">Suppliers<"));
+        assertThat(html).doesNotContain("cheapest first");
         assertThat(html).contains("purchase cost").contains("in transit").contains("Damaged");
         assertThat(html.split("is-cheapest", -1)).hasSize(2);
         assertThat(html).contains("+4,1%").contains("+13,1%");
-        assertThat(html).contains("data-sort-price=\"405.0\"").contains("data-inventory-sortable");
+        assertThat(html).contains("data-sort-price=\"329.27\"").contains("data-sort-delivery=\"3\"").contains("data-inventory-sortable");
+        assertThat(html).contains("Net price").contains("Delivery").contains("3 days").contains("1 day")
+                .contains("58 pcs").contains("cl-status is-neutral\">none<");
+        assertThat(html).doesNotContain("fa-sort").contains("<colgroup>");
         assertThat(html).contains("global").contains("manual");
     }
 
