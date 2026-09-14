@@ -692,9 +692,21 @@
 }
 
 .cl-inv-figure {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: 8px;
     min-width: 0;
-    padding: 12px 16px;
+    padding: 8px 16px;
     border-left: 1px solid var(--cl-line);
+}
+
+.cl-inv-figure dt {
+    flex-basis: 100%;
+}
+
+.cl-inv-figure dd {
+    margin: 0;
 }
 
 .cl-inv-figure:first-child {
@@ -702,7 +714,8 @@
 }
 
 .cl-inv-figure-value {
-    font-size: 20px;
+    font-size: 18px;
+    line-height: 1.3;
     font-weight: 650;
     font-variant-numeric: tabular-nums;
     color: var(--cl-ink);
@@ -758,16 +771,6 @@
 
 .cl-inv-page .cl-inv-table .is-numeric {
     text-align: right;
-}
-
-.cl-inv-page .cl-inv-table .cl-inv-group th {
-    padding: 6px 16px;
-    background: var(--cl-surface-2);
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: .08em;
-    text-transform: uppercase;
-    color: var(--cl-ink-3);
 }
 
 .cl-inv-page .cl-inv-table td .cl-status,
@@ -848,20 +851,12 @@
     width: 180px;
 }
 
-.cl-inv-col-delivery {
-    width: 120px;
-}
-
 .cl-inv-col-price {
     width: 140px;
 }
 
 .cl-inv-col-qty {
     width: 90px;
-}
-
-.cl-inv-page .cl-inv-offers tbody.is-after-warehouse tr:first-child td {
-    border-top: 2px solid var(--cl-line);
 }
 
 .cl-inv-page .cl-inv-table .cl-inv-code {
@@ -966,10 +961,6 @@
         width: 130px;
     }
 
-    .cl-inv-col-delivery {
-        width: 90px;
-    }
-
     .cl-inv-col-price {
         width: 115px;
     }
@@ -1022,11 +1013,11 @@
     }
 
     .cl-inv-figure-value {
-        font-size: 17px;
+        font-size: 16px;
     }
 }
 
-/* six columns stop being readable as a table on narrow tablets, so offers switch to cards below 900px */
+/* the offers table stops being readable on narrow tablets, so offers switch to cards below 900px */
 @media screen and (max-width: 899px) {
     .cl-inv-page .cl-inv-offers thead {
         position: absolute;
@@ -1068,23 +1059,18 @@
         grid-column: 1 / -1;
     }
 
-    .cl-inv-page .cl-inv-offers tr.cl-inv-offer td:nth-child(5) {
+    .cl-inv-page .cl-inv-offers tr.cl-inv-offer td:nth-child(4) {
         grid-column: 2;
-        grid-row: 2 / span 4;
+        grid-row: 2 / span 3;
         text-align: right;
     }
 
     .cl-inv-page .cl-inv-offers tr.cl-inv-offer td:nth-child(2)::before,
     .cl-inv-page .cl-inv-offers tr.cl-inv-offer td:nth-child(3)::before,
-    .cl-inv-page .cl-inv-offers tr.cl-inv-offer td:nth-child(4)::before,
-    .cl-inv-page .cl-inv-offers tr.cl-inv-offer td:nth-child(6)::before {
+    .cl-inv-page .cl-inv-offers tr.cl-inv-offer td:nth-child(5)::before {
         content: attr(data-label) ": ";
         color: var(--cl-ink-3);
         font-size: 12px;
-    }
-
-    .cl-inv-page .cl-inv-offers .cl-inv-group th {
-        display: block;
     }
 }
 

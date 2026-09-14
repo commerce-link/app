@@ -39,17 +39,17 @@ class InventoryResultsRenderingTest {
 
     private InventorySearchResult.Found found(boolean warehouseChecked) {
         return new InventorySearchResult.Found(MatchedBy.EAN, PRODUCT,
-                List.of(new OfferRow("Elko", "Elko", ConnectionMode.GLOBAL, "5901234123457", "910-006559", 389.0, 58, 3, true),
-                        new OfferRow("AB", "AB", ConnectionMode.GLOBAL, "5901234123457", "910-006559", 405.0, 80, 1, false),
-                        new OfferRow("manual-nowak", "Hurtownia Nowak", ConnectionMode.MANUAL, "5901234123457", "910-006559", 439.9, 0, 0, false)),
+                List.of(new OfferRow("Elko", "Elko", ConnectionMode.GLOBAL, "5901234123457", "910-006559", 389.0, 58, true),
+                        new OfferRow("AB", "AB", ConnectionMode.GLOBAL, "5901234123457", "910-006559", 405.0, 80, false),
+                        new OfferRow("manual-nowak", "Hurtownia Nowak", ConnectionMode.MANUAL, "5901234123457", "910-006559", 439.9, 0, false)),
                 List.of(new WarehouseRow("5901234123457", "910-006559", 355.2, 3, false, ItemCondition.Sealed),
                         new WarehouseRow("5901234123457", "910-006559", 349.0, 2, true, ItemCondition.Damaged)),
-                new PriceSummary(389.0, "Elko", 405.0, 3, 138, 2, 3, 3, 2),
+                new PriceSummary(389.0, 405.0, 3, 138, 3, 2),
                 warehouseChecked);
     }
 
     @Test
-    void rendersTheFoundProductWithWarehouseGroupFirstAndOneCheapestSupplier() {
+    void rendersWarehouseAndSuppliersAsRowsOfOneSourceList() {
         // when
         String html = engine.process(RESULTS, context(found(), true));
 
@@ -57,17 +57,30 @@ class InventoryResultsRenderingTest {
         assertThat(html).doesNotContain("??");
         assertThat(html).contains("data-inventory-fragment=\"results\"").contains("data-announce=\"Offers found: 3\"");
         assertThat(html).contains("Logitech MX Master 3S").contains("Matched by: EAN");
-        assertThat(html).contains("389,00 PLN").contains("405,00 PLN").contains("355,20 PLN")
-                .contains("at 2 of 3").contains("+2 in transit");
-        assertThat(html.indexOf("Your warehouse")).isLessThan(html.indexOf("data-inventory-sortable"));
-        assertThat(html).doesNotContain(">Suppliers<").doesNotContain("PLN gross").doesNotContain("%");
+        assertThat(html).contains("389,00 PLN").contains("405,00 PLN").contains("355,20 PLN").contains("+2 in transit");
+        assertThat(html.split("data-inventory-sortable", -1)).hasSize(2);
+        assertThat(html.split("<tbody", -1)).hasSize(2);
+        assertThat(html.indexOf("is-warehouse")).isLessThan(html.indexOf("data-sort-source=\"Elko\""));
+        assertThat(html).contains("data-sort-source=\"Warehouse\"").contains("data-sort-price=\"355.2\"").contains("data-sort-qty=\"3\"");
+        assertThat(html).doesNotContain("Your warehouse").doesNotContain(">Suppliers<").doesNotContain("PLN gross").doesNotContain("%");
+        assertThat(html).doesNotContain("Delivery").doesNotContain("data-sort-delivery").doesNotContain("Cheapest")
+                .doesNotContain("at 2 of 3").doesNotContain("in stock");
         assertThat(html).contains("purchase cost").contains("in transit").contains("Damaged");
         assertThat(html.split("is-cheapest", -1)).hasSize(2);
-        assertThat(html).contains("data-sort-price=\"405.0\"").contains("data-sort-delivery=\"3\"").contains("data-inventory-sortable");
-        assertThat(html).contains("Gross price").contains("Manufacturer code").contains(">EAN<").contains("Delivery").contains("3 days").contains("1 day")
+        assertThat(html).contains("Gross price").contains("Manufacturer code").contains(">EAN<")
                 .contains("58 pcs").contains("cl-status is-neutral\">none<");
-        assertThat(html).doesNotContain("fa-sort").contains("<colgroup>");
+        assertThat(html).doesNotContain("fa-sort").contains("<colgroup>").doesNotContain("cl-inv-col-delivery");
         assertThat(html).contains("global").contains("manual");
+    }
+
+    @Test
+    void lowestPriceFigureOmitsTheSupplierName() {
+        // when
+        String html = engine.process(RESULTS, context(found(), true));
+
+        // then
+        String lowestFigure = html.substring(html.indexOf("Lowest price"), html.indexOf("Median"));
+        assertThat(lowestFigure).contains("389,00 PLN").doesNotContain("Elko");
     }
 
     @Test

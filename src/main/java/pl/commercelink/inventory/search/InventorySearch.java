@@ -6,7 +6,6 @@ import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
-import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
 import pl.commercelink.inventory.supplier.manual.ManualSupplierInfos;
 import pl.commercelink.invoicing.api.Price;
@@ -42,7 +41,6 @@ public class InventorySearch {
     private final PimCatalog pimCatalog;
     private final TaxonomyCache taxonomyCache;
     private final Warehouse warehouse;
-    private final SupplierRegistry supplierRegistry;
 
     public InventorySearchResult search(String storeId, String query) {
         Store store = storesRepository.findById(storeId);
@@ -122,14 +120,8 @@ public class InventorySearch {
                         item.mfn(),
                         Price.fromNet(item.netPrice()).grossValue(),
                         item.qty(),
-                        deliveryDays(item),
                         item.netPrice() > 0 && item.netPrice() == lowestNet))
                 .toList();
-    }
-
-    // same estimate the order flow uses: the supplier's own lead time plus its shipping time to Poland
-    private int deliveryDays(InventoryItem item) {
-        return item.leadTimeDays() + supplierRegistry.get(item.supplier()).shippingTermsFor("PL").arrivalDays();
     }
 
     private static List<WarehouseRow> warehouseRows(List<WarehouseItemView> items) {
@@ -145,12 +137,9 @@ public class InventorySearch {
         int inDelivery = rows.stream().filter(WarehouseRow::inDelivery).mapToInt(WarehouseRow::qty).sum();
         return new PriceSummary(
                 offers.stream().filter(OfferRow::cheapest).mapToDouble(OfferRow::grossPrice).findFirst().orElse(0),
-                offers.stream().filter(OfferRow::cheapest).map(OfferRow::supplierLabel).findFirst().orElse(null),
                 medianGross(offers),
                 offers.size(),
                 offers.stream().mapToLong(OfferRow::qty).sum(),
-                (int) offers.stream().filter(OfferRow::hasStock).map(OfferRow::supplier).distinct().count(),
-                (int) offers.stream().map(OfferRow::supplier).distinct().count(),
                 inStock,
                 inDelivery);
     }

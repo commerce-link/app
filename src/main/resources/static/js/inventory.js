@@ -254,6 +254,8 @@
             return ascending ? order : -order;
         });
         rows.forEach(row => body.appendChild(row));
+        // the "no supplier offers" note has no sort key and always closes the list
+        body.querySelectorAll('tr:not([' + attribute + '])').forEach(row => body.appendChild(row));
     }
 
     form.addEventListener('submit', event => {
