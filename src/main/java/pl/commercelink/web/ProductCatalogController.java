@@ -10,8 +10,6 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
-import pl.commercelink.scheduling.InvalidScheduleException;
-import pl.commercelink.scheduling.PollingSchedule;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
 import pl.commercelink.starter.util.PaginationUtil;
@@ -20,7 +18,6 @@ import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
-import pl.commercelink.pricelist.PricelistEventScheduler;
 import pl.commercelink.products.*;
 import pl.commercelink.products.brand.BrandMapper;
 import pl.commercelink.products.filters.InventoryFilterType;
@@ -63,16 +60,13 @@ public class ProductCatalogController {
     private StoresRepository storesRepository;
 
     @Autowired
-    private PricelistEventScheduler pricelistEventScheduler;
+    private ProductCatalogDetailsService productCatalogDetailsService;
 
     @Autowired
     private BrandMapper brandMapper;
 
     @Value("${application.env}")
     private String env;
-
-    @Value("${scheduling.min-interval-minutes}")
-    private int scheduleMinIntervalMinutes;
 
     @Autowired
     private MessageSource messageSource;
@@ -100,54 +94,34 @@ public class ProductCatalogController {
 
     private String showEditProductCatalog(Model model, ProductCatalog productCatalog) {
         model.addAttribute("productCatalog", productCatalog);
-        model.addAttribute("scheduleMinIntervalMinutes", scheduleMinIntervalMinutes);
+        model.addAttribute("scheduleMinIntervalMinutes", productCatalogDetailsService.minIntervalMinutes());
         return "catalogDetails";
     }
 
     @PostMapping("/dashboard/catalogs/{catalogId}/delete")
-    public String deleteCatalog(@PathVariable String catalogId) {
-        ProductCatalog productCatalog = productCatalogRepository.findById(getStoreId(), catalogId);
-        pricelistEventScheduler.deleteSchedule(productCatalog.getStoreId(), catalogId);
-
-        List<Product> products = productRepository.findAll(productCatalog);
-        productRepository.delete(products);
-        productCatalogRepository.delete(productCatalog);
+    public String deleteCatalog(@PathVariable String catalogId, RedirectAttributes redirectAttributes) {
+        ProductCatalogDetailsService.UpdateResult result = productCatalogDetailsService.delete(getStoreId(), catalogId);
+        if (result.hasErrors()) {
+            redirectAttributes.addFlashAttribute("errorMessage", join(result));
+            return "redirect:/dashboard/catalogs/" + catalogId;
+        }
         return "redirect:/dashboard/catalogs";
     }
 
     @PostMapping("/dashboard/catalogs/{catalogId}")
     public String saveCatalogDetails(@PathVariable String catalogId, @ModelAttribute ProductCatalog productCatalog,
                                      RedirectAttributes redirectAttributes) {
-        String schedule = PollingSchedule.normalizeOrNull(productCatalog.getPricelistSchedule());
-        if (schedule != null) {
-            try {
-                PollingSchedule.parse(schedule, scheduleMinIntervalMinutes);
-            } catch (InvalidScheduleException e) {
-                String code = e.getReason() == InvalidScheduleException.Reason.TOO_FREQUENT
-                        ? "catalog.pricelist.schedule.error.too.frequent"
-                        : "catalog.pricelist.schedule.error.invalid";
-                redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage(code,
-                        new Object[]{schedule, scheduleMinIntervalMinutes}, LocaleContextHolder.getLocale()));
-                return "redirect:/dashboard/catalogs/" + catalogId;
-            }
+        ProductCatalogDetailsService.UpdateResult result = productCatalogDetailsService.save(getStoreId(), catalogId, productCatalog);
+        if (result.hasErrors()) {
+            redirectAttributes.addFlashAttribute("errorMessage", join(result));
         }
-
-        ProductCatalog catalog = productCatalogRepository.findById(getStoreId(), catalogId);
-        if (catalog == null) {
-            pricelistEventScheduler.schedule(getStoreId(), catalogId, schedule);
-
-            catalog = productCatalog;
-        } else if (!Objects.equals(schedule, catalog.getPricelistSchedule())) {
-            pricelistEventScheduler.schedule(getStoreId(), catalogId, schedule);
-        }
-
-        catalog.setName(productCatalog.getName());
-        catalog.setDeletionProtection(productCatalog.isDeletionProtection());
-        catalog.setPricelistSchedule(schedule);
-
-        productCatalogRepository.save(catalog);
-
         return "redirect:/dashboard/catalogs/" + catalogId;
+    }
+
+    private String join(ProductCatalogDetailsService.UpdateResult result) {
+        return result.errors().stream()
+                .map(error -> messageSource.getMessage(error.code(), error.args(), LocaleContextHolder.getLocale()))
+                .collect(Collectors.joining(" "));
     }
 
     @GetMapping("/dashboard/catalogs/{catalogId}/category/new")

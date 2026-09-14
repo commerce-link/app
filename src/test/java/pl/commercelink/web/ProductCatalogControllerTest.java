@@ -15,7 +15,6 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.ui.ExtendedModelMap;
-import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.InventoryView;
@@ -27,8 +26,9 @@ import pl.commercelink.products.CategoryDefinitionType;
 import pl.commercelink.products.PimCategoryOptions;
 import pl.commercelink.products.PriceDefinition;
 import pl.commercelink.products.Product;
-import pl.commercelink.pricelist.PricelistEventScheduler;
+import pl.commercelink.inventory.supplier.ErrorMessage;
 import pl.commercelink.products.ProductCatalog;
+import pl.commercelink.products.ProductCatalogDetailsService;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.products.StockDefinition;
@@ -87,7 +87,7 @@ class ProductCatalogControllerTest {
     private StoresRepository storesRepository;
 
     @Mock
-    private PricelistEventScheduler pricelistEventScheduler;
+    private ProductCatalogDetailsService productCatalogDetailsService;
 
     @InjectMocks
     private ProductCatalogController controller;
@@ -95,7 +95,6 @@ class ProductCatalogControllerTest {
     @BeforeEach
     void setUp() {
         authenticateAsStoreAdmin();
-        ReflectionTestUtils.setField(controller, "scheduleMinIntervalMinutes", 5);
         when(productCatalogRepository.findById(STORE_ID, CATALOG_ID)).thenReturn(catalog);
         when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(inventoryView);
         when(messageSource.getMessage(any(String.class), any(), any(Locale.class))).thenReturn("brak produktow");
@@ -360,101 +359,65 @@ class ProductCatalogControllerTest {
     }
 
     @Test
-    void creatingCatalogSchedulesPricelistWithTheSubmittedCron() {
+    void savingCatalogDetailsDelegatesToTheServiceAndRedirectsToTheCatalog() {
         // given
-        when(productCatalogRepository.findById(STORE_ID, "new-cat")).thenReturn(null);
-        ProductCatalog submitted = submittedCatalog("  0/30  9-17 * * ? * ");
-
-        // when
-        String view = controller.saveCatalogDetails("new-cat", submitted, new RedirectAttributesModelMap());
-
-        // then
-        assertThat(view).isEqualTo("redirect:/dashboard/catalogs/new-cat");
-        verify(pricelistEventScheduler).schedule(STORE_ID, "new-cat", "0/30 9-17 * * ? *");
-        assertThat(submitted.getPricelistSchedule()).isEqualTo("0/30 9-17 * * ? *");
-        verify(productCatalogRepository).save(submitted);
-    }
-
-    @Test
-    void changingTheCronOnAnExistingCatalogUpdatesTheSchedule() {
-        // given
-        ProductCatalog existing = submittedCatalog("0 5 * * ? *");
-        when(productCatalogRepository.findById(STORE_ID, CATALOG_ID)).thenReturn(existing);
-
-        // when
-        controller.saveCatalogDetails(CATALOG_ID, submittedCatalog("0 6,14 * * ? *"), new RedirectAttributesModelMap());
-
-        // then
-        verify(pricelistEventScheduler).schedule(STORE_ID, CATALOG_ID, "0 6,14 * * ? *");
-        assertThat(existing.getPricelistSchedule()).isEqualTo("0 6,14 * * ? *");
-        verify(productCatalogRepository).save(existing);
-    }
-
-    @Test
-    void savingAnExistingCatalogWithTheSameCronLeavesTheScheduleAlone() {
-        // given
-        ProductCatalog existing = submittedCatalog("0 5 * * ? *");
-        when(productCatalogRepository.findById(STORE_ID, CATALOG_ID)).thenReturn(existing);
-
-        // when
-        controller.saveCatalogDetails(CATALOG_ID, submittedCatalog(" 0 5 * * ? * "), new RedirectAttributesModelMap());
-
-        // then
-        verify(pricelistEventScheduler, never()).schedule(any(), any(), any());
-        verify(productCatalogRepository).save(existing);
-    }
-
-    @Test
-    void clearingTheCronRestoresTheDefaultSchedule() {
-        // given
-        ProductCatalog existing = submittedCatalog("0 5 * * ? *");
-        when(productCatalogRepository.findById(STORE_ID, CATALOG_ID)).thenReturn(existing);
-
-        // when
-        controller.saveCatalogDetails(CATALOG_ID, submittedCatalog(""), new RedirectAttributesModelMap());
-
-        // then
-        verify(pricelistEventScheduler).schedule(STORE_ID, CATALOG_ID, null);
-        assertThat(existing.getPricelistSchedule()).isNull();
-    }
-
-    @Test
-    void rejectsInvalidCronWithoutSavingOrScheduling() {
-        // given
+        ProductCatalog submitted = submittedCatalog("0 5 * * ? *");
+        when(productCatalogDetailsService.save(STORE_ID, CATALOG_ID, submitted))
+                .thenReturn(new ProductCatalogDetailsService.UpdateResult(List.of()));
         RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
         // when
-        String view = controller.saveCatalogDetails(CATALOG_ID, submittedCatalog("every 5 minutes"), redirect);
+        String view = controller.saveCatalogDetails(CATALOG_ID, submitted, redirect);
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/catalogs/" + CATALOG_ID);
+        assertThat(redirect.getFlashAttributes()).doesNotContainKey("errorMessage");
+    }
+
+    @Test
+    void aRejectedSaveFlashesTheResolvedErrorAndStaysOnTheCatalog() {
+        // given
+        ProductCatalog submitted = submittedCatalog("0/2 * * * ? *");
+        when(productCatalogDetailsService.save(STORE_ID, CATALOG_ID, submitted))
+                .thenReturn(new ProductCatalogDetailsService.UpdateResult(List.of(
+                        ErrorMessage.of("catalog.pricelist.schedule.error.too.frequent", "0/2 * * * ? *", 5))));
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        String view = controller.saveCatalogDetails(CATALOG_ID, submitted, redirect);
 
         // then
         assertThat(view).isEqualTo("redirect:/dashboard/catalogs/" + CATALOG_ID);
         assertThat(redirect.getFlashAttributes()).containsKey("errorMessage");
-        verify(messageSource).getMessage(eq("catalog.pricelist.schedule.error.invalid"), any(), any(Locale.class));
-        verify(productCatalogRepository, never()).save(any());
-        verify(pricelistEventScheduler, never()).schedule(any(), any(), any());
+        verify(messageSource).getMessage(eq("catalog.pricelist.schedule.error.too.frequent"),
+                eq(new Object[]{"0/2 * * * ? *", 5}), any(Locale.class));
     }
 
     @Test
-    void rejectsCronBelowTheFloor() {
-        // when
-        controller.saveCatalogDetails(CATALOG_ID, submittedCatalog("0/2 * * * ? *"), new RedirectAttributesModelMap());
-
-        // then
-        verify(messageSource).getMessage(eq("catalog.pricelist.schedule.error.too.frequent"), any(), any(Locale.class));
-        verify(productCatalogRepository, never()).save(any());
-    }
-
-    @Test
-    void deletingCatalogRemovesItsSchedule() {
+    void deletingACatalogDelegatesToTheServiceAndRedirectsToTheList() {
         // given
-        when(catalog.getStoreId()).thenReturn(STORE_ID);
-        when(productRepository.findAll(catalog)).thenReturn(List.of());
+        when(productCatalogDetailsService.delete(STORE_ID, CATALOG_ID))
+                .thenReturn(new ProductCatalogDetailsService.UpdateResult(List.of()));
 
         // when
-        controller.deleteCatalog(CATALOG_ID);
+        String view = controller.deleteCatalog(CATALOG_ID, new RedirectAttributesModelMap());
 
         // then
-        verify(pricelistEventScheduler).deleteSchedule(STORE_ID, CATALOG_ID);
-        verify(productCatalogRepository).delete(catalog);
+        assertThat(view).isEqualTo("redirect:/dashboard/catalogs");
+    }
+
+    @Test
+    void aFailedDeleteFlashesTheErrorAndStaysOnTheCatalog() {
+        // given
+        when(productCatalogDetailsService.delete(STORE_ID, CATALOG_ID))
+                .thenReturn(new ProductCatalogDetailsService.UpdateResult(List.of(ErrorMessage.of("catalog.delete.error.failed"))));
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        String view = controller.deleteCatalog(CATALOG_ID, redirect);
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/catalogs/" + CATALOG_ID);
+        assertThat(redirect.getFlashAttributes()).containsKey("errorMessage");
     }
 }

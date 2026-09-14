@@ -6,6 +6,8 @@ import pl.commercelink.scheduling.EventBridgeSchedules;
 import pl.commercelink.scheduling.PollingSchedule;
 import pl.commercelink.starter.util.ConversionUtil;
 
+import java.util.Optional;
+
 @Component
 public class PricelistEventScheduler {
 
@@ -28,6 +30,20 @@ public class PricelistEventScheduler {
 
     public void deleteSchedule(String storeId, String catalogId) {
         schedules.delete(scheduleName(storeId, catalogId));
+    }
+
+    public Optional<String> snapshot(String storeId, String catalogId) {
+        return schedules.expressionOf(scheduleName(storeId, catalogId));
+    }
+
+    public void restore(String storeId, String catalogId, Optional<String> snapshot) {
+        String name = scheduleName(storeId, catalogId);
+        if (snapshot.isPresent()) {
+            schedules.put(name, snapshot.get(), pricelistQueueArn,
+                    ConversionUtil.toJson(new PricelistEventPayload(storeId, catalogId)));
+        } else {
+            schedules.delete(name);
+        }
     }
 
     private String scheduleName(String storeId, String catalogId) {

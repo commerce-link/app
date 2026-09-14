@@ -8,10 +8,15 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.scheduling.EventBridgeSchedules;
 
+import java.util.Optional;
+
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class PricelistEventSchedulerTest {
@@ -48,6 +53,36 @@ class PricelistEventSchedulerTest {
         ArgumentCaptor<String> expression = ArgumentCaptor.forClass(String.class);
         verify(schedules).put(eq("pricelist-store-1-cat-1"), expression.capture(), eq(QUEUE_ARN), anyString());
         assertThat(expression.getValue()).matches("cron\\(\\d{1,2} (23|0|1|2|3|4) \\* \\* \\? \\*\\)");
+    }
+
+    @Test
+    void snapshotReadsTheLiveExpression() {
+        // given
+        when(schedules.expressionOf("pricelist-store-1-cat-1")).thenReturn(Optional.of("cron(0 5 * * ? *)"));
+
+        // when / then
+        assertThat(scheduler.snapshot("store-1", "cat-1")).contains("cron(0 5 * * ? *)");
+    }
+
+    @Test
+    void restoringAPresentSnapshotPutsTheOldExpressionBack() {
+        // when
+        scheduler.restore("store-1", "cat-1", Optional.of("cron(0 5 * * ? *)"));
+
+        // then
+        ArgumentCaptor<String> input = ArgumentCaptor.forClass(String.class);
+        verify(schedules).put(eq("pricelist-store-1-cat-1"), eq("cron(0 5 * * ? *)"), eq(QUEUE_ARN), input.capture());
+        assertThat(input.getValue()).contains("\"catalogId\":\"cat-1\"");
+    }
+
+    @Test
+    void restoringAnEmptySnapshotRemovesWhateverWasCreatedMeanwhile() {
+        // when
+        scheduler.restore("store-1", "cat-1", Optional.empty());
+
+        // then
+        verify(schedules).delete("pricelist-store-1-cat-1");
+        verify(schedules, never()).put(anyString(), anyString(), anyString(), any());
     }
 
     @Test

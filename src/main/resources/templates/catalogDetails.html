@@ -47,6 +47,9 @@
             </form>
             <script th:replace="~{fragments/schedule-field :: script}"></script>
             <style th:replace="~{fragments/schedule-field :: style}"></style>
+            <script>
+                window.scheduleField.init(document.querySelector('#editCatalogForm .schedule-field'));
+            </script>
 
                 <div class="field" th:if="${productCatalog.name != null}">
                     <label class="label" th:text="#{catalog.category.definition}"></label>
