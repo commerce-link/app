@@ -18,10 +18,6 @@
 
 <th:block th:fragment="header(intro, actions)" th:if="${settingsPage != null}">
 
-    <nav class="cl-settings-nav" th:if="${!settingsPage.navigation().isEmpty()}" th:attr="aria-label=#{store.title}">
-        <th:block th:replace="~{:: groups(${settingsPage.navigation()}, ${settingsPage.tile().key()})}"></th:block>
-    </nav>
-
     <header class="cl-page-header">
         <a th:if="${settingsPage.homeHref() != null}" class="cl-back" th:href="@{${settingsPage.homeHref()}}">
             <span class="icon is-small" aria-hidden="true"><i class="fas fa-chevron-left"></i></span>
@@ -38,6 +34,13 @@
         </div>
         <div class="cl-page-lead" th:text="#{${settingsPage.tile().descriptionKey()}}"></div>
     </header>
+
+    <!-- Placed after the header so keyboard/tab order follows the page heading first; the grid
+         placement below (grid-column: 1, grid-row: 1 / span 99) keeps the sidebar-style layout
+         regardless of source order. -->
+    <nav class="cl-settings-nav" th:if="${!settingsPage.navigation().isEmpty()}" th:attr="aria-label=#{store.title}">
+        <th:block th:replace="~{:: groups(${settingsPage.navigation()}, ${settingsPage.tile().key()})}"></th:block>
+    </nav>
 
     <details class="cl-settings-jump" th:if="${!settingsPage.navigation().isEmpty()}">
         <summary class="cl-settings-jump-toggle">

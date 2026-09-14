@@ -70,10 +70,10 @@ class SettingsHeaderFragmentTest {
 
         // then
         assertThat(html).contains("<nav class=\"cl-settings-nav\"").contains("aria-label=\"Ustawienia sklepu\"");
-        String navBlock = html.substring(0, html.indexOf("<header"));
+        String navBlock = navBlock(html);
         assertThat(occurrences(navBlock, "cl-settings-nav-title")).isEqualTo(6);
-        assertThat(html).contains("href=\"/dashboard/store/rma-centers\"").contains(">Centra RMA<");
-        assertThat(html).contains("href=\"/dashboard/store/invoicing\"");
+        assertThat(navBlock).contains("href=\"/dashboard/store/rma-centers\"").contains(">Centra RMA<");
+        assertThat(navBlock).contains("href=\"/dashboard/store/invoicing\"");
     }
 
     @Test
@@ -95,9 +95,8 @@ class SettingsHeaderFragmentTest {
         // then
         assertThat(occurrences(html, "aria-current=\"page\"")).isEqualTo(2);
         assertThat(occurrences(html, "cl-settings-nav-item is-active")).isEqualTo(2);
-        int navEnd = html.indexOf("<details");
-        assertThat(html.substring(0, navEnd)).contains("aria-current=\"page\"");
-        assertThat(html.substring(navEnd)).contains("aria-current=\"page\"");
+        assertThat(navBlock(html)).contains("aria-current=\"page\"");
+        assertThat(detailsBlock(html)).contains("aria-current=\"page\"");
     }
 
     @Test
@@ -111,6 +110,25 @@ class SettingsHeaderFragmentTest {
         assertThat(html.indexOf("</header>")).isLessThan(html.indexOf("<details"));
     }
 
+    @Test
+    void placesTheNavigationAfterTheHeaderSoTabOrderFollowsThePageHeadingFirst() {
+        // when
+        String html = SettingsTemplateRenderer.render(WITHOUT_ACTIONS, page(UserRole.ADMIN, "/dashboard/store/warehouse"));
+
+        // then: keyboard/tab order follows document order, so the heading and back link must come
+        // before the settings navigation even though the grid keeps the nav visually on the side
+        assertThat(html.indexOf("</header>")).isLessThan(html.indexOf("<nav class=\"cl-settings-nav\""));
+        assertThat(html.indexOf("<nav class=\"cl-settings-nav\"")).isLessThan(html.indexOf("<details"));
+    }
+
+    private static String navBlock(String html) {
+        return html.substring(html.indexOf("<nav class=\"cl-settings-nav\""), html.indexOf("<details"));
+    }
+
+    private static String detailsBlock(String html) {
+        return html.substring(html.indexOf("<details"));
+    }
+
     private static int occurrences(String haystack, String needle) {
         return haystack.split(java.util.regex.Pattern.quote(needle), -1).length - 1;
     }
@@ -122,6 +140,7 @@ class SettingsHeaderFragmentTest {
 
         // then
         assertThat(html).doesNotContain("cl-page-header");
+        assertThat(html).doesNotContain("cl-settings-nav").doesNotContain("cl-settings-jump");
     }
 
     @Test

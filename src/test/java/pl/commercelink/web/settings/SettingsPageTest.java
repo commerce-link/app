@@ -119,4 +119,16 @@ class SettingsPageTest {
         assertThat(page.navigation()).hasSize(6);
         assertThat(page.navigation().stream().flatMap(section -> section.tiles().stream())).hasSize(14);
     }
+
+    @Test
+    void fillsTheNavigationForASuperAdminWhenBuiltByTileWithHrefsPrefixedByTheStore() {
+        // when
+        SettingsPage page = SettingsPage.forTile("/shipping", UserRole.SUPER_ADMIN, "store-1");
+
+        // then
+        List<SettingsTileView> tiles = page.navigation().stream().flatMap(section -> section.tiles().stream()).toList();
+        assertThat(tiles).hasSize(13);
+        assertThat(tiles).noneMatch(tile -> tile.tile().key().equals("rmaCenters"));
+        assertThat(tiles).allMatch(tile -> tile.href().startsWith("/dashboard/store/store-1/"));
+    }
 }

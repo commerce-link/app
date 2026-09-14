@@ -52,7 +52,7 @@
 .cl-sidebar { view-transition-name: cl-sidebar; }
 .cl-topbar { view-transition-name: cl-topbar; }
 .cl-settings-nav { view-transition-name: cl-settings-nav; }
-::view-transition-old(root), ::view-transition-new(root) { animation-duration: 150ms; }
+::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation-duration: 150ms; }
 @media (prefers-reduced-motion: reduce) { @view-transition { navigation: none; } }
 
 .cl-sidebar {
@@ -851,76 +851,91 @@ body.cl-drawer-open .cl-sidebar {
     outline-offset: 1px;
 }
 
-@media screen and (max-width: 1399px) {
-    .cl-settings-nav {
-        display: none;
-    }
-
-    .cl-settings-jump {
-        margin-bottom: 20px;
-    }
-
-    .cl-settings-jump > summary {
-        list-style: none;
-    }
-
-    .cl-settings-jump > summary::-webkit-details-marker {
-        display: none;
-    }
-
-    .cl-page .cl-settings-jump-toggle {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        min-height: 44px;
-        padding: 0 14px;
-        border: 1px solid var(--cl-line);
-        border-radius: var(--cl-radius);
-        background: var(--cl-surface);
-        color: var(--cl-ink-2);
-        font-size: 14px;
-        font-weight: 600;
-        cursor: pointer;
-    }
-
-    .cl-page .cl-settings-jump-toggle:focus-visible {
-        outline: 2px solid var(--cl-accent);
-        outline-offset: 2px;
-    }
-
-    .cl-page .cl-settings-jump-panel {
-        margin-top: 8px;
-    }
-
-    .cl-page .cl-settings-jump-panel .cl-settings-nav-item {
-        height: auto;
-        min-height: 44px;
-    }
+.cl-page .cl-settings-nav li + li,
+.cl-page .cl-settings-jump-panel li + li {
+    /* Bulma's .content li + li adds margin-top: .25em; both settings lists manage their own spacing. */
+    margin-top: 0;
 }
 
-@media screen and (min-width: 1400px) {
-    .cl-settings-jump {
-        display: none;
-    }
+/* Default (and the permanent fallback for browsers without :has() support, at every width): the
+   sidebar-style nav is hidden and the collapsible jump menu is the only way to switch settings. */
+.cl-settings-nav {
+    display: none;
+}
 
-    /* Subpages keep their own markup untouched, so the navigation spans every implicit grid row
-       instead of the content wrapping around it. */
-    .cl-page-body:has(> .cl-settings-nav) {
-        display: grid;
-        grid-template-columns: 14rem minmax(0, 1fr);
-        column-gap: 32px;
-        align-items: start;
-    }
+.cl-settings-jump {
+    margin-bottom: 20px;
+}
 
-    .cl-page-body:has(> .cl-settings-nav) > :not(.cl-settings-nav) {
-        grid-column: 2;
-    }
+.cl-settings-jump > summary {
+    list-style: none;
+}
 
-    .cl-settings-nav {
-        grid-column: 1;
-        grid-row: 1 / span 99;
-        position: sticky;
-        top: calc(var(--cl-topbar-height) + 16px);
+.cl-settings-jump > summary::-webkit-details-marker {
+    display: none;
+}
+
+.cl-page .cl-settings-jump-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 0 14px;
+    border: 1px solid var(--cl-line);
+    border-radius: var(--cl-radius);
+    background: var(--cl-surface);
+    color: var(--cl-ink-2);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.cl-page .cl-settings-jump-toggle:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
+}
+
+.cl-page .cl-settings-jump-panel {
+    margin-top: 8px;
+}
+
+.cl-page .cl-settings-jump-panel .cl-settings-nav-item {
+    height: auto;
+    min-height: 44px;
+}
+
+/* :has() is required to turn the settings-nav sibling into a grid track, so the wide layout only
+   switches on for browsers that support it; everyone else keeps the jump menu at every width. */
+@supports selector(:has(*)) {
+    @media screen and (min-width: 1400px) {
+        .cl-settings-jump {
+            display: none;
+        }
+
+        /* Subpages keep their own markup untouched, so the navigation spans every implicit grid row
+           instead of the content wrapping around it. */
+        .cl-page-body:has(> .cl-settings-nav) {
+            display: grid;
+            grid-template-columns: 14rem minmax(0, 1fr);
+            column-gap: 32px;
+            align-items: start;
+            max-width: calc(1200px + 14rem + 32px);
+        }
+
+        .cl-page-body:has(> .cl-settings-nav) > :not(.cl-settings-nav) {
+            grid-column: 2;
+        }
+
+        .cl-settings-nav {
+            display: block;
+            grid-column: 1;
+            grid-row: 1 / span 99;
+            position: sticky;
+            top: calc(var(--cl-topbar-height) + 16px);
+            max-height: calc(100vh - var(--cl-topbar-height) - 32px);
+            overflow-y: auto;
+            overscroll-behavior: contain;
+        }
     }
 }
 
@@ -1340,7 +1355,7 @@ body.cl-drawer-open .cl-sidebar {
         padding: 0;
     }
 
-    .cl-page .cl-back, .cl-page .cl-page-actions, .cl-page .cl-tile-chevron {
+    .cl-page .cl-back, .cl-page .cl-page-actions, .cl-page .cl-tile-chevron, .cl-settings-nav, .cl-settings-jump {
         display: none !important;
     }
 
