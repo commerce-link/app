@@ -21,7 +21,6 @@ class ShipmentTrackingTemplateTest {
             "order.shipment.tracking.status.PENDING",
             "order.shipment.tracking.status.ACTIVE",
             "order.shipment.tracking.status.FAILED",
-            "store.shipping.title",
             "store.shipping.webhook.title",
             "store.shipping.webhook.lead",
             "store.shipping.webhook.url",
@@ -88,7 +87,7 @@ class ShipmentTrackingTemplateTest {
 
         // then
         assertThat(html).contains("~{fragments/screen-intro :: panel('shipping'");
-        assertThat(html).contains("~{fragments/screen-intro :: toggle}");
+        assertThat(html).contains("fragments/settings-header :: header(true, null)");
         for (String suffix : List.of("title", "lead", "item1", "item1.text", "item2", "item2.text", "item3", "item3.text")) {
             assertThat(pl).contains("\nintro.shipping." + suffix + "=");
             assertThat(en).contains("\nintro.shipping." + suffix + "=");
