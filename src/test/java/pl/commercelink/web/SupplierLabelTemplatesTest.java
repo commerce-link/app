@@ -53,6 +53,17 @@ class SupplierLabelTemplatesTest {
                 .contains("th:each=\"option : ${providerOptions}\"");
         assertThat(template("rma-center-form.html")).contains("th:each=\"option : ${providerOptions}\"");
         assertThat(template("rma-centers.html")).contains("supplierLabels.of(center.provider)");
+        assertThat(template("warehouse.html")).contains("<select id=\"quickAddSupplier\" name=\"supplier\"")
+                .contains("th:each=\"option : ${providerOptions}\"")
+                .doesNotContain("type=\"text\" id=\"quickAddSupplier\"");
+    }
+
+    @Test
+    void theRecommendationTableShowsLabelsForItsAlternativeSuppliers() throws Exception {
+        // when / then -- alternativeSuppliers carries connection identities, not display names
+        assertThat(template("catalogDetails_categoryDefinition_productRecommendations.html"))
+                .contains("supplierLabels.of(provider)")
+                .doesNotContain("th:text=\"${provider}\"");
     }
 
     /**
