@@ -32,7 +32,6 @@ public class StoreSupplierConnectionService {
     private final StoreSupplierConnectionPersister persister;
 
     private static final List<ErrorMessage> UPDATE_FAILED = List.of(ErrorMessage.of("store.supplier.connection.error.update.failed"));
-    private static final int IDENTITY_ATTEMPTS = 5;
 
     public Map<String, List<ProviderField>> configurationFields() {
         Map<String, List<ProviderField>> fields = new LinkedHashMap<>();
@@ -163,15 +162,10 @@ public class StoreSupplierConnectionService {
         for (StoreSupplierConnection connection : existingConfiguration(existingStore).getSupplierConnections()) {
             used.add(connection.getSupplierName().toLowerCase(Locale.ROOT));
         }
-        // Bounded: handing back a colliding candidate would have replaced the existing connection
-        // (and its secret, feed and schedule) instead of adding a second instance.
-        for (int attempt = 0; attempt < IDENTITY_ATTEMPTS; attempt++) {
-            String candidate = newIdentity(type);
-            if (!used.contains(candidate.toLowerCase(Locale.ROOT))) {
-                return Resolved.ok(candidate);
-            }
-        }
-        return Resolved.fail("store.supplier.connection.error.identity.exhausted");
+        return SupplierIdentity.firstFresh(() -> newIdentity(type),
+                        candidate -> used.contains(candidate.toLowerCase(Locale.ROOT)))
+                .map(Resolved::ok)
+                .orElseGet(() -> Resolved.fail("store.supplier.connection.error.identity.exhausted"));
     }
 
     /** Seam for tests that need a deterministic collision. */

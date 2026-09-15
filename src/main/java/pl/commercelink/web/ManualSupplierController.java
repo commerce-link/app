@@ -19,7 +19,6 @@ import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.inventory.supplier.manual.ManualSupplierService;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.stores.Store;
-import pl.commercelink.stores.StoreSupplierConnection;
 import pl.commercelink.stores.StoresRepository;
 
 import java.io.IOException;
@@ -34,6 +33,7 @@ public class ManualSupplierController {
     private final ManualSupplierService manualSupplierService;
     private final StoresRepository storesRepository;
     private final SupplierConnectionViewFactory supplierConnectionViewFactory;
+    private final SupplierLabels supplierLabels;
     private final MessageSource messageSource;
 
     @PostMapping("/dashboard/store/manual-supplier")
@@ -123,14 +123,7 @@ public class ManualSupplierController {
     // Resolved before delete()/applySelections() run, since the connection (and any label it
     // carries) is gone from the store once the mutation succeeds.
     private String labelFor(Store store, String identity) {
-        if (store != null) {
-            for (StoreSupplierConnection connection : store.getSupplierConnections()) {
-                if (connection.getSupplierName().equals(identity)) {
-                    return SupplierLabels.labelOf(connection);
-                }
-            }
-        }
-        return SupplierIdentity.legacyLabel(identity);
+        return store == null ? SupplierIdentity.legacyLabel(identity) : supplierLabels.forStore(store).of(identity);
     }
 
     @PostMapping("/dashboard/store/fulfilment/manual-supplier/{identity}")

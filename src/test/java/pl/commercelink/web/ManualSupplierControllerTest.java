@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.MessageSource;
@@ -11,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.ui.ConcurrentModel;
 import pl.commercelink.inventory.supplier.SupplierConnectionViewFactory;
+import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.inventory.supplier.manual.ManualSupplierService;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.stores.Store;
@@ -42,6 +44,10 @@ class ManualSupplierControllerTest {
     private SupplierConnectionViewFactory supplierConnectionViewFactory;
     @Mock
     private MessageSource messageSource;
+    // Real instance: forStore(store) never touches the repository, and the tests assert the
+    // label actually resolved for the store's connections.
+    @Spy
+    private SupplierLabels supplierLabels = new SupplierLabels(null);
 
     @InjectMocks
     private ManualSupplierController controller;

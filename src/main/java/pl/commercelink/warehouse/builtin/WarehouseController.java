@@ -169,16 +169,17 @@ class WarehouseController {
         model.addAttribute("hasExternalWarehouse", hasExternalWarehouse);
         model.addAttribute("quickAddStatuses", WarehouseItemController.NEW_ITEM_STATUSES);
         model.addAttribute("defaultVatRate", Price.DEFAULT_VAT_RATE);
-        model.addAttribute("providerOptions", quickAddSupplierOptions());
-        model.addAttribute("supplierLabels", supplierLabels.forStoreId(getStoreId()));
+        SupplierLabelMap labels = supplierLabels.forStoreId(getStoreId());
+        model.addAttribute("providerOptions", quickAddSupplierOptions(labels));
+        model.addAttribute("supplierLabels", labels);
 
         return "warehouse";
     }
 
     // Quick-add used to be a free-text supplier field, so both built-in entities stay reachable
     // next to the store's own connections -- the value posted is the connection identity.
-    private List<SupplierLabelMap.Option> quickAddSupplierOptions() {
-        List<SupplierLabelMap.Option> options = new ArrayList<>(supplierLabels.forStoreId(getStoreId()).options());
+    private static List<SupplierLabelMap.Option> quickAddSupplierOptions(SupplierLabelMap labels) {
+        List<SupplierLabelMap.Option> options = new ArrayList<>(labels.options());
         options.add(new SupplierLabelMap.Option(SupplierRegistry.WAREHOUSE, SupplierRegistry.WAREHOUSE));
         options.add(new SupplierLabelMap.Option(SupplierRegistry.OTHER, SupplierRegistry.OTHER));
         return options;

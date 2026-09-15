@@ -1,6 +1,9 @@
 package pl.commercelink.inventory.supplier;
 
 import java.security.SecureRandom;
+import java.util.Optional;
+import java.util.function.Predicate;
+import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
 /**
@@ -21,7 +24,24 @@ public final class SupplierIdentity {
     private static final Pattern TOKEN = Pattern.compile("^[a-z0-9]{" + TOKEN_LENGTH + "}$");
     private static final SecureRandom RANDOM = new SecureRandom();
 
+    private static final int ALLOCATION_ATTEMPTS = 5;
+
     private SupplierIdentity() {
+    }
+
+    /**
+     * First candidate the store does not already hold. Bounded rather than an unbounded retry:
+     * a stuck generator would otherwise spin forever inside a request thread, and handing back a
+     * colliding candidate would have replaced the existing connection instead of adding one.
+     */
+    public static Optional<String> firstFresh(Supplier<String> candidates, Predicate<String> taken) {
+        for (int attempt = 0; attempt < ALLOCATION_ATTEMPTS; attempt++) {
+            String candidate = candidates.get();
+            if (!taken.test(candidate)) {
+                return Optional.of(candidate);
+            }
+        }
+        return Optional.empty();
     }
 
     public static String typeOf(String identity) {

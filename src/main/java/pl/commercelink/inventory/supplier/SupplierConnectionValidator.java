@@ -19,6 +19,8 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
 @Component
 public class SupplierConnectionValidator {
 
+    public static final int MAX_LABEL_LENGTH = 60;
+
     private final int minIntervalMinutes;
     private final SupplierRegistry supplierRegistry;
 
@@ -77,7 +79,7 @@ public class SupplierConnectionValidator {
         String label = edited.getLabel();
         if (isBlank(label)) {
             errors.add(ErrorMessage.of("store.supplier.connection.error.label.required"));
-        } else if (label.trim().length() > 60) {
+        } else if (label.trim().length() > MAX_LABEL_LENGTH) {
             errors.add(ErrorMessage.of("store.supplier.connection.error.label.too.long"));
         } else if (isReservedFor(edited, label.trim())) {
             errors.add(ErrorMessage.of("store.supplier.connection.error.label.reserved"));

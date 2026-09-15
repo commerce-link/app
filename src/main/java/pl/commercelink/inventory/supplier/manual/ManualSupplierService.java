@@ -5,6 +5,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import pl.commercelink.inventory.StoreInventoryCache;
 import pl.commercelink.inventory.supplier.StoreFeedRepository;
+import pl.commercelink.inventory.supplier.SupplierConnectionValidator;
 import pl.commercelink.inventory.supplier.SupplierIdentity;
 import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
@@ -27,8 +28,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 @RequiredArgsConstructor
 public class ManualSupplierService {
 
-    private static final int MAX_LABEL_LENGTH = 60;
-    private static final int IDENTITY_ATTEMPTS = 5;
 
     private final StoresRepository storesRepository;
     private final StoreFeedRepository storeFeedRepository;
@@ -60,7 +59,7 @@ public class ManualSupplierService {
             return Result.error("store.manual.error.store.notfound");
         }
         String trimmed = label == null ? "" : label.trim();
-        if (trimmed.isEmpty() || trimmed.length() > MAX_LABEL_LENGTH) {
+        if (trimmed.isEmpty() || trimmed.length() > SupplierConnectionValidator.MAX_LABEL_LENGTH) {
             return Result.error("store.manual.error.name.invalid");
         }
         if (reservedName(trimmed)) {
@@ -82,16 +81,9 @@ public class ManualSupplierService {
         return Result.created(identity);
     }
 
-    // Bounded rather than an unbounded retry loop: a stuck token generator would otherwise spin
-    // forever inside a request thread.
     private String freshIdentity(Store store) {
-        for (int attempt = 0; attempt < IDENTITY_ATTEMPTS; attempt++) {
-            String candidate = newIdentity();
-            if (!alreadyExists(store, candidate)) {
-                return candidate;
-            }
-        }
-        return null;
+        return SupplierIdentity.firstFresh(this::newIdentity, candidate -> alreadyExists(store, candidate))
+                .orElse(null);
     }
 
     /** Seam for tests that need a deterministic collision. */
@@ -180,7 +172,7 @@ public class ManualSupplierService {
             return null;
         }
         String label = submittedLabel(selection);
-        if (label == null || label.length() > MAX_LABEL_LENGTH) {
+        if (label == null || label.length() > SupplierConnectionValidator.MAX_LABEL_LENGTH) {
             return Result.error("store.manual.error.name.invalid");
         }
         if (reservedName(label)) {
