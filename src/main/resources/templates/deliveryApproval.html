@@ -11,14 +11,12 @@
             <h1 class="title" th:text="#{deliveries.approval.screen.title}">Request realisation</h1>
             <h2 class="subtitle" th:text="${delivery.provider} + ' — ' + ${delivery.shortenedDeliveryId}">Supplier</h2>
 
-            <div th:each="routed : ${routedOrders}"
-                 th:class="${routed.deliveryMatches} ? 'notification is-info is-light' : 'notification is-danger is-light'">
+            <div th:each="routed : ${routedOrders}" class="notification is-danger is-light">
                 <span th:if="${routed.supplier.matched}"
                       th:text="#{deliveries.approval.routed(${routed.orderId}, ${routed.supplier.supplierName})}"></span>
                 <span th:unless="${routed.supplier.matched}"
                       th:text="#{deliveries.approval.routed.unmatched(${routed.orderId}, ${routed.supplier.externalSupplierId})}"></span>
-                <strong th:unless="${routed.deliveryMatches}" class="ml-2"
-                        th:text="#{deliveries.approval.routed.mismatch}"></strong>
+                <strong class="ml-2" th:text="#{deliveries.approval.routed.mismatch}"></strong>
             </div>
 
             <div id="approval-validation-area" class="mb-6"

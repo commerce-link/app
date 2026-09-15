@@ -219,6 +219,27 @@ class StoreSupplierConnectionServiceTest {
     }
 
     @Test
+    void connectOrUpdateNeverStoresAnExternalSupplierIdOnAGlobalConnection() {
+        // given
+        Store store = storeWith(true);
+        when(validator.validate(anyBoolean(), anyList(), anyMap(), anyMap(), anySet())).thenReturn(List.of());
+        when(persister.persist(any(), any(), anyMap()))
+                .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of("Elko"), Set.of(), Set.of()));
+        SupplierSelectionForm global = new SupplierSelectionForm("Elko", ConnectionMode.GLOBAL, true, true);
+        global.setExternalSupplierId("2");
+
+        // when
+        service.connectOrUpdate(store, global, Map.of());
+
+        // then
+        ArgumentCaptor<FulfilmentConfiguration> captor = ArgumentCaptor.forClass(FulfilmentConfiguration.class);
+        verify(persister).persist(any(), captor.capture(), anyMap());
+        StoreSupplierConnection stored = captor.getValue().getSupplierConnections().get(0);
+        assertEquals(ConnectionMode.GLOBAL, stored.getMode());
+        assertNull(stored.getExternalSupplierId());
+    }
+
+    @Test
     void connectOrUpdateValidatesOnlyTheEditedSupplier() {
         // given a second supplier whose stored credentials are broken must not block this edit
         Store store = storeWith(true,

@@ -1933,7 +1933,7 @@ class DeliveriesControllerApprovalTest {
     }
 
     private static Store storeRouting(String supplierName, String externalSupplierId) {
-        StoreSupplierConnection connection = new StoreSupplierConnection(supplierName, ConnectionMode.GLOBAL);
+        StoreSupplierConnection connection = new StoreSupplierConnection(supplierName, ConnectionMode.OWN);
         connection.setExternalSupplierId(externalSupplierId);
         FulfilmentConfiguration config = new FulfilmentConfiguration();
         config.setSupplierConnections(new ArrayList<>(List.of(connection)));
@@ -1967,16 +1967,14 @@ class DeliveriesControllerApprovalTest {
     }
 
     @Test
-    void approvalScreenTellsTheSuperAdminWhichOrdersTheMarketplaceRouted() {
+    void approvalScreenWarnsTheSuperAdminAboutAnOrderTheMarketplaceRoutedToAnotherSupplier() {
         // given
         Delivery delivery = awaitingWarehouseDeliveryFor("Acme", "order-1", "order-2");
         when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
         when(supplierPurchaseService.deliveryAddressesForDelivery(STORE_ID, DELIVERY_ID)).thenReturn(List.of());
-        when(storesRepository.findById(STORE_ID)).thenReturn(storeRouting("Acme", "2"));
+        when(storesRepository.findById(STORE_ID)).thenReturn(storeRouting("Bravo", "2"));
         when(ordersRepository.findById(STORE_ID, "order-1")).thenReturn(routedOrder("order-1", "2"));
         when(ordersRepository.findById(STORE_ID, "order-2")).thenReturn(routedOrder("order-2", null));
-        when(supplierRegistry.get("Acme")).thenReturn(
-                new SupplierInfo("Acme", SupplierType.Distributor, 5, "PL", null, null));
         Model model = new ConcurrentModel();
 
         // when
@@ -1987,20 +1985,18 @@ class DeliveriesControllerApprovalTest {
         List<RoutedOrderView> routed = (List<RoutedOrderView>) model.getAttribute("routedOrders");
         assertThat(routed).hasSize(1);
         assertThat(routed.get(0).orderId()).isEqualTo("order-1");
-        assertThat(routed.get(0).supplier().supplierName()).isEqualTo("Acme");
-        assertThat(routed.get(0).deliveryMatches()).isTrue();
+        assertThat(routed.get(0).supplier().isMatched()).isTrue();
+        assertThat(routed.get(0).supplier().supplierName()).isEqualTo("Bravo");
     }
 
     @Test
-    void approvalScreenFlagsADeliveryAtADifferentSupplierThanTheMarketplaceChose() {
+    void approvalScreenWarnsTheSuperAdminAboutAnOrderRoutedToAnIdNoSupplierCarries() {
         // given
-        Delivery delivery = awaitingWarehouseDeliveryFor("Bravo", "order-1");
+        Delivery delivery = awaitingWarehouseDeliveryFor("Acme", "order-1");
         when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
         when(supplierPurchaseService.deliveryAddressesForDelivery(STORE_ID, DELIVERY_ID)).thenReturn(List.of());
-        when(storesRepository.findById(STORE_ID)).thenReturn(storeRouting("Acme", "2"));
-        when(ordersRepository.findById(STORE_ID, "order-1")).thenReturn(routedOrder("order-1", "2"));
-        when(supplierRegistry.get("Acme")).thenReturn(
-                new SupplierInfo("Acme", SupplierType.Distributor, 5, "PL", null, null));
+        when(storesRepository.findById(STORE_ID)).thenReturn(storeRouting("Bravo", "2"));
+        when(ordersRepository.findById(STORE_ID, "order-1")).thenReturn(routedOrder("order-1", "9"));
         Model model = new ConcurrentModel();
 
         // when
@@ -2010,7 +2006,8 @@ class DeliveriesControllerApprovalTest {
         @SuppressWarnings("unchecked")
         List<RoutedOrderView> routed = (List<RoutedOrderView>) model.getAttribute("routedOrders");
         assertThat(routed).hasSize(1);
-        assertThat(routed.get(0).deliveryMatches()).isFalse();
+        assertThat(routed.get(0).supplier().isMatched()).isFalse();
+        assertThat(routed.get(0).supplier().externalSupplierId()).isEqualTo("9");
     }
 
     @Test

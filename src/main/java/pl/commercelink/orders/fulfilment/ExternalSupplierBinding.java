@@ -33,8 +33,9 @@ public final class ExternalSupplierBinding implements Predicate<FulfilmentItem> 
         Map<String, String> bySupplierName = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
         List<StoreSupplierConnection> connections = store != null ? store.getSupplierConnections() : List.of();
         for (StoreSupplierConnection connection : connections) {
-            if (connection.getExternalSupplierId() != null) {
-                bySupplierName.put(connection.getSupplierName(), connection.getExternalSupplierId());
+            String externalSupplierId = connection.routingExternalSupplierId();
+            if (externalSupplierId != null) {
+                bySupplierName.put(connection.getSupplierName(), externalSupplierId);
             }
         }
 

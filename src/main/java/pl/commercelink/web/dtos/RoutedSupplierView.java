@@ -20,7 +20,7 @@ public record RoutedSupplierView(
         }
         String externalSupplierId = order.getExternalSupplierId();
         StoreSupplierConnection connection = store == null ? null : store.getSupplierConnections().stream()
-                .filter(c -> externalSupplierId.equals(c.getExternalSupplierId()))
+                .filter(c -> externalSupplierId.equals(c.routingExternalSupplierId()))
                 .findFirst()
                 .orElse(null);
         if (connection == null) {

@@ -338,7 +338,7 @@
                                 </label>
                             </div>
 
-                            <div class="field">
+                            <div class="field" id="supplier-external-id-wrap">
                                 <label class="label" th:text="#{store.supplier.external.id}"></label>
                                 <div class="control">
                                     <input class="input" type="text" name="externalSupplierId" id="supplier-external-id"
@@ -422,6 +422,7 @@
                     var pricing = document.getElementById('supplier-pricing');
                     var fulfilment = document.getElementById('supplier-fulfilment');
                     var externalId = document.getElementById('supplier-external-id');
+                    var externalIdWrap = document.getElementById('supplier-external-id-wrap');
                     var scheduleWrap = document.getElementById('supplier-schedule-wrap');
                     var schedule = scheduleWrap.querySelector('.schedule-field');
                     var addTitle = /*[[#{store.supplier.add.modal.title}]]*/ '';
@@ -497,6 +498,11 @@
                             });
                         });
                         scheduleWrap.classList.toggle('is-hidden', !isOwn);
+                        // GLOBAL suppliers never route marketplace orders; the server drops the
+                        // id for them anyway, disabling the input just keeps it out of the POST.
+                        var isGlobal = mode.value === 'GLOBAL';
+                        externalIdWrap.classList.toggle('is-hidden', isGlobal);
+                        externalId.disabled = isGlobal;
                         var row = rowFor(name);
                         var leavingOwn = row && row.mode === 'OWN' && mode.value === 'GLOBAL';
                         warning.classList.toggle('is-hidden', !leavingOwn);

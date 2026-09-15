@@ -87,6 +87,13 @@ public class StoreSupplierConnection {
         return externalSupplierId;
     }
 
+    // A GLOBAL connection is the platform's shared supplier, not a vendor of this store's own
+    // marketplace, so it never takes part in marketplace routing. connectOrUpdate() never stores
+    // an id on one; this keeps every reader consistent with that rule whatever is in the table.
+    public String routingExternalSupplierId() {
+        return mode == ConnectionMode.GLOBAL ? null : externalSupplierId;
+    }
+
     public void setExternalSupplierId(String externalSupplierId) {
         this.externalSupplierId = externalSupplierId;
     }

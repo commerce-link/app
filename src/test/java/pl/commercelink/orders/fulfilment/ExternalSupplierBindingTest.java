@@ -26,7 +26,11 @@ class ExternalSupplierBindingTest {
     }
 
     private static StoreSupplierConnection connection(String supplierName, String externalSupplierId) {
-        StoreSupplierConnection connection = new StoreSupplierConnection(supplierName, ConnectionMode.GLOBAL);
+        return connection(supplierName, ConnectionMode.OWN, externalSupplierId);
+    }
+
+    private static StoreSupplierConnection connection(String supplierName, ConnectionMode mode, String externalSupplierId) {
+        StoreSupplierConnection connection = new StoreSupplierConnection(supplierName, mode);
         connection.setExternalSupplierId(externalSupplierId);
         return connection;
     }
@@ -70,6 +74,17 @@ class ExternalSupplierBindingTest {
         assertThat(binding.test(candidate("order-1", "Bravo"))).isFalse();
         assertThat(binding.test(candidate("order-1", "Charlie"))).isFalse();
         assertThat(binding.test(candidate("order-1", SupplierRegistry.WAREHOUSE))).isFalse();
+    }
+
+    @Test
+    @DisplayName("a GLOBAL connection never routes, even when an id is stored on it")
+    void globalConnectionNeverMatchesEvenWhenItCarriesAnId() {
+        ExternalSupplierBinding binding = ExternalSupplierBinding.of(
+                storeWith(connection("Acme", ConnectionMode.GLOBAL, "2"), connection("Bravo", ConnectionMode.OWN, "2")),
+                List.of(order("order-1", "2")));
+
+        assertThat(binding.test(candidate("order-1", "Acme"))).isFalse();
+        assertThat(binding.test(candidate("order-1", "Bravo"))).isTrue();
     }
 
     @Test
