@@ -6,6 +6,7 @@ import org.apache.logging.log4j.util.Strings;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.MessageSource;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -32,6 +33,7 @@ import pl.commercelink.orders.filters.services.OrderFiltersService;
 
 import pl.commercelink.orders.filters.ShippingDue;
 import pl.commercelink.orders.filters.services.ListOrderFiltersView;
+import pl.commercelink.orders.fulfilment.ExternalSupplierBinding;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.orders.imports.BasketOrderImporter;
 import pl.commercelink.orders.pos.PosOrderCreator;
@@ -55,6 +57,7 @@ import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.warehouse.GoodsOutEventPublisher;
 import pl.commercelink.web.dtos.AddPaymentForm;
+import pl.commercelink.web.dtos.RoutedSupplierView;
 import pl.commercelink.web.dtos.ClientDataDto;
 import pl.commercelink.web.dtos.OrderFilterForm;
 import pl.commercelink.web.dtos.OrderStatusSelection;
@@ -416,6 +419,7 @@ public class OrdersController extends BaseController {
         model.addAttribute("order", order);
         model.addAttribute("clientOrderUrl", store.isClientOrderPageEnabled() && !order.hasStatus(OrderStatus.Completed)
                 ? order.createClientOrderUrl(appDomain) : null);
+        model.addAttribute("routedSupplier", RoutedSupplierView.from(order, store));
         model.addAttribute("orderEvents", orderEventsRepository.findByOrderId(order.getOrderId()));
         model.addAttribute("orderItemsForm", new OrderItemsForm(orderItems));
         model.addAttribute("serialUpdateItems", serialUpdateItems);
@@ -615,6 +619,17 @@ public class OrdersController extends BaseController {
             boolean serviceFlagLocked = orderItem.hasSupplierAllocation();
             boolean priceLocked = !order.getDocuments().isEmpty();
 
+            String postedDeliveryId = StringUtils.trimToNull(updatedItem.getDeliveryId());
+            boolean deliveryIdChanged = postedDeliveryId != null && !postedDeliveryId.equals(orderItem.getDeliveryId());
+            if (deliveryIdChanged) {
+                Store store = storesRepository.findById(getStoreId());
+                if (!ExternalSupplierBinding.of(store, List.of(order)).permits(orderId, postedDeliveryId)) {
+                    model.addAttribute("errorMessage",
+                            messageSource.getMessage("order.item.assign.supplier.routed", null, LocaleContextHolder.getLocale()));
+                    return showOrderItemDetails(order, orderItem, model);
+                }
+            }
+
             if (StringUtils.isBlank(updatedItem.getCategory())) {
                 updatedItem.setCategory(null);
             }
@@ -662,6 +677,13 @@ public class OrdersController extends BaseController {
         if (!orderItem.isReleasable()) {
             redirectAttributes.addFlashAttribute("errorMessage",
                     messageSource.getMessage("order.item.assign.supplier.blocked", null, locale));
+            return "redirect:/dashboard/orders/" + orderId;
+        }
+
+        Store store = storesRepository.findById(getStoreId());
+        if (!ExternalSupplierBinding.of(store, List.of(order)).permits(orderId, supplier)) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage("order.item.assign.supplier.routed", null, locale));
             return "redirect:/dashboard/orders/" + orderId;
         }
 

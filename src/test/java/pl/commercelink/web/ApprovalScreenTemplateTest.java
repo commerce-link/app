@@ -232,4 +232,16 @@ class ApprovalScreenTemplateTest {
         }
         return false;
     }
+
+    @Test
+    void tellsTheSuperAdminWhenTheMarketplaceChoseTheSupplier() throws Exception {
+        // when
+        String html = approval();
+
+        // then
+        assertThat(html).contains("th:each=\"routed : ${routedOrders}\"");
+        assertThat(html).contains("deliveries.approval.routed");
+        assertThat(html).contains("deliveries.approval.routed.mismatch");
+        assertThat(html).contains("deliveries.approval.routed.unmatched");
+    }
 }
