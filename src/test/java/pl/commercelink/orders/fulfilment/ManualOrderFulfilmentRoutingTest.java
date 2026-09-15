@@ -102,7 +102,7 @@ class ManualOrderFulfilmentRoutingTest {
     }
 
     private static StoreSupplierConnection connection(String supplierName, String externalSupplierId) {
-        StoreSupplierConnection connection = new StoreSupplierConnection(supplierName, ConnectionMode.GLOBAL);
+        StoreSupplierConnection connection = new StoreSupplierConnection(supplierName, ConnectionMode.OWN);
         connection.setExternalSupplierId(externalSupplierId);
         return connection;
     }

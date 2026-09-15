@@ -160,16 +160,15 @@
                 <p class="title is-5 mb-1" th:if="${routedSupplier.matched}">
                     <span th:text="${routedSupplier.supplierName}"></span>
                     <span class="tag is-light ml-1" th:if="${routedSupplier.providerType != null and routedSupplier.providerType != 'manual'}" th:text="${routedSupplier.providerType}"></span>
-                    <span class="is-size-6 has-text-grey" th:text="' (' + #{${routedSupplier.modeKey}} + ')'"></span>
+                    <span class="is-size-6 has-text-grey"
+                          th:text="' (' + #{${routedSupplier.modeKey}} + ', ' + #{order.routed.supplier.external.no} + ' ' + ${routedSupplier.externalSupplierId} + ')'"></span>
                 </p>
                 <p class="title is-5 mb-1 has-text-danger" th:unless="${routedSupplier.matched}" th:text="#{order.routed.supplier.unmatched}"></p>
-                <p class="is-size-7 has-text-grey" th:text="'id: ' + ${routedSupplier.externalSupplierId}"></p>
-                <p class="is-size-7 has-text-grey" th:if="${routedSupplier.matched}">
-                    <span th:text="${routedSupplier.type}"></span>
-                    <span th:if="${routedSupplier.origin != null}" th:text="' · ' + ${routedSupplier.origin}"></span>
-                    <span th:unless="${routedSupplier.enabled and routedSupplier.includeInFulfilment}"
-                          class="has-text-danger" th:text="' · ' + #{order.routed.supplier.not.in.fulfilment}"></span>
-                </p>
+                <p class="is-size-7 has-text-grey" th:unless="${routedSupplier.matched}"
+                   th:text="#{order.routed.supplier.external.no} + ' ' + ${routedSupplier.externalSupplierId}"></p>
+                <p class="is-size-7 has-text-danger"
+                   th:if="${routedSupplier.matched and !(routedSupplier.enabled and routedSupplier.includeInFulfilment)}"
+                   th:text="#{order.routed.supplier.not.in.fulfilment}"></p>
             </div>
         </div>
     </div>

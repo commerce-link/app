@@ -14,7 +14,6 @@ import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrdersManager;
 import pl.commercelink.orders.OrdersRepository;
-import pl.commercelink.orders.fulfilment.ExternalSupplierBinding;
 import pl.commercelink.orders.Payment;
 import pl.commercelink.orders.PaymentDirection;
 import pl.commercelink.orders.PaymentSource;
@@ -1215,13 +1214,11 @@ public class DeliveriesController {
                     .toList();
         }
         Store store = storesRepository.findById(storeId);
-        ExternalSupplierBinding binding = ExternalSupplierBinding.of(store, orders);
         return orders.stream()
                 .filter(Order::isBoundToExternalSupplier)
                 .map(order -> new RoutedOrderView(
                         order.getShortenedOrderId(),
-                        RoutedSupplierView.from(order, store, supplierRegistry),
-                        binding.permits(order.getOrderId(), delivery.getProvider())))
+                        RoutedSupplierView.from(order, store)))
                 .toList();
     }
 

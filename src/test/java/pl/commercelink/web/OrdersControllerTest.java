@@ -803,7 +803,7 @@ class OrdersControllerTest {
     }
 
     private static Store storeRouting(String supplierName, String externalSupplierId) {
-        StoreSupplierConnection connection = new StoreSupplierConnection(supplierName, ConnectionMode.GLOBAL);
+        StoreSupplierConnection connection = new StoreSupplierConnection(supplierName, ConnectionMode.OWN);
         connection.setExternalSupplierId(externalSupplierId);
         FulfilmentConfiguration config = new FulfilmentConfiguration();
         config.setSupplierConnections(new ArrayList<>(List.of(connection)));

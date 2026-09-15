@@ -83,7 +83,11 @@ public class StoreSupplierConnectionService {
 
         StoreSupplierConnection edited = new StoreSupplierConnection(identity, mode,
                 selection.isIncludeInPricing(), selection.isIncludeInFulfilment());
-        edited.setExternalSupplierId(StringUtils.trimToNull(selection.getExternalSupplierId()));
+        // GLOBAL suppliers never route marketplace orders (see StoreSupplierConnection
+        // .routingExternalSupplierId), so switching a connection to GLOBAL drops its id too.
+        edited.setExternalSupplierId(mode == ConnectionMode.GLOBAL
+                ? null
+                : StringUtils.trimToNull(selection.getExternalSupplierId()));
         if (mode == ConnectionMode.OWN) {
             edited.setFeedSchedule(PollingSchedule.normalizeOrNull(selection.getFeedSchedule()));
             edited.setLabel(StringUtils.trimToNull(selection.getLabel()));
