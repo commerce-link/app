@@ -47,9 +47,7 @@ public class EventBridgeSchedules {
                 .roleArn(roleArn)
                 .input(input)
                 .build();
-        FlexibleTimeWindow window = FlexibleTimeWindow.builder()
-                .mode(FlexibleTimeWindowMode.OFF)
-                .build();
+        FlexibleTimeWindow window = FlexibleTimeWindow.builder().mode(FlexibleTimeWindowMode.OFF).build();
         try {
             schedulerClient.createSchedule(CreateScheduleRequest.builder()
                     .name(name)

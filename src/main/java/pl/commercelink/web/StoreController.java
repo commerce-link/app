@@ -15,6 +15,7 @@ import pl.commercelink.inventory.supplier.SupplierConnectionViewFactory;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.provider.api.ProviderField;
 import pl.commercelink.stores.ConnectionMode;
+import pl.commercelink.marketplace.MarketplaceConnectionService;
 import pl.commercelink.marketplace.MarketplaceProviderFactory;
 import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
@@ -42,6 +43,9 @@ public class StoreController {
 
     @Value("${scheduling.min-interval-minutes}")
     private int scheduleMinIntervalMinutes;
+
+    @Autowired
+    private MarketplaceConnectionService marketplaceConnectionService;
 
     @Autowired
     private StoresRepository storesRepository;
@@ -572,21 +576,13 @@ public class StoreController {
             return "error";
         }
 
-        StoreForm form = new StoreForm(store);
-        form.setProviderConfiguration(new HashMap<>());
-
-        List<String> deviceAuthProviders = marketplaceProviderFactory.deviceAuthProviders();
-        List<ConnectedIntegration> integrations = store.getMarketplaces().stream()
-                .map(m -> new ConnectedIntegration(m.getName(), m.isLoggedIn(), false,
-                        deviceAuthProviders.contains(m.getName())))
-                .toList();
-
-        model.addAttribute("form", form);
-        model.addAttribute("availableProviders", marketplaceProviderFactory.availableProviders());
-        model.addAttribute("selectedProviderName", form.getMarketplace());
-        model.addAttribute("connectedIntegrations", integrations);
-        model.addAttribute("deviceAuthProviders", deviceAuthProviders);
+        MarketplaceSectionModel.render(marketplaceConnectionService, store, null, model);
+        model.addAttribute("basePath", SupplierSectionModel.basePath(storeId));
         model.addAttribute("isSuperAdmin", isSuperAdmin());
+        model.addAttribute("allMarketplaces", marketplaceProviderFactory.availableProviders());
+        model.addAttribute("marketplaceConfigurations", marketplaceConnectionService.configurationsForUI(store));
+        model.addAttribute("marketplacesWithStoredConfig", marketplaceConnectionService.marketplacesWithStoredConfiguration(store));
+        model.addAttribute("scheduleMinIntervalMinutes", marketplaceConnectionService.minIntervalMinutes());
 
         return "store-marketplaces";
     }

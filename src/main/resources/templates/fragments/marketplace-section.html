@@ -1,0 +1,88 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<div th:fragment="section(rows, addDisabled, successMessage, storedConfigMarketplaces, basePath, defaultIntervalMinutes)"
+     th:attr="data-success-message=${successMessage},data-marketplaces-with-stored-config=${storedConfigMarketplaces}">
+    <div class="is-flex is-justify-content-space-between is-align-items-center mb-3">
+        <h2 class="subtitle mb-0" th:text="#{store.marketplaces.section.title}"></h2>
+        <button type="button" class="button is-primary is-small" id="marketplace-add-button"
+                th:text="#{store.marketplaces.add.button}"
+                th:disabled="${addDisabled}"
+                th:title="${addDisabled} ? #{store.marketplaces.add.none} : ''"></button>
+    </div>
+
+    <table class="table is-fullwidth is-striped" th:if="${!rows.isEmpty()}">
+        <thead>
+            <tr>
+                <th th:text="#{store.marketplace.name}"></th>
+                <th th:text="#{store.marketplaces.status}"></th>
+                <th class="is-hidden-mobile" th:text="#{store.marketplace.last.fetched}"></th>
+                <th th:text="#{store.marketplaces.column.schedule}"></th>
+                <th th:text="#{general.actions}"></th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr th:each="row : ${rows}"
+                th:attr="data-marketplace=${row.name()},data-orders-import-schedule=${row.ordersImportSchedule()}">
+                <td th:text="${row.displayName()}"></td>
+                <td>
+                    <span class="tag is-success" th:if="${row.connected()}" th:text="#{store.marketplaces.connected}"></span>
+                    <span class="tag is-warning" th:if="${!row.connected() && row.deviceAuth()}" th:text="#{store.integrations.deviceauth.pending}"></span>
+                    <span class="tag is-danger" th:if="${!row.connected() && !row.deviceAuth()}" th:text="#{store.marketplaces.disconnected}"></span>
+                </td>
+                <td class="is-hidden-mobile">
+                    <span th:if="${row.hasFetched()}"
+                          th:text="${#temporals.format(row.lastFetchedAt(), 'dd.MM.yyyy HH:mm')}"></span>
+                    <span th:unless="${row.hasFetched()}" class="has-text-grey">&mdash;</span>
+                </td>
+                <td>
+                    <span th:if="${row.hasOwnSchedule()}" th:title="${row.ordersImportSchedule()}"
+                          th:text="${#messages.msgWithParams(row.scheduleDescription().code(),
+                                                             row.scheduleDescription().messageArgs())}"></span>
+                    <span th:unless="${row.hasOwnSchedule()}" class="has-text-grey"
+                          th:text="#{store.marketplaces.schedule.summary.default(${defaultIntervalMinutes})}"></span>
+                </td>
+                <td>
+                    <div class="dropdown is-right marketplace-actions">
+                        <div class="dropdown-trigger">
+                            <button type="button" class="button is-small is-ghost" aria-haspopup="true"
+                                    th:attr="aria-label=#{general.actions}">
+                                <span class="icon is-small"><i class="fas fa-ellipsis-v" aria-hidden="true"></i></span>
+                            </button>
+                        </div>
+                        <div class="dropdown-menu" role="menu">
+                            <div class="dropdown-content">
+                                <button type="button" th:if="${row.deviceAuth() && !row.connected()}"
+                                        class="dropdown-item button is-ghost is-shadowless has-text-left device-auth-row-connect"
+                                        th:attr="data-provider=${row.name()}"
+                                        th:text="#{store.integrations.deviceauth.connect}"></button>
+                                <button type="button" class="dropdown-item button is-ghost is-shadowless has-text-left"
+                                        th:attr="data-configure-marketplace=${row.name()}"
+                                        th:text="#{store.supplier.action.edit}"></button>
+                                <a class="dropdown-item"
+                                   th:href="@{${basePath + '/marketplaces/exports/' + row.name()}}"
+                                   th:text="#{store.marketplaces.exports.history.link}"></a>
+                                <hr class="dropdown-divider">
+                                <button type="button"
+                                        class="dropdown-item button is-ghost is-shadowless has-text-left has-text-danger marketplace-disconnect-button"
+                                        th:attr="data-identity=${row.name()},data-confirm-message=#{store.marketplaces.disconnect.confirm}"
+                                        th:text="#{store.integrations.disconnect}"></button>
+                            </div>
+                        </div>
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+
+    <p class="has-text-grey" th:if="${rows.isEmpty()}" th:text="#{store.marketplaces.empty}"></p>
+</div>
+
+<div th:fragment="marketplaceSection"
+     th:replace="~{fragments/marketplace-section :: section(${sectionRows}, ${sectionAddDisabled}, ${sectionSuccessMessage}, ${sectionMarketplacesWithStoredConfig}, ${sectionBasePath}, ${sectionDefaultIntervalMinutes})}"></div>
+
+<div th:fragment="sectionError" class="notification is-danger" th:text="${errorMessage}"></div>
+
+</body>
+</html>
