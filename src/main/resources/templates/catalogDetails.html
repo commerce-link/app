@@ -42,7 +42,7 @@
 
                 <div class="field">
                     <label class="label" th:text="#{catalog.pricelist.schedule}"></label>
-                    <div th:replace="~{fragments/schedule-field :: input('pricelistSchedule', ${productCatalog.pricelistSchedule}, ${scheduleMinIntervalMinutes}, 'catalog.pricelist.schedule.summary.default', 'minutes,hours,days')}"></div>
+                    <div th:replace="~{fragments/schedule-field :: input('pricelistSchedule', ${productCatalog.pricelistSchedule}, ${scheduleMinIntervalMinutes}, #{catalog.pricelist.schedule.summary.default}, 'minutes,hours,days')}"></div>
                 </div>
             </form>
             <script th:replace="~{fragments/schedule-field :: script}"></script>

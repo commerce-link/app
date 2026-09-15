@@ -24,7 +24,7 @@ class CatalogDetailsTemplateTest {
 
         // then
         assertThat(html).contains("fragments/schedule-field :: input('pricelistSchedule', ${productCatalog.pricelistSchedule}, "
-                + "${scheduleMinIntervalMinutes}, 'catalog.pricelist.schedule.summary.default', 'minutes,hours,days')");
+                + "${scheduleMinIntervalMinutes}, #{catalog.pricelist.schedule.summary.default}, 'minutes,hours,days')");
         assertThat(html).contains("window.scheduleField.init(document.querySelector('#editCatalogForm .schedule-field'))");
         assertThat(html.indexOf("schedule-field :: script")).isLessThan(html.indexOf("window.scheduleField.init("));
         assertThat(html.indexOf("id=\"editCatalogForm\"")).isLessThan(html.indexOf("schedule-field :: input("));
@@ -35,7 +35,7 @@ class CatalogDetailsTemplateTest {
         // when
         String html = EnglishFragmentTemplateEngine.create().process(
                 "<div th:replace=\"~{fragments/schedule-field :: input('pricelistSchedule', '', 5, "
-                        + "'catalog.pricelist.schedule.summary.default', 'minutes,hours,days')}\"></div>", new Context());
+                        + "#{catalog.pricelist.schedule.summary.default}, 'minutes,hours,days')}\"></div>", new Context());
 
         // then
         assertThat(html).doesNotContain("??");
