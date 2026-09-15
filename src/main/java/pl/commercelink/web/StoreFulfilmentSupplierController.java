@@ -70,6 +70,7 @@ public class StoreFulfilmentSupplierController {
         SupplierSelectionForm selection = new SupplierSelectionForm(
                 form.getSupplierName(), form.getMode(),
                 form.isIncludeInPricing(), form.isIncludeInFulfilment(), form.getFeedSchedule());
+        selection.setExternalSupplierId(form.getExternalSupplierId());
 
         StoreSupplierConnectionService.ConnectionUpdateResult result =
                 storeSupplierConnectionService.connectOrUpdate(store, selection, form.getConfiguration());

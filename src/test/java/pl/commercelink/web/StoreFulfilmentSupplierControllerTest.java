@@ -102,6 +102,31 @@ class StoreFulfilmentSupplierControllerTest {
     }
 
     @Test
+    void theSubmittedExternalSupplierIdReachesTheService() {
+        // given
+        when(storesRepository.findById(STORE_ID)).thenReturn(store());
+        when(storeSupplierConnectionService.connectOrUpdate(any(), any(), anyMap()))
+                .thenReturn(new StoreSupplierConnectionService.ConnectionUpdateResult(List.of(), Set.of(), Set.of(), Set.of()));
+        when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenReturn("ok");
+        stubEmptyViews();
+        SupplierConnectionForm form = form();
+        form.setExternalSupplierId("12345");
+
+        try (MockedStatic<CustomSecurityContext> context = mockStatic(CustomSecurityContext.class)) {
+            context.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            context.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(false);
+
+            // when
+            controller.save(form, Locale.ENGLISH, new ConcurrentModel(), new MockHttpServletResponse());
+
+            // then
+            ArgumentCaptor<SupplierSelectionForm> captor = ArgumentCaptor.forClass(SupplierSelectionForm.class);
+            verify(storeSupplierConnectionService).connectOrUpdate(any(), captor.capture(), anyMap());
+            assertThat(captor.getValue().getExternalSupplierId()).isEqualTo("12345");
+        }
+    }
+
+    @Test
     void savingASupplierDelegatesToTheServiceAndReturnsTheExternalSectionFragment() {
         // given
         when(storesRepository.findById(STORE_ID)).thenReturn(store());

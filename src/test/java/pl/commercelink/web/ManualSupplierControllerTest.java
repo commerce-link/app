@@ -69,7 +69,7 @@ class ManualSupplierControllerTest {
             context.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(false);
 
             // when
-            String view = controller.saveSelection(IDENTITY, true, true, false, Locale.ENGLISH, model, response);
+            String view = controller.saveSelection(IDENTITY, true, true, false, null, Locale.ENGLISH, model, response);
 
             // then -- a no-argument view name: ThymeleafView rejects a view name carrying
             // positional fragment parameters, so a regression back to that shape is caught here
@@ -78,7 +78,29 @@ class ManualSupplierControllerTest {
             assertThat(response.getStatus()).isEqualTo(200);
             assertThat(model.getAttribute("sectionSuccessMessage")).isEqualTo("ok");
             verify(manualSupplierService).applySelections(eq(STORE_ID),
-                    eq(List.of(new ManualSupplierService.ManualSelection(IDENTITY, true, true, false))));
+                    eq(List.of(new ManualSupplierService.ManualSelection(IDENTITY, true, true, false, null))));
+        }
+    }
+
+    @Test
+    void theSubmittedExternalSupplierIdReachesTheManualSelection() {
+        // given
+        when(storesRepository.findById(STORE_ID)).thenReturn(store());
+        when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenReturn("ok");
+        stubEmptyViews();
+        ConcurrentModel model = new ConcurrentModel();
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        try (MockedStatic<CustomSecurityContext> context = mockStatic(CustomSecurityContext.class)) {
+            context.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            context.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(false);
+
+            // when
+            controller.saveSelection(IDENTITY, true, true, false, "12345", Locale.ENGLISH, model, response);
+
+            // then
+            verify(manualSupplierService).applySelections(eq(STORE_ID),
+                    eq(List.of(new ManualSupplierService.ManualSelection(IDENTITY, true, true, false, "12345"))));
         }
     }
 
@@ -96,13 +118,14 @@ class ManualSupplierControllerTest {
 
             // when
             String view = controller.saveSelectionForStore(STORE_ID, IDENTITY, false, true, true,
+                    null,
                     Locale.ENGLISH, model, response);
 
             // then
             assertThat(view).isEqualTo("fragments/supplier-section :: manualSection");
             assertThat(view).doesNotContain("(");
             verify(manualSupplierService).applySelections(eq(STORE_ID),
-                    eq(List.of(new ManualSupplierService.ManualSelection(IDENTITY, false, true, true))));
+                    eq(List.of(new ManualSupplierService.ManualSelection(IDENTITY, false, true, true, null))));
         }
     }
 
@@ -119,7 +142,7 @@ class ManualSupplierControllerTest {
             context.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(false);
 
             // when
-            String view = controller.saveSelection(IDENTITY, true, true, true, Locale.ENGLISH, model, response);
+            String view = controller.saveSelection(IDENTITY, true, true, true, null, Locale.ENGLISH, model, response);
 
             // then
             assertThat(view).isEqualTo("fragments/supplier-section :: sectionError");

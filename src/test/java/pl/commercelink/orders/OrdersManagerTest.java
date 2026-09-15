@@ -768,6 +768,28 @@ class OrdersManagerTest {
     }
 
     @Test
+    @DisplayName("assignFromWarehouse refuses an order the marketplace routed to a supplier")
+    void assignFromWarehouseRefusesARoutedOrder() {
+        // given
+        Order routed = new Order(STORE_ID);
+        routed.setOrderId(ORDER_ID);
+        routed.setExternalSupplierId("2");
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(routed);
+        WarehouseItemView warehouseItem = new WarehouseItemView(
+                STORE_ID, "warehouse-item-1", "5901234123457", "MFN-1", Price.fromNet(20.0), 1, FulfilmentStatus.Delivered, ItemCondition.Sealed
+        );
+        when(warehouse.stockQueryService(STORE_ID)).thenReturn(stockQueryService);
+        when(stockQueryService.findById(STORE_ID, "warehouse-item-1")).thenReturn(warehouseItem);
+
+        // when / then
+        assertThatThrownBy(() -> ordersManager.assignFromWarehouse(STORE_ID, ORDER_ID, "item-1", "warehouse-item-1"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("order.routed.warehouse.blocked");
+        verify(orderItemsRepository, never()).save(any());
+        verify(manualWarehouseItemFulfilment, never()).run(any(), any(), any());
+    }
+
+    @Test
     @DisplayName("claimOrderItems binds items to the delivery and leaves them in allocation")
     void claimOrderItemsBindsItemsToTheDeliveryAndLeavesThemInAllocation() {
         // given

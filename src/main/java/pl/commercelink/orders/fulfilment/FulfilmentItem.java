@@ -58,6 +58,10 @@ public class FulfilmentItem {
                 .collect(Collectors.toList());
     }
 
+    public static List<FulfilmentItem> fromProviders(OrderItem orderItem, Collection<InventoryItem> inventoryItems) {
+        return tryFulfilmentFromProvider(orderItem, inventoryItems);
+    }
+
     private static List<FulfilmentItem> tryFulfilmentFromProvider(OrderItem orderItem, Collection<InventoryItem> inventoryItems) {
         return inventoryItems.stream()
                 .filter(i -> !i.hasSupplier(WAREHOUSE))

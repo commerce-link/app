@@ -1,6 +1,7 @@
 package pl.commercelink.inventory.supplier;
 
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import pl.commercelink.inventory.supplier.api.SupplierProviderDescriptor;
 import pl.commercelink.provider.ProviderConfigurationManager;
@@ -71,6 +72,11 @@ public class StoreSupplierConnectionService {
         StoreSupplierConnection edited = new StoreSupplierConnection(
                 selection.getSupplierName(), mode,
                 selection.isIncludeInPricing(), selection.isIncludeInFulfilment());
+        // GLOBAL suppliers never route marketplace orders (see StoreSupplierConnection
+        // .routingExternalSupplierId), so switching a connection to GLOBAL drops its id too.
+        edited.setExternalSupplierId(mode == ConnectionMode.GLOBAL
+                ? null
+                : StringUtils.trimToNull(selection.getExternalSupplierId()));
         if (mode == ConnectionMode.OWN) {
             edited.setFeedSchedule(PollingSchedule.normalizeOrNull(selection.getFeedSchedule()));
         }

@@ -12,8 +12,8 @@ import java.util.stream.Collectors;
 abstract class OrderFulfilment {
 
     final OrderItemsRepository orderItemsRepository;
+    final OrdersRepository ordersRepository;
 
-    private final OrdersRepository ordersRepository;
     private final OrderLifecycle orderLifecycle;
     private final WarehouseFulfilmentService warehouseFulfilmentService;
 
