@@ -6,10 +6,10 @@
 
 <div layout:fragment="content">
 
-    <section class="section">
-        <div class="container">
+    <section class="cl-page">
+        <div class="cl-page-body">
 
-            <h1 class="title" th:text="#{store.categories.page.title}"></h1>
+            <div th:replace="~{fragments/settings-header :: header(false, null)}"></div>
             <p class="subtitle is-6" th:text="#{store.categories.page.description}"></p>
 
 

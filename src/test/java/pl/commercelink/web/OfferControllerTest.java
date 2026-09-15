@@ -14,6 +14,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.context.MessageSource;
 import org.springframework.ui.ConcurrentModel;
+import org.springframework.ui.ExtendedModelMap;
 import org.springframework.ui.Model;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 import pl.commercelink.baskets.Basket;
@@ -35,6 +36,7 @@ import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.StoreCategories;
 import pl.commercelink.starter.security.CustomSecurityContext;
+import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 
 import java.util.Collections;
@@ -427,6 +429,24 @@ class OfferControllerTest {
         verify(basketsRepository).save(basketCaptor.capture());
         assertThat(basketCaptor.getValue().getBasketItems())
                 .extracting(BasketItem::getMfn).containsExactly("MFN-B");
+    }
+
+    @Test
+    void showsOfferDetailsForAStoreThatHasNeverSavedCheckoutSettings() {
+        // given
+        Store store = new Store();
+        store.setStoreId(STORE_ID);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basketBase()));
+        when(productCatalogRepository.findAll(STORE_ID)).thenReturn(List.of());
+        Model model = new ExtendedModelMap();
+
+        // when
+        String view = offerController.showOfferDetails(OFFER_ID, model);
+
+        // then
+        assertThat(view).isEqualTo("offerDetails");
+        assertThat((List<?>) model.getAttribute("deliveryOptions")).isEmpty();
     }
 
     private Basket basketBase() {

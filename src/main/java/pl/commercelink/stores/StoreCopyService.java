@@ -86,7 +86,6 @@ public class StoreCopyService {
         target.setBankAccounts(new LinkedList<>());
         target.setMarketplaces(new LinkedList<>());
         target.setIntegrations(new LinkedList<>());
-        target.setNotifications(new LinkedList<>());
 
         return target;
     }
