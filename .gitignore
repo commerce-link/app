@@ -4,6 +4,7 @@
 /docs/
 !.mvn/wrapper/maven-wrapper.jar
 nul
+.java-version
 
 ### STS ###
 .apt_generated

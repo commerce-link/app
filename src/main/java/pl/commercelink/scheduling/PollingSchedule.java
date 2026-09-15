@@ -3,6 +3,7 @@ package pl.commercelink.scheduling;
 import java.util.Locale;
 import java.util.Random;
 import java.util.TreeSet;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.apache.commons.lang3.StringUtils.isBlank;
@@ -25,6 +26,8 @@ public final class PollingSchedule {
     private static final Pattern DAY_OF_WEEK = Pattern.compile(
             "^(\\?|L|[1-7]L|[1-7]#[1-5]|" + list(DAY_OF_WEEK_VALUE) + ")$");
     private static final Pattern YEAR = Pattern.compile("^" + list(YEAR_NUMBER) + "$");
+    private static final Pattern STEP_FROM_ZERO = Pattern.compile("^0/(\\d{1,4})$");
+    private static final Pattern STEP_FROM_ONE = Pattern.compile("^1/(\\d{1,4})$");
 
     private final String expression;
 
@@ -61,17 +64,45 @@ public final class PollingSchedule {
         return new PollingSchedule(String.format("%d %d * * ? *", minute, hour));
     }
 
-    public static PollingSchedule randomEveryMinutes(int intervalMinutes) {
-        int offset = new Random().nextInt(intervalMinutes);
-        return new PollingSchedule(String.format("%d/%d * * * ? *", offset, intervalMinutes));
+    public static PollingSchedule everyMinutes(int intervalMinutes) {
+        return new PollingSchedule(String.format("0/%d * * * ? *", intervalMinutes));
     }
 
     public static PollingSchedule stored(String expression) {
         return new PollingSchedule(expression);
     }
 
-    public static PollingSchedule storedOrRandomEveryMinutes(String stored, int intervalMinutes) {
-        return isBlank(stored) ? randomEveryMinutes(intervalMinutes) : stored(stored);
+    public static PollingSchedule storedOrEveryMinutes(String stored, int intervalMinutes) {
+        return isBlank(stored) ? everyMinutes(intervalMinutes) : stored(stored);
+    }
+
+    public PollingSchedule withRandomStart() {
+        String[] fields = expression.split(" ");
+        if (fields.length != 6 || !"*".equals(fields[3]) || !"?".equals(fields[4]) || !"*".equals(fields[5])) {
+            return this;
+        }
+        Random random = new Random();
+        Matcher everyMinutes = STEP_FROM_ZERO.matcher(fields[0]);
+        if (everyMinutes.matches() && "*".equals(fields[1]) && "*".equals(fields[2])) {
+            int interval = Integer.parseInt(everyMinutes.group(1));
+            return new PollingSchedule(String.format("%d/%d * * * ? *", random.nextInt(interval), interval));
+        }
+        if (!"0".equals(fields[0])) {
+            return this;
+        }
+        int minute = random.nextInt(MINUTES_PER_HOUR);
+        if ("*".equals(fields[1]) && "*".equals(fields[2])) {
+            return new PollingSchedule(String.format("%d * * * ? *", minute));
+        }
+        Matcher everyHours = STEP_FROM_ZERO.matcher(fields[1]);
+        if (everyHours.matches() && "*".equals(fields[2])) {
+            int interval = Integer.parseInt(everyHours.group(1));
+            return new PollingSchedule(String.format("%d %d/%d * * ? *", minute, random.nextInt(interval), interval));
+        }
+        if ("0".equals(fields[1]) && STEP_FROM_ONE.matcher(fields[2]).matches()) {
+            return new PollingSchedule(String.format("%d %d %s * ? *", minute, random.nextInt(HOURS_PER_DAY), fields[2]));
+        }
+        return this;
     }
 
     public static PollingSchedule storedOrRandomNightly(String stored) {

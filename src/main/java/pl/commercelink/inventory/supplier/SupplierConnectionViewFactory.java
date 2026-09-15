@@ -78,6 +78,7 @@ public class SupplierConnectionViewFactory {
                 manual ? connection.isEnabled() : true,
                 feed,
                 connection.getFeedSchedule(),
+                connection.routingExternalSupplierId(),
                 manual || supplierRegistry.exists(identity));
     }
 

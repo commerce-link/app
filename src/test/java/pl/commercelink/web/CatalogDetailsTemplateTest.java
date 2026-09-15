@@ -25,9 +25,22 @@ class CatalogDetailsTemplateTest {
         // then
         assertThat(html).contains("fragments/schedule-field :: input('pricelistSchedule', ${productCatalog.pricelistSchedule}, "
                 + "${scheduleMinIntervalMinutes}, #{catalog.pricelist.schedule.summary.default}, 'minutes,hours,days')");
-        assertThat(html).contains("window.scheduleField.init(document.querySelector('#editCatalogForm .schedule-field'))");
+        assertThat(html).contains("window.scheduleField.init(field)");
         assertThat(html.indexOf("schedule-field :: script")).isLessThan(html.indexOf("window.scheduleField.init("));
         assertThat(html.indexOf("id=\"editCatalogForm\"")).isLessThan(html.indexOf("schedule-field :: input("));
+    }
+
+    @Test
+    void theFormRefusesToSubmitAnIncompleteExactTimeSchedule() throws Exception {
+        // given
+        String html = template();
+
+        // then
+        assertThat(html).contains("form.addEventListener('submit'");
+        assertThat(html).contains("if (window.scheduleField.valid(field)) { return; }");
+        assertThat(html).contains("event.preventDefault();");
+        assertThat(html).contains("#{schedule.at.nohours}");
+        assertThat(html).contains("id=\"pricelist-schedule-error\"");
     }
 
     @Test

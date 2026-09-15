@@ -232,6 +232,24 @@ class OrderTest {
     }
 
     @Test
+    @DisplayName("createSplit keeps the supplier the marketplace routed to")
+    void splitOrderKeepsTheSupplierTheMarketplaceRoutedTo() {
+        // given
+        Order order = new Order("store-1");
+        order.setOrderId("order-1");
+        order.setBillingDetails(new BillingDetails());
+        order.setShippingDetails(new ShippingDetails());
+        order.setExternalSupplierId("2");
+
+        // when
+        Order split = order.createSplit();
+
+        // then
+        assertThat(split.getExternalSupplierId()).isEqualTo("2");
+        assertThat(split.isBoundToExternalSupplier()).isTrue();
+    }
+
+    @Test
     @DisplayName("goods shipped by the supplier leave on the delivery day, with no in-house handling added")
     void shipsOnTheDeliveryDayWhenTheSupplierShipsToTheCustomer() {
         // given

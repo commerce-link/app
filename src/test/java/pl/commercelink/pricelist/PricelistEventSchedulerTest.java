@@ -45,6 +45,17 @@ class PricelistEventSchedulerTest {
     }
 
     @Test
+    void anIntervalChosenByTheShopStartsAtARandomMinuteWithinIt() {
+        // when
+        scheduler.schedule("store-1", "cat-1", "0/30 * * * ? *");
+
+        // then
+        ArgumentCaptor<String> expression = ArgumentCaptor.forClass(String.class);
+        verify(schedules).put(eq("pricelist-store-1-cat-1"), expression.capture(), eq(QUEUE_ARN), anyString());
+        assertThat(expression.getValue()).matches("cron\\((\\d|[12]\\d)/30 \\* \\* \\* \\? \\*\\)");
+    }
+
+    @Test
     void fallsBackToRandomNightlyCronWhenNoScheduleGiven() {
         // when
         scheduler.schedule("store-1", "cat-1", null);
