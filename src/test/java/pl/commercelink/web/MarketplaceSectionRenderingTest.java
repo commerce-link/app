@@ -32,6 +32,7 @@ class MarketplaceSectionRenderingTest {
         context.setVariable("sectionMarketplacesWithStoredConfig", "Empik");
         context.setVariable("sectionBasePath", "/dashboard/store");
         context.setVariable("sectionDefaultIntervalMinutes", 10);
+        context.setVariable("sectionReturnsDefaultIntervalMinutes", 60);
         return context;
     }
 
@@ -39,9 +40,9 @@ class MarketplaceSectionRenderingTest {
     void rendersTheSectionExactlyAsStoreMarketplaceControllerPublishesIt() {
         // given
         MarketplaceIntegrationView empik = new MarketplaceIntegrationView(
-                "Empik", "EmpikPlace", true, false, LocalDateTime.of(2026, 9, 14, 8, 30), "0/15 * * * ? *");
+                "Empik", "EmpikPlace", true, false, LocalDateTime.of(2026, 9, 14, 8, 30), "0/15 * * * ? *", "0 8 * * ? *");
         MarketplaceIntegrationView allegro = new MarketplaceIntegrationView(
-                "Allegro", "Allegro.pl", false, true, null, null);
+                "Allegro", "Allegro.pl", false, true, null, null, null);
 
         // when
         String html = EnglishFragmentTemplateEngine.create().process(WRAPPER, context(List.of(empik, allegro)));
@@ -57,6 +58,10 @@ class MarketplaceSectionRenderingTest {
         assertThat(html).contains("Every 15 min");
         assertThat(html).contains("title=\"0/15 * * * ? *\"");
         assertThat(html).contains("Default — every 10 min");
+        assertThat(html).contains("Returns import schedule");
+        assertThat(html).contains("Daily at 08:00");
+        assertThat(html).contains("data-returns-import-schedule=\"0 8 * * ? *\"");
+        assertThat(html).contains("Default — every 60 min");
         assertThat(html).doesNotContain("once a day");
         assertThat(html).contains("data-configure-marketplace=\"Empik\"");
         assertThat(html).contains("data-orders-import-schedule=\"0/15 * * * ? *\"");
@@ -76,7 +81,7 @@ class MarketplaceSectionRenderingTest {
     @Test
     void everyActionLivesInsideTheRowDropdown() {
         // given
-        MarketplaceIntegrationView empik = new MarketplaceIntegrationView("Empik", "EmpikPlace", true, false, null, null);
+        MarketplaceIntegrationView empik = new MarketplaceIntegrationView("Empik", "EmpikPlace", true, false, null, null, null);
 
         // when
         String html = EnglishFragmentTemplateEngine.create().process(WRAPPER, context(List.of(empik)));

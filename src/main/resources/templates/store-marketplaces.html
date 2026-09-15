@@ -64,9 +64,14 @@
                                 </div>
                             </div>
 
-                            <div class="field">
+                            <div class="field" id="marketplace-orders-schedule">
                                 <label class="label" th:text="#{store.marketplaces.column.schedule}"></label>
                                 <div th:replace="~{fragments/schedule-field :: input('schedule', '', ${scheduleMinIntervalMinutes}, #{store.marketplaces.schedule.summary.default(${sectionDefaultIntervalMinutes})}, 'minutes,hours')}"></div>
+                            </div>
+
+                            <div class="field" id="marketplace-returns-schedule">
+                                <label class="label" th:text="#{store.marketplaces.returns.column.schedule}"></label>
+                                <div th:replace="~{fragments/schedule-field :: input('returnsSchedule', '', ${scheduleMinIntervalMinutes}, #{store.marketplaces.returns.schedule.summary.default(${sectionReturnsDefaultIntervalMinutes})}, 'minutes,hours')}"></div>
                             </div>
 
                             <div class="field is-grouped mt-4">
@@ -112,7 +117,8 @@
             var selectWrap = document.getElementById('marketplace-select-wrap');
             var hiddenName = document.getElementById('marketplace-name-hidden');
             var title = document.getElementById('marketplace-modal-title');
-            var schedule = form.querySelector('.schedule-field');
+            var schedule = form.querySelector('#marketplace-orders-schedule .schedule-field');
+            var returnsSchedule = form.querySelector('#marketplace-returns-schedule .schedule-field');
             var submitInFlight = false;
 
             function applySectionSwap(html) {
@@ -137,7 +143,11 @@
 
             function rowFor(name) {
                 var row = section.querySelector('tr[data-marketplace="' + name + '"]');
-                return row ? { name: name, schedule: row.getAttribute('data-orders-import-schedule') || '' } : null;
+                return row ? {
+                    name: name,
+                    schedule: row.getAttribute('data-orders-import-schedule') || '',
+                    returnsSchedule: row.getAttribute('data-returns-import-schedule') || ''
+                } : null;
             }
 
             function connectedNames() {
@@ -187,6 +197,7 @@
                     select.value = '';
                 }
                 window.scheduleField.sync(schedule, row ? row.schedule : '');
+                window.scheduleField.sync(returnsSchedule, row ? row.returnsSchedule : '');
                 refreshFields();
                 modal.classList.add('is-active');
             }
@@ -253,7 +264,7 @@
             form.addEventListener('submit', function (event) {
                 event.preventDefault();
                 if (submitInFlight) { return; }
-                if (!window.scheduleField.valid(schedule)) {
+                if (!window.scheduleField.valid(schedule) || !window.scheduleField.valid(returnsSchedule)) {
                     formError.innerHTML = '<div class="notification is-danger is-light"></div>';
                     formError.firstElementChild.textContent = scheduleIncompleteMessage;
                     return;

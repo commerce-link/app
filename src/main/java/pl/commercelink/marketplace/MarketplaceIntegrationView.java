@@ -12,7 +12,8 @@ public record MarketplaceIntegrationView(
         boolean connected,
         boolean deviceAuth,
         LocalDateTime lastFetchedAt,
-        String ordersImportSchedule) {
+        String ordersImportSchedule,
+        String returnsImportSchedule) {
 
     public boolean hasOwnSchedule() {
         return isNotBlank(ordersImportSchedule);
@@ -20,6 +21,14 @@ public record MarketplaceIntegrationView(
 
     public PollingScheduleDescription scheduleDescription() {
         return PollingScheduleDescription.of(ordersImportSchedule);
+    }
+
+    public boolean hasOwnReturnsSchedule() {
+        return isNotBlank(returnsImportSchedule);
+    }
+
+    public PollingScheduleDescription returnsScheduleDescription() {
+        return PollingScheduleDescription.of(returnsImportSchedule);
     }
 
     public boolean hasFetched() {
