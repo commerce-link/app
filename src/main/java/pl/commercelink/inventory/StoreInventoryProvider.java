@@ -5,7 +5,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import pl.commercelink.financials.ExchangeRates;
-import pl.commercelink.inventory.supplier.ConnectionSupplierDescriptor;
 import pl.commercelink.inventory.supplier.StoreFeedItemLoader;
 import pl.commercelink.inventory.supplier.SupplierProviderFactory;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
@@ -90,6 +89,6 @@ public class StoreInventoryProvider {
             return ManualSupplierDescriptor.forIdentity(identity);
         }
         SupplierProviderDescriptor descriptor = supplierProviderFactory.getDescriptor(identity);
-        return descriptor == null ? null : new ConnectionSupplierDescriptor(identity, descriptor);
+        return descriptor == null ? null : descriptor.renamedTo(identity);
     }
 }

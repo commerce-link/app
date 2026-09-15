@@ -52,7 +52,7 @@ public class SupplierRegistry {
         if (info == null) {
             return defaultFor(supplierName);
         }
-        return type.equals(supplierName) ? info : SupplierInfos.renamed(info, supplierName);
+        return info.withName(supplierName);
     }
 
     private SupplierInfo defaultFor(String supplierName) {

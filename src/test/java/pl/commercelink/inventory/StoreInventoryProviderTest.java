@@ -99,6 +99,7 @@ class StoreInventoryProviderTest {
         when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of("PLN", 1.0));
         SupplierProviderDescriptor descriptor = mock(SupplierProviderDescriptor.class);
         when(descriptor.supplierInfo()).thenReturn(supplierInfo("Wortmann"));
+        when(descriptor.renamedTo("Wortmann")).thenCallRealMethod();
         when(supplierProviderFactory.getDescriptor("Wortmann")).thenReturn(descriptor);
         when(storeFeedItemLoader.load(eq("store-1"), argThat(d -> d.supplierInfo().name().equals("Wortmann")), any()))
                 .thenReturn(List.of(item("Wortmann")));
@@ -257,6 +258,7 @@ class StoreInventoryProviderTest {
         when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of());
         SupplierProviderDescriptor descriptor = mock(SupplierProviderDescriptor.class);
         when(descriptor.supplierInfo()).thenReturn(supplierInfo("Action"));
+        when(descriptor.renamedTo("Action")).thenCallRealMethod();
         when(supplierProviderFactory.getDescriptor("Action")).thenReturn(descriptor);
         InventoryItem ownItem = new InventoryItem("111", "AAA", 100.0, "PLN", 5, 2, "Action", true, true, false);
         when(storeFeedItemLoader.load(eq("store-1"), argThat(d -> d.supplierInfo().name().equals("Action")), anyMap()))
