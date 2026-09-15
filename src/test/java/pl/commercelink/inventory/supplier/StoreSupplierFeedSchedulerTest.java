@@ -69,7 +69,7 @@ class StoreSupplierFeedSchedulerTest {
                 eq("supplier-feed-store-1-ingram-micro"),
                 eq("cron(0/30 9-17 * * ? *)"),
                 eq(QUEUE_ARN),
-                eq("{\"supplierName\":\"Ingram Micro\",\"storeId\":\"store-1\"}"), eq(1));
+                eq("{\"supplierName\":\"Ingram Micro\",\"storeId\":\"store-1\"}"));
     }
 
     @Test
@@ -79,7 +79,7 @@ class StoreSupplierFeedSchedulerTest {
 
         // then
         ArgumentCaptor<String> expression = ArgumentCaptor.forClass(String.class);
-        verify(schedules).put(eq("supplier-feed-store-1-acme"), expression.capture(), eq(QUEUE_ARN), anyString(), eq(1));
+        verify(schedules).put(eq("supplier-feed-store-1-acme"), expression.capture(), eq(QUEUE_ARN), anyString());
         assertThat(expression.getValue()).matches("cron\\(\\d{1,2} (23|0|1|2|3|4) \\* \\* \\? \\*\\)");
     }
 
@@ -99,7 +99,7 @@ class StoreSupplierFeedSchedulerTest {
 
         // then
         verify(schedules).put(eq("supplier-feed-store-1-acme"), eq("cron(37 2 * * ? *)"), eq(QUEUE_ARN),
-                eq("{\"supplierName\":\"Acme\",\"storeId\":\"store-1\"}"), eq(1));
+                eq("{\"supplierName\":\"Acme\",\"storeId\":\"store-1\"}"));
     }
 
     @Test
@@ -109,7 +109,7 @@ class StoreSupplierFeedSchedulerTest {
 
         // then
         verify(schedules).delete("supplier-feed-store-1-acme");
-        verify(schedules, never()).put(anyString(), anyString(), anyString(), anyString(), eq(1));
+        verify(schedules, never()).put(anyString(), anyString(), anyString(), anyString());
     }
 
     @Test

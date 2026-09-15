@@ -17,23 +17,6 @@ class StoreMarketplaceConnectionTest {
     }
 
     @Test
-    void aStoreWithoutItsOwnScheduleImportsOnTheGlobalOne() {
-        assertThat(storeWith("Allegro", true, null).importsOrdersOnGlobalSchedule("Allegro")).isTrue();
-        assertThat(storeWith("Allegro", true, "  ").importsOrdersOnGlobalSchedule("Allegro")).isTrue();
-    }
-
-    @Test
-    void aStoreWithItsOwnScheduleIsLeftToItsOwnSchedule() {
-        assertThat(storeWith("Allegro", true, "0/15 * * * ? *").importsOrdersOnGlobalSchedule("Allegro")).isFalse();
-    }
-
-    @Test
-    void aLoggedOutOrForeignIntegrationNeverImportsGlobally() {
-        assertThat(storeWith("Allegro", false, null).importsOrdersOnGlobalSchedule("Allegro")).isFalse();
-        assertThat(storeWith("Empik", true, null).importsOrdersOnGlobalSchedule("Allegro")).isFalse();
-    }
-
-    @Test
     void connectingANewMarketplaceStartsLoggedInUnlessItNeedsDeviceAuthorization() {
         Store store = new Store();
 

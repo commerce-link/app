@@ -61,8 +61,17 @@ public final class PollingSchedule {
         return new PollingSchedule(String.format("%d %d * * ? *", minute, hour));
     }
 
+    public static PollingSchedule randomEveryMinutes(int intervalMinutes) {
+        int offset = new Random().nextInt(intervalMinutes);
+        return new PollingSchedule(String.format("%d/%d * * * ? *", offset, intervalMinutes));
+    }
+
     public static PollingSchedule stored(String expression) {
         return new PollingSchedule(expression);
+    }
+
+    public static PollingSchedule storedOrRandomEveryMinutes(String stored, int intervalMinutes) {
+        return isBlank(stored) ? randomEveryMinutes(intervalMinutes) : stored(stored);
     }
 
     public static PollingSchedule storedOrRandomNightly(String stored) {

@@ -62,6 +62,7 @@ class StoreMarketplaceControllerTest {
                 new MarketplaceIntegrationView("Empik", "EmpikPlace", true, false, null, "0/15 * * * ? *")));
         when(marketplaceConnectionService.availableMarketplaces(store)).thenReturn(List.of());
         when(marketplaceConnectionService.marketplacesWithStoredConfiguration(store)).thenReturn(Set.of("Empik"));
+        when(marketplaceConnectionService.defaultIntervalMinutes()).thenReturn(10);
         controller = new StoreMarketplaceController(storesRepository, marketplaceConnectionService, messageSource);
     }
 
@@ -89,6 +90,7 @@ class StoreMarketplaceControllerTest {
         assertThat(model.get("sectionAddDisabled")).isEqualTo(true);
         assertThat(model.get("sectionMarketplacesWithStoredConfig")).isEqualTo("Empik");
         assertThat(model.get("sectionBasePath")).isEqualTo("/dashboard/store");
+        assertThat(model.get("sectionDefaultIntervalMinutes")).isEqualTo(10);
         verify(messageSource).getMessage(eq("store.marketplaces.saved"), eq(new Object[]{"Empik"}), any(Locale.class));
     }
 

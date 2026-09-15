@@ -84,7 +84,7 @@ class EventBridgeSchedulesTest {
         EventBridgeSchedules schedules = new EventBridgeSchedules("prod", null, ROLE_ARN, schedulerClient);
 
         // when
-        schedules.put("supplier-feed-s1-acme", "cron(0/30 9-17 * * ? *)", TARGET_ARN, "{\"storeId\":\"s1\"}", 1);
+        schedules.put("supplier-feed-s1-acme", "cron(0/30 9-17 * * ? *)", TARGET_ARN, "{\"storeId\":\"s1\"}");
 
         // then
         ArgumentCaptor<CreateScheduleRequest> request = ArgumentCaptor.forClass(CreateScheduleRequest.class);
@@ -92,8 +92,7 @@ class EventBridgeSchedulesTest {
         assertThat(request.getValue().name()).isEqualTo("supplier-feed-s1-acme");
         assertThat(request.getValue().scheduleExpression()).isEqualTo("cron(0/30 9-17 * * ? *)");
         assertThat(request.getValue().scheduleExpressionTimezone()).isEqualTo("Europe/Warsaw");
-        assertThat(request.getValue().flexibleTimeWindow().mode()).isEqualTo(FlexibleTimeWindowMode.FLEXIBLE);
-        assertThat(request.getValue().flexibleTimeWindow().maximumWindowInMinutes()).isEqualTo(1);
+        assertThat(request.getValue().flexibleTimeWindow().mode()).isEqualTo(FlexibleTimeWindowMode.OFF);
         assertThat(request.getValue().target().arn()).isEqualTo(TARGET_ARN);
         assertThat(request.getValue().target().roleArn()).isEqualTo(ROLE_ARN);
         assertThat(request.getValue().target().input()).isEqualTo("{\"storeId\":\"s1\"}");
@@ -108,7 +107,7 @@ class EventBridgeSchedulesTest {
                 .thenThrow(ConflictException.builder().message("exists").build());
 
         // when
-        schedules.put("supplier-feed-s1-acme", "cron(0 5 * * ? *)", TARGET_ARN, "{}", 1);
+        schedules.put("supplier-feed-s1-acme", "cron(0 5 * * ? *)", TARGET_ARN, "{}");
 
         // then
         ArgumentCaptor<UpdateScheduleRequest> request = ArgumentCaptor.forClass(UpdateScheduleRequest.class);
@@ -118,8 +117,7 @@ class EventBridgeSchedulesTest {
         assertThat(request.getValue().scheduleExpressionTimezone()).isEqualTo("Europe/Warsaw");
         assertThat(request.getValue().target().arn()).isEqualTo(TARGET_ARN);
         assertThat(request.getValue().target().roleArn()).isEqualTo(ROLE_ARN);
-        assertThat(request.getValue().flexibleTimeWindow().mode()).isEqualTo(FlexibleTimeWindowMode.FLEXIBLE);
-        assertThat(request.getValue().flexibleTimeWindow().maximumWindowInMinutes()).isEqualTo(1);
+        assertThat(request.getValue().flexibleTimeWindow().mode()).isEqualTo(FlexibleTimeWindowMode.OFF);
     }
 
     @Test
@@ -155,21 +153,6 @@ class EventBridgeSchedulesTest {
         // when / then
         assertThat(schedules.expressionOf("supplier-feed-s1-acme")).isEmpty();
         verifyNoInteractions(schedulerClient);
-    }
-
-    @Test
-    void putWithoutAWindowTurnsFlexibleTimeOff() {
-        // given
-        EventBridgeSchedules schedules = new EventBridgeSchedules("prod", null, ROLE_ARN, schedulerClient);
-
-        // when
-        schedules.put("pricelist-s1-c1", "cron(0 3 * * ? *)", TARGET_ARN, "{}");
-
-        // then
-        ArgumentCaptor<CreateScheduleRequest> request = ArgumentCaptor.forClass(CreateScheduleRequest.class);
-        verify(schedulerClient).createSchedule(request.capture());
-        assertThat(request.getValue().flexibleTimeWindow().mode()).isEqualTo(FlexibleTimeWindowMode.OFF);
-        assertThat(request.getValue().flexibleTimeWindow().maximumWindowInMinutes()).isNull();
     }
 
     @Test

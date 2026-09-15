@@ -242,12 +242,6 @@ public class Store {
     }
 
     @DynamoDBIgnore
-    public boolean importsOrdersOnGlobalSchedule(String marketplace) {
-        return marketplaces.stream().anyMatch(integration -> marketplace.equals(integration.getName())
-                && integration.isLoggedIn() && !integration.hasOwnOrdersImportSchedule());
-    }
-
-    @DynamoDBIgnore
     public MarketplaceIntegration connectMarketplace(String marketplace, boolean requiresDeviceAuth) {
         MarketplaceIntegration integration = getMarketplaceIntegration(marketplace);
         if (integration == null) {

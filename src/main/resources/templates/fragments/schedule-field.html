@@ -13,8 +13,8 @@
   the operator staring at a conflict they cannot act on. A stored expression the builder cannot
   show is named in a note and kept as the value until the operator picks a new schedule.
 -->
-<div th:fragment="input(inputName, value, minInterval, defaultTextKey, units)" class="schedule-field"
-     th:attr="data-min-interval=${minInterval},data-default-text=#{${defaultTextKey}},data-units=${units}">
+<div th:fragment="input(inputName, value, minInterval, defaultText, units)" class="schedule-field"
+     th:attr="data-min-interval=${minInterval},data-default-text=${defaultText},data-units=${units}">
 
     <div class="tabs is-toggle is-small schedule-modes mb-2">
         <ul>

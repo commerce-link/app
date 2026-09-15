@@ -3,6 +3,7 @@ package pl.commercelink.marketplace;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.scheduling.EventBridgeSchedules;
@@ -11,8 +12,8 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -29,7 +30,7 @@ class MarketplaceOrdersImportSchedulerTest {
 
     @BeforeEach
     void setUp() {
-        scheduler = new MarketplaceOrdersImportScheduler(QUEUE_ARN, schedules);
+        scheduler = new MarketplaceOrdersImportScheduler(QUEUE_ARN, 10, schedules);
     }
 
     @Test
@@ -42,17 +43,28 @@ class MarketplaceOrdersImportSchedulerTest {
                 "orders-import-store-1-cscartmultivendor",
                 "cron(0/15 * * * ? *)",
                 QUEUE_ARN,
-                "{\"marketplace\":\"CsCartMultiVendor\",\"storeId\":\"store-1\"}", 1);
+                "{\"marketplace\":\"CsCartMultiVendor\",\"storeId\":\"store-1\"}");
     }
 
     @Test
-    void blankScheduleRemovesTheStoreSchedule() {
+    void blankScheduleBecomesTheDefaultIntervalWithARandomMinuteOffset() {
         // when
         scheduler.apply("store-1", "Allegro", "  ");
 
         // then
+        ArgumentCaptor<String> expression = ArgumentCaptor.forClass(String.class);
+        verify(schedules).put(eq("orders-import-store-1-allegro"), expression.capture(), eq(QUEUE_ARN), anyString());
+        assertThat(expression.getValue()).matches("cron\\([0-9]/10 \\* \\* \\* \\? \\*\\)");
+        verify(schedules, never()).delete(anyString());
+    }
+
+    @Test
+    void deleteRemovesTheStoreSchedule() {
+        // when
+        scheduler.delete("store-1", "Allegro");
+
+        // then
         verify(schedules).delete("orders-import-store-1-allegro");
-        verify(schedules, never()).put(anyString(), anyString(), anyString(), any(), anyInt());
     }
 
     @Test
@@ -71,7 +83,7 @@ class MarketplaceOrdersImportSchedulerTest {
 
         // then
         verify(schedules).put("orders-import-store-1-allegro", "cron(0 9 * * ? *)", QUEUE_ARN,
-                "{\"marketplace\":\"Allegro\",\"storeId\":\"store-1\"}", 1);
+                "{\"marketplace\":\"Allegro\",\"storeId\":\"store-1\"}");
     }
 
     @Test
@@ -81,15 +93,6 @@ class MarketplaceOrdersImportSchedulerTest {
 
         // then
         verify(schedules).delete("orders-import-store-1-allegro");
-        verify(schedules, never()).put(anyString(), anyString(), anyString(), any(), anyInt());
-    }
-
-    @Test
-    void deleteRemovesTheStoreSchedule() {
-        // when
-        scheduler.delete("store-1", "Allegro");
-
-        // then
-        verify(schedules).delete("orders-import-store-1-allegro");
+        verify(schedules, never()).put(anyString(), anyString(), anyString(), any());
     }
 }

@@ -90,8 +90,30 @@ class MarketplaceConnectionServiceTest {
 
         // then
         assertThat(store.getMarketplaceIntegration("Allegro").isLoggedIn()).isFalse();
-        verify(ordersImportScheduler, never()).apply(any(), any(), any());
         verify(storesRepository).save(store);
+    }
+
+    @Test
+    void aNewMarketplaceWithoutAScheduleStillGetsTheDefaultOne() {
+        // when
+        service.connectOrUpdate(store, "Empik", Map.of("apiKey", "secret"), "");
+
+        // then
+        verify(ordersImportScheduler).apply("store-1", "Empik", null);
+        assertThat(store.getMarketplaceIntegration("Empik").getOrdersImportSchedule()).isNull();
+    }
+
+    @Test
+    void anExistingMarketplaceWithoutAScheduleIsNotRescheduledOnEveryEdit() {
+        // given
+        store.getMarketplaces().add(new MarketplaceIntegration("Empik"));
+        when(providerFactory.loadConfiguration(store, "Empik")).thenReturn(Map.of("apiKey", "stored"));
+
+        // when
+        service.connectOrUpdate(store, "Empik", Map.of("apiKey", ""), "");
+
+        // then
+        verify(ordersImportScheduler, never()).apply(any(), any(), any());
     }
 
     @Test
@@ -114,7 +136,7 @@ class MarketplaceConnectionServiceTest {
     }
 
     @Test
-    void clearingTheScheduleRemovesItFromTheScheduler() {
+    void clearingTheScheduleFallsBackToTheDefaultOne() {
         // given
         MarketplaceIntegration existing = new MarketplaceIntegration("Empik");
         existing.setOrdersImportSchedule("0/15 * * * ? *");
@@ -313,6 +335,15 @@ class MarketplaceConnectionServiceTest {
 
         // when / then
         assertThat(service.availableMarketplaces(store)).containsExactly(EMPIK);
+    }
+
+    @Test
+    void theDefaultIntervalComesFromTheScheduler() {
+        // given
+        when(ordersImportScheduler.defaultIntervalMinutes()).thenReturn(10);
+
+        // when / then
+        assertThat(service.defaultIntervalMinutes()).isEqualTo(10);
     }
 
     @Test
