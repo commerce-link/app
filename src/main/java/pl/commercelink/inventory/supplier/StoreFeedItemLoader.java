@@ -37,19 +37,11 @@ public class StoreFeedItemLoader {
                             descriptor.supplierInfo().withName(identity), storeId, taxonomyPenalty);
         };
 
+        // Adapter CSV parsers stamp rows with the type name they were compiled with; a connection
+        // may be one of several instances of that type, so the connection identity must replace it.
         return items.stream()
-                .map(item -> stampedWith(item, identity))
+                .map(item -> item.withSupplier(identity))
                 .flatMap(item -> item.toLocalCurrency(ExchangeRates.LOCAL_CURRENCY, sellRates.get(item.currency())).stream())
                 .collect(Collectors.toList());
-    }
-
-    // Adapter CSV parsers stamp rows with the type name they were compiled with; a connection may
-    // be one of several instances of that type, so the identity of the connection must replace it.
-    private static InventoryItem stampedWith(InventoryItem item, String identity) {
-        if (identity.equals(item.supplier())) {
-            return item;
-        }
-        return new InventoryItem(item.ean(), item.mfn(), item.netPrice(), item.currency(), item.qty(),
-                item.leadTimeDays(), identity, item.sellable(), item.inStock(), item.inDelivery(), item.sku());
     }
 }
