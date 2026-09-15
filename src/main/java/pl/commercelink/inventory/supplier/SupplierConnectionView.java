@@ -20,6 +20,7 @@ public record SupplierConnectionView(
         boolean enabled,
         LocalDateTime feedLastModified,
         String feedSchedule,
+        String externalSupplierId,
         boolean knownProvider) {
 
     /**
@@ -44,5 +45,9 @@ public record SupplierConnectionView(
 
     public boolean isGlobal() {
         return mode == ConnectionMode.GLOBAL;
+    }
+
+    public boolean hasExternalSupplierId() {
+        return externalSupplierId != null && !externalSupplierId.isBlank();
     }
 }

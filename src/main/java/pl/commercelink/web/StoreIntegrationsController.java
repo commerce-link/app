@@ -9,8 +9,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.invoicing.InvoicingProviderFactory;
-import pl.commercelink.marketplace.MarketplaceProviderFactory;
-import pl.commercelink.notifications.StoreNotificationService;
 import pl.commercelink.payments.PaymentProviderFactory;
 import pl.commercelink.provider.ProviderFactory;
 import pl.commercelink.shipping.ShippingProviderFactory;
@@ -28,24 +26,18 @@ public class StoreIntegrationsController {
     private final ShippingProviderFactory shippingProviderFactory;
     private final InvoicingProviderFactory invoicingProviderFactory;
     private final PaymentProviderFactory paymentProviderFactory;
-    private final MarketplaceProviderFactory marketplaceProviderFactory;
     private final MessageSource messageSource;
-    private final StoreNotificationService notificationService;
 
     public StoreIntegrationsController(StoresRepository storesRepository,
                                        ShippingProviderFactory shippingProviderFactory,
                                        InvoicingProviderFactory invoicingProviderFactory,
                                        PaymentProviderFactory paymentProviderFactory,
-                                       MarketplaceProviderFactory marketplaceProviderFactory,
-                                       MessageSource messageSource,
-                                       StoreNotificationService notificationService) {
+                                       MessageSource messageSource) {
         this.storesRepository = storesRepository;
         this.shippingProviderFactory = shippingProviderFactory;
         this.invoicingProviderFactory = invoicingProviderFactory;
         this.paymentProviderFactory = paymentProviderFactory;
-        this.marketplaceProviderFactory = marketplaceProviderFactory;
         this.messageSource = messageSource;
-        this.notificationService = notificationService;
     }
 
     @PostMapping("/dashboard/store/integrations/credentials")
@@ -67,29 +59,13 @@ public class StoreIntegrationsController {
         ProviderFactory<?, ?> factory = resolveFactory(providerType);
         factory.saveConfiguration(store, providerName, config);
 
-        boolean connectionRestored = false;
         switch (providerType) {
             case "shipping" -> store.setConfigurationValue(IntegrationType.SHIPPING_PROVIDER, providerName);
             case "invoicing" -> store.setConfigurationValue(IntegrationType.INVOICING_PROVIDER, providerName);
             case "payments" -> store.addPaymentIntegration(providerName);
-            case "marketplace" -> {
-                MarketplaceIntegration integration = store.getMarketplaceIntegration(providerName);
-                boolean requiresDeviceAuth = marketplaceProviderFactory.deviceAuthProviders().contains(providerName);
-                if (integration == null) {
-                    MarketplaceIntegration created = new MarketplaceIntegration(providerName);
-                    created.setLoggedIn(!requiresDeviceAuth);
-                    store.getMarketplaces().add(created);
-                } else if (!requiresDeviceAuth) {
-                    store.markConnectionAsRestored(providerName);
-                    connectionRestored = true;
-                }
-            }
         }
 
         storesRepository.save(store);
-        if (connectionRestored) {
-            resolveExpiredConnection(store.getStoreId(), providerName);
-        }
         redirectAttributes.addFlashAttribute("successMessage",
                 messageSource.getMessage("store.integrations.credentials.success", null, locale));
         return redirectToIntegrationSettings(providerType, store.getStoreId());
@@ -117,13 +93,9 @@ public class StoreIntegrationsController {
             case "shipping" -> store.removeIntegration(IntegrationType.SHIPPING_PROVIDER);
             case "invoicing" -> store.removeIntegration(IntegrationType.INVOICING_PROVIDER);
             case "payments" -> store.removePaymentIntegration(providerName);
-            case "marketplace" -> store.removeMarketplaceIntegration(providerName);
         }
 
         storesRepository.save(store);
-        if ("marketplace".equals(providerType)) {
-            resolveExpiredConnection(store.getStoreId(), providerName);
-        }
         redirectAttributes.addFlashAttribute("successMessage",
                 messageSource.getMessage("store.integrations.disconnect.success", null, locale));
         return redirectToIntegrationSettings(providerType, store.getStoreId());
@@ -148,17 +120,11 @@ public class StoreIntegrationsController {
         return redirectToIntegrationSettings(providerType, store.getStoreId());
     }
 
-    private void resolveExpiredConnection(String storeId, String marketplace) {
-        notificationService.resolve(storeId, StoreNotificationType.UNAUTHENTICATED,
-                StoreNotification.marketplaceConnectionObject(marketplace));
-    }
-
     private ProviderFactory<?, ?> resolveFactory(String providerType) {
         return switch (providerType) {
             case "shipping" -> shippingProviderFactory;
             case "invoicing" -> invoicingProviderFactory;
             case "payments" -> paymentProviderFactory;
-            case "marketplace" -> marketplaceProviderFactory;
             default -> throw new IllegalArgumentException("Unknown provider type: " + providerType);
         };
     }
@@ -168,7 +134,6 @@ public class StoreIntegrationsController {
             case "shipping" -> "shipping";
             case "invoicing" -> "invoicing";
             case "payments" -> "payments";
-            case "marketplace" -> "marketplaces";
             default -> throw new IllegalArgumentException("Unknown provider type: " + providerType);
         };
         return CustomSecurityContext.hasRole("SUPER_ADMIN")

@@ -145,4 +145,11 @@ class SupplierTableFragmentTest {
         assertThat(html).contains("data-enabled=${row.enabled()}");
         assertThat(html).contains("data-feed-last-modified=${row.feedLastModified()}");
     }
+
+    @Test
+    void rendersTheMarketplaceIdColumnAndCarriesItAsADataAttribute() throws Exception {
+        String html = fragment();
+        assertThat(html).contains("data-external-supplier-id=${row.externalSupplierId()}");
+        assertThat(html).contains("#{store.supplier.column.externalId}");
+    }
 }

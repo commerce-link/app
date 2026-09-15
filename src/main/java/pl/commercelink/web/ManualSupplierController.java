@@ -125,9 +125,10 @@ public class ManualSupplierController {
                                 @RequestParam(name = "enabled", defaultValue = "false") boolean enabled,
                                 @RequestParam(name = "includeInPricing", defaultValue = "false") boolean includeInPricing,
                                 @RequestParam(name = "includeInFulfilment", defaultValue = "false") boolean includeInFulfilment,
+                                @RequestParam(name = "externalSupplierId", required = false) String externalSupplierId,
                                 Locale locale, Model model, HttpServletResponse response) {
-        return doSaveSelection(currentStoreId(), identity, enabled, includeInPricing, includeInFulfilment, locale,
-                model, response);
+        return doSaveSelection(currentStoreId(), identity, enabled, includeInPricing, includeInFulfilment,
+                externalSupplierId, locale, model, response);
     }
 
     @PostMapping("/dashboard/store/{storeId}/fulfilment/manual-supplier/{identity}")
@@ -136,13 +137,14 @@ public class ManualSupplierController {
                                         @RequestParam(name = "enabled", defaultValue = "false") boolean enabled,
                                         @RequestParam(name = "includeInPricing", defaultValue = "false") boolean includeInPricing,
                                         @RequestParam(name = "includeInFulfilment", defaultValue = "false") boolean includeInFulfilment,
+                                        @RequestParam(name = "externalSupplierId", required = false) String externalSupplierId,
                                         Locale locale, Model model, HttpServletResponse response) {
-        return doSaveSelection(storeId, identity, enabled, includeInPricing, includeInFulfilment, locale, model,
-                response);
+        return doSaveSelection(storeId, identity, enabled, includeInPricing, includeInFulfilment, externalSupplierId,
+                locale, model, response);
     }
 
     private String doSaveSelection(String storeId, String identity, boolean enabled,
-                                   boolean includeInPricing, boolean includeInFulfilment,
+                                   boolean includeInPricing, boolean includeInFulfilment, String externalSupplierId,
                                    Locale locale, Model model, HttpServletResponse response) {
         Store store = storesRepository.findById(storeId);
         if (store == null) {
@@ -150,7 +152,8 @@ public class ManualSupplierController {
                     messageSource.getMessage("store.manual.error.store.notfound", null, locale), model, response);
         }
         manualSupplierService.applySelections(storeId, List.of(
-                new ManualSupplierService.ManualSelection(identity, enabled, includeInPricing, includeInFulfilment)));
+                new ManualSupplierService.ManualSelection(identity, enabled, includeInPricing, includeInFulfilment,
+                        externalSupplierId)));
         Store updated = storesRepository.findById(storeId);
         String successMessage = messageSource.getMessage(
                 "store.fulfilment.supplier.saved", new Object[]{ManualSupplierInfos.label(identity)}, locale);

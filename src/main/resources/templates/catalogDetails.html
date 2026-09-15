@@ -39,7 +39,34 @@
                         <span th:text="#{catalog.deletion.protection}"></span>
                     </label>
                 </div>
+
+                <div class="field">
+                    <label class="label" th:text="#{catalog.pricelist.schedule}"></label>
+                    <div id="pricelist-schedule-error"></div>
+                    <div th:replace="~{fragments/schedule-field :: input('pricelistSchedule', ${productCatalog.pricelistSchedule}, ${scheduleMinIntervalMinutes}, #{catalog.pricelist.schedule.summary.default}, 'minutes,hours,days')}"></div>
+                </div>
             </form>
+            <script th:replace="~{fragments/schedule-field :: script}"></script>
+            <style th:replace="~{fragments/schedule-field :: style}"></style>
+            <script th:inline="javascript">
+                (function () {
+                    var form = document.getElementById('editCatalogForm');
+                    var field = form.querySelector('.schedule-field');
+                    var error = document.getElementById('pricelist-schedule-error');
+                    var scheduleIncompleteMessage = /*[[#{schedule.at.nohours}]]*/ '';
+                    window.scheduleField.init(field);
+                    form.addEventListener('submit', function (event) {
+                        if (window.scheduleField.valid(field)) { return; }
+                        event.preventDefault();
+                        var notification = document.createElement('div');
+                        notification.className = 'notification is-danger is-light';
+                        notification.textContent = scheduleIncompleteMessage;
+                        error.innerHTML = '';
+                        error.appendChild(notification);
+                        field.scrollIntoView({ block: 'center' });
+                    });
+                })();
+            </script>
 
                 <div class="field" th:if="${productCatalog.name != null}">
                     <label class="label" th:text="#{catalog.category.definition}"></label>

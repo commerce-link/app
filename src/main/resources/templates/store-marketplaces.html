@@ -11,23 +11,281 @@
 
             <div th:replace="~{fragments/settings-header :: header(false, null)}"></div>
 
-            <div th:replace="~{fragments/integration-panel :: panel(${connectedIntegrations}, ${availableProviders}, ${selectedProviderName}, #{store.marketplace.name}, ${form.providerConfiguration}, 'marketplace', ${form.store.storeId}, false)}"></div>
+            <div class="box" id="marketplace-section">
+                <div th:replace="~{fragments/marketplace-section :: marketplaceSection}"></div>
+            </div>
+
+            <div id="marketplaceModal" class="modal">
+                <div class="modal-background"></div>
+                <div class="modal-content">
+                    <form th:action="@{${basePath} + '/marketplaces/connection'}" method="post" id="marketplace-form">
+                        <div class="box">
+                            <h2 class="subtitle" id="marketplace-modal-title"></h2>
+
+                            <div id="marketplace-form-error"></div>
+
+                            <div class="field" id="marketplace-select-wrap">
+                                <label class="label" th:text="#{store.marketplace.name}"></label>
+                                <div class="control">
+                                    <div class="select is-fullwidth">
+                                        <select name="marketplace" id="marketplace-select">
+                                            <option value="" th:text="#{general.select}"></option>
+                                            <option th:each="descriptor : ${allMarketplaces}"
+                                                    th:value="${descriptor.name()}" th:text="${descriptor.displayName()}"></option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            <input type="hidden" name="marketplace" id="marketplace-name-hidden" disabled />
+
+                            <div th:each="descriptor : ${allMarketplaces}"
+                                 th:id="'marketplace-fields-' + ${descriptor.name()}" class="marketplace-fields">
+                                <div class="field" th:each="cf : ${descriptor.configurationFields()}">
+                                    <label class="label">
+                                        <span th:text="${cf.label()}"></span>
+                                        <span th:if="${cf.required()}" class="has-text-danger ml-1"
+                                              th:title="#{store.supplier.field.required.tooltip}"
+                                              th:text="#{store.supplier.field.required.marker}"></span>
+                                    </label>
+                                    <div class="control">
+                                        <input class="input"
+                                               th:type="${cf.type().name() == 'PASSWORD' ? 'password' : 'text'}"
+                                               th:name="'configuration[' + ${cf.key()} + ']'"
+                                               th:value="${cf.type().name() == 'PASSWORD'
+                                                          ? ''
+                                                          : (marketplaceConfigurations.get(descriptor.name()) != null
+                                                             ? marketplaceConfigurations.get(descriptor.name()).get(cf.key()) : '')}"
+                                               th:placeholder="${cf.placeholder()}"
+                                               th:attr="data-required=${cf.required()}"
+                                               disabled />
+                                    </div>
+                                    <p class="help" th:if="${cf.type().name() == 'PASSWORD'}"
+                                       th:text="#{store.supplier.password.keep}"></p>
+                                </div>
+                            </div>
+
+                            <div class="field">
+                                <label class="label" th:text="#{store.marketplaces.column.schedule}"></label>
+                                <div th:replace="~{fragments/schedule-field :: input('schedule', '', ${scheduleMinIntervalMinutes}, #{store.marketplaces.schedule.summary.default(${sectionDefaultIntervalMinutes})}, 'minutes,hours')}"></div>
+                            </div>
+
+                            <div class="field is-grouped mt-4">
+                                <div class="control">
+                                    <button class="button is-primary" type="submit" th:text="#{general.save}"></button>
+                                </div>
+                                <div class="control">
+                                    <button type="button" class="button" id="marketplace-modal-cancel"
+                                            th:text="#{general.cancel}"></button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <button class="modal-close is-large" aria-label="close" id="marketplace-modal-close"></button>
+            </div>
 
         </div>
     </section>
 
+    <script th:replace="~{fragments/schedule-field :: script}"></script>
+    <style th:replace="~{fragments/schedule-field :: style}"></style>
+    <style>
+        .marketplace-actions .dropdown-item.button { width: 100%; text-decoration: none; }
+    </style>
+
     <script th:inline="javascript">
         (function () {
-            const messages = {
-                failed: /*[[#{store.integrations.deviceauth.failed}]]*/ '',
-                expired: /*[[#{store.integrations.deviceauth.expired}]]*/ ''
-            };
-            const connectButtons = document.querySelectorAll('.device-auth-row-connect');
-            let pollTimer = null;
-            let activeButton = null;
+            var basePath = /*[[${basePath}]]*/ '';
+            var genericError = /*[[#{general.error}]]*/ 'Error';
+            var addTitle = /*[[#{store.marketplaces.add.modal.title}]]*/ '';
+            var editTitle = /*[[#{store.marketplaces.edit.modal.title}]]*/ '';
+            var scheduleIncompleteMessage = /*[[#{schedule.at.nohours}]]*/ '';
+            var deviceAuthFailed = /*[[#{store.integrations.deviceauth.failed}]]*/ '';
+            var deviceAuthExpired = /*[[#{store.integrations.deviceauth.expired}]]*/ '';
+
+            var section = document.getElementById('marketplace-section');
+            var modal = document.getElementById('marketplaceModal');
+            var form = document.getElementById('marketplace-form');
+            var submitButton = form.querySelector('button[type="submit"]');
+            var formError = document.getElementById('marketplace-form-error');
+            var select = document.getElementById('marketplace-select');
+            var selectWrap = document.getElementById('marketplace-select-wrap');
+            var hiddenName = document.getElementById('marketplace-name-hidden');
+            var title = document.getElementById('marketplace-modal-title');
+            var schedule = form.querySelector('.schedule-field');
+            var submitInFlight = false;
+
+            function applySectionSwap(html) {
+                var temp = document.createElement('div');
+                temp.innerHTML = html;
+                var message = temp.firstElementChild ? temp.firstElementChild.getAttribute('data-success-message') : null;
+                section.innerHTML = temp.innerHTML;
+                if (message) { showToast(message, 'success'); }
+            }
+
+            function extractErrorMessage(html) {
+                if (!html) { return genericError; }
+                var temp = document.createElement('div');
+                temp.innerHTML = html;
+                return temp.textContent.trim() || genericError;
+            }
+
+            function showFormError(html, status) {
+                var trusted = status === 400 && !!html && html.indexOf('notification is-danger') !== -1 && html.indexOf('<html') === -1;
+                formError.innerHTML = trusted ? html : ('<div class="notification is-danger">' + genericError + '</div>');
+            }
+
+            function rowFor(name) {
+                var row = section.querySelector('tr[data-marketplace="' + name + '"]');
+                return row ? { name: name, schedule: row.getAttribute('data-orders-import-schedule') || '' } : null;
+            }
+
+            function connectedNames() {
+                return Array.prototype.slice.call(section.querySelectorAll('tr[data-marketplace]'))
+                        .map(function (tr) { return tr.getAttribute('data-marketplace'); });
+            }
+
+            function activeName() {
+                return selectWrap.classList.contains('is-hidden') ? hiddenName.value : select.value;
+            }
+
+            function refreshFields() {
+                var name = activeName();
+                var root = section.firstElementChild;
+                var stored = (root && root.getAttribute('data-marketplaces-with-stored-config') || '')
+                        .split(';').filter(function (s) { return s.length > 0; });
+                var hasStoredConfig = stored.indexOf(name) !== -1;
+                form.querySelectorAll('.marketplace-fields').forEach(function (group) {
+                    var active = group.id === 'marketplace-fields-' + name;
+                    group.style.display = active ? '' : 'none';
+                    group.querySelectorAll('input').forEach(function (input) {
+                        input.disabled = !active;
+                        var required = input.dataset.required === 'true';
+                        input.required = required && !(input.type === 'password' && hasStoredConfig);
+                    });
+                });
+            }
+
+            function refreshAvailableOptions() {
+                var connected = connectedNames();
+                Array.prototype.slice.call(select.options).forEach(function (option) {
+                    option.hidden = option.value !== '' && connected.indexOf(option.value) !== -1;
+                });
+            }
+
+            function open(name) {
+                var row = name ? rowFor(name) : null;
+                title.textContent = row ? editTitle : addTitle;
+                selectWrap.classList.toggle('is-hidden', !!row);
+                select.disabled = !!row;
+                hiddenName.disabled = !row;
+                formError.innerHTML = '';
+                if (row) {
+                    hiddenName.value = row.name;
+                } else {
+                    refreshAvailableOptions();
+                    select.value = '';
+                }
+                window.scheduleField.sync(schedule, row ? row.schedule : '');
+                refreshFields();
+                modal.classList.add('is-active');
+            }
+
+            function close() { modal.classList.remove('is-active'); }
+
+            function disconnectMarketplace(name, button) {
+                button.disabled = true;
+                fetch(basePath + '/marketplaces/' + encodeURIComponent(name) + '/disconnect', { method: 'POST' })
+                    .then(function (response) {
+                        return response.text().then(function (html) { return { ok: response.ok, html: html }; });
+                    })
+                    .then(function (result) {
+                        if (!result.ok) {
+                            button.disabled = false;
+                            alert(extractErrorMessage(result.html));
+                            return;
+                        }
+                        applySectionSwap(result.html);
+                    })
+                    .catch(function () {
+                        button.disabled = false;
+                        alert(genericError);
+                    });
+            }
+
+            function closeDropdowns(except) {
+                section.querySelectorAll('.marketplace-actions.is-active').forEach(function (dropdown) {
+                    if (dropdown !== except) { dropdown.classList.remove('is-active'); }
+                });
+            }
+
+            document.addEventListener('click', function (event) {
+                if (!event.target.closest('.marketplace-actions')) { closeDropdowns(null); }
+            });
+
+            section.addEventListener('click', function (event) {
+                var trigger = event.target.closest('.marketplace-actions .dropdown-trigger');
+                if (trigger) {
+                    var dropdown = trigger.closest('.marketplace-actions');
+                    closeDropdowns(dropdown);
+                    dropdown.classList.toggle('is-active');
+                    return;
+                }
+                closeDropdowns(null);
+                if (event.target.closest('#marketplace-add-button')) { open(null); return; }
+                var configureButton = event.target.closest('[data-configure-marketplace]');
+                if (configureButton) { open(configureButton.getAttribute('data-configure-marketplace')); return; }
+                var disconnectButton = event.target.closest('.marketplace-disconnect-button');
+                if (disconnectButton) {
+                    var name = disconnectButton.getAttribute('data-identity');
+                    confirmDelete(disconnectButton, function () { disconnectMarketplace(name, disconnectButton); });
+                    return;
+                }
+                var connectButton = event.target.closest('.device-auth-row-connect');
+                if (connectButton) { startDeviceAuth(connectButton); }
+            });
+
+            select.addEventListener('change', refreshFields);
+            document.getElementById('marketplace-modal-cancel').addEventListener('click', close);
+            document.getElementById('marketplace-modal-close').addEventListener('click', close);
+            modal.querySelector('.modal-background').addEventListener('click', close);
+
+            form.addEventListener('submit', function (event) {
+                event.preventDefault();
+                if (submitInFlight) { return; }
+                if (!window.scheduleField.valid(schedule)) {
+                    formError.innerHTML = '<div class="notification is-danger is-light"></div>';
+                    formError.firstElementChild.textContent = scheduleIncompleteMessage;
+                    return;
+                }
+                submitInFlight = true;
+                submitButton.disabled = true;
+                formError.innerHTML = '';
+                fetch(form.action, { method: 'POST', body: new URLSearchParams(new FormData(form)) })
+                    .then(function (response) {
+                        return response.text().then(function (html) {
+                            return { ok: response.ok, status: response.status, html: html };
+                        });
+                    })
+                    .then(function (result) {
+                        submitInFlight = false;
+                        submitButton.disabled = false;
+                        if (!result.ok) { showFormError(result.html, result.status); return; }
+                        applySectionSwap(result.html);
+                        close();
+                    })
+                    .catch(function () {
+                        submitInFlight = false;
+                        submitButton.disabled = false;
+                        showFormError(null, null);
+                    });
+            });
+
+            var pollTimer = null;
+            var activeButton = null;
 
             function setInProgress(button, inProgress) {
-                connectButtons.forEach(function (b) { b.disabled = inProgress; });
+                section.querySelectorAll('.device-auth-row-connect').forEach(function (b) { b.disabled = inProgress; });
                 button.classList.toggle('is-loading', inProgress);
                 activeButton = inProgress ? button : null;
             }
@@ -44,33 +302,32 @@
                     method: 'POST',
                     headers: {'Content-Type': 'application/x-www-form-urlencoded'},
                     body: new URLSearchParams(params)
-                }).then(response => response.json().then(body => ({ok: response.ok, body: body})));
+                }).then(function (response) {
+                    return response.json().then(function (body) { return { ok: response.ok, body: body }; });
+                });
             }
 
             function fail(message) {
                 stopPolling();
-                if (activeButton) {
-                    setInProgress(activeButton, false);
-                }
+                if (activeButton) { setInProgress(activeButton, false); }
                 alert(message);
             }
 
             function poll(providerName, deviceCode, intervalSeconds, deadline) {
                 if (Date.now() > deadline) {
-                    fail(messages.expired);
+                    fail(deviceAuthExpired);
                     return;
                 }
                 pollTimer = setTimeout(function () {
-                    post('/dashboard/store/integrations/device-auth/poll',
-                            {providerName: providerName, deviceCode: deviceCode})
+                    post('/dashboard/store/integrations/device-auth/poll', {providerName: providerName, deviceCode: deviceCode})
                         .then(function (result) {
-                            const status = result.body.status;
+                            var status = result.body.status;
                             if (status === 'AUTHORIZED') {
                                 window.location.reload();
                             } else if (status === 'FAILED' || !result.ok) {
-                                fail(messages.failed + ' ' + (result.body.error || ''));
+                                fail(deviceAuthFailed + ' ' + (result.body.error || ''));
                             } else {
-                                const nextInterval = status === 'SLOW_DOWN' ? intervalSeconds + 5 : intervalSeconds;
+                                var nextInterval = status === 'SLOW_DOWN' ? intervalSeconds + 5 : intervalSeconds;
                                 poll(providerName, deviceCode, nextInterval, deadline);
                             }
                         })
@@ -80,37 +337,31 @@
                 }, intervalSeconds * 1000);
             }
 
-            connectButtons.forEach(function (button) {
-                button.addEventListener('click', function () {
-                    const providerName = button.getAttribute('data-provider');
-                    const authWindow = window.open('about:blank', '_blank');
-                    stopPolling();
-                    setInProgress(button, true);
-                    post('/dashboard/store/integrations/device-auth/start', {providerName: providerName})
-                        .then(function (result) {
-                            if (!result.ok) {
-                                if (authWindow) {
-                                    authWindow.close();
-                                }
-                                fail(messages.failed + ' ' + (result.body.error || ''));
-                                return;
-                            }
-                            if (authWindow) {
-                                authWindow.location = result.body.verificationUriComplete;
-                            } else {
-                                window.open(result.body.verificationUriComplete, '_blank');
-                            }
-                            const deadline = Date.now() + result.body.expiresIn * 1000;
-                            poll(providerName, result.body.deviceCode, result.body.interval || 5, deadline);
-                        })
-                        .catch(function () {
-                            if (authWindow) {
-                                authWindow.close();
-                            }
-                            fail(messages.failed);
-                        });
-                });
-            });
+            function startDeviceAuth(button) {
+                var providerName = button.getAttribute('data-provider');
+                var authWindow = window.open('about:blank', '_blank');
+                stopPolling();
+                setInProgress(button, true);
+                post('/dashboard/store/integrations/device-auth/start', {providerName: providerName})
+                    .then(function (result) {
+                        if (!result.ok) {
+                            if (authWindow) { authWindow.close(); }
+                            fail(deviceAuthFailed + ' ' + (result.body.error || ''));
+                            return;
+                        }
+                        if (authWindow) {
+                            authWindow.location = result.body.verificationUriComplete;
+                        } else {
+                            window.open(result.body.verificationUriComplete, '_blank');
+                        }
+                        var deadline = Date.now() + result.body.expiresIn * 1000;
+                        poll(providerName, result.body.deviceCode, result.body.interval || 5, deadline);
+                    })
+                    .catch(function () {
+                        if (authWindow) { authWindow.close(); }
+                        fail(deviceAuthFailed);
+                    });
+            }
         })();
     </script>
 

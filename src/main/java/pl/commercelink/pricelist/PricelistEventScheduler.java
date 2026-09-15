@@ -1,81 +1,52 @@
 package pl.commercelink.pricelist;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import pl.commercelink.scheduling.EventBridgeSchedules;
+import pl.commercelink.scheduling.PollingSchedule;
 import pl.commercelink.starter.util.ConversionUtil;
-import software.amazon.awssdk.services.scheduler.SchedulerClient;
-import software.amazon.awssdk.services.scheduler.model.*;
 
-import java.util.Random;
+import java.util.Optional;
 
 @Component
 public class PricelistEventScheduler {
 
-    @Value("${application.env}")
-    private String env;
+    private final String pricelistQueueArn;
+    private final EventBridgeSchedules schedules;
 
-    @Value("${sqs.pricelist.queue.arn}")
-    private String pricelistQueueArn;
+    public PricelistEventScheduler(@Value("${sqs.pricelist.queue.arn}") String pricelistQueueArn,
+                                   EventBridgeSchedules schedules) {
+        this.pricelistQueueArn = pricelistQueueArn;
+        this.schedules = schedules;
+    }
 
-    @Value("${eventbridge.scheduler.role.arn}")
-    private String eventBridgeSchedulerRoleArn;
-
-    @Autowired(required = false)
-    private SchedulerClient schedulerClient;
-
-    public void createRecurringSchedule(String storeId, String catalogId) {
-        if (!env.equals("prod")) {
-            return;
-        }
-
-        String scheduleBody = ConversionUtil.toJson(new PricelistEventPayload(storeId, catalogId));
-        String cronExpression = generateRandomSchedule();
-
-        CreateScheduleRequest request = CreateScheduleRequest.builder()
-                .name(scheduleName(storeId, catalogId))
-                .scheduleExpression("cron(" + cronExpression + ")")
-                .scheduleExpressionTimezone("Europe/Warsaw")
-                .flexibleTimeWindow(FlexibleTimeWindow.builder()
-                        .mode(FlexibleTimeWindowMode.OFF)
-                        .build())
-                .target(Target.builder()
-                        .arn(pricelistQueueArn)
-                        .roleArn(eventBridgeSchedulerRoleArn)
-                        .input(scheduleBody)
-                        .build())
-                .build();
-
-        schedulerClient.createSchedule(request);
+    public void schedule(String storeId, String catalogId, String pricelistSchedule) {
+        schedules.put(
+                scheduleName(storeId, catalogId),
+                PollingSchedule.storedOrRandomNightly(pricelistSchedule).withRandomStart().awsExpression(),
+                pricelistQueueArn,
+                ConversionUtil.toJson(new PricelistEventPayload(storeId, catalogId)));
     }
 
     public void deleteSchedule(String storeId, String catalogId) {
-        if (!env.equals("prod")) {
-            return;
-        }
-
-        DeleteScheduleRequest deleteRequest = DeleteScheduleRequest.builder()
-                .name(scheduleName(storeId, catalogId))
-                .build();
-
-        try {
-            schedulerClient.deleteSchedule(deleteRequest);
-        } catch (ResourceNotFoundException e) {
-            throw new RuntimeException("No existing schedule to delete: " + scheduleName(storeId, catalogId), e);
-        }
+        schedules.delete(scheduleName(storeId, catalogId));
     }
 
-    // Random time between 23PM - 5AM
-    private String generateRandomSchedule() {
-        Random random = new Random();
-        int[] allowedHours = { 23, 0, 1, 2, 3, 4 };
-        int hour = allowedHours[random.nextInt(allowedHours.length)];
-        int minute = random.nextInt(60);
-        return String.format("%d %d * * ? *", minute, hour);
+    public Optional<String> snapshot(String storeId, String catalogId) {
+        return schedules.expressionOf(scheduleName(storeId, catalogId));
+    }
+
+    public void restore(String storeId, String catalogId, Optional<String> snapshot) {
+        String name = scheduleName(storeId, catalogId);
+        if (snapshot.isPresent()) {
+            schedules.put(name, snapshot.get(), pricelistQueueArn,
+                    ConversionUtil.toJson(new PricelistEventPayload(storeId, catalogId)));
+        } else {
+            schedules.delete(name);
+        }
     }
 
     private String scheduleName(String storeId, String catalogId) {
         return "pricelist-" + storeId + "-" + catalogId;
     }
-
 }

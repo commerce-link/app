@@ -12,6 +12,7 @@ public class SupplierConnectionForm {
     private boolean includeInPricing;
     private boolean includeInFulfilment;
     private String feedSchedule;
+    private String externalSupplierId;
     private Map<String, String> configuration = new HashMap<>();
 
     public String getSupplierName() {
@@ -52,6 +53,14 @@ public class SupplierConnectionForm {
 
     public void setFeedSchedule(String feedSchedule) {
         this.feedSchedule = feedSchedule;
+    }
+
+    public String getExternalSupplierId() {
+        return externalSupplierId;
+    }
+
+    public void setExternalSupplierId(String externalSupplierId) {
+        this.externalSupplierId = externalSupplierId;
     }
 
     public Map<String, String> getConfiguration() {
