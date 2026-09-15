@@ -18,6 +18,7 @@ import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
+import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.pricelist.PricelistEventScheduler;
 import pl.commercelink.products.*;
 import pl.commercelink.products.brand.BrandMapper;
@@ -71,6 +72,9 @@ public class ProductCatalogController {
 
     @Autowired
     private MessageSource messageSource;
+
+    @Autowired
+    private SupplierLabels supplierLabels;
     private static final int CATALOGS_PAGE_SIZE = 25;
     private static final int PRODUCTS_PAGE_SIZE = 25;
 
@@ -302,6 +306,8 @@ public class ProductCatalogController {
 
         model.addAttribute("brands", brands);
         model.addAttribute("productRecommendations", paginatedRecommendations);
+        // Alternative suppliers are connection identities; the table shows the operator's label.
+        model.addAttribute("supplierLabels", supplierLabels.forStoreId(getStoreId()));
         model.addAttribute("categoryId", categoryId);
         model.addAttribute("paginationParams", paginationParams);
 

@@ -289,6 +289,25 @@ class SupplierConnectionViewFactoryTest {
     }
 
     @Test
+    void tokenedOwnConnectionShowsItsLabelAndType() {
+        // given
+        StoreSupplierConnection connection = new StoreSupplierConnection("Elko-k7f3a9c2", ConnectionMode.OWN);
+        connection.setLabel("Elko drugie konto");
+        Store store = storeWith(connection);
+        when(storeFeedRepository.feedLastModifiedByIdentity("store-1")).thenReturn(Map.of());
+        when(supplierRegistry.exists("Elko-k7f3a9c2")).thenReturn(true);
+
+        // when
+        SupplierConnectionView view = factory.views(store).external().get(0);
+
+        // then
+        assertThat(view.identity()).isEqualTo("Elko-k7f3a9c2");
+        assertThat(view.providerName()).isEqualTo("Elko");
+        assertThat(view.label()).isEqualTo("Elko drugie konto");
+        assertThat(view.canSwitchMode()).isFalse();
+    }
+
+    @Test
     void returnsEmptyListsWhenTheStoreHasNoFulfilmentConfiguration() {
         // given
         Store store = new Store();

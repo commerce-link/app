@@ -15,7 +15,9 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.context.MessageSource;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 import pl.commercelink.inventory.deliveries.DropshipItemLookup;
+import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.orders.BillingDetails;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.Order;
@@ -58,6 +60,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -101,6 +104,8 @@ class OrdersControllerTest {
     private TaxonomyCache taxonomyCache;
     @Mock
     private StoreCategories storeCategories;
+    @Mock
+    private SupplierLabels supplierLabels;
 
     @InjectMocks
     private OrdersController ordersController;
@@ -111,6 +116,11 @@ class OrdersControllerTest {
     void setupStoreId() {
         securityStub = mockStatic(CustomSecurityContext.class);
         securityStub.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+    }
+
+    @BeforeEach
+    void setUpSupplierLabels() {
+        when(supplierLabels.forStore(any())).thenReturn(new SupplierLabels(mock(StoresRepository.class)).forStore(null));
     }
 
     @AfterEach
@@ -817,7 +827,11 @@ class OrdersControllerTest {
         item.setManufacturerCode("MFN-1");
         when(orderItemsRepository.findById(ORDER_ID, item.getItemId())).thenReturn(item);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(routedOrder("2"));
-        when(storesRepository.findById(STORE_ID)).thenReturn(storeRouting("Acme", "2"));
+        Store store = storeRouting("Acme", "2");
+        StoreSupplierConnection bravo = new StoreSupplierConnection("Bravo", ConnectionMode.GLOBAL);
+        bravo.setExternalSupplierId("3");
+        store.getSupplierConnections().add(bravo);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(messageSource.getMessage(eq("order.item.assign.supplier.routed"), any(), eq(Locale.ENGLISH)))
                 .thenReturn("routed");
 
@@ -853,6 +867,48 @@ class OrdersControllerTest {
         verify(orderItemsRepository).save(item);
         verify(redirectAttributes, never()).addFlashAttribute(eq("errorMessage"), any());
         assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+    }
+
+    @Test
+    void assignSupplierRefusesAnIdentityThatIsNotConnectedToTheStore() {
+        // given
+        OrderItem item = existingOrderItem("Laptopy", false);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(routedOrder(null));
+        when(orderItemsRepository.findById(ORDER_ID, item.getItemId())).thenReturn(item);
+        when(storesRepository.findById(STORE_ID)).thenReturn(storeRouting("Acme", "2"));
+        when(messageSource.getMessage(eq("order.item.assign.supplier.unknown"), any(), any(Locale.class))).thenReturn("unknown");
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        ordersController.assignSupplier(ORDER_ID, item.getItemId(), "MFN-1", 10.0, "Bravo-k7f3a9c2",
+                new ExtendedModelMap(), redirect, Locale.ENGLISH);
+
+        // then
+        assertThat(redirect.getFlashAttributes().get("errorMessage")).isEqualTo("unknown");
+        assertThat(item.getDeliveryId()).isNull();
+        verify(orderItemsRepository, never()).save(any());
+    }
+
+    @Test
+    void assignSupplierRefusesADisabledConnection() {
+        // given
+        OrderItem item = existingOrderItem("Laptopy", false);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(routedOrder(null));
+        when(orderItemsRepository.findById(ORDER_ID, item.getItemId())).thenReturn(item);
+        Store store = storeRouting("Acme", "2");
+        store.getSupplierConnections().get(0).setEnabled(false);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(messageSource.getMessage(eq("order.item.assign.supplier.unknown"), any(), any(Locale.class))).thenReturn("unknown");
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        ordersController.assignSupplier(ORDER_ID, item.getItemId(), "MFN-1", 10.0, "Acme",
+                new ExtendedModelMap(), redirect, Locale.ENGLISH);
+
+        // then
+        assertThat(redirect.getFlashAttributes().get("errorMessage")).isEqualTo("unknown");
+        assertThat(item.getDeliveryId()).isNull();
+        verify(orderItemsRepository, never()).save(any());
     }
 
     @Test

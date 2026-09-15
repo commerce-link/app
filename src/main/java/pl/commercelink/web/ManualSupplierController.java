@@ -14,10 +14,12 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.multipart.MultipartFile;
 import pl.commercelink.inventory.supplier.SupplierConnectionViewFactory;
-import pl.commercelink.inventory.supplier.manual.ManualSupplierInfos;
+import pl.commercelink.inventory.supplier.SupplierIdentity;
+import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.inventory.supplier.manual.ManualSupplierService;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoreSupplierConnection;
 import pl.commercelink.stores.StoresRepository;
 
 import java.io.IOException;
@@ -85,8 +87,7 @@ public class ManualSupplierController {
         if (!result.ok()) {
             return ResponseEntity.badRequest().body(Map.of("ok", false, "message", messageSource.getMessage(result.messageCode(), null, locale)));
         }
-        String identity = ManualSupplierInfos.identityFor(name.trim());
-        return ResponseEntity.ok(Map.of("ok", true, "identity", identity, "label", ManualSupplierInfos.label(identity)));
+        return ResponseEntity.ok(Map.of("ok", true, "identity", result.identity(), "label", name.trim()));
     }
 
     private ResponseEntity<Map<String, Object>> doUploadFeed(String storeId, String identity, MultipartFile file, Locale locale) throws IOException {
@@ -104,6 +105,7 @@ public class ManualSupplierController {
     }
 
     private String doDelete(String storeId, String identity, Locale locale, Model model, HttpServletResponse response) {
+        String label = labelFor(storesRepository.findById(storeId), identity);
         ManualSupplierService.Result result = manualSupplierService.delete(storeId, identity);
         if (!result.ok()) {
             return SupplierSectionModel.renderErrorFragment(
@@ -114,9 +116,21 @@ public class ManualSupplierController {
             return SupplierSectionModel.renderErrorFragment(
                     messageSource.getMessage("store.manual.error.store.notfound", null, locale), model, response);
         }
-        String successMessage = messageSource.getMessage(
-                "store.manual.deleted", new Object[]{ManualSupplierInfos.label(identity)}, locale);
+        String successMessage = messageSource.getMessage("store.manual.deleted", new Object[]{label}, locale);
         return SupplierSectionModel.renderManualSection(supplierConnectionViewFactory, store, successMessage, model);
+    }
+
+    // Resolved before delete()/applySelections() run, since the connection (and any label it
+    // carries) is gone from the store once the mutation succeeds.
+    private String labelFor(Store store, String identity) {
+        if (store != null) {
+            for (StoreSupplierConnection connection : store.getSupplierConnections()) {
+                if (connection.getSupplierName().equals(identity)) {
+                    return SupplierLabels.labelOf(connection);
+                }
+            }
+        }
+        return SupplierIdentity.legacyLabel(identity);
     }
 
     @PostMapping("/dashboard/store/fulfilment/manual-supplier/{identity}")
@@ -126,9 +140,11 @@ public class ManualSupplierController {
                                 @RequestParam(name = "includeInPricing", defaultValue = "false") boolean includeInPricing,
                                 @RequestParam(name = "includeInFulfilment", defaultValue = "false") boolean includeInFulfilment,
                                 @RequestParam(name = "externalSupplierId", required = false) String externalSupplierId,
+                                @RequestParam(name = "label", required = false) String label,
+                                @RequestParam(name = "billingShortcut", required = false) String billingShortcut,
                                 Locale locale, Model model, HttpServletResponse response) {
         return doSaveSelection(currentStoreId(), identity, enabled, includeInPricing, includeInFulfilment,
-                externalSupplierId, locale, model, response);
+                externalSupplierId, label, billingShortcut, locale, model, response);
     }
 
     @PostMapping("/dashboard/store/{storeId}/fulfilment/manual-supplier/{identity}")
@@ -138,25 +154,32 @@ public class ManualSupplierController {
                                         @RequestParam(name = "includeInPricing", defaultValue = "false") boolean includeInPricing,
                                         @RequestParam(name = "includeInFulfilment", defaultValue = "false") boolean includeInFulfilment,
                                         @RequestParam(name = "externalSupplierId", required = false) String externalSupplierId,
+                                        @RequestParam(name = "label", required = false) String label,
+                                        @RequestParam(name = "billingShortcut", required = false) String billingShortcut,
                                         Locale locale, Model model, HttpServletResponse response) {
         return doSaveSelection(storeId, identity, enabled, includeInPricing, includeInFulfilment, externalSupplierId,
-                locale, model, response);
+                label, billingShortcut, locale, model, response);
     }
 
     private String doSaveSelection(String storeId, String identity, boolean enabled,
                                    boolean includeInPricing, boolean includeInFulfilment, String externalSupplierId,
-                                   Locale locale, Model model, HttpServletResponse response) {
+                                   String label, String billingShortcut, Locale locale, Model model,
+                                   HttpServletResponse response) {
         Store store = storesRepository.findById(storeId);
         if (store == null) {
             return SupplierSectionModel.renderErrorFragment(
                     messageSource.getMessage("store.manual.error.store.notfound", null, locale), model, response);
         }
-        manualSupplierService.applySelections(storeId, List.of(
+        ManualSupplierService.Result result = manualSupplierService.applySelections(storeId, List.of(
                 new ManualSupplierService.ManualSelection(identity, enabled, includeInPricing, includeInFulfilment,
-                        externalSupplierId)));
+                        externalSupplierId, label, billingShortcut)));
+        if (!result.ok()) {
+            return SupplierSectionModel.renderErrorFragment(
+                    messageSource.getMessage(result.messageCode(), null, locale), model, response);
+        }
         Store updated = storesRepository.findById(storeId);
         String successMessage = messageSource.getMessage(
-                "store.fulfilment.supplier.saved", new Object[]{ManualSupplierInfos.label(identity)}, locale);
+                "store.fulfilment.supplier.saved", new Object[]{labelFor(updated, identity)}, locale);
         return SupplierSectionModel.renderManualSection(supplierConnectionViewFactory, updated, successMessage, model);
     }
 

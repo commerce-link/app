@@ -28,6 +28,12 @@ public class StoreSupplierConnection {
     @DynamoDBAttribute(attributeName = "feedSchedule")
     private String feedSchedule;
 
+    @DynamoDBAttribute(attributeName = "label")
+    private String label;
+
+    @DynamoDBAttribute(attributeName = "billingShortcut")
+    private String billingShortcut;
+
     public StoreSupplierConnection() {
     }
 
@@ -104,5 +110,21 @@ public class StoreSupplierConnection {
 
     public void setFeedSchedule(String feedSchedule) {
         this.feedSchedule = feedSchedule;
+    }
+
+    public String getLabel() {
+        return label;
+    }
+
+    public void setLabel(String label) {
+        this.label = label;
+    }
+
+    public String getBillingShortcut() {
+        return billingShortcut;
+    }
+
+    public void setBillingShortcut(String billingShortcut) {
+        this.billingShortcut = billingShortcut;
     }
 }

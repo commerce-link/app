@@ -320,7 +320,7 @@ class ProviderFactoryTest {
         ProviderFactory<OAuth2Descriptor, Object> factory = factoryWith(descriptor);
 
         // when
-        Map<String, Object> context = factory.buildContext(store, descriptor);
+        Map<String, Object> context = factory.buildContext(store, descriptor, descriptor.name());
 
         // then
         assertTrue(context.get("restApi") instanceof RestApiWithRetry);
@@ -334,7 +334,7 @@ class ProviderFactoryTest {
         // given
         OAuth2WithContentTypeDescriptor descriptor = new OAuth2WithContentTypeDescriptor();
         ProviderFactory<OAuth2Descriptor, Object> factory = factoryWith(descriptor);
-        Map<String, Object> context = factory.buildContext(store, descriptor);
+        Map<String, Object> context = factory.buildContext(store, descriptor, descriptor.name());
         RestApiWithRetry restApi = (RestApiWithRetry) context.get("restApi");
 
         // when
@@ -369,7 +369,7 @@ class ProviderFactoryTest {
                 7776000L, "application/vnd.allegro.public.v1+json", "refreshToken");
 
         // when
-        ConfigurableOAuth2AuthorizationService authService = factory.createAuthService(store, descriptor, oauth2);
+        ConfigurableOAuth2AuthorizationService authService = factory.createAuthService(store, descriptor, oauth2, descriptor.name());
 
         // then
         String[] endpoints = authEndpointsOf(authService);

@@ -33,8 +33,8 @@ class ManualSupplierServiceTest {
 
     @Mock StoresRepository storesRepository;
     @Mock StoreFeedRepository storeFeedRepository;
-    @Mock SupplierRegistry supplierRegistry;
     @Mock StoreInventoryCache storeInventoryCache;
+    @Mock SupplierRegistry supplierRegistry;
     @InjectMocks ManualSupplierService service;
 
     private Store storeWith(StoreSupplierConnection... connections) {
@@ -51,88 +51,91 @@ class ManualSupplierServiceTest {
         // given
         Store store = storeWith();
         when(storesRepository.findById("store-1")).thenReturn(store);
-        when(supplierRegistry.getAllSupplierNames()).thenReturn(List.of("Acme"));
 
         // when
-        ManualSupplierService.Result result = service.create("store-1", "Hurtownia A");
+        ManualSupplierService.Result result = service.create("store-1", "Hurtownia Ą");
 
         // then
         assertTrue(result.ok());
-        assertTrue(store.getManualSupplierNames().contains("manual:Hurtownia A"));
+        assertTrue(result.identity().matches("^manual-[a-z0-9]{8}$"));
+        StoreSupplierConnection created = store.getSupplierConnections().get(0);
+        assertEquals(result.identity(), created.getSupplierName());
+        assertEquals("Hurtownia Ą", created.getLabel());
+        assertEquals(ConnectionMode.MANUAL, created.getMode());
+        assertFalse(created.isEnabled());
         verify(storesRepository).save(store);
+        verify(storeInventoryCache).evict("store-1");
     }
 
     @Test
-    void createStartsSupplierDisabled() {
+    void createRejectsALabelAlreadyUsedByAnyConnection() {
         // given
-        Store store = storeWith();
+        StoreSupplierConnection legacy = new StoreSupplierConnection("manual:Asus", ConnectionMode.MANUAL, true, true);
+        Store store = storeWith(legacy, new StoreSupplierConnection("Kosatec", ConnectionMode.OWN, true, true));
         when(storesRepository.findById("store-1")).thenReturn(store);
-        when(supplierRegistry.getAllSupplierNames()).thenReturn(List.of("Acme"));
 
-        // when
-        service.create("store-1", "Hurtownia A");
-
-        // then
-        StoreSupplierConnection connection = store.getFulfilmentConfiguration().getSupplierConnections().get(0);
-        assertFalse(connection.isEnabled());
+        // when / then
+        assertEquals("store.manual.error.name.taken", service.create("store-1", "asus").messageCode());
+        assertEquals("store.manual.error.name.taken", service.create("store-1", "kosatec").messageCode());
     }
 
     @Test
-    void createProducesConsistentManualNaming() {
+    void createRefusesABuiltInOrTypeName() {
         // given
-        Store store = storeWith();
-        when(storesRepository.findById("store-1")).thenReturn(store);
-        when(supplierRegistry.getAllSupplierNames()).thenReturn(List.of("Acme"));
+        when(storesRepository.findById("store-1")).thenReturn(storeWith());
+        when(supplierRegistry.getAllSupplierNames()).thenReturn(List.of("Amazon", "Warehouse", "Other", "Kosatec"));
 
-        // when
-        service.create("store-1", "Hurtownia A");
-
-        // then
-        StoreSupplierConnection connection = store.getFulfilmentConfiguration().getSupplierConnections().get(0);
-        assertEquals(ConnectionMode.MANUAL, connection.getMode());
-        assertEquals("manual:Hurtownia A", connection.getSupplierName());
+        // when / then
+        assertEquals("store.supplier.connection.error.label.reserved", service.create("store-1", "Warehouse").messageCode());
+        assertEquals("store.supplier.connection.error.label.reserved", service.create("store-1", "kosatec").messageCode());
     }
 
     @Test
-    void createRejectsDuplicateLabel() {
+    void renameRefusesABuiltInOrTypeName() {
         // given
-        Store store = storeWith(new StoreSupplierConnection("manual:Hurtownia A", ConnectionMode.MANUAL));
+        Store store = storeWith(new StoreSupplierConnection("manual-k7f3a9c2", ConnectionMode.MANUAL, true, true));
         when(storesRepository.findById("store-1")).thenReturn(store);
-        when(supplierRegistry.getAllSupplierNames()).thenReturn(List.of("Acme"));
+        when(supplierRegistry.getAllSupplierNames()).thenReturn(List.of("Amazon", "Warehouse", "Other", "Kosatec"));
 
         // when
-        ManualSupplierService.Result result = service.create("store-1", "hurtownia a");
+        ManualSupplierService.Result result = service.applySelections("store-1", List.of(
+                new ManualSupplierService.ManualSelection("manual-k7f3a9c2", true, true, true, null, "warehouse", null)));
 
         // then
-        assertFalse(result.ok());
+        assertEquals("store.supplier.connection.error.label.reserved", result.messageCode());
+        verify(storesRepository, never()).save(any());
     }
 
     @Test
-    void createRejectsCollisionWithStaticSupplier() {
+    void applySelectionsStoresTheBillingShortcut() {
         // given
-        Store store = storeWith();
+        StoreSupplierConnection connection = new StoreSupplierConnection("manual-k7f3a9c2", ConnectionMode.MANUAL, true, true);
+        Store store = storeWith(connection);
         when(storesRepository.findById("store-1")).thenReturn(store);
-        when(supplierRegistry.getAllSupplierNames()).thenReturn(List.of("Acme"));
 
         // when
-        ManualSupplierService.Result result = service.create("store-1", "Acme");
+        service.applySelections("store-1", List.of(
+                new ManualSupplierService.ManualSelection("manual-k7f3a9c2", false, true, true, null, null, "  HURT-A  ")));
 
         // then
-        assertFalse(result.ok());
+        assertEquals("HURT-A", connection.getBillingShortcut());
+
+        // when -- a blank submission clears the shortcut instead of storing whitespace
+        service.applySelections("store-1", List.of(
+                new ManualSupplierService.ManualSelection("manual-k7f3a9c2", false, true, true, null, null, "   ")));
+
+        // then
+        assertEquals(null, connection.getBillingShortcut());
     }
 
     @Test
-    void createRejectsInvalidCharset() {
+    void createRejectsBlankAndOverlongLabels() {
         // given
-        Store store = storeWith();
-        when(storesRepository.findById("store-1")).thenReturn(store);
-        lenient().when(supplierRegistry.getAllSupplierNames()).thenReturn(List.of());
+        when(storesRepository.findById("store-1")).thenReturn(storeWith());
 
-        // when
-        ManualSupplierService.Result result = service.create("store-1", "bad/name:x");
-
-        // then
-        assertFalse(result.ok());
+        // when / then
+        assertEquals("store.manual.error.name.invalid", service.create("store-1", "  ").messageCode());
+        assertEquals("store.manual.error.name.invalid", service.create("store-1", "x".repeat(61)).messageCode());
     }
 
     @Test
@@ -199,7 +202,7 @@ class ManualSupplierServiceTest {
         when(storesRepository.findById("store-1")).thenReturn(store);
         lenient().when(storeFeedRepository.canRead("store-1", "manual:Hurtownia A", "csv")).thenReturn(true);
         ManualSupplierService.ManualSelection selection =
-                new ManualSupplierService.ManualSelection("manual:Hurtownia A", false, false, true, " 2 ");
+                new ManualSupplierService.ManualSelection("manual:Hurtownia A", false, false, true, " 2 ", null, null);
 
         // when
         service.applySelections("store-1", List.of(selection));
@@ -220,7 +223,7 @@ class ManualSupplierServiceTest {
         when(storesRepository.findById("store-1")).thenReturn(store);
         when(storeFeedRepository.canRead("store-1", "manual:Hurtownia A", "csv")).thenReturn(false);
         ManualSupplierService.ManualSelection selection =
-                new ManualSupplierService.ManualSelection("manual:Hurtownia A", true, true, true, null);
+                new ManualSupplierService.ManualSelection("manual:Hurtownia A", true, true, true, null, null, null);
 
         // when
         service.applySelections("store-1", List.of(selection));
@@ -238,7 +241,7 @@ class ManualSupplierServiceTest {
         when(storesRepository.findById("store-1")).thenReturn(store);
         when(storeFeedRepository.canRead("store-1", "manual:Hurtownia A", "csv")).thenReturn(true);
         ManualSupplierService.ManualSelection selection =
-                new ManualSupplierService.ManualSelection("manual:Hurtownia A", true, true, true, null);
+                new ManualSupplierService.ManualSelection("manual:Hurtownia A", true, true, true, null, null, null);
 
         // when
         service.applySelections("store-1", List.of(selection));
@@ -247,6 +250,85 @@ class ManualSupplierServiceTest {
         StoreSupplierConnection connection = store.getFulfilmentConfiguration().getSupplierConnections().get(0);
         assertTrue(connection.isEnabled());
         verify(storesRepository).save(store);
+    }
+
+    @Test
+    void applySelectionsRenamesTheConnection() {
+        // given
+        StoreSupplierConnection connection = new StoreSupplierConnection("manual-k7f3a9c2", ConnectionMode.MANUAL, true, true);
+        connection.setLabel("Stara");
+        Store store = storeWith(connection);
+        when(storesRepository.findById("store-1")).thenReturn(store);
+        when(storeFeedRepository.canRead("store-1", "manual-k7f3a9c2", "csv")).thenReturn(true);
+
+        // when
+        service.applySelections("store-1", List.of(
+                new ManualSupplierService.ManualSelection("manual-k7f3a9c2", true, true, true, null, "Nowa", null)));
+
+        // then
+        assertEquals("Nowa", connection.getLabel());
+    }
+
+    @Test
+    void createFailsExplicitlyWhenEveryGeneratedIdentityCollides() {
+        // given -- a generator stuck on one token, so all five attempts hit the existing connection
+        Store store = storeWith(new StoreSupplierConnection("manual-aaaaaaaa", ConnectionMode.MANUAL, true, true));
+        when(storesRepository.findById("store-1")).thenReturn(store);
+        ManualSupplierService colliding = new ManualSupplierService(
+                storesRepository, storeFeedRepository, storeInventoryCache, supplierRegistry) {
+            @Override
+            String newIdentity() {
+                return "manual-aaaaaaaa";
+            }
+        };
+
+        // when
+        ManualSupplierService.Result result = colliding.create("store-1", "Hurtownia B");
+
+        // then
+        assertFalse(result.ok());
+        assertEquals("store.supplier.connection.error.identity.exhausted", result.messageCode());
+        verify(storesRepository, never()).save(store);
+    }
+
+    @Test
+    void applySelectionsRejectsAnInvalidLabelInsteadOfDroppingIt() {
+        // given
+        StoreSupplierConnection connection = new StoreSupplierConnection("manual-k7f3a9c2", ConnectionMode.MANUAL, true, true);
+        connection.setLabel("Stara");
+        Store store = storeWith(connection);
+        when(storesRepository.findById("store-1")).thenReturn(store);
+
+        // when
+        ManualSupplierService.Result result = service.applySelections("store-1", List.of(
+                new ManualSupplierService.ManualSelection("manual-k7f3a9c2", true, true, true, null, "   ", null)));
+
+        // then -- nothing is written and the caller learns why
+        assertFalse(result.ok());
+        assertEquals("store.manual.error.name.invalid", result.messageCode());
+        assertEquals("Stara", connection.getLabel());
+        verify(storesRepository, never()).save(store);
+    }
+
+    @Test
+    void applySelectionsRejectsALabelAnotherConnectionAlreadyUses() {
+        // given
+        StoreSupplierConnection renamed = new StoreSupplierConnection("manual-k7f3a9c2", ConnectionMode.MANUAL, true, true);
+        renamed.setLabel("Stara");
+        StoreSupplierConnection other = new StoreSupplierConnection("manual-9x2pq0ab", ConnectionMode.MANUAL, true, true);
+        other.setLabel("Hurtownia A");
+        Store store = storeWith(renamed, other);
+        when(storesRepository.findById("store-1")).thenReturn(store);
+
+        // when
+        ManualSupplierService.Result result = service.applySelections("store-1", List.of(
+                new ManualSupplierService.ManualSelection("manual-k7f3a9c2", true, true, true, null, "hurtownia a", null)));
+
+        // then
+        assertFalse(result.ok());
+        assertEquals("store.manual.error.name.taken", result.messageCode());
+        assertEquals("Stara", renamed.getLabel());
+        verify(storesRepository, never()).save(store);
     }
 
     @Test
@@ -289,7 +371,6 @@ class ManualSupplierServiceTest {
         // given
         Store store = storeWith();
         when(storesRepository.findById("store-1")).thenReturn(store);
-        when(supplierRegistry.getAllSupplierNames()).thenReturn(List.of("Acme"));
 
         // when
         service.create("store-1", "Hurtownia A");
@@ -335,7 +416,7 @@ class ManualSupplierServiceTest {
 
         // when
         service.applySelections("store-1",
-                List.of(new ManualSupplierService.ManualSelection("manual:Hurtownia A", true, true, true, null)));
+                List.of(new ManualSupplierService.ManualSelection("manual:Hurtownia A", true, true, true, null, null, null)));
 
         // then
         verify(storeInventoryCache).evict("store-1");

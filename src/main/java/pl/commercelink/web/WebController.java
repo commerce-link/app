@@ -13,6 +13,7 @@ import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.inventory.deliveries.DeliveriesRepository;
 import pl.commercelink.inventory.deliveries.Delivery;
+import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.warehouse.api.Warehouse;
 import pl.commercelink.orders.*;
@@ -60,6 +61,9 @@ public class WebController {
 
     @Autowired
     private Warehouse warehouse;
+
+    @Autowired
+    private SupplierLabels supplierLabels;
 
     private static final int CLIENTS_PAGE_SIZE = 25;
 
@@ -138,6 +142,7 @@ public class WebController {
         model.addAttribute("unpaidDeliveriesAmountNet", unpaidDeliveriesAmountNet);
         model.addAttribute("paymentSources", PaymentSource.values());
         model.addAttribute("unpaidDeliveriesAmountGross", unpaidDeliveriesAmountGross);
+        model.addAttribute("supplierLabels", supplierLabels.forStoreId(getStoreId()));
 
         return "payments";
     }
@@ -204,6 +209,9 @@ public class WebController {
         model.addAttribute("taxonomyFileName", taxonomyCache.getFileName());
         model.addAttribute("taxonomySize", taxonomyCache.size());
         model.addAttribute("pimIndexSize", pimCatalog.findAll().size());
+        // `store` is already loaded (and null-guarded) above; forStoreId(getStoreId()) only worked
+        // for the super admin because findById(null) happens to return null.
+        model.addAttribute("supplierLabels", supplierLabels.forStore(store));
 
         return "inventory";
     }

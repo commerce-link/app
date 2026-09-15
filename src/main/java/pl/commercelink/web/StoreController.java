@@ -11,7 +11,6 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.invoicing.InvoicingProviderFactory;
 import pl.commercelink.inventory.supplier.StoreSupplierConnectionService;
-import pl.commercelink.inventory.supplier.SupplierConnectionView;
 import pl.commercelink.inventory.supplier.SupplierConnectionViewFactory;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.provider.api.ProviderField;
@@ -418,22 +417,23 @@ public class StoreController {
         Map<String, List<ProviderField>> supplierFields = storeSupplierConnectionService.configurationFields();
 
         StoreForm form = new StoreForm(store);
-        form.setSupplierConfiguration(storeSupplierConnectionService.configurationsForUI(store));
+        Map<String, Map<String, String>> configurations = storeSupplierConnectionService.configurationsForUI(store);
 
         model.addAttribute("form", form);
         model.addAttribute("settings", FulfilmentSettingsForm.from(store));
         model.addAttribute("fulfilmentTypes", FulfilmentType.values());
         model.addAttribute("supplierFields", supplierFields);
-        // Lets the modal render the HTML required attribute only where blank genuinely means
-        // missing: a required password field already has a stored secret for suppliers in this
-        // set, so a blank submission there is a deliberate "keep the current value", not an error.
+        // Published on the external section's root as data-suppliers-with-stored-config (see
+        // fragments/supplier-section.html), keyed by connection identity, so the modal's JS derives
+        // password requiredness per connection on every open. The markup itself never carries it:
+        // the modal is rendered once, before any connection is picked, and is never re-rendered by
+        // an async section swap.
         Set<String> suppliersWithStoredConfig = storeSupplierConnectionService.suppliersWithStoredConfiguration(store);
-        model.addAttribute("suppliersWithStoredConfig", suppliersWithStoredConfig);
-        // Republished on the external section's root as data-suppliers-with-stored-config (see
-        // fragments/supplier-section.html) so the modal's JS can re-derive password requiredness
-        // fresh on every open instead of trusting the required attribute above, which is frozen at
-        // this page load and never touched by an async section swap.
         model.addAttribute("suppliersWithStoredConfigJoined", String.join(";", suppliersWithStoredConfig));
+        // The modal's credential inputs are grouped per supplier type, so two connections of one
+        // type share one group: the values travel per connection instead, as a JSON blob on each
+        // table row, and the modal fills the group from the row it is editing.
+        model.addAttribute("supplierConfigurations", SupplierSectionModel.configurationPayloads(configurations));
         model.addAttribute("connectionModes", Arrays.stream(ConnectionMode.values())
                 .filter(mode -> mode != ConnectionMode.MANUAL)
                 .toList());
@@ -447,13 +447,10 @@ public class StoreController {
                 ? "/dashboard/store/" + storeId
                 : "/dashboard/store");
 
+        // A supplier type may be connected several times (one per label), so the Add dropdown no
+        // longer removes already-connected types -- it always offers every registered type.
         List<String> allSupplierNames = supplierRegistry.getExternalSupplierNames();
-        Set<String> connected = views.external().stream()
-                .map(SupplierConnectionView::identity)
-                .collect(Collectors.toCollection(() -> new TreeSet<>(String.CASE_INSENSITIVE_ORDER)));
-        model.addAttribute("availableSuppliers", allSupplierNames.stream()
-                .filter(name -> !connected.contains(name))
-                .toList());
+        model.addAttribute("availableSuppliers", allSupplierNames);
         // Rendered once as a data attribute on the stable section container so the page script can
         // recompute the Add dropdown after an async swap without a second request.
         model.addAttribute("allSupplierNames", allSupplierNames);

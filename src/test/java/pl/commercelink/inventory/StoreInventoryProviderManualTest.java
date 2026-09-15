@@ -56,14 +56,14 @@ class StoreInventoryProviderManualTest {
         when(cache.get("store-1")).thenReturn(java.util.Optional.empty());
         when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of());
         when(autoDiscovery.run(any())).thenReturn(List.of());
-        when(storeFeedItemLoader.load(eq("store-1"), any(SupplierProviderDescriptor.class), any()))
+        when(storeFeedItemLoader.load(eq("store-1"), any(String.class), any(SupplierProviderDescriptor.class), any()))
                 .thenReturn(List.of());
 
         // when
         provider.ownIndex(store);
 
         // then
-        verify(storeFeedItemLoader, times(1)).load(eq("store-1"), descriptorCaptor.capture(), any());
+        verify(storeFeedItemLoader, times(1)).load(eq("store-1"), eq("manual:H1"), descriptorCaptor.capture(), any());
         assertInstanceOf(ManualSupplierDescriptor.class, descriptorCaptor.getValue());
         assertEquals("manual:H1", descriptorCaptor.getValue().name());
         verifyNoInteractions(supplierProviderFactory);
@@ -84,14 +84,14 @@ class StoreInventoryProviderManualTest {
         when(cache.get("store-1")).thenReturn(java.util.Optional.empty());
         when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of());
         when(autoDiscovery.run(any())).thenReturn(List.of());
-        when(storeFeedItemLoader.load(eq("store-1"), any(SupplierProviderDescriptor.class), any()))
+        when(storeFeedItemLoader.load(eq("store-1"), any(String.class), any(SupplierProviderDescriptor.class), any()))
                 .thenReturn(List.of());
 
         // when
         provider.ownIndex(store);
 
         // then
-        verify(storeFeedItemLoader, times(1)).load(eq("store-1"), descriptorCaptor.capture(), any());
+        verify(storeFeedItemLoader, times(1)).load(eq("store-1"), eq("manual:Enabled"), descriptorCaptor.capture(), any());
         assertEquals("manual:Enabled", descriptorCaptor.getValue().name());
     }
 }

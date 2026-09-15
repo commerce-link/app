@@ -41,7 +41,7 @@
                         <div class="field">
                             <label class="label" th:text="#{general.provider.name}"></label>
                             <div class="control">
-                                <span th:text="${delivery.provider}"></span>
+                                <span th:text="${supplierLabels.of(delivery.provider)}"></span>
                                 <input type="hidden" th:field="*{provider}"/>
                             </div>
                         </div>

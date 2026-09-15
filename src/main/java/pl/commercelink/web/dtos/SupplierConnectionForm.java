@@ -13,6 +13,9 @@ public class SupplierConnectionForm {
     private boolean includeInFulfilment;
     private String feedSchedule;
     private String externalSupplierId;
+    private String identity;
+    private String label;
+    private String billingShortcut;
     private Map<String, String> configuration = new HashMap<>();
 
     public String getSupplierName() {
@@ -61,6 +64,30 @@ public class SupplierConnectionForm {
 
     public void setExternalSupplierId(String externalSupplierId) {
         this.externalSupplierId = externalSupplierId;
+    }
+
+    public String getIdentity() {
+        return identity;
+    }
+
+    public void setIdentity(String identity) {
+        this.identity = identity;
+    }
+
+    public String getLabel() {
+        return label;
+    }
+
+    public void setLabel(String label) {
+        this.label = label;
+    }
+
+    public String getBillingShortcut() {
+        return billingShortcut;
+    }
+
+    public void setBillingShortcut(String billingShortcut) {
+        this.billingShortcut = billingShortcut;
     }
 
     public Map<String, String> getConfiguration() {

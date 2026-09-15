@@ -9,7 +9,7 @@
     <section class="section">
         <div class="container">
             <h1 class="title" th:text="#{deliveries.approval.screen.title}">Request realisation</h1>
-            <h2 class="subtitle" th:text="${delivery.provider} + ' — ' + ${delivery.shortenedDeliveryId}">Supplier</h2>
+            <h2 class="subtitle" th:text="${supplierLabels.of(delivery.provider)} + ' — ' + ${delivery.shortenedDeliveryId}">Supplier</h2>
 
             <div th:each="routed : ${routedOrders}" class="notification is-danger is-light">
                 <span th:if="${routed.supplier.matched}"

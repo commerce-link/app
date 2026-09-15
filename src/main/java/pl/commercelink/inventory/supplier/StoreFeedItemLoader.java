@@ -25,16 +25,31 @@ public class StoreFeedItemLoader {
         this.taxonomyPenalty = taxonomyPenalty;
     }
 
-    public List<InventoryItem> load(String storeId, SupplierProviderDescriptor descriptor, Map<String, Double> sellRates) {
+    // identity is the connection's stored identity (e.g. Kosatec-k7f3a9c2); the descriptor is the
+    // adapter type's own and keeps reporting the type name, which never reaches the loaded items.
+    public List<InventoryItem> load(String storeId, String identity, SupplierProviderDescriptor descriptor,
+                                    Map<String, Double> sellRates) {
         List<InventoryItem> items = switch (descriptor.feedFormat()) {
             case FeedFormat.Csv csv ->
-                    csvProductFeedLoader.fetch(csv.parser(), csv.separator(), storeId, descriptor.supplierInfo().name(), taxonomyPenalty);
+                    csvProductFeedLoader.fetch(csv.parser(), csv.separator(), storeId, identity, taxonomyPenalty);
             case FeedFormat.Xml xml ->
-                    xmlProductFeedLoader.load(xml.itemClass(), xml.itemElementName(), descriptor.supplierInfo(), storeId, taxonomyPenalty);
+                    xmlProductFeedLoader.load(xml.itemClass(), xml.itemElementName(),
+                            descriptor.supplierInfo().withName(identity), storeId, taxonomyPenalty);
         };
 
         return items.stream()
+                .map(item -> stampedWith(item, identity))
                 .flatMap(item -> item.toLocalCurrency(ExchangeRates.LOCAL_CURRENCY, sellRates.get(item.currency())).stream())
                 .collect(Collectors.toList());
+    }
+
+    // Adapter CSV parsers stamp rows with the type name they were compiled with; a connection may
+    // be one of several instances of that type, so the identity of the connection must replace it.
+    private static InventoryItem stampedWith(InventoryItem item, String identity) {
+        if (identity.equals(item.supplier())) {
+            return item;
+        }
+        return new InventoryItem(item.ean(), item.mfn(), item.netPrice(), item.currency(), item.qty(),
+                item.leadTimeDays(), identity, item.sellable(), item.inStock(), item.inDelivery(), item.sku());
     }
 }
