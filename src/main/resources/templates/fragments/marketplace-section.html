@@ -46,9 +46,9 @@
                 <td>
                     <div class="dropdown is-right marketplace-actions">
                         <div class="dropdown-trigger">
-                            <button type="button" class="button is-small" aria-haspopup="true">
-                                <span th:text="#{general.actions}"></span>
-                                <span class="icon is-small"><i class="fas fa-angle-down" aria-hidden="true"></i></span>
+                            <button type="button" class="button is-small is-ghost" aria-haspopup="true"
+                                    th:attr="aria-label=#{general.actions}">
+                                <span class="icon is-small"><i class="fas fa-ellipsis-v" aria-hidden="true"></i></span>
                             </button>
                         </div>
                         <div class="dropdown-menu" role="menu">

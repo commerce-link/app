@@ -65,6 +65,9 @@ class MarketplaceSectionRenderingTest {
         assertThat(html).contains("data-identity=\"Empik\"");
         assertThat(html).contains("class=\"dropdown is-right marketplace-actions\"");
         assertThat(html).contains("dropdown-trigger");
+        assertThat(html).contains("fa-ellipsis-v");
+        assertThat(html).contains("aria-label=\"Actions\"");
+        assertThat(html).doesNotContain("fa-angle-down");
         assertThat(html).doesNotContain("device-auth-row-connect\" data-provider=\"Empik\"");
         assertThat(html).contains("class=\"is-hidden-mobile\"");
     }
