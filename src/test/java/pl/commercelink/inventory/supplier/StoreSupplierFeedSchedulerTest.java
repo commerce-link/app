@@ -60,6 +60,17 @@ class StoreSupplierFeedSchedulerTest {
     }
 
     @Test
+    void anIntervalChosenByTheShopStartsAtARandomMinuteWithinIt() {
+        // when
+        scheduler.schedule("store-1", "Acme", "0/30 * * * ? *");
+
+        // then
+        ArgumentCaptor<String> expression = ArgumentCaptor.forClass(String.class);
+        verify(schedules).put(eq("supplier-feed-store-1-acme"), expression.capture(), eq(QUEUE_ARN), anyString());
+        assertThat(expression.getValue()).matches("cron\\((\\d|[12]\\d)/30 \\* \\* \\* \\? \\*\\)");
+    }
+
+    @Test
     void createsScheduleWithTheSuppliedCron() {
         // when
         scheduler.schedule("store-1", "Ingram Micro", "0/30 9-17 * * ? *");

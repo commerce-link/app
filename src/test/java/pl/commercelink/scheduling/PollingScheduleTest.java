@@ -4,6 +4,8 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -151,25 +153,73 @@ class PollingScheduleTest {
     }
 
     @Test
-    void randomEveryMinutesKeepsTheIntervalAndSpreadsTheStartMinute() {
+    void everyMinutesIsTheCanonicalStepFromZero() {
+        // when / then
+        assertThat(PollingSchedule.everyMinutes(10).expression()).isEqualTo("0/10 * * * ? *");
+        assertThat(PollingSchedule.storedOrEveryMinutes("0 9 * * ? *", 10).expression()).isEqualTo("0 9 * * ? *");
+        assertThat(PollingSchedule.storedOrEveryMinutes("  ", 10).expression()).isEqualTo("0/10 * * * ? *");
+    }
+
+    @Test
+    void randomStartSpreadsAMinuteIntervalWithinTheInterval() {
         for (int i = 0; i < 200; i++) {
             // when
-            PollingSchedule schedule = PollingSchedule.randomEveryMinutes(10);
+            String[] fields = PollingSchedule.stored("0/10 * * * ? *").withRandomStart().expression().split(" ");
 
             // then
-            String[] fields = schedule.expression().split(" ");
             String[] minute = fields[0].split("/");
             assertThat(Integer.parseInt(minute[0])).isBetween(0, 9);
             assertThat(minute[1]).isEqualTo("10");
-            assertThat(schedule.expression()).endsWith(" * * * ? *");
+            assertThat(String.join(" ", fields[1], fields[2], fields[3], fields[4], fields[5])).isEqualTo("* * * ? *");
         }
     }
 
     @Test
-    void storedOrRandomEveryMinutesKeepsAStoredExpression() {
+    void randomStartGivesAnHourlyScheduleARandomMinute() {
+        for (int i = 0; i < 200; i++) {
+            // when
+            String[] fields = PollingSchedule.stored("0 * * * ? *").withRandomStart().expression().split(" ");
+
+            // then
+            assertThat(Integer.parseInt(fields[0])).isBetween(0, 59);
+            assertThat(fields[1]).isEqualTo("*");
+        }
+    }
+
+    @Test
+    void randomStartSpreadsAnHourIntervalOverMinuteAndHourOffset() {
+        for (int i = 0; i < 200; i++) {
+            // when
+            String[] fields = PollingSchedule.stored("0 0/6 * * ? *").withRandomStart().expression().split(" ");
+
+            // then
+            assertThat(Integer.parseInt(fields[0])).isBetween(0, 59);
+            String[] hour = fields[1].split("/");
+            assertThat(Integer.parseInt(hour[0])).isBetween(0, 5);
+            assertThat(hour[1]).isEqualTo("6");
+        }
+    }
+
+    @Test
+    void randomStartGivesADayIntervalARandomTimeOfDay() {
+        for (int i = 0; i < 200; i++) {
+            // when
+            String[] fields = PollingSchedule.stored("0 0 1/3 * ? *").withRandomStart().expression().split(" ");
+
+            // then
+            assertThat(Integer.parseInt(fields[0])).isBetween(0, 59);
+            assertThat(Integer.parseInt(fields[1])).isBetween(0, 23);
+            assertThat(fields[2]).isEqualTo("1/3");
+        }
+    }
+
+    @Test
+    void randomStartLeavesExplicitTimesAndAnythingElseUntouched() {
         // when / then
-        assertThat(PollingSchedule.storedOrRandomEveryMinutes("0 9 * * ? *", 10).expression()).isEqualTo("0 9 * * ? *");
-        assertThat(PollingSchedule.storedOrRandomEveryMinutes("  ", 10).expression()).endsWith("/10 * * * ? *");
+        for (String exact : List.of("0 9 * * ? *", "30 6,14 * * ? *", "0 8 ? * MON-FRI *", "0/30 9-17 * * ? *",
+                "37 2 * * ? *", "15/10 * * * ? *", "0 0 15 * ? *")) {
+            assertThat(PollingSchedule.stored(exact).withRandomStart().expression()).isEqualTo(exact);
+        }
     }
 
     @Test

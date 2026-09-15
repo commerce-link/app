@@ -6,6 +6,7 @@ public class SupplierSelectionForm {
     private ConnectionMode mode = ConnectionMode.GLOBAL;
     private boolean includeInPricing = true;
     private boolean includeInFulfilment = true;
+    private String externalSupplierId;
     private String feedSchedule;
 
     public SupplierSelectionForm() {
@@ -55,6 +56,14 @@ public class SupplierSelectionForm {
 
     public void setIncludeInFulfilment(boolean includeInFulfilment) {
         this.includeInFulfilment = includeInFulfilment;
+    }
+
+    public String getExternalSupplierId() {
+        return externalSupplierId;
+    }
+
+    public void setExternalSupplierId(String externalSupplierId) {
+        this.externalSupplierId = externalSupplierId;
     }
 
     public String getFeedSchedule() {
