@@ -23,7 +23,7 @@ public class PricelistEventScheduler {
     public void schedule(String storeId, String catalogId, String pricelistSchedule) {
         schedules.put(
                 scheduleName(storeId, catalogId),
-                PollingSchedule.storedOrRandomNightly(pricelistSchedule).awsExpression(),
+                PollingSchedule.storedOrRandomNightly(pricelistSchedule).withRandomStart().awsExpression(),
                 pricelistQueueArn,
                 ConversionUtil.toJson(new PricelistEventPayload(storeId, catalogId)));
     }
