@@ -69,7 +69,6 @@ import pl.commercelink.web.dtos.SplitGroupPreviewDto;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import pl.commercelink.inventory.deliveries.DropshipItemLookup;
-import pl.commercelink.inventory.supplier.SupplierRegistry;
 
 import java.util.*;
 import java.util.stream.Stream;
@@ -98,9 +97,6 @@ public class OrdersController extends BaseController {
 
     @Autowired
     private StoresRepository storesRepository;
-
-    @Autowired
-    private SupplierRegistry supplierRegistry;
 
     @Autowired
     private BasketsRepository basketsRepository;
@@ -423,7 +419,7 @@ public class OrdersController extends BaseController {
         model.addAttribute("order", order);
         model.addAttribute("clientOrderUrl", store.isClientOrderPageEnabled() && !order.hasStatus(OrderStatus.Completed)
                 ? order.createClientOrderUrl(appDomain) : null);
-        model.addAttribute("routedSupplier", RoutedSupplierView.from(order, store, supplierRegistry));
+        model.addAttribute("routedSupplier", RoutedSupplierView.from(order, store));
         model.addAttribute("orderEvents", orderEventsRepository.findByOrderId(order.getOrderId()));
         model.addAttribute("orderItemsForm", new OrderItemsForm(orderItems));
         model.addAttribute("serialUpdateItems", serialUpdateItems);

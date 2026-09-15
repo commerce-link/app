@@ -1,7 +1,5 @@
 package pl.commercelink.web.dtos;
 
-import pl.commercelink.inventory.supplier.SupplierRegistry;
-import pl.commercelink.inventory.supplier.api.SupplierInfo;
 import pl.commercelink.inventory.supplier.manual.ManualSupplierInfos;
 import pl.commercelink.orders.Order;
 import pl.commercelink.stores.ConnectionMode;
@@ -12,13 +10,11 @@ public record RoutedSupplierView(
         String externalSupplierId,
         String supplierName,
         String modeKey,
-        String type,
-        String origin,
         boolean enabled,
         boolean includeInFulfilment
 ) {
 
-    public static RoutedSupplierView from(Order order, Store store, SupplierRegistry supplierRegistry) {
+    public static RoutedSupplierView from(Order order, Store store) {
         if (!order.isBoundToExternalSupplier()) {
             return null;
         }
@@ -30,7 +26,6 @@ public record RoutedSupplierView(
         if (connection == null) {
             return unmatched(externalSupplierId);
         }
-        SupplierInfo info = supplierRegistry.get(connection.getSupplierName());
         String label = connection.getMode() == ConnectionMode.MANUAL
                 ? ManualSupplierInfos.label(connection.getSupplierName())
                 : connection.getSupplierName();
@@ -38,14 +33,12 @@ public record RoutedSupplierView(
                 externalSupplierId,
                 label,
                 "inventory.provider." + connection.getMode().name().toLowerCase(),
-                info.type() != null ? info.type().name() : null,
-                info.origin(),
                 connection.isEnabled(),
                 connection.isIncludeInFulfilment());
     }
 
     private static RoutedSupplierView unmatched(String externalSupplierId) {
-        return new RoutedSupplierView(externalSupplierId, null, null, null, null, false, false);
+        return new RoutedSupplierView(externalSupplierId, null, null, false, false);
     }
 
     public boolean isMatched() {
