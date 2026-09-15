@@ -11,7 +11,7 @@ import pl.commercelink.financials.ExchangeRates;
 import pl.commercelink.inventory.supplier.StoreFeedItemLoader;
 import pl.commercelink.inventory.supplier.SupplierProviderFactory;
 import pl.commercelink.inventory.supplier.api.SupplierProviderDescriptor;
-import pl.commercelink.inventory.supplier.manual.ManualConnectionDescriptor;
+import pl.commercelink.inventory.supplier.manual.ManualSupplierDescriptor;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.FulfilmentConfiguration;
 import pl.commercelink.stores.Store;
@@ -64,7 +64,7 @@ class StoreInventoryProviderManualTest {
 
         // then
         verify(storeFeedItemLoader, times(1)).load(eq("store-1"), descriptorCaptor.capture(), any());
-        assertInstanceOf(ManualConnectionDescriptor.class, descriptorCaptor.getValue());
+        assertInstanceOf(ManualSupplierDescriptor.class, descriptorCaptor.getValue());
         assertEquals("manual:H1", descriptorCaptor.getValue().name());
         verifyNoInteractions(supplierProviderFactory);
     }
