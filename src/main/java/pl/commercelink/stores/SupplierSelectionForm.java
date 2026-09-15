@@ -3,28 +3,23 @@ package pl.commercelink.stores;
 public class SupplierSelectionForm {
 
     private String supplierName;
-    private boolean enabled;
     private ConnectionMode mode = ConnectionMode.GLOBAL;
     private boolean includeInPricing = true;
     private boolean includeInFulfilment = true;
+    private String externalSupplierId;
     private String feedSchedule;
 
     public SupplierSelectionForm() {
     }
 
-    public SupplierSelectionForm(String supplierName, boolean enabled, ConnectionMode mode) {
-        this(supplierName, enabled, mode, true, true);
-    }
-
-    public SupplierSelectionForm(String supplierName, boolean enabled, ConnectionMode mode,
+    public SupplierSelectionForm(String supplierName, ConnectionMode mode,
                                  boolean includeInPricing, boolean includeInFulfilment) {
-        this(supplierName, enabled, mode, includeInPricing, includeInFulfilment, null);
+        this(supplierName, mode, includeInPricing, includeInFulfilment, null);
     }
 
-    public SupplierSelectionForm(String supplierName, boolean enabled, ConnectionMode mode,
+    public SupplierSelectionForm(String supplierName, ConnectionMode mode,
                                  boolean includeInPricing, boolean includeInFulfilment, String feedSchedule) {
         this.supplierName = supplierName;
-        this.enabled = enabled;
         this.mode = mode;
         this.includeInPricing = includeInPricing;
         this.includeInFulfilment = includeInFulfilment;
@@ -37,14 +32,6 @@ public class SupplierSelectionForm {
 
     public void setSupplierName(String supplierName) {
         this.supplierName = supplierName;
-    }
-
-    public boolean isEnabled() {
-        return enabled;
-    }
-
-    public void setEnabled(boolean enabled) {
-        this.enabled = enabled;
     }
 
     public ConnectionMode getMode() {
@@ -69,6 +56,14 @@ public class SupplierSelectionForm {
 
     public void setIncludeInFulfilment(boolean includeInFulfilment) {
         this.includeInFulfilment = includeInFulfilment;
+    }
+
+    public String getExternalSupplierId() {
+        return externalSupplierId;
+    }
+
+    public void setExternalSupplierId(String externalSupplierId) {
+        this.externalSupplierId = externalSupplierId;
     }
 
     public String getFeedSchedule() {

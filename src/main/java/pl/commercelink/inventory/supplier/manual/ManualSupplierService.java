@@ -1,6 +1,7 @@
 package pl.commercelink.inventory.supplier.manual;
 
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import pl.commercelink.inventory.StoreInventoryCache;
 import pl.commercelink.inventory.supplier.StoreFeedRepository;
@@ -17,7 +18,6 @@ import java.io.ByteArrayInputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
@@ -43,12 +43,8 @@ public class ManualSupplierService {
         }
     }
 
-    public record ManualSupplierView(String identity, String label, boolean enabled, boolean includeInPricing,
-                                     boolean includeInFulfilment, boolean hasFeed) {
-    }
-
     public record ManualSelection(String identity, boolean enabled, boolean includeInPricing,
-                                  boolean includeInFulfilment) {
+                                  boolean includeInFulfilment, String externalSupplierId) {
     }
 
     public Result create(String storeId, String label) {
@@ -114,31 +110,12 @@ public class ManualSupplierService {
                     connection.setEnabled(selection.enabled() && hasFeed);
                     connection.setIncludeInPricing(selection.includeInPricing());
                     connection.setIncludeInFulfilment(selection.includeInFulfilment());
+                    connection.setExternalSupplierId(StringUtils.trimToNull(selection.externalSupplierId()));
                 }
             }
         }
         storesRepository.save(store);
         storeInventoryCache.evict(storeId);
-    }
-
-    public List<ManualSupplierView> list(Store store) {
-        List<ManualSupplierView> views = new ArrayList<>();
-        if (store == null) {
-            return views;
-        }
-        for (StoreSupplierConnection connection : connections(store)) {
-            if (connection.getMode() == ConnectionMode.MANUAL) {
-                String identity = connection.getSupplierName();
-                views.add(new ManualSupplierView(
-                        identity,
-                        ManualSupplierInfos.label(identity),
-                        connection.isEnabled(),
-                        connection.isIncludeInPricing(),
-                        connection.isIncludeInFulfilment(),
-                        storeFeedRepository.canRead(store.getStoreId(), identity, "csv")));
-            }
-        }
-        return views;
     }
 
     private boolean collidesWithStatic(String label) {

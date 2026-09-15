@@ -193,28 +193,13 @@ class ManualSupplierServiceTest {
     }
 
     @Test
-    void listExposesEnabledFlagFromConnection() {
-        // given
-        StoreSupplierConnection connection = new StoreSupplierConnection("manual:Hurtownia A", ConnectionMode.MANUAL, true, true);
-        connection.setEnabled(false);
-        Store store = storeWith(connection);
-
-        // when
-        ManualSupplierService.ManualSupplierView view = service.list(store).get(0);
-
-        // then
-        assertFalse(view.enabled());
-        assertEquals("Hurtownia A", view.label());
-    }
-
-    @Test
     void applySelectionsUpdatesEnabledAndFlags() {
         // given
         Store store = storeWith(new StoreSupplierConnection("manual:Hurtownia A", ConnectionMode.MANUAL, true, true));
         when(storesRepository.findById("store-1")).thenReturn(store);
         lenient().when(storeFeedRepository.canRead("store-1", "manual:Hurtownia A", "csv")).thenReturn(true);
         ManualSupplierService.ManualSelection selection =
-                new ManualSupplierService.ManualSelection("manual:Hurtownia A", false, false, true);
+                new ManualSupplierService.ManualSelection("manual:Hurtownia A", false, false, true, " 2 ");
 
         // when
         service.applySelections("store-1", List.of(selection));
@@ -224,6 +209,7 @@ class ManualSupplierServiceTest {
         assertFalse(connection.isEnabled());
         assertFalse(connection.isIncludeInPricing());
         assertTrue(connection.isIncludeInFulfilment());
+        assertEquals("2", connection.getExternalSupplierId());
         verify(storesRepository).save(store);
     }
 
@@ -234,7 +220,7 @@ class ManualSupplierServiceTest {
         when(storesRepository.findById("store-1")).thenReturn(store);
         when(storeFeedRepository.canRead("store-1", "manual:Hurtownia A", "csv")).thenReturn(false);
         ManualSupplierService.ManualSelection selection =
-                new ManualSupplierService.ManualSelection("manual:Hurtownia A", true, true, true);
+                new ManualSupplierService.ManualSelection("manual:Hurtownia A", true, true, true, null);
 
         // when
         service.applySelections("store-1", List.of(selection));
@@ -252,7 +238,7 @@ class ManualSupplierServiceTest {
         when(storesRepository.findById("store-1")).thenReturn(store);
         when(storeFeedRepository.canRead("store-1", "manual:Hurtownia A", "csv")).thenReturn(true);
         ManualSupplierService.ManualSelection selection =
-                new ManualSupplierService.ManualSelection("manual:Hurtownia A", true, true, true);
+                new ManualSupplierService.ManualSelection("manual:Hurtownia A", true, true, true, null);
 
         // when
         service.applySelections("store-1", List.of(selection));
@@ -349,7 +335,7 @@ class ManualSupplierServiceTest {
 
         // when
         service.applySelections("store-1",
-                List.of(new ManualSupplierService.ManualSelection("manual:Hurtownia A", true, true, true)));
+                List.of(new ManualSupplierService.ManualSelection("manual:Hurtownia A", true, true, true, null)));
 
         // then
         verify(storeInventoryCache).evict("store-1");

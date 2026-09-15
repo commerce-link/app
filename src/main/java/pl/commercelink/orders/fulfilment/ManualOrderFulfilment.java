@@ -5,12 +5,15 @@ import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.orders.*;
+import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.stores.SupplierScope;
 import pl.commercelink.warehouse.WarehouseFulfilmentService;
 
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -19,11 +22,13 @@ public class ManualOrderFulfilment extends OrderFulfilment {
 
     private final Inventory inventory;
     private final SupplierRegistry supplierRegistry;
+    private final StoresRepository storesRepository;
 
-    public ManualOrderFulfilment(Inventory inventory, OrdersRepository ordersRepository, OrderLifecycle orderLifecycle, OrderItemsRepository orderItemsRepository, WarehouseFulfilmentService warehouseFulfilmentService, SupplierRegistry supplierRegistry) {
+    public ManualOrderFulfilment(Inventory inventory, OrdersRepository ordersRepository, OrderLifecycle orderLifecycle, OrderItemsRepository orderItemsRepository, WarehouseFulfilmentService warehouseFulfilmentService, SupplierRegistry supplierRegistry, StoresRepository storesRepository) {
         super(ordersRepository, orderItemsRepository, orderLifecycle, warehouseFulfilmentService);
         this.inventory = inventory;
         this.supplierRegistry = supplierRegistry;
+        this.storesRepository = storesRepository;
     }
 
     public FulfilmentForm init(String storeId, List<String> selectedOrders, String pathSelector, boolean onlyWithProfit, boolean onlyMultiOrder, boolean onlyLocalSuppliers) {
@@ -40,7 +45,8 @@ public class ManualOrderFulfilment extends OrderFulfilment {
         }
 
         FulfilmentGroupsGenerator.Builder builder = FulfilmentGroupsGenerator.builder()
-                .withInventory(inventory.withEnabledSuppliersAndWarehouseData(storeId, SupplierScope.FULFILMENT));
+                .withInventory(inventory.withEnabledSuppliersAndWarehouseData(storeId, SupplierScope.FULFILMENT))
+                .withCandidateFilter(ExternalSupplierBinding.of(storesRepository.findById(storeId), ordersOf(storeId, selectedOrders)));
         if (onlyWithProfit) {
             builder.withFulfilmentUnderCost();
         }
@@ -66,6 +72,14 @@ public class ManualOrderFulfilment extends OrderFulfilment {
         return form;
     }
 
+    private List<Order> ordersOf(String storeId, List<String> orderIds) {
+        return orderIds.stream()
+                .distinct()
+                .map(orderId -> ordersRepository.findById(storeId, orderId))
+                .filter(Objects::nonNull)
+                .toList();
+    }
+
     private List<FulfilmentPath> resolvePaths(String pathSelector, List<FulfilmentGroup> entries) {
         if ("suggest".equals(pathSelector)) {
             return new FulfilmentPathFinder(supplierRegistry).resolve(entries);
@@ -78,11 +92,17 @@ public class ManualOrderFulfilment extends OrderFulfilment {
 
     public void commit(String storeId, FulfilmentForm form) {
         Map<String, List<FulfilmentItem>> entriesByOrderId = form.getAcceptedFulfilmentItemsGroupedByOrderId();
+        ExternalSupplierBinding binding = ExternalSupplierBinding.of(
+                storesRepository.findById(storeId), ordersOf(storeId, new ArrayList<>(entriesByOrderId.keySet())));
 
         for (String orderId : entriesByOrderId.keySet()) {
+            List<FulfilmentItem> permitted = entriesByOrderId.get(orderId).stream().filter(binding).toList();
+            if (permitted.isEmpty()) {
+                continue;
+            }
             List<OrderItem> orderItems = orderItemsRepository.findByOrderId(orderId)
                     .stream()
-                    .map(i -> accept(i, entriesByOrderId.get(orderId)))
+                    .map(i -> accept(i, permitted))
                     .filter(Optional::isPresent)
                     .map(Optional::get)
                     .collect(Collectors.toList());

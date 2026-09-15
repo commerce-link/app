@@ -9,7 +9,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.invoicing.InvoicingProviderFactory;
-import pl.commercelink.marketplace.MarketplaceProviderFactory;
 import pl.commercelink.payments.PaymentProviderFactory;
 import pl.commercelink.provider.ProviderFactory;
 import pl.commercelink.shipping.ShippingProviderFactory;
@@ -27,20 +26,17 @@ public class StoreIntegrationsController {
     private final ShippingProviderFactory shippingProviderFactory;
     private final InvoicingProviderFactory invoicingProviderFactory;
     private final PaymentProviderFactory paymentProviderFactory;
-    private final MarketplaceProviderFactory marketplaceProviderFactory;
     private final MessageSource messageSource;
 
     public StoreIntegrationsController(StoresRepository storesRepository,
                                        ShippingProviderFactory shippingProviderFactory,
                                        InvoicingProviderFactory invoicingProviderFactory,
                                        PaymentProviderFactory paymentProviderFactory,
-                                       MarketplaceProviderFactory marketplaceProviderFactory,
                                        MessageSource messageSource) {
         this.storesRepository = storesRepository;
         this.shippingProviderFactory = shippingProviderFactory;
         this.invoicingProviderFactory = invoicingProviderFactory;
         this.paymentProviderFactory = paymentProviderFactory;
-        this.marketplaceProviderFactory = marketplaceProviderFactory;
         this.messageSource = messageSource;
     }
 
@@ -67,17 +63,6 @@ public class StoreIntegrationsController {
             case "shipping" -> store.setConfigurationValue(IntegrationType.SHIPPING_PROVIDER, providerName);
             case "invoicing" -> store.setConfigurationValue(IntegrationType.INVOICING_PROVIDER, providerName);
             case "payments" -> store.addPaymentIntegration(providerName);
-            case "marketplace" -> {
-                MarketplaceIntegration integration = store.getMarketplaceIntegration(providerName);
-                boolean requiresDeviceAuth = marketplaceProviderFactory.deviceAuthProviders().contains(providerName);
-                if (integration == null) {
-                    MarketplaceIntegration created = new MarketplaceIntegration(providerName);
-                    created.setLoggedIn(!requiresDeviceAuth);
-                    store.getMarketplaces().add(created);
-                } else if (!requiresDeviceAuth) {
-                    store.markConnectionAsRestored(providerName);
-                }
-            }
         }
 
         storesRepository.save(store);
@@ -108,7 +93,6 @@ public class StoreIntegrationsController {
             case "shipping" -> store.removeIntegration(IntegrationType.SHIPPING_PROVIDER);
             case "invoicing" -> store.removeIntegration(IntegrationType.INVOICING_PROVIDER);
             case "payments" -> store.removePaymentIntegration(providerName);
-            case "marketplace" -> store.removeMarketplaceIntegration(providerName);
         }
 
         storesRepository.save(store);
@@ -141,7 +125,6 @@ public class StoreIntegrationsController {
             case "shipping" -> shippingProviderFactory;
             case "invoicing" -> invoicingProviderFactory;
             case "payments" -> paymentProviderFactory;
-            case "marketplace" -> marketplaceProviderFactory;
             default -> throw new IllegalArgumentException("Unknown provider type: " + providerType);
         };
     }
@@ -151,7 +134,6 @@ public class StoreIntegrationsController {
             case "shipping" -> "shipping";
             case "invoicing" -> "invoicing";
             case "payments" -> "payments";
-            case "marketplace" -> "marketplaces";
             default -> throw new IllegalArgumentException("Unknown provider type: " + providerType);
         };
         return CustomSecurityContext.hasRole("SUPER_ADMIN")
