@@ -32,7 +32,7 @@ public class MarketplaceReturnsImportScheduler {
     public void apply(String storeId, String marketplace, String returnsImportSchedule) {
         schedules.put(
                 scheduleName(storeId, marketplace),
-                PollingSchedule.storedOrRandomEveryMinutes(returnsImportSchedule, defaultIntervalMinutes).awsExpression(),
+                PollingSchedule.storedOrEveryMinutes(returnsImportSchedule, defaultIntervalMinutes).withRandomStart().awsExpression(),
                 returnsImportQueueArn,
                 ConversionUtil.toJson(importRequest(storeId, marketplace)));
     }

@@ -34,16 +34,27 @@ class MarketplaceReturnsImportSchedulerTest {
     }
 
     @Test
-    void appliesCronAsPerStoreScheduleCarryingTheStoreId() {
+    void appliesAnExactTimeAsGivenCarryingTheStoreId() {
         // when
-        scheduler.apply("store-1", "CsCartMultiVendor", "0/15 * * * ? *");
+        scheduler.apply("store-1", "CsCartMultiVendor", "0 8 * * ? *");
 
         // then
         verify(schedules).put(
                 "returns-import-store-1-cscartmultivendor",
-                "cron(0/15 * * * ? *)",
+                "cron(0 8 * * ? *)",
                 QUEUE_ARN,
                 "{\"marketplace\":\"CsCartMultiVendor\",\"storeId\":\"store-1\"}");
+    }
+
+    @Test
+    void anIntervalChosenByTheShopStartsAtARandomMinuteWithinIt() {
+        // when
+        scheduler.apply("store-1", "CsCartMultiVendor", "0/15 * * * ? *");
+
+        // then
+        ArgumentCaptor<String> expression = ArgumentCaptor.forClass(String.class);
+        verify(schedules).put(eq("returns-import-store-1-cscartmultivendor"), expression.capture(), eq(QUEUE_ARN), anyString());
+        assertThat(expression.getValue()).matches("cron\\((\\d|1[0-4])/15 \\* \\* \\* \\? \\*\\)");
     }
 
     @Test
