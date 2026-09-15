@@ -25,13 +25,16 @@ public class StoreFeedItemLoader {
         this.taxonomyPenalty = taxonomyPenalty;
     }
 
-    public List<InventoryItem> load(String storeId, SupplierProviderDescriptor descriptor, Map<String, Double> sellRates) {
-        String identity = descriptor.supplierInfo().name();
+    // identity is the connection's stored identity (e.g. Kosatec-k7f3a9c2); the descriptor is the
+    // adapter type's own and keeps reporting the type name, which never reaches the loaded items.
+    public List<InventoryItem> load(String storeId, String identity, SupplierProviderDescriptor descriptor,
+                                    Map<String, Double> sellRates) {
         List<InventoryItem> items = switch (descriptor.feedFormat()) {
             case FeedFormat.Csv csv ->
                     csvProductFeedLoader.fetch(csv.parser(), csv.separator(), storeId, identity, taxonomyPenalty);
             case FeedFormat.Xml xml ->
-                    xmlProductFeedLoader.load(xml.itemClass(), xml.itemElementName(), descriptor.supplierInfo(), storeId, taxonomyPenalty);
+                    xmlProductFeedLoader.load(xml.itemClass(), xml.itemElementName(),
+                            descriptor.supplierInfo().withName(identity), storeId, taxonomyPenalty);
         };
 
         return items.stream()

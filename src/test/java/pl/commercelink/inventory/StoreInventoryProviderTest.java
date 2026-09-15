@@ -39,6 +39,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -99,9 +100,8 @@ class StoreInventoryProviderTest {
         when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of("PLN", 1.0));
         SupplierProviderDescriptor descriptor = mock(SupplierProviderDescriptor.class);
         when(descriptor.supplierInfo()).thenReturn(supplierInfo("Wortmann"));
-        when(descriptor.renamedTo("Wortmann")).thenCallRealMethod();
         when(supplierProviderFactory.getDescriptor("Wortmann")).thenReturn(descriptor);
-        when(storeFeedItemLoader.load(eq("store-1"), argThat(d -> d.supplierInfo().name().equals("Wortmann")), any()))
+        when(storeFeedItemLoader.load(eq("store-1"), eq("Wortmann"), same(descriptor), any()))
                 .thenReturn(List.of(item("Wortmann")));
         MatchedInventory matched = mock(MatchedInventory.class);
         when(matched.getInventoryKey()).thenReturn(new InventoryKey());
@@ -258,10 +258,9 @@ class StoreInventoryProviderTest {
         when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of());
         SupplierProviderDescriptor descriptor = mock(SupplierProviderDescriptor.class);
         when(descriptor.supplierInfo()).thenReturn(supplierInfo("Action"));
-        when(descriptor.renamedTo("Action")).thenCallRealMethod();
         when(supplierProviderFactory.getDescriptor("Action")).thenReturn(descriptor);
         InventoryItem ownItem = new InventoryItem("111", "AAA", 100.0, "PLN", 5, 2, "Action", true, true, false);
-        when(storeFeedItemLoader.load(eq("store-1"), argThat(d -> d.supplierInfo().name().equals("Action")), anyMap()))
+        when(storeFeedItemLoader.load(eq("store-1"), eq("Action"), same(descriptor), anyMap()))
                 .thenReturn(List.of(ownItem));
         when(autoDiscovery.run(anyList())).thenAnswer(inv -> {
             List<InventoryItem> items = inv.getArgument(0);

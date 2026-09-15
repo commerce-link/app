@@ -76,7 +76,7 @@ public class StoreInventoryProvider {
             }
             SupplierProviderDescriptor descriptor = descriptorFor(connection);
             if (descriptor != null) {
-                ownItems.addAll(storeFeedItemLoader.load(storeId, descriptor, sellRates));
+                ownItems.addAll(storeFeedItemLoader.load(storeId, connection.getSupplierName(), descriptor, sellRates));
             }
         }
 
@@ -88,7 +88,6 @@ public class StoreInventoryProvider {
         if (connection.getMode() == ConnectionMode.MANUAL) {
             return ManualSupplierDescriptor.forIdentity(identity);
         }
-        SupplierProviderDescriptor descriptor = supplierProviderFactory.getDescriptor(identity);
-        return descriptor == null ? null : descriptor.renamedTo(identity);
+        return supplierProviderFactory.getDescriptor(identity);
     }
 }

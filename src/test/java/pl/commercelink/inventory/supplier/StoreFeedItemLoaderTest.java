@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -73,7 +74,7 @@ class StoreFeedItemLoaderTest {
         when(csvLoader.fetch(any(), eq(';'), eq("store-1"), eq("Action"), eq(1000))).thenReturn(List.of(eurItem));
 
         // when
-        List<InventoryItem> result = loader.load("store-1", descriptor, Map.of("EUR", 4.0));
+        List<InventoryItem> result = loader.load("store-1", "Action", descriptor, Map.of("EUR", 4.0));
 
         // then
         assertEquals(1, result.size());
@@ -89,12 +90,13 @@ class StoreFeedItemLoaderTest {
         when(xmlLoader.load(any(), eq("Item"), any(), eq("store-1"), eq(1000))).thenReturn(List.of(eurItem));
 
         // when
-        List<InventoryItem> result = loader.load("store-1", descriptor, Map.of("EUR", 4.0));
+        List<InventoryItem> result = loader.load("store-1", "Action-k7f3a9c2", descriptor, Map.of("EUR", 4.0));
 
         // then
         assertEquals(1, result.size());
         assertEquals("PLN", result.get(0).currency());
-        verify(xmlLoader).load(any(), eq("Item"), any(), eq("store-1"), eq(1000));
+        verify(xmlLoader).load(any(), eq("Item"),
+                argThat((SupplierInfo info) -> info.name().equals("Action-k7f3a9c2")), eq("store-1"), eq(1000));
     }
 
     @Test
@@ -105,22 +107,22 @@ class StoreFeedItemLoaderTest {
         when(csvLoader.fetch(any(), eq(';'), eq("store-1"), eq("Action"), anyInt())).thenReturn(List.of(eurItem));
 
         // when
-        List<InventoryItem> result = loader.load("store-1", descriptor, Map.of());
+        List<InventoryItem> result = loader.load("store-1", "Action", descriptor, Map.of());
 
         // then
         assertTrue(result.isEmpty());
     }
 
     @Test
-    void restampsCsvRowsWithTheDescriptorIdentity() {
+    void restampsCsvRowsWithTheConnectionIdentity() {
         // given -- adapter parsers hardcode the type name; the connection identity must win
-        SupplierProviderDescriptor descriptor = csvDescriptor("Kosatec-k7f3a9c2");
+        SupplierProviderDescriptor descriptor = csvDescriptor("Kosatec");
         InventoryItem parsedByType = new InventoryItem("4711111111111", "MFN", 10.0, "PLN", 1, 1, "Kosatec");
         when(csvLoader.fetch(any(), eq(';'), eq("store-1"), eq("Kosatec-k7f3a9c2"), anyInt()))
                 .thenReturn(new java.util.ArrayList<>(List.of(parsedByType)));
 
         // when
-        List<InventoryItem> items = loader.load("store-1", descriptor, Map.of("PLN", 1.0));
+        List<InventoryItem> items = loader.load("store-1", "Kosatec-k7f3a9c2", descriptor, Map.of("PLN", 1.0));
 
         // then
         assertEquals(1, items.size());
@@ -137,7 +139,7 @@ class StoreFeedItemLoaderTest {
                 .thenReturn(new java.util.ArrayList<>(List.of(parsed)));
 
         // when
-        List<InventoryItem> items = loader.load("store-1", descriptor, Map.of("PLN", 1.0));
+        List<InventoryItem> items = loader.load("store-1", "Kosatec", descriptor, Map.of("PLN", 1.0));
 
         // then
         assertEquals("Kosatec", items.get(0).supplier());
