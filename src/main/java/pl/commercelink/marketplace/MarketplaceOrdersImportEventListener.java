@@ -13,7 +13,7 @@ import pl.commercelink.stores.StoresRepository;
 
 import java.util.List;
 
-import static org.apache.commons.lang3.StringUtils.isNotBlank;
+import static org.apache.commons.lang3.StringUtils.isBlank;
 
 @Component
 @ConditionalOnProperty(name = "application.env", havingValue = "prod", matchIfMissing = false)
@@ -33,12 +33,11 @@ public class MarketplaceOrdersImportEventListener {
     )
     public void handleMessage(MarketplaceOrderPayload payload) {
         String marketplace = payload.getMarketplace();
-        List<Store> stores = isNotBlank(payload.getStoreId())
-                ? addressedStore(payload.getStoreId(), marketplace)
-                : storesRepository.findAll()
-                        .stream()
-                        .filter(s -> s.importsOrdersOnGlobalSchedule(marketplace))
-                        .toList();
+        if (isBlank(payload.getStoreId())) {
+            log.error("Marketplace {} orders import rejected: the message names no store", marketplace);
+            return;
+        }
+        List<Store> stores = addressedStore(payload.getStoreId(), marketplace);
 
         log.info("Marketplace {} orders import started: stores={}", marketplace, stores.size());
         ElapsedTime elapsed = ElapsedTime.started();

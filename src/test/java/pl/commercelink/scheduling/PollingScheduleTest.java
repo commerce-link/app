@@ -151,6 +151,28 @@ class PollingScheduleTest {
     }
 
     @Test
+    void randomEveryMinutesKeepsTheIntervalAndSpreadsTheStartMinute() {
+        for (int i = 0; i < 200; i++) {
+            // when
+            PollingSchedule schedule = PollingSchedule.randomEveryMinutes(10);
+
+            // then
+            String[] fields = schedule.expression().split(" ");
+            String[] minute = fields[0].split("/");
+            assertThat(Integer.parseInt(minute[0])).isBetween(0, 9);
+            assertThat(minute[1]).isEqualTo("10");
+            assertThat(schedule.expression()).endsWith(" * * * ? *");
+        }
+    }
+
+    @Test
+    void storedOrRandomEveryMinutesKeepsAStoredExpression() {
+        // when / then
+        assertThat(PollingSchedule.storedOrRandomEveryMinutes("0 9 * * ? *", 10).expression()).isEqualTo("0 9 * * ? *");
+        assertThat(PollingSchedule.storedOrRandomEveryMinutes("  ", 10).expression()).endsWith("/10 * * * ? *");
+    }
+
+    @Test
     void randomNightlyFallsBetweenElevenPmAndFiveAm() {
         for (int i = 0; i < 200; i++) {
             // when

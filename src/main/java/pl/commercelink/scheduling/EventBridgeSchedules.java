@@ -20,7 +20,6 @@ import software.amazon.awssdk.services.scheduler.model.UpdateScheduleRequest;
 public class EventBridgeSchedules {
 
     public static final String TIMEZONE = "Europe/Warsaw";
-    public static final int NO_FLEXIBLE_WINDOW = 0;
 
     private final boolean enabled;
     private final String roleArn;
@@ -40,10 +39,6 @@ public class EventBridgeSchedules {
     }
 
     public void put(String name, String scheduleExpression, String targetArn, String input) {
-        put(name, scheduleExpression, targetArn, input, NO_FLEXIBLE_WINDOW);
-    }
-
-    public void put(String name, String scheduleExpression, String targetArn, String input, int flexibleWindowMinutes) {
         if (!isEnabled()) {
             return;
         }
@@ -52,9 +47,7 @@ public class EventBridgeSchedules {
                 .roleArn(roleArn)
                 .input(input)
                 .build();
-        FlexibleTimeWindow window = flexibleWindowMinutes > NO_FLEXIBLE_WINDOW
-                ? FlexibleTimeWindow.builder().mode(FlexibleTimeWindowMode.FLEXIBLE).maximumWindowInMinutes(flexibleWindowMinutes).build()
-                : FlexibleTimeWindow.builder().mode(FlexibleTimeWindowMode.OFF).build();
+        FlexibleTimeWindow window = FlexibleTimeWindow.builder().mode(FlexibleTimeWindowMode.OFF).build();
         try {
             schedulerClient.createSchedule(CreateScheduleRequest.builder()
                     .name(name)

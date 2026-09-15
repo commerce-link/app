@@ -31,6 +31,7 @@ class MarketplaceSectionRenderingTest {
         context.setVariable("sectionSuccessMessage", "Marketplace Empik settings saved.");
         context.setVariable("sectionMarketplacesWithStoredConfig", "Empik");
         context.setVariable("sectionBasePath", "/dashboard/store");
+        context.setVariable("sectionDefaultIntervalMinutes", 10);
         return context;
     }
 

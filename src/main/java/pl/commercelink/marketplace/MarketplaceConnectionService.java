@@ -55,6 +55,10 @@ public class MarketplaceConnectionService {
         return minIntervalMinutes;
     }
 
+    public int defaultIntervalMinutes() {
+        return ordersImportScheduler.defaultIntervalMinutes();
+    }
+
     public List<MarketplaceIntegrationView> views(Store store) {
         List<String> deviceAuthProviders = providerFactory.deviceAuthProviders();
         return store.getMarketplaces().stream()
@@ -112,9 +116,10 @@ public class MarketplaceConnectionService {
         try {
             rememberSecret(store, descriptor, compensations);
             providerFactory.saveConfiguration(store, marketplace, submitted);
+            boolean created = store.getMarketplaceIntegration(marketplace) == null;
             MarketplaceIntegration integration = store.connectMarketplace(
                     marketplace, providerFactory.deviceAuthProviders().contains(marketplace));
-            if (!Objects.equals(normalizedSchedule, integration.getOrdersImportSchedule())) {
+            if (created || !Objects.equals(normalizedSchedule, integration.getOrdersImportSchedule())) {
                 rememberSchedule(store.getStoreId(), marketplace, compensations);
                 ordersImportScheduler.apply(store.getStoreId(), marketplace, normalizedSchedule);
                 integration.setOrdersImportSchedule(normalizedSchedule);

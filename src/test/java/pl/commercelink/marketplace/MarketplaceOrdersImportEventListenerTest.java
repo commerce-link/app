@@ -58,7 +58,6 @@ class MarketplaceOrdersImportEventListenerTest {
         Store addressed = storeWithIntegration("store-1", "Allegro", true);
         Store other = storeWithIntegration("store-2", "Allegro", true);
         when(storesRepository.findById("store-1")).thenReturn(addressed);
-        when(storesRepository.findAll()).thenReturn(List.of(addressed, other));
         when(providerFactory.get(addressed, "Allegro")).thenReturn(provider);
         when(provider.fetchOrders()).thenReturn(List.of(order));
 
@@ -99,66 +98,8 @@ class MarketplaceOrdersImportEventListenerTest {
     }
 
     @Test
-    void importsForEveryActiveStoreWhenPayloadHasNoStoreId() {
+    void aMessageWithoutAStoreIsRejectedInsteadOfImportingEveryStore() throws Exception {
         // given
-        Store first = storeWithIntegration("store-1", "Allegro", true);
-        Store loggedOut = storeWithIntegration("store-2", "Allegro", false);
-        Store otherMarketplace = storeWithIntegration("store-3", "Empik", true);
-        when(storesRepository.findAll()).thenReturn(List.of(first, loggedOut, otherMarketplace));
-        when(providerFactory.get(first, "Allegro")).thenReturn(provider);
-        when(provider.fetchOrders()).thenReturn(List.of(order));
-
-        // when
-        listener.handleMessage(new MarketplaceOrdersImportEventListener.MarketplaceOrderPayload("Allegro", null));
-
-        // then
-        verify(marketplaceOrderImporter).importOrder(first, "Allegro", order);
-        verify(providerFactory, never()).get(loggedOut, "Allegro");
-        verify(providerFactory, never()).get(otherMarketplace, "Allegro");
-        verify(storesRepository, never()).findById(anyString());
-    }
-
-    @Test
-    void theGlobalScheduleLeavesStoresWithTheirOwnScheduleToThatSchedule() {
-        // given
-        Store global = storeWithIntegration("store-1", "Allegro", true);
-        Store ownSchedule = storeWithIntegration("store-2", "Allegro", true);
-        ownSchedule.getMarketplaceIntegration("Allegro").setOrdersImportSchedule("0/15 * * * ? *");
-        when(storesRepository.findAll()).thenReturn(List.of(global, ownSchedule));
-        when(providerFactory.get(global, "Allegro")).thenReturn(provider);
-        when(provider.fetchOrders()).thenReturn(List.of(order));
-
-        // when
-        listener.handleMessage(new MarketplaceOrdersImportEventListener.MarketplaceOrderPayload("Allegro", null));
-
-        // then
-        verify(marketplaceOrderImporter).importOrder(global, "Allegro", order);
-        verify(providerFactory, never()).get(ownSchedule, "Allegro");
-    }
-
-    @Test
-    void aStoreWithItsOwnScheduleIsStillImportedWhenAddressedByIt() {
-        // given
-        Store ownSchedule = storeWithIntegration("store-2", "Allegro", true);
-        ownSchedule.getMarketplaceIntegration("Allegro").setOrdersImportSchedule("0/15 * * * ? *");
-        when(storesRepository.findById("store-2")).thenReturn(ownSchedule);
-        when(providerFactory.get(ownSchedule, "Allegro")).thenReturn(provider);
-        when(provider.fetchOrders()).thenReturn(List.of(order));
-
-        // when
-        listener.handleMessage(new MarketplaceOrdersImportEventListener.MarketplaceOrderPayload("Allegro", "store-2"));
-
-        // then
-        verify(marketplaceOrderImporter).importOrder(ownSchedule, "Allegro", order);
-    }
-
-    @Test
-    void schedulerPayloadWithoutStoreIdImportsEveryActiveStoreAndAdvancesTheMarker() throws Exception {
-        // given
-        Store store = storeWithIntegration("store-1", "Allegro", true);
-        when(storesRepository.findAll()).thenReturn(List.of(store));
-        when(providerFactory.get(store, "Allegro")).thenReturn(provider);
-        when(provider.fetchOrders()).thenReturn(List.of(order));
         MarketplaceOrdersImportEventListener.MarketplaceOrderPayload payload = new ObjectMapper().readValue(
                 "{\"marketplace\":\"Allegro\"}", MarketplaceOrdersImportEventListener.MarketplaceOrderPayload.class);
 
@@ -166,9 +107,8 @@ class MarketplaceOrdersImportEventListenerTest {
         listener.handleMessage(payload);
 
         // then
-        verify(marketplaceOrderImporter).importOrder(store, "Allegro", order);
-        verify(storesRepository).save(store);
-        assertThat(store.getMarketplaceIntegration("Allegro").getLastFetchedAt()).isNotNull();
+        verify(storesRepository, never()).findAll();
+        verify(providerFactory, never()).get(any(), anyString());
     }
 
     @Test

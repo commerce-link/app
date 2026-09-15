@@ -2,7 +2,7 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
 
-<div th:fragment="section(rows, addDisabled, successMessage, storedConfigMarketplaces, basePath)"
+<div th:fragment="section(rows, addDisabled, successMessage, storedConfigMarketplaces, basePath, defaultIntervalMinutes)"
      th:attr="data-success-message=${successMessage},data-marketplaces-with-stored-config=${storedConfigMarketplaces}">
     <div class="is-flex is-justify-content-space-between is-align-items-center mb-3">
         <h2 class="subtitle mb-0" th:text="#{store.marketplaces.section.title}"></h2>
@@ -41,7 +41,7 @@
                           th:text="${#messages.msgWithParams(row.scheduleDescription().code(),
                                                              row.scheduleDescription().messageArgs())}"></span>
                     <span th:unless="${row.hasOwnSchedule()}" class="has-text-grey"
-                          th:text="#{store.marketplaces.schedule.summary.default}"></span>
+                          th:text="#{store.marketplaces.schedule.summary.default(${defaultIntervalMinutes})}"></span>
                 </td>
                 <td>
                     <div class="dropdown is-right marketplace-actions">
@@ -80,7 +80,7 @@
 </div>
 
 <div th:fragment="marketplaceSection"
-     th:replace="~{fragments/marketplace-section :: section(${sectionRows}, ${sectionAddDisabled}, ${sectionSuccessMessage}, ${sectionMarketplacesWithStoredConfig}, ${sectionBasePath})}"></div>
+     th:replace="~{fragments/marketplace-section :: section(${sectionRows}, ${sectionAddDisabled}, ${sectionSuccessMessage}, ${sectionMarketplacesWithStoredConfig}, ${sectionBasePath}, ${sectionDefaultIntervalMinutes})}"></div>
 
 <div th:fragment="sectionError" class="notification is-danger" th:text="${errorMessage}"></div>
 

@@ -10,33 +10,31 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 
-import static org.apache.commons.lang3.StringUtils.isBlank;
-
 @Component
 public class MarketplaceOrdersImportScheduler {
 
-    private static final int FLEXIBLE_WINDOW_MINUTES = 1;
-
     private final String ordersImportQueueArn;
+    private final int defaultIntervalMinutes;
     private final EventBridgeSchedules schedules;
 
     public MarketplaceOrdersImportScheduler(@Value("${sqs.orders-import.queue.arn}") String ordersImportQueueArn,
+                                            @Value("${marketplace.orders-import.default-interval-minutes}") int defaultIntervalMinutes,
                                             EventBridgeSchedules schedules) {
         this.ordersImportQueueArn = ordersImportQueueArn;
+        this.defaultIntervalMinutes = defaultIntervalMinutes;
         this.schedules = schedules;
     }
 
+    public int defaultIntervalMinutes() {
+        return defaultIntervalMinutes;
+    }
+
     public void apply(String storeId, String marketplace, String ordersImportSchedule) {
-        if (isBlank(ordersImportSchedule)) {
-            delete(storeId, marketplace);
-            return;
-        }
         schedules.put(
                 scheduleName(storeId, marketplace),
-                PollingSchedule.stored(ordersImportSchedule).awsExpression(),
+                PollingSchedule.storedOrRandomEveryMinutes(ordersImportSchedule, defaultIntervalMinutes).awsExpression(),
                 ordersImportQueueArn,
-                ConversionUtil.toJson(importRequest(storeId, marketplace)),
-                FLEXIBLE_WINDOW_MINUTES);
+                ConversionUtil.toJson(importRequest(storeId, marketplace)));
     }
 
     public void delete(String storeId, String marketplace) {
@@ -51,7 +49,7 @@ public class MarketplaceOrdersImportScheduler {
         String name = scheduleName(storeId, marketplace);
         if (snapshot.isPresent()) {
             schedules.put(name, snapshot.get(), ordersImportQueueArn,
-                    ConversionUtil.toJson(importRequest(storeId, marketplace)), FLEXIBLE_WINDOW_MINUTES);
+                    ConversionUtil.toJson(importRequest(storeId, marketplace)));
         } else {
             schedules.delete(name);
         }

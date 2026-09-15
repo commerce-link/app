@@ -304,6 +304,7 @@ class MarketplaceExportHistoryTemplateTest {
         context.setVariable("sectionSuccessMessage", null);
         context.setVariable("sectionMarketplacesWithStoredConfig", "allegro");
         context.setVariable("sectionBasePath", "/dashboard/store");
+        context.setVariable("sectionDefaultIntervalMinutes", 10);
         context.setVariable("basePath", "/dashboard/store");
         context.setVariable("allMarketplaces", List.of());
         context.setVariable("marketplaceConfigurations", Map.of());

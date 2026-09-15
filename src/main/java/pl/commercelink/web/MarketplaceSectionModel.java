@@ -19,6 +19,7 @@ public final class MarketplaceSectionModel {
         model.addAttribute("sectionMarketplacesWithStoredConfig",
                 String.join(";", marketplaceConnectionService.marketplacesWithStoredConfiguration(store)));
         model.addAttribute("sectionBasePath", SupplierSectionModel.basePath(store.getStoreId()));
+        model.addAttribute("sectionDefaultIntervalMinutes", marketplaceConnectionService.defaultIntervalMinutes());
         return "fragments/marketplace-section :: marketplaceSection";
     }
 
