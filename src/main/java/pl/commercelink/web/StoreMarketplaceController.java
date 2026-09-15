@@ -83,7 +83,7 @@ public class StoreMarketplaceController {
             return MarketplaceSectionModel.renderErrorFragment(join(result, locale), model, response);
         }
         String successMessage = messageSource.getMessage(
-                "store.marketplaces.disconnected", new Object[]{marketplace}, locale);
+                "store.marketplaces.disconnect.success", new Object[]{marketplace}, locale);
         return MarketplaceSectionModel.render(marketplaceConnectionService, store, successMessage, model);
     }
 

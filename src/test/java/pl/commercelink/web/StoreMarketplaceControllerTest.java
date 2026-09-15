@@ -141,7 +141,7 @@ class StoreMarketplaceControllerTest {
 
         // then
         assertThat(view).isEqualTo("fragments/marketplace-section :: marketplaceSection");
-        assertThat(model.get("sectionSuccessMessage")).isEqualTo("store.marketplaces.disconnected");
+        assertThat(model.get("sectionSuccessMessage")).isEqualTo("store.marketplaces.disconnect.success");
     }
 
     @Test
