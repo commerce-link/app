@@ -250,7 +250,9 @@ class StoreSupplierConnectionServiceTest {
     void connectOrUpdateNeverStoresAnExternalSupplierIdOnAGlobalConnection() {
         // given
         Store store = storeWith(true);
+        registryHas("Elko");
         when(validator.validate(anyBoolean(), anyList(), anyMap(), anyMap(), anySet())).thenReturn(List.of());
+        when(validator.validateLabel(any(), any())).thenReturn(List.of());
         when(persister.persist(any(), any(), anyMap()))
                 .thenReturn(StoreSupplierConnectionPersister.PersistOutcome.success(Set.of("Elko"), Set.of(), Set.of()));
         SupplierSelectionForm global = new SupplierSelectionForm("Elko", ConnectionMode.GLOBAL, true, true);
