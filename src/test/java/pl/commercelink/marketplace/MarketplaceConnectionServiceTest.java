@@ -48,6 +48,8 @@ class MarketplaceConnectionServiceTest {
     private ProviderConfigurationManager configurationManager;
     @Mock
     private MarketplaceOrdersImportScheduler ordersImportScheduler;
+    @Mock
+    private MarketplaceReturnsImportScheduler returnsImportScheduler;
 
     private MarketplaceConnectionService service;
     private Store store;
@@ -55,7 +57,7 @@ class MarketplaceConnectionServiceTest {
     @BeforeEach
     void setUp() {
         service = new MarketplaceConnectionService(storesRepository, providerFactory, configurationManager,
-                ordersImportScheduler, 5);
+                ordersImportScheduler, returnsImportScheduler, 5);
         store = new Store();
         store.setStoreId("store-1");
         when(providerFactory.availableProviders()).thenReturn(List.of(ALLEGRO, EMPIK));
@@ -70,8 +72,7 @@ class MarketplaceConnectionServiceTest {
     @Test
     void connectsANewMarketplaceWithItsCredentialsAndSchedule() {
         // when
-        MarketplaceConnectionService.ConnectionUpdateResult result = service.connectOrUpdate(
-                store, "Empik", Map.of("apiKey", "secret"), " 0/15 * * * ? * ");
+        MarketplaceConnectionService.ConnectionUpdateResult result = service.connectOrUpdate(store, "Empik", Map.of("apiKey", "secret"), " 0/15 * * * ? * ", "");
 
         // then
         assertThat(result.hasErrors()).isFalse();
@@ -86,7 +87,7 @@ class MarketplaceConnectionServiceTest {
     @Test
     void aDeviceAuthMarketplaceStartsAsAwaitingAuthorization() {
         // when
-        service.connectOrUpdate(store, "Allegro", Map.of("clientId", "id", "clientSecret", "s"), "");
+        service.connectOrUpdate(store, "Allegro", Map.of("clientId", "id", "clientSecret", "s"), "", "");
 
         // then
         assertThat(store.getMarketplaceIntegration("Allegro").isLoggedIn()).isFalse();
@@ -96,7 +97,7 @@ class MarketplaceConnectionServiceTest {
     @Test
     void aNewMarketplaceWithoutAScheduleStillGetsTheDefaultOne() {
         // when
-        service.connectOrUpdate(store, "Empik", Map.of("apiKey", "secret"), "");
+        service.connectOrUpdate(store, "Empik", Map.of("apiKey", "secret"), "", "");
 
         // then
         verify(ordersImportScheduler).apply("store-1", "Empik", null);
@@ -110,7 +111,7 @@ class MarketplaceConnectionServiceTest {
         when(providerFactory.loadConfiguration(store, "Empik")).thenReturn(Map.of("apiKey", "stored"));
 
         // when
-        service.connectOrUpdate(store, "Empik", Map.of("apiKey", ""), "");
+        service.connectOrUpdate(store, "Empik", Map.of("apiKey", ""), "", "");
 
         // then
         verify(ordersImportScheduler, never()).apply(any(), any(), any());
@@ -125,8 +126,7 @@ class MarketplaceConnectionServiceTest {
         when(providerFactory.loadConfiguration(store, "Empik")).thenReturn(Map.of("apiKey", "stored"));
 
         // when
-        MarketplaceConnectionService.ConnectionUpdateResult result = service.connectOrUpdate(
-                store, "Empik", Map.of("apiKey", ""), "0/15  * * * ? *");
+        MarketplaceConnectionService.ConnectionUpdateResult result = service.connectOrUpdate(store, "Empik", Map.of("apiKey", ""), "0/15  * * * ? *", "");
 
         // then
         assertThat(result.hasErrors()).isFalse();
@@ -144,7 +144,7 @@ class MarketplaceConnectionServiceTest {
         when(providerFactory.loadConfiguration(store, "Empik")).thenReturn(Map.of("apiKey", "stored"));
 
         // when
-        service.connectOrUpdate(store, "Empik", Map.of(), "   ");
+        service.connectOrUpdate(store, "Empik", Map.of(), "   ", "");
 
         // then
         verify(ordersImportScheduler).apply("store-1", "Empik", null);
@@ -154,8 +154,7 @@ class MarketplaceConnectionServiceTest {
     @Test
     void aBlankRequiredPasswordIsAnErrorOnlyWithoutAStoredSecret() {
         // when
-        MarketplaceConnectionService.ConnectionUpdateResult result = service.connectOrUpdate(
-                store, "Empik", Map.of("apiKey", ""), "");
+        MarketplaceConnectionService.ConnectionUpdateResult result = service.connectOrUpdate(store, "Empik", Map.of("apiKey", ""), "", "");
 
         // then
         assertThat(result.errors()).extracting(ErrorMessage::code)
@@ -168,8 +167,7 @@ class MarketplaceConnectionServiceTest {
     @Test
     void rejectsAScheduleBelowTheFloorWithoutTouchingAnything() {
         // when
-        MarketplaceConnectionService.ConnectionUpdateResult result = service.connectOrUpdate(
-                store, "Empik", Map.of("apiKey", "secret"), "0/2 * * * ? *");
+        MarketplaceConnectionService.ConnectionUpdateResult result = service.connectOrUpdate(store, "Empik", Map.of("apiKey", "secret"), "0/2 * * * ? *", "");
 
         // then
         assertThat(result.errors()).extracting(ErrorMessage::code)
@@ -183,8 +181,7 @@ class MarketplaceConnectionServiceTest {
     @Test
     void rejectsAnInvalidScheduleExpression() {
         // when
-        MarketplaceConnectionService.ConnectionUpdateResult result = service.connectOrUpdate(
-                store, "Empik", Map.of("apiKey", "secret"), "every 5 minutes");
+        MarketplaceConnectionService.ConnectionUpdateResult result = service.connectOrUpdate(store, "Empik", Map.of("apiKey", "secret"), "every 5 minutes", "");
 
         // then
         assertThat(result.errors()).extracting(ErrorMessage::code)
@@ -195,8 +192,7 @@ class MarketplaceConnectionServiceTest {
     @Test
     void rejectsAnUnknownMarketplace() {
         // when
-        MarketplaceConnectionService.ConnectionUpdateResult result = service.connectOrUpdate(
-                store, "Ebay", Map.of(), "");
+        MarketplaceConnectionService.ConnectionUpdateResult result = service.connectOrUpdate(store, "Ebay", Map.of(), "", "");
 
         // then
         assertThat(result.errors()).extracting(ErrorMessage::code).containsExactly("store.marketplaces.error.unknown");
@@ -240,8 +236,7 @@ class MarketplaceConnectionServiceTest {
         doThrow(new RuntimeException("dynamo down")).when(storesRepository).save(store);
 
         // when
-        MarketplaceConnectionService.ConnectionUpdateResult result = service.connectOrUpdate(
-                store, "Empik", Map.of("apiKey", "secret"), "0/15 * * * ? *");
+        MarketplaceConnectionService.ConnectionUpdateResult result = service.connectOrUpdate(store, "Empik", Map.of("apiKey", "secret"), "0/15 * * * ? *", "");
 
         // then
         assertThat(result.errors()).extracting(ErrorMessage::code).containsExactly("store.marketplaces.error.update.failed");
@@ -263,8 +258,7 @@ class MarketplaceConnectionServiceTest {
         doThrow(new RuntimeException("eventbridge down")).when(ordersImportScheduler).apply(any(), any(), any());
 
         // when
-        MarketplaceConnectionService.ConnectionUpdateResult result = service.connectOrUpdate(
-                store, "Empik", Map.of("apiKey", "new"), "0/15 * * * ? *");
+        MarketplaceConnectionService.ConnectionUpdateResult result = service.connectOrUpdate(store, "Empik", Map.of("apiKey", "new"), "0/15 * * * ? *", "");
 
         // then
         assertThat(result.hasErrors()).isTrue();
@@ -280,7 +274,7 @@ class MarketplaceConnectionServiceTest {
                 .thenReturn(new ProviderConfigurationManager.SecretSnapshot(false, null));
 
         // when
-        service.connectOrUpdate(store, "Empik", Map.of("apiKey", "secret"), "0/15 * * * ? *");
+        service.connectOrUpdate(store, "Empik", Map.of("apiKey", "secret"), "0/15 * * * ? *", "");
 
         // then
         verify(configurationManager, never()).restore(any(), anyString(), any());
@@ -307,6 +301,80 @@ class MarketplaceConnectionServiceTest {
     }
 
     @Test
+    void aNewMarketplaceGetsAReturnsScheduleTooAndAStoredCronIsKept() {
+        // when
+        service.connectOrUpdate(store, "Empik", Map.of("apiKey", "secret"), "", " 0 8 * * ? * ");
+
+        // then
+        verify(returnsImportScheduler).apply("store-1", "Empik", "0 8 * * ? *");
+        assertThat(store.getMarketplaceIntegration("Empik").getReturnsImportSchedule()).isEqualTo("0 8 * * ? *");
+    }
+
+    @Test
+    void anUnchangedReturnsScheduleIsNotSentToTheSchedulerAgain() {
+        // given
+        MarketplaceIntegration existing = new MarketplaceIntegration("Empik");
+        existing.setReturnsImportSchedule("0 8 * * ? *");
+        store.getMarketplaces().add(existing);
+        when(providerFactory.loadConfiguration(store, "Empik")).thenReturn(Map.of("apiKey", "stored"));
+
+        // when
+        service.connectOrUpdate(store, "Empik", Map.of(), "", "0 8 * * ? *");
+
+        // then
+        verify(returnsImportScheduler, never()).apply(any(), any(), any());
+    }
+
+    @Test
+    void anInvalidReturnsScheduleIsReportedUnderItsOwnKey() {
+        // when
+        MarketplaceConnectionService.ConnectionUpdateResult result = service.connectOrUpdate(
+                store, "Empik", Map.of("apiKey", "secret"), "", "0/2 * * * ? *");
+
+        // then
+        assertThat(result.errors()).extracting(ErrorMessage::code)
+                .containsExactly("store.marketplaces.returns.schedule.error.too.frequent");
+        verify(returnsImportScheduler, never()).apply(any(), any(), any());
+        verify(storesRepository, never()).save(any());
+    }
+
+    @Test
+    void aFailedStoreSaveRestoresTheReturnsScheduleAsWell() {
+        // given
+        when(configurationManager.snapshot(any(), anyString()))
+                .thenReturn(new ProviderConfigurationManager.SecretSnapshot(false, null));
+        when(returnsImportScheduler.snapshot("store-1", "Empik")).thenReturn(Optional.of("cron(0 8 * * ? *)"));
+        doThrow(new RuntimeException("dynamo down")).when(storesRepository).save(store);
+
+        // when
+        service.connectOrUpdate(store, "Empik", Map.of("apiKey", "secret"), "", "0 9 * * ? *");
+
+        // then
+        verify(returnsImportScheduler).restore("store-1", "Empik", Optional.of("cron(0 8 * * ? *)"));
+    }
+
+    @Test
+    void disconnectingDropsTheReturnsScheduleToo() {
+        // given
+        store.getMarketplaces().add(new MarketplaceIntegration("Empik"));
+
+        // when
+        service.disconnect(store, "Empik");
+
+        // then
+        verify(returnsImportScheduler).delete("store-1", "Empik");
+    }
+
+    @Test
+    void theReturnsDefaultIntervalComesFromItsScheduler() {
+        // given
+        when(returnsImportScheduler.defaultIntervalMinutes()).thenReturn(60);
+
+        // when / then
+        assertThat(service.returnsDefaultIntervalMinutes()).isEqualTo(60);
+    }
+
+    @Test
     void viewsDescribeEveryConnectedMarketplace() {
         // given
         MarketplaceIntegration allegro = new MarketplaceIntegration("Allegro");
@@ -326,6 +394,7 @@ class MarketplaceConnectionServiceTest {
         assertThat(views.get(0).hasOwnSchedule()).isFalse();
         assertThat(views.get(1).hasOwnSchedule()).isTrue();
         assertThat(views.get(1).scheduleDescription().code()).isEqualTo("store.supplier.schedule.summary.every.minutes");
+        assertThat(views.get(1).hasOwnReturnsSchedule()).isFalse();
     }
 
     @Test

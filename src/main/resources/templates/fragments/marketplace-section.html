@@ -2,7 +2,7 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
 
-<div th:fragment="section(rows, addDisabled, successMessage, storedConfigMarketplaces, basePath, defaultIntervalMinutes)"
+<div th:fragment="section(rows, addDisabled, successMessage, storedConfigMarketplaces, basePath, defaultIntervalMinutes, returnsDefaultIntervalMinutes)"
      th:attr="data-success-message=${successMessage},data-marketplaces-with-stored-config=${storedConfigMarketplaces}">
     <div class="is-flex is-justify-content-space-between is-align-items-center mb-3">
         <h2 class="subtitle mb-0" th:text="#{store.marketplaces.section.title}"></h2>
@@ -19,12 +19,13 @@
                 <th th:text="#{store.marketplaces.status}"></th>
                 <th class="is-hidden-mobile" th:text="#{store.marketplace.last.fetched}"></th>
                 <th th:text="#{store.marketplaces.column.schedule}"></th>
+                <th th:text="#{store.marketplaces.returns.column.schedule}"></th>
                 <th th:text="#{general.actions}"></th>
             </tr>
         </thead>
         <tbody>
             <tr th:each="row : ${rows}"
-                th:attr="data-marketplace=${row.name()},data-orders-import-schedule=${row.ordersImportSchedule()}">
+                th:attr="data-marketplace=${row.name()},data-orders-import-schedule=${row.ordersImportSchedule()},data-returns-import-schedule=${row.returnsImportSchedule()}">
                 <td th:text="${row.displayName()}"></td>
                 <td>
                     <span class="tag is-success" th:if="${row.connected()}" th:text="#{store.marketplaces.connected}"></span>
@@ -42,6 +43,13 @@
                                                              row.scheduleDescription().messageArgs())}"></span>
                     <span th:unless="${row.hasOwnSchedule()}" class="has-text-grey"
                           th:text="#{store.marketplaces.schedule.summary.default(${defaultIntervalMinutes})}"></span>
+                </td>
+                <td>
+                    <span th:if="${row.hasOwnReturnsSchedule()}" th:title="${row.returnsImportSchedule()}"
+                          th:text="${#messages.msgWithParams(row.returnsScheduleDescription().code(),
+                                                             row.returnsScheduleDescription().messageArgs())}"></span>
+                    <span th:unless="${row.hasOwnReturnsSchedule()}" class="has-text-grey"
+                          th:text="#{store.marketplaces.returns.schedule.summary.default(${returnsDefaultIntervalMinutes})}"></span>
                 </td>
                 <td>
                     <div class="dropdown is-right marketplace-actions">
@@ -80,7 +88,7 @@
 </div>
 
 <div th:fragment="marketplaceSection"
-     th:replace="~{fragments/marketplace-section :: section(${sectionRows}, ${sectionAddDisabled}, ${sectionSuccessMessage}, ${sectionMarketplacesWithStoredConfig}, ${sectionBasePath}, ${sectionDefaultIntervalMinutes})}"></div>
+     th:replace="~{fragments/marketplace-section :: section(${sectionRows}, ${sectionAddDisabled}, ${sectionSuccessMessage}, ${sectionMarketplacesWithStoredConfig}, ${sectionBasePath}, ${sectionDefaultIntervalMinutes}, ${sectionReturnsDefaultIntervalMinutes})}"></div>
 
 <div th:fragment="sectionError" class="notification is-danger" th:text="${errorMessage}"></div>
 

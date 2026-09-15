@@ -62,7 +62,7 @@ public class StoreMarketplaceController {
                     messageSource.getMessage("store.manual.error.store.notfound", null, locale), model, response);
         }
         MarketplaceConnectionService.ConnectionUpdateResult result = marketplaceConnectionService.connectOrUpdate(
-                store, form.getMarketplace(), form.getConfiguration(), form.getSchedule());
+                store, form.getMarketplace(), form.getConfiguration(), form.getSchedule(), form.getReturnsSchedule());
         if (result.hasErrors()) {
             return MarketplaceSectionModel.renderErrorFragment(join(result, locale), model, response);
         }
