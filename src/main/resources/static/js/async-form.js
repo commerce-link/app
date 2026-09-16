@@ -4,15 +4,53 @@
 (function () {
     'use strict';
 
+    // DOMParser gives an inert document: unlike innerHTML, its images are not fetched until the form is on the page.
     function swap(form, html) {
-        var temp = document.createElement('div');
-        temp.innerHTML = html;
-        var next = temp.querySelector('form[data-cl-async]');
+        var parsed = new DOMParser().parseFromString(html, 'text/html');
+        var next = parsed.querySelector('form[data-cl-async]');
         if (!next || next.id !== form.id) {
             return null;
         }
+        var kept = keepLoadedImages(form, next, parsed);
         form.replaceWith(next);
+        kept.forEach(function (image) {
+            image.slot.replaceWith(image.loaded);
+        });
         return next;
+    }
+
+    // An image sent back under the same address is already on screen. Its loaded element takes the place of the new
+    // one, so it is neither fetched again nor blank for a frame; a replaced image comes back with a new address.
+    function keepLoadedImages(form, next, parsed) {
+        var kept = [];
+        next.querySelectorAll('img[src]').forEach(function (image) {
+            var loaded = Array.prototype.find.call(form.querySelectorAll('img[src]'), function (candidate) {
+                return candidate.getAttribute('src') === image.getAttribute('src') && candidate.complete;
+            });
+            if (loaded) {
+                loaded.alt = image.alt;
+                var slot = parsed.createElement('span');
+                image.replaceWith(slot);
+                kept.push({ slot: slot, loaded: loaded });
+            }
+        });
+        return kept;
+    }
+
+    // A browser cannot re-render a chosen file, so after a failed save the file moves into the returned form unless
+    // the server rejected that very file.
+    function keepChosenFiles(form, next) {
+        form.querySelectorAll('input[type="file"]').forEach(function (input) {
+            var target = input.name && next.querySelector('input[type="file"][name="' + input.name + '"]');
+            if (input.files.length && target && target.getAttribute('aria-invalid') !== 'true') {
+                target.files = input.files;
+            }
+        });
+    }
+
+    function body(form) {
+        var data = new FormData(form);
+        return form.enctype === 'multipart/form-data' ? data : new URLSearchParams(data);
     }
 
     function unlock(form, button) {
@@ -39,7 +77,7 @@
 
         fetch(form.action, {
             method: 'POST',
-            body: new URLSearchParams(new FormData(form)),
+            body: body(form),
             headers: { 'X-Requested-With': 'fetch' },
             // An expired session answers with a redirect to the login page on another origin; following it would
             // fail as a CORS error indistinguishable from a network outage.
@@ -59,6 +97,10 @@
                     HTMLFormElement.prototype.submit.call(form);
                     return;
                 }
+                if (result.status === 422) {
+                    keepChosenFiles(form, next);
+                }
+                next.dispatchEvent(new CustomEvent('cl:form-replaced', { bubbles: true }));
                 var summary = next.querySelector('[data-cl-error-summary]');
                 if (summary) {
                     summary.focus();

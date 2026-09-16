@@ -218,7 +218,7 @@
         }
     </style>
 
-    <div class="container" th:style="${#strings.isEmpty(branding.primaryColor)} ? null : '--client-primary-color:' + ${branding.primaryColor}">
+    <div class="container" th:style="${#strings.isEmpty(branding.safePrimaryColor)} ? null : '--client-primary-color:' + ${branding.safePrimaryColor}">
 
         <header class="client-order-head">
             <div class="client-order-brand">
@@ -368,7 +368,7 @@
                                             </div>
                                             <div class="control">
                                                 <button type="submit" class="button is-primary is-small"
-                                                        th:style="${#strings.isEmpty(branding.primaryColor)} ? null : 'background-color:' + ${branding.primaryColor} + ' !important; color: #fff;'"
+                                                        th:style="${#strings.isEmpty(branding.safePrimaryColor)} ? null : 'background-color:' + ${branding.safePrimaryColor} + ' !important; color: #fff;'"
                                                         th:text="#{client.order.address.code.submit}"></button>
                                             </div>
                                             <div class="control">
@@ -450,7 +450,7 @@
                                         <div class="field is-grouped mt-2">
                                             <div class="control">
                                                 <button type="submit" class="button is-primary"
-                                                        th:style="${#strings.isEmpty(branding.primaryColor)} ? null : 'background-color:' + ${branding.primaryColor} + ' !important; color: #fff;'"
+                                                        th:style="${#strings.isEmpty(branding.safePrimaryColor)} ? null : 'background-color:' + ${branding.safePrimaryColor} + ' !important; color: #fff;'"
                                                         th:text="#{client.order.address.edit.submit}"></button>
                                             </div>
                                             <div class="control">
@@ -486,7 +486,7 @@
                                     </div>
                                     <a th:if="${shipment.trackingUrl != null}" class="button is-primary is-small"
                                        th:href="${shipment.trackingUrl}" target="_blank" rel="noopener"
-                                       th:style="${#strings.isEmpty(branding.primaryColor)} ? null : 'background-color:' + ${branding.primaryColor} + ' !important; color: #fff;'"
+                                       th:style="${#strings.isEmpty(branding.safePrimaryColor)} ? null : 'background-color:' + ${branding.safePrimaryColor} + ' !important; color: #fff;'"
                                        th:text="#{client.order.shipment.track}"></a>
                                 </div>
                             </dd>
