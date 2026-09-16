@@ -21,8 +21,6 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
 @DynamoDBTable(tableName = "Stores")
 public class Store {
 
-    private static final int MAX_NOTIFICATIONS = 200;
-
     @DynamoDBHashKey(attributeName = "storeId")
     private String storeId;
     @DynamoDBAttribute(attributeName = "name")
@@ -35,8 +33,6 @@ public class Store {
     private List<MarketplaceIntegration> marketplaces = new LinkedList<>();
     @DynamoDBAttribute(attributeName = "payments")
     private List<PaymentIntegration> payments = new LinkedList<>();
-    @DynamoDBAttribute(attributeName = "notifications")
-    private List<StoreNotification> notifications = new LinkedList<>();
     @DynamoDBAttribute(attributeName = "bankAccounts")
     private List<BankAccount> bankAccounts = new LinkedList<>();
     @DynamoDBAttribute(attributeName = "clientNotifications")
@@ -95,8 +91,6 @@ public class Store {
                 m.setLoggedIn(true);
             }
         });
-        String tokenName = marketplace.toLowerCase() + "_marketplace";
-        notifications.removeIf(n -> n.getType() == StoreNotificationType.UNAUTHENTICATED && tokenName.equals(n.getObject()));
     }
 
     @DynamoDBIgnore
@@ -106,26 +100,6 @@ public class Store {
                 m.setLoggedIn(false);
             }
         });
-        String tokenName = marketplace.toLowerCase() + "_marketplace";
-        StoreNotification notification = new StoreNotification(
-                StoreNotificationSeverity.WARNING,
-                StoreNotificationType.UNAUTHENTICATED,
-                tokenName,
-                "Your connection to " + marketplace + " marketplace has expired, reauthenticate it in the settings");
-
-        addNotification(notification);
-    }
-
-    /** Notifications have no dismiss path, so the oldest ones are dropped to keep the Stores item small. */
-    @DynamoDBIgnore
-    public void addNotification(StoreNotification notification) {
-        if (notifications.contains(notification)) {
-            return;
-        }
-        notifications.add(notification);
-        while (notifications.size() > MAX_NOTIFICATIONS) {
-            notifications.remove(0);
-        }
     }
 
     @DynamoDBIgnore
@@ -161,8 +135,6 @@ public class Store {
     @DynamoDBIgnore
     public void removeMarketplaceIntegration(String marketplaceName) {
         marketplaces.removeIf(m -> marketplaceName.equals(m.getName()));
-        String tokenName = marketplaceName.toLowerCase() + "_marketplace";
-        notifications.removeIf(n -> n.getType() == StoreNotificationType.UNAUTHENTICATED && tokenName.equals(n.getObject()));
     }
 
     @DynamoDBIgnore
@@ -297,14 +269,6 @@ public class Store {
 
     public void setPayments(List<PaymentIntegration> payments) {
         this.payments = payments;
-    }
-
-    public List<StoreNotification> getNotifications() {
-        return notifications;
-    }
-
-    public void setNotifications(List<StoreNotification> notifications) {
-        this.notifications = notifications;
     }
 
     public Branding getBranding() { return branding; }

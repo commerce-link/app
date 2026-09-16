@@ -90,37 +90,30 @@ class StoreTest {
     }
 
     @Test
-    void addNotificationSkipsAnAlreadyPresentDuplicate() {
+    void markConnectionAsLostFlagsTheMarketplaceAsDisconnected() {
         // given
         Store store = new Store();
-        StoreNotification notification = new StoreNotification(
-                StoreNotificationSeverity.WARNING, StoreNotificationType.UNAUTHENTICATED, "obj", "message");
-        store.addNotification(notification);
+        store.getMarketplaces().add(new MarketplaceIntegration("Allegro"));
 
         // when
-        store.addNotification(new StoreNotification(
-                StoreNotificationSeverity.WARNING, StoreNotificationType.UNAUTHENTICATED, "obj", "message"));
+        store.markConnectionAsLost("Allegro");
 
         // then
-        assertThat(store.getNotifications()).hasSize(1);
+        assertThat(store.getMarketplaceIntegration("Allegro").isLoggedIn()).isFalse();
     }
 
     @Test
-    void addNotificationDropsTheOldestOnceTheCapIsExceeded() {
-        // given: notifications have no dismiss path, so unbounded accumulation must be prevented
+    void markConnectionAsRestoredFlagsTheMarketplaceAsConnectedAgain() {
+        // given
         Store store = new Store();
-        for (int i = 0; i < 200; i++) {
-            store.addNotification(new StoreNotification(
-                    StoreNotificationSeverity.WARNING, StoreNotificationType.UNAUTHENTICATED, "obj-" + i, "message"));
-        }
+        MarketplaceIntegration integration = new MarketplaceIntegration("Allegro");
+        integration.setLoggedIn(false);
+        store.getMarketplaces().add(integration);
 
         // when
-        store.addNotification(new StoreNotification(
-                StoreNotificationSeverity.WARNING, StoreNotificationType.UNAUTHENTICATED, "obj-200", "message"));
+        store.markConnectionAsRestored("Allegro");
 
         // then
-        assertThat(store.getNotifications()).hasSize(200);
-        assertThat(store.getNotifications().get(0).getObject()).isEqualTo("obj-1");
-        assertThat(store.getNotifications().get(199).getObject()).isEqualTo("obj-200");
+        assertThat(store.getMarketplaceIntegration("Allegro").isLoggedIn()).isTrue();
     }
 }

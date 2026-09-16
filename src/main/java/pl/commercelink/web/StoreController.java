@@ -26,7 +26,10 @@ import pl.commercelink.products.PimCategoryOptions;
 import pl.commercelink.shipping.ShippingProviderFactory;
 import pl.commercelink.shipping.api.Carrier;
 import pl.commercelink.shipping.api.ShippingProviderDescriptor;
+import pl.commercelink.starter.security.UserRole;
 import pl.commercelink.stores.*;
+import pl.commercelink.web.settings.SettingsPage;
+import pl.commercelink.web.settings.StoreSettingsOverviewFactory;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.web.dtos.CarrierSelectionForm;
 import pl.commercelink.web.dtos.ConnectedIntegration;
@@ -86,6 +89,9 @@ public class StoreController {
     @Autowired
     private PimCategoryOptions pimCategoryOptions;
 
+    @Autowired
+    private StoreSettingsOverviewFactory storeSettingsOverviewFactory;
+
     @GetMapping("/dashboard/store")
     @PreAuthorize("hasRole('ADMIN')")
     public String store(Model model) {
@@ -94,6 +100,7 @@ public class StoreController {
         StoreForm form = new StoreForm(store);
         model.addAttribute("form", form);
         model.addAttribute("isSuperAdmin", false);
+        model.addAttribute("overview", storeSettingsOverviewFactory.build(store, UserRole.ADMIN));
         return "store";
     }
 
@@ -538,8 +545,12 @@ public class StoreController {
             return "error";
         }
 
-        store.getCheckoutConfiguration().getDeliveryOptions().add(new DeliveryOption());
-        store.getCheckoutConfiguration().getDeliveryOptions().add(new DeliveryOption());
+        // a store created by StoreCreationService has no checkout configuration until this page is saved once
+        CheckoutConfiguration checkoutConfiguration = Objects.requireNonNullElseGet(
+                store.getCheckoutConfiguration(), CheckoutConfiguration::new);
+        store.setCheckoutConfiguration(checkoutConfiguration);
+        checkoutConfiguration.getDeliveryOptions().add(new DeliveryOption());
+        checkoutConfiguration.getDeliveryOptions().add(new DeliveryOption());
 
         StoreForm form = new StoreForm(store);
         form.setProviderConfiguration(new HashMap<>());
@@ -707,6 +718,10 @@ public class StoreController {
                 .collect(Collectors.toList());
 
         model.addAttribute("availableCarriers", selections);
+        // Renders under a non-tile URL, so SettingsPageAdvice cannot recognise it from the request path;
+        // set it explicitly (a handler's model attribute overrides the advice's value).
+        model.addAttribute("settingsPage", SettingsPage.forTile("/shipping",
+                isSuperAdmin() ? UserRole.SUPER_ADMIN : UserRole.ADMIN, storeId));
         return renderStoreShipping(storeId, model);
     }
 

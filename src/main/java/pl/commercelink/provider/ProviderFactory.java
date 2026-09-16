@@ -120,11 +120,14 @@ public class ProviderFactory<D extends ProviderDescriptor<T>, T> {
                 resolveAuthEndpoint(apiUrl, oauth2.authEndpointPath()),
                 resolveAuthEndpoint(apiUrl, oauth2.refreshEndpointPath()),
                 oauth2.refreshTokenExpirationSeconds(),
-                storeId -> {
-                    Store s = storesRepository.findById(storeId);
-                    onAuthorizationLost(s, descriptor);
-                    storesRepository.save(s);
-                });
+                storeId -> handleAuthorizationLost(storeId, descriptor));
+    }
+
+    void handleAuthorizationLost(String storeId, D descriptor) {
+        Store store = storesRepository.findById(storeId);
+        onAuthorizationLost(store, descriptor);
+        storesRepository.save(store);
+        afterAuthorizationLostSaved(store, descriptor);
     }
 
     public static String resolveAuthEndpoint(String apiUrl, String path) {
@@ -143,6 +146,9 @@ public class ProviderFactory<D extends ProviderDescriptor<T>, T> {
     }
 
     protected void onAuthorizationLost(Store store, D descriptor) {
+    }
+
+    protected void afterAuthorizationLostSaved(Store store, D descriptor) {
     }
 
     protected String resolveCredentialName(D descriptor) {

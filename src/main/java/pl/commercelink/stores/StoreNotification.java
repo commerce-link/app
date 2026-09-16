@@ -30,6 +30,18 @@ public class StoreNotification {
         this.message = message;
     }
 
+    public static StoreNotification marketplaceConnectionExpired(String marketplace) {
+        return new StoreNotification(
+                StoreNotificationSeverity.WARNING,
+                StoreNotificationType.UNAUTHENTICATED,
+                marketplaceConnectionObject(marketplace),
+                "Your connection to " + marketplace + " marketplace has expired, reauthenticate it in the settings");
+    }
+
+    public static String marketplaceConnectionObject(String marketplace) {
+        return marketplace.toLowerCase() + "_marketplace";
+    }
+
     @Override
     public boolean equals(Object o) {
         if (o == null || getClass() != o.getClass()) return false;

@@ -200,7 +200,9 @@ public class OfferController {
         model.addAttribute("backofficeDomain", appDomain);
 
         model.addAttribute("catalogs", catalogs);
-        model.addAttribute("deliveryOptions", store.getCheckoutConfiguration().getDeliveryOptions());
+        model.addAttribute("deliveryOptions", store.getCheckoutConfiguration() != null
+                ? store.getCheckoutConfiguration().getDeliveryOptions()
+                : List.of());
 
         return "offerDetails";
     }
