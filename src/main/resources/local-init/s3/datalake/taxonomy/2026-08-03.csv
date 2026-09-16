@@ -158,3 +158,8 @@ ean;mfn;brand;name;category;category_id;data_accuracy_score;net_weight_g;gross_w
 5900000000903;SIM-UNKNOWN-LOST;Acme;Symulacja: HTTP 502, zamówienia nie ma;Części i akcesoria do systemów chłodzenia komputerów;1571;1;100;150
 5900000000904;SIM-REJECTED;Acme;Symulacja: odrzucenie przez dostawcę;Części i akcesoria do systemów chłodzenia komputerów;1571;1;100;150
 5900000000905;SIM-BLANK-ID;Acme;Symulacja: odpowiedź bez numeru zamówienia;Części i akcesoria do systemów chłodzenia komputerów;1571;1;100;150
+5904000000001;RTX4070S-GAMING-OC;Gigabyte;Gigabyte GeForce RTX 4070 Super Gaming OC 12GB;Karty graficzne;170;1;900;1200
+5904000000002;100-100001503WOF;AMD;AMD Ryzen 9 7950X3D;Procesory;989;1;200;300
+5904000000003;X670E-TAICHI;ASRock;ASRock X670E Taichi;Płyty główne;164;1;800;1000
+5904000000004;990PRO-4TB;Samsung;Samsung 990 Pro 4TB NVMe Gen4;Urządzenia SSD;1563;1;50;100
+5904000000005;PG27AQDM;ASUS;ASUS ROG Swift OLED PG27AQDM 27 QHD 240Hz;Monitory komputerowe;222;1;4000;5500

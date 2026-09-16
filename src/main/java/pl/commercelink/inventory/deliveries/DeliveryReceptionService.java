@@ -28,6 +28,8 @@ public class DeliveryReceptionService {
     private Warehouse warehouse;
     @Autowired
     private DeliveriesRepository deliveriesRepository;
+    @Autowired
+    private CounterpartyShortcuts counterpartyShortcuts;
 
     public OperationResult<Document> receive(
             String storeId, String provider, String deliveryId,
@@ -60,9 +62,11 @@ public class DeliveryReceptionService {
                 return OperationResult.failure("Failed to fetch cost center with id: " + warehouseConfiguration.getCostCenterId());
             }
 
-            BillingParty counterparty = invoicingProvider.fetchBillingPartyByShortcut(provider);
+            Delivery delivery = deliveriesRepository.findById(storeId, deliveryId);
+            String shortcut = delivery != null ? counterpartyShortcuts.forDelivery(store, delivery) : provider;
+            BillingParty counterparty = invoicingProvider.fetchBillingPartyByShortcut(shortcut);
             if (counterparty == null || !counterparty.hasCompanyDetails()) {
-                return OperationResult.failure("Failed to fetch counterparty with shortcut: " + provider);
+                return OperationResult.failure("Failed to fetch counterparty with shortcut: " + shortcut);
             }
 
             builder.issuer(issuer)

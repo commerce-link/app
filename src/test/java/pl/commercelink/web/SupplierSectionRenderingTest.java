@@ -7,6 +7,7 @@ import pl.commercelink.inventory.supplier.SupplierConnectionView;
 import pl.commercelink.stores.ConnectionMode;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -40,7 +41,7 @@ class SupplierSectionRenderingTest {
     void rendersTheExternalSectionExactlyAsStoreFulfilmentSupplierControllerBuildsIt() {
         // given -- the same argument shape SupplierSectionModel.renderExternalSection returns
         SupplierConnectionView elko = new SupplierConnectionView(
-                "Elko", "Elko", "Elko", ConnectionMode.OWN, true, true, true, null, null, null, true);
+                "Elko", "Elko", "Elko", ConnectionMode.OWN, true, true, true, null, null, null, null, true);
         Context context = new Context();
         context.setVariable("sectionRows", List.of(elko));
         context.setVariable("sectionShowMode", true);
@@ -51,7 +52,7 @@ class SupplierSectionRenderingTest {
         String args = "${sectionRows}, false, ${sectionShowMode}, "
                 + "'store.supplier.section.title', 'supplier-add-button', 'store.supplier.add.button', "
                 + "${sectionAvailableSuppliers.isEmpty()}, 'store.supplier.add.none', ${sectionSuccessMessage}, "
-                + "${sectionSuppliersWithStoredConfig}";
+                + "${sectionSuppliersWithStoredConfig}, ${sectionConfigurations}";
 
         // when
         String html = templateEngine().process(SECTION.formatted(args), context);
@@ -77,11 +78,11 @@ class SupplierSectionRenderingTest {
         // and fail the second assertion, exactly the class of bug that let a stale `required`
         // survive a same-session save in the real page.
         SupplierConnectionView elko = new SupplierConnectionView(
-                "Elko", "Elko", "Elko", ConnectionMode.OWN, true, true, true, null, null, null, true);
+                "Elko", "Elko", "Elko", ConnectionMode.OWN, true, true, true, null, null, null, null, true);
         String args = "${sectionRows}, false, ${sectionShowMode}, "
                 + "'store.supplier.section.title', 'supplier-add-button', 'store.supplier.add.button', "
                 + "${sectionAvailableSuppliers.isEmpty()}, 'store.supplier.add.none', ${sectionSuccessMessage}, "
-                + "${sectionSuppliersWithStoredConfig}";
+                + "${sectionSuppliersWithStoredConfig}, ${sectionConfigurations}";
 
         // when -- before Elko's credentials were ever saved
         Context before = new Context();
@@ -110,13 +111,13 @@ class SupplierSectionRenderingTest {
     void rendersTheManualSectionExactlyAsManualSupplierControllerBuildsIt() {
         // given -- the same argument shape SupplierSectionModel.renderManualSection returns
         SupplierConnectionView manual = new SupplierConnectionView(
-                "manual:Hurtownia X", null, "Hurtownia X", ConnectionMode.MANUAL, false, false, false, null, null, null, true);
+                "manual:Hurtownia X", null, "Hurtownia X", ConnectionMode.MANUAL, false, false, false, null, null, null, null, true);
         Context context = new Context();
         context.setVariable("sectionRows", List.of(manual));
         context.setVariable("sectionSuccessMessage", null);
 
         String args = "${sectionRows}, true, false, 'store.manual.section.title', "
-                + "'manual-add-button', 'store.manual.add.button', false, null, ${sectionSuccessMessage}, ''";
+                + "'manual-add-button', 'store.manual.add.button', false, null, ${sectionSuccessMessage}, '', null";
 
         // when
         String html = templateEngine().process(SECTION.formatted(args), context);
@@ -135,7 +136,7 @@ class SupplierSectionRenderingTest {
         // given -- exactly the model attributes SupplierSectionModel.renderExternalSection sets,
         // and the no-argument selector it now returns as the view name
         SupplierConnectionView elko = new SupplierConnectionView(
-                "Elko", "Elko", "Elko", ConnectionMode.OWN, true, true, true, null, null, null, true);
+                "Elko", "Elko", "Elko", ConnectionMode.OWN, true, true, true, null, null, null, null, true);
         Context context = new Context();
         context.setVariable("sectionRows", List.of(elko));
         context.setVariable("sectionShowMode", true);
@@ -162,7 +163,7 @@ class SupplierSectionRenderingTest {
     void theManualSectionWrapperRendersTheSameMarkupAsTheParameterizedFragment() {
         // given -- exactly the model attributes SupplierSectionModel.renderManualSection sets
         SupplierConnectionView manual = new SupplierConnectionView(
-                "manual:Hurtownia X", null, "Hurtownia X", ConnectionMode.MANUAL, false, false, false, null, null, null, true);
+                "manual:Hurtownia X", null, "Hurtownia X", ConnectionMode.MANUAL, false, false, false, null, null, null, null, true);
         Context context = new Context();
         context.setVariable("sectionRows", List.of(manual));
         context.setVariable("sectionSuccessMessage", null);
@@ -183,7 +184,7 @@ class SupplierSectionRenderingTest {
     void theScheduleColumnSummarisesAnOwnConnectionAndCarriesTheExpressionForTheModal() {
         // given
         SupplierConnectionView elko = new SupplierConnectionView(
-                "Elko", "Elko", "Elko", ConnectionMode.OWN, true, true, true, null, "0 5,17 * * ? *", null, true);
+                "Elko", "Elko", "Elko", ConnectionMode.OWN, true, true, true, null, "0 5,17 * * ? *", null, null, true);
         Context context = new Context();
         context.setVariable("sectionRows", List.of(elko));
         context.setVariable("sectionShowMode", true);
@@ -207,7 +208,7 @@ class SupplierSectionRenderingTest {
     void theScheduleColumnSaysNothingForAGlobalConnection() {
         // given -- a global connection rides the platform-wide feed, which this store does not schedule
         SupplierConnectionView acme = new SupplierConnectionView(
-                "Acme", "Acme", "Acme", ConnectionMode.GLOBAL, true, true, true, null, null, null, true);
+                "Acme", "Acme", "Acme", ConnectionMode.GLOBAL, true, true, true, null, null, null, null, true);
         Context context = new Context();
         context.setVariable("sectionRows", List.of(acme));
         context.setVariable("sectionShowMode", true);
@@ -229,7 +230,7 @@ class SupplierSectionRenderingTest {
     void theManualSectionHasNoScheduleColumn() {
         // given -- manual feeds are uploaded by hand, so there is nothing to schedule
         SupplierConnectionView manual = new SupplierConnectionView(
-                "manual:Hurtownia X", null, "Hurtownia X", ConnectionMode.MANUAL, false, false, false, null, null, null, true);
+                "manual:Hurtownia X", null, "Hurtownia X", ConnectionMode.MANUAL, false, false, false, null, null, null, null, true);
         Context context = new Context();
         context.setVariable("sectionRows", List.of(manual));
         context.setVariable("sectionSuccessMessage", null);
@@ -255,5 +256,49 @@ class SupplierSectionRenderingTest {
         // then
         assertThat(html).contains("notification is-danger");
         assertThat(html).contains("Supplier Elko requires field Login.");
+    }
+
+    /**
+     * Two connections of one supplier type share the same {@code supplier-fields-{type}} group in
+     * the edit modal, so the credential VALUES cannot live in that group -- they have to travel per
+     * connection. This pins that each row carries its own {@code data-configuration} payload, which
+     * is what lets open(identity) populate the inputs with the edited connection's values instead of
+     * the other instance's (or none at all, which the save would then write back over the secret).
+     */
+    @Test
+    void eachRowCarriesItsOwnStoredConfigurationSoTwoInstancesOfOneTypeNeverShareValues() {
+        // given -- the legacy untokened Kosatec connection plus a second, tokened instance
+        SupplierConnectionView legacy = new SupplierConnectionView(
+                "Kosatec", "Kosatec", "Kosatec", ConnectionMode.OWN, true, true, true, null, null, null, null, true);
+        SupplierConnectionView second = new SupplierConnectionView(
+                "Kosatec-k7f3a9c2", "Kosatec", "Kosatec B2B", ConnectionMode.OWN, true, true, true,
+                null, null, null, null, true);
+        Context context = new Context();
+        context.setVariable("sectionRows", List.of(legacy, second));
+        context.setVariable("sectionShowMode", true);
+        context.setVariable("sectionAvailableSuppliers", List.of("Acme"));
+        context.setVariable("sectionSuccessMessage", null);
+        context.setVariable("sectionSuppliersWithStoredConfig", "Kosatec;Kosatec-k7f3a9c2");
+        context.setVariable("sectionConfigurations", Map.of(
+                "Kosatec", "{\"login\":\"legacy-login\",\"password\":\"\"}",
+                "Kosatec-k7f3a9c2", "{\"login\":\"second-login\",\"password\":\"\"}"));
+
+        // when
+        String html = templateEngine().process(
+                "<div th:replace=\"~{fragments/supplier-section :: externalSection}\"></div>", context);
+
+        // then -- each row's payload is its own, and neither leaks into the other
+        assertThat(rowOf(html, "Kosatec")).contains("legacy-login").doesNotContain("second-login");
+        assertThat(rowOf(html, "Kosatec-k7f3a9c2")).contains("second-login").doesNotContain("legacy-login");
+    }
+
+    /** The table row whose Edit button carries this identity, so assertions stay row-scoped. */
+    private String rowOf(String html, String identity) {
+        for (String row : html.split("<tr")) {
+            if (row.contains("data-configure-supplier=\"" + identity + "\"")) {
+                return row;
+            }
+        }
+        throw new AssertionError("no row for identity " + identity);
     }
 }

@@ -159,6 +159,7 @@
                 <p class="heading" th:text="#{order.routed.supplier}"></p>
                 <p class="title is-5 mb-1" th:if="${routedSupplier.matched}">
                     <span th:text="${routedSupplier.supplierName}"></span>
+                    <span class="tag is-light ml-1" th:if="${routedSupplier.providerType != null and routedSupplier.providerType != 'manual'}" th:text="${routedSupplier.providerType}"></span>
                     <span class="is-size-6 has-text-grey"
                           th:text="' (' + #{${routedSupplier.modeKey}} + ', ' + #{order.routed.supplier.external.no} + ' ' + ${routedSupplier.externalSupplierId} + ')'"></span>
                 </p>
@@ -382,7 +383,8 @@
                             <span th:if="${item.manufacturerCode}" class="copyable" th:text="${item.manufacturerCode}" th:data-copy="${item.manufacturerCode}" onclick="copyToClipboard(this)"></span>
                         </td>
                         <td>
-                            <a th:if="${item.deliveryId != null}" th:href="@{${@deliveryRedirectResolver.resolveFor(order, item)}}" th:text="${item.shortenedDeliveryId}"></a>
+                            <a th:if="${item.deliveryId != null}" th:href="@{${@deliveryRedirectResolver.resolveFor(order, item)}}"
+                               th:text="${supplierLabels.has(item.deliveryId)} ? ${supplierLabels.of(item.deliveryId)} : ${item.shortenedDeliveryId}"></a>
                         </td>
                         <td>
                             <span th:if="${item.serialNo}" class="copyable truncate-serial" th:text="${item.serialNo}" th:title="${item.serialNo}" th:data-copy="${item.serialNo}" onclick="copyToClipboard(this)"></span>
@@ -585,7 +587,24 @@
                     <div class="field">
                         <label class="label" th:text="#{order.item.supplier}"></label>
                         <div class="control">
-                            <input class="input" type="text" id="quickAssignSupplier" name="supplier" required/>
+                            <div class="select is-fullwidth">
+                                <select id="quickAssignSupplier" name="supplier" required
+                                        onchange="toggleQuickAssignCustomSupplier()"
+                                        data-custom="__custom__">
+                                    <option value="" th:text="#{general.select}"></option>
+                                    <option th:each="option : ${assignableSuppliers}"
+                                            th:value="${option.identity()}" th:text="${option.label()}"></option>
+                                    <option value="__custom__"
+                                            th:text="#{order.item.supplier.custom}"></option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="control mt-2" id="quickAssignCustomSupplierControl" style="display: none;">
+                            <input class="input" type="text" id="quickAssignCustomSupplier" name="customSupplier"
+                                   autocomplete="off" pattern="[\p{L}\p{N}_\-]+"
+                                   th:placeholder="#{order.item.supplier.custom.placeholder}"
+                                   th:title="#{order.item.supplier.custom.format}"/>
+                            <p class="help" th:text="#{order.item.supplier.custom.hint}"></p>
                         </div>
                     </div>
                 </section>
@@ -1652,9 +1671,25 @@
             highlightQuickAssignSku();
             document.getElementById('quickAssignPrice').value = '';
             document.getElementById('quickAssignSupplier').value = '';
+            document.getElementById('quickAssignCustomSupplier').value = '';
+            toggleQuickAssignCustomSupplier();
             document.getElementById('quickAssignPrice').setAttribute('data-tax', button.getAttribute('data-tax') || '');
             setQuickAssignPriceType('net');
             toggleQuickAssignModal(true);
+        }
+
+        function toggleQuickAssignCustomSupplier() {
+            const select = document.getElementById('quickAssignSupplier');
+            const custom = select.value === select.getAttribute('data-custom');
+            const control = document.getElementById('quickAssignCustomSupplierControl');
+            const input = document.getElementById('quickAssignCustomSupplier');
+            control.style.display = custom ? '' : 'none';
+            input.required = custom;
+            if (custom) {
+                input.focus();
+            } else {
+                input.value = '';
+            }
         }
 
         function setQuickAssignPriceType(type) {

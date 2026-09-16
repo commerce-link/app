@@ -89,6 +89,42 @@ class FeedRowProcessorTest {
     }
 
     @Test
+    void pendingEligibleRowScopesTheMappingToTheSupplierTypeForAnOwnConnection() {
+        // given -- category mappings are learned per adapter type, not per connection instance
+        ParsedRow parsed = new ParsedRow(sellableItem, feedProduct);
+        when(dataCorrection.run(sellableItem)).thenReturn(sellableItem);
+        when(dataCorrection.run(feedProduct)).thenReturn(pendingTaxonomy);
+        when(enrichment.enrich(pendingTaxonomy)).thenReturn(pendingTaxonomy);
+        when(enrichment.isPendingEligible(pendingTaxonomy)).thenReturn(true);
+        FeedParseStats stats = mock(FeedParseStats.class);
+        when(stats.supplierName()).thenReturn("Kosatec-k7f3a9c2");
+
+        // when
+        processor.process(parsed, 0, stats);
+
+        // then
+        verify(enrichment).addPending(pendingTaxonomy, "Kosatec");
+    }
+
+    @Test
+    void pendingEligibleRowScopesTheMappingToTheFullIdentityForAManualConnection() {
+        // given -- manual feeds are distinct per connection, so each keeps its own mappings
+        ParsedRow parsed = new ParsedRow(sellableItem, feedProduct);
+        when(dataCorrection.run(sellableItem)).thenReturn(sellableItem);
+        when(dataCorrection.run(feedProduct)).thenReturn(pendingTaxonomy);
+        when(enrichment.enrich(pendingTaxonomy)).thenReturn(pendingTaxonomy);
+        when(enrichment.isPendingEligible(pendingTaxonomy)).thenReturn(true);
+        FeedParseStats stats = mock(FeedParseStats.class);
+        when(stats.supplierName()).thenReturn("manual-k7f3a9c2");
+
+        // when
+        processor.process(parsed, 0, stats);
+
+        // then
+        verify(enrichment).addPending(pendingTaxonomy, "manual-k7f3a9c2");
+    }
+
+    @Test
     void pendingIneligibleRowWithCompleteDataIsDeferredToNextFeed() {
         // given
         ParsedRow parsed = new ParsedRow(sellableItem, feedProduct);

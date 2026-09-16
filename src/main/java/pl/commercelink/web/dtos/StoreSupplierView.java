@@ -1,7 +1,6 @@
 package pl.commercelink.web.dtos;
 
-import pl.commercelink.inventory.supplier.manual.ManualSupplierInfos;
-import pl.commercelink.stores.ConnectionMode;
+import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.stores.StoreSupplierConnection;
 
 public record StoreSupplierView(
@@ -9,9 +8,7 @@ public record StoreSupplierView(
         String modeKey
 ) {
     public static StoreSupplierView from(StoreSupplierConnection connection) {
-        String label = connection.getMode() == ConnectionMode.MANUAL ?
-                ManualSupplierInfos.label(connection.getSupplierName()) :
-                connection.getSupplierName();
+        String label = SupplierLabels.labelOf(connection);
         return new StoreSupplierView(label, "inventory.provider." + connection.getMode().name().toLowerCase());
     }
 }

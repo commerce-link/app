@@ -10,6 +10,7 @@ import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderIndexEntry;
 import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.fulfilment.*;
+import pl.commercelink.inventory.supplier.SupplierLabels;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -33,6 +34,9 @@ class FulfilmentController extends BaseController {
 
     @Autowired
     private ManualOrderFulfilment manualOrderFulfilment;
+
+    @Autowired
+    private SupplierLabels supplierLabels;
 
     @GetMapping("/dashboard/fulfilment/queue")
     @PreAuthorize("hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
@@ -114,6 +118,7 @@ class FulfilmentController extends BaseController {
             model.addAttribute("pathSelector", pathSelector);
             model.addAttribute("isSuperAdmin", true);
         }
+        model.addAttribute("supplierLabels", supplierLabels.forStoreId(storeId));
 
         return "fulfilment";
     }

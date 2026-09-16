@@ -19,7 +19,14 @@
                     <div class="field">
                         <label class="label" th:text="#{general.provider.name}"></label>
                         <div class="control">
-                            <input class="input" th:field="*{provider}" required />
+                            <div class="select is-fullwidth">
+                                <select th:field="*{provider}" required>
+                                    <option th:each="option : ${providerOptions}" th:value="${option.identity()}"
+                                            th:text="${option.label()}"></option>
+                                    <option th:if="${rmaCenter.provider != null and !#lists.contains(providerOptions.![identity()], rmaCenter.provider)}"
+                                            th:value="${rmaCenter.provider}" th:text="${rmaCenter.provider}"></option>
+                                </select>
+                            </div>
                         </div>
                     </div>
 

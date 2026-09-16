@@ -8,6 +8,9 @@ public class SupplierSelectionForm {
     private boolean includeInFulfilment = true;
     private String externalSupplierId;
     private String feedSchedule;
+    private String identity;
+    private String label;
+    private String billingShortcut;
 
     public SupplierSelectionForm() {
     }
@@ -72,5 +75,29 @@ public class SupplierSelectionForm {
 
     public void setFeedSchedule(String feedSchedule) {
         this.feedSchedule = feedSchedule;
+    }
+
+    public String getIdentity() {
+        return identity;
+    }
+
+    public void setIdentity(String identity) {
+        this.identity = identity;
+    }
+
+    public String getLabel() {
+        return label;
+    }
+
+    public void setLabel(String label) {
+        this.label = label;
+    }
+
+    public String getBillingShortcut() {
+        return billingShortcut;
+    }
+
+    public void setBillingShortcut(String billingShortcut) {
+        this.billingShortcut = billingShortcut;
     }
 }

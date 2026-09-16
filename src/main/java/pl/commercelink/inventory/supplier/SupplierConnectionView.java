@@ -21,6 +21,7 @@ public record SupplierConnectionView(
         LocalDateTime feedLastModified,
         String feedSchedule,
         String externalSupplierId,
+        String billingShortcut,
         boolean knownProvider) {
 
     /**
@@ -49,5 +50,10 @@ public record SupplierConnectionView(
 
     public boolean hasExternalSupplierId() {
         return externalSupplierId != null && !externalSupplierId.isBlank();
+    }
+
+    /** A tokened own identity cannot become GLOBAL (GLOBAL identities are bare type names). */
+    public boolean canSwitchMode() {
+        return mode != ConnectionMode.MANUAL && !SupplierIdentity.hasToken(identity);
     }
 }

@@ -146,7 +146,7 @@
                             <td>
                                 <span class="tag"
                                       th:classappend="${enabledSuppliers.contains(item.supplier)} ? 'is-primary' : 'is-danger'"
-                                      th:text="${item.supplierLabel}"></span>
+                                      th:text="${supplierLabels.of(item.supplier)}"></span>
                                 <span class="tag ml-1" th:if="${item.hasSpecialCondition()}"
                                       th:classappend="${item.condition.name() == 'Damaged'} ? 'is-danger' : 'is-warning'"
                                       th:text="${enumI18n.localize(item.condition)}"></span>

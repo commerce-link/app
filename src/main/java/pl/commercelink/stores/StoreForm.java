@@ -21,9 +21,6 @@ public class StoreForm {
     // marketplaces
     private String marketplace;
 
-    // per-supplier credentials: supplier name → (field key → value)
-    private Map<String, Map<String, String>> supplierConfiguration = new HashMap<>();
-
     public StoreForm() {
         this.providerConfiguration = new HashMap<>();
     }
@@ -126,11 +123,4 @@ public class StoreForm {
         this.wmsProvider = wmsProvider;
     }
 
-    public Map<String, Map<String, String>> getSupplierConfiguration() {
-        return supplierConfiguration;
-    }
-
-    public void setSupplierConfiguration(Map<String, Map<String, String>> supplierConfiguration) {
-        this.supplierConfiguration = supplierConfiguration;
-    }
 }
