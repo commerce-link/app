@@ -14,7 +14,7 @@
                 <div th:if="${!errors.isEmpty()}" id="form-errors" class="cl-alert is-bad" tabindex="-1" data-cl-error-summary>
                     <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
                     <div>
-                        <p class="cl-alert-title" th:text="#{store.company.details.errors.title}"></p>
+                        <p class="cl-alert-title" th:text="#{form.errors.title}"></p>
                         <ul class="cl-alert-list">
                             <li th:each="error : ${errors}">
                                 <a th:href="'#' + ${error.key}" th:text="#{${error.value}}"></a>
@@ -51,7 +51,7 @@
                     </fieldset>
 
                     <div class="cl-card-footer">
-                        <button class="cl-button is-primary" type="submit" th:text="#{store.company.details.save}"></button>
+                        <button class="cl-button is-primary" type="submit" th:text="#{form.save.changes}"></button>
                     </div>
                 </div>
             </form>
