@@ -159,4 +159,17 @@ class StoreSupplierFeedSchedulerTest {
         // then
         verify(schedules).delete("supplier-feed-store-1-acme");
     }
+
+    @Test
+    void scheduleNameOfATokenedIdentityStaysWithinEventBridgeLimits() {
+        // when
+        scheduler.schedule("oh4d5y15it", "IngramMicro-k7f3a9c2", "0 6 * * ? *");
+
+        // then
+        ArgumentCaptor<String> name = ArgumentCaptor.forClass(String.class);
+        verify(schedules).put(name.capture(), anyString(), anyString(), anyString());
+        assertThat(name.getValue()).isEqualTo("supplier-feed-oh4d5y15it-ingrammicro-k7f3a9c2")
+                .hasSizeLessThanOrEqualTo(64)
+                .matches("^[0-9a-zA-Z-_.]+$");
+    }
 }

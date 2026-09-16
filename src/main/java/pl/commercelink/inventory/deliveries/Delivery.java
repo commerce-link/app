@@ -56,6 +56,11 @@ public class Delivery {
     @DynamoDBAttribute(attributeName = "provider")
     private String provider;
 
+    // Counterparty shortcut in the invoicing system, set when a purchase invoice is synced.
+    // Kept apart from `provider`, which is the supplier connection identity and must never change.
+    @DynamoDBAttribute(attributeName = "counterpartyShortcut")
+    private String counterpartyShortcut;
+
     @DynamoDBAttribute(attributeName = "orderStatus")
     @DynamoDBTypeConvertedEnum
     private DeliveryOrderStatus orderStatus;
@@ -453,6 +458,14 @@ public class Delivery {
 
     public void setProvider(String provider) {
         this.provider = provider;
+    }
+
+    public String getCounterpartyShortcut() {
+        return counterpartyShortcut;
+    }
+
+    public void setCounterpartyShortcut(String counterpartyShortcut) {
+        this.counterpartyShortcut = counterpartyShortcut;
     }
 
     public DeliveryOrderStatus getOrderStatus() {

@@ -143,6 +143,8 @@ public class DemoStoreSeeder implements StoreSeeder {
 
     private static final String ACME = "Acme";
     private static final String ACME_B = "AcmeB";
+    /** Second AcmeB instance of the local store: same adapter, its own feed file and configuration. */
+    private static final String ACME_B_SECOND = "AcmeB-h6rxcqtb";
     private static final List<String> SIM_SUPPLIERS = List.of(ACME, ACME_B);
     private static final String SIM_MFN_PREFIX = "SIM-";
     /** AcmeB simulates dropshipping only when asked to; the demo store asks, so the OWN path is visible. */
@@ -185,7 +187,7 @@ public class DemoStoreSeeder implements StoreSeeder {
         applyDemoFulfilmentDefaults(store);
         List<CatalogSeedRow> rows = loadFilteredRows();
         seedStoreData(store.getStoreId(), rows);
-        enableAcmeBDropship(store);
+        enableAcmeBDropship(store, ACME_B);
         saveSupplierRmaCenters(store.getStoreId());
         saveCompletedOrders(store, rows);
         saveWarehouseStock(store, rows);
@@ -195,30 +197,41 @@ public class DemoStoreSeeder implements StoreSeeder {
         DynamoDBMapper mapper = new DynamoDBMapper(dynamoDB);
         Store store = Objects.requireNonNullElseGet(mapper.load(Store.class, storeId), Store::new);
         applyStoreConfiguration(store, storeId, storeName, demo);
+        connectSecondAcmeB(store);
         enableDevInvoicing(store, invoicingProviderFactory);
         mapper.save(store);
         List<CatalogSeedRow> rows = loadFilteredRows();
         seedStoreData(storeId, rows);
-        enableAcmeBDropship(store);
+        enableAcmeBDropship(store, ACME_B);
+        enableAcmeBDropship(store, ACME_B_SECOND);
         saveInvoicingFixtures(storeId, rows);
         return store;
+    }
+
+    private static void connectSecondAcmeB(Store store) {
+        FulfilmentConfiguration fulfilment = store.getFulfilmentConfiguration();
+        List<StoreSupplierConnection> connections = new ArrayList<>(fulfilment.getSupplierConnections());
+        connections.add(new StoreSupplierConnection(ACME_B_SECOND, ConnectionMode.OWN));
+        fulfilment.setSupplierConnections(connections);
     }
 
     /**
      * Turns on AcmeB's dropship simulation in the store's OWN configuration so the seeded AcmeB
      * dropship order can be fulfilled. Only the missing knob is added: a value already chosen in
-     * the fulfilment settings stays untouched, so re-seeding never flips it back.
+     * the fulfilment settings stays untouched, so re-seeding never flips it back. A stored
+     * configuration is also what makes a store-owned feed importable at all, so every OWN AcmeB
+     * instance goes through here.
      */
-    private void enableAcmeBDropship(Store store) {
+    private void enableAcmeBDropship(Store store, String identity) {
         if (!supplierRegistry.exists(ACME_B)) {
             return;
         }
-        Map<String, String> current = supplierProviderFactory.loadConfiguration(store, ACME_B);
+        Map<String, String> current = supplierProviderFactory.loadConfiguration(store, identity);
         Map<String, String> merged = new HashMap<>(current);
         merged.putIfAbsent(ACME_B_DROPSHIP_KNOB, "1");
         merged.putIfAbsent(ACME_B_PICKUP_POINTS_KNOB, "0");
         if (!merged.equals(current)) {
-            supplierProviderFactory.saveConfiguration(store, ACME_B, merged);
+            supplierProviderFactory.saveConfiguration(store, identity, merged);
         }
     }
 

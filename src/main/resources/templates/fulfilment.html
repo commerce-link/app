@@ -197,6 +197,7 @@
              th:each="entry : ${form.entries}"
              th:data-groupid="${entry.id}"
              th:data-provider="${entry.source.provider}"
+             th:data-provider-label="${supplierLabels.of(entry.source.provider)}"
              th:data-name="${entry.source.name}"
              th:data-ean="${entry.source.ean}"
              th:data-mfn="${entry.source.mfn}"
@@ -213,7 +214,7 @@
                         <span>EAN <span th:text="${entry.source.ean}"></span></span>
                         <span> &middot; <span th:text="#{fulfilment.product.code}"></span> <span th:text="${entry.source.mfn}"></span></span>
                         <span> &middot; </span>
-                        <span class="provider-chip"><i class="fas fa-truck"></i><span th:text="${entry.source.provider}"></span></span>
+                        <span class="provider-chip"><i class="fas fa-truck"></i><span th:text="${supplierLabels.of(entry.source.provider)}"></span></span>
                     </div>
                 </div>
                 <div class="group-metrics">
@@ -331,7 +332,19 @@
 
     <script>
         const fmt = n => n.toLocaleString('pl-PL', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        /* Connection labels and product names are operator-supplied free text that reaches this
+           screen through innerHTML string builds below, so every one of them is escaped here at
+           the sink -- SupplierLabelTemplatesTest fails the build if one is concatenated raw. */
+        const esc = s => String(s == null ? '' : s)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
         const cards = () => Array.from(document.querySelectorAll('.group-card'));
+        /* Identity (posted/compared) -> display label, derived once per call from the rendered cards. */
+        function providerLabels() {
+            const map = {};
+            cards().forEach(c => { map[c.dataset.provider] = c.dataset.providerLabel; });
+            return map;
+        }
         let activeOrder = null;
         let activeProviders = new Set();
         let activeVariant = null;
@@ -353,7 +366,10 @@
         function setAll(v) { cards().forEach(c => { if (!c.classList.contains('is-hidden')) setAccept(c, v); }); markCustomVariant(); render(); }
 
         function supplierCountLabel(n) { return n + ' ' + (n === 1 ? MSG.supplierOne : MSG.supplierMany); }
-        function variantChip(p) { return '<span class="provider-chip" style="--accent:' + provColor(p) + ';">' + p + '</span>'; }
+        function variantChip(p) {
+            const label = esc(providerLabels()[p] || p);
+            return '<span class="provider-chip" style="--accent:' + provColor(p) + ';">' + label + '</span>';
+        }
 
         function variantMatchesCurrent(v) {
             const acceptedIds = cards().filter(isAccepted).map(c => c.dataset.groupid).sort();
@@ -453,6 +469,7 @@
             const bar = document.getElementById('providerFilter');
             if (!bar) return;
             const counts = {};
+            const labels = providerLabels();
             cards().forEach(c => { counts[c.dataset.provider] = (counts[c.dataset.provider] || 0) + 1; });
             bar.innerHTML = '';
             Object.keys(counts).sort().forEach(p => {
@@ -460,7 +477,7 @@
                 chip.className = 'prov-chip-btn' + (activeProviders.has(p) ? ' active' : (activeProviders.size ? ' inactive' : ''));
                 chip.style.setProperty('--accent', provColor(p));
                 chip.onclick = () => focusProvider(p);
-                chip.innerHTML = '<i class="fas fa-truck"></i>' + p + '<span class="cnt">' + counts[p] + '</span>';
+                chip.innerHTML = '<i class="fas fa-truck"></i>' + esc(labels[p]) + '<span class="cnt">' + counts[p] + '</span>';
                 bar.appendChild(chip);
             });
         }
@@ -502,8 +519,8 @@
                     allProfit += (price / v - net(c)) * qty;
                     r.querySelectorAll('.alt-tag').forEach(t => t.remove());
                     if (w && w !== c) {
-                        coveredAway.push({ qty: qty, order: r.dataset.order, by: w.dataset.provider });
-                        headChips.push({ row: r, qty: qty, price: price, lost: true, by: w.dataset.provider });
+                        coveredAway.push({ qty: qty, order: r.dataset.order, by: w.dataset.providerLabel });
+                        headChips.push({ row: r, qty: qty, price: price, lost: true, by: w.dataset.providerLabel });
                     } else {
                         headChips.push({ row: r, qty: qty, price: price, lost: false });
                         visibleRows++;
@@ -517,7 +534,7 @@
                 if (coveredAway.length) {
                     const by = {};
                     coveredAway.forEach(x => { by[x.by] = (by[x.by] || 0) + x.qty; });
-                    const txt = Object.keys(by).map(p => p + ' (' + by[p] + ' ' + MSG.unit + ')').join(', ');
+                    const txt = Object.keys(by).map(p => esc(p) + ' (' + by[p] + ' ' + MSG.unit + ')').join(', ');
                     const note = document.createElement('div');
                     note.className = 'covered-note';
                     note.innerHTML = '<span class="icon is-small"><i class="fas fa-arrow-right"></i></span> ' +
@@ -609,11 +626,12 @@
                 c.classList.toggle('is-mini', redundant);
                 if (redundant) {
                     const winnerProv = coveredAway.length ? coveredAway[0].by : '';
+                    const coveredByText = winnerProv ? MSG.coveredBy + ' ' + esc(winnerProv) : '';
                     mini.innerHTML =
-                        '<span class="mini-title">' + c.dataset.name + '</span>' +
-                        '<span class="provider-chip" style="--accent:' + provColor(c.dataset.provider) + ';"><i class="fas fa-truck"></i>' + c.dataset.provider + '</span>' +
+                        '<span class="mini-title">' + esc(c.dataset.name) + '</span>' +
+                        '<span class="provider-chip" style="--accent:' + provColor(c.dataset.provider) + ';"><i class="fas fa-truck"></i>' + esc(c.dataset.providerLabel) + '</span>' +
                         '<span class="tag is-light">' + MSG.margin + ' ' + (allMarginPct >= 0 ? '+' : '−') + Math.abs(allMarginPct * 100).toFixed(0) + '%</span>' +
-                        '<span class="mini-state">' + (winnerProv ? MSG.coveredBy + ' ' + winnerProv : '') + '</span>';
+                        '<span class="mini-state">' + coveredByText + '</span>';
                 }
             });
 
@@ -654,6 +672,7 @@
 
         function recalcFooter() {
             let total = 0, totalProfit = 0; const byProv = {};
+            const labels = providerLabels();
             Object.keys(COMMITTED_SUPPLIERS).forEach(p => { byProv[p] = COMMITTED_SUPPLIERS[p]; });
             cards().forEach(c => {
                 const v = parseFloat(c.dataset.effvalue || 0);
@@ -669,7 +688,7 @@
             Object.keys(byProv).sort().forEach(p => {
                 const el = document.createElement('span');
                 el.className = 'prov-pill'; el.style.setProperty('--accent', provColor(p));
-                el.innerHTML = '<strong>' + p + '</strong> ' + fmt(byProv[p]); bd.appendChild(el);
+                el.innerHTML = '<strong>' + esc(labels[p] || p) + '</strong> ' + fmt(byProv[p]); bd.appendChild(el);
             });
             if (!Object.keys(byProv).length) bd.innerHTML = '<span class="has-text-grey is-size-7">' + MSG.nothingSelected + '</span>';
         }

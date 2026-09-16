@@ -3,6 +3,7 @@ package pl.commercelink.warehouse.builtin;
 import org.springframework.stereotype.Service;
 import pl.commercelink.documents.Document;
 import pl.commercelink.documents.DocumentReason;
+import pl.commercelink.inventory.deliveries.CounterpartyShortcuts;
 import pl.commercelink.inventory.deliveries.DeliveriesRepository;
 import pl.commercelink.inventory.deliveries.Delivery;
 import pl.commercelink.invoicing.api.BillingParty;
@@ -28,19 +29,22 @@ public class WarehouseGoodsOutService {
     private final StoresRepository storesRepository;
     private final InvoicingProviderFactory invoicingProviderFactory;
     private final DeliveriesRepository deliveriesRepository;
+    private final CounterpartyShortcuts counterpartyShortcuts;
 
     public WarehouseGoodsOutService(
             Warehouse warehouse,
             WarehouseRepository warehouseRepository,
             StoresRepository storesRepository,
             InvoicingProviderFactory invoicingProviderFactory,
-            DeliveriesRepository deliveriesRepository
+            DeliveriesRepository deliveriesRepository,
+            CounterpartyShortcuts counterpartyShortcuts
     ) {
         this.warehouse = warehouse;
         this.warehouseRepository = warehouseRepository;
         this.storesRepository = storesRepository;
         this.invoicingProviderFactory = invoicingProviderFactory;
         this.deliveriesRepository = deliveriesRepository;
+        this.counterpartyShortcuts = counterpartyShortcuts;
     }
 
     public OperationResult<Document> issueGoodsOutForExternalService(
@@ -77,9 +81,10 @@ public class WarehouseGoodsOutService {
             return OperationResult.failure("Failed to fetch delivery with id: " + deliveryId);
         }
 
-        BillingParty counterparty = invoicingProvider.fetchBillingPartyByShortcut(delivery.getProvider());
+        String shortcut = counterpartyShortcuts.forDelivery(store, delivery);
+        BillingParty counterparty = invoicingProvider.fetchBillingPartyByShortcut(shortcut);
         if (counterparty == null || !counterparty.hasCompanyDetails()) {
-            return OperationResult.failure("Failed to fetch counterparty with shortcut: " + delivery.getProvider());
+            return OperationResult.failure("Failed to fetch counterparty with shortcut: " + shortcut);
         }
 
         markAllItemsAsSentToExternalService(warehouseItems);

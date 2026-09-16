@@ -176,4 +176,23 @@ class StoreSupplierFeedServiceTest {
         verify(supplierProviderFactory, never()).loadConfiguration(any(), anyString());
         verify(storeFeedRepository, never()).store(anyString(), anyString(), any(byte[].class), anyString());
     }
+
+    @Test
+    void loadsATokenedConnectionThroughTheTypeDescriptorAndStoresUnderTheIdentity() throws Exception {
+        // given
+        Store store = new Store();
+        store.setStoreId("store-1");
+        when(storesRepository.findById("store-1")).thenReturn(store);
+        SupplierProviderDescriptor descriptor = mock(SupplierProviderDescriptor.class);
+        when(descriptor.configurationFields()).thenReturn(List.of());
+        when(supplierProviderFactory.getDescriptor("Stub-k7f3a9c2")).thenReturn(descriptor);
+        SupplierProvider provider = () -> Optional.of(FeedData.csv("rows".getBytes()));
+        when(supplierProviderFactory.get(store, "Stub-k7f3a9c2")).thenReturn(provider);
+
+        // when
+        service.loadStoreFeed("store-1", "Stub-k7f3a9c2");
+
+        // then
+        verify(storeFeedRepository).store("store-1", "Stub-k7f3a9c2", "rows".getBytes(), "csv");
+    }
 }

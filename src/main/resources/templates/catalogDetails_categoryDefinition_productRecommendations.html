@@ -86,7 +86,8 @@
                         </td>
                         <td>
                             <ul>
-                                <li th:each="provider : ${recommendation.alternativeSuppliers}" th:text="${provider}"></li>
+                                <li th:each="provider : ${recommendation.alternativeSuppliers}"
+                                    th:text="${supplierLabels.of(provider)}"></li>
                             </ul>
                         </td>
                         <td>

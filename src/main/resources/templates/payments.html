@@ -46,7 +46,7 @@
                               th:text="${delivery.overpaid} ? #{deliveries.status.overpaid} :
                                        (${delivery.underpaid} ? #{deliveries.status.underpaid} : #{deliveries.status.unpaid})"></span>
                     </td>
-                    <td th:text="${delivery.provider}"></td>
+                    <td th:text="${supplierLabels.of(delivery.provider)}"></td>
                     <td>
                         <a th:href="@{/dashboard/deliveries/details(deliveryId=${delivery.deliveryId})}">
                             <span th:text="${delivery.shortenedDeliveryId}"></span>

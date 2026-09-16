@@ -69,6 +69,9 @@ import pl.commercelink.web.dtos.SplitGroupPreviewDto;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import pl.commercelink.inventory.deliveries.DropshipItemLookup;
+import pl.commercelink.inventory.supplier.SupplierChoice;
+import pl.commercelink.inventory.supplier.SupplierLabelMap;
+import pl.commercelink.inventory.supplier.SupplierLabels;
 
 import java.util.*;
 import java.util.stream.Stream;
@@ -97,6 +100,12 @@ public class OrdersController extends BaseController {
 
     @Autowired
     private StoresRepository storesRepository;
+
+    @Autowired
+    private SupplierLabels supplierLabels;
+
+    @Autowired
+    private SupplierChoice supplierChoice;
 
     @Autowired
     private BasketsRepository basketsRepository;
@@ -469,6 +478,10 @@ public class OrdersController extends BaseController {
         model.addAttribute("canAddDocumentManually", manualDocumentTypes.contains(nextDocumentToIssue));
         model.addAttribute("issuableDocumentTypes", order.getIssuableDocumentTypes());
 
+        SupplierLabelMap labels = supplierLabels.forStore(store);
+        model.addAttribute("supplierLabels", labels);
+        model.addAttribute("assignableSuppliers", labels.options());
+
         return "orderDetails";
     }
 
@@ -623,6 +636,15 @@ public class OrdersController extends BaseController {
             boolean deliveryIdChanged = postedDeliveryId != null && !postedDeliveryId.equals(orderItem.getDeliveryId());
             if (deliveryIdChanged) {
                 Store store = storesRepository.findById(getStoreId());
+                // Same rules as the "assign supplier" modal: a connection identity or a typed name.
+                SupplierChoice.Resolution resolution = supplierChoice.resolve(store, postedDeliveryId, null);
+                if (!resolution.accepted()) {
+                    model.addAttribute("errorMessage", messageSource.getMessage(
+                            resolution.errorCode(), resolution.errorArgs(), LocaleContextHolder.getLocale()));
+                    return showOrderItemDetails(order, orderItem, model);
+                }
+                postedDeliveryId = resolution.identity();
+                updatedItem.setDeliveryId(postedDeliveryId);
                 if (!ExternalSupplierBinding.of(store, List.of(order)).permits(orderId, postedDeliveryId)) {
                     model.addAttribute("errorMessage",
                             messageSource.getMessage("order.item.assign.supplier.routed", null, LocaleContextHolder.getLocale()));
@@ -669,8 +691,8 @@ public class OrdersController extends BaseController {
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String assignSupplier(@PathVariable String orderId, @RequestParam String itemId,
                                  @RequestParam String manufacturerCode, @RequestParam double cost,
-                                 @RequestParam String supplier, Model model,
-                                 RedirectAttributes redirectAttributes, Locale locale) {
+                                 @RequestParam String supplier, @RequestParam(required = false) String customSupplier,
+                                 Model model, RedirectAttributes redirectAttributes, Locale locale) {
         Order order = ordersRepository.findById(getStoreId(), orderId);
         OrderItem orderItem = orderItemsRepository.findById(orderId, itemId);
 
@@ -681,6 +703,14 @@ public class OrdersController extends BaseController {
         }
 
         Store store = storesRepository.findById(getStoreId());
+        SupplierChoice.Resolution resolution = supplierChoice.resolve(store, supplier, customSupplier);
+        if (!resolution.accepted()) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage(resolution.errorCode(), resolution.errorArgs(), locale));
+            return "redirect:/dashboard/orders/" + orderId;
+        }
+        supplier = resolution.identity();
+
         if (!ExternalSupplierBinding.of(store, List.of(order)).permits(orderId, supplier)) {
             redirectAttributes.addFlashAttribute("errorMessage",
                     messageSource.getMessage("order.item.assign.supplier.routed", null, locale));
