@@ -1,9 +1,11 @@
 package pl.commercelink.web;
 
+import jakarta.servlet.http.HttpServletResponse;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.MessageSource;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -32,6 +34,7 @@ import pl.commercelink.web.settings.SettingsPage;
 import pl.commercelink.web.settings.StoreSettingsOverviewFactory;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.web.dtos.CarrierSelectionForm;
+import pl.commercelink.web.dtos.CompanyDetailsForm;
 import pl.commercelink.web.dtos.ConnectedIntegration;
 import pl.commercelink.web.dtos.FulfilmentSettingsForm;
 import pl.commercelink.web.dtos.ParcelForm;
@@ -43,6 +46,10 @@ import java.util.stream.Collectors;
 
 @Controller
 public class StoreController {
+
+    private static final String ASYNC_FORM_HEADER = "X-Requested-With";
+    private static final String ASYNC_FORM_HEADER_VALUE = "fetch";
+    private static final String COMPANY_DETAILS_FORM_FRAGMENT = "store-company-details :: companyDetailsForm";
 
     @Value("${scheduling.min-interval-minutes}")
     private int scheduleMinIntervalMinutes;
@@ -600,26 +607,29 @@ public class StoreController {
 
     @GetMapping("/dashboard/store/company-details")
     @PreAuthorize("hasRole('ADMIN')")
-    public String storeBillingShippingConfig(Model model) {
-        return renderStoreBillingShippingConfig(getStoreId(), model);
+    public String storeCompanyDetails(Model model, Locale locale) {
+        return renderStoreCompanyDetails(getStoreId(), null, Map.of(), model, locale);
     }
 
     @GetMapping("/dashboard/store/{storeId}/company-details")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public String superAdminStoreBillingShippingConfig(@PathVariable String storeId, Model model) {
-        return renderStoreBillingShippingConfig(storeId, model);
+    public String superAdminStoreCompanyDetails(@PathVariable String storeId, Model model, Locale locale) {
+        return renderStoreCompanyDetails(storeId, null, Map.of(), model, locale);
     }
 
-    private String renderStoreBillingShippingConfig(String storeId, Model model) {
+    private String renderStoreCompanyDetails(String storeId, CompanyDetailsForm submitted, Map<String, String> errors,
+                                             Model model, Locale locale) {
         Store store = storesRepository.findById(storeId);
         if (store == null) {
             model.addAttribute("error", "Store not found");
             return "error";
         }
 
-        StoreForm form = new StoreForm(store);
-
+        CompanyDetailsForm form = submitted != null ? submitted : CompanyDetailsForm.from(store.getBillingDetails());
         model.addAttribute("form", form);
+        model.addAttribute("errors", errors);
+        model.addAttribute("countries", CompanyDetailsForm.countryOptions(form.getCountry(), locale));
+        model.addAttribute("formAction", companyDetailsPath(storeId));
         return "store-company-details";
     }
 
@@ -789,21 +799,59 @@ public class StoreController {
                 : "redirect:/dashboard/store/payments";
     }
 
-    @PostMapping("/dashboard/store/company-details/edit")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
-    public String updateBillingShippingConfiguration(@ModelAttribute StoreForm form, Locale locale, RedirectAttributes redirectAttributes) {
-        Store existingStore = storesRepository.findById(form.getStore().getStoreId());
+    // The store is taken from the session (ADMIN) or the path (SUPER_ADMIN), never from the submitted form.
+    @PostMapping("/dashboard/store/company-details")
+    @PreAuthorize("hasRole('ADMIN')")
+    public String updateStoreCompanyDetails(@ModelAttribute CompanyDetailsForm form,
+                                            @RequestHeader(value = ASYNC_FORM_HEADER, required = false) String requestedWith,
+                                            Model model, Locale locale, RedirectAttributes redirectAttributes,
+                                            HttpServletResponse response) {
+        return saveStoreCompanyDetails(getStoreId(), form, ASYNC_FORM_HEADER_VALUE.equals(requestedWith), model, locale,
+                redirectAttributes, response);
+    }
 
-        if (form.getStore().getBillingDetails().isProperlyFilled()) {
-            existingStore.setBillingDetails(form.getStore().getBillingDetails());
+    @PostMapping("/dashboard/store/{storeId}/company-details")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public String superAdminUpdateStoreCompanyDetails(@PathVariable String storeId, @ModelAttribute CompanyDetailsForm form,
+                                                      @RequestHeader(value = ASYNC_FORM_HEADER, required = false) String requestedWith,
+                                                      Model model, Locale locale, RedirectAttributes redirectAttributes,
+                                                      HttpServletResponse response) {
+        return saveStoreCompanyDetails(storeId, form, ASYNC_FORM_HEADER_VALUE.equals(requestedWith), model, locale,
+                redirectAttributes, response);
+    }
+
+    // A form sent by static/js/async-form.js gets only the re-rendered form back (422 with errors, 200 once saved) and
+    // swaps it in place; a plain submit without JavaScript keeps the full page render and the redirect after saving.
+    private String saveStoreCompanyDetails(String storeId, CompanyDetailsForm form, boolean async, Model model,
+                                           Locale locale, RedirectAttributes redirectAttributes,
+                                           HttpServletResponse response) {
+        Map<String, String> errors = form.validate();
+        Store store = storesRepository.findById(storeId);
+        if (store == null || !errors.isEmpty()) {
+            String view = renderStoreCompanyDetails(storeId, form, errors, model, locale);
+            if (async && store != null) {
+                response.setStatus(HttpStatus.UNPROCESSABLE_ENTITY.value());
+                return COMPANY_DETAILS_FORM_FRAGMENT;
+            }
+            return view;
         }
 
-        storesRepository.save(existingStore);
-        redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("store.company.details.update.success", null, locale));
+        store.setBillingDetails(form.applyTo(store.getBillingDetails()));
+        storesRepository.save(store);
+        String successMessage = messageSource.getMessage("store.company.details.update.success", null, locale);
+        if (async) {
+            renderStoreCompanyDetails(storeId, CompanyDetailsForm.from(store.getBillingDetails()), Map.of(), model, locale);
+            model.addAttribute("savedMessage", successMessage);
+            return COMPANY_DETAILS_FORM_FRAGMENT;
+        }
+        redirectAttributes.addFlashAttribute("successMessage", successMessage);
+        return "redirect:" + companyDetailsPath(storeId);
+    }
 
+    private String companyDetailsPath(String storeId) {
         return isSuperAdmin()
-                ? String.format("redirect:/dashboard/store/%s/company-details", form.getStore().getStoreId())
-                : "redirect:/dashboard/store/company-details";
+                ? String.format("/dashboard/store/%s/company-details", storeId)
+                : "/dashboard/store/company-details";
     }
 
     @PostMapping("/dashboard/store/rma")

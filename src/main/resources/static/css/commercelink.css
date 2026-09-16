@@ -792,6 +792,258 @@ body.cl-drawer-open .cl-sidebar {
     }
 }
 
+/* Forms: cards, field grid, inputs, primary button and an error summary, shared by settings forms. Rules touching
+   p, ul, a and fieldset carry the .cl-page prefix to outweigh Bulma's .content. */
+:root {
+    --cl-ok: #1d6b45;
+    --cl-ok-soft: #e3f4ea;
+    --cl-bad: #a61b1b;
+    --cl-bad-soft: #fbe7e7;
+}
+
+.cl-page .cl-form {
+    max-width: 760px;
+}
+
+.cl-page .cl-card {
+    border: 1px solid var(--cl-line);
+    border-radius: var(--cl-radius);
+    background: var(--cl-surface);
+}
+
+.cl-page .cl-fieldset {
+    min-width: 0;
+    margin: 0;
+    padding: 14px 20px 16px;
+    border: 0;
+}
+
+.cl-page .cl-fieldset + .cl-fieldset {
+    border-top: 1px solid var(--cl-line);
+}
+
+/* A floated legend leaves the fieldset border and joins normal flow, so it lays out like a heading. */
+.cl-page .cl-fieldset-title {
+    float: left;
+    width: 100%;
+    margin: 0 0 10px;
+    padding: 0;
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.3;
+    color: var(--cl-ink);
+}
+
+.cl-page .cl-fieldset-title + * {
+    clear: both;
+}
+
+.cl-page .cl-card-footer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 14px 20px;
+    border-top: 1px solid var(--cl-line);
+    border-radius: 0 0 var(--cl-radius) var(--cl-radius);
+    background: var(--cl-surface-2);
+}
+
+.cl-form-grid {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 12px 16px;
+}
+
+.cl-form-grid > * {
+    grid-column: span 6;
+    min-width: 0;
+}
+
+.cl-form-grid > .cl-span-2 { grid-column: span 2; }
+.cl-form-grid > .cl-span-3 { grid-column: span 3; }
+.cl-form-grid > .cl-span-4 { grid-column: span 4; }
+
+.cl-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.cl-label {
+    font-size: 13.5px;
+    font-weight: 600;
+    line-height: 1.3;
+    color: var(--cl-ink);
+}
+
+.cl-optional {
+    font-weight: 400;
+    color: var(--cl-ink-3);
+}
+
+.cl-input,
+.cl-select {
+    width: 100%;
+    height: 40px;
+    padding: 0 12px;
+    border: 1px solid var(--cl-line);
+    border-radius: var(--cl-radius);
+    background-color: var(--cl-surface);
+    color: var(--cl-ink);
+    font: inherit;
+    font-size: 15px;
+    transition: border-color .15s ease, box-shadow .15s ease;
+}
+
+/* An error summary link scrolls its field to the top edge; the margin keeps the field and its label clear of the
+   sticky top bar. */
+.cl-input,
+.cl-select {
+    scroll-margin-top: calc(var(--cl-topbar-height) + 44px);
+}
+
+.cl-select {
+    padding-right: 36px;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%2363748d' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    cursor: pointer;
+}
+
+.cl-input:hover,
+.cl-select:hover {
+    border-color: var(--cl-ink-3);
+}
+
+.cl-input:focus,
+.cl-select:focus {
+    outline: none;
+    border-color: var(--cl-accent);
+    box-shadow: 0 0 0 3px var(--cl-accent-soft);
+}
+
+.cl-input.is-invalid,
+.cl-select.is-invalid {
+    border-color: var(--cl-bad);
+}
+
+.cl-input.is-invalid:focus,
+.cl-select.is-invalid:focus {
+    box-shadow: 0 0 0 3px var(--cl-bad-soft);
+}
+
+.cl-page .cl-field-error {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.35;
+    color: var(--cl-bad);
+}
+
+.cl-button.is-primary {
+    border-color: var(--cl-accent);
+    background: var(--cl-accent);
+    color: #fff;
+}
+
+.cl-button:disabled,
+.cl-form[aria-busy="true"] .cl-button {
+    opacity: .6;
+    cursor: progress;
+}
+
+.cl-button.is-primary:hover {
+    border-color: var(--cl-accent-ink);
+    background: var(--cl-accent-ink);
+    color: #fff;
+}
+
+.cl-page .cl-alert {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 16px;
+    padding: 12px 16px;
+    border: 1px solid transparent;
+    border-left-width: 4px;
+    border-radius: var(--cl-radius);
+    color: var(--cl-ink);
+}
+
+.cl-page .cl-alert:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
+}
+
+.cl-page .cl-alert.is-bad {
+    border-color: var(--cl-bad-soft);
+    border-left-color: var(--cl-bad);
+    background: var(--cl-bad-soft);
+}
+
+.cl-page .cl-alert.is-bad .cl-alert-icon {
+    margin-top: 3px;
+    color: var(--cl-bad);
+}
+
+.cl-page .cl-alert-title {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.cl-page .cl-alert-list {
+    margin: 4px 0 0;
+    padding-left: 18px;
+    list-style: disc;
+    font-size: 13.5px;
+}
+
+.cl-page .cl-alert-list li + li {
+    margin-top: 2px;
+}
+
+.cl-page .cl-alert-list a {
+    color: var(--cl-bad);
+    text-decoration: underline;
+}
+
+@media screen and (max-width: 1023px) {
+    .cl-input,
+    .cl-select {
+        height: 44px;
+    }
+}
+
+@media screen and (max-width: 719px) {
+    .cl-form-grid > .cl-span-2,
+    .cl-form-grid > .cl-span-3,
+    .cl-form-grid > .cl-span-4 {
+        grid-column: span 6;
+    }
+
+    .cl-page .cl-fieldset,
+    .cl-page .cl-card-footer {
+        padding-left: 16px;
+        padding-right: 16px;
+    }
+
+    .cl-page .cl-card-footer .cl-button {
+        flex: 1 1 100%;
+        justify-content: center;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cl-input,
+    .cl-select {
+        transition: none;
+    }
+}
+
 /* Notifications: rows shared by the top bar dropdown and the notifications page. Spans and buttons only, so no
    .cl-page prefix is needed; rules touching lists and links inside page content keep it. */
 .cl-link-button {
