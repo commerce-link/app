@@ -1,0 +1,51 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<div th:fragment="field(id, options, withPlaceholder)" class="field" data-supplier-choice>
+    <label class="label" th:text="#{order.item.supplier}"></label>
+    <div class="control">
+        <div class="select is-fullwidth">
+            <select th:id="${id}" name="supplier" required
+                    onchange="toggleCustomSupplier(this)"
+                    data-custom="__custom__">
+                <option th:if="${withPlaceholder}" value="" th:text="#{general.select}"></option>
+                <option th:each="option : ${options}"
+                        th:value="${option.identity()}" th:text="${option.label()}"></option>
+                <option value="__custom__"
+                        th:text="#{order.item.supplier.custom}"></option>
+            </select>
+        </div>
+    </div>
+    <div class="control mt-2" style="display: none;" data-custom-supplier>
+        <input class="input" type="text" name="customSupplier"
+               autocomplete="off" pattern="[\p{L}\p{N}_\-]+"
+               th:placeholder="#{order.item.supplier.custom.placeholder}"
+               th:title="#{order.item.supplier.custom.format}"/>
+        <p class="help" th:text="#{order.item.supplier.custom.hint}"></p>
+    </div>
+
+    <script>
+        function toggleCustomSupplier(select) {
+            const custom = select.value === select.getAttribute('data-custom');
+            const control = select.closest('[data-supplier-choice]').querySelector('[data-custom-supplier]');
+            const input = control.querySelector('input');
+            control.style.display = custom ? '' : 'none';
+            input.required = custom;
+            if (custom) {
+                input.focus();
+            } else {
+                input.value = '';
+            }
+        }
+
+        function resetSupplierChoice(selectId) {
+            const select = document.getElementById(selectId);
+            select.selectedIndex = 0;
+            toggleCustomSupplier(select);
+        }
+    </script>
+</div>
+
+</body>
+</html>
