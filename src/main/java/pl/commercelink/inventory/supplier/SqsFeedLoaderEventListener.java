@@ -23,7 +23,9 @@ public class SqsFeedLoaderEventListener {
             value = "supplier-feed-import-queue",
             maxConcurrentMessages = "1",
             maxMessagesPerPoll = "1",
-            pollTimeoutSeconds = "20"
+            pollTimeoutSeconds = "20",
+            // Paged REST downloads (e.g. Shoper) take minutes; the queue's own visibility timeout is 30 s
+            messageVisibilitySeconds = "900"
     )
     public void handleMessage(FeedLoaderEventPayload payload) throws Exception {
         if (isNotBlank(payload.getStoreId())) {

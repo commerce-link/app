@@ -114,4 +114,13 @@ class SqsFeedLoaderEventListenerTest {
                 () -> listener.handleMessage(payload("Wortmann", "store-1", 5)));
         verify(feedScheduler, never()).scheduleConfigurationRetry(anyString(), anyString(), anyInt());
     }
+
+    @Test
+    void keepsTheMessageInvisibleLongEnoughForPagedApiDownloads() throws Exception {
+        io.awspring.cloud.sqs.annotation.SqsListener annotation = SqsFeedLoaderEventListener.class
+                .getMethod("handleMessage", FeedLoaderEventPayload.class)
+                .getAnnotation(io.awspring.cloud.sqs.annotation.SqsListener.class);
+        // Adapters that page through a REST API (Shoper) need minutes; the queue default is 30 s
+        org.junit.jupiter.api.Assertions.assertEquals("900", annotation.messageVisibilitySeconds());
+    }
 }
