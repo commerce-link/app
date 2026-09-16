@@ -35,9 +35,9 @@ public class V014_CreateMarketplaceImportSchedules {
     public void createMissingSchedules() {
         for (Store store : storesRepository.findAll()) {
             for (MarketplaceIntegration integration : store.getMarketplaces()) {
-                ensure(ordersImportScheduler, store.getStoreId(), integration.getName(), integration.getOrdersImportSchedule());
+                ensureScheduleExists(ordersImportScheduler, store.getStoreId(), integration.getName(), integration.getOrdersImportSchedule());
                 if (supportsReturns(integration.getName())) {
-                    ensure(returnsImportScheduler, store.getStoreId(), integration.getName(), integration.getReturnsImportSchedule());
+                    ensureScheduleExists(returnsImportScheduler, store.getStoreId(), integration.getName(), integration.getReturnsImportSchedule());
                 }
             }
         }
@@ -47,7 +47,7 @@ public class V014_CreateMarketplaceImportSchedules {
         }
     }
 
-    private void ensure(MarketplaceImportScheduler scheduler, String storeId, String marketplace, String stored) {
+    private void ensureScheduleExists(MarketplaceImportScheduler scheduler, String storeId, String marketplace, String stored) {
         try {
             if (scheduler.snapshot(storeId, marketplace).isPresent()) {
                 present++;
