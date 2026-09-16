@@ -1,6 +1,7 @@
 package pl.commercelink.web;
 
 import org.junit.jupiter.api.Test;
+import pl.commercelink.inventory.supplier.SupplierChoice;
 import pl.commercelink.inventory.supplier.SupplierLabelMap;
 import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
@@ -35,5 +36,13 @@ class DeliveriesControllerProviderOptionsTest {
         // then
         assertThat(options).extracting(SupplierLabelMap.Option::identity)
                 .containsExactly("AcmeB-k7f3a9c2", SupplierRegistry.WAREHOUSE);
+    }
+
+    @Test
+    void providerFilterUsesTheTypedNameWhenOtherSupplierIsChosen() {
+        // when / then
+        assertThat(DeliveriesController.providerFilter(SupplierChoice.CUSTOM, "  HURT-ABC ")).isEqualTo("HURT-ABC");
+        assertThat(DeliveriesController.providerFilter(SupplierChoice.CUSTOM, "   ")).isNull();
+        assertThat(DeliveriesController.providerFilter("AcmeB-k7f3a9c2", "ignored")).isEqualTo("AcmeB-k7f3a9c2");
     }
 }

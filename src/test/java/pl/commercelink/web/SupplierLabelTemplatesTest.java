@@ -1,6 +1,7 @@
 package pl.commercelink.web;
 
 import org.junit.jupiter.api.Test;
+import pl.commercelink.inventory.supplier.SupplierChoice;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -59,9 +60,18 @@ class SupplierLabelTemplatesTest {
         // when / then
         assertThat(template("orderDetails.html")).contains("id=\"quickAssignSupplier\" name=\"supplier\"")
                 .contains("th:each=\"option : ${assignableSuppliers}\"")
-                .doesNotContain("type=\"text\" id=\"quickAssignSupplier\"");
+                .doesNotContain("type=\"text\" id=\"quickAssignSupplier\"")
+                // "other supplier" reveals a text field for a supplier that is not connected to the store;
+                // the option value is a literal (Thymeleaf 3.1 forbids T() here), so keep it in sync with the constant
+                .contains("value=\"" + SupplierChoice.CUSTOM + "\"")
+                .contains("data-custom=\"" + SupplierChoice.CUSTOM + "\"")
+                .contains("id=\"quickAssignCustomSupplier\" name=\"customSupplier\"")
+                .contains("order.item.supplier.custom.hint");
         assertThat(template("deliveries.html")).contains("<select name=\"provider\"")
                 .contains("th:each=\"option : ${providerOptions}\"")
+                .contains("value=\"" + SupplierChoice.CUSTOM + "\"")
+                .contains("data-custom=\"" + SupplierChoice.CUSTOM + "\"")
+                .contains("name=\"providerCustom\"")
                 // a filter value outside the options (e.g. a disconnected instance) must stay
                 // visible as the selected option instead of silently showing "all"
                 .contains("!#lists.contains(providerOptions.![identity()], searchParams.provider)")

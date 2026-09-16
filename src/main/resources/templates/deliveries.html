@@ -35,7 +35,8 @@
                         <label class="label" th:text="#{deliveries.provider}"></label>
                         <div class="control" th:if="${!providerOptions.isEmpty()}">
                             <div class="select is-fullwidth">
-                                <select name="provider">
+                                <select name="provider" onchange="toggleProviderCustom(this)"
+                                        data-custom="__custom__">
                                     <option value="" th:text="#{deliveries.provider.all}"></option>
                                     <option th:each="option : ${providerOptions}" th:value="${option.identity()}"
                                             th:text="${option.label()}" th:selected="${option.identity() == searchParams.provider}"></option>
@@ -43,8 +44,13 @@
                                          so keep it visible as the selected option instead of showing "all" -->
                                     <option th:if="${!#strings.isEmpty(searchParams.provider) and !#lists.contains(providerOptions.![identity()], searchParams.provider)}"
                                             th:value="${searchParams.provider}" th:text="${supplierLabels.of(searchParams.provider)}" selected></option>
+                                    <option value="__custom__"
+                                            th:text="#{deliveries.provider.custom}"></option>
                                 </select>
                             </div>
+                            <!-- suppliers typed by hand in an order have no connection, so they are filtered by name -->
+                            <input class="input mt-2" type="text" name="providerCustom" id="providerCustom" style="display: none;"
+                                   th:placeholder="#{deliveries.provider.custom.placeholder}">
                         </div>
                         <div class="control" th:if="${providerOptions.isEmpty()}">
                             <input class="input" type="text" name="provider" th:value="${searchParams.provider}">
@@ -148,5 +154,17 @@
         </div>
     </section>
 </div>
+<script>
+    function toggleProviderCustom(select) {
+        const input = document.getElementById('providerCustom');
+        const custom = select.value === select.getAttribute('data-custom');
+        input.style.display = custom ? '' : 'none';
+        if (custom) {
+            input.focus();
+        } else {
+            input.value = '';
+        }
+    }
+</script>
 </body>
 </html>
