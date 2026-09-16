@@ -83,4 +83,38 @@ class InvoiceSyncServiceTest {
         verify(invoiceSyncHandler).sync(any());
         verify(deliveriesRepository).save(delivery);
     }
+
+    @Test
+    void applyResolvesCounterpartyShortcutWithoutOverwritingTheDeliveryProvider() {
+        // given
+        Store store = new Store();
+        when(storesRepository.findById("store-1")).thenReturn(store);
+        when(invoicingProviderFactory.get(store)).thenReturn(invoicingProvider);
+        Invoice invoice = new Invoice("inv-1", "FV/1", null, Price.fromNet(120.0), null, "PLN",
+                1.0, false, null, List.of(new InvoicePosition("pos-1", "Line", 1, Price.fromNet(120.0))), null, null);
+        when(invoicingProvider.fetchInvoiceById("inv-1", InvoiceDirection.Purchase)).thenReturn(invoice);
+        when(warehouse.invoiceSyncHandler("store-1")).thenReturn(invoiceSyncHandler);
+        when(deliveryCostSync.apply(eq("store-1"), eq("delivery-1"), eq(Map.of("MFN-1", 120.0)))).thenReturn(0.0);
+
+        Delivery delivery = new Delivery("store-1", null, "Kosatec-k7f3a9c2");
+        delivery.setDeliveryId("delivery-1");
+        when(deliveriesRepository.findById("store-1", "delivery-1")).thenReturn(delivery);
+
+        InvoiceSyncPreview preview = new InvoiceSyncPreview();
+        preview.setDeliveryId("delivery-1");
+        preview.setInvoiceId("inv-1");
+        preview.setInvoiceShortcut("KOS-INV");
+        InvoiceSyncPreview.Mapping mapping = new InvoiceSyncPreview.Mapping();
+        mapping.setMfn("MFN-1");
+        mapping.setSelectedPositionId("pos-1");
+        preview.setMappings(List.of(mapping));
+
+        // when
+        invoiceSyncService.apply("store-1", preview);
+
+        // then
+        assertThat(delivery.getProvider()).isEqualTo("Kosatec-k7f3a9c2");
+        assertThat(delivery.getCounterpartyShortcut()).isEqualTo("KOS-INV");
+        verify(deliveriesRepository).save(delivery);
+    }
 }

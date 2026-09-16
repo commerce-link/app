@@ -1,5 +1,6 @@
 package pl.commercelink.web;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -18,6 +19,7 @@ import pl.commercelink.inventory.deliveries.DropshipEligibility;
 import pl.commercelink.inventory.deliveries.DropshipPurchaseService;
 import pl.commercelink.inventory.deliveries.PurchaseSubmission;
 import pl.commercelink.inventory.deliveries.SupplierPurchaseService;
+import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.BillingDetails;
 import pl.commercelink.orders.Order;
@@ -30,6 +32,7 @@ import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.starter.util.OperationResult;
+import pl.commercelink.stores.StoresRepository;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -42,6 +45,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.same;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -70,9 +75,17 @@ class DropshipControllerTest {
     private MessageSource messageSource;
     @Mock
     private org.springframework.web.servlet.mvc.support.RedirectAttributes redirectAttributes;
+    @Mock
+    private SupplierLabels supplierLabels;
 
     @InjectMocks
     private DropshipController controller;
+
+    @BeforeEach
+    void setUpSupplierLabels() {
+        lenient().when(supplierLabels.forStoreId(any()))
+                .thenReturn(new SupplierLabels(mock(StoresRepository.class)).forStore(null));
+    }
 
     private static Order order() {
         Order order = new Order();

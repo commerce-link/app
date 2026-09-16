@@ -32,7 +32,7 @@
 
                 <tbody>
                 <tr th:each="center : ${rmaCenters}">
-                    <td th:text="${center.provider}"></td>
+                    <td th:text="${supplierLabels.of(center.provider)}"></td>
                     <td th:text="${center.shippingDetails.companyName}"></td>
                     <td th:text="${center.shippingDetails.streetAndNumber}"></td>
                     <td th:text="${center.shippingDetails.postalCode}"></td>

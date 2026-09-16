@@ -33,7 +33,26 @@
 
                     <div class="field">
                         <label class="label" th:text="#{deliveries.provider}"></label>
-                        <div class="control">
+                        <div class="control" th:if="${!providerOptions.isEmpty()}">
+                            <div class="select is-fullwidth">
+                                <select name="provider" onchange="toggleProviderCustom(this)"
+                                        data-custom="__custom__">
+                                    <option value="" th:text="#{deliveries.provider.all}"></option>
+                                    <option th:each="option : ${providerOptions}" th:value="${option.identity()}"
+                                            th:text="${option.label()}" th:selected="${option.identity() == searchParams.provider}"></option>
+                                    <!-- a filter on a disconnected instance still narrows the list server-side,
+                                         so keep it visible as the selected option instead of showing "all" -->
+                                    <option th:if="${!#strings.isEmpty(searchParams.provider) and !#lists.contains(providerOptions.![identity()], searchParams.provider)}"
+                                            th:value="${searchParams.provider}" th:text="${supplierLabels.of(searchParams.provider)}" selected></option>
+                                    <option value="__custom__"
+                                            th:text="#{deliveries.provider.custom}"></option>
+                                </select>
+                            </div>
+                            <!-- suppliers typed by hand in an order have no connection, so they are filtered by name -->
+                            <input class="input mt-2" type="text" name="providerCustom" id="providerCustom" style="display: none;"
+                                   th:placeholder="#{deliveries.provider.custom.placeholder}">
+                        </div>
+                        <div class="control" th:if="${providerOptions.isEmpty()}">
                             <input class="input" type="text" name="provider" th:value="${searchParams.provider}">
                         </div>
                     </div>
@@ -102,7 +121,7 @@
                         <tr th:each="delivery : ${deliveries}"
                             th:with="detailPath=${isSuperAdmin} ? '/dashboard/store/' + ${delivery.storeId} : '/dashboard'">
                             <td th:if="${isSuperAdmin}" th:text="${delivery.storeId}"></td>
-                            <td th:text="${delivery.provider}"></td>
+                            <td th:text="${supplierLabels.of(delivery.storeId, delivery.provider)}"></td>
                             <td>
                                 <span class="tag is-info is-light mb-0" th:if="${delivery.dropship}" th:text="#{deliveries.dropship.badge}"></span>
                                 <span class="tag is-primary is-light mb-0" th:unless="${delivery.dropship}" th:text="#{deliveries.type.warehouse}"></span>
@@ -135,5 +154,17 @@
         </div>
     </section>
 </div>
+<script>
+    function toggleProviderCustom(select) {
+        const input = document.getElementById('providerCustom');
+        const custom = select.value === select.getAttribute('data-custom');
+        input.style.display = custom ? '' : 'none';
+        if (custom) {
+            input.focus();
+        } else {
+            input.value = '';
+        }
+    }
+</script>
 </body>
 </html>

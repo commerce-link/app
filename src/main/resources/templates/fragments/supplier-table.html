@@ -2,7 +2,7 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
 
-<div th:fragment="supplierTable(rows, manual, showMode)">
+<div th:fragment="supplierTable(rows, manual, showMode, configurations)">
 
     <table class="table is-fullwidth is-striped" th:if="${!rows.isEmpty()}">
         <thead>
@@ -23,9 +23,12 @@
                 th:attr="data-mode=${row.mode()},data-include-pricing=${row.includeInPricing()},
                          data-include-fulfilment=${row.includeInFulfilment()},data-label=${row.label()},
                          data-enabled=${row.enabled()},data-feed-last-modified=${row.feedLastModified()},
-                         data-feed-schedule=${row.feedSchedule()},data-external-supplier-id=${row.externalSupplierId()}">
+                         data-feed-schedule=${row.feedSchedule()},data-external-supplier-id=${row.externalSupplierId()},
+                         data-provider-name=${row.providerName()},data-billing-shortcut=${row.billingShortcut()},data-can-switch-mode=${row.canSwitchMode()},
+                         data-configuration=${configurations == null ? null : configurations.get(row.identity())}">
                 <td>
                     <span th:text="${row.label()}">name</span>
+                    <span class="tag is-light ml-2" th:unless="${manual}" th:text="${row.providerName()}"></span>
                     <span class="tag is-warning is-light ml-2" th:if="${!row.knownProvider()}"
                           th:text="#{store.supplier.provider.unknown}"></span>
                 </td>

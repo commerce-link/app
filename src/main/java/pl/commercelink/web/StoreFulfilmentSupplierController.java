@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import pl.commercelink.inventory.supplier.StoreSupplierConnectionService;
 import pl.commercelink.inventory.supplier.SupplierConnectionViewFactory;
+import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.stores.Store;
@@ -31,6 +32,7 @@ public class StoreFulfilmentSupplierController {
     private final SupplierConnectionViewFactory supplierConnectionViewFactory;
     private final SupplierRegistry supplierRegistry;
     private final MessageSource messageSource;
+    private final SupplierLabels supplierLabels;
 
     @PostMapping("/dashboard/store/fulfilment/supplier")
     @PreAuthorize("hasRole('ADMIN')")
@@ -46,18 +48,21 @@ public class StoreFulfilmentSupplierController {
         return doSave(storeId, form, locale, model, response);
     }
 
+    // {supplierName} in the URL path is a connection identity (e.g. "Elko" for a single connection
+    // or "Elko-k7f3a9c2" for a labeled one); the path segment stays as-is, but the bound variable is
+    // named identity to match what it actually carries.
     @PostMapping("/dashboard/store/fulfilment/supplier/{supplierName}/disconnect")
     @PreAuthorize("hasRole('ADMIN')")
-    public String disconnect(@PathVariable String supplierName, Locale locale, Model model,
+    public String disconnect(@PathVariable("supplierName") String identity, Locale locale, Model model,
                              HttpServletResponse response) {
-        return doDisconnect(CustomSecurityContext.getStoreId(), supplierName, locale, model, response);
+        return doDisconnect(CustomSecurityContext.getStoreId(), identity, locale, model, response);
     }
 
     @PostMapping("/dashboard/store/{storeId}/fulfilment/supplier/{supplierName}/disconnect")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public String disconnectForStore(@PathVariable String storeId, @PathVariable String supplierName,
+    public String disconnectForStore(@PathVariable String storeId, @PathVariable("supplierName") String identity,
                                      Locale locale, Model model, HttpServletResponse response) {
-        return doDisconnect(storeId, supplierName, locale, model, response);
+        return doDisconnect(storeId, identity, locale, model, response);
     }
 
     private String doSave(String storeId, SupplierConnectionForm form, Locale locale, Model model,
@@ -71,6 +76,9 @@ public class StoreFulfilmentSupplierController {
                 form.getSupplierName(), form.getMode(),
                 form.isIncludeInPricing(), form.isIncludeInFulfilment(), form.getFeedSchedule());
         selection.setExternalSupplierId(form.getExternalSupplierId());
+        selection.setIdentity(form.getIdentity());
+        selection.setLabel(form.getLabel());
+        selection.setBillingShortcut(form.getBillingShortcut());
 
         StoreSupplierConnectionService.ConnectionUpdateResult result =
                 storeSupplierConnectionService.connectOrUpdate(store, selection, form.getConfiguration());
@@ -80,21 +88,28 @@ public class StoreFulfilmentSupplierController {
                     .collect(Collectors.joining(" "));
             return SupplierSectionModel.renderErrorFragment(message, model, response);
         }
+        // Works because the persister mutates this `store` instance in place; a re-read would
+        // otherwise be needed to see the just-saved connection.
+        String savedLabel = supplierLabels.forStore(store).of(result.identity());
         String successMessage = messageSource.getMessage(
-                "store.fulfilment.supplier.saved", new Object[]{form.getSupplierName()}, locale);
+                "store.fulfilment.supplier.saved", new Object[]{savedLabel}, locale);
         return SupplierSectionModel.renderExternalSection(supplierConnectionViewFactory, supplierRegistry, store,
-                storeSupplierConnectionService.suppliersWithStoredConfiguration(store), successMessage, model);
+                storeSupplierConnectionService.suppliersWithStoredConfiguration(store),
+                storeSupplierConnectionService.configurationsForUI(store), successMessage, model);
     }
 
-    private String doDisconnect(String storeId, String supplierName, Locale locale, Model model,
+    private String doDisconnect(String storeId, String identity, Locale locale, Model model,
                                 HttpServletResponse response) {
         Store store = storesRepository.findById(storeId);
         if (store == null) {
             return SupplierSectionModel.renderErrorFragment(
                     messageSource.getMessage("store.manual.error.store.notfound", null, locale), model, response);
         }
+        // Read before disconnect: once the connection is removed, forStore(store) no longer knows
+        // its label and would fall back to the identity itself.
+        String label = supplierLabels.forStore(store).of(identity);
         StoreSupplierConnectionService.ConnectionUpdateResult result =
-                storeSupplierConnectionService.disconnect(store, supplierName);
+                storeSupplierConnectionService.disconnect(store, identity);
         if (result.hasErrors()) {
             String message = result.errors().stream()
                     .map(error -> messageSource.getMessage(error.code(), error.args(), locale))
@@ -102,9 +117,10 @@ public class StoreFulfilmentSupplierController {
             return SupplierSectionModel.renderErrorFragment(message, model, response);
         }
         String successMessage = messageSource.getMessage(
-                "store.fulfilment.supplier.disconnected", new Object[]{supplierName}, locale);
+                "store.fulfilment.supplier.disconnected", new Object[]{label}, locale);
         return SupplierSectionModel.renderExternalSection(supplierConnectionViewFactory, supplierRegistry, store,
-                storeSupplierConnectionService.suppliersWithStoredConfiguration(store), successMessage, model);
+                storeSupplierConnectionService.suppliersWithStoredConfiguration(store),
+                storeSupplierConnectionService.configurationsForUI(store), successMessage, model);
     }
 
     @GetMapping("/dashboard/store/fulfilment/supplier/section")
@@ -132,6 +148,7 @@ public class StoreFulfilmentSupplierController {
                     messageSource.getMessage("store.manual.error.store.notfound", null, locale), model, response);
         }
         return SupplierSectionModel.renderExternalSection(supplierConnectionViewFactory, supplierRegistry, store,
-                storeSupplierConnectionService.suppliersWithStoredConfiguration(store), null, model);
+                storeSupplierConnectionService.suppliersWithStoredConfiguration(store),
+                storeSupplierConnectionService.configurationsForUI(store), null, model);
     }
 }

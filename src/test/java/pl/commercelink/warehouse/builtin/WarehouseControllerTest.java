@@ -12,21 +12,30 @@ import org.mockito.quality.Strictness;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
 import pl.commercelink.inventory.deliveries.DeliveredPredicate;
+import pl.commercelink.inventory.supplier.SupplierLabelMap;
+import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.orders.FulfilmentStatus;
+import pl.commercelink.orders.fulfilment.FulfilmentForm;
 import pl.commercelink.orders.fulfilment.ManualWarehouseFulfilment;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.starter.security.CustomSecurityContext;
+import pl.commercelink.stores.ConnectionMode;
+import pl.commercelink.stores.FulfilmentConfiguration;
 import pl.commercelink.stores.IntegrationType;
 import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoreSupplierConnection;
 import pl.commercelink.stores.StoresRepository;
+import pl.commercelink.warehouse.RestockScope;
 import pl.commercelink.warehouse.RestockSuggestionService;
 import pl.commercelink.warehouse.api.Warehouse;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
@@ -63,6 +72,8 @@ class WarehouseControllerTest {
     private WarehouseInternalReservationService warehouseInternalReservationService;
     @Mock
     private WarehouseAllocationsManager warehouseAllocationsManager;
+    @Mock
+    private SupplierLabels supplierLabels;
 
     @InjectMocks
     private WarehouseController warehouseController;
@@ -86,6 +97,7 @@ class WarehouseControllerTest {
                     .thenReturn(List.of(withCategory, withoutCategory));
             when(warehouseRepository.findAllCategories(STORE_ID)).thenReturn(Collections.emptySet());
             when(productCatalogRepository.findAll(STORE_ID)).thenReturn(Collections.emptyList());
+            when(supplierLabels.forStoreId(STORE_ID)).thenReturn(labelsOfOneConnection());
 
             Model model = new ConcurrentModel();
 
@@ -96,7 +108,49 @@ class WarehouseControllerTest {
             assertThat(view).isEqualTo("warehouse");
             List<WarehouseItem> deliveredItems = (List<WarehouseItem>) model.getAttribute("deliveredItems");
             assertThat(deliveredItems).containsExactly(withoutCategory, withCategory);
+            // Quick-add posts a connection identity now, so the screen has to be handed the options
+            // -- the store's connections plus the two built-in entities the free-text field allowed.
+            assertThat((List<SupplierLabelMap.Option>) model.getAttribute("providerOptions"))
+                    .extracting(SupplierLabelMap.Option::identity)
+                    .containsExactly("AcmeB-k7f3a9c2", "Warehouse", "Other");
         }
+    }
+
+    @Test
+    @DisplayName("restock exposes supplierLabels so fulfilment.html can resolve connection labels")
+    void restockExposesSupplierLabelsForTheFulfilmentScreen() {
+        // given
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+
+            when(restockSuggestionService.suggestForRestock(eq(STORE_ID), anyString(), isNull(),
+                    eq(RestockScope.WholeCatalog), eq(false), isNull()))
+                    .thenReturn(Collections.emptyList());
+            when(manualWarehouseFulfilment.init(eq(STORE_ID), anyList())).thenReturn(new FulfilmentForm());
+            var labels = new SupplierLabels(mock(StoresRepository.class)).forStore(null);
+            when(supplierLabels.forStoreId(STORE_ID)).thenReturn(labels);
+
+            Model model = new ConcurrentModel();
+
+            // when
+            String view = warehouseController.restock("catalog-1", null, RestockScope.WholeCatalog, null, false, model);
+
+            // then
+            assertThat(view).isEqualTo("fulfilment");
+            assertThat(model.getAttribute("supplierLabels")).isSameAs(labels);
+        }
+    }
+
+    private SupplierLabelMap labelsOfOneConnection() {
+        StoreSupplierConnection connection =
+                new StoreSupplierConnection("AcmeB-k7f3a9c2", ConnectionMode.OWN, true, true);
+        connection.setLabel("AcmeB drugie konto");
+        FulfilmentConfiguration config = new FulfilmentConfiguration();
+        config.setSupplierConnections(new ArrayList<>(List.of(connection)));
+        Store store = new Store();
+        store.setStoreId(STORE_ID);
+        store.setFulfilmentConfiguration(config);
+        return new SupplierLabels(mock(StoresRepository.class)).forStore(store);
     }
 
     private WarehouseItem deliveredItem(String categoryKey, String name) {

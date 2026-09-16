@@ -3,6 +3,7 @@ package pl.commercelink.warehouse.builtin;
 import org.springframework.stereotype.Service;
 import pl.commercelink.documents.DocumentReason;
 import pl.commercelink.documents.DocumentType;
+import pl.commercelink.inventory.deliveries.CounterpartyShortcuts;
 import pl.commercelink.inventory.deliveries.DeliveriesRepository;
 import pl.commercelink.inventory.deliveries.Delivery;
 import pl.commercelink.invoicing.api.BillingParty;
@@ -25,19 +26,22 @@ class WarehouseGoodsInService {
     private final DeliveriesRepository deliveriesRepository;
     private final InvoicingProviderFactory invoicingProviderFactory;
     private final BuiltInDocumentCreationService documentCreationService;
+    private final CounterpartyShortcuts counterpartyShortcuts;
 
     WarehouseGoodsInService(
             WarehouseRepository warehouseRepository,
             StoresRepository storesRepository,
             DeliveriesRepository deliveriesRepository,
             InvoicingProviderFactory invoicingProviderFactory,
-            BuiltInDocumentCreationService documentCreationService
+            BuiltInDocumentCreationService documentCreationService,
+            CounterpartyShortcuts counterpartyShortcuts
     ) {
         this.warehouseRepository = warehouseRepository;
         this.storesRepository = storesRepository;
         this.deliveriesRepository = deliveriesRepository;
         this.invoicingProviderFactory = invoicingProviderFactory;
         this.documentCreationService = documentCreationService;
+        this.counterpartyShortcuts = counterpartyShortcuts;
     }
 
     OperationResult<Document> receiveFromExternalService(
@@ -64,9 +68,10 @@ class WarehouseGoodsInService {
             return OperationResult.failure("Failed to find delivery with order no: " + warehouseItems.get(0).getDeliveryId());
         }
 
-        BillingParty counterparty = invoicingProvider.fetchBillingPartyByShortcut(delivery.getProvider());
+        String shortcut = counterpartyShortcuts.forDelivery(store, delivery);
+        BillingParty counterparty = invoicingProvider.fetchBillingPartyByShortcut(shortcut);
         if (counterparty == null || !counterparty.hasCompanyDetails()) {
-            return OperationResult.failure("Failed to fetch counterparty with shortcut: " + delivery.getProvider());
+            return OperationResult.failure("Failed to fetch counterparty with shortcut: " + shortcut);
         }
 
         markAllItemsAsReceived(warehouseItems);
