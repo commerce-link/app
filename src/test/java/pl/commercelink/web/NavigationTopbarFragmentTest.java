@@ -17,6 +17,7 @@ import org.thymeleaf.web.servlet.JakartaServletWebApplication;
 import pl.commercelink.starter.security.UserRole;
 import pl.commercelink.web.nav.NavigationModel;
 import pl.commercelink.web.nav.StoreContext;
+import pl.commercelink.web.notifications.NotificationBell;
 
 import java.text.MessageFormat;
 import java.util.Locale;
@@ -28,6 +29,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 class NavigationTopbarFragmentTest {
 
     private String render(UserRole role, String path, StoreContext storeContext) {
+        return render(role, path, storeContext, null);
+    }
+
+    private String render(UserRole role, String path, StoreContext storeContext, NotificationBell notificationBell) {
         JakartaServletWebApplication application = JakartaServletWebApplication.buildApplication(new MockServletContext());
         IWebExchange exchange = application.buildExchange(new MockHttpServletRequest(), new MockHttpServletResponse());
         WebContext context = new WebContext(exchange);
@@ -36,6 +41,7 @@ class NavigationTopbarFragmentTest {
         context.setVariable("currentUri", path);
         context.setVariable("currentQuery", "");
         context.setVariable("userEmail", "operator@commercelink.local");
+        context.setVariable("notificationBell", notificationBell);
         return templateEngine().process("<div th:replace=\"~{fragments/navigation :: topbar}\"></div>", context);
     }
 
@@ -89,6 +95,48 @@ class NavigationTopbarFragmentTest {
         assertThat(html).contains("aria-expanded=\"false\"");
         assertThat(html).contains("aria-controls=\"clSidebar\"");
         assertThat(html).contains("<button");
+    }
+
+    @Test
+    void leavesTheBellOutWhenTheOperatorHasNoNotificationBell() {
+        // when
+        String html = render(UserRole.USER, "/dashboard/orders", null);
+
+        // then
+        assertThat(html).doesNotContain("clNotificationsToggle").doesNotContain("clNotificationsMenu");
+    }
+
+    @Test
+    void showsTheBellWithoutABadgeWhenEverythingIsRead() {
+        // when
+        String html = render(UserRole.ADMIN, "/dashboard/orders", null,
+                new NotificationBell(0, "/dashboard/notifications/dropdown", "/dashboard/notifications"));
+
+        // then
+        assertThat(html).contains("id=\"clNotificationsToggle\"").contains("aria-controls=\"clNotificationsMenu\"");
+        assertThat(html).contains("aria-label=\"Powiadomienia, nieprzeczytane: 0\"");
+        assertThat(html).contains("data-dropdown-href=\"/dashboard/notifications/dropdown\"");
+        assertThat(html).contains("fa-bell").doesNotContain("cl-bell-badge");
+        assertThat(html).contains("id=\"clNotificationsMenu\"").contains("role=\"region\"");
+        assertThat(html).contains("Wczytywanie…").contains("Nie udało się wczytać powiadomień.");
+        assertThat(html).contains("href=\"/dashboard/notifications\"");
+        assertThat(html).doesNotContain("??");
+    }
+
+    @Test
+    void countsUnreadNotificationsOnTheBadgeUpToNinePlus() {
+        // when
+        String three = render(UserRole.ADMIN, "/dashboard/orders", null,
+                new NotificationBell(3, "/dashboard/notifications/dropdown", "/dashboard/notifications"));
+        String many = render(UserRole.SUPER_ADMIN, "/dashboard/store/uma2dqukxr/orders",
+                new StoreContext("uma2dqukxr", "Bio Planet"),
+                new NotificationBell(12, "/dashboard/store/uma2dqukxr/notifications/dropdown",
+                        "/dashboard/store/uma2dqukxr/notifications"));
+
+        // then
+        assertThat(three).contains("aria-label=\"Powiadomienia, nieprzeczytane: 3\"").contains("aria-hidden=\"true\">3</span>");
+        assertThat(many).contains("aria-label=\"Powiadomienia, nieprzeczytane: 12\"").contains("aria-hidden=\"true\">9+</span>");
+        assertThat(many).contains("data-dropdown-href=\"/dashboard/store/uma2dqukxr/notifications/dropdown\"");
     }
 
     private TemplateEngine templateEngine() {

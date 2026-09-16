@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import pl.commercelink.marketplace.MarketplaceProviderFactory;
 import pl.commercelink.marketplace.api.MarketplaceProviderDescriptor;
+import pl.commercelink.notifications.StoreNotificationService;
 import pl.commercelink.provider.ProviderFactory;
 import pl.commercelink.provider.api.AuthConfig;
 import pl.commercelink.rest.client.HttpClientException;
@@ -21,6 +22,8 @@ import pl.commercelink.rest.client.OAuth2Secrets;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.stores.MarketplaceIntegration;
 import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoreNotification;
+import pl.commercelink.stores.StoreNotificationType;
 import pl.commercelink.stores.StoresRepository;
 
 import java.util.Map;
@@ -31,22 +34,27 @@ public class MarketplaceDeviceAuthController {
     private final StoresRepository storesRepository;
     private final MarketplaceProviderFactory marketplaceProviderFactory;
     private final OAuth2CredentialStore credentialStore;
+    private final StoreNotificationService notificationService;
     private final OAuth2DeviceAuthorizationService deviceAuthorizationService;
 
     @Autowired
     public MarketplaceDeviceAuthController(StoresRepository storesRepository,
                                            MarketplaceProviderFactory marketplaceProviderFactory,
-                                           OAuth2CredentialStore credentialStore) {
-        this(storesRepository, marketplaceProviderFactory, credentialStore, new OAuth2DeviceAuthorizationService());
+                                           OAuth2CredentialStore credentialStore,
+                                           StoreNotificationService notificationService) {
+        this(storesRepository, marketplaceProviderFactory, credentialStore, notificationService,
+                new OAuth2DeviceAuthorizationService());
     }
 
     MarketplaceDeviceAuthController(StoresRepository storesRepository,
                                     MarketplaceProviderFactory marketplaceProviderFactory,
                                     OAuth2CredentialStore credentialStore,
+                                    StoreNotificationService notificationService,
                                     OAuth2DeviceAuthorizationService deviceAuthorizationService) {
         this.storesRepository = storesRepository;
         this.marketplaceProviderFactory = marketplaceProviderFactory;
         this.credentialStore = credentialStore;
+        this.notificationService = notificationService;
         this.deviceAuthorizationService = deviceAuthorizationService;
     }
 
@@ -112,7 +120,8 @@ public class MarketplaceDeviceAuthController {
     }
 
     private void connectIntegration(String providerName, String refreshToken) {
-        Store store = storesRepository.findById(CustomSecurityContext.getStoreId());
+        String storeId = CustomSecurityContext.getStoreId();
+        Store store = storesRepository.findById(storeId);
         marketplaceProviderFactory.seedRefreshToken(store, providerName, refreshToken);
         MarketplaceIntegration integration = store.getMarketplaceIntegration(providerName);
         if (integration == null) {
@@ -121,6 +130,8 @@ public class MarketplaceDeviceAuthController {
             store.markConnectionAsRestored(providerName);
         }
         storesRepository.save(store);
+        notificationService.resolve(storeId, StoreNotificationType.UNAUTHENTICATED,
+                StoreNotification.marketplaceConnectionObject(providerName));
     }
 
     private AuthConfig.OAuth2 deviceFlowConfig(String providerName) {

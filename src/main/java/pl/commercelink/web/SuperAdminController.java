@@ -8,6 +8,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.products.OrphanedProductCleanupService;
+import pl.commercelink.starter.security.UserRole;
 import pl.commercelink.stores.CreateStoreRequest;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoreCopyService;
@@ -15,6 +16,7 @@ import pl.commercelink.stores.StoreCreationService;
 import pl.commercelink.stores.StoreDeletionService;
 import pl.commercelink.stores.StoreForm;
 import pl.commercelink.stores.StoresRepository;
+import pl.commercelink.web.settings.StoreSettingsOverviewFactory;
 
 import java.util.*;
 
@@ -40,6 +42,9 @@ public class SuperAdminController {
     @Autowired
     private StoreCreationService storeCreationService;
 
+    @Autowired
+    private StoreSettingsOverviewFactory storeSettingsOverviewFactory;
+
     @GetMapping("/dashboard/stores")
     public String store(@RequestParam(defaultValue = "desc") String dir, Model model) {
         boolean ascending = "asc".equalsIgnoreCase(dir);
@@ -63,6 +68,7 @@ public class SuperAdminController {
         StoreForm form = new StoreForm(store);
         model.addAttribute("form", form);
         model.addAttribute("isSuperAdmin", true);
+        model.addAttribute("overview", storeSettingsOverviewFactory.build(store, UserRole.SUPER_ADMIN));
 
         return "store";
     }

@@ -1,0 +1,46 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<div th:fragment="dropdown" class="cl-notifications-panel" data-notifications-dropdown>
+    <div class="cl-notifications-head">
+        <h2 class="cl-notifications-heading" th:text="#{notifications.title}"></h2>
+        <form th:if="${unreadCount > 0}" method="post" th:action="@{${basePath + '/read-all'}}">
+            <input type="hidden" name="redirect" th:value="${basePath}">
+            <button type="submit" class="cl-link-button">
+                <span th:text="#{notifications.markAllRead.short}"></span>
+                <span class="icon is-small" aria-hidden="true"><i class="fas fa-check"></i></span>
+            </button>
+        </form>
+    </div>
+
+    <div th:if="${#lists.isEmpty(notifications)}" class="cl-notifications-empty" th:text="#{notifications.empty.all}"></div>
+
+    <ul th:unless="${#lists.isEmpty(notifications)}" class="cl-notifications-list">
+        <li th:each="notification : ${notifications}">
+            <form method="post" th:action="@{${notification.openHref()}}">
+                <button type="submit" class="cl-notification-row"
+                        th:classappend="${notification.unread()} ? 'is-unread' : ''">
+                    <span class="cl-notification-dot" aria-hidden="true"></span>
+                    <span class="cl-notification-icon icon" th:classappend="${notification.cssClass()}" aria-hidden="true">
+                        <i class="fas" th:classappend="${notification.icon()}"></i>
+                    </span>
+                    <span class="cl-notification-text">
+                        <span class="cl-notification-title" th:text="#{${notification.titleKey()}}"></span>
+                        <span class="is-sr-only" th:if="${notification.unread()}" th:text="#{notifications.unread.sr}"></span>
+                        <span class="cl-notification-message" th:text="${notification.message()}"></span>
+                        <span class="cl-notification-date" th:text="${notification.createdAtText()}"></span>
+                    </span>
+                </button>
+            </form>
+        </li>
+    </ul>
+
+    <a class="cl-notifications-all" th:href="@{${basePath + '?filter=all'}}">
+        <span th:text="#{notifications.viewAll}"></span>
+        <span class="icon is-small" aria-hidden="true"><i class="fas fa-chevron-right"></i></span>
+    </a>
+</div>
+
+</body>
+</html>
