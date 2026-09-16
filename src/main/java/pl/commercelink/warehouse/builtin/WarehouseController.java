@@ -13,7 +13,6 @@ import pl.commercelink.documents.DocumentReason;
 import pl.commercelink.inventory.deliveries.DeliveredPredicate;
 import pl.commercelink.inventory.supplier.SupplierLabelMap;
 import pl.commercelink.inventory.supplier.SupplierLabels;
-import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.OrderItem;
@@ -170,19 +169,10 @@ class WarehouseController {
         model.addAttribute("quickAddStatuses", WarehouseItemController.NEW_ITEM_STATUSES);
         model.addAttribute("defaultVatRate", Price.DEFAULT_VAT_RATE);
         SupplierLabelMap labels = supplierLabels.forStoreId(getStoreId());
-        model.addAttribute("providerOptions", quickAddSupplierOptions(labels));
+        model.addAttribute("providerOptions", labels.options());
         model.addAttribute("supplierLabels", labels);
 
         return "warehouse";
-    }
-
-    // Quick-add used to be a free-text supplier field, so both built-in entities stay reachable
-    // next to the store's own connections -- the value posted is the connection identity.
-    private static List<SupplierLabelMap.Option> quickAddSupplierOptions(SupplierLabelMap labels) {
-        List<SupplierLabelMap.Option> options = new ArrayList<>(labels.options());
-        options.add(new SupplierLabelMap.Option(SupplierRegistry.WAREHOUSE, SupplierRegistry.WAREHOUSE));
-        options.add(new SupplierLabelMap.Option(SupplierRegistry.OTHER, SupplierRegistry.OTHER));
-        return options;
     }
 
     private static List<FulfilmentStatus> getFulfilmentStatuses(boolean hasExternalWarehouse) {

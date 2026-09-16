@@ -8,6 +8,8 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import pl.commercelink.inventory.supplier.SupplierChoice;
+import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.products.StoreCategories;
@@ -57,6 +59,12 @@ class WarehouseItemController {
     @Autowired
     private WarehouseItemUpdateService warehouseItemUpdateService;
 
+    @Autowired
+    private StoresRepository storesRepository;
+
+    @Autowired
+    private SupplierChoice supplierChoice;
+
     @GetMapping("/dashboard/warehouse/items/add")
     String addWarehouseItem(Model model) {
         return showWarehouseItemDetails(model, WarehouseItem.empty(getStoreId()));
@@ -103,8 +111,16 @@ class WarehouseItemController {
     @PostMapping("/dashboard/warehouse/items/quick-add")
     String quickAddWarehouseItem(@RequestParam String manufacturerCode, @RequestParam double cost,
                                  @RequestParam int qty, @RequestParam FulfilmentStatus status,
-                                 @RequestParam String supplier, Model model, Locale locale,
-                                 RedirectAttributes redirectAttributes) {
+                                 @RequestParam String supplier, @RequestParam(required = false) String customSupplier,
+                                 Model model, Locale locale, RedirectAttributes redirectAttributes) {
+        SupplierChoice.Resolution resolution = supplierChoice.resolve(
+                storesRepository.findById(getStoreId()), supplier, customSupplier);
+        if (!resolution.accepted()) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage(resolution.errorCode(), resolution.errorArgs(), locale));
+            return "redirect:/dashboard/warehouse";
+        }
+        supplier = resolution.identity();
         String mfn = UnifiedProductIdentifiers.unifyMfn(manufacturerCode);
         Taxonomy taxonomy = taxonomyCache.findByMfn(mfn);
 
