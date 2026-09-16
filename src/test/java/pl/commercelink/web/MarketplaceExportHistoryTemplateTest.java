@@ -299,7 +299,7 @@ class MarketplaceExportHistoryTemplateTest {
     private String renderMarketplacesPage() {
         WebContext context = webContext();
         context.setVariable("sectionRows", List.of(
-                new MarketplaceIntegrationView("allegro", "Allegro", true, true, null, null, null)));
+                new MarketplaceIntegrationView("allegro", "Allegro", true, true, null, new MarketplaceIntegrationView.ImportScheduleView(null), new MarketplaceIntegrationView.ImportScheduleView(null), true)));
         context.setVariable("sectionAddDisabled", false);
         context.setVariable("sectionSuccessMessage", null);
         context.setVariable("sectionMarketplacesWithStoredConfig", "allegro");

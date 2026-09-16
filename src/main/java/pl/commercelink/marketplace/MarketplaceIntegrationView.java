@@ -12,26 +12,22 @@ public record MarketplaceIntegrationView(
         boolean connected,
         boolean deviceAuth,
         LocalDateTime lastFetchedAt,
-        String ordersImportSchedule,
-        String returnsImportSchedule) {
-
-    public boolean hasOwnSchedule() {
-        return isNotBlank(ordersImportSchedule);
-    }
-
-    public PollingScheduleDescription scheduleDescription() {
-        return PollingScheduleDescription.of(ordersImportSchedule);
-    }
-
-    public boolean hasOwnReturnsSchedule() {
-        return isNotBlank(returnsImportSchedule);
-    }
-
-    public PollingScheduleDescription returnsScheduleDescription() {
-        return PollingScheduleDescription.of(returnsImportSchedule);
-    }
+        ImportScheduleView orders,
+        ImportScheduleView returns,
+        boolean supportsReturns) {
 
     public boolean hasFetched() {
         return lastFetchedAt != null;
+    }
+
+    public record ImportScheduleView(String expression) {
+
+        public boolean hasOwn() {
+            return isNotBlank(expression);
+        }
+
+        public PollingScheduleDescription description() {
+            return PollingScheduleDescription.of(expression);
+        }
     }
 }

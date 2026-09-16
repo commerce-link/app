@@ -36,10 +36,10 @@ import static org.mockito.Mockito.when;
 @MockitoSettings(strictness = Strictness.LENIENT)
 class MarketplaceConnectionServiceTest {
 
-    private static final MarketplaceProviderDescriptor ALLEGRO = descriptor("Allegro", "Allegro.pl",
+    private static final MarketplaceProviderDescriptor ALLEGRO = descriptor("Allegro", "Allegro.pl", false,
             new ProviderField("clientId", "Client ID", ProviderField.FieldType.TEXT, true, ""),
             new ProviderField("clientSecret", "Client Secret", ProviderField.FieldType.PASSWORD, true, ""));
-    private static final MarketplaceProviderDescriptor EMPIK = descriptor("Empik", "EmpikPlace",
+    private static final MarketplaceProviderDescriptor EMPIK = descriptor("Empik", "EmpikPlace", true,
             new ProviderField("apiKey", "API Key", ProviderField.FieldType.PASSWORD, true, ""));
 
     @Mock
@@ -370,6 +370,31 @@ class MarketplaceConnectionServiceTest {
     }
 
     @Test
+    void aMarketplaceWithoutAReturnsApiGetsNoReturnsScheduleAndItsReturnsCronIsIgnored() {
+        // when
+        MarketplaceConnectionService.ConnectionUpdateResult result = service.connectOrUpdate(
+                store, "Allegro", Map.of("clientId", "id", "clientSecret", "s"), "", "not a cron");
+
+        // then
+        assertThat(result.hasErrors()).isFalse();
+        verify(returnsImportScheduler, never()).apply(any(), any(), any());
+        assertThat(store.getMarketplaceIntegration("Allegro").getReturnsImportSchedule()).isNull();
+    }
+
+    @Test
+    void disconnectingAMarketplaceWithoutAReturnsApiLeavesTheReturnsSchedulerAlone() {
+        // given
+        store.getMarketplaces().add(new MarketplaceIntegration("Allegro"));
+
+        // when
+        service.disconnect(store, "Allegro");
+
+        // then
+        verify(returnsImportScheduler, never()).delete(any(), any());
+        verify(ordersImportScheduler).delete("store-1", "Allegro");
+    }
+
+    @Test
     void theReturnsDefaultIntervalComesFromItsScheduler() {
         // given
         when(returnsImportScheduler.defaultIntervalMinutes()).thenReturn(60);
@@ -467,10 +492,12 @@ class MarketplaceConnectionServiceTest {
         assertThat(views.get(0).displayName()).isEqualTo("Allegro.pl");
         assertThat(views.get(0).deviceAuth()).isTrue();
         assertThat(views.get(0).connected()).isFalse();
-        assertThat(views.get(0).hasOwnSchedule()).isFalse();
-        assertThat(views.get(1).hasOwnSchedule()).isTrue();
-        assertThat(views.get(1).scheduleDescription().code()).isEqualTo("store.supplier.schedule.summary.every.minutes");
-        assertThat(views.get(1).hasOwnReturnsSchedule()).isFalse();
+        assertThat(views.get(0).orders().hasOwn()).isFalse();
+        assertThat(views.get(1).orders().hasOwn()).isTrue();
+        assertThat(views.get(1).orders().description().code()).isEqualTo("store.supplier.schedule.summary.every.minutes");
+        assertThat(views.get(1).returns().hasOwn()).isFalse();
+        assertThat(views.get(0).supportsReturns()).isFalse();
+        assertThat(views.get(1).supportsReturns()).isTrue();
     }
 
     @Test
@@ -500,11 +527,17 @@ class MarketplaceConnectionServiceTest {
         assertThat(service.marketplacesWithStoredConfiguration(store)).containsExactly("Allegro");
     }
 
-    private static MarketplaceProviderDescriptor descriptor(String name, String displayName, ProviderField... fields) {
+    private static MarketplaceProviderDescriptor descriptor(String name, String displayName, boolean supportsReturns,
+                                                            ProviderField... fields) {
         return new MarketplaceProviderDescriptor() {
             @Override
             public String name() {
                 return name;
+            }
+
+            @Override
+            public boolean supportsReturns() {
+                return supportsReturns;
             }
 
             @Override

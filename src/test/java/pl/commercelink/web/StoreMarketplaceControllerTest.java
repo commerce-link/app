@@ -59,7 +59,8 @@ class StoreMarketplaceControllerTest {
         when(messageSource.getMessage(any(String.class), any(), any(Locale.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
         when(marketplaceConnectionService.views(store)).thenReturn(List.of(
-                new MarketplaceIntegrationView("Empik", "EmpikPlace", true, false, null, "0/15 * * * ? *", null)));
+                new MarketplaceIntegrationView("Empik", "EmpikPlace", true, false, null,
+                        new MarketplaceIntegrationView.ImportScheduleView("0/15 * * * ? *"), new MarketplaceIntegrationView.ImportScheduleView(null), true)));
         when(marketplaceConnectionService.availableMarketplaces(store)).thenReturn(List.of());
         when(marketplaceConnectionService.marketplacesWithStoredConfiguration(store)).thenReturn(Set.of("Empik"));
         when(marketplaceConnectionService.defaultIntervalMinutes()).thenReturn(10);

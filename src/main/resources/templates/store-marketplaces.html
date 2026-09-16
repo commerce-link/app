@@ -39,7 +39,8 @@
                             <input type="hidden" name="marketplace" id="marketplace-name-hidden" disabled />
 
                             <div th:each="descriptor : ${allMarketplaces}"
-                                 th:id="'marketplace-fields-' + ${descriptor.name()}" class="marketplace-fields">
+                                 th:id="'marketplace-fields-' + ${descriptor.name()}" class="marketplace-fields"
+                                 th:attr="data-supports-returns=${descriptor.supportsReturns()}">
                                 <div class="field" th:each="cf : ${descriptor.configurationFields()}">
                                     <label class="label">
                                         <span th:text="${cf.label()}"></span>
@@ -118,7 +119,8 @@
             var hiddenName = document.getElementById('marketplace-name-hidden');
             var title = document.getElementById('marketplace-modal-title');
             var schedule = form.querySelector('#marketplace-orders-schedule .schedule-field');
-            var returnsSchedule = form.querySelector('#marketplace-returns-schedule .schedule-field');
+            var returnsWrap = document.getElementById('marketplace-returns-schedule');
+            var returnsSchedule = returnsWrap.querySelector('.schedule-field');
             var submitInFlight = false;
 
             function applySectionSwap(html) {
@@ -159,8 +161,15 @@
                 return selectWrap.classList.contains('is-hidden') ? hiddenName.value : select.value;
             }
 
+            function supportsReturns(name) {
+                var group = document.getElementById('marketplace-fields-' + name);
+                return !!(group && group.getAttribute('data-supports-returns') === 'true');
+            }
+
             function refreshFields() {
                 var name = activeName();
+                returnsWrap.classList.toggle('is-hidden', !supportsReturns(name));
+                returnsSchedule.querySelector('.schedule-input').disabled = !supportsReturns(name);
                 var root = section.firstElementChild;
                 var stored = (root && root.getAttribute('data-marketplaces-with-stored-config') || '')
                         .split(';').filter(function (s) { return s.length > 0; });
@@ -264,7 +273,7 @@
             form.addEventListener('submit', function (event) {
                 event.preventDefault();
                 if (submitInFlight) { return; }
-                if (!window.scheduleField.valid(schedule) || !window.scheduleField.valid(returnsSchedule)) {
+                if (!window.scheduleField.valid(schedule) || (supportsReturns(activeName()) && !window.scheduleField.valid(returnsSchedule))) {
                     formError.innerHTML = '<div class="notification is-danger is-light"></div>';
                     formError.firstElementChild.textContent = scheduleIncompleteMessage;
                     return;
