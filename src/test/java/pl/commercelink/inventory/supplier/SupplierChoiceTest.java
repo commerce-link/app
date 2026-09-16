@@ -61,6 +61,37 @@ class SupplierChoiceTest {
     }
 
     @Test
+    void customNameWithSpaceIsRejectedAsInvalid() {
+        // when
+        SupplierChoice.Resolution resolution = choice.resolve(store(), SupplierChoice.CUSTOM, "HURT ABC");
+
+        // then
+        assertThat(resolution.accepted()).isFalse();
+        assertThat(resolution.errorCode()).isEqualTo("order.item.assign.supplier.custom.invalid");
+        assertThat(resolution.errorArgs()).containsExactly("HURT ABC");
+    }
+
+    @Test
+    void customNameWithSpecialCharacterIsRejectedAsInvalid() {
+        // when
+        SupplierChoice.Resolution resolution = choice.resolve(store(), SupplierChoice.CUSTOM, "HURT.ABC/1");
+
+        // then
+        assertThat(resolution.accepted()).isFalse();
+        assertThat(resolution.errorCode()).isEqualTo("order.item.assign.supplier.custom.invalid");
+    }
+
+    @Test
+    void customNameWithLettersDigitsUnderscoreAndDashIsAccepted() {
+        // when
+        SupplierChoice.Resolution resolution = choice.resolve(store(), SupplierChoice.CUSTOM, "Hurt_ABC-2ł");
+
+        // then
+        assertThat(resolution.accepted()).isTrue();
+        assertThat(resolution.identity()).isEqualTo("Hurt_ABC-2ł");
+    }
+
+    @Test
     void customNameEqualToAnEnabledConnectionIdentityResolvesToThatConnection() {
         // when
         SupplierChoice.Resolution resolution = choice.resolve(store(connection("Acme-k7f3a9c2", true)), SupplierChoice.CUSTOM, "Acme-k7f3a9c2");

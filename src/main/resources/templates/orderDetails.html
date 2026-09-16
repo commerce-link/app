@@ -601,7 +601,9 @@
                         </div>
                         <div class="control mt-2" id="quickAssignCustomSupplierControl" style="display: none;">
                             <input class="input" type="text" id="quickAssignCustomSupplier" name="customSupplier"
-                                   autocomplete="off" th:placeholder="#{order.item.supplier.custom.placeholder}"/>
+                                   autocomplete="off" pattern="[\p{L}\p{N}_\-]+"
+                                   th:placeholder="#{order.item.supplier.custom.placeholder}"
+                                   th:title="#{order.item.supplier.custom.format}"/>
                             <p class="help" th:text="#{order.item.supplier.custom.hint}"></p>
                         </div>
                     </div>

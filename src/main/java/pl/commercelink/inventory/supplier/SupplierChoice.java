@@ -6,21 +6,20 @@ import org.springframework.stereotype.Component;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoreSupplierConnection;
 
-/**
- * Resolves the supplier an operator assigns to an order item. The select posts a connection identity;
- * the "other supplier" option posts {@link #CUSTOM} plus a typed name. A typed name becomes the delivery
- * provider verbatim and, with no connection behind it, doubles as the counterparty shortcut in the
- * invoicing system (see {@code CounterpartyShortcuts}), so it may be anything except a name that would
- * collide with a connection identity or a supplier the store should connect instead.
- */
+import java.util.regex.Pattern;
+
 @Component
 @RequiredArgsConstructor
 public class SupplierChoice {
 
     public static final String CUSTOM = "__custom__";
+    public static final String CUSTOM_NAME_PATTERN = "[\\p{L}\\p{N}_\\-]+";
+
+    private static final Pattern CUSTOM_NAME = Pattern.compile("^" + CUSTOM_NAME_PATTERN + "$");
 
     private static final String UNKNOWN = "order.item.assign.supplier.unknown";
     private static final String REQUIRED = "order.item.assign.supplier.custom.required";
+    private static final String INVALID = "order.item.assign.supplier.custom.invalid";
     private static final String INTEGRATED = "order.item.assign.supplier.integrated";
     private static final String RESERVED = "order.item.assign.supplier.reserved";
 
@@ -53,6 +52,9 @@ public class SupplierChoice {
         }
         if (SupplierIdentity.hasToken(name) || SupplierIdentity.isManual(name)) {
             return Resolution.rejected(UNKNOWN);
+        }
+        if (!CUSTOM_NAME.matcher(name).matches()) {
+            return Resolution.rejected(INVALID, name);
         }
         if (name.equalsIgnoreCase(SupplierRegistry.WAREHOUSE)) {
             return Resolution.rejected(RESERVED, name);
