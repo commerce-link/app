@@ -5,12 +5,15 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import pl.commercelink.inventory.supplier.ErrorMessage;
 import pl.commercelink.marketplace.api.MarketplaceProviderDescriptor;
+import pl.commercelink.notifications.StoreNotificationService;
 import pl.commercelink.provider.ProviderConfigurationManager;
 import pl.commercelink.provider.api.ProviderField;
 import pl.commercelink.scheduling.InvalidScheduleException;
 import pl.commercelink.scheduling.PollingSchedule;
 import pl.commercelink.stores.MarketplaceIntegration;
 import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoreNotification;
+import pl.commercelink.stores.StoreNotificationType;
 import pl.commercelink.stores.StoresRepository;
 
 import java.util.ArrayDeque;
@@ -38,6 +41,7 @@ public class MarketplaceConnectionService {
     private final ProviderConfigurationManager configurationManager;
     private final MarketplaceOrdersImportScheduler ordersImportScheduler;
     private final MarketplaceReturnsImportScheduler returnsImportScheduler;
+    private final StoreNotificationService notificationService;
     private final int minIntervalMinutes;
 
     public MarketplaceConnectionService(StoresRepository storesRepository,
@@ -45,12 +49,14 @@ public class MarketplaceConnectionService {
                                         ProviderConfigurationManager configurationManager,
                                         MarketplaceOrdersImportScheduler ordersImportScheduler,
                                         MarketplaceReturnsImportScheduler returnsImportScheduler,
+                                        StoreNotificationService notificationService,
                                         @Value("${scheduling.min-interval-minutes}") int minIntervalMinutes) {
         this.storesRepository = storesRepository;
         this.providerFactory = providerFactory;
         this.configurationManager = configurationManager;
         this.ordersImportScheduler = ordersImportScheduler;
         this.returnsImportScheduler = returnsImportScheduler;
+        this.notificationService = notificationService;
         this.minIntervalMinutes = minIntervalMinutes;
     }
 
@@ -123,13 +129,13 @@ public class MarketplaceConnectionService {
             return ConnectionUpdateResult.errors(errors);
         }
 
+        boolean requiresDeviceAuth = providerFactory.deviceAuthProviders().contains(marketplace);
         Deque<Runnable> compensations = new ArrayDeque<>();
         try {
             rememberSecret(store, descriptor, compensations);
             providerFactory.saveConfiguration(store, marketplace, submitted);
             boolean created = store.getMarketplaceIntegration(marketplace) == null;
-            MarketplaceIntegration integration = store.connectMarketplace(
-                    marketplace, providerFactory.deviceAuthProviders().contains(marketplace));
+            MarketplaceIntegration integration = store.connectMarketplace(marketplace, requiresDeviceAuth);
             if (created || !Objects.equals(normalizedSchedule, integration.getOrdersImportSchedule())) {
                 rememberOrdersSchedule(store.getStoreId(), marketplace, compensations);
                 ordersImportScheduler.apply(store.getStoreId(), marketplace, normalizedSchedule);
@@ -146,6 +152,9 @@ public class MarketplaceConnectionService {
                     marketplace, store.getStoreId(), e);
             compensate(compensations);
             return ConnectionUpdateResult.errors(UPDATE_FAILED);
+        }
+        if (!requiresDeviceAuth) {
+            clearExpiredConnectionNotification(store.getStoreId(), marketplace);
         }
         return ConnectionUpdateResult.ok();
     }
@@ -174,7 +183,19 @@ public class MarketplaceConnectionService {
             compensate(compensations);
             return ConnectionUpdateResult.errors(UPDATE_FAILED);
         }
+        clearExpiredConnectionNotification(store.getStoreId(), marketplace);
         return ConnectionUpdateResult.ok();
+    }
+
+    // runs after the store is saved and outside the compensations: a stale warning is not worth undoing a saved connection
+    private void clearExpiredConnectionNotification(String storeId, String marketplace) {
+        try {
+            notificationService.resolve(storeId, StoreNotificationType.UNAUTHENTICATED,
+                    StoreNotification.marketplaceConnectionObject(marketplace));
+        } catch (RuntimeException e) {
+            log.warn("Clearing the expired connection notification of marketplace {} in store {} failed",
+                    marketplace, storeId, e);
+        }
     }
 
     private void rememberSecret(Store store, MarketplaceProviderDescriptor descriptor, Deque<Runnable> compensations) {

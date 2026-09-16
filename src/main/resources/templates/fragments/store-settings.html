@@ -1,0 +1,23 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<th:block th:fragment="sections(sections)">
+    <section th:each="section : ${sections}" class="cl-settings-section"
+             th:attr="aria-labelledby=${'settings-group-' + sectionStat.index}">
+        <h2 class="cl-settings-section-title" th:id="${'settings-group-' + sectionStat.index}"
+            th:text="#{${section.messageKey()}}"></h2>
+        <ul class="cl-tile-grid">
+            <li th:each="item : ${section.tiles()}">
+                <a class="cl-tile" th:href="@{${item.href()}}">
+                    <span class="cl-tile-icon" aria-hidden="true"><i class="fas" th:classappend="${item.tile().icon()}"></i></span>
+                    <span class="cl-tile-title" th:text="#{${item.tile().titleKey()}}"></span>
+                    <span class="cl-tile-desc" th:text="#{${item.tile().descriptionKey()}}"></span>
+                </a>
+            </li>
+        </ul>
+    </section>
+</th:block>
+
+</body>
+</html>

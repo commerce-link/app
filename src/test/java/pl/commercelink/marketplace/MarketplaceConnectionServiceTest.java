@@ -8,12 +8,14 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import pl.commercelink.inventory.supplier.ErrorMessage;
+import pl.commercelink.notifications.StoreNotificationService;
 import pl.commercelink.marketplace.api.MarketplaceProvider;
 import pl.commercelink.marketplace.api.MarketplaceProviderDescriptor;
 import pl.commercelink.provider.ProviderConfigurationManager;
 import pl.commercelink.provider.api.ProviderField;
 import pl.commercelink.stores.MarketplaceIntegration;
 import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoreNotificationType;
 import pl.commercelink.stores.StoresRepository;
 
 import java.util.HashMap;
@@ -50,6 +52,8 @@ class MarketplaceConnectionServiceTest {
     private MarketplaceOrdersImportScheduler ordersImportScheduler;
     @Mock
     private MarketplaceReturnsImportScheduler returnsImportScheduler;
+    @Mock
+    private StoreNotificationService notificationService;
 
     private MarketplaceConnectionService service;
     private Store store;
@@ -57,7 +61,7 @@ class MarketplaceConnectionServiceTest {
     @BeforeEach
     void setUp() {
         service = new MarketplaceConnectionService(storesRepository, providerFactory, configurationManager,
-                ordersImportScheduler, returnsImportScheduler, 5);
+                ordersImportScheduler, returnsImportScheduler, notificationService, 5);
         store = new Store();
         store.setStoreId("store-1");
         when(providerFactory.availableProviders()).thenReturn(List.of(ALLEGRO, EMPIK));
@@ -372,6 +376,78 @@ class MarketplaceConnectionServiceTest {
 
         // when / then
         assertThat(service.returnsDefaultIntervalMinutes()).isEqualTo(60);
+    }
+
+    @Test
+    void resavingCredentialsOfAMarketplaceWithoutDeviceAuthClearsItsExpiredConnectionNotificationAfterTheSave() {
+        // given
+        store.getMarketplaces().add(new MarketplaceIntegration("Empik"));
+
+        // when
+        MarketplaceConnectionService.ConnectionUpdateResult result = service.connectOrUpdate(
+                store, "Empik", Map.of("apiKey", "fresh"), "", "");
+
+        // then
+        assertThat(result.hasErrors()).isFalse();
+        assertThat(store.getMarketplaceIntegration("Empik").isLoggedIn()).isTrue();
+        var order = inOrder(storesRepository, notificationService);
+        order.verify(storesRepository).save(store);
+        order.verify(notificationService).resolve("store-1", StoreNotificationType.UNAUTHENTICATED, "empik_marketplace");
+    }
+
+    @Test
+    void resavingCredentialsOfADeviceAuthMarketplaceKeepsTheNotificationUntilItIsAuthorizedAgain() {
+        // given
+        store.getMarketplaces().add(new MarketplaceIntegration("Allegro"));
+
+        // when
+        service.connectOrUpdate(store, "Allegro", Map.of("clientId", "id", "clientSecret", "s"), "", "");
+
+        // then
+        verify(notificationService, never()).resolve(any(), any(), any());
+    }
+
+    @Test
+    void disconnectingClearsTheExpiredConnectionNotificationAfterTheSave() {
+        // given
+        store.getMarketplaces().add(new MarketplaceIntegration("Allegro"));
+
+        // when
+        service.disconnect(store, "Allegro");
+
+        // then
+        var order = inOrder(storesRepository, notificationService);
+        order.verify(storesRepository).save(store);
+        order.verify(notificationService).resolve("store-1", StoreNotificationType.UNAUTHENTICATED, "allegro_marketplace");
+    }
+
+    @Test
+    void aFailedSaveLeavesTheNotificationInPlace() {
+        // given
+        store.getMarketplaces().add(new MarketplaceIntegration("Empik"));
+        doThrow(new RuntimeException("dynamo down")).when(storesRepository).save(store);
+
+        // when
+        service.connectOrUpdate(store, "Empik", Map.of("apiKey", "fresh"), "", "");
+        service.disconnect(store, "Empik");
+
+        // then
+        verify(notificationService, never()).resolve(any(), any(), any());
+    }
+
+    @Test
+    void aNotificationThatCannotBeClearedDoesNotTurnASavedConnectionIntoAFailure() {
+        // given
+        store.getMarketplaces().add(new MarketplaceIntegration("Empik"));
+        doThrow(new RuntimeException("dynamo down")).when(notificationService).resolve(any(), any(), any());
+
+        // when
+        MarketplaceConnectionService.ConnectionUpdateResult result = service.connectOrUpdate(
+                store, "Empik", Map.of("apiKey", "fresh"), "", "");
+
+        // then
+        assertThat(result.hasErrors()).isFalse();
+        verify(configurationManager, never()).restore(any(), anyString(), any());
     }
 
     @Test
