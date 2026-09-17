@@ -299,12 +299,13 @@ class MarketplaceExportHistoryTemplateTest {
     private String renderMarketplacesPage() {
         WebContext context = webContext();
         context.setVariable("sectionRows", List.of(
-                new MarketplaceIntegrationView("allegro", "Allegro", true, true, null, null)));
+                new MarketplaceIntegrationView("allegro", "Allegro", true, true, null, new MarketplaceIntegrationView.ImportScheduleView(null), new MarketplaceIntegrationView.ImportScheduleView(null), true)));
         context.setVariable("sectionAddDisabled", false);
         context.setVariable("sectionSuccessMessage", null);
         context.setVariable("sectionMarketplacesWithStoredConfig", "allegro");
         context.setVariable("sectionBasePath", "/dashboard/store");
         context.setVariable("sectionDefaultIntervalMinutes", 10);
+        context.setVariable("sectionReturnsDefaultIntervalMinutes", 60);
         context.setVariable("basePath", "/dashboard/store");
         context.setVariable("allMarketplaces", List.of());
         context.setVariable("marketplaceConfigurations", Map.of());

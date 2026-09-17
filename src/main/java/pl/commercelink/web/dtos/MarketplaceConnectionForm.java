@@ -8,6 +8,7 @@ public class MarketplaceConnectionForm {
     private String marketplace;
     private Map<String, String> configuration = new HashMap<>();
     private String schedule;
+    private String returnsSchedule;
 
     public String getMarketplace() {
         return marketplace;
@@ -31,5 +32,13 @@ public class MarketplaceConnectionForm {
 
     public void setSchedule(String schedule) {
         this.schedule = schedule;
+    }
+
+    public String getReturnsSchedule() {
+        return returnsSchedule;
+    }
+
+    public void setReturnsSchedule(String returnsSchedule) {
+        this.returnsSchedule = returnsSchedule;
     }
 }
