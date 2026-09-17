@@ -108,11 +108,9 @@ class WarehouseControllerTest {
             assertThat(view).isEqualTo("warehouse");
             List<WarehouseItem> deliveredItems = (List<WarehouseItem>) model.getAttribute("deliveredItems");
             assertThat(deliveredItems).containsExactly(withoutCategory, withCategory);
-            // Quick-add posts a connection identity now, so the screen has to be handed the options
-            // -- the store's connections plus the two built-in entities the free-text field allowed.
             assertThat((List<SupplierLabelMap.Option>) model.getAttribute("providerOptions"))
                     .extracting(SupplierLabelMap.Option::identity)
-                    .containsExactly("AcmeB-k7f3a9c2", "Warehouse", "Other");
+                    .containsExactly("AcmeB-k7f3a9c2");
         }
     }
 

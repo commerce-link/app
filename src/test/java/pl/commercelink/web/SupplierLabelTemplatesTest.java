@@ -58,14 +58,15 @@ class SupplierLabelTemplatesTest {
     @Test
     void orderRmaAndDeliveryFiltersUseSelectsOfConnections() throws Exception {
         // when / then
-        assertThat(template("orderDetails.html")).contains("id=\"quickAssignSupplier\" name=\"supplier\"")
-                .contains("th:each=\"option : ${assignableSuppliers}\"")
-                .doesNotContain("type=\"text\" id=\"quickAssignSupplier\"")
+        assertThat(template("orderDetails.html"))
+                .contains("fragments/supplier-choice :: field('quickAssignSupplier', ${assignableSuppliers}, true)");
+        assertThat(template("fragments/supplier-choice.html")).contains("name=\"supplier\"")
+                .contains("th:each=\"option : ${options}\"")
                 // "other supplier" reveals a text field for a supplier that is not connected to the store;
                 // the option value is a literal (Thymeleaf 3.1 forbids T() here), so keep it in sync with the constant
                 .contains("value=\"" + SupplierChoice.CUSTOM + "\"")
                 .contains("data-custom=\"" + SupplierChoice.CUSTOM + "\"")
-                .contains("id=\"quickAssignCustomSupplier\" name=\"customSupplier\"")
+                .contains("name=\"customSupplier\"")
                 .contains("order.item.supplier.custom.hint");
         assertThat(template("deliveries.html")).contains("<select name=\"provider\"")
                 .contains("th:each=\"option : ${providerOptions}\"")
@@ -78,9 +79,8 @@ class SupplierLabelTemplatesTest {
                 .contains("supplierLabels.of(searchParams.provider)");
         assertThat(template("rma-center-form.html")).contains("th:each=\"option : ${providerOptions}\"");
         assertThat(template("rma-centers.html")).contains("supplierLabels.of(center.provider)");
-        assertThat(template("warehouse.html")).contains("<select id=\"quickAddSupplier\" name=\"supplier\"")
-                .contains("th:each=\"option : ${providerOptions}\"")
-                .doesNotContain("type=\"text\" id=\"quickAddSupplier\"");
+        assertThat(template("warehouse.html"))
+                .contains("fragments/supplier-choice :: field('quickAddSupplier', ${providerOptions}, false)");
     }
 
     @Test

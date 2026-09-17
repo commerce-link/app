@@ -60,7 +60,6 @@ public class StoreCopyService {
         if (source.getBranding() != null) {
             Branding branding = new Branding();
             branding.setPrimaryColor(source.getBranding().getPrimaryColor());
-            branding.setSecondaryColor(source.getBranding().getSecondaryColor());
             target.setBranding(branding);
         }
 
