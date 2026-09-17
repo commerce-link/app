@@ -19,9 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -58,39 +56,34 @@ class StoreSupplierFeedServiceTest {
         when(supplierProviderFactory.get(store, "Wortmann")).thenReturn(supplier);
 
         // when
-        boolean loaded = service.loadStoreFeed("store-1", "Wortmann");
+        service.loadStoreFeed("store-1", "Wortmann");
 
         // then
-        assertTrue(loaded);
         verify(storeFeedRepository).store("store-1", "Wortmann", data, "csv");
     }
 
     @Test
-    void doesNothingWhenStoreNotFound() throws ResourceDownloadException {
+    void failsWhenTheStoreIsGone() throws ResourceDownloadException {
         // given
         when(storesRepository.findById("missing")).thenReturn(null);
 
-        // when
-        boolean loaded = service.loadStoreFeed("missing", "Wortmann");
-
-        // then
-        assertFalse(loaded);
+        // when / then
+        assertThrows(SupplierFeedTargetMissingException.class,
+                () -> service.loadStoreFeed("missing", "Wortmann"));
         verifyNoInteractions(supplierProviderFactory);
         verify(storeFeedRepository, never()).store(anyString(), anyString(), any(byte[].class), anyString());
     }
 
     @Test
-    void doesNothingWhenNoSupplierResolved() throws ResourceDownloadException {
+    void failsWhenNoProviderIsRegistered() throws ResourceDownloadException {
         // given
         Store store = storeWithId("store-1");
         when(storesRepository.findById("store-1")).thenReturn(store);
         when(supplierProviderFactory.get(store, "Wortmann")).thenReturn(null);
 
-        // when
-        boolean loaded = service.loadStoreFeed("store-1", "Wortmann");
-
-        // then
-        assertFalse(loaded);
+        // when / then
+        assertThrows(SupplierFeedTargetMissingException.class,
+                () -> service.loadStoreFeed("store-1", "Wortmann"));
         verify(storeFeedRepository, never()).store(anyString(), anyString(), any(byte[].class), anyString());
     }
 
@@ -103,10 +96,9 @@ class StoreSupplierFeedServiceTest {
         when(supplierProviderFactory.get(store, "Wortmann")).thenReturn(supplier);
 
         // when
-        boolean loaded = service.loadStoreFeed("store-1", "Wortmann");
+        service.loadStoreFeed("store-1", "Wortmann");
 
         // then
-        assertFalse(loaded);
         verify(storeFeedRepository, never()).store(anyString(), anyString(), any(byte[].class), anyString());
     }
 
@@ -175,10 +167,9 @@ class StoreSupplierFeedServiceTest {
         when(supplierProviderFactory.getDescriptor("Wortmann")).thenReturn(null);
         when(supplierProviderFactory.get(store, "Wortmann")).thenReturn(null);
 
-        // when
-        service.loadStoreFeed("store-1", "Wortmann");
-
-        // then
+        // when / then
+        assertThrows(SupplierFeedTargetMissingException.class,
+                () -> service.loadStoreFeed("store-1", "Wortmann"));
         verify(supplierProviderFactory, never()).loadConfiguration(any(), anyString());
         verify(storeFeedRepository, never()).store(anyString(), anyString(), any(byte[].class), anyString());
     }

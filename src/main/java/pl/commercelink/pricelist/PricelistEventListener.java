@@ -1,7 +1,7 @@
 package pl.commercelink.pricelist;
 
 import io.awspring.cloud.sqs.annotation.SqsListener;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import pl.commercelink.inventory.Inventory;
@@ -15,15 +15,20 @@ import java.util.List;
 
 @Service
 @ConditionalOnProperty(name = "application.env", havingValue = "prod", matchIfMissing = false)
-@RequiredArgsConstructor
 class PricelistEventListener {
 
-    private final Inventory inventory;
-    private final PricelistRepository pricelistRepository;
-    private final PricelistEventPublisher pricelistEventPublisher;
-    private final AvailabilityAndPriceListFactory availabilityAndPriceListFactory;
-    private final SellingPriceHistoryService sellingPriceHistoryService;
-    private final ScheduledExecutionCounter scheduledExecutionCounter;
+    @Autowired
+    private Inventory inventory;
+    @Autowired
+    private PricelistRepository pricelistRepository;
+    @Autowired
+    private PricelistEventPublisher pricelistEventPublisher;
+    @Autowired
+    private AvailabilityAndPriceListFactory availabilityAndPriceListFactory;
+    @Autowired
+    private SellingPriceHistoryService sellingPriceHistoryService;
+    @Autowired
+    private ScheduledExecutionCounter scheduledExecutionCounter;
 
     @SqsListener(
             value = "catalog-pricelist-queue",

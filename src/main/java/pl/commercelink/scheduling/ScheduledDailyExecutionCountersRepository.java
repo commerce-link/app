@@ -10,8 +10,8 @@ import org.springframework.stereotype.Component;
 import pl.commercelink.starter.dynamodb.DynamoDbRepository;
 
 import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import static pl.commercelink.scheduling.ScheduledDailyExecutionCounters.DATE_ATTRIBUTE;
 import static pl.commercelink.scheduling.ScheduledDailyExecutionCounters.STORE_ID_ATTRIBUTE;
@@ -26,27 +26,26 @@ public class ScheduledDailyExecutionCountersRepository extends DynamoDbRepositor
     }
 
     public void increment(String storeId, LocalDate date, ScheduledExecution scheduledExecution, String dimension) {
-        Map<String, AttributeValue> key = Map.of(
-                STORE_ID_ATTRIBUTE, new AttributeValue().withS(storeId),
-                DATE_ATTRIBUTE, new AttributeValue().withS(formatDate(date)));
+        AttributeValue store = new AttributeValue().withS(storeId);
+        AttributeValue day = new AttributeValue().withS(formatDate(date));
 
         amazonDynamoDB.updateItem(new UpdateItemRequest()
                 .withTableName(TABLE_NAME)
-                .withKey(key)
+                .addKeyEntry(STORE_ID_ATTRIBUTE, store)
+                .addKeyEntry(DATE_ATTRIBUTE, day)
                 .withUpdateExpression("SET #counters = if_not_exists(#counters, :empty)")
-                .withExpressionAttributeNames(Map.of("#counters", scheduledExecution.getAttributeName()))
-                .withExpressionAttributeValues(Map.of(":empty", new AttributeValue().withM(Map.of()))));
+                .addExpressionAttributeNamesEntry("#counters", scheduledExecution.getAttributeName())
+                .addExpressionAttributeValuesEntry(":empty", new AttributeValue().withM(new HashMap<>())));
 
         amazonDynamoDB.updateItem(new UpdateItemRequest()
                 .withTableName(TABLE_NAME)
-                .withKey(key)
+                .addKeyEntry(STORE_ID_ATTRIBUTE, store)
+                .addKeyEntry(DATE_ATTRIBUTE, day)
                 .withUpdateExpression("SET #counters.#dimension = if_not_exists(#counters.#dimension, :zero) + :one")
-                .withExpressionAttributeNames(Map.of(
-                        "#counters", scheduledExecution.getAttributeName(),
-                        "#dimension", dimension))
-                .withExpressionAttributeValues(Map.of(
-                        ":zero", new AttributeValue().withN("0"),
-                        ":one", new AttributeValue().withN("1"))));
+                .addExpressionAttributeNamesEntry("#counters", scheduledExecution.getAttributeName())
+                .addExpressionAttributeNamesEntry("#dimension", dimension)
+                .addExpressionAttributeValuesEntry(":zero", new AttributeValue().withN("0"))
+                .addExpressionAttributeValuesEntry(":one", new AttributeValue().withN("1")));
     }
 
     public List<ScheduledDailyExecutionCounters> findAll(String storeId) {

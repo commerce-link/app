@@ -2,6 +2,7 @@ package pl.commercelink.inventory.supplier;
 
 import io.awspring.cloud.sqs.annotation.SqsListener;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import pl.commercelink.scheduling.ScheduledExecutionCounter;
@@ -13,6 +14,7 @@ import static org.apache.commons.lang3.StringUtils.isNotBlank;
 @Component
 @ConditionalOnProperty(name = "application.env", havingValue = "prod", matchIfMissing = false)
 @RequiredArgsConstructor
+@Slf4j
 public class SqsFeedLoaderEventListener {
 
     static final int MAX_CONFIGURATION_RETRIES = 5;
@@ -38,16 +40,17 @@ public class SqsFeedLoaderEventListener {
 
     private void loadStoreFeed(FeedLoaderEventPayload payload) throws Exception {
         try {
-            boolean loaded = storeSupplierFeedService.loadStoreFeed(payload.getStoreId(), payload.getSupplierName());
-            if (loaded) {
-                scheduledExecutionCounter.countCompleted(payload.getStoreId(), ScheduledExecution.SUPPLIER_FEED, payload.getSupplierName());
-            }
+            storeSupplierFeedService.loadStoreFeed(payload.getStoreId(), payload.getSupplierName());
+            scheduledExecutionCounter.countCompleted(payload.getStoreId(), ScheduledExecution.SUPPLIER_FEED, payload.getSupplierName());
         } catch (SupplierConfigurationNotReadyException e) {
             if (payload.getAttempt() >= MAX_CONFIGURATION_RETRIES) {
                 throw e;
             }
             feedScheduler.scheduleConfigurationRetry(
                     payload.getStoreId(), payload.getSupplierName(), payload.getAttempt() + 1);
+        } catch (SupplierFeedTargetMissingException e) {
+            log.error("Supplier {} feed import dropped for store {}: retrying cannot fix it",
+                    payload.getSupplierName(), payload.getStoreId(), e);
         }
     }
 

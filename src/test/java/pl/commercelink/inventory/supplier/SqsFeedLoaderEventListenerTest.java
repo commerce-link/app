@@ -67,9 +67,6 @@ class SqsFeedLoaderEventListenerTest {
 
     @Test
     void storeScopedPayloadDelegatesToStoreSupplierFeedService() throws Exception {
-        // given
-        when(storeSupplierFeedService.loadStoreFeed("store-1", "Wortmann")).thenReturn(true);
-
         // when
         listener.handleMessage(payload("Wortmann", "store-1"));
 
@@ -80,15 +77,15 @@ class SqsFeedLoaderEventListenerTest {
     }
 
     @Test
-    void aStoreFeedRunThatLoadedNothingIsNotCounted() throws Exception {
+    void aRunWhoseStoreOrProviderIsGoneIsDroppedWithoutCounting() throws Exception {
         // given
-        when(storeSupplierFeedService.loadStoreFeed("store-1", "Wortmann")).thenReturn(false);
+        doThrow(new SupplierFeedTargetMissingException("store-1", "Wortmann", "the store does not exist"))
+                .when(storeSupplierFeedService).loadStoreFeed("store-1", "Wortmann");
 
         // when
         listener.handleMessage(payload("Wortmann", "store-1"));
 
         // then
-        verify(storeSupplierFeedService).loadStoreFeed("store-1", "Wortmann");
         verifyNoInteractions(scheduledExecutionCounter);
     }
 
