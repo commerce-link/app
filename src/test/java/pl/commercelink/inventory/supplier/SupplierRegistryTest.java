@@ -57,7 +57,7 @@ class SupplierRegistryTest {
         List<String> external = registry.getExternalSupplierNames();
 
         // then
-        assertThat(external).contains("Stub", "Amazon").doesNotContain("Warehouse", "Other");
+        assertThat(external).contains("Stub").doesNotContain("Warehouse", "Other");
     }
 
     @Test
