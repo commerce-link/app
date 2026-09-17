@@ -15,7 +15,11 @@ import pl.commercelink.orders.rma.RMAItemsRepository;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.ProductRepository;
+import pl.commercelink.inventory.supplier.StoreSupplierFeedScheduler;
 import pl.commercelink.inventory.supplier.SupplierProviderFactory;
+import pl.commercelink.marketplace.MarketplaceOrdersImportScheduler;
+import pl.commercelink.marketplace.MarketplaceReturnsImportScheduler;
+import pl.commercelink.pricelist.PricelistEventScheduler;
 import pl.commercelink.scheduling.ScheduledDailyExecutionCountersRepository;
 import pl.commercelink.starter.storage.FileStorage;
 import pl.commercelink.users.CognitoUserService;
@@ -43,6 +47,10 @@ public class StoreDeletionService {
     private final CognitoUserService cognitoUserService;
     private final SupplierProviderFactory supplierProviderFactory;
     private final ScheduledDailyExecutionCountersRepository scheduledDailyExecutionCountersRepository;
+    private final MarketplaceOrdersImportScheduler ordersImportScheduler;
+    private final MarketplaceReturnsImportScheduler returnsImportScheduler;
+    private final StoreSupplierFeedScheduler feedScheduler;
+    private final PricelistEventScheduler pricelistEventScheduler;
 
     @Value("${s3.bucket.stores}")
     String storesBucket;
@@ -65,6 +73,7 @@ public class StoreDeletionService {
         if (store.getDemo() != null) {
             allSucceeded &= step(storeId, "cognito user", () -> deleteCognitoUser(store));
         }
+        allSucceeded &= step(storeId, "schedules", () -> deleteSchedules(store));
         allSucceeded &= step(storeId, "orders", () -> deleteOrders(storeId));
         allSucceeded &= step(storeId, "baskets", () -> wipeRepository.deleteAll(wipeRepository.findBaskets(storeId)));
         allSucceeded &= step(storeId, "deliveries", () -> wipeRepository.deleteAll(wipeRepository.findDeliveries(storeId)));
@@ -84,6 +93,21 @@ public class StoreDeletionService {
             System.err.println("[StoreDeletion] Store " + storeId + " kept for retry after failed steps");
         }
         return allSucceeded;
+    }
+
+    private void deleteSchedules(Store store) {
+        String storeId = store.getStoreId();
+        for (MarketplaceIntegration integration : store.getMarketplaces()) {
+            ordersImportScheduler.delete(storeId, integration.getName());
+            returnsImportScheduler.delete(storeId, integration.getName());
+        }
+        FulfilmentConfiguration fulfilment = store.getFulfilmentConfiguration();
+        if (fulfilment != null && fulfilment.getSupplierConnections() != null) {
+            fulfilment.getSupplierConnections()
+                    .forEach(connection -> feedScheduler.deleteSchedule(storeId, connection.getSupplierName()));
+        }
+        productCatalogRepository.findAll(storeId)
+                .forEach(catalog -> pricelistEventScheduler.deleteSchedule(storeId, catalog.getCatalogId()));
     }
 
     /** OWN supplier connections keep their credentials in per-store secrets that nothing else cleans up. */

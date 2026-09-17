@@ -173,7 +173,7 @@ public class MarketplaceConnectionService {
             }
             providerFactory.deleteConfiguration(store, marketplace);
             deleteSchedule(store, marketplace, ordersSchedule, compensations);
-            if (descriptor != null && descriptor.supportsReturns()) {
+            if (descriptor == null || descriptor.supportsReturns()) {
                 deleteSchedule(store, marketplace, returnsSchedule, compensations);
             }
             store.removeMarketplaceIntegration(marketplace);
