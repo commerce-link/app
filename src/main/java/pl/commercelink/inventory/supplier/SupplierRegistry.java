@@ -11,7 +11,7 @@ import java.util.TreeMap;
 
 /**
  * SupplierProvider catalog: {@link SupplierInfo} metadata for every discovered supplier plus the
- * built-in non-plugin entities (Amazon, Warehouse, Other). The list of supplier providers
+ * built-in non-plugin entities (Warehouse, Other). The list of supplier providers
  * lives in {@link SupplierProviderFactory}; this registry only owns catalog metadata.
  */
 @Component
@@ -34,9 +34,6 @@ public class SupplierRegistry {
             }
             register(info);
         }
-        register(new SupplierInfo("Amazon", SupplierType.Retailer, 1, "PL",
-                new ShippingPolicy(new ShippingTerms(2, new ShippingCostPolicy.Free())),
-                "https://www.amazon.pl/gp/your-account/order-details?ie=UTF8&orderID=%s"));
         register(new SupplierInfo("Warehouse", SupplierType.Distributor, 1, "PL",
                 new ShippingPolicy(new ShippingTerms(1, new ShippingCostPolicy.Free()))));
         register(OTHER_ENTITY);

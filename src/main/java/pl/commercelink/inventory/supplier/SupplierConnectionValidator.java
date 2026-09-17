@@ -93,7 +93,7 @@ public class SupplierConnectionValidator {
         return otherLabels.stream().anyMatch(other -> other != null && other.equalsIgnoreCase(label));
     }
 
-    // Built-in registry entries (Warehouse, Amazon, Other) and other adapters' type names would
+    // Built-in registry entries (Warehouse, Other) and other adapters' type names would
     // make the label ambiguous in every supplier select. The connection's own type stays allowed:
     // legacy OWN connections (identity = type) already carry it and the modal suggests it for the
     // first tokened instance.
