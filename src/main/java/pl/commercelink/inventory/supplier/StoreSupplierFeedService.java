@@ -1,6 +1,7 @@
 package pl.commercelink.inventory.supplier;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import pl.commercelink.inventory.supplier.api.FeedData;
 import pl.commercelink.inventory.supplier.api.SupplierProvider;
@@ -14,6 +15,7 @@ import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class StoreSupplierFeedService {
 
     private final StoresRepository storesRepository;
@@ -23,16 +25,22 @@ public class StoreSupplierFeedService {
     public boolean loadStoreFeed(String storeId, String supplierName) throws ResourceDownloadException {
         Store store = storesRepository.findById(storeId);
         if (store == null) {
+            log.warn("Supplier {} feed import skipped: store {} does not exist", supplierName, storeId);
             return false;
         }
         requireReadableConfiguration(store, supplierName);
         SupplierProvider supplier = supplierProviderFactory.get(store, supplierName);
         if (supplier == null) {
+            log.warn("Supplier {} feed import skipped store {}: no provider for this supplier", supplierName, storeId);
             return false;
         }
         Optional<FeedData> feed = supplier.download();
-        feed.ifPresent(feedData -> storeFeedRepository.store(storeId, supplierName, feedData.data(), feedData.extension()));
-        return feed.isPresent();
+        if (feed.isEmpty()) {
+            log.warn("Supplier {} feed import skipped store {}: the supplier returned no feed", supplierName, storeId);
+            return false;
+        }
+        storeFeedRepository.store(storeId, supplierName, feed.get().data(), feed.get().extension());
+        return true;
     }
 
     private void requireReadableConfiguration(Store store, String supplierName) {

@@ -19,7 +19,7 @@ import pl.commercelink.stores.IntegrationType;
 
 
 @Component
-@ConditionalOnProperty(name = "application.env", havingValue = "prod", matchIfMissing = false)
+@ConditionalOnProperty(name = "marketplace.listeners.enabled", havingValue = "true", matchIfMissing = false)
 @RequiredArgsConstructor
 public class MarketplaceOrderLifecycleEventListener {
 

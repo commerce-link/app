@@ -14,7 +14,7 @@ import java.io.IOException;
 import java.util.List;
 
 @Service
-@ConditionalOnProperty(name = "application.env", havingValue = "prod", matchIfMissing = false)
+@ConditionalOnProperty(name = "marketplace.listeners.enabled", havingValue = "true", matchIfMissing = false)
 @RequiredArgsConstructor
 class PricelistEventListener {
 

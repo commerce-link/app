@@ -12,10 +12,13 @@ public class OrderLifecycleEventPublisher {
     @Value("${application.env}")
     private String env;
 
+    @Value("${marketplace.listeners.enabled:false}")
+    private boolean marketplaceListenersEnabled;
+
     private final SqsTemplate sqsTemplate;
 
     public void publish(Order order, OrderLifecycleEventType eventType) {
-        if (!env.equals("prod")) {
+        if (!marketplaceListenersEnabled && !env.equals("prod")) {
             return;
         }
 
