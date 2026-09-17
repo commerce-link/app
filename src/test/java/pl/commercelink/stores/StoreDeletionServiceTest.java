@@ -27,9 +27,12 @@ import pl.commercelink.products.ProductRepository;
 import pl.commercelink.warehouse.builtin.WarehouseDocument;
 import pl.commercelink.warehouse.builtin.WarehouseDocumentItem;
 import pl.commercelink.inventory.supplier.SupplierProviderFactory;
+import pl.commercelink.scheduling.ScheduledDailyExecutionCounters;
+import pl.commercelink.scheduling.ScheduledDailyExecutionCountersRepository;
 import pl.commercelink.starter.storage.FileStorage;
 import pl.commercelink.users.CognitoUserService;
 
+import java.time.LocalDate;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -54,6 +57,7 @@ class StoreDeletionServiceTest {
     @Mock private StoreInventoryCache storeInventoryCache;
     @Mock private CognitoUserService cognitoUserService;
     @Mock private SupplierProviderFactory supplierProviderFactory;
+    @Mock private ScheduledDailyExecutionCountersRepository scheduledDailyExecutionCountersRepository;
 
     private StoreDeletionService service;
 
@@ -62,7 +66,7 @@ class StoreDeletionServiceTest {
         service = new StoreDeletionService(storesRepository, ordersRepository, orderItemsRepository,
                 orderEventsRepository, productCatalogRepository, productRepository, rmaCentersRepository,
                 rmaItemsRepository, wipeRepository, fileStorage, storeInventoryCache, cognitoUserService,
-                supplierProviderFactory);
+                supplierProviderFactory, scheduledDailyExecutionCountersRepository);
         service.storesBucket = "stores";
     }
 
@@ -90,6 +94,7 @@ class StoreDeletionServiceTest {
         when(wipeRepository.findEmailTemplates(STORE_ID)).thenReturn(List.of());
         when(wipeRepository.findBaskets(STORE_ID)).thenReturn(List.of());
         when(wipeRepository.findDeliveries(STORE_ID)).thenReturn(List.of());
+        when(scheduledDailyExecutionCountersRepository.findAll(STORE_ID)).thenReturn(List.of());
     }
 
     @Test
@@ -161,6 +166,8 @@ class StoreDeletionServiceTest {
         Delivery delivery = new Delivery();
         delivery.setStoreId(STORE_ID);
         when(wipeRepository.findDeliveries(STORE_ID)).thenReturn(List.of(delivery));
+        ScheduledDailyExecutionCounters counters = new ScheduledDailyExecutionCounters(STORE_ID, LocalDate.of(2026, 7, 1));
+        when(scheduledDailyExecutionCountersRepository.findAll(STORE_ID)).thenReturn(List.of(counters));
 
         // when
         boolean deleted = service.deleteDemoStore(STORE_ID);
@@ -179,6 +186,7 @@ class StoreDeletionServiceTest {
         verify(wipeRepository).deleteAll(List.of(rma));
         verify(wipeRepository).deleteAll(List.of(documentItem));
         verify(wipeRepository).deleteAll(List.of(document));
+        verify(wipeRepository).deleteAll(List.of(counters));
         verify(wipeRepository, never()).deleteAll(List.of(sharedCenter));
         verify(fileStorage).deleteAll("stores", STORE_ID + "/");
         InOrder lastStep = inOrder(storeInventoryCache, storesRepository);

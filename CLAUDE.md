@@ -133,6 +133,7 @@ All entities use `@DynamoDBTable`, `@DynamoDBHashKey`, `@DynamoDBRangeKey` annot
 | WarehouseDocumentItems | `WarehouseDocumentItem` | documentId | itemId | GSI `DeliveryIdIndex` |
 | WarehouseDocumentSequences | `WarehouseDocumentSequence` | storeId | sequenceKey | |
 | TaxonomyCategoryMappings | `CategoryMapping` | supplier | rawCategory | |
+| ScheduledDailyExecutionCounters | `ScheduledDailyExecutionCounters` | storeId | executionDate | |
 
 Mongock additionally owns `AppMigrationsHistory` and `mongockLock` (no entity classes). Product information tables (PIM index, brands, queue, category matches) live in the PIM microservice, not in the app — the app consumes the index via HTTP (`/PIM/Index`).
 
@@ -169,6 +170,31 @@ Async work is driven through `@SqsListener` methods. Queue names follow `{domain
 - Hourly: `PimCatalogRegistry` — refresh PIM caches
 - Hourly: `DemoStoreCleanupJob` — clean up demo stores
 - Hourly: `DropshipTrackingSweepScheduler` — local-only trigger for the dropship tracking sweep; in prod the trigger is instead `supplier-dropship-tracking-sweep-queue`, sent by EventBridge Scheduler with no payload and consumed by `DropshipTrackingSweepListener`
+
+### Scheduled Execution Counters
+
+Per-store schedules (orders import, returns import, supplier feed, pricelist) are billed by how often they actually ran, so every completed execution is counted in the `ScheduledDailyExecutionCounters` table. One item per store and day (`executionDate` in `yyyy-MM-dd`, day boundaries in `EventBridgeSchedules.TIMEZONE`, Europe/Warsaw) holds one counter map per `ScheduledExecution`, keyed by the integration the schedule belongs to:
+
+```
+{ storeId, executionDate: "2026-09-17",
+  ordersImport:  { Allegro: 144, Empik: 3 },   // per marketplace
+  returnsImport: { Allegro: 2 },               // per marketplace
+  supplierFeed:  { Wortmann: 1 },              // per supplier
+  pricelist:     { "catalog-1": 1 } }          // per catalog
+```
+
+`ScheduledExecutionCounter.countCompleted(...)` is called as the last step of the success path in each SQS listener, so only runs that did their work are counted:
+
+| `ScheduledExecution` | Counted in | Counted when | Not counted |
+|---|---|---|---|
+| `ORDERS_IMPORT` | `MarketplaceOrdersImportEventListener` | orders fetched and the store's `lastFetchedAt` saved | store unknown or without an active integration, no provider, fetch or import threw |
+| `RETURNS_IMPORT` | `MarketplaceReturnsImportEventListener` | returns fetched and imported | same skips as orders, plus marketplaces whose provider has no returns API, plus the `marketplace.returns.enabled=false` kill switch |
+| `SUPPLIER_FEED` | `SqsFeedLoaderEventListener` | the store feed load returned normally | global feeds (no store), configuration-not-ready retries, load threw |
+| `PRICELIST` | `PricelistEventListener` | pricelist saved and the pricelist event published | generation, save or publish threw |
+
+Manual triggers that go through the same queues (e.g. `StoreSupplierFeedScheduler.triggerImmediateImport`) count like scheduled runs; there is no way to tell them apart from the payload. Standard SQS queues are at-least-once, so a redelivered message can count a run twice; this is accepted rather than deduplicated.
+
+Increments are atomic `UpdateItem` calls in `ScheduledDailyExecutionCountersRepository` (create the type's map if absent, then add one to the dimension), so concurrent app instances never lose a count. A failed increment is logged at ERROR and swallowed: rethrowing would make SQS redeliver the message and rerun the whole import. `StoreDeletionService` wipes a store's counters. The listeners are prod-only (`application.env=prod`), so counting cannot be observed locally beyond the unit tests.
 
 ### Security
 

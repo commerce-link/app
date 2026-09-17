@@ -4,6 +4,8 @@ import io.awspring.cloud.sqs.annotation.SqsListener;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
+import pl.commercelink.scheduling.ScheduledExecutionCounter;
+import pl.commercelink.scheduling.ScheduledExecution;
 
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
@@ -18,6 +20,7 @@ public class SqsFeedLoaderEventListener {
     private final StoreSupplierFeedService storeSupplierFeedService;
     private final GlobalSupplierFeedService globalSupplierFeedService;
     private final StoreSupplierFeedScheduler feedScheduler;
+    private final ScheduledExecutionCounter scheduledExecutionCounter;
 
     @SqsListener(
             value = "supplier-feed-import-queue",
@@ -36,6 +39,7 @@ public class SqsFeedLoaderEventListener {
     private void loadStoreFeed(FeedLoaderEventPayload payload) throws Exception {
         try {
             storeSupplierFeedService.loadStoreFeed(payload.getStoreId(), payload.getSupplierName());
+            scheduledExecutionCounter.countCompleted(payload.getStoreId(), ScheduledExecution.SUPPLIER_FEED, payload.getSupplierName());
         } catch (SupplierConfigurationNotReadyException e) {
             if (payload.getAttempt() >= MAX_CONFIGURATION_RETRIES) {
                 throw e;

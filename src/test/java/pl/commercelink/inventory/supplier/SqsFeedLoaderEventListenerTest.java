@@ -9,6 +9,8 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import pl.commercelink.inventory.supplier.SqsFeedLoaderEventListener.FeedLoaderEventPayload;
 import pl.commercelink.inventory.supplier.api.support.ResourceDownloadException;
+import pl.commercelink.scheduling.ScheduledExecutionCounter;
+import pl.commercelink.scheduling.ScheduledExecution;
 
 import java.lang.reflect.Field;
 
@@ -25,6 +27,8 @@ class SqsFeedLoaderEventListenerTest {
     private GlobalSupplierFeedService globalSupplierFeedService;
     @Mock
     private StoreSupplierFeedScheduler feedScheduler;
+    @Mock
+    private ScheduledExecutionCounter scheduledExecutionCounter;
 
     @InjectMocks
     private SqsFeedLoaderEventListener listener;
@@ -58,6 +62,7 @@ class SqsFeedLoaderEventListenerTest {
         // then
         verify(globalSupplierFeedService).loadFeed("Wortmann");
         verifyNoInteractions(storeSupplierFeedService);
+        verifyNoInteractions(scheduledExecutionCounter);
     }
 
     @Test
@@ -68,6 +73,7 @@ class SqsFeedLoaderEventListenerTest {
         // then
         verify(storeSupplierFeedService).loadStoreFeed("store-1", "Wortmann");
         verify(globalSupplierFeedService, never()).loadFeed(anyString());
+        verify(scheduledExecutionCounter).countCompleted("store-1", ScheduledExecution.SUPPLIER_FEED, "Wortmann");
     }
 
     @Test
@@ -78,6 +84,7 @@ class SqsFeedLoaderEventListenerTest {
 
         // when / then
         assertThrows(Exception.class, () -> listener.handleMessage(payload("Wortmann", "store-1")));
+        verifyNoInteractions(scheduledExecutionCounter);
     }
 
     @Test
@@ -101,6 +108,7 @@ class SqsFeedLoaderEventListenerTest {
 
         // then
         verify(feedScheduler).scheduleConfigurationRetry("store-1", "Wortmann", 3);
+        verifyNoInteractions(scheduledExecutionCounter);
     }
 
     @Test
