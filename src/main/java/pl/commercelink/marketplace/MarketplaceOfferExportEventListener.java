@@ -25,7 +25,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 @Component
-@ConditionalOnProperty(name = "marketplace.listeners.enabled", havingValue = "true", matchIfMissing = false)
+@ConditionalOnProperty(name = "application.env", havingValue = "prod", matchIfMissing = false)
 @RequiredArgsConstructor
 public class MarketplaceOfferExportEventListener {
 

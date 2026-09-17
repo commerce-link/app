@@ -11,7 +11,7 @@ import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 
 @Component
-@ConditionalOnProperty(name = "marketplace.listeners.enabled", havingValue = "true", matchIfMissing = false)
+@ConditionalOnProperty(name = "application.env", havingValue = "prod", matchIfMissing = false)
 @RequiredArgsConstructor
 public class SqsFeedLoaderEventListener {
 

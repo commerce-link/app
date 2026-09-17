@@ -63,21 +63,6 @@
     <dependencies>
         <dependency>
             <groupId>pl.commercelink</groupId>
-            <artifactId>supplier-acme</artifactId>
-            <version>0.3.1</version>
-        </dependency>
-        <dependency>
-            <groupId>pl.commercelink</groupId>
-            <artifactId>pim-commercelink</artifactId>
-            <version>0.1.8</version>
-        </dependency>
-        <dependency>
-            <groupId>pl.commercelink</groupId>
-            <artifactId>marketplace-cs-cart-multivendor</artifactId>
-            <version>0.5.0</version>
-        </dependency>
-        <dependency>
-            <groupId>pl.commercelink</groupId>
             <artifactId>commercelink-commons</artifactId>
             <version>0.1.5</version>
         </dependency>

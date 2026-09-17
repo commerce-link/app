@@ -18,7 +18,7 @@ import java.util.List;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
 @Component
-@ConditionalOnProperty(name = "marketplace.listeners.enabled", havingValue = "true", matchIfMissing = false)
+@ConditionalOnProperty(name = "application.env", havingValue = "prod", matchIfMissing = false)
 @Slf4j
 @RequiredArgsConstructor
 public class MarketplaceOrdersImportEventListener {

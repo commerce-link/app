@@ -17,9 +17,6 @@ class PricelistEventPublisher {
     @Value("${application.env}")
     private String env;
 
-    @Value("${marketplace.listeners.enabled:false}")
-    private boolean marketplaceListenersEnabled;
-
     @Autowired
     private StoresRepository storesRepository;
 
@@ -30,7 +27,7 @@ class PricelistEventPublisher {
     private SqsTemplate sqsTemplate;
 
     public void publish(String storeId, String catalogId, String pricelistId) {
-        if (!marketplaceListenersEnabled && !env.equals("prod")) {
+        if (!env.equals("prod")) {
             return;
         }
 
