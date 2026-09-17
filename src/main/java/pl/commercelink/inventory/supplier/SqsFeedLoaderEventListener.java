@@ -38,8 +38,10 @@ public class SqsFeedLoaderEventListener {
 
     private void loadStoreFeed(FeedLoaderEventPayload payload) throws Exception {
         try {
-            storeSupplierFeedService.loadStoreFeed(payload.getStoreId(), payload.getSupplierName());
-            scheduledExecutionCounter.countCompleted(payload.getStoreId(), ScheduledExecution.SUPPLIER_FEED, payload.getSupplierName());
+            boolean loaded = storeSupplierFeedService.loadStoreFeed(payload.getStoreId(), payload.getSupplierName());
+            if (loaded) {
+                scheduledExecutionCounter.countCompleted(payload.getStoreId(), ScheduledExecution.SUPPLIER_FEED, payload.getSupplierName());
+            }
         } catch (SupplierConfigurationNotReadyException e) {
             if (payload.getAttempt() >= MAX_CONFIGURATION_RETRIES) {
                 throw e;

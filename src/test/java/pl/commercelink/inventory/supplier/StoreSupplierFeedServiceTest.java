@@ -19,7 +19,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -56,9 +58,10 @@ class StoreSupplierFeedServiceTest {
         when(supplierProviderFactory.get(store, "Wortmann")).thenReturn(supplier);
 
         // when
-        service.loadStoreFeed("store-1", "Wortmann");
+        boolean loaded = service.loadStoreFeed("store-1", "Wortmann");
 
         // then
+        assertTrue(loaded);
         verify(storeFeedRepository).store("store-1", "Wortmann", data, "csv");
     }
 
@@ -68,9 +71,10 @@ class StoreSupplierFeedServiceTest {
         when(storesRepository.findById("missing")).thenReturn(null);
 
         // when
-        service.loadStoreFeed("missing", "Wortmann");
+        boolean loaded = service.loadStoreFeed("missing", "Wortmann");
 
         // then
+        assertFalse(loaded);
         verifyNoInteractions(supplierProviderFactory);
         verify(storeFeedRepository, never()).store(anyString(), anyString(), any(byte[].class), anyString());
     }
@@ -83,9 +87,10 @@ class StoreSupplierFeedServiceTest {
         when(supplierProviderFactory.get(store, "Wortmann")).thenReturn(null);
 
         // when
-        service.loadStoreFeed("store-1", "Wortmann");
+        boolean loaded = service.loadStoreFeed("store-1", "Wortmann");
 
         // then
+        assertFalse(loaded);
         verify(storeFeedRepository, never()).store(anyString(), anyString(), any(byte[].class), anyString());
     }
 
@@ -98,9 +103,10 @@ class StoreSupplierFeedServiceTest {
         when(supplierProviderFactory.get(store, "Wortmann")).thenReturn(supplier);
 
         // when
-        service.loadStoreFeed("store-1", "Wortmann");
+        boolean loaded = service.loadStoreFeed("store-1", "Wortmann");
 
         // then
+        assertFalse(loaded);
         verify(storeFeedRepository, never()).store(anyString(), anyString(), any(byte[].class), anyString());
     }
 
