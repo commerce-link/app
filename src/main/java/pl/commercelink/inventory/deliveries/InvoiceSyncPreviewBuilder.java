@@ -24,6 +24,8 @@ public class InvoiceSyncPreviewBuilder {
     private DeliveriesQueryService deliveriesQueryService;
     @Autowired
     private InvoicingProviderFactory invoicingProviderFactory;
+    @Autowired
+    private CounterpartyShortcuts counterpartyShortcuts;
 
     public InvoiceSyncPreview build(String storeId, String deliveryId, String invoiceId) {
         Store store = storesRepository.findById(storeId);
@@ -67,7 +69,7 @@ public class InvoiceSyncPreviewBuilder {
         preview.setShippingCostPositionId(matcher.matchAuxiliary(delivery.getShippingCost()).orElse(null));
         preview.setPaymentCostPositionId(matcher.matchAuxiliary(delivery.getPaymentCost()).orElse(null));
         preview.setInvoiceShortcut(shortcut);
-        preview.setDeliveryProvider(delivery.getProvider());
+        preview.setDeliveryProvider(counterpartyShortcuts.forDelivery(store, delivery));
         preview.setInvoicePaid(invoice.paid());
         preview.setInvoicePaymentToDate(invoice.paymentToDate() != null ? invoice.paymentToDate().toString() : null);
         preview.setDeliveryPaid(delivery.isPaid());

@@ -12,7 +12,12 @@ import pl.commercelink.inventory.supplier.StoreFeedItemLoader;
 import pl.commercelink.inventory.supplier.SupplierProviderFactory;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
+import pl.commercelink.inventory.supplier.api.ShippingCostPolicy;
+import pl.commercelink.inventory.supplier.api.ShippingPolicy;
+import pl.commercelink.inventory.supplier.api.ShippingTerms;
+import pl.commercelink.inventory.supplier.api.SupplierInfo;
 import pl.commercelink.inventory.supplier.api.SupplierProviderDescriptor;
+import pl.commercelink.inventory.supplier.api.SupplierType;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoreSupplierConnection;
@@ -34,6 +39,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -67,6 +73,11 @@ class StoreInventoryProviderTest {
         return new InventoryItem("4711111111111", "MFN", 10.0, "PLN", 1, 1, supplier, true, true, false);
     }
 
+    private SupplierInfo supplierInfo(String name) {
+        return new SupplierInfo(name, SupplierType.Distributor, 1, "PL",
+                new ShippingPolicy(new ShippingTerms(1, new ShippingCostPolicy.Free())));
+    }
+
     @Test
     void returnsCachedEntryWithoutBuilding() {
         // given
@@ -88,8 +99,10 @@ class StoreInventoryProviderTest {
                 .thenReturn(List.of(new StoreSupplierConnection("Wortmann", ConnectionMode.OWN)));
         when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of("PLN", 1.0));
         SupplierProviderDescriptor descriptor = mock(SupplierProviderDescriptor.class);
+        when(descriptor.supplierInfo()).thenReturn(supplierInfo("Wortmann"));
         when(supplierProviderFactory.getDescriptor("Wortmann")).thenReturn(descriptor);
-        when(storeFeedItemLoader.load(eq("store-1"), eq(descriptor), any())).thenReturn(List.of(item("Wortmann")));
+        when(storeFeedItemLoader.load(eq("store-1"), eq("Wortmann"), same(descriptor), any()))
+                .thenReturn(List.of(item("Wortmann")));
         MatchedInventory matched = mock(MatchedInventory.class);
         when(matched.getInventoryKey()).thenReturn(new InventoryKey());
         when(autoDiscovery.run(anyList())).thenReturn(List.of(matched));
@@ -244,9 +257,11 @@ class StoreInventoryProviderTest {
         when(cache.get("store-1")).thenReturn(Optional.empty());
         when(exchangeRates.getCurrentSellRates()).thenReturn(Map.of());
         SupplierProviderDescriptor descriptor = mock(SupplierProviderDescriptor.class);
+        when(descriptor.supplierInfo()).thenReturn(supplierInfo("Action"));
         when(supplierProviderFactory.getDescriptor("Action")).thenReturn(descriptor);
         InventoryItem ownItem = new InventoryItem("111", "AAA", 100.0, "PLN", 5, 2, "Action", true, true, false);
-        when(storeFeedItemLoader.load(eq("store-1"), eq(descriptor), anyMap())).thenReturn(List.of(ownItem));
+        when(storeFeedItemLoader.load(eq("store-1"), eq("Action"), same(descriptor), anyMap()))
+                .thenReturn(List.of(ownItem));
         when(autoDiscovery.run(anyList())).thenAnswer(inv -> {
             List<InventoryItem> items = inv.getArgument(0);
             return List.of(new MatchedInventory(new InventoryKey("111", "AAA"), items, taxonomyCache, supplierRegistry));

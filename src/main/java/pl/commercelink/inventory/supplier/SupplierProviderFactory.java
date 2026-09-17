@@ -14,7 +14,13 @@ public class SupplierProviderFactory extends ProviderFactory<SupplierProviderDes
     }
 
     @Override
-    public String resolveCredentialName(SupplierProviderDescriptor descriptor) {
-        return descriptor.name();
+    protected String descriptorNameFor(String providerName) {
+        return SupplierIdentity.typeOf(providerName);
+    }
+
+    /** A connection's secret is keyed by its identity, so two instances of one type never share credentials. */
+    @Override
+    protected String credentialNameFor(String providerName, SupplierProviderDescriptor descriptor) {
+        return providerName;
     }
 }

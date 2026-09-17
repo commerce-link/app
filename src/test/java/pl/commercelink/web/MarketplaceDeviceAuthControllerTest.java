@@ -11,6 +11,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.ResponseEntity;
 import pl.commercelink.marketplace.MarketplaceProviderFactory;
 import pl.commercelink.marketplace.api.MarketplaceProviderDescriptor;
+import pl.commercelink.notifications.StoreNotificationService;
 import pl.commercelink.provider.api.AuthConfig;
 import pl.commercelink.rest.client.OAuth2CredentialStore;
 import pl.commercelink.rest.client.OAuth2DeviceAuthorization;
@@ -20,6 +21,7 @@ import pl.commercelink.rest.client.OAuth2Secrets;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.stores.MarketplaceIntegration;
 import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoreNotificationType;
 import pl.commercelink.stores.StoresRepository;
 
 import java.util.ArrayList;
@@ -48,6 +50,9 @@ class MarketplaceDeviceAuthControllerTest {
     private MarketplaceProviderDescriptor descriptor;
 
     @Mock
+    private StoreNotificationService notificationService;
+
+    @Mock
     private Store store;
 
     private MockedStatic<CustomSecurityContext> securityStub;
@@ -65,7 +70,7 @@ class MarketplaceDeviceAuthControllerTest {
         securityStub = mockStatic(CustomSecurityContext.class);
         securityStub.when(CustomSecurityContext::getStoreId).thenReturn("store-1");
         controller = new MarketplaceDeviceAuthController(
-                storesRepository, marketplaceProviderFactory, credentialStore, deviceAuthorizationService);
+                storesRepository, marketplaceProviderFactory, credentialStore, notificationService, deviceAuthorizationService);
     }
 
     @AfterEach
@@ -203,6 +208,7 @@ class MarketplaceDeviceAuthControllerTest {
         assertEquals(1, marketplaces.size());
         assertEquals("Allegro", marketplaces.get(0).getName());
         verify(storesRepository).save(store);
+        verify(notificationService).resolve("store-1", StoreNotificationType.UNAUTHENTICATED, "allegro_marketplace");
     }
 
     @Test
@@ -221,6 +227,7 @@ class MarketplaceDeviceAuthControllerTest {
         // then
         verify(store).markConnectionAsRestored("Allegro");
         verify(storesRepository).save(store);
+        verify(notificationService).resolve("store-1", StoreNotificationType.UNAUTHENTICATED, "allegro_marketplace");
     }
 
     @Test
@@ -237,6 +244,7 @@ class MarketplaceDeviceAuthControllerTest {
         // then
         assertEquals("PENDING", response.getBody().get("status"));
         verifyNoInteractions(storesRepository);
+        verifyNoInteractions(notificationService);
     }
 
     @Test

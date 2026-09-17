@@ -126,7 +126,7 @@
                         </div>
 
                         <div class="field" style="margin-top: 20px">
-                            <button class="button is-primary" type="submit" th:style="'background-color:' + ${branding.primaryColor}" th:text="#{general.submit}"></button>
+                            <button class="button is-primary" type="submit" th:style="${#strings.isEmpty(branding.safePrimaryColor)} ? null : 'background-color:' + ${branding.safePrimaryColor}" th:text="#{general.submit}"></button>
                         </div>
                     </form>
 

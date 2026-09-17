@@ -6,10 +6,10 @@
 
 <div layout:fragment="content">
 
-    <section class="section">
-        <div class="container">
+    <section class="cl-page">
+        <div class="cl-page-body">
 
-            <h1 class="title" th:text="#{store.marketplaces.configuration}"></h1>
+            <div th:replace="~{fragments/settings-header :: header(false, null)}"></div>
 
             <div class="box" id="marketplace-section">
                 <div th:replace="~{fragments/marketplace-section :: marketplaceSection}"></div>
@@ -39,7 +39,8 @@
                             <input type="hidden" name="marketplace" id="marketplace-name-hidden" disabled />
 
                             <div th:each="descriptor : ${allMarketplaces}"
-                                 th:id="'marketplace-fields-' + ${descriptor.name()}" class="marketplace-fields">
+                                 th:id="'marketplace-fields-' + ${descriptor.name()}" class="marketplace-fields"
+                                 th:attr="data-supports-returns=${descriptor.supportsReturns()}">
                                 <div class="field" th:each="cf : ${descriptor.configurationFields()}">
                                     <label class="label">
                                         <span th:text="${cf.label()}"></span>
@@ -64,9 +65,14 @@
                                 </div>
                             </div>
 
-                            <div class="field">
+                            <div class="field" id="marketplace-orders-schedule">
                                 <label class="label" th:text="#{store.marketplaces.column.schedule}"></label>
                                 <div th:replace="~{fragments/schedule-field :: input('schedule', '', ${scheduleMinIntervalMinutes}, #{store.marketplaces.schedule.summary.default(${sectionDefaultIntervalMinutes})}, 'minutes,hours')}"></div>
+                            </div>
+
+                            <div class="field" id="marketplace-returns-schedule">
+                                <label class="label" th:text="#{store.marketplaces.returns.column.schedule}"></label>
+                                <div th:replace="~{fragments/schedule-field :: input('returnsSchedule', '', ${scheduleMinIntervalMinutes}, #{store.marketplaces.returns.schedule.summary.default(${sectionReturnsDefaultIntervalMinutes})}, 'minutes,hours')}"></div>
                             </div>
 
                             <div class="field is-grouped mt-4">
@@ -112,7 +118,9 @@
             var selectWrap = document.getElementById('marketplace-select-wrap');
             var hiddenName = document.getElementById('marketplace-name-hidden');
             var title = document.getElementById('marketplace-modal-title');
-            var schedule = form.querySelector('.schedule-field');
+            var schedule = form.querySelector('#marketplace-orders-schedule .schedule-field');
+            var returnsWrap = document.getElementById('marketplace-returns-schedule');
+            var returnsSchedule = returnsWrap.querySelector('.schedule-field');
             var submitInFlight = false;
 
             function applySectionSwap(html) {
@@ -137,7 +145,11 @@
 
             function rowFor(name) {
                 var row = section.querySelector('tr[data-marketplace="' + name + '"]');
-                return row ? { name: name, schedule: row.getAttribute('data-orders-import-schedule') || '' } : null;
+                return row ? {
+                    name: name,
+                    schedule: row.getAttribute('data-orders-import-schedule') || '',
+                    returnsSchedule: row.getAttribute('data-returns-import-schedule') || ''
+                } : null;
             }
 
             function connectedNames() {
@@ -149,8 +161,15 @@
                 return selectWrap.classList.contains('is-hidden') ? hiddenName.value : select.value;
             }
 
+            function supportsReturns(name) {
+                var group = document.getElementById('marketplace-fields-' + name);
+                return !!(group && group.getAttribute('data-supports-returns') === 'true');
+            }
+
             function refreshFields() {
                 var name = activeName();
+                returnsWrap.classList.toggle('is-hidden', !supportsReturns(name));
+                returnsSchedule.querySelector('.schedule-input').disabled = !supportsReturns(name);
                 var root = section.firstElementChild;
                 var stored = (root && root.getAttribute('data-marketplaces-with-stored-config') || '')
                         .split(';').filter(function (s) { return s.length > 0; });
@@ -187,6 +206,7 @@
                     select.value = '';
                 }
                 window.scheduleField.sync(schedule, row ? row.schedule : '');
+                window.scheduleField.sync(returnsSchedule, row ? row.returnsSchedule : '');
                 refreshFields();
                 modal.classList.add('is-active');
             }
@@ -253,7 +273,7 @@
             form.addEventListener('submit', function (event) {
                 event.preventDefault();
                 if (submitInFlight) { return; }
-                if (!window.scheduleField.valid(schedule)) {
+                if (!window.scheduleField.valid(schedule) || (supportsReturns(activeName()) && !window.scheduleField.valid(returnsSchedule))) {
                     formError.innerHTML = '<div class="notification is-danger is-light"></div>';
                     formError.firstElementChild.textContent = scheduleIncompleteMessage;
                     return;

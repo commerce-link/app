@@ -159,6 +159,7 @@
                 <p class="heading" th:text="#{order.routed.supplier}"></p>
                 <p class="title is-5 mb-1" th:if="${routedSupplier.matched}">
                     <span th:text="${routedSupplier.supplierName}"></span>
+                    <span class="tag is-light ml-1" th:if="${routedSupplier.providerType != null and routedSupplier.providerType != 'manual'}" th:text="${routedSupplier.providerType}"></span>
                     <span class="is-size-6 has-text-grey"
                           th:text="' (' + #{${routedSupplier.modeKey}} + ', ' + #{order.routed.supplier.external.no} + ' ' + ${routedSupplier.externalSupplierId} + ')'"></span>
                 </p>
@@ -382,7 +383,8 @@
                             <span th:if="${item.manufacturerCode}" class="copyable" th:text="${item.manufacturerCode}" th:data-copy="${item.manufacturerCode}" onclick="copyToClipboard(this)"></span>
                         </td>
                         <td>
-                            <a th:if="${item.deliveryId != null}" th:href="@{${@deliveryRedirectResolver.resolveFor(order, item)}}" th:text="${item.shortenedDeliveryId}"></a>
+                            <a th:if="${item.deliveryId != null}" th:href="@{${@deliveryRedirectResolver.resolveFor(order, item)}}"
+                               th:text="${supplierLabels.has(item.deliveryId)} ? ${supplierLabels.of(item.deliveryId)} : ${item.shortenedDeliveryId}"></a>
                         </td>
                         <td>
                             <span th:if="${item.serialNo}" class="copyable truncate-serial" th:text="${item.serialNo}" th:title="${item.serialNo}" th:data-copy="${item.serialNo}" onclick="copyToClipboard(this)"></span>
@@ -582,12 +584,7 @@
                            th:attr="data-template=#{order.item.price.net.hint}"></p>
                     </div>
 
-                    <div class="field">
-                        <label class="label" th:text="#{order.item.supplier}"></label>
-                        <div class="control">
-                            <input class="input" type="text" id="quickAssignSupplier" name="supplier" required/>
-                        </div>
-                    </div>
+                    <div th:replace="~{fragments/supplier-choice :: field('quickAssignSupplier', ${assignableSuppliers}, true)}"></div>
                 </section>
 
                 <footer class="modal-card-foot">
@@ -1651,7 +1648,7 @@
                 });
             highlightQuickAssignSku();
             document.getElementById('quickAssignPrice').value = '';
-            document.getElementById('quickAssignSupplier').value = '';
+            resetSupplierChoice('quickAssignSupplier');
             document.getElementById('quickAssignPrice').setAttribute('data-tax', button.getAttribute('data-tax') || '');
             setQuickAssignPriceType('net');
             toggleQuickAssignModal(true);

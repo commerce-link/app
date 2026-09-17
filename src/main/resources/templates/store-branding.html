@@ -3,91 +3,114 @@
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
       layout:decorate="~{layout}">
 <body>
-
 <div layout:fragment="content">
+    <section class="cl-page">
+        <div class="cl-page-body">
+            <div th:replace="~{fragments/settings-header :: header(false, null)}"></div>
 
-    <section class="section">
-        <div class="container">
-
-            <h1 class="title" th:text="#{store.branding.title}"></h1>
-            
-            <form th:action="@{/dashboard/store/branding/edit}" th:object="${form}" method="post" enctype="multipart/form-data">
-
-                <input type="hidden" th:field="*{store.storeId}"/>
-
-                <!-- Branding Section -->
-                <div class="box">
-                    <h2 class="subtitle">Store Identity</h2>
-
-                    <div class="field">
-                        <label class="label" th:text="#{store.name}"></label>
-                        <div class="control">
-                            <input class="input" type="text" th:field="*{store.name}" th:placeholder="#{store.name.placeholder}">
-                        </div>
-                    </div>
-
-                    <div class="field">
-                        <label class="label" th:text="#{store.logo}"></label>
-                        <div class="field" th:if="${form.store.branding.logo != null}">
-                            <p class="help">Current logo:</p>
-                            <input class="input" type="text"
-                                   th:value="${backofficeDomain + '/StoreLogo/' + form.store.storeId}"
-                                   readonly>
-                        </div>
-                        <div class="file has-name is-fullwidth">
-                            <label class="file-label">
-                                <input class="file-input" type="file" th:field="*{logoFile}" accept="image/*"
-                                       onchange="updateFileName(this)">
-                                <span class="file-cta">
-                                    <span class="file-icon">
-                                        <i class="fas fa-upload"></i>
-                                    </span>
-                                    <span class="file-label" th:text="#{store.choose.file} + '...'"></span>
-                                </span>
-                                <span class="file-name" id="fileNameDisplay" th:text="#{store.no.file.uploaded}"></span>
-                            </label>
-                        </div>
-                    </div>
-
-                    <div class="field">
-                        <label class="label" th:text="#{store.primary.color}"></label>
-                        <div class="control">
-                            <input class="input" type="text" th:field="*{store.branding.primaryColor}" placeholder="Enter primary color code">
-                        </div>
-                        <p class="help">Use hex color codes (e.g., #3273dc)</p>
-                    </div>
-
-                    <div class="field">
-                        <label class="label" th:text="#{store.secondary.color}"></label>
-                        <div class="control">
-                            <input class="input" type="text" th:field="*{store.branding.secondaryColor}" placeholder="Enter secondary color code">
-                        </div>
-                        <p class="help">Use hex color codes (e.g., #363636)</p>
+            <form th:fragment="brandingForm" id="branding-form" class="cl-form"
+                  th:action="@{${formAction}}" th:object="${form}" method="post" enctype="multipart/form-data" novalidate
+                  data-cl-async th:attr="data-success-message=${savedMessage}, data-error-message=#{form.save.failed}">
+                <div th:if="${!errors.isEmpty()}" id="form-errors" class="cl-alert is-bad" tabindex="-1" data-cl-error-summary>
+                    <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
+                    <div>
+                        <p class="cl-alert-title" th:text="#{form.errors.title}"></p>
+                        <ul class="cl-alert-list">
+                            <li th:each="error : ${errors}">
+                                <a th:href="'#' + ${error.key}" th:text="#{${error.value}}"></a>
+                            </li>
+                        </ul>
                     </div>
                 </div>
 
-                <div class="field is-grouped">
-                    <div class="control">
-                        <button class="button is-primary" type="button" onclick="confirmSave(this)"
-                                th:text="#{general.save}"></button>
-                    </div>
-                    <div class="control">
-                        <a th:href="@{/dashboard/store}" class="button is-light">Cancel</a>
+                <div class="cl-card">
+                    <fieldset class="cl-fieldset">
+                        <legend class="cl-fieldset-title" th:text="#{store.branding.section.store}"></legend>
+                        <div class="cl-form-grid">
+                            <div class="cl-span-4" th:insert="~{fragments/form-field :: input('storeName', 'store.branding.name', *{storeName}, 'text', 'off', true, ${errors['storeName']})}"></div>
+                        </div>
+                    </fieldset>
+
+                    <fieldset class="cl-fieldset">
+                        <legend class="cl-fieldset-title" th:text="#{store.branding.section.logo}"></legend>
+                        <div class="cl-image-field" data-cl-image-field
+                             th:attr="data-max-bytes=${logoMaxBytes},
+                                      data-too-large-message=#{store.branding.logo.too.large},
+                                      data-selected-alt=#{store.branding.logo.selected.alt}">
+                            <div class="cl-image-preview" data-cl-image-preview>
+                                <img th:if="${hasLogo}" th:src="${logoUrl}" th:alt="#{store.branding.logo.current.alt}"/>
+                                <span th:unless="${hasLogo}" class="cl-image-empty" th:text="#{store.branding.logo.none}"></span>
+                            </div>
+                            <div class="cl-field" th:with="logoError=${errors['logoFile']}">
+                                <label class="cl-label" for="logoFile">
+                                    <span th:text="#{store.branding.logo.file}"></span>
+                                    <span class="cl-optional" th:text="#{form.optional}"></span>
+                                </label>
+                                <div class="cl-file-row">
+                                    <input class="cl-file" th:classappend="${logoError != null} ? 'is-invalid'"
+                                           id="logoFile" name="logoFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif"
+                                           th:attr="aria-invalid=${logoError != null ? 'true' : null},
+                                                    aria-describedby=${logoError != null ? 'logoFile-help logoFile-error' : 'logoFile-help'}"/>
+                                    <label th:if="${hasLogo}" class="cl-check">
+                                        <input type="checkbox" name="removeLogo" value="true" data-cl-image-remove th:checked="*{removeLogo}"/>
+                                        <span th:text="#{store.branding.logo.remove}"></span>
+                                    </label>
+                                </div>
+                                <p class="cl-help" id="logoFile-help" th:text="#{store.branding.logo.help}"></p>
+                                <p th:if="${logoError != null}" class="cl-field-error" id="logoFile-error">
+                                    <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                                    <span th:text="#{${logoError}}"></span>
+                                </p>
+                            </div>
+                        </div>
+                    </fieldset>
+
+                    <fieldset class="cl-fieldset">
+                        <legend class="cl-fieldset-title" th:text="#{store.branding.section.color}"></legend>
+                        <div class="cl-field" data-cl-color-field
+                             th:with="colorError=${errors['primaryColor']}, color=${form.normalizedColor}">
+                            <label class="cl-label" for="primaryColor">
+                                <span th:text="#{store.branding.color}"></span>
+                                <span class="cl-optional" th:text="#{form.optional}"></span>
+                            </label>
+                            <div class="cl-color-row">
+                                <!--/* A colour input always submits a value, so it has no name and only mirrors the text field; shown by color-field.js. */-->
+                                <input class="cl-color-picker" type="color" data-cl-color-picker hidden
+                                       th:value="${color != null ? color : '#1b4db1'}"
+                                       th:attr="aria-label=#{store.branding.color.picker}"/>
+                                <input class="cl-input cl-color-input" th:classappend="${colorError != null} ? 'is-invalid'"
+                                       id="primaryColor" name="primaryColor" type="text" th:value="*{primaryColor}"
+                                       autocomplete="off" spellcheck="false" autocapitalize="off"
+                                       th:attr="aria-invalid=${colorError != null ? 'true' : null},
+                                                aria-describedby=${colorError != null ? 'primaryColor-help primaryColor-error' : 'primaryColor-help'}"/>
+                                <!--/* The only style attribute on the page: the value comes from BrandColor.normalize, never raw input. */-->
+                                <span class="cl-brand-preview" aria-hidden="true" data-cl-brand-sample th:hidden="${color == null}"
+                                      th:style="${color != null} ? '--cl-brand: ' + ${color}">
+                                    <span class="cl-brand-preview-label" th:text="#{store.branding.color.sample}"></span>
+                                    <span class="cl-brand-sample" th:text="#{offer.payment.btn.text}"></span>
+                                </span>
+                            </div>
+                            <p class="cl-help" id="primaryColor-help" th:text="#{store.branding.color.help}"></p>
+                            <p th:if="${colorError != null}" class="cl-field-error" id="primaryColor-error">
+                                <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                                <span th:text="#{${colorError}}"></span>
+                            </p>
+                        </div>
+                    </fieldset>
+
+                    <div class="cl-card-footer">
+                        <button class="cl-button is-primary" type="submit" th:text="#{form.save.changes}"></button>
                     </div>
                 </div>
             </form>
-
         </div>
     </section>
-
+    <script th:if="${!errors.isEmpty()}">
+        document.getElementById('form-errors').focus();
+    </script>
+    <script th:src="@{/js/async-form.js}" defer></script>
+    <script th:src="@{/js/color-field.js}" defer></script>
+    <script th:src="@{/js/image-field.js}" defer></script>
 </div>
-
-<script layout:fragment="scripts">
-    function updateFileName(input) {
-        const fileName = input.files[0] ? input.files[0].name : 'No file uploaded';
-        document.getElementById('fileNameDisplay').textContent = fileName;
-    }
-</script>
-
 </body>
 </html>

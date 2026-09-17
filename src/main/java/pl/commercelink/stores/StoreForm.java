@@ -1,14 +1,11 @@
 package pl.commercelink.stores;
 
-import org.springframework.web.multipart.MultipartFile;
-
 import java.util.HashMap;
 import java.util.Map;
 
 public class StoreForm {
 
     private Store store;
-    private MultipartFile logoFile;
     private String defaultBankAccountId;
     private String shippingProvider;
     private String invoicingSoftwareProvider;
@@ -23,9 +20,6 @@ public class StoreForm {
 
     // marketplaces
     private String marketplace;
-
-    // per-supplier credentials: supplier name → (field key → value)
-    private Map<String, Map<String, String>> supplierConfiguration = new HashMap<>();
 
     public StoreForm() {
         this.providerConfiguration = new HashMap<>();
@@ -47,18 +41,6 @@ public class StoreForm {
 
     public void setStore(Store store) {
         this.store = store;
-    }
-
-    public MultipartFile getLogoFile() {
-        return logoFile;
-    }
-
-    public void setLogoFile(MultipartFile logoFile) {
-        this.logoFile = logoFile;
-    }
-
-    public boolean hasLogoFile() {
-        return logoFile != null && !logoFile.isEmpty();
     }
 
     public String getShippingProvider() {
@@ -141,11 +123,4 @@ public class StoreForm {
         this.wmsProvider = wmsProvider;
     }
 
-    public Map<String, Map<String, String>> getSupplierConfiguration() {
-        return supplierConfiguration;
-    }
-
-    public void setSupplierConfiguration(Map<String, Map<String, String>> supplierConfiguration) {
-        this.supplierConfiguration = supplierConfiguration;
-    }
 }

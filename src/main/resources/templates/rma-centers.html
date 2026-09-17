@@ -5,19 +5,14 @@
 <body>
 
 <div layout:fragment="content">
-    <section class="section">
-        <div class="container">
+    <section class="cl-page">
+        <div class="cl-page-body">
 
-            <div class="level">
-                <div class="level-left">
-                    <h1 class="title" th:text="#{rma.centers}"></h1>
-                </div>
-                <div class="level-right">
-                    <a th:href="@{/dashboard/store/rma-centers/new}" class="button is-link is-light">
-                        <span class="icon"><i class="fas fa-plus"></i></span>
-                        <span th:text="#{rma.add.new.center}"></span>
-                    </a>
-                </div>
+            <div th:replace="~{fragments/settings-header :: header(false, ~{::settingsActions})}">
+                <a th:ref="settingsActions" th:href="@{/dashboard/store/rma-centers/new}" class="button is-link is-light">
+                    <span class="icon"><i class="fas fa-plus"></i></span>
+                    <span th:text="#{rma.add.new.center}"></span>
+                </a>
             </div>
 
             <table class="table is-fullwidth is-striped is-hoverable">
@@ -37,7 +32,7 @@
 
                 <tbody>
                 <tr th:each="center : ${rmaCenters}">
-                    <td th:text="${center.provider}"></td>
+                    <td th:text="${supplierLabels.of(center.provider)}"></td>
                     <td th:text="${center.shippingDetails.companyName}"></td>
                     <td th:text="${center.shippingDetails.streetAndNumber}"></td>
                     <td th:text="${center.shippingDetails.postalCode}"></td>

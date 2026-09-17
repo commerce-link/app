@@ -9,7 +9,6 @@ import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.MessageSource;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
-import pl.commercelink.orders.BillingDetails;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.stores.Store;
@@ -137,30 +136,6 @@ class StoreShippingDetailsControllerTest {
             verify(storesRepository).save(saved.capture());
             assertThat(saved.getValue().getDefaultShippingDetails().getStreetAndNumber()).isEqualTo("ul. Druga 2");
             assertThat(saved.getValue().getShippingDetails().get(0).is_default()).isFalse();
-        }
-    }
-
-    @Test
-    void billingSaveDoesNotClearShippingDetails() {
-        // given
-        Store existing = existingStore();
-        existing.setShippingDetails(new ArrayList<>(List.of(address("Sklep", "ul. Testowa 1"))));
-        when(storesRepository.findById(STORE_ID)).thenReturn(existing);
-        Store submitted = new Store();
-        submitted.setStoreId(STORE_ID);
-        submitted.setBillingDetails(new BillingDetails());
-        StoreForm form = new StoreForm(submitted);
-
-        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
-            security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(false);
-
-            // when
-            storeController.updateBillingShippingConfiguration(form, Locale.ENGLISH, redirectAttributes);
-
-            // then
-            ArgumentCaptor<Store> saved = ArgumentCaptor.forClass(Store.class);
-            verify(storesRepository).save(saved.capture());
-            assertThat(saved.getValue().getShippingDetails()).hasSize(1);
         }
     }
 }

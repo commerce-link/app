@@ -33,8 +33,15 @@
   already stored) must be re-derived from this fresh attribute on every open instead of the
   server-rendered `required` attribute on the password input, which is frozen at the page load
   that first built the modal markup.
+
+  configurations (identity -> JSON blob of that connection's stored credential values, passwords
+  masked to blank) travels the same route, but per row rather than on the root: the modal's
+  credential inputs are grouped per supplier *type*, so two connections of one type share one group
+  and the values cannot live in it. Each row carries its own data-configuration and open(identity)
+  fills the group from that row -- otherwise editing one instance would show (and then save back)
+  the other instance's credentials.
 -->
-<div th:fragment="supplierSection(rows, manual, showMode, titleKey, addButtonId, addButtonLabelKey, addDisabled, addDisabledTitleKey, successMessage, storedConfigSuppliers)"
+<div th:fragment="supplierSection(rows, manual, showMode, titleKey, addButtonId, addButtonLabelKey, addDisabled, addDisabledTitleKey, successMessage, storedConfigSuppliers, configurations)"
      th:attr="data-success-message=${successMessage},data-show-mode=${showMode},data-suppliers-with-stored-config=${storedConfigSuppliers}">
     <div class="is-flex is-justify-content-space-between is-align-items-center mb-3">
         <h2 class="subtitle mb-0" th:text="#{${titleKey}}"></h2>
@@ -43,20 +50,20 @@
                 th:disabled="${addDisabled}"
                 th:title="${addDisabled} ? #{${addDisabledTitleKey}} : ''"></button>
     </div>
-    <div th:replace="~{fragments/supplier-table :: supplierTable(${rows}, ${manual}, ${showMode})}"></div>
+    <div th:replace="~{fragments/supplier-table :: supplierTable(${rows}, ${manual}, ${showMode}, ${configurations})}"></div>
 </div>
 
 <!-- No-argument selector for StoreFulfilmentSupplierController's async endpoints: sectionRows,
      sectionShowMode, sectionAvailableSuppliers and sectionSuccessMessage are model attributes set
      by SupplierSectionModel.renderExternalSection. -->
 <div th:fragment="externalSection"
-     th:replace="~{fragments/supplier-section :: supplierSection(${sectionRows}, false, ${sectionShowMode}, 'store.supplier.section.title', 'supplier-add-button', 'store.supplier.add.button', ${sectionAvailableSuppliers.isEmpty()}, 'store.supplier.add.none', ${sectionSuccessMessage}, ${sectionSuppliersWithStoredConfig})}"></div>
+     th:replace="~{fragments/supplier-section :: supplierSection(${sectionRows}, false, ${sectionShowMode}, 'store.supplier.section.title', 'supplier-add-button', 'store.supplier.add.button', ${sectionAvailableSuppliers.isEmpty()}, 'store.supplier.add.none', ${sectionSuccessMessage}, ${sectionSuppliersWithStoredConfig}, ${sectionConfigurations})}"></div>
 
 <!-- No-argument selector for ManualSupplierController's async endpoints: sectionRows and
      sectionSuccessMessage are model attributes set by SupplierSectionModel.renderManualSection.
      Manual suppliers have no credential fields, so there is nothing to publish here. -->
 <div th:fragment="manualSection"
-     th:replace="~{fragments/supplier-section :: supplierSection(${sectionRows}, true, false, 'store.manual.section.title', 'manual-add-button', 'store.manual.add.button', false, null, ${sectionSuccessMessage}, '')}"></div>
+     th:replace="~{fragments/supplier-section :: supplierSection(${sectionRows}, true, false, 'store.manual.section.title', 'manual-add-button', 'store.manual.add.button', false, null, ${sectionSuccessMessage}, '', null)}"></div>
 
 <!-- Small error carrier for a rejected connect/edit/save: a non-2xx status lets the page script
      tell this apart from a successful section swap, so the modal stays open with the operator's

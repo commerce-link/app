@@ -35,8 +35,7 @@ public class StoresRepository extends DynamoDbRepository<Store> {
     }
 
     public String storeLogo(String storeId, String fileName, byte[] image) {
-        // Remove current logo
-        deleteLogo(storeId);
+        removeLogo(storeId);
 
         String extension = fileImageStorage.getFileExtension(fileName);
         String location = storeId + "/logo." + extension;
@@ -53,7 +52,7 @@ public class StoresRepository extends DynamoDbRepository<Store> {
         return fileImageStorage.getMediaType(fileName);
     }
 
-    private void deleteLogo(String storeId) {
+    public void removeLogo(String storeId) {
         String location = findLogoLocationWithExtension(storeId);
         if (location == null) return;
         fileImageStorage.deleteImage(location);

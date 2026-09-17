@@ -39,7 +39,7 @@ class FeedRowProcessor {
         }
 
         if (enrichment.isPendingEligible(taxonomy)) {
-            enrichment.addPending(deprioritized, stats.supplierName());
+            enrichment.addPending(deprioritized, mappingScopeOf(stats.supplierName()));
             stats.markCategorizationScheduled();
         } else if (enrichment.hasIdentificationData(taxonomy)) {
             stats.markCategorizationPostponed();
@@ -47,5 +47,10 @@ class FeedRowProcessor {
             stats.markIncomplete();
         }
         return Optional.empty();
+    }
+
+    // Category mappings are learned per adapter type; manual feeds are distinct per connection.
+    private static String mappingScopeOf(String identity) {
+        return SupplierIdentity.isManual(identity) ? identity : SupplierIdentity.typeOf(identity);
     }
 }

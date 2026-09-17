@@ -18,7 +18,7 @@
                 <div class="level">
                     <div class="level-left">
                         <div class="level-item">
-                            <h2 class="title is-4 mb-0" th:text="${candidate.provider}"></h2>
+                            <h2 class="title is-4 mb-0" th:text="${supplierLabels.of(candidate.provider)}"></h2>
                         </div>
                         <div class="level-item">
                             <span class="has-text-grey" th:text="${candidate.orderId}"></span>
@@ -91,7 +91,7 @@
                 <div class="level">
                     <div class="level-left">
                         <div class="level-item">
-                            <h2 class="title is-4" th:text="${delivery.provider}"></h2>
+                            <h2 class="title is-4" th:text="${supplierLabels.of(delivery.provider)}"></h2>
                         </div>
                         <div class="level-item">
                             <span class="tag is-warning" th:if="${delivery.hasDirectToConsumerAllocations()}"

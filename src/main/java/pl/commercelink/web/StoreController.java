@@ -1,9 +1,11 @@
 package pl.commercelink.web;
 
+import jakarta.servlet.http.HttpServletResponse;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.MessageSource;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -11,7 +13,6 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.invoicing.InvoicingProviderFactory;
 import pl.commercelink.inventory.supplier.StoreSupplierConnectionService;
-import pl.commercelink.inventory.supplier.SupplierConnectionView;
 import pl.commercelink.inventory.supplier.SupplierConnectionViewFactory;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.provider.api.ProviderField;
@@ -27,20 +28,29 @@ import pl.commercelink.products.PimCategoryOptions;
 import pl.commercelink.shipping.ShippingProviderFactory;
 import pl.commercelink.shipping.api.Carrier;
 import pl.commercelink.shipping.api.ShippingProviderDescriptor;
+import pl.commercelink.starter.security.UserRole;
 import pl.commercelink.stores.*;
+import pl.commercelink.web.settings.SettingsPage;
+import pl.commercelink.web.settings.StoreSettingsOverviewFactory;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.web.dtos.CarrierSelectionForm;
+import pl.commercelink.web.dtos.BrandingForm;
+import pl.commercelink.web.dtos.CompanyDetailsForm;
 import pl.commercelink.web.dtos.ConnectedIntegration;
 import pl.commercelink.web.dtos.FulfilmentSettingsForm;
 import pl.commercelink.web.dtos.ParcelForm;
 import pl.commercelink.web.dtos.PrinterForm;
 
-import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
 
 @Controller
 public class StoreController {
+
+    private static final String ASYNC_FORM_HEADER = "X-Requested-With";
+    private static final String ASYNC_FORM_HEADER_VALUE = "fetch";
+    private static final String COMPANY_DETAILS_FORM_FRAGMENT = "store-company-details :: companyDetailsForm";
+    private static final String BRANDING_FORM_FRAGMENT = "store-branding :: brandingForm";
 
     @Value("${scheduling.min-interval-minutes}")
     private int scheduleMinIntervalMinutes;
@@ -72,9 +82,6 @@ public class StoreController {
     @Autowired
     private SupplierConnectionViewFactory supplierConnectionViewFactory;
 
-    @Value("${app.domain}")
-    private String appDomain;
-
     @Value("${api.domain}")
     private String apiDomain;
 
@@ -87,6 +94,9 @@ public class StoreController {
     @Autowired
     private PimCategoryOptions pimCategoryOptions;
 
+    @Autowired
+    private StoreSettingsOverviewFactory storeSettingsOverviewFactory;
+
     @GetMapping("/dashboard/store")
     @PreAuthorize("hasRole('ADMIN')")
     public String store(Model model) {
@@ -95,35 +105,37 @@ public class StoreController {
         StoreForm form = new StoreForm(store);
         model.addAttribute("form", form);
         model.addAttribute("isSuperAdmin", false);
+        model.addAttribute("overview", storeSettingsOverviewFactory.build(store, UserRole.ADMIN));
         return "store";
     }
 
     @GetMapping("/dashboard/store/branding")
     @PreAuthorize("hasRole('ADMIN')")
     public String storeBranding(Model model) {
-        return renderStoreBranding(getStoreId(), model);
+        return renderStoreBranding(getStoreId(), null, Map.of(), model);
     }
 
     @GetMapping("/dashboard/store/{storeId}/branding")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     public String superAdminStoreBranding(@PathVariable String storeId, Model model) {
-        return renderStoreBranding(storeId, model);
+        return renderStoreBranding(storeId, null, Map.of(), model);
     }
 
-    private String renderStoreBranding(String storeId, Model model) {
+    private String renderStoreBranding(String storeId, BrandingForm submitted, Map<String, String> errors, Model model) {
         Store store = storesRepository.findById(storeId);
         if (store == null) {
             model.addAttribute("error", "Store not found");
             return "error";
         }
 
-        if (store.getBranding() == null) {
-            store.setBranding(new Branding());
-        }
-        StoreForm form = new StoreForm(store);
-
-        model.addAttribute("form", form);
-        model.addAttribute("backofficeDomain", appDomain);
+        model.addAttribute("form", submitted != null ? submitted : BrandingForm.from(store));
+        model.addAttribute("errors", errors);
+        model.addAttribute("formAction", brandingPath(storeId));
+        Branding branding = store.getBranding();
+        model.addAttribute("hasLogo", branding != null && branding.getLogo() != null);
+        model.addAttribute("logoUrl", "/StoreLogo/" + storeId
+                + (branding != null && branding.getLogoVersion() != null ? "?v=" + branding.getLogoVersion() : ""));
+        model.addAttribute("logoMaxBytes", BrandingForm.LOGO_MAX_BYTES);
         return "store-branding";
     }
 
@@ -422,22 +434,23 @@ public class StoreController {
         Map<String, List<ProviderField>> supplierFields = storeSupplierConnectionService.configurationFields();
 
         StoreForm form = new StoreForm(store);
-        form.setSupplierConfiguration(storeSupplierConnectionService.configurationsForUI(store));
+        Map<String, Map<String, String>> configurations = storeSupplierConnectionService.configurationsForUI(store);
 
         model.addAttribute("form", form);
         model.addAttribute("settings", FulfilmentSettingsForm.from(store));
         model.addAttribute("fulfilmentTypes", FulfilmentType.values());
         model.addAttribute("supplierFields", supplierFields);
-        // Lets the modal render the HTML required attribute only where blank genuinely means
-        // missing: a required password field already has a stored secret for suppliers in this
-        // set, so a blank submission there is a deliberate "keep the current value", not an error.
+        // Published on the external section's root as data-suppliers-with-stored-config (see
+        // fragments/supplier-section.html), keyed by connection identity, so the modal's JS derives
+        // password requiredness per connection on every open. The markup itself never carries it:
+        // the modal is rendered once, before any connection is picked, and is never re-rendered by
+        // an async section swap.
         Set<String> suppliersWithStoredConfig = storeSupplierConnectionService.suppliersWithStoredConfiguration(store);
-        model.addAttribute("suppliersWithStoredConfig", suppliersWithStoredConfig);
-        // Republished on the external section's root as data-suppliers-with-stored-config (see
-        // fragments/supplier-section.html) so the modal's JS can re-derive password requiredness
-        // fresh on every open instead of trusting the required attribute above, which is frozen at
-        // this page load and never touched by an async section swap.
         model.addAttribute("suppliersWithStoredConfigJoined", String.join(";", suppliersWithStoredConfig));
+        // The modal's credential inputs are grouped per supplier type, so two connections of one
+        // type share one group: the values travel per connection instead, as a JSON blob on each
+        // table row, and the modal fills the group from the row it is editing.
+        model.addAttribute("supplierConfigurations", SupplierSectionModel.configurationPayloads(configurations));
         model.addAttribute("connectionModes", Arrays.stream(ConnectionMode.values())
                 .filter(mode -> mode != ConnectionMode.MANUAL)
                 .toList());
@@ -451,13 +464,10 @@ public class StoreController {
                 ? "/dashboard/store/" + storeId
                 : "/dashboard/store");
 
+        // A supplier type may be connected several times (one per label), so the Add dropdown no
+        // longer removes already-connected types -- it always offers every registered type.
         List<String> allSupplierNames = supplierRegistry.getExternalSupplierNames();
-        Set<String> connected = views.external().stream()
-                .map(SupplierConnectionView::identity)
-                .collect(Collectors.toCollection(() -> new TreeSet<>(String.CASE_INSENSITIVE_ORDER)));
-        model.addAttribute("availableSuppliers", allSupplierNames.stream()
-                .filter(name -> !connected.contains(name))
-                .toList());
+        model.addAttribute("availableSuppliers", allSupplierNames);
         // Rendered once as a data attribute on the stable section container so the page script can
         // recompute the Add dropdown after an async swap without a second request.
         model.addAttribute("allSupplierNames", allSupplierNames);
@@ -541,8 +551,12 @@ public class StoreController {
             return "error";
         }
 
-        store.getCheckoutConfiguration().getDeliveryOptions().add(new DeliveryOption());
-        store.getCheckoutConfiguration().getDeliveryOptions().add(new DeliveryOption());
+        // a store created by StoreCreationService has no checkout configuration until this page is saved once
+        CheckoutConfiguration checkoutConfiguration = Objects.requireNonNullElseGet(
+                store.getCheckoutConfiguration(), CheckoutConfiguration::new);
+        store.setCheckoutConfiguration(checkoutConfiguration);
+        checkoutConfiguration.getDeliveryOptions().add(new DeliveryOption());
+        checkoutConfiguration.getDeliveryOptions().add(new DeliveryOption());
 
         StoreForm form = new StoreForm(store);
         form.setProviderConfiguration(new HashMap<>());
@@ -592,26 +606,29 @@ public class StoreController {
 
     @GetMapping("/dashboard/store/company-details")
     @PreAuthorize("hasRole('ADMIN')")
-    public String storeBillingShippingConfig(Model model) {
-        return renderStoreBillingShippingConfig(getStoreId(), model);
+    public String storeCompanyDetails(Model model, Locale locale) {
+        return renderStoreCompanyDetails(getStoreId(), null, Map.of(), model, locale);
     }
 
     @GetMapping("/dashboard/store/{storeId}/company-details")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public String superAdminStoreBillingShippingConfig(@PathVariable String storeId, Model model) {
-        return renderStoreBillingShippingConfig(storeId, model);
+    public String superAdminStoreCompanyDetails(@PathVariable String storeId, Model model, Locale locale) {
+        return renderStoreCompanyDetails(storeId, null, Map.of(), model, locale);
     }
 
-    private String renderStoreBillingShippingConfig(String storeId, Model model) {
+    private String renderStoreCompanyDetails(String storeId, CompanyDetailsForm submitted, Map<String, String> errors,
+                                             Model model, Locale locale) {
         Store store = storesRepository.findById(storeId);
         if (store == null) {
             model.addAttribute("error", "Store not found");
             return "error";
         }
 
-        StoreForm form = new StoreForm(store);
-
+        CompanyDetailsForm form = submitted != null ? submitted : CompanyDetailsForm.from(store.getBillingDetails());
         model.addAttribute("form", form);
+        model.addAttribute("errors", errors);
+        model.addAttribute("countries", CompanyDetailsForm.countryOptions(form.getCountry(), locale));
+        model.addAttribute("formAction", companyDetailsPath(storeId));
         return "store-company-details";
     }
 
@@ -648,21 +665,71 @@ public class StoreController {
         return "store-rma";
     }
 
-    @PostMapping("/dashboard/store/branding/edit")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
-    public String updateStoreBranding(@ModelAttribute StoreForm form,
-                                      Locale locale,
-                                      RedirectAttributes redirectAttributes) throws IOException {
-        Store existingStore = storesRepository.findById(form.getStore().getStoreId());
-        existingStore.setName(form.getStore().getName());
-        existingStore.setBranding(createOrUpdateBranding(form, existingStore));
+    // The store is taken from the session (ADMIN) or the path (SUPER_ADMIN), never from the submitted form.
+    @PostMapping("/dashboard/store/branding")
+    @PreAuthorize("hasRole('ADMIN')")
+    public String updateStoreBranding(@ModelAttribute BrandingForm form,
+                                      @RequestHeader(value = ASYNC_FORM_HEADER, required = false) String requestedWith,
+                                      Model model, Locale locale, RedirectAttributes redirectAttributes,
+                                      HttpServletResponse response) {
+        return saveStoreBranding(getStoreId(), form, ASYNC_FORM_HEADER_VALUE.equals(requestedWith), model, locale,
+                redirectAttributes, response);
+    }
 
-        storesRepository.save(existingStore);
-        redirectAttributes.addFlashAttribute("successMessage",messageSource.getMessage("store.branding.update.success", null, locale) );
+    @PostMapping("/dashboard/store/{storeId}/branding")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public String superAdminUpdateStoreBranding(@PathVariable String storeId, @ModelAttribute BrandingForm form,
+                                                @RequestHeader(value = ASYNC_FORM_HEADER, required = false) String requestedWith,
+                                                Model model, Locale locale, RedirectAttributes redirectAttributes,
+                                                HttpServletResponse response) {
+        return saveStoreBranding(storeId, form, ASYNC_FORM_HEADER_VALUE.equals(requestedWith), model, locale,
+                redirectAttributes, response);
+    }
 
+    private String saveStoreBranding(String storeId, BrandingForm form, boolean async, Model model, Locale locale,
+                                     RedirectAttributes redirectAttributes, HttpServletResponse response) {
+        Map<String, String> errors = form.validate();
+        Store store = storesRepository.findById(storeId);
+        if (store == null || !errors.isEmpty()) {
+            String view = renderStoreBranding(storeId, form, errors, model);
+            if (async && store != null) {
+                response.setStatus(HttpStatus.UNPROCESSABLE_ENTITY.value());
+                return BRANDING_FORM_FRAGMENT;
+            }
+            return view;
+        }
+
+        form.applyTo(store);
+        // Only after the whole form is valid: storing a logo replaces the previous file straight away.
+        Branding branding = store.getBranding();
+        form.logoUpload().ifPresentOrElse(
+                upload -> {
+                    branding.setLogo(storesRepository.storeLogo(storeId, "logo." + upload.type().extension(), upload.content()));
+                    branding.setLogoVersion(System.currentTimeMillis());
+                },
+                () -> {
+                    if (form.isRemoveLogo() && branding.getLogo() != null) {
+                        storesRepository.removeLogo(storeId);
+                        branding.setLogo(null);
+                        branding.setLogoVersion(null);
+                    }
+                });
+        storesRepository.save(store);
+
+        String successMessage = messageSource.getMessage("store.branding.update.success", null, locale);
+        if (async) {
+            renderStoreBranding(storeId, BrandingForm.from(store), Map.of(), model);
+            model.addAttribute("savedMessage", successMessage);
+            return BRANDING_FORM_FRAGMENT;
+        }
+        redirectAttributes.addFlashAttribute("successMessage", successMessage);
+        return "redirect:" + brandingPath(storeId);
+    }
+
+    private String brandingPath(String storeId) {
         return isSuperAdmin()
-                ? String.format("redirect:/dashboard/store/%s/branding", form.getStore().getStoreId())
-                : "redirect:/dashboard/store/branding";
+                ? String.format("/dashboard/store/%s/branding", storeId)
+                : "/dashboard/store/branding";
     }
 
     @PostMapping("/dashboard/store/invoicing/edit")
@@ -710,6 +777,10 @@ public class StoreController {
                 .collect(Collectors.toList());
 
         model.addAttribute("availableCarriers", selections);
+        // Renders under a non-tile URL, so SettingsPageAdvice cannot recognise it from the request path;
+        // set it explicitly (a handler's model attribute overrides the advice's value).
+        model.addAttribute("settingsPage", SettingsPage.forTile("/shipping",
+                isSuperAdmin() ? UserRole.SUPER_ADMIN : UserRole.ADMIN, storeId));
         return renderStoreShipping(storeId, model);
     }
 
@@ -777,21 +848,59 @@ public class StoreController {
                 : "redirect:/dashboard/store/payments";
     }
 
-    @PostMapping("/dashboard/store/company-details/edit")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
-    public String updateBillingShippingConfiguration(@ModelAttribute StoreForm form, Locale locale, RedirectAttributes redirectAttributes) {
-        Store existingStore = storesRepository.findById(form.getStore().getStoreId());
+    // The store is taken from the session (ADMIN) or the path (SUPER_ADMIN), never from the submitted form.
+    @PostMapping("/dashboard/store/company-details")
+    @PreAuthorize("hasRole('ADMIN')")
+    public String updateStoreCompanyDetails(@ModelAttribute CompanyDetailsForm form,
+                                            @RequestHeader(value = ASYNC_FORM_HEADER, required = false) String requestedWith,
+                                            Model model, Locale locale, RedirectAttributes redirectAttributes,
+                                            HttpServletResponse response) {
+        return saveStoreCompanyDetails(getStoreId(), form, ASYNC_FORM_HEADER_VALUE.equals(requestedWith), model, locale,
+                redirectAttributes, response);
+    }
 
-        if (form.getStore().getBillingDetails().isProperlyFilled()) {
-            existingStore.setBillingDetails(form.getStore().getBillingDetails());
+    @PostMapping("/dashboard/store/{storeId}/company-details")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public String superAdminUpdateStoreCompanyDetails(@PathVariable String storeId, @ModelAttribute CompanyDetailsForm form,
+                                                      @RequestHeader(value = ASYNC_FORM_HEADER, required = false) String requestedWith,
+                                                      Model model, Locale locale, RedirectAttributes redirectAttributes,
+                                                      HttpServletResponse response) {
+        return saveStoreCompanyDetails(storeId, form, ASYNC_FORM_HEADER_VALUE.equals(requestedWith), model, locale,
+                redirectAttributes, response);
+    }
+
+    // A form sent by static/js/async-form.js gets only the re-rendered form back (422 with errors, 200 once saved) and
+    // swaps it in place; a plain submit without JavaScript keeps the full page render and the redirect after saving.
+    private String saveStoreCompanyDetails(String storeId, CompanyDetailsForm form, boolean async, Model model,
+                                           Locale locale, RedirectAttributes redirectAttributes,
+                                           HttpServletResponse response) {
+        Map<String, String> errors = form.validate();
+        Store store = storesRepository.findById(storeId);
+        if (store == null || !errors.isEmpty()) {
+            String view = renderStoreCompanyDetails(storeId, form, errors, model, locale);
+            if (async && store != null) {
+                response.setStatus(HttpStatus.UNPROCESSABLE_ENTITY.value());
+                return COMPANY_DETAILS_FORM_FRAGMENT;
+            }
+            return view;
         }
 
-        storesRepository.save(existingStore);
-        redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("store.company.details.update.success", null, locale));
+        store.setBillingDetails(form.applyTo(store.getBillingDetails()));
+        storesRepository.save(store);
+        String successMessage = messageSource.getMessage("store.company.details.update.success", null, locale);
+        if (async) {
+            renderStoreCompanyDetails(storeId, CompanyDetailsForm.from(store.getBillingDetails()), Map.of(), model, locale);
+            model.addAttribute("savedMessage", successMessage);
+            return COMPANY_DETAILS_FORM_FRAGMENT;
+        }
+        redirectAttributes.addFlashAttribute("successMessage", successMessage);
+        return "redirect:" + companyDetailsPath(storeId);
+    }
 
+    private String companyDetailsPath(String storeId) {
         return isSuperAdmin()
-                ? String.format("redirect:/dashboard/store/%s/company-details", form.getStore().getStoreId())
-                : "redirect:/dashboard/store/company-details";
+                ? String.format("/dashboard/store/%s/company-details", storeId)
+                : "/dashboard/store/company-details";
     }
 
     @PostMapping("/dashboard/store/rma")
@@ -988,27 +1097,6 @@ public class StoreController {
         return isSuperAdmin()
                 ? String.format("redirect:/dashboard/store/%s/report", form.getStore().getStoreId())
                 : "redirect:/dashboard/store/report";
-    }
-
-    private Branding createOrUpdateBranding(StoreForm form, Store store) throws IOException {
-        Branding branding = new Branding();
-        branding.setPrimaryColor(form.getStore().getBranding().getPrimaryColor());
-        branding.setSecondaryColor(form.getStore().getBranding().getSecondaryColor());
-        if (store.getBranding() != null && store.getBranding().getLogo() != null) {
-            branding.setLogo(store.getBranding().getLogo());
-        }
-
-        if (form.hasLogoFile()) {
-            branding.setLogo(saveLogo(form, store.getStoreId()));
-        }
-
-        return branding;
-    }
-
-    private String saveLogo(StoreForm form, String storeId) throws IOException {
-        String fileName = form.getLogoFile().getOriginalFilename();
-        byte[] bytes = form.getLogoFile().getBytes();
-        return storesRepository.storeLogo(storeId, fileName, bytes);
     }
 
     private String getStoreId() { return CustomSecurityContext.getStoreId(); }

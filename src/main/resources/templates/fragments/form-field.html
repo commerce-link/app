@@ -1,0 +1,44 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!--/* Labelled text input. errorKey is the message key of the field's error, or null. The id equals the name, so an
+       error summary can link to the field with #name. */-->
+<div th:fragment="input(name, labelKey, value, type, autocomplete, required, errorKey)" class="cl-field">
+    <label class="cl-label" th:for="${name}">
+        <span th:text="#{${labelKey}}"></span>
+        <span th:unless="${required}" class="cl-optional" th:text="#{form.optional}"></span>
+    </label>
+    <input class="cl-input" th:classappend="${errorKey != null} ? 'is-invalid'"
+           th:id="${name}" th:name="${name}" th:type="${type}" th:value="${value}" th:required="${required}"
+           th:attr="autocomplete=${autocomplete},
+                    aria-invalid=${errorKey != null ? 'true' : null},
+                    aria-describedby=${errorKey != null ? name + '-error' : null}"/>
+    <p th:if="${errorKey != null}" class="cl-field-error" th:id="${name} + '-error'">
+        <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+        <span th:text="#{${errorKey}}"></span>
+    </p>
+</div>
+
+<!--/* Labelled select. options is a list of PickerOption(value, label). */-->
+<div th:fragment="select(name, labelKey, value, options, autocomplete, required, errorKey)" class="cl-field">
+    <label class="cl-label" th:for="${name}">
+        <span th:text="#{${labelKey}}"></span>
+        <span th:unless="${required}" class="cl-optional" th:text="#{form.optional}"></span>
+    </label>
+    <select class="cl-select" th:classappend="${errorKey != null} ? 'is-invalid'"
+            th:id="${name}" th:name="${name}" th:required="${required}"
+            th:attr="autocomplete=${autocomplete},
+                     aria-invalid=${errorKey != null ? 'true' : null},
+                     aria-describedby=${errorKey != null ? name + '-error' : null}">
+        <option th:each="option : ${options}" th:value="${option.value}" th:text="${option.label}"
+                th:selected="${option.value == value}"></option>
+    </select>
+    <p th:if="${errorKey != null}" class="cl-field-error" th:id="${name} + '-error'">
+        <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+        <span th:text="#{${errorKey}}"></span>
+    </p>
+</div>
+
+</body>
+</html>

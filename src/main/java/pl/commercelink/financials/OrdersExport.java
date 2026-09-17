@@ -35,7 +35,11 @@ public class OrdersExport {
         csvWriter.append("Order ID,Affiliate ID,Ordered At,Order Source Name,Order Source Type,Order Type,Billing City,Shipping City,Original payment source,Total Amount,Invoiced At\n");
 
         for (Order order : orders) {
-            PaymentSource paymentSource = order.getPayments().get(0).getSource();
+            // An order can legitimately have no payment recorded (imported, POS, cash on delivery),
+            // and the export must not die on it.
+            PaymentSource paymentSource = order.getPayments().isEmpty()
+                    ? null
+                    : order.getPayments().get(0).getSource();
 
             csvWriter.append(order.getOrderId()).append(",")
                     .append(order.getAffiliateId()).append(",")

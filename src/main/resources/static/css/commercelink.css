@@ -45,6 +45,15 @@
     grid-template-columns: 1fr;
 }
 
+/* Progressive enhancement: browsers without cross-document view transitions navigate as before.
+   Naming the shell parts keeps sidebar and topbar visually still while the rest of the page
+   content cross-fades between navigations. */
+@view-transition { navigation: auto; }
+.cl-sidebar { view-transition-name: cl-sidebar; }
+.cl-topbar { view-transition-name: cl-topbar; }
+::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation-duration: 150ms; }
+@media (prefers-reduced-motion: reduce) { @view-transition { navigation: none; } }
+
 .cl-sidebar {
     position: fixed;
     inset-block: 0;
@@ -560,6 +569,1070 @@ body.cl-drawer-open .cl-sidebar {
 .cl-toast.is-info { background: #3e8ed0; }
 .cl-toast.is-warning { background: #ffdd57; color: rgba(0, 0, 0, 0.7); }
 
+/* Settings pages. Content sits inside Bulma's .content wrapper (layout.html), so rules that touch headings,
+   lists and links are prefixed with .cl-page to outweigh .content h1/h2/ul/li. */
+:root {
+    --cl-warn: #8a4b00;
+    --cl-warn-soft: #fdf0dc;
+    --cl-info: #1b4db1;
+    --cl-info-soft: #e6edfb;
+}
+
+.cl-page {
+    padding: 0 0 40px;
+}
+
+.cl-page-body {
+    max-width: 1200px;
+}
+
+.cl-page-body.is-wide {
+    max-width: 1440px;
+}
+
+.cl-page .cl-page-header {
+    margin-bottom: 20px;
+}
+
+.cl-page .cl-page-header-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.cl-page .cl-page-title {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 650;
+    line-height: 1.25;
+    color: var(--cl-ink);
+}
+
+.cl-page .cl-page-actions {
+    margin-left: auto;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.cl-page .cl-page-lead {
+    margin-top: 4px;
+    max-width: 72ch;
+    font-size: .95rem;
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 44px;
+    margin-top: -12px;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--cl-accent-ink);
+    text-decoration: none;
+}
+
+.cl-page .cl-back:hover {
+    text-decoration: underline;
+}
+
+.cl-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 36px;
+    padding: 0 14px;
+    border: 1px solid var(--cl-line);
+    border-radius: var(--cl-radius);
+    background: var(--cl-surface);
+    color: var(--cl-ink-2);
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.cl-button:hover {
+    border-color: var(--cl-accent);
+    color: var(--cl-accent-ink);
+}
+
+.cl-page .cl-back:focus-visible,
+.cl-button:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+.cl-page .cl-settings-section + .cl-settings-section {
+    margin-top: 28px;
+}
+
+.cl-page .cl-settings-section-title {
+    margin: 0 0 10px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-tile-grid {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    /* Minimum is the larger of the phone-safe 17.5rem-or-full-width and a third of
+       the row (minus two 16px gaps), so the grid never forms a fourth column. */
+    grid-template-columns: repeat(auto-fill, minmax(max(min(17.5rem, 100%), calc((100% - 32px) / 3)), 1fr));
+    gap: 16px;
+}
+
+.cl-page .cl-tile-grid > li {
+    margin: 0;
+    min-width: 0;
+}
+
+.cl-page .cl-tile {
+    height: 100%;
+    display: grid;
+    grid-template-columns: 40px minmax(0, 1fr);
+    align-content: start;
+    column-gap: 14px;
+    row-gap: 4px;
+    padding: 16px;
+    border: 1px solid var(--cl-line);
+    border-radius: var(--cl-radius);
+    background: var(--cl-surface);
+    color: var(--cl-ink);
+    text-decoration: none;
+    transition: border-color .15s ease, box-shadow .15s ease;
+}
+
+.cl-page .cl-tile:hover {
+    border-color: var(--cl-accent);
+    box-shadow: var(--cl-shadow);
+    color: var(--cl-ink);
+}
+
+.cl-page .cl-tile:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
+}
+
+.cl-page .cl-tile-icon {
+    grid-row: 1 / span 2;
+    width: 40px;
+    height: 40px;
+    display: grid;
+    place-items: center;
+    border-radius: 8px;
+    background: var(--cl-accent-soft);
+    color: var(--cl-accent);
+    font-size: 17px;
+}
+
+.cl-page .cl-tile-title {
+    grid-column: 2;
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.3;
+}
+
+.cl-page .cl-tile-desc {
+    grid-column: 2;
+    font-size: 13.5px;
+    line-height: 1.4;
+    color: var(--cl-ink-2);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.cl-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 100%;
+    padding: 2px 9px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+
+.cl-status::before {
+    content: "";
+    flex: 0 0 auto;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.cl-status.is-warn {
+    color: var(--cl-warn);
+    background: var(--cl-warn-soft);
+}
+
+@media screen and (max-width: 1023px) {
+    .cl-button {
+        height: 44px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cl-page .cl-tile {
+        transition: none;
+    }
+}
+
+/* Forms: cards, field grid, inputs, primary button and an error summary, shared by settings forms. Rules touching
+   p, ul, a and fieldset carry the .cl-page prefix to outweigh Bulma's .content. */
+:root {
+    --cl-ok: #1d6b45;
+    --cl-ok-soft: #e3f4ea;
+    --cl-bad: #a61b1b;
+    --cl-bad-soft: #fbe7e7;
+}
+
+.cl-page .cl-form {
+    max-width: 760px;
+}
+
+.cl-page .cl-card {
+    border: 1px solid var(--cl-line);
+    border-radius: var(--cl-radius);
+    background: var(--cl-surface);
+}
+
+.cl-page .cl-fieldset {
+    min-width: 0;
+    margin: 0;
+    padding: 14px 20px 16px;
+    border: 0;
+}
+
+.cl-page .cl-fieldset + .cl-fieldset {
+    border-top: 1px solid var(--cl-line);
+}
+
+/* A floated legend leaves the fieldset border and joins normal flow, so it lays out like a heading. */
+.cl-page .cl-fieldset-title {
+    float: left;
+    width: 100%;
+    margin: 0 0 10px;
+    padding: 0;
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.3;
+    color: var(--cl-ink);
+}
+
+.cl-page .cl-fieldset-title + * {
+    clear: both;
+}
+
+.cl-page .cl-card-footer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 14px 20px;
+    border-top: 1px solid var(--cl-line);
+    border-radius: 0 0 var(--cl-radius) var(--cl-radius);
+    background: var(--cl-surface-2);
+}
+
+.cl-form-grid {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 12px 16px;
+}
+
+.cl-form-grid > * {
+    grid-column: span 6;
+    min-width: 0;
+}
+
+.cl-form-grid > .cl-span-2 { grid-column: span 2; }
+.cl-form-grid > .cl-span-3 { grid-column: span 3; }
+.cl-form-grid > .cl-span-4 { grid-column: span 4; }
+
+.cl-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.cl-label {
+    font-size: 13.5px;
+    font-weight: 600;
+    line-height: 1.3;
+    color: var(--cl-ink);
+}
+
+.cl-optional {
+    font-weight: 400;
+    color: var(--cl-ink-3);
+}
+
+.cl-input,
+.cl-select {
+    width: 100%;
+    height: 40px;
+    padding: 0 12px;
+    border: 1px solid var(--cl-line);
+    border-radius: var(--cl-radius);
+    background-color: var(--cl-surface);
+    color: var(--cl-ink);
+    font: inherit;
+    font-size: 15px;
+    transition: border-color .15s ease, box-shadow .15s ease;
+}
+
+/* An error summary link scrolls its field to the top edge; the margin keeps the field and its label clear of the
+   sticky top bar. */
+.cl-input,
+.cl-select {
+    scroll-margin-top: calc(var(--cl-topbar-height) + 44px);
+}
+
+.cl-select {
+    padding-right: 36px;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%2363748d' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    cursor: pointer;
+}
+
+.cl-input:hover,
+.cl-select:hover {
+    border-color: var(--cl-ink-3);
+}
+
+.cl-input:focus,
+.cl-select:focus {
+    outline: none;
+    border-color: var(--cl-accent);
+    box-shadow: 0 0 0 3px var(--cl-accent-soft);
+}
+
+.cl-input.is-invalid,
+.cl-select.is-invalid {
+    border-color: var(--cl-bad);
+}
+
+.cl-input.is-invalid:focus,
+.cl-select.is-invalid:focus {
+    box-shadow: 0 0 0 3px var(--cl-bad-soft);
+}
+
+.cl-page .cl-field-error {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.35;
+    color: var(--cl-bad);
+}
+
+.cl-button.is-primary {
+    border-color: var(--cl-accent);
+    background: var(--cl-accent);
+    color: #fff;
+}
+
+.cl-button:disabled,
+.cl-form[aria-busy="true"] .cl-button {
+    opacity: .6;
+    cursor: progress;
+}
+
+.cl-button.is-primary:hover {
+    border-color: var(--cl-accent-ink);
+    background: var(--cl-accent-ink);
+    color: #fff;
+}
+
+.cl-page .cl-alert {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 16px;
+    padding: 12px 16px;
+    border: 1px solid transparent;
+    border-left-width: 4px;
+    border-radius: var(--cl-radius);
+    color: var(--cl-ink);
+}
+
+.cl-page .cl-alert:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
+}
+
+.cl-page .cl-alert.is-bad {
+    border-color: var(--cl-bad-soft);
+    border-left-color: var(--cl-bad);
+    background: var(--cl-bad-soft);
+}
+
+.cl-page .cl-alert.is-bad .cl-alert-icon {
+    margin-top: 3px;
+    color: var(--cl-bad);
+}
+
+.cl-page .cl-alert-title {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.cl-page .cl-alert-list {
+    margin: 4px 0 0;
+    padding-left: 18px;
+    list-style: disc;
+    font-size: 13.5px;
+}
+
+.cl-page .cl-alert-list li + li {
+    margin-top: 2px;
+}
+
+.cl-page .cl-alert-list a {
+    color: var(--cl-bad);
+    text-decoration: underline;
+}
+
+@media screen and (max-width: 1023px) {
+    .cl-input,
+    .cl-select {
+        height: 44px;
+    }
+}
+
+@media screen and (max-width: 719px) {
+    .cl-form-grid > .cl-span-2,
+    .cl-form-grid > .cl-span-3,
+    .cl-form-grid > .cl-span-4 {
+        grid-column: span 6;
+    }
+
+    .cl-page .cl-fieldset,
+    .cl-page .cl-card-footer {
+        padding-left: 16px;
+        padding-right: 16px;
+    }
+
+    .cl-page .cl-card-footer .cl-button {
+        flex: 1 1 100%;
+        justify-content: center;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cl-input,
+    .cl-select {
+        transition: none;
+    }
+}
+
+/* Form parts added with the branding form: help text, checkbox, image and colour fields. */
+/* Three classes deep to outweigh Bulma's .content p:not(:last-child) margin. */
+.cl-page .cl-field .cl-help {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.4;
+    color: var(--cl-ink-2);
+}
+
+.cl-file-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 20px;
+}
+
+.cl-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 36px;
+    font-size: 14px;
+    color: var(--cl-ink);
+    cursor: pointer;
+}
+
+.cl-check input {
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    accent-color: var(--cl-accent);
+}
+
+.cl-check input:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
+}
+
+.cl-image-field {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+}
+
+.cl-image-field > .cl-field {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+/* The checkerboard shows where a logo is transparent, so a white logo does not vanish on a white card. */
+.cl-image-preview {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    width: 144px;
+    height: 88px;
+    padding: 8px;
+    border: 1px solid var(--cl-line);
+    border-radius: var(--cl-radius);
+    background: repeating-conic-gradient(var(--cl-surface-2) 0 25%, var(--cl-surface) 0 50%) 0 0 / 16px 16px;
+}
+
+.cl-image-preview img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+.cl-image-empty {
+    font-size: 13px;
+    color: var(--cl-ink-3);
+}
+
+.cl-file {
+    max-width: 100%;
+    font: inherit;
+    font-size: 14px;
+    color: var(--cl-ink-2);
+    cursor: pointer;
+}
+
+.cl-file::file-selector-button {
+    height: 36px;
+    margin-right: 12px;
+    padding: 0 14px;
+    border: 1px solid var(--cl-line);
+    border-radius: var(--cl-radius);
+    background: var(--cl-surface);
+    color: var(--cl-ink-2);
+    font: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.cl-file:hover::file-selector-button {
+    border-color: var(--cl-accent);
+    color: var(--cl-accent-ink);
+}
+
+.cl-file:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+.cl-file.is-invalid::file-selector-button {
+    border-color: var(--cl-bad);
+}
+
+.cl-color-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+}
+
+.cl-color-picker {
+    flex: 0 0 auto;
+    width: 40px;
+    height: 40px;
+    padding: 2px;
+    border: 1px solid var(--cl-line);
+    border-radius: var(--cl-radius);
+    background: var(--cl-surface);
+    cursor: pointer;
+}
+
+.cl-color-picker:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
+}
+
+.cl-input.cl-color-input {
+    width: 124px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+/* A sample of the customer-page button (brand colour behind white text, as clientOffer/clientOrder render it), framed
+   and captioned so it is not mistaken for a button of this form. */
+.cl-brand-preview {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 40px;
+    padding: 0 4px 0 10px;
+    border: 1px dashed var(--cl-line);
+    border-radius: var(--cl-radius);
+}
+
+.cl-brand-preview[hidden] {
+    display: none;
+}
+
+.cl-brand-preview-label {
+    font-size: 12px;
+    color: var(--cl-ink-3);
+    white-space: nowrap;
+}
+
+.cl-brand-sample {
+    display: inline-flex;
+    align-items: center;
+    height: 30px;
+    padding: 0 12px;
+    border-radius: 6px;
+    background: var(--cl-brand);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+@media screen and (max-width: 1023px) {
+    .cl-check {
+        min-height: 44px;
+    }
+
+    .cl-file::file-selector-button,
+    .cl-color-picker,
+    .cl-brand-preview {
+        height: 44px;
+    }
+
+    .cl-color-picker {
+        width: 44px;
+    }
+}
+
+@media screen and (max-width: 719px) {
+    .cl-image-field {
+        flex-direction: column;
+    }
+
+    .cl-image-field > .cl-field,
+    .cl-file {
+        width: 100%;
+    }
+
+    .cl-brand-preview {
+        width: 100%;
+        height: auto;
+        min-height: 44px;
+        padding: 6px;
+    }
+
+    .cl-brand-preview-label {
+        white-space: normal;
+    }
+}
+
+/* Notifications: rows shared by the top bar dropdown and the notifications page. Spans and buttons only, so no
+   .cl-page prefix is needed; rules touching lists and links inside page content keep it. */
+.cl-link-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 44px;
+    padding: 0 4px;
+    border: 0;
+    background: transparent;
+    font: inherit;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--cl-accent-ink);
+    cursor: pointer;
+}
+
+.cl-link-button:hover {
+    text-decoration: underline;
+}
+
+.cl-link-button:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+.cl-notifications-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 2px 8px 2px 14px;
+    border-bottom: 1px solid var(--cl-line);
+}
+
+.cl-notifications-heading {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 650;
+    color: var(--cl-ink);
+}
+
+.cl-notifications-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.cl-notifications-list li + li {
+    border-top: 1px solid var(--cl-line);
+}
+
+.cl-notification-row {
+    display: grid;
+    grid-template-columns: 8px 1.5rem minmax(0, 1fr);
+    align-items: start;
+    gap: 4px 10px;
+    width: 100%;
+    min-height: 44px;
+    padding: 10px 14px;
+    border: 0;
+    background: transparent;
+    font: inherit;
+    text-align: left;
+    color: var(--cl-ink-2);
+    cursor: pointer;
+}
+
+.cl-notification-row:hover {
+    background: var(--cl-surface-2);
+}
+
+.cl-notification-row:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: -2px;
+}
+
+.cl-notification-row.is-unread {
+    background: var(--cl-accent-soft);
+}
+
+.cl-notification-dot {
+    width: 8px;
+    height: 8px;
+    margin-top: 7px;
+    border-radius: 50%;
+}
+
+.is-unread > .cl-notification-dot {
+    background: var(--cl-accent);
+}
+
+.cl-notification-icon {
+    color: var(--cl-info);
+}
+
+.cl-notification-icon.is-warn {
+    color: var(--cl-warn);
+}
+
+.cl-notification-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.cl-notification-title {
+    font-size: 13.5px;
+    font-weight: 500;
+    color: var(--cl-ink);
+}
+
+.is-unread .cl-notification-title {
+    font-weight: 700;
+}
+
+.cl-notification-message {
+    font-size: 12.5px;
+    color: var(--cl-ink-2);
+    overflow-wrap: anywhere;
+}
+
+.cl-notification-date {
+    font-size: 12px;
+    color: var(--cl-ink-3);
+    white-space: nowrap;
+}
+
+.cl-notifications-empty {
+    padding: 18px 14px;
+    font-size: 13.5px;
+    color: var(--cl-ink-3);
+    text-align: center;
+}
+
+.cl-notifications-all {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 44px;
+    border-top: 1px solid var(--cl-line);
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--cl-accent-ink);
+    text-decoration: none;
+}
+
+.cl-notifications-all:hover {
+    text-decoration: underline;
+}
+
+.cl-page .cl-notifications-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px 16px;
+    margin-bottom: 14px;
+}
+
+.cl-page .cl-notifications-tabs {
+    display: inline-flex;
+    border: 1px solid var(--cl-line);
+    border-radius: var(--cl-radius);
+    overflow: hidden;
+}
+
+.cl-page .cl-notifications-tabs a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 14px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--cl-ink-2);
+    text-decoration: none;
+}
+
+.cl-page .cl-notifications-tabs a.is-current {
+    background: var(--cl-accent);
+    color: #fff;
+}
+
+.cl-page .cl-notifications-tabs a:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: -3px;
+}
+
+.cl-page .cl-notifications-type {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    max-width: 100%;
+}
+
+.cl-page .cl-notifications-type label {
+    font-size: 13.5px;
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-notifications-type select {
+    min-height: 44px;
+    max-width: 100%;
+    padding: 0 10px;
+    border: 1px solid var(--cl-line);
+    border-radius: var(--cl-radius);
+    background: var(--cl-surface);
+    font: inherit;
+    font-size: 14px;
+    color: var(--cl-ink);
+}
+
+.cl-page .cl-notifications-bulk {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+    margin-bottom: 10px;
+}
+
+.cl-page .cl-notifications-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    font-size: 14px;
+    color: var(--cl-ink-2);
+    cursor: pointer;
+}
+
+.cl-page .cl-notification-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    border: 1px solid var(--cl-line);
+    border-radius: var(--cl-radius);
+    background: var(--cl-surface);
+    overflow: hidden;
+}
+
+.cl-page .cl-notification-item {
+    display: grid;
+    grid-template-columns: auto 8px 1.5rem minmax(0, 1fr);
+    align-items: start;
+    gap: 4px 10px;
+    margin: 0;
+    padding: 12px 14px;
+}
+
+.cl-page .cl-notification-item + .cl-notification-item {
+    border-top: 1px solid var(--cl-line);
+}
+
+.cl-page .cl-notification-item.is-unread {
+    background: var(--cl-accent-soft);
+}
+
+.cl-page .cl-notification-select {
+    width: 18px;
+    height: 18px;
+}
+
+/* The checkbox stays 18px visually; the label around it is inflated to a 44x44 hit area and pulled
+   back in with a negative margin so the grid column (and the row's height) keep the same footprint. */
+.cl-page .cl-notification-select-hit {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    min-height: 44px;
+    margin: -13px;
+    cursor: pointer;
+}
+
+.cl-page .cl-notification-main {
+    min-width: 0;
+}
+
+.cl-page .cl-notification-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 2px 12px;
+}
+
+.cl-page .cl-notification-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 12px;
+    margin-top: 6px;
+}
+
+.cl-page .cl-notification-actions form:last-child {
+    margin-left: auto;
+}
+
+.cl-page .cl-notifications-pagination-label {
+    margin-top: -12px;
+    text-align: center;
+    font-size: 13px;
+    color: var(--cl-ink-3);
+}
+
+/* Notification bell in the top bar. The top bar sits outside Bulma's .content, so no .cl-page prefix is needed. */
+.cl-notifications {
+    position: relative;
+}
+
+.cl-bell {
+    position: relative;
+}
+
+.cl-bell-badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 9px;
+    background: var(--cl-warn);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 18px;
+    text-align: center;
+}
+
+.cl-notifications-pop {
+    position: absolute;
+    right: 0;
+    top: 42px;
+    z-index: var(--cl-z-pop);
+    width: 360px;
+    max-height: 70vh;
+    overflow-y: auto;
+    background: var(--cl-surface);
+    border: 1px solid var(--cl-line);
+    border-radius: 10px;
+    box-shadow: var(--cl-shadow);
+}
+
+.cl-notifications-pop[hidden],
+.cl-notifications-status[hidden] {
+    display: none;
+}
+
+.cl-notifications-status {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 14px;
+    font-size: 13.5px;
+    color: var(--cl-ink-2);
+}
+
+.cl-notifications-status a {
+    font-weight: 600;
+    color: var(--cl-accent-ink);
+}
+
+@media screen and (max-width: 719px) {
+    .cl-notifications-pop {
+        position: fixed;
+        top: calc(var(--cl-topbar-height) + 4px);
+        left: 8px;
+        right: 8px;
+        width: auto;
+    }
+}
+
 /* Print: the shell chrome (rail column, fixed sidebar, sticky topbar) has no place on paper. */
 @page {
     margin: 15mm;
@@ -593,6 +1666,14 @@ body.cl-drawer-open .cl-sidebar {
 
     .cl-content .section {
         padding: 0;
+    }
+
+    .cl-content .cl-page {
+        padding: 0;
+    }
+
+    .cl-page .cl-back, .cl-page .cl-page-actions {
+        display: none !important;
     }
 
     .cl-content .container.is-fluid {

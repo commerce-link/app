@@ -37,11 +37,15 @@ import pl.commercelink.web.dtos.RoutedOrderView;
 import pl.commercelink.web.dtos.RoutedSupplierView;
 import pl.commercelink.web.dtos.SuggestedDeliveryItem;
 import pl.commercelink.web.dtos.SupplierOrderChoicesParams;
+import pl.commercelink.inventory.supplier.SupplierChoice;
+import pl.commercelink.inventory.supplier.SupplierLabelMap;
+import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.SupplierDeliveryAddress;
 
 import java.time.LocalDate;
 import pl.commercelink.inventory.deliveries.DropshipCandidate;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
@@ -136,6 +140,9 @@ public class DeliveriesController {
     @Autowired
     private DropshipTrackingService dropshipTrackingService;
 
+    @Autowired
+    private SupplierLabels supplierLabels;
+
     private static final int DELIVERY_PAGE_SIZE = 25;
 
     @GetMapping("/dashboard/deliveries")
@@ -143,6 +150,7 @@ public class DeliveriesController {
             @RequestParam(required = false) String deliveryId,
             @RequestParam(required = false) String externalDeliveryId,
             @RequestParam(required = false) String provider,
+            @RequestParam(required = false) String providerCustom,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate orderedAtStart,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate orderedAtEnd,
             @RequestParam(required = false, defaultValue = "false") boolean showArchived,
@@ -151,6 +159,7 @@ public class DeliveriesController {
             @RequestParam(required = false, defaultValue = "false") boolean showAwaitingApproval,
             @RequestParam(required = false, defaultValue = "1") int page,
             Model model) {
+        provider = providerFilter(provider, providerCustom);
         DeliveryFilter deliveryFilter = new DeliveryFilter(deliveryId, externalDeliveryId, provider,
                 orderedAtStart, orderedAtEnd, !showArchived, showWithoutInvoice, showWithoutSync,
                 showAwaitingApproval, isSuperAdmin());
@@ -180,7 +189,25 @@ public class DeliveriesController {
         model.addAttribute("isSuperAdmin", isSuperAdmin());
         model.addAttribute("isAdmin", isAdmin());
 
+        List<String> storeIds = paginatedDeliveries.stream().map(Delivery::getStoreId).distinct().toList();
+        SupplierLabelMap labels = isSuperAdmin() ? supplierLabels.forStoreIds(storeIds) : supplierLabels.forStoreId(getStoreId());
+        model.addAttribute("supplierLabels", labels);
+        model.addAttribute("providerOptions", isSuperAdmin() ? List.of() : providerFilterOptions(labels));
+
         return "deliveries";
+    }
+
+    // Deliveries can also sit on the internal warehouse, so the filter offers it next to the
+    // store's connections (spec: the deliveries filter lists connections plus Warehouse).
+    static List<SupplierLabelMap.Option> providerFilterOptions(SupplierLabelMap labels) {
+        List<SupplierLabelMap.Option> options = new ArrayList<>(labels.options());
+        options.add(new SupplierLabelMap.Option(SupplierRegistry.WAREHOUSE, SupplierRegistry.WAREHOUSE));
+        return options;
+    }
+
+    // Deliveries on suppliers typed by hand in an order (no connection) are filtered by the typed name.
+    static String providerFilter(String provider, String providerCustom) {
+        return SupplierChoice.CUSTOM.equals(provider) ? StringUtils.trimToNull(providerCustom) : provider;
     }
 
     @PostMapping("/dashboard/deliveries/{deliveryId}/addPayment")
@@ -508,6 +535,7 @@ public class DeliveriesController {
         model.addAttribute("dropshipCandidates", planning.dropshipCandidates());
         model.addAttribute("storeId", storeId);
         model.addAttribute("isSuperAdmin", isSuperAdmin());
+        model.addAttribute("supplierLabels", supplierLabels.forStoreId(storeId));
 
         return "deliveriesPreview";
     }
@@ -553,6 +581,7 @@ public class DeliveriesController {
         model.addAttribute("delivery", delivery);
         model.addAttribute("isSuperAdmin", isSuperAdmin());
         model.addAttribute("purchaseAvailable", supplierPurchaseService.isOrderingAvailable(storeId, provider));
+        model.addAttribute("supplierLabels", supplierLabels.forStoreId(storeId));
 
         return "deliveryCreate";
     }
@@ -691,6 +720,7 @@ public class DeliveriesController {
         model.addAttribute("form", form);
         model.addAttribute("purchaseRef", UUID.randomUUID().toString());
         model.addAttribute("isSuperAdmin", isSuperAdmin());
+        model.addAttribute("supplierLabels", supplierLabels.forStoreId(storeId));
         addDeliveryAddresses(storeId, provider, form, model);
         if (!supplierPurchaseService.requiresApproval(storeId, provider)) {
             OrderOptionsModel.addOrderOptions(supplierPurchaseService, storeId, provider,
@@ -793,6 +823,7 @@ public class DeliveriesController {
             model.addAttribute("form", form);
             model.addAttribute("purchaseRef", purchaseRef);
             model.addAttribute("isSuperAdmin", isSuperAdmin());
+            model.addAttribute("supplierLabels", supplierLabels.forStoreId(storeId));
             model.addAttribute("errorMessage", messageSource.getMessage(result.getMessage(), null, locale));
             addDeliveryAddresses(storeId, provider, form, model);
             if (!supplierPurchaseService.requiresApproval(storeId, provider)) {
@@ -841,6 +872,7 @@ public class DeliveriesController {
         model.addAttribute("routedOrders", routedOrdersOf(storeId, delivery, dropshipOrder));
         OrderOptionsModel.addOrderOptions(supplierPurchaseService, storeId, delivery.getProvider(),
                 optionsContext, delivery.getSupplierOrderChoices(), model);
+        model.addAttribute("supplierLabels", supplierLabels.forStoreId(storeId));
         return "deliveryApproval";
     }
 
@@ -1160,6 +1192,7 @@ public class DeliveriesController {
         if (delivery.isOrderFailed() || delivery.isOrderDispatched()) {
             model.addAttribute("suggestedEstimatedDeliveryAt", supplierPurchaseService.suggestEstimatedDeliveryAt(delivery));
         }
+        model.addAttribute("supplierLabels", supplierLabels.forStoreId(storeId));
         return "deliveryDetails";
     }
 

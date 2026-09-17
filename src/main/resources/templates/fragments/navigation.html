@@ -71,6 +71,26 @@
             <span class="icon is-small"><i class="fas fa-times"></i></span>
         </a>
 
+        <div class="cl-notifications" th:if="${notificationBell != null}">
+            <button type="button" class="cl-icon-button cl-bell" id="clNotificationsToggle" aria-expanded="false"
+                    aria-controls="clNotificationsMenu"
+                    th:attr="aria-label=${#messages.msg('notifications.bell.aria', notificationBell.unreadCount())},
+                             data-dropdown-href=@{${notificationBell.dropdownHref()}}">
+                <span class="icon"><i class="fas fa-bell"></i></span>
+                <span class="cl-bell-badge" aria-hidden="true" th:if="${notificationBell.unreadCount() > 0}"
+                      th:text="${notificationBell.badgeText()}"></span>
+            </button>
+            <div class="cl-notifications-pop" id="clNotificationsMenu" role="region"
+                 th:attr="aria-label=#{notifications.title}" hidden>
+                <div class="cl-notifications-status" data-notifications-loading th:text="#{notifications.loading}"></div>
+                <div class="cl-notifications-status" data-notifications-error hidden>
+                    <span th:text="#{notifications.loadError}"></span>
+                    <a th:href="@{${notificationBell.pageHref()}}" th:text="#{notifications.viewAll}"></a>
+                </div>
+                <div data-notifications-body></div>
+            </div>
+        </div>
+
         <div class="cl-lang">
             <a th:href="${currentUri + '?' + currentQuery + 'lang=pl'}"
                th:classappend="${#locale.language == 'pl'} ? 'is-current' : ''"
