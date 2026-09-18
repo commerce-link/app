@@ -31,11 +31,22 @@ class SettingsSubpageHeaderTemplateTest {
     }
 
     @Test
-    void keepsTheHelpToggleOnShippingAndTheAddButtonOnRmaCentres() throws Exception {
+    void keepsTheHelpToggleOnShipping() throws Exception {
         // when / then
         assertThat(template("store-shipping")).contains("fragments/settings-header :: header(true, null)")
                 .contains("fragments/screen-intro :: panel('shipping', 'fas fa-shipping-fast')");
-        assertThat(template("rma-centers")).contains("fragments/settings-header :: header(false, ~{::settingsActions})")
-                .contains("th:ref=\"settingsActions\"").contains("@{/dashboard/store/rma-centers/new}");
+    }
+
+    /** Adding belongs to the list it adds to: in the head of the list card, as on the warehouse page. */
+    @Test
+    void rmaCentresCarryTheAddButtonInTheListCardHeadNotInThePageHeader() throws Exception {
+        // when
+        String html = template("rma-centers");
+
+        // then
+        assertThat(html).contains("fragments/settings-header :: header(false, null)").doesNotContain("settingsActions");
+        assertThat(html.indexOf("@{/dashboard/store/rma-centers/new}"))
+                .isGreaterThan(html.indexOf("class=\"cl-card-head\""))
+                .isLessThan(html.indexOf("class=\"cl-card-desc\""));
     }
 }

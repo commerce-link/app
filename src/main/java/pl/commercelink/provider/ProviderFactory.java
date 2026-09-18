@@ -179,6 +179,15 @@ public class ProviderFactory<D extends ProviderDescriptor<T>, T> {
         return configurationManager.getConfigurationForUI(store, configName, descriptor);
     }
 
+    /** Settings of one named provider, secrets present but blanked; for integrations with several providers per store. */
+    public Map<String, String> loadConfigurationForUI(Store store, String providerName) {
+        D descriptor = getDescriptor(providerName);
+        if (descriptor == null) {
+            return new HashMap<>();
+        }
+        return configurationManager.getConfigurationForUI(store, credentialNameFor(providerName, descriptor), descriptor);
+    }
+
     public void deleteConfiguration(Store store, String providerName) {
         D descriptor = getDescriptor(providerName);
         if (descriptor == null) {

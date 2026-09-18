@@ -11,7 +11,6 @@ public class StoreForm {
     private String invoicingSoftwareProvider;
     private String wmsProvider;
     private Map<String, String> providerConfiguration;
-    private int defaultShippingDetailIndex;
     private String defaultPickupAddressId;
     private String defaultSenderAddressId;
 
@@ -83,13 +82,7 @@ public class StoreForm {
         this.paymentProviderName = paymentProviderName;
     }
 
-    public int getDefaultShippingDetailIndex() {
-        return defaultShippingDetailIndex;
-    }
 
-    public void setDefaultShippingDetailIndex(int defaultShippingDetailIndex) {
-        this.defaultShippingDetailIndex = defaultShippingDetailIndex;
-    }
 
     public String getDefaultPickupAddressId() {
         return defaultPickupAddressId;

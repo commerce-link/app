@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import pl.commercelink.orders.BillingDetails;
 import pl.commercelink.starter.security.UserRole;
 import pl.commercelink.web.dtos.CompanyDetailsForm;
+import pl.commercelink.web.dtos.CountryOptions;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -23,7 +24,7 @@ class StoreCompanyDetailsTemplateTest {
         variables.put("navigation", null);
         variables.put("form", form);
         variables.put("errors", errors);
-        variables.put("countries", CompanyDetailsForm.countryOptions(form.getCountry(), Locale.forLanguageTag("pl")));
+        variables.put("countries", CountryOptions.forPicker(form.getCountry(), Locale.forLanguageTag("pl")));
         variables.put("formAction", "/dashboard/store/company-details");
         return variables;
     }

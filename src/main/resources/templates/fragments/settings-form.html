@@ -1,0 +1,106 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!--/* Error summary above a settings form. errors maps a field id to the message key of its error, in page order;
+       labels (or null) maps a field id to a label prepended to the message, for fields whose labels are not message
+       keys (provider settings). Focused after a failed save, links move to the fields. */-->
+<div th:fragment="errorSummary(id, errors, labels)" th:if="${!errors.isEmpty()}" th:id="${id}" class="cl-alert is-bad"
+     tabindex="-1" data-cl-error-summary>
+    <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
+    <div>
+        <p class="cl-alert-title" th:text="#{form.errors.title}"></p>
+        <ul class="cl-alert-list">
+            <li th:each="error : ${errors}">
+                <a th:href="'#' + ${error.key}"
+                   th:text="${labels != null and labels[error.key] != null} ? ${labels[error.key] + ': ' + #messages.msg(error.value)} : #{${error.value}}"></a>
+            </li>
+        </ul>
+    </div>
+</div>
+
+<!--/* Labelled input with an optional help text (already resolved, or null) read out with the field. Not named "input":
+       a fragment name is also an element selector and would pull in every input of this file. */-->
+<div th:fragment="textField(name, labelKey, value, type, autocomplete, required, errorKey, help)" class="cl-field">
+    <label class="cl-label" th:for="${name}">
+        <span th:text="#{${labelKey}}"></span>
+        <span th:unless="${required}" class="cl-optional" th:text="#{form.optional}"></span>
+    </label>
+    <input class="cl-input" th:classappend="${errorKey != null} ? 'is-invalid'"
+           th:id="${name}" th:name="${name}" th:type="${type}" th:value="${value}" th:required="${required}"
+           th:attr="autocomplete=${autocomplete},
+                    inputmode=${type == 'email' ? 'email' : (type == 'tel' ? 'tel' : null)},
+                    aria-invalid=${errorKey != null ? 'true' : null},
+                    aria-describedby=${(help != null or errorKey != null) ? ((help != null ? name + '-help' : '') + (help != null and errorKey != null ? ' ' : '') + (errorKey != null ? name + '-error' : '')) : null}"/>
+    <p th:if="${help != null}" class="cl-help" th:id="${name} + '-help'" th:text="${help}"></p>
+    <p th:if="${errorKey != null}" class="cl-field-error" th:id="${name} + '-error'">
+        <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+        <span th:text="#{${errorKey}}"></span>
+    </p>
+</div>
+
+<!--/* Labelled select with an optional help text (already resolved, or null), like textField; options are PickerOptions. */-->
+<div th:fragment="selectField(name, labelKey, value, options, required, errorKey, help)" class="cl-field">
+    <label class="cl-label" th:for="${name}">
+        <span th:text="#{${labelKey}}"></span>
+        <span th:unless="${required}" class="cl-optional" th:text="#{form.optional}"></span>
+    </label>
+    <select class="cl-select" th:classappend="${errorKey != null} ? 'is-invalid'" th:id="${name}" th:name="${name}"
+            th:attr="aria-invalid=${errorKey != null ? 'true' : null},
+                     aria-describedby=${(help != null or errorKey != null) ? ((help != null ? name + '-help' : '') + (help != null and errorKey != null ? ' ' : '') + (errorKey != null ? name + '-error' : '')) : null}">
+        <option th:each="option : ${options}" th:value="${option.value}" th:text="${option.label}"
+                th:selected="${option.value == value}"></option>
+    </select>
+    <p th:if="${help != null}" class="cl-help" th:id="${name} + '-help'" th:text="${help}"></p>
+    <p th:if="${errorKey != null}" class="cl-field-error" th:id="${name} + '-error'">
+        <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+        <span th:text="#{${errorKey}}"></span>
+    </p>
+</div>
+
+<!--/* A read-only value to paste elsewhere (a webhook address), with a Copy button (static/js/copy-field.js). Not
+       masked: use the reporting page's markup for a value with a token. Without JavaScript the value is in a details
+       element. help is already resolved, or null. */-->
+<div th:fragment="copyField(id, label, value, help)" class="cl-field" data-cl-copy-field th:attr="data-value=${value}">
+    <span class="cl-label" th:id="${id} + '-label'" th:text="${label}"></span>
+    <span class="cl-copy-value" data-cl-copy-value hidden th:attr="aria-labelledby=${id} + '-label'"></span>
+    <details class="cl-copy-fallback" data-cl-copy-fallback>
+        <summary th:text="#{form.copy.show}"></summary>
+        <span class="cl-copy-value" th:text="${value}"></span>
+    </details>
+    <span class="cl-copy-status cl-visually-hidden" role="status" data-cl-copy-status></span>
+    <div class="cl-copy-actions">
+        <button type="button" class="cl-button" data-cl-copy-button hidden th:attr="data-copied-text=#{form.copy.done}">
+            <span class="cl-swap" aria-hidden="true">
+                <span class="cl-swap-a"><i class="fas fa-copy"></i></span>
+                <span class="cl-swap-b cl-copy-done"><i class="fas fa-check"></i></span>
+            </span>
+            <span th:text="#{form.copy}"></span>
+        </button>
+    </div>
+    <p th:if="${help != null}" class="cl-help" th:text="${help}"></p>
+</div>
+
+<!--/* A setting that switches a feature on when the form is saved. The label says what happens; the description says
+       the effect. revealId (or null) names the container of fields that only matter while the box is ticked;
+       static/js/reveal.js hides it while unticked, without JavaScript it stays visible. */-->
+<div th:fragment="check(name, labelKey, checked, descriptionKey, revealId)" class="cl-check-field">
+    <label class="cl-check">
+        <input type="checkbox" th:id="${name}" th:name="${name}" value="true" th:checked="${checked}"
+               th:attr="data-cl-reveal=${revealId}, aria-controls=${revealId},
+                        aria-describedby=${descriptionKey != null ? name + '-description' : null}"/>
+        <span th:text="#{${labelKey}}"></span>
+    </label>
+    <p th:if="${descriptionKey != null}" class="cl-check-description" th:id="${name} + '-description'"
+       th:text="#{${descriptionKey}}"></p>
+</div>
+
+<!--/* Outcome of an action that returned to this page (flash settingsSavedMessage), inside the page body instead of
+       the full-width banner of the layout. */-->
+<div th:fragment="savedAlert" th:if="${settingsSavedMessage != null}" class="cl-alert is-ok" role="status" data-cl-saved-alert>
+    <i class="fas fa-check-circle cl-alert-icon" aria-hidden="true"></i>
+    <p class="cl-alert-title" th:text="${settingsSavedMessage}"></p>
+</div>
+
+</body>
+</html>

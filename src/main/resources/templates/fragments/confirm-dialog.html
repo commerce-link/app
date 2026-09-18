@@ -1,0 +1,20 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!--/* One confirmation dialog per page, filled from the data-cl-confirm-* attributes of the link that opens it
+       (static/js/confirm-dialog.js). The link leads to a confirmation page, which is what happens without JavaScript. */-->
+<dialog th:fragment="dialog" class="cl-dialog" id="cl-confirm-dialog" aria-labelledby="cl-confirm-title"
+        aria-describedby="cl-confirm-message">
+    <form method="post" class="cl-dialog-form">
+        <h2 class="cl-dialog-title" id="cl-confirm-title"></h2>
+        <p class="cl-dialog-message" id="cl-confirm-message"></p>
+        <div class="cl-dialog-actions">
+            <button type="button" class="cl-button" data-cl-confirm-cancel th:text="#{general.cancel}"></button>
+            <button type="submit" class="cl-button is-danger" data-cl-confirm-submit></button>
+        </div>
+    </form>
+</dialog>
+
+</body>
+</html>

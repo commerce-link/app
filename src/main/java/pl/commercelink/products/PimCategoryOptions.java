@@ -32,6 +32,13 @@ public class PimCategoryOptions {
     public record CategoryOption(String id, String name, String parentId) {
     }
 
+    /**
+     * One checkbox on the store settings page. {@code inCatalogue} is false for a name the store has saved but PIM no
+     * longer offers — it still gets a checkbox, otherwise saving the form would drop it without saying so.
+     */
+    public record TopLevelChoice(String name, boolean selected, boolean inCatalogue) {
+    }
+
     private static final Collator POLISH_COLLATOR = Collator.getInstance(Locale.forLanguageTag("pl-PL"));
 
     private static final String LANG = "pl";
@@ -42,6 +49,25 @@ public class PimCategoryOptions {
         return categories().topLevels().stream()
                 .map(PimCategory::name)
                 .sorted(POLISH_COLLATOR)
+                .toList();
+    }
+
+    /**
+     * The top levels the store settings page ticks, in one pass over the catalogue: what PIM offers now, plus whatever
+     * the store already has saved, so a category that left the catalogue keeps its box instead of being erased by the
+     * next save. Same rule as {@link #categoryOptions(Collection, Collection)} applies to the catalog pickers.
+     */
+    public List<TopLevelChoice> topLevelChoices(Collection<String> selected) {
+        List<String> offered = topLevelNames();
+        List<String> names = new ArrayList<>(offered);
+        List<String> kept = selected.stream()
+                .filter(name -> name != null && !name.isBlank())
+                .distinct()
+                .toList();
+        kept.stream().filter(name -> !names.contains(name)).forEach(names::add);
+        names.sort(POLISH_COLLATOR);
+        return names.stream()
+                .map(name -> new TopLevelChoice(name, kept.contains(name), offered.contains(name)))
                 .toList();
     }
 

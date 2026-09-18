@@ -3,93 +3,193 @@
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
       layout:decorate="~{layout}">
 <body>
-
 <div layout:fragment="content">
-
     <section class="cl-page">
         <div class="cl-page-body">
-
             <div th:replace="~{fragments/settings-header :: header(false, null)}"></div>
+            <div th:replace="~{fragments/settings-form :: savedAlert}"></div>
 
-            <div class="box">
-                <h2 class="subtitle" th:text="#{store.checkout.settings}"></h2>
-                <form th:action="@{/dashboard/store/payments/checkout/edit}" th:object="${form}" method="post">
-                    <input type="hidden" th:field="*{store.storeId}"/>
-                    <div class="field">
-                        <label class="label" th:text="#{store.payments.successUrl}"></label>
-                        <div class="control">
-                            <input class="input" type="text" th:field="*{store.checkoutConfiguration.successUrl}" />
-                        </div>
+            <div class="cl-stack">
+                <!--/* Online gateways first: without one the offer's "Pay" button fails. Several gateways may be used, the
+                       customer picks one in the offer and the online-store checkout gets the default. */-->
+                <section class="cl-card" aria-labelledby="payment-gateways-title">
+                    <div class="cl-card-head">
+                        <h2 class="cl-card-title" id="payment-gateways-title" th:text="#{store.payments.gateways.title}"></h2>
+                        <a th:if="${newGatewayHref != null}" class="cl-button" th:href="@{${newGatewayHref}}">
+                            <i class="fas fa-plus" aria-hidden="true"></i>
+                            <span th:text="#{store.payments.gateways.add}"></span>
+                        </a>
+                    </div>
+                    <p class="cl-card-desc" th:text="#{store.payments.gateways.description}"></p>
+
+                    <div th:if="${gateways.isEmpty()}" class="cl-alert is-warn">
+                        <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+                        <p class="cl-alert-text">
+                            <span th:text="#{store.payments.gateways.none}"></span>
+                            <span th:unless="${gatewaysInstalled}" th:text="#{store.payments.gateways.noneInstalled}"></span>
+                        </p>
                     </div>
 
-                    <div class="field">
-                        <label class="label" th:text="#{store.payments.cancelUrl}"></label>
-                        <div class="control">
-                            <input class="input" type="text" th:field="*{store.checkoutConfiguration.cancelUrl}" />
-                        </div>
+                    <ul th:unless="${gateways.isEmpty()}" class="cl-list" aria-labelledby="payment-gateways-title">
+                        <li class="cl-list-item" th:each="gateway : ${gateways}">
+                            <div>
+                                <div class="cl-list-title">
+                                    <span th:text="${gateway.displayName()}"></span>
+                                    <span th:if="${gateway.isDefault()}" class="cl-status is-info" th:text="#{store.payments.gateways.default}"></span>
+                                    <span th:unless="${gateway.installed()}" class="cl-status is-warn" th:text="#{store.payments.gateways.missing}"></span>
+                                    <span th:if="${gateway.installed() and !gateway.configured()}" class="cl-status is-warn"
+                                          th:text="#{store.payments.gateways.incomplete}"></span>
+                                    <form th:if="${!gateway.isDefault() and gateway.usable()}" class="cl-list-title-action" method="post"
+                                          th:action="@{${gateway.defaultHref()}}">
+                                        <button type="submit" class="cl-link-button" th:text="#{store.payments.gateways.makeDefault}"
+                                                th:attr="aria-label=#{store.payments.gateways.makeDefault.for(${gateway.displayName()})}"></button>
+                                    </form>
+                                </div>
+                                <p th:unless="${gateway.installed()}" class="cl-list-desc" th:text="#{store.payments.gateways.missing.text}"></p>
+                                <p th:if="${gateway.installed() and !gateway.configured()}" class="cl-list-desc"
+                                   th:text="#{store.payments.gateways.incomplete.text}"></p>
+                            </div>
+                            <div class="cl-list-actions">
+                                <a th:if="${gateway.installed()}" class="cl-link-button" th:href="@{${gateway.editHref()}}"
+                                   th:text="${gateway.configured()} ? #{store.payments.gateways.edit} : #{store.payments.gateways.complete}"
+                                   th:attr="aria-label=#{store.payments.gateways.edit.for(${gateway.displayName()})}"></a>
+                                <a class="cl-link-button is-danger" th:href="@{${gateway.disconnectHref()}}" data-cl-confirm
+                                   th:text="#{store.payments.gateways.disconnect}"
+                                   th:attr="aria-label=#{store.payments.gateway.disconnect.title(${gateway.displayName()})},
+                                            data-cl-confirm-title=#{store.payments.gateway.disconnect.title(${gateway.displayName()})},
+                                            data-cl-confirm-message=${gatewayDisconnectMessages[gateway.name()]},
+                                            data-cl-confirm-action=#{store.payments.gateway.disconnect.action}"></a>
+                            </div>
+                        </li>
+                    </ul>
+                </section>
+
+                <section class="cl-card" aria-labelledby="bank-accounts-title">
+                    <div class="cl-card-head">
+                        <h2 class="cl-card-title" id="bank-accounts-title" th:text="#{store.payments.accounts.title}"></h2>
+                        <a class="cl-button" th:href="@{${newAccountHref}}">
+                            <i class="fas fa-plus" aria-hidden="true"></i>
+                            <span th:text="#{store.payments.accounts.add}"></span>
+                        </a>
+                    </div>
+                    <p class="cl-card-desc" th:text="#{store.payments.accounts.description}"></p>
+
+                    <div th:if="${!accounts.isEmpty() and !#lists.contains(accounts.![isDefault()], true)}" class="cl-alert is-warn">
+                        <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+                        <p class="cl-alert-text" th:text="#{store.payments.accounts.noDefault}"></p>
                     </div>
 
-                    <div class="field">
-                        <label class="label" th:text="#{store.payments.numberOfAcceptedPricelist}"></label>
-                        <div class="control">
-                            <input class="input" type="number" th:field="*{store.checkoutConfiguration.numberOfAcceptedPricelists}" />
-                        </div>
-                    </div>
-                    <div class="field">
-                        <label class="label" th:text="#{store.payments.currency}"></label>
-                        <div class="control">
-                            <input class="input" type="text" th:field="*{store.checkoutConfiguration.currency}" />
-                        </div>
-                    </div>
-                    <fieldset class="box">
-                        <legend class="label" th:text="#{store.delivery.options}"></legend>
-                        <table class="table is-fullwidth is-striped">
-                            <thead>
-                            <tr>
-                                <th th:text="#{store.delivery.option.name}"></th>
-                                <th th:text="#{store.delivery.option.description}"></th>
-                                <th th:text="#{store.delivery.option.price}"></th>
-                                <th th:text="#{store.delivery.option.shipmentType}"></th>
-                            </tr>
-                            </thead>
-                            <tbody th:each="option, iterStat : ${form.store.checkoutConfiguration.deliveryOptions}">
-                            <tr>
-                                <td>
-                                    <input type="hidden" th:field="*{store.checkoutConfiguration.deliveryOptions[__${iterStat.index}__].id}" />
-                                    <input class="input" type="text" th:field="*{store.checkoutConfiguration.deliveryOptions[__${iterStat.index}__].name}" th:placeholder="#{store.delivery.option.name}" />
-                                </td>
-                                <td>
-                                    <input class="input" type="text" th:field="*{store.checkoutConfiguration.deliveryOptions[__${iterStat.index}__].description}" th:placeholder="#{store.delivery.option.description}" />
-                                </td>
-                                <td>
-                                    <input class="input" type="number" step="0.01" th:field="*{store.checkoutConfiguration.deliveryOptions[__${iterStat.index}__].price}" th:placeholder="#{store.delivery.option.price}" />
-                                </td>
-                                <td>
-                                    <div class="select">
-                                        <select th:field="*{store.checkoutConfiguration.deliveryOptions[__${iterStat.index}__].type}">
-                                            <option th:each="st : ${shipmentTypes}" th:value="${st}" th:text="${enumI18n.localize(st)}"></option>
-                                        </select>
-                                    </div>
-                                </td>
-                            </tr>
-                            </tbody>
-                        </table>
-                    </fieldset>
+                    <ul th:unless="${accounts.isEmpty()}" class="cl-list" aria-labelledby="bank-accounts-title">
+                        <li class="cl-list-item" th:each="account : ${accounts}">
+                            <div>
+                                <div class="cl-list-title">
+                                    <span th:text="${account.title()}"></span>
+                                    <span th:if="${account.isDefault()}" class="cl-status is-info" th:text="#{store.payments.accounts.default}"></span>
+                                    <span th:unless="${account.ibanValid()}" class="cl-status is-warn" th:text="#{store.payments.accounts.ibanInvalid}"></span>
+                                    <form th:if="${!account.isDefault() and account.ibanValid()}" class="cl-list-title-action" method="post"
+                                          th:action="@{${account.defaultHref()}}">
+                                        <button type="submit" class="cl-link-button" th:text="#{store.payments.accounts.makeDefault}"
+                                                th:attr="aria-label=#{store.payments.accounts.makeDefault.for(${account.title()})}"></button>
+                                    </form>
+                                </div>
+                                <p class="cl-list-desc cl-tabular" th:text="${account.iban()}"></p>
+                                <p th:if="${account.detailLine() != null}" class="cl-list-desc" th:text="${account.detailLine()}"></p>
+                            </div>
+                            <div class="cl-list-actions">
+                                <a class="cl-link-button" th:href="@{${account.editHref()}}"
+                                   th:text="${account.ibanValid()} ? #{store.payments.accounts.edit} : #{store.payments.accounts.fix}"
+                                   th:attr="aria-label=#{store.payments.accounts.edit.for(${account.title()})}"></a>
+                                <a class="cl-link-button is-danger" th:href="@{${account.deleteHref()}}" data-cl-confirm
+                                   th:text="#{store.payments.accounts.delete}"
+                                   th:attr="aria-label=#{store.payments.account.delete.title(${account.title()})},
+                                            data-cl-confirm-title=#{store.payments.account.delete.title(${account.title()})},
+                                            data-cl-confirm-message=${accounts.size() == 1}
+                                                ? #{store.payments.account.delete.message.last}
+                                                : #{store.payments.account.delete.message},
+                                            data-cl-confirm-action=#{store.payments.account.delete.action}"></a>
+                            </div>
+                        </li>
+                    </ul>
+                    <p th:if="${accounts.isEmpty()}" class="cl-list-empty" th:text="#{store.payments.accounts.empty}"></p>
+                </section>
 
-                    <div class="field is-grouped">
-                        <div class="control">
-                            <button class="button is-primary" type="submit" th:text="#{general.save}"></button>
+                <section class="cl-card" aria-labelledby="delivery-options-title">
+                    <div class="cl-card-head">
+                        <h2 class="cl-card-title" id="delivery-options-title" th:text="#{store.payments.delivery.title}"></h2>
+                        <a class="cl-button" th:href="@{${newDeliveryOptionHref}}">
+                            <i class="fas fa-plus" aria-hidden="true"></i>
+                            <span th:text="#{store.payments.delivery.add}"></span>
+                        </a>
+                    </div>
+                    <p class="cl-card-desc" th:text="#{store.payments.delivery.description}"></p>
+
+                    <ul th:unless="${deliveryOptions.isEmpty()}" class="cl-list" aria-labelledby="delivery-options-title">
+                        <li class="cl-list-item" th:each="option : ${deliveryOptions}">
+                            <div>
+                                <div class="cl-list-title">
+                                    <span th:text="${option.name()}"></span>
+                                </div>
+                                <p class="cl-list-desc">
+                                    <span th:if="${option.typeKey() != null}" th:text="#{${option.typeKey()}}"></span>
+                                    <span th:if="${option.typeKey() != null}" aria-hidden="true">·</span>
+                                    <span class="cl-tabular" th:text="#{store.payments.delivery.price(${#numbers.formatDecimal(option.price(), 1, 'DEFAULT', 2, 'DEFAULT')})}"></span>
+                                </p>
+                                <p th:if="${option.description() != null}" class="cl-list-desc" th:text="${option.description()}"></p>
+                            </div>
+                            <div class="cl-list-actions">
+                                <a class="cl-link-button" th:href="@{${option.editHref()}}" th:text="#{store.payments.delivery.edit}"
+                                   th:attr="aria-label=#{store.payments.delivery.edit.for(${option.name()})}"></a>
+                                <a class="cl-link-button is-danger" th:href="@{${option.deleteHref()}}" data-cl-confirm
+                                   th:text="#{store.payments.delivery.delete}"
+                                   th:attr="aria-label=#{store.payments.delivery.delete.title(${option.name()})},
+                                            data-cl-confirm-title=#{store.payments.delivery.delete.title(${option.name()})},
+                                            data-cl-confirm-message=#{store.payments.delivery.delete.message},
+                                            data-cl-confirm-action=#{store.payments.delivery.delete.action}"></a>
+                            </div>
+                        </li>
+                    </ul>
+                    <p th:if="${deliveryOptions.isEmpty()}" class="cl-list-empty" th:text="#{store.payments.delivery.empty}"></p>
+                </section>
+
+                <form th:fragment="checkoutForm" id="payments-checkout-form" class="cl-form"
+                      th:action="@{${checkoutAction}}" th:object="${checkoutForm}" method="post" novalidate data-cl-async
+                      th:attr="data-success-message=${savedMessage}, data-error-message=#{form.save.failed}">
+                    <div th:replace="~{fragments/settings-form :: errorSummary('payments-checkout-errors', ${checkoutErrors}, null)}"></div>
+
+                    <div class="cl-card">
+                        <fieldset class="cl-fieldset">
+                            <legend class="cl-fieldset-title" th:text="#{store.payments.checkout.return.title}"></legend>
+                            <div th:if="${returnToLocalMachine}" class="cl-alert is-warn">
+                                <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+                                <p class="cl-alert-text" th:text="#{store.payments.checkout.localhost}"></p>
+                            </div>
+                            <div class="cl-form-grid">
+                                <div th:insert="~{fragments/settings-form :: textField('successUrl', 'store.payments.checkout.successUrl', *{successUrl}, 'url', 'off', true, ${checkoutErrors['successUrl']}, #{store.payments.checkout.successUrl.help})}"></div>
+                                <div th:insert="~{fragments/settings-form :: textField('cancelUrl', 'store.payments.checkout.cancelUrl', *{cancelUrl}, 'url', 'off', true, ${checkoutErrors['cancelUrl']}, #{store.payments.checkout.cancelUrl.help})}"></div>
+                            </div>
+                        </fieldset>
+                        <fieldset class="cl-fieldset">
+                            <legend class="cl-fieldset-title" th:text="#{store.payments.checkout.settlement.title}"></legend>
+                            <div class="cl-form-grid">
+                                <div class="cl-span-3" th:insert="~{fragments/settings-form :: selectField('currency', 'store.payments.checkout.currency', *{currency}, ${currencies}, true, ${checkoutErrors['currency']}, #{store.payments.checkout.currency.help})}"></div>
+                                <div class="cl-span-3" th:insert="~{fragments/settings-form :: textField('acceptedPricelists', 'store.payments.checkout.pricelists', *{acceptedPricelists}, 'number', 'off', true, ${checkoutErrors['acceptedPricelists']}, #{store.payments.checkout.pricelists.help})}"></div>
+                            </div>
+                        </fieldset>
+                        <div class="cl-card-footer">
+                            <button class="cl-button is-primary" type="submit" th:text="#{form.save.changes}"></button>
                         </div>
                     </div>
                 </form>
             </div>
 
-            <div th:replace="~{fragments/integration-panel :: panel(${connectedIntegrations}, ${availableProviders}, ${selectedProviderName}, #{store.payments.provider}, ${form.providerConfiguration}, 'payments', ${form.store.storeId}, true)}"></div>
-
+            <dialog th:replace="~{fragments/confirm-dialog :: dialog}"></dialog>
         </div>
     </section>
-
+    <script th:if="${!checkoutErrors.isEmpty()}">
+        document.getElementById('payments-checkout-errors').focus();
+    </script>
+    <script th:src="@{/js/async-form.js}" defer></script>
+    <script th:src="@{/js/confirm-dialog.js}" defer></script>
 </div>
-
 </body>
 </html>

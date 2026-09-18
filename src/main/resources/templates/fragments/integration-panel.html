@@ -10,7 +10,6 @@
                 <tr>
                     <th th:text="#{store.integrations.provider.name}"></th>
                     <th th:text="#{store.marketplaces.status}"></th>
-                    <th th:if="${showDefault}" th:text="#{store.integrations.default}"></th>
                     <th th:text="#{general.actions}"></th>
                 </tr>
             </thead>
@@ -21,14 +20,6 @@
                         <span class="tag is-success" th:if="${integration.connected}" th:text="#{store.marketplaces.connected}"></span>
                         <span class="tag is-warning" th:if="${!integration.connected && integration.deviceAuth}" th:text="#{store.integrations.deviceauth.pending}"></span>
                         <span class="tag is-danger" th:if="${!integration.connected && !integration.deviceAuth}" th:text="#{store.marketplaces.disconnected}"></span>
-                    </td>
-                    <td th:if="${showDefault}">
-                        <span class="tag is-info" th:if="${integration.isDefault}" th:text="#{store.integrations.default}"></span>
-                        <form th:if="${!integration.isDefault}" th:action="@{/dashboard/store/integrations/default}" method="post" style="display:inline;">
-                            <input type="hidden" name="providerType" th:value="${providerType}"/>
-                            <input type="hidden" name="providerName" th:value="${integration.name}"/>
-                            <button type="submit" class="button is-small is-info is-outlined" th:text="#{store.integrations.set.default}"></button>
-                        </form>
                     </td>
                     <td>
                         <button type="button" th:if="${integration.deviceAuth && !integration.connected}"

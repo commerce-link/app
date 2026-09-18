@@ -201,7 +201,7 @@ public class OfferController {
 
         model.addAttribute("catalogs", catalogs);
         model.addAttribute("deliveryOptions", store.getCheckoutConfiguration() != null
-                ? store.getCheckoutConfiguration().getDeliveryOptions()
+                ? store.getCheckoutConfiguration().deliveryOptionsFor(basket.getDeliveryOptionId())
                 : List.of());
 
         return "offerDetails";

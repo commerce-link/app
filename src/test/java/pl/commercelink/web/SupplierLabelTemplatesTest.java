@@ -76,8 +76,10 @@ class SupplierLabelTemplatesTest {
                 // visible as the selected option instead of silently showing "all"
                 .contains("!#lists.contains(providerOptions.![identity()], searchParams.provider)")
                 .contains("supplierLabels.of(searchParams.provider)");
-        assertThat(template("rma-center-form.html")).contains("th:each=\"option : ${providerOptions}\"");
-        assertThat(template("rma-centers.html")).contains("supplierLabels.of(center.provider)");
+        // The RMA pages resolve the label in the controller (RmaCenterView.title), so the templates must not fall
+        // back to the stored identity, which carries a connection token such as "Elko-k7f3a9c2".
+        assertThat(template("rma-center-form.html")).contains("${providerOptions}");
+        assertThat(template("rma-centers.html")).doesNotContain("${center.provider}").contains("center.title()");
         assertThat(template("warehouse.html")).contains("<select id=\"quickAddSupplier\" name=\"supplier\"")
                 .contains("th:each=\"option : ${providerOptions}\"")
                 .doesNotContain("type=\"text\" id=\"quickAddSupplier\"");

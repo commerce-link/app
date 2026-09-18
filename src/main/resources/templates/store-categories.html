@@ -3,51 +3,59 @@
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
       layout:decorate="~{layout}">
 <body>
-
 <div layout:fragment="content">
-
     <section class="cl-page">
         <div class="cl-page-body">
-
             <div th:replace="~{fragments/settings-header :: header(false, null)}"></div>
-            <p class="subtitle is-6" th:text="#{store.categories.page.description}"></p>
+            <div th:replace="~{fragments/settings-form :: savedAlert}"></div>
 
-
-            <div class="box" th:if="${#lists.isEmpty(categoryNames)}">
-                <p th:text="#{store.enabled.categories.unavailable}"></p>
+            <div th:if="${choices.isEmpty()}" class="cl-card">
+                <div class="cl-alert is-warn">
+                    <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+                    <p class="cl-alert-text" th:text="#{store.enabled.categories.unavailable}"></p>
+                </div>
             </div>
 
-            <form th:if="${!#lists.isEmpty(categoryNames)}" th:action="@{/dashboard/store/categories}" method="post">
-                <input type="hidden" name="storeId" th:value="${storeId}"/>
+            <form th:unless="${choices.isEmpty()}" th:fragment="categoriesForm" id="store-categories-form"
+                  class="cl-form is-wide" th:action="@{${formAction}}" method="post" novalidate data-cl-async
+                  th:attr="data-success-message=${savedMessage}, data-error-message=#{form.save.failed}">
+                <div class="cl-card">
+                    <div class="cl-card-head">
+                        <h2 class="cl-card-title" id="store-categories-title"
+                            th:text="#{store.categories.list.title}"></h2>
+                    </div>
+                    <p class="cl-card-desc" th:text="#{store.categories.page.description}"></p>
 
-                <div class="box">
-                    <div class="columns is-multiline">
-                        <div class="column is-one-third" th:each="categoryName : ${categoryNames}">
-                            <label class="checkbox">
-                                <input type="checkbox" name="enabledCategories"
-                                       th:value="${categoryName}"
-                                       th:checked="${enabledCategories.contains(categoryName)}"/>
-                                <span th:text="${categoryName}"></span>
-                            </label>
+                    <div th:if="${selectedCount == 0}" class="cl-alert is-warn">
+                        <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+                        <div>
+                            <p class="cl-alert-title" th:text="#{store.categories.none.title}"></p>
+                            <p class="cl-alert-text" th:text="#{store.categories.none.text}"></p>
                         </div>
                     </div>
-                </div>
 
-                <div class="field is-grouped">
-                    <div class="control">
-                        <button type="submit" class="button is-primary" th:text="#{general.save}"></button>
-                    </div>
-                    <div class="control">
-                        <a th:href="@{${isSuperAdmin} ? '/dashboard/store/' + ${storeId} : '/dashboard/store'}"
-                           class="button" th:text="#{general.cancel}"></a>
+                    <ul class="cl-check-columns" aria-labelledby="store-categories-title">
+                        <li th:each="choice : ${choices}">
+                            <label class="cl-check">
+                                <input type="checkbox" name="enabledCategories" th:value="${choice.name()}"
+                                       th:checked="${choice.selected()}"/>
+                                <span class="cl-check-text">
+                                    <span th:text="${choice.name()}"></span>
+                                    <span th:unless="${choice.inCatalogue()}" class="cl-status is-warn"
+                                          th:text="#{store.categories.missing}"></span>
+                                </span>
+                            </label>
+                        </li>
+                    </ul>
+
+                    <div class="cl-card-footer">
+                        <button class="cl-button is-primary" type="submit" th:text="#{form.save.changes}"></button>
                     </div>
                 </div>
             </form>
-
         </div>
     </section>
-
+    <script th:src="@{/js/async-form.js}" defer></script>
 </div>
-
 </body>
 </html>

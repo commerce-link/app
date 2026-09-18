@@ -3,7 +3,6 @@ package pl.commercelink.starter.email;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import pl.commercelink.orders.notifications.EmailNotificationType;
-import pl.commercelink.stores.ClientNotificationsConfiguration;
 import pl.commercelink.templates.EmailTemplate;
 import software.amazon.awssdk.services.sesv2.SesV2Client;
 import software.amazon.awssdk.services.sesv2.model.*;
@@ -36,15 +35,14 @@ public class EmailClient {
     }
 
     public boolean send(String storeId, EmailNotificationType type, EmailNotification msg) {
-        if (!configProvider.supports(storeId, type)) {
+        NotificationSettings settings = configProvider.settings(storeId);
+        if (settings == null || !settings.supports(type)) {
             return false;
         }
 
-        ClientNotificationsConfiguration notificationsConfig = configProvider.getConfig(storeId);
-        String templateName = notificationsConfig.getTemplateName(type);
-        String replyToEmail = notificationsConfig.getReplyToEmail() != null ? notificationsConfig.getReplyToEmail() : defaultSenderEmail;
-
-        return sendInternal(storeId, templateName, msg, defaultSenderEmail, notificationsConfig.getSenderName(), replyToEmail);
+        String templateName = settings.configuration().getTemplateName(type);
+        String replyToEmail = settings.replyToEmail() != null ? settings.replyToEmail() : defaultSenderEmail;
+        return sendInternal(storeId, templateName, msg, defaultSenderEmail, settings.senderName(), replyToEmail);
     }
 
     private boolean sendInternal(String storeId, String templateName, EmailNotification msg, String senderEmail, String senderName, String replyToEmail) {
@@ -77,7 +75,7 @@ public class EmailClient {
                 .build();
 
         SendEmailRequest request = SendEmailRequest.builder()
-                .fromEmailAddress(String.format("\"%s\" <%s>", senderName, senderEmail))
+                .fromEmailAddress(FromHeader.of(senderName, senderEmail))
                 .destination(destination)
                 .replyToAddresses(replyToEmail)
                 .content(emailContent)

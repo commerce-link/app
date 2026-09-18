@@ -11,7 +11,6 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
-import pl.commercelink.invoicing.InvoicingProviderFactory;
 import pl.commercelink.inventory.supplier.StoreSupplierConnectionService;
 import pl.commercelink.inventory.supplier.SupplierConnectionViewFactory;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
@@ -19,12 +18,8 @@ import pl.commercelink.provider.api.ProviderField;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.marketplace.MarketplaceConnectionService;
 import pl.commercelink.marketplace.MarketplaceProviderFactory;
-import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
-import pl.commercelink.payments.PaymentProviderFactory;
-import pl.commercelink.printing.PrintProviderRegistry;
-import pl.commercelink.products.PimCategoryOptions;
 import pl.commercelink.shipping.ShippingProviderFactory;
 import pl.commercelink.shipping.api.Carrier;
 import pl.commercelink.shipping.api.ShippingProviderDescriptor;
@@ -36,10 +31,10 @@ import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.web.dtos.CarrierSelectionForm;
 import pl.commercelink.web.dtos.BrandingForm;
 import pl.commercelink.web.dtos.CompanyDetailsForm;
+import pl.commercelink.web.dtos.CountryOptions;
 import pl.commercelink.web.dtos.ConnectedIntegration;
 import pl.commercelink.web.dtos.FulfilmentSettingsForm;
 import pl.commercelink.web.dtos.ParcelForm;
-import pl.commercelink.web.dtos.PrinterForm;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -64,11 +59,6 @@ public class StoreController {
     @Autowired
     private ShippingProviderFactory shippingProviderFactory;
 
-    @Autowired
-    private InvoicingProviderFactory invoicingProviderFactory;
-
-    @Autowired
-    private PaymentProviderFactory paymentProviderFactory;
 
     @Autowired
     private MarketplaceProviderFactory marketplaceProviderFactory;
@@ -87,12 +77,6 @@ public class StoreController {
 
     @Autowired
     private MessageSource messageSource;
-
-    @Autowired
-    private PrintProviderRegistry printProviderRegistry;
-
-    @Autowired
-    private PimCategoryOptions pimCategoryOptions;
 
     @Autowired
     private StoreSettingsOverviewFactory storeSettingsOverviewFactory;
@@ -137,41 +121,6 @@ public class StoreController {
                 + (branding != null && branding.getLogoVersion() != null ? "?v=" + branding.getLogoVersion() : ""));
         model.addAttribute("logoMaxBytes", BrandingForm.LOGO_MAX_BYTES);
         return "store-branding";
-    }
-
-    @GetMapping("/dashboard/store/invoicing")
-    @PreAuthorize("hasRole('ADMIN')")
-    public String storeInvoicing(Model model) {
-        return renderStoreInvoicing(getStoreId(), model);
-    }
-
-    @GetMapping("/dashboard/store/{storeId}/invoicing")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public String superAdminStoreInvoicing(@PathVariable String storeId, Model model) {
-        return renderStoreInvoicing(storeId, model);
-    }
-
-    private String renderStoreInvoicing(String storeId, Model model) {
-        Store store = storesRepository.findById(storeId);
-        if (store == null) {
-            model.addAttribute("error", "Store not found");
-            return "error";
-        }
-
-        store.getBankAccounts().add(new BankAccount());
-
-        if (store.getInvoicingConfiguration() == null) {
-            store.setInvoicingConfiguration(new InvoicingConfiguration());
-        }
-
-        StoreForm form = new StoreForm(store);
-        form.setProviderConfiguration(invoicingProviderFactory.loadConfigurationForUI(store));
-
-        model.addAttribute("form", form);
-        model.addAttribute("availableProviders", invoicingProviderFactory.availableProviders());
-        model.addAttribute("selectedProviderName", form.getInvoicingSoftwareProvider());
-        model.addAttribute("connectedIntegrations", connectedIntegration(form.getInvoicingSoftwareProvider()));
-        return "store-invoicing";
     }
 
     @GetMapping("/dashboard/store/shipping")
@@ -380,35 +329,6 @@ public class StoreController {
                 : "redirect:/dashboard/store/shipping";
     }
 
-    @GetMapping("/dashboard/store/notification")
-    @PreAuthorize("hasRole('ADMIN')")
-    public String storeNotification(Model model) {
-        return renderStoreNotification(getStoreId(), model);
-    }
-
-    @GetMapping("/dashboard/store/{storeId}/notification")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public String superAdminStoreNotification(@PathVariable String storeId, Model model) {
-        return renderStoreNotification(storeId, model);
-    }
-
-    private String renderStoreNotification(String storeId, Model model) {
-        Store store = storesRepository.findById(storeId);
-        if (store == null) {
-            model.addAttribute("error", "Store not found");
-            return "error";
-        }
-
-        if (store.getClientNotificationsConfiguration() == null) {
-            store.setClientNotificationsConfiguration(new ClientNotificationsConfiguration());
-        }
-
-        StoreForm form = new StoreForm(store);
-
-        model.addAttribute("form", form);
-        return "store-notification";
-    }
-
     @GetMapping("/dashboard/store/fulfilment")
     @PreAuthorize("hasRole('ADMIN')")
     public String storeFulfilmentConfiguration(Model model) {
@@ -475,104 +395,6 @@ public class StoreController {
         return "store-fulfilment";
     }
 
-    @GetMapping("/dashboard/store/categories")
-    @PreAuthorize("hasRole('ADMIN')")
-    public String storeCategories(Model model) {
-        return renderStoreCategories(getStoreId(), model);
-    }
-
-    @GetMapping("/dashboard/store/{storeId}/categories")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public String superAdminStoreCategories(@PathVariable String storeId, Model model) {
-        return renderStoreCategories(storeId, model);
-    }
-
-    private String renderStoreCategories(String storeId, Model model) {
-        Store store = storesRepository.findById(storeId);
-        if (store == null) {
-            model.addAttribute("error", "Store not found");
-            return "error";
-        }
-
-        model.addAttribute("storeId", storeId);
-        model.addAttribute("categoryNames", pimCategoryOptions.topLevelNames());
-        model.addAttribute("enabledCategories", store.getEnabledCategories());
-        model.addAttribute("isSuperAdmin", isSuperAdmin());
-
-        return "store-categories";
-    }
-
-    @PostMapping("/dashboard/store/categories")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
-    public String updateStoreCategories(@RequestParam String storeId,
-                                        @RequestParam(required = false) List<String> enabledCategories,
-                                        Locale locale, RedirectAttributes redirectAttributes) {
-        String targetStoreId = isSuperAdmin() ? storeId : getStoreId();
-
-        Store store = storesRepository.findById(targetStoreId);
-        if (store == null) {
-            redirectAttributes.addFlashAttribute("errorMessage", "Store not found.");
-            return redirectToCategories(targetStoreId);
-        }
-        if (store.getFulfilmentConfiguration() == null) {
-            store.setFulfilmentConfiguration(new FulfilmentConfiguration());
-        }
-        store.getFulfilmentConfiguration().setEnabledCategories(
-                enabledCategories != null ? enabledCategories : new ArrayList<>());
-        storesRepository.save(store);
-
-        redirectAttributes.addFlashAttribute("successMessage",
-                messageSource.getMessage("store.categories.update.success", null, locale));
-        return redirectToCategories(targetStoreId);
-    }
-
-    private String redirectToCategories(String storeId) {
-        return isSuperAdmin()
-                ? String.format("redirect:/dashboard/store/%s/categories", storeId)
-                : "redirect:/dashboard/store/categories";
-    }
-
-    @GetMapping("/dashboard/store/payments")
-    @PreAuthorize("hasRole('ADMIN')")
-    public String storePayments(Model model) {
-        return renderStorePayments(getStoreId(), model);
-    }
-
-    @GetMapping("/dashboard/store/{storeId}/payments")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public String superAdminStorePayments(@PathVariable String storeId, Model model) {
-        return renderStorePayments(storeId, model);
-    }
-
-    private String renderStorePayments(String storeId, Model model) {
-        Store store = storesRepository.findById(storeId);
-        if (store == null) {
-            model.addAttribute("error", "Store not found");
-            return "error";
-        }
-
-        // a store created by StoreCreationService has no checkout configuration until this page is saved once
-        CheckoutConfiguration checkoutConfiguration = Objects.requireNonNullElseGet(
-                store.getCheckoutConfiguration(), CheckoutConfiguration::new);
-        store.setCheckoutConfiguration(checkoutConfiguration);
-        checkoutConfiguration.getDeliveryOptions().add(new DeliveryOption());
-        checkoutConfiguration.getDeliveryOptions().add(new DeliveryOption());
-
-        StoreForm form = new StoreForm(store);
-        form.setProviderConfiguration(new HashMap<>());
-
-        List<ConnectedIntegration> integrations = store.getPayments().stream()
-                .map(p -> new ConnectedIntegration(p.getName(), true, p.is_default()))
-                .toList();
-
-        model.addAttribute("form", form);
-        model.addAttribute("availableProviders", paymentProviderFactory.availableProviders());
-        model.addAttribute("selectedProviderName", form.getPaymentProviderName());
-        model.addAttribute("shipmentTypes", ShipmentType.values());
-        model.addAttribute("connectedIntegrations", integrations);
-
-        return "store-payments";
-    }
 
     @GetMapping("/dashboard/store/marketplaces")
     @PreAuthorize("hasRole('ADMIN')")
@@ -627,42 +449,9 @@ public class StoreController {
         CompanyDetailsForm form = submitted != null ? submitted : CompanyDetailsForm.from(store.getBillingDetails());
         model.addAttribute("form", form);
         model.addAttribute("errors", errors);
-        model.addAttribute("countries", CompanyDetailsForm.countryOptions(form.getCountry(), locale));
+        model.addAttribute("countries", CountryOptions.forPicker(form.getCountry(), locale));
         model.addAttribute("formAction", companyDetailsPath(storeId));
         return "store-company-details";
-    }
-
-    @GetMapping("/dashboard/store/rma")
-    @PreAuthorize("hasRole('ADMIN')")
-    public String storeRMAConfig(Model model) {
-        return renderStoreRMAConfig(getStoreId(), model);
-    }
-
-    @GetMapping("/dashboard/store/{storeId}/rma")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public String superAdminRMAConfig(@PathVariable String storeId, Model model) {
-        return renderStoreRMAConfig(storeId, model);
-    }
-
-    private String renderStoreRMAConfig(String storeId, Model model) {
-        Store store = storesRepository.findById(storeId);
-        if (store == null) {
-            model.addAttribute("error", "Store not found");
-            return "error";
-        }
-        if (store.getRmaConfiguration() == null) {
-            store.setRmaConfiguration(new RMAConfiguration());
-        }
-
-        StoreForm form = new StoreForm(store);
-
-        List<AuthorizedCarrier> carriers = store.getShippingConfiguration() != null
-                ? store.getShippingConfiguration().getAuthorizedCarriers()
-                : Collections.emptyList();
-
-        model.addAttribute("form", form);
-        model.addAttribute("carrierTypes", carriers);
-        return "store-rma";
     }
 
     // The store is taken from the session (ADMIN) or the path (SUPER_ADMIN), never from the submitted form.
@@ -732,26 +521,6 @@ public class StoreController {
                 : "/dashboard/store/branding";
     }
 
-    @PostMapping("/dashboard/store/invoicing/edit")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
-    public String updateStoreInvoicing(@ModelAttribute StoreForm form, Locale locale, RedirectAttributes redirectAttributes) {
-        Store existingStore = storesRepository.findById(form.getStore().getStoreId());
-        existingStore.setInvoicingConfiguration(form.getStore().getInvoicingConfiguration());
-
-        List<BankAccount> validAccounts = form.getStore().getBankAccounts().stream()
-                .filter(BankAccount::isComplete)
-                .peek(account -> account.set_default(account.getId().equals(form.getDefaultBankAccountId())))
-                .collect(Collectors.toList());
-        existingStore.setBankAccounts(validAccounts);
-
-        storesRepository.save(existingStore);
-        redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("store.invoicing.update.success",null, locale));
-
-        return isSuperAdmin()
-                ? String.format("redirect:/dashboard/store/%s/invoicing", form.getStore().getStoreId())
-                : "redirect:/dashboard/store/invoicing";
-    }
-
     @PostMapping("/dashboard/store/shipping/carriers/fetch")
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public String fetchAvailableCarriers(@RequestParam String storeId, Model model) {
@@ -811,43 +580,6 @@ public class StoreController {
                 : "redirect:/dashboard/store/shipping";
     }
 
-    @PostMapping("/dashboard/store/notification/edit")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
-    public String updateStoreNotification(@ModelAttribute StoreForm form, Locale locale, RedirectAttributes redirectAttributes) {
-        Store existingStore = storesRepository.findById(form.getStore().getStoreId());
-        if (existingStore.getClientNotificationsConfiguration() == null) {
-            existingStore.setClientNotificationsConfiguration(new ClientNotificationsConfiguration());
-        }
-
-        ClientNotificationsConfiguration clientNotificationsConfiguration = form.getStore().getClientNotificationsConfiguration();
-        if (clientNotificationsConfiguration != null) {
-            clientNotificationsConfiguration.setSupportedTemplates(existingStore.getClientNotificationsConfiguration().getSupportedTemplates());
-            existingStore.setClientNotificationsConfiguration(clientNotificationsConfiguration);
-        }
-        storesRepository.save(existingStore);
-        redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("store.notification.update.success",null , locale));
-
-        return isSuperAdmin()
-                ? String.format("redirect:/dashboard/store/%s/notification", form.getStore().getStoreId())
-                : "redirect:/dashboard/store/notification";
-    }
-
-    @PostMapping("/dashboard/store/payments/checkout/edit")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
-    public String updateStoreCheckoutConfiguration(@ModelAttribute StoreForm form, Locale locale, RedirectAttributes redirectAttributes) {
-        Store existingStore = storesRepository.findById(form.getStore().getStoreId());
-        CheckoutConfiguration checkoutConfiguration = form.getStore().getCheckoutConfiguration();
-        checkoutConfiguration.getDeliveryOptions().removeIf(o -> !o.isComplete());
-        existingStore.setCheckoutConfiguration(checkoutConfiguration);
-
-        storesRepository.save(existingStore);
-        redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("store.checkout.settings.update.success", null, locale));
-
-        return isSuperAdmin()
-                ? String.format("redirect:/dashboard/store/%s/payments", form.getStore().getStoreId())
-                : "redirect:/dashboard/store/payments";
-    }
-
     // The store is taken from the session (ADMIN) or the path (SUPER_ADMIN), never from the submitted form.
     @PostMapping("/dashboard/store/company-details")
     @PreAuthorize("hasRole('ADMIN')")
@@ -901,202 +633,6 @@ public class StoreController {
         return isSuperAdmin()
                 ? String.format("/dashboard/store/%s/company-details", storeId)
                 : "/dashboard/store/company-details";
-    }
-
-    @PostMapping("/dashboard/store/rma")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
-    public String updateStoreReturnSettings(@ModelAttribute StoreForm form, Locale locale, RedirectAttributes redirectAttributes) {
-        Store existingStore = storesRepository.findById(form.getStore().getStoreId());
-
-        String selectedCarrierName = form.getStore().getRmaConfiguration().getCarrier() != null
-                ? form.getStore().getRmaConfiguration().getCarrier().getName()
-                : null;
-
-        RMAConfiguration rmaConfiguration = new RMAConfiguration();
-        if (selectedCarrierName != null && existingStore.getShippingConfiguration() != null) {
-            existingStore.getShippingConfiguration().getAuthorizedCarriers().stream()
-                    .filter(c -> c.getName().equals(selectedCarrierName))
-                    .findFirst()
-                    .ifPresent(rmaConfiguration::setCarrier);
-        }
-        existingStore.setRmaConfiguration(rmaConfiguration);
-
-        storesRepository.save(existingStore);
-        redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("store.fulfilment.settings.update.success", null, locale));
-
-        return isSuperAdmin()
-                ? String.format("redirect:/dashboard/store/%s/rma", form.getStore().getStoreId())
-                : "redirect:/dashboard/store/rma";
-    }
-
-    @GetMapping("/dashboard/store/warehouse")
-    @PreAuthorize("hasRole('ADMIN')")
-    public String storeWarehouse(Model model) {
-        return renderStoreWarehouse(getStoreId(), model);
-    }
-
-    @GetMapping("/dashboard/store/{storeId}/warehouse")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public String superAdminStoreWarehouse(@PathVariable String storeId, Model model) {
-        return renderStoreWarehouse(storeId, model);
-    }
-
-    private String renderStoreWarehouse(String storeId, Model model) {
-        Store store = storesRepository.findById(storeId);
-        if (store == null) {
-            model.addAttribute("error", "Store not found");
-            return "error";
-        }
-
-        if (store.getWarehouseConfiguration() == null) {
-            store.setWarehouseConfiguration(new WarehouseConfiguration());
-        }
-
-        ShippingDetails blankRow = new ShippingDetails();
-        blankRow.set_default(false);
-        store.getShippingDetails().add(blankRow);
-
-        StoreForm form = new StoreForm(store);
-
-        model.addAttribute("form", form);
-        model.addAttribute("availableProviders", printProviderRegistry.availableProviders());
-        return "store-warehouse";
-    }
-
-    @PostMapping("/dashboard/store/warehouse/edit")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
-    public String updateStoreWarehouse(@ModelAttribute StoreForm form, Locale locale, RedirectAttributes redirectAttributes) {
-        Store existingStore = storesRepository.findById(form.getStore().getStoreId());
-        WarehouseConfiguration existingConfiguration = existingStore.getWarehouseConfiguration();
-        if (existingConfiguration == null) {
-            existingConfiguration = new WarehouseConfiguration();
-            existingStore.setWarehouseConfiguration(existingConfiguration);
-        }
-        WarehouseConfiguration submitted = form.getStore().getWarehouseConfiguration();
-        existingConfiguration.setWarehouseId(submitted.getWarehouseId());
-        existingConfiguration.setCostCenterId(submitted.getCostCenterId());
-        existingConfiguration.setDocumentsGenerationEnabled(submitted.isDocumentsGenerationEnabled());
-
-        existingStore.setShippingDetails(shippingDetailsWithDefault(
-                form.getStore().getShippingDetails(), form.getDefaultShippingDetailIndex()));
-
-        storesRepository.save(existingStore);
-        redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("store.warehouse.update.success", null, locale));
-
-        return isSuperAdmin()
-                ? String.format("redirect:/dashboard/store/%s/warehouse", form.getStore().getStoreId())
-                : "redirect:/dashboard/store/warehouse";
-    }
-
-    private List<ShippingDetails> shippingDetailsWithDefault(List<ShippingDetails> submitted, int defaultIndex) {
-        ShippingDetails chosen = defaultIndex >= 0 && defaultIndex < submitted.size()
-                ? submitted.get(defaultIndex)
-                : null;
-
-        List<ShippingDetails> kept = submitted.stream()
-                .filter(ShippingDetails::isProperlyFilled)
-                .collect(Collectors.toList());
-
-        kept.forEach(details -> details.set_default(false));
-
-        if (kept.contains(chosen)) {
-            chosen.set_default(true);
-        } else if (!kept.isEmpty()) {
-            kept.getFirst().set_default(true);
-        }
-
-        return kept;
-    }
-
-    @PostMapping("/dashboard/store/warehouse/printers/add")
-    @PreAuthorize("hasRole('ADMIN')")
-    public String addWarehousePrinter(@ModelAttribute PrinterForm form, Locale locale, RedirectAttributes redirectAttributes) {
-        Store store = storesRepository.findById(getStoreId());
-        if (store.getWarehouseConfiguration() == null) {
-            store.setWarehouseConfiguration(new WarehouseConfiguration());
-        }
-
-        Printer printer = new Printer();
-        printer.setName(form.getName());
-        printer.setProviderName(form.getProviderName());
-        printer.setSettings(form.getSettings());
-        store.getWarehouseConfiguration().addPrinter(printer);
-
-        storesRepository.save(store);
-        redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("store.warehouse.printers.add.success", null, locale));
-        return "redirect:/dashboard/store/warehouse";
-    }
-
-    @PostMapping("/dashboard/store/warehouse/printers/delete")
-    @PreAuthorize("hasRole('ADMIN')")
-    public String deleteWarehousePrinter(@RequestParam String name, Locale locale, RedirectAttributes redirectAttributes) {
-        Store store = storesRepository.findById(getStoreId());
-        if (store.getWarehouseConfiguration() != null) {
-            store.getWarehouseConfiguration().removePrinter(name);
-        }
-
-        storesRepository.save(store);
-        redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("store.warehouse.printers.delete.success", null, locale));
-        return "redirect:/dashboard/store/warehouse";
-    }
-
-    @GetMapping("/dashboard/store/report")
-    @PreAuthorize("hasRole('ADMIN')")
-    public String storeReport(Model model) {
-        return renderStoreReport(getStoreId(), model);
-    }
-
-    @GetMapping("/dashboard/store/{storeId}/report")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public String superAdminStoreReport(@PathVariable String storeId, Model model) {
-        return renderStoreReport(storeId, model);
-    }
-
-    private String renderStoreReport(String storeId, Model model) {
-        Store store = storesRepository.findById(storeId);
-        if (store == null) {
-            model.addAttribute("error", "Store not found");
-            return "error";
-        }
-
-        if (store.getReportingConfiguration() == null) {
-            store.setReportingConfiguration(new ReportingConfiguration());
-        }
-
-        StoreForm form = new StoreForm(store);
-        model.addAttribute("form", form);
-        model.addAttribute("apiDomain", apiDomain);
-
-        return "store-report";
-    }
-
-    @PostMapping("/dashboard/store/report")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
-    public String updateStoreReport(@ModelAttribute StoreForm form, Locale locale, RedirectAttributes redirectAttributes) {
-        Store existingStore = storesRepository.findById(form.getStore().getStoreId());
-
-        ReportingConfiguration config = form.getStore().getReportingConfiguration();
-        if (config == null) {
-            config = new ReportingConfiguration();
-        }
-
-        if (config.isGoogleAdsEnabled()) {
-            if (StringUtils.isBlank(config.getGoogleAdsToken())) {
-                config.setGoogleAdsToken(UUID.randomUUID().toString());
-            }
-        } else {
-            config.setGoogleAdsToken(null);
-            config.setGoogleAdsEnabled(false);
-        }
-
-        existingStore.setReportingConfiguration(config);
-        storesRepository.save(existingStore);
-
-        redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("store.report.configuration.update.success", null, locale));
-
-        return isSuperAdmin()
-                ? String.format("redirect:/dashboard/store/%s/report", form.getStore().getStoreId())
-                : "redirect:/dashboard/store/report";
     }
 
     private String getStoreId() { return CustomSecurityContext.getStoreId(); }
