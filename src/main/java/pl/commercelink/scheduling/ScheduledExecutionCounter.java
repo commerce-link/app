@@ -12,26 +12,25 @@ import java.time.ZoneId;
 @Slf4j
 public class ScheduledExecutionCounter {
 
-    private final ScheduledDailyExecutionCountersRepository repository;
+    private final DailyScheduleExecutionCountRepository repository;
     private final Clock clock;
 
     @Autowired
-    public ScheduledExecutionCounter(ScheduledDailyExecutionCountersRepository repository) {
+    public ScheduledExecutionCounter(DailyScheduleExecutionCountRepository repository) {
         this(repository, Clock.system(ZoneId.of(EventBridgeSchedules.TIMEZONE)));
     }
 
-    ScheduledExecutionCounter(ScheduledDailyExecutionCountersRepository repository, Clock clock) {
+    ScheduledExecutionCounter(DailyScheduleExecutionCountRepository repository, Clock clock) {
         this.repository = repository;
         this.clock = clock;
     }
 
-    public void countCompleted(String storeId, ScheduledExecution scheduledExecution, String dimension) {
+    public void countCompleted(String storeId, ScheduledExecution type, String target) {
         LocalDate today = LocalDate.now(clock);
         try {
-            repository.increment(storeId, today, scheduledExecution, dimension);
+            repository.increment(storeId, today, type, target);
         } catch (RuntimeException e) {
-            log.error("Execution not counted: store={} scheduledExecution={} dimension={} date={}",
-                    storeId, scheduledExecution, dimension, today, e);
+            log.error("Execution not counted: store={} type={} target={} date={}", storeId, type, target, today, e);
         }
     }
 }

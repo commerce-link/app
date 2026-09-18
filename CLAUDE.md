@@ -133,7 +133,7 @@ All entities use `@DynamoDBTable`, `@DynamoDBHashKey`, `@DynamoDBRangeKey` annot
 | WarehouseDocumentItems | `WarehouseDocumentItem` | documentId | itemId | GSI `DeliveryIdIndex` |
 | WarehouseDocumentSequences | `WarehouseDocumentSequence` | storeId | sequenceKey | |
 | TaxonomyCategoryMappings | `CategoryMapping` | supplier | rawCategory | |
-| ScheduledDailyExecutionCounters | `ScheduledDailyExecutionCounters` (keys only; counters are dynamic attributes) | storeId | executionDate | |
+| DailyScheduleExecutionCounts | `DailyScheduleExecutionCount` | storeId | counterKey | |
 
 Mongock additionally owns `AppMigrationsHistory` and `mongockLock` (no entity classes). Product information tables (PIM index, brands, queue, category matches) live in the PIM microservice, not in the app — the app consumes the index via HTTP (`/PIM/Index`).
 
@@ -173,17 +173,16 @@ Async work is driven through `@SqsListener` methods. Queue names follow `{domain
 
 ### Scheduled Execution Counters
 
-Per-store schedules (orders import, returns import, supplier feed, pricelist) are billed by how often they actually ran, so every completed execution is counted in the `ScheduledDailyExecutionCounters` table. One item per store and day (`executionDate` in `yyyy-MM-dd`, day boundaries in `EventBridgeSchedules.TIMEZONE`, Europe/Warsaw). The item is flat: every counter is its own top-level number attribute, one total per `ScheduledExecution` plus one per integration, named `<type>#<dimension>`:
+Per-store schedules (orders import, returns import, supplier feed, pricelist) are billed by how often they actually ran, so every completed execution is counted in the `DailyScheduleExecutionCounts` table. One item per store, day, execution type and target (the marketplace, supplier or catalog the schedule belongs to), with the day cut in `EventBridgeSchedules.TIMEZONE`, Europe/Warsaw. The range key is `<date>#<TYPE>#<target>`, so a store's day or month is one `begins_with` query:
 
 ```
-{ storeId, executionDate: "2026-09-17",
-  ordersImport: 147,  "ordersImport#Allegro": 144,  "ordersImport#Empik": 3,
-  returnsImport: 2,   "returnsImport#Allegro": 2,
-  supplierFeed: 1,    "supplierFeed#Wortmann": 1,
-  pricelist: 1,       "pricelist#catalog-1": 1 }
+storeId     counterKey                           executionDate  executionType   target        executionCount
+uma2dqukxr  2026-09-17#ORDERS_IMPORT#Allegro     2026-09-17     ORDERS_IMPORT   Allegro       144
+uma2dqukxr  2026-09-17#ORDERS_IMPORT#Empik       2026-09-17     ORDERS_IMPORT   Empik         3
+uma2dqukxr  2026-09-17#SUPPLIER_FEED#Wortmann    2026-09-17     SUPPLIER_FEED   Wortmann      1
 ```
 
-The dimension is the marketplace, supplier or catalog the schedule belongs to. Counter names are data, so the entity maps only the two keys and every counter, totals included, is a dynamic attribute created by its first write. `ScheduledDailyExecutionCountersRepository` only writes, through the low-level client; nothing reads the counters yet, since billing is not implemented. It does not extend `DynamoDbRepository`, so there is no `save()` that could rewrite counters from a stale copy.
+Totals are never stored: per-type and monthly figures are sums on read (`ScheduleExecutionUsage`, via `ScheduleExecutionUsageService.monthlyUsage` / `dailyUsage`), so they cannot drift from the counts. Enum constant names are part of the key, so renaming a `ScheduledExecution` constant orphans its history.
 
 `ScheduledExecutionCounter.countCompleted(...)` is called as the last step of the success path in each SQS listener, so only runs that did their work are counted:
 
@@ -196,7 +195,7 @@ The dimension is the marketplace, supplier or catalog the schedule belongs to. C
 
 Manual triggers that go through the same queues (e.g. `StoreSupplierFeedScheduler.triggerImmediateImport`) count like scheduled runs; there is no way to tell them apart from the payload. Standard SQS queues are at-least-once, so a redelivered message can count a run twice; this is accepted rather than deduplicated.
 
-Each execution is one atomic `UpdateItem` in `ScheduledDailyExecutionCountersRepository`, `ADD #type :one, #integration :one`, which creates the item and both attributes if missing and raises them together, so concurrent app instances never lose a count. A failed increment is logged at ERROR and swallowed: rethrowing would make SQS redeliver the message and rerun the whole import. Counters are billing data and outlive the store: `StoreDeletionService` does not touch them, so a store deleted mid-month can still be invoiced for the days it ran. The listeners are prod-only (`application.env=prod`), so counting cannot be observed locally beyond the unit tests.
+Each execution is one atomic `UpdateItem` in `DailyScheduleExecutionCountRepository`: `ADD #count :one` raises `executionCount` and `SET` writes the date, type and target, creating the item on the first execution of the day. Concurrent app instances never lose a count. The repository does not extend `DynamoDbRepository`, so there is no `save()` that could overwrite a count from a stale copy. A failed increment is logged at ERROR and swallowed: rethrowing would make SQS redeliver the message and rerun the whole import. Counts are billing data and outlive the store: `StoreDeletionService` does not touch them, so a store deleted mid-month can still be invoiced for the days it ran. The listeners are prod-only (`application.env=prod`); locally they run through the `cl` script's patches.
 
 ### Security
 

@@ -22,7 +22,7 @@ class ScheduledExecutionCounterTest {
     private static final ZoneId WARSAW = ZoneId.of("Europe/Warsaw");
 
     @Mock
-    private ScheduledDailyExecutionCountersRepository repository;
+    private DailyScheduleExecutionCountRepository repository;
 
     private ScheduledExecutionCounter counterAt(String instant) {
         return new ScheduledExecutionCounter(repository, Clock.fixed(Instant.parse(instant), WARSAW));
