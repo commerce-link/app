@@ -21,6 +21,8 @@ public class MarketplaceIntegration {
     private boolean loggedIn;
     @DynamoDBAttribute(attributeName = "ordersImportSchedule")
     private String ordersImportSchedule;
+    @DynamoDBAttribute(attributeName = "returnsImportSchedule")
+    private String returnsImportSchedule;
 
     public MarketplaceIntegration() {
     }
@@ -60,5 +62,13 @@ public class MarketplaceIntegration {
 
     public void setOrdersImportSchedule(String ordersImportSchedule) {
         this.ordersImportSchedule = ordersImportSchedule;
+    }
+
+    public String getReturnsImportSchedule() {
+        return returnsImportSchedule;
+    }
+
+    public void setReturnsImportSchedule(String returnsImportSchedule) {
+        this.returnsImportSchedule = returnsImportSchedule;
     }
 }

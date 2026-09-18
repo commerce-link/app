@@ -215,17 +215,7 @@
                         </div>
                     </div>
 
-                    <div class="field">
-                        <label class="label" th:text="#{order.item.supplier}"></label>
-                        <div class="control">
-                            <div class="select is-fullwidth">
-                                <select id="quickAddSupplier" name="supplier" required>
-                                    <option th:each="option : ${providerOptions}" th:value="${option.identity()}"
-                                            th:text="${option.label()}"></option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
+                    <div th:replace="~{fragments/supplier-choice :: field('quickAddSupplier', ${providerOptions}, false)}"></div>
                 </section>
 
                 <footer class="modal-card-foot">
@@ -311,7 +301,7 @@
             document.getElementById('quickAddMfn').value = '';
             document.getElementById('quickAddPrice').value = '';
             document.getElementById('quickAddQty').value = '1';
-            document.getElementById('quickAddSupplier').selectedIndex = 0;
+            resetSupplierChoice('quickAddSupplier');
             setQuickAddPriceType('net');
             toggleQuickAddModal(true);
         }

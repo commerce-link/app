@@ -83,7 +83,7 @@ class ManualSupplierServiceTest {
     void createRefusesABuiltInOrTypeName() {
         // given
         when(storesRepository.findById("store-1")).thenReturn(storeWith());
-        when(supplierRegistry.getAllSupplierNames()).thenReturn(List.of("Amazon", "Warehouse", "Other", "Kosatec"));
+        when(supplierRegistry.getAllSupplierNames()).thenReturn(List.of("Warehouse", "Other", "Kosatec"));
 
         // when / then
         assertEquals("store.supplier.connection.error.label.reserved", service.create("store-1", "Warehouse").messageCode());
@@ -95,7 +95,7 @@ class ManualSupplierServiceTest {
         // given
         Store store = storeWith(new StoreSupplierConnection("manual-k7f3a9c2", ConnectionMode.MANUAL, true, true));
         when(storesRepository.findById("store-1")).thenReturn(store);
-        when(supplierRegistry.getAllSupplierNames()).thenReturn(List.of("Amazon", "Warehouse", "Other", "Kosatec"));
+        when(supplierRegistry.getAllSupplierNames()).thenReturn(List.of("Warehouse", "Other", "Kosatec"));
 
         // when
         ManualSupplierService.Result result = service.applySelections("store-1", List.of(

@@ -584,29 +584,7 @@
                            th:attr="data-template=#{order.item.price.net.hint}"></p>
                     </div>
 
-                    <div class="field">
-                        <label class="label" th:text="#{order.item.supplier}"></label>
-                        <div class="control">
-                            <div class="select is-fullwidth">
-                                <select id="quickAssignSupplier" name="supplier" required
-                                        onchange="toggleQuickAssignCustomSupplier()"
-                                        data-custom="__custom__">
-                                    <option value="" th:text="#{general.select}"></option>
-                                    <option th:each="option : ${assignableSuppliers}"
-                                            th:value="${option.identity()}" th:text="${option.label()}"></option>
-                                    <option value="__custom__"
-                                            th:text="#{order.item.supplier.custom}"></option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="control mt-2" id="quickAssignCustomSupplierControl" style="display: none;">
-                            <input class="input" type="text" id="quickAssignCustomSupplier" name="customSupplier"
-                                   autocomplete="off" pattern="[\p{L}\p{N}_\-]+"
-                                   th:placeholder="#{order.item.supplier.custom.placeholder}"
-                                   th:title="#{order.item.supplier.custom.format}"/>
-                            <p class="help" th:text="#{order.item.supplier.custom.hint}"></p>
-                        </div>
-                    </div>
+                    <div th:replace="~{fragments/supplier-choice :: field('quickAssignSupplier', ${assignableSuppliers}, true)}"></div>
                 </section>
 
                 <footer class="modal-card-foot">
@@ -1670,26 +1648,10 @@
                 });
             highlightQuickAssignSku();
             document.getElementById('quickAssignPrice').value = '';
-            document.getElementById('quickAssignSupplier').value = '';
-            document.getElementById('quickAssignCustomSupplier').value = '';
-            toggleQuickAssignCustomSupplier();
+            resetSupplierChoice('quickAssignSupplier');
             document.getElementById('quickAssignPrice').setAttribute('data-tax', button.getAttribute('data-tax') || '');
             setQuickAssignPriceType('net');
             toggleQuickAssignModal(true);
-        }
-
-        function toggleQuickAssignCustomSupplier() {
-            const select = document.getElementById('quickAssignSupplier');
-            const custom = select.value === select.getAttribute('data-custom');
-            const control = document.getElementById('quickAssignCustomSupplierControl');
-            const input = document.getElementById('quickAssignCustomSupplier');
-            control.style.display = custom ? '' : 'none';
-            input.required = custom;
-            if (custom) {
-                input.focus();
-            } else {
-                input.value = '';
-            }
         }
 
         function setQuickAssignPriceType(type) {

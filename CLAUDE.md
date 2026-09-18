@@ -99,7 +99,7 @@ The app depends only on contract and shared libraries, never on adapter implemen
 
 ## Terminology
 
-- **Supplier**: A distributor or retailer that supplies goods/inventory. There is **no `Supplier` enum** — suppliers are identified by name (`String`) with a `SupplierInfo` record (name, type, accuracy score, origin, shipping policy) provided by each adapter's `SupplierProviderDescriptor`. `SupplierRegistry` collects all descriptors from `ServiceLoader` and adds three built-in entries: `Amazon`, `Warehouse` (internal), `Other` (fallback). `SupplierType` is `Distributor` or `Retailer`.
+- **Supplier**: A distributor or retailer that supplies goods/inventory. There is **no `Supplier` enum** — suppliers are identified by name (`String`) with a `SupplierInfo` record (name, type, accuracy score, origin, shipping policy) provided by each adapter's `SupplierProviderDescriptor`. `SupplierRegistry` collects all descriptors from `ServiceLoader` and adds two built-in entries: `Warehouse` (internal), `Other` (fallback). `SupplierType` is `Distributor` or `Retailer`.
 - **Provider**: Any pluggable integration (suppliers, marketplaces, payments, shipping, invoicing, printing) using the `provider-api` plugin pattern.
 
 ## Architecture

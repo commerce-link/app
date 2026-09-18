@@ -26,6 +26,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.BiConsumer;
+import java.util.function.Function;
 
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
@@ -39,7 +41,8 @@ public class MarketplaceConnectionService {
     private final StoresRepository storesRepository;
     private final MarketplaceProviderFactory providerFactory;
     private final ProviderConfigurationManager configurationManager;
-    private final MarketplaceOrdersImportScheduler ordersImportScheduler;
+    private final ImportSchedule ordersSchedule;
+    private final ImportSchedule returnsSchedule;
     private final StoreNotificationService notificationService;
     private final int minIntervalMinutes;
 
@@ -47,12 +50,18 @@ public class MarketplaceConnectionService {
                                         MarketplaceProviderFactory providerFactory,
                                         ProviderConfigurationManager configurationManager,
                                         MarketplaceOrdersImportScheduler ordersImportScheduler,
+                                        MarketplaceReturnsImportScheduler returnsImportScheduler,
                                         StoreNotificationService notificationService,
                                         @Value("${scheduling.min-interval-minutes}") int minIntervalMinutes) {
         this.storesRepository = storesRepository;
         this.providerFactory = providerFactory;
         this.configurationManager = configurationManager;
-        this.ordersImportScheduler = ordersImportScheduler;
+        this.ordersSchedule = new ImportSchedule(ordersImportScheduler,
+                MarketplaceIntegration::getOrdersImportSchedule, MarketplaceIntegration::setOrdersImportSchedule,
+                "store.marketplaces.import.schedule.error");
+        this.returnsSchedule = new ImportSchedule(returnsImportScheduler,
+                MarketplaceIntegration::getReturnsImportSchedule, MarketplaceIntegration::setReturnsImportSchedule,
+                "store.marketplaces.returns.schedule.error");
         this.notificationService = notificationService;
         this.minIntervalMinutes = minIntervalMinutes;
     }
@@ -62,7 +71,11 @@ public class MarketplaceConnectionService {
     }
 
     public int defaultIntervalMinutes() {
-        return ordersImportScheduler.defaultIntervalMinutes();
+        return ordersSchedule.scheduler().defaultIntervalMinutes();
+    }
+
+    public int returnsDefaultIntervalMinutes() {
+        return returnsSchedule.scheduler().defaultIntervalMinutes();
     }
 
     public List<MarketplaceIntegrationView> views(Store store) {
@@ -74,7 +87,9 @@ public class MarketplaceConnectionService {
                         integration.isLoggedIn(),
                         deviceAuthProviders.contains(integration.getName()),
                         integration.getLastFetchedAt(),
-                        integration.getOrdersImportSchedule()))
+                        new MarketplaceIntegrationView.ImportScheduleView(integration.getOrdersImportSchedule()),
+                        new MarketplaceIntegrationView.ImportScheduleView(integration.getReturnsImportSchedule()),
+                        supportsReturns(integration.getName())))
                 .toList();
     }
 
@@ -104,16 +119,19 @@ public class MarketplaceConnectionService {
     }
 
     public ConnectionUpdateResult connectOrUpdate(Store store, String marketplace,
-                                                  Map<String, String> configuration, String schedule) {
+                                                  Map<String, String> configuration, String schedule,
+                                                  String returnsSchedule) {
         MarketplaceProviderDescriptor descriptor = isBlank(marketplace) ? null : providerFactory.getDescriptor(marketplace);
         if (descriptor == null) {
             return ConnectionUpdateResult.errors(List.of(ErrorMessage.of("store.marketplaces.error.unknown", marketplace)));
         }
         Map<String, String> submitted = configuration == null ? Map.of() : configuration;
         String normalizedSchedule = PollingSchedule.normalizeOrNull(schedule);
+        String normalizedReturnsSchedule = descriptor.supportsReturns() ? PollingSchedule.normalizeOrNull(returnsSchedule) : null;
         List<ErrorMessage> errors = new ArrayList<>();
         validateRequiredFields(store, descriptor, submitted, errors);
-        validateSchedule(marketplace, normalizedSchedule, errors);
+        validateSchedule(marketplace, normalizedSchedule, ordersSchedule, errors);
+        validateSchedule(marketplace, normalizedReturnsSchedule, this.returnsSchedule, errors);
         if (!errors.isEmpty()) {
             return ConnectionUpdateResult.errors(errors);
         }
@@ -125,10 +143,9 @@ public class MarketplaceConnectionService {
             providerFactory.saveConfiguration(store, marketplace, submitted);
             boolean created = store.getMarketplaceIntegration(marketplace) == null;
             MarketplaceIntegration integration = store.connectMarketplace(marketplace, requiresDeviceAuth);
-            if (created || !Objects.equals(normalizedSchedule, integration.getOrdersImportSchedule())) {
-                rememberSchedule(store.getStoreId(), marketplace, compensations);
-                ordersImportScheduler.apply(store.getStoreId(), marketplace, normalizedSchedule);
-                integration.setOrdersImportSchedule(normalizedSchedule);
+            applyIfChanged(store, integration, ordersSchedule, normalizedSchedule, created, compensations);
+            if (descriptor.supportsReturns()) {
+                applyIfChanged(store, integration, this.returnsSchedule, normalizedReturnsSchedule, created, compensations);
             }
             storesRepository.save(store);
         } catch (RuntimeException e) {
@@ -155,8 +172,10 @@ public class MarketplaceConnectionService {
                 rememberSecret(store, descriptor, compensations);
             }
             providerFactory.deleteConfiguration(store, marketplace);
-            rememberSchedule(store.getStoreId(), marketplace, compensations);
-            ordersImportScheduler.delete(store.getStoreId(), marketplace);
+            deleteSchedule(store, marketplace, ordersSchedule, compensations);
+            if (descriptor != null && descriptor.supportsReturns()) {
+                deleteSchedule(store, marketplace, returnsSchedule, compensations);
+            }
             store.removeMarketplaceIntegration(marketplace);
             storesRepository.save(store);
         } catch (RuntimeException e) {
@@ -186,9 +205,29 @@ public class MarketplaceConnectionService {
         compensations.push(() -> configurationManager.restore(store, credentialName, snapshot));
     }
 
-    private void rememberSchedule(String storeId, String marketplace, Deque<Runnable> compensations) {
-        Optional<String> before = ordersImportScheduler.snapshot(storeId, marketplace);
-        compensations.push(() -> ordersImportScheduler.restore(storeId, marketplace, before));
+    private void applyIfChanged(Store store, MarketplaceIntegration integration, ImportSchedule schedule,
+                                String normalized, boolean created, Deque<Runnable> compensations) {
+        if (!created && Objects.equals(normalized, schedule.stored().apply(integration))) {
+            return;
+        }
+        rememberSchedule(store, integration.getName(), schedule, compensations);
+        schedule.scheduler().apply(store.getStoreId(), integration.getName(), normalized);
+        schedule.store().accept(integration, normalized);
+    }
+
+    private void deleteSchedule(Store store, String marketplace, ImportSchedule schedule, Deque<Runnable> compensations) {
+        rememberSchedule(store, marketplace, schedule, compensations);
+        schedule.scheduler().delete(store.getStoreId(), marketplace);
+    }
+
+    private void rememberSchedule(Store store, String marketplace, ImportSchedule schedule, Deque<Runnable> compensations) {
+        Optional<String> before = schedule.scheduler().snapshot(store.getStoreId(), marketplace);
+        compensations.push(() -> schedule.scheduler().restore(store.getStoreId(), marketplace, before));
+    }
+
+    private boolean supportsReturns(String marketplace) {
+        MarketplaceProviderDescriptor descriptor = providerFactory.getDescriptor(marketplace);
+        return descriptor != null && descriptor.supportsReturns();
     }
 
     private void compensate(Deque<Runnable> compensations) {
@@ -215,7 +254,8 @@ public class MarketplaceConnectionService {
         }
     }
 
-    private void validateSchedule(String marketplace, String normalizedSchedule, List<ErrorMessage> errors) {
+    private void validateSchedule(String marketplace, String normalizedSchedule, ImportSchedule schedule,
+                                  List<ErrorMessage> errors) {
         if (normalizedSchedule == null) {
             return;
         }
@@ -223,13 +263,17 @@ public class MarketplaceConnectionService {
             PollingSchedule.parse(normalizedSchedule, minIntervalMinutes);
         } catch (InvalidScheduleException e) {
             if (e.getReason() == InvalidScheduleException.Reason.TOO_FREQUENT) {
-                errors.add(ErrorMessage.of("store.marketplaces.import.schedule.error.too.frequent",
-                        marketplace, normalizedSchedule, minIntervalMinutes));
+                errors.add(ErrorMessage.of(schedule.errorPrefix() + ".too.frequent", marketplace, normalizedSchedule, minIntervalMinutes));
             } else {
-                errors.add(ErrorMessage.of("store.marketplaces.import.schedule.error.invalid",
-                        marketplace, normalizedSchedule));
+                errors.add(ErrorMessage.of(schedule.errorPrefix() + ".invalid", marketplace, normalizedSchedule));
             }
         }
+    }
+
+    private record ImportSchedule(MarketplaceImportScheduler scheduler,
+                                  Function<MarketplaceIntegration, String> stored,
+                                  BiConsumer<MarketplaceIntegration, String> store,
+                                  String errorPrefix) {
     }
 
     private boolean hasStoredConfiguration(Store store, String marketplace) {

@@ -59,10 +59,12 @@ class StoreMarketplaceControllerTest {
         when(messageSource.getMessage(any(String.class), any(), any(Locale.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
         when(marketplaceConnectionService.views(store)).thenReturn(List.of(
-                new MarketplaceIntegrationView("Empik", "EmpikPlace", true, false, null, "0/15 * * * ? *")));
+                new MarketplaceIntegrationView("Empik", "EmpikPlace", true, false, null,
+                        new MarketplaceIntegrationView.ImportScheduleView("0/15 * * * ? *"), new MarketplaceIntegrationView.ImportScheduleView(null), true)));
         when(marketplaceConnectionService.availableMarketplaces(store)).thenReturn(List.of());
         when(marketplaceConnectionService.marketplacesWithStoredConfiguration(store)).thenReturn(Set.of("Empik"));
         when(marketplaceConnectionService.defaultIntervalMinutes()).thenReturn(10);
+        when(marketplaceConnectionService.returnsDefaultIntervalMinutes()).thenReturn(60);
         controller = new StoreMarketplaceController(storesRepository, marketplaceConnectionService, messageSource);
     }
 
@@ -75,7 +77,7 @@ class StoreMarketplaceControllerTest {
     void aSuccessfulSaveReturnsTheRefreshedSectionWithItsSuccessMessage() {
         // given
         MarketplaceConnectionForm form = form("Empik", "0/15 * * * ? *");
-        when(marketplaceConnectionService.connectOrUpdate(store, "Empik", form.getConfiguration(), "0/15 * * * ? *"))
+        when(marketplaceConnectionService.connectOrUpdate(store, "Empik", form.getConfiguration(), "0/15 * * * ? *", "0 8 * * ? *"))
                 .thenReturn(new MarketplaceConnectionService.ConnectionUpdateResult(List.of()));
         ConcurrentModel model = new ConcurrentModel();
         MockHttpServletResponse response = new MockHttpServletResponse();
@@ -91,6 +93,7 @@ class StoreMarketplaceControllerTest {
         assertThat(model.get("sectionMarketplacesWithStoredConfig")).isEqualTo("Empik");
         assertThat(model.get("sectionBasePath")).isEqualTo("/dashboard/store");
         assertThat(model.get("sectionDefaultIntervalMinutes")).isEqualTo(10);
+        assertThat(model.get("sectionReturnsDefaultIntervalMinutes")).isEqualTo(60);
         verify(messageSource).getMessage(eq("store.marketplaces.saved"), eq(new Object[]{"Empik"}), any(Locale.class));
     }
 
@@ -98,7 +101,7 @@ class StoreMarketplaceControllerTest {
     void aRejectedSaveAnswersWithTheErrorFragmentAndStatus400() {
         // given
         MarketplaceConnectionForm form = form("Empik", "0/2 * * * ? *");
-        when(marketplaceConnectionService.connectOrUpdate(any(), any(), any(), any()))
+        when(marketplaceConnectionService.connectOrUpdate(any(), any(), any(), any(), any()))
                 .thenReturn(new MarketplaceConnectionService.ConnectionUpdateResult(List.of(
                         ErrorMessage.of("store.marketplaces.import.schedule.error.too.frequent", "Empik", "0/2 * * * ? *", 5))));
         ConcurrentModel model = new ConcurrentModel();
@@ -119,7 +122,7 @@ class StoreMarketplaceControllerTest {
         Store other = new Store();
         other.setStoreId("store-2");
         when(storesRepository.findById("store-2")).thenReturn(other);
-        when(marketplaceConnectionService.connectOrUpdate(any(), any(), any(), any()))
+        when(marketplaceConnectionService.connectOrUpdate(any(), any(), any(), any(), any()))
                 .thenReturn(new MarketplaceConnectionService.ConnectionUpdateResult(List.of()));
         security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(true);
 
@@ -127,8 +130,8 @@ class StoreMarketplaceControllerTest {
         controller.saveForStore("store-2", form("Empik", ""), Locale.ENGLISH, new ConcurrentModel(), new MockHttpServletResponse());
 
         // then
-        verify(marketplaceConnectionService).connectOrUpdate(eq(other), eq("Empik"), any(), eq(""));
-        verify(marketplaceConnectionService, never()).connectOrUpdate(eq(store), any(), any(), any());
+        verify(marketplaceConnectionService).connectOrUpdate(eq(other), eq("Empik"), any(), eq(""), eq("0 8 * * ? *"));
+        verify(marketplaceConnectionService, never()).connectOrUpdate(eq(store), any(), any(), any(), any());
     }
 
     @Test
@@ -166,6 +169,7 @@ class StoreMarketplaceControllerTest {
         form.setMarketplace(marketplace);
         form.setConfiguration(Map.of("apiKey", "secret"));
         form.setSchedule(schedule);
+        form.setReturnsSchedule("0 8 * * ? *");
         return form;
     }
 }
