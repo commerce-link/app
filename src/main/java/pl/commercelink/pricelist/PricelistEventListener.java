@@ -6,6 +6,8 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.InventoryView;
+import pl.commercelink.scheduling.ScheduledExecutionCounter;
+import pl.commercelink.scheduling.ScheduledExecution;
 import pl.commercelink.stores.SupplierScope;
 
 import java.io.IOException;
@@ -25,6 +27,8 @@ class PricelistEventListener {
     private AvailabilityAndPriceListFactory availabilityAndPriceListFactory;
     @Autowired
     private SellingPriceHistoryService sellingPriceHistoryService;
+    @Autowired
+    private ScheduledExecutionCounter scheduledExecutionCounter;
 
     @SqsListener(
             value = "catalog-pricelist-queue",
@@ -44,6 +48,8 @@ class PricelistEventListener {
         sellingPriceHistoryService.update(payload.getStoreId(), payload.getCatalogId(), pricelist);
 
         pricelistEventPublisher.publish(payload.getStoreId(), payload.getCatalogId(), pricelistId);
+
+        scheduledExecutionCounter.countCompleted(payload.getStoreId(), ScheduledExecution.PRICELIST, payload.getCatalogId());
     }
 
 }

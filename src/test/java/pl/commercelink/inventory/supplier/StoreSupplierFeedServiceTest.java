@@ -63,29 +63,27 @@ class StoreSupplierFeedServiceTest {
     }
 
     @Test
-    void doesNothingWhenStoreNotFound() throws ResourceDownloadException {
+    void failsWhenTheStoreIsGone() throws ResourceDownloadException {
         // given
         when(storesRepository.findById("missing")).thenReturn(null);
 
-        // when
-        service.loadStoreFeed("missing", "Wortmann");
-
-        // then
+        // when / then
+        assertThrows(SupplierFeedTargetMissingException.class,
+                () -> service.loadStoreFeed("missing", "Wortmann"));
         verifyNoInteractions(supplierProviderFactory);
         verify(storeFeedRepository, never()).store(anyString(), anyString(), any(byte[].class), anyString());
     }
 
     @Test
-    void doesNothingWhenNoSupplierResolved() throws ResourceDownloadException {
+    void failsWhenNoProviderIsRegistered() throws ResourceDownloadException {
         // given
         Store store = storeWithId("store-1");
         when(storesRepository.findById("store-1")).thenReturn(store);
         when(supplierProviderFactory.get(store, "Wortmann")).thenReturn(null);
 
-        // when
-        service.loadStoreFeed("store-1", "Wortmann");
-
-        // then
+        // when / then
+        assertThrows(SupplierFeedTargetMissingException.class,
+                () -> service.loadStoreFeed("store-1", "Wortmann"));
         verify(storeFeedRepository, never()).store(anyString(), anyString(), any(byte[].class), anyString());
     }
 
@@ -169,10 +167,9 @@ class StoreSupplierFeedServiceTest {
         when(supplierProviderFactory.getDescriptor("Wortmann")).thenReturn(null);
         when(supplierProviderFactory.get(store, "Wortmann")).thenReturn(null);
 
-        // when
-        service.loadStoreFeed("store-1", "Wortmann");
-
-        // then
+        // when / then
+        assertThrows(SupplierFeedTargetMissingException.class,
+                () -> service.loadStoreFeed("store-1", "Wortmann"));
         verify(supplierProviderFactory, never()).loadConfiguration(any(), anyString());
         verify(storeFeedRepository, never()).store(anyString(), anyString(), any(byte[].class), anyString());
     }

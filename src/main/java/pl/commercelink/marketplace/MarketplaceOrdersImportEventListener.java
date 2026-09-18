@@ -7,6 +7,8 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import pl.commercelink.marketplace.api.MarketplaceOrder;
 import pl.commercelink.marketplace.api.MarketplaceProvider;
+import pl.commercelink.scheduling.ScheduledExecutionCounter;
+import pl.commercelink.scheduling.ScheduledExecution;
 import pl.commercelink.starter.util.ElapsedTime;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
@@ -24,6 +26,7 @@ public class MarketplaceOrdersImportEventListener {
     private final StoresRepository storesRepository;
     private final MarketplaceOrderImporter marketplaceOrderImporter;
     private final MarketplaceProviderFactory providerFactory;
+    private final ScheduledExecutionCounter scheduledExecutionCounter;
 
     @SqsListener(
             value = "marketplace-orders-import-queue",
@@ -81,6 +84,7 @@ public class MarketplaceOrdersImportEventListener {
                         + " fetchDurationInMs={} importDurationInMs={}",
                 marketplace, store.getStoreId(), orders.size(), imported, orders.size() - imported,
                 fetchDurationInMs, elapsed.inMillis());
+        scheduledExecutionCounter.countCompleted(store.getStoreId(), ScheduledExecution.ORDERS_IMPORT, marketplace);
     }
 
     public static class MarketplaceOrderPayload {

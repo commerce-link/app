@@ -390,7 +390,7 @@ public class DemoStoreSeeder implements StoreSeeder {
                 continue;
             }
             Product product = new Product(CatalogSeed.categoryId(row.category(), storeId), row.pimId(), row.ean(),
-                    row.mfn(), row.brand(), row.label(), row.name(), null);
+                    row.mfn(), row.brand(), row.label(), row.name(), PriceDefinition.DEFAULT_PRICING_GROUP);
             product.setProductId("prod-" + row.pimId());
             product.setEnabled(true);
             product.setEstimatedDeliveryDays(row.estimatedDeliveryDays());
