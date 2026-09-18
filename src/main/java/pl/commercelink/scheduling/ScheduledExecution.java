@@ -11,5 +11,11 @@ public enum ScheduledExecution {
     SUPPLIER_FEED("supplierFeed"),
     PRICELIST("pricelist");
 
+    private static final String DIMENSION_SEPARATOR = "#";
+
     private final String attributeName;
+
+    public String attributeNameFor(String dimension) {
+        return attributeName + DIMENSION_SEPARATOR + dimension;
+    }
 }

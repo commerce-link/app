@@ -20,7 +20,6 @@ import pl.commercelink.inventory.supplier.SupplierProviderFactory;
 import pl.commercelink.marketplace.MarketplaceOrdersImportScheduler;
 import pl.commercelink.marketplace.MarketplaceReturnsImportScheduler;
 import pl.commercelink.pricelist.PricelistEventScheduler;
-import pl.commercelink.scheduling.ScheduledDailyExecutionCountersRepository;
 import pl.commercelink.starter.storage.FileStorage;
 import pl.commercelink.users.CognitoUserService;
 import pl.commercelink.warehouse.builtin.WarehouseDocument;
@@ -46,7 +45,6 @@ public class StoreDeletionService {
     private final StoreInventoryCache storeInventoryCache;
     private final CognitoUserService cognitoUserService;
     private final SupplierProviderFactory supplierProviderFactory;
-    private final ScheduledDailyExecutionCountersRepository scheduledDailyExecutionCountersRepository;
     private final MarketplaceOrdersImportScheduler ordersImportScheduler;
     private final MarketplaceReturnsImportScheduler returnsImportScheduler;
     private final StoreSupplierFeedScheduler feedScheduler;
@@ -81,7 +79,6 @@ public class StoreDeletionService {
         allSucceeded &= step(storeId, "warehouse", () -> deleteWarehouse(storeId));
         allSucceeded &= step(storeId, "rma", () -> deleteRma(storeId));
         allSucceeded &= step(storeId, "email templates", () -> wipeRepository.deleteAll(wipeRepository.findEmailTemplates(storeId)));
-        allSucceeded &= step(storeId, "scheduled execution counters", () -> wipeRepository.deleteAll(scheduledDailyExecutionCountersRepository.findAll(storeId)));
         allSucceeded &= step(storeId, "s3 objects", () -> fileStorage.deleteAll(storesBucket, storeId + "/"));
         allSucceeded &= step(storeId, "inventory cache", () -> storeInventoryCache.evict(storeId));
         allSucceeded &= step(storeId, "supplier secrets", () -> deleteOwnSupplierSecrets(store));
