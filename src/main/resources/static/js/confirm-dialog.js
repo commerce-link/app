@@ -27,6 +27,10 @@
         title.textContent = link.getAttribute('data-cl-confirm-title');
         message.textContent = link.getAttribute('data-cl-confirm-message');
         submit.textContent = link.getAttribute('data-cl-confirm-action');
+        // Red only for removing something; a link marked data-cl-confirm-tone="primary" confirms a replaceable change.
+        var primary = link.getAttribute('data-cl-confirm-tone') === 'primary';
+        submit.classList.toggle('is-danger', !primary);
+        submit.classList.toggle('is-primary', primary);
         submit.disabled = false;
         dialog.showModal();
         cancel.focus();

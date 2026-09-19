@@ -27,4 +27,23 @@ class SettingsConfirmTemplateTest {
         assertThat(html).contains("<button type=\"submit\" class=\"cl-button is-danger\">Usuń adres</button>");
         assertThat(html).contains("href=\"/dashboard/store/warehouse\"").contains(">Anuluj<");
     }
+
+    @Test
+    void aReplaceableChangeIsConfirmedWithThePrimaryButtonUnderTheSharedHeader() {
+        // given
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("navigation", null);
+        variables.put("backLabel", "Raportowanie");
+        variables.put("confirm", new ConfirmAction("Wygenerować nowy adres?", "Stary adres przestanie działać.",
+                "Wygeneruj nowy adres", "/dashboard/store/report/new-address", "/dashboard/store/report", false));
+
+        // when
+        String html = SettingsTemplateRenderer.render("settings-confirm", variables);
+
+        // then
+        assertThat(html).containsPattern("<button type=\"submit\" class=\"cl-button is-primary\"\\s*>Wygeneruj nowy adres</button>");
+        assertThat(html).doesNotContain("cl-button is-danger");
+        assertThat(html.indexOf("Wygeneruj nowy adres</button>")).isLessThan(html.indexOf(">Anuluj<"));
+        assertThat(html).containsOnlyOnce("class=\"cl-back\"");
+    }
 }

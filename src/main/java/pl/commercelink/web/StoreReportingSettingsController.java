@@ -142,7 +142,7 @@ public class StoreReportingSettingsController {
                 messageSource.getMessage("store.reporting.googleAds.newAddress.confirm.message", null, locale),
                 messageSource.getMessage("store.reporting.googleAds.newAddress.confirm.action", null, locale),
                 SettingsPaths.store(storeId, NEW_ADDRESS_PATH),
-                SettingsPaths.store(storeId, "/report")));
+                SettingsPaths.store(storeId, "/report"), false));
         model.addAttribute("backLabel", messageSource.getMessage("store.reporting", null, locale));
         return "settings-confirm";
     }
