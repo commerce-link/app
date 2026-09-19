@@ -1,6 +1,7 @@
 package pl.commercelink.web;
 
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -11,7 +12,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.server.ResponseStatusException;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.starter.security.CustomSecurityContext;
-import pl.commercelink.stores.AuthorizedCarrier;
 import pl.commercelink.stores.ShippingConfiguration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
@@ -71,7 +71,11 @@ public class StoreShippingSettingsController {
         model.addAttribute("accountHref", SettingsPaths.store(storeId, "/shipping/account"));
         model.addAttribute("disconnectHref", SettingsPaths.store(storeId, "/shipping/account/disconnect"));
 
-        model.addAttribute("carriers", configuration.getAuthorizedCarriers().stream().map(AuthorizedCarrier::getDisplayName).toList());
+        // A carrier saved without a display name is named by its service name rather than printed as "null".
+        model.addAttribute("carriers", configuration.getAuthorizedCarriers().stream()
+                .map(carrier -> StringUtils.defaultIfBlank(carrier.getDisplayName(), carrier.getName()))
+                .filter(StringUtils::isNotBlank)
+                .toList());
         model.addAttribute("carriersHref", SettingsPaths.store(storeId, "/shipping/carriers"));
 
         String addressesPath = SettingsPaths.store(storeId, "/shipping/addresses");

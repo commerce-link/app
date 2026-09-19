@@ -139,6 +139,17 @@ class StoreWarehouseTemplateTest {
     }
 
     @Test
+    void aRecordWithoutANameIsCalledUntitledInsteadOfNull() {
+        // when
+        String html = SettingsTemplateRenderer.render("store-warehouse",
+                page(List.of(complete("a-9", null, false)), List.of(), true, documents(), Map.of()));
+
+        // then
+        assertThat(html).contains("<span>(bez nazwy)</span>").containsPattern("aria-label=\"(Edytuj|Uzupełnij): \\(bez nazwy\\)\"")
+                .doesNotContain(">null<").doesNotContain(": null\"").doesNotContain("„null”");
+    }
+
+    @Test
     void deletingIsConfirmedInADialogOrOnItsOwnPage() {
         // when
         String html = SettingsTemplateRenderer.render("store-warehouse",

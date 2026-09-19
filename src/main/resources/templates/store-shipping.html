@@ -68,16 +68,17 @@
                     </div>
                     <p class="cl-card-desc" th:text="#{store.shipping.addresses.description}"></p>
                     <ul th:unless="${addresses.isEmpty()}" class="cl-list">
-                        <li class="cl-list-item" th:each="address : ${addresses}">
+                        <li class="cl-list-item" th:each="address : ${addresses}"
+                            th:with="name=${#strings.isEmpty(address.title())} ? #{settings.list.untitled} : ${address.title()}">
                             <div>
                                 <div class="cl-list-title">
-                                    <span th:text="${address.title()}"></span>
+                                    <span th:text="${name}"></span>
                                     <span th:if="${address.isDefault()}" class="cl-status is-info" th:text="#{settings.list.default}"></span>
                                     <span th:unless="${address.complete()}" class="cl-status is-warn" th:text="#{settings.list.incomplete}"></span>
                                     <form th:if="${!address.isDefault() and address.complete()}" class="cl-list-title-action" method="post"
                                           th:action="@{${address.defaultHref()}}">
                                         <button type="submit" class="cl-link-button" th:text="#{settings.list.makeDefault}"
-                                                th:attr="aria-label=#{settings.list.makeDefault.for(${address.title()})}"></button>
+                                                th:attr="aria-label=#{settings.list.makeDefault.for(${name})}"></button>
                                     </form>
                                 </div>
                                 <p th:if="${address.addressLine() != null}" class="cl-list-desc" th:text="${address.addressLine()}"></p>
@@ -88,11 +89,11 @@
                             <div class="cl-list-actions">
                                 <a class="cl-link-button" th:href="@{${address.editHref()}}"
                                    th:text="${address.complete()} ? #{settings.list.edit} : #{settings.list.complete}"
-                                   th:attr="aria-label=${address.complete()} ? #{settings.list.edit.for(${address.title()})} : #{settings.list.complete.for(${address.title()})}"></a>
+                                   th:attr="aria-label=${address.complete()} ? #{settings.list.edit.for(${name})} : #{settings.list.complete.for(${name})}"></a>
                                 <a class="cl-link-button is-danger" th:href="@{${address.deleteHref()}}" data-cl-confirm
                                    th:text="#{settings.list.delete}"
-                                   th:attr="aria-label=#{settings.list.delete.for(${address.title()})},
-                                            data-cl-confirm-title=#{store.shipping.address.delete.title(${address.title()})},
+                                   th:attr="aria-label=#{settings.list.delete.for(${name})},
+                                            data-cl-confirm-title=#{store.shipping.address.delete.title(${name})},
                                             data-cl-confirm-message=${address.isDefault()} ? #{store.shipping.address.delete.message.default} : #{store.shipping.address.delete.message},
                                             data-cl-confirm-action=#{store.shipping.address.delete.action}"></a>
                             </div>
@@ -127,17 +128,18 @@
                     </div>
                     <p class="cl-card-desc" th:text="#{store.shipping.templates.description}"></p>
                     <ul th:unless="${templates.isEmpty()}" class="cl-list">
-                        <li class="cl-list-item" th:each="template : ${templates}">
+                        <li class="cl-list-item" th:each="template : ${templates}"
+                            th:with="name=${#strings.isEmpty(template.name())} ? #{settings.list.untitled} : ${template.name()}">
                             <div>
                                 <div class="cl-list-title">
-                                    <span th:text="${template.name()}"></span>
+                                    <span th:text="${name}"></span>
                                     <span th:if="${template.isDefault()}" class="cl-status is-info" th:text="#{settings.list.default}"></span>
                                     <span th:if="${template.forReturns()}" class="cl-status is-neutral" th:text="#{store.shipping.templates.returns}"></span>
                                     <span th:unless="${template.complete()}" class="cl-status is-warn" th:text="#{settings.list.incomplete}"></span>
                                     <form th:if="${!template.isDefault() and template.complete()}" class="cl-list-title-action" method="post"
                                           th:action="@{${template.defaultHref()}}">
                                         <button type="submit" class="cl-link-button" th:text="#{settings.list.makeDefault}"
-                                                th:attr="aria-label=#{settings.list.makeDefault.for(${template.name()})}"></button>
+                                                th:attr="aria-label=#{settings.list.makeDefault.for(${name})}"></button>
                                     </form>
                                 </div>
                                 <p th:each="parcel : ${template.parcels()}" class="cl-list-desc cl-tabular" th:text="${parcel}"></p>
@@ -147,11 +149,11 @@
                             <div class="cl-list-actions">
                                 <a class="cl-link-button" th:href="@{${template.editHref()}}"
                                    th:text="${template.complete()} ? #{settings.list.edit} : #{settings.list.complete}"
-                                   th:attr="aria-label=${template.complete()} ? #{settings.list.edit.for(${template.name()})} : #{settings.list.complete.for(${template.name()})}"></a>
+                                   th:attr="aria-label=${template.complete()} ? #{settings.list.edit.for(${name})} : #{settings.list.complete.for(${name})}"></a>
                                 <a class="cl-link-button is-danger" th:href="@{${template.deleteHref()}}" data-cl-confirm
                                    th:text="#{settings.list.delete}"
-                                   th:attr="aria-label=#{settings.list.delete.for(${template.name()})},
-                                            data-cl-confirm-title=#{store.shipping.template.delete.title(${template.name()})},
+                                   th:attr="aria-label=#{settings.list.delete.for(${name})},
+                                            data-cl-confirm-title=#{store.shipping.template.delete.title(${name})},
                                             data-cl-confirm-message=${template.forReturns()} ? #{store.shipping.template.delete.message.returns} : #{store.shipping.template.delete.message},
                                             data-cl-confirm-action=#{store.shipping.template.delete.action}"></a>
                             </div>
