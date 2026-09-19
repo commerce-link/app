@@ -9,21 +9,18 @@ import java.util.Set;
 
 import static pl.commercelink.orders.notifications.EmailNotificationType.*;
 
-/** Which emails the store sends to customers, grouped the way an admin thinks of them, each linked to its template. */
-public record NotificationOverview(List<Group> groups, int enabledCount, int totalCount, boolean addressChangeBlocked) {
-
-    public record Group(String labelKey, List<Item> items) {
-    }
-
-    public record Item(EmailNotificationType type, String labelKey, boolean enabled, boolean requiredForAddressChange,
-                       String templateHref) {
-    }
+/**
+ * The notifications page's summary of the customer emails: how many actually go out, how many are switched on without
+ * content, and whether the customer address change lacks one of its two emails. The emails themselves are listed and
+ * edited on the email templates page only, so the two pages cannot disagree about a message's state.
+ */
+public record NotificationOverview(int sentCount, int totalCount, int brokenCount, boolean addressChangeBlocked) {
 
     // ClientShippingAddressChangeService lets a customer change the delivery address only when both are enabled.
-    private static final Set<EmailNotificationType> ADDRESS_CHANGE_TYPES =
+    public static final Set<EmailNotificationType> ADDRESS_CHANGE_TYPES =
             Set.of(CLIENT_VERIFICATION_CODE, ORDER_SHIPPING_ADDRESS_CHANGED);
 
-    /** The notification types grouped the way an admin thinks of them; the templates page lists them the same way. */
+    /** The notification types grouped the way an admin thinks of them, as the templates page lists them. */
     public static final List<GroupDefinition> GROUPS = List.of(
             new GroupDefinition("email.notification.group.orders", List.of(ORDER_CONFIRMATION, ORDER_ASSEMBLY,
                     ORDER_ASSEMBLY_DATE_CHANGED, ORDER_ASSEMBLED, ORDER_REALIZATION, ORDER_SHIPPING, ORDER_PICKUP,
@@ -37,19 +34,21 @@ public record NotificationOverview(List<Group> groups, int enabledCount, int tot
     public record GroupDefinition(String labelKey, List<EmailNotificationType> types) {
     }
 
-    public static NotificationOverview of(Store store, String emailTemplatesPath) {
-        List<Group> groups = GROUPS.stream()
-                .map(definition -> new Group(definition.labelKey(), definition.types().stream()
-                        .map(type -> new Item(type, "email.notification.type." + type.name(),
-                                store.supportsNotification(type), ADDRESS_CHANGE_TYPES.contains(type),
-                                emailTemplatesPath + "/" + type.name()))
-                        .toList()))
-                .toList();
-        int enabled = (int) groups.stream().flatMap(group -> group.items().stream()).filter(Item::enabled).count();
-        int total = (int) groups.stream().mapToLong(group -> group.items().size()).sum();
+    public static NotificationOverview of(Store store, List<EmailTemplateView> emails) {
+        int sent = (int) emails.stream().filter(EmailTemplateView::sent).count();
+        int broken = (int) emails.stream().filter(EmailTemplateView::broken).count();
+        return new NotificationOverview(sent, emails.size(), broken, addressChangeBlocked(store, emails));
+    }
+
+    /** The customer address change is on, but one of its two emails would not go out. */
+    public static boolean addressChangeBlocked(Store store, List<EmailTemplateView> emails) {
+        return addressChangeOn(store) && !emails.stream()
+                .filter(email -> ADDRESS_CHANGE_TYPES.contains(email.type()))
+                .allMatch(EmailTemplateView::sent);
+    }
+
+    public static boolean addressChangeOn(Store store) {
         FulfilmentConfiguration fulfilment = store.getFulfilmentConfiguration();
-        boolean addressChangeOn = fulfilment != null && fulfilment.isClientShippingAddressChangeEnabled();
-        boolean blocked = addressChangeOn && !ADDRESS_CHANGE_TYPES.stream().allMatch(store::supportsNotification);
-        return new NotificationOverview(groups, enabled, total, blocked);
+        return fulfilment != null && fulfilment.isClientShippingAddressChangeEnabled();
     }
 }

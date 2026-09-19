@@ -19,6 +19,7 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 import pl.commercelink.orders.notifications.EmailNotificationType;
 import pl.commercelink.stores.ClientNotificationsConfiguration;
+import pl.commercelink.stores.FulfilmentConfiguration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.templates.EmailTemplate;
@@ -230,6 +231,26 @@ class EmailTemplateControllerTest {
         // then
         assertThat(view).isEqualTo("store-email-templates");
         assertThat(model.get("totalCount")).isEqualTo(EmailNotificationType.values().length);
+    }
+
+    @Test
+    void theAddressChangeEmailsWarnThatCustomersNeedThemWhileTheFeatureIsOn() {
+        // given
+        logInAs("ADMIN", "store-1");
+        Store store = store("store-1");
+        FulfilmentConfiguration fulfilment = new FulfilmentConfiguration();
+        fulfilment.setClientShippingAddressChangeEnabled(true);
+        store.setFulfilmentConfiguration(fulfilment);
+        ExtendedModelMap required = new ExtendedModelMap();
+        ExtendedModelMap other = new ExtendedModelMap();
+
+        // when
+        controller.editTemplate("CLIENT_VERIFICATION_CODE", required, POLISH);
+        controller.editTemplate("ORDER_SHIPPING", other, POLISH);
+
+        // then
+        assertThat(required.get("requiredForAddressChange")).isEqualTo(true);
+        assertThat(other.get("requiredForAddressChange")).isEqualTo(false);
     }
 
     @Test

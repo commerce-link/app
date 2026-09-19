@@ -27,6 +27,7 @@ import pl.commercelink.web.dtos.EmailTemplateForm;
 import pl.commercelink.web.settings.ConfirmAction;
 import pl.commercelink.web.settings.EmailTemplateParameter;
 import pl.commercelink.web.settings.EmailTemplateView;
+import pl.commercelink.web.settings.NotificationOverview;
 import pl.commercelink.web.settings.SettingsFlash;
 import pl.commercelink.web.settings.SettingsPaths;
 
@@ -134,10 +135,9 @@ public class EmailTemplateController {
             return "redirect:" + typePath(storeId, selected);
         }
         ClientNotificationsConfiguration configuration = configurationOf(store);
-        Map<String, EmailTemplate> own = byName(emailTemplatesRepository.findAllOfStore(storeId));
-        Map<String, EmailTemplate> defaults = byName(emailTemplatesRepository.findAllOfStore(EmailTemplatesRepository.DEFAULT_STORE));
-        List<EmailTemplateView.Group> groups = EmailTemplateView.groups(configuration::supports,
-                type -> templateName(configuration, type), own, defaults, basePath(storeId));
+        List<EmailTemplateView.Group> groups = EmailTemplateView.forStore(configuration,
+                emailTemplatesRepository.findAllOfStore(storeId),
+                emailTemplatesRepository.findAllOfStore(EmailTemplatesRepository.DEFAULT_STORE), basePath(storeId));
         List<EmailTemplateView> all = groups.stream().flatMap(group -> group.items().stream()).toList();
         model.addAttribute("groups", groups);
         model.addAttribute("enabledCount", all.stream().filter(EmailTemplateView::enabled).count());
@@ -154,7 +154,7 @@ public class EmailTemplateController {
         EmailTemplate own = emailTemplatesRepository.findByTemplateName(storeId, name);
         EmailTemplate fallback = emailTemplatesRepository.findByTemplateName(EmailTemplatesRepository.DEFAULT_STORE, name);
         EmailTemplateForm form = EmailTemplateForm.from(own != null ? own : fallback, configuration.supports(type));
-        return render(storeId, type, form, Map.of(), own, fallback, model, locale);
+        return render(store, type, form, Map.of(), own, fallback, model, locale);
     }
 
     private String save(String storeId, String typeName, EmailTemplateForm form, boolean async, Model model, Locale locale,
@@ -168,7 +168,7 @@ public class EmailTemplateController {
 
         Map<String, String> errors = form.validate();
         if (!errors.isEmpty()) {
-            String view = render(storeId, type, form, errors, own, fallback, model, locale);
+            String view = render(store, type, form, errors, own, fallback, model, locale);
             if (async) {
                 response.setStatus(HttpStatus.UNPROCESSABLE_ENTITY.value());
                 return FORM_FRAGMENT;
@@ -198,7 +198,7 @@ public class EmailTemplateController {
                 new Object[]{label(type, locale)}, locale);
         if (async) {
             SettingsFlash.forNextPage(request, response, listPath, message);
-            render(storeId, type, form, Map.of(), own, fallback, model, locale);
+            render(store, type, form, Map.of(), own, fallback, model, locale);
             model.addAttribute("redirectTo", listPath);
             return FORM_FRAGMENT;
         }
@@ -232,8 +232,9 @@ public class EmailTemplateController {
         return "redirect:" + typePath(storeId, type);
     }
 
-    private String render(String storeId, EmailNotificationType type, EmailTemplateForm form, Map<String, String> errors,
+    private String render(Store store, EmailNotificationType type, EmailTemplateForm form, Map<String, String> errors,
                           EmailTemplate own, EmailTemplate fallback, Model model, Locale locale) {
+        String storeId = store.getStoreId();
         model.addAttribute("form", form);
         model.addAttribute("errors", errors);
         model.addAttribute("errorLabels", form.errorLabels((number, field) -> messageSource.getMessage(
@@ -245,6 +246,10 @@ public class EmailTemplateController {
                 : fallback != null ? EmailTemplateView.Source.DEFAULT : EmailTemplateView.Source.NONE);
         model.addAttribute("restorable", own != null && fallback != null);
         model.addAttribute("restoreHref", typePath(storeId, type) + "/restore");
+        // Switching one of these off while customers may change the address disables that feature.
+        model.addAttribute("requiredForAddressChange", NotificationOverview.ADDRESS_CHANGE_TYPES.contains(type)
+                && NotificationOverview.addressChangeOn(store));
+        model.addAttribute("fulfilmentHref", SettingsPaths.store(storeId, "/fulfilment") + "#client-order-page");
         model.addAttribute("parameters", EmailTemplateParameter.of(type));
         model.addAttribute("extrasOpen", form.hasExtras()
                 || errors.keySet().stream().anyMatch(field -> field.equals("bccAddresses") || field.startsWith("attachment-")));
@@ -268,14 +273,8 @@ public class EmailTemplateController {
         return store.getClientNotificationsConfiguration();
     }
 
-    /** The template a store sends a type with: the one it points at, or the type's own name while it is switched off. */
     private static String templateName(ClientNotificationsConfiguration configuration, EmailNotificationType type) {
-        String name = configuration.getTemplateName(type);
-        return name != null ? name : type.getTemplateName();
-    }
-
-    private static Map<String, EmailTemplate> byName(List<EmailTemplate> templates) {
-        return templates.stream().collect(Collectors.toMap(EmailTemplate::getTemplateName, Function.identity(), (a, b) -> a));
+        return EmailTemplateView.templateName(configuration, type);
     }
 
     private String label(EmailNotificationType type, Locale locale) {

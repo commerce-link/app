@@ -5,11 +5,12 @@ import pl.commercelink.orders.notifications.EmailNotificationType;
 import pl.commercelink.stores.ClientNotificationsConfiguration;
 import pl.commercelink.stores.FulfilmentConfiguration;
 import pl.commercelink.stores.Store;
+import pl.commercelink.templates.EmailTemplate;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.ResourceBundle;
 import java.util.Locale;
+import java.util.ResourceBundle;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -23,56 +24,47 @@ class NotificationOverviewTest {
         return store;
     }
 
-    private List<NotificationOverview.Item> items(NotificationOverview overview) {
-        return overview.groups().stream().flatMap(group -> group.items().stream()).toList();
+    private static EmailTemplate template(EmailNotificationType type, String subject, String body) {
+        EmailTemplate template = new EmailTemplate();
+        template.setTemplateName(type.getTemplateName());
+        template.setType(type);
+        template.setSubject(subject);
+        template.setTextBody(body);
+        return template;
+    }
+
+    /** Every type has default content, as the shared pool on production does. */
+    private static List<EmailTemplate> defaultsForEveryType() {
+        return Arrays.stream(EmailNotificationType.values()).map(type -> template(type, "Temat", "Treść")).toList();
+    }
+
+    private static NotificationOverview overview(Store store, List<EmailTemplate> own, List<EmailTemplate> defaults) {
+        List<EmailTemplateView> emails = EmailTemplateView.forStore(store.getClientNotificationsConfiguration(), own,
+                        defaults, "/x").stream().flatMap(group -> group.items().stream()).toList();
+        return NotificationOverview.of(store, emails);
     }
 
     @Test
-    void listsEveryNotificationTypeExactlyOnceInGroups() {
+    void countsTheEnabledEmailsThatHaveContentAsSent() {
         // when
-        NotificationOverview overview = NotificationOverview.of(storeWith(), "/dashboard/store/email-templates");
+        NotificationOverview overview = overview(storeWith(EmailNotificationType.ORDER_CONFIRMATION,
+                EmailNotificationType.RMA_REJECTED), List.of(), defaultsForEveryType());
 
         // then
-        assertThat(items(overview)).extracting(NotificationOverview.Item::type)
-                .containsExactlyInAnyOrder(EmailNotificationType.values());
-        assertThat(overview.groups()).extracting(NotificationOverview.Group::labelKey).containsExactly(
-                "email.notification.group.orders", "email.notification.group.invoices",
-                "email.notification.group.returns", "email.notification.group.clientVerification");
-    }
-
-    @Test
-    void marksTheEnabledTypesAndCountsThem() {
-        // when
-        NotificationOverview overview = NotificationOverview.of(
-                storeWith(EmailNotificationType.ORDER_CONFIRMATION, EmailNotificationType.RMA_REJECTED), "/dashboard/store/email-templates");
-
-        // then
-        assertThat(overview.enabledCount()).isEqualTo(2);
+        assertThat(overview.sentCount()).isEqualTo(2);
         assertThat(overview.totalCount()).isEqualTo(EmailNotificationType.values().length);
-        assertThat(items(overview)).filteredOn(NotificationOverview.Item::enabled).extracting(NotificationOverview.Item::type)
-                .containsExactlyInAnyOrder(EmailNotificationType.ORDER_CONFIRMATION, EmailNotificationType.RMA_REJECTED);
+        assertThat(overview.brokenCount()).isZero();
     }
 
     @Test
-    void linksEachTypeToItsTemplate() {
+    void anEnabledEmailWhoseCopyHasNoBodyIsNotCountedAsSent() {
         // when
-        NotificationOverview overview = NotificationOverview.of(storeWith(), "/dashboard/store/store-9/email-templates");
+        NotificationOverview overview = overview(storeWith(EmailNotificationType.ORDER_ASSEMBLY),
+                List.of(template(EmailNotificationType.ORDER_ASSEMBLY, "Temat", null)), defaultsForEveryType());
 
         // then
-        assertThat(items(overview)).filteredOn(item -> item.type() == EmailNotificationType.ORDER_SHIPPING).singleElement()
-                .extracting(NotificationOverview.Item::templateHref)
-                .isEqualTo("/dashboard/store/store-9/email-templates/ORDER_SHIPPING");
-    }
-
-    @Test
-    void namesTheTypesTheCustomerAddressChangeNeeds() {
-        // when
-        NotificationOverview overview = NotificationOverview.of(storeWith(), "/dashboard/store/email-templates");
-
-        // then
-        assertThat(items(overview)).filteredOn(NotificationOverview.Item::requiredForAddressChange)
-                .extracting(NotificationOverview.Item::type)
-                .containsExactlyInAnyOrder(EmailNotificationType.CLIENT_VERIFICATION_CODE, EmailNotificationType.ORDER_SHIPPING_ADDRESS_CHANGED);
+        assertThat(overview.sentCount()).isZero();
+        assertThat(overview.brokenCount()).isEqualTo(1);
     }
 
     @Test
@@ -84,26 +76,37 @@ class NotificationOverviewTest {
         store.setFulfilmentConfiguration(fulfilment);
 
         // when / then
-        assertThat(NotificationOverview.of(store, "/x").addressChangeBlocked()).isTrue();
+        assertThat(overview(store, List.of(), defaultsForEveryType()).addressChangeBlocked()).isTrue();
+    }
+
+    @Test
+    void warnsWhenARequiredTypeIsOnButHasNoContent() {
+        // given
+        Store store = storeWith(EmailNotificationType.CLIENT_VERIFICATION_CODE, EmailNotificationType.ORDER_SHIPPING_ADDRESS_CHANGED);
+        FulfilmentConfiguration fulfilment = new FulfilmentConfiguration();
+        fulfilment.setClientShippingAddressChangeEnabled(true);
+        store.setFulfilmentConfiguration(fulfilment);
+
+        // when / then
+        assertThat(overview(store, List.of(), List.of()).addressChangeBlocked()).isTrue();
+        assertThat(overview(store, List.of(), defaultsForEveryType()).addressChangeBlocked()).isFalse();
     }
 
     @Test
     void doesNotWarnWhenCustomerAddressChangeIsOff() {
         // when / then
-        assertThat(NotificationOverview.of(storeWith(), "/x").addressChangeBlocked()).isFalse();
+        assertThat(overview(storeWith(), List.of(), List.of()).addressChangeBlocked()).isFalse();
     }
 
     @Test
     void everyTypeAndGroupHasAPolishAndEnglishName() {
-        // given
-        NotificationOverview overview = NotificationOverview.of(storeWith(), "/x");
-
         // when / then
         for (Locale locale : List.of(Locale.forLanguageTag("pl"), Locale.ENGLISH)) {
             ResourceBundle messages = ResourceBundle.getBundle("messages", locale);
-            overview.groups().forEach(group -> {
+            NotificationOverview.GROUPS.forEach(group -> {
                 assertThat(messages.containsKey(group.labelKey())).as(group.labelKey()).isTrue();
-                group.items().forEach(item -> assertThat(messages.containsKey(item.labelKey())).as(item.labelKey()).isTrue());
+                group.types().forEach(type -> assertThat(messages.containsKey(EmailTemplateView.labelKey(type)))
+                        .as(type.name()).isTrue());
             });
         }
     }

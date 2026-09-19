@@ -17,6 +17,16 @@
                 <div class="cl-card">
                     <fieldset class="cl-fieldset">
                         <legend class="cl-fieldset-title" th:text="#{store.emailTemplate.content}"></legend>
+                        <div th:if="${requiredForAddressChange}" class="cl-alert is-warn">
+                            <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+                            <div>
+                                <p class="cl-alert-title" th:text="#{store.emailTemplate.addressChange.title}"></p>
+                                <p class="cl-alert-text">
+                                    <span th:text="#{store.emailTemplate.addressChange.text}"></span>
+                                    <a th:href="@{${fulfilmentHref}}" th:text="#{store.notification.messages.addressChange.link}"></a>
+                                </p>
+                            </div>
+                        </div>
                         <div th:replace="~{fragments/settings-form :: check('enabled', 'store.emailTemplate.enabled', *{enabled}, 'store.emailTemplate.enabled.description', null)}"></div>
                         <p class="cl-help" th:switch="${source.name()}">
                             <th:block th:case="'OWN'">

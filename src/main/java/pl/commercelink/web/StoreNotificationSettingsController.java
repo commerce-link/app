@@ -14,15 +14,20 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.dtos.NotificationSenderForm;
+import pl.commercelink.stores.ClientNotificationsConfiguration;
+import pl.commercelink.templates.EmailTemplatesRepository;
+import pl.commercelink.web.settings.EmailTemplateView;
 import pl.commercelink.web.settings.NotificationOverview;
 import pl.commercelink.web.settings.SettingsFlash;
 import pl.commercelink.web.settings.SettingsPaths;
 
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
@@ -35,6 +40,7 @@ public class StoreNotificationSettingsController {
     private static final String FORM_FRAGMENT = VIEW + " :: senderForm";
 
     private final StoresRepository storesRepository;
+    private final EmailTemplatesRepository emailTemplatesRepository;
     private final MessageSource messageSource;
 
     @Value("${order.sender.mail:noreplay@commercelink.pl}")
@@ -99,8 +105,7 @@ public class StoreNotificationSettingsController {
     private String render(String storeId, NotificationSenderForm submitted, Map<String, String> errors, Model model) {
         Store store = storesRepository.findById(storeId);
         if (store == null) {
-            model.addAttribute("error", "Store not found");
-            return "error";
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
         NotificationSenderForm form = submitted != null ? submitted : NotificationSenderForm.from(store);
         model.addAttribute("form", form);
@@ -113,7 +118,13 @@ public class StoreNotificationSettingsController {
         String templatesHref = SettingsPaths.store(storeId, "/email-templates");
         model.addAttribute("templatesHref", templatesHref);
         model.addAttribute("fulfilmentHref", SettingsPaths.store(storeId, "/fulfilment") + "#client-order-page");
-        model.addAttribute("overview", NotificationOverview.of(store, templatesHref));
+        ClientNotificationsConfiguration configuration = store.getClientNotificationsConfiguration() != null
+                ? store.getClientNotificationsConfiguration() : new ClientNotificationsConfiguration();
+        List<EmailTemplateView> emails = EmailTemplateView.forStore(configuration,
+                        emailTemplatesRepository.findAllOfStore(storeId),
+                        emailTemplatesRepository.findAllOfStore(EmailTemplatesRepository.DEFAULT_STORE), templatesHref)
+                .stream().flatMap(group -> group.items().stream()).toList();
+        model.addAttribute("overview", NotificationOverview.of(store, emails));
         return VIEW;
     }
 }

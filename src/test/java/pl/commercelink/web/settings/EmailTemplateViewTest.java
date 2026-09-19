@@ -16,6 +16,7 @@ class EmailTemplateViewTest {
     private static EmailTemplate template(String subject) {
         EmailTemplate template = new EmailTemplate();
         template.setSubject(subject);
+        template.setTextBody("Treść");
         return template;
     }
 
@@ -50,5 +51,20 @@ class EmailTemplateViewTest {
                 .containsExactly("email.notification.group.orders", "email.notification.group.invoices",
                         "email.notification.group.returns", "email.notification.group.clientVerification");
         assertThat(groups.stream().mapToInt(group -> group.items().size()).sum()).isEqualTo(EmailNotificationType.values().length);
+    }
+
+    @Test
+    void aSentEmailWhoseOwnCopyLostItsBodyIsBrokenEvenWithADefault() {
+        // given
+        EmailTemplate withoutBody = new EmailTemplate();
+        withoutBody.setSubject("Własny");
+
+        // when
+        EmailTemplateView view = EmailTemplateView.of(EmailNotificationType.ORDER_ASSEMBLY, true, withoutBody,
+                template("Domyślny"), PATH);
+
+        // then
+        assertThat(view.broken()).isTrue();
+        assertThat(view.sent()).isFalse();
     }
 }

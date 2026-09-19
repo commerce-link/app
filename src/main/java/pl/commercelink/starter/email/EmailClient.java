@@ -1,7 +1,6 @@
 package pl.commercelink.starter.email;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import pl.commercelink.orders.notifications.EmailNotificationType;
@@ -21,10 +20,9 @@ import com.github.mustachejava.DefaultMustacheFactory;
 import com.github.mustachejava.Mustache;
 import com.github.mustachejava.MustacheFactory;
 
+@Slf4j
 @Service
 public class EmailClient {
-
-    private static final Logger logger = LoggerFactory.getLogger(EmailClient.class);
 
     private final SesV2Client sesClient;
     private final NotificationConfigProvider configProvider;
@@ -55,7 +53,7 @@ public class EmailClient {
         EmailTemplate template = templateProvider.getTemplate(storeId, templateName);
         if (template == null) return false;
         if (isBlank(template.getSubject()) || isBlank(template.getTextBody())) {
-            logger.warn("Email template {} of store {} has no subject or body, email not sent", templateName, storeId);
+            log.warn("Email template {} of store {} has no subject or body, email not sent", templateName, storeId);
             return false;
         }
 
@@ -95,7 +93,7 @@ public class EmailClient {
             SendEmailResponse response = sesClient.sendEmail(request);
             return response.messageId() != null;
         } catch (SesV2Exception e) {
-            System.err.println("Failed to send email: " + e.awsErrorDetails().errorMessage());
+            log.error("Failed to send email: {}", e.awsErrorDetails().errorMessage());
             return false;
         }
     }

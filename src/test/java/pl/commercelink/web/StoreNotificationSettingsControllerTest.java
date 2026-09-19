@@ -10,11 +10,15 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.context.MessageSource;
+import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.ui.ExtendedModelMap;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
+import pl.commercelink.orders.notifications.EmailNotificationType;
 import pl.commercelink.stores.ClientNotificationsConfiguration;
+import pl.commercelink.templates.EmailTemplatesRepository;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.dtos.NotificationSenderForm;
@@ -24,6 +28,7 @@ import java.util.Locale;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -39,6 +44,9 @@ class StoreNotificationSettingsControllerTest {
 
     @Mock
     private StoresRepository storesRepository;
+
+    @Mock
+    private EmailTemplatesRepository emailTemplatesRepository;
 
     @Mock
     private MessageSource messageSource;
@@ -85,9 +93,17 @@ class StoreNotificationSettingsControllerTest {
         assertThat(view).isEqualTo("store-notification");
         assertThat(model.get("form")).isInstanceOf(NotificationSenderForm.class);
         assertThat(model.get("formAction")).isEqualTo("/dashboard/store/notification");
-        assertThat(((NotificationOverview) model.get("overview")).groups()).isNotEmpty();
+        assertThat(((NotificationOverview) model.get("overview")).totalCount()).isEqualTo(EmailNotificationType.values().length);
         assertThat(model.get("senderPreviewName")).isEqualTo("Sklep store-1");
         assertThat(errors(model)).isEmpty();
+    }
+
+    @Test
+    void anUnknownStoreIsNotFound() {
+        // when / then
+        assertThatThrownBy(() -> controller.superAdminNotification("missing", new ExtendedModelMap()))
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                        e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
     }
 
     @Test

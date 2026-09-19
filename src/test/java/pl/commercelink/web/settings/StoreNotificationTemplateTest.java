@@ -6,12 +6,15 @@ import pl.commercelink.starter.security.UserRole;
 import pl.commercelink.stores.ClientNotificationsConfiguration;
 import pl.commercelink.stores.FulfilmentConfiguration;
 import pl.commercelink.stores.Store;
+import pl.commercelink.templates.EmailTemplate;
 import pl.commercelink.web.dtos.NotificationSenderForm;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -40,7 +43,16 @@ class StoreNotificationTemplateTest {
         variables.put("senderEmail", "noreply@commercelink.pl");
         variables.put("templatesHref", "/dashboard/store/email-templates");
         variables.put("fulfilmentHref", "/dashboard/store/fulfilment");
-        variables.put("overview", NotificationOverview.of(store, "/dashboard/store/email-templates"));
+        List<EmailTemplate> defaults = Arrays.stream(EmailNotificationType.values()).map(type -> {
+            EmailTemplate template = new EmailTemplate();
+            template.setTemplateName(type.getTemplateName());
+            template.setSubject("Temat");
+            template.setTextBody("Treść");
+            return template;
+        }).toList();
+        variables.put("overview", NotificationOverview.of(store, EmailTemplateView.forStore(
+                store.getClientNotificationsConfiguration(), List.of(), defaults, "/dashboard/store/email-templates")
+                .stream().flatMap(group -> group.items().stream()).toList()));
         return variables;
     }
 
@@ -65,7 +77,7 @@ class StoreNotificationTemplateTest {
     }
 
     @Test
-    void listsCustomerEmailsByNameWithTheirStateAndTemplateLink() {
+    void summarisesTheCustomerEmailsAndLeavesTheListToTheTemplatesPage() {
         // given
         Store store = store();
 
@@ -74,12 +86,9 @@ class StoreNotificationTemplateTest {
 
         // then
         assertThat(html).contains("Wysyłane: 1 z 19.");
-        assertThat(html).contains("Zamówienie wysłane").contains("Kod weryfikacyjny").doesNotContain(">ORDER_SHIPPING<");
-        assertThat(html).containsPattern("Zamówienie wysłane</span>\\s*<span class=\"cl-status is-ok\">Wysyłane</span>");
-        assertThat(html).containsPattern("Faktura proforma</span>\\s*<span class=\"cl-status is-neutral\">Wyłączone</span>");
-        assertThat(html).contains("href=\"/dashboard/store/email-templates/ORDER_SHIPPING\"");
-        assertThat(html).contains("aria-label=\"Edytuj szablon: Zamówienie wysłane\"");
-        assertThat(html).contains("Wymagane do zmiany adresu dostawy przez klienta");
+        assertThat(html).contains("href=\"/dashboard/store/email-templates\"");
+        assertThat(html).doesNotContain("Zamówienie wysłane").doesNotContain("class=\"cl-list\"")
+                .doesNotContain("/dashboard/store/email-templates/ORDER_SHIPPING");
         assertThat(html).doesNotContain("cl-alert is-warn");
     }
 
