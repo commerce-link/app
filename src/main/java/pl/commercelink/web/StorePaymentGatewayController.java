@@ -186,7 +186,7 @@ public class StorePaymentGatewayController {
         Map<String, String> errors = new LinkedHashMap<>();
         if (existing == null && paymentGateways.addable(store).stream().noneMatch(d -> d.name().equals(form.getProviderName()))) {
             // Not installed, not chosen, or already used by the store (it would be edited, not added twice)
-            errors.put("providerName", "integration.provider.required");
+            errors.put("providerName", "store.payments.gateway.provider.required");
         } else {
             errors.putAll(form.validate(fields, paymentGateways.storedSecretKeys(store, form.getProviderName())));
         }

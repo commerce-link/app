@@ -137,7 +137,7 @@ class StorePaymentGatewayControllerTest {
 
         // then
         verify(storesRepository, never()).save(any(Store.class));
-        assertThat(model.getAttribute("errors")).isEqualTo(Map.of("providerName", "integration.provider.required"));
+        assertThat(model.getAttribute("errors")).isEqualTo(Map.of("providerName", "store.payments.gateway.provider.required"));
     }
 
     /** An empty secret keeps the stored one; the gateway edited is the one in the address, not the posted one. */
