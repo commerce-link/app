@@ -163,6 +163,10 @@ class StoreSuppliersTemplateTest {
                 .contains("enctype=\"multipart/form-data\"");
         assertThat(html).contains("name=\"mode\" data-cl-variant-select=\"mode\" value=\"GLOBAL\"")
                 .contains("data-cl-variant-when=\"mode!=GLOBAL\"");
+        // Before the supplier is chosen only the choice shows: the rest waits for it and is not sent.
+        assertThat(html).contains("data-cl-variant-when=\"supplier!=|manual\"")
+                .contains("data-cl-variant-when=\"supplier!= mode!=GLOBAL\"").contains("data-cl-variant-when=\"supplier!=\"");
+        assertThat(html).contains("class=\"cl-span-4 cl-field\"").doesNotContain("class=\"cl-span-3 cl-field\"");
         assertThat(html).containsPattern("name=\"includeInPricing\" value=\"true\"[^>]*checked=\"checked\"")
                 .contains(">Zapisz dostawcę<").contains("/js/variant-fields.js");
     }

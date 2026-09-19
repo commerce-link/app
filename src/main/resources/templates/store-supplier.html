@@ -52,7 +52,7 @@
                         </th:block>
 
                         <fieldset th:if="${canChooseMode}" class="cl-choice-group" id="mode" tabindex="-1"
-                                  data-cl-variant-when="supplier!=manual"
+                                  data-cl-variant-when="supplier!=|manual"
                                   th:with="error=${errors['mode']}">
                             <legend class="cl-label" th:text="#{store.suppliers.mode}"></legend>
                             <label class="cl-choice" th:each="mode : ${ {'OWN', 'GLOBAL'} }">
@@ -77,7 +77,9 @@
                         <input th:if="${!canChooseMode and !form.csv()}" type="hidden" name="mode" data-cl-variant-select="mode"
                                th:value="*{mode}"/>
 
-                        <fieldset class="cl-choice-group" data-cl-variant-when="mode!=GLOBAL">
+                        <!--/* Groups below wait for the supplier choice (an empty choice hides them), so a new supplier starts
+                               with one question instead of a form whose parts may not apply. */-->
+                        <fieldset class="cl-choice-group" data-cl-variant-when="supplier!= mode!=GLOBAL">
                             <div th:replace="~{fragments/settings-form :: textField('label', 'store.suppliers.label', *{label}, 'text', 'off', true, ${errors['label']}, #{store.suppliers.label.help})}"></div>
                         </fieldset>
                     </fieldset>
@@ -88,7 +90,8 @@
                                   th:attr="data-cl-variant-group=${editing ? null : 'supplier'}, data-cl-variant=${editing ? null : type}">
                             <legend class="cl-fieldset-title" th:text="#{store.suppliers.credentials(${type})}"></legend>
                             <div class="cl-form-grid">
-                                <div class="cl-span-3 cl-field" th:each="field : ${typeFields}"
+                                <!--/* One per row: adapter settings are independent of each other (§6.1). */-->
+                                <div class="cl-span-4 cl-field" th:each="field : ${typeFields}"
                                      th:with="id=${T(pl.commercelink.web.dtos.IntegrationSettingsForm).fieldId(type, field)},
                                               secret=${field.type().name() == 'PASSWORD'},
                                               error=${errors.get(id)},
@@ -154,13 +157,13 @@
                         <div th:replace="~{fragments/settings-form :: check('enabled', 'store.suppliers.enabled', *{enabled}, 'store.suppliers.enabled.description', null)}"></div>
                     </fieldset>
 
-                    <fieldset class="cl-fieldset">
+                    <fieldset class="cl-fieldset" data-cl-variant-when="supplier!=">
                         <legend class="cl-fieldset-title" th:text="#{store.suppliers.usage.section}"></legend>
                         <div th:replace="~{fragments/settings-form :: check('includeInPricing', 'store.suppliers.includeInPricing', *{includeInPricing}, 'store.suppliers.includeInPricing.description', null)}"></div>
                         <div th:replace="~{fragments/settings-form :: check('includeInFulfilment', 'store.suppliers.includeInFulfilment', *{includeInFulfilment}, 'store.suppliers.includeInFulfilment.description', null)}"></div>
                     </fieldset>
 
-                    <fieldset class="cl-fieldset" data-cl-variant-when="mode!=GLOBAL">
+                    <fieldset class="cl-fieldset" data-cl-variant-when="supplier!= mode!=GLOBAL">
                         <legend class="cl-fieldset-title" th:text="#{store.suppliers.ids.section}"></legend>
                         <div class="cl-form-grid">
                             <div class="cl-span-3" th:insert="~{fragments/settings-form :: textField('externalSupplierId', 'store.supplier.external.id', *{externalSupplierId}, 'text', 'off', false, ${errors['externalSupplierId']}, #{store.suppliers.externalId.help})}"></div>
