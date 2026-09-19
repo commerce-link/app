@@ -113,6 +113,14 @@ public class StoreReportingSettingsController {
         if (store == null) {
             return render(storeId, form, model);
         }
+        if (!form.submitted()) {
+            // Nothing to apply, so nothing is saved and no success is claimed.
+            if (async) {
+                render(storeId, null, model);
+                return FORM_FRAGMENT;
+            }
+            return "redirect:" + SettingsPaths.store(storeId, "/report");
+        }
         boolean hadAddress = conversionsAddress(store) != null;
         form.applyTo(store);
         storesRepository.save(store);

@@ -412,4 +412,27 @@ class StoreReportingSettingsControllerTest {
                 .isInstanceOfSatisfying(org.springframework.web.server.ResponseStatusException.class,
                         e -> assertThat(e.getStatusCode()).isEqualTo(org.springframework.http.HttpStatus.NOT_FOUND));
     }
+
+    /** A tab opened before this release posts store.reportingConfiguration.googleAdsEnabled, which binds to nothing here. */
+    @Test
+    void aSubmissionWithoutTheSwitchChangesNothingAndSaysNothing() {
+        // given
+        logInAs("ADMIN", "store-1");
+        Store store = new Store();
+        store.setStoreId("store-1");
+        store.setReportingConfiguration(new pl.commercelink.stores.ReportingConfiguration());
+        store.getReportingConfiguration().enableGoogleAds();
+        when(storesRepository.findById("store-1")).thenReturn(store);
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        String view = controller.saveReport(new ReportingForm(), null, new ExtendedModelMap(), Locale.forLanguageTag("pl"),
+                redirect, new MockHttpServletResponse());
+
+        // then
+        verify(storesRepository, never()).save(any(Store.class));
+        assertThat(store.getReportingConfiguration().isGoogleAdsEnabled()).isTrue();
+        assertThat(view).isEqualTo("redirect:/dashboard/store/report");
+        assertThat(redirect.getFlashAttributes()).isEmpty();
+    }
 }
