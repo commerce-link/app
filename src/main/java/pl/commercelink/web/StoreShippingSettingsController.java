@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
+import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -21,6 +22,7 @@ import pl.commercelink.web.settings.WarehouseAddressView;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Settings › Shipping: a stack of read-only cards (courier account, carriers, pickup addresses, label sender, package
@@ -32,6 +34,7 @@ public class StoreShippingSettingsController {
 
     private final StoresRepository storesRepository;
     private final ShippingAccounts shippingAccounts;
+    private final OptimisticLockingExecutor optimisticLockingExecutor;
 
     @GetMapping("/dashboard/store/shipping")
     @PreAuthorize("hasRole('ADMIN')")
@@ -46,14 +49,21 @@ public class StoreShippingSettingsController {
     }
 
     private String show(String storeId, Model model, Locale locale) {
-        Store store = storesRepository.findById(storeId);
-        if (store == null) {
+        if (storesRepository.findById(storeId) == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
+        // Records are edited and deleted by id; ones saved by the old forms have none yet. Another save of the store may
+        // land meanwhile, so the ids are assigned on a fresh copy with a retry, and nothing is written when all have one.
+        AtomicBoolean assigned = new AtomicBoolean();
+        Store store = optimisticLockingExecutor.modifyAndSave(
+                () -> storesRepository.findById(storeId),
+                fresh -> assigned.set(configurationOf(fresh).assignMissingIds()),
+                fresh -> {
+                    if (assigned.get()) {
+                        storesRepository.save(fresh);
+                    }
+                });
         ShippingConfiguration configuration = configurationOf(store);
-        if (configuration.assignMissingIds()) {
-            storesRepository.save(store);
-        }
 
         IntegrationStatus account = shippingAccounts.status(store);
         model.addAttribute("account", account);
