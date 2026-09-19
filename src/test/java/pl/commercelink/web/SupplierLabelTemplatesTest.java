@@ -35,17 +35,6 @@ class SupplierLabelTemplatesTest {
     }
 
     @Test
-    void addingANewInstanceDoesNotBorrowTheLegacyRowOfTheSameType() throws Exception {
-        // when
-        String html = template("store-fulfilment.html");
-
-        // then -- while adding, activeIdentity() must be empty instead of falling back to the
-        // selected type, which matched the legacy row of the same type (stored secret, warning)
-        assertThat(html).contains("return identityInput.value;")
-                .doesNotContain("identityInput.value || select.value");
-    }
-
-    @Test
     void fulfilmentCardsKeepTheIdentityAsDataAndShowTheLabel() throws Exception {
         // when
         String html = template("fulfilment.html");

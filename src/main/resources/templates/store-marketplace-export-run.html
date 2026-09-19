@@ -3,117 +3,103 @@
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
       layout:decorate="~{layout}">
 <body>
-
 <div layout:fragment="content">
-    <section class="section">
-        <div class="container" th:with="basePath=${isSuperAdmin} ? '/dashboard/store/' + ${storeId} : '/dashboard/store'">
-
-            <h1 class="title is-4" th:text="#{store.marketplaces.exports.run.title}"></h1>
-
-            <div class="box mb-5">
-                <div class="columns is-multiline">
-                    <div class="column is-one-quarter">
-                        <p class="heading" th:text="#{store.marketplaces.exports.column.date}"></p>
-                        <p class="title is-6" th:text="${runTimestamp}"></p>
-                    </div>
-                    <div class="column is-one-quarter">
-                        <p class="heading" th:text="#{store.marketplaces.exports.status}"></p>
-                        <p class="title is-6">
-                            <span class="tag is-success" th:unless="${failed}"
-                                  th:text="#{store.marketplaces.exports.status.succeeded}"></span>
-                            <span class="tag is-danger" th:if="${failed}"
-                                  th:text="#{store.marketplaces.exports.status.failed}"></span>
-                        </p>
-                    </div>
-                    <div class="column is-one-quarter">
-                        <p class="heading" th:text="#{store.marketplaces.exports.column.marketplace}"></p>
-                        <p class="title is-6" th:text="${marketplace}"></p>
-                    </div>
-                    <div class="column is-one-quarter">
-                        <p class="heading" th:text="#{store.marketplaces.exports.column.catalog}"></p>
-                        <p class="title is-6" th:text="${catalogId}"></p>
-                    </div>
-                    <div class="column is-one-quarter">
-                        <p class="heading" th:text="#{store.marketplaces.exports.rows.count}"></p>
-                        <p class="title is-6" th:text="${rows.size()}"></p>
-                    </div>
+    <section class="cl-page">
+        <div class="cl-page-body">
+            <!--/* The subpage header with a line of what the run was and how it ended. */-->
+            <div class="cl-page-header">
+                <a class="cl-back" th:href="@{${historyHref}}">
+                    <span class="icon is-small" aria-hidden="true"><i class="fas fa-chevron-left"></i></span>
+                    <span th:text="${historyLabel}"></span>
+                </a>
+                <div class="cl-page-header-row">
+                    <h1 class="cl-page-title" th:text="#{store.marketplaces.exports.run.title}"></h1>
+                </div>
+                <div class="cl-page-lead">
+                    <span th:text="#{store.marketplaces.exports.run.meta(${displayName}, ${catalogName}, ${runTimestamp})}"></span>
+                    <span th:unless="${failed}" class="cl-status is-ok" th:text="#{store.marketplaces.exports.status.succeeded}"></span>
+                    <span th:if="${failed}" class="cl-status is-warn" th:text="#{store.marketplaces.exports.status.failed}"></span>
                 </div>
             </div>
 
-            <div class="box mb-5">
-                <h2 class="title is-6" th:text="#{store.marketplaces.exports.rows.title}"></h2>
-
-                <div class="field" th:if="${!rows.isEmpty()}">
-                    <div class="control">
-                        <input class="input is-small" type="text" id="exportRowsSearch"
-                               th:placeholder="#{store.marketplaces.exports.rows.search.placeholder}">
+            <div class="cl-stack is-wide">
+                <div th:if="${view.abortMessage() != null}" class="cl-alert is-warn">
+                    <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+                    <div>
+                        <p class="cl-alert-title" th:text="#{store.marketplaces.exports.aborted.title(${displayName})}"></p>
+                        <p class="cl-alert-text" th:text="#{store.marketplaces.exports.aborted.text(${view.abortMessage()})}"></p>
                     </div>
                 </div>
 
-                <div class="table-container" th:if="${!rows.isEmpty()}">
-                    <table class="table is-fullwidth is-narrow is-striped">
-                        <thead>
-                        <tr>
-                            <th th:text="#{store.marketplaces.exports.column.pimId}"></th>
-                            <th th:text="#{store.marketplaces.exports.column.price}"></th>
-                            <th th:text="#{store.marketplaces.exports.column.quantity}"></th>
-                            <th th:text="#{store.marketplaces.exports.column.removalAttempts}"></th>
-                            <th th:text="#{store.marketplaces.exports.column.outcome}"></th>
-                            <th th:text="#{store.marketplaces.exports.column.reasonCode}"></th>
-                            <th th:text="#{store.marketplaces.exports.column.message}"></th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        <tr class="export-row" th:each="row : ${rows}">
-                            <td class="export-row-pim-id" th:text="${row.pimId()}"></td>
-                            <td th:text="${row.price()}"></td>
-                            <td th:text="${row.quantity()}"></td>
-                            <td th:text="${row.removalAttempts()}"></td>
-                            <td th:text="${row.outcome()}"></td>
-                            <td th:text="${row.reasonCode()}"></td>
-                            <td th:text="${row.message()}"></td>
-                        </tr>
-                        </tbody>
-                    </table>
-                </div>
+                <section class="cl-card" id="export-offers" aria-labelledby="export-offers-title"
+                         data-cl-table-filter th:attr="data-cl-filter-default=${view.defaultFilter()}">
+                    <div class="cl-card-head">
+                        <h2 class="cl-card-title" id="export-offers-title" th:text="#{store.marketplaces.exports.offers.title}"></h2>
+                        <a class="cl-link-button" th:href="@{${fileHref}}" download>
+                            <i class="fas fa-download" aria-hidden="true"></i>
+                            <span th:text="#{store.marketplaces.exports.offers.download}"></span>
+                        </a>
+                    </div>
 
-                <p th:if="${rows.isEmpty()}" class="has-text-grey"
-                   th:text="#{store.marketplaces.exports.rows.empty}"></p>
+                    <p th:if="${view.rows().isEmpty()}" class="cl-list-empty" th:text="#{store.marketplaces.exports.offers.empty}"></p>
+
+                    <th:block th:unless="${view.rows().isEmpty()}">
+                        <div class="cl-table-toolbar" data-cl-filter-controls hidden>
+                            <div class="cl-segmented" role="group" th:attr="aria-label=#{store.marketplaces.exports.filter.label}">
+                                <button type="button" class="cl-segment" data-cl-filter="all" aria-pressed="false">
+                                    <span th:text="#{store.marketplaces.exports.filter.all}"></span>
+                                    <span class="cl-segment-count" th:text="${view.rows().size()}"></span>
+                                </button>
+                                <button type="button" class="cl-segment" aria-pressed="false"
+                                        th:each="outcome : ${T(pl.commercelink.web.settings.MarketplaceExportRunView.Outcome).values()}"
+                                        th:if="${view.count(outcome) > 0}" th:attr="data-cl-filter=${outcome.filter()}">
+                                    <span th:text="#{'store.marketplaces.exports.filter.' + ${outcome.filter()}}"></span>
+                                    <span class="cl-segment-count" th:text="${view.count(outcome)}"></span>
+                                </button>
+                            </div>
+                            <input class="cl-input cl-table-search" type="search" autocomplete="off" data-cl-table-search
+                                   th:placeholder="#{store.marketplaces.exports.search.placeholder}"
+                                   th:attr="aria-label=#{store.marketplaces.exports.search.label}"/>
+                        </div>
+
+                        <table class="cl-table" aria-labelledby="export-offers-title">
+                            <thead>
+                            <tr>
+                                <th scope="col" th:text="#{store.marketplaces.exports.column.product}"></th>
+                                <th scope="col" class="is-numeric" th:text="#{store.marketplaces.exports.column.price}"></th>
+                                <th scope="col" class="is-numeric" th:text="#{store.marketplaces.exports.column.quantity}"></th>
+                                <th scope="col" th:text="#{store.marketplaces.exports.column.outcome}"></th>
+                                <th scope="col" th:text="#{store.marketplaces.exports.column.reason}"></th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="row : ${view.rows()}" class="export-row"
+                                th:attr="data-cl-filter-value=${row.outcome().filter()}, data-cl-search=${row.searchText()}">
+                                <th scope="row" class="cl-table-key" th:attr="data-label=#{store.marketplaces.exports.column.product}"
+                                    th:text="${row.pimId()}"></th>
+                                <td class="is-numeric" th:attr="data-label=#{store.marketplaces.exports.column.price}"
+                                    th:text="${row.price() != null} ? ${#numbers.formatInteger(row.price(), 1, 'WHITESPACE')} : '—'"></td>
+                                <td class="is-numeric" th:attr="data-label=#{store.marketplaces.exports.column.quantity}"
+                                    th:text="${row.quantity()}"></td>
+                                <td th:attr="data-label=#{store.marketplaces.exports.column.outcome}">
+                                    <span class="cl-status" th:classappend="${row.outcome().tone()}"
+                                          th:text="#{'store.marketplaces.exports.outcome.' + ${row.outcome().name()}(${row.removalAttempts()})}"></span>
+                                </td>
+                                <td th:attr="data-label=#{store.marketplaces.exports.column.reason}"
+                                    th:classappend="${row.message() == null and row.reasonCode() == null} ? 'is-empty'">
+                                    <span th:if="${row.message() != null}" th:text="${row.message()}"></span>
+                                    <span th:if="${row.reasonCode() != null}" class="cl-table-sub" th:text="${row.reasonCode()}"></span>
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                        <p class="cl-list-empty" data-cl-filter-empty hidden th:text="#{store.marketplaces.exports.filter.none}"></p>
+                    </th:block>
+                </section>
             </div>
-
-            <div class="field is-grouped">
-                <div class="control">
-                    <a th:href="@{${basePath + '/marketplaces'}}" class="button is-light"
-                       th:text="#{general.back}"></a>
-                </div>
-                <div class="control">
-                    <a th:href="@{${basePath + '/marketplaces/exports/' + marketplace + '/' + catalogId + '/' + runId + '/file'}}"
-                       target="_blank" class="button is-light"
-                       th:text="#{store.marketplaces.exports.open.raw}"></a>
-                </div>
-            </div>
-
-            <script th:inline="none">
-                document.addEventListener('DOMContentLoaded', function () {
-                    const search = document.getElementById('exportRowsSearch');
-                    if (!search) {
-                        return;
-                    }
-
-                    search.addEventListener('input', function () {
-                        const needle = search.value.toLowerCase();
-                        document.querySelectorAll('.export-row').forEach(function (row) {
-                            const pimId = row.querySelector('.export-row-pim-id');
-                            const matches = pimId !== null
-                                    && pimId.textContent.toLowerCase().indexOf(needle) !== -1;
-                            row.classList.toggle('is-hidden', !matches);
-                        });
-                    });
-                });
-            </script>
-
         </div>
     </section>
+    <script th:src="@{/js/table-filter.js}" defer></script>
 </div>
 </body>
 </html>

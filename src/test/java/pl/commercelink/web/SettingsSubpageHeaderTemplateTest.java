@@ -18,8 +18,8 @@ class SettingsSubpageHeaderTemplateTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"store-company-details", "store-branding", "store-invoicing", "store-payments",
-            "store-marketplaces", "store-categories", "store-report", "store-fulfilment", "store-warehouse",
-            "store-shipping", "store-rma", "rma-centers", "store-notification", "emailTemplates"})
+            "store-marketplaces", "store-categories", "store-report", "store-fulfilment", "store-suppliers", "store-warehouse",
+            "store-shipping", "store-rma", "rma-centers", "store-notification", "store-email-templates"})
     void everySettingsSubpageUsesTheSharedHeaderInsideThePageWrapper(String name) throws Exception {
         // when
         String html = template(name);

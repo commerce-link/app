@@ -1,0 +1,166 @@
+package pl.commercelink.web;
+
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+import pl.commercelink.provider.api.ProviderField;
+import pl.commercelink.provider.api.ProviderField.FieldType;
+import pl.commercelink.shipping.ShippingProviderFactory;
+import pl.commercelink.shipping.api.Carrier;
+import pl.commercelink.shipping.api.ShippingProvider;
+import pl.commercelink.shipping.api.ShippingProviderDescriptor;
+import pl.commercelink.stores.IntegrationType;
+import pl.commercelink.stores.Store;
+import pl.commercelink.web.settings.IntegrationStatus;
+
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+/**
+ * What the shipping settings pages need to know about the store's courier account (Furgonetka today): the installed
+ * providers, the status shown on the shipping page, the adapter settings edited on the account subpage, the webhook
+ * address the provider posts delivery updates to, and the carriers the account offers.
+ */
+@Component
+class ShippingAccounts {
+
+    /** Adapter setting holding the shared secret the provider signs its webhook calls with. */
+    static final String WEBHOOK_TOKEN = "webhookToken";
+
+    private static final int MAX_ERROR_LENGTH = 300;
+
+    private final ShippingProviderFactory shippingProviderFactory;
+    private final String apiDomain;
+
+    ShippingAccounts(ShippingProviderFactory shippingProviderFactory, @Value("${api.domain}") String apiDomain) {
+        this.shippingProviderFactory = shippingProviderFactory;
+        this.apiDomain = apiDomain;
+    }
+
+    List<ShippingProviderDescriptor> installed() {
+        return shippingProviderFactory.availableProviders().stream()
+                .sorted(Comparator.comparing(ShippingProviderDescriptor::displayName, String.CASE_INSENSITIVE_ORDER))
+                .toList();
+    }
+
+    String current(Store store) {
+        return store.getConfigurationValue(IntegrationType.SHIPPING_PROVIDER);
+    }
+
+    /** Configured means every required setting is stored; nothing tests the connection. */
+    IntegrationStatus status(Store store) {
+        String providerName = current(store);
+        if (providerName == null) {
+            return IntegrationStatus.none();
+        }
+        ShippingProviderDescriptor descriptor = shippingProviderFactory.getDescriptor(providerName);
+        if (descriptor == null) {
+            return new IntegrationStatus(providerName, providerName, false, false);
+        }
+        Map<String, String> stored = storedSettings(store);
+        boolean configured = descriptor.configurationFields().stream()
+                .filter(ProviderField::required)
+                .allMatch(field -> field.type() == FieldType.PASSWORD
+                        ? stored.containsKey(field.key())
+                        : StringUtils.isNotBlank(stored.get(field.key())));
+        return new IntegrationStatus(providerName, descriptor.displayName(), true, configured);
+    }
+
+    /** The current provider's settings, secrets present but blanked. */
+    Map<String, String> storedSettings(Store store) {
+        return shippingProviderFactory.loadConfigurationForUI(store);
+    }
+
+    /** Secrets are loaded for the store's current provider only; another provider starts without any. */
+    Set<String> storedSecretKeys(Store store, String providerName) {
+        if (providerName == null || !providerName.equals(current(store))) {
+            return Set.of();
+        }
+        Map<String, String> stored = storedSettings(store);
+        List<ProviderField> fields = fieldsOf(providerName);
+        return fields == null ? Set.of() : fields.stream()
+                .filter(field -> field.type() == FieldType.PASSWORD && stored.containsKey(field.key()))
+                .map(ProviderField::key)
+                .collect(Collectors.toSet());
+    }
+
+    /** The adapter settings of a provider, or null when it is not installed (or none is given). */
+    List<ProviderField> fieldsOf(String providerName) {
+        if (providerName == null) {
+            return null;
+        }
+        ShippingProviderDescriptor descriptor = shippingProviderFactory.getDescriptor(providerName);
+        return descriptor == null ? null : descriptor.configurationFields();
+    }
+
+    void save(Store store, String providerName, Map<String, String> configuration) {
+        shippingProviderFactory.saveConfiguration(store, providerName, configuration);
+        store.setConfigurationValue(IntegrationType.SHIPPING_PROVIDER, providerName);
+    }
+
+    void disconnect(Store store, String providerName) {
+        shippingProviderFactory.deleteConfiguration(store, providerName);
+        store.removeIntegration(IntegrationType.SHIPPING_PROVIDER);
+    }
+
+    /** True for a provider that reports deliveries by webhook, i.e. has a webhook token setting. */
+    boolean usesWebhook(String providerName) {
+        List<ProviderField> fields = fieldsOf(providerName);
+        return fields != null && fields.stream().anyMatch(field -> WEBHOOK_TOKEN.equals(field.key()));
+    }
+
+    /** The address the provider posts delivery updates to, or null for a provider without webhooks. */
+    String webhookUrl(String storeId, String providerName) {
+        if (StringUtils.isBlank(providerName) || !usesWebhook(providerName)) {
+            return null;
+        }
+        return StringUtils.removeEnd(apiDomain, "/") + "/Store/" + storeId + "/Webhooks/Shipping/" + providerName;
+    }
+
+    /**
+     * True when the current provider takes webhooks but no token is stored, so the updates are not verified. Secrets
+     * are blanked in the UI configuration, so the stored configuration tells "empty" from "hidden".
+     */
+    boolean webhookTokenMissing(Store store) {
+        String providerName = current(store);
+        if (!usesWebhook(providerName)) {
+            return false;
+        }
+        Map<String, String> configuration = shippingProviderFactory.loadConfiguration(store, providerName);
+        return configuration == null || StringUtils.isBlank(configuration.get(WEBHOOK_TOKEN));
+    }
+
+    /**
+     * The carriers the store's account offers, asked from the provider. Empty when no provider is configured; a
+     * failed call (wrong credentials, provider down) is reported, not thrown, so the page can say what happened.
+     */
+    CarrierLookup carriers(Store store) {
+        if (!status(store).configured()) {
+            return new CarrierLookup(List.of(), null);
+        }
+        try {
+            ShippingProvider provider = shippingProviderFactory.get(store);
+            if (provider == null) {
+                return new CarrierLookup(List.of(), null);
+            }
+            List<Carrier> carriers = Optional.ofNullable(provider.getAvailableCarriers()).orElse(List.of());
+            return new CarrierLookup(carriers, null);
+        } catch (RuntimeException ex) {
+            // The provider's message says what to fix; a long response body is cut so the page stays readable.
+            String message = StringUtils.defaultIfBlank(ex.getMessage(), ex.getClass().getSimpleName());
+            return new CarrierLookup(List.of(), StringUtils.abbreviate(message, MAX_ERROR_LENGTH));
+        }
+    }
+
+    /** @param error the provider's failure, or null when the carriers were fetched */
+    record CarrierLookup(List<Carrier> carriers, String error) {
+
+        boolean failed() {
+            return error != null;
+        }
+    }
+}

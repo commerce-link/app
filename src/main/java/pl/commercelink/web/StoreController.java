@@ -1,9 +1,7 @@
 package pl.commercelink.web;
 
 import jakarta.servlet.http.HttpServletResponse;
-import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.MessageSource;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -11,33 +9,15 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
-import pl.commercelink.inventory.supplier.StoreSupplierConnectionService;
-import pl.commercelink.inventory.supplier.SupplierConnectionViewFactory;
-import pl.commercelink.inventory.supplier.SupplierRegistry;
-import pl.commercelink.provider.api.ProviderField;
-import pl.commercelink.stores.ConnectionMode;
-import pl.commercelink.marketplace.MarketplaceConnectionService;
-import pl.commercelink.marketplace.MarketplaceProviderFactory;
-import pl.commercelink.orders.ShippingDetails;
-import pl.commercelink.orders.fulfilment.FulfilmentType;
-import pl.commercelink.shipping.ShippingProviderFactory;
-import pl.commercelink.shipping.api.Carrier;
-import pl.commercelink.shipping.api.ShippingProviderDescriptor;
 import pl.commercelink.starter.security.UserRole;
 import pl.commercelink.stores.*;
-import pl.commercelink.web.settings.SettingsPage;
 import pl.commercelink.web.settings.StoreSettingsOverviewFactory;
 import pl.commercelink.starter.security.CustomSecurityContext;
-import pl.commercelink.web.dtos.CarrierSelectionForm;
 import pl.commercelink.web.dtos.BrandingForm;
 import pl.commercelink.web.dtos.CompanyDetailsForm;
 import pl.commercelink.web.dtos.CountryOptions;
-import pl.commercelink.web.dtos.ConnectedIntegration;
-import pl.commercelink.web.dtos.FulfilmentSettingsForm;
-import pl.commercelink.web.dtos.ParcelForm;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Controller
 public class StoreController {
@@ -47,33 +27,8 @@ public class StoreController {
     private static final String COMPANY_DETAILS_FORM_FRAGMENT = "store-company-details :: companyDetailsForm";
     private static final String BRANDING_FORM_FRAGMENT = "store-branding :: brandingForm";
 
-    @Value("${scheduling.min-interval-minutes}")
-    private int scheduleMinIntervalMinutes;
-
-    @Autowired
-    private MarketplaceConnectionService marketplaceConnectionService;
-
     @Autowired
     private StoresRepository storesRepository;
-
-    @Autowired
-    private ShippingProviderFactory shippingProviderFactory;
-
-
-    @Autowired
-    private MarketplaceProviderFactory marketplaceProviderFactory;
-
-    @Autowired
-    private SupplierRegistry supplierRegistry;
-
-    @Autowired
-    private StoreSupplierConnectionService storeSupplierConnectionService;
-
-    @Autowired
-    private SupplierConnectionViewFactory supplierConnectionViewFactory;
-
-    @Value("${api.domain}")
-    private String apiDomain;
 
     @Autowired
     private MessageSource messageSource;
@@ -121,309 +76,6 @@ public class StoreController {
                 + (branding != null && branding.getLogoVersion() != null ? "?v=" + branding.getLogoVersion() : ""));
         model.addAttribute("logoMaxBytes", BrandingForm.LOGO_MAX_BYTES);
         return "store-branding";
-    }
-
-    @GetMapping("/dashboard/store/shipping")
-    @PreAuthorize("hasRole('ADMIN')")
-    public String storeShipping(Model model) {
-        return renderStoreShipping(getStoreId(), model);
-    }
-
-    @GetMapping("/dashboard/store/{storeId}/shipping")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public String superAdminStoreShipping(@PathVariable String storeId, Model model) {
-        return renderStoreShipping(storeId, model);
-    }
-
-    private String renderStoreShipping(String storeId, Model model) {
-        Store store = storesRepository.findById(storeId);
-        if (store == null) {
-            model.addAttribute("error", "Store not found");
-            return "error";
-        }
-
-        if (store.getShippingConfiguration() == null) {
-            store.setShippingConfiguration(new ShippingConfiguration());
-        }
-
-        ShippingDetails pickupAddress = new ShippingDetails();
-        pickupAddress.setId(UUID.randomUUID().toString());
-        pickupAddress.set_default(false);
-
-        ShippingDetails senderAddress = new ShippingDetails();
-        senderAddress.setId(UUID.randomUUID().toString());
-        senderAddress.set_default(false);
-
-        store.getShippingConfiguration().getPickUpAddresses().add(pickupAddress);
-        store.getShippingConfiguration().getSenderAddresses().add(senderAddress);
-
-        StoreForm form = new StoreForm(store);
-        form.setProviderConfiguration(shippingProviderFactory.loadConfigurationForUI(store));
-
-        model.addAttribute("form", form);
-        model.addAttribute("availableProviders", shippingProviderFactory.availableProviders());
-        model.addAttribute("selectedProviderName", form.getShippingProvider());
-        model.addAttribute("shippingWebhookUrl", shippingWebhookUrl(storeId, form.getShippingProvider()));
-        model.addAttribute("webhookTokenMissing", webhookTokenMissing(store, form.getShippingProvider()));
-        model.addAttribute("connectedIntegrations", connectedIntegration(form.getShippingProvider()));
-        return "store-shipping";
-    }
-
-    private String shippingWebhookUrl(String storeId, String providerName) {
-        if (StringUtils.isBlank(providerName)) {
-            return null;
-        }
-        String domain = StringUtils.removeEnd(apiDomain, "/");
-        return domain + "/Store/" + storeId + "/Webhooks/Shipping/" + providerName;
-    }
-
-    // password fields are masked in the UI configuration, so read the stored configuration to tell "empty" from "hidden"
-    boolean webhookTokenMissing(Store store, String providerName) {
-        if (StringUtils.isBlank(providerName)) {
-            return false;
-        }
-        ShippingProviderDescriptor descriptor = shippingProviderFactory.getDescriptor(providerName);
-        if (descriptor == null || descriptor.configurationFields().stream().noneMatch(f -> "webhookToken".equals(f.key()))) {
-            return false;
-        }
-        Map<String, String> configuration = shippingProviderFactory.loadConfiguration(store, providerName);
-        return configuration == null || StringUtils.isBlank(configuration.get("webhookToken"));
-    }
-
-    @GetMapping("/dashboard/store/shipping/templates/new")
-    @PreAuthorize("hasRole('ADMIN')")
-    public String newTemplate(Model model) {
-        return showEditPackageTemplate(model, null);
-    }
-
-    @GetMapping("/dashboard/store/shipping/templates/edit")
-    @PreAuthorize("hasRole('ADMIN')")
-    public String editTemplate(@RequestParam String templateId, Model model) {
-        return showEditPackageTemplate(model, templateId);
-    }
-
-    private String showEditPackageTemplate(Model model, String templateId) {
-        Store store = storesRepository.findById(getStoreId());
-        ShippingConfiguration config = store.getShippingConfiguration();
-
-        if (config == null) {
-            config = new ShippingConfiguration();
-            store.setShippingConfiguration(config);
-        }
-
-        PackageTemplate template;
-        if (templateId == null) {
-            template = new PackageTemplate("", new ArrayList<>(Collections.nCopies(3, Parcel.empty())));
-        } else {
-            template = config.getPackageTemplates().stream()
-                    .filter(t -> t.getId().equals(templateId))
-                    .findFirst()
-                    .orElseThrow(() -> new IllegalArgumentException("Template not found"));
-            template.getParcels().addAll(Collections.nCopies(2, Parcel.empty()));
-        }
-
-        ParcelForm form = new ParcelForm();
-        form.setStoreId(store.getStoreId());
-        form.setTemplateId(template.getId());
-        form.setTemplateName(template.getName());
-        form.setParcels(template.getParcels());
-
-        model.addAttribute("form", form);
-        model.addAttribute("isNew", templateId == null);
-
-        return "shipping-template-edit";
-    }
-
-    @PostMapping("/dashboard/store/shipping/templates/edit")
-    @PreAuthorize("hasAnyRole('ADMIN')")
-    public String updateShippingTemplates(@ModelAttribute ParcelForm form, Locale locale, RedirectAttributes redirectAttributes) {
-        Store existingStore = storesRepository.findById(form.getStoreId());
-        ShippingConfiguration config = existingStore.getShippingConfiguration();
-
-        PackageTemplate template = config.getPackageTemplates().stream()
-                .filter(t -> t.getId().equals(form.getTemplateId()))
-                .findFirst()
-                .orElse(null);
-
-        List<Parcel> validParcels = form.getParcels().stream()
-                .filter(Parcel::isComplete)
-                .collect(Collectors.toList());
-
-        if (template == null) {
-            template = new PackageTemplate();
-            template.setId(form.getTemplateId());
-            template.setName(form.getTemplateName());
-            template.setParcels(validParcels);
-
-            config.getPackageTemplates().add(template);
-        } else {
-            template.setName(form.getTemplateName());
-            template.setParcels(validParcels);
-        }
-
-        storesRepository.save(existingStore);
-        redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("store.shipping.package.template.update.success", null, locale));
-        return isSuperAdmin()
-                ? String.format("redirect:/dashboard/store/%s/shipping", existingStore.getStoreId())
-                : "redirect:/dashboard/store/shipping";
-    }
-
-    @PostMapping("/dashboard/store/shipping/templates/default")
-    @PreAuthorize("hasAnyRole('ADMIN')")
-    public String setDefaultTemplate(@RequestParam String storeId, @RequestParam String templateId) {
-        Store store = storesRepository.findById(storeId);
-        ShippingConfiguration shippingConfig = store.getShippingConfiguration();
-        shippingConfig.getPackageTemplates().forEach(t -> t.setDefault(t.getId().equals(templateId)));
-
-        storesRepository.save(store);
-        return isSuperAdmin()
-                ? String.format("redirect:/dashboard/store/%s/shipping", storeId)
-                : "redirect:/dashboard/store/shipping";
-    }
-
-    @PostMapping("/dashboard/store/shipping/templates/delete")
-    @PreAuthorize("hasAnyRole('ADMIN')")
-    public String deleteTemplate(@RequestParam String storeId, @RequestParam String templateId, Locale locale, RedirectAttributes redirectAttributes) {
-        Store store = storesRepository.findById(storeId);
-        ShippingConfiguration shippingConfig = store.getShippingConfiguration();
-        shippingConfig.getPackageTemplates().removeIf(t -> t.getId().equals(templateId));
-        storesRepository.save(store);
-
-        redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("shipping.template.delete.success", null, locale));
-
-        return isSuperAdmin()
-                ? String.format("redirect:/dashboard/store/%s/shipping", storeId)
-                : "redirect:/dashboard/store/shipping";
-    }
-
-    @PostMapping("/dashboard/store/shipping/pickup-sender/save")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
-    public String updateShippingConfiguration(@ModelAttribute StoreForm form, Locale locale, RedirectAttributes redirectAttributes) {
-        Store existingStore = storesRepository.findById(form.getStore().getStoreId());
-        ShippingConfiguration existingConfig = existingStore.getShippingConfiguration() != null
-                ? existingStore.getShippingConfiguration()
-                : new ShippingConfiguration();
-
-        ShippingConfiguration formConfig = form.getStore().getShippingConfiguration();
-        List<ShippingDetails> updatedPickupAddresses = formConfig.getPickUpAddresses().stream()
-                .filter(ShippingDetails::isProperlyFilled)
-                .peek(s -> s.set_default(s.getId().equals(form.getDefaultPickupAddressId())))
-                .collect(Collectors.toList());
-
-        existingConfig.setPickUpAddresses(updatedPickupAddresses);
-
-        List<ShippingDetails> updatedSenderAddresses = formConfig.getSenderAddresses().stream()
-                .filter(ShippingDetails::isProperlyFilled)
-                .peek(s -> s.set_default(s.getId().equals(form.getDefaultSenderAddressId())))
-                .collect(Collectors.toList());
-
-        existingConfig.setSenderAddresses(updatedSenderAddresses);
-
-        existingStore.setShippingConfiguration(existingConfig);
-        storesRepository.save(existingStore);
-
-        redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("store.shipping.configuration.update.success", null, locale));
-
-        return isSuperAdmin()
-                ? String.format("redirect:/dashboard/store/%s/shipping", existingStore.getStoreId())
-                : "redirect:/dashboard/store/shipping";
-    }
-
-    @GetMapping("/dashboard/store/fulfilment")
-    @PreAuthorize("hasRole('ADMIN')")
-    public String storeFulfilmentConfiguration(Model model) {
-        return renderStoreFulfilmentConfiguration(getStoreId(), model);
-    }
-
-    @GetMapping("/dashboard/store/{storeId}/fulfilment")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public String superAdminStoreFulfilmentConfiguration(@PathVariable String storeId, Model model) {
-        return renderStoreFulfilmentConfiguration(storeId, model);
-    }
-
-    private String renderStoreFulfilmentConfiguration(String storeId, Model model) {
-        Store store = storesRepository.findById(storeId);
-        if (store == null) {
-            model.addAttribute("error", "Store not found");
-            return "error";
-        }
-        if (store.getFulfilmentConfiguration() == null) {
-            store.setFulfilmentConfiguration(new FulfilmentConfiguration());
-        }
-
-        Map<String, List<ProviderField>> supplierFields = storeSupplierConnectionService.configurationFields();
-
-        StoreForm form = new StoreForm(store);
-        Map<String, Map<String, String>> configurations = storeSupplierConnectionService.configurationsForUI(store);
-
-        model.addAttribute("form", form);
-        model.addAttribute("settings", FulfilmentSettingsForm.from(store));
-        model.addAttribute("fulfilmentTypes", FulfilmentType.values());
-        model.addAttribute("supplierFields", supplierFields);
-        // Published on the external section's root as data-suppliers-with-stored-config (see
-        // fragments/supplier-section.html), keyed by connection identity, so the modal's JS derives
-        // password requiredness per connection on every open. The markup itself never carries it:
-        // the modal is rendered once, before any connection is picked, and is never re-rendered by
-        // an async section swap.
-        Set<String> suppliersWithStoredConfig = storeSupplierConnectionService.suppliersWithStoredConfiguration(store);
-        model.addAttribute("suppliersWithStoredConfigJoined", String.join(";", suppliersWithStoredConfig));
-        // The modal's credential inputs are grouped per supplier type, so two connections of one
-        // type share one group: the values travel per connection instead, as a JSON blob on each
-        // table row, and the modal fills the group from the row it is editing.
-        model.addAttribute("supplierConfigurations", SupplierSectionModel.configurationPayloads(configurations));
-        model.addAttribute("connectionModes", Arrays.stream(ConnectionMode.values())
-                .filter(mode -> mode != ConnectionMode.MANUAL)
-                .toList());
-        model.addAttribute("isSuperAdmin", isSuperAdmin());
-        model.addAttribute("scheduleMinIntervalMinutes", scheduleMinIntervalMinutes);
-
-        SupplierConnectionViewFactory.SupplierConnectionViews views = supplierConnectionViewFactory.views(store);
-        model.addAttribute("externalConnections", views.external());
-        model.addAttribute("manualConnections", views.manual());
-        model.addAttribute("basePath", isSuperAdmin()
-                ? "/dashboard/store/" + storeId
-                : "/dashboard/store");
-
-        // A supplier type may be connected several times (one per label), so the Add dropdown no
-        // longer removes already-connected types -- it always offers every registered type.
-        List<String> allSupplierNames = supplierRegistry.getExternalSupplierNames();
-        model.addAttribute("availableSuppliers", allSupplierNames);
-        // Rendered once as a data attribute on the stable section container so the page script can
-        // recompute the Add dropdown after an async swap without a second request.
-        model.addAttribute("allSupplierNames", allSupplierNames);
-
-        return "store-fulfilment";
-    }
-
-
-    @GetMapping("/dashboard/store/marketplaces")
-    @PreAuthorize("hasRole('ADMIN')")
-    public String storeMarketplaces(Model model) {
-        return renderStoreMarketplaces(getStoreId(), model);
-    }
-
-    @GetMapping("/dashboard/store/{storeId}/marketplaces")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public String superAdminStoreMarketplaces(@PathVariable String storeId, Model model) {
-        return renderStoreMarketplaces(storeId, model);
-    }
-
-    private String renderStoreMarketplaces(String storeId, Model model) {
-        Store store = storesRepository.findById(storeId);
-        if (store == null) {
-            model.addAttribute("error", "Store not found");
-            return "error";
-        }
-
-        MarketplaceSectionModel.render(marketplaceConnectionService, store, null, model);
-        model.addAttribute("basePath", SupplierSectionModel.basePath(storeId));
-        model.addAttribute("isSuperAdmin", isSuperAdmin());
-        model.addAttribute("allMarketplaces", marketplaceProviderFactory.availableProviders());
-        model.addAttribute("marketplaceConfigurations", marketplaceConnectionService.configurationsForUI(store));
-        model.addAttribute("marketplacesWithStoredConfig", marketplaceConnectionService.marketplacesWithStoredConfiguration(store));
-        model.addAttribute("scheduleMinIntervalMinutes", marketplaceConnectionService.minIntervalMinutes());
-
-        return "store-marketplaces";
     }
 
     @GetMapping("/dashboard/store/company-details")
@@ -521,65 +173,6 @@ public class StoreController {
                 : "/dashboard/store/branding";
     }
 
-    @PostMapping("/dashboard/store/shipping/carriers/fetch")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
-    public String fetchAvailableCarriers(@RequestParam String storeId, Model model) {
-        Store store = storesRepository.findById(storeId);
-
-        Set<String> currentCarrierIds = store.getShippingConfiguration() != null
-                ? store.getShippingConfiguration().getAuthorizedCarriers().stream()
-                    .map(AuthorizedCarrier::getId)
-                    .collect(Collectors.toSet())
-                : Collections.emptySet();
-
-        List<Carrier> carriers = shippingProviderFactory.get(store).getAvailableCarriers();
-
-        List<CarrierSelectionForm.CarrierSelection> selections = carriers.stream()
-                .map(c -> {
-                    CarrierSelectionForm.CarrierSelection s = new CarrierSelectionForm.CarrierSelection();
-                    s.setId(c.id());
-                    s.setName(c.name());
-                    s.setDisplayName(c.displayName());
-                    s.setSelected(currentCarrierIds.contains(c.id()));
-                    return s;
-                })
-                .collect(Collectors.toList());
-
-        model.addAttribute("availableCarriers", selections);
-        // Renders under a non-tile URL, so SettingsPageAdvice cannot recognise it from the request path;
-        // set it explicitly (a handler's model attribute overrides the advice's value).
-        model.addAttribute("settingsPage", SettingsPage.forTile("/shipping",
-                isSuperAdmin() ? UserRole.SUPER_ADMIN : UserRole.ADMIN, storeId));
-        return renderStoreShipping(storeId, model);
-    }
-
-    @PostMapping("/dashboard/store/shipping/carriers/save")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
-    public String saveAuthorizedCarriers(@ModelAttribute CarrierSelectionForm form,
-                                         Locale locale,
-                                         RedirectAttributes redirectAttributes) {
-        Store store = storesRepository.findById(form.getStoreId());
-
-        if (store.getShippingConfiguration() == null) {
-            store.setShippingConfiguration(new ShippingConfiguration());
-        }
-
-        List<AuthorizedCarrier> authorized = form.getCarriers().stream()
-                .filter(CarrierSelectionForm.CarrierSelection::isSelected)
-                .map(c -> new AuthorizedCarrier(c.getId(), c.getName(), c.getDisplayName()))
-                .collect(Collectors.toList());
-
-        store.getShippingConfiguration().setAuthorizedCarriers(authorized);
-        storesRepository.save(store);
-
-        redirectAttributes.addFlashAttribute("successMessage",
-                messageSource.getMessage("store.shipping.carriers.save.success", null, locale));
-
-        return isSuperAdmin()
-                ? String.format("redirect:/dashboard/store/%s/shipping", form.getStoreId())
-                : "redirect:/dashboard/store/shipping";
-    }
-
     // The store is taken from the session (ADMIN) or the path (SUPER_ADMIN), never from the submitted form.
     @PostMapping("/dashboard/store/company-details")
     @PreAuthorize("hasRole('ADMIN')")
@@ -638,9 +231,4 @@ public class StoreController {
     private String getStoreId() { return CustomSecurityContext.getStoreId(); }
 
     private boolean isSuperAdmin() { return CustomSecurityContext.hasRole("SUPER_ADMIN"); }
-
-    private List<ConnectedIntegration> connectedIntegration(String providerName) {
-        return providerName != null ? List.of(new ConnectedIntegration(providerName, true)) : List.of();
-    }
-
 }

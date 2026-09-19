@@ -1,0 +1,54 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+<div layout:fragment="content">
+    <section class="cl-page">
+        <div class="cl-page-body">
+            <div th:replace="~{fragments/settings-header :: subpage(${shippingHref}, ${backLabel}, ${pageTitle})}"></div>
+
+            <form th:fragment="senderForm" id="shipping-sender-form" class="cl-form"
+                  th:action="@{${formAction}}" th:object="${form}" method="post" novalidate data-cl-async
+                  th:attr="data-cl-redirect=${redirectTo}, data-error-message=#{form.save.failed}">
+                <div th:replace="~{fragments/settings-form :: errorSummary('shipping-sender-errors', ${errors}, null)}"></div>
+
+                <div class="cl-card">
+                    <!--/* The page title already names the choice; the legend stays for screen readers only. */-->
+                    <fieldset class="cl-fieldset">
+                        <legend class="cl-visually-hidden" th:text="#{store.shipping.sender.title}"></legend>
+                        <fieldset class="cl-choice-group is-row" th:attr="aria-label=#{store.shipping.sender.title}">
+                            <label class="cl-choice" th:each="option : ${ {'PICKUP', 'OTHER'} }">
+                                <input type="radio" name="sender" data-cl-variant-select="sender" th:value="${option}"
+                                       th:checked="${option == form.sender}"
+                                       th:attr="aria-describedby='sender-' + ${option} + '-description'"/>
+                                <span class="cl-choice-text">
+                                    <span class="cl-choice-title" th:text="#{'store.shipping.sender.' + ${option}}"></span>
+                                    <span class="cl-choice-description" th:id="'sender-' + ${option} + '-description'"
+                                          th:text="#{'store.shipping.sender.' + ${option} + '.description'}"></span>
+                                </span>
+                            </label>
+                        </fieldset>
+                    </fieldset>
+
+                    <!--/* Hidden and not sent while the pickup address is the sender; without JavaScript always shown. */-->
+                    <fieldset class="cl-choice-group" data-cl-variant-when="sender=OTHER">
+                        <div th:replace="~{store-shipping-address :: addressFields(false)}"></div>
+                    </fieldset>
+
+                    <div class="cl-card-footer">
+                        <button class="cl-button is-primary" type="submit" th:text="#{form.save.changes}"></button>
+                        <a class="cl-button" th:href="@{${shippingHref}}" th:text="#{general.cancel}"></a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </section>
+    <script th:if="${!errors.isEmpty()}">
+        document.getElementById('shipping-sender-errors').focus();
+    </script>
+    <script th:src="@{/js/async-form.js}" defer></script>
+    <script th:src="@{/js/variant-fields.js}" defer></script>
+</div>
+</body>
+</html>

@@ -10,8 +10,8 @@ public final class StorePath {
 
     private static final Set<String> RESERVED_SEGMENTS = Set.of(
             "branding", "categories", "company-details", "create", "email-templates", "fulfilment",
-            "integrations", "invoicing", "manual-supplier", "marketplaces", "notification", "payments",
-            "report", "rma", "rma-centers", "shipping", "warehouse");
+            "integrations", "invoicing", "marketplaces", "notification", "payments",
+            "report", "rma", "rma-centers", "shipping", "suppliers", "warehouse");
 
     private StorePath() {
     }

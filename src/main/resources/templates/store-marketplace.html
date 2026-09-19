@@ -1,0 +1,119 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+<div layout:fragment="content">
+    <section class="cl-page">
+        <div class="cl-page-body">
+            <div th:replace="~{fragments/settings-header :: subpage(${marketplacesHref}, ${backLabel}, ${pageTitle})}"></div>
+
+            <form th:fragment="marketplaceForm" id="marketplace-form" class="cl-form" data-cl-schedule-auto
+                  th:action="@{${formAction}}" th:object="${form}" method="post" novalidate data-cl-async
+                  th:attr="data-cl-redirect=${redirectTo}, data-error-message=#{form.save.failed}">
+                <div th:replace="~{fragments/settings-form :: errorSummary('marketplace-errors', ${errors}, ${errorLabels})}"></div>
+                <div th:if="${failure != null}" class="cl-alert is-bad" role="status">
+                    <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
+                    <p class="cl-alert-text" th:text="${failure}"></p>
+                </div>
+
+                <div class="cl-card">
+                    <!--/* Adding: pick one of the installed marketplaces the store is not connected to. Editing: the
+                           marketplace is fixed by the address, so there is nothing to pick. */-->
+                    <fieldset th:unless="${editing}" class="cl-fieldset">
+                        <legend class="cl-fieldset-title" th:text="#{store.marketplace.section}"></legend>
+                        <div class="cl-field">
+                            <label class="cl-label" for="providerName" th:text="#{store.marketplace.provider}"></label>
+                            <select class="cl-select" id="providerName" name="providerName" data-cl-variant-select="marketplace"
+                                    th:classappend="${errors['providerName'] != null} ? 'is-invalid'"
+                                    th:attr="aria-invalid=${errors['providerName'] != null ? 'true' : null},
+                                             aria-describedby=${errors['providerName'] != null ? 'providerName-help providerName-error' : 'providerName-help'}">
+                                <option th:unless="${providerKnown}" value="" th:text="#{store.marketplace.choose}"></option>
+                                <option th:each="provider : ${providers}" th:value="${provider.name()}"
+                                        th:text="${provider.displayName()}"
+                                        th:selected="${provider.name() == form.providerName}"></option>
+                            </select>
+                            <p class="cl-help" id="providerName-help" th:text="#{store.marketplace.provider.help}"></p>
+                            <p th:if="${errors['providerName'] != null}" class="cl-field-error" id="providerName-error">
+                                <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                                <span th:text="#{${errors['providerName']}}"></span>
+                            </p>
+                        </div>
+                    </fieldset>
+
+                    <th:block th:each="provider : ${providers}"
+                              th:with="variantGroup=${editing ? null : 'marketplace'}, variant=${editing ? null : provider.name()}">
+                        <fieldset class="cl-fieldset" th:attr="data-cl-variant-group=${variantGroup}, data-cl-variant=${variant}">
+                            <legend class="cl-fieldset-title" th:text="#{store.marketplace.settings(${provider.displayName()})}"></legend>
+                            <p th:if="${authorizedOnMarketplace.contains(provider.name())}" class="cl-help"
+                               th:text="#{store.marketplace.settings.authorize(${provider.displayName()})}"></p>
+                            <div class="cl-form-grid">
+                                <div class="cl-span-3 cl-field" th:each="field : ${provider.configurationFields()}"
+                                     th:with="id=${T(pl.commercelink.web.dtos.IntegrationSettingsForm).fieldId(provider.name(), field)},
+                                              secret=${field.type().name() == 'PASSWORD'},
+                                              error=${errors.get(id)},
+                                              stored=${storedSecretIds.contains(id)},
+                                              exampleText=${T(pl.commercelink.web.settings.ProviderFieldText).example(field)},
+                                              example=${exampleText != null}">
+                                    <label class="cl-label" th:for="${id}">
+                                        <span th:text="${T(pl.commercelink.web.settings.ProviderFieldText).label(field)}"></span>
+                                        <span th:unless="${field.required()}" class="cl-optional" th:text="#{form.optional}"></span>
+                                    </label>
+                                    <input class="cl-input" th:classappend="${error != null} ? 'is-invalid'"
+                                           th:id="${id}" th:name="${T(pl.commercelink.web.dtos.IntegrationSettingsForm).fieldName(provider.name(), field)}"
+                                           th:type="${secret ? 'password' : (field.type().name() == 'URL' ? 'url' : 'text')}"
+                                           th:value="${form.value(provider.name(), field)}"
+                                           th:attr="autocomplete=${secret ? 'new-password' : 'off'},
+                                                    inputmode=${field.type().name() == 'NUMBER' ? 'decimal' : null},
+                                                    aria-invalid=${error != null ? 'true' : null},
+                                                    aria-describedby=${(example or stored or error != null) ? ((example or stored ? id + '-help' : '') + ((example or stored) and error != null ? ' ' : '') + (error != null ? id + '-error' : '')) : null}"/>
+                                    <p th:if="${stored}" class="cl-help" th:id="${id} + '-help'" th:text="#{integration.secret.stored}"></p>
+                                    <p th:if="${example}" class="cl-help" th:id="${id} + '-help'"
+                                       th:text="#{integration.setting.example(${exampleText})}"></p>
+                                    <p th:if="${error != null}" class="cl-field-error" th:id="${id} + '-error'">
+                                        <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                                        <span th:text="#{${error}}"></span>
+                                    </p>
+                                </div>
+                            </div>
+                        </fieldset>
+
+                        <fieldset class="cl-fieldset" th:attr="data-cl-variant-group=${variantGroup}, data-cl-variant=${variant}">
+                            <legend class="cl-fieldset-title" th:text="#{store.marketplace.schedule.section}"></legend>
+                            <th:block th:each="kind : ${provider.supportsReturns() ? {'orders', 'returns'} : {'orders'}}"
+                                      th:with="id=${T(pl.commercelink.web.dtos.MarketplaceSettingsForm).scheduleId(provider.name(), kind)},
+                                               inputName=${T(pl.commercelink.web.dtos.MarketplaceSettingsForm).scheduleName(provider.name(), kind)},
+                                               inputValue=${form.schedule(provider.name(), kind)},
+                                               defaultText=${kind == 'orders' ? ordersDefaultText : returnsDefaultText},
+                                               error=${errors.get(id)}">
+                                <div class="cl-field" th:id="${id}" tabindex="-1">
+                                    <span class="cl-label" th:id="${id} + '-label'"
+                                          th:text="${kind == 'orders'} ? #{store.marketplace.schedule.orders} : #{store.marketplace.schedule.returns}"></span>
+                                    <div th:replace="~{fragments/schedule-field :: input(${inputName}, ${inputValue},
+                                            ${scheduleMinIntervalMinutes}, ${defaultText}, 'minutes,hours')}"></div>
+                                    <p th:if="${error != null}" class="cl-field-error" th:id="${id} + '-error'">
+                                        <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                                        <span th:text="#{${error}}"></span>
+                                    </p>
+                                </div>
+                            </th:block>
+                        </fieldset>
+                    </th:block>
+
+                    <div class="cl-card-footer">
+                        <button class="cl-button is-primary" type="submit" th:text="#{store.marketplace.save}"></button>
+                        <a class="cl-button" th:href="@{${marketplacesHref}}" th:text="#{general.cancel}"></a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </section>
+    <script th:if="${!errors.isEmpty()}">
+        document.getElementById('marketplace-errors').focus();
+    </script>
+    <script th:replace="~{fragments/schedule-field :: script}"></script>
+    <script th:src="@{/js/async-form.js}" defer></script>
+    <script th:src="@{/js/variant-fields.js}" defer></script>
+</div>
+</body>
+</html>

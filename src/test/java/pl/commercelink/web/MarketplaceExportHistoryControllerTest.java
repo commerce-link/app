@@ -9,6 +9,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.context.MessageSource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -23,12 +24,15 @@ import org.springframework.ui.Model;
 import pl.commercelink.marketplace.MarketplaceExportRunFile;
 import pl.commercelink.marketplace.MarketplaceExportRunHeader;
 import pl.commercelink.marketplace.MarketplaceExportRunService;
+import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.marketplace.MarketplaceOfferSnapshot;
+import pl.commercelink.web.settings.MarketplaceExportRunView;
 import pl.commercelink.starter.security.model.CustomUser;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
@@ -56,6 +60,15 @@ class MarketplaceExportHistoryControllerTest {
     @Mock
     private MarketplaceExportRunService marketplaceExportRunService;
 
+    @Mock
+    private MarketplaceConnections marketplaces;
+
+    @Mock
+    private ProductCatalogRepository catalogRepository;
+
+    @Mock
+    private MessageSource messageSource;
+
     @InjectMocks
     private MarketplaceExportHistoryController controller;
 
@@ -76,7 +89,7 @@ class MarketplaceExportHistoryControllerTest {
         Model model = new ExtendedModelMap();
 
         // when
-        String view = controller.exportRun(MARKETPLACE, CATALOG_ID, RUN_ID, model);
+        String view = controller.exportRun(MARKETPLACE, CATALOG_ID, RUN_ID, model, Locale.forLanguageTag("pl"));
 
         // then
         assertThat(view).isEqualTo("store-marketplace-export-run");
@@ -87,10 +100,10 @@ class MarketplaceExportHistoryControllerTest {
         assertThat(model.getAttribute("catalogId")).isEqualTo(CATALOG_ID);
         assertThat(model.getAttribute("storeId")).isEqualTo(STORE_ID);
 
-        @SuppressWarnings("unchecked")
-        List<MarketplaceOfferSnapshot> rows = (List<MarketplaceOfferSnapshot>) model.getAttribute("rows");
-        assertThat(rows).hasSize(1);
-        assertThat(rows.get(0).pimId()).isEqualTo("pim-A");
+        MarketplaceExportRunView run = (MarketplaceExportRunView) model.getAttribute("view");
+        assertThat(run.rows()).singleElement().satisfies(row -> assertThat(row.pimId()).isEqualTo("pim-A"));
+        assertThat(model.getAttribute("fileHref"))
+                .isEqualTo("/dashboard/store/marketplaces/exports/" + MARKETPLACE + "/" + CATALOG_ID + "/" + RUN_ID + "/file");
     }
 
     @Test
@@ -100,7 +113,7 @@ class MarketplaceExportHistoryControllerTest {
         Model model = new ExtendedModelMap();
 
         // when
-        controller.exportRun(MARKETPLACE, CATALOG_ID, RUN_ID, model);
+        controller.exportRun(MARKETPLACE, CATALOG_ID, RUN_ID, model, Locale.forLanguageTag("pl"));
 
         // then
         assertThat(model.getAttribute("raw")).isNull();
@@ -114,12 +127,10 @@ class MarketplaceExportHistoryControllerTest {
         Model model = new ExtendedModelMap();
 
         // when
-        controller.exportRun(MARKETPLACE, CATALOG_ID, RUN_ID, model);
+        controller.exportRun(MARKETPLACE, CATALOG_ID, RUN_ID, model, Locale.forLanguageTag("pl"));
 
         // then
-        @SuppressWarnings("unchecked")
-        List<MarketplaceOfferSnapshot> rows = (List<MarketplaceOfferSnapshot>) model.getAttribute("rows");
-        assertThat(rows).hasSize(620);
+        assertThat(((MarketplaceExportRunView) model.getAttribute("view")).rows()).hasSize(620);
     }
 
     @Test
@@ -129,7 +140,7 @@ class MarketplaceExportHistoryControllerTest {
         Model model = new ExtendedModelMap();
 
         // when
-        controller.exportRun(MARKETPLACE, CATALOG_ID, RUN_ID, model);
+        controller.exportRun(MARKETPLACE, CATALOG_ID, RUN_ID, model, Locale.forLanguageTag("pl"));
 
         // then
         assertThat(model.getAttribute("failed")).isEqualTo(true);
@@ -142,7 +153,7 @@ class MarketplaceExportHistoryControllerTest {
         Model model = new ExtendedModelMap();
 
         // when
-        controller.exportRun(MARKETPLACE, CATALOG_ID, LEGACY_RUN_ID, model);
+        controller.exportRun(MARKETPLACE, CATALOG_ID, LEGACY_RUN_ID, model, Locale.forLanguageTag("pl"));
 
         // then
         assertThat(model.getAttribute("runId")).isEqualTo(LEGACY_RUN_ID);
@@ -156,7 +167,7 @@ class MarketplaceExportHistoryControllerTest {
         Model model = new ExtendedModelMap();
 
         // when
-        controller.exportRun(MARKETPLACE, CATALOG_ID, "no-timestamp", model);
+        controller.exportRun(MARKETPLACE, CATALOG_ID, "no-timestamp", model, Locale.forLanguageTag("pl"));
 
         // then
         assertThat(model.getAttribute("runTimestamp")).isEqualTo("no-timestamp");
@@ -195,7 +206,7 @@ class MarketplaceExportHistoryControllerTest {
         Model model = new ExtendedModelMap();
 
         // when
-        String view = controller.exportRun(MARKETPLACE, CATALOG_ID, RUN_ID, model);
+        String view = controller.exportRun(MARKETPLACE, CATALOG_ID, RUN_ID, model, Locale.forLanguageTag("pl"));
 
         // then
         assertThat(view).isEqualTo("error");
@@ -237,7 +248,7 @@ class MarketplaceExportHistoryControllerTest {
         Model model = new ExtendedModelMap();
 
         // when
-        String view = controller.superAdminExportRun("store-2", MARKETPLACE, CATALOG_ID, RUN_ID, model);
+        String view = controller.superAdminExportRun("store-2", MARKETPLACE, CATALOG_ID, RUN_ID, model, Locale.forLanguageTag("pl"));
 
         // then
         assertThat(view).isEqualTo("store-marketplace-export-run");
@@ -252,7 +263,7 @@ class MarketplaceExportHistoryControllerTest {
         Model model = new ExtendedModelMap();
 
         // when
-        String view = controller.exportHistory(MARKETPLACE, model);
+        String view = controller.exportHistory(MARKETPLACE, model, Locale.forLanguageTag("pl"));
 
         // then
         assertThat(view).isEqualTo("store-marketplace-export-history");
@@ -270,7 +281,7 @@ class MarketplaceExportHistoryControllerTest {
         Model model = new ExtendedModelMap();
 
         // when
-        controller.exportHistory(MARKETPLACE, model);
+        controller.exportHistory(MARKETPLACE, model, Locale.forLanguageTag("pl"));
 
         // then
         verify(marketplaceExportRunService).findRuns(STORE_ID, MARKETPLACE, 25);
@@ -285,7 +296,7 @@ class MarketplaceExportHistoryControllerTest {
         Model model = new ExtendedModelMap();
 
         // when
-        String view = controller.superAdminExportHistory("store-2", MARKETPLACE, model);
+        String view = controller.superAdminExportHistory("store-2", MARKETPLACE, model, Locale.forLanguageTag("pl"));
 
         // then
         assertThat(view).isEqualTo("store-marketplace-export-history");
@@ -302,7 +313,7 @@ class MarketplaceExportHistoryControllerTest {
         Model model = new ExtendedModelMap();
 
         // when
-        controller.exportHistory(MARKETPLACE, model);
+        controller.exportHistory(MARKETPLACE, model, Locale.forLanguageTag("pl"));
 
         // then
         assertThat(exportRunsOf(model)).isEmpty();

@@ -1,0 +1,144 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+<div layout:fragment="content">
+    <section class="cl-page">
+        <div class="cl-page-body">
+            <div th:replace="~{fragments/settings-header :: subpage(${listHref}, ${backLabel}, ${pageTitle})}"></div>
+            <div th:replace="~{fragments/settings-form :: savedAlert}"></div>
+
+            <form th:fragment="templateForm" id="email-template-form" class="cl-form"
+                  th:action="@{${formAction}}" th:object="${form}" method="post" novalidate data-cl-async
+                  th:attr="data-cl-redirect=${redirectTo}, data-error-message=#{form.save.failed}">
+                <div th:replace="~{fragments/settings-form :: errorSummary('email-template-errors', ${errors}, ${errorLabels})}"></div>
+
+                <div class="cl-card">
+                    <fieldset class="cl-fieldset">
+                        <legend class="cl-fieldset-title" th:text="#{store.emailTemplate.content}"></legend>
+                        <div th:replace="~{fragments/settings-form :: check('enabled', 'store.emailTemplate.enabled', *{enabled}, 'store.emailTemplate.enabled.description', null)}"></div>
+                        <p class="cl-help" th:switch="${source.name()}">
+                            <th:block th:case="'OWN'">
+                                <span th:text="#{store.emailTemplate.source.own}"></span>
+                                <a th:if="${restorable}" th:href="@{${restoreHref}}" data-cl-confirm
+                                   th:text="#{store.emailTemplate.restore}"
+                                   th:attr="data-cl-confirm-title=#{store.emailTemplate.restore.title(${pageTitle})},
+                                            data-cl-confirm-message=#{store.emailTemplate.restore.message},
+                                            data-cl-confirm-action=#{store.emailTemplate.restore.action}"></a>
+                            </th:block>
+                            <span th:case="'DEFAULT'" th:text="#{store.emailTemplate.source.default}"></span>
+                            <span th:case="*" th:text="#{store.emailTemplate.source.none}"></span>
+                        </p>
+                        <div class="cl-form-grid">
+                            <div th:insert="~{fragments/settings-form :: textField('subject', 'store.emailTemplate.subject', *{subject}, 'text', 'off', true, ${errors['subject']}, null)}"></div>
+                            <div class="cl-field" th:with="error=${errors['textBody']}">
+                                <label class="cl-label" for="textBody" th:text="#{store.emailTemplate.body}"></label>
+                                <textarea class="cl-input cl-textarea" id="textBody" name="textBody" rows="8"
+                                          th:classappend="${error != null} ? 'is-invalid'" th:text="*{textBody}"
+                                          th:attr="aria-invalid=${error != null ? 'true' : null},
+                                                   aria-describedby=${'textBody-help' + (error != null ? ' textBody-error' : '')}"></textarea>
+                                <p class="cl-help" id="textBody-help" th:text="#{store.emailTemplate.body.help}"></p>
+                                <p th:if="${error != null}" class="cl-field-error" id="textBody-error">
+                                    <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                                    <span th:text="#{${error}}"></span>
+                                </p>
+                            </div>
+                        </div>
+                        <details class="cl-disclosure" id="email-template-parameters">
+                            <summary th:text="#{store.emailTemplate.parameters}"></summary>
+                            <div class="cl-disclosure-body">
+                                <p class="cl-help cl-param-hint" data-cl-insert-hint hidden th:text="#{store.emailTemplate.parameters.insert}"></p>
+                                <ul class="cl-param-list" data-cl-insert-into="textBody subject"
+                                    th:attr="data-insert-label=#{store.emailTemplate.parameters.insert.label}">
+                                    <li th:each="parameter : ${parameters}"><code class="cl-code" th:attr="data-cl-insert=${parameter.snippet()}"
+                                                                                  th:text="${parameter.snippet()}"></code></li>
+                                </ul>
+                                <span class="cl-visually-hidden" role="status" data-cl-insert-status
+                                      th:attr="data-template=#{store.emailTemplate.parameters.inserted}"></span>
+                                <p class="cl-help cl-steps-note" th:text="#{store.emailTemplate.parameters.help}"></p>
+                            </div>
+                        </details>
+                    </fieldset>
+
+                    <!--/* Rarely used, so folded away unless something is set or wrong in it. */-->
+                    <details class="cl-disclosure cl-card-extras" id="email-template-extras"
+                             th:open="${extrasOpen}">
+                        <summary th:text="#{store.emailTemplate.extras}"></summary>
+                        <div class="cl-disclosure-body">
+                            <div class="cl-form-grid">
+                                <div th:insert="~{fragments/settings-form :: textField('bccAddresses', 'store.emailTemplate.bcc', *{bccAddresses}, 'text', 'off', false, ${errors['bccAddresses']}, #{store.emailTemplate.bcc.help})}"></div>
+                            </div>
+                            <div class="cl-repeat" data-cl-repeat="attachments" data-cl-repeat-id="attachment" data-cl-repeat-min="0">
+                                <!--/* th:insert runs before th:each on one element, so the loop sits on its own block. */-->
+                                <th:block th:each="attachment, stat : *{attachments}">
+                                    <fieldset class="cl-fieldset" data-cl-repeat-item
+                                              th:insert="~{store-email-template :: attachmentFields(${stat.index}, ${stat.count}, ${attachment})}"></fieldset>
+                                </th:block>
+                                <template data-cl-repeat-template>
+                                    <fieldset class="cl-fieldset" data-cl-repeat-item
+                                              th:insert="~{store-email-template :: attachmentFields('@INDEX@', '@NUMBER@', null)}"></fieldset>
+                                </template>
+                                <noscript>
+                                    <fieldset class="cl-fieldset"
+                                              th:insert="~{store-email-template :: attachmentFields(${form.attachments.size()}, ${form.attachments.size() + 1}, null)}"></fieldset>
+                                </noscript>
+                                <div class="cl-repeat-add">
+                                    <button type="button" class="cl-button" data-cl-repeat-add hidden>
+                                        <i class="fas fa-plus" aria-hidden="true"></i>
+                                        <span th:text="#{store.emailTemplate.attachment.add}"></span>
+                                    </button>
+                                    <p class="cl-help" th:text="#{store.emailTemplate.attachment.help}"></p>
+                                </div>
+                            </div>
+                        </div>
+                    </details>
+
+                    <div class="cl-card-footer">
+                        <button class="cl-button is-primary" type="submit" th:text="#{store.emailTemplate.save}"></button>
+                        <a class="cl-button" th:href="@{${listHref}}" th:text="#{general.cancel}"></a>
+                    </div>
+                </div>
+            </form>
+
+            <dialog th:replace="~{fragments/confirm-dialog :: dialog}"></dialog>
+        </div>
+    </section>
+    <script th:if="${!errors.isEmpty()}">
+        document.getElementById('email-template-errors').focus();
+    </script>
+    <script th:src="@{/js/async-form.js}" defer></script>
+    <script th:src="@{/js/repeat-fields.js}" defer></script>
+    <script th:src="@{/js/confirm-dialog.js}" defer></script>
+    <script th:src="@{/js/insert-snippet.js}" defer></script>
+</div>
+
+<!--/* One attachment: index in the posted list, its number shown to people, and its values (null for a blank one). */-->
+<th:block th:fragment="attachmentFields(index, number, attachment)">
+    <legend class="cl-fieldset-title">
+        <span th:text="#{store.emailTemplate.attachment}"></span>
+        <span data-cl-repeat-number th:text="${number}"></span>
+    </legend>
+    <div class="cl-form-grid">
+        <th:block th:each="field : ${ {'name', 'url'} }">
+            <div class="cl-field" th:classappend="${field == 'name'} ? 'cl-span-2' : 'cl-span-4'"
+                 th:with="id=${'attachment-' + index + '-' + field}, error=${errors.get(id)}">
+                <label class="cl-label" th:for="${id}" th:text="#{'store.emailTemplate.attachment.' + ${field}}"></label>
+                <input class="cl-input" autocomplete="off" th:type="${field == 'url'} ? 'url' : 'text'"
+                       th:classappend="${error != null} ? 'is-invalid'"
+                       th:id="${id}" th:name="${'attachments[' + index + '].' + field}"
+                       th:value="${attachment != null ? attachment[field] : null}"
+                       th:attr="aria-invalid=${error != null ? 'true' : null}, aria-describedby=${error != null ? id + '-error' : null}"/>
+                <p th:if="${error != null}" class="cl-field-error" th:id="${id} + '-error'">
+                    <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                    <span th:text="#{${error}}"></span>
+                </p>
+            </div>
+        </th:block>
+    </div>
+    <!--/* After the grid: the floated legend is cleared by the element that follows it, so it must be the grid. */-->
+    <button type="button" class="cl-link-button is-danger cl-repeat-remove" data-cl-repeat-remove hidden
+            th:text="#{store.emailTemplate.attachment.remove}"></button>
+</th:block>
+</body>
+</html>

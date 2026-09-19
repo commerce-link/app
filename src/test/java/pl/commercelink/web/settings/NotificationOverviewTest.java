@@ -61,7 +61,7 @@ class NotificationOverviewTest {
         // then
         assertThat(items(overview)).filteredOn(item -> item.type() == EmailNotificationType.ORDER_SHIPPING).singleElement()
                 .extracting(NotificationOverview.Item::templateHref)
-                .isEqualTo("/dashboard/store/store-9/email-templates?selectedType=ORDER_SHIPPING");
+                .isEqualTo("/dashboard/store/store-9/email-templates/ORDER_SHIPPING");
     }
 
     @Test

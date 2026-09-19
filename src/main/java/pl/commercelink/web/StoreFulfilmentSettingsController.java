@@ -3,79 +3,120 @@ package pl.commercelink.web;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.MessageSource;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.inventory.supplier.StoreSupplierConnectionService;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.dtos.FulfilmentSettingsForm;
+import pl.commercelink.web.settings.SettingsFlash;
+import pl.commercelink.web.settings.SettingsPaths;
 
 import java.util.Locale;
-import java.util.stream.Collectors;
+import java.util.Map;
 
 /**
- * Saves the fulfilment settings panel (assembly/realization days, automated fulfilment, default
- * fulfilment type and, for a super admin, the global-suppliers flag and inventory cache TTL)
- * asynchronously, the same way {@link StoreFulfilmentSupplierController} saves a supplier
- * connection: the response is the re-rendered section, swapped in without a page reload.
+ * Settings › Order fulfilment: delivery time, how new orders are fulfilled and the customer's order page, as one form
+ * posted back to the page's address. Suppliers have their own page ({@link StoreSuppliersSettingsController}). The store
+ * comes from the session (ADMIN) or the path (SUPER_ADMIN), never from the form.
  */
 @Controller
 @RequiredArgsConstructor
 public class StoreFulfilmentSettingsController {
 
+    private static final String VIEW = "store-fulfilment";
+    private static final String FORM_FRAGMENT = VIEW + " :: fulfilmentForm";
+
     private final StoresRepository storesRepository;
     private final StoreSupplierConnectionService storeSupplierConnectionService;
     private final MessageSource messageSource;
 
-    @PostMapping("/dashboard/store/fulfilment/settings")
+    @GetMapping("/dashboard/store/fulfilment")
     @PreAuthorize("hasRole('ADMIN')")
-    public String save(@ModelAttribute FulfilmentSettingsForm form, Locale locale, Model model,
-                       HttpServletResponse response) {
-        return doSave(CustomSecurityContext.getStoreId(), form, locale, model, response);
+    public String fulfilment(Model model) {
+        Store store = requireStore(CustomSecurityContext.getStoreId());
+        return render(store, FulfilmentSettingsForm.from(store), Map.of(), null, model);
     }
 
-    @PostMapping("/dashboard/store/{storeId}/fulfilment/settings")
+    @GetMapping("/dashboard/store/{storeId}/fulfilment")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public String saveForStore(@PathVariable String storeId, @ModelAttribute FulfilmentSettingsForm form,
-                               Locale locale, Model model, HttpServletResponse response) {
-        return doSave(storeId, form, locale, model, response);
+    public String superAdminFulfilment(@PathVariable String storeId, Model model) {
+        Store store = requireStore(storeId);
+        return render(store, FulfilmentSettingsForm.from(store), Map.of(), null, model);
     }
 
-    private String doSave(String storeId, FulfilmentSettingsForm form, Locale locale, Model model,
-                          HttpServletResponse response) {
+    @PostMapping("/dashboard/store/fulfilment")
+    @PreAuthorize("hasRole('ADMIN')")
+    public String save(@ModelAttribute FulfilmentSettingsForm form,
+                       @RequestHeader(value = SettingsPaths.ASYNC_HEADER, required = false) String requestedWith,
+                       Model model, Locale locale, RedirectAttributes redirectAttributes, HttpServletResponse response) {
+        return save(CustomSecurityContext.getStoreId(), form, SettingsPaths.isAsync(requestedWith), model, locale,
+                redirectAttributes, response);
+    }
+
+    @PostMapping("/dashboard/store/{storeId}/fulfilment")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public String superAdminSave(@PathVariable String storeId, @ModelAttribute FulfilmentSettingsForm form,
+                                 @RequestHeader(value = SettingsPaths.ASYNC_HEADER, required = false) String requestedWith,
+                                 Model model, Locale locale, RedirectAttributes redirectAttributes,
+                                 HttpServletResponse response) {
+        return save(storeId, form, SettingsPaths.isAsync(requestedWith), model, locale, redirectAttributes, response);
+    }
+
+    private String save(String storeId, FulfilmentSettingsForm form, boolean async, Model model, Locale locale,
+                        RedirectAttributes redirectAttributes, HttpServletResponse response) {
+        Store store = requireStore(storeId);
+        Map<String, String> errors = form.validate();
+        String failure = null;
+        if (errors.isEmpty()) {
+            boolean isSuperAdmin = CustomSecurityContext.hasRole("SUPER_ADMIN");
+            if (storeSupplierConnectionService.applyStoreSettings(store, form.toFulfilmentConfiguration(store), isSuperAdmin)
+                    .hasErrors()) {
+                failure = messageSource.getMessage("store.supplier.connection.error.update.failed", null, locale);
+            }
+        }
+        if (!errors.isEmpty() || failure != null) {
+            String view = render(store, form, errors, failure, model);
+            if (async) {
+                response.setStatus(HttpStatus.UNPROCESSABLE_ENTITY.value());
+                return FORM_FRAGMENT;
+            }
+            return view;
+        }
+
+        String message = messageSource.getMessage("store.fulfilment.settings.update.success", null, locale);
+        if (async) {
+            render(store, FulfilmentSettingsForm.from(store), Map.of(), null, model);
+            model.addAttribute("savedMessage", message);
+            return FORM_FRAGMENT;
+        }
+        SettingsFlash.onRedirect(redirectAttributes, message);
+        return "redirect:" + SettingsPaths.store(storeId, "/fulfilment");
+    }
+
+    private String render(Store store, FulfilmentSettingsForm form, Map<String, String> errors, String failure, Model model) {
+        model.addAttribute("form", form);
+        model.addAttribute("errors", errors);
+        model.addAttribute("failure", failure);
+        model.addAttribute("formAction", SettingsPaths.store(store.getStoreId(), "/fulfilment"));
+        return VIEW;
+    }
+
+    private Store requireStore(String storeId) {
         Store store = storesRepository.findById(storeId);
         if (store == null) {
-            return SupplierSectionModel.renderErrorFragment(
-                    messageSource.getMessage("store.manual.error.store.notfound", null, locale), model, response);
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
-        boolean isSuperAdmin = CustomSecurityContext.hasRole("SUPER_ADMIN");
-        // Captured before the save so it can be compared against the post-save value below --
-        // applyStoreSettings mutates this same Store instance in place (via
-        // StoreSupplierConnectionPersister.saveStore), so re-reading it afterwards is enough,
-        // no second lookup needed.
-        boolean canUseGlobalSuppliersBefore = store.canUseGlobalSuppliers();
-
-        StoreSupplierConnectionService.ConnectionUpdateResult result = storeSupplierConnectionService
-                .applyStoreSettings(store, form.toFulfilmentConfiguration(), isSuperAdmin);
-        if (result.hasErrors()) {
-            String message = result.errors().stream()
-                    .map(error -> messageSource.getMessage(error.code(), error.args(), locale))
-                    .collect(Collectors.joining(" "));
-            return SupplierSectionModel.renderErrorFragment(message, model, response);
-        }
-
-        // The external suppliers section's mode column and the supplier modal's mode selector
-        // both depend on canUseGlobalSuppliers; a save that flips it must tell the page to refresh
-        // that section too, but a save that only touched e.g. the day counts must not -- that
-        // would refresh (and flicker) the suppliers table on every unrelated settings save.
-        boolean refreshExternalSuppliers = canUseGlobalSuppliersBefore != store.canUseGlobalSuppliers();
-        String successMessage = messageSource.getMessage("store.fulfilment.settings.update.success", null, locale);
-        return FulfilmentSettingsSectionModel.renderSection(
-                store, isSuperAdmin, successMessage, refreshExternalSuppliers, model);
+        return store;
     }
 }

@@ -67,6 +67,55 @@ public class StoreSupplierConnectionService {
         return stored;
     }
 
+    /**
+     * Connections that cannot work as saved: an own connection missing a required access detail, or a global one in a
+     * store that may no longer use the global configuration. The suppliers page marks them and offers to complete them.
+     */
+    public Set<String> incompleteConnections(Store store) {
+        Set<String> incomplete = new LinkedHashSet<>();
+        for (StoreSupplierConnection connection : existingConfiguration(store).getSupplierConnections()) {
+            String identity = connection.getSupplierName();
+            if (connection.getMode() == ConnectionMode.GLOBAL && !store.canUseGlobalSuppliers()) {
+                incomplete.add(identity);
+            } else if (connection.getMode() == ConnectionMode.OWN) {
+                SupplierProviderDescriptor descriptor = supplierProviderFactory.getDescriptor(identity);
+                if (descriptor == null) {
+                    continue;
+                }
+                Map<String, String> stored = configurationManager.loadConfiguration(store, identity);
+                boolean missing = descriptor.configurationFields().stream()
+                        .filter(ProviderField::required)
+                        .anyMatch(field -> StringUtils.isBlank(stored.get(field.key())));
+                if (missing) {
+                    incomplete.add(identity);
+                }
+            }
+        }
+        return incomplete;
+    }
+
+    /** Keys of the secrets saved for one own connection, which its form may leave empty to keep them. */
+    public Set<String> storedSecretKeys(Store store, String identity) {
+        SupplierProviderDescriptor descriptor = supplierProviderFactory.getDescriptor(identity);
+        if (descriptor == null) {
+            return Set.of();
+        }
+        Map<String, String> stored = configurationManager.loadConfiguration(store, identity);
+        Set<String> keys = new LinkedHashSet<>();
+        for (ProviderField field : descriptor.configurationFields()) {
+            if (field.type() == ProviderField.FieldType.PASSWORD && StringUtils.isNotBlank(stored.get(field.key()))) {
+                keys.add(field.key());
+            }
+        }
+        return keys;
+    }
+
+    /** The saved settings of one own connection with its secrets blanked, for its form. */
+    public Map<String, String> storedSettings(Store store, String identity) {
+        SupplierProviderDescriptor descriptor = supplierProviderFactory.getDescriptor(identity);
+        return descriptor == null ? Map.of() : configurationManager.getConfigurationForUI(store, identity, descriptor);
+    }
+
     public ConnectionUpdateResult connectOrUpdate(Store existingStore, SupplierSelectionForm selection,
                                                   Map<String, String> submittedConfig) {
         boolean canUseGlobal = existingStore.canUseGlobalSuppliers();

@@ -23,7 +23,8 @@ public record NotificationOverview(List<Group> groups, int enabledCount, int tot
     private static final Set<EmailNotificationType> ADDRESS_CHANGE_TYPES =
             Set.of(CLIENT_VERIFICATION_CODE, ORDER_SHIPPING_ADDRESS_CHANGED);
 
-    private static final List<GroupDefinition> GROUPS = List.of(
+    /** The notification types grouped the way an admin thinks of them; the templates page lists them the same way. */
+    public static final List<GroupDefinition> GROUPS = List.of(
             new GroupDefinition("email.notification.group.orders", List.of(ORDER_CONFIRMATION, ORDER_ASSEMBLY,
                     ORDER_ASSEMBLY_DATE_CHANGED, ORDER_ASSEMBLED, ORDER_REALIZATION, ORDER_SHIPPING, ORDER_PICKUP,
                     ORDER_SHIPPING_ADDRESS_CHANGED, ORDER_REVIEW)),
@@ -33,7 +34,7 @@ public record NotificationOverview(List<Group> groups, int enabledCount, int tot
                     RMA_REJECTED, RMA_ITEMS_SEND_TO_CLIENT)),
             new GroupDefinition("email.notification.group.clientVerification", List.of(CLIENT_VERIFICATION_CODE)));
 
-    private record GroupDefinition(String labelKey, List<EmailNotificationType> types) {
+    public record GroupDefinition(String labelKey, List<EmailNotificationType> types) {
     }
 
     public static NotificationOverview of(Store store, String emailTemplatesPath) {
@@ -41,7 +42,7 @@ public record NotificationOverview(List<Group> groups, int enabledCount, int tot
                 .map(definition -> new Group(definition.labelKey(), definition.types().stream()
                         .map(type -> new Item(type, "email.notification.type." + type.name(),
                                 store.supportsNotification(type), ADDRESS_CHANGE_TYPES.contains(type),
-                                emailTemplatesPath + "?selectedType=" + type.name()))
+                                emailTemplatesPath + "/" + type.name()))
                         .toList()))
                 .toList();
         int enabled = (int) groups.stream().flatMap(group -> group.items().stream()).filter(Item::enabled).count();

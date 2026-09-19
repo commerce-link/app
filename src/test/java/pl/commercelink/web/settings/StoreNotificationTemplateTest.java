@@ -77,7 +77,7 @@ class StoreNotificationTemplateTest {
         assertThat(html).contains("Zamówienie wysłane").contains("Kod weryfikacyjny").doesNotContain(">ORDER_SHIPPING<");
         assertThat(html).containsPattern("Zamówienie wysłane</span>\\s*<span class=\"cl-status is-ok\">Wysyłane</span>");
         assertThat(html).containsPattern("Faktura proforma</span>\\s*<span class=\"cl-status is-neutral\">Wyłączone</span>");
-        assertThat(html).contains("href=\"/dashboard/store/email-templates?selectedType=ORDER_SHIPPING\"");
+        assertThat(html).contains("href=\"/dashboard/store/email-templates/ORDER_SHIPPING\"");
         assertThat(html).contains("aria-label=\"Edytuj szablon: Zamówienie wysłane\"");
         assertThat(html).contains("Wymagane do zmiany adresu dostawy przez klienta");
         assertThat(html).doesNotContain("cl-alert is-warn");

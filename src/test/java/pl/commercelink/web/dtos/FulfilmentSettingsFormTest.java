@@ -1,6 +1,8 @@
 package pl.commercelink.web.dtos;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.stores.FulfilmentConfiguration;
 import pl.commercelink.stores.Store;
@@ -9,17 +11,23 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class FulfilmentSettingsFormTest {
 
+    private static FulfilmentSettingsForm valid() {
+        FulfilmentSettingsForm form = new FulfilmentSettingsForm();
+        form.setOrderAssemblyDays("2");
+        form.setOrderRealizationDays("0");
+        form.setDefaultFulfilmentType(FulfilmentType.WarehouseFulfilment.name());
+        return form;
+    }
+
     @Test
-    void fromReadsEveryFieldOffTheStoresFulfilmentConfiguration() {
+    void fromReadsTheFulfilmentFieldsOfTheStore() {
         // given
         Store store = new Store();
         FulfilmentConfiguration config = new FulfilmentConfiguration();
         config.setOrderAssemblyDays(2);
         config.setOrderRealizationDays(4);
         config.setAutomatedFulfilment(true);
-        config.setDefaultFulfilmentType(FulfilmentType.WarehouseFulfilment);
-        config.setCanUseGlobalSuppliers(true);
-        config.setInventoryCacheTtlMinutes(20);
+        config.setDefaultFulfilmentType(FulfilmentType.DirectToConsumer);
         config.setClientOrderPageEnabled(true);
         config.setClientShippingAddressChangeEnabled(true);
         store.setFulfilmentConfiguration(config);
@@ -28,12 +36,10 @@ class FulfilmentSettingsFormTest {
         FulfilmentSettingsForm form = FulfilmentSettingsForm.from(store);
 
         // then
-        assertThat(form.getOrderAssemblyDays()).isEqualTo(2);
-        assertThat(form.getOrderRealizationDays()).isEqualTo(4);
+        assertThat(form.getOrderAssemblyDays()).isEqualTo("2");
+        assertThat(form.getOrderRealizationDays()).isEqualTo("4");
         assertThat(form.isAutomatedFulfilment()).isTrue();
-        assertThat(form.getDefaultFulfilmentType()).isEqualTo(FulfilmentType.WarehouseFulfilment);
-        assertThat(form.isCanUseGlobalSuppliers()).isTrue();
-        assertThat(form.getInventoryCacheTtlMinutes()).isEqualTo(20);
+        assertThat(form.getDefaultFulfilmentType()).isEqualTo("DirectToConsumer");
         assertThat(form.isClientOrderPageEnabled()).isTrue();
         assertThat(form.isClientShippingAddressChangeEnabled()).isTrue();
     }
@@ -42,46 +48,61 @@ class FulfilmentSettingsFormTest {
     void fromDefaultsSafelyForAStoreWithoutAFulfilmentConfigurationYet() {
         // given
         Store store = new Store();
-        store.setFulfilmentConfiguration(null);
 
         // when
         FulfilmentSettingsForm form = FulfilmentSettingsForm.from(store);
 
         // then
-        assertThat(form.getOrderAssemblyDays()).isEqualTo(0);
-        assertThat(form.getOrderRealizationDays()).isEqualTo(0);
+        assertThat(form.getOrderAssemblyDays()).isEqualTo("0");
+        assertThat(form.getDefaultFulfilmentType()).isEqualTo("WarehouseFulfilment");
         assertThat(form.isAutomatedFulfilment()).isFalse();
-        assertThat(form.isCanUseGlobalSuppliers()).isFalse();
-        assertThat(form.getInventoryCacheTtlMinutes()).isNull();
     }
 
     @Test
-    void toFulfilmentConfigurationCarriesOnlyTheFieldsThisFormEdits() {
+    void aValidFormHasNoErrors() {
+        // when / then
+        assertThat(valid().validate()).isEmpty();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", " ", "-1", "2.5", "abc", "61", "1000"})
+    void dayCountsOutsideZeroToSixtyAreRejected(String days) {
         // given
-        FulfilmentSettingsForm form = new FulfilmentSettingsForm();
-        form.setOrderAssemblyDays(1);
-        form.setOrderRealizationDays(3);
-        form.setAutomatedFulfilment(true);
-        form.setDefaultFulfilmentType(FulfilmentType.WarehouseFulfilment);
-        form.setCanUseGlobalSuppliers(true);
-        form.setInventoryCacheTtlMinutes(10);
-        form.setClientOrderPageEnabled(true);
-        form.setClientShippingAddressChangeEnabled(true);
+        FulfilmentSettingsForm form = valid();
+        form.setOrderAssemblyDays(days);
+
+        // when / then
+        assertThat(form.validate()).containsOnlyKeys("orderAssemblyDays");
+    }
+
+    @Test
+    void anUnknownFulfilmentTypeIsRejected() {
+        // given
+        FulfilmentSettingsForm form = valid();
+        form.setDefaultFulfilmentType("Teleport");
+
+        // when / then
+        assertThat(form.validate()).containsOnlyKeys("defaultFulfilmentType");
+    }
+
+    @Test
+    void theSavedConfigurationKeepsTheSupplierSettingsOfTheStore() {
+        // given
+        Store store = new Store();
+        FulfilmentConfiguration config = new FulfilmentConfiguration();
+        config.setCanUseGlobalSuppliers(true);
+        config.setInventoryCacheTtlMinutes(15);
+        store.setFulfilmentConfiguration(config);
+        FulfilmentSettingsForm form = valid();
+        form.setOrderAssemblyDays(" 3 ");
 
         // when
-        FulfilmentConfiguration config = form.toFulfilmentConfiguration();
+        FulfilmentConfiguration saved = form.toFulfilmentConfiguration(store);
 
         // then
-        assertThat(config.getOrderAssemblyDays()).isEqualTo(1);
-        assertThat(config.getOrderRealizationDays()).isEqualTo(3);
-        assertThat(config.isAutomatedFulfilment()).isTrue();
-        assertThat(config.getDefaultFulfilmentType()).isEqualTo(FulfilmentType.WarehouseFulfilment);
-        assertThat(config.isCanUseGlobalSuppliers()).isTrue();
-        assertThat(config.getInventoryCacheTtlMinutes()).isEqualTo(10);
-        assertThat(config.isClientOrderPageEnabled()).isTrue();
-        assertThat(config.isClientShippingAddressChangeEnabled()).isTrue();
-        // supplier connections/enabled product groups/categories are not this form's concern --
-        // applyStoreSettings fills those in from the existing configuration
-        assertThat(config.getSupplierConnections()).isEmpty();
+        assertThat(saved).isNotSameAs(config);
+        assertThat(saved.getOrderAssemblyDays()).isEqualTo(3);
+        assertThat(saved.isCanUseGlobalSuppliers()).isTrue();
+        assertThat(saved.getInventoryCacheTtlMinutes()).isEqualTo(15);
     }
 }

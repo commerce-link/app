@@ -1,5 +1,6 @@
 package pl.commercelink.inventory.supplier;
 
+import pl.commercelink.provider.api.ProviderField;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -859,5 +860,58 @@ class StoreSupplierConnectionServiceTest {
                 .filter(connection -> SupplierIdentity.typeOf(connection.getSupplierName()).equals(supplierType))
                 .findFirst()
                 .orElseThrow();
+    }
+
+    private SupplierProviderDescriptor descriptorWith(ProviderField... fields) {
+        SupplierProviderDescriptor descriptor = org.mockito.Mockito.mock(SupplierProviderDescriptor.class);
+        when(descriptor.configurationFields()).thenReturn(List.of(fields));
+        return descriptor;
+    }
+
+    @Test
+    void aConnectionMissingARequiredAccessDetailOrAGlobalOneTheStoreMayNotUseIsIncomplete() {
+        // given
+        SupplierProviderDescriptor descriptor = descriptorWith(
+                new ProviderField("login", "Login", ProviderField.FieldType.TEXT, true, null),
+                new ProviderField("note", "Uwagi", ProviderField.FieldType.TEXT, false, null));
+        when(supplierProviderFactory.getDescriptor(any())).thenReturn(descriptor);
+        Store store = storeWith(false,
+                new StoreSupplierConnection("Acme", ConnectionMode.GLOBAL, true, true),
+                new StoreSupplierConnection("Kosatec-abcd1234", ConnectionMode.OWN, true, true),
+                new StoreSupplierConnection("Kosatec-efgh5678", ConnectionMode.OWN, true, true),
+                new StoreSupplierConnection("manual-ijkl9012", ConnectionMode.MANUAL, true, true));
+        when(configurationManager.loadConfiguration(store, "Kosatec-abcd1234")).thenReturn(Map.of("note", "x"));
+        when(configurationManager.loadConfiguration(store, "Kosatec-efgh5678")).thenReturn(Map.of("login", "sklep"));
+
+        // when
+        Set<String> incomplete = service.incompleteConnections(store);
+
+        // then
+        assertThat(incomplete).containsExactly("Acme", "Kosatec-abcd1234");
+    }
+
+    @Test
+    void aGlobalConnectionIsCompleteWhileTheStoreMayUseTheGlobalConfiguration() {
+        // given
+        Store store = storeWith(true, new StoreSupplierConnection("Acme", ConnectionMode.GLOBAL, true, true));
+
+        // when / then
+        assertThat(service.incompleteConnections(store)).isEmpty();
+    }
+
+    @Test
+    void onlySavedSecretsCountAsStoredSecretKeys() {
+        // given
+        SupplierProviderDescriptor descriptor = descriptorWith(
+                new ProviderField("login", "Login", ProviderField.FieldType.TEXT, true, null),
+                new ProviderField("password", "Hasło", ProviderField.FieldType.PASSWORD, true, null),
+                new ProviderField("token", "Token", ProviderField.FieldType.PASSWORD, false, null));
+        when(supplierProviderFactory.getDescriptor("Kosatec-abcd1234")).thenReturn(descriptor);
+        Store store = storeWith(false);
+        when(configurationManager.loadConfiguration(store, "Kosatec-abcd1234"))
+                .thenReturn(Map.of("login", "sklep", "password", "tajne", "token", ""));
+
+        // when / then
+        assertThat(service.storedSecretKeys(store, "Kosatec-abcd1234")).containsExactly("password");
     }
 }

@@ -112,7 +112,7 @@ public class StoreNotificationSettingsController {
         model.addAttribute("senderEmail", senderEmail);
         String templatesHref = SettingsPaths.store(storeId, "/email-templates");
         model.addAttribute("templatesHref", templatesHref);
-        model.addAttribute("fulfilmentHref", SettingsPaths.store(storeId, "/fulfilment"));
+        model.addAttribute("fulfilmentHref", SettingsPaths.store(storeId, "/fulfilment") + "#client-order-page");
         model.addAttribute("overview", NotificationOverview.of(store, templatesHref));
         return VIEW;
     }

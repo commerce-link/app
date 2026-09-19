@@ -16,57 +16,48 @@
 <div th:fragment="input(inputName, value, minInterval, defaultText, units)" class="schedule-field"
      th:attr="data-min-interval=${minInterval},data-default-text=${defaultText},data-units=${units}">
 
-    <div class="tabs is-toggle is-small schedule-modes mb-2">
-        <ul>
-            <li data-mode="default"><a><span th:text="#{schedule.mode.default}"></span></a></li>
-            <li data-mode="every"><a><span th:text="#{schedule.mode.every}"></span></a></li>
-            <li data-mode="at"><a><span th:text="#{schedule.mode.at}"></span></a></li>
-        </ul>
+    <div class="cl-segmented schedule-modes" role="group" th:attr="aria-label=#{schedule.mode.label}">
+        <button type="button" class="cl-segment" data-mode="default" aria-pressed="false" th:text="#{schedule.mode.default}"></button>
+        <button type="button" class="cl-segment" data-mode="every" aria-pressed="false" th:text="#{schedule.mode.every}"></button>
+        <button type="button" class="cl-segment" data-mode="at" aria-pressed="false" th:text="#{schedule.mode.at}"></button>
     </div>
 
-    <div class="schedule-pane" data-pane="every">
-        <div class="field is-grouped is-align-items-center">
-            <div class="control"><div class="select is-small"><select class="schedule-every-value"></select></div></div>
-            <div class="control">
-                <div class="select is-small">
-                    <select class="schedule-every-unit">
-                        <option value="minutes" th:text="#{schedule.unit.minutes}"></option>
-                        <option value="hours" th:text="#{schedule.unit.hours}"></option>
-                        <option value="days" th:text="#{schedule.unit.days}"></option>
-                    </select>
-                </div>
-            </div>
+    <div class="schedule-pane" data-pane="every" hidden>
+        <div class="schedule-row">
+            <span class="schedule-row-text" th:text="#{schedule.every.prefix}"></span>
+            <select class="cl-select is-compact schedule-every-value" th:attr="aria-label=#{schedule.every.value}"></select>
+            <select class="cl-select is-compact schedule-every-unit" th:attr="aria-label=#{schedule.every.unit}">
+                <option value="minutes" th:text="#{schedule.unit.minutes}"></option>
+                <option value="hours" th:text="#{schedule.unit.hours}"></option>
+                <option value="days" th:text="#{schedule.unit.days}"></option>
+            </select>
         </div>
     </div>
 
-    <div class="schedule-pane" data-pane="at">
-        <label class="label is-size-7 mb-1" th:text="#{schedule.at.hours}"></label>
-        <div class="buttons are-small schedule-hours"></div>
-        <div class="field is-grouped is-align-items-center is-flex-wrap-wrap">
-            <div class="control"><span class="is-size-7" th:text="#{schedule.at.minute}"></span></div>
-            <div class="control"><div class="select is-small"><select class="schedule-minute"></select></div></div>
-            <div class="control"><span class="is-size-7" th:text="#{schedule.at.day}"></span></div>
-            <div class="control">
-                <div class="select is-small">
-                    <select class="schedule-day">
-                        <option value="every" th:text="#{schedule.at.day.every}"></option>
-                        <option value="MON-FRI" th:text="#{schedule.at.day.weekdays}"></option>
-                        <option value="MON" th:text="#{schedule.day.mon}"></option>
-                        <option value="TUE" th:text="#{schedule.day.tue}"></option>
-                        <option value="WED" th:text="#{schedule.day.wed}"></option>
-                        <option value="THU" th:text="#{schedule.day.thu}"></option>
-                        <option value="FRI" th:text="#{schedule.day.fri}"></option>
-                        <option value="SAT" th:text="#{schedule.day.sat}"></option>
-                        <option value="SUN" th:text="#{schedule.day.sun}"></option>
-                    </select>
-                </div>
-            </div>
+    <div class="schedule-pane" data-pane="at" hidden>
+        <p class="schedule-row-text" th:text="#{schedule.at.hours}"></p>
+        <div class="schedule-hours" role="group" th:attr="aria-label=#{schedule.at.hours}"></div>
+        <div class="schedule-row">
+            <span class="schedule-row-text" th:text="#{schedule.at.minute}"></span>
+            <select class="cl-select is-compact schedule-minute" th:attr="aria-label=#{schedule.at.minute}"></select>
+            <span class="schedule-row-text" th:text="#{schedule.at.day}"></span>
+            <select class="cl-select is-compact schedule-day" th:attr="aria-label=#{schedule.at.day}">
+                <option value="every" th:text="#{schedule.at.day.every}"></option>
+                <option value="MON-FRI" th:text="#{schedule.at.day.weekdays}"></option>
+                <option value="MON" th:text="#{schedule.day.mon}"></option>
+                <option value="TUE" th:text="#{schedule.day.tue}"></option>
+                <option value="WED" th:text="#{schedule.day.wed}"></option>
+                <option value="THU" th:text="#{schedule.day.thu}"></option>
+                <option value="FRI" th:text="#{schedule.day.fri}"></option>
+                <option value="SAT" th:text="#{schedule.day.sat}"></option>
+                <option value="SUN" th:text="#{schedule.day.sun}"></option>
+            </select>
         </div>
     </div>
 
     <!-- The one thing the operator should read instead of the expression itself. -->
-    <p class="schedule-summary is-size-7 mt-2"></p>
-    <p class="schedule-unsupported is-size-7 has-text-warning-dark mt-2"></p>
+    <p class="cl-help schedule-summary" aria-live="polite"></p>
+    <p class="cl-help is-warn schedule-unsupported" hidden></p>
     <input type="hidden" class="schedule-input" th:name="${inputName}" th:value="${value}">
 </div>
 
@@ -119,7 +110,7 @@
             var units = (field.getAttribute('data-units') || 'minutes,hours,days').split(',');
             var q = function (selector) { return field.querySelector(selector); };
             var input = q('.schedule-input');
-            var tabs = Array.prototype.slice.call(field.querySelectorAll('.schedule-modes li'));
+            var tabs = Array.prototype.slice.call(field.querySelectorAll('.schedule-modes [data-mode]'));
             var panes = Array.prototype.slice.call(field.querySelectorAll('.schedule-pane'));
             var everyValue = q('.schedule-every-value');
             var everyUnit = q('.schedule-every-unit');
@@ -138,8 +129,9 @@
             for (var hour = 0; hour < 24; hour++) {
                 var button = document.createElement('button');
                 button.type = 'button';
-                button.className = 'button is-small';
+                button.className = 'cl-chip';
                 button.setAttribute('data-hour', String(hour));
+                button.setAttribute('aria-pressed', 'false');
                 button.textContent = pad(hour);
                 hourButtons.appendChild(button);
             }
@@ -151,7 +143,7 @@
             }
 
             function hours() {
-                return Array.prototype.slice.call(hourButtons.querySelectorAll('.is-link'))
+                return Array.prototype.slice.call(hourButtons.querySelectorAll('[aria-pressed="true"]'))
                         .map(function (b) { return parseInt(b.getAttribute('data-hour'), 10); })
                         .sort(function (a, b) { return a - b; });
             }
@@ -159,13 +151,13 @@
             function setHours(list) {
                 Array.prototype.slice.call(hourButtons.children).forEach(function (b) {
                     var on = list.indexOf(parseInt(b.getAttribute('data-hour'), 10)) >= 0;
-                    b.classList.toggle('is-link', on);
+                    b.setAttribute('aria-pressed', on ? 'true' : 'false');
                 });
             }
 
             function setMode(next) {
                 mode = next;
-                tabs.forEach(function (tab) { tab.classList.toggle('is-active', tab.getAttribute('data-mode') === next); });
+                tabs.forEach(function (tab) { tab.setAttribute('aria-pressed', tab.getAttribute('data-mode') === next ? 'true' : 'false'); });
                 panes.forEach(function (pane) { pane.hidden = pane.getAttribute('data-pane') !== next; });
             }
 
@@ -211,8 +203,7 @@
                 }
                 var text = describe();
                 summary.textContent = text === null ? TEXT.noHours : text;
-                summary.classList.toggle('has-text-danger', text === null);
-                summary.classList.toggle('has-text-grey', text !== null);
+                summary.classList.toggle('is-bad', text === null);
             }
 
             function fromBuilder() {
@@ -281,8 +272,7 @@
             }
 
             tabs.forEach(function (tab) {
-                tab.querySelector('a').addEventListener('click', function (event) {
-                    event.preventDefault();
+                tab.addEventListener('click', function () {
                     supported = true;
                     setMode(tab.getAttribute('data-mode'));
                     fromBuilder();
@@ -291,7 +281,7 @@
             hourButtons.addEventListener('click', function (event) {
                 var button = event.target.closest('[data-hour]');
                 if (!button) { return; }
-                button.classList.toggle('is-link');
+                button.setAttribute('aria-pressed', button.getAttribute('aria-pressed') === 'true' ? 'false' : 'true');
                 fromBuilder();
             });
             everyUnit.addEventListener('change', function () { everyOptions(everyUnit.value); fromBuilder(); });
@@ -310,6 +300,30 @@
             return field.scheduleController;
         }
 
+        // Fields marked data-cl-schedule-auto set themselves up, also in a form swapped in by async-form.js, and a
+        // form is not sent while one of its enabled fields is in the only invalid state the builder can reach (no
+        // hour chosen); the capture listener runs before async-form.js, which listens on the bubbling phase.
+        function initAll(root) {
+            root.querySelectorAll('[data-cl-schedule-auto] .schedule-field').forEach(of);
+        }
+
+        document.addEventListener('cl:form-replaced', function (event) { initAll(event.target); });
+        document.addEventListener('submit', function (event) {
+            var invalid = Array.prototype.slice.call(event.target.querySelectorAll('[data-cl-schedule-auto] .schedule-field'))
+                    .filter(function (field) { return !field.querySelector('.schedule-input').matches(':disabled') && !of(field).valid(); });
+            if (invalid.length > 0) {
+                event.preventDefault();
+                event.stopPropagation();
+                var chip = invalid[0].querySelector('[data-hour]');
+                if (chip) { chip.focus(); }
+            }
+        }, true);
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', function () { initAll(document); });
+        } else {
+            initAll(document);
+        }
+
         return {
             init: function (field) { return of(field); },
             sync: function (field, value) { of(field).sync(value); },
@@ -318,17 +332,8 @@
     })();
 </script>
 
-<style th:fragment="style">
-    .schedule-field .schedule-hours { gap: .25rem; }
-    .schedule-field .schedule-hours .button { min-width: 2.4rem; }
-    .schedule-field .field.is-grouped .control + .control { margin-left: .5rem; }
-    .schedule-field .tabs.is-toggle { margin-bottom: .5rem; }
-    /* The screen's body is a Bulma `.content` block, and `.content ul` applies its typography to
-       any plain list -- including the one a tabs bar is built from. That indented the mode toggle
-       by 2em (24px at this font size) and pushed it down by 1em, while every other control in the
-       modal starts at the box's left edge. */
-    .schedule-field .tabs ul { margin: 0; list-style: none; border-bottom: 0; }
-</style>
+<!--/* Styles live in commercelink.css (schedule field section); the fragment stays for the pages that include it. */-->
+<style th:fragment="style"></style>
 
 </body>
 </html>

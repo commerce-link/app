@@ -3,389 +3,83 @@
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
       layout:decorate="~{layout}">
 <body>
-
 <div layout:fragment="content">
-
     <section class="cl-page">
         <div class="cl-page-body">
-
             <div th:replace="~{fragments/settings-header :: header(false, null)}"></div>
+            <div th:replace="~{fragments/settings-form :: savedAlert}"></div>
 
-            <div class="box" id="marketplace-section">
-                <div th:replace="~{fragments/marketplace-section :: marketplaceSection}"></div>
-            </div>
+            <div class="cl-stack">
+                <section class="cl-card" aria-labelledby="marketplaces-title">
+                    <div class="cl-card-head">
+                        <h2 class="cl-card-title" id="marketplaces-title" th:text="#{store.marketplaces.list.title}"></h2>
+                        <a th:if="${newMarketplaceHref != null}" class="cl-button" th:href="@{${newMarketplaceHref}}">
+                            <i class="fas fa-plus" aria-hidden="true"></i>
+                            <span th:text="#{store.marketplaces.add}"></span>
+                        </a>
+                    </div>
+                    <p class="cl-card-desc" th:text="#{store.marketplaces.list.description}"></p>
 
-            <div id="marketplaceModal" class="modal">
-                <div class="modal-background"></div>
-                <div class="modal-content">
-                    <form th:action="@{${basePath} + '/marketplaces/connection'}" method="post" id="marketplace-form">
-                        <div class="box">
-                            <h2 class="subtitle" id="marketplace-modal-title"></h2>
-
-                            <div id="marketplace-form-error"></div>
-
-                            <div class="field" id="marketplace-select-wrap">
-                                <label class="label" th:text="#{store.marketplace.name}"></label>
-                                <div class="control">
-                                    <div class="select is-fullwidth">
-                                        <select name="marketplace" id="marketplace-select">
-                                            <option value="" th:text="#{general.select}"></option>
-                                            <option th:each="descriptor : ${allMarketplaces}"
-                                                    th:value="${descriptor.name()}" th:text="${descriptor.displayName()}"></option>
-                                        </select>
-                                    </div>
-                                </div>
-                            </div>
-                            <input type="hidden" name="marketplace" id="marketplace-name-hidden" disabled />
-
-                            <div th:each="descriptor : ${allMarketplaces}"
-                                 th:id="'marketplace-fields-' + ${descriptor.name()}" class="marketplace-fields"
-                                 th:attr="data-supports-returns=${descriptor.supportsReturns()}">
-                                <div class="field" th:each="cf : ${descriptor.configurationFields()}">
-                                    <label class="label">
-                                        <span th:text="${cf.label()}"></span>
-                                        <span th:if="${cf.required()}" class="has-text-danger ml-1"
-                                              th:title="#{store.supplier.field.required.tooltip}"
-                                              th:text="#{store.supplier.field.required.marker}"></span>
-                                    </label>
-                                    <div class="control">
-                                        <input class="input"
-                                               th:type="${cf.type().name() == 'PASSWORD' ? 'password' : 'text'}"
-                                               th:name="'configuration[' + ${cf.key()} + ']'"
-                                               th:value="${cf.type().name() == 'PASSWORD'
-                                                          ? ''
-                                                          : (marketplaceConfigurations.get(descriptor.name()) != null
-                                                             ? marketplaceConfigurations.get(descriptor.name()).get(cf.key()) : '')}"
-                                               th:placeholder="${cf.placeholder()}"
-                                               th:attr="data-required=${cf.required()}"
-                                               disabled />
-                                    </div>
-                                    <p class="help" th:if="${cf.type().name() == 'PASSWORD'}"
-                                       th:text="#{store.supplier.password.keep}"></p>
-                                </div>
-                            </div>
-
-                            <div class="field" id="marketplace-orders-schedule">
-                                <label class="label" th:text="#{store.marketplaces.column.schedule}"></label>
-                                <div th:replace="~{fragments/schedule-field :: input('schedule', '', ${scheduleMinIntervalMinutes}, #{store.marketplaces.schedule.summary.default(${sectionDefaultIntervalMinutes})}, 'minutes,hours')}"></div>
-                            </div>
-
-                            <div class="field" id="marketplace-returns-schedule">
-                                <label class="label" th:text="#{store.marketplaces.returns.column.schedule}"></label>
-                                <div th:replace="~{fragments/schedule-field :: input('returnsSchedule', '', ${scheduleMinIntervalMinutes}, #{store.marketplaces.returns.schedule.summary.default(${sectionReturnsDefaultIntervalMinutes})}, 'minutes,hours')}"></div>
-                            </div>
-
-                            <div class="field is-grouped mt-4">
-                                <div class="control">
-                                    <button class="button is-primary" type="submit" th:text="#{general.save}"></button>
-                                </div>
-                                <div class="control">
-                                    <button type="button" class="button" id="marketplace-modal-cancel"
-                                            th:text="#{general.cancel}"></button>
-                                </div>
-                            </div>
+                    <th:block th:if="${marketplaces.isEmpty()}">
+                        <p th:if="${marketplacesInstalled}" class="cl-list-empty" th:text="#{store.marketplaces.list.empty}"></p>
+                        <div th:unless="${marketplacesInstalled}" class="cl-alert is-warn">
+                            <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+                            <p class="cl-alert-text" th:text="#{store.marketplaces.list.noneInstalled}"></p>
                         </div>
-                    </form>
-                </div>
-                <button class="modal-close is-large" aria-label="close" id="marketplace-modal-close"></button>
+                    </th:block>
+
+                    <ul th:unless="${marketplaces.isEmpty()}" class="cl-list" aria-labelledby="marketplaces-title">
+                        <li class="cl-list-item" th:each="marketplace : ${marketplaces}" th:attr="data-marketplace=${marketplace.name()}">
+                            <div>
+                                <div class="cl-list-title">
+                                    <span th:text="${marketplace.displayName()}"></span>
+                                    <span th:if="${marketplace.state().name() == 'NOT_AUTHORIZED'}" class="cl-status is-warn"
+                                          th:text="#{store.marketplaces.state.notAuthorized}"></span>
+                                    <span th:if="${marketplace.state().name() == 'EXPIRED'}" class="cl-status is-warn"
+                                          th:text="#{store.marketplaces.state.expired}"></span>
+                                    <span th:if="${marketplace.state().name() == 'MISSING'}" class="cl-status is-warn"
+                                          th:text="#{store.marketplaces.state.missing}"></span>
+                                    <a th:if="${marketplace.needsAuthorization()}" class="cl-link-button cl-list-title-action"
+                                       th:href="@{${marketplace.authorizeHref()}}" th:text="#{store.marketplaces.authorize}"
+                                       th:attr="aria-label=#{store.marketplaces.authorize.for(${marketplace.displayName()})}"></a>
+                                </div>
+                                <th:block th:if="${marketplace.installed()}">
+                                    <p th:if="${marketplace.state().name() == 'NOT_AUTHORIZED'}" class="cl-list-desc is-warn"
+                                       th:text="#{store.marketplaces.state.notAuthorized.text}"></p>
+                                    <p th:if="${marketplace.state().name() == 'EXPIRED'}" class="cl-list-desc is-warn"
+                                       th:text="${marketplace.authorizeHref() != null} ? #{store.marketplaces.state.expired.authorize}
+                                                                                      : #{store.marketplaces.state.expired.keys}"></p>
+                                    <p class="cl-list-desc" th:text="${marketplace.orders()}"></p>
+                                    <p th:if="${marketplace.returns() != null}" class="cl-list-desc" th:text="${marketplace.returns()}"></p>
+                                    <p th:unless="${marketplace.catalogs().isEmpty()}" class="cl-list-desc">
+                                        <span th:text="#{store.marketplaces.list.catalogs(${#strings.listJoin(marketplace.catalogs(), ', ')})}"></span>
+                                        · <a th:href="@{${marketplace.exportsHref()}}" th:text="#{store.marketplaces.list.exports}"
+                                             th:attr="aria-label=#{store.marketplaces.list.exports.for(${marketplace.displayName()})}"></a>
+                                    </p>
+                                </th:block>
+                                <p th:unless="${marketplace.installed()}" class="cl-list-desc is-warn" th:text="#{store.marketplaces.state.missing.text}"></p>
+                            </div>
+                            <div class="cl-list-actions">
+                                <a th:if="${marketplace.installed()}" class="cl-link-button" th:href="@{${marketplace.editHref()}}"
+                                   th:text="${marketplace.state().name() == 'EXPIRED' and marketplace.authorizeHref() == null}
+                                            ? #{store.marketplaces.complete} : #{store.marketplaces.edit}"
+                                   th:attr="aria-label=#{store.marketplaces.edit.for(${marketplace.displayName()})}"></a>
+                                <a class="cl-link-button is-danger" th:href="@{${marketplace.disconnectHref()}}" data-cl-confirm
+                                   th:text="#{store.marketplaces.disconnect}"
+                                   th:attr="aria-label=#{store.marketplace.disconnect.title(${marketplace.displayName()})},
+                                            data-cl-confirm-title=#{store.marketplace.disconnect.title(${marketplace.displayName()})},
+                                            data-cl-confirm-message=${disconnectMessages[marketplace.name()]},
+                                            data-cl-confirm-action=#{store.marketplace.disconnect.action}"></a>
+                            </div>
+                        </li>
+                    </ul>
+                </section>
             </div>
 
+            <dialog th:replace="~{fragments/confirm-dialog :: dialog}"></dialog>
         </div>
     </section>
-
-    <script th:replace="~{fragments/schedule-field :: script}"></script>
-    <style th:replace="~{fragments/schedule-field :: style}"></style>
-    <style>
-        .marketplace-actions .dropdown-item.button { width: 100%; text-decoration: none; }
-    </style>
-
-    <script th:inline="javascript">
-        (function () {
-            var basePath = /*[[${basePath}]]*/ '';
-            var genericError = /*[[#{general.error}]]*/ 'Error';
-            var addTitle = /*[[#{store.marketplaces.add.modal.title}]]*/ '';
-            var editTitle = /*[[#{store.marketplaces.edit.modal.title}]]*/ '';
-            var scheduleIncompleteMessage = /*[[#{schedule.at.nohours}]]*/ '';
-            var deviceAuthFailed = /*[[#{store.integrations.deviceauth.failed}]]*/ '';
-            var deviceAuthExpired = /*[[#{store.integrations.deviceauth.expired}]]*/ '';
-
-            var section = document.getElementById('marketplace-section');
-            var modal = document.getElementById('marketplaceModal');
-            var form = document.getElementById('marketplace-form');
-            var submitButton = form.querySelector('button[type="submit"]');
-            var formError = document.getElementById('marketplace-form-error');
-            var select = document.getElementById('marketplace-select');
-            var selectWrap = document.getElementById('marketplace-select-wrap');
-            var hiddenName = document.getElementById('marketplace-name-hidden');
-            var title = document.getElementById('marketplace-modal-title');
-            var schedule = form.querySelector('#marketplace-orders-schedule .schedule-field');
-            var returnsWrap = document.getElementById('marketplace-returns-schedule');
-            var returnsSchedule = returnsWrap.querySelector('.schedule-field');
-            var submitInFlight = false;
-
-            function applySectionSwap(html) {
-                var temp = document.createElement('div');
-                temp.innerHTML = html;
-                var message = temp.firstElementChild ? temp.firstElementChild.getAttribute('data-success-message') : null;
-                section.innerHTML = temp.innerHTML;
-                if (message) { showToast(message, 'success'); }
-            }
-
-            function extractErrorMessage(html) {
-                if (!html) { return genericError; }
-                var temp = document.createElement('div');
-                temp.innerHTML = html;
-                return temp.textContent.trim() || genericError;
-            }
-
-            function showFormError(html, status) {
-                var trusted = status === 400 && !!html && html.indexOf('notification is-danger') !== -1 && html.indexOf('<html') === -1;
-                formError.innerHTML = trusted ? html : ('<div class="notification is-danger">' + genericError + '</div>');
-            }
-
-            function rowFor(name) {
-                var row = section.querySelector('tr[data-marketplace="' + name + '"]');
-                return row ? {
-                    name: name,
-                    schedule: row.getAttribute('data-orders-import-schedule') || '',
-                    returnsSchedule: row.getAttribute('data-returns-import-schedule') || ''
-                } : null;
-            }
-
-            function connectedNames() {
-                return Array.prototype.slice.call(section.querySelectorAll('tr[data-marketplace]'))
-                        .map(function (tr) { return tr.getAttribute('data-marketplace'); });
-            }
-
-            function activeName() {
-                return selectWrap.classList.contains('is-hidden') ? hiddenName.value : select.value;
-            }
-
-            function supportsReturns(name) {
-                var group = document.getElementById('marketplace-fields-' + name);
-                return !!(group && group.getAttribute('data-supports-returns') === 'true');
-            }
-
-            function refreshFields() {
-                var name = activeName();
-                returnsWrap.classList.toggle('is-hidden', !supportsReturns(name));
-                returnsSchedule.querySelector('.schedule-input').disabled = !supportsReturns(name);
-                var root = section.firstElementChild;
-                var stored = (root && root.getAttribute('data-marketplaces-with-stored-config') || '')
-                        .split(';').filter(function (s) { return s.length > 0; });
-                var hasStoredConfig = stored.indexOf(name) !== -1;
-                form.querySelectorAll('.marketplace-fields').forEach(function (group) {
-                    var active = group.id === 'marketplace-fields-' + name;
-                    group.style.display = active ? '' : 'none';
-                    group.querySelectorAll('input').forEach(function (input) {
-                        input.disabled = !active;
-                        var required = input.dataset.required === 'true';
-                        input.required = required && !(input.type === 'password' && hasStoredConfig);
-                    });
-                });
-            }
-
-            function refreshAvailableOptions() {
-                var connected = connectedNames();
-                Array.prototype.slice.call(select.options).forEach(function (option) {
-                    option.hidden = option.value !== '' && connected.indexOf(option.value) !== -1;
-                });
-            }
-
-            function open(name) {
-                var row = name ? rowFor(name) : null;
-                title.textContent = row ? editTitle : addTitle;
-                selectWrap.classList.toggle('is-hidden', !!row);
-                select.disabled = !!row;
-                hiddenName.disabled = !row;
-                formError.innerHTML = '';
-                if (row) {
-                    hiddenName.value = row.name;
-                } else {
-                    refreshAvailableOptions();
-                    select.value = '';
-                }
-                window.scheduleField.sync(schedule, row ? row.schedule : '');
-                window.scheduleField.sync(returnsSchedule, row ? row.returnsSchedule : '');
-                refreshFields();
-                modal.classList.add('is-active');
-            }
-
-            function close() { modal.classList.remove('is-active'); }
-
-            function disconnectMarketplace(name, button) {
-                button.disabled = true;
-                fetch(basePath + '/marketplaces/' + encodeURIComponent(name) + '/disconnect', { method: 'POST' })
-                    .then(function (response) {
-                        return response.text().then(function (html) { return { ok: response.ok, html: html }; });
-                    })
-                    .then(function (result) {
-                        if (!result.ok) {
-                            button.disabled = false;
-                            alert(extractErrorMessage(result.html));
-                            return;
-                        }
-                        applySectionSwap(result.html);
-                    })
-                    .catch(function () {
-                        button.disabled = false;
-                        alert(genericError);
-                    });
-            }
-
-            function closeDropdowns(except) {
-                section.querySelectorAll('.marketplace-actions.is-active').forEach(function (dropdown) {
-                    if (dropdown !== except) { dropdown.classList.remove('is-active'); }
-                });
-            }
-
-            document.addEventListener('click', function (event) {
-                if (!event.target.closest('.marketplace-actions')) { closeDropdowns(null); }
-            });
-
-            section.addEventListener('click', function (event) {
-                var trigger = event.target.closest('.marketplace-actions .dropdown-trigger');
-                if (trigger) {
-                    var dropdown = trigger.closest('.marketplace-actions');
-                    closeDropdowns(dropdown);
-                    dropdown.classList.toggle('is-active');
-                    return;
-                }
-                closeDropdowns(null);
-                if (event.target.closest('#marketplace-add-button')) { open(null); return; }
-                var configureButton = event.target.closest('[data-configure-marketplace]');
-                if (configureButton) { open(configureButton.getAttribute('data-configure-marketplace')); return; }
-                var disconnectButton = event.target.closest('.marketplace-disconnect-button');
-                if (disconnectButton) {
-                    var name = disconnectButton.getAttribute('data-identity');
-                    confirmDelete(disconnectButton, function () { disconnectMarketplace(name, disconnectButton); });
-                    return;
-                }
-                var connectButton = event.target.closest('.device-auth-row-connect');
-                if (connectButton) { startDeviceAuth(connectButton); }
-            });
-
-            select.addEventListener('change', refreshFields);
-            document.getElementById('marketplace-modal-cancel').addEventListener('click', close);
-            document.getElementById('marketplace-modal-close').addEventListener('click', close);
-            modal.querySelector('.modal-background').addEventListener('click', close);
-
-            form.addEventListener('submit', function (event) {
-                event.preventDefault();
-                if (submitInFlight) { return; }
-                if (!window.scheduleField.valid(schedule) || (supportsReturns(activeName()) && !window.scheduleField.valid(returnsSchedule))) {
-                    formError.innerHTML = '<div class="notification is-danger is-light"></div>';
-                    formError.firstElementChild.textContent = scheduleIncompleteMessage;
-                    return;
-                }
-                submitInFlight = true;
-                submitButton.disabled = true;
-                formError.innerHTML = '';
-                fetch(form.action, { method: 'POST', body: new URLSearchParams(new FormData(form)) })
-                    .then(function (response) {
-                        return response.text().then(function (html) {
-                            return { ok: response.ok, status: response.status, html: html };
-                        });
-                    })
-                    .then(function (result) {
-                        submitInFlight = false;
-                        submitButton.disabled = false;
-                        if (!result.ok) { showFormError(result.html, result.status); return; }
-                        applySectionSwap(result.html);
-                        close();
-                    })
-                    .catch(function () {
-                        submitInFlight = false;
-                        submitButton.disabled = false;
-                        showFormError(null, null);
-                    });
-            });
-
-            var pollTimer = null;
-            var activeButton = null;
-
-            function setInProgress(button, inProgress) {
-                section.querySelectorAll('.device-auth-row-connect').forEach(function (b) { b.disabled = inProgress; });
-                button.classList.toggle('is-loading', inProgress);
-                activeButton = inProgress ? button : null;
-            }
-
-            function stopPolling() {
-                if (pollTimer) {
-                    clearTimeout(pollTimer);
-                    pollTimer = null;
-                }
-            }
-
-            function post(url, params) {
-                return fetch(url, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                    body: new URLSearchParams(params)
-                }).then(function (response) {
-                    return response.json().then(function (body) { return { ok: response.ok, body: body }; });
-                });
-            }
-
-            function fail(message) {
-                stopPolling();
-                if (activeButton) { setInProgress(activeButton, false); }
-                alert(message);
-            }
-
-            function poll(providerName, deviceCode, intervalSeconds, deadline) {
-                if (Date.now() > deadline) {
-                    fail(deviceAuthExpired);
-                    return;
-                }
-                pollTimer = setTimeout(function () {
-                    post('/dashboard/store/integrations/device-auth/poll', {providerName: providerName, deviceCode: deviceCode})
-                        .then(function (result) {
-                            var status = result.body.status;
-                            if (status === 'AUTHORIZED') {
-                                window.location.reload();
-                            } else if (status === 'FAILED' || !result.ok) {
-                                fail(deviceAuthFailed + ' ' + (result.body.error || ''));
-                            } else {
-                                var nextInterval = status === 'SLOW_DOWN' ? intervalSeconds + 5 : intervalSeconds;
-                                poll(providerName, deviceCode, nextInterval, deadline);
-                            }
-                        })
-                        .catch(function () {
-                            poll(providerName, deviceCode, intervalSeconds, deadline);
-                        });
-                }, intervalSeconds * 1000);
-            }
-
-            function startDeviceAuth(button) {
-                var providerName = button.getAttribute('data-provider');
-                var authWindow = window.open('about:blank', '_blank');
-                stopPolling();
-                setInProgress(button, true);
-                post('/dashboard/store/integrations/device-auth/start', {providerName: providerName})
-                    .then(function (result) {
-                        if (!result.ok) {
-                            if (authWindow) { authWindow.close(); }
-                            fail(deviceAuthFailed + ' ' + (result.body.error || ''));
-                            return;
-                        }
-                        if (authWindow) {
-                            authWindow.location = result.body.verificationUriComplete;
-                        } else {
-                            window.open(result.body.verificationUriComplete, '_blank');
-                        }
-                        var deadline = Date.now() + result.body.expiresIn * 1000;
-                        poll(providerName, result.body.deviceCode, result.body.interval || 5, deadline);
-                    })
-                    .catch(function () {
-                        if (authWindow) { authWindow.close(); }
-                        fail(deviceAuthFailed);
-                    });
-            }
-        })();
-    </script>
-
+    <script th:src="@{/js/confirm-dialog.js}" defer></script>
 </div>
-
 </body>
 </html>
