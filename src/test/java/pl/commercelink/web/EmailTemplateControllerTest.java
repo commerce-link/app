@@ -193,6 +193,27 @@ class EmailTemplateControllerTest {
     }
 
     @Test
+    void aDefaultTemplateOfATypeRemovedFromTheEnumIsLeftOutOfTheList() {
+        // given
+        logInAs("ADMIN", "store-1");
+        store("store-1");
+        EmailTemplate removedType = template(EmailTemplatesRepository.DEFAULT_STORE, "Rejected", "Body");
+        removedType.setTemplateName("RMAItemsRejectedTemplate");
+        removedType.setTypeName("RMA_ITEMS_REJECTED");
+        when(emailTemplatesRepository.findAllOfStore("store-1")).thenReturn(List.of());
+        when(emailTemplatesRepository.findAllOfStore(EmailTemplatesRepository.DEFAULT_STORE))
+                .thenReturn(List.of(template(EmailTemplatesRepository.DEFAULT_STORE, "Shipped", "Body"), removedType));
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        String view = controller.templates(null, model);
+
+        // then
+        assertThat(view).isEqualTo("store-email-templates");
+        assertThat(model.get("totalCount")).isEqualTo(EmailNotificationType.values().length);
+    }
+
+    @Test
     void anOldLinkToASelectedTypeOpensItsPage() {
         // given
         logInAs("ADMIN", "store-1");

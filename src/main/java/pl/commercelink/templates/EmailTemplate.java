@@ -3,6 +3,8 @@ package pl.commercelink.templates;
 import com.amazonaws.services.dynamodbv2.datamodeling.*;
 import pl.commercelink.orders.notifications.EmailNotificationType;
 
+import org.apache.commons.lang3.EnumUtils;
+
 import java.util.LinkedList;
 import java.util.List;
 
@@ -15,9 +17,9 @@ public class EmailTemplate {
     private String storeId;
     @DynamoDBRangeKey(attributeName = "templateName")
     private String templateName;
+    // Stored as text so a type later removed from the enum (e.g. RMA_ITEMS_REJECTED) does not break reading the table.
     @DynamoDBAttribute(attributeName = "type")
-    @DynamoDBTypeConvertedEnum
-    private EmailNotificationType type;
+    private String typeName;
     @DynamoDBAttribute(attributeName = "subject")
     private String subject;
     @DynamoDBAttribute(attributeName = "textBody")
@@ -53,12 +55,22 @@ public class EmailTemplate {
         this.templateName = templateName;
     }
 
+    /** The notification type, or {@code null} when the stored name is not a type this version knows. */
+    @DynamoDBIgnore
     public EmailNotificationType getType() {
-        return type;
+        return EnumUtils.getEnum(EmailNotificationType.class, typeName);
     }
 
     public void setType(EmailNotificationType type) {
-        this.type = type;
+        this.typeName = type == null ? null : type.name();
+    }
+
+    public String getTypeName() {
+        return typeName;
+    }
+
+    public void setTypeName(String typeName) {
+        this.typeName = typeName;
     }
 
     public String getSubject() {
