@@ -2618,6 +2618,11 @@ a.cl-link-button:hover {
 
 /* Schedule field (fragments/schedule-field): mode as a segmented control, hours as toggle chips. Shared by Marketplaces,
    Fulfilment (supplier feed) and the catalog (pricelist), so it is not scoped to .cl-page. */
+/* The catalog form wraps the field in a Bulma .field under a label; it lost its mt-2 and touched the label. */
+.field > .schedule-field {
+    margin-top: var(--cl-gap-related);
+}
+
 .schedule-field p.cl-help {
     margin: var(--cl-gap-attached) 0 0;
     font-size: 13px;

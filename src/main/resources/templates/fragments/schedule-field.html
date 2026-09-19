@@ -16,7 +16,8 @@
 <div th:fragment="input(inputName, value, minInterval, defaultText, units)" class="schedule-field"
      th:attr="data-min-interval=${minInterval},data-default-text=${defaultText},data-units=${units}">
 
-    <div class="cl-segmented schedule-modes" role="group" th:attr="aria-label=#{schedule.mode.label}">
+    <!--/* Hidden until the script takes over: without it the buttons could not change anything. */-->
+    <div class="cl-segmented schedule-modes" role="group" th:attr="aria-label=#{schedule.mode.label}" hidden>
         <button type="button" class="cl-segment" data-mode="default" aria-pressed="false" th:text="#{schedule.mode.default}"></button>
         <button type="button" class="cl-segment" data-mode="every" aria-pressed="false" th:text="#{schedule.mode.every}"></button>
         <button type="button" class="cl-segment" data-mode="at" aria-pressed="false" th:text="#{schedule.mode.at}"></button>
@@ -56,7 +57,11 @@
     </div>
 
     <!-- The one thing the operator should read instead of the expression itself. -->
-    <p class="cl-help schedule-summary" aria-live="polite"></p>
+    <!--/* Rendered by the server too, so the stored schedule is named without JavaScript; the script rewrites it. */-->
+    <p class="cl-help schedule-summary" aria-live="polite"
+       th:with="description=${T(pl.commercelink.scheduling.PollingScheduleDescription).of(value)}"
+       th:text="${description.code().endsWith('.default')} ? ${defaultText}
+                : ${#messages.msgWithParams(description.code(), description.args().toArray())}"></p>
     <p class="cl-help is-warn schedule-unsupported" hidden></p>
     <input type="hidden" class="schedule-input" th:name="${inputName}" th:value="${value}">
 </div>
@@ -110,6 +115,8 @@
             var units = (field.getAttribute('data-units') || 'minutes,hours,days').split(',');
             var q = function (selector) { return field.querySelector(selector); };
             var input = q('.schedule-input');
+            var modes = q('.schedule-modes');
+            modes.hidden = false;
             var tabs = Array.prototype.slice.call(field.querySelectorAll('.schedule-modes [data-mode]'));
             var panes = Array.prototype.slice.call(field.querySelectorAll('.schedule-pane'));
             var everyValue = q('.schedule-every-value');

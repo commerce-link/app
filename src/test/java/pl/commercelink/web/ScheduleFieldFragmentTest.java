@@ -128,4 +128,18 @@ class ScheduleFieldFragmentTest {
         assertThat(html).contains("The stored schedule ({0}) does not fit the builder.");
         assertThat(html).contains("window.scheduleField");
     }
+
+    /** Without JavaScript the stored schedule is still named, and the mode buttons that could not work are hidden. */
+    @Test
+    void theSummaryOfTheStoredScheduleIsRenderedByTheServerAndTheModesWaitForTheScript() {
+        // when
+        String every = render("input('feedSchedule', '0/30 * * * ? *', 5, 'Default text', 'minutes,hours,days')");
+        String unset = render("input('feedSchedule', null, 5, 'Default text', 'minutes,hours,days')");
+
+        // then
+        assertThat(every).containsPattern("<p class=\"cl-help schedule-summary\" aria-live=\"polite\">Every 30 min</p>");
+        assertThat(unset).contains(">Default text</p>");
+        assertThat(every).contains("class=\"cl-segmented schedule-modes\" role=\"group\"").contains("hidden");
+        assertThat(render("script")).contains("modes.hidden = false");
+    }
 }
