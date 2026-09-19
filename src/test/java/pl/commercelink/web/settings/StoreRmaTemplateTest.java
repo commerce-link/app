@@ -169,9 +169,9 @@ class StoreRmaTemplateTest {
 
         // then
         assertThat(html).contains("Nazwa szablonu musi zaczynać się od „RMA - ”.");
-        assertThat(html).contains("Oznacz jeden adres odbioru jako domyślny.");
+        assertThat(html).contains("Oznacz w Wysyłce jeden adres nadania jako domyślny.");
         assertThat(html).contains("aria-label=\"Ustaw w Wysyłce: Szablony paczek zwrotu\"");
-        assertThat(html).contains("aria-label=\"Ustaw w Wysyłce: Domyślny adres odbioru\"");
+        assertThat(html).contains("aria-label=\"Ustaw w Wysyłce: Domyślny adres nadania\"");
     }
 
     @Test

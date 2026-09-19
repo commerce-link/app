@@ -47,8 +47,11 @@
                 <section class="cl-card" id="shipping-carriers" aria-labelledby="shipping-carriers-title">
                     <div class="cl-card-head">
                         <h2 class="cl-card-title" id="shipping-carriers-title" th:text="#{store.shipping.carriers.title}"></h2>
-                        <a th:if="${account.configured()}" class="cl-button" th:href="@{${carriersHref}}"
-                           th:text="#{store.shipping.carriers.choose}"></a>
+                        <!--/* One setting, like the label sender: a text action; "+ Add" buttons belong to list cards. */-->
+                        <div th:if="${account.configured()}" class="cl-list-actions">
+                            <a class="cl-link-button" th:href="@{${carriersHref}}" th:text="#{store.shipping.carriers.choose}"
+                               th:attr="aria-label=#{store.shipping.carriers.change.label}"></a>
+                        </div>
                     </div>
                     <p class="cl-card-desc" th:text="#{store.shipping.carriers.description}"></p>
                     <p th:unless="${carriers.isEmpty()}" class="cl-card-body" th:text="${#strings.listJoin(carriers, ' · ')}"></p>
