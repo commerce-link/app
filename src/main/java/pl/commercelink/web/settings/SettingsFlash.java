@@ -26,8 +26,14 @@ public final class SettingsFlash {
      * for that page here instead of through a redirect.
      */
     public static void forNextPage(HttpServletRequest request, HttpServletResponse response, String path, String message) {
+        forNextPage(request, response, path, SAVED_MESSAGE, message);
+    }
+
+    /** The same for a page that shows its own flash attribute (an error, a notice) instead of the saved message. */
+    public static void forNextPage(HttpServletRequest request, HttpServletResponse response, String path, String attribute,
+                                   String message) {
         FlashMap flashMap = RequestContextUtils.getOutputFlashMap(request);
-        flashMap.put(SAVED_MESSAGE, message);
+        flashMap.put(attribute, message);
         RequestContextUtils.saveOutputFlashMap(path, request, response);
     }
 }

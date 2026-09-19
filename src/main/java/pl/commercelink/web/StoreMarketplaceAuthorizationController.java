@@ -165,6 +165,9 @@ public class StoreMarketplaceAuthorizationController {
         Outcome outcome = checkOnce(storeId, name, session, locale);
         if (outcome.authorized()) {
             SettingsFlash.forNextPage(request, response, outcome.next(), outcome.message());
+        } else if (!outcome.pending()) {
+            // The script navigates straight to the page, which shows the refusal or expiry only from the flash.
+            SettingsFlash.forNextPage(request, response, outcome.next(), ERROR, outcome.message());
         }
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("status", outcome.status());

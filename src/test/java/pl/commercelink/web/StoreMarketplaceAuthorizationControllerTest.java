@@ -18,6 +18,9 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.ui.ExtendedModelMap;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
+import org.springframework.web.servlet.DispatcherServlet;
+import org.springframework.web.servlet.FlashMap;
+import org.springframework.web.servlet.support.SessionFlashMapManager;
 import pl.commercelink.marketplace.MarketplaceConnectionService;
 import pl.commercelink.marketplace.MarketplaceProviderFactory;
 import pl.commercelink.products.ProductCatalogRepository;
@@ -192,13 +195,45 @@ class StoreMarketplaceAuthorizationControllerTest {
         ResponseEntity<Map<String, Object>> waiting = controller.status("Allegro", session, PL,
                 new MockHttpServletRequest(), new MockHttpServletResponse());
         ResponseEntity<Map<String, Object>> refused = controller.status("Allegro", session, PL,
-                new MockHttpServletRequest(), new MockHttpServletResponse());
+                requestWithFlash(), new MockHttpServletResponse());
 
         // then
         assertThat(waiting.getBody()).containsEntry("status", "PENDING").containsEntry("redirect", null);
         assertThat(refused.getBody()).containsEntry("status", "FAILED")
                 .containsEntry("redirect", "/dashboard/store/marketplaces/Allegro/authorize");
         assertThat(session.getAttribute(StoreMarketplaceAuthorizationController.PENDING_ATTRIBUTE)).isNull();
+    }
+
+    /** Without this the script navigated back to the page and the operator saw no reason why nothing was connected. */
+    @Test
+    void aRefusedOrExpiredCodeLeavesItsMessageForThePageTheScriptOpens() {
+        // given
+        Store store = store("store-1", false);
+        Pending pending = pending("store-1", Instant.now().plusSeconds(600));
+        session.setAttribute(StoreMarketplaceAuthorizationController.PENDING_ATTRIBUTE, pending);
+        when(authorization.check(store, pending)).thenReturn(OAuth2DeviceTokenResult.Status.FAILED);
+        MockHttpServletRequest refusedRequest = requestWithFlash();
+        MockHttpServletRequest expiredRequest = requestWithFlash();
+
+        // when
+        controller.status("Allegro", session, PL, refusedRequest, new MockHttpServletResponse());
+        controller.status("Allegro", session, PL, expiredRequest, new MockHttpServletResponse());
+
+        // then
+        assertThat((String) flash(refusedRequest).get("authorizeError")).startsWith("Połączenie z Allegro nie powiodło się");
+        assertThat((String) flash(expiredRequest).get("authorizeError")).startsWith("Kod wygasł");
+        assertThat(flash(refusedRequest).getTargetRequestPath()).isEqualTo("/dashboard/store/marketplaces/Allegro/authorize");
+    }
+
+    private static MockHttpServletRequest requestWithFlash() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setAttribute(DispatcherServlet.OUTPUT_FLASH_MAP_ATTRIBUTE, new FlashMap());
+        request.setAttribute(DispatcherServlet.FLASH_MAP_MANAGER_ATTRIBUTE, new SessionFlashMapManager());
+        return request;
+    }
+
+    private static FlashMap flash(MockHttpServletRequest request) {
+        return (FlashMap) request.getAttribute(DispatcherServlet.OUTPUT_FLASH_MAP_ATTRIBUTE);
     }
 
     /** A code of another store (a super admin switching stores) or an expired one is never checked. */
