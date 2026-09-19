@@ -205,11 +205,11 @@ class MarketplaceExportHistoryControllerTest {
                 .thenReturn(Optional.empty());
         Model model = new ExtendedModelMap();
 
-        // when
-        String view = controller.exportRun(MARKETPLACE, CATALOG_ID, RUN_ID, model, Locale.forLanguageTag("pl"));
-
-        // then
-        assertThat(view).isEqualTo("error");
+        // when / then
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                        () -> controller.exportRun(MARKETPLACE, CATALOG_ID, RUN_ID, model, Locale.forLanguageTag("pl")))
+                .isInstanceOfSatisfying(org.springframework.web.server.ResponseStatusException.class,
+                        e -> assertThat(e.getStatusCode()).isEqualTo(org.springframework.http.HttpStatus.NOT_FOUND));
     }
 
     @Test

@@ -16,7 +16,7 @@ import java.util.Map;
 public record MarketplaceExportRunView(List<Row> rows, Map<Outcome, Integer> counts, String abortMessage) {
 
     public enum Outcome {
-        PUBLISHED("is-ok"), REJECTED("is-warn"), REMOVAL_PENDING("is-neutral");
+        PUBLISHED("is-ok"), REJECTED("is-warn"), REMOVAL_PENDING("is-neutral"), UNKNOWN("is-neutral");
 
         private final String tone;
 
@@ -33,11 +33,16 @@ public record MarketplaceExportRunView(List<Row> rows, Map<Outcome, Integer> cou
         }
 
         static Outcome of(String outcome) {
+            String value = StringUtils.trimToNull(outcome);
             // Run files written before outcomes were recorded hold only the published snapshot (pimId, price, quantity).
-            if (StringUtils.isBlank(outcome) || MarketplaceOfferSnapshot.OUTCOME_PUBLISHED.equals(outcome)) {
+            if (value == null || MarketplaceOfferSnapshot.OUTCOME_PUBLISHED.equals(value)) {
                 return PUBLISHED;
             }
-            return MarketplaceOfferSnapshot.OUTCOME_REMOVAL_PENDING.equals(outcome) ? REMOVAL_PENDING : REJECTED;
+            if (MarketplaceOfferSnapshot.OUTCOME_REMOVAL_PENDING.equals(value)) {
+                return REMOVAL_PENDING;
+            }
+            // A value this version does not know is not claimed to be a rejection.
+            return MarketplaceOfferSnapshot.OUTCOME_REJECTED.equals(value) ? REJECTED : UNKNOWN;
         }
     }
 

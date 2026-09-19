@@ -51,4 +51,16 @@ class MarketplaceExportRunViewTest {
         assertThat(view.rows().get(0).reasonCode()).isNull();
         assertThat(view.rows().get(1).price()).isNull();
     }
+
+    @Test
+    void anOutcomeThisVersionDoesNotKnowIsNotShownAsARejection() {
+        // when
+        MarketplaceExportRunView view = MarketplaceExportRunView.of(List.of(
+                new MarketplaceOfferSnapshot("pim-1", 100L, 1L, 0, "WITHHELD", null, null),
+                new MarketplaceOfferSnapshot("pim-2", 100L, 1L, 0, " REJECTED ", "E1", "Za krótki tytuł")));
+
+        // then
+        assertThat(view.rows()).extracting(MarketplaceExportRunView.Row::outcome)
+                .containsExactly(MarketplaceExportRunView.Outcome.UNKNOWN, MarketplaceExportRunView.Outcome.REJECTED);
+    }
 }
