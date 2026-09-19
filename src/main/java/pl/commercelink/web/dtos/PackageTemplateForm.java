@@ -72,7 +72,8 @@ public class PackageTemplateForm {
             FormRules.requireText(errors, fieldId(i, "description"), parcel.description, "store.shipping.template.description.required");
         }
         if (!anyParcel) {
-            errors.put(fieldId(0, "width"), "store.shipping.template.parcels.required");
+            // The list as a whole, not "Parcel 1 · Width": the problem is that no parcel is filled in.
+            errors.put("parcels", "store.shipping.template.parcels.required");
         }
         return errors;
     }

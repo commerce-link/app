@@ -28,7 +28,8 @@
                         </div>
                     </fieldset>
 
-                    <div class="cl-repeat" data-cl-repeat="parcels" data-cl-repeat-id="parcel">
+                    <div class="cl-repeat" data-cl-repeat="parcels" data-cl-repeat-id="parcel" id="parcels" tabindex="-1"
+                         th:with="parcelsError=${errors.get('parcels')}">
                         <!--/* th:insert runs before th:each on one element, so the loop sits on its own block. */-->
                         <th:block th:each="parcel, stat : *{parcels}">
                             <fieldset class="cl-fieldset" data-cl-repeat-item
@@ -47,7 +48,13 @@
                                 <i class="fas fa-plus" aria-hidden="true"></i>
                                 <span th:text="#{store.shipping.template.parcel.add}"></span>
                             </button>
+                            <p th:if="${parcelsError != null}" class="cl-field-error" id="parcels-error">
+                                <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                                <span th:text="#{${parcelsError}}"></span>
+                            </p>
                             <p class="cl-help" th:text="#{store.shipping.template.insurance.help}"></p>
+                            <span class="cl-visually-hidden" role="status" data-cl-repeat-status
+                                  th:attr="data-template=#{store.shipping.template.parcel.removed('@N@')}"></span>
                         </div>
                     </div>
 
@@ -104,7 +111,9 @@
     </div>
     <!--/* After the grid: the floated legend is cleared by the element that follows it, so it must be the grid. */-->
     <button type="button" class="cl-link-button is-danger cl-repeat-remove" data-cl-repeat-remove hidden
-            th:text="#{store.shipping.template.parcel.remove}"></button>
+            th:text="#{store.shipping.template.parcel.remove}"
+            th:attr="aria-label=#{store.shipping.template.parcel.remove.for(${number})},
+                     data-cl-repeat-label=#{store.shipping.template.parcel.remove.for('@N@')}"></button>
 </th:block>
 </body>
 </html>

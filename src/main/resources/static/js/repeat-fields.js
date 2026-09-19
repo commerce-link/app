@@ -33,6 +33,11 @@
             });
             item.querySelectorAll('[data-cl-repeat-remove]').forEach(function (button) {
                 button.hidden = all.length <= min;
+                // "Remove parcel 2", not two identical "Remove parcel" buttons for a screen reader.
+                var label = button.getAttribute('data-cl-repeat-label');
+                if (label) {
+                    button.setAttribute('aria-label', label.replace('@N@', String(index + 1)));
+                }
             });
         });
         container.querySelectorAll('[data-cl-repeat-add]').forEach(function (button) {
@@ -72,9 +77,15 @@
             var owner = remove.closest('[data-cl-repeat]');
             var removed = remove.closest('[data-cl-repeat-item]');
             var siblings = items(owner);
-            var next = siblings[siblings.indexOf(removed) + 1] || siblings[siblings.indexOf(removed) - 1];
+            var position = siblings.indexOf(removed);
+            var next = siblings[position + 1] || siblings[position - 1];
             removed.remove();
             renumber(owner);
+            // Focus moves to the neighbouring group without saying why; the status names what went.
+            var status = owner.querySelector('[data-cl-repeat-status]');
+            if (status) {
+                status.textContent = status.getAttribute('data-template').replace('@N@', String(position + 1));
+            }
             var focus = (next && next.querySelector('input, select, textarea')) || owner.querySelector('[data-cl-repeat-add]');
             if (focus) {
                 focus.focus();

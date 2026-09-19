@@ -64,7 +64,7 @@ class PackageTemplateFormTest {
         form.setName(" ");
 
         // when / then
-        assertThat(form.validate()).containsOnlyKeys("name", "parcel-0-width");
+        assertThat(form.validate()).containsOnlyKeys("name", "parcels");
     }
 
     @Test
