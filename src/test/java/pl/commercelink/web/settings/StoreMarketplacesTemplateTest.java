@@ -85,13 +85,15 @@ class StoreMarketplacesTemplateTest {
     }
 
     /** Without a catalog sending offers the row says nothing about catalogs (decision 2026-09-18: no warning). */
+    /** Past runs matter after the last catalog stopped exporting here, so the history link stays (as on the old page). */
     @Test
-    void aMarketplaceNoCatalogSendsOffersToHasNoCatalogLine() {
+    void aMarketplaceNoCatalogSendsOffersToHasNoCatalogsButKeepsItsHistory() {
         // when
         String html = list(List.of(view("Allegro", "Allegro", State.ACTIVE, null, List.of(), true)), true);
 
         // then
-        assertThat(html).doesNotContain("Oferty z katalogów").doesNotContain("Żaden katalog").doesNotContain("Historia eksportu");
+        assertThat(html).doesNotContain("Oferty z katalogów").doesNotContain("Żaden katalog");
+        assertThat(html).contains("href=\"/dashboard/store/marketplaces/exports/Allegro\"").contains("Historia eksportu");
     }
 
     @Test

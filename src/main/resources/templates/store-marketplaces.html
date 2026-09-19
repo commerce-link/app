@@ -51,10 +51,13 @@
                                                                                       : #{store.marketplaces.state.expired.keys}"></p>
                                     <p class="cl-list-desc" th:text="${marketplace.orders()}"></p>
                                     <p th:if="${marketplace.returns() != null}" class="cl-list-desc" th:text="${marketplace.returns()}"></p>
-                                    <p th:unless="${marketplace.catalogs().isEmpty()}" class="cl-list-desc">
-                                        <span th:text="#{store.marketplaces.list.catalogs(${#strings.listJoin(marketplace.catalogs(), ', ')})}"></span>
-                                        · <a th:href="@{${marketplace.exportsHref()}}" th:text="#{store.marketplaces.list.exports}"
-                                             th:attr="aria-label=#{store.marketplaces.list.exports.for(${marketplace.displayName()})}"></a>
+                                    <!--/* The history stays reachable after the last catalog stopped exporting here: past runs still matter. */-->
+                                    <p class="cl-list-desc">
+                                        <th:block th:unless="${marketplace.catalogs().isEmpty()}">
+                                            <span th:text="#{store.marketplaces.list.catalogs(${#strings.listJoin(marketplace.catalogs(), ', ')})}"></span> ·
+                                        </th:block>
+                                        <a th:href="@{${marketplace.exportsHref()}}" th:text="#{store.marketplaces.list.exports}"
+                                           th:attr="aria-label=#{store.marketplaces.list.exports.for(${marketplace.displayName()})}"></a>
                                     </p>
                                 </th:block>
                                 <p th:unless="${marketplace.installed()}" class="cl-list-desc is-warn" th:text="#{store.marketplaces.state.missing.text}"></p>
