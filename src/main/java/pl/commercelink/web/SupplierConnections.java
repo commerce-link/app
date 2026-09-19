@@ -2,6 +2,7 @@ package pl.commercelink.web;
 
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Component;
@@ -39,6 +40,7 @@ import java.util.stream.Stream;
  * {@link ManualSupplierService}. Both services still check their own rules; their errors are mapped onto the page's
  * fields so they show where the operator can fix them.
  */
+@Slf4j
 @Component
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class SupplierConnections {
@@ -184,26 +186,55 @@ class SupplierConnections {
         }
 
         String storeId = store.getStoreId();
-        if (identity == null) {
+        boolean createdNow = identity == null;
+        if (createdNow) {
             ManualSupplierService.Result created = manualSupplierService.create(storeId, form.getLabel());
             if (!created.ok()) {
                 return fromServiceErrors(List.of(ErrorMessage.of(created.messageCode())), locale);
             }
             identity = created.identity();
         }
+        ManualSupplierService.Result failed;
+        try {
+            failed = uploadAndApply(storeId, identity, file, form);
+        } catch (RuntimeException e) {
+            removeCreated(createdNow, storeId, identity);
+            throw e;
+        }
+        if (failed != null) {
+            removeCreated(createdNow, storeId, identity);
+            return fromServiceErrors(List.of(ErrorMessage.of(failed.messageCode())), locale);
+        }
+        return new SaveResult(Map.of(), null, identity);
+    }
+
+    /** The first refused step after the price list exists, or null when the file and the settings are stored. */
+    private ManualSupplierService.Result uploadAndApply(String storeId, String identity, byte[] file, SupplierSettingsForm form) {
         if (file != null) {
             ManualSupplierService.Result uploaded = manualSupplierService.uploadFeed(storeId, identity, file);
             if (!uploaded.ok()) {
-                return fromServiceErrors(List.of(ErrorMessage.of(uploaded.messageCode())), locale);
+                return uploaded;
             }
         }
         ManualSupplierService.Result applied = manualSupplierService.applySelections(storeId, List.of(
                 new ManualSupplierService.ManualSelection(identity, form.isEnabled(), form.isIncludeInPricing(),
                         form.isIncludeInFulfilment(), form.getExternalSupplierId(), form.getLabel(), form.getBillingShortcut())));
-        if (!applied.ok()) {
-            return fromServiceErrors(List.of(ErrorMessage.of(applied.messageCode())), locale);
+        return applied.ok() ? null : applied;
+    }
+
+    /**
+     * A price list created by this save but left without its file or settings is removed again: otherwise it stays as
+     * an empty, switched-off entry and saving again is refused because the name is taken.
+     */
+    private void removeCreated(boolean createdNow, String storeId, String identity) {
+        if (!createdNow) {
+            return;
         }
-        return new SaveResult(Map.of(), null, identity);
+        try {
+            manualSupplierService.delete(storeId, identity);
+        } catch (RuntimeException e) {
+            log.error("Could not remove price list {} of store {} after a failed save", identity, storeId, e);
+        }
     }
 
     /** Disconnects an integration or deletes a price list; false when nothing changed (the store was left as it was). */

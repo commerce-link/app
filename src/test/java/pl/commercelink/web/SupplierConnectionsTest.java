@@ -38,6 +38,7 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyMap;
@@ -203,6 +204,59 @@ class SupplierConnectionsTest {
         order.verify(manualSupplierService).create("store-1", "Hurtownia");
         order.verify(manualSupplierService).uploadFeed("store-1", "manual-abcd1234", PRICE_LIST);
         order.verify(manualSupplierService).applySelections(eq("store-1"), any());
+    }
+
+    /** Without this a failed upload left an empty, switched-off price list, and saving again said the name was taken. */
+    @Test
+    void aNewPriceListIsRemovedAgainWhenItsFileCannotBeStored() {
+        // given
+
+        when(manualSupplierService.labelProblem(store, null, "Hurtownia")).thenReturn(null);
+        when(manualSupplierService.isLoadable(PRICE_LIST)).thenReturn(true);
+        when(manualSupplierService.create("store-1", "Hurtownia")).thenReturn(ManualSupplierService.Result.created("manual-abcd1234"));
+        when(manualSupplierService.uploadFeed(eq("store-1"), eq("manual-abcd1234"), any()))
+                .thenThrow(new IllegalStateException("S3 unavailable"));
+
+        // when / then
+        assertThatThrownBy(() -> suppliers.saveCsv(store, null, priceList("Hurtownia", PRICE_LIST), POLISH))
+                .hasMessage("S3 unavailable");
+        verify(manualSupplierService).delete("store-1", "manual-abcd1234");
+        verify(manualSupplierService, never()).applySelections(anyString(), any());
+    }
+
+    @Test
+    void aNewPriceListIsRemovedAgainWhenItsSettingsAreRefused() {
+        // given
+
+        when(manualSupplierService.labelProblem(store, null, "Hurtownia")).thenReturn(null);
+        when(manualSupplierService.isLoadable(PRICE_LIST)).thenReturn(true);
+        when(manualSupplierService.create("store-1", "Hurtownia")).thenReturn(ManualSupplierService.Result.created("manual-abcd1234"));
+        when(manualSupplierService.uploadFeed(eq("store-1"), eq("manual-abcd1234"), any())).thenReturn(ManualSupplierService.Result.success());
+        when(manualSupplierService.applySelections(eq("store-1"), any()))
+                .thenReturn(ManualSupplierService.Result.error("store.manual.error.store.notfound"));
+
+        // when
+        SupplierConnections.SaveResult result = suppliers.saveCsv(store, null, priceList("Hurtownia", PRICE_LIST), POLISH);
+
+        // then
+        assertThat(result.ok()).isFalse();
+        verify(manualSupplierService).delete("store-1", "manual-abcd1234");
+    }
+
+    @Test
+    void anExistingPriceListIsNeverRemovedWhenItsNewFileFails() {
+        // given
+
+        StoreSupplierConnection existing = new StoreSupplierConnection("manual-abcd1234", ConnectionMode.MANUAL, true, true);
+        when(manualSupplierService.labelProblem(any(), any(), any())).thenReturn(null);
+        when(manualSupplierService.isLoadable(PRICE_LIST)).thenReturn(true);
+        when(manualSupplierService.uploadFeed(eq("store-1"), eq("manual-abcd1234"), any()))
+                .thenThrow(new IllegalStateException("S3 unavailable"));
+
+        // when / then
+        assertThatThrownBy(() -> suppliers.saveCsv(store, existing, priceList("Hurtownia", PRICE_LIST), POLISH))
+                .isInstanceOf(IllegalStateException.class);
+        verify(manualSupplierService, never()).delete(anyString(), anyString());
     }
 
     @Test
