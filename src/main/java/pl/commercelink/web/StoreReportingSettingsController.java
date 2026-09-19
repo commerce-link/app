@@ -6,7 +6,9 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.MessageSource;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Controller;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
@@ -133,8 +135,7 @@ public class StoreReportingSettingsController {
 
     private String confirmNewAddress(String storeId, Model model, Locale locale) {
         if (storesRepository.findById(storeId) == null) {
-            model.addAttribute("error", "Store not found");
-            return "error";
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
         model.addAttribute("confirm", new ConfirmAction(
                 messageSource.getMessage("store.reporting.googleAds.newAddress.confirm.title", null, locale),
@@ -170,8 +171,7 @@ public class StoreReportingSettingsController {
     private String render(String storeId, ReportingForm submitted, Model model) {
         Store store = storesRepository.findById(storeId);
         if (store == null) {
-            model.addAttribute("error", "Store not found");
-            return "error";
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
         ReportingForm form = submitted != null ? submitted : ReportingForm.from(store);
         model.addAttribute("form", form);

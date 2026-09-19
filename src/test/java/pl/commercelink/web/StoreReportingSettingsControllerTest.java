@@ -27,6 +27,7 @@ import pl.commercelink.web.settings.SettingsFlash;
 import java.util.Locale;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -402,5 +403,13 @@ class StoreReportingSettingsControllerTest {
         assertThat(savedStore().getStoreId()).isEqualTo("store-9");
         assertThat(view).isEqualTo("store-report :: reportingForm");
         assertThat(model.get("formAction")).isEqualTo("/dashboard/store/store-9/report");
+    }
+
+    @Test
+    void anUnknownStoreIsNotFound() {
+        // when / then
+        assertThatThrownBy(() -> controller.superAdminReport("missing", new ExtendedModelMap()))
+                .isInstanceOfSatisfying(org.springframework.web.server.ResponseStatusException.class,
+                        e -> assertThat(e.getStatusCode()).isEqualTo(org.springframework.http.HttpStatus.NOT_FOUND));
     }
 }

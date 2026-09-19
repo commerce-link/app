@@ -32,6 +32,7 @@ import java.util.Locale;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -222,5 +223,13 @@ class StoreWarehouseSettingsControllerTest {
         assertThat(response.getStatus()).isEqualTo(200);
         assertThat(model.get("savedMessage")).isEqualTo("Zapisano");
         assertThat(((WarehouseDocumentsForm) model.get("form")).getWarehouseId()).isEqualTo("MAG-01");
+    }
+
+    @Test
+    void anUnknownStoreIsNotFound() {
+        // when / then
+        assertThatThrownBy(() -> controller.superAdminWarehouse("missing", new ExtendedModelMap(), Locale.forLanguageTag("pl")))
+                .isInstanceOfSatisfying(org.springframework.web.server.ResponseStatusException.class,
+                        e -> assertThat(e.getStatusCode()).isEqualTo(org.springframework.http.HttpStatus.NOT_FOUND));
     }
 }

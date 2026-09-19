@@ -7,6 +7,7 @@ import org.springframework.context.MessageSource;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -132,8 +133,7 @@ public class StoreRmaSettingsController {
     private String render(String storeId, String submittedId, Map<String, String> errors, Model model, Locale locale) {
         Store store = storesRepository.findById(storeId);
         if (store == null) {
-            model.addAttribute("error", "Store not found");
-            return "error";
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
 
         AuthorizedCarrier saved = savedCarrier(store);

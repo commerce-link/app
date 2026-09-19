@@ -6,6 +6,7 @@ import org.springframework.context.MessageSource;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
@@ -63,8 +64,7 @@ public class StoreController {
     private String renderStoreBranding(String storeId, BrandingForm submitted, Map<String, String> errors, Model model) {
         Store store = storesRepository.findById(storeId);
         if (store == null) {
-            model.addAttribute("error", "Store not found");
-            return "error";
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
 
         model.addAttribute("form", submitted != null ? submitted : BrandingForm.from(store));
@@ -94,8 +94,7 @@ public class StoreController {
                                              Model model, Locale locale) {
         Store store = storesRepository.findById(storeId);
         if (store == null) {
-            model.addAttribute("error", "Store not found");
-            return "error";
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
 
         CompanyDetailsForm form = submitted != null ? submitted : CompanyDetailsForm.from(store.getBillingDetails());

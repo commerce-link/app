@@ -6,6 +6,7 @@ import org.springframework.context.MessageSource;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
@@ -79,8 +80,7 @@ public class StoreWarehouseSettingsController {
 
     private String show(String storeId, Model model, Locale locale) {
         if (storesRepository.findById(storeId) == null) {
-            model.addAttribute("error", "Store not found");
-            return "error";
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
         // Records are edited and deleted by id; addresses saved by the old table form, and printers, have none yet.
         // Another save of the store may land meanwhile, so the ids are assigned on a fresh copy with a retry.
@@ -105,8 +105,7 @@ public class StoreWarehouseSettingsController {
                         RedirectAttributes redirectAttributes, HttpServletResponse response) {
         Store store = storesRepository.findById(storeId);
         if (store == null) {
-            model.addAttribute("error", "Store not found");
-            return "error";
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
         Map<String, String> errors = form.validate();
         if (!errors.isEmpty()) {

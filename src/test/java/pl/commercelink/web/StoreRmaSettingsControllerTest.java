@@ -14,6 +14,8 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.ui.ExtendedModelMap;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.rma.RMAShippingService;
@@ -34,6 +36,7 @@ import java.util.Locale;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -273,13 +276,11 @@ class StoreRmaSettingsControllerTest {
         // given
         when(storesRepository.findById("store-1")).thenReturn(null);
 
-        // when
-        String view = controller.saveRma("dpd-1", null, new ExtendedModelMap(), PL, new RedirectAttributesModelMap(),
-                new MockHttpServletResponse());
-
-        // then
+        // when / then
+        assertThatThrownBy(() -> controller.saveRma("dpd-1", null, new ExtendedModelMap(), PL, new RedirectAttributesModelMap(),
+                new MockHttpServletResponse())).isInstanceOfSatisfying(ResponseStatusException.class,
+                e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
         verify(storesRepository, never()).save(any(Store.class));
-        assertThat(view).isEqualTo("error");
     }
 
     @SuppressWarnings("unchecked")
