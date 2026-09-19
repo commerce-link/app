@@ -175,6 +175,10 @@ public class StoreMarketplaceController {
                         HttpServletResponse response) {
         Store store = requireStore(storeId);
         MarketplaceIntegration existing = existingName == null ? null : requireMarketplace(store, existingName);
+        if (existing != null && marketplaces.descriptor(existingName) == null) {
+            // The adapter is gone, as on the edit page: the list offers only disconnecting it.
+            return "redirect:" + marketplacesPath(storeId);
+        }
         if (existing != null) {
             // The marketplace of an edit is the one in the address, whatever the form says.
             form.setProviderName(existingName);

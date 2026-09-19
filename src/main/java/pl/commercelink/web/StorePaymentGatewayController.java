@@ -174,6 +174,10 @@ public class StorePaymentGatewayController {
                         HttpServletRequest request, HttpServletResponse response) {
         Store store = requireStore(storeId);
         PaymentIntegration existing = existingName == null ? null : requireGateway(store, existingName);
+        if (existing != null && paymentGateways.descriptor(existingName) == null) {
+            // The adapter is gone, as on the edit page: the list offers only disconnecting it.
+            return "redirect:" + paymentsPath(storeId);
+        }
         if (existing != null) {
             // The gateway of an edit is the one in the address, whatever the form says.
             form.setProviderName(existingName);

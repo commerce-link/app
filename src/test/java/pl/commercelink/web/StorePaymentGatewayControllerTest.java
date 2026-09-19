@@ -162,6 +162,21 @@ class StorePaymentGatewayControllerTest {
     }
 
     @Test
+    void savingAGatewayWhoseAdapterIsGoneGoesBackToTheList() {
+        // given
+        Store store = store("store-1");
+        store.addPaymentIntegration("gone");
+
+        // when
+        String view = controller.updateGateway("gone", gateway("gone", Map.of()), false, null, new ExtendedModelMap(), PL,
+                new RedirectAttributesModelMap(), new MockHttpServletRequest(), new MockHttpServletResponse());
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/store/payments");
+        verify(paymentProviderFactory, never()).saveConfiguration(any(), anyString(), anyMap());
+    }
+
+    @Test
     void superAdminWorksOnTheStoreFromThePath() {
         // given
         authenticateAs(null, "SUPER_ADMIN");

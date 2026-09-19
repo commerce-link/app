@@ -212,6 +212,22 @@ class StoreMarketplaceControllerTest {
         verify(connectionService).connectOrUpdate(eq(store), eq("CsCart"), anyMap(), isNull(), isNull());
     }
 
+    /** The adapter is gone: GET already went back to the list, POST failed with an NPE on the missing descriptor. */
+    @Test
+    void savingAMarketplaceWhoseAdapterIsGoneGoesBackToTheList() {
+        // given
+        Store store = store("store-1");
+        store.getMarketplaces().add(new MarketplaceIntegration("Gone"));
+
+        // when
+        String view = controller.updateMarketplace("Gone", form("Gone", Map.of(), "", ""), null, new ExtendedModelMap(), PL,
+                new RedirectAttributesModelMap(), new MockHttpServletRequest(), new MockHttpServletResponse());
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/store/marketplaces");
+        verify(connectionService, never()).connectOrUpdate(any(), anyString(), anyMap(), any(), any());
+    }
+
     @Test
     void aMarketplaceTheStoreIsNotConnectedToAnswers404() {
         // given
