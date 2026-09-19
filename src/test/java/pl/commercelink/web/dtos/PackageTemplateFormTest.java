@@ -101,4 +101,23 @@ class PackageTemplateFormTest {
                 .containsEntry("parcel-1-weight", "2:weight")
                 .hasSize(10);
     }
+
+    /**
+     * Nothing reads the insured value today, but the release before this one drops a parcel with value 0 on its next
+     * save (Parcel.isComplete), so a rollback must find values above zero.
+     */
+    @Test
+    void editingKeepsTheStoredInsuredValueAndANewParcelGetsOne() {
+        // given
+        PackageTemplate template = new PackageTemplate();
+        template.setParcels(new java.util.ArrayList<>(java.util.List.of(new Parcel(40, 30, 20, 5, 250, "Karton"))));
+        PackageTemplateForm form = form(row("41", "30", "20", "5", "Karton"), row("10", "10", "10", "1", "Koperta"));
+
+        // when
+        form.applyTo(template);
+
+        // then
+        assertThat(template.getParcels()).extracting(Parcel::getValue).containsExactly(250, 1);
+        assertThat(template.getParcels()).extracting(Parcel::getWidth).containsExactly(41, 10);
+    }
 }

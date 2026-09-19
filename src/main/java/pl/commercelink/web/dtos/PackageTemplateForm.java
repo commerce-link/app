@@ -94,13 +94,20 @@ public class PackageTemplateForm {
         return template;
     }
 
-    /** Edits the template in place; its id and default flag stay as they were. */
+    /**
+     * Edits the template in place; its id and default flag stay as they were. The insured value has no field (the
+     * shipment always takes the order's value), but it is carried over by position and a new parcel gets 1: the
+     * previous release drops a parcel with value 0 on its next save, so a rollback must not lose parcels.
+     */
     public void applyTo(PackageTemplate template) {
+        List<Parcel> previous = template.getParcels() == null ? List.of() : template.getParcels();
         template.setName(StringUtils.trim(name));
         List<Parcel> saved = new ArrayList<>();
         for (ParcelRow row : parcels) {
             if (!row.blank()) {
-                saved.add(new Parcel(number(row.width), number(row.depth), number(row.height), number(row.weight), 0,
+                int index = saved.size();
+                int value = index < previous.size() && previous.get(index).getValue() > 0 ? previous.get(index).getValue() : 1;
+                saved.add(new Parcel(number(row.width), number(row.depth), number(row.height), number(row.weight), value,
                         StringUtils.trim(row.description)));
             }
         }
