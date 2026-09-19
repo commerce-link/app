@@ -8,6 +8,8 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import pl.commercelink.marketplace.api.MarketplaceProvider;
 import pl.commercelink.marketplace.api.MarketplaceReturn;
+import pl.commercelink.scheduling.ScheduledExecutionCounter;
+import pl.commercelink.scheduling.ScheduledExecution;
 import pl.commercelink.stores.Store;
 import pl.commercelink.starter.util.ElapsedTime;
 import pl.commercelink.stores.StoresRepository;
@@ -25,6 +27,7 @@ public class MarketplaceReturnsImportEventListener {
     private final StoresRepository storesRepository;
     private final MarketplaceReturnImporter marketplaceReturnImporter;
     private final MarketplaceProviderFactory providerFactory;
+    private final ScheduledExecutionCounter scheduledExecutionCounter;
 
     @Value("${marketplace.returns.enabled:true}")
     private boolean returnsEnabled = true;
@@ -78,6 +81,7 @@ public class MarketplaceReturnsImportEventListener {
             log.info("Marketplace {} returns import store={}: fetched={} fetchDurationInMs={}"
                             + " importDurationInMs={}",
                     marketplace, store.getStoreId(), fetched.size(), fetchDurationInMs, elapsed.inMillis());
+            scheduledExecutionCounter.countCompleted(store.getStoreId(), ScheduledExecution.RETURNS_IMPORT, marketplace);
         });
     }
 

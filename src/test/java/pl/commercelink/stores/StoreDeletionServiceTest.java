@@ -26,7 +26,11 @@ import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.warehouse.builtin.WarehouseDocument;
 import pl.commercelink.warehouse.builtin.WarehouseDocumentItem;
+import pl.commercelink.inventory.supplier.StoreSupplierFeedScheduler;
 import pl.commercelink.inventory.supplier.SupplierProviderFactory;
+import pl.commercelink.marketplace.MarketplaceOrdersImportScheduler;
+import pl.commercelink.marketplace.MarketplaceReturnsImportScheduler;
+import pl.commercelink.pricelist.PricelistEventScheduler;
 import pl.commercelink.starter.storage.FileStorage;
 import pl.commercelink.users.CognitoUserService;
 
@@ -54,6 +58,10 @@ class StoreDeletionServiceTest {
     @Mock private StoreInventoryCache storeInventoryCache;
     @Mock private CognitoUserService cognitoUserService;
     @Mock private SupplierProviderFactory supplierProviderFactory;
+    @Mock private MarketplaceOrdersImportScheduler ordersImportScheduler;
+    @Mock private MarketplaceReturnsImportScheduler returnsImportScheduler;
+    @Mock private StoreSupplierFeedScheduler feedScheduler;
+    @Mock private PricelistEventScheduler pricelistEventScheduler;
 
     private StoreDeletionService service;
 
@@ -62,7 +70,8 @@ class StoreDeletionServiceTest {
         service = new StoreDeletionService(storesRepository, ordersRepository, orderItemsRepository,
                 orderEventsRepository, productCatalogRepository, productRepository, rmaCentersRepository,
                 rmaItemsRepository, wipeRepository, fileStorage, storeInventoryCache, cognitoUserService,
-                supplierProviderFactory);
+                supplierProviderFactory,
+                ordersImportScheduler, returnsImportScheduler, feedScheduler, pricelistEventScheduler);
         service.storesBucket = "stores";
     }
 
@@ -71,6 +80,31 @@ class StoreDeletionServiceTest {
         store.setStoreId(STORE_ID);
         store.setDemo(new DemoStoreMetadata("user@example.com", "2026-07-01T00:00:00Z", "2026-07-15T00:00:00Z"));
         return store;
+    }
+
+    @Test
+    void deletingAStoreRemovesEveryScheduleItOwns() {
+        // given
+        Store store = demoStore();
+        store.getMarketplaces().add(new MarketplaceIntegration("Allegro"));
+        FulfilmentConfiguration fulfilment = new FulfilmentConfiguration();
+        fulfilment.setSupplierConnections(List.of(new StoreSupplierConnection("Wortmann", ConnectionMode.OWN)));
+        store.setFulfilmentConfiguration(fulfilment);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        ProductCatalog catalog = new ProductCatalog(STORE_ID, "Demo");
+        stubEmptyCascade();
+        when(productCatalogRepository.findAll(STORE_ID)).thenReturn(List.of(catalog));
+        when(productRepository.findAll(catalog)).thenReturn(List.of());
+
+        // when
+        boolean deleted = service.deleteDemoStore(STORE_ID);
+
+        // then
+        assertTrue(deleted);
+        verify(ordersImportScheduler).delete(STORE_ID, "Allegro");
+        verify(returnsImportScheduler).delete(STORE_ID, "Allegro");
+        verify(feedScheduler).deleteSchedule(STORE_ID, "Wortmann");
+        verify(pricelistEventScheduler).deleteSchedule(STORE_ID, catalog.getCatalogId());
     }
 
     private Store regularStore() {

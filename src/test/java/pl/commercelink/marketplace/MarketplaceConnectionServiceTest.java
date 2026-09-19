@@ -382,6 +382,20 @@ class MarketplaceConnectionServiceTest {
     }
 
     @Test
+    void disconnectingAMarketplaceWhoseAdapterIsGoneDeletesTheReturnsScheduleToo() {
+        // given
+        store.getMarketplaces().add(new MarketplaceIntegration("Empik"));
+        when(providerFactory.getDescriptor("Empik")).thenReturn(null);
+
+        // when
+        service.disconnect(store, "Empik");
+
+        // then
+        verify(returnsImportScheduler).delete("store-1", "Empik");
+        verify(ordersImportScheduler).delete("store-1", "Empik");
+    }
+
+    @Test
     void disconnectingAMarketplaceWithoutAReturnsApiLeavesTheReturnsSchedulerAlone() {
         // given
         store.getMarketplaces().add(new MarketplaceIntegration("Allegro"));

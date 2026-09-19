@@ -20,15 +20,14 @@ public class StoreSupplierFeedService {
     public void loadStoreFeed(String storeId, String supplierName) throws ResourceDownloadException {
         Store store = storesRepository.findById(storeId);
         if (store == null) {
-            return;
+            throw new SupplierFeedTargetMissingException(storeId, supplierName, "the store does not exist");
         }
         requireReadableConfiguration(store, supplierName);
         SupplierProvider supplier = supplierProviderFactory.get(store, supplierName);
         if (supplier == null) {
-            return;
+            throw new SupplierFeedTargetMissingException(storeId, supplierName, "no provider is registered for this supplier");
         }
-        supplier.download().ifPresent(feedData ->
-                storeFeedRepository.store(storeId, supplierName, feedData.data(), feedData.extension()));
+        supplier.download().ifPresent(feed -> storeFeedRepository.store(storeId, supplierName, feed.data(), feed.extension()));
     }
 
     private void requireReadableConfiguration(Store store, String supplierName) {
