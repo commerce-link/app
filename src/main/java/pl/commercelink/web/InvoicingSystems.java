@@ -82,9 +82,21 @@ class InvoicingSystems {
         return descriptor == null ? null : descriptor.configurationFields();
     }
 
+    /**
+     * A system the store does not use yet starts from a clean secret (saving merges into an existing one, which would
+     * bring back keys of an earlier connection), and the previous system's secret goes once the new one is saved.
+     */
     void save(Store store, String providerName, Map<String, String> configuration) {
+        String previous = current(store);
+        boolean switching = !providerName.equals(previous);
+        if (switching) {
+            invoicingProviderFactory.deleteConfiguration(store, providerName);
+        }
         invoicingProviderFactory.saveConfiguration(store, providerName, configuration);
         store.setConfigurationValue(IntegrationType.INVOICING_PROVIDER, providerName);
+        if (switching && previous != null) {
+            invoicingProviderFactory.deleteConfiguration(store, previous);
+        }
     }
 
     void disconnect(Store store, String providerName) {

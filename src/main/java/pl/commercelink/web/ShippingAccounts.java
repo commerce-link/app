@@ -123,9 +123,18 @@ class ShippingAccounts {
         return descriptor == null ? null : descriptor.configurationFields();
     }
 
+    /** As InvoicingSystems.save: a new courier starts from a clean secret, the previous one's secret goes after. */
     void save(Store store, String providerName, Map<String, String> configuration) {
+        String previous = current(store);
+        boolean switching = !providerName.equals(previous);
+        if (switching) {
+            shippingProviderFactory.deleteConfiguration(store, providerName);
+        }
         shippingProviderFactory.saveConfiguration(store, providerName, configuration);
         store.setConfigurationValue(IntegrationType.SHIPPING_PROVIDER, providerName);
+        if (switching && previous != null) {
+            shippingProviderFactory.deleteConfiguration(store, previous);
+        }
     }
 
     void disconnect(Store store, String providerName) {

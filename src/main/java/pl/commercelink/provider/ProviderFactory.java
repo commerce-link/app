@@ -191,6 +191,9 @@ public class ProviderFactory<D extends ProviderDescriptor<T>, T> {
     public void deleteConfiguration(Store store, String providerName) {
         D descriptor = getDescriptor(providerName);
         if (descriptor == null) {
+            // The adapter is gone, so its credential name and auth kind are unknown: the secret goes under the name it
+            // is loaded by (loadConfiguration), OAuth2 tokens of an uninstalled adapter cannot be told apart.
+            configurationManager.deleteConfiguration(store, providerName);
             return;
         }
         String configName = credentialNameFor(providerName, descriptor);

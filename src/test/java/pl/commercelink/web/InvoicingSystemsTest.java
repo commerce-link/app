@@ -82,4 +82,31 @@ class InvoicingSystemsTest {
         assertThat(systems.storedSecretKeys(store, SYSTEM)).containsExactly("apiToken");
         assertThat(systems.storedSecretKeys(store, "another")).isEmpty();
     }
+
+    /** Switching system A to B left A's secret behind, and its keys came back if A was chosen again. */
+    @Test
+    void switchingToAnotherSystemDeletesThePreviousOnesSecretAndStartsTheNewOneClean() {
+        // given
+        store.setStoreId("store-1");
+        when(invoicingProviderFactory.getDescriptor("saldeo")).thenReturn(descriptor);
+
+        // when
+        systems.save(store, "saldeo", java.util.Map.of("domain", "x"));
+
+        // then
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(invoicingProviderFactory);
+        order.verify(invoicingProviderFactory).deleteConfiguration(store, "saldeo");
+        order.verify(invoicingProviderFactory).saveConfiguration(store, "saldeo", java.util.Map.of("domain", "x"));
+        order.verify(invoicingProviderFactory).deleteConfiguration(store, SYSTEM);
+        assertThat(store.getConfigurationValue(IntegrationType.INVOICING_PROVIDER)).isEqualTo("saldeo");
+    }
+
+    @Test
+    void savingTheSameSystemAgainKeepsItsSecret() {
+        // when
+        systems.save(store, SYSTEM, java.util.Map.of("domain", "x"));
+
+        // then
+        org.mockito.Mockito.verify(invoicingProviderFactory, org.mockito.Mockito.never()).deleteConfiguration(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyString());
+    }
 }

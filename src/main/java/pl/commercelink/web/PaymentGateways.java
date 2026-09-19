@@ -138,6 +138,10 @@ class PaymentGateways {
     }
 
     void save(Store store, String name, Map<String, String> configuration, boolean makeDefault) {
+        if (store.getPaymentIntegration(name) == null) {
+            // Saving merges into an existing secret: one left by an earlier connection must not bring its keys back.
+            paymentProviderFactory.deleteConfiguration(store, name);
+        }
         paymentProviderFactory.saveConfiguration(store, name, configuration);
         store.addPaymentIntegration(name);
         if (makeDefault) {

@@ -97,7 +97,10 @@ class StorePaymentGatewayControllerTest {
                 new MockHttpServletResponse());
 
         // then
-        verify(paymentProviderFactory).saveConfiguration(store, "stripe", Map.of("apiKey", "sk_live"));
+        // A secret left by an earlier connection (4s9msnc2u8-paynow on production) must not merge into the new one.
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(paymentProviderFactory);
+        order.verify(paymentProviderFactory).deleteConfiguration(store, "stripe");
+        order.verify(paymentProviderFactory).saveConfiguration(store, "stripe", Map.of("apiKey", "sk_live"));
         verify(storesRepository).save(store);
         assertThat(store.getPayments()).extracting(PaymentIntegration::getName).containsExactly("stripe");
         assertThat(store.getPayments().get(0).is_default()).isTrue();
@@ -156,6 +159,7 @@ class StorePaymentGatewayControllerTest {
 
         // then
         verify(paymentProviderFactory).saveConfiguration(store, "stripe", Map.of("shopId", "42"));
+        verify(paymentProviderFactory, never()).deleteConfiguration(any(), anyString());
         assertThat(store.getPaymentIntegration("stripe").is_default()).isTrue();
         assertThat(store.getPaymentIntegration("bank").is_default()).isFalse();
         assertThat(view).isEqualTo("redirect:/dashboard/store/payments");
