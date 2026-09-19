@@ -171,7 +171,7 @@
                         <fieldset class="cl-fieldset">
                             <legend class="cl-fieldset-title" th:text="#{store.payments.checkout.settlement.title}"></legend>
                             <div class="cl-form-grid">
-                                <div class="cl-span-3" th:insert="~{fragments/settings-form :: selectField('currency', 'store.payments.checkout.currency', *{currency}, ${currencies}, true, ${checkoutErrors['currency']}, #{store.payments.checkout.currency.help})}"></div>
+                                <div class="cl-span-3" th:insert="~{fragments/settings-form :: selectField('currency', 'store.payments.checkout.currency', *{currency}, ${currencies}, 'off', true, ${checkoutErrors['currency']}, #{store.payments.checkout.currency.help})}"></div>
                                 <div class="cl-span-3" th:insert="~{fragments/settings-form :: textField('acceptedPricelists', 'store.payments.checkout.pricelists', *{acceptedPricelists}, 'number', 'off', true, ${checkoutErrors['acceptedPricelists']}, #{store.payments.checkout.pricelists.help})}"></div>
                             </div>
                         </fieldset>

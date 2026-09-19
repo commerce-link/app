@@ -51,7 +51,7 @@ class StoreRmaTemplateTest {
 
         // then
         assertThat(html).contains("action=\"/dashboard/store/rma\"");
-        assertThat(html).contains("<select class=\"cl-select\" id=\"carrierId\" name=\"carrierId\" autocomplete=\"off\" required=\"required\">");
+        assertThat(html).containsPattern("<select class=\"cl-select\" id=\"carrierId\" name=\"carrierId\"\\s+autocomplete=\"off\" required=\"required\">");
         assertThat(html).contains("<option value=\"inpost-1\" selected=\"selected\">InPost Kurier</option>");
         assertThat(html).contains("<option value=\"dpd-1\">DPD</option>");
         assertThat(html).doesNotContain("type=\"radio\"").doesNotContain("name=\"store.storeId\"");

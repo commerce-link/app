@@ -20,7 +20,7 @@
                             <div class="cl-span-4" th:insert="~{fragments/settings-form :: textField('name', 'store.payments.delivery.name', *{name}, 'text', 'off', true, ${errors['name']}, #{store.payments.delivery.name.help})}"></div>
                             <div class="cl-span-2" th:insert="~{fragments/settings-form :: textField('price', 'store.payments.delivery.priceLabel', *{price}, 'text', 'off', true, ${errors['price']}, null)}"></div>
                             <div th:insert="~{fragments/settings-form :: textField('description', 'store.payments.delivery.descriptionLabel', *{description}, 'text', 'off', false, ${errors['description']}, #{store.payments.delivery.descriptionLabel.help})}"></div>
-                            <div class="cl-span-3" th:insert="~{fragments/settings-form :: selectField('type', 'store.payments.delivery.type', *{type}, ${types}, true, ${errors['type']}, #{store.payments.delivery.type.help})}"></div>
+                            <div class="cl-span-3" th:insert="~{fragments/settings-form :: selectField('type', 'store.payments.delivery.type', *{type}, ${types}, 'off', true, ${errors['type']}, #{store.payments.delivery.type.help})}"></div>
                         </div>
                         <p th:if="${editing}" class="cl-help" th:text="#{store.payments.delivery.editing.help}"></p>
                     </fieldset>
