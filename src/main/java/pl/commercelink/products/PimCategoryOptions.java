@@ -45,7 +45,7 @@ public class PimCategoryOptions {
 
     private final PimCatalog pimCatalog;
 
-    public List<String> topLevelNames() {
+    List<String> topLevelNames() {
         return categories().topLevels().stream()
                 .map(PimCategory::name)
                 .sorted(POLISH_COLLATOR)

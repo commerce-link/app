@@ -106,15 +106,6 @@ class ScheduleFieldFragmentTest {
     }
 
     @Test
-    void theStylesLiveInTheSharedStylesheetAndTheFragmentStaysForThePagesIncludingIt() {
-        // when
-        String html = render("style");
-
-        // then
-        assertThat(html).contains("<style></style>");
-    }
-
-    @Test
     void theScriptFragmentInlinesTheSameSummaryTextsTheTableCellUses() {
         // when
         String html = render("script");

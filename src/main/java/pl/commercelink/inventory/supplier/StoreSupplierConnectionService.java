@@ -41,32 +41,6 @@ public class StoreSupplierConnectionService {
         return fields;
     }
 
-    public Map<String, Map<String, String>> configurationsForUI(Store store) {
-        Map<String, Map<String, String>> configs = new LinkedHashMap<>();
-        for (StoreSupplierConnection connection : ownConnections(store)) {
-            String identity = connection.getSupplierName();
-            SupplierProviderDescriptor descriptor = supplierProviderFactory.getDescriptor(identity);
-            if (descriptor != null) {
-                configs.put(identity, configurationManager.getConfigurationForUI(store, identity, descriptor));
-            }
-        }
-        return configs;
-    }
-
-    // The template needs to tell "no stored configuration" apart from "stored configuration whose
-    // password is masked to blank" -- getConfigurationForUI() makes both look identical, so this
-    // publishes the same notion connectOrUpdate()/storedConfigFor() already use to decide
-    // preservedPassword, without exposing the configuration values themselves.
-    public Set<String> suppliersWithStoredConfiguration(Store store) {
-        Set<String> stored = new LinkedHashSet<>();
-        for (StoreSupplierConnection connection : ownConnections(store)) {
-            if (hasStoredConfiguration(store, connection.getSupplierName())) {
-                stored.add(connection.getSupplierName());
-            }
-        }
-        return stored;
-    }
-
     /**
      * Connections that cannot work as saved: an own connection missing a required access detail, or a global one in a
      * store that may no longer use the global configuration. The suppliers page marks them and offers to complete them.

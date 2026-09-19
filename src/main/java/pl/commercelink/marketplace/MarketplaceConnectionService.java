@@ -93,31 +93,6 @@ public class MarketplaceConnectionService {
                 .toList();
     }
 
-    public List<MarketplaceProviderDescriptor> availableMarketplaces(Store store) {
-        return providerFactory.availableProviders().stream()
-                .filter(descriptor -> store.getMarketplaceIntegration(descriptor.name()) == null)
-                .toList();
-    }
-
-    public Map<String, Map<String, String>> configurationsForUI(Store store) {
-        Map<String, Map<String, String>> configurations = new LinkedHashMap<>();
-        for (MarketplaceProviderDescriptor descriptor : providerFactory.availableProviders()) {
-            configurations.put(descriptor.name(), configurationManager.getConfigurationForUI(
-                    store, providerFactory.resolveCredentialName(descriptor), descriptor));
-        }
-        return configurations;
-    }
-
-    public Set<String> marketplacesWithStoredConfiguration(Store store) {
-        Set<String> stored = new LinkedHashSet<>();
-        for (MarketplaceProviderDescriptor descriptor : providerFactory.availableProviders()) {
-            if (hasStoredConfiguration(store, descriptor.name())) {
-                stored.add(descriptor.name());
-            }
-        }
-        return stored;
-    }
-
     public ConnectionUpdateResult connectOrUpdate(Store store, String marketplace,
                                                   Map<String, String> configuration, String schedule,
                                                   String returnsSchedule) {

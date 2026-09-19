@@ -515,30 +515,12 @@ class MarketplaceConnectionServiceTest {
     }
 
     @Test
-    void availableMarketplacesLeaveOutTheConnectedOnes() {
-        // given
-        store.getMarketplaces().add(new MarketplaceIntegration("Allegro"));
-
-        // when / then
-        assertThat(service.availableMarketplaces(store)).containsExactly(EMPIK);
-    }
-
-    @Test
     void theDefaultIntervalComesFromTheScheduler() {
         // given
         when(ordersImportScheduler.defaultIntervalMinutes()).thenReturn(10);
 
         // when / then
         assertThat(service.defaultIntervalMinutes()).isEqualTo(10);
-    }
-
-    @Test
-    void marketplacesWithStoredConfigurationComeFromTheSecretsNotTheIntegrationList() {
-        // given
-        when(providerFactory.loadConfiguration(store, "Allegro")).thenReturn(Map.of("clientId", "id"));
-
-        // when / then
-        assertThat(service.marketplacesWithStoredConfiguration(store)).containsExactly("Allegro");
     }
 
     private static MarketplaceProviderDescriptor descriptor(String name, String displayName, boolean supportsReturns,

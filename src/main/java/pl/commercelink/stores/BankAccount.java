@@ -30,11 +30,6 @@ public class BankAccount {
         this.id = UUID.randomUUID().toString();
     }
 
-    @DynamoDBIgnore
-    public boolean isComplete() {
-        return isNotBlank(id) && isNotBlank(bankName) && isNotBlank(iban) && isNotBlank(accountHolder) && isNotBlank(swiftCode) && isNotBlank(currency);
-    }
-
     public String getId() {
         return id;
     }

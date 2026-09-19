@@ -43,7 +43,7 @@
                             <ol class="cl-steps">
                                 <li>
                                     <span th:text="#{store.marketplace.authorize.steps.open(${displayName})}"></span>
-                                    <a class="cl-button cl-steps-action" th:href="${pending.openUri()}" target="_blank" rel="noopener noreferrer">
+                                    <a class="cl-button" th:href="${pending.openUri()}" target="_blank" rel="noopener noreferrer">
                                         <span th:text="#{store.marketplace.authorize.open(${displayName})}"></span>
                                         <i class="fas fa-external-link-alt" aria-hidden="true"></i>
                                     </a>
@@ -55,7 +55,7 @@
                                 </li>
                                 <li th:text="#{store.marketplace.authorize.steps.back}"></li>
                             </ol>
-                            <p class="cl-help cl-device-status" role="status" data-cl-device-status
+                            <p class="cl-help" role="status" data-cl-device-status
                                th:text="#{store.marketplace.authorize.waiting(${displayName}, ${expiresAtText})}"></p>
                         </fieldset>
                         <div class="cl-card-footer">

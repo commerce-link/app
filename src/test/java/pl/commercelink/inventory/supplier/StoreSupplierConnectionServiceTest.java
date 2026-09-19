@@ -640,22 +640,6 @@ class StoreSupplierConnectionServiceTest {
     }
 
     @Test
-    void storedConfigurationSetIsKeyedByConnectionIdentity() {
-        // given: an OWN connection whose type also has a GLOBAL connection, plus a second OWN
-        // instance of the same type -- the stored-configuration set must be keyed by connection
-        // identity, not by supplier type, so each instance's secret is looked up separately
-        Store store = storeWith(true,
-                new StoreSupplierConnection("Stub", ConnectionMode.OWN, true, true),
-                new StoreSupplierConnection("Stub-k7f3a9c2", ConnectionMode.OWN, true, true),
-                new StoreSupplierConnection("Stub", ConnectionMode.GLOBAL, true, true));
-        when(configurationManager.loadConfiguration(store, "Stub")).thenReturn(Map.of("url", "a"));
-        when(configurationManager.loadConfiguration(store, "Stub-k7f3a9c2")).thenReturn(Map.of());
-
-        // when / then
-        assertThat(service.suppliersWithStoredConfiguration(store)).containsExactly("Stub");
-    }
-
-    @Test
     void disconnectRemovesOnlyTheNamedSupplier() {
         // given
         Store store = storeWith(true,

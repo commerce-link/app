@@ -1,37 +1,15 @@
 package pl.commercelink.stores;
 
-import java.util.HashMap;
-import java.util.Map;
-
+/** The store a settings hub page is about; the page reads only its name and id. */
 public class StoreForm {
 
     private Store store;
-    private String defaultBankAccountId;
-    private String shippingProvider;
-    private String invoicingSoftwareProvider;
-    private String wmsProvider;
-    private Map<String, String> providerConfiguration;
-    private String defaultPickupAddressId;
-    private String defaultSenderAddressId;
-
-    // payments
-    private String paymentProviderName;
-
-    // marketplaces
-    private String marketplace;
 
     public StoreForm() {
-        this.providerConfiguration = new HashMap<>();
     }
 
     public StoreForm(Store store) {
         this.store = store;
-        this.shippingProvider = store.getConfigurationValue(IntegrationType.SHIPPING_PROVIDER);
-        this.invoicingSoftwareProvider =  store.getConfigurationValue(IntegrationType.INVOICING_PROVIDER);
-        this.wmsProvider = store.getConfigurationValue(IntegrationType.WMS_PROVIDER);
-        this.paymentProviderName = store.getDefaultPaymentIntegration()
-                .map(PaymentIntegration::getName)
-                .orElse(null);
     }
 
     public Store getStore() {
@@ -41,79 +19,4 @@ public class StoreForm {
     public void setStore(Store store) {
         this.store = store;
     }
-
-    public String getShippingProvider() {
-        return shippingProvider;
-    }
-
-    public void setShippingProvider(String shippingProvider) {
-        this.shippingProvider = shippingProvider;
-    }
-
-    public String getInvoicingSoftwareProvider() {
-        return invoicingSoftwareProvider;
-    }
-
-    public void setInvoicingSoftwareProvider(String invoicingSoftwareProvider) {
-        this.invoicingSoftwareProvider = invoicingSoftwareProvider;
-    }
-
-    public String getDefaultBankAccountId() {
-        return defaultBankAccountId;
-    }
-
-    public void setDefaultBankAccountId(String defaultBankAccountId) {
-        this.defaultBankAccountId = defaultBankAccountId;
-    }
-
-    public Map<String, String> getProviderConfiguration() {
-        return providerConfiguration;
-    }
-
-    public void setProviderConfiguration(Map<String, String> providerConfiguration) {
-        this.providerConfiguration = providerConfiguration;
-    }
-
-    public String getPaymentProviderName() {
-        return paymentProviderName;
-    }
-
-    public void setPaymentProviderName(String paymentProviderName) {
-        this.paymentProviderName = paymentProviderName;
-    }
-
-
-
-    public String getDefaultPickupAddressId() {
-        return defaultPickupAddressId;
-    }
-
-    public void setDefaultPickupAddressId(String defaultPickupAddressId) {
-        this.defaultPickupAddressId = defaultPickupAddressId;
-    }
-
-    public String getDefaultSenderAddressId() {
-        return defaultSenderAddressId;
-    }
-
-    public void setDefaultSenderAddressId(String defaultSenderAddressId) {
-        this.defaultSenderAddressId = defaultSenderAddressId;
-    }
-
-    public String getMarketplace() {
-        return marketplace;
-    }
-
-    public void setMarketplace(String marketplace) {
-        this.marketplace = marketplace;
-    }
-
-    public String getWmsProvider() {
-        return wmsProvider;
-    }
-
-    public void setWmsProvider(String wmsProvider) {
-        this.wmsProvider = wmsProvider;
-    }
-
 }

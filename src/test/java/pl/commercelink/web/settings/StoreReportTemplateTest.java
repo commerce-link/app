@@ -65,7 +65,7 @@ class StoreReportTemplateTest {
         assertThat(html).contains("data-value=\"" + URL + "\"").contains("data-masked=\"" + MASKED + "\"");
         assertThat(html).containsPattern("class=\"cl-copy-value\" data-cl-copy-value hidden[\\s\\S]*?<div class=\"cl-copy-actions\">"
                 + "[\\s\\S]*?data-cl-copy-button[\\s\\S]*?data-cl-reveal-button[\\s\\S]*?<a class=\"cl-button cl-copy-actions-end\"[^>]*href=\"/dashboard/store/report/google-ads/new-address\"");
-        assertThat(html).containsPattern("class=\"cl-copy-status cl-visually-hidden\"[^>]*role=\"status\"");
+        assertThat(html).containsPattern("class=\"cl-visually-hidden\"[^>]*role=\"status\"");
         assertThat(html).contains("<summary>Pokaż adres</summary>").contains("Działa jak hasło");
         assertThat(html).contains("id=\"google-ads-new-address\"").contains("data-cl-confirm data-cl-confirm-async");
         assertThat(html).contains("data-cl-confirm-action=\"Wygeneruj nowy adres\"").contains("<dialog class=\"cl-dialog\" id=\"cl-confirm-dialog\"");
