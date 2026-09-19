@@ -100,4 +100,37 @@ class EmailClientTest {
         assertThat(sent).isFalse();
         org.mockito.Mockito.verifyNoInteractions(sesClient);
     }
+
+    @Test
+    void aTemplateWithoutABodyIsNotSentInsteadOfFailing() {
+        // given
+        EmailTemplate withoutBody = new EmailTemplate();
+        withoutBody.setSubject("Wysłane");
+        when(templateProvider.getTemplate("store-1", "OrderShippingTemplate")).thenReturn(withoutBody);
+        when(configProvider.settings("store-1")).thenReturn(new NotificationSettings(configuration, "Sklep Demo", null));
+
+        // when
+        boolean sent = emailClient.send("store-1", EmailNotificationType.ORDER_SHIPPING, new EmailNotification("klient@example.com", "Jan"));
+
+        // then
+        assertThat(sent).isFalse();
+        org.mockito.Mockito.verifyNoInteractions(sesClient);
+    }
+
+    @Test
+    void aTemplateWithABlankSubjectIsNotSent() {
+        // given
+        EmailTemplate withoutSubject = new EmailTemplate();
+        withoutSubject.setSubject("  ");
+        withoutSubject.setTextBody("Paczka w drodze");
+        when(templateProvider.getTemplate("store-1", "OrderShippingTemplate")).thenReturn(withoutSubject);
+        when(configProvider.settings("store-1")).thenReturn(new NotificationSettings(configuration, "Sklep Demo", null));
+
+        // when
+        boolean sent = emailClient.send("store-1", EmailNotificationType.ORDER_SHIPPING, new EmailNotification("klient@example.com", "Jan"));
+
+        // then
+        assertThat(sent).isFalse();
+        org.mockito.Mockito.verifyNoInteractions(sesClient);
+    }
 }

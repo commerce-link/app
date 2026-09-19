@@ -178,7 +178,9 @@ public class EmailTemplateController {
 
         // Content equal to the default one is not copied into the store, so it keeps getting the default's updates.
         boolean keepsDefault = own == null && (form.sameContentAs(fallback) || !form.hasContent());
-        if (!keepsDefault) {
+        // Switching off with an emptied form must not blank the store's copy: another flow can switch the email back on.
+        boolean keepsOwn = own != null && !form.isEnabled() && !form.hasContent();
+        if (!keepsDefault && !keepsOwn) {
             EmailTemplate template = own != null ? own : newTemplate(storeId, name, type);
             form.applyTo(template);
             emailTemplatesRepository.save(template);

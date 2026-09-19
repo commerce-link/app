@@ -1,5 +1,7 @@
 package pl.commercelink.starter.email;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import pl.commercelink.orders.notifications.EmailNotificationType;
@@ -13,12 +15,16 @@ import java.io.StringWriter;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import static org.apache.commons.lang3.StringUtils.isBlank;
+
 import com.github.mustachejava.DefaultMustacheFactory;
 import com.github.mustachejava.Mustache;
 import com.github.mustachejava.MustacheFactory;
 
 @Service
 public class EmailClient {
+
+    private static final Logger logger = LoggerFactory.getLogger(EmailClient.class);
 
     private final SesV2Client sesClient;
     private final NotificationConfigProvider configProvider;
@@ -48,6 +54,10 @@ public class EmailClient {
     private boolean sendInternal(String storeId, String templateName, EmailNotification msg, String senderEmail, String senderName, String replyToEmail) {
         EmailTemplate template = templateProvider.getTemplate(storeId, templateName);
         if (template == null) return false;
+        if (isBlank(template.getSubject()) || isBlank(template.getTextBody())) {
+            logger.warn("Email template {} of store {} has no subject or body, email not sent", templateName, storeId);
+            return false;
+        }
 
         String subject = renderTemplate(template.getSubject(), msg);
         String body = renderTemplate(template.getTextBody(), msg);

@@ -172,6 +172,25 @@ class EmailTemplateControllerTest {
     }
 
     @Test
+    void switchingOffWithAnEmptyFormLeavesTheStoresCopyAsItWas() {
+        // given
+        logInAs("ADMIN", "store-1");
+        Store store = store("store-1");
+        store.getClientNotificationsConfiguration().enableNotification(EmailNotificationType.ORDER_SHIPPING, NAME);
+        EmailTemplate own = template("store-1", "Wysłane", "Treść");
+        when(emailTemplatesRepository.findByTemplateName("store-1", NAME)).thenReturn(own);
+
+        // when
+        save(form(false, "", ""), null, new ExtendedModelMap(), new MockHttpServletResponse());
+
+        // then
+        verify(emailTemplatesRepository, never()).save(any(EmailTemplate.class));
+        assertThat(own.getSubject()).isEqualTo("Wysłane");
+        assertThat(own.getTextBody()).isEqualTo("Treść");
+        assertThat(store.supportsNotification(EmailNotificationType.ORDER_SHIPPING)).isFalse();
+    }
+
+    @Test
     void anEnabledEmailWithoutAnyTemplateOpensInsteadOfFailing() {
         // given
         logInAs("ADMIN", "store-1");

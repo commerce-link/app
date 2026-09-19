@@ -91,4 +91,47 @@ class EmailTemplateFormTest {
         assertThat(changed.sameContentAs(defaults)).isFalse();
         assertThat(same.sameContentAs(null)).isFalse();
     }
+
+    @Test
+    void aBodySentWithWindowsLineEndingsEqualsTheSameDefaultWithUnixOnes() {
+        // given
+        EmailTemplate defaults = new EmailTemplate();
+        defaults.setSubject("Temat");
+        defaults.setTextBody("Dzień dobry,\nzamówienie {{orderId}}\nPozdrawiamy");
+        EmailTemplateForm form = EmailTemplateForm.empty(true);
+        form.setSubject("Temat");
+        form.setTextBody("Dzień dobry,\r\nzamówienie {{orderId}}\r\nPozdrawiamy");
+
+        // when / then
+        assertThat(form.sameContentAs(defaults)).isTrue();
+    }
+
+    @Test
+    void savedContentUsesUnixLineEndings() {
+        // given
+        EmailTemplateForm form = EmailTemplateForm.empty(true);
+        form.setSubject("Temat");
+        form.setTextBody("a\r\nb\rc");
+        EmailTemplate template = new EmailTemplate();
+
+        // when
+        form.applyTo(template);
+
+        // then
+        assertThat(template.getTextBody()).isEqualTo("a\nb\nc");
+    }
+
+    @Test
+    void aStoredBodyWithWindowsLineEndingsIsComparedByContent() {
+        // given
+        EmailTemplate stored = new EmailTemplate();
+        stored.setSubject("Temat");
+        stored.setTextBody("a\r\nb");
+        EmailTemplateForm form = EmailTemplateForm.empty(true);
+        form.setSubject("Temat");
+        form.setTextBody("a\nb");
+
+        // when / then
+        assertThat(form.sameContentAs(stored)).isTrue();
+    }
 }

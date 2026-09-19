@@ -117,7 +117,7 @@ public class EmailTemplateForm {
         EmailTemplate candidate = new EmailTemplate();
         applyTo(candidate);
         return Objects.equals(candidate.getSubject(), StringUtils.trimToNull(template.getSubject()))
-                && Objects.equals(candidate.getTextBody(), template.getTextBody())
+                && Objects.equals(candidate.getTextBody(), unixLineEndings(template.getTextBody()))
                 && candidate.getBccAddresses().equals(template.getBccAddresses() == null ? List.of() : template.getBccAddresses())
                 && attachmentsOf(candidate).equals(attachmentsOf(template));
     }
@@ -125,7 +125,7 @@ public class EmailTemplateForm {
     /** Writes the content into the template; its store, name and type stay as they were. */
     public void applyTo(EmailTemplate template) {
         template.setSubject(StringUtils.trimToNull(subject));
-        template.setTextBody(StringUtils.isBlank(textBody) ? null : textBody);
+        template.setTextBody(StringUtils.isBlank(textBody) ? null : unixLineEndings(textBody));
         template.setBccAddresses(new ArrayList<>(bccList()));
         List<EmailAttachment> saved = new ArrayList<>();
         for (AttachmentRow row : attachments) {
@@ -134,6 +134,11 @@ public class EmailTemplateForm {
             }
         }
         template.setAttachments(saved);
+    }
+
+    /** A browser posts a textarea with CRLF; stored templates use LF, so equal content must not look changed. */
+    private static String unixLineEndings(String text) {
+        return text == null ? null : text.replace("\r\n", "\n").replace('\r', '\n');
     }
 
     private List<String> bccList() {
