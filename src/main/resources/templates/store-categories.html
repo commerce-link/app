@@ -9,14 +9,14 @@
             <div th:replace="~{fragments/settings-header :: header(false, null)}"></div>
             <div th:replace="~{fragments/settings-form :: savedAlert}"></div>
 
-            <div th:if="${choices.isEmpty()}" class="cl-card">
+            <div th:unless="${catalogueAvailable}" class="cl-card">
                 <div class="cl-alert is-warn">
                     <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
                     <p class="cl-alert-text" th:text="#{store.enabled.categories.unavailable}"></p>
                 </div>
             </div>
 
-            <form th:unless="${choices.isEmpty()}" th:fragment="categoriesForm" id="store-categories-form"
+            <form th:if="${catalogueAvailable}" th:fragment="categoriesForm" id="store-categories-form"
                   class="cl-form is-wide" th:action="@{${formAction}}" method="post" novalidate data-cl-async
                   th:attr="data-success-message=${savedMessage}, data-error-message=#{form.save.failed}">
                 <div class="cl-card">

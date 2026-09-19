@@ -16,6 +16,7 @@ class StoreCategoriesTemplateTest {
         Map<String, Object> variables = new HashMap<>();
         variables.put("settingsPage", SettingsPage.forRequest(UserRole.ADMIN, "/dashboard/store/categories"));
         variables.put("navigation", null);
+        variables.put("catalogueAvailable", choices.stream().anyMatch(TopLevelChoice::inCatalogue));
         variables.put("choices", choices);
         variables.put("selectedCount", choices.stream().filter(TopLevelChoice::selected).count());
         variables.put("formAction", "/dashboard/store/categories");
@@ -92,6 +93,17 @@ class StoreCategoriesTemplateTest {
 
         // then
         assertThat(html).contains("Lista kategorii jest niedostępna");
+        assertThat(html).doesNotContain("id=\"store-categories-form\"");
+    }
+
+    @Test
+    void savedCategoriesAreNotShownAsMissingWhenTheCatalogueIsEmpty() {
+        // when
+        String html = rendered(List.of(new TopLevelChoice("Dom", true, false)));
+
+        // then
+        assertThat(html).contains("Lista kategorii jest niedostępna");
+        assertThat(html).doesNotContain("Poza katalogiem PIM");
         assertThat(html).doesNotContain("id=\"store-categories-form\"");
     }
 }

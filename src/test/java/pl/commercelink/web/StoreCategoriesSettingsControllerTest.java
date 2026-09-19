@@ -7,11 +7,16 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.MessageSource;
+import org.springframework.http.HttpStatus;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.ui.ExtendedModelMap;
 import org.springframework.ui.Model;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimCategory;
@@ -28,10 +33,13 @@ import java.util.Locale;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @ExtendWith(MockitoExtension.class)
 class StoreCategoriesSettingsControllerTest {
@@ -70,8 +78,8 @@ class StoreCategoriesSettingsControllerTest {
         successMessage();
 
         // when
-        String view = controller.saveCategories(List.of("Dom"), null, new ExtendedModelMap(), PL,
-                new RedirectAttributesModelMap());
+        String view = controller.saveCategories(submitted("Dom"), null, new ExtendedModelMap(), PL,
+                new RedirectAttributesModelMap(), new MockHttpServletResponse());
 
         // then
         verify(storesRepository).save(store);
@@ -89,8 +97,8 @@ class StoreCategoriesSettingsControllerTest {
         successMessage();
 
         // when
-        String view = controller.superAdminSaveCategories("store-2", List.of("Dom"), null, new ExtendedModelMap(), PL,
-                new RedirectAttributesModelMap());
+        String view = controller.superAdminSaveCategories("store-2", submitted("Dom"), null, new ExtendedModelMap(), PL,
+                new RedirectAttributesModelMap(), new MockHttpServletResponse());
 
         // then
         verify(storesRepository).save(store);
@@ -107,7 +115,7 @@ class StoreCategoriesSettingsControllerTest {
         successMessage();
 
         // when
-        controller.saveCategories(null, null, new ExtendedModelMap(), PL, new RedirectAttributesModelMap());
+        controller.saveCategories(submitted(), null, new ExtendedModelMap(), PL, new RedirectAttributesModelMap(), new MockHttpServletResponse());
 
         // then
         verify(storesRepository).save(store);
@@ -124,7 +132,7 @@ class StoreCategoriesSettingsControllerTest {
         successMessage();
 
         // when
-        controller.saveCategories(List.of("Dom"), null, new ExtendedModelMap(), PL, new RedirectAttributesModelMap());
+        controller.saveCategories(submitted("Dom"), null, new ExtendedModelMap(), PL, new RedirectAttributesModelMap(), new MockHttpServletResponse());
 
         // then
         verify(storesRepository).save(store);
@@ -140,8 +148,8 @@ class StoreCategoriesSettingsControllerTest {
         successMessage();
 
         // when
-        controller.saveCategories(List.of("Dom", "Wymyślona"), null, new ExtendedModelMap(), PL,
-                new RedirectAttributesModelMap());
+        controller.saveCategories(submitted("Dom", "Wymyślona"), null, new ExtendedModelMap(), PL,
+                new RedirectAttributesModelMap(), new MockHttpServletResponse());
 
         // then
         assertThat(store.getEnabledCategories()).containsExactly("Dom");
@@ -156,8 +164,8 @@ class StoreCategoriesSettingsControllerTest {
         successMessage();
 
         // when
-        controller.saveCategories(List.of("Zniknięta"), null, new ExtendedModelMap(), PL,
-                new RedirectAttributesModelMap());
+        controller.saveCategories(submitted("Zniknięta"), null, new ExtendedModelMap(), PL,
+                new RedirectAttributesModelMap(), new MockHttpServletResponse());
 
         // then
         assertThat(store.getEnabledCategories()).containsExactly("Zniknięta");
@@ -194,7 +202,7 @@ class StoreCategoriesSettingsControllerTest {
         RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
 
         // when
-        String view = controller.saveCategories(List.of("Dom"), "fetch", model, PL, redirectAttributes);
+        String view = controller.saveCategories(submitted("Dom"), "fetch", model, PL, redirectAttributes, new MockHttpServletResponse());
 
         // then
         assertThat(view).isEqualTo("store-categories :: categoriesForm");
@@ -204,17 +212,78 @@ class StoreCategoriesSettingsControllerTest {
     }
 
     @Test
-    void doesNotSaveWhenTheStoreDoesNotExist() {
+    void anUnknownStoreIsNotFound() {
         // given
-        when(storesRepository.findById("store-1")).thenReturn(null);
+        authenticateAs(null, "SUPER_ADMIN");
+        when(storesRepository.findById("missing")).thenReturn(null);
+
+        // when / then
+        assertThatThrownBy(() -> controller.superAdminCategories("missing", new ExtendedModelMap()))
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                        e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
+        assertThatThrownBy(() -> controller.superAdminSaveCategories("missing", submitted("Dom"), null,
+                new ExtendedModelMap(), PL, new RedirectAttributesModelMap(), new MockHttpServletResponse()))
+                .isInstanceOf(ResponseStatusException.class);
+        verify(storesRepository, never()).save(any(Store.class));
+    }
+
+    @Test
+    void aSingleTickedCategoryWithACommaInItsNameIsSavedWhole() throws Exception {
+        // given
+        Store store = storeWith("store-1");
+        catalogueOffers("Dom", "Żywność, napoje i tytoń");
+        when(storesRepository.findById("store-1")).thenReturn(store);
+        successMessage();
 
         // when
-        String view = controller.saveCategories(List.of("Dom"), null, new ExtendedModelMap(), PL,
-                new RedirectAttributesModelMap());
+        MockMvcBuilders.standaloneSetup(controller).build()
+                .perform(post("/dashboard/store/categories").param("enabledCategories", "Żywność, napoje i tytoń"))
+                .andExpect(status().is3xxRedirection());
+
+        // then
+        assertThat(store.getEnabledCategories()).containsExactly("Żywność, napoje i tytoń");
+    }
+
+    @Test
+    void anEmptyCatalogueShowsTheListAsUnavailableInsteadOfEverySavedCategoryAsMissing() {
+        // given
+        Store store = storeWith("store-1", "Dom");
+        when(pimCatalog.allCategories()).thenReturn(List.of());
+        when(storesRepository.findById("store-1")).thenReturn(store);
+        Model model = new ExtendedModelMap();
+
+        // when
+        String view = controller.categories(model);
+
+        // then
+        assertThat(view).isEqualTo("store-categories");
+        assertThat(model.getAttribute("catalogueAvailable")).isEqualTo(false);
+    }
+
+    @Test
+    void anEmptyCatalogueRejectsTheSaveAndKeepsTheSavedCategories() {
+        // given
+        Store store = storeWith("store-1", "Dom");
+        when(pimCatalog.allCategories()).thenReturn(List.of());
+        when(storesRepository.findById("store-1")).thenReturn(store);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        // when
+        controller.saveCategories(submitted(), "fetch", new ExtendedModelMap(), PL, new RedirectAttributesModelMap(),
+                response);
 
         // then
         verify(storesRepository, never()).save(any(Store.class));
-        assertThat(view).isEqualTo("error");
+        assertThat(store.getEnabledCategories()).containsExactly("Dom");
+        assertThat(response.getStatus()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE.value());
+    }
+
+    private static MockHttpServletRequest submitted(String... names) {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        if (names.length > 0) {
+            request.addParameter("enabledCategories", names);
+        }
+        return request;
     }
 
     private void catalogueOffers(String... names) {

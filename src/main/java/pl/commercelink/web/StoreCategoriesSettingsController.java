@@ -1,7 +1,10 @@
 package pl.commercelink.web;
 
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.MessageSource;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -9,7 +12,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
-import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.products.PimCategoryOptions;
 import pl.commercelink.products.PimCategoryOptions.TopLevelChoice;
@@ -55,30 +58,47 @@ public class StoreCategoriesSettingsController {
 
     @PostMapping("/dashboard/store/categories")
     @PreAuthorize("hasRole('ADMIN')")
-    public String saveCategories(@RequestParam(required = false) List<String> enabledCategories,
+    public String saveCategories(HttpServletRequest request,
                                  @RequestHeader(value = SettingsPaths.ASYNC_HEADER, required = false) String requestedWith,
-                                 Model model, Locale locale, RedirectAttributes redirectAttributes) {
-        return save(CustomSecurityContext.getStoreId(), enabledCategories, SettingsPaths.isAsync(requestedWith), model,
-                locale, redirectAttributes);
+                                 Model model, Locale locale, RedirectAttributes redirectAttributes,
+                                 HttpServletResponse response) {
+        return save(CustomSecurityContext.getStoreId(), submitted(request), SettingsPaths.isAsync(requestedWith), model,
+                locale, redirectAttributes, response);
     }
 
     @PostMapping("/dashboard/store/{storeId}/categories")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public String superAdminSaveCategories(@PathVariable String storeId,
-                                           @RequestParam(required = false) List<String> enabledCategories,
+    public String superAdminSaveCategories(@PathVariable String storeId, HttpServletRequest request,
                                            @RequestHeader(value = SettingsPaths.ASYNC_HEADER, required = false) String requestedWith,
-                                           Model model, Locale locale, RedirectAttributes redirectAttributes) {
-        return save(storeId, enabledCategories, SettingsPaths.isAsync(requestedWith), model, locale, redirectAttributes);
+                                           Model model, Locale locale, RedirectAttributes redirectAttributes,
+                                           HttpServletResponse response) {
+        return save(storeId, submitted(request), SettingsPaths.isAsync(requestedWith), model, locale, redirectAttributes,
+                response);
+    }
+
+    /**
+     * The ticked names as sent. Not {@code @RequestParam List<String>}: Spring splits a single value on commas, and
+     * three PIM top levels have a comma in their name ("Żywność, napoje i tytoń").
+     */
+    private static List<String> submitted(HttpServletRequest request) {
+        String[] values = request.getParameterValues("enabledCategories");
+        return values == null ? List.of() : List.of(values);
     }
 
     private String save(String storeId, List<String> submitted, boolean async, Model model, Locale locale,
-                        RedirectAttributes redirectAttributes) {
-        Store store = storesRepository.findById(storeId);
-        if (store == null) {
-            return render(storeId, model);
+                        RedirectAttributes redirectAttributes, HttpServletResponse response) {
+        Store store = requireStore(storeId);
+        List<TopLevelChoice> choices = pimCategoryOptions.topLevelChoices(store.getEnabledCategories());
+        // Without the catalogue the page cannot tell what it offers, so it saves nothing rather than drop the selection.
+        if (!catalogueAvailable(choices)) {
+            if (async) {
+                response.setStatus(HttpStatus.SERVICE_UNAVAILABLE.value());
+                return render(storeId, model);
+            }
+            return "redirect:" + SettingsPaths.store(storeId, "/categories");
         }
 
-        apply(store, submitted);
+        apply(store, choices, submitted);
         storesRepository.save(store);
 
         String successMessage = messageSource.getMessage("store.categories.update.success", null, locale);
@@ -95,13 +115,11 @@ public class StoreCategoriesSettingsController {
      * Only names the page actually offered are stored: a name PIM does not know and the store does not already have
      * cannot arrive from the form, so a submission carrying one is ignored rather than written to the store.
      */
-    private void apply(Store store, List<String> submitted) {
-        Set<String> offered = pimCategoryOptions.topLevelChoices(store.getEnabledCategories()).stream()
+    private static void apply(Store store, List<TopLevelChoice> choices, List<String> submitted) {
+        Set<String> offered = choices.stream()
                 .map(TopLevelChoice::name)
                 .collect(Collectors.toSet());
-        List<String> enabled = submitted == null
-                ? List.of()
-                : submitted.stream().filter(offered::contains).distinct().toList();
+        List<String> enabled = submitted.stream().filter(offered::contains).distinct().toList();
         if (store.getFulfilmentConfiguration() == null) {
             store.setFulfilmentConfiguration(new FulfilmentConfiguration());
         }
@@ -109,15 +127,25 @@ public class StoreCategoriesSettingsController {
     }
 
     private String render(String storeId, Model model) {
-        Store store = storesRepository.findById(storeId);
-        if (store == null) {
-            model.addAttribute("error", "Store not found");
-            return "error";
-        }
+        Store store = requireStore(storeId);
         List<TopLevelChoice> choices = pimCategoryOptions.topLevelChoices(store.getEnabledCategories());
+        model.addAttribute("catalogueAvailable", catalogueAvailable(choices));
         model.addAttribute("choices", choices);
         model.addAttribute("selectedCount", choices.stream().filter(TopLevelChoice::selected).count());
         model.addAttribute("formAction", SettingsPaths.store(storeId, "/categories"));
         return VIEW;
+    }
+
+    /** An empty PIM cache (start-up, failed load) would otherwise show every saved category as outside the catalogue. */
+    private static boolean catalogueAvailable(List<TopLevelChoice> choices) {
+        return choices.stream().anyMatch(TopLevelChoice::inCatalogue);
+    }
+
+    private Store requireStore(String storeId) {
+        Store store = storesRepository.findById(storeId);
+        if (store == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+        return store;
     }
 }
