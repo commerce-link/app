@@ -151,6 +151,7 @@ public class StoreShippingAccountController {
         String providerName = shippingAccounts.current(store);
         IntegrationSettingsForm form = IntegrationSettingsForm.from(providerName, shippingAccounts.storedSettings(store),
                 shippingAccounts.fieldsOf(providerName));
+        shippingAccounts.fillDefaults(form);
         return renderAccount(store, form, Map.of(), model, locale);
     }
 
@@ -158,6 +159,7 @@ public class StoreShippingAccountController {
                                RedirectAttributes redirectAttributes, HttpServletRequest request, HttpServletResponse response) {
         Store store = requireStore(storeId);
         List<ProviderField> fields = shippingAccounts.fieldsOf(form.getProviderName());
+        shippingAccounts.fillDefaults(form);
         Map<String, String> errors = form.validate(fields, shippingAccounts.storedSecretKeys(store, form.getProviderName()));
         if (!errors.isEmpty()) {
             String view = renderAccount(store, form, errors, model, locale);

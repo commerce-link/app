@@ -41,6 +41,14 @@ public class IntegrationSettingsForm {
         return form;
     }
 
+    /** Sets a setting of the given provider only when it is empty. */
+    public void fillBlank(String provider, ProviderField field, String value) {
+        String key = settingKey(provider, field);
+        if (StringUtils.isBlank(settings.get(key))) {
+            settings.put(key, value);
+        }
+    }
+
     /** Id of the input of a setting, also the key of its error. */
     public static String fieldId(String provider, ProviderField field) {
         return "setting-" + provider + "-" + field.key();

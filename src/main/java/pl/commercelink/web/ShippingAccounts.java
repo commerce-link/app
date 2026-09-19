@@ -4,6 +4,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import pl.commercelink.provider.api.ProviderField;
+import pl.commercelink.web.dtos.IntegrationSettingsForm;
 import pl.commercelink.provider.api.ProviderField.FieldType;
 import pl.commercelink.shipping.ShippingProviderFactory;
 import pl.commercelink.shipping.api.Carrier;
@@ -51,7 +52,32 @@ class ShippingAccounts {
         return store.getConfigurationValue(IntegrationType.SHIPPING_PROVIDER);
     }
 
-    /** Configured means every required setting is stored; nothing tests the connection. */
+    /**
+     * The value a required address setting takes when left empty: the adapter's example, when that is a full http(s)
+     * address. ProviderField has no default value, and Furgonetka 0.3.0 requires "API URL" (example
+     * https://api.furgonetka.pl) while reading FURGONETKA_API_URL instead, so an empty dead field blocked the save and
+     * an account stored without it looked incomplete. Kept to the courier account: elsewhere an example address is an
+     * example of the operator's own value (a shop URL), not a default.
+     */
+    static String defaultValue(ProviderField field) {
+        String example = StringUtils.trimToNull(field.placeholder());
+        boolean addressField = field.type() == FieldType.TEXT || field.type() == FieldType.URL;
+        return field.required() && addressField && example != null && example.matches("https?://\\S+") ? example : null;
+    }
+
+    /** Puts the default value into every empty setting that has one, for each installed courier's fields. */
+    void fillDefaults(IntegrationSettingsForm form) {
+        for (ShippingProviderDescriptor descriptor : installed()) {
+            for (ProviderField field : descriptor.configurationFields()) {
+                String value = defaultValue(field);
+                if (value != null) {
+                    form.fillBlank(descriptor.name(), field, value);
+                }
+            }
+        }
+    }
+
+    /** Configured means every required setting is stored (or has a default); nothing tests the connection. */
     IntegrationStatus status(Store store) {
         String providerName = current(store);
         if (providerName == null) {
@@ -66,7 +92,7 @@ class ShippingAccounts {
                 .filter(ProviderField::required)
                 .allMatch(field -> field.type() == FieldType.PASSWORD
                         ? stored.containsKey(field.key())
-                        : StringUtils.isNotBlank(stored.get(field.key())));
+                        : StringUtils.isNotBlank(stored.get(field.key())) || defaultValue(field) != null);
         return new IntegrationStatus(providerName, descriptor.displayName(), true, configured);
     }
 

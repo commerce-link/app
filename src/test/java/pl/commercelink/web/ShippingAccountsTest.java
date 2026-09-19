@@ -15,6 +15,7 @@ import pl.commercelink.shipping.api.ShippingProvider;
 import pl.commercelink.shipping.api.ShippingProviderDescriptor;
 import pl.commercelink.stores.IntegrationType;
 import pl.commercelink.stores.Store;
+import pl.commercelink.web.dtos.IntegrationSettingsForm;
 
 import java.util.List;
 import java.util.Map;
@@ -146,5 +147,38 @@ class ShippingAccountsTest {
         // then
         assertThat(lookup.failed()).isFalse();
         assertThat(lookup.carriers()).isEmpty();
+    }
+
+    @Test
+    void aRequiredAddressWithAFullExampleAddressCountsAsSetWhenTheSecretLacksIt() {
+        // given
+        when(descriptor.configurationFields()).thenReturn(List.of(
+                new ProviderField("apiUrl", "API URL", FieldType.TEXT, true, "https://api.furgonetka.pl"),
+                new ProviderField("username", "API Username", FieldType.TEXT, true, null)));
+        storedSettings(Map.of("username", "sklep"));
+
+        // when / then
+        assertThat(accounts.status(store).configured()).isTrue();
+    }
+
+    @Test
+    void anEmptyAddressFieldTakesTheAdaptersExampleAddressButAnExampleOfAnotherValueStaysAnExample() {
+        // given
+        when(descriptor.name()).thenReturn(PROVIDER);
+        when(descriptor.configurationFields()).thenReturn(List.of(
+                new ProviderField("apiUrl", "API URL", FieldType.TEXT, true, "https://api.furgonetka.pl"),
+                new ProviderField("username", "API Username", FieldType.TEXT, true, "sklep@example.pl"),
+                new ProviderField("optionalUrl", "Optional URL", FieldType.URL, false, "https://example.pl")));
+        when(shippingProviderFactory.availableProviders()).thenReturn(List.of(descriptor));
+        IntegrationSettingsForm form = new IntegrationSettingsForm();
+        form.setProviderName(PROVIDER);
+        form.setSettings(new java.util.HashMap<>(Map.of("furgonetka.apiUrl", " ")));
+
+        // when
+        accounts.fillDefaults(form);
+
+        // then
+        assertThat(form.getSettings()).containsEntry("furgonetka.apiUrl", "https://api.furgonetka.pl")
+                .doesNotContainKey("furgonetka.username").doesNotContainKey("furgonetka.optionalUrl");
     }
 }
