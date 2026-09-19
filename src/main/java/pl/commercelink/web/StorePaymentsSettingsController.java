@@ -146,7 +146,9 @@ public class StorePaymentsSettingsController {
         model.addAttribute("gateways", paymentGateways.views(store, gatewaysPath));
         model.addAttribute("gatewayDisconnectMessages", store.getPayments().stream()
                 .collect(Collectors.toMap(PaymentIntegration::getName,
-                        gateway -> paymentGateways.disconnectMessage(store, gateway.getName(), locale))));
+                        gateway -> paymentGateways.disconnectMessage(store, gateway.getName(), locale),
+                        // The page never adds a duplicate, but a record edited by hand must not take it down.
+                        (first, second) -> first)));
         model.addAttribute("gatewaysInstalled", !paymentGateways.installed().isEmpty());
         model.addAttribute("newGatewayHref", paymentGateways.addable(store).isEmpty() ? null : gatewaysPath + "/new");
         model.addAttribute("accounts", store.getBankAccounts().stream()

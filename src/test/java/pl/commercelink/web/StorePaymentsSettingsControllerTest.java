@@ -20,6 +20,7 @@ import pl.commercelink.payments.PaymentProviderFactory;
 import pl.commercelink.starter.security.model.CustomUser;
 import pl.commercelink.stores.CheckoutConfiguration;
 import pl.commercelink.stores.DeliveryOption;
+import pl.commercelink.stores.PaymentIntegration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.dtos.CheckoutSettingsForm;
@@ -85,6 +86,24 @@ class StorePaymentsSettingsControllerTest {
         assertThat(model.getAttribute("returnToLocalMachine")).isEqualTo(true);
         assertThat(((CheckoutSettingsForm) model.getAttribute("checkoutForm")).getCurrency()).isEqualTo("pln");
         assertThat(model.getAttribute("newGatewayHref")).isEqualTo("/dashboard/store/payments/gateways/new");
+    }
+
+    /** The page cannot create a duplicate, but a record edited by hand could, and it took the whole page down. */
+    @Test
+    @SuppressWarnings("unchecked")
+    void thePageOpensWhenTwoGatewaysAreStoredUnderTheSameName() {
+        // given
+        Store store = store("store-1");
+        store.addPaymentIntegration("stripe");
+        store.getPayments().add(new PaymentIntegration("stripe"));
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        String view = controller.payments(model, PL);
+
+        // then
+        assertThat(view).isEqualTo("store-payments");
+        assertThat((Map<String, String>) model.getAttribute("gatewayDisconnectMessages")).containsKey("stripe");
     }
 
     @Test
