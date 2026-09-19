@@ -46,4 +46,26 @@ class FromHeaderTest {
         String encoded = Base64.getEncoder().encodeToString("Sklep Łódź".getBytes(StandardCharsets.UTF_8));
         assertThat(header).isEqualTo("=?UTF-8?B?" + encoded + "?= <noreply@commercelink.pl>");
     }
+
+    /** RFC 2047 caps an encoded word at 75 characters; a longer Polish name is split into several on whole characters. */
+    @Test
+    void aLongPolishNameIsSplitIntoEncodedWordsOfAtMost75Characters() {
+        // given
+        String name = "Hurtownia Łódzka Żółć i Gęśla Jaźń Spółka z ograniczoną odpowiedzialnością";
+
+        // when
+        String header = FromHeader.of(name, "noreply@commercelink.pl");
+
+        // then
+        String words = header.substring(0, header.indexOf(" <"));
+        assertThat(words.split(" ")).hasSizeGreaterThan(1).allSatisfy(word -> assertThat(word.length()).isLessThanOrEqualTo(75));
+        java.io.ByteArrayOutputStream decoded = new java.io.ByteArrayOutputStream();
+        for (String word : words.split(" ")) {
+            assertThat(word).startsWith("=?UTF-8?B?").endsWith("?=");
+            decoded.writeBytes(java.util.Base64.getDecoder().decode(word.substring(10, word.length() - 2)));
+        }
+        // Each word decodes on its own too: a split never cuts a character in half.
+        assertThat(decoded.toString(java.nio.charset.StandardCharsets.UTF_8)).isEqualTo(name);
+        assertThat(header).endsWith(" <noreply@commercelink.pl>");
+    }
 }
