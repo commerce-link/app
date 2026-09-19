@@ -109,7 +109,7 @@ class StoreRmaTemplateTest {
         assertThat(html).contains("GLS, usunięty z autoryzowanych");
         assertThat(html).doesNotContain("Zwroty wyłączone");
         // the saved copy still creates shipments, so the status must not claim that returns fail
-        assertThat(html).contains("Zwroty klientów działają, ale przewoźnik wymaga uwagi")
+        assertThat(html).contains("Zwroty klientów mogą nie działać: przewoźnik wymaga uwagi")
                 .doesNotContain("Zwroty klientów nie zadziałają");
         assertThat(html).contains("<span class=\"cl-status is-warn\">Nieautoryzowany</span>");
     }
