@@ -157,6 +157,24 @@ class RMACenterControllerTest {
         assertThat(attribute(model, "ownCenters")).isEmpty();
     }
 
+    /** A CSV price list is no adapter, so the registry does not know it; its centre must not read "unknown supplier". */
+    @Test
+    void aCentreOfAManualPriceListIsNotShownAsAnUnknownSupplier() {
+        // given
+        labelled();
+        when(rmaCentersRepository.findByStoreId("store-1")).thenReturn(List.of(center("store-1", "own-1", "manual:Asus")));
+        when(storesRepository.findById("store-1")).thenReturn(storeWith(
+                new StoreSupplierConnection("manual:Asus", ConnectionMode.MANUAL, true, true)));
+        when(supplierRegistry.exists("manual:Asus")).thenReturn(false);
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        asStoreAdmin(() -> controller.list(model, PL));
+
+        // then
+        assertThat(attribute(model, "ownCenters")).extracting(RmaCenterView::knownProvider).containsExactly(true);
+    }
+
     @Test
     void listSeparatesTheStoresOwnCentresFromTheSharedOnes() {
         // given

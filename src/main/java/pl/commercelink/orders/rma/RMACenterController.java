@@ -80,7 +80,8 @@ public class RMACenterController {
         for (RMACenter center : visible) {
             boolean isShared = !scope.equals(center.getStoreId());
             (isShared ? shared : own).add(RmaCenterView.of(center, title(labels, center.getProvider(), locale), isShared,
-                    StringUtils.isBlank(center.getProvider()) || supplierRegistry.exists(center.getProvider()),
+                    StringUtils.isBlank(center.getProvider()) || SupplierIdentity.isManual(center.getProvider())
+                            || supplierRegistry.exists(center.getProvider()),
                     ownPerProvider.getOrDefault(center.getProvider(), 0L) == 1L, locale, PATH));
         }
         // Sorted by what the row shows, so a supplier renamed by its label lands where the reader looks for it.
