@@ -56,11 +56,11 @@
                             </div>
                             <div class="cl-list-actions">
                                 <a th:if="${supplier.editHref() != null}" class="cl-link-button" th:href="@{${supplier.editHref()}}"
-                                   th:text="${state == 'INCOMPLETE'} ? #{store.suppliers.complete} : #{store.suppliers.edit}"
-                                   th:attr="aria-label=#{store.suppliers.edit.for(${supplier.title()})}"></a>
+                                   th:text="${state == 'INCOMPLETE'} ? #{settings.list.complete} : #{settings.list.edit}"
+                                   th:attr="aria-label=${state == 'INCOMPLETE'} ? #{settings.list.complete.for(${supplier.title()})} : #{settings.list.edit.for(${supplier.title()})}"></a>
                                 <a class="cl-link-button is-danger" th:href="@{${supplier.removeHref()}}" data-cl-confirm
-                                   th:text="${supplier.csv()} ? #{store.suppliers.delete} : #{store.suppliers.disconnect}"
-                                   th:attr="aria-label=${supplier.csv()} ? #{store.suppliers.delete.title(${supplier.title()})} : #{store.suppliers.disconnect.title(${supplier.title()})},
+                                   th:text="${supplier.csv()} ? #{settings.list.delete} : #{settings.list.disconnect}"
+                                   th:attr="aria-label=${supplier.csv()} ? #{settings.list.delete.for(${supplier.title()})} : #{settings.list.disconnect.for(${supplier.title()})},
                                             data-cl-confirm-title=${supplier.csv()} ? #{store.suppliers.delete.title(${supplier.title()})} : #{store.suppliers.disconnect.title(${supplier.title()})},
                                             data-cl-confirm-message=${removeMessages[supplier.identity()]},
                                             data-cl-confirm-action=${supplier.csv()} ? #{store.suppliers.delete.action} : #{store.suppliers.disconnect.action}"></a>

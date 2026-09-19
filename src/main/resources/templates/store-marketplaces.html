@@ -62,11 +62,12 @@
                             <div class="cl-list-actions">
                                 <a th:if="${marketplace.installed()}" class="cl-link-button" th:href="@{${marketplace.editHref()}}"
                                    th:text="${marketplace.state().name() == 'EXPIRED' and marketplace.authorizeHref() == null}
-                                            ? #{store.marketplaces.complete} : #{store.marketplaces.edit}"
-                                   th:attr="aria-label=#{store.marketplaces.edit.for(${marketplace.displayName()})}"></a>
+                                            ? #{settings.list.complete} : #{settings.list.edit}"
+                                   th:attr="aria-label=${marketplace.state().name() == 'EXPIRED' and marketplace.authorizeHref() == null}
+                                            ? #{settings.list.complete.for(${marketplace.displayName()})} : #{settings.list.edit.for(${marketplace.displayName()})}"></a>
                                 <a class="cl-link-button is-danger" th:href="@{${marketplace.disconnectHref()}}" data-cl-confirm
-                                   th:text="#{store.marketplaces.disconnect}"
-                                   th:attr="aria-label=#{store.marketplace.disconnect.title(${marketplace.displayName()})},
+                                   th:text="#{settings.list.disconnect}"
+                                   th:attr="aria-label=#{settings.list.disconnect.for(${marketplace.displayName()})},
                                             data-cl-confirm-title=#{store.marketplace.disconnect.title(${marketplace.displayName()})},
                                             data-cl-confirm-message=${disconnectMessages[marketplace.name()]},
                                             data-cl-confirm-action=#{store.marketplace.disconnect.action}"></a>

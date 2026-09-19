@@ -124,6 +124,20 @@ class StoreWarehouseTemplateTest {
         assertThat(html).doesNotContainPattern("<div class=\"cl-list-actions\">(?:(?!</div>).)*/default");
     }
 
+    /** WCAG 2.5.3: the accessible name starts with the visible text; the question stays in the dialog title. */
+    @Test
+    void rowActionsAreNamedByTheirVisibleTextAndTheRecord() {
+        // when
+        String html = SettingsTemplateRenderer.render("store-warehouse",
+                page(List.of(complete("a-2", "Magazyn Warszawa", false), incomplete()), List.of(), true, documents(), Map.of()));
+
+        // then
+        assertThat(html).contains("aria-label=\"Edytuj: Magazyn Warszawa\">Edytuj</a>")
+                .contains("aria-label=\"Uzupełnij: Oddział Berlin\">Uzupełnij</a>")
+                .contains("aria-label=\"Usuń: Oddział Berlin\"");
+        assertThat(html).doesNotContain("aria-label=\"Usunąć");
+    }
+
     @Test
     void deletingIsConfirmedInADialogOrOnItsOwnPage() {
         // when

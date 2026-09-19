@@ -51,11 +51,11 @@
                             </div>
                             <div class="cl-list-actions">
                                 <a th:if="${gateway.installed()}" class="cl-link-button" th:href="@{${gateway.editHref()}}"
-                                   th:text="${gateway.configured()} ? #{store.payments.gateways.edit} : #{store.payments.gateways.complete}"
-                                   th:attr="aria-label=#{store.payments.gateways.edit.for(${gateway.displayName()})}"></a>
+                                   th:text="${gateway.configured()} ? #{settings.list.edit} : #{settings.list.complete}"
+                                   th:attr="aria-label=${gateway.configured()} ? #{settings.list.edit.for(${gateway.displayName()})} : #{settings.list.complete.for(${gateway.displayName()})}"></a>
                                 <a class="cl-link-button is-danger" th:href="@{${gateway.disconnectHref()}}" data-cl-confirm
-                                   th:text="#{store.payments.gateways.disconnect}"
-                                   th:attr="aria-label=#{store.payments.gateway.disconnect.title(${gateway.displayName()})},
+                                   th:text="#{settings.list.disconnect}"
+                                   th:attr="aria-label=#{settings.list.disconnect.for(${gateway.displayName()})},
                                             data-cl-confirm-title=#{store.payments.gateway.disconnect.title(${gateway.displayName()})},
                                             data-cl-confirm-message=${gatewayDisconnectMessages[gateway.name()]},
                                             data-cl-confirm-action=#{store.payments.gateway.disconnect.action}"></a>
@@ -97,11 +97,11 @@
                             </div>
                             <div class="cl-list-actions">
                                 <a class="cl-link-button" th:href="@{${account.editHref()}}"
-                                   th:text="${account.ibanValid()} ? #{store.payments.accounts.edit} : #{store.payments.accounts.fix}"
-                                   th:attr="aria-label=#{store.payments.accounts.edit.for(${account.title()})}"></a>
+                                   th:text="${account.ibanValid()} ? #{settings.list.edit} : #{settings.list.fix}"
+                                   th:attr="aria-label=${account.ibanValid()} ? #{settings.list.edit.for(${account.title()})} : #{settings.list.fix.for(${account.title()})}"></a>
                                 <a class="cl-link-button is-danger" th:href="@{${account.deleteHref()}}" data-cl-confirm
-                                   th:text="#{store.payments.accounts.delete}"
-                                   th:attr="aria-label=#{store.payments.account.delete.title(${account.title()})},
+                                   th:text="#{settings.list.delete}"
+                                   th:attr="aria-label=#{settings.list.delete.for(${account.title()})},
                                             data-cl-confirm-title=#{store.payments.account.delete.title(${account.title()})},
                                             data-cl-confirm-message=${accounts.size() == 1}
                                                 ? #{store.payments.account.delete.message.last}
@@ -137,11 +137,11 @@
                                 <p th:if="${option.description() != null}" class="cl-list-desc" th:text="${option.description()}"></p>
                             </div>
                             <div class="cl-list-actions">
-                                <a class="cl-link-button" th:href="@{${option.editHref()}}" th:text="#{store.payments.delivery.edit}"
-                                   th:attr="aria-label=#{store.payments.delivery.edit.for(${option.name()})}"></a>
+                                <a class="cl-link-button" th:href="@{${option.editHref()}}" th:text="#{settings.list.edit}"
+                                   th:attr="aria-label=#{settings.list.edit.for(${option.name()})}"></a>
                                 <a class="cl-link-button is-danger" th:href="@{${option.deleteHref()}}" data-cl-confirm
-                                   th:text="#{store.payments.delivery.delete}"
-                                   th:attr="aria-label=#{store.payments.delivery.delete.title(${option.name()})},
+                                   th:text="#{settings.list.delete}"
+                                   th:attr="aria-label=#{settings.list.delete.for(${option.name()})},
                                             data-cl-confirm-title=#{store.payments.delivery.delete.title(${option.name()})},
                                             data-cl-confirm-message=#{store.payments.delivery.delete.message},
                                             data-cl-confirm-action=#{store.payments.delivery.delete.action}"></a>

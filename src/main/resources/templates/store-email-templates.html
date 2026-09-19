@@ -43,8 +43,8 @@
                                 </div>
                                 <div class="cl-list-actions">
                                     <a class="cl-link-button" th:href="@{${item.editHref()}}"
-                                       th:text="${item.broken()} ? #{store.emailTemplates.complete} : #{store.emailTemplates.edit}"
-                                       th:attr="aria-label=#{store.emailTemplates.edit.for(${#messages.msg(item.labelKey())})}"></a>
+                                       th:text="${item.broken()} ? #{settings.list.complete} : #{settings.list.edit}"
+                                       th:attr="aria-label=${item.broken()} ? #{settings.list.complete.for(${#messages.msg(item.labelKey())})} : #{settings.list.edit.for(${#messages.msg(item.labelKey())})}"></a>
                                 </div>
                             </li>
                         </ul>

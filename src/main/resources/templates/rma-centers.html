@@ -43,11 +43,11 @@
                         </div>
                         <div class="cl-list-actions">
                             <a class="cl-link-button" th:href="@{${center.editHref()}}"
-                               th:text="${center.complete()} ? #{rma.center.edit} : #{rma.center.complete}"
-                               th:attr="aria-label=#{rma.center.edit.for(${center.title()})}"></a>
+                               th:text="${center.complete()} ? #{settings.list.edit} : #{settings.list.complete}"
+                               th:attr="aria-label=${center.complete()} ? #{settings.list.edit.for(${center.title()})} : #{settings.list.complete.for(${center.title()})}"></a>
                             <a class="cl-link-button is-danger" th:href="@{${center.deleteHref()}}" data-cl-confirm
-                               th:text="#{rma.center.delete}"
-                               th:attr="aria-label=#{rma.center.delete.title(${center.title()})},
+                               th:text="#{settings.list.delete}"
+                               th:attr="aria-label=#{settings.list.delete.for(${center.title()})},
                                         data-cl-confirm-title=#{rma.center.delete.title(${center.title()})},
                                         data-cl-confirm-message=${center.lastForProvider()}
                                             ? #{rma.center.delete.message.last(${center.title()})}

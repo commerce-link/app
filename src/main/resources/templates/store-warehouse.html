@@ -57,14 +57,14 @@
                             <div>
                                 <div class="cl-list-title">
                                     <span th:text="${address.title()}"></span>
-                                    <span th:if="${address.isDefault()}" class="cl-status is-info" th:text="#{store.warehouse.addresses.default}"></span>
-                                    <span th:unless="${address.complete()}" class="cl-status is-warn" th:text="#{store.warehouse.addresses.incomplete}"></span>
+                                    <span th:if="${address.isDefault()}" class="cl-status is-info" th:text="#{settings.list.default}"></span>
+                                    <span th:unless="${address.complete()}" class="cl-status is-warn" th:text="#{settings.list.incomplete}"></span>
                                     <!--/* The shortcut sits where the Default pill would be, so the state and the way to move it share a place
                                            and the row keeps two actions on the right. An incomplete address is completed first. */-->
                                     <form th:if="${!address.isDefault() and address.complete()}" class="cl-list-title-action" method="post"
                                           th:action="@{${address.defaultHref()}}">
-                                        <button type="submit" class="cl-link-button" th:text="#{store.warehouse.addresses.makeDefault}"
-                                                th:attr="aria-label=#{store.warehouse.addresses.makeDefault.for(${address.title()})}"></button>
+                                        <button type="submit" class="cl-link-button" th:text="#{settings.list.makeDefault}"
+                                                th:attr="aria-label=#{settings.list.makeDefault.for(${address.title()})}"></button>
                                     </form>
                                 </div>
                                 <p th:if="${address.addressLine() != null}" class="cl-list-desc" th:text="${address.addressLine()}"></p>
@@ -74,11 +74,11 @@
                             </div>
                             <div class="cl-list-actions">
                                 <a class="cl-link-button" th:href="@{${address.editHref()}}"
-                                   th:text="${address.complete()} ? #{store.warehouse.addresses.edit} : #{store.warehouse.addresses.complete}"
-                                   th:attr="aria-label=#{store.warehouse.addresses.edit.for(${address.title()})}"></a>
+                                   th:text="${address.complete()} ? #{settings.list.edit} : #{settings.list.complete}"
+                                   th:attr="aria-label=${address.complete()} ? #{settings.list.edit.for(${address.title()})} : #{settings.list.complete.for(${address.title()})}"></a>
                                 <a class="cl-link-button is-danger" th:href="@{${address.deleteHref()}}" data-cl-confirm
-                                   th:text="#{store.warehouse.addresses.delete}"
-                                   th:attr="aria-label=#{store.warehouse.address.delete.title(${address.title()})},
+                                   th:text="#{settings.list.delete}"
+                                   th:attr="aria-label=#{settings.list.delete.for(${address.title()})},
                                             data-cl-confirm-title=#{store.warehouse.address.delete.title(${address.title()})},
                                             data-cl-confirm-message=#{store.warehouse.address.delete.message},
                                             data-cl-confirm-action=#{store.warehouse.address.delete.action}"></a>
@@ -105,11 +105,11 @@
                                    th:text="${printer.summary() != null} ? ${printer.typeName() + ' · ' + printer.summary()} : ${printer.typeName()}"></p>
                             </div>
                             <div class="cl-list-actions">
-                                <a class="cl-link-button" th:href="@{${printer.editHref()}}" th:text="#{store.warehouse.addresses.edit}"
-                                   th:attr="aria-label=#{store.warehouse.printers.edit.for(${printer.name()})}"></a>
+                                <a class="cl-link-button" th:href="@{${printer.editHref()}}" th:text="#{settings.list.edit}"
+                                   th:attr="aria-label=#{settings.list.edit.for(${printer.name()})}"></a>
                                 <a class="cl-link-button is-danger" th:href="@{${printer.deleteHref()}}" data-cl-confirm
-                                   th:text="#{store.warehouse.addresses.delete}"
-                                   th:attr="aria-label=#{store.warehouse.printer.delete.title(${printer.name()})},
+                                   th:text="#{settings.list.delete}"
+                                   th:attr="aria-label=#{settings.list.delete.for(${printer.name()})},
                                             data-cl-confirm-title=#{store.warehouse.printer.delete.title(${printer.name()})},
                                             data-cl-confirm-message=#{store.warehouse.printer.delete.message},
                                             data-cl-confirm-action=#{store.warehouse.printer.delete.action}"></a>
