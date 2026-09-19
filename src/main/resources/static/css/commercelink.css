@@ -1475,8 +1475,9 @@ body.cl-drawer-open .cl-sidebar {
     background: var(--cl-info-soft);
 }
 
+/* --cl-ink-2: --cl-ink-3 on --cl-surface-2 is 4.48:1 at 12 px, below AA */
 .cl-status.is-neutral {
-    color: var(--cl-ink-3);
+    color: var(--cl-ink-2);
     background: var(--cl-surface-2);
     box-shadow: inset 0 0 0 1px var(--cl-line);
 }
@@ -1934,7 +1935,8 @@ a.cl-link-button:hover {
     width: 40px;
     height: 22px;
     border-radius: 11px;
-    background: #c3cbd8;
+    /* The track of a switched-off switch is its only outline: at least 3:1 against the card (WCAG 1.4.11) */
+    background: var(--cl-ink-3);
     transition: background-color .15s;
 }
 
