@@ -23,7 +23,7 @@
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <th:block th:replace="~{fragments/gtm :: tag}"></th:block>
 </head>
-<body>
+<body th:attr="data-cl-server-error=#{form.save.serverError}">
 <th:block th:replace="~{fragments/gtm :: noscript}"></th:block>
 
 <a class="cl-skip" href="#clContent" th:text="#{nav.skip.to.content}"></a>

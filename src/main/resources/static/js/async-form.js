@@ -141,9 +141,10 @@
                 var next = result.status === 200 || result.status === 422 ? swap(form, result.html) : null;
                 if (!next) {
                     // A server error may come after the record was already saved (a failed render), so the form is
-                    // not sent again: a second submit of a new record would create a duplicate.
+                    // not sent again: a second submit of a new record would create a duplicate. The page's own message
+                    // blames the connection, which is wrong for an answer the server did give (403, 500).
                     unlock(form, button);
-                    showToast(form.getAttribute('data-error-message'), 'danger');
+                    showToast(document.body.getAttribute('data-cl-server-error') || form.getAttribute('data-error-message'), 'danger');
                     return;
                 }
                 if (result.status === 422) {
