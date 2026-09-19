@@ -391,15 +391,15 @@
                                 <strong th:text="#{bank.iban} + ':'"></strong>
                                 <span th:text="${bankAccount.iban}"></span>
                             </li>
-                            <li class="mb-2">
+                            <li class="mb-2" th:if="${!#strings.isEmpty(bankAccount.swiftCode)}">
                                 <strong th:text="#{bank.swift} + ':'"></strong>
                                 <span th:text="${bankAccount.swiftCode}"></span>
                             </li>
-                            <li class="mb-2">
+                            <li class="mb-2" th:if="${!#strings.isEmpty(bankAccount.bankName)}">
                                 <strong th:text="#{bank.name} + ':'"></strong>
                                 <span th:text="${bankAccount.bankName}"></span>
                             </li>
-                            <li class="mb-2">
+                            <li class="mb-2" th:if="${!#strings.isEmpty(bankAccount.currency)}">
                                 <strong th:text="#{bank.currency} + ':'"></strong>
                                 <span th:text="${bankAccount.currency}"></span>
                             </li>
