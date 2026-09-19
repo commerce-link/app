@@ -30,11 +30,12 @@ class SettingsSubpageHeaderTemplateTest {
         assertThat(html).doesNotContain("<h1").doesNotContain("class=\"section\"").doesNotContain("class=\"container\"");
     }
 
+    /** The status cards say what the old screen guide said, and the guide described a layout that no longer exists. */
     @Test
-    void keepsTheHelpToggleOnShipping() throws Exception {
+    void shippingHasNoScreenGuide() throws Exception {
         // when / then
-        assertThat(template("store-shipping")).contains("fragments/settings-header :: header(true, null)")
-                .contains("fragments/screen-intro :: panel('shipping', 'fas fa-shipping-fast')");
+        assertThat(template("store-shipping")).contains("fragments/settings-header :: header(false, null)")
+                .doesNotContain("screen-intro");
     }
 
     /** Adding belongs to the list it adds to: in the head of the list card, as on the warehouse page. */

@@ -70,7 +70,8 @@ class StoreNotificationTemplateTest {
         assertThat(html).contains(">Nadawca e-maili</legend>");
         assertThat(html).contains("value=\"Sklep Demo\"").contains("value=\"kontakt@sklep-demo.pl\"");
         assertThat(html).contains("Klient zobaczy nadawcę: Sklep Demo &lt;noreply@commercelink.pl&gt;");
-        assertThat(html).contains("type=\"email\"").contains("inputmode=\"email\"").contains("autocomplete=\"email\"");
+        // The reply-to address is the store's, not the signed-in admin's, so the browser must not offer the latter.
+        assertThat(html).contains("type=\"email\"").contains("inputmode=\"email\"").doesNotContain("autocomplete=\"email\"");
         assertThat(html).contains("aria-describedby=\"senderName-help\"");
         assertThat(html.split("class=\"cl-optional\"", -1)).hasSize(3);
         assertThat(html).doesNotContain("??").doesNotContain("store.storeId").doesNotContain("type=\"checkbox\"");

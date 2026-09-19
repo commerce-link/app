@@ -79,21 +79,18 @@ class ShipmentTrackingTemplateTest {
         }
     }
 
+    /** The Furgonetka webhook guidance moved from the shipping screen guide to the courier account page. */
     @Test
-    void shippingScreenHasHelpPanelWithFurgonetkaGuidance() throws Exception {
+    void theCourierAccountPageGuidesTheWebhookSetup() throws Exception {
         // when
-        String html = read(STORE_SHIPPING);
+        String html = read(STORE_SHIPPING.resolveSibling("store-shipping-account.html"));
         String pl = read(MESSAGES_PL);
         String en = read(MESSAGES_EN);
 
         // then
-        assertThat(html).contains("~{fragments/screen-intro :: panel('shipping'");
-        assertThat(html).contains("fragments/settings-header :: header(true, null)");
-        for (String suffix : List.of("title", "lead", "item1", "item1.text", "item2", "item2.text", "item3", "item3.text")) {
-            assertThat(pl).contains("\nintro.shipping." + suffix + "=");
-            assertThat(en).contains("\nintro.shipping." + suffix + "=");
-        }
-        assertThat(pl).contains("Furgonetk");
-        assertThat(en).contains("Furgonetka");
+        assertThat(read(STORE_SHIPPING)).doesNotContain("screen-intro");
+        assertThat(html).contains("store.shipping.account.webhook.steps.states");
+        assertThat(pl).contains("\nstore.shipping.account.webhook.steps.states=");
+        assertThat(en).contains("\nstore.shipping.account.webhook.steps.states=");
     }
 }

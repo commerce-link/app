@@ -39,7 +39,7 @@ class StoreSettingsTemplateTest {
         assertThat(html).contains("Finanse").contains("Zwroty");
         assertThat(html).contains("href=\"/dashboard/store/invoicing\"");
         assertThat(html).contains("href=\"/dashboard/store/rma-centers\"");
-        assertThat(html).contains("Fakturowanie").contains("System fakturowy, warunki faktur i konta do przelewów");
+        assertThat(html).contains("Fakturowanie").contains("System fakturowy i ustawienia faktur");
         assertThat(html).contains("fa-calculator");
         assertThat(html).doesNotContain("??");
     }

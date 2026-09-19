@@ -20,7 +20,7 @@
                             <legend class="cl-fieldset-title" th:text="#{store.notification.sender.title}"></legend>
                             <div class="cl-form-grid">
                                 <div class="cl-span-3" th:insert="~{fragments/settings-form :: textField('senderName', 'store.notification.senderName', *{senderName}, 'text', 'off', false, ${errors['senderName']}, #{store.notification.senderName.help(${senderPreviewName}, ${senderEmail})})}"></div>
-                                <div class="cl-span-3" th:insert="~{fragments/settings-form :: textField('replyToEmail', 'store.notification.replyToEmail', *{replyToEmail}, 'email', 'email', false, ${errors['replyToEmail']}, #{store.notification.replyToEmail.help})}"></div>
+                                <div class="cl-span-3" th:insert="~{fragments/settings-form :: textField('replyToEmail', 'store.notification.replyToEmail', *{replyToEmail}, 'email', 'off', false, ${errors['replyToEmail']}, #{store.notification.replyToEmail.help})}"></div>
                             </div>
                         </fieldset>
                         <div class="cl-card-footer">

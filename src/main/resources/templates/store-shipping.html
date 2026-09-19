@@ -6,8 +6,7 @@
 <div layout:fragment="content">
     <section class="cl-page">
         <div class="cl-page-body">
-            <div th:replace="~{fragments/settings-header :: header(true, null)}"></div>
-            <div th:replace="~{fragments/screen-intro :: panel('shipping', 'fas fa-shipping-fast')}"></div>
+            <div th:replace="~{fragments/settings-header :: header(false, null)}"></div>
             <div th:replace="~{fragments/settings-form :: savedAlert}"></div>
 
             <div class="cl-stack">
