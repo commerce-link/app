@@ -76,6 +76,15 @@ public class ProviderFactory<D extends ProviderDescriptor<T>, T> {
         return resolveCredentialName(descriptor);
     }
 
+    /**
+     * Name the configuration is stored under when the adapter is gone and there is no descriptor to ask. Factories
+     * that decorate the name (marketplaces append a suffix) must override this, otherwise an uninstalled adapter
+     * would be read and deleted under a name that belongs to another integration.
+     */
+    protected String credentialNameWithoutDescriptor(String providerName) {
+        return providerName;
+    }
+
     public T get(Store store, String providerName) {
         D descriptor = getDescriptor(providerName);
         if (descriptor == null) {
@@ -161,7 +170,9 @@ public class ProviderFactory<D extends ProviderDescriptor<T>, T> {
 
     public Map<String, String> loadConfiguration(Store store, String providerName) {
         D descriptor = getDescriptor(providerName);
-        String configName = descriptor != null ? credentialNameFor(providerName, descriptor) : providerName;
+        String configName = descriptor != null
+                ? credentialNameFor(providerName, descriptor)
+                : credentialNameWithoutDescriptor(providerName);
         return configurationManager.loadConfiguration(store, configName);
     }
 
@@ -179,9 +190,21 @@ public class ProviderFactory<D extends ProviderDescriptor<T>, T> {
         return configurationManager.getConfigurationForUI(store, configName, descriptor);
     }
 
+    /** Settings of one named provider, secrets present but blanked; for integrations with several providers per store. */
+    public Map<String, String> loadConfigurationForUI(Store store, String providerName) {
+        D descriptor = getDescriptor(providerName);
+        if (descriptor == null) {
+            return new HashMap<>();
+        }
+        return configurationManager.getConfigurationForUI(store, credentialNameFor(providerName, descriptor), descriptor);
+    }
+
     public void deleteConfiguration(Store store, String providerName) {
         D descriptor = getDescriptor(providerName);
         if (descriptor == null) {
+            // The adapter is gone, so its auth kind is unknown: the secret goes under the name it is loaded by
+            // (loadConfiguration), OAuth2 tokens of an uninstalled adapter cannot be told apart.
+            configurationManager.deleteConfiguration(store, credentialNameWithoutDescriptor(providerName));
             return;
         }
         String configName = credentialNameFor(providerName, descriptor);

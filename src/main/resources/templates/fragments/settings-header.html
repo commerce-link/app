@@ -19,5 +19,17 @@
     <div class="cl-page-lead" th:text="#{${settingsPage.tile().descriptionKey()}}"></div>
 </header>
 
+<!--/* Header of a page below a settings page (a record's form, a confirmation): back to the parent page, own title. */-->
+<!--/* A div, not a header element: "header" is also the name of the fragment above and would select both. */-->
+<div th:fragment="subpage(backHref, backLabel, title)" class="cl-page-header">
+    <a class="cl-back" th:href="@{${backHref}}">
+        <span class="icon is-small" aria-hidden="true"><i class="fas fa-chevron-left"></i></span>
+        <span th:text="${backLabel}"></span>
+    </a>
+    <div class="cl-page-header-row">
+        <h1 class="cl-page-title" th:text="${title}"></h1>
+    </div>
+</div>
+
 </body>
 </html>

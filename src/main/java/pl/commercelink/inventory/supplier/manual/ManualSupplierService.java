@@ -99,6 +99,33 @@ public class ManualSupplierService {
                 .anyMatch(connection -> SupplierLabels.labelOf(connection).equalsIgnoreCase(label));
     }
 
+    /**
+     * Why a name cannot be given to a manual supplier (null when it can), checked before anything is written so a form
+     * that also uploads a file saves both or neither. exceptIdentity is the supplier being renamed, or null for a new one.
+     */
+    public String labelProblem(Store store, String exceptIdentity, String label) {
+        String trimmed = StringUtils.trimToNull(label);
+        if (trimmed == null || trimmed.length() > SupplierConnectionValidator.MAX_LABEL_LENGTH) {
+            return "store.manual.error.name.invalid";
+        }
+        if (reservedName(trimmed)) {
+            return "store.supplier.connection.error.label.reserved";
+        }
+        if (labelTaken(store, trimmed, exceptIdentity)) {
+            return "store.manual.error.name.taken";
+        }
+        return null;
+    }
+
+    /** Whether a price list has at least one row the feed loader would load, checked before it is stored. */
+    public boolean isLoadable(byte[] csvBytes) {
+        return hasAtLeastOneLoadableRow(SupplierIdentity.MANUAL_TYPE, csvBytes);
+    }
+
+    public boolean hasFeed(String storeId, String identity) {
+        return storeFeedRepository.canRead(storeId, identity, "csv");
+    }
+
     public Result delete(String storeId, String identity) {
         Store store = storesRepository.findById(storeId);
         if (store == null) {

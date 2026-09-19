@@ -18,8 +18,8 @@ class SettingsSubpageHeaderTemplateTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"store-company-details", "store-branding", "store-invoicing", "store-payments",
-            "store-marketplaces", "store-categories", "store-report", "store-fulfilment", "store-warehouse",
-            "store-shipping", "store-rma", "rma-centers", "store-notification", "emailTemplates"})
+            "store-marketplaces", "store-categories", "store-report", "store-fulfilment", "store-suppliers", "store-warehouse",
+            "store-shipping", "store-rma", "rma-centers", "store-notification", "store-email-templates"})
     void everySettingsSubpageUsesTheSharedHeaderInsideThePageWrapper(String name) throws Exception {
         // when
         String html = template(name);
@@ -30,12 +30,24 @@ class SettingsSubpageHeaderTemplateTest {
         assertThat(html).doesNotContain("<h1").doesNotContain("class=\"section\"").doesNotContain("class=\"container\"");
     }
 
+    /** The status cards say what the old screen guide said, and the guide described a layout that no longer exists. */
     @Test
-    void keepsTheHelpToggleOnShippingAndTheAddButtonOnRmaCentres() throws Exception {
+    void shippingHasNoScreenGuide() throws Exception {
         // when / then
-        assertThat(template("store-shipping")).contains("fragments/settings-header :: header(true, null)")
-                .contains("fragments/screen-intro :: panel('shipping', 'fas fa-shipping-fast')");
-        assertThat(template("rma-centers")).contains("fragments/settings-header :: header(false, ~{::settingsActions})")
-                .contains("th:ref=\"settingsActions\"").contains("@{/dashboard/store/rma-centers/new}");
+        assertThat(template("store-shipping")).contains("fragments/settings-header :: header(false, null)")
+                .doesNotContain("screen-intro");
+    }
+
+    /** Adding belongs to the list it adds to: in the head of the list card, as on the warehouse page. */
+    @Test
+    void rmaCentresCarryTheAddButtonInTheListCardHeadNotInThePageHeader() throws Exception {
+        // when
+        String html = template("rma-centers");
+
+        // then
+        assertThat(html).contains("fragments/settings-header :: header(false, null)").doesNotContain("settingsActions");
+        assertThat(html.indexOf("@{/dashboard/store/rma-centers/new}"))
+                .isGreaterThan(html.indexOf("class=\"cl-card-head\""))
+                .isLessThan(html.indexOf("class=\"cl-card-desc\""));
     }
 }

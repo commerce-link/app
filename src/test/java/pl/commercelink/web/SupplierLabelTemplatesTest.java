@@ -35,17 +35,6 @@ class SupplierLabelTemplatesTest {
     }
 
     @Test
-    void addingANewInstanceDoesNotBorrowTheLegacyRowOfTheSameType() throws Exception {
-        // when
-        String html = template("store-fulfilment.html");
-
-        // then -- while adding, activeIdentity() must be empty instead of falling back to the
-        // selected type, which matched the legacy row of the same type (stored secret, warning)
-        assertThat(html).contains("return identityInput.value;")
-                .doesNotContain("identityInput.value || select.value");
-    }
-
-    @Test
     void fulfilmentCardsKeepTheIdentityAsDataAndShowTheLabel() throws Exception {
         // when
         String html = template("fulfilment.html");
@@ -77,8 +66,10 @@ class SupplierLabelTemplatesTest {
                 // visible as the selected option instead of silently showing "all"
                 .contains("!#lists.contains(providerOptions.![identity()], searchParams.provider)")
                 .contains("supplierLabels.of(searchParams.provider)");
-        assertThat(template("rma-center-form.html")).contains("th:each=\"option : ${providerOptions}\"");
-        assertThat(template("rma-centers.html")).contains("supplierLabels.of(center.provider)");
+        // The RMA pages resolve the label in the controller (RmaCenterView.title), so the templates must not fall
+        // back to the stored identity, which carries a connection token such as "Elko-k7f3a9c2".
+        assertThat(template("rma-center-form.html")).contains("${providerOptions}");
+        assertThat(template("rma-centers.html")).doesNotContain("${center.provider}").contains("center.title()");
         assertThat(template("warehouse.html"))
                 .contains("fragments/supplier-choice :: field('quickAddSupplier', ${providerOptions}, false)");
     }

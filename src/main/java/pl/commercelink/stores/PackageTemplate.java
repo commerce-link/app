@@ -62,8 +62,4 @@ public class PackageTemplate {
         this.parcels = parcels;
     }
 
-    @DynamoDBIgnore
-    public boolean isComplete() {
-        return isNotBlank(id) && isNotBlank(name);
-    }
 }

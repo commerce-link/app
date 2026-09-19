@@ -37,6 +37,8 @@ public final class StoreSettingsCatalog {
             new SettingsSection("store.settings.group.fulfilment", List.of(
                     new SettingsTile("fulfilment", "store.fulfilment.settings",
                             "store.fulfilment.settings.description", "fa-box", "/fulfilment", STORE_ADMINS),
+                    new SettingsTile("suppliers", "store.suppliers", "store.suppliers.description",
+                            "fa-industry", "/suppliers", STORE_ADMINS),
                     new SettingsTile("warehouse", "store.warehouse", "store.warehouse.description",
                             "fa-warehouse", "/warehouse", STORE_ADMINS),
                     new SettingsTile("shipping", "store.shipping", "store.shipping.description",

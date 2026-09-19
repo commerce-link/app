@@ -444,4 +444,22 @@ class ProviderFactoryTest {
                 (String) refreshTokenEndpointField.get(authService)
         };
     }
+
+    /** An integration whose adapter is gone kept its secret after disconnecting; it is deleted by name now. */
+    @Test
+    void disconnectingAnIntegrationWhoseAdapterIsGoneDeletesItsSecretByName() {
+        // given
+        pl.commercelink.starter.secrets.SecretsManager secretsManager = org.mockito.Mockito.mock(pl.commercelink.starter.secrets.SecretsManager.class);
+        ProviderFactory<OAuth2Descriptor, Object> factory = new ProviderFactory<>(OAuth2Descriptor.class, null,
+                new ProviderConfigurationManager(secretsManager), credentialStore, tokenStore, storesRepository);
+        Store realStore = new Store();
+        realStore.setStoreId("store-1");
+        when(secretsManager.exists("store-1-paynow")).thenReturn(true);
+
+        // when
+        factory.deleteConfiguration(realStore, "paynow");
+
+        // then
+        org.mockito.Mockito.verify(secretsManager).deleteSecret("store-1-paynow");
+    }
 }

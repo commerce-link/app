@@ -364,4 +364,54 @@ class PimCategoryOptionsTest {
                 new PimCategoryOptions.CategoryOption("2", "Stoły", "1"),
                 new PimCategoryOptions.CategoryOption("nieznane-id", "nieznane-id", null));
     }
+
+    @Test
+    void topLevelChoicesMarkTheSelectedOnesAndKeepPolishCollation() {
+        // given
+        when(pimCatalog.allCategories()).thenReturn(List.of(
+                new PimCategory("1", null, "Meble", "pl"),
+                new PimCategory("2", null, "Łóżka", "pl"),
+                new PimCategory("3", null, "Dom", "pl")
+        ));
+
+        // when
+        List<PimCategoryOptions.TopLevelChoice> choices = pimCategoryOptions().topLevelChoices(List.of("Meble"));
+
+        // then
+        assertThat(choices).containsExactly(
+                new PimCategoryOptions.TopLevelChoice("Dom", false, true),
+                new PimCategoryOptions.TopLevelChoice("Łóżka", false, true),
+                new PimCategoryOptions.TopLevelChoice("Meble", true, true));
+    }
+
+    @Test
+    void topLevelChoicesKeepASelectedNameTheCatalogueNoLongerOffers() {
+        // given
+        when(pimCatalog.allCategories()).thenReturn(List.of(
+                new PimCategory("1", null, "Meble", "pl")
+        ));
+
+        // when
+        List<PimCategoryOptions.TopLevelChoice> choices = pimCategoryOptions().topLevelChoices(List.of("Dom"));
+
+        // then
+        assertThat(choices).containsExactly(
+                new PimCategoryOptions.TopLevelChoice("Dom", true, false),
+                new PimCategoryOptions.TopLevelChoice("Meble", false, true));
+    }
+
+    @Test
+    void topLevelChoicesIgnoreBlankAndRepeatedSelections() {
+        // given
+        when(pimCatalog.allCategories()).thenReturn(List.of(
+                new PimCategory("1", null, "Meble", "pl")
+        ));
+
+        // when
+        List<PimCategoryOptions.TopLevelChoice> choices =
+                pimCategoryOptions().topLevelChoices(Arrays.asList("Meble", "Meble", " ", null));
+
+        // then
+        assertThat(choices).containsExactly(new PimCategoryOptions.TopLevelChoice("Meble", true, true));
+    }
 }

@@ -4,7 +4,7 @@ import java.util.Arrays;
 import java.util.List;
 
 public enum EmailNotificationType {
-    ORDER_CONFIRMATION("OrderConfirmationTemplate", Arrays.asList("orderId", "orderStatusLink", "totalAmount", "paymentMethod", "products (category, name, quantity, price)", "services (category, name, quantity, price)", "shippingDetails", "receiptType", "personalCollection")),
+    ORDER_CONFIRMATION("OrderConfirmationTemplate", Arrays.asList("orderId", "orderStatusLink", "totalAmount", "paymentMethod", "products (category, name, quantity, price)", "services (category, name, quantity, price)", "shippingDetails", "documentType", "personalCollection")),
     ORDER_ASSEMBLY("OrderAssemblyTemplate", Arrays.asList("orderId", "orderStatusLink", "estimatedAssemblyDate", "estimatedShippingDate", "personalCollection")),
     ORDER_ASSEMBLED("OrderAssembledTemplate", Arrays.asList("orderId", "orderStatusLink", "estimatedShippingDate")),
     ORDER_REALIZATION("OrderRealizationTemplate", Arrays.asList("orderId", "orderStatusLink", "estimatedShippingDate")),

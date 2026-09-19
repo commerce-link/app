@@ -9,6 +9,9 @@ import java.util.Map;
 @DynamoDBDocument
 public class Printer {
 
+    @DynamoDBAttribute(attributeName = "id")
+    private String id;
+
     @DynamoDBAttribute(attributeName = "name")
     private String name;
 
@@ -19,6 +22,14 @@ public class Printer {
     private Map<String, String> settings = new HashMap<>();
 
     public Printer() {
+    }
+
+    public String getId() {
+        return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
     }
 
     public String getName() {

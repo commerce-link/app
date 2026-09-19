@@ -14,7 +14,8 @@ import java.util.stream.Collectors;
 @Component
 public class GoogleOfflineConversionsExport {
 
-    private static final String CONVERSION_NAME = "Zakupy offline";
+    // The conversion action in Google Ads must carry exactly this name; the reporting settings page shows it.
+    public static final String CONVERSION_NAME = "Zakupy offline";
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final OrdersRepository ordersRepository;

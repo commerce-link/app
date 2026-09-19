@@ -1,0 +1,120 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+<div layout:fragment="content">
+    <section class="cl-page">
+        <div class="cl-page-body">
+            <div th:replace="~{fragments/settings-header :: subpage(${paymentsHref}, ${backLabel}, ${pageTitle})}"></div>
+
+            <form th:fragment="gatewayForm" id="payment-gateway-form" class="cl-form"
+                  th:action="@{${formAction}}" th:object="${form}" method="post" novalidate data-cl-async
+                  th:attr="data-cl-redirect=${redirectTo}, data-error-message=#{form.save.failed}">
+                <div th:replace="~{fragments/settings-form :: errorSummary('payment-gateway-errors', ${errors}, ${errorLabels})}"></div>
+
+                <div class="cl-card">
+                    <!--/* Adding: pick one of the installed gateways the store does not use yet. Editing: the gateway is fixed
+                           by the address, so there is nothing to pick. */-->
+                    <fieldset th:unless="${editing}" class="cl-fieldset">
+                        <legend class="cl-fieldset-title" th:text="#{store.payments.gateway.section}"></legend>
+                        <div class="cl-field">
+                            <label class="cl-label" for="providerName" th:text="#{store.payments.gateway.provider}"></label>
+                            <select class="cl-select" id="providerName" name="providerName" data-cl-variant-select="payment-gateway"
+                                    th:classappend="${errors['providerName'] != null} ? 'is-invalid'"
+                                    th:attr="aria-invalid=${errors['providerName'] != null ? 'true' : null},
+                                             aria-describedby=${errors['providerName'] != null ? 'providerName-help providerName-error' : 'providerName-help'}">
+                                <option th:unless="${providerKnown}" value="" th:text="#{store.payments.gateway.choose}"></option>
+                                <option th:each="provider : ${providers}" th:value="${provider.name()}"
+                                        th:text="${provider.displayName()}"
+                                        th:selected="${provider.name() == form.providerName}"></option>
+                            </select>
+                            <p class="cl-help" id="providerName-help" th:text="#{store.payments.gateway.provider.help}"></p>
+                            <p th:if="${errors['providerName'] != null}" class="cl-field-error" id="providerName-error">
+                                <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                                <span th:text="#{${errors['providerName']}}"></span>
+                            </p>
+                        </div>
+                    </fieldset>
+
+                    <fieldset th:each="provider : ${providers}" class="cl-fieldset"
+                              th:attr="data-cl-variant-group=${editing ? null : 'payment-gateway'}, data-cl-variant=${editing ? null : provider.name()}">
+                        <legend class="cl-fieldset-title" th:text="#{store.payments.gateway.settings(${provider.displayName()})}"></legend>
+
+                        <!--/* The webhook comes before the keys: Stripe issues the signing secret only once the endpoint exists. */-->
+                        <th:block th:if="${webhooks[provider.name()] != null}">
+                            <div th:replace="~{fragments/settings-form :: copyField('webhook-' + ${provider.name()},
+                                    #{store.payments.gateway.webhook}, ${webhooks[provider.name()]},
+                                    #{store.payments.gateway.webhook.help(${provider.displayName()})})}"></div>
+                            <details class="cl-disclosure" th:id="'webhook-steps-' + ${provider.name()}">
+                                <summary th:text="#{store.payments.gateway.webhook.steps.title(${provider.displayName()})}"></summary>
+                                <div class="cl-disclosure-body">
+                                    <ol class="cl-steps" th:with="specific=${#messages.msgOrNull('store.payments.gateway.webhook.steps.' + provider.name() + '.event')}">
+                                        <li th:text="#{store.payments.gateway.webhook.steps.open(${provider.displayName()})}"></li>
+                                        <li th:text="#{store.payments.gateway.webhook.steps.paste}"></li>
+                                        <li th:if="${specific != null}">
+                                            <span th:text="#{store.payments.gateway.webhook.steps.event}"></span>
+                                            <code class="cl-code" th:text="${specific}"></code>
+                                        </li>
+                                        <li th:text="#{store.payments.gateway.webhook.steps.keys}"></li>
+                                    </ol>
+                                </div>
+                            </details>
+                        </th:block>
+
+                        <div class="cl-form-grid">
+                            <div class="cl-span-3 cl-field" th:each="field : ${provider.configurationFields()}"
+                                 th:with="id=${T(pl.commercelink.web.dtos.IntegrationSettingsForm).fieldId(provider.name(), field)},
+                                          secret=${field.type().name() == 'PASSWORD'},
+                                          error=${errors.get(id)},
+                                          stored=${storedSecretIds.contains(id)},
+                                          example=${!secret and field.placeholder() != null and !#strings.isEmpty(field.placeholder())}">
+                                <label class="cl-label" th:for="${id}">
+                                    <span th:text="${field.label()}"></span>
+                                    <span th:unless="${field.required()}" class="cl-optional" th:text="#{form.optional}"></span>
+                                </label>
+                                <input class="cl-input" th:classappend="${error != null} ? 'is-invalid'"
+                                       th:id="${id}" th:name="${T(pl.commercelink.web.dtos.IntegrationSettingsForm).fieldName(provider.name(), field)}"
+                                       th:type="${secret ? 'password' : (field.type().name() == 'URL' ? 'url' : 'text')}"
+                                       th:value="${form.value(provider.name(), field)}"
+                                       th:attr="autocomplete=${secret ? 'new-password' : 'off'},
+                                                inputmode=${field.type().name() == 'NUMBER' ? 'decimal' : null},
+                                                aria-invalid=${error != null ? 'true' : null},
+                                                aria-describedby=${(example or stored or error != null) ? ((example or stored ? id + '-help' : '') + ((example or stored) and error != null ? ' ' : '') + (error != null ? id + '-error' : '')) : null}"/>
+                                <p th:if="${stored}" class="cl-help" th:id="${id} + '-help'" th:text="#{integration.secret.stored}"></p>
+                                <p th:if="${example}" class="cl-help" th:id="${id} + '-help'"
+                                   th:text="#{integration.setting.example(${field.placeholder()})}"></p>
+                                <p th:if="${error != null}" class="cl-field-error" th:id="${id} + '-error'">
+                                    <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                                    <span th:text="#{${error}}"></span>
+                                </p>
+                            </div>
+                        </div>
+                    </fieldset>
+
+                    <!--/* The store's first gateway becomes the default anyway, so there is nothing to choose or say. */-->
+                    <fieldset th:unless="${firstGateway}" class="cl-fieldset">
+                        <legend class="cl-fieldset-title" th:text="#{store.payments.gateway.defaultSection}"></legend>
+                        <p th:if="${alreadyDefault}" class="cl-help" th:text="#{store.payments.gateway.isDefault}"></p>
+                        <th:block th:unless="${alreadyDefault}">
+                            <div th:replace="~{fragments/settings-form :: check('makeDefault', 'store.payments.gateway.makeDefault', ${makeDefault}, 'store.payments.gateway.makeDefault.description', null)}"></div>
+                        </th:block>
+                    </fieldset>
+
+                    <div class="cl-card-footer">
+                        <button class="cl-button is-primary" type="submit" th:text="#{store.payments.gateway.save}"></button>
+                        <a class="cl-button" th:href="@{${paymentsHref}}" th:text="#{general.cancel}"></a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </section>
+    <script th:if="${!errors.isEmpty()}">
+        document.getElementById('payment-gateway-errors').focus();
+    </script>
+    <script th:src="@{/js/async-form.js}" defer></script>
+    <script th:src="@{/js/variant-fields.js}" defer></script>
+    <script th:src="@{/js/copy-field.js}" defer></script>
+</div>
+</body>
+</html>

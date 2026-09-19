@@ -26,6 +26,11 @@ public class DeliveryOption {
     @DynamoDBTypeConvertedEnum
     private ShipmentType type = ShipmentType.Courier;
 
+    // A removed option stays in the store so offers and baskets that chose it keep resolving it: the payment webhook
+    // and the offer page look the option up by id and failed once it was gone, so a paid basket produced no order.
+    @DynamoDBAttribute(attributeName = "retired")
+    private boolean retired;
+
     public DeliveryOption() {
         this.id = UniqueIdentifierGenerator.generate();
     }
@@ -68,6 +73,14 @@ public class DeliveryOption {
 
     public void setType(ShipmentType type) {
         this.type = type;
+    }
+
+    public boolean isRetired() {
+        return retired;
+    }
+
+    public void setRetired(boolean retired) {
+        this.retired = retired;
     }
 
     @DynamoDBIgnore

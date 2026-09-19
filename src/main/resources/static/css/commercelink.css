@@ -13,7 +13,13 @@
     --cl-rail-width: 76px;
     --cl-topbar-height: 56px;
     --cl-radius: 8px;
+    /* Vertical rhythm inside forms and cards: text attached to one control, controls that work together, separate fields */
+    --cl-gap-attached: 6px;
+    --cl-gap-related: 8px;
+    --cl-gap-fields: 12px;
     --cl-shadow: 0 10px 28px -14px rgba(14, 23, 33, .4);
+    /* A card at rest: soft and wide enough to lift a white card off a white page, lighter than a popover */
+    --cl-shadow-card: 0 4px 16px rgba(14, 23, 33, .08);
     --cl-z-sidebar: 30;
     --cl-z-scrim: 20;
     --cl-z-topbar: 25;
@@ -707,6 +713,7 @@ body.cl-drawer-open .cl-sidebar {
     border: 1px solid var(--cl-line);
     border-radius: var(--cl-radius);
     background: var(--cl-surface);
+    box-shadow: var(--cl-shadow-card);
     color: var(--cl-ink);
     text-decoration: none;
     transition: border-color .15s ease, box-shadow .15s ease;
@@ -714,7 +721,7 @@ body.cl-drawer-open .cl-sidebar {
 
 .cl-page .cl-tile:hover {
     border-color: var(--cl-accent);
-    box-shadow: var(--cl-shadow);
+    box-shadow: var(--cl-shadow-card), var(--cl-shadow);
     color: var(--cl-ink);
 }
 
@@ -805,10 +812,25 @@ body.cl-drawer-open .cl-sidebar {
     max-width: 760px;
 }
 
+/* A form built around a long value (e.g. an address to paste into another service) is wide enough to show it on one
+   line; its prose keeps a readable measure. */
+.cl-page .cl-form.is-wide {
+    max-width: 1040px;
+}
+
+.cl-page .cl-form.is-wide :is(.cl-help, .cl-steps) {
+    max-width: 72ch;
+}
+
+.cl-page .cl-form.is-wide .cl-card-desc {
+    max-width: calc(72ch + 40px);
+}
+
 .cl-page .cl-card {
     border: 1px solid var(--cl-line);
     border-radius: var(--cl-radius);
     background: var(--cl-surface);
+    box-shadow: var(--cl-shadow-card);
 }
 
 .cl-page .cl-fieldset {
@@ -828,8 +850,8 @@ body.cl-drawer-open .cl-sidebar {
     width: 100%;
     margin: 0 0 10px;
     padding: 0;
-    font-size: 15px;
-    font-weight: 600;
+    font-size: 16px;
+    font-weight: 650;
     line-height: 1.3;
     color: var(--cl-ink);
 }
@@ -851,7 +873,7 @@ body.cl-drawer-open .cl-sidebar {
 .cl-form-grid {
     display: grid;
     grid-template-columns: repeat(6, minmax(0, 1fr));
-    gap: 12px 16px;
+    gap: var(--cl-gap-fields) 16px;
 }
 
 .cl-form-grid > * {
@@ -866,19 +888,36 @@ body.cl-drawer-open .cl-sidebar {
 .cl-field {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: var(--cl-gap-attached);
 }
 
+/* A row of controls inside a field (file + remove, colour picker + value, Copy/Show/New) is a group, not a single
+   control: it keeps --cl-gap-related from the control above it and from the help or error text below it. */
+.cl-page .cl-field > :not(.cl-label) + :is(.cl-file-row, .cl-color-row, .cl-copy-actions),
+.cl-page .cl-field > :is(.cl-file-row, .cl-color-row, .cl-copy-actions) + :is(.cl-help, .cl-field-error) {
+    margin-top: calc(var(--cl-gap-related) - var(--cl-gap-attached));
+}
+
+/* A field name is the quietest part of its field: the section heading above it is dark and heavy, the value below it is
+   larger and dark, so the name stays light and grey. */
 .cl-label {
     font-size: 13.5px;
-    font-weight: 600;
+    font-weight: 500;
     line-height: 1.3;
-    color: var(--cl-ink);
+    color: var(--cl-ink-2);
 }
 
+/* "optional" after a field name, told apart from the name itself — some names end in brackets of their own
+   (e.g. "Zaciemnienie (0-30)"), so a second pair of brackets would read as part of the name. */
 .cl-optional {
-    font-weight: 400;
+    font-size: 12.5px;
+    font-weight: 500;
     color: var(--cl-ink-3);
+}
+
+.cl-optional::before {
+    content: "·";
+    margin-right: 5px;
 }
 
 .cl-input,
@@ -950,7 +989,7 @@ body.cl-drawer-open .cl-sidebar {
 }
 
 .cl-button:disabled,
-.cl-form[aria-busy="true"] .cl-button {
+.cl-form[aria-busy="true"] .cl-button[type="submit"] {
     opacity: .6;
     cursor: progress;
 }
@@ -1018,6 +1057,14 @@ body.cl-drawer-open .cl-sidebar {
     }
 }
 
+/* Safari on iOS zooms the page when a field it focuses has text smaller than 16px. */
+@media screen and (max-width: 719px) {
+    .cl-input,
+    .cl-select {
+        font-size: 16px;
+    }
+}
+
 @media screen and (max-width: 719px) {
     .cl-form-grid > .cl-span-2,
     .cl-form-grid > .cl-span-3,
@@ -1057,7 +1104,7 @@ body.cl-drawer-open .cl-sidebar {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 8px 20px;
+    gap: var(--cl-gap-related) 20px;
 }
 
 .cl-check {
@@ -1159,7 +1206,7 @@ body.cl-drawer-open .cl-sidebar {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 8px 12px;
+    gap: var(--cl-gap-related) 12px;
 }
 
 .cl-color-picker {
@@ -1253,6 +1300,828 @@ body.cl-drawer-open .cl-sidebar {
 
     .cl-brand-preview-label {
         white-space: normal;
+    }
+}
+
+/* Settings building blocks added with the notification, reporting and warehouse pages: page sections, record lists,
+   status tones, reveal, copy field, confirmation dialog and destructive buttons. Selectors on p, ul, li and h2 carry
+   extra classes to outweigh Bulma's .content rules (.content p:not(:last-child) is 0,2,1). */
+:root {
+    --cl-bad-ink: #861515;
+}
+
+/* Elements toggled by scripts (reveal, copy field, variant fields) use the hidden attribute; component display rules
+   must not bring them back. */
+.cl-page [hidden] {
+    display: none !important;
+}
+
+.cl-page .cl-stack {
+    display: grid;
+    gap: 20px;
+    max-width: 760px;
+}
+
+/* The stack's gap already separates an alert from the card below it. */
+.cl-page .cl-stack > .cl-alert {
+    margin-bottom: 0;
+}
+
+.cl-page .cl-card-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px 16px;
+    padding: 14px 20px 0;
+}
+
+.cl-page .cl-card .cl-card-title {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 650;
+    line-height: 1.3;
+    color: var(--cl-ink);
+}
+
+.cl-page .cl-card .cl-card-desc {
+    margin: 4px 0 0;
+    padding: 0 20px;
+    font-size: 13.5px;
+    line-height: 1.4;
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-card .cl-card-body {
+    margin: 0;
+    padding: 16px 20px;
+    font-size: 14px;
+    color: var(--cl-ink);
+}
+
+.cl-page .cl-card .cl-card-head + .cl-list,
+.cl-page .cl-card .cl-card-desc + .cl-list,
+.cl-page .cl-card .cl-card-head + .cl-list-empty,
+.cl-page .cl-card .cl-card-desc + .cl-list-empty {
+    margin-top: 12px;
+}
+
+.cl-page .cl-card > .cl-alert {
+    margin: 12px 20px 0;
+}
+
+/* An alert that closes the card (nothing to list or choose) keeps its distance from the card's bottom edge. */
+.cl-page .cl-card > .cl-alert:last-child {
+    margin-bottom: 16px;
+}
+
+/* Record list: one row per record or configuration item, summary on the left, actions on the right. */
+.cl-page .cl-card .cl-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.cl-page .cl-list .cl-list-item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 4px 20px;
+    margin: 0;
+    padding: 10px 20px;
+    border-top: 1px solid var(--cl-line);
+}
+
+.cl-page .cl-list-title {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+    font-size: 14.5px;
+    font-weight: 600;
+    line-height: 1.35;
+    color: var(--cl-ink);
+    overflow-wrap: anywhere;
+}
+
+.cl-page .cl-list .cl-list-desc {
+    margin: 2px 0 0;
+    font-size: 13.5px;
+    line-height: 1.4;
+    color: var(--cl-ink-2);
+    overflow-wrap: anywhere;
+}
+
+/* A small action in the title line (e.g. "Make default" where the Default pill would be): the 44 px touch target is kept
+   but pulled out of the line box, so the row is as tall as one with a pill. */
+.cl-page .cl-list-title-action {
+    display: inline-flex;
+    margin: 0;
+}
+
+.cl-page .cl-list-title-action .cl-link-button {
+    margin-block: -12px;
+    font-size: 13px;
+}
+
+/* What a record still lacks, in the colour of its warning pill so it is read together with it */
+.cl-page .cl-list .cl-list-desc.is-warn {
+    color: var(--cl-warn);
+}
+
+.cl-page .cl-list-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0 16px;
+}
+
+.cl-page .cl-list-actions form {
+    margin: 0;
+}
+
+.cl-page .cl-card .cl-list-group {
+    margin: 0;
+    padding: 14px 20px 6px;
+    border-top: 1px solid var(--cl-line);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-list-group + .cl-list .cl-list-item:first-child {
+    border-top: 0;
+}
+
+.cl-page .cl-card .cl-list-empty {
+    margin: 0;
+    padding: 14px 20px 18px;
+    border-top: 1px solid var(--cl-line);
+    font-size: 14px;
+    color: var(--cl-ink-2);
+}
+
+/* Status tones next to the warning tone defined with the tiles. */
+.cl-status.is-ok {
+    color: var(--cl-ok);
+    background: var(--cl-ok-soft);
+}
+
+.cl-status.is-info {
+    color: var(--cl-info);
+    background: var(--cl-info-soft);
+}
+
+/* --cl-ink-2: --cl-ink-3 on --cl-surface-2 is 4.48:1 at 12 px, below AA */
+.cl-status.is-neutral {
+    color: var(--cl-ink-2);
+    background: var(--cl-surface-2);
+    box-shadow: inset 0 0 0 1px var(--cl-line);
+}
+
+.cl-page .cl-alert.is-warn {
+    border-color: var(--cl-warn-soft);
+    border-left-color: var(--cl-warn);
+    background: var(--cl-warn-soft);
+}
+
+.cl-page .cl-alert.is-warn .cl-alert-icon {
+    margin-top: 3px;
+    color: var(--cl-warn);
+}
+
+.cl-page .cl-alert.is-ok {
+    max-width: 760px;
+    align-items: center;
+    border-color: var(--cl-ok-soft);
+    border-left-color: var(--cl-ok);
+    background: var(--cl-ok-soft);
+}
+
+.cl-page .cl-alert.is-ok .cl-alert-icon {
+    color: var(--cl-ok);
+}
+
+.cl-page .cl-alert .cl-alert-text {
+    margin: 2px 0 0;
+    font-size: 13.5px;
+}
+
+.cl-page .cl-alert .cl-alert-text a {
+    color: var(--cl-accent-ink);
+    text-decoration: underline;
+}
+
+/* Destructive actions */
+.cl-button.is-danger {
+    border-color: var(--cl-bad);
+    background: var(--cl-bad);
+    color: #fff;
+}
+
+.cl-button.is-danger:hover {
+    border-color: var(--cl-bad-ink);
+    background: var(--cl-bad-ink);
+    color: #fff;
+}
+
+.cl-link-button.is-danger,
+.cl-link-button.is-danger:hover {
+    color: var(--cl-bad);
+}
+
+a.cl-link-button {
+    text-decoration: none;
+}
+
+a.cl-link-button:hover {
+    text-decoration: underline;
+}
+
+/* A checkbox that switches a feature on, with its effect below the label and the fields it reveals. */
+.cl-page .cl-check-field .cl-check {
+    font-weight: 600;
+}
+
+.cl-page .cl-check-field .cl-check-description {
+    margin: -6px 0 0 24px;
+    font-size: 13px;
+    line-height: 1.4;
+    color: var(--cl-ink-2);
+}
+
+/* One of a few fixed options, each with its effect under the name (how new orders are fulfilled, where a supplier's
+   access details come from). The whole row is the target; the description lines up with the name, not the circle. */
+.cl-page .cl-choice {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    min-height: 36px;
+    padding: 6px 0;
+    cursor: pointer;
+}
+
+.cl-page .cl-choice input {
+    flex: none;
+    width: 16px;
+    height: 16px;
+    margin: 2px 0 0;
+    accent-color: var(--cl-accent);
+}
+
+.cl-page .cl-choice input:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
+}
+
+.cl-page .cl-choice-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.cl-page .cl-choice-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--cl-ink);
+}
+
+.cl-page .cl-choice-description {
+    font-size: 13px;
+    line-height: 1.4;
+    color: var(--cl-ink-2);
+}
+
+/* A group of fields or options inside a card's group, without a frame of its own: radios under a legend that reads like a
+   field label, or a part of the form that is switched off as a whole (disabled with its fieldset). */
+.cl-page .cl-choice-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--cl-gap-attached);
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.cl-page .cl-choice-group[hidden] {
+    display: none;
+}
+
+.cl-page .cl-choice-group > legend.cl-label {
+    float: left;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+}
+
+.cl-page .cl-choice-group > legend.cl-label + * {
+    clear: both;
+}
+
+/* Two or three short options side by side, so the form stays within a laptop screen (how new orders are fulfilled). */
+@media screen and (min-width: 720px) {
+    .cl-page .cl-choice-group.is-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        column-gap: 20px;
+    }
+
+    .cl-page .cl-choice-group.is-row > legend,
+    .cl-page .cl-choice-group.is-row > .cl-field-error {
+        grid-column: 1 / -1;
+    }
+}
+
+.cl-page .cl-fieldset > * + .cl-choice-group,
+.cl-page .cl-fieldset > .cl-choice-group + *,
+.cl-page .cl-choice-group > .cl-alert {
+    margin-top: var(--cl-gap-fields);
+}
+
+/* A day count: two or three digits, so the field is as wide as its value, not as its column. */
+.cl-page .cl-input-days {
+    max-width: 120px;
+}
+
+@media screen and (max-width: 1023px) {
+    .cl-page .cl-choice {
+        min-height: 44px;
+    }
+}
+
+/* Many equal checkboxes (store categories). Newspaper columns, not a grid: the names stay alphabetical down each
+   column, so finding one is a single scan instead of a zigzag across rows. */
+.cl-page .cl-check-columns {
+    margin: 0;
+    padding: 12px 20px 16px;
+    columns: 3;
+    column-gap: 20px;
+    list-style: none;
+}
+
+.cl-page .cl-check-columns > li {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    break-inside: avoid;
+}
+
+/* The label fills its column so the whole width is clickable, and a name long enough to wrap keeps its second line
+   clear of the box instead of running under it. */
+.cl-page .cl-check-columns .cl-check {
+    display: flex;
+    width: 100%;
+}
+
+.cl-page .cl-check-columns .cl-check input {
+    flex: none;
+}
+
+/* Name and its state pill share one text flow, so the pill follows the name and wraps under it when the column is
+   too narrow; as separate flex items the pill squeezed the name into an extra line of its own. */
+.cl-page .cl-check-columns .cl-check-text {
+    min-width: 0;
+    line-height: 1.35;
+}
+
+.cl-page .cl-check-columns .cl-check-text .cl-status {
+    margin-left: 6px;
+    vertical-align: middle;
+}
+
+@media screen and (max-width: 1215px) {
+    .cl-page .cl-check-columns {
+        columns: 2;
+    }
+}
+
+@media screen and (max-width: 719px) {
+    .cl-page .cl-check-columns {
+        columns: 1;
+    }
+}
+
+/* Fields that only matter while a box is ticked: indented to the box's label, which is enough to tie them to it. */
+.cl-reveal {
+    margin: var(--cl-gap-fields) 0 0 24px;
+}
+
+.cl-page .cl-reveal .cl-help {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.4;
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-card-head + .cl-card-body {
+    padding-top: 12px;
+}
+
+/* A note that belongs to the whole group rather than one field (the default account, an edit that reaches open offers). */
+.cl-page .cl-fieldset > .cl-help,
+.cl-page .cl-form-grid > .cl-help {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.4;
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-fieldset > .cl-form-grid + .cl-help {
+    margin-top: var(--cl-gap-fields);
+}
+
+.cl-page .cl-card-body > .cl-help {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.4;
+    color: var(--cl-ink-2);
+}
+
+/* A read-only status of what a feature depends on (e.g. whether customer returns work). Tinted and flat, so it does not
+   read as a card to fill in and save; the title states the outcome with an icon in the matching tone. */
+.cl-page .cl-card.is-status {
+    background: var(--cl-surface-2);
+    box-shadow: none;
+}
+
+.cl-page .cl-card.is-status .cl-card-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.cl-page .cl-card.is-status .cl-card-title .is-ok {
+    color: var(--cl-ok);
+}
+
+.cl-page .cl-card.is-status .cl-card-title .is-warn {
+    color: var(--cl-warn);
+}
+
+/* Collapsed details straight under the head keep the same distance as a list would. */
+.cl-page .cl-card.is-status .cl-card-head + .cl-disclosure {
+    margin-top: 12px;
+}
+
+/* A state pill next to a card title. */
+.cl-page .cl-card-title .cl-status {
+    margin-left: 8px;
+    vertical-align: middle;
+}
+
+/* Digits of equal width, so account numbers grouped in fours line up from row to row. */
+.cl-page .cl-tabular {
+    font-variant-numeric: tabular-nums;
+}
+
+/* Collapsible section at the bottom of a card (e.g. setup instructions read once) */
+.cl-page .cl-disclosure {
+    border-top: 1px solid var(--cl-line);
+}
+
+.cl-page .cl-disclosure > summary {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 0 20px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--cl-accent-ink);
+    cursor: pointer;
+    list-style: none;
+}
+
+.cl-page .cl-disclosure > summary::-webkit-details-marker {
+    display: none;
+}
+
+.cl-page .cl-disclosure > summary::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-right: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    transform: rotate(-45deg);
+    transition: transform .15s;
+}
+
+.cl-page .cl-disclosure[open] > summary::before {
+    transform: rotate(45deg);
+}
+
+.cl-page .cl-disclosure > summary:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: -2px;
+}
+
+.cl-page .cl-disclosure-body {
+    padding: 0 20px 16px;
+}
+
+/* Inside a group of fields (setup steps under a webhook address): aligned with the fields, no rule above, spaced
+   from the fields that follow; the rule and the 20 px inset belong to the disclosure closing a card. */
+.cl-page .cl-fieldset > .cl-disclosure {
+    border-top: 0;
+    margin: 4px 0 var(--cl-gap-fields);
+}
+
+.cl-page .cl-fieldset > .cl-disclosure > summary {
+    padding: 0;
+}
+
+.cl-page .cl-fieldset > .cl-disclosure > .cl-disclosure-body {
+    padding: 0 0 4px;
+}
+
+/* Numbered setup steps, e.g. what to do in an external service */
+.cl-page .cl-steps {
+    margin: 0;
+    padding-left: 20px;
+    list-style: decimal;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--cl-ink);
+}
+
+.cl-page .cl-steps li {
+    padding-left: 4px;
+}
+
+.cl-page .cl-steps li + li {
+    margin-top: 6px;
+}
+
+.cl-page .cl-steps li::marker {
+    font-weight: 600;
+}
+
+/* A literal value to type in elsewhere (a name, a code) inside running text */
+.cl-page .cl-code {
+    padding: 1px 6px;
+    border: 1px solid var(--cl-line);
+    border-radius: 4px;
+    background: var(--cl-surface-2);
+    color: var(--cl-ink);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 13px;
+    white-space: nowrap;
+}
+
+.cl-page .cl-disclosure-body .cl-steps-note {
+    margin: var(--cl-gap-fields) 0 0;
+    padding-top: var(--cl-gap-fields);
+    border-top: 1px dashed var(--cl-line);
+    font-size: 13px;
+    line-height: 1.4;
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-steps-note a {
+    color: var(--cl-accent-ink);
+    font-weight: 600;
+}
+
+/* Read-only value with Copy and optional Show: the value spans the field, its actions sit in one row below. */
+.cl-copy-value {
+    display: block;
+    min-width: 0;
+    padding: 9px 12px;
+    border: 1px solid var(--cl-line);
+    border-radius: var(--cl-radius);
+    background: var(--cl-surface-2);
+    color: var(--cl-ink);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 13.5px;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+}
+
+.cl-copy-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--cl-gap-related);
+}
+
+/* A rarer action in the same row (e.g. replace the value), kept apart from Copy so it is not hit by mistake */
+.cl-copy-actions .cl-copy-actions-end {
+    margin-left: auto;
+}
+
+/* Switch that saves at once: a submit button with role="switch" and the opposite value in a hidden field, so it works
+   without JavaScript. The state label sits in a .cl-swap, so the switch never changes width. */
+.cl-switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 36px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    font: inherit;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--cl-ink-2);
+    cursor: pointer;
+}
+
+.cl-switch-track {
+    position: relative;
+    flex: none;
+    width: 40px;
+    height: 22px;
+    border-radius: 11px;
+    /* The track of a switched-off switch is its only outline: at least 3:1 against the card (WCAG 1.4.11) */
+    background: var(--cl-ink-3);
+    transition: background-color .15s;
+}
+
+.cl-switch-thumb {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, .25);
+    transition: transform .15s;
+}
+
+.cl-switch[aria-checked="true"] {
+    color: var(--cl-accent-ink);
+}
+
+.cl-switch[aria-checked="true"] .cl-switch-track {
+    background: var(--cl-accent);
+}
+
+.cl-switch[aria-checked="true"] .cl-switch-thumb {
+    transform: translateX(18px);
+}
+
+.cl-switch:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 3px;
+    border-radius: 12px;
+}
+
+.cl-form[aria-busy="true"] .cl-switch {
+    cursor: progress;
+}
+
+/* A card that ends with its description (e.g. a switched-off integration) */
+.cl-page .cl-card > .cl-card-desc:last-child {
+    padding-bottom: 16px;
+}
+
+.cl-page .cl-card-desc + .cl-card-body {
+    padding-top: 14px;
+}
+
+/* Two states of a button rendered in one grid cell: the button is as wide as the wider state, so switching
+   (Show/Hide, Copy/Copied icon) never resizes it. The inactive state is visibility: hidden, so it is not read out. */
+.cl-swap {
+    display: inline-grid;
+}
+
+.cl-swap > .cl-swap-a,
+.cl-swap > .cl-swap-b {
+    grid-area: 1 / 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.cl-swap > .cl-swap-b,
+.cl-swap.is-swapped > .cl-swap-a {
+    visibility: hidden;
+}
+
+.cl-swap.is-swapped > .cl-swap-b {
+    visibility: visible;
+}
+
+.cl-copy-done {
+    color: var(--cl-ok);
+}
+
+.cl-visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+
+
+.cl-copy-fallback summary {
+    min-height: 36px;
+    display: flex;
+    align-items: center;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--cl-accent-ink);
+    cursor: pointer;
+}
+
+/* Confirmation dialog. It opens in the top layer, but its markup sits inside .cl-page, hence the prefix. */
+.cl-dialog {
+    width: min(440px, calc(100vw - 32px));
+    padding: 0;
+    border: 0;
+    border-radius: 10px;
+    background: var(--cl-surface);
+    color: var(--cl-ink);
+    box-shadow: var(--cl-shadow);
+}
+
+.cl-dialog::backdrop {
+    background: rgba(14, 23, 33, .45);
+}
+
+.cl-page .cl-dialog .cl-dialog-title {
+    margin: 0;
+    padding: 18px 20px 6px;
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.35;
+    color: var(--cl-ink);
+    overflow-wrap: anywhere;
+}
+
+.cl-page .cl-dialog .cl-dialog-message {
+    margin: 0;
+    padding: 0 20px 18px;
+    font-size: 14px;
+    line-height: 1.45;
+    color: var(--cl-ink-2);
+}
+
+/* The confirming action first and left, as in card footers and on the confirmation page */
+.cl-dialog-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 8px;
+    padding: 12px 20px;
+    border-top: 1px solid var(--cl-line);
+    border-radius: 0 0 10px 10px;
+    background: var(--cl-surface-2);
+}
+
+@media screen and (max-width: 719px) {
+    .cl-page .cl-list .cl-list-item {
+        grid-template-columns: minmax(0, 1fr);
+        padding: 10px 16px;
+    }
+
+    .cl-page .cl-list-actions {
+        justify-content: flex-start;
+    }
+
+    .cl-page .cl-card-head,
+    .cl-page .cl-card .cl-card-desc,
+    .cl-page .cl-card .cl-list-group,
+    .cl-page .cl-card .cl-list-empty,
+    .cl-page .cl-card .cl-card-body {
+        padding-left: 16px;
+        padding-right: 16px;
+    }
+
+    .cl-page .cl-card > .cl-alert {
+        margin-left: 16px;
+        margin-right: 16px;
+    }
+
+    .cl-copy-actions .cl-button {
+        flex: 1 1 0;
+        min-width: 0;
+        justify-content: center;
+    }
+
+    .cl-copy-actions .cl-copy-actions-end {
+        flex-basis: 100%;
+        margin-left: 0;
+    }
+
+    .cl-switch {
+        min-height: 44px;
+    }
+
+    .cl-dialog-actions .cl-button {
+        flex: 1 1 100%;
+        justify-content: center;
     }
 }
 
@@ -1731,5 +2600,520 @@ body.cl-drawer-open .cl-sidebar {
     tr,
     img {
         page-break-inside: avoid;
+    }
+}
+
+/* A link used as the title-line shortcut (e.g. "Connect account" on Marketplaces), same box as the button in a form */
+.cl-page a.cl-link-button.cl-list-title-action {
+    margin-block: -12px;
+    font-size: 13px;
+}
+
+/* A link inside a row description ("Export history", "Set up in a catalog") */
+.cl-page .cl-list .cl-list-desc a {
+    color: var(--cl-accent-ink);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+/* Schedule field (fragments/schedule-field): mode as a segmented control, hours as toggle chips. Shared by Marketplaces,
+   Fulfilment (supplier feed) and the catalog (pricelist), so it is not scoped to .cl-page. */
+/* Separate fields stacked in a group without a grid (the orders and returns schedules of a marketplace) are as far apart
+   as fields in a grid; without it the second label touched the first field's summary. */
+.cl-page .cl-fieldset > .cl-field + .cl-field {
+    margin-top: var(--cl-gap-fields);
+}
+
+/* The catalog form wraps the field in a Bulma .field under a label; it lost its mt-2 and touched the label. */
+.field > .schedule-field {
+    margin-top: var(--cl-gap-related);
+}
+
+.schedule-field p.cl-help {
+    margin: var(--cl-gap-attached) 0 0;
+    font-size: 13px;
+    color: var(--cl-ink-2);
+}
+
+.schedule-field .cl-help.is-bad {
+    color: var(--cl-bad);
+}
+
+.schedule-field .cl-help.is-warn {
+    color: var(--cl-warn);
+}
+
+.cl-segmented {
+    display: inline-flex;
+    flex-wrap: wrap;
+    border: 1px solid var(--cl-line);
+    border-radius: var(--cl-radius);
+    background: var(--cl-surface-2);
+    padding: 2px;
+    gap: 2px;
+}
+
+.cl-segment {
+    min-height: 32px;
+    padding: 0 12px;
+    border: 0;
+    border-radius: calc(var(--cl-radius) - 2px);
+    background: transparent;
+    color: var(--cl-ink-2);
+    font: inherit;
+    font-size: 13.5px;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.cl-segment:hover {
+    color: var(--cl-ink);
+}
+
+.cl-segment[aria-pressed="true"] {
+    background: var(--cl-surface);
+    color: var(--cl-accent-ink);
+    box-shadow: 0 1px 2px rgba(14, 23, 33, .12), inset 0 0 0 1px var(--cl-accent);
+    font-weight: 600;
+}
+
+.cl-segment:focus-visible,
+.cl-chip:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
+}
+
+.schedule-field .schedule-pane {
+    margin-top: var(--cl-gap-related);
+}
+
+.schedule-field .schedule-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--cl-gap-related);
+    margin-top: var(--cl-gap-related);
+}
+
+.schedule-field .schedule-pane > .schedule-row:first-child {
+    margin-top: 0;
+}
+
+.schedule-field .schedule-row-text,
+.schedule-field p.schedule-row-text {
+    margin: 0;
+    font-size: 13.5px;
+    color: var(--cl-ink-2);
+}
+
+.cl-select.is-compact {
+    width: auto;
+    min-width: 88px;
+    height: 36px;
+    font-size: 14px;
+}
+
+.schedule-field .schedule-hours {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 4px;
+    margin-top: var(--cl-gap-attached);
+    max-width: 560px;
+}
+
+.cl-chip {
+    min-height: 32px;
+    padding: 0;
+    border: 1px solid var(--cl-line);
+    border-radius: 6px;
+    background: var(--cl-surface);
+    color: var(--cl-ink-2);
+    font: inherit;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+}
+
+.cl-chip:hover {
+    border-color: var(--cl-ink-3);
+}
+
+.cl-chip[aria-pressed="true"] {
+    border-color: var(--cl-accent);
+    background: var(--cl-accent);
+    color: #fff;
+    font-weight: 600;
+}
+
+@media screen and (max-width: 1023px) {
+    .cl-segment,
+    .cl-chip {
+        min-height: 44px;
+    }
+
+    .cl-select.is-compact {
+        height: 44px;
+    }
+}
+
+/* A note under a group title, before the fields it is about ("After saving you connect the account…") */
+.cl-page .cl-fieldset > p.cl-help + .cl-form-grid {
+    margin-top: var(--cl-gap-fields);
+}
+
+@media screen and (max-width: 719px) {
+    .schedule-field .schedule-hours {
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+    }
+
+    /* Three modes do not fit one line of a phone card: every segment takes the whole width of its line */
+    .cl-segmented {
+        display: flex;
+        width: 100%;
+    }
+
+    .cl-segment {
+        flex: 1 1 auto;
+    }
+
+    .cl-select.is-compact {
+        font-size: 16px;
+    }
+}
+
+/* Shipping: a card description that warns (the courier account works, but its webhook is not verified). */
+.cl-page .cl-card .cl-card-desc.is-warn {
+    color: var(--cl-warn);
+}
+
+/* A sentence about the whole list, under its last row (which package templates customers see for returns). */
+.cl-page .cl-card .cl-card-desc.cl-card-note {
+    margin: 0;
+    padding-top: 12px;
+    padding-bottom: 16px;
+    border-top: 1px solid var(--cl-line);
+}
+
+/* A single record summarised in a card body: its name, then its address on the next line. */
+.cl-page .cl-card-body-title {
+    display: block;
+    font-weight: 600;
+}
+
+.cl-page .cl-card-body-line {
+    display: block;
+    color: var(--cl-ink-2);
+}
+
+/* Repeatable groups of fields (parcels of a package template): "Remove" sits at the top right of its group, next to the
+   floated legend; "Add" follows the last group, aligned with the fields. */
+.cl-page .cl-repeat > .cl-fieldset {
+    position: relative;
+}
+
+.cl-page .cl-repeat .cl-repeat-remove {
+    position: absolute;
+    top: 8px;
+    right: 20px;
+}
+
+.cl-page .cl-repeat-add {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--cl-gap-related);
+    padding: 10px 20px 12px;
+    border-top: 1px solid var(--cl-line);
+}
+
+.cl-page .cl-repeat-add .cl-help {
+    margin: 0;
+    font-size: 13px;
+    color: var(--cl-ink-2);
+}
+
+/* Multi-line text (the body of an email): the look of .cl-input, growing with its rows instead of a fixed height. */
+.cl-input.cl-textarea {
+    height: auto;
+    min-height: 160px;
+    padding: 10px 12px;
+    line-height: 1.5;
+    resize: vertical;
+}
+
+/* Values to paste into a template ({{orderId}}), wrapping as chips; a long list section may break anywhere. */
+.cl-page .cl-param-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+/* Bulma spaces every li after the first (li + li), which lifted the first chip 4 px above the others. */
+.cl-page .cl-param-list li {
+    margin: 0;
+}
+
+.cl-page .cl-param-list .cl-code {
+    display: inline-block;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+.cl-page .cl-disclosure-body .cl-param-hint {
+    margin: 0 0 var(--cl-gap-related);
+    font-size: 13px;
+    line-height: 1.4;
+    color: var(--cl-ink-2);
+}
+
+/* A chip that inserts its value into the field being written (parameters of an email template). */
+.cl-page .cl-param {
+    display: inline-flex;
+    align-items: center;
+    min-height: 28px;
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+    text-align: left;
+}
+
+.cl-page .cl-param .cl-code {
+    transition: border-color .15s ease, color .15s ease;
+}
+
+.cl-page .cl-param:hover .cl-code {
+    border-color: var(--cl-accent);
+    color: var(--cl-accent-ink);
+}
+
+.cl-page .cl-param:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+@media screen and (max-width: 1023px) {
+    .cl-page .cl-param {
+        min-height: 44px;
+    }
+}
+
+/* Rarely used fields folded at the bottom of a form card (hidden copies, attachments): its groups keep their own
+   padding, so the body adds none; each group is ruled off like the groups above it. */
+.cl-page .cl-card-extras > .cl-disclosure-body {
+    padding: 0;
+}
+
+.cl-page .cl-card-extras > .cl-disclosure-body > .cl-form-grid {
+    padding: 4px 20px 16px;
+}
+
+.cl-page .cl-card-extras .cl-repeat > .cl-fieldset {
+    border-top: 1px solid var(--cl-line);
+}
+
+@media screen and (max-width: 719px) {
+    .cl-page .cl-card-extras > .cl-disclosure-body > .cl-form-grid {
+        padding-left: 16px;
+        padding-right: 16px;
+    }
+}
+
+/* A group note right after a checkbox keeps the distance the fields below it keep. */
+.cl-page .cl-fieldset > .cl-check-field + .cl-help {
+    margin-top: var(--cl-gap-fields);
+}
+
+/* Chromium puts details content in a ::details-content box that breaks Bulma's box-sizing inheritance, so fields in a
+   disclosure were content-box and their 100% width overflowed the card by their padding. */
+.cl-page .cl-disclosure-body,
+.cl-page .cl-disclosure-body *,
+.cl-page .cl-disclosure-body *::before,
+.cl-page .cl-disclosure-body *::after {
+    box-sizing: border-box;
+}
+
+/* A stack of cards holding a data table: wider than the 760 px of settings forms, so a message column can breathe. */
+.cl-page .cl-stack.is-wide {
+    max-width: 1040px;
+}
+
+/* A state pill in the line under a page title. */
+.cl-page .cl-page-lead .cl-status {
+    margin-left: 8px;
+    vertical-align: middle;
+}
+
+/* Controls above a data table: the filter on the left, the search on the right; stacked on a phone. */
+.cl-page .cl-table-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--cl-gap-related);
+    padding: 0 20px 14px;
+}
+
+.cl-page .cl-table-search {
+    width: 280px;
+    height: 36px;
+}
+
+.cl-segment-count {
+    margin-left: 4px;
+    color: var(--cl-ink-3);
+    font-variant-numeric: tabular-nums;
+}
+
+.cl-segment[aria-pressed="true"] .cl-segment-count {
+    color: inherit;
+}
+
+/* Data table: rows of records compared column by column (offers of an export run). Header cells name their scope;
+   numbers align right in digits of equal width. Below 720 px each row becomes a small card whose cells carry their
+   column name from data-label, so nothing scrolls sideways. */
+.cl-page .cl-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+    color: var(--cl-ink);
+}
+
+.cl-page .cl-table thead th {
+    padding: 10px 12px;
+    border-top: 1px solid var(--cl-line);
+    border-bottom: 1px solid var(--cl-line);
+    background: var(--cl-surface-2);
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--cl-ink-2);
+    text-align: left;
+    white-space: nowrap;
+}
+
+.cl-page .cl-table tbody th,
+.cl-page .cl-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--cl-line);
+    text-align: left;
+    vertical-align: top;
+    font-weight: 400;
+}
+
+.cl-page .cl-table tbody tr:last-child > * {
+    border-bottom: 0;
+}
+
+.cl-page .cl-table :is(th, td):first-child {
+    padding-left: 20px;
+}
+
+.cl-page .cl-table :is(th, td):last-child {
+    padding-right: 20px;
+}
+
+.cl-page .cl-table .is-numeric {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.cl-page .cl-table .cl-table-key {
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.cl-page .cl-table .cl-status {
+    white-space: nowrap;
+}
+
+.cl-page .cl-table .cl-table-sub {
+    display: block;
+    margin-top: 2px;
+    font-size: 12.5px;
+    color: var(--cl-ink-3);
+    overflow-wrap: anywhere;
+}
+
+.cl-page .cl-table + .cl-list-empty {
+    border-top: 0;
+}
+
+@media screen and (max-width: 719px) {
+    .cl-page .cl-table-toolbar {
+        padding-left: 16px;
+        padding-right: 16px;
+    }
+
+    .cl-page .cl-table-search {
+        width: 100%;
+        height: 44px;
+    }
+
+    .cl-page .cl-table thead {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+    }
+
+    .cl-page .cl-table,
+    .cl-page .cl-table tbody,
+    .cl-page .cl-table tr {
+        display: block;
+    }
+
+    .cl-page .cl-table tr {
+        padding: 10px 16px;
+        border-top: 1px solid var(--cl-line);
+    }
+
+    .cl-page .cl-table tbody th,
+    .cl-page .cl-table td {
+        display: grid;
+        grid-template-columns: 84px minmax(0, 1fr);
+        column-gap: 12px;
+        row-gap: 2px;
+        align-items: start;
+        padding: 3px 0;
+        border: 0;
+        text-align: left;
+    }
+
+    .cl-page .cl-table :is(th, td):first-child,
+    .cl-page .cl-table :is(th, td):last-child {
+        padding-left: 0;
+        padding-right: 0;
+    }
+
+    .cl-page .cl-table :is(tbody th, td)::before {
+        content: attr(data-label);
+        font-size: 12.5px;
+        font-weight: 400;
+        color: var(--cl-ink-2);
+    }
+
+    .cl-page .cl-table td.is-empty {
+        display: none;
+    }
+
+    .cl-page .cl-table .is-numeric {
+        text-align: left;
+    }
+
+    .cl-page .cl-table .cl-status,
+    .cl-page .cl-table .cl-table-key {
+        white-space: normal;
+    }
+
+    .cl-page .cl-table td > span {
+        grid-column: 2;
+        justify-self: start;
     }
 }

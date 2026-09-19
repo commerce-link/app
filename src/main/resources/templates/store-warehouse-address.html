@@ -1,0 +1,52 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+<div layout:fragment="content">
+    <section class="cl-page">
+        <div class="cl-page-body">
+            <div th:replace="~{fragments/settings-header :: subpage(${warehouseHref}, ${backLabel}, ${pageTitle})}"></div>
+
+            <form th:fragment="addressForm" id="warehouse-address-form" class="cl-form"
+                  th:action="@{${formAction}}" th:object="${form}" method="post" novalidate data-cl-async
+                  th:attr="data-cl-redirect=${redirectTo}, data-error-message=#{form.save.failed}">
+                <div th:replace="~{fragments/settings-form :: errorSummary('warehouse-address-errors', ${errors}, null)}"></div>
+
+                <div class="cl-card">
+                    <fieldset class="cl-fieldset">
+                        <legend class="cl-fieldset-title" th:text="#{store.warehouse.address.section.address}"></legend>
+                        <div class="cl-form-grid">
+                            <div th:insert="~{fragments/settings-form :: textField('companyName', 'store.warehouse.address.companyName', *{companyName}, 'text', 'organization', true, ${errors['companyName']}, null)}"></div>
+                            <div th:insert="~{fragments/settings-form :: textField('streetAndNumber', 'order.address.street', *{streetAndNumber}, 'text', 'street-address', true, ${errors['streetAndNumber']}, null)}"></div>
+                            <div class="cl-span-2" th:insert="~{fragments/settings-form :: textField('postalCode', 'order.address.postal', *{postalCode}, 'text', 'postal-code', true, ${errors['postalCode']}, null)}"></div>
+                            <div class="cl-span-2" th:insert="~{fragments/settings-form :: textField('city', 'order.address.city', *{city}, 'text', 'address-level2', true, ${errors['city']}, null)}"></div>
+                            <div class="cl-span-2" th:insert="~{fragments/form-field :: select('country', 'order.address.country', *{country}, ${countries}, 'country', true, ${errors['country']})}"></div>
+                        </div>
+                    </fieldset>
+                    <fieldset class="cl-fieldset">
+                        <legend class="cl-fieldset-title" th:text="#{store.warehouse.address.section.contact}"></legend>
+                        <div class="cl-form-grid">
+                            <div class="cl-span-3" th:insert="~{fragments/settings-form :: textField('email', 'order.address.email', *{email}, 'email', 'email', false, ${errors['email']}, null)}"></div>
+                            <div class="cl-span-3" th:insert="~{fragments/settings-form :: textField('phone', 'order.address.phone', *{phone}, 'tel', 'tel', false, ${errors['phone']}, null)}"></div>
+                            <p th:if="${alreadyDefault}" class="cl-help" th:text="#{store.warehouse.address.isDefault}"></p>
+                            <th:block th:unless="${alreadyDefault}">
+                                <div th:replace="~{fragments/settings-form :: check('makeDefault', 'store.warehouse.address.makeDefault', *{makeDefault}, 'store.warehouse.address.makeDefault.description', null)}"></div>
+                            </th:block>
+                        </div>
+                    </fieldset>
+                    <div class="cl-card-footer">
+                        <button class="cl-button is-primary" type="submit" th:text="#{store.warehouse.address.save}"></button>
+                        <a class="cl-button" th:href="@{${warehouseHref}}" th:text="#{general.cancel}"></a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </section>
+    <script th:if="${!errors.isEmpty()}">
+        document.getElementById('warehouse-address-errors').focus();
+    </script>
+    <script th:src="@{/js/async-form.js}" defer></script>
+</div>
+</body>
+</html>

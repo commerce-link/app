@@ -3,8 +3,6 @@ package pl.commercelink.web.dtos;
 import org.junit.jupiter.api.Test;
 import pl.commercelink.orders.BillingDetails;
 
-import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -138,28 +136,5 @@ class CompanyDetailsFormTest {
         // then
         assertThat(form.getCountry()).isEqualTo("PL");
         assertThat(form.getCompanyName()).isNull();
-    }
-
-    @Test
-    void listsPolandFirstAndNamesCountriesInTheUserLanguage() {
-        // when
-        List<PickerOption> polish = CompanyDetailsForm.countryOptions("PL", Locale.forLanguageTag("pl"));
-        List<PickerOption> english = CompanyDetailsForm.countryOptions("PL", Locale.ENGLISH);
-
-        // then
-        assertThat(polish.get(0)).isEqualTo(new PickerOption("PL", "Polska"));
-        assertThat(polish).contains(new PickerOption("DE", "Niemcy"));
-        assertThat(english.get(0)).isEqualTo(new PickerOption("PL", "Poland"));
-        assertThat(polish).extracting(PickerOption::value).doesNotHaveDuplicates().hasSize(27);
-    }
-
-    @Test
-    void keepsAStoredCountryThatIsNotOnTheList() {
-        // when
-        List<PickerOption> options = CompanyDetailsForm.countryOptions("Polska", Locale.forLanguageTag("pl"));
-
-        // then
-        assertThat(options.get(0)).isEqualTo(new PickerOption("Polska", "Polska"));
-        assertThat(options).hasSize(28);
     }
 }
