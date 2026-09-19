@@ -52,4 +52,9 @@ public class MarketplaceProviderFactory extends ProviderFactory<MarketplaceProvi
     public String resolveCredentialName(String marketplaceName) {
         return marketplaceName.toLowerCase() + "_marketplace";
     }
+
+    @Override
+    protected String credentialNameWithoutDescriptor(String marketplaceName) {
+        return resolveCredentialName(marketplaceName);
+    }
 }
