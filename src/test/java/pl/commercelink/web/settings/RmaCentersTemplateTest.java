@@ -59,6 +59,19 @@ class RmaCentersTemplateTest {
                 .doesNotContain("button is-link is-light").doesNotContain("<th>");
     }
 
+    /** The own-centres heading renders only next to shared centres; the list must not point at a missing element. */
+    @Test
+    void theOwnListIsLabelledByTheCardTitleWhenThereIsNoGroupHeading() {
+        // when
+        String alone = list(List.of(center("Acme", false, true, false, List.of())), List.of());
+        String withShared = list(List.of(center("Acme", false, true, false, List.of())),
+                List.of(center("Elko", true, true, false, List.of())));
+
+        // then
+        assertThat(alone).contains("class=\"cl-list\" aria-labelledby=\"rma-centers-title\"").doesNotContain("id=\"rma-centers-own\"");
+        assertThat(withShared).contains("class=\"cl-list\" aria-labelledby=\"rma-centers-own\"").contains("id=\"rma-centers-own\"");
+    }
+
     @Test
     void aSharedCentreIsMarkedAndOffersNoActions() {
         // when

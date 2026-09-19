@@ -173,6 +173,8 @@ class StoreWarehouseTemplateTest {
 
         // then
         assertThat(html).contains("cl-alert is-warn").contains("href=\"/dashboard/store/invoicing\"");
+        // Only relevant while documents are on: it is revealed with their ids, not shown to stores that keep them off.
+        assertThat(html.indexOf("cl-alert is-warn")).isGreaterThan(html.indexOf("id=\"warehouse-documents-ids\""));
     }
 
     @Test

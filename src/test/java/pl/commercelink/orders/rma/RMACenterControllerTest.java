@@ -175,6 +175,22 @@ class RMACenterControllerTest {
         assertThat(attribute(model, "ownCenters")).extracting(RmaCenterView::knownProvider).containsExactly(true);
     }
 
+    /** Without an empty first option the browser silently picks the first supplier and "choose a supplier" never shows. */
+    @Test
+    void aNewCentreStartsWithoutAChosenSupplier() {
+        // given
+        labelled();
+        when(storesRepository.findById("store-1")).thenReturn(storeWith(
+                new StoreSupplierConnection("Acme", ConnectionMode.OWN, true, true)));
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        asStoreAdmin(() -> controller.newForm(model, PL));
+
+        // then
+        assertThat((List<?>) model.get("providerOptions")).first().extracting("value").isEqualTo("");
+    }
+
     @Test
     void listSeparatesTheStoresOwnCentresFromTheSharedOnes() {
         // given

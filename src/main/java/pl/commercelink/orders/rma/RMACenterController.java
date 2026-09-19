@@ -195,10 +195,14 @@ public class RMACenterController {
     /**
      * Store admins pick one of their connections; the platform-wide (super admin) centres are keyed by supplier type.
      * A provider already saved but no longer offered stays as the first option, so editing the rest of a centre cannot
-     * silently move it to another supplier.
+     * silently move it to another supplier; a new centre starts with an empty "choose" option.
      */
-    private List<PickerOption> providerOptions(String selected) {
+    private List<PickerOption> providerOptions(String selected, Locale locale) {
         List<PickerOption> options = new ArrayList<>();
+        if (StringUtils.isBlank(selected)) {
+            // Without it the browser picks the first supplier and the "choose a supplier" error can never show.
+            options.add(new PickerOption("", messageSource.getMessage("rma.center.provider.placeholder", null, locale)));
+        }
         if (CustomSecurityContext.hasRole("ADMIN")) {
             supplierLabels.forStoreId(CustomSecurityContext.getStoreId()).options()
                     .forEach(option -> options.add(new PickerOption(option.identity(), option.label())));
@@ -256,7 +260,7 @@ public class RMACenterController {
     private String render(RMACenter existing, RmaCenterForm form, Map<String, String> errors, Model model, Locale locale) {
         model.addAttribute("form", form);
         model.addAttribute("errors", errors);
-        model.addAttribute("providerOptions", providerOptions(form.getProvider()));
+        model.addAttribute("providerOptions", providerOptions(form.getProvider(), locale));
         model.addAttribute("countries", CountryOptions.forPicker(form.getCountry(), locale));
         model.addAttribute("formAction", existing == null ? PATH + "/new" : PATH + "/" + existing.getRmaCenterId());
         model.addAttribute("pageTitle", messageSource.getMessage(

@@ -25,7 +25,8 @@
                        them, and without the heading the missing actions read as a fault. */-->
                 <h3 th:if="${!ownCenters.isEmpty() and !sharedCenters.isEmpty()}" id="rma-centers-own"
                     class="cl-list-group" th:text="#{rma.center.group.own}"></h3>
-                <ul th:unless="${ownCenters.isEmpty()}" class="cl-list" aria-labelledby="rma-centers-own">
+                <ul th:unless="${ownCenters.isEmpty()}" class="cl-list"
+                    th:attr="aria-labelledby=${sharedCenters.isEmpty()} ? 'rma-centers-title' : 'rma-centers-own'">
                     <li class="cl-list-item" th:each="center : ${ownCenters}">
                         <div>
                             <div class="cl-list-title">
