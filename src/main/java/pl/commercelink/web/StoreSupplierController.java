@@ -49,8 +49,10 @@ public class StoreSupplierController {
 
     private static final String VIEW = "store-supplier";
     private static final String FORM_FRAGMENT = VIEW + " :: supplierForm";
-    // Identities are type names, "Type-token" or legacy "manual:Name" keys.
-    private static final String IDENTITY = "/{identity:[A-Za-z0-9_.:-]+}";
+    // Identities are type names, "Type-token" or legacy "manual:Name" keys, and a legacy name is whatever the operator
+    // typed — spaces and Polish letters included — so the whole segment is taken. A character class listing the allowed
+    // characters left such a price list unreachable, and "[^/]" cannot be used: the pattern parser splits on the slash.
+    private static final String IDENTITY = "/{identity:.+}";
 
     private final StoresRepository storesRepository;
     private final SupplierConnections suppliers;

@@ -1,8 +1,10 @@
 package pl.commercelink.web.settings;
 
+import org.springframework.web.util.UriUtils;
 import pl.commercelink.inventory.supplier.SupplierConnectionView;
 import pl.commercelink.scheduling.PollingScheduleDescription;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 
 /**
@@ -40,7 +42,8 @@ public record SupplierView(String identity, String title, Source source, State s
         } else {
             state = State.ACTIVE;
         }
-        String href = suppliersPath + "/" + connection.identity();
+        // A legacy price list is keyed "manual:<name>", so the identity carries whatever the operator typed.
+        String href = suppliersPath + "/" + UriUtils.encodePathSegment(connection.identity(), StandardCharsets.UTF_8);
         return new SupplierView(connection.identity(), connection.label(), source, state, connection.providerName(),
                 connection.includeInPricing(), connection.includeInFulfilment(), connection.feedLastModified(),
                 source == Source.OWN ? connection.scheduleDescription() : null,
