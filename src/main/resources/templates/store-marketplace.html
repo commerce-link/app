@@ -12,7 +12,7 @@
                   th:action="@{${formAction}}" th:object="${form}" method="post" novalidate data-cl-async
                   th:attr="data-cl-redirect=${redirectTo}, data-error-message=#{form.save.failed}">
                 <div th:replace="~{fragments/settings-form :: errorSummary('marketplace-errors', ${errors}, ${errorLabels})}"></div>
-                <div th:if="${failure != null}" class="cl-alert is-bad" role="status">
+                <div th:if="${failure != null}" class="cl-alert is-bad" data-cl-error-summary tabindex="-1">
                     <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
                     <p class="cl-alert-text" th:text="${failure}"></p>
                 </div>
