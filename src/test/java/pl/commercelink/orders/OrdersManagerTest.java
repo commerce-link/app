@@ -814,13 +814,42 @@ class OrdersManagerTest {
     }
 
     @Test
-    @DisplayName("moveOrderItemsToOrder refuses a target that is not a fresh unpaid order")
+    @DisplayName("moveOrderItemsToOrder moves items between orders already in assembly")
+    void moveOrderItemsToOrderWorksBetweenOrdersInAssembly() {
+        // given
+        Order original = splittableOrder(300.0);
+        original.setStatus(OrderStatus.Assembly);
+        Order target = splittableOrder(50.0);
+        target.setOrderId("target-order");
+        target.setStatus(OrderStatus.Assembled);
+        OrderItem itemA = allocatedItem("item-a", "CPU-A", "Acme", "5900000000001", "MFN-A", 100.0);
+        itemA.markAsOrdered("d-1", 100.0);
+        OrderItem itemB = allocatedItem("item-b", "CPU-B", "AcmeB", "5900000000002", "MFN-B", 200.0);
+        itemB.markAsOrdered("d-2", 200.0);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(original);
+        when(ordersRepository.findById(STORE_ID, "target-order")).thenReturn(target);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(itemA, itemB));
+        when(orderItemsRepository.findByOrderId("target-order")).thenReturn(List.of());
+
+        // when
+        ordersManager.moveOrderItemsToOrder(STORE_ID, ORDER_ID, "target-order", List.of("item-b"));
+
+        // then
+        verify(orderItemsRepository).delete(itemB);
+        assertThat(target.getTotalPrice()).isEqualTo(250.0);
+        assertThat(original.getTotalPrice()).isEqualTo(100.0);
+        verify(orderLifecycle).update(target);
+        verify(orderLifecycle).update(original);
+    }
+
+    @Test
+    @DisplayName("moveOrderItemsToOrder refuses a target that is already in realization")
     void moveOrderItemsToOrderRefusesTargetInInvalidState() {
         // given
         Order original = splittableOrder(300.0);
         Order target = splittableOrder(50.0);
         target.setOrderId("target-order");
-        target.setStatus(OrderStatus.Assembly);
+        target.setStatus(OrderStatus.Realization);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(original);
         when(ordersRepository.findById(STORE_ID, "target-order")).thenReturn(target);
 

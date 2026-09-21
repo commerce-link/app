@@ -338,7 +338,7 @@ public class Order {
 
     @DynamoDBIgnore
     public boolean canBeSplit() {
-        return hasStatus(OrderStatus.New)
+        return hasOneOfStatuses(OrderStatus.New, OrderStatus.Blocked, OrderStatus.Assembly, OrderStatus.Assembled)
                 && getPaidAmount() == 0
                 && !getDocumentByType(DocumentType.GoodsIssue).isPresent()
                 && !isInvoiced();
