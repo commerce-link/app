@@ -38,6 +38,7 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
@@ -755,6 +756,78 @@ class OrdersManagerTest {
         assertThatThrownBy(() -> ordersManager.splitOrder(STORE_ID, ORDER_ID, List.of(itemB.getItemId())))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("split.order.items.have.fulfilment");
+        verify(orderItemsRepository, never()).save(any(OrderItem.class));
+    }
+
+    @Test
+    @DisplayName("moveOrderItemsToOrder appends the selected items to the target order after its own")
+    void moveOrderItemsToOrderAppendsItemsToTheTarget() {
+        // given
+        Order original = splittableOrder(300.0);
+        Order target = splittableOrder(50.0);
+        target.setOrderId("target-order");
+        OrderItem itemA = allocatedItem("item-a", "CPU-A", "Acme", "5900000000001", "MFN-A", 100.0);
+        OrderItem itemB = allocatedItem("item-b", "CPU-B", "AcmeB", "5900000000002", "MFN-B", 200.0);
+        itemB.markAsOrdered("d-1", 200.0);
+        OrderItem existing = new OrderItem("target-order", "Accessories", "Mouse", 1, 50.0, "SKU-C", false);
+        existing.setPosition(3);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(original);
+        when(ordersRepository.findById(STORE_ID, "target-order")).thenReturn(target);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(itemA, itemB));
+        when(orderItemsRepository.findByOrderId("target-order")).thenReturn(List.of(existing));
+
+        // when
+        Order result = ordersManager.moveOrderItemsToOrder(STORE_ID, ORDER_ID, "target-order", List.of("item-b"));
+
+        // then
+        assertThat(result).isSameAs(target);
+        ArgumentCaptor<OrderItem> movedCaptor = ArgumentCaptor.forClass(OrderItem.class);
+        verify(orderItemsRepository).save(movedCaptor.capture());
+        OrderItem moved = movedCaptor.getValue();
+        assertThat(moved.getOrderId()).isEqualTo("target-order");
+        assertThat(moved.getPosition()).isEqualTo(4);
+        assertThat(moved.getStatus()).isEqualTo(FulfilmentStatus.Ordered);
+        assertThat(moved.getClaimedDeliveryId()).isEqualTo("d-1");
+        verify(orderItemsRepository).delete(itemB);
+        assertThat(target.getTotalPrice()).isEqualTo(250.0);
+        assertThat(original.getTotalPrice()).isEqualTo(100.0);
+        verify(ordersRepository, never()).save(argThat(o -> o != original && o != target));
+        verify(orderLifecycle).update(target);
+        verify(orderLifecycle).update(original);
+    }
+
+    @Test
+    @DisplayName("moveOrderItemsToOrder refuses an unknown, blank or self target")
+    void moveOrderItemsToOrderRefusesUnknownOrSelfTarget() {
+        // given
+        Order original = splittableOrder(300.0);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(original);
+        when(ordersRepository.findById(STORE_ID, "missing")).thenReturn(null);
+
+        // when / then
+        for (String targetId : List.of("missing", ORDER_ID, "")) {
+            assertThatThrownBy(() -> ordersManager.moveOrderItemsToOrder(STORE_ID, ORDER_ID, targetId, List.of("item-b")))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("split.order.target.not.found");
+        }
+        verify(orderItemsRepository, never()).save(any(OrderItem.class));
+    }
+
+    @Test
+    @DisplayName("moveOrderItemsToOrder refuses a target that is not a fresh unpaid order")
+    void moveOrderItemsToOrderRefusesTargetInInvalidState() {
+        // given
+        Order original = splittableOrder(300.0);
+        Order target = splittableOrder(50.0);
+        target.setOrderId("target-order");
+        target.setStatus(OrderStatus.Assembly);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(original);
+        when(ordersRepository.findById(STORE_ID, "target-order")).thenReturn(target);
+
+        // when / then
+        assertThatThrownBy(() -> ordersManager.moveOrderItemsToOrder(STORE_ID, ORDER_ID, "target-order", List.of("item-b")))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("split.order.target.invalid.state");
         verify(orderItemsRepository, never()).save(any(OrderItem.class));
     }
 

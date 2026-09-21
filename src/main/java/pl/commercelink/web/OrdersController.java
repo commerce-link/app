@@ -879,6 +879,21 @@ public class OrdersController extends BaseController {
         }
     }
 
+    @PostMapping("/dashboard/orders/{orderId}/moveItemsToOrder")
+    @PreAuthorize("!hasRole('SUPER_ADMIN')")
+    public String moveItemsToOrder(@PathVariable String orderId, @ModelAttribute OrderItemsForm form,
+                                   @RequestParam(required = false) String targetOrderId,
+                                   RedirectAttributes redirectAttributes, Locale locale) {
+        try {
+            Order target = ordersManager.moveOrderItemsToOrder(getStoreId(), orderId, targetOrderId, form.getSelectedOrderItemIds());
+            return "redirect:/dashboard/orders/" + target.getOrderId();
+        } catch (IllegalStateException e) {
+            String code = "error.message." + e.getMessage();
+            redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage(code, null, locale));
+            return "redirect:/dashboard/orders/" + orderId;
+        }
+    }
+
     @PostMapping("/dashboard/orders/{orderId}/updateSerialNumbers")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String updateSerialNumbers(@PathVariable String orderId, @ModelAttribute OrderItemsForm form) {

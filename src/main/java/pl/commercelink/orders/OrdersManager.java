@@ -287,7 +287,33 @@ public class OrdersManager {
 
     public Order splitOrder(String storeId, String orderId, List<String> orderItemIds) {
         Order original = ordersRepository.findById(storeId, orderId);
+        List<OrderItem> selectedItems = selectItemsToMoveOut(storeId, original, orderItemIds);
 
+        Order newOrder = original.createSplit();
+        ordersRepository.save(newOrder);
+
+        moveItems(original, newOrder, List.of(), selectedItems);
+        return newOrder;
+    }
+
+    public Order moveOrderItemsToOrder(String storeId, String orderId, String targetOrderId, List<String> orderItemIds) {
+        Order original = ordersRepository.findById(storeId, orderId);
+        Order target = StringUtils.isBlank(targetOrderId) ? null : ordersRepository.findById(storeId, targetOrderId.trim());
+
+        if (target == null || target.getOrderId().equals(original.getOrderId())) {
+            throw new IllegalStateException("split.order.target.not.found");
+        }
+        if (!target.canBeSplit()) {
+            throw new IllegalStateException("split.order.target.invalid.state");
+        }
+        List<OrderItem> selectedItems = selectItemsToMoveOut(storeId, original, orderItemIds);
+        List<OrderItem> targetItems = orderItemsRepository.findByOrderId(target.getOrderId());
+
+        moveItems(original, target, targetItems, selectedItems);
+        return target;
+    }
+
+    private List<OrderItem> selectItemsToMoveOut(String storeId, Order original, List<String> orderItemIds) {
         if (!original.canBeSplit()) {
             throw new IllegalStateException("split.order.invalid.state");
         }
@@ -312,29 +338,39 @@ public class OrdersManager {
         if (!dropshipItemLookup.itemIdsInDropshipDeliveries(storeId, selectedItems).isEmpty()) {
             throw new IllegalStateException("split.order.items.in.dropship");
         }
+        return selectedItems;
+    }
 
-        Order newOrder = original.createSplit();
-        ordersRepository.save(newOrder);
-
+    private void moveItems(Order from, Order to, List<OrderItem> existingTargetItems, List<OrderItem> selectedItems) {
+        int nextProductPosition = nextPositionAfter(existingTargetItems, false);
+        int nextServicePosition = nextPositionAfter(existingTargetItems, true);
         double movedTotal = 0;
         for (OrderItem source : selectedItems) {
-            OrderItem moved = new OrderItem(newOrder.getOrderId(), source, source.getQty());
+            OrderItem moved = new OrderItem(to.getOrderId(), source, source.getQty());
+            moved.setPosition(moved.isService() ? nextServicePosition++ : nextProductPosition++);
             orderItemsRepository.save(moved);
             orderItemsRepository.delete(source);
 
             movedTotal += source.getTotalPrice();
         }
 
-        newOrder.setTotalPrice(movedTotal);
-        original.decreaseTotalPrice(movedTotal);
+        to.increaseTotalPrice(movedTotal);
+        from.decreaseTotalPrice(movedTotal);
 
-        ordersRepository.save(newOrder);
-        ordersRepository.save(original);
+        ordersRepository.save(to);
+        ordersRepository.save(from);
 
-        orderLifecycle.update(newOrder);
-        orderLifecycle.update(original);
+        orderLifecycle.update(to);
+        orderLifecycle.update(from);
+    }
 
-        return newOrder;
+    private int nextPositionAfter(List<OrderItem> items, boolean service) {
+        int bandStart = service ? PositionGroup.SERVICE_GROUP_START : 0;
+        return items.stream()
+                .filter(i -> i.isService() == service)
+                .mapToInt(OrderItem::getPosition)
+                .filter(p -> p >= bandStart)
+                .max().orElse(bandStart - 1) + 1;
     }
 
     public void splitGroupItem(String orderId, String itemId, List<SplitGroupComponent> components) {
