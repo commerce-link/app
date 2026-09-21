@@ -1,0 +1,75 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+<div layout:fragment="content">
+    <section class="cl-page">
+        <div class="cl-page-body">
+            <!--/* The delete link is defined inside the replaced element: the header pulls it in as its actions slot,
+                   and the body of a th:replace host is dropped, so it is never rendered twice. */-->
+            <div th:replace="~{fragments/settings-header :: subpageWithActions(${backHref}, ${backLabel}, ${pageTitle}, #{catalog.settings.lead}, ~{::deleteAction})}">
+                <th:block th:fragment="deleteAction">
+                    <a th:if="${deleteHref != null}" class="cl-link-button is-danger" th:href="@{${deleteHref}}" data-cl-confirm
+                       th:text="#{catalog.delete}"
+                       th:attr="data-cl-confirm-title=#{catalog.delete.title(${form.name})},
+                                data-cl-confirm-message=#{catalog.delete.message(${categoriesCount}, ${productsCount})},
+                                data-cl-confirm-action=#{catalog.delete}"></a>
+                </th:block>
+            </div>
+
+            <form th:fragment="settingsForm" id="catalog-settings-form" class="cl-form" th:action="@{${formAction}}" th:object="${form}"
+                  method="post" novalidate data-cl-async data-cl-schedule-auto
+                  th:attr="data-cl-redirect=${redirectTo}, data-error-message=#{form.save.failed}">
+                <div th:replace="~{fragments/settings-form :: errorSummary('catalog-settings-errors', ${errors}, null)}"></div>
+                <div class="cl-card">
+                    <fieldset class="cl-fieldset">
+                        <legend class="cl-fieldset-title" th:text="#{catalog.settings.section.catalog}"></legend>
+                        <div class="cl-form-grid">
+                            <div class="cl-span-4" th:insert="~{fragments/settings-form :: textField('name', 'catalog.name', *{name}, 'text', 'off', true, ${errors['name']}, null)}"></div>
+                        </div>
+                    </fieldset>
+                    <fieldset class="cl-fieldset">
+                        <legend class="cl-fieldset-title" th:text="#{catalog.settings.section.pricelist}"></legend>
+                        <div class="cl-form-grid">
+                            <div class="cl-span-6">
+                                <div class="cl-field" id="pricelistSchedule" tabindex="-1">
+                                    <span class="cl-label" th:text="#{catalog.pricelist.schedule}"></span>
+                                    <div th:replace="~{fragments/schedule-field :: input('pricelistSchedule', *{pricelistSchedule}, ${scheduleMinIntervalMinutes}, #{catalog.pricelist.schedule.summary.default}, 'minutes,hours,days')}"></div>
+                                    <p class="cl-help" th:text="#{catalog.pricelist.schedule.help(${scheduleMinIntervalMinutes})}"></p>
+                                    <p th:if="${errors['pricelistSchedule'] != null}" class="cl-field-error" id="pricelistSchedule-error">
+                                        <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                                        <span th:text="#{${errors['pricelistSchedule']}}"></span>
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </fieldset>
+                    <fieldset class="cl-fieldset">
+                        <legend class="cl-fieldset-title" th:text="#{catalog.settings.section.safety}"></legend>
+                        <div class="cl-form-grid">
+                            <div class="cl-span-6">
+                                <div th:replace="~{fragments/settings-form :: check('deletionProtection', 'catalog.protect', *{deletionProtection}, 'catalog.protect.desc', null)}"></div>
+                                <!--/* Only worth saying once the catalog exists and the protection is what stands between it and the delete link. */-->
+                                <p th:if="${existing and form.deletionProtection}" class="cl-help" th:text="#{catalog.protect.hint}"></p>
+                            </div>
+                        </div>
+                    </fieldset>
+                    <div class="cl-card-footer">
+                        <button class="cl-button is-primary" type="submit" th:text="${existing} ? #{catalog.save} : #{catalog.create}"></button>
+                        <a class="cl-button" th:href="@{${backHref}}" th:text="#{general.cancel}"></a>
+                    </div>
+                </div>
+            </form>
+            <dialog th:replace="~{fragments/confirm-dialog :: dialog}"></dialog>
+        </div>
+    </section>
+    <script th:if="${!errors.isEmpty()}">
+        document.getElementById('catalog-settings-errors').focus();
+    </script>
+    <script th:replace="~{fragments/schedule-field :: script}"></script>
+    <script th:src="@{/js/async-form.js}" defer></script>
+    <script th:src="@{/js/confirm-dialog.js}" defer></script>
+</div>
+</body>
+</html>

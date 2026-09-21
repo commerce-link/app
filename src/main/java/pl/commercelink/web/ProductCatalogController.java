@@ -52,9 +52,6 @@ public class ProductCatalogController {
     private StoresRepository storesRepository;
 
     @Autowired
-    private ProductCatalogDetailsService productCatalogDetailsService;
-
-    @Autowired
     private BrandMapper brandMapper;
 
     @Value("${application.env}")
@@ -64,48 +61,6 @@ public class ProductCatalogController {
     private MessageSource messageSource;
 
     private static final int PRODUCTS_PAGE_SIZE = 25;
-
-    @GetMapping("/dashboard/catalogs/new")
-    public String newCatalog(Model model) {
-        return showEditProductCatalog(model, new ProductCatalog(getStoreId(), null));
-    }
-
-    @GetMapping("/dashboard/catalogs/{catalogId}")
-    public String getCatalogDetails(@PathVariable("catalogId") String catalogId, Model model) {
-        return showEditProductCatalog(model, productCatalogRepository.findById(getStoreId(), catalogId));
-    }
-
-    private String showEditProductCatalog(Model model, ProductCatalog productCatalog) {
-        model.addAttribute("productCatalog", productCatalog);
-        model.addAttribute("scheduleMinIntervalMinutes", productCatalogDetailsService.minIntervalMinutes());
-        return "catalogDetails";
-    }
-
-    @PostMapping("/dashboard/catalogs/{catalogId}/delete")
-    public String deleteCatalog(@PathVariable String catalogId, RedirectAttributes redirectAttributes) {
-        ProductCatalogDetailsService.UpdateResult result = productCatalogDetailsService.delete(getStoreId(), catalogId);
-        if (result.hasErrors()) {
-            redirectAttributes.addFlashAttribute("errorMessage", join(result));
-            return "redirect:/dashboard/catalogs/" + catalogId;
-        }
-        return "redirect:/dashboard/catalogs";
-    }
-
-    @PostMapping("/dashboard/catalogs/{catalogId}")
-    public String saveCatalogDetails(@PathVariable String catalogId, @ModelAttribute ProductCatalog productCatalog,
-                                     RedirectAttributes redirectAttributes) {
-        ProductCatalogDetailsService.UpdateResult result = productCatalogDetailsService.save(getStoreId(), catalogId, productCatalog);
-        if (result.hasErrors()) {
-            redirectAttributes.addFlashAttribute("errorMessage", join(result));
-        }
-        return "redirect:/dashboard/catalogs/" + catalogId;
-    }
-
-    private String join(ProductCatalogDetailsService.UpdateResult result) {
-        return result.errors().stream()
-                .map(error -> messageSource.getMessage(error.code(), error.args(), LocaleContextHolder.getLocale()))
-                .collect(Collectors.joining(" "));
-    }
 
     @GetMapping("/dashboard/catalogs/{catalogId}/category/new")
     public String newCategory(@PathVariable("catalogId") String catalogId, Model model) throws IllegalAccessException, InstantiationException {

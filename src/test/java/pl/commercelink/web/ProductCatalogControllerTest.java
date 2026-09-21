@@ -26,9 +26,7 @@ import pl.commercelink.products.CategoryDefinitionType;
 import pl.commercelink.products.PimCategoryOptions;
 import pl.commercelink.products.PriceDefinition;
 import pl.commercelink.products.Product;
-import pl.commercelink.inventory.supplier.ErrorMessage;
 import pl.commercelink.products.ProductCatalog;
-import pl.commercelink.products.ProductCatalogDetailsService;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.products.StockDefinition;
@@ -85,9 +83,6 @@ class ProductCatalogControllerTest {
 
     @Mock
     private StoresRepository storesRepository;
-
-    @Mock
-    private ProductCatalogDetailsService productCatalogDetailsService;
 
     @InjectMocks
     private ProductCatalogController controller;
@@ -348,76 +343,5 @@ class ProductCatalogControllerTest {
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(user, null, List.of(new SimpleGrantedAuthority("ROLE_ADMIN")))
         );
-    }
-
-    private ProductCatalog submittedCatalog(String schedule) {
-        ProductCatalog submitted = new ProductCatalog();
-        submitted.setName("Main");
-        submitted.setDeletionProtection(false);
-        submitted.setPricelistSchedule(schedule);
-        return submitted;
-    }
-
-    @Test
-    void savingCatalogDetailsDelegatesToTheServiceAndRedirectsToTheCatalog() {
-        // given
-        ProductCatalog submitted = submittedCatalog("0 5 * * ? *");
-        when(productCatalogDetailsService.save(STORE_ID, CATALOG_ID, submitted))
-                .thenReturn(new ProductCatalogDetailsService.UpdateResult(List.of()));
-        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
-
-        // when
-        String view = controller.saveCatalogDetails(CATALOG_ID, submitted, redirect);
-
-        // then
-        assertThat(view).isEqualTo("redirect:/dashboard/catalogs/" + CATALOG_ID);
-        assertThat(redirect.getFlashAttributes()).doesNotContainKey("errorMessage");
-    }
-
-    @Test
-    void aRejectedSaveFlashesTheResolvedErrorAndStaysOnTheCatalog() {
-        // given
-        ProductCatalog submitted = submittedCatalog("0/2 * * * ? *");
-        when(productCatalogDetailsService.save(STORE_ID, CATALOG_ID, submitted))
-                .thenReturn(new ProductCatalogDetailsService.UpdateResult(List.of(
-                        ErrorMessage.of("catalog.pricelist.schedule.error.too.frequent", "0/2 * * * ? *", 5))));
-        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
-
-        // when
-        String view = controller.saveCatalogDetails(CATALOG_ID, submitted, redirect);
-
-        // then
-        assertThat(view).isEqualTo("redirect:/dashboard/catalogs/" + CATALOG_ID);
-        assertThat(redirect.getFlashAttributes()).containsKey("errorMessage");
-        verify(messageSource).getMessage(eq("catalog.pricelist.schedule.error.too.frequent"),
-                eq(new Object[]{"0/2 * * * ? *", 5}), any(Locale.class));
-    }
-
-    @Test
-    void deletingACatalogDelegatesToTheServiceAndRedirectsToTheList() {
-        // given
-        when(productCatalogDetailsService.delete(STORE_ID, CATALOG_ID))
-                .thenReturn(new ProductCatalogDetailsService.UpdateResult(List.of()));
-
-        // when
-        String view = controller.deleteCatalog(CATALOG_ID, new RedirectAttributesModelMap());
-
-        // then
-        assertThat(view).isEqualTo("redirect:/dashboard/catalogs");
-    }
-
-    @Test
-    void aFailedDeleteFlashesTheErrorAndStaysOnTheCatalog() {
-        // given
-        when(productCatalogDetailsService.delete(STORE_ID, CATALOG_ID))
-                .thenReturn(new ProductCatalogDetailsService.UpdateResult(List.of(ErrorMessage.of("catalog.delete.error.failed"))));
-        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
-
-        // when
-        String view = controller.deleteCatalog(CATALOG_ID, redirect);
-
-        // then
-        assertThat(view).isEqualTo("redirect:/dashboard/catalogs/" + CATALOG_ID);
-        assertThat(redirect.getFlashAttributes()).containsKey("errorMessage");
     }
 }
