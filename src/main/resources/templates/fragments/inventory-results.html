@@ -120,7 +120,6 @@
                     <col class="cl-inv-col-total">
                     <col class="cl-inv-col-qty">
                     <col class="cl-inv-col-lead">
-                    <col th:if="${selection != null}" class="cl-inv-col-pick">
                 </colgroup>
                 <thead>
                 <tr th:attr="data-sort-label=#{inventory.table.sortBy}">
@@ -139,9 +138,6 @@
                     </th>
                     <th scope="col" class="is-numeric" aria-sort="none" th:title="#{inventory.table.lead.hint}">
                         <button type="button" class="cl-table-sort" data-sort-key="lead" th:text="#{inventory.table.lead}"></button>
-                    </th>
-                    <th th:if="${selection != null}" scope="col" class="cl-inv-pick-head">
-                        <span class="cl-visually-hidden" th:text="#{inventory.select.column}"></span>
                     </th>
                 </tr>
                 </thead>
@@ -172,7 +168,6 @@
                     </td>
                     <td class="is-numeric cl-inv-qty-cell" th:attr="data-label=#{inventory.table.available}" th:text="#{inventory.table.qtyValue(${row.qty()})}"></td>
                     <td class="is-numeric cl-inv-muted" th:attr="data-label=#{inventory.table.lead}" th:text="#{inventory.table.leadNow}"></td>
-                    <td th:if="${selection != null}" class="cl-inv-pick-cell"></td>
                 </tr>
                 <tr th:each="offer : ${result.supplierOffers()}" class="cl-inv-offer"
                     th:classappend="${offer.cheapest() ? 'is-cheapest' : ''} + ' ' + ${offer.hasStock() ? '' : 'is-dim'}"
@@ -227,20 +222,9 @@
                         <span th:if="${offer.hasLeadTime()}" th:text="#{inventory.table.leadDays(${offer.leadTimeDays()})}"></span>
                         <span th:unless="${offer.hasLeadTime()}" class="cl-inv-muted" th:text="#{inventory.table.unknown}"></span>
                     </td>
-                    <td th:if="${selection != null}" class="cl-inv-pick-cell">
-                        <form th:if="${offer.hasPrice() and offer.hasStock()}" method="post" th:action="${selection.assignUrl()}">
-                            <input type="hidden" name="itemId" th:value="${selection.itemId()}">
-                            <input type="hidden" name="manufacturerCode" th:value="${offer.productCode()}">
-                            <input type="hidden" name="cost" th:value="${offer.netPrice()}">
-                            <input type="hidden" name="supplier" th:value="${offer.supplier()}">
-                            <button type="submit" class="cl-button is-primary cl-inv-pick"
-                                    th:attr="aria-label=#{inventory.select.choose.aria(${offer.supplierLabel()})}"
-                                    th:text="#{inventory.select.choose}"></button>
-                        </form>
-                    </td>
                 </tr>
                 <tr th:if="${result.supplierOffers().isEmpty()}">
-                    <td th:colspan="${selection != null} ? 7 : 6" class="cl-inv-muted" th:text="#{inventory.table.noOffers}"></td>
+                    <td colspan="6" class="cl-inv-muted" th:text="#{inventory.table.noOffers}"></td>
                 </tr>
                 </tbody>
             </table>

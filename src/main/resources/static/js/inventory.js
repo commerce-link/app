@@ -26,12 +26,6 @@
     let currentSearch = null;
     let failedQuery = null;
 
-    // the page can be opened to pick a source for an order item; every navigation has to keep that mode
-    function selectionParam() {
-        const selection = page.dataset.selection;
-        return selection ? '&for=' + encodeURIComponent(selection) : '';
-    }
-
     function urlQuery() {
         return (new URLSearchParams(window.location.search).get('q') || '').trim();
     }
@@ -213,12 +207,12 @@
         const spinnerTimer = window.setTimeout(() => {
             spinner.hidden = false;
         }, SPINNER_DELAY_MS);
-        fetchFragment(page.dataset.searchUrl + '?q=' + encodeURIComponent(query) + selectionParam(), 'results', controller.signal)
+        fetchFragment(page.dataset.searchUrl + '?q=' + encodeURIComponent(query), 'results', controller.signal)
             .then(fragment => {
                 results.replaceChildren(fragment);
                 failedQuery = null;
                 if (pushHistory) {
-                    window.history.pushState({q: query}, '', page.dataset.pageUrl + '?q=' + encodeURIComponent(query) + selectionParam());
+                    window.history.pushState({q: query}, '', page.dataset.pageUrl + '?q=' + encodeURIComponent(query));
                 }
                 announce(fragment);
                 const heading = fragment.querySelector('[data-inventory-results-heading]');

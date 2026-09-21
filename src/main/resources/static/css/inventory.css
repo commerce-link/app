@@ -6,7 +6,6 @@
 
 :root {
     /* barely-there green wash behind the cheapest offer: --cl-ok-soft reads as a status chip on a table row */
-    --cl-ok-tint: #f3f8f5;
 }
 
 /* Several rules below (.cl-inv-errorbar, .cl-inv-load-error, ...) set their own `display`, which beats
@@ -540,9 +539,6 @@
     width: 90px;
 }
 
-.cl-inv-col-pick {
-    width: 116px;
-}
 
 .cl-inv-page .cl-table td .cl-status,
 .cl-inv-page .cl-table td .cl-inv-mode {
@@ -592,7 +588,7 @@
     height: 16px;
     margin-right: 6px;
     border-radius: 50%;
-    background: var(--cl-ok);
+    background: var(--cl-ink);
     color: var(--cl-surface);
     font-size: 9px;
     vertical-align: 1px;
@@ -606,14 +602,10 @@
     background: var(--cl-surface-2);
 }
 
-.cl-inv-page .cl-inv-offer.is-cheapest td,
-.cl-inv-page .cl-inv-offers tbody tr.cl-inv-offer.is-cheapest:hover td {
-    background: var(--cl-ok-tint);
-}
-
+/* The cheapest offer is marked, not coloured: a tinted row read as an endorsement of a figure the page
+   cannot vouch for, and the delivered total is a calculation, not a status. */
 .cl-inv-page .cl-inv-offer.is-cheapest .cl-inv-total-cell .cl-inv-price {
     font-weight: 700;
-    color: var(--cl-ok);
 }
 
 /* Secondary figure under a price: the gross equivalent, or the order value that makes shipping free. */
@@ -638,30 +630,6 @@
 .cl-inv-page .cl-inv-summary-warning svg {
     flex: 0 0 auto;
     margin-top: 2px;
-}
-
-.cl-inv-page .cl-inv-selection {
-    align-items: flex-start;
-    margin-bottom: 12px;
-}
-
-.cl-inv-page .cl-inv-selection .cl-alert-text {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-}
-
-.cl-inv-page .cl-inv-selection-lead {
-    font-weight: 400;
-    color: var(--cl-ink-2);
-}
-
-.cl-inv-page .cl-inv-pick-cell {
-    text-align: right;
-}
-
-.cl-inv-page .cl-inv-pick {
-    width: 100%;
 }
 
 .cl-inv-page .cl-inv-source-link {
@@ -824,9 +792,8 @@
         background: none;
     }
 
-    /* the source column and the pick column have nothing to sort by */
-    .cl-inv-page .cl-inv-offers thead th:first-child,
-    .cl-inv-page .cl-inv-offers thead th.cl-inv-pick-head {
+    /* the source column has nothing to sort by */
+    .cl-inv-page .cl-inv-offers thead th:first-child {
         display: none;
     }
 
@@ -897,14 +864,6 @@
         margin-top: 2px;
     }
 
-    .cl-inv-page .cl-inv-offers tr.cl-inv-offer td.cl-inv-pick-cell {
-        display: block;
-        margin-top: 10px;
-    }
-
-    .cl-inv-page .cl-inv-offers tr.cl-inv-offer.is-cheapest {
-        background: var(--cl-ok-tint);
-    }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -12,7 +12,6 @@ import pl.commercelink.inventory.search.ProductHeader;
 import pl.commercelink.inventory.search.WarehouseRow;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.warehouse.api.ItemCondition;
-import pl.commercelink.web.inventory.OfferSelection;
 
 import java.util.List;
 
@@ -32,7 +31,6 @@ class InventoryResultsRenderingTest {
         context.setVariable("canManageSuppliers", canManageSuppliers);
         context.setVariable("manageSuppliersUrl", "/dashboard/store/suppliers");
         context.setVariable("warehouseUrl", "/dashboard/warehouse");
-        context.setVariable("selection", null);
         return context;
     }
 
@@ -226,36 +224,6 @@ class InventoryResultsRenderingTest {
         assertThat(html.split("cl-inv-code-info", -1)).hasSize(3);
         assertThat(html.split("cl-inv-code-warning", -1)).hasSize(2);
         assertThat(html).doesNotContain(">5901234123457</code>");
-    }
-
-    /** The page opened from an order item hands the chosen offer straight back to it. */
-    @Test
-    void selectionModeAddsAChooseButtonCarryingTheOfferToTheOrderItem() {
-        // given
-        Context context = context(found(), true);
-        context.setVariable("selection", new OfferSelection("ORD-7", "item-3"));
-
-        // when
-        String html = engine.process(RESULTS, context);
-
-        // then
-        assertThat(html).contains("action=\"/dashboard/orders/ORD-7/assign-supplier\"")
-                .contains("name=\"itemId\" value=\"item-3\"")
-                .contains("name=\"supplier\" value=\"manual-nowak\"")
-                .contains("name=\"cost\" value=\"389.0\"")
-                .contains("name=\"manufacturerCode\" value=\"910-006559\"")
-                .contains(">Choose<");
-        // an offer nobody can deliver, and the warehouse row, are not something to assign
-        assertThat(html.split(">Choose<", -1)).hasSize(4);
-    }
-
-    @Test
-    void withoutTheSelectionParameterTheTableHasNoActionColumn() {
-        // when
-        String html = engine.process(RESULTS, context(found(), true));
-
-        // then
-        assertThat(html).doesNotContain("assign-supplier").doesNotContain(">Choose<").doesNotContain("cl-inv-col-pick");
     }
 
     @Test

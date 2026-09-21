@@ -63,15 +63,16 @@ class InventorySummaryRenderingTest {
         assertThat(html).contains("data-inventory-warehouse-products");
         assertThat(html).contains("Expand").contains("Collapse");
         assertThat(html).doesNotContain("All sources have a feed file").doesNotContain("Active suppliers:")
-                .doesNotContain(">Working<").doesNotContain("Open the warehouse").doesNotContain("cl-inv-sources-footer");
+                .doesNotContain(">Working<").doesNotContain("cl-inv-sources-footer");
     }
 
     /**
-     * Each of these figures ends in a question the operator then wants to open; the "3 of 3" hint also
-     * says what the tile counts, so it no longer looks like it disagrees with the sources badge.
+     * The screen is for looking things up, so a figure is a figure: nothing on a tile navigates away.
+     * The hint still names what the supplier tile counts, so "3 of 3" does not read as a contradiction
+     * of the sources badge, which counts the warehouse too.
      */
     @Test
-    void supplierAndWarehouseTilesOpenThePagesBehindTheirFigures() {
+    void tilesStayReadOnlyAndTheSupplierTileSaysWhatItCounts() {
         // given
         InventorySourcesView sources = new InventorySourcesView(List.of(), List.of(working("AB")), 2, 3, false);
 
@@ -83,9 +84,24 @@ class InventorySummaryRenderingTest {
         String tile = engine.process(WAREHOUSE, warehouse);
 
         // then
-        assertThat(summary).contains("cl-stat-link").contains("connections enabled");
-        assertThat(tile).contains("cl-stat-link").contains("href=\"/dashboard/warehouse\"");
+        assertThat(summary).contains("connections enabled").doesNotContain("cl-stat-link");
+        assertThat(tile).doesNotContain("cl-stat-link").doesNotContain("href=");
         assertThat(summary + tile).doesNotContain("??");
+    }
+
+    /** The one way out of the screen is the sources bar, which opens the warehouse as it opens a connection. */
+    @Test
+    void theWarehouseRowOpensTheWarehouseForEveryone() {
+        // given
+        InventorySourcesView sources = new InventorySourcesView(List.of(), List.of(working("Elko")), 2, 3, false);
+
+        // when
+        String admin = engine.process(SUMMARY, context(sources, true));
+        String user = engine.process(SUMMARY, context(sources, false));
+
+        // then -- unlike a supplier connection, the warehouse needs no supplier rights
+        assertThat(admin).contains("href=\"/dashboard/warehouse\"");
+        assertThat(user).contains("href=\"/dashboard/warehouse\"");
     }
 
     /** A source that looks wrong is worth opening; the row is the shortest way to its settings. */
@@ -99,8 +115,8 @@ class InventorySummaryRenderingTest {
         String user = engine.process(SUMMARY, context(sources, false));
 
         // then
-        assertThat(admin).contains("href=\"/dashboard/store/suppliers/Elko\"").contains("cl-inv-source-link");
-        assertThat(user).doesNotContain("cl-inv-source-link").contains("Elko");
+        assertThat(admin).contains("href=\"/dashboard/store/suppliers/Elko\"");
+        assertThat(user).doesNotContain("/dashboard/store/suppliers/Elko").contains("Elko");
     }
 
     @Test
