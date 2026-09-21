@@ -20,6 +20,7 @@ class CatalogLegacyRedirectsTest {
 
     @Test
     void productViewsBecomeStatusAndFeatureFilters() throws Exception {
+        // when / then
         mvc.perform(get("/dashboard/catalogs/c1/category/k1/products").param("status", "Enabled"))
                 .andExpect(status().isFound()).andExpect(redirectedUrl("/dashboard/catalogs/c1/category/k1?status=active"));
         mvc.perform(get("/dashboard/catalogs/c1/category/k1/products").param("status", "Queued"))
@@ -34,6 +35,7 @@ class CatalogLegacyRedirectsTest {
 
     @Test
     void recommendationsAndBulkPagesMoveUnderProductsAdd() throws Exception {
+        // when / then
         mvc.perform(get("/dashboard/catalogs/c1/category/k1/recommendations"))
                 .andExpect(status().isFound()).andExpect(redirectedUrl("/dashboard/catalogs/c1/category/k1/products/add"));
         mvc.perform(get("/dashboard/catalogs/c1/category/k1/products/bulk-new").param("eans", "1"))
@@ -42,6 +44,7 @@ class CatalogLegacyRedirectsTest {
 
     @Test
     void newProductFromEanBecomesAQueryParameter() throws Exception {
+        // when / then
         mvc.perform(get("/dashboard/catalogs/c1/category/k1/products/5900000000001/new"))
                 .andExpect(redirectedUrl("/dashboard/catalogs/c1/category/k1/products/new?ean=5900000000001"));
     }
