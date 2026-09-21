@@ -1,7 +1,9 @@
-/* Inventory page. Content sits inside Bulma's .content wrapper (layout.html), so rules touching headings, lists,
-   tables and definition lists are prefixed with .cl-inv-page to outweigh .content h1/ul/table. */
+/* Inventory page. Everything the rest of the panel already has — page frame, cards, buttons, inputs, alerts,
+   tables, stat tiles, skeletons, spinner — comes from commercelink.css; this sheet only holds what exists
+   nowhere else: the sources bar, the search card, the result states and the offers table.
+   Content sits inside Bulma's .content wrapper (layout.html), so rules touching headings, lists, tables and
+   definition lists are prefixed with .cl-inv-page to outweigh .content h1/ul/table. */
 
-/* Status tokens and .cl-status live in commercelink.css; only the tint this page adds is defined here. */
 :root {
     /* barely-there green wash behind the cheapest offer: --cl-ok-soft reads as a status chip on a table row */
     --cl-ok-tint: #f3f8f5;
@@ -14,10 +16,15 @@
     display: none !important;
 }
 
+/* .cl-page-body gives the 1200px width, .cl-page the bottom padding; this page only adds its top inset. */
 .cl-inv-page {
-    max-width: 1200px;
     padding-block: 24px 40px;
     color: var(--cl-ink);
+}
+
+/* the only .cl-card here is the super admin's feed card, which follows the tiles */
+.cl-inv-page .cl-card {
+    margin-top: 12px;
 }
 
 .cl-inv-page ul,
@@ -47,60 +54,7 @@
     margin: 0;
 }
 
-.cl-inv-visually-hidden {
-    position: absolute !important;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-    white-space: nowrap;
-    border: 0;
-}
-
-.cl-inv-header {
-    margin-bottom: 20px;
-}
-
-.cl-inv-header-row {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 10px;
-}
-
-.cl-inv-page .cl-inv-title {
-    margin: 0;
-    font-size: 1.5rem;
-    font-weight: 650;
-    line-height: 1.25;
-    color: var(--cl-ink);
-}
-
-.cl-inv-page .cl-inv-lead {
-    margin: 4px 0 0;
-    max-width: 72ch;
-    font-size: .95rem;
-    color: var(--cl-ink-2);
-}
-
-.cl-inv-page .cl-inv-eyebrow {
-    margin: 0;
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: .12em;
-    text-transform: uppercase;
-    color: var(--cl-ink-2);
-}
-
 .cl-inv-muted {
-    color: var(--cl-ink-3);
-}
-
-.cl-inv-hint {
-    display: block;
-    font-size: 12.5px;
     color: var(--cl-ink-3);
 }
 
@@ -108,55 +62,12 @@
     overflow-wrap: anywhere;
 }
 
-/* Tiles */
+/* Summary */
 .cl-inv-summary-slot {
     margin-bottom: 16px;
 }
 
-.cl-inv-page .cl-inv-tiles {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 12px;
-}
-
-.cl-inv-page .cl-inv-tile {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 0;
-    padding: 14px 16px;
-    border: 1px solid var(--cl-line);
-    border-radius: var(--cl-radius);
-    background: var(--cl-surface);
-}
-
-.cl-inv-number {
-    font-size: 26px;
-    font-weight: 650;
-    line-height: 1.15;
-    font-variant-numeric: tabular-nums;
-    color: var(--cl-ink);
-}
-
-.cl-inv-number-of {
-    font-size: 15px;
-    font-weight: 600;
-    color: var(--cl-ink-3);
-}
-
-.cl-inv-tile-text {
-    font-weight: 600;
-}
-
-/* Skeletons */
-.cl-inv-skeleton {
-    display: block;
-    border-radius: 6px;
-    background: linear-gradient(90deg, var(--cl-line) 0%, var(--cl-surface-2) 50%, var(--cl-line) 100%);
-    background-size: 200% 100%;
-    animation: cl-inv-shimmer 1.2s ease-in-out infinite;
-}
-
+/* Skeleton sizes for the tiles and the inline warehouse figure; the block itself is .cl-skeleton. */
 .cl-inv-skeleton-label {
     width: 55%;
     height: 11px;
@@ -181,17 +92,13 @@
     vertical-align: middle;
 }
 
-@keyframes cl-inv-shimmer {
-    from { background-position: 200% 0; }
-    to { background-position: -200% 0; }
-}
-
 /* Sources bar */
 .cl-inv-sources {
     margin-top: 12px;
     border: 1px solid var(--cl-line);
     border-radius: var(--cl-radius);
     background: var(--cl-surface);
+    box-shadow: var(--cl-shadow-card);
 }
 
 .cl-inv-sources-bar {
@@ -242,28 +149,6 @@
     gap: 8px;
 }
 
-.cl-inv-toggle,
-.cl-inv-link {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    min-height: 36px;
-    padding: 0 4px;
-    border: 0;
-    background: none;
-    font: inherit;
-    font-size: 13.5px;
-    font-weight: 600;
-    color: var(--cl-accent-ink);
-    text-decoration: none;
-    cursor: pointer;
-}
-
-.cl-inv-toggle:hover,
-.cl-inv-link:hover {
-    text-decoration: underline;
-}
-
 .cl-inv-toggle svg {
     transition: transform .15s ease;
 }
@@ -288,6 +173,11 @@
     color: var(--cl-accent);
 }
 
+.cl-inv-iconbtn:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
+}
+
 .cl-inv-sources-list {
     border-top: 1px solid var(--cl-line);
 }
@@ -310,6 +200,10 @@
     gap: 6px 10px;
     padding: 10px 14px;
     border-top: 1px solid var(--cl-line);
+}
+
+.cl-inv-page .cl-inv-source-row:hover {
+    background: var(--cl-surface-2);
 }
 
 .cl-inv-source-name {
@@ -338,62 +232,22 @@
     font-variant-numeric: tabular-nums;
 }
 
-.cl-inv-load-error {
-    display: flex;
+/* Built by the script when a background fragment fails to load, so it stands on its own instead of
+   inside a card: it keeps the alert's tone but carries its own border and spacing. */
+.cl-inv-page .cl-inv-load-error {
     align-items: center;
-    flex-wrap: wrap;
-    gap: 8px;
-    padding: 12px 14px;
-    border: 1px solid var(--cl-line);
-    border-left: 4px solid var(--cl-bad);
+    margin: 0;
+    border-color: var(--cl-line);
+    border-left-color: var(--cl-bad);
     border-radius: var(--cl-radius);
-    background: var(--cl-bad-soft);
-    color: var(--cl-ink);
 }
 
-/* Buttons and search */
-.cl-inv-button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    height: 40px;
-    padding: 0 16px;
-    border: 1px solid var(--cl-line);
-    border-radius: var(--cl-radius);
-    background: var(--cl-surface);
-    color: var(--cl-accent-ink);
-    font: inherit;
-    font-size: 14px;
-    font-weight: 600;
-    text-decoration: none;
-    white-space: nowrap;
-    cursor: pointer;
-}
-
-.cl-inv-button:hover {
-    border-color: var(--cl-accent);
-}
-
-.cl-inv-button.is-primary {
-    border-color: var(--cl-accent);
-    background: var(--cl-accent);
-    color: var(--cl-surface);
-}
-
-.cl-inv-button.is-primary:hover {
-    background: var(--cl-accent-ink);
-}
-
-.cl-inv-button:disabled {
-    opacity: .45;
-    cursor: not-allowed;
-}
-
+/* Search */
 .cl-inv-search-card {
     border: 1px solid var(--cl-line);
     border-radius: var(--cl-radius);
     background: var(--cl-surface);
+    box-shadow: var(--cl-shadow-card);
 }
 
 .cl-inv-search {
@@ -402,6 +256,11 @@
     align-items: flex-start;
     gap: 8px;
     padding: 14px;
+}
+
+/* the submit sits next to the field, so it takes the field's height rather than the 36px of a card footer */
+.cl-inv-search .cl-button {
+    height: 40px;
 }
 
 .cl-inv-search-field {
@@ -419,27 +278,9 @@
     pointer-events: none;
 }
 
-.cl-inv-input {
-    width: 100%;
-    height: 40px;
+/* room for the lupe on the left and the clear button on the right */
+.cl-inv-search-field .cl-input {
     padding: 0 40px 0 36px;
-    border: 1px solid var(--cl-line);
-    border-radius: var(--cl-radius);
-    background: var(--cl-surface);
-    color: var(--cl-ink);
-    font: inherit;
-    font-size: 15px;
-}
-
-.cl-inv-input:focus {
-    outline: none;
-    border-color: var(--cl-accent);
-    box-shadow: 0 0 0 3px var(--cl-accent-soft);
-}
-
-.cl-inv-input.is-invalid {
-    border-color: var(--cl-bad);
-    box-shadow: 0 0 0 3px var(--cl-bad-soft);
 }
 
 .cl-inv-clear {
@@ -461,57 +302,34 @@
     color: var(--cl-ink);
 }
 
-.cl-inv-page .cl-inv-field-error {
-    flex-basis: 100%;
-    margin: 0;
-    font-size: 13px;
-    color: var(--cl-bad);
+.cl-inv-clear:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
 }
 
-.cl-inv-errorbar {
-    display: flex;
+.cl-inv-page .cl-inv-search .cl-field-error {
+    flex-basis: 100%;
+}
+
+/* The search error is part of the card, not a free-standing message: it spans the card and is divided
+   from the form by a line instead of floating with a margin and rounded corners. */
+.cl-inv-page .cl-inv-errorbar {
     align-items: center;
-    flex-wrap: wrap;
-    gap: 10px;
+    margin: 0;
     padding: 12px 14px;
     border-top: 1px solid var(--cl-line);
-    border-left: 4px solid var(--cl-bad);
-    background: var(--cl-bad-soft);
-    color: var(--cl-ink);
+    border-radius: 0;
 }
 
-.cl-inv-errorbar > svg {
-    color: var(--cl-bad);
-}
-
-.cl-inv-errorbar-text {
+.cl-inv-page .cl-inv-errorbar .cl-alert-text {
     flex: 1 1 220px;
+    margin: 0;
+    font-size: 1rem;
 }
 
 /* Results */
 #inventory-results {
     border-top: 1px solid var(--cl-line);
-}
-
-/* Spinner: the app has no loading indicator yet; this ring mirrors the shape Bulma draws for button.is-loading,
-   in the app's tokens, so it can move to commercelink.css as the shared standard. */
-.cl-spinner {
-    display: inline-block;
-    width: 32px;
-    height: 32px;
-    border: 3px solid var(--cl-line);
-    border-top-color: var(--cl-accent);
-    border-radius: 50%;
-    animation: cl-spin .7s linear infinite;
-}
-
-@keyframes cl-spin {
-    to { transform: rotate(360deg); }
-}
-
-@keyframes cl-spin-pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: .35; }
 }
 
 .cl-inv-results-region {
@@ -585,7 +403,7 @@
     margin-bottom: 0;
 }
 
-.cl-inv-page .cl-inv-empty .cl-inv-button {
+.cl-inv-page .cl-inv-empty .cl-button {
     margin-top: 14px;
 }
 
@@ -670,13 +488,22 @@
     color: var(--cl-ok);
 }
 
+/* Offers table: the shared .cl-table, inset to the 16px the card uses elsewhere, with a sticky header. */
 .cl-inv-table-wrap {
     overflow-x: auto;
 }
 
-/* from 900px the offers render as a table; an overflow container would stop the header from sticking under the
+.cl-inv-page .cl-table :is(th, td):first-child {
+    padding-left: 16px;
+}
+
+.cl-inv-page .cl-table :is(th, td):last-child {
+    padding-right: 16px;
+}
+
+/* from 720px the offers render as a table; an overflow container would stop the header from sticking under the
    top bar, so the wrapper only scrolls on narrower screens (where offers are cards anyway) */
-@media screen and (min-width: 900px) {
+@media screen and (min-width: 720px) {
     .cl-inv-table-wrap {
         overflow: visible;
     }
@@ -686,102 +513,6 @@
         top: var(--cl-topbar-height);
         z-index: 1;
     }
-}
-
-.cl-inv-page .cl-inv-table {
-    width: 100%;
-    margin: 0;
-    border-collapse: collapse;
-    font-variant-numeric: tabular-nums;
-}
-
-.cl-inv-page .cl-inv-table th,
-.cl-inv-page .cl-inv-table td {
-    padding: 10px 16px;
-    border: 0;
-    border-top: 1px solid var(--cl-line);
-    vertical-align: middle;
-    text-align: left;
-    color: var(--cl-ink);
-}
-
-.cl-inv-page .cl-inv-table thead th {
-    background: var(--cl-surface-2);
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: .08em;
-    text-transform: uppercase;
-    color: var(--cl-ink-3);
-}
-
-.cl-inv-page .cl-inv-table .is-numeric {
-    text-align: right;
-}
-
-.cl-inv-page .cl-inv-table td .cl-status,
-.cl-inv-page .cl-inv-table td .cl-inv-mode {
-    margin-left: 6px;
-}
-
-.cl-inv-page .cl-inv-table td .cl-status {
-    white-space: nowrap;
-}
-
-.cl-inv-sort {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 0;
-    border: 0;
-    background: none;
-    font: inherit;
-    letter-spacing: inherit;
-    text-transform: inherit;
-    color: inherit;
-    cursor: pointer;
-}
-
-.cl-inv-sort {
-    position: relative;
-}
-
-/* the marker is positioned outside the label so headers stay aligned with their column values */
-.cl-inv-sort::after {
-    content: "\2195";
-    position: absolute;
-    left: 100%;
-    margin-left: 4px;
-    opacity: 0;
-    transition: opacity .15s ease;
-}
-
-.cl-inv-page th.is-numeric .cl-inv-sort::after {
-    left: auto;
-    right: 100%;
-    margin-left: 0;
-    margin-right: 4px;
-}
-
-.cl-inv-page th:hover .cl-inv-sort::after,
-.cl-inv-sort:focus-visible::after {
-    opacity: .45;
-}
-
-.cl-inv-page th[aria-sort="ascending"] .cl-inv-sort,
-.cl-inv-page th[aria-sort="descending"] .cl-inv-sort {
-    color: var(--cl-accent-ink);
-}
-
-.cl-inv-page th[aria-sort="ascending"] .cl-inv-sort::after {
-    content: "\25B2";
-    opacity: 1;
-    font-size: .8em;
-}
-
-.cl-inv-page th[aria-sort="descending"] .cl-inv-sort::after {
-    content: "\25BC";
-    opacity: 1;
-    font-size: .8em;
 }
 
 .cl-inv-offers {
@@ -796,23 +527,12 @@
     width: 130px;
 }
 
-.cl-inv-page .cl-inv-offers thead th {
-    font-size: 12.5px;
-    letter-spacing: 0;
-    text-transform: none;
-    color: var(--cl-ink-2);
-    white-space: nowrap;
+.cl-inv-page .cl-table td .cl-status,
+.cl-inv-page .cl-table td .cl-inv-mode {
+    margin-left: 6px;
 }
 
-.cl-inv-page .cl-inv-offers td {
-    vertical-align: top;
-}
-
-.cl-inv-page .cl-inv-offers td.is-numeric {
-    white-space: nowrap;
-}
-
-.cl-inv-page .cl-inv-table .cl-inv-code {
+.cl-inv-page .cl-table .cl-inv-code {
     padding: 0;
     background: none;
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -856,28 +576,21 @@
     margin-right: 6px;
     border-radius: 50%;
     background: var(--cl-ok);
-    color: #fff;
+    color: var(--cl-surface);
     font-size: 9px;
     vertical-align: 1px;
-}
-
-.cl-inv-page .cl-inv-offers tbody tr.cl-inv-offer:hover td {
-    background: var(--cl-surface-2);
-}
-
-.cl-inv-page .cl-inv-offers tbody tr.cl-inv-offer.is-cheapest:hover td {
-    background: var(--cl-ok-tint);
-}
-
-.cl-inv-page .cl-inv-source-row:hover {
-    background: var(--cl-surface-2);
 }
 
 .cl-inv-price {
     font-weight: 650;
 }
 
-.cl-inv-page .cl-inv-offer.is-cheapest td {
+.cl-inv-page .cl-inv-offers tbody tr.cl-inv-offer:hover td {
+    background: var(--cl-surface-2);
+}
+
+.cl-inv-page .cl-inv-offer.is-cheapest td,
+.cl-inv-page .cl-inv-offers tbody tr.cl-inv-offer.is-cheapest:hover td {
     background: var(--cl-ok-tint);
 }
 
@@ -891,13 +604,7 @@
     color: var(--cl-ink-3);
 }
 
-.cl-inv-card {
-    margin-top: 12px;
-    border: 1px solid var(--cl-line);
-    border-radius: var(--cl-radius);
-    background: var(--cl-surface);
-}
-
+/* Technical card (super admin) */
 .cl-inv-page .cl-inv-card-title {
     padding: 12px 16px;
 }
@@ -907,17 +614,6 @@
     padding: 0 16px 14px;
 }
 
-/* Focus */
-.cl-inv-button:focus-visible,
-.cl-inv-toggle:focus-visible,
-.cl-inv-link:focus-visible,
-.cl-inv-iconbtn:focus-visible,
-.cl-inv-clear:focus-visible,
-.cl-inv-sort:focus-visible {
-    outline: 2px solid var(--cl-accent);
-    outline-offset: 2px;
-}
-
 /* Results headings are non-interactive focus targets (script moves focus there after a search purely
    for screen-reader announcement), so they never get the interactive-element outline treatment. */
 .cl-inv-page [data-inventory-results-heading]:focus {
@@ -925,22 +621,12 @@
 }
 
 @media screen and (max-width: 1023px) {
-    .cl-inv-page .cl-inv-tiles {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    .cl-inv-button,
-    .cl-inv-input {
+    .cl-inv-iconbtn {
+        width: 44px;
         height: 44px;
     }
 
-    .cl-inv-toggle,
-    .cl-inv-link {
-        min-height: 44px;
-    }
-
-    .cl-inv-iconbtn {
-        width: 44px;
+    .cl-inv-search .cl-button {
         height: 44px;
     }
 
@@ -958,7 +644,7 @@
         right: 0;
     }
 
-    .cl-inv-input {
+    .cl-inv-search-field .cl-input {
         padding-right: 48px;
     }
 }
@@ -966,14 +652,6 @@
 @media screen and (max-width: 719px) {
     .cl-inv-page {
         padding-block: 16px 32px;
-    }
-
-    .cl-inv-number {
-        font-size: 18px;
-    }
-
-    .cl-inv-page .cl-inv-tile {
-        padding: 10px 12px;
     }
 
     .cl-inv-issues {
@@ -986,7 +664,7 @@
         margin-left: 0;
     }
 
-    .cl-inv-search .cl-inv-button.is-primary {
+    .cl-inv-search .cl-button.is-primary {
         flex: 1 1 100%;
     }
 
@@ -1002,11 +680,10 @@
     .cl-inv-price-summary > span:not(:last-child)::after {
         content: none;
     }
-}
 
-/* below 900px offers become cards: source and price on the first line, quantity under the price, code notes across
-   the whole card; the header stays as a slim sort bar because cards have no column headers of their own */
-@media screen and (max-width: 899px) {
+    /* Offers become cards: source and price on the first line, quantity under the price, code notes across
+       the whole card. Unlike the shared table's card mode the header stays — as a slim sort bar — because
+       sorting the offers is the point of this table and the shared mode hides `thead` from sight. */
     .cl-inv-page .cl-inv-offers,
     .cl-inv-page .cl-inv-offers thead,
     .cl-inv-page .cl-inv-offers tbody,
@@ -1019,10 +696,19 @@
         display: none;
     }
 
+    .cl-inv-page .cl-inv-offers thead {
+        position: static;
+        width: auto;
+        height: auto;
+        overflow: visible;
+        clip: auto;
+    }
+
     .cl-inv-page .cl-inv-offers thead tr {
         display: flex;
         align-items: center;
         gap: 16px;
+        padding: 0;
         background: var(--cl-surface-2);
         border-top: 1px solid var(--cl-line);
     }
@@ -1043,7 +729,7 @@
         padding-right: 16px;
     }
 
-    .cl-inv-page .cl-inv-offers thead .cl-inv-sort {
+    .cl-inv-page .cl-inv-offers thead .cl-table-sort {
         min-height: 44px;
     }
 
@@ -1060,6 +746,11 @@
         padding: 0;
         border: 0;
         background: none;
+        text-align: left;
+    }
+
+    .cl-inv-page .cl-inv-offers tr.cl-inv-offer td::before {
+        content: none;
     }
 
     .cl-inv-page .cl-inv-offers tr.cl-inv-offer td.cl-inv-source-cell {
@@ -1093,16 +784,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .cl-inv-skeleton {
-        animation: none;
-    }
-
-    .cl-inv-toggle svg,
-    .cl-inv-sort::after {
+    .cl-inv-toggle svg {
         transition: none;
-    }
-
-    .cl-spinner {
-        animation: cl-spin-pulse 1.2s ease-in-out infinite;
     }
 }

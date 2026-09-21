@@ -7,7 +7,7 @@
 <div layout:fragment="content">
     <link rel="stylesheet" th:href="@{/css/inventory.css}">
 
-    <div class="cl-inv-page" data-inventory-page
+    <div class="cl-page cl-page-body cl-inv-page" data-inventory-page
          th:data-summary-url="@{/dashboard/inventory/summary}"
          th:data-warehouse-url="${superAdmin} ? '' : @{/dashboard/inventory/warehouse}"
          th:data-search-url="@{/dashboard/inventory/search}"
@@ -15,40 +15,40 @@
          th:data-msg-load-error="#{inventory.load.error}"
          th:data-msg-retry="#{inventory.retry}">
 
-        <header class="cl-inv-header">
-            <div class="cl-inv-header-row">
-                <h1 class="cl-inv-title" th:text="#{inventory.title}"></h1>
+        <header class="cl-page-header">
+            <div class="cl-page-header-row">
+                <h1 class="cl-page-title" th:text="#{inventory.title}"></h1>
                 <button th:replace="~{fragments/screen-intro :: toggle}"></button>
             </div>
-            <p class="cl-inv-lead" th:text="${superAdmin} ? #{inventory.tech.lead} : #{inventory.lead}"></p>
+            <p class="cl-page-lead" th:text="${superAdmin} ? #{inventory.tech.lead} : #{inventory.lead}"></p>
         </header>
 
         <div th:replace="~{fragments/screen-intro :: panel('inventory', 'fas fa-cubes')}"></div>
 
         <section class="cl-inv-summary-slot" data-inventory-summary aria-busy="true"
                  th:attr="aria-label=#{inventory.summary.aria}">
-            <ul class="cl-inv-tiles" aria-hidden="true">
-                <li class="cl-inv-tile" th:each="i : ${#numbers.sequence(1, superAdmin ? 3 : 4)}">
-                    <span class="cl-inv-skeleton cl-inv-skeleton-label"></span>
-                    <span class="cl-inv-skeleton cl-inv-skeleton-number"></span>
-                    <span class="cl-inv-skeleton cl-inv-skeleton-hint"></span>
+            <ul class="cl-stat-grid" aria-hidden="true">
+                <li class="cl-stat" th:each="i : ${#numbers.sequence(1, superAdmin ? 3 : 4)}">
+                    <span class="cl-skeleton cl-inv-skeleton-label"></span>
+                    <span class="cl-skeleton cl-inv-skeleton-number"></span>
+                    <span class="cl-skeleton cl-inv-skeleton-hint"></span>
                 </li>
             </ul>
             <div th:unless="${superAdmin}" class="cl-inv-sources cl-inv-sources-bar" aria-hidden="true">
-                <span class="cl-inv-skeleton cl-inv-skeleton-label"></span>
+                <span class="cl-skeleton cl-inv-skeleton-label"></span>
             </div>
-            <span class="cl-inv-visually-hidden" th:text="#{inventory.summary.loading}"></span>
+            <span class="cl-visually-hidden" th:text="#{inventory.summary.loading}"></span>
             <noscript><p class="cl-inv-muted" th:text="#{inventory.noscript}"></p></noscript>
         </section>
 
         <section class="cl-inv-search-card" aria-labelledby="inventory-search-title">
-            <h2 class="cl-inv-visually-hidden" id="inventory-search-title" th:text="#{inventory.search.title}"></h2>
+            <h2 class="cl-visually-hidden" id="inventory-search-title" th:text="#{inventory.search.title}"></h2>
             <form class="cl-inv-search" th:action="@{/dashboard/inventory}" method="get" role="search"
                   data-inventory-search novalidate>
-                <label class="cl-inv-visually-hidden" for="inventory-q" th:text="#{inventory.search.label}"></label>
+                <label class="cl-visually-hidden" for="inventory-q" th:text="#{inventory.search.label}"></label>
                 <div class="cl-inv-search-field">
                     <span class="cl-inv-search-icon" aria-hidden="true"><i class="fas fa-search"></i></span>
-                    <input id="inventory-q" class="cl-inv-input" type="text" name="q" inputmode="search"
+                    <input id="inventory-q" class="cl-input" type="text" name="q" inputmode="search"
                            autocomplete="off" spellcheck="false" maxlength="100"
                            th:value="${query}" th:placeholder="#{inventory.search.placeholder}"
                            aria-describedby="inventory-q-error">
@@ -57,24 +57,24 @@
                         <i class="fas fa-times" aria-hidden="true"></i>
                     </button>
                 </div>
-                <button type="submit" class="cl-inv-button is-primary" data-inventory-submit
+                <button type="submit" class="cl-button is-primary" data-inventory-submit
                         th:text="#{inventory.search.submit}"></button>
-                <p id="inventory-q-error" class="cl-inv-field-error" role="alert" data-inventory-field-error hidden>
+                <p id="inventory-q-error" class="cl-field-error" role="alert" data-inventory-field-error hidden>
                     <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
                     <span th:text="#{inventory.search.tooShort}"></span>
                 </p>
             </form>
 
-            <div class="cl-inv-errorbar" data-inventory-search-error role="alert" hidden>
-                <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
-                <span class="cl-inv-errorbar-text" th:text="#{inventory.search.error}"></span>
-                <button type="button" class="cl-inv-button" data-inventory-search-retry>
+            <div class="cl-alert is-bad cl-inv-errorbar" data-inventory-search-error role="alert" hidden>
+                <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+                <span class="cl-alert-text" th:text="#{inventory.search.error}"></span>
+                <button type="button" class="cl-button" data-inventory-search-retry>
                     <i class="fas fa-sync-alt" aria-hidden="true"></i>
                     <span th:text="#{inventory.retry}"></span>
                 </button>
             </div>
 
-            <p class="cl-inv-visually-hidden" aria-live="polite" data-inventory-live></p>
+            <p class="cl-visually-hidden" aria-live="polite" data-inventory-live></p>
 
             <template data-inventory-empty-template>
                 <div th:replace="~{fragments/inventory-results :: emptyState}"></div>
@@ -91,7 +91,7 @@
                 </div>
                 <div class="cl-inv-spinner-overlay" data-inventory-spinner role="status" hidden>
                     <span class="cl-spinner" aria-hidden="true"></span>
-                    <span class="cl-inv-visually-hidden" th:text="#{inventory.search.loading}"></span>
+                    <span class="cl-visually-hidden" th:text="#{inventory.search.loading}"></span>
                 </div>
             </div>
         </section>

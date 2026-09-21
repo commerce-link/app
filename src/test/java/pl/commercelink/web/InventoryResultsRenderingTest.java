@@ -80,7 +80,7 @@ class InventoryResultsRenderingTest {
         // then
         assertThat(html.split("is-cheapest", -1)).hasSize(2);
         assertThat(html.split("cl-inv-check", -1)).hasSize(2);
-        assertThat(html).contains("cl-inv-visually-hidden\">lowest price<").doesNotContain("Cheapest");
+        assertThat(html).contains("cl-visually-hidden\">lowest price<").doesNotContain("Cheapest");
     }
 
     @Test

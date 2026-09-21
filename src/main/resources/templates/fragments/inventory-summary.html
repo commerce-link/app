@@ -3,38 +3,38 @@
 <body>
 
 <div th:fragment="summary" class="cl-inv-summary" data-inventory-fragment="summary">
-    <ul class="cl-inv-tiles">
-        <li class="cl-inv-tile">
-            <span class="cl-inv-eyebrow" th:text="#{inventory.tile.products}"></span>
-            <span class="cl-inv-number" th:text="${#numbers.formatInteger(statistics.distinctProducts(), 1, 'WHITESPACE')}"></span>
-            <span class="cl-inv-hint" th:text="#{inventory.tile.products.hint}"></span>
+    <ul class="cl-stat-grid">
+        <li class="cl-stat">
+            <span class="cl-eyebrow" th:text="#{inventory.tile.products}"></span>
+            <span class="cl-stat-value" th:text="${#numbers.formatInteger(statistics.distinctProducts(), 1, 'WHITESPACE')}"></span>
+            <span class="cl-stat-hint" th:text="#{inventory.tile.products.hint}"></span>
         </li>
-        <li class="cl-inv-tile">
-            <span class="cl-inv-eyebrow" th:text="#{inventory.tile.inStock}"></span>
-            <span class="cl-inv-number" th:text="${#numbers.formatInteger(statistics.productsInStock(), 1, 'WHITESPACE')}"></span>
-            <span class="cl-inv-hint" th:text="#{inventory.tile.inStock.hint(${statistics.inStockPercent()})}"></span>
+        <li class="cl-stat">
+            <span class="cl-eyebrow" th:text="#{inventory.tile.inStock}"></span>
+            <span class="cl-stat-value" th:text="${#numbers.formatInteger(statistics.productsInStock(), 1, 'WHITESPACE')}"></span>
+            <span class="cl-stat-hint" th:text="#{inventory.tile.inStock.hint(${statistics.inStockPercent()})}"></span>
         </li>
-        <li class="cl-inv-tile">
-            <span class="cl-inv-eyebrow" th:text="#{inventory.tile.suppliers}"></span>
-            <span class="cl-inv-number">
+        <li class="cl-stat">
+            <span class="cl-eyebrow" th:text="#{inventory.tile.suppliers}"></span>
+            <span class="cl-stat-value">
                 <span th:text="${sources.activeSupplierCount()}"></span>
-                <small class="cl-inv-number-of" th:text="#{inventory.tile.suppliers.of(${sources.connectedSupplierCount()})}"></small>
+                <small class="cl-stat-value-of" th:text="#{inventory.tile.suppliers.of(${sources.connectedSupplierCount()})}"></small>
             </span>
         </li>
-        <li class="cl-inv-tile" data-inventory-slot="warehouse" aria-busy="true">
-            <span class="cl-inv-eyebrow" th:text="#{inventory.tile.warehouse}"></span>
-            <span class="cl-inv-skeleton cl-inv-skeleton-number" aria-hidden="true"></span>
-            <span class="cl-inv-skeleton cl-inv-skeleton-hint" aria-hidden="true"></span>
+        <li class="cl-stat" data-inventory-slot="warehouse" aria-busy="true">
+            <span class="cl-eyebrow" th:text="#{inventory.tile.warehouse}"></span>
+            <span class="cl-skeleton cl-inv-skeleton-number" aria-hidden="true"></span>
+            <span class="cl-skeleton cl-inv-skeleton-hint" aria-hidden="true"></span>
         </li>
     </ul>
 
     <section class="cl-inv-sources" aria-labelledby="inventory-sources-title">
         <div class="cl-inv-sources-bar">
-            <h2 class="cl-inv-eyebrow" id="inventory-sources-title" th:text="#{inventory.sources.title}"></h2>
+            <h2 class="cl-eyebrow" id="inventory-sources-title" th:text="#{inventory.sources.title}"></h2>
             <span class="cl-inv-count" data-inventory-source-count
                   th:title="#{inventory.sources.count(${sources.sourceCount()})}">
                 <span aria-hidden="true" th:text="${sources.sourceCount()}"></span>
-                <span class="cl-inv-visually-hidden" th:text="#{inventory.sources.count(${sources.sourceCount()})}"></span>
+                <span class="cl-visually-hidden" th:text="#{inventory.sources.count(${sources.sourceCount()})}"></span>
             </span>
             <th:block th:if="${sources.hasIssues()}">
                 <span class="cl-status is-warn" th:text="#{inventory.sources.attention(${sources.attention().size()})}"></span>
@@ -47,7 +47,7 @@
                 </span>
             </th:block>
             <span class="cl-inv-sources-actions">
-                <button type="button" class="cl-inv-toggle" data-inventory-sources-toggle aria-expanded="false"
+                <button type="button" class="cl-link-button cl-inv-toggle" data-inventory-sources-toggle aria-expanded="false"
                         aria-controls="inventory-sources-list">
                     <span data-when-collapsed th:text="#{inventory.sources.show}"></span>
                     <span data-when-expanded hidden th:text="#{inventory.sources.hide}"></span>
@@ -75,7 +75,7 @@
                           th:text="${sources.externalWarehouse()} ? #{inventory.sources.warehouse.external} : #{inventory.sources.warehouse}"></span>
                     <span class="cl-inv-source-meta" th:unless="${sources.externalWarehouse()}">
                         <span data-inventory-warehouse-products>
-                            <span class="cl-inv-skeleton cl-inv-skeleton-inline" aria-hidden="true"></span>
+                            <span class="cl-skeleton cl-inv-skeleton-inline" aria-hidden="true"></span>
                         </span>
                     </span>
                 </li>
@@ -99,17 +99,17 @@
     </span>
 </li>
 
-<li th:fragment="warehouseTile" class="cl-inv-tile" data-inventory-fragment="warehouse">
-    <span class="cl-inv-eyebrow" th:text="#{inventory.tile.warehouse}"></span>
+<li th:fragment="warehouseTile" class="cl-stat" data-inventory-fragment="warehouse">
+    <span class="cl-eyebrow" th:text="#{inventory.tile.warehouse}"></span>
     <th:block th:if="${externalWarehouse}">
-        <span class="cl-inv-tile-text" th:text="#{inventory.tile.warehouse.external}"></span>
-        <a class="cl-inv-link" th:href="${warehouseUrl}" th:text="#{inventory.tile.warehouse.open}"></a>
+        <span class="cl-stat-text" th:text="#{inventory.tile.warehouse.external}"></span>
+        <a class="cl-link-button" th:href="${warehouseUrl}" th:text="#{inventory.tile.warehouse.open}"></a>
     </th:block>
     <th:block th:unless="${externalWarehouse}">
-        <span class="cl-inv-number" th:text="${#numbers.formatInteger(warehouseSummary.products(), 1, 'WHITESPACE')}"></span>
+        <span class="cl-stat-value" th:text="${#numbers.formatInteger(warehouseSummary.products(), 1, 'WHITESPACE')}"></span>
         <span data-warehouse-products-label hidden
               th:text="#{inventory.sources.products(${warehouseSummary.products()})}"></span>
-        <span class="cl-inv-hint"><span th:text="#{inventory.tile.warehouse.hint(${warehouseSummary.inStockQty()})}"></span><span
+        <span class="cl-stat-hint"><span th:text="#{inventory.tile.warehouse.hint(${warehouseSummary.inStockQty()})}"></span><span
                 th:if="${warehouseSummary.inDeliveryQty() > 0}"
                 th:text="#{inventory.tile.warehouse.inDelivery(${warehouseSummary.inDeliveryQty()})}"></span></span>
     </th:block>

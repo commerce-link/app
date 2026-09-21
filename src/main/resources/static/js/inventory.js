@@ -53,13 +53,14 @@
 
     function loadError(onRetry) {
         const box = document.createElement('div');
-        box.className = 'cl-inv-load-error';
+        box.className = 'cl-alert is-bad cl-inv-load-error';
         box.setAttribute('role', 'alert');
         const text = document.createElement('span');
+        text.className = 'cl-alert-text';
         text.textContent = page.dataset.msgLoadError;
         const retry = document.createElement('button');
         retry.type = 'button';
-        retry.className = 'cl-inv-link';
+        retry.className = 'cl-link-button';
         retry.textContent = page.dataset.msgRetry;
         retry.addEventListener('click', onRetry);
         box.append(text, retry);
@@ -124,7 +125,7 @@
             .catch(() => {
                 showWarehouseProducts(summary, '—');
                 slot.removeAttribute('aria-busy');
-                slot.querySelectorAll('.cl-inv-skeleton, .cl-inv-load-error').forEach(node => node.remove());
+                slot.querySelectorAll('.cl-skeleton, .cl-inv-load-error').forEach(node => node.remove());
                 slot.appendChild(loadError(() => {
                     slot.querySelectorAll('.cl-inv-load-error').forEach(node => node.remove());
                     slot.setAttribute('aria-busy', 'true');

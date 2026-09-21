@@ -67,23 +67,54 @@ class InventoryScriptContractTest {
     }
 
     @Test
-    void styleSheetDefinesTheSpinnerWithAReducedMotionFallback() throws Exception {
+    void spinnerAndSkeletonAreSharedAndKeepAReducedMotionFallback() throws Exception {
         // given
-        String css = read("src/main/resources/static/css/inventory.css");
+        String shared = read("src/main/resources/static/css/commercelink.css");
 
         // when / then
-        assertThat(css).contains(".cl-spinner {").contains("@keyframes cl-spin").contains("@keyframes cl-spin-pulse")
-                .contains(".cl-inv-count {");
+        assertThat(shared).contains(".cl-spinner {").contains("@keyframes cl-spin").contains("@keyframes cl-spin-pulse")
+                .contains(".cl-skeleton {").contains("@keyframes cl-shimmer");
     }
 
     @Test
     void offersTableHasFixedColumnsAStickyHeaderAndDirectionalSortMarkers() throws Exception {
         // given
         String css = read("src/main/resources/static/css/inventory.css");
+        String shared = read("src/main/resources/static/css/commercelink.css");
+
+        // when / then -- the column widths and the sticky header belong to this page, the sort marker to .cl-table
+        assertThat(css).contains(".cl-inv-col-price {").contains("position: sticky").contains("top: var(--cl-topbar-height)")
+                .contains("tr.cl-inv-offer:hover td");
+        assertThat(shared).contains("th[aria-sort=\"ascending\"] .cl-table-sort::after");
+    }
+
+    /**
+     * The page is built from the shared components; a copy of one under a `cl-inv-` name is how the two
+     * drifted apart before (the page button grew to 40px while `.cl-button` stayed 36px).
+     */
+    @Test
+    void pageDoesNotKeepItsOwnCopyOfASharedComponent() throws Exception {
+        // given
+        String css = read("src/main/resources/static/css/inventory.css");
 
         // when / then
-        assertThat(css).contains(".cl-inv-col-price {").contains("position: sticky").contains("top: var(--cl-topbar-height)")
-                .contains("th[aria-sort=\"ascending\"] .cl-inv-sort::after").contains("tr.cl-inv-offer:hover td");
+        assertThat(css)
+                .doesNotContain(".cl-inv-button").doesNotContain(".cl-inv-input").doesNotContain(".cl-inv-card {")
+                .doesNotContain(".cl-inv-title").doesNotContain(".cl-inv-lead").doesNotContain(".cl-inv-eyebrow")
+                .doesNotContain(".cl-inv-visually-hidden").doesNotContain(".cl-inv-field-error")
+                .doesNotContain(".cl-inv-table {").doesNotContain(".cl-inv-sort").doesNotContain(".cl-inv-skeleton {")
+                .doesNotContain("\n.cl-spinner {");
+    }
+
+    /** Only the frame's breakpoints: a page-specific one is how the offers table ended up folding at 900px. */
+    @Test
+    void styleSheetUsesOnlyTheBreakpointsOfTheFrame() throws Exception {
+        // given
+        String css = read("src/main/resources/static/css/inventory.css");
+
+        // when / then
+        assertThat(css).contains("@media screen and (max-width: 719px)")
+                .doesNotContain("899px").doesNotContain("900px");
     }
 
     @Test

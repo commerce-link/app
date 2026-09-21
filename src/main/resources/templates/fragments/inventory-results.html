@@ -41,7 +41,7 @@
 <div th:fragment="results" class="cl-inv-results" data-inventory-fragment="results">
 
     <div th:if="${validationError}" class="cl-inv-state" th:attr="data-announce=#{inventory.search.tooShort}">
-        <p class="cl-inv-field-error" role="alert" tabindex="-1" data-inventory-results-heading>
+        <p class="cl-field-error" role="alert" tabindex="-1" data-inventory-results-heading>
             <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
             <span th:text="#{inventory.search.tooShort}"></span>
         </p>
@@ -66,7 +66,7 @@
         <div class="cl-inv-empty">
             <h3 class="cl-inv-empty-title" th:text="#{inventory.known.title}"></h3>
             <p th:unless="${superAdmin}" th:text="#{inventory.known.text}"></p>
-            <a th:if="${canManageSuppliers}" class="cl-inv-button" th:href="${manageSuppliersUrl}">
+            <a th:if="${canManageSuppliers}" class="cl-button" th:href="${manageSuppliersUrl}">
                 <i class="fas fa-cog" aria-hidden="true"></i>
                 <span th:text="#{inventory.known.manage}"></span>
             </a>
@@ -102,8 +102,8 @@
         </p>
 
         <div class="cl-inv-table-wrap">
-            <table class="cl-inv-table cl-inv-offers" data-inventory-offers>
-                <caption class="cl-inv-visually-hidden" th:text="#{inventory.table.caption}"></caption>
+            <table class="cl-table cl-inv-offers" data-inventory-offers>
+                <caption class="cl-visually-hidden" th:text="#{inventory.table.caption}"></caption>
                 <colgroup>
                     <col class="cl-inv-col-source">
                     <col class="cl-inv-col-price">
@@ -113,10 +113,10 @@
                 <tr>
                     <th scope="col" th:text="#{inventory.table.source}"></th>
                     <th scope="col" class="is-numeric" aria-sort="none">
-                        <button type="button" class="cl-inv-sort" data-sort-key="price" th:text="#{inventory.table.purchasePrice}"></button>
+                        <button type="button" class="cl-table-sort" data-sort-key="price" th:text="#{inventory.table.purchasePrice}"></button>
                     </th>
                     <th scope="col" class="is-numeric" aria-sort="none">
-                        <button type="button" class="cl-inv-sort" data-sort-key="qty" th:text="#{inventory.table.available}"></button>
+                        <button type="button" class="cl-table-sort" data-sort-key="qty" th:text="#{inventory.table.available}"></button>
                     </th>
                 </tr>
                 </thead>
@@ -154,7 +154,7 @@
                     <td class="is-numeric cl-inv-price-cell">
                         <th:block th:if="${offer.hasPrice()}">
                             <span th:if="${offer.cheapest()}" class="cl-inv-check" aria-hidden="true"><i class="fas fa-check"></i></span>
-                            <span th:if="${offer.cheapest()}" class="cl-inv-visually-hidden" th:text="#{inventory.table.cheapest}"></span>
+                            <span th:if="${offer.cheapest()}" class="cl-visually-hidden" th:text="#{inventory.table.cheapest}"></span>
                             <span class="cl-inv-price" th:text="${#numbers.formatDecimal(offer.grossPrice(), 1, 'WHITESPACE', 2, 'COMMA')} + ' PLN'"></span>
                         </th:block>
                         <span th:unless="${offer.hasPrice()}" class="cl-inv-muted" th:text="#{inventory.table.noPrice}"></span>
