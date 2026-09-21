@@ -11,6 +11,8 @@ import pl.commercelink.marketplace.api.MarketplaceProvider;
 import pl.commercelink.marketplace.api.MarketplaceReturn;
 import pl.commercelink.marketplace.api.MarketplaceReturnStatus;
 import pl.commercelink.marketplace.api.MarketplaceReturns;
+import pl.commercelink.scheduling.ScheduledExecutionCounter;
+import pl.commercelink.scheduling.ScheduledExecution;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 
@@ -36,6 +38,7 @@ class MarketplaceReturnsImportEventListenerTest {
     @Mock private Store store;
     @Mock private MarketplaceProvider provider;
     @Mock private MarketplaceReturns returns;
+    @Mock private ScheduledExecutionCounter scheduledExecutionCounter;
 
     @InjectMocks
     private MarketplaceReturnsImportEventListener listener;
@@ -81,6 +84,7 @@ class MarketplaceReturnsImportEventListenerTest {
 
         // then
         verify(marketplaceReturnImporter).importReturn(store, MARKETPLACE, aReturn);
+        verify(scheduledExecutionCounter).countCompleted(STORE_ID, ScheduledExecution.RETURNS_IMPORT, MARKETPLACE);
         verify(storesRepository, never()).findAll();
     }
 
@@ -95,6 +99,7 @@ class MarketplaceReturnsImportEventListenerTest {
 
         // then
         verifyNoInteractions(marketplaceReturnImporter);
+        verifyNoInteractions(scheduledExecutionCounter);
     }
 
     @Test
@@ -109,6 +114,7 @@ class MarketplaceReturnsImportEventListenerTest {
         // then
         verifyNoInteractions(providerFactory);
         verifyNoInteractions(marketplaceReturnImporter);
+        verifyNoInteractions(scheduledExecutionCounter);
     }
 
     @Test

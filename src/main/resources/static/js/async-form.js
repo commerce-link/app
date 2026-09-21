@@ -12,11 +12,50 @@
             return null;
         }
         var kept = keepLoadedImages(form, next, parsed);
+        keepDrawnIcons(form, next);
+        keepOpenedSections(form, next);
         form.replaceWith(next);
         kept.forEach(function (image) {
             image.slot.replaceWith(image.loaded);
         });
         return next;
+    }
+
+    // A <details> the user opened or closed stays that way after a save; the server only knows its default.
+    function keepOpenedSections(form, next) {
+        next.querySelectorAll('details[id]').forEach(function (section) {
+            var current = form.querySelector('details[id="' + section.id + '"]');
+            if (current) {
+                section.open = current.open;
+            }
+        });
+    }
+
+    // Font Awesome draws an <i class="fas fa-…"> as an <svg> only once it is on the page, so a swapped-in button would
+    // lose its icon and change width for a frame. An icon already drawn in the old form is reused instead.
+    function keepDrawnIcons(form, next) {
+        next.querySelectorAll('i[class*="fa-"]').forEach(function (icon) {
+            var prefix = ['fas', 'far', 'fab'].find(function (candidate) {
+                return icon.classList.contains(candidate);
+            });
+            var name = Array.prototype.find.call(icon.classList, function (candidate) {
+                return candidate.indexOf('fa-') === 0;
+            });
+            var drawn = prefix && name
+                && form.querySelector('svg[data-prefix="' + prefix + '"][data-icon="' + name.slice(3) + '"]');
+            if (!drawn) {
+                return;
+            }
+            var copy = drawn.cloneNode(true);
+            var own = Array.prototype.filter.call(drawn.classList, function (candidate) {
+                return candidate === 'svg-inline--fa' || /^fa-w-\d+$/.test(candidate);
+            });
+            var extra = Array.prototype.filter.call(icon.classList, function (candidate) {
+                return candidate !== prefix && candidate !== name;
+            });
+            copy.setAttribute('class', own.concat([name], extra).join(' '));
+            icon.replaceWith(copy);
+        });
     }
 
     // An image sent back under the same address is already on screen. Its loaded element takes the place of the new
@@ -70,12 +109,16 @@
             return;
         }
         var button = form.querySelector('[type="submit"]');
+        // Disabling the button drops focus; an element with an id (e.g. a switch that saves) gets it back in the new form.
+        var focusedId = form.contains(document.activeElement) ? document.activeElement.id : '';
         form.setAttribute('aria-busy', 'true');
         if (button) {
             button.disabled = true;
         }
 
-        fetch(form.action, {
+        // A submitter with formaction (e.g. an action confirmed in a dialog) posts the same form to its own address.
+        var action = event.submitter && event.submitter.hasAttribute('formaction') ? event.submitter.formAction : form.action;
+        fetch(action, {
             method: 'POST',
             body: body(form),
             headers: { 'X-Requested-With': 'fetch' },
@@ -85,20 +128,34 @@
         })
             .then(function (response) {
                 return response.text().then(function (html) {
-                    return { status: response.status, html: html };
+                    return { status: response.status, redirected: response.type === 'opaqueredirect', html: html };
                 });
             })
             .then(function (result) {
-                var next = result.status === 200 || result.status === 422 ? swap(form, result.html) : null;
-                if (!next) {
-                    // Anything but the form coming back (an expired session redirected to the login page, a server
-                    // error page) is left to a regular submit, which shows the user what the server has to say.
+                if (result.redirected) {
+                    // An expired session is redirected to the login page; a regular submit takes the user there.
                     unlock(form, button);
                     HTMLFormElement.prototype.submit.call(form);
                     return;
                 }
+                var next = result.status === 200 || result.status === 422 ? swap(form, result.html) : null;
+                if (!next) {
+                    // A server error may come after the record was already saved (a failed render), so the form is
+                    // not sent again: a second submit of a new record would create a duplicate. The page's own message
+                    // blames the connection, which is wrong for an answer the server did give (403, 500).
+                    unlock(form, button);
+                    showToast(document.body.getAttribute('data-cl-server-error') || form.getAttribute('data-error-message'), 'danger');
+                    return;
+                }
                 if (result.status === 422) {
                     keepChosenFiles(form, next);
+                }
+                // A form saved on its own page (a new record) returns to the page listing it; the server has already
+                // stored the success message for that page.
+                var redirect = result.status === 200 && next.getAttribute('data-cl-redirect');
+                if (redirect) {
+                    window.location.assign(redirect);
+                    return;
                 }
                 next.dispatchEvent(new CustomEvent('cl:form-replaced', { bubbles: true }));
                 var summary = next.querySelector('[data-cl-error-summary]');
@@ -108,11 +165,16 @@
                 }
                 var message = next.getAttribute('data-success-message');
                 if (message) {
+                    // An outcome left on the page by an earlier reload (e.g. "switched on") would contradict this one.
+                    document.querySelectorAll('[data-cl-saved-alert]').forEach(function (alert) {
+                        alert.remove();
+                    });
                     showToast(message, 'success');
                 }
-                var nextButton = next.querySelector('[type="submit"]');
-                if (nextButton) {
-                    nextButton.focus({ preventScroll: true });
+                // Focus goes back to the element that had it (a switch, an action confirmed in a dialog), else to the save button.
+                var refocus = (focusedId && next.querySelector('[id="' + focusedId + '"]')) || next.querySelector('[type="submit"]');
+                if (refocus) {
+                    refocus.focus({ preventScroll: true });
                 }
             })
             .catch(function () {

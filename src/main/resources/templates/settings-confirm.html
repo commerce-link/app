@@ -1,0 +1,24 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+<div layout:fragment="content">
+    <section class="cl-page">
+        <div class="cl-page-body">
+            <div th:replace="~{fragments/settings-header :: subpage(${confirm.cancelPath()}, ${backLabel}, ${confirm.title()})}"></div>
+            <form class="cl-form" method="post" th:action="@{${confirm.actionPath()}}">
+                <div class="cl-card">
+                    <p class="cl-card-body" th:text="${confirm.message()}"></p>
+                    <div class="cl-card-footer">
+                        <button type="submit" class="cl-button" th:classappend="${confirm.destructive()} ? 'is-danger' : 'is-primary'"
+                                th:text="${confirm.confirmLabel()}"></button>
+                        <a class="cl-button" th:href="@{${confirm.cancelPath()}}" th:text="#{general.cancel}"></a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </section>
+</div>
+</body>
+</html>

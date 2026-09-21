@@ -1,41 +1,50 @@
 package pl.commercelink.web;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import org.springframework.context.MessageSource;
 import org.springframework.mock.web.MockHttpServletResponse;
-import org.springframework.ui.ConcurrentModel;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.ui.ExtendedModelMap;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 import pl.commercelink.inventory.supplier.ErrorMessage;
 import pl.commercelink.inventory.supplier.StoreSupplierConnectionService;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
-import pl.commercelink.starter.security.CustomSecurityContext;
+import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.FulfilmentConfiguration;
 import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoreSupplierConnection;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.dtos.FulfilmentSettingsForm;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static pl.commercelink.testsupport.SecurityContextLogin.logInAs;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class StoreFulfilmentSettingsControllerTest {
 
-    private static final String STORE_ID = "store-1";
+    private static final Locale POLISH = Locale.forLanguageTag("pl");
 
     @Mock
     private StoresRepository storesRepository;
@@ -47,180 +56,158 @@ class StoreFulfilmentSettingsControllerTest {
     @InjectMocks
     private StoreFulfilmentSettingsController controller;
 
-    private Store store() {
+    @AfterEach
+    void clearSecurityContext() {
+        SecurityContextHolder.clearContext();
+    }
+
+    private Store store(String storeId) {
         Store store = new Store();
-        store.setStoreId(STORE_ID);
+        store.setStoreId(storeId);
         FulfilmentConfiguration config = new FulfilmentConfiguration();
-        config.setCanUseGlobalSuppliers(false);
+        config.setOrderAssemblyDays(2);
+        config.setOrderRealizationDays(5);
+        config.setCanUseGlobalSuppliers(true);
+        config.setInventoryCacheTtlMinutes(30);
+        config.setSupplierConnections(List.of(new StoreSupplierConnection("Acme", ConnectionMode.GLOBAL, true, true)));
         store.setFulfilmentConfiguration(config);
+        when(storesRepository.findById(storeId)).thenReturn(store);
         return store;
     }
 
-    private FulfilmentSettingsForm form() {
+    private FulfilmentSettingsForm form(String assemblyDays, String realizationDays) {
         FulfilmentSettingsForm form = new FulfilmentSettingsForm();
-        form.setOrderAssemblyDays(1);
-        form.setOrderRealizationDays(2);
+        form.setOrderAssemblyDays(assemblyDays);
+        form.setOrderRealizationDays(realizationDays);
+        form.setDefaultFulfilmentType(FulfilmentType.DirectToConsumer.name());
         form.setAutomatedFulfilment(true);
-        form.setDefaultFulfilmentType(FulfilmentType.WarehouseFulfilment);
-        form.setCanUseGlobalSuppliers(true);
-        form.setInventoryCacheTtlMinutes(30);
+        form.setClientOrderPageEnabled(true);
+        form.setClientShippingAddressChangeEnabled(true);
         return form;
     }
 
-    @Test
-    void savingSettingsOnlyAppliesStoreSettingsAndNeverTouchesConnections() {
-        // given: connections have their own per-supplier endpoints; this one must never call
-        // connectOrUpdate/disconnect, only applyStoreSettings
-        when(storesRepository.findById(STORE_ID)).thenReturn(store());
+    private void saveSucceeds() {
         when(storeSupplierConnectionService.applyStoreSettings(any(), any(), anyBoolean()))
                 .thenReturn(new StoreSupplierConnectionService.ConnectionUpdateResult(List.of(), null, Set.of(), Set.of(), Set.of()));
-        when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenReturn("ok");
-        ConcurrentModel model = new ConcurrentModel();
-        MockHttpServletResponse response = new MockHttpServletResponse();
+    }
 
-        try (MockedStatic<CustomSecurityContext> context = mockStatic(CustomSecurityContext.class)) {
-            context.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-            context.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(false);
-
-            // when
-            String view = controller.save(form(), Locale.ENGLISH, model, response);
-
-            // then -- a no-argument view name: ThymeleafView rejects positional fragment parameters
-            assertThat(view).isEqualTo("fragments/fulfilment-settings-section :: section");
-            assertThat(view).doesNotContain("(");
-            assertThat(response.getStatus()).isEqualTo(200);
-            assertThat(model.getAttribute("sectionSuccessMessage")).isEqualTo("ok");
-            verify(storeSupplierConnectionService).applyStoreSettings(any(), any(), eq(false));
-            verify(storeSupplierConnectionService, never()).connectOrUpdate(any(), any(), any());
-            verify(storeSupplierConnectionService, never()).disconnect(any(), any());
-        }
+    @SuppressWarnings("unchecked")
+    private Map<String, String> errors(ExtendedModelMap model) {
+        return (Map<String, String>) model.get("errors");
     }
 
     @Test
-    void doesNotFlagAnExternalSupplierRefreshWhenCanUseGlobalSuppliersDidNotChange() {
-        // given: the store already has it enabled, and applyStoreSettings leaves it enabled --
-        // resolveCanUseGlobalSuppliers is stubbed out here (it is proven separately in
-        // StoreSupplierConnectionServiceTest), so this test simulates its effect directly by
-        // having the mock leave the store's flag untouched
-        Store store = store();
-        store.getFulfilmentConfiguration().setCanUseGlobalSuppliers(true);
-        when(storesRepository.findById(STORE_ID)).thenReturn(store);
-        when(storeSupplierConnectionService.applyStoreSettings(any(), any(), anyBoolean()))
-                .thenReturn(new StoreSupplierConnectionService.ConnectionUpdateResult(List.of(), null, Set.of(), Set.of(), Set.of()));
-        when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenReturn("ok");
-        ConcurrentModel model = new ConcurrentModel();
-        MockHttpServletResponse response = new MockHttpServletResponse();
-
-        try (MockedStatic<CustomSecurityContext> context = mockStatic(CustomSecurityContext.class)) {
-            context.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-            context.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(true);
-
-            // when
-            controller.save(form(), Locale.ENGLISH, model, response);
-
-            // then -- must not ask the page to refresh the suppliers section for an unrelated save
-            assertThat(model.getAttribute("sectionRefreshExternalSuppliers")).isEqualTo(false);
-        }
-    }
-
-    @Test
-    void flagsAnExternalSupplierRefreshWhenCanUseGlobalSuppliersChanged() {
-        // given: applyStoreSettings mutates the same Store instance in place (via
-        // StoreSupplierConnectionPersister.saveStore), so this simulates that by flipping the
-        // flag on the store as a side effect of the stubbed call
-        Store store = store();
-        store.getFulfilmentConfiguration().setCanUseGlobalSuppliers(false);
-        when(storesRepository.findById(STORE_ID)).thenReturn(store);
-        when(storeSupplierConnectionService.applyStoreSettings(any(), any(), anyBoolean()))
-                .thenAnswer(invocation -> {
-                    store.getFulfilmentConfiguration().setCanUseGlobalSuppliers(true);
-                    return new StoreSupplierConnectionService.ConnectionUpdateResult(List.of(), null, Set.of(), Set.of(), Set.of());
-                });
-        when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenReturn("ok");
-        ConcurrentModel model = new ConcurrentModel();
-        MockHttpServletResponse response = new MockHttpServletResponse();
-
-        try (MockedStatic<CustomSecurityContext> context = mockStatic(CustomSecurityContext.class)) {
-            context.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-            context.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(true);
-
-            // when
-            controller.save(form(), Locale.ENGLISH, model, response);
-
-            // then
-            assertThat(model.getAttribute("sectionRefreshExternalSuppliers")).isEqualTo(true);
-        }
-    }
-
-    @Test
-    void aFailedSaveReturnsTheSmallErrorFragmentWithANon2xxStatus() {
+    void rendersTheStoresSettingsAndPostsBackToThePage() {
         // given
-        when(storesRepository.findById(STORE_ID)).thenReturn(store());
+        logInAs("ADMIN", "store-1");
+        store("store-1");
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        String view = controller.fulfilment(model);
+
+        // then
+        assertThat(view).isEqualTo("store-fulfilment");
+        FulfilmentSettingsForm form = (FulfilmentSettingsForm) model.get("form");
+        assertThat(form.getOrderAssemblyDays()).isEqualTo("2");
+        assertThat(form.getOrderRealizationDays()).isEqualTo("5");
+        assertThat(model.get("formAction")).isEqualTo("/dashboard/store/fulfilment");
+    }
+
+    @Test
+    void storeAdminSavesTheStoreFromTheSessionAndKeepsItsSupplierSettings() {
+        // given
+        logInAs("ADMIN", "store-1");
+        Store store = store("store-1");
+        saveSucceeds();
+        when(messageSource.getMessage(eq("store.fulfilment.settings.update.success"), any(), eq(POLISH))).thenReturn("Zapisano");
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        String view = controller.save(form("3", "4"), null, new ExtendedModelMap(), POLISH, redirect,
+                new MockHttpServletResponse());
+
+        // then
+        ArgumentCaptor<FulfilmentConfiguration> saved = ArgumentCaptor.forClass(FulfilmentConfiguration.class);
+        verify(storeSupplierConnectionService).applyStoreSettings(eq(store), saved.capture(), eq(false));
+        assertThat(saved.getValue().getOrderAssemblyDays()).isEqualTo(3);
+        assertThat(saved.getValue().getOrderRealizationDays()).isEqualTo(4);
+        assertThat(saved.getValue().getDefaultFulfilmentType()).isEqualTo(FulfilmentType.DirectToConsumer);
+        assertThat(saved.getValue().isAutomatedFulfilment()).isTrue();
+        assertThat(saved.getValue().isClientShippingAddressChangeEnabled()).isTrue();
+        assertThat(saved.getValue().isCanUseGlobalSuppliers()).isTrue();
+        assertThat(saved.getValue().getInventoryCacheTtlMinutes()).isEqualTo(30);
+        assertThat(saved.getValue().getSupplierConnections()).extracting(StoreSupplierConnection::getSupplierName)
+                .containsExactly("Acme");
+        assertThat(view).isEqualTo("redirect:/dashboard/store/fulfilment");
+        assertThat(redirect.getFlashAttributes().get("settingsSavedMessage")).isEqualTo("Zapisano");
+    }
+
+    @Test
+    void superAdminSavesTheStoreFromThePathWithoutResettingTheGlobalSupplierFlag() {
+        // given
+        logInAs("SUPER_ADMIN", "none");
+        Store store = store("store-9");
+        saveSucceeds();
+
+        // when
+        String view = controller.superAdminSave("store-9", form("1", "1"), null, new ExtendedModelMap(), POLISH,
+                new RedirectAttributesModelMap(), new MockHttpServletResponse());
+
+        // then
+        ArgumentCaptor<FulfilmentConfiguration> saved = ArgumentCaptor.forClass(FulfilmentConfiguration.class);
+        verify(storeSupplierConnectionService).applyStoreSettings(eq(store), saved.capture(), eq(true));
+        assertThat(saved.getValue().isCanUseGlobalSuppliers()).isTrue();
+        assertThat(view).isEqualTo("redirect:/dashboard/store/store-9/fulfilment");
+    }
+
+    @Test
+    void blankOrTooLargeDayCountsComeBackAtTheirFieldsInsteadOfABindingError() {
+        // given
+        logInAs("ADMIN", "store-1");
+        store("store-1");
+        ExtendedModelMap model = new ExtendedModelMap();
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        // when
+        String view = controller.save(form("", "61"), "fetch", model, POLISH, new RedirectAttributesModelMap(), response);
+
+        // then
+        verify(storeSupplierConnectionService, never()).applyStoreSettings(any(), any(), anyBoolean());
+        assertThat(view).isEqualTo("store-fulfilment :: fulfilmentForm");
+        assertThat(response.getStatus()).isEqualTo(422);
+        assertThat(errors(model)).containsOnlyKeys("orderAssemblyDays", "orderRealizationDays");
+        assertThat(((FulfilmentSettingsForm) model.get("form")).getOrderRealizationDays()).isEqualTo("61");
+    }
+
+    @Test
+    void aFailedSaveShowsAFailureAndNoSuccessMessage() {
+        // given
+        logInAs("ADMIN", "store-1");
+        store("store-1");
         when(storeSupplierConnectionService.applyStoreSettings(any(), any(), anyBoolean()))
                 .thenReturn(new StoreSupplierConnectionService.ConnectionUpdateResult(
                         List.of(ErrorMessage.of("store.supplier.connection.error.update.failed")), null, Set.of(), Set.of(), Set.of()));
-        when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenReturn("Update failed.");
-        ConcurrentModel model = new ConcurrentModel();
-        MockHttpServletResponse response = new MockHttpServletResponse();
+        when(messageSource.getMessage(eq("store.supplier.connection.error.update.failed"), any(), eq(POLISH))).thenReturn("Nie udało się");
+        ExtendedModelMap model = new ExtendedModelMap();
 
-        try (MockedStatic<CustomSecurityContext> context = mockStatic(CustomSecurityContext.class)) {
-            context.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-            context.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(false);
+        // when
+        String view = controller.save(form("1", "1"), null, model, POLISH, new RedirectAttributesModelMap(),
+                new MockHttpServletResponse());
 
-            // when
-            String view = controller.save(form(), Locale.ENGLISH, model, response);
-
-            // then
-            assertThat(view).isEqualTo("fragments/supplier-section :: sectionError");
-            assertThat(response.getStatus()).isEqualTo(400);
-            assertThat(model.getAttribute("errorMessage")).isEqualTo("Update failed.");
-        }
+        // then
+        assertThat(view).isEqualTo("store-fulfilment");
+        assertThat(model.get("failure")).isEqualTo("Nie udało się");
+        assertThat(model.get("savedMessage")).isNull();
     }
 
     @Test
-    void theSuperAdminVariantUsesTheStoreFromThePathNotTheSecurityContext() {
+    void anUnknownStoreIsNotFound() {
         // given
-        when(storesRepository.findById(STORE_ID)).thenReturn(store());
-        when(storeSupplierConnectionService.applyStoreSettings(any(), any(), anyBoolean()))
-                .thenReturn(new StoreSupplierConnectionService.ConnectionUpdateResult(List.of(), null, Set.of(), Set.of(), Set.of()));
-        when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenReturn("ok");
-        ConcurrentModel model = new ConcurrentModel();
-        MockHttpServletResponse response = new MockHttpServletResponse();
+        logInAs("SUPER_ADMIN", "none");
 
-        try (MockedStatic<CustomSecurityContext> context = mockStatic(CustomSecurityContext.class)) {
-            context.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(true);
-            // getStoreId() is intentionally not stubbed: a regression that read the store from the
-            // security context instead of the path variable would look up a different store and
-            // this test would fail rather than pass silently.
-
-            // when
-            String view = controller.saveForStore(STORE_ID, form(), Locale.ENGLISH, model, response);
-
-            // then
-            assertThat(view).isEqualTo("fragments/fulfilment-settings-section :: section");
-            assertThat(view).doesNotContain("(");
-            verify(storeSupplierConnectionService).applyStoreSettings(any(), any(), eq(true));
-        }
-    }
-
-    @Test
-    void aMissingStoreReturnsTheSmallErrorFragmentInsteadOfThrowing() {
-        // given
-        when(storesRepository.findById(STORE_ID)).thenReturn(null);
-        when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenReturn("Store not found.");
-        ConcurrentModel model = new ConcurrentModel();
-        MockHttpServletResponse response = new MockHttpServletResponse();
-
-        try (MockedStatic<CustomSecurityContext> context = mockStatic(CustomSecurityContext.class)) {
-            context.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-
-            // when
-            String view = controller.save(form(), Locale.ENGLISH, model, response);
-
-            // then
-            assertThat(view).isEqualTo("fragments/supplier-section :: sectionError");
-            assertThat(response.getStatus()).isEqualTo(400);
-            assertThat(model.getAttribute("errorMessage")).isEqualTo("Store not found.");
-        }
+        // when / then
+        assertThatThrownBy(() -> controller.superAdminFulfilment("missing", new ExtendedModelMap()))
+                .isInstanceOf(ResponseStatusException.class);
     }
 }

@@ -1,0 +1,74 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+<div layout:fragment="content">
+    <section class="cl-page">
+        <div class="cl-page-body">
+            <div th:replace="~{fragments/settings-header :: subpage(${shippingHref}, ${backLabel}, ${pageTitle})}"></div>
+
+            <form th:fragment="carriersForm" id="shipping-carriers-form" class="cl-form"
+                  th:action="@{${formAction}}" method="post" novalidate data-cl-async
+                  th:attr="data-cl-redirect=${redirectTo}, data-error-message=#{form.save.failed}">
+                <div class="cl-card">
+                    <fieldset class="cl-fieldset">
+                        <legend class="cl-fieldset-title" id="shipping-carriers-title"
+                                th:text="${account.configured()} ? #{store.shipping.carriers.legend(${account.displayName()})} : #{store.shipping.carriers.title}"></legend>
+
+                        <div th:unless="${account.configured()}" class="cl-alert is-warn">
+                            <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+                            <div>
+                                <p class="cl-alert-title" th:text="#{store.shipping.carriers.noAccount}"></p>
+                                <p class="cl-alert-text"><a th:href="@{${accountHref}}" th:text="#{store.shipping.account.connect}"></a></p>
+                            </div>
+                        </div>
+
+                        <!--/* The provider's own message stays in the page: it says what to fix (credentials, a switched-off API). */-->
+                        <div th:if="${lookupError != null}" class="cl-alert is-warn" id="shipping-carriers-error" tabindex="-1" data-cl-error-summary>
+                            <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+                            <div>
+                                <p class="cl-alert-title" th:text="#{store.shipping.carriers.failed.title(${account.displayName()})}"></p>
+                                <p class="cl-alert-text">
+                                    <span th:text="#{store.shipping.carriers.failed.text}"></span>
+                                    <a th:href="@{${accountHref}}" th:text="#{store.shipping.carriers.failed.link}"></a>
+                                </p>
+                                <p class="cl-alert-text" th:text="#{store.shipping.carriers.failed.detail(${lookupError})}"></p>
+                            </div>
+                        </div>
+
+                        <th:block th:unless="${options.isEmpty()}">
+                            <p class="cl-help" th:text="#{store.shipping.carriers.help}"></p>
+                            <ul class="cl-check-columns" aria-labelledby="shipping-carriers-title">
+                                <li th:each="option : ${options}">
+                                    <label class="cl-check">
+                                        <input type="checkbox" name="carrierIds" th:value="${option.id()}" th:checked="${option.selected()}"/>
+                                        <span class="cl-check-text">
+                                            <span th:text="${option.displayName()}"></span>
+                                            <span th:unless="${option.available()}" class="cl-status is-warn"
+                                                  th:text="#{store.shipping.carriers.unavailable}"></span>
+                                        </span>
+                                    </label>
+                                </li>
+                            </ul>
+                        </th:block>
+                        <p th:if="${options.isEmpty() and account.configured() and lookupError == null}" class="cl-help"
+                           th:text="#{store.shipping.carriers.none(${account.displayName()})}"></p>
+                    </fieldset>
+
+                    <div class="cl-card-footer">
+                        <button th:unless="${options.isEmpty()}" class="cl-button is-primary" type="submit"
+                                th:text="#{store.shipping.carriers.save}"></button>
+                        <a class="cl-button" th:href="@{${shippingHref}}" th:text="#{general.cancel}"></a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </section>
+    <script th:if="${lookupError != null}">
+        document.getElementById('shipping-carriers-error').focus();
+    </script>
+    <script th:src="@{/js/async-form.js}" defer></script>
+</div>
+</body>
+</html>

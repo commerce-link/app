@@ -35,23 +35,6 @@ public class Parcel {
         this.description = description;
     }
 
-    @DynamoDBIgnore
-    public boolean isComplete() {
-        return width > 0 && depth > 0 && height > 0 && weight > 0 && value > 0 && isNotBlank(description);
-    }
-
-    @DynamoDBIgnore
-    public static Parcel empty() {
-        Parcel parcel = new Parcel();
-        parcel.setWidth(0);
-        parcel.setDepth(0);
-        parcel.setHeight(0);
-        parcel.setWeight(0);
-        parcel.setValue(0);
-        parcel.setDescription("");
-        return parcel;
-    }
-
     public int getWidth() {
         return width;
     }

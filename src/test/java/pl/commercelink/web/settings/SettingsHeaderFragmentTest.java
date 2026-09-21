@@ -27,7 +27,7 @@ class SettingsHeaderFragmentTest {
         // then
         assertThat(html).contains("class=\"cl-back\"").contains("href=\"/dashboard/store\"").contains(">Ustawienia<");
         assertThat(html).contains("<h1 class=\"cl-page-title\">Magazyn</h1>");
-        assertThat(html).contains("Konfiguruj ustawienia magazynu i adresy wysyłkowe");
+        assertThat(html).contains("Dokumenty magazynowe, adresy przyjęcia towaru i drukarki etykiet<");
         assertThat(html).doesNotContain("screen-intro-toggle").doesNotContain("cl-page-actions");
     }
 

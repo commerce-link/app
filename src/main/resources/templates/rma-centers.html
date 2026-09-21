@@ -3,61 +3,83 @@
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
       layout:decorate="~{layout}">
 <body>
-
 <div layout:fragment="content">
     <section class="cl-page">
         <div class="cl-page-body">
+            <div th:replace="~{fragments/settings-header :: header(false, null)}"></div>
+            <div th:replace="~{fragments/settings-form :: savedAlert}"></div>
 
-            <div th:replace="~{fragments/settings-header :: header(false, ~{::settingsActions})}">
-                <a th:ref="settingsActions" th:href="@{/dashboard/store/rma-centers/new}" class="button is-link is-light">
-                    <span class="icon"><i class="fas fa-plus"></i></span>
-                    <span th:text="#{rma.add.new.center}"></span>
-                </a>
-            </div>
+            <section class="cl-card" aria-labelledby="rma-centers-title">
+                <div class="cl-card-head">
+                    <h2 class="cl-card-title" id="rma-centers-title" th:text="#{rma.center.list.title}"></h2>
+                    <!--/* Adding belongs to the list it adds to, as on the warehouse page: a list card carries its
+                           action in its head and has no footer, a form card has the save button in its footer. */-->
+                    <a class="cl-button" th:href="@{/dashboard/store/rma-centers/new}">
+                        <i class="fas fa-plus" aria-hidden="true"></i>
+                        <span th:text="#{rma.add.new.center}"></span>
+                    </a>
+                </div>
+                <p class="cl-card-desc" th:text="#{rma.center.list.description}"></p>
 
-            <table class="table is-fullwidth is-striped is-hoverable">
-                <thead>
-                <tr>
-                    <th th:text="#{warehouse.item.provider}"></th>
-                    <th th:text="#{order.address.company}"></th>
-                    <th th:text="#{order.address.street}"></th>
-                    <th th:text="#{order.address.postal}"></th>
-                    <th th:text="#{order.address.city}"></th>
-                    <th th:text="#{order.address.country}"></th>
-                    <th th:text="#{order.address.email}"></th>
-                    <th th:text="#{order.address.phone}"></th>
-                    <th th:text="#{warehouse.item.action}"></th>
-                </tr>
-                </thead>
-
-                <tbody>
-                <tr th:each="center : ${rmaCenters}">
-                    <td th:text="${supplierLabels.of(center.provider)}"></td>
-                    <td th:text="${center.shippingDetails.companyName}"></td>
-                    <td th:text="${center.shippingDetails.streetAndNumber}"></td>
-                    <td th:text="${center.shippingDetails.postalCode}"></td>
-                    <td th:text="${center.shippingDetails.city}"></td>
-                    <td th:text="${center.shippingDetails.country}"></td>
-                    <td th:text="${center.shippingDetails.email}"></td>
-                    <td th:text="${center.shippingDetails.phone}"></td>
-                    <td>
-                        <div  th:if="${center.storeId.equals(scope)}">
-                            <a class="button is-small is-primary is-info mb-2"
-                               th:text="#{product.edit}"
-                               th:href="@{'/dashboard/store/rma-centers/' + ${center.rmaCenterId} + '/edit'}"></a>
-
-                            <form th:action="@{'/dashboard/store/rma-centers/' + ${center.rmaCenterId} + '/delete'}" method="post">
-                                <button type="button" class="button is-small is-danger"
-                                        onclick="confirmDelete(this)" th:text="#{general.delete}"></button>
-                            </form>
+                <!--/* The platform-wide centres get their own heading: a store admin sees them but has no actions on
+                       them, and without the heading the missing actions read as a fault. */-->
+                <h3 th:if="${!ownCenters.isEmpty() and !sharedCenters.isEmpty()}" id="rma-centers-own"
+                    class="cl-list-group" th:text="#{rma.center.group.own}"></h3>
+                <ul th:unless="${ownCenters.isEmpty()}" class="cl-list"
+                    th:attr="aria-labelledby=${sharedCenters.isEmpty()} ? 'rma-centers-title' : 'rma-centers-own'">
+                    <li class="cl-list-item" th:each="center : ${ownCenters}">
+                        <div>
+                            <div class="cl-list-title">
+                                <span th:text="${center.title()}"></span>
+                                <span th:unless="${center.knownProvider()}" class="cl-status is-warn"
+                                      th:text="#{rma.center.provider.unknown}"></span>
+                                <span th:unless="${center.complete()}" class="cl-status is-warn"
+                                      th:text="#{rma.center.incomplete}"></span>
+                            </div>
+                            <p th:if="${center.summary() != null}" class="cl-list-desc" th:text="${center.summary()}"></p>
+                            <p th:if="${center.contactLine() != null and center.complete()}" class="cl-list-desc"
+                               th:text="${center.contactLine()}"></p>
+                            <p th:unless="${center.complete()}" class="cl-list-desc is-warn"
+                               th:text="#{rma.center.missing(${#strings.listJoin(#messages.listMsg(center.missingFieldKeys()), ', ')})}"></p>
                         </div>
-                    </td>
-                </tr>
-                </tbody>
-            </table>
+                        <div class="cl-list-actions">
+                            <a class="cl-link-button" th:href="@{${center.editHref()}}"
+                               th:text="${center.complete()} ? #{settings.list.edit} : #{settings.list.complete}"
+                               th:attr="aria-label=${center.complete()} ? #{settings.list.edit.for(${center.title()})} : #{settings.list.complete.for(${center.title()})}"></a>
+                            <a class="cl-link-button is-danger" th:href="@{${center.deleteHref()}}" data-cl-confirm
+                               th:text="#{settings.list.delete}"
+                               th:attr="aria-label=#{settings.list.delete.for(${center.title()})},
+                                        data-cl-confirm-title=#{rma.center.delete.title(${center.title()})},
+                                        data-cl-confirm-message=${center.lastForProvider()}
+                                            ? #{rma.center.delete.message.last(${center.title()})}
+                                            : #{rma.center.delete.message(${center.title()})},
+                                        data-cl-confirm-action=#{rma.center.delete.action}"></a>
+                        </div>
+                    </li>
+                </ul>
+
+                <h3 th:unless="${sharedCenters.isEmpty()}" id="rma-centers-shared" class="cl-list-group"
+                    th:text="#{rma.center.group.shared}"></h3>
+                <ul th:unless="${sharedCenters.isEmpty()}" class="cl-list" aria-labelledby="rma-centers-shared">
+                    <li class="cl-list-item" th:each="center : ${sharedCenters}">
+                        <div>
+                            <div class="cl-list-title">
+                                <span th:text="${center.title()}"></span>
+                                <span class="cl-status is-neutral" th:text="#{rma.center.shared}"></span>
+                            </div>
+                            <p th:if="${center.summary() != null}" class="cl-list-desc" th:text="${center.summary()}"></p>
+                        </div>
+                    </li>
+                </ul>
+
+                <p th:if="${ownCenters.isEmpty() and sharedCenters.isEmpty()}" class="cl-list-empty"
+                   th:text="#{rma.center.empty}"></p>
+            </section>
+
+            <dialog th:replace="~{fragments/confirm-dialog :: dialog}"></dialog>
         </div>
     </section>
+    <script th:src="@{/js/confirm-dialog.js}" defer></script>
 </div>
-
 </body>
 </html>

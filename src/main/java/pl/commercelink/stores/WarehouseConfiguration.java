@@ -7,6 +7,8 @@ import org.apache.commons.lang3.StringUtils;
 
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 
 @DynamoDBDocument
 public class WarehouseConfiguration {
@@ -64,8 +66,34 @@ public class WarehouseConfiguration {
     }
 
     @DynamoDBIgnore
-    public void removePrinter(String name) {
-        printers.removeIf(printer -> name.equals(printer.getName()));
+    public void removePrinter(String id) {
+        printers.removeIf(printer -> id.equals(printer.getId()));
+    }
+
+    @DynamoDBIgnore
+    public Optional<Printer> findPrinter(String id) {
+        return printers.stream().filter(printer -> id.equals(printer.getId())).findFirst();
+    }
+
+    // Label printing picks a printer by its name, so two printers must not share one.
+    @DynamoDBIgnore
+    public boolean isPrinterNameTaken(String name, String exceptPrinterId) {
+        String wanted = StringUtils.trimToEmpty(name);
+        return printers.stream()
+                .filter(printer -> exceptPrinterId == null || !exceptPrinterId.equals(printer.getId()))
+                .anyMatch(printer -> wanted.equalsIgnoreCase(StringUtils.trimToEmpty(printer.getName())));
+    }
+
+    @DynamoDBIgnore
+    public boolean assignMissingPrinterIds() {
+        boolean changed = false;
+        for (Printer printer : printers) {
+            if (StringUtils.isBlank(printer.getId())) {
+                printer.setId(UUID.randomUUID().toString());
+                changed = true;
+            }
+        }
+        return changed;
     }
 
     @DynamoDBIgnore

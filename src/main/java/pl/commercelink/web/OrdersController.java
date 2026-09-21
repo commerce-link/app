@@ -454,7 +454,7 @@ public class OrdersController extends BaseController {
         model.addAttribute("canOrderShipment", !order.getStatus().isOneOf(OrderStatus.New, OrderStatus.Blocked, OrderStatus.Assembly));
         model.addAttribute("canDeleteOrder", order.hasStatus(OrderStatus.New) && orderItems.isEmpty() && !order.isInvoiced());
         model.addAttribute("canCancelOrder", order.canBeCancelled(orderItems));
-        boolean canSplitOrder = order.canBeSplit() && orderItems.size() > 1;
+        boolean canSplitOrder = order.canBeSplit() && !orderItems.isEmpty();
         model.addAttribute("canSplitOrder", canSplitOrder);
         model.addAttribute("fulfilmentTypeLocked", !order.canChangeFulfilmentType(orderItems));
         model.addAttribute("hasWarehouseDocument", order.getDocumentByType(DocumentType.GoodsIssue).isPresent());
@@ -872,6 +872,21 @@ public class OrdersController extends BaseController {
         try {
             Order newOrder = ordersManager.splitOrder(getStoreId(), orderId, form.getSelectedOrderItemIds());
             return "redirect:/dashboard/orders/" + newOrder.getOrderId();
+        } catch (IllegalStateException e) {
+            String code = "error.message." + e.getMessage();
+            redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage(code, null, locale));
+            return "redirect:/dashboard/orders/" + orderId;
+        }
+    }
+
+    @PostMapping("/dashboard/orders/{orderId}/moveItemsToOrder")
+    @PreAuthorize("!hasRole('SUPER_ADMIN')")
+    public String moveItemsToOrder(@PathVariable String orderId, @ModelAttribute OrderItemsForm form,
+                                   @RequestParam(required = false) String targetOrderId,
+                                   RedirectAttributes redirectAttributes, Locale locale) {
+        try {
+            Order target = ordersManager.moveOrderItemsToOrder(getStoreId(), orderId, targetOrderId, form.getSelectedOrderItemIds());
+            return "redirect:/dashboard/orders/" + target.getOrderId();
         } catch (IllegalStateException e) {
             String code = "error.message." + e.getMessage();
             redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage(code, null, locale));

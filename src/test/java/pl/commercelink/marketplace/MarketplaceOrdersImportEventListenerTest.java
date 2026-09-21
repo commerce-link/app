@@ -10,6 +10,8 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import pl.commercelink.marketplace.api.MarketplaceOrder;
 import pl.commercelink.marketplace.api.MarketplaceProvider;
+import pl.commercelink.scheduling.ScheduledExecutionCounter;
+import pl.commercelink.scheduling.ScheduledExecution;
 import pl.commercelink.stores.MarketplaceIntegration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
@@ -23,6 +25,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -39,6 +42,8 @@ class MarketplaceOrdersImportEventListenerTest {
     private MarketplaceProvider provider;
     @Mock
     private MarketplaceOrder order;
+    @Mock
+    private ScheduledExecutionCounter scheduledExecutionCounter;
 
     @InjectMocks
     private MarketplaceOrdersImportEventListener listener;
@@ -67,6 +72,7 @@ class MarketplaceOrdersImportEventListenerTest {
         // then
         verify(marketplaceOrderImporter).importOrder(addressed, "Allegro", order);
         verify(storesRepository).save(addressed);
+        verify(scheduledExecutionCounter).countCompleted("store-1", ScheduledExecution.ORDERS_IMPORT, "Allegro");
         verify(storesRepository, never()).findAll();
         verify(providerFactory, never()).get(other, "Allegro");
     }
@@ -83,6 +89,7 @@ class MarketplaceOrdersImportEventListenerTest {
         // then
         verify(providerFactory, never()).get(any(), anyString());
         verify(storesRepository, never()).save(any());
+        verifyNoInteractions(scheduledExecutionCounter);
     }
 
     @Test
@@ -129,5 +136,6 @@ class MarketplaceOrdersImportEventListenerTest {
         assertSame(failure, thrown);
         assertThat(store.getMarketplaceIntegration("Allegro").getLastFetchedAt()).isNull();
         verify(storesRepository, never()).save(any());
+        verifyNoInteractions(scheduledExecutionCounter);
     }
 }

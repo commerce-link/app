@@ -23,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -87,6 +88,36 @@ class MarketplaceProviderFactoryTest {
         assertThat(published.getValue()).isEqualTo(new StoreNotification(StoreNotificationSeverity.WARNING,
                 StoreNotificationType.UNAUTHENTICATED, "allegro_marketplace",
                 "Your connection to Allegro marketplace has expired, reauthenticate it in the settings"));
+    }
+
+    /**
+     * A marketplace keeps its configuration under "<name>_marketplace". When its adapter is no longer on the
+     * classpath there is no descriptor to derive that name from, and the plain provider name would point at the
+     * secret of a supplier or a payment gateway called the same.
+     */
+    @Test
+    void deletesTheSecretOfAnUninstalledMarketplaceUnderItsMarketplaceName() {
+        // given: no descriptor is registered, so the adapter is gone
+        Store store = storeConnectedTo("Allegro");
+
+        // when
+        factory.deleteConfiguration(store, "Allegro");
+
+        // then
+        verify(configurationManager).deleteConfiguration(store, "allegro_marketplace");
+        verify(configurationManager, never()).deleteConfiguration(store, "Allegro");
+    }
+
+    @Test
+    void readsTheConfigurationOfAnUninstalledMarketplaceUnderItsMarketplaceName() {
+        // given
+        Store store = storeConnectedTo("Allegro");
+
+        // when
+        factory.loadConfiguration(store, "Allegro");
+
+        // then
+        verify(configurationManager).loadConfiguration(store, "allegro_marketplace");
     }
 
     @Test

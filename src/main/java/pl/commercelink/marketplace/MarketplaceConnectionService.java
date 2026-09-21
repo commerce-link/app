@@ -78,46 +78,6 @@ public class MarketplaceConnectionService {
         return returnsSchedule.scheduler().defaultIntervalMinutes();
     }
 
-    public List<MarketplaceIntegrationView> views(Store store) {
-        List<String> deviceAuthProviders = providerFactory.deviceAuthProviders();
-        return store.getMarketplaces().stream()
-                .map(integration -> new MarketplaceIntegrationView(
-                        integration.getName(),
-                        displayNameOf(integration.getName()),
-                        integration.isLoggedIn(),
-                        deviceAuthProviders.contains(integration.getName()),
-                        integration.getLastFetchedAt(),
-                        new MarketplaceIntegrationView.ImportScheduleView(integration.getOrdersImportSchedule()),
-                        new MarketplaceIntegrationView.ImportScheduleView(integration.getReturnsImportSchedule()),
-                        supportsReturns(integration.getName())))
-                .toList();
-    }
-
-    public List<MarketplaceProviderDescriptor> availableMarketplaces(Store store) {
-        return providerFactory.availableProviders().stream()
-                .filter(descriptor -> store.getMarketplaceIntegration(descriptor.name()) == null)
-                .toList();
-    }
-
-    public Map<String, Map<String, String>> configurationsForUI(Store store) {
-        Map<String, Map<String, String>> configurations = new LinkedHashMap<>();
-        for (MarketplaceProviderDescriptor descriptor : providerFactory.availableProviders()) {
-            configurations.put(descriptor.name(), configurationManager.getConfigurationForUI(
-                    store, providerFactory.resolveCredentialName(descriptor), descriptor));
-        }
-        return configurations;
-    }
-
-    public Set<String> marketplacesWithStoredConfiguration(Store store) {
-        Set<String> stored = new LinkedHashSet<>();
-        for (MarketplaceProviderDescriptor descriptor : providerFactory.availableProviders()) {
-            if (hasStoredConfiguration(store, descriptor.name())) {
-                stored.add(descriptor.name());
-            }
-        }
-        return stored;
-    }
-
     public ConnectionUpdateResult connectOrUpdate(Store store, String marketplace,
                                                   Map<String, String> configuration, String schedule,
                                                   String returnsSchedule) {
@@ -139,7 +99,7 @@ public class MarketplaceConnectionService {
         boolean requiresDeviceAuth = providerFactory.deviceAuthProviders().contains(marketplace);
         Deque<Runnable> compensations = new ArrayDeque<>();
         try {
-            rememberSecret(store, descriptor, compensations);
+            rememberSecret(store, marketplace, compensations);
             providerFactory.saveConfiguration(store, marketplace, submitted);
             boolean created = store.getMarketplaceIntegration(marketplace) == null;
             MarketplaceIntegration integration = store.connectMarketplace(marketplace, requiresDeviceAuth);
@@ -168,12 +128,11 @@ public class MarketplaceConnectionService {
         Deque<Runnable> compensations = new ArrayDeque<>();
         try {
             MarketplaceProviderDescriptor descriptor = providerFactory.getDescriptor(marketplace);
-            if (descriptor != null) {
-                rememberSecret(store, descriptor, compensations);
-            }
+            // The secret is deleted whether or not the adapter is still installed, so it is always remembered first.
+            rememberSecret(store, marketplace, compensations);
             providerFactory.deleteConfiguration(store, marketplace);
             deleteSchedule(store, marketplace, ordersSchedule, compensations);
-            if (descriptor != null && descriptor.supportsReturns()) {
+            if (descriptor == null || descriptor.supportsReturns()) {
                 deleteSchedule(store, marketplace, returnsSchedule, compensations);
             }
             store.removeMarketplaceIntegration(marketplace);
@@ -199,8 +158,8 @@ public class MarketplaceConnectionService {
         }
     }
 
-    private void rememberSecret(Store store, MarketplaceProviderDescriptor descriptor, Deque<Runnable> compensations) {
-        String credentialName = providerFactory.resolveCredentialName(descriptor);
+    private void rememberSecret(Store store, String marketplace, Deque<Runnable> compensations) {
+        String credentialName = providerFactory.resolveCredentialName(marketplace);
         ProviderConfigurationManager.SecretSnapshot snapshot = configurationManager.snapshot(store, credentialName);
         compensations.push(() -> configurationManager.restore(store, credentialName, snapshot));
     }
@@ -223,11 +182,6 @@ public class MarketplaceConnectionService {
     private void rememberSchedule(Store store, String marketplace, ImportSchedule schedule, Deque<Runnable> compensations) {
         Optional<String> before = schedule.scheduler().snapshot(store.getStoreId(), marketplace);
         compensations.push(() -> schedule.scheduler().restore(store.getStoreId(), marketplace, before));
-    }
-
-    private boolean supportsReturns(String marketplace) {
-        MarketplaceProviderDescriptor descriptor = providerFactory.getDescriptor(marketplace);
-        return descriptor != null && descriptor.supportsReturns();
     }
 
     private void compensate(Deque<Runnable> compensations) {
@@ -278,11 +232,6 @@ public class MarketplaceConnectionService {
 
     private boolean hasStoredConfiguration(Store store, String marketplace) {
         return !providerFactory.loadConfiguration(store, marketplace).isEmpty();
-    }
-
-    private String displayNameOf(String marketplace) {
-        MarketplaceProviderDescriptor descriptor = providerFactory.getDescriptor(marketplace);
-        return descriptor != null ? descriptor.displayName() : marketplace;
     }
 
     public record ConnectionUpdateResult(List<ErrorMessage> errors) {

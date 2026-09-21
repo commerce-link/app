@@ -1,0 +1,60 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+<div layout:fragment="content">
+    <section class="cl-page">
+        <div class="cl-page-body">
+            <div th:replace="~{fragments/settings-header :: subpage(${shippingHref}, ${backLabel}, ${pageTitle})}"></div>
+
+            <form th:fragment="addressForm" id="shipping-address-form" class="cl-form"
+                  th:action="@{${formAction}}" th:object="${form}" method="post" novalidate data-cl-async
+                  th:attr="data-cl-redirect=${redirectTo}, data-error-message=#{form.save.failed}">
+                <div th:replace="~{fragments/settings-form :: errorSummary('shipping-address-errors', ${errors}, null)}"></div>
+
+                <div class="cl-card">
+                    <div th:replace="~{store-shipping-address :: addressFields(true)}"></div>
+
+                    <div class="cl-card-footer">
+                        <button class="cl-button is-primary" type="submit" th:text="#{store.warehouse.address.save}"></button>
+                        <a class="cl-button" th:href="@{${shippingHref}}" th:text="#{general.cancel}"></a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </section>
+    <script th:if="${!errors.isEmpty()}">
+        document.getElementById('shipping-address-errors').focus();
+    </script>
+    <script th:src="@{/js/async-form.js}" defer></script>
+</div>
+
+<!--/* The fields of a shipping address, shared with the label sender page; withDefault adds the default-address choice
+       at the end of the contact group (the first address becomes the default without asking). */-->
+<th:block th:fragment="addressFields(withDefault)">
+    <!--/* One group: the page title already says whose address it is, so the legend is for screen readers only and the
+           form keeps its save button above the fold of a 1280×720 laptop. */-->
+    <fieldset class="cl-fieldset">
+        <legend class="cl-visually-hidden" th:text="#{store.shipping.address.section}"></legend>
+        <div class="cl-form-grid">
+            <div class="cl-span-4" th:insert="~{fragments/settings-form :: textField('companyName', 'store.shipping.address.companyName', ${form.companyName}, 'text', 'organization', true, ${errors['companyName']}, null)}"></div>
+            <div class="cl-span-2" th:insert="~{fragments/settings-form :: textField('contactPerson', 'store.shipping.address.contactPerson', ${form.contactPerson}, 'text', 'name', false, ${errors['contactPerson']}, null)}"></div>
+            <div th:insert="~{fragments/settings-form :: textField('streetAndNumber', 'order.address.street', ${form.streetAndNumber}, 'text', 'street-address', true, ${errors['streetAndNumber']}, null)}"></div>
+            <div class="cl-span-2" th:insert="~{fragments/settings-form :: textField('postalCode', 'order.address.postal', ${form.postalCode}, 'text', 'postal-code', true, ${errors['postalCode']}, null)}"></div>
+            <div class="cl-span-2" th:insert="~{fragments/settings-form :: textField('city', 'order.address.city', ${form.city}, 'text', 'address-level2', true, ${errors['city']}, null)}"></div>
+            <div class="cl-span-2" th:insert="~{fragments/form-field :: select('country', 'order.address.country', ${form.country}, ${countries}, 'country', true, ${errors['country']})}"></div>
+            <div class="cl-span-3" th:insert="~{fragments/settings-form :: textField('email', 'order.address.email', ${form.email}, 'email', 'email', true, ${errors['email']}, null)}"></div>
+            <div class="cl-span-3" th:insert="~{fragments/settings-form :: textField('phone', 'order.address.phone', ${form.phone}, 'tel', 'tel', true, ${errors['phone']}, null)}"></div>
+            <p class="cl-help" th:text="#{store.shipping.address.contact.help}"></p>
+            <th:block th:if="${withDefault and !firstAddress}">
+                <p th:if="${alreadyDefault}" class="cl-help" th:text="#{store.shipping.address.isDefault}"></p>
+                <th:block th:unless="${alreadyDefault}">
+                    <div th:replace="~{fragments/settings-form :: check('makeDefault', 'store.shipping.address.makeDefault', ${form.makeDefault}, 'store.shipping.address.makeDefault.description', null)}"></div>
+                </th:block>
+            </th:block>
+        </div>
+    </fieldset>
+</th:block>
+</body>
+</html>
