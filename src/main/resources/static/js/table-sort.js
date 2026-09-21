@@ -1,8 +1,12 @@
 // Sorts the rows of a cl-table by a column: th[aria-sort] > button.cl-table-sort[data-sort-key]. A row supplies the
-// value in tr[data-sort-<key>] (numbers compare numerically), otherwise the text of the cell in the same column.
+// value in tr[data-sort-<key>], otherwise the text of the cell in the same column. Two values compare as numbers only
+// when both are nothing but a number ("1 500,00"); anything else -- a date, a code, a name -- compares as text with
+// numeric collation, so "01.12.2026" is not read as the number 1 and "5060-RTX" is not read as 5060.
 // Clicking the sorted column again flips the direction; aria-sort tells screen readers which column is sorted.
 (function () {
     'use strict';
+
+    var NUMBER = /^-?\d+(?:[.,]\d+)?$/;
 
     function value(row, key, index) {
         var explicit = row.getAttribute('data-sort-' + key);
@@ -14,10 +18,11 @@
     }
 
     function compare(a, b) {
-        var na = parseFloat(String(a).replace(/\s/g, '').replace(',', '.'));
-        var nb = parseFloat(String(b).replace(/\s/g, '').replace(',', '.'));
-        if (!isNaN(na) && !isNaN(nb)) {
-            return na - nb;
+        // The thousands separator is a space in Polish, so it is stripped before the value is judged to be a number.
+        var sa = String(a).replace(/\s/g, '');
+        var sb = String(b).replace(/\s/g, '');
+        if (NUMBER.test(sa) && NUMBER.test(sb)) {
+            return parseFloat(sa.replace(',', '.')) - parseFloat(sb.replace(',', '.'));
         }
         return String(a).localeCompare(String(b), document.documentElement.lang || 'pl', { sensitivity: 'base', numeric: true });
     }

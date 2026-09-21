@@ -1,14 +1,24 @@
 // Filter and search over the rows of a data table. A container [data-cl-table-filter] holds any number of filter
 // groups: buttons [data-cl-filter-group="g"][data-cl-filter="value"] (one pressed per group; a button without a group
 // belongs to "status") and selects [data-cl-filter-group="g"][data-cl-filter-select] (option value "all" = no filter).
-// A row carries one attribute per group: [data-cl-filter-<g>="value"] (space-separated list for groups that may match
-// several values); the legacy [data-cl-filter-value] is read as the "status" group. Optional [data-cl-table-search]
-// matches [data-cl-search] (lower-cased). [data-cl-filter-empty] shows when nothing matches, [data-cl-filter-clear]
-// resets every group. Counts in span.cl-segment-count / option[data-count] are recomputed against the other groups and
-// the search, so a segment tells how many rows it would show. The state of the groups named in
-// [data-cl-filter-default="status:active feature:all"] lives in the URL (history.replaceState) and starts from there;
-// a bare default ("rejected") is the value of the "status" group and stays out of the URL. Each change dispatches
-// "cl:table-filtered" on the container so table-select.js can drop hidden rows from the selection.
+// A row carries one attribute per group: [data-cl-filter-<g>="value"]; the legacy [data-cl-filter-value] is read as
+// the "status" group.
+//
+// The container says which groups may match several values at once: [data-cl-filter-multi="feature tag"], a
+// space-separated list of group names. For a group named there the row attribute is a space-separated list and the row
+// matches any one of its values; for every other group the whole attribute is the value, so a free-text label with a
+// space in it ("RTX 5060") matches only itself and never the word "RTX". A group cannot be both.
+//
+// Optional [data-cl-table-search] matches [data-cl-search] (lower-cased). [data-cl-filter-empty] shows when nothing
+// matches, [data-cl-filter-clear] resets every group. Counts are recomputed against the other groups and the search,
+// so a segment tells how many rows it would show: span.cl-segment-count inside a button, and option[data-count] on a
+// select -- but only an option that also carries [data-label] has the count written into its text ("Promocja (3)"),
+// because reading the label back out of the text would eat a legitimate trailing "(n)" in the label itself.
+//
+// The state of the groups named in [data-cl-filter-default="status:active feature:all"] lives in the URL
+// (history.replaceState) and starts from there; a bare default ("rejected") is the value of the "status" group and
+// stays out of the URL. Each change dispatches "cl:table-filtered" on the container so table-select.js can drop hidden
+// rows from the selection.
 (function () {
     'use strict';
 
@@ -16,7 +26,11 @@
         return control.getAttribute('data-cl-filter-group') || 'status';
     }
 
-    function rowValues(row, group) {
+    function multiGroups(container) {
+        return (container.getAttribute('data-cl-filter-multi') || '').split(/\s+/).filter(Boolean);
+    }
+
+    function rowValues(row, group, multi) {
         var attribute = row.getAttribute('data-cl-filter-' + group);
         if (attribute === null && group === 'status') {
             attribute = row.getAttribute('data-cl-filter-value');
@@ -24,14 +38,11 @@
         if (attribute === null) {
             return [];
         }
-        // The whole attribute counts as one value, so a group whose values are free text matches a label with a space
-        // in it ("RTX 5060"); a group whose row may match several values lists them separated by spaces.
-        var values = attribute.split(/\s+/).filter(Boolean);
-        var whole = attribute.trim();
-        if (whole !== '' && values.indexOf(whole) === -1) {
-            values.push(whole);
+        if (multi.indexOf(group) !== -1) {
+            return attribute.split(/\s+/).filter(Boolean);
         }
-        return values;
+        var whole = attribute.trim();
+        return whole === '' ? [] : [whole];
     }
 
     function selected(container) {
@@ -45,12 +56,12 @@
         return state;
     }
 
-    function matches(row, state, needle, skipGroup) {
+    function matches(row, state, needle, skipGroup, multi) {
         for (var group in state) {
             if (group === skipGroup || state[group] === 'all') {
                 continue;
             }
-            if (rowValues(row, group).indexOf(state[group]) === -1) {
+            if (rowValues(row, group, multi).indexOf(state[group]) === -1) {
                 return false;
             }
         }
@@ -65,12 +76,13 @@
         });
     }
 
-    function recount(container, all, state, needle) {
+    function recount(container, all, state, needle, multi) {
         container.querySelectorAll('[data-cl-filter]').forEach(function (button) {
             var group = groupOf(button);
             var value = button.getAttribute('data-cl-filter');
             var count = all.filter(function (row) {
-                return matches(row, state, needle, group) && (value === 'all' || rowValues(row, group).indexOf(value) !== -1);
+                return matches(row, state, needle, group, multi)
+                    && (value === 'all' || rowValues(row, group, multi).indexOf(value) !== -1);
             }).length;
             button.setAttribute('data-count', String(count));
             var badge = button.querySelector('.cl-segment-count');
@@ -85,13 +97,16 @@
                     return;
                 }
                 var count = all.filter(function (row) {
-                    return matches(row, state, needle, group)
-                        && (option.value === 'all' || rowValues(row, group).indexOf(option.value) !== -1);
+                    return matches(row, state, needle, group, multi)
+                        && (option.value === 'all' || rowValues(row, group, multi).indexOf(option.value) !== -1);
                 }).length;
                 option.setAttribute('data-count', String(count));
-                var label = option.getAttribute('data-label') || option.textContent.replace(/\s*\(\d+\)$/, '');
-                option.setAttribute('data-label', label);
-                option.textContent = label + ' (' + count + ')';
+                // Only a label the template states can be rewritten; guessing it back out of the text would eat a
+                // legitimate trailing "(n)" the first time the count is written.
+                var label = option.getAttribute('data-label');
+                if (label !== null) {
+                    option.textContent = label + ' (' + count + ')';
+                }
             });
         });
     }
@@ -130,9 +145,10 @@
         var search = container.querySelector('[data-cl-table-search]');
         var needle = search ? search.value.trim().toLowerCase() : '';
         var all = rows(container);
+        var multi = multiGroups(container);
         var shown = 0;
         all.forEach(function (row) {
-            var visible = matches(row, state, needle, null);
+            var visible = matches(row, state, needle, null, multi);
             row.hidden = !visible;
             if (visible) {
                 shown++;
@@ -142,7 +158,7 @@
         if (empty) {
             empty.hidden = shown > 0;
         }
-        recount(container, all, state, needle);
+        recount(container, all, state, needle, multi);
         remember(container, state);
         container.dispatchEvent(new CustomEvent('cl:table-filtered', { bubbles: true, detail: { shown: shown, state: state } }));
     }

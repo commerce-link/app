@@ -3,9 +3,10 @@
 // anything is checked: [data-cl-selection-count][data-template="... {n}"] says how many, buttons [data-cl-select-action=x]
 // submit form[data-cl-select-form] with hidden inputs name=action / name=productIds, [data-cl-select-clear] unchecks all.
 // A button with [data-cl-select-confirm-title] first opens the page's dialog#cl-confirm-dialog (fragments/confirm-dialog,
-// whose confirm-dialog.js closes it on Cancel) and submits on confirm. Rows hidden by table-filter.js (event
-// cl:table-filtered) are dropped from the selection so a bulk action never touches what the operator cannot see.
-// Without JavaScript nothing here is shown.
+// whose confirm-dialog.js closes it on Cancel) and submits on confirm; "{n}" in the title and the message becomes the
+// number of checked rows. Such a button does nothing at all when the page has no usable dialog -- an action worth
+// confirming is not worth doing unconfirmed. Rows hidden by table-filter.js (event cl:table-filtered) are dropped from
+// the selection so a bulk action never touches what the operator cannot see. Without JavaScript nothing here is shown.
 (function () {
     'use strict';
 
@@ -80,33 +81,35 @@
     function confirmThen(button, table) {
         var dialog = document.getElementById('cl-confirm-dialog');
         var action = button.getAttribute('data-cl-select-action');
-        var confirm = dialog && dialog.querySelector('[data-cl-confirm-submit]');
-        if (!dialog || !confirm || typeof dialog.showModal !== 'function') {
-            submit(table, action);
+        var accept = dialog && dialog.querySelector('[data-cl-confirm-submit]');
+        // Fails closed: without the dialog the operator never gets asked, and a bulk delete is not something to do on
+        // a page whose confirmation markup is missing.
+        if (!dialog || !accept || typeof dialog.showModal !== 'function') {
             return;
         }
+        var count = String(checked(table).length);
         var title = dialog.querySelector('#cl-confirm-title');
         var message = dialog.querySelector('#cl-confirm-message');
         if (title) {
-            title.textContent = (button.getAttribute('data-cl-select-confirm-title') || '').replace('{n}', String(checked(table).length));
+            title.textContent = (button.getAttribute('data-cl-select-confirm-title') || '').replace('{n}', count);
         }
         if (message) {
-            message.textContent = button.getAttribute('data-cl-select-confirm-message') || '';
+            message.textContent = (button.getAttribute('data-cl-select-confirm-message') || '').replace('{n}', count);
         }
-        confirm.textContent = button.getAttribute('data-cl-select-confirm-action') || confirm.textContent;
-        confirm.classList.toggle('is-danger', button.classList.contains('is-danger'));
-        confirm.classList.toggle('is-primary', !button.classList.contains('is-danger'));
+        accept.textContent = button.getAttribute('data-cl-select-confirm-action') || accept.textContent;
+        accept.classList.toggle('is-danger', button.classList.contains('is-danger'));
+        accept.classList.toggle('is-primary', !button.classList.contains('is-danger'));
         // The dialog's own form posts to the address of the link that last opened it; this action goes through the
         // bulk form instead, so the confirm button must not submit that form.
-        confirm.disabled = false;
+        accept.disabled = false;
         var onConfirm = function (event) {
             event.preventDefault();
             dialog.close();
             submit(table, action);
         };
-        confirm.addEventListener('click', onConfirm);
+        accept.addEventListener('click', onConfirm);
         dialog.addEventListener('close', function () {
-            confirm.removeEventListener('click', onConfirm);
+            accept.removeEventListener('click', onConfirm);
         }, { once: true });
         dialog.showModal();
         var cancel = dialog.querySelector('[data-cl-confirm-cancel]');
