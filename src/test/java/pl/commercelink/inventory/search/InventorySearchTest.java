@@ -188,6 +188,27 @@ class InventorySearchTest {
         assertThat(row.deliveryKnown()).isTrue();
     }
 
+    /**
+     * Half of the real adapters say "never free" with a million-zloty threshold, because `FlatRate` has no
+     * other way to express it. Shown literally that becomes "free above 1 000 000 PLN" on those suppliers.
+     */
+    @Test
+    void anUnreachableFreeShippingThresholdIsReportedAsNoThresholdAtAll() {
+        // given
+        when(supplierRegistry.get("Elko"))
+                .thenReturn(supplierShipping(new ShippingCostPolicy.FlatRate(1_000_000, 18.90), 1));
+        when(view.findByEan(EAN)).thenReturn(offers(offer("Elko", 100.0, 5)));
+
+        // when
+        InventorySearchResult.Found found = (InventorySearchResult.Found) search.search(STORE_ID, EAN);
+
+        // then -- the cost is real and still shown, only the unreachable promise is dropped
+        OfferRow row = found.supplierOffers().get(0);
+        assertThat(row.deliveryNet()).isEqualTo(18.90);
+        assertThat(row.freeDeliveryFrom()).isEqualTo(0.0);
+        assertThat(row.hasFreeDeliveryFrom()).isFalse();
+    }
+
     /** A cheaper unit price loses to a dearer one that ships for nothing; that is the whole point of the column. */
     @Test
     void cheapestOfferIsTheOneWithTheLowestDeliveredCostNotTheLowestPrice() {
