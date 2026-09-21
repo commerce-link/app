@@ -3312,3 +3312,448 @@ a.cl-link-button:hover {
         animation: cl-spin-pulse 1.2s ease-in-out infinite;
     }
 }
+
+/* --- Catalog: Selection bar (actions on the checked rows of a cl-table) --- */
+.cl-page .cl-selection-bar {
+    position: sticky;
+    top: calc(var(--cl-topbar-height) + 8px);
+    z-index: 5;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--cl-gap-related);
+    margin: 0 20px 12px;
+    padding: 10px 14px;
+    border: 1px solid var(--cl-accent);
+    border-radius: var(--cl-radius);
+    background: var(--cl-accent-soft);
+    box-shadow: var(--cl-shadow-card);
+}
+
+.cl-page .cl-selection-bar[hidden] {
+    display: none;
+}
+
+.cl-page .cl-selection-count {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--cl-accent-ink);
+    font-variant-numeric: tabular-nums;
+    margin-right: 6px;
+}
+
+.cl-page .cl-selection-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--cl-gap-related);
+}
+
+.cl-page .cl-selection-bar .cl-button:not(.is-danger) {
+    background: var(--cl-surface);
+}
+
+.cl-page .cl-selection-clear {
+    margin-left: auto;
+}
+
+/* the primary action keeps its accent fill */
+.cl-page .cl-selection-bar .cl-button.is-primary {
+    background: var(--cl-accent);
+    color: #fff;
+    border-color: var(--cl-accent);
+}
+
+.cl-page .cl-selection-bar .cl-button.is-primary:hover {
+    background: var(--cl-accent-ink);
+}
+
+/* --- Catalog: Selectable rows --- */
+.cl-page .cl-table .cl-table-check {
+    width: 44px;
+    padding-right: 4px;
+}
+
+.cl-page .cl-table .cl-check-input {
+    width: 18px;
+    height: 18px;
+    margin: 2px 0 0;
+    accent-color: var(--cl-accent);
+    cursor: pointer;
+}
+
+.cl-page .cl-table .cl-check-input:disabled {
+    cursor: not-allowed;
+    opacity: .45;
+}
+
+.cl-page .cl-table .cl-check-input:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
+}
+
+.cl-page .cl-table tr.is-selected > * {
+    background: var(--cl-accent-soft);
+}
+
+.cl-page .cl-table tr.is-muted > * {
+    color: var(--cl-ink-3);
+}
+
+.cl-page .cl-table .cl-table-key a {
+    color: var(--cl-ink);
+    text-decoration: none;
+}
+
+.cl-page .cl-table .cl-table-key a:hover {
+    color: var(--cl-accent-ink);
+    text-decoration: underline;
+}
+
+.cl-page .cl-table .cl-table-key {
+    white-space: normal;
+}
+
+.cl-page .cl-table .cl-table-note {
+    display: block;
+    max-width: 34ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-style: italic;
+}
+
+.cl-page .cl-table .cl-table-sub .cl-status {
+    margin-top: 4px;
+    font-size: 11.5px;
+    padding: 1px 8px;
+}
+
+.cl-page .cl-table td .cl-status + .cl-status {
+    margin-left: 4px;
+}
+
+/* --- Catalog: Segment with zero matches (stays clickable but recedes) --- */
+.cl-segment[data-count="0"] {
+    color: var(--cl-ink-3);
+}
+
+.cl-segment[data-count="0"][aria-pressed="true"] {
+    color: var(--cl-accent-ink);
+}
+
+/* --- Catalog: Toolbar in two rows (status segments across the top, category and search below) --- */
+.cl-page .cl-table-toolbar.is-stacked {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    row-gap: 10px;
+}
+
+.cl-page .cl-table-toolbar.is-stacked .cl-toolbar-filters,
+.cl-page .cl-table-toolbar.is-stacked .cl-toolbar-row {
+    grid-column: 1 / -1;
+}
+
+.cl-page .cl-table-toolbar .cl-toolbar-row {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--cl-gap-related);
+}
+
+.cl-page .cl-table-toolbar.is-stacked .cl-segmented {
+    display: flex;
+    flex-wrap: wrap;
+}
+
+.cl-page .cl-table-toolbar.is-stacked .cl-segment {
+    flex: 1 1 auto;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.cl-page .cl-table-toolbar .cl-toolbar-filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--cl-gap-related);
+}
+
+.cl-page .cl-table-toolbar .cl-select.is-compact {
+    min-width: 180px;
+}
+
+/* toolbar with a single row (no segments) */
+.cl-page .cl-table-toolbar .cl-toolbar-row:only-child {
+    width: 100%;
+}
+
+/* --- Catalog: Tree picker (PIM categories): trigger looks like a select, chosen entries as removable chips below --- */
+.cl-page .cl-picker {
+    display: grid;
+    gap: var(--cl-gap-related);
+}
+
+.cl-page .cl-picker-trigger {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    min-height: 40px;
+    padding: 0 12px;
+    font: inherit;
+    font-size: 15px;
+    color: var(--cl-ink);
+    background: var(--cl-surface);
+    border: 1px solid var(--cl-line);
+    border-radius: var(--cl-radius);
+    cursor: pointer;
+    text-align: left;
+}
+
+.cl-page .cl-picker-trigger:hover {
+    border-color: var(--cl-ink-3);
+}
+
+.cl-page .cl-picker-trigger:focus-visible {
+    outline: none;
+    border-color: var(--cl-accent);
+    box-shadow: 0 0 0 3px var(--cl-accent-soft);
+}
+
+.cl-page .cl-chip-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--cl-gap-related);
+}
+
+.cl-page .cl-chip-list:empty {
+    display: none;
+}
+
+.cl-page .cl-chip-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 100%;
+    margin: 0;
+    padding: 4px 6px 4px 10px;
+    font-size: 13px;
+    color: var(--cl-ink);
+    background: var(--cl-accent-soft);
+    border-radius: var(--cl-radius);
+}
+
+.cl-page .cl-chip-tag-path {
+    color: var(--cl-ink-3);
+    font-size: 12px;
+}
+
+.cl-page .cl-chip-tag-path::after {
+    content: " ›";
+}
+
+.cl-page .cl-chip-tag-remove {
+    display: inline-grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    margin: -2px 0;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--cl-ink-2);
+    font: inherit;
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.cl-page .cl-chip-tag-remove:hover {
+    background: var(--cl-surface);
+    color: var(--cl-bad);
+}
+
+/* --- Catalog: One-field repeat rows (labels list): numbered lines instead of a fieldset per entry --- */
+.cl-page .cl-repeat-lines {
+    display: grid;
+    gap: var(--cl-gap-related);
+}
+
+.cl-page .cl-repeat-line {
+    display: grid;
+    grid-template-columns: 28px 1fr auto;
+    align-items: center;
+    gap: var(--cl-gap-related);
+}
+
+.cl-page .cl-repeat-line-no {
+    color: var(--cl-ink-3);
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+
+.cl-page .cl-repeat-lines .cl-repeat-remove {
+    position: static;
+}
+
+.cl-page .cl-repeat-lines .cl-repeat-add {
+    margin-top: 4px;
+}
+
+.cl-page .cl-repeat-lines .cl-input {
+    height: 36px;
+}
+
+/* filters card: repeat groups sit under the card head like fieldsets */
+.cl-page .cl-card > .cl-repeat {
+    padding: 0 20px;
+}
+
+.cl-page .cl-card > .cl-repeat > .cl-fieldset {
+    padding-left: 0;
+    padding-right: 0;
+}
+
+/* --- Catalog: Editable compact table (bulk review) --- */
+.cl-page .cl-table.is-editable td {
+    padding: 6px 8px;
+    vertical-align: middle;
+}
+
+.cl-page .cl-table.is-editable .cl-input,
+.cl-page .cl-table.is-editable .cl-select {
+    height: 36px;
+    font-size: 14px;
+    width: 100%;
+}
+
+.cl-page .cl-table.is-editable tbody th {
+    vertical-align: middle;
+}
+
+.cl-page .cl-table.is-compact thead th,
+.cl-page .cl-table.is-compact td,
+.cl-page .cl-table.is-compact tbody th {
+    padding: 8px 10px;
+}
+
+/* --- Catalog: Pills inside table cells wrap; empty marker --- */
+.cl-page .cl-table .cl-table-pills {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.cl-page .cl-table.is-products .cl-table-key {
+    min-width: 300px;
+}
+
+.cl-page .cl-form-grid p.cl-help,
+.cl-page .cl-disclosure-body p.cl-help {
+    font-size: 13px;
+    color: var(--cl-ink-2);
+    line-height: 1.4;
+    margin: 0;
+}
+
+.cl-page .cl-table .cl-table-empty {
+    color: var(--cl-ink-3);
+}
+
+.cl-page .cl-table .cl-table-key .cl-status {
+    margin-left: 8px;
+    vertical-align: middle;
+}
+
+.cl-page .cl-table .cl-table-actions {
+    text-align: right;
+    white-space: nowrap;
+}
+
+/* --- Catalog: Warning help text (labels outside the list) --- */
+.cl-page .cl-help.is-warn,
+.cl-page .cl-list-desc .is-warn {
+    color: var(--cl-warn);
+}
+
+/* --- Catalog: Lead with a status pill --- */
+.cl-page .cl-page-lead .cl-status {
+    vertical-align: middle;
+}
+
+/* --- Catalog: Choice group used without a visible legend inside a fieldset: no extra top gap --- */
+.cl-page .cl-fieldset .cl-choice-group + .cl-alert {
+    margin-top: var(--cl-gap-fields);
+}
+
+/* --- Catalog: Section labels inside a form grid (marketplace thresholds) --- */
+.cl-page .cl-form-grid > .cl-span-6 > .cl-label {
+    margin-top: 4px;
+}
+
+@media screen and (max-width: 719px) {
+    .cl-page .cl-repeat-line {
+        grid-template-columns: 24px 1fr;
+    }
+
+    .cl-page .cl-repeat-line .cl-repeat-remove {
+        grid-column: 2;
+        justify-self: start;
+    }
+
+    .cl-page .cl-table.is-editable td {
+        padding: 4px 0;
+    }
+}
+
+/* card mode (< 720 px): the product cell spans the whole card, codes under the name instead of a narrow label column */
+@media screen and (max-width: 719px) {
+    .cl-page .cl-table.is-products tbody th.cl-table-key,
+    .cl-page .cl-table[data-cl-select-table] tbody th.cl-table-key {
+        display: block;
+        padding: 8px 12px 4px 44px;
+    }
+
+    .cl-page .cl-table.is-products tbody th.cl-table-key::before,
+    .cl-page .cl-table[data-cl-select-table] tbody th.cl-table-key::before {
+        display: none;
+    }
+
+    .cl-page .cl-table tbody th.cl-table-key .cl-table-sub {
+        display: block;
+        margin-top: 2px;
+        word-break: normal;
+        overflow-wrap: anywhere;
+    }
+
+    .cl-page .cl-table tbody th.cl-table-key .cl-status {
+        margin-left: 0;
+    }
+
+    .cl-page .cl-table[data-cl-select-table] tbody tr {
+        position: relative;
+    }
+
+    .cl-page .cl-table[data-cl-select-table] tbody td.cl-table-check {
+        position: absolute;
+        top: 6px;
+        left: 8px;
+        width: auto;
+        padding: 0;
+        display: block;
+    }
+
+    .cl-page .cl-table[data-cl-select-table] tbody td.cl-table-check::before {
+        display: none;
+    }
+
+    .cl-page .cl-table tbody td.cl-table-actions {
+        text-align: left;
+    }
+}

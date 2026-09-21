@@ -31,5 +31,27 @@
     </div>
 </div>
 
+<!--/* Subpage header with a lead line and actions on the right (catalog pages: "Add products", "Category settings").
+       Both are optional; the actions slot is a fragment block (~{::x}) or null.
+       lead is either plain/HTML text built from messageSource strings and HtmlUtils.htmlEscape'd values, or a
+       fragment block (e.g. ~{::x}) when the caller needs to include markup such as a status pill. */-->
+<div th:fragment="subpageWithActions(backHref, backLabel, title, lead, actions)" class="cl-page-header">
+    <a class="cl-back" th:href="@{${backHref}}">
+        <span class="icon is-small" aria-hidden="true"><i class="fas fa-chevron-left"></i></span>
+        <span th:text="${backLabel}"></span>
+    </a>
+    <div class="cl-page-header-row">
+        <h1 class="cl-page-title" th:text="${title}"></h1>
+        <div th:if="${actions != null}" class="cl-page-actions">
+            <th:block th:replace="${actions}"></th:block>
+        </div>
+    </div>
+    <p th:if="${lead != null and lead instanceof T(org.thymeleaf.standard.expression.Fragment)}" class="cl-page-lead">
+        <th:block th:insert="${lead}"></th:block>
+    </p>
+    <p th:if="${lead != null and !(lead instanceof T(org.thymeleaf.standard.expression.Fragment))}"
+       class="cl-page-lead" th:utext="${lead}"></p>
+</div>
+
 </body>
 </html>
