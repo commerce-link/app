@@ -15,10 +15,7 @@ import pl.commercelink.pim.api.PimEntry;
 import pl.commercelink.starter.util.PaginationUtil;
 import pl.commercelink.starter.dynamodb.Metadata;
 import pl.commercelink.inventory.Inventory;
-import pl.commercelink.inventory.InventoryKey;
-import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
-import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.products.*;
 import pl.commercelink.products.brand.BrandMapper;
 import pl.commercelink.products.filters.InventoryFilterType;
@@ -32,8 +29,6 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
-import static pl.commercelink.starter.util.ConversionUtil.asDistinctCollectionFromStream;
-import static pl.commercelink.starter.util.ConversionUtil.guessValueType;
 
 @Controller
 @PreAuthorize("hasRole('ADMIN')")
@@ -50,9 +45,6 @@ public class ProductCatalogController {
 
     @Autowired
     private PimCatalog pimCatalog;
-
-    @Autowired
-    private ProductRecommendationEngine recommendationEngine;
 
     @Autowired
     private PimCategoryOptions pimCategoryOptions;
@@ -72,8 +64,6 @@ public class ProductCatalogController {
     @Autowired
     private MessageSource messageSource;
 
-    @Autowired
-    private SupplierLabels supplierLabels;
     private static final int CATALOGS_PAGE_SIZE = 25;
     private static final int PRODUCTS_PAGE_SIZE = 25;
 
@@ -264,54 +254,6 @@ public class ProductCatalogController {
         return "redirect:/dashboard/catalogs/" + catalogId;
     }
 
-    @GetMapping("/dashboard/catalogs/{catalogId}/category/{categoryId}/recommendations")
-    public String showRecommendations(@PathVariable String catalogId, @PathVariable String categoryId,
-                                      @RequestParam(required = false, defaultValue = "1") int page,
-                                      @RequestParam(required = false) String brand,
-                                      @RequestParam(required = false) String label,
-                                      @RequestParam(required = false) String pimId,
-                                      @RequestParam(required = false) String ean,
-                                      @RequestParam(required = false) String mfn,
-                                      Model model) {
-        ProductCatalog catalog = productCatalogRepository.findById(getStoreId(),catalogId);
-        CategoryDefinition categoryDefinition = catalog.findCategoryDefinition(categoryId);
-
-        List<ProductRecommendation> recommendations = recommendationEngine.getRecommendations(categoryDefinition, inventory.withEnabledSuppliersOnly(getStoreId()));
-
-        // Apply filtering similar to showProducts
-        List<ProductRecommendation> filteredRecommendations = recommendations.stream()
-                .filter(r -> !isNotBlank(brand) || StringUtils.equalsIgnoreCase(r.getBrand(), brand))
-                .filter(r -> !isNotBlank(label) || StringUtils.equalsIgnoreCase(r.getLabel(), label))
-                .filter(r -> !isNotBlank(pimId) || StringUtils.equalsIgnoreCase(r.getPimId(), pimId))
-                .filter(r -> !isNotBlank(ean) || StringUtils.equalsIgnoreCase(r.getEan(), ean))
-                .filter(r -> !isNotBlank(mfn) || StringUtils.equalsIgnoreCase(r.getManufacturerCode(), mfn))
-                .collect(Collectors.toList());
-
-        Collection<String> brands = asDistinctCollectionFromStream(filteredRecommendations.stream()
-                .map(ProductRecommendation::getBrand));
-
-        List<ProductRecommendation> paginatedRecommendations = PaginationUtil.paginate(
-                filteredRecommendations, page, PRODUCTS_PAGE_SIZE, model
-        );
-
-        // Add pagination parameters for filtering
-        Map<String, Object> paginationParams = new HashMap<>();
-        if (StringUtils.isNotBlank(brand)) paginationParams.put("brand", brand);
-        if (StringUtils.isNotBlank(label)) paginationParams.put("label", label);
-        if (StringUtils.isNotBlank(pimId)) paginationParams.put("pimId", pimId);
-        if (StringUtils.isNotBlank(ean)) paginationParams.put("ean", ean);
-        if (StringUtils.isNotBlank(mfn)) paginationParams.put("mfn", mfn);
-
-        model.addAttribute("brands", brands);
-        model.addAttribute("productRecommendations", paginatedRecommendations);
-        // Alternative suppliers are connection identities; the table shows the operator's label.
-        model.addAttribute("supplierLabels", supplierLabels.forStoreId(getStoreId()));
-        model.addAttribute("categoryId", categoryId);
-        model.addAttribute("paginationParams", paginationParams);
-
-        return "catalogDetails_categoryDefinition_productRecommendations";
-    }
-
     @GetMapping("/dashboard/catalogs/{catalogId}/category/{categoryId}/products/new")
     public String newProduct(@PathVariable String catalogId, @PathVariable String categoryId, Model model) {
         ProductCatalog productCatalog = productCatalogRepository.findById(getStoreId(), catalogId);
@@ -319,232 +261,6 @@ public class ProductCatalogController {
 
         Product product = new Product(categoryDefinition.getCategoryId());
         return showEditProductForm( model,catalogId, product, categoryDefinition);
-    }
-
-    @GetMapping("/dashboard/catalogs/{catalogId}/category/{categoryId}/products")
-    public String showProducts(@PathVariable String catalogId, @PathVariable String categoryId,
-                               @RequestParam(value = "status", defaultValue = "Enabled") String status,
-                               @RequestParam(required = false, defaultValue = "1") int page,
-                               @RequestParam(required = false) String brand,
-                               @RequestParam(required = false) String label,
-                               @RequestParam(required = false) String pimId,
-                               @RequestParam(required = false) String ean,
-                               @RequestParam(required = false) String mfn,
-                               Model model) {
-        ProductCatalog productCatalog = productCatalogRepository.findById(getStoreId(), catalogId);
-        CategoryDefinition categoryDefinition = productCatalog.findCategoryDefinition(categoryId);
-
-        List<Product> products = new LinkedList<>();
-        if (categoryDefinition.hasType(CategoryDefinitionType.Dynamic)) {
-            InventoryView enabledInventory = inventory.withEnabledSuppliersOnly(getStoreId());
-
-            if ("Enabled".equalsIgnoreCase(status)) {
-                products = recommendationEngine.getRecommendationsForMappedProducts(categoryDefinition, enabledInventory).stream()
-                        .map(ProductRecommendation::toProduct)
-                        .collect(Collectors.toList());
-            } else if ("Disabled".equalsIgnoreCase(status)) {
-                products = recommendationEngine.getRecommendationsForUnmappedProducts(categoryDefinition, enabledInventory).stream()
-                        .map(ProductRecommendation::toProduct)
-                        .collect(Collectors.toList());
-            } else if ("Queued".equalsIgnoreCase(status)) {
-                products = recommendationEngine.getRecommendations(categoryDefinition, enabledInventory).stream()
-                        .filter(r -> !r.hasPimId())
-                        .map(ProductRecommendation::toProduct)
-                        .collect(Collectors.toList());
-            } else if ("MarketplaceEligible".equalsIgnoreCase(status)) {
-                if (!categoryDefinition.hasEnabledMarketplaceDefinitions()) {
-                    products = new LinkedList<>();
-                } else {
-                    products = recommendationEngine.getRecommendationsForMappedProducts(categoryDefinition, enabledInventory).stream()
-                            .map(ProductRecommendation::toProduct)
-                            .collect(Collectors.toList());
-                }
-            } else if ("ExpectedStock".equalsIgnoreCase(status)) {
-                // function not applicable for dynamic categories
-                products = new LinkedList<>();
-            }
-            List<Product> sortedProducts = products.stream()
-                    .sorted(Comparator.comparing(Product::getLabel, Comparator.nullsLast(Comparator.naturalOrder()))
-                            .thenComparing(Product::getName, Comparator.nullsLast(Comparator.naturalOrder())))
-                    .filter(p -> !isNotBlank(brand) || StringUtils.equalsIgnoreCase(p.getBrand(), brand))
-                    .filter(r -> !isNotBlank(label) || StringUtils.equalsIgnoreCase(r.getLabel(), label))
-                    .filter(p -> !isNotBlank(pimId) || StringUtils.equalsIgnoreCase(p.getPimId(), pimId))
-                    .filter(p -> !isNotBlank(ean) || StringUtils.equalsIgnoreCase(p.getEan(), ean))
-                    .filter(p -> !isNotBlank(mfn) || StringUtils.equalsIgnoreCase(p.getManufacturerCode(), mfn))
-                    .collect(Collectors.toList());
-
-            products = PaginationUtil.paginate(sortedProducts, page, PRODUCTS_PAGE_SIZE, model);
-            model.addAttribute("products", products);
-        } else {
-            Boolean enabled = null;
-            if ("Enabled".equalsIgnoreCase(status)) {
-                enabled = true;
-            } else if ("Disabled".equalsIgnoreCase(status)) {
-                enabled = false;
-            }
-
-            if ("MarketplaceEligible".equalsIgnoreCase(status)) {
-                if (!categoryDefinition.hasEnabledMarketplaceDefinitions()) {
-                    products = new LinkedList<>();
-                } else {
-                    boolean hasExportSelectedProducts = categoryDefinition.getMarketplaceDefinitions().stream()
-                            .allMatch(MarketplaceDefinition::isExportSelectedProducts);
-
-                    if (hasExportSelectedProducts) {
-                        products = productRepository.findAllProductsPaginated(
-                                categoryDefinition.getCategoryId(), true, brand, label, pimId, ean, mfn, true, null, true, null, null, page, PRODUCTS_PAGE_SIZE);
-                    } else {
-                        products = productRepository.findAllProductsPaginated(
-                                categoryDefinition.getCategoryId(), true, brand, label, pimId, ean, mfn, true, null, null, null, null, page, PRODUCTS_PAGE_SIZE);
-                    }
-                }
-                model.addAttribute("products", products.subList(0, Math.min(products.size(), PRODUCTS_PAGE_SIZE)));
-                model.addAttribute("currentPage", page);
-                model.addAttribute("hasNextPage", products.size() > PRODUCTS_PAGE_SIZE);
-            } else if ("ExpectedStock".equalsIgnoreCase(status)) {
-                products = productRepository.findAllProductsPaginated(categoryDefinition.getCategoryId(), null, brand, label, pimId, ean, mfn, true, 1, null, null, null, page, PRODUCTS_PAGE_SIZE);
-                model.addAttribute("products", products.subList(0, Math.min(products.size(), PRODUCTS_PAGE_SIZE)));
-                model.addAttribute("currentPage", page);
-                model.addAttribute("hasNextPage", products.size() > PRODUCTS_PAGE_SIZE);
-            } else if ("SuggestedRetailPrice".equalsIgnoreCase(status)) {
-                products = productRepository.findAllProductsPaginated(categoryDefinition.getCategoryId(), null, brand, label, pimId, ean, mfn, true, null, null, 1, null, page, PRODUCTS_PAGE_SIZE);
-                model.addAttribute("products", products.subList(0, Math.min(products.size(), PRODUCTS_PAGE_SIZE)));
-                model.addAttribute("currentPage", page);
-                model.addAttribute("hasNextPage", products.size() > PRODUCTS_PAGE_SIZE);
-            } else if ("MaxRetailPrice".equalsIgnoreCase(status)) {
-                products = productRepository.findAllProductsPaginated(categoryDefinition.getCategoryId(), null, brand, label, pimId, ean, mfn, true, null, null, null, 1, page, PRODUCTS_PAGE_SIZE);
-                model.addAttribute("products", products.subList(0, Math.min(products.size(), PRODUCTS_PAGE_SIZE)));
-                model.addAttribute("currentPage", page);
-                model.addAttribute("hasNextPage", products.size() > PRODUCTS_PAGE_SIZE);
-            } else {
-                products = productRepository.findAllProductsPaginated(categoryDefinition.getCategoryId(), enabled, brand, label, pimId, ean, mfn, !"Queued".equalsIgnoreCase(status), null, null, null, null, page, PRODUCTS_PAGE_SIZE);
-                model.addAttribute("products", products.subList(0, Math.min(products.size(), PRODUCTS_PAGE_SIZE)));
-                model.addAttribute("currentPage", page);
-                model.addAttribute("hasNextPage", products.size() > PRODUCTS_PAGE_SIZE);
-            }
-        }
-
-        model.addAttribute("catalogId", catalogId);
-        model.addAttribute("categoryDefinition", categoryDefinition);
-        model.addAttribute("categoryDisplayName", displayCategories(categoryDefinition));
-
-        Map<String, Object> paginationParams = new HashMap<>();
-        if (StringUtils.isNotBlank(status)) paginationParams.put("status", status);
-        if (StringUtils.isNotBlank(brand)) paginationParams.put("brand", brand);
-        if (StringUtils.isNotBlank(label)) paginationParams.put("label", label);
-        if (StringUtils.isNotBlank(pimId)) paginationParams.put("pimId", pimId);
-        if (StringUtils.isNotBlank(ean)) paginationParams.put("ean", ean);
-        if (StringUtils.isNotBlank(mfn)) paginationParams.put("mfn", mfn);
-        model.addAttribute("paginationParams", paginationParams);
-
-        Set<String> unmappedLabels = new HashSet<>();
-        if (categoryDefinition.hasGrouping()) {
-            unmappedLabels = products.stream()
-                    .map(Product::getLabel)
-                    .filter(l -> !categoryDefinition.getGroupingOrder().contains(l))
-                    .collect(Collectors.toSet());
-        }
-        model.addAttribute("unmappedLabels", unmappedLabels);
-
-        Set<String> quickFilters = products.stream()
-                .map(Product::getQuickFilters)
-                .flatMap(List::stream)
-                .collect(Collectors.toSet());
-        model.addAttribute("quickFilters", quickFilters);
-
-        Collection<String> customAttributesFilters = products.stream()
-                .map(Product::getCustomAttributesFilters)
-                .flatMap(List::stream)
-                .map(filter -> {
-
-                    String valueType = guessValueType(filter.getValue());
-                    if (valueType.equalsIgnoreCase("text")) {
-                        return filter.getCategory() + ":" + filter.getName() + " " + filter.getOperator() + " " + filter.getValue();
-                    }
-                    return filter.getCategory() + ":" + filter.getName() + " " + filter.getOperator() + " " + valueType;
-
-                })
-                .distinct().sorted().collect(Collectors.toList());
-        model.addAttribute("customAttributesFilters", customAttributesFilters);
-
-        Collection<String> customAttributes = products.stream()
-                .map(Product::getCustomAttributes)
-                .flatMap(List::stream)
-                .map(tag -> {
-
-                    String valueType = guessValueType(tag.getValue());
-                    if (valueType.equalsIgnoreCase("text")) {
-                        return tag.getName() + ": " + tag.getValue();
-                    }
-                    return tag.getName() + ": " + valueType;
-
-                })
-                .distinct().sorted().collect(Collectors.toList());
-        model.addAttribute("customAttributes", customAttributes);
-
-        Collection<String> metadata = products.stream()
-                .map(Product::getMetadata)
-                .flatMap(List::stream)
-                        .map(m -> {
-
-                            String valueType = guessValueType(m.getValue());
-                            if (valueType.equalsIgnoreCase("text")) {
-                                return m.getKey() + ": " + m.getValue();
-                            }
-                            return m.getKey() + ": " + valueType;
-
-                        })
-                .distinct().sorted().collect(Collectors.toList());
-        model.addAttribute("metadataTags", metadata);
-
-        Collection<String> brands = asDistinctCollectionFromStream(products.stream()
-                .map(Product::getBrand)
-                .filter(b -> !Objects.isNull(b)));
-        model.addAttribute("brands", brands);
-
-        return "catalogDetails_categoryDefinition_productsList";
-    }
-
-    @GetMapping("/dashboard/catalogs/{catalogId}/category/{categoryId}/products/{ean}/new")
-    public String newProduct(@PathVariable String catalogId, @PathVariable String categoryId, @PathVariable String ean, Model model) {
-        MatchedInventory matchedInventory = inventory.withEnabledSuppliersOnly(getStoreId()).findByEan(ean);
-        if (matchedInventory.isEmpty()) {
-            throw new RuntimeException("Product not found in inventory");
-        }
-
-        ProductCatalog productCatalog = productCatalogRepository.findById(getStoreId(), catalogId);
-        CategoryDefinition categoryDefinition = productCatalog.findCategoryDefinition(categoryId);
-
-        InventoryKey key = matchedInventory.getInventoryKey();
-        Optional<PimEntry> pimEntry = pimCatalog.findByPimIdOrGtinsOrMpns(key.getId(), key.getProductEans(), key.getProductCodes());
-
-        ProductRecommendation recommendation = new ProductRecommendation(categoryDefinition, matchedInventory, pimEntry);
-        return showEditProductForm(model, catalogId, recommendation.toProduct(), categoryDefinition);
-    }
-
-    @GetMapping("/dashboard/catalogs/{catalogId}/category/{categoryId}/products/bulk-new")
-    public String newProducts(@PathVariable String catalogId, @PathVariable String categoryId, @RequestParam List<String> eans, Model model) {
-        ProductCatalog productCatalog = productCatalogRepository.findById(getStoreId(), catalogId);
-        CategoryDefinition categoryDefinition = productCatalog.findCategoryDefinition(categoryId);
-
-        InventoryView enabledInventory = inventory.withEnabledSuppliersOnly(getStoreId());
-        List<Product> products = eans.stream()
-                .map(enabledInventory::findByEan)
-                .filter(matchedInventory -> !matchedInventory.isEmpty())
-                .map(matchedInventory -> {
-                    InventoryKey key = matchedInventory.getInventoryKey();
-                    Optional<PimEntry> pimEntry = pimCatalog.findByPimIdOrGtinsOrMpns(key.getId(), key.getProductEans(), key.getProductCodes());
-                    return new ProductRecommendation(categoryDefinition, matchedInventory, pimEntry).toProduct();
-                })
-                .collect(Collectors.toList());
-
-        model.addAttribute("form", new ProductsBulkAddForm(products));
-        model.addAttribute("labels", categoryDefinition.getGroupingOrder());
-        model.addAttribute("pricingGroups", categoryDefinition.getPriceDefinitions().stream().map(PriceDefinition::getPricingGroup).distinct().collect(Collectors.toList()));
-        model.addAttribute("catalogId", catalogId);
-        model.addAttribute("categoryId", categoryId);
-
-        return "catalogDetails_categoryDefinition_productsBulkAdd";
     }
 
     @PostMapping("/dashboard/catalogs/{catalogId}/category/{categoryId}/products/bulk-create")
