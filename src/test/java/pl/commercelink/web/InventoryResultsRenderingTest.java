@@ -29,7 +29,7 @@ class InventoryResultsRenderingTest {
         context.setVariable("result", result);
         context.setVariable("superAdmin", false);
         context.setVariable("canManageSuppliers", canManageSuppliers);
-        context.setVariable("manageSuppliersUrl", "/dashboard/store/fulfilment");
+        context.setVariable("manageSuppliersUrl", "/dashboard/store/suppliers");
         context.setVariable("warehouseUrl", "/dashboard/warehouse");
         return context;
     }
@@ -171,7 +171,7 @@ class InventoryResultsRenderingTest {
 
         // then
         assertThat(admin).contains("No active supplier offers this product right now").contains("Enable more suppliers")
-                .contains("href=\"/dashboard/store/fulfilment\"");
+                .contains("href=\"/dashboard/store/suppliers\"");
         assertThat(user).doesNotContain("Enable more suppliers");
         assertThat(admin + user).doesNotContain("??");
     }

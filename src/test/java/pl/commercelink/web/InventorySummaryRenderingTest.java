@@ -37,7 +37,7 @@ class InventorySummaryRenderingTest {
         context.setVariable("statistics", new InventoryStatistics(38755, 24102, Map.of()));
         context.setVariable("sources", sources);
         context.setVariable("canManageSuppliers", canManageSuppliers);
-        context.setVariable("manageSuppliersUrl", "/dashboard/store/fulfilment");
+        context.setVariable("manageSuppliersUrl", "/dashboard/store/suppliers");
         context.setVariable("warehouseUrl", "/dashboard/warehouse");
         return context;
     }
@@ -55,7 +55,7 @@ class InventorySummaryRenderingTest {
         assertThat(html).contains("data-inventory-fragment=\"summary\"");
         assertThat(html).contains("Products at suppliers").contains("38 755").contains("62% with stock above zero");
         assertThat(html).contains("data-inventory-slot=\"warehouse\"");
-        assertThat(html).contains("href=\"/dashboard/store/fulfilment\"");
+        assertThat(html).contains("href=\"/dashboard/store/suppliers\"");
         assertThat(html).contains("Products: 12,430").contains("feed 3 h ago");
         assertThat(html).containsPattern("data-inventory-source-count[^>]*>\\s*<span aria-hidden=\"true\">3</span>")
                 .contains("Sources: 3");
@@ -74,7 +74,7 @@ class InventorySummaryRenderingTest {
         String html = engine.process(SUMMARY, context(sources, false));
 
         // then
-        assertThat(html).doesNotContain("/dashboard/store/fulfilment");
+        assertThat(html).doesNotContain("/dashboard/store/suppliers");
     }
 
     @Test

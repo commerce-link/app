@@ -26,7 +26,7 @@ import java.util.stream.Stream;
 public class InventoryPageController {
 
     static final int MIN_QUERY_LENGTH = 3;
-    static final String MANAGE_SUPPLIERS_URL = "/dashboard/store/fulfilment";
+    static final String MANAGE_SUPPLIERS_URL = "/dashboard/store/suppliers";
     static final String WAREHOUSE_URL = "/dashboard/warehouse";
     private static final String PAGE_PATH = "/dashboard/inventory";
 
