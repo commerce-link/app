@@ -48,8 +48,12 @@ class SettingsHeaderFragmentTest {
         String html = EnglishFragmentTemplateEngine.create().process(template, new Context());
 
         // then
-        assertThat(html).contains("<p class=\"cl-page-lead\">")
-                .contains("<span class=\"cl-status is-neutral\">Manual</span>")
-                .contains("PIM: Graphics cards");
+        int leadOpen = html.indexOf("<p class=\"cl-page-lead\">");
+        int leadClose = html.indexOf("</p>", leadOpen);
+        int pillIndex = html.indexOf("<span class=\"cl-status is-neutral\">Manual</span>");
+        assertThat(leadOpen).isNotEqualTo(-1);
+        assertThat(leadClose).isNotEqualTo(-1);
+        assertThat(pillIndex).isGreaterThan(leadOpen).isLessThan(leadClose);
+        assertThat(html.substring(leadOpen, leadClose)).contains("PIM: Graphics cards");
     }
 }
