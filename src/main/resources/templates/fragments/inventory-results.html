@@ -81,15 +81,15 @@
         <p class="cl-inv-price-summary" data-inventory-price-summary>
             <span th:if="${prices.hasLowestPrice()}">
                 <span th:text="#{inventory.summary.lowest.prefix}"></span>
-                <b class="is-ok" th:text="${#numbers.formatDecimal(prices.lowestGross(), 1, 'WHITESPACE', 2, 'COMMA')} + ' PLN'"></b>
-                <span th:text="#{inventory.summary.atSuppliers}"></span><th:block th:if="${prices.showsDeliveredPrice()}">,
+                <b class="is-ok" th:text="${#numbers.formatDecimal(prices.lowestNet(), 1, 'WHITESPACE', 2, 'COMMA')} + ' PLN'"></b>
+                <span th:text="#{inventory.summary.netAtSuppliers}"></span><th:block th:if="${prices.showsDeliveredPrice()}">,
                 <span th:text="#{inventory.summary.withDelivery}"></span>
-                <b th:text="${#numbers.formatDecimal(prices.lowestDeliveredGross(), 1, 'WHITESPACE', 2, 'COMMA')} + ' PLN'"></b></th:block>
+                <b th:text="${#numbers.formatDecimal(prices.lowestDeliveredNet(), 1, 'WHITESPACE', 2, 'COMMA')} + ' PLN'"></b></th:block>
             </span>
             <span th:unless="${prices.hasLowestPrice()}" th:text="#{inventory.summary.noSupplierStock}"></span>
             <span th:if="${prices.showsMedian()}">
                 <span th:text="#{inventory.summary.median}"></span>
-                <b th:text="${#numbers.formatDecimal(prices.medianGross(), 1, 'WHITESPACE', 2, 'COMMA')} + ' PLN'"></b>
+                <b th:text="${#numbers.formatDecimal(prices.medianNet(), 1, 'WHITESPACE', 2, 'COMMA')} + ' PLN'"></b>
             </span>
             <span th:if="${prices.supplierQty() > 0}">
                 <b th:text="#{inventory.table.qtyValue(${prices.supplierQty()})}"></b>
@@ -208,7 +208,6 @@
                     </td>
                     <td class="is-numeric cl-inv-total-cell" th:attr="data-label=#{inventory.table.total}">
                         <th:block th:if="${offer.hasPrice()}">
-                            <span th:if="${offer.cheapest()}" class="cl-inv-check" aria-hidden="true"><i class="fas fa-check"></i></span>
                             <span th:if="${offer.cheapest()}" class="cl-visually-hidden" th:text="#{inventory.table.cheapest}"></span>
                             <span class="cl-inv-price" th:text="${#numbers.formatDecimal(offer.totalNet(), 1, 'WHITESPACE', 2, 'COMMA')} + ' PLN'"></span>
                         </th:block>

@@ -187,12 +187,12 @@ public class InventorySearch {
         int inStock = rows.stream().filter(row -> !row.inDelivery()).mapToInt(WarehouseRow::qty).sum();
         int inDelivery = rows.stream().filter(WarehouseRow::inDelivery).mapToInt(WarehouseRow::qty).sum();
         List<OfferRow> buyable = offers.stream().filter(offer -> offer.hasStock() && offer.hasPrice()).toList();
-        List<Double> pricesInStock = buyable.stream().map(OfferRow::grossPrice).sorted().toList();
+        List<Double> pricesInStock = buyable.stream().map(OfferRow::netPrice).sorted().toList();
         // the headline figure names one offer, so it must be the same one the table marks as cheapest
         OfferRow lowest = buyable.stream().min(Comparator.comparingDouble(OfferRow::totalNet)).orElse(null);
         return new PriceSummary(
-                lowest == null ? 0 : lowest.grossPrice(),
-                lowest == null ? 0 : Price.fromNet(lowest.totalNet()).grossValue(),
+                lowest == null ? 0 : lowest.netPrice(),
+                lowest == null ? 0 : lowest.totalNet(),
                 median(pricesInStock),
                 pricesInStock.size(),
                 offers.stream().mapToLong(OfferRow::qty).sum(),

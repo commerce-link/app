@@ -207,8 +207,8 @@ class InventorySearchTest {
         assertThat(found.supplierOffers()).extracting(OfferRow::supplier).containsExactly("AB", "Elko");
         assertThat(found.supplierOffers().get(0).cheapest()).isTrue();
         assertThat(found.supplierOffers().get(1).cheapest()).isFalse();
-        assertThat(found.prices().lowestGross()).isEqualTo(Price.fromNet(110.0).grossValue());
-        assertThat(found.prices().lowestDeliveredGross()).isEqualTo(Price.fromNet(110.0).grossValue());
+        assertThat(found.prices().lowestNet()).isEqualTo(110.0);
+        assertThat(found.prices().lowestDeliveredNet()).isEqualTo(110.0);
     }
 
     /**
@@ -379,7 +379,7 @@ class InventorySearchTest {
         // then
         assertThat(found.supplierOffers()).extracting(OfferRow::supplier).containsExactly("Elko", "AB", "Nowak");
         assertThat(found.supplierOffers()).extracting(OfferRow::cheapest).containsExactly(true, false, false);
-        assertThat(found.prices().lowestGross()).isEqualTo(Price.fromNet(100.0).grossValue());
+        assertThat(found.prices().lowestNet()).isEqualTo(100.0);
         assertThat(found.supplierOffers().get(0).grossPrice()).isEqualTo(Price.fromNet(100.0).grossValue());
         assertThat(found.warehouseRows().get(0).grossUnitCost()).isEqualTo(Price.fromNet(50.0).grossValue());
         assertThat(found.warehouseRows()).extracting(WarehouseRow::inDelivery).containsExactly(false, true);
@@ -423,7 +423,7 @@ class InventorySearchTest {
         InventorySearchResult.Found found = (InventorySearchResult.Found) search.search(STORE_ID, EAN);
 
         // then
-        assertThat(found.prices().lowestGross()).isEqualTo(Price.fromNet(100.0).grossValue());
+        assertThat(found.prices().lowestNet()).isEqualTo(100.0);
         assertThat(found.supplierOffers()).filteredOn(OfferRow::cheapest).extracting(OfferRow::supplier).containsExactly("Elko");
     }
 
@@ -436,8 +436,8 @@ class InventorySearchTest {
         InventorySearchResult.Found found = (InventorySearchResult.Found) search.search(STORE_ID, EAN);
 
         // then
-        assertThat(found.prices().lowestGross()).isEqualTo(0.0);
-        assertThat(found.prices().medianGross()).isEqualTo(0.0);
+        assertThat(found.prices().lowestNet()).isEqualTo(0.0);
+        assertThat(found.prices().medianNet()).isEqualTo(0.0);
         assertThat(found.supplierOffers()).extracting(OfferRow::cheapest).containsExactly(false, false);
     }
 
@@ -451,8 +451,7 @@ class InventorySearchTest {
         InventorySearchResult.Found found = (InventorySearchResult.Found) search.search(STORE_ID, EAN);
 
         // then
-        assertThat(found.prices().medianGross())
-                .isCloseTo((Price.fromNet(110.0).grossValue() + Price.fromNet(120.0).grossValue()) / 2, within(0.001));
+        assertThat(found.prices().medianNet()).isCloseTo((110.0 + 120.0) / 2, within(0.001));
         assertThat(found.prices().showsMedian()).isTrue();
     }
 
@@ -482,7 +481,7 @@ class InventorySearchTest {
         // then
         assertThat(found.supplierOffers()).extracting(OfferRow::supplier).containsExactly("AB", "Kosatec", "Elko");
         assertThat(found.supplierOffers()).extracting(OfferRow::cheapest).containsExactly(true, false, false);
-        assertThat(found.prices().lowestGross()).isEqualTo(Price.fromNet(100.0).grossValue());
+        assertThat(found.prices().lowestNet()).isEqualTo(100.0);
         assertThat(found.prices().supplierQty()).isEqualTo(8);
     }
 

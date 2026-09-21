@@ -1,10 +1,12 @@
 package pl.commercelink.inventory.search;
 
 /**
- * The one-line answer above the table. {@code lowestGross} is the unit price of the offer that wins on
- * delivered cost, {@code lowestDeliveredGross} the same offer with shipping added.
+ * The one-line answer above the table, in net figures. Net is the only price a feed actually carries;
+ * gross is this application's flat 23% assumption, so the headline someone prices against states net
+ * and says so. {@code lowestNet} is the unit price of the offer that wins on delivered cost,
+ * {@code lowestDeliveredNet} the same offer with shipping added.
  */
-public record PriceSummary(double lowestGross, double lowestDeliveredGross, double medianGross,
+public record PriceSummary(double lowestNet, double lowestDeliveredNet, double medianNet,
                            int pricedOffersInStock, long supplierQty, int warehouseInStockQty,
                            int warehouseInDeliveryQty, boolean lowestIsUncertainMatch) {
 
@@ -12,7 +14,7 @@ public record PriceSummary(double lowestGross, double lowestDeliveredGross, doub
     static final int MEDIAN_MIN_OFFERS = 4;
 
     public boolean hasLowestPrice() {
-        return lowestGross > 0;
+        return lowestNet > 0;
     }
 
     public boolean showsMedian() {
@@ -21,6 +23,6 @@ public record PriceSummary(double lowestGross, double lowestDeliveredGross, doub
 
     /** Only worth a second figure when shipping actually moves the number. */
     public boolean showsDeliveredPrice() {
-        return lowestDeliveredGross > lowestGross;
+        return lowestDeliveredNet > lowestNet;
     }
 }

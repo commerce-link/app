@@ -50,7 +50,7 @@ class InventoryResultsRenderingTest {
                                 379.0, 466.17, 0, 0, false, 0, 0, false, false, CodeMatch.CODE_DIFFERS)),
                 List.of(new WarehouseRow("5901234123457", "910-006559", 288.78, 355.2, 3, false, ItemCondition.Sealed, CodeMatch.SAME),
                         new WarehouseRow("5901234123457", "910-006559", 283.74, 349.0, 2, true, ItemCondition.Damaged, CodeMatch.SAME)),
-                new PriceSummary(478.47, 478.47, 498.15, 3, 96, 3, 2, false),
+                new PriceSummary(389.0, 389.0, 405.0, 3, 96, 3, 2, false),
                 warehouseChecked);
     }
 
@@ -116,27 +116,36 @@ class InventoryResultsRenderingTest {
         assertThat(html).contains("data-sort-delivery=\"999999999\"").contains("data-sort-lead=\"999999999\"");
     }
 
+    /**
+     * Nothing in the row is drawn or coloured for the winner any more: the figure is simply bold. Bold
+     * does not reach a screen reader, so the hidden label stays as its equivalent.
+     */
     @Test
-    void cheapestOfferCarriesACheckWithScreenReaderTextButNoVisibleLabel() {
+    void cheapestOfferIsBoldWithScreenReaderTextAndNoMarkerOfItsOwn() {
         // when
         String html = engine.process(RESULTS, context(found(), true));
 
         // then
         assertThat(html.split("is-cheapest", -1)).hasSize(2);
-        assertThat(html.split("cl-inv-check", -1)).hasSize(2);
+        assertThat(html).doesNotContain("cl-inv-check").doesNotContain("fa-check");
         assertThat(html).contains("cl-visually-hidden\">lowest delivered cost<").doesNotContain("Cheapest");
     }
 
+    /**
+     * Net is the only price a feed actually carries; gross is a flat 23% assumption. The figure someone
+     * prices against therefore quotes net and says so in the sentence, rather than leaving it to be guessed.
+     */
     @Test
-    void summaryLineReplacesTheFiguresAndOmitsTheSupplierName() {
+    void summaryLineQuotesTheNetPriceAndNamesItAsNet() {
         // when
         String html = engine.process(RESULTS, context(found(), true));
 
         // then
         String summary = html.substring(html.indexOf("data-inventory-price-summary"), html.indexOf("data-inventory-offers"));
-        assertThat(summary).contains("From").contains("478,47 PLN").contains("at suppliers").contains("96 pcs")
+        assertThat(summary).contains("From").contains("389,00 PLN").contains("net at suppliers")
+                .contains("96 pcs").contains("at suppliers")
                 .contains("3 pcs").contains("in the warehouse").contains("2 pcs").contains("in transit")
-                .doesNotContain("Nowak").doesNotContain("median");
+                .doesNotContain("478,47").doesNotContain("Nowak").doesNotContain("median");
     }
 
     /** Shipping only earns a second figure in the headline when it actually moves the number. */
@@ -144,14 +153,14 @@ class InventoryResultsRenderingTest {
     void summaryAddsTheDeliveredPriceOnlyWhenDeliveryCostsAnything() {
         // given
         InventorySearchResult.Found shipped = new InventorySearchResult.Found(MatchedBy.EAN, PRODUCT, List.of(), List.of(),
-                new PriceSummary(478.47, 500.61, 0, 1, 10, 0, 0, false), true);
+                new PriceSummary(389.0, 407.0, 0, 1, 10, 0, 0, false), true);
 
         // when
         String withShipping = engine.process(RESULTS, context(shipped, true));
         String withoutShipping = engine.process(RESULTS, context(found(), true));
 
         // then
-        assertThat(withShipping).contains("with delivery").contains("500,61 PLN");
+        assertThat(withShipping).contains("with delivery").contains("407,00 PLN");
         assertThat(withoutShipping).doesNotContain("with delivery");
     }
 
@@ -163,7 +172,7 @@ class InventoryResultsRenderingTest {
     void summaryWarnsWhenTheCheapestOfferIsADoubtfulMatch()  {
         // given
         InventorySearchResult.Found doubtful = new InventorySearchResult.Found(MatchedBy.EAN, PRODUCT, List.of(), List.of(),
-                new PriceSummary(290.03, 290.03, 0, 1, 50, 0, 0, true), true);
+                new PriceSummary(235.80, 235.80, 0, 1, 50, 0, 0, true), true);
 
         // when
         String warned = engine.process(RESULTS, context(doubtful, true));
@@ -183,7 +192,7 @@ class InventoryResultsRenderingTest {
                                 290.03, 356.74, 0, 0, true, 2, 50, true, true, CodeMatch.SAME),
                         offer("AcmeB-k7f3a9c2", "AcmeB", ConnectionMode.OWN, "5901234123457", "910-006559",
                                 393.47, 483.97, 0, 0, true, 2, 10, false, true, CodeMatch.SAME)),
-                List.of(), new PriceSummary(356.74, 356.74, 0, 2, 60, 0, 0, false), true);
+                List.of(), new PriceSummary(290.03, 290.03, 0, 2, 60, 0, 0, false), true);
 
         // when
         String html = engine.process(RESULTS, context(twins, true));

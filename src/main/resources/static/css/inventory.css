@@ -581,19 +581,6 @@
     flex: 0 0 auto;
 }
 
-.cl-inv-check {
-    display: inline-grid;
-    place-items: center;
-    width: 16px;
-    height: 16px;
-    margin-right: 6px;
-    border-radius: 50%;
-    background: var(--cl-ink);
-    color: var(--cl-surface);
-    font-size: 9px;
-    vertical-align: 1px;
-}
-
 .cl-inv-price {
     font-weight: 650;
 }
