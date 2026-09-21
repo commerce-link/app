@@ -84,7 +84,7 @@ class InventoryPageControllerTest {
         ConcurrentModel model = new ConcurrentModel();
 
         // when
-        String view = controller.page(null, model);
+        String view = controller.page(null, null, model);
 
         // then
         assertThat(view).isEqualTo("inventory");
@@ -103,7 +103,7 @@ class InventoryPageControllerTest {
         when(inventorySearch.search(STORE_ID, "5901234123457")).thenReturn(notFound);
 
         // when
-        controller.page("  5901234123457 ", model);
+        controller.page("  5901234123457 ", null, model);
 
         // then
         assertThat(model.getAttribute("query")).isEqualTo("5901234123457");
@@ -117,7 +117,7 @@ class InventoryPageControllerTest {
         MockHttpServletResponse response = new MockHttpServletResponse();
 
         // when
-        String view = controller.search("9 ", model, response);
+        String view = controller.search("9 ", null, model, response);
 
         // then
         assertThat(view).isEqualTo("fragments/inventory-results :: results");
@@ -134,12 +134,51 @@ class InventoryPageControllerTest {
         when(inventorySearch.searchGlobal("MFN-1")).thenReturn(new InventorySearchResult.NotFound("MFN-1"));
 
         // when
-        controller.search("MFN-1", model, new MockHttpServletResponse());
+        controller.search("MFN-1", null, model, new MockHttpServletResponse());
 
         // then
         verify(inventorySearch).searchGlobal("MFN-1");
         verify(inventorySearch, never()).search(any(), any());
         assertThat(model.getAttribute("canManageSuppliers")).isEqualTo(false);
+    }
+
+    /** The page can be opened to pick a source for an order item; the mode rides in the address. */
+    @Test
+    void selectionParameterPutsThePageIntoPickASourceMode() {
+        // given
+        ConcurrentModel model = new ConcurrentModel();
+
+        // when
+        controller.page(null, "order:ORD-7:item-3", model);
+
+        // then
+        assertThat(model.getAttribute("selection")).isEqualTo(new OfferSelection("ORD-7", "item-3"));
+    }
+
+    @Test
+    void anUnparseableSelectionIsIgnoredInsteadOfBreakingTheSearch() {
+        // given
+        ConcurrentModel model = new ConcurrentModel();
+
+        // when
+        controller.page(null, "order:../../etc:x", model);
+
+        // then
+        assertThat(model.getAttribute("selection")).isNull();
+    }
+
+    /** The super admin's search spans every store, so there is no order of his to assign anything to. */
+    @Test
+    void superAdminNeverGetsTheSelectionMode() {
+        // given
+        signedInAs("SUPER_ADMIN");
+        ConcurrentModel model = new ConcurrentModel();
+
+        // when
+        controller.page(null, "order:ORD-7:item-3", model);
+
+        // then
+        assertThat(model.getAttribute("selection")).isNull();
     }
 
     @Test
@@ -149,7 +188,7 @@ class InventoryPageControllerTest {
         ConcurrentModel model = new ConcurrentModel();
 
         // when
-        controller.page(null, model);
+        controller.page(null, null, model);
 
         // then
         assertThat(model.getAttribute("canManageSuppliers")).isEqualTo(false);

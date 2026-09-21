@@ -6,9 +6,11 @@ import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
-import pl.commercelink.inventory.supplier.api.InventoryItem;
+import pl.commercelink.inventory.supplier.SupplierIdentity;
 import pl.commercelink.inventory.supplier.SupplierLabelMap;
 import pl.commercelink.inventory.supplier.SupplierLabels;
+import pl.commercelink.inventory.supplier.SupplierRegistry;
+import pl.commercelink.inventory.supplier.api.InventoryItem;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
@@ -29,7 +31,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static pl.commercelink.taxonomy.UnifiedProductIdentifiers.unifyMfn;
 
@@ -37,12 +41,16 @@ import static pl.commercelink.taxonomy.UnifiedProductIdentifiers.unifyMfn;
 @RequiredArgsConstructor
 public class InventorySearch {
 
+    // The rest of the application quotes supplier shipping for Poland; the page must not disagree with it.
+    private static final String DESTINATION = "PL";
+
     private final Inventory inventory;
     private final StoresRepository storesRepository;
     private final PimCatalog pimCatalog;
     private final TaxonomyCache taxonomyCache;
     private final Warehouse warehouse;
     private final SupplierLabels supplierLabels;
+    private final SupplierRegistry supplierRegistry;
 
     public InventorySearchResult search(String storeId, String query) {
         Store store = storesRepository.findById(storeId);
@@ -112,49 +120,85 @@ public class InventorySearch {
 
     private List<OfferRow> offers(List<InventoryItem> items, Function<String, ConnectionMode> modeOf,
                                   SupplierLabelMap labels, ProductCodes product) {
+        record Quoted(InventoryItem item, OfferShipping shipping) {
+            double totalNet() {
+                return item.netPrice() + shipping.deliveryNet();
+            }
+
+            boolean buyable() {
+                return item.qty() > 0 && item.netPrice() > 0;
+            }
+        }
+        List<Quoted> quoted = items.stream().map(item -> new Quoted(item, shippingFor(item))).toList();
+        // two connections of one supplier, or one feed listing a product twice, both render the same name
+        Set<String> repeatedLabels = quoted.stream()
+                .collect(Collectors.groupingBy(row -> labels.of(row.item().supplier()), Collectors.counting()))
+                .entrySet().stream().filter(entry -> entry.getValue() > 1).map(Map.Entry::getKey)
+                .collect(Collectors.toSet());
         // an offer nobody can deliver is not a price anyone can buy at, so it neither wins nor leads the list
-        double lowestNet = items.stream().filter(item -> item.qty() > 0)
-                .mapToDouble(InventoryItem::netPrice).filter(price -> price > 0).min().orElse(0);
-        return items.stream()
-                .sorted(Comparator.comparing((InventoryItem item) -> item.qty() <= 0)
-                        .thenComparing(item -> item.netPrice() <= 0)
-                        .thenComparingDouble(InventoryItem::netPrice))
-                .map(item -> new OfferRow(
-                        item.supplier(),
-                        labels.of(item.supplier()),
-                        modeOf.apply(item.supplier()),
-                        item.ean(),
-                        item.mfn(),
-                        Price.fromNet(item.netPrice()).grossValue(),
-                        item.qty(),
-                        item.qty() > 0 && item.netPrice() > 0 && item.netPrice() == lowestNet,
-                        CodeMatch.of(product, item.ean(), item.mfn())))
+        double lowestTotal = quoted.stream().filter(Quoted::buyable).mapToDouble(Quoted::totalNet).min().orElse(0);
+        return quoted.stream()
+                .sorted(Comparator.comparing((Quoted row) -> row.item().qty() <= 0)
+                        .thenComparing(row -> row.item().netPrice() <= 0)
+                        .thenComparingDouble(Quoted::totalNet))
+                .map(row -> new OfferRow(
+                        row.item().supplier(),
+                        labels.of(row.item().supplier()),
+                        modeOf.apply(row.item().supplier()),
+                        row.item().ean(),
+                        row.item().mfn(),
+                        Price.fromNet(row.item().netPrice()).netValue(),
+                        Price.fromNet(row.item().netPrice()).grossValue(),
+                        row.shipping().deliveryNet(),
+                        row.shipping().freeFrom(),
+                        row.shipping().known(),
+                        row.shipping().totalDays(),
+                        row.item().qty(),
+                        row.buyable() && row.totalNet() == lowestTotal,
+                        repeatedLabels.contains(labels.of(row.item().supplier())),
+                        CodeMatch.of(product, row.item().ean(), row.item().mfn())))
                 .toList();
+    }
+
+    /**
+     * Shipping terms come from the supplier plugin, the same source the fulfilment planner quotes.
+     * A supplier the registry does not know falls back to a placeholder policy there, so rather than
+     * print an invented cost the row reports that shipping is simply unknown.
+     */
+    private OfferShipping shippingFor(InventoryItem item) {
+        String supplier = item.supplier();
+        if (!supplierRegistry.exists(supplier) && !SupplierIdentity.isManual(supplier)) {
+            return OfferShipping.UNKNOWN;
+        }
+        return OfferShipping.of(supplierRegistry.get(supplier).shippingTermsFor(DESTINATION),
+                item.netPrice(), item.leadTimeDays());
     }
 
     private static List<WarehouseRow> warehouseRows(List<WarehouseItemView> items, ProductCodes product) {
         return items.stream()
                 .sorted(Comparator.comparing(WarehouseItemView::isInDelivery))
-                .map(item -> new WarehouseRow(item.getEan(), item.getMfn(), item.getPrice().grossValue(), item.getQty(),
-                        item.isInDelivery(), item.getCondition(), CodeMatch.of(product, item.getEan(), item.getMfn())))
+                .map(item -> new WarehouseRow(item.getEan(), item.getMfn(), item.getPrice().netValue(),
+                        item.getPrice().grossValue(), item.getQty(), item.isInDelivery(), item.getCondition(),
+                        CodeMatch.of(product, item.getEan(), item.getMfn())))
                 .toList();
     }
 
     private static PriceSummary prices(List<OfferRow> offers, List<WarehouseRow> rows) {
         int inStock = rows.stream().filter(row -> !row.inDelivery()).mapToInt(WarehouseRow::qty).sum();
         int inDelivery = rows.stream().filter(WarehouseRow::inDelivery).mapToInt(WarehouseRow::qty).sum();
-        List<Double> pricesInStock = offers.stream()
-                .filter(offer -> offer.hasStock() && offer.hasPrice())
-                .map(OfferRow::grossPrice)
-                .sorted()
-                .toList();
+        List<OfferRow> buyable = offers.stream().filter(offer -> offer.hasStock() && offer.hasPrice()).toList();
+        List<Double> pricesInStock = buyable.stream().map(OfferRow::grossPrice).sorted().toList();
+        // the headline figure names one offer, so it must be the same one the table marks as cheapest
+        OfferRow lowest = buyable.stream().min(Comparator.comparingDouble(OfferRow::totalNet)).orElse(null);
         return new PriceSummary(
-                pricesInStock.isEmpty() ? 0 : pricesInStock.get(0),
+                lowest == null ? 0 : lowest.grossPrice(),
+                lowest == null ? 0 : Price.fromNet(lowest.totalNet()).grossValue(),
                 median(pricesInStock),
                 pricesInStock.size(),
                 offers.stream().mapToLong(OfferRow::qty).sum(),
                 inStock,
-                inDelivery);
+                inDelivery,
+                lowest != null && lowest.codeMatch().isWarning());
     }
 
     // listed offers, not warehouse stock, drive the summary price; MatchedInventory's own

@@ -15,11 +15,24 @@
             <span class="cl-stat-hint" th:text="#{inventory.tile.inStock.hint(${statistics.inStockPercent()})}"></span>
         </li>
         <li class="cl-stat">
-            <span class="cl-eyebrow" th:text="#{inventory.tile.suppliers}"></span>
-            <span class="cl-stat-value">
-                <span th:text="${sources.activeSupplierCount()}"></span>
-                <small class="cl-stat-value-of" th:text="#{inventory.tile.suppliers.of(${sources.connectedSupplierCount()})}"></small>
-            </span>
+            <a th:if="${canManageSuppliers}" class="cl-stat-link" th:href="${manageSuppliersUrl}">
+                <span class="cl-eyebrow" th:text="#{inventory.tile.suppliers}"></span>
+                <span class="cl-stat-value">
+                    <span th:text="${sources.activeSupplierCount()}"></span>
+                    <small class="cl-stat-value-of" th:text="#{inventory.tile.suppliers.of(${sources.connectedSupplierCount()})}"></small>
+                </span>
+                <!-- names what the figure counts, so it no longer looks like it disagrees with the sources badge -->
+                <span class="cl-stat-hint" th:text="#{inventory.tile.suppliers.hint}"></span>
+                <i class="fas fa-chevron-right cl-stat-go" aria-hidden="true"></i>
+            </a>
+            <th:block th:unless="${canManageSuppliers}">
+                <span class="cl-eyebrow" th:text="#{inventory.tile.suppliers}"></span>
+                <span class="cl-stat-value">
+                    <span th:text="${sources.activeSupplierCount()}"></span>
+                    <small class="cl-stat-value-of" th:text="#{inventory.tile.suppliers.of(${sources.connectedSupplierCount()})}"></small>
+                </span>
+                <span class="cl-stat-hint" th:text="#{inventory.tile.suppliers.hint}"></span>
+            </th:block>
         </li>
         <li class="cl-stat" data-inventory-slot="warehouse" aria-busy="true">
             <span class="cl-eyebrow" th:text="#{inventory.tile.warehouse}"></span>
@@ -88,7 +101,10 @@
 </div>
 
 <li th:fragment="sourceRow(row)" class="cl-inv-source-row">
-    <span class="cl-inv-source-name" th:text="${row.label()}"></span>
+    <a th:if="${canManageSuppliers}" class="cl-inv-source-name cl-inv-source-link"
+       th:href="|${connectionUrlPrefix}${row.connectionPath()}|"
+       th:title="#{inventory.sources.open}" th:text="${row.label()}"></a>
+    <span th:unless="${canManageSuppliers}" class="cl-inv-source-name" th:text="${row.label()}"></span>
     <span class="cl-inv-mode" th:text="#{${'inventory.mode.' + row.mode().name()}}"></span>
     <span class="cl-inv-source-meta">
         <span th:unless="${row.needsAttention()}" th:text="#{inventory.sources.products(${row.products()})}"></span>
@@ -106,12 +122,15 @@
         <a class="cl-link-button" th:href="${warehouseUrl}" th:text="#{inventory.tile.warehouse.open}"></a>
     </th:block>
     <th:block th:unless="${externalWarehouse}">
-        <span class="cl-stat-value" th:text="${#numbers.formatInteger(warehouseSummary.products(), 1, 'WHITESPACE')}"></span>
+        <a class="cl-stat-link" th:href="${warehouseUrl}">
+            <span class="cl-stat-value" th:text="${#numbers.formatInteger(warehouseSummary.products(), 1, 'WHITESPACE')}"></span>
+            <span class="cl-stat-hint"><span th:text="#{inventory.tile.warehouse.hint(${warehouseSummary.inStockQty()})}"></span><span
+                    th:if="${warehouseSummary.inDeliveryQty() > 0}"
+                    th:text="#{inventory.tile.warehouse.inDelivery(${warehouseSummary.inDeliveryQty()})}"></span></span>
+            <i class="fas fa-chevron-right cl-stat-go" aria-hidden="true"></i>
+        </a>
         <span data-warehouse-products-label hidden
               th:text="#{inventory.sources.products(${warehouseSummary.products()})}"></span>
-        <span class="cl-stat-hint"><span th:text="#{inventory.tile.warehouse.hint(${warehouseSummary.inStockQty()})}"></span><span
-                th:if="${warehouseSummary.inDeliveryQty() > 0}"
-                th:text="#{inventory.tile.warehouse.inDelivery(${warehouseSummary.inDeliveryQty()})}"></span></span>
     </th:block>
 </li>
 

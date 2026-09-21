@@ -14,6 +14,11 @@ import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
+import pl.commercelink.inventory.supplier.api.ShippingCostPolicy;
+import pl.commercelink.inventory.supplier.api.ShippingPolicy;
+import pl.commercelink.inventory.supplier.api.ShippingTerms;
+import pl.commercelink.inventory.supplier.api.SupplierInfo;
+import pl.commercelink.inventory.supplier.api.SupplierType;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.pim.api.PimCatalog;
@@ -78,7 +83,10 @@ class InventorySearchTest {
     void setUp() {
         // the label map is real: resolving a connection's label is part of what a search returns
         search = new InventorySearch(inventory, storesRepository, pimCatalog, taxonomyCache, warehouse,
-                new SupplierLabels(storesRepository));
+                new SupplierLabels(storesRepository), supplierRegistry);
+        // shipping is free and instant unless a test says otherwise, so a case about prices stays about prices
+        when(supplierRegistry.exists(anyString())).thenReturn(true);
+        when(supplierRegistry.get(anyString())).thenReturn(supplierShipping(new ShippingCostPolicy.Free(), 0));
         store = mock(Store.class);
         StoreSupplierConnection elko = mock(StoreSupplierConnection.class);
         when(elko.getSupplierName()).thenReturn("Elko");
@@ -95,6 +103,11 @@ class InventorySearchTest {
         when(pimCatalog.findByPimId(anyString())).thenReturn(Optional.empty());
         when(pimCatalog.findByGtin(anyString())).thenReturn(Optional.empty());
         when(stock.searchAllAvailableByMfns(eq(STORE_ID), anyCollection())).thenReturn(List.of());
+    }
+
+    private static SupplierInfo supplierShipping(ShippingCostPolicy policy, int arrivalDays) {
+        return new SupplierInfo("Any", SupplierType.Distributor, 1, "PL",
+                new ShippingPolicy(new ShippingTerms(arrivalDays, policy)));
     }
 
     private MatchedInventory empty() {
@@ -153,6 +166,106 @@ class InventorySearchTest {
         // then
         assertThat(found.supplierOffers()).extracting(OfferRow::supplierLabel)
                 .containsExactly("Kosatec Wrocław", "Elko");
+    }
+
+    /** Shipping comes from the supplier plugin, the same terms the fulfilment planner quotes. */
+    @Test
+    void offerCarriesTheSuppliersDeliveryCostFreeShippingThresholdAndTotalLeadTime() {
+        // given -- 18 zl below a 1000 zl basket, two days in transit on top of the supplier's own day
+        when(supplierRegistry.get("Elko"))
+                .thenReturn(supplierShipping(new ShippingCostPolicy.FlatRate(1000, 18), 2));
+        when(view.findByEan(EAN)).thenReturn(offers(offer("Elko", 100.0, 5)));
+
+        // when
+        InventorySearchResult.Found found = (InventorySearchResult.Found) search.search(STORE_ID, EAN);
+
+        // then
+        OfferRow row = found.supplierOffers().get(0);
+        assertThat(row.deliveryNet()).isEqualTo(18.0);
+        assertThat(row.freeDeliveryFrom()).isEqualTo(1000.0);
+        assertThat(row.leadTimeDays()).isEqualTo(3);
+        assertThat(row.totalNet()).isEqualTo(118.0);
+        assertThat(row.deliveryKnown()).isTrue();
+    }
+
+    /** A cheaper unit price loses to a dearer one that ships for nothing; that is the whole point of the column. */
+    @Test
+    void cheapestOfferIsTheOneWithTheLowestDeliveredCostNotTheLowestPrice() {
+        // given
+        StoreSupplierConnection ab = mock(StoreSupplierConnection.class);
+        when(ab.getSupplierName()).thenReturn("AB");
+        when(ab.getMode()).thenReturn(ConnectionMode.GLOBAL);
+        when(store.getSupplierConnections()).thenReturn(List.of(ab));
+        when(supplierRegistry.get("Elko")).thenReturn(supplierShipping(new ShippingCostPolicy.FlatRate(5000, 30), 1));
+        when(supplierRegistry.get("AB")).thenReturn(supplierShipping(new ShippingCostPolicy.Free(), 1));
+        when(view.findByEan(EAN)).thenReturn(offers(offer("Elko", 100.0, 5), offer("AB", 110.0, 5)));
+
+        // when
+        InventorySearchResult.Found found = (InventorySearchResult.Found) search.search(STORE_ID, EAN);
+
+        // then -- AB leads the list and wins the marker at 110, Elko trails at 130 delivered
+        assertThat(found.supplierOffers()).extracting(OfferRow::supplier).containsExactly("AB", "Elko");
+        assertThat(found.supplierOffers().get(0).cheapest()).isTrue();
+        assertThat(found.supplierOffers().get(1).cheapest()).isFalse();
+        assertThat(found.prices().lowestGross()).isEqualTo(Price.fromNet(110.0).grossValue());
+        assertThat(found.prices().lowestDeliveredGross()).isEqualTo(Price.fromNet(110.0).grossValue());
+    }
+
+    /**
+     * The registry hands out a placeholder policy for suppliers it does not know. Showing that as a cost
+     * would put an invented number in front of someone deciding where to buy.
+     */
+    @Test
+    void supplierWithoutKnownTermsReportsNoShippingRatherThanThePlaceholder() {
+        // given
+        when(supplierRegistry.exists("Ghost")).thenReturn(false);
+        when(view.findByEan(EAN)).thenReturn(offers(offer("Ghost", 100.0, 5)));
+
+        // when
+        InventorySearchResult.Found found = (InventorySearchResult.Found) search.search(STORE_ID, EAN);
+
+        // then
+        OfferRow row = found.supplierOffers().get(0);
+        assertThat(row.deliveryKnown()).isFalse();
+        assertThat(row.hasLeadTime()).isFalse();
+        assertThat(row.totalNet()).isEqualTo(100.0);
+    }
+
+    /** Two connections of one supplier render the same name, so the rows say which codes they matched on. */
+    @Test
+    void offersRenderingUnderTheSameNameAreFlaggedAsAmbiguous() {
+        // given -- neither connection was given a label, so both fall back to the same identity shape
+        StoreSupplierConnection first = mock(StoreSupplierConnection.class);
+        when(first.getSupplierName()).thenReturn("AcmeB");
+        when(first.getMode()).thenReturn(ConnectionMode.OWN);
+        StoreSupplierConnection second = mock(StoreSupplierConnection.class);
+        when(second.getSupplierName()).thenReturn("AcmeB-k7f3a9c2");
+        when(second.getMode()).thenReturn(ConnectionMode.OWN);
+        when(second.getLabel()).thenReturn("AcmeB");
+        when(store.getSupplierConnections()).thenReturn(List.of(first, second));
+        when(view.findByEan(EAN)).thenReturn(offers(offer("AcmeB", 100.0, 5), offer("AcmeB-k7f3a9c2", 120.0, 5)));
+
+        // when
+        InventorySearchResult.Found found = (InventorySearchResult.Found) search.search(STORE_ID, EAN);
+
+        // then
+        assertThat(found.supplierOffers()).extracting(OfferRow::sharesLabel).containsExactly(true, true);
+    }
+
+    /** A doubtful match can win on price, so the summary has to say the headline figure is doubtful. */
+    @Test
+    void summaryFlagsTheCheapestOfferWhenItWasMatchedOnDifferentCodes() {
+        // given -- the cheapest row carries neither the searched EAN nor its code
+        when(view.findByEan(EAN)).thenReturn(offers(
+                offer("Elko", "5903000000002", "OTHER-CODE", 100.0, 5),
+                offer("Elko", EAN, MFN, 200.0, 5)));
+
+        // when
+        InventorySearchResult.Found found = (InventorySearchResult.Found) search.search(STORE_ID, EAN);
+
+        // then
+        assertThat(found.supplierOffers().get(0).codeMatch()).isEqualTo(CodeMatch.BOTH_DIFFER);
+        assertThat(found.prices().lowestIsUncertainMatch()).isTrue();
     }
 
     @Test

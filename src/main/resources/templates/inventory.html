@@ -13,7 +13,8 @@
          th:data-search-url="@{/dashboard/inventory/search}"
          th:data-page-url="@{/dashboard/inventory}"
          th:data-msg-load-error="#{inventory.load.error}"
-         th:data-msg-retry="#{inventory.retry}">
+         th:data-msg-retry="#{inventory.retry}"
+         th:data-selection="${selection != null} ? ${selection.token()} : ''">
 
         <header class="cl-page-header">
             <div class="cl-page-header-row">
@@ -23,7 +24,17 @@
             <p class="cl-page-lead" th:text="${superAdmin} ? #{inventory.tech.lead} : #{inventory.lead}"></p>
         </header>
 
-        <div th:replace="~{fragments/screen-intro :: panel('inventory', 'fas fa-cubes')}"></div>
+        <div th:replace="~{fragments/screen-intro :: panel(${superAdmin} ? 'inventory-tech' : 'inventory', ${superAdmin} ? 'fas fa-database' : 'fas fa-cubes')}"></div>
+
+        <div th:if="${selection != null}" class="cl-alert is-info cl-inv-selection" role="status">
+            <i class="fas fa-crosshairs cl-alert-icon" aria-hidden="true"></i>
+            <span class="cl-alert-text">
+                <strong th:text="#{inventory.select.title}"></strong>
+                <span th:text="#{inventory.select.order(${selection.orderId()})}"></span>
+                <span class="cl-inv-selection-lead" th:text="#{inventory.select.lead}"></span>
+            </span>
+            <a class="cl-button" th:href="${selection.cancelUrl()}" th:text="#{inventory.select.cancel}"></a>
+        </div>
 
         <section class="cl-inv-summary-slot" data-inventory-summary aria-busy="true"
                  th:attr="aria-label=#{inventory.summary.aria}">
@@ -45,6 +56,7 @@
             <h2 class="cl-visually-hidden" id="inventory-search-title" th:text="#{inventory.search.title}"></h2>
             <form class="cl-inv-search" th:action="@{/dashboard/inventory}" method="get" role="search"
                   data-inventory-search novalidate>
+                <input th:if="${selection != null}" type="hidden" name="for" th:value="${selection.token()}">
                 <label class="cl-visually-hidden" for="inventory-q" th:text="#{inventory.search.label}"></label>
                 <div class="cl-inv-search-field">
                     <span class="cl-inv-search-icon" aria-hidden="true"><i class="fas fa-search"></i></span>

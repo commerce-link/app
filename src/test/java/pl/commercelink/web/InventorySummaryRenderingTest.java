@@ -39,6 +39,7 @@ class InventorySummaryRenderingTest {
         context.setVariable("canManageSuppliers", canManageSuppliers);
         context.setVariable("manageSuppliersUrl", "/dashboard/store/suppliers");
         context.setVariable("warehouseUrl", "/dashboard/warehouse");
+        context.setVariable("connectionUrlPrefix", "/dashboard/store/suppliers/");
         return context;
     }
 
@@ -63,6 +64,43 @@ class InventorySummaryRenderingTest {
         assertThat(html).contains("Expand").contains("Collapse");
         assertThat(html).doesNotContain("All sources have a feed file").doesNotContain("Active suppliers:")
                 .doesNotContain(">Working<").doesNotContain("Open the warehouse").doesNotContain("cl-inv-sources-footer");
+    }
+
+    /**
+     * Each of these figures ends in a question the operator then wants to open; the "3 of 3" hint also
+     * says what the tile counts, so it no longer looks like it disagrees with the sources badge.
+     */
+    @Test
+    void supplierAndWarehouseTilesOpenThePagesBehindTheirFigures() {
+        // given
+        InventorySourcesView sources = new InventorySourcesView(List.of(), List.of(working("AB")), 2, 3, false);
+
+        // when
+        String summary = engine.process(SUMMARY, context(sources, true));
+        Context warehouse = context(sources, true);
+        warehouse.setVariable("externalWarehouse", false);
+        warehouse.setVariable("warehouseSummary", new StockSummary(16, 52, 0));
+        String tile = engine.process(WAREHOUSE, warehouse);
+
+        // then
+        assertThat(summary).contains("cl-stat-link").contains("connections enabled");
+        assertThat(tile).contains("cl-stat-link").contains("href=\"/dashboard/warehouse\"");
+        assertThat(summary + tile).doesNotContain("??");
+    }
+
+    /** A source that looks wrong is worth opening; the row is the shortest way to its settings. */
+    @Test
+    void aSourceRowLinksToItsOwnConnectionForAdminOnly() {
+        // given
+        InventorySourcesView sources = new InventorySourcesView(List.of(), List.of(working("Elko")), 2, 3, false);
+
+        // when
+        String admin = engine.process(SUMMARY, context(sources, true));
+        String user = engine.process(SUMMARY, context(sources, false));
+
+        // then
+        assertThat(admin).contains("href=\"/dashboard/store/suppliers/Elko\"").contains("cl-inv-source-link");
+        assertThat(user).doesNotContain("cl-inv-source-link").contains("Elko");
     }
 
     @Test

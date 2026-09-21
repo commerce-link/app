@@ -479,6 +479,7 @@
 }
 
 .cl-inv-price-summary b {
+    white-space: nowrap;
     font-weight: 650;
     font-variant-numeric: tabular-nums;
     color: var(--cl-ink);
@@ -520,11 +521,27 @@
 }
 
 .cl-inv-col-price {
-    width: 190px;
+    width: 150px;
+}
+
+.cl-inv-col-delivery {
+    width: 130px;
+}
+
+.cl-inv-col-total {
+    width: 140px;
 }
 
 .cl-inv-col-qty {
-    width: 130px;
+    width: 110px;
+}
+
+.cl-inv-col-lead {
+    width: 90px;
+}
+
+.cl-inv-col-pick {
+    width: 116px;
 }
 
 .cl-inv-page .cl-table td .cl-status,
@@ -594,9 +611,69 @@
     background: var(--cl-ok-tint);
 }
 
-.cl-inv-page .cl-inv-offer.is-cheapest .cl-inv-price {
+.cl-inv-page .cl-inv-offer.is-cheapest .cl-inv-total-cell .cl-inv-price {
     font-weight: 700;
     color: var(--cl-ok);
+}
+
+/* Secondary figure under a price: the gross equivalent, or the order value that makes shipping free. */
+.cl-inv-price-alt {
+    display: block;
+    margin-top: 2px;
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--cl-ink-2);
+}
+
+/* The headline price names one offer; when that offer is a doubtful match the caveat sits with it. */
+.cl-inv-page .cl-inv-summary-warning {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin: 0 0 4px;
+    color: var(--cl-warn);
+    font-size: 13px;
+}
+
+.cl-inv-page .cl-inv-summary-warning svg {
+    flex: 0 0 auto;
+    margin-top: 2px;
+}
+
+.cl-inv-page .cl-inv-selection {
+    align-items: flex-start;
+    margin-bottom: 12px;
+}
+
+.cl-inv-page .cl-inv-selection .cl-alert-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.cl-inv-page .cl-inv-selection-lead {
+    font-weight: 400;
+    color: var(--cl-ink-2);
+}
+
+.cl-inv-page .cl-inv-pick-cell {
+    text-align: right;
+}
+
+.cl-inv-page .cl-inv-pick {
+    width: 100%;
+}
+
+.cl-inv-page .cl-inv-source-link {
+    color: inherit;
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+}
+
+.cl-inv-page .cl-inv-source-link:hover,
+.cl-inv-page .cl-inv-source-link:focus-visible {
+    color: var(--cl-accent-ink);
+    border-bottom-color: currentColor;
 }
 
 .cl-inv-page .cl-inv-offer.is-dim td,
@@ -631,11 +708,23 @@
     }
 
     .cl-inv-col-price {
-        width: 175px;
+        width: 130px;
+    }
+
+    .cl-inv-col-delivery {
+        width: 112px;
+    }
+
+    .cl-inv-col-total {
+        width: 124px;
     }
 
     .cl-inv-col-qty {
-        width: 110px;
+        width: 96px;
+    }
+
+    .cl-inv-col-lead {
+        width: 78px;
     }
 
     .cl-inv-clear {
@@ -673,8 +762,10 @@
         flex-basis: 100%;
     }
 
+    /* the delivered price made these segments too long to hold on one line at 390px */
     .cl-inv-price-summary > span {
         flex-basis: 100%;
+        white-space: normal;
     }
 
     .cl-inv-price-summary > span:not(:last-child)::after {
@@ -704,15 +795,26 @@
         clip: auto;
     }
 
-    /* wraps rather than clips: at 320px the three labels do not fit on one line */
+    /* Once the offers are cards the header row is no longer a header, so it says what it now is and its
+       buttons look like buttons: a bare row of column names read as a broken fragment above the first
+       card, and nothing suggested the labels could be tapped. */
     .cl-inv-page .cl-inv-offers thead tr {
         display: flex;
         align-items: center;
         flex-wrap: wrap;
-        gap: 0 16px;
-        padding: 0;
+        gap: 8px;
+        padding: 10px 16px;
         background: var(--cl-surface-2);
         border-top: 1px solid var(--cl-line);
+    }
+
+    .cl-inv-page .cl-inv-offers thead tr::before {
+        content: attr(data-sort-label);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: .06em;
+        text-transform: uppercase;
+        color: var(--cl-ink-2);
     }
 
     .cl-inv-page .cl-inv-offers thead th {
@@ -722,67 +824,82 @@
         background: none;
     }
 
-    .cl-inv-page .cl-inv-offers thead th:first-child {
-        flex: 1 1 auto;
-        padding: 10px 0 10px 16px;
-    }
-
-    /* a wrapped label keeps the row's left inset instead of hanging under the sort buttons */
-    .cl-inv-page .cl-inv-offers thead th:not(:first-child) {
-        padding-block: 0 10px;
-    }
-
-    .cl-inv-page .cl-inv-offers thead th:last-child {
-        padding-right: 16px;
+    /* the source column and the pick column have nothing to sort by */
+    .cl-inv-page .cl-inv-offers thead th:first-child,
+    .cl-inv-page .cl-inv-offers thead th.cl-inv-pick-head {
+        display: none;
     }
 
     .cl-inv-page .cl-inv-offers thead .cl-table-sort {
         min-height: 44px;
+        padding: 0 10px;
+        border: 1px solid var(--cl-line);
+        border-radius: 999px;
+        background: var(--cl-surface);
+        font-size: 12px;
+        text-transform: none;
+        letter-spacing: 0;
+    }
+
+    .cl-inv-page .cl-inv-offers thead th[aria-sort="ascending"] .cl-table-sort,
+    .cl-inv-page .cl-inv-offers thead th[aria-sort="descending"] .cl-table-sort {
+        border-color: var(--cl-accent);
+    }
+
+    /* the marker sits outside the button on a wide table; inside the chip it would fall off the edge */
+    .cl-inv-page .cl-inv-offers thead .cl-table-sort::after {
+        position: static;
+        margin: 0 0 0 6px;
     }
 
     .cl-inv-page .cl-inv-offers tr.cl-inv-offer {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
-        gap: 2px 12px;
+        display: block;
         padding: 12px 16px;
         border-top: 1px solid var(--cl-line);
     }
 
+    /* label on the left, figure on the right: six columns only stay readable when each one says what it is */
     .cl-inv-page .cl-inv-offers tr.cl-inv-offer td {
-        display: block;
-        padding: 0;
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 0 12px;
+        padding: 2px 0;
         border: 0;
         background: none;
+        text-align: right;
+    }
+
+    /* the gross price and the free-shipping threshold take their own line under the figure they explain */
+    .cl-inv-page .cl-inv-offers tr.cl-inv-offer td .cl-inv-price-alt {
+        flex: 1 0 100%;
+        text-align: right;
+    }
+
+    .cl-inv-page .cl-inv-offers tr.cl-inv-offer td[data-label]::before {
+        content: attr(data-label);
+        flex: 0 0 auto;
+        color: var(--cl-ink-2);
+        font-size: 13px;
+        font-weight: 400;
         text-align: left;
     }
 
-    .cl-inv-page .cl-inv-offers tr.cl-inv-offer td::before {
-        content: none;
-    }
-
     .cl-inv-page .cl-inv-offers tr.cl-inv-offer td.cl-inv-source-cell {
-        display: contents;
-    }
-
-    .cl-inv-page .cl-inv-offers .cl-inv-source-name {
-        grid-column: 1;
-        grid-row: 1 / span 2;
+        display: block;
+        margin-bottom: 6px;
+        text-align: left;
     }
 
     .cl-inv-page .cl-inv-offers .cl-inv-code-info,
     .cl-inv-page .cl-inv-offers .cl-inv-code-warning {
-        grid-column: 1 / -1;
-        grid-row: 3;
+        margin-top: 2px;
     }
 
-    .cl-inv-page .cl-inv-offers tr.cl-inv-offer td.cl-inv-price-cell {
-        grid-column: 2;
-        grid-row: 1;
-    }
-
-    .cl-inv-page .cl-inv-offers tr.cl-inv-offer td.cl-inv-qty-cell {
-        grid-column: 2;
-        grid-row: 2;
+    .cl-inv-page .cl-inv-offers tr.cl-inv-offer td.cl-inv-pick-cell {
+        display: block;
+        margin-top: 10px;
     }
 
     .cl-inv-page .cl-inv-offers tr.cl-inv-offer.is-cheapest {

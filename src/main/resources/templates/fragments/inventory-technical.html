@@ -12,11 +12,13 @@
         <li class="cl-stat">
             <span class="cl-eyebrow" th:text="#{inventory.tech.taxonomy}"></span>
             <span class="cl-stat-value" th:text="${#numbers.formatInteger(technical.taxonomySize(), 1, 'WHITESPACE')}"></span>
+            <span class="cl-stat-hint" th:text="#{inventory.tech.taxonomy.hint}"></span>
             <span class="cl-stat-hint cl-inv-break" th:text="${technical.taxonomyFileName()}"></span>
         </li>
         <li class="cl-stat">
             <span class="cl-eyebrow" th:text="#{inventory.tech.pim}"></span>
             <span class="cl-stat-value" th:text="${#numbers.formatInteger(technical.pimIndexSize(), 1, 'WHITESPACE')}"></span>
+            <span class="cl-stat-hint" th:text="#{inventory.tech.pim.hint}"></span>
         </li>
     </ul>
 

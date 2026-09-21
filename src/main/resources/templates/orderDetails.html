@@ -435,6 +435,10 @@
                                            th:text="#{order.item.quick.assign}"></a>
                                         <span th:unless="${item.isNew() and !item.group}" class="dropdown-item has-text-grey-light" style="cursor: not-allowed;"
                                               th:text="#{order.item.quick.assign}"></span>
+                                        <!-- the same assignment, but made from the offers side by side instead of typed in -->
+                                        <a th:if="${item.isNew() and !item.group and !isSuperAdmin}" class="dropdown-item"
+                                           th:href="@{/dashboard/inventory(q=${!#strings.isEmpty(item.ean) ? item.ean : item.manufacturerCode}, for='order:' + ${order.orderId} + ':' + ${item.itemId})}"
+                                           th:text="#{order.item.pick.from.inventory}"></a>
                                         <a th:if="${item.isNew() and !item.group}" class="dropdown-item"
                                            href="#"
                                            th:attr="data-item-id=${item.itemId},data-sku=${item.sku},data-name=${item.name},data-category=${item.category},data-qty=${item.qty},data-price=${item.price}"

@@ -117,6 +117,74 @@ class InventoryScriptContractTest {
                 .doesNotContain("899px").doesNotContain("900px");
     }
 
+    /**
+     * A marker that only appears on hover cannot be discovered on a touch screen, where the offers table
+     * is exactly the place someone wants to reorder by price.
+     */
+    @Test
+    void sortableHeadersShowTheirMarkerWithoutHovering() throws Exception {
+        // given
+        String shared = read("src/main/resources/static/css/commercelink.css");
+        String sortMarker = shared.substring(shared.indexOf(".cl-page .cl-table-sort::after"));
+        sortMarker = sortMarker.substring(0, sortMarker.indexOf("}"));
+
+        // when / then
+        assertThat(sortMarker).contains("opacity: .3").doesNotContain("opacity: 0;");
+    }
+
+    /**
+     * The panel used to collapse by animating a fixed max-height, which cut the dismiss button off on a
+     * phone whenever the copy wrapped past it.
+     */
+    @Test
+    void screenIntroCollapsesWithoutAHeightCeilingAndStaysHideable() throws Exception {
+        // given
+        String fragment = read("src/main/resources/templates/fragments/screen-intro.html");
+
+        // when / then
+        assertThat(fragment).doesNotContain("max-height: 640px")
+                .contains("grid-template-rows: 1fr").contains("grid-template-rows: 0fr")
+                // `display: grid` outranks the user-agent rule for the attribute
+                .contains(".screen-intro[hidden]");
+    }
+
+    /** Six columns only stay readable on a phone when each figure says what it is. */
+    @Test
+    void offersBecomeLabelledCardsWithAnExplicitSortBarOnAPhone() throws Exception {
+        // given
+        String css = read("src/main/resources/static/css/inventory.css");
+        String template = read("src/main/resources/templates/fragments/inventory-results.html");
+
+        // when / then
+        assertThat(css).contains("td[data-label]::before").contains("content: attr(data-label)")
+                .contains("content: attr(data-sort-label)");
+        assertThat(template).contains("data-sort-label=#{inventory.table.sortBy}")
+                .contains("data-label=#{inventory.table.delivery}").contains("data-label=#{inventory.table.total}");
+    }
+
+    @Test
+    void offersTableReservesAColumnForEveryFigureItCompares() throws Exception {
+        // given
+        String css = read("src/main/resources/static/css/inventory.css");
+
+        // when / then
+        assertThat(css).contains(".cl-inv-col-delivery {").contains(".cl-inv-col-total {")
+                .contains(".cl-inv-col-lead {").contains(".cl-inv-col-pick {");
+    }
+
+    /** Searching again, or pressing back, must not silently drop the order the page was opened for. */
+    @Test
+    void selectionModeSurvivesEveryNavigationOfThePage() throws Exception {
+        // given
+        String script = read("src/main/resources/static/js/inventory.js");
+        String page = read("src/main/resources/templates/inventory.html");
+
+        // when / then
+        assertThat(page).contains("th:data-selection=").contains("type=\"hidden\" name=\"for\"");
+        assertThat(script).contains("page.dataset.selection").contains("'&for=' + encodeURIComponent(selection)")
+                .contains("selectionParam()");
+    }
+
     @Test
     void styleSheetForcesHiddenElementsToStayHidden() throws Exception {
         // given

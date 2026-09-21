@@ -12,6 +12,7 @@ import pl.commercelink.inventory.search.ProductHeader;
 import pl.commercelink.inventory.search.WarehouseRow;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.warehouse.api.ItemCondition;
+import pl.commercelink.web.inventory.OfferSelection;
 
 import java.util.List;
 
@@ -31,6 +32,7 @@ class InventoryResultsRenderingTest {
         context.setVariable("canManageSuppliers", canManageSuppliers);
         context.setVariable("manageSuppliersUrl", "/dashboard/store/suppliers");
         context.setVariable("warehouseUrl", "/dashboard/warehouse");
+        context.setVariable("selection", null);
         return context;
     }
 
@@ -40,14 +42,25 @@ class InventoryResultsRenderingTest {
 
     private InventorySearchResult.Found found(boolean warehouseChecked) {
         return new InventorySearchResult.Found(MatchedBy.EAN, PRODUCT,
-                List.of(new OfferRow("manual-nowak", "Hurtownia Nowak", ConnectionMode.MANUAL, "5903000000000", "910-006559", 389.0, 12, true, CodeMatch.EAN_DIFFERS),
-                        new OfferRow("AB", "AB", ConnectionMode.GLOBAL, "5901234123457", "910-006559", 405.0, 80, false, CodeMatch.SAME),
-                        new OfferRow("HurtPol", "Hurt-Pol", ConnectionMode.MANUAL, "5900000000099", "MXM3S-BOX", 412.0, 4, false, CodeMatch.BOTH_DIFFER),
-                        new OfferRow("Elko", "Elko", ConnectionMode.GLOBAL, "5901234123457", "910-OTHER", 379.0, 0, false, CodeMatch.CODE_DIFFERS)),
-                List.of(new WarehouseRow("5901234123457", "910-006559", 355.2, 3, false, ItemCondition.Sealed, CodeMatch.SAME),
-                        new WarehouseRow("5901234123457", "910-006559", 349.0, 2, true, ItemCondition.Damaged, CodeMatch.SAME)),
-                new PriceSummary(389.0, 405.0, 3, 96, 3, 2),
+                List.of(offer("manual-nowak", "Hurtownia Nowak", ConnectionMode.MANUAL, "5903000000000", "910-006559",
+                                389.0, 478.47, 0, 0, true, 3, 12, true, false, CodeMatch.EAN_DIFFERS),
+                        offer("AB", "AB", ConnectionMode.GLOBAL, "5901234123457", "910-006559",
+                                405.0, 498.15, 18.0, 1000.0, true, 2, 80, false, false, CodeMatch.SAME),
+                        offer("HurtPol", "Hurt-Pol", ConnectionMode.MANUAL, "5900000000099", "MXM3S-BOX",
+                                412.0, 506.76, 0, 0, true, 5, 4, false, false, CodeMatch.BOTH_DIFFER),
+                        offer("Elko", "Elko", ConnectionMode.GLOBAL, "5901234123457", "910-OTHER",
+                                379.0, 466.17, 0, 0, false, 0, 0, false, false, CodeMatch.CODE_DIFFERS)),
+                List.of(new WarehouseRow("5901234123457", "910-006559", 288.78, 355.2, 3, false, ItemCondition.Sealed, CodeMatch.SAME),
+                        new WarehouseRow("5901234123457", "910-006559", 283.74, 349.0, 2, true, ItemCondition.Damaged, CodeMatch.SAME)),
+                new PriceSummary(478.47, 478.47, 498.15, 3, 96, 3, 2, false),
                 warehouseChecked);
+    }
+
+    private static OfferRow offer(String supplier, String label, ConnectionMode mode, String ean, String code,
+                                  double net, double gross, double delivery, double freeFrom, boolean deliveryKnown,
+                                  int leadDays, int qty, boolean cheapest, boolean sharesLabel, CodeMatch match) {
+        return new OfferRow(supplier, label, mode, ean, code, net, gross, delivery, freeFrom, deliveryKnown,
+                leadDays, qty, cheapest, sharesLabel, match);
     }
 
     @Test
@@ -62,14 +75,47 @@ class InventoryResultsRenderingTest {
         assertThat(html.split("data-inventory-sortable", -1)).hasSize(2);
         assertThat(html.split("<tbody", -1)).hasSize(2);
         assertThat(html.indexOf("is-warehouse")).isLessThan(html.indexOf("Hurtownia Nowak"));
-        assertThat(html).contains("data-sort-price=\"355.2\"").contains("data-sort-qty=\"3\"").doesNotContain("data-sort-source");
-        assertThat(html).contains("Source</th>").contains("Gross purchase price").contains(">Available<");
-        assertThat(html).doesNotContain("Your warehouse").doesNotContain("Delivery").doesNotContain("purchase cost")
+        assertThat(html).contains("data-sort-price=\"288.78\"").contains("data-sort-qty=\"3\"").doesNotContain("data-sort-source");
+        assertThat(html).contains("Source</th>").contains("Purchase price").contains(">Available<");
+        assertThat(html).doesNotContain("Your warehouse").doesNotContain("purchase cost")
                 .doesNotContain("Manufacturer code").doesNotContain("%");
-        assertThat(html).contains("in transit").contains("Damaged").contains("355,20 PLN").contains("80 pcs")
+        assertThat(html).contains("in transit").contains("Damaged").contains("288,78 PLN").contains("355,20 gross").contains("80 pcs")
                 .contains("cl-status is-neutral\">none<");
         assertThat(html).contains("<colgroup>").doesNotContain("cl-inv-figure");
         assertThat(html).contains("global").contains("manual");
+    }
+
+    /** Two offers a few zloty apart are decided by shipping, so the table has to show it next to the price. */
+    @Test
+    void everyOfferShowsNetAndGrossPriceDeliveryTotalPerUnitAndLeadTime() {
+        // when
+        String html = engine.process(RESULTS, context(found(), true));
+
+        // then
+        assertThat(html).contains(">Delivery<").contains(">Total / pc<").contains(">Time<");
+        assertThat(html).contains("389,00 PLN").contains("478,47 gross")
+                .contains("18,00 PLN").contains("free above 1 000 PLN").contains("free")
+                .contains("423,00 PLN")
+                .contains("3 days").contains("2 days");
+        assertThat(html).contains("data-sort-delivery=\"18.0\"").contains("data-sort-total=\"423.0\"")
+                .contains("data-sort-lead=\"2\"");
+        // the warehouse is already here: nothing to ship and nothing to wait for
+        assertThat(html).contains("already yours").contains("on hand");
+    }
+
+    /**
+     * The registry answers for an unknown supplier with a placeholder policy; printing that as a cost would
+     * be inventing a number the operator could act on.
+     */
+    @Test
+    void deliveryAndLeadTimeStayBlankForASupplierWithoutKnownTerms() {
+        // when
+        String html = engine.process(RESULTS, context(found(), true));
+
+        // then
+        String elko = html.substring(html.indexOf("Elko"));
+        assertThat(elko).contains("no data");
+        assertThat(html).contains("data-sort-delivery=\"999999999\"").contains("data-sort-lead=\"999999999\"");
     }
 
     @Test
@@ -80,7 +126,7 @@ class InventoryResultsRenderingTest {
         // then
         assertThat(html.split("is-cheapest", -1)).hasSize(2);
         assertThat(html.split("cl-inv-check", -1)).hasSize(2);
-        assertThat(html).contains("cl-visually-hidden\">lowest price<").doesNotContain("Cheapest");
+        assertThat(html).contains("cl-visually-hidden\">lowest delivered cost<").doesNotContain("Cheapest");
     }
 
     @Test
@@ -90,18 +136,73 @@ class InventoryResultsRenderingTest {
 
         // then
         String summary = html.substring(html.indexOf("data-inventory-price-summary"), html.indexOf("data-inventory-offers"));
-        assertThat(summary).contains("From").contains("389,00 PLN").contains("at suppliers").contains("96 pcs")
+        assertThat(summary).contains("From").contains("478,47 PLN").contains("at suppliers").contains("96 pcs")
                 .contains("3 pcs").contains("in the warehouse").contains("2 pcs").contains("in transit")
                 .doesNotContain("Nowak").doesNotContain("median");
+    }
+
+    /** Shipping only earns a second figure in the headline when it actually moves the number. */
+    @Test
+    void summaryAddsTheDeliveredPriceOnlyWhenDeliveryCostsAnything() {
+        // given
+        InventorySearchResult.Found shipped = new InventorySearchResult.Found(MatchedBy.EAN, PRODUCT, List.of(), List.of(),
+                new PriceSummary(478.47, 500.61, 0, 1, 10, 0, 0, false), true);
+
+        // when
+        String withShipping = engine.process(RESULTS, context(shipped, true));
+        String withoutShipping = engine.process(RESULTS, context(found(), true));
+
+        // then
+        assertThat(withShipping).contains("with delivery").contains("500,61 PLN");
+        assertThat(withoutShipping).doesNotContain("with delivery");
+    }
+
+    /**
+     * The headline figure names one offer. When that offer was matched on different codes the caveat has to
+     * travel with it, or the number is read as a firm price.
+     */
+    @Test
+    void summaryWarnsWhenTheCheapestOfferIsADoubtfulMatch()  {
+        // given
+        InventorySearchResult.Found doubtful = new InventorySearchResult.Found(MatchedBy.EAN, PRODUCT, List.of(), List.of(),
+                new PriceSummary(290.03, 290.03, 0, 1, 50, 0, 0, true), true);
+
+        // when
+        String warned = engine.process(RESULTS, context(doubtful, true));
+        String plain = engine.process(RESULTS, context(found(), true));
+
+        // then
+        assertThat(warned).contains("cl-inv-summary-warning").contains("matched on a different EAN and code");
+        assertThat(plain).doesNotContain("cl-inv-summary-warning");
+    }
+
+    /** Two connections of one supplier render the same name; then only the codes tell the rows apart. */
+    @Test
+    void offersSharingALabelPrintTheirOwnCodes() {
+        // given
+        InventorySearchResult.Found twins = new InventorySearchResult.Found(MatchedBy.EAN, PRODUCT,
+                List.of(offer("AcmeB", "AcmeB", ConnectionMode.OWN, "5901234123457", "910-006559",
+                                290.03, 356.74, 0, 0, true, 2, 50, true, true, CodeMatch.SAME),
+                        offer("AcmeB-k7f3a9c2", "AcmeB", ConnectionMode.OWN, "5901234123457", "910-006559",
+                                393.47, 483.97, 0, 0, true, 2, 10, false, true, CodeMatch.SAME)),
+                List.of(), new PriceSummary(356.74, 356.74, 0, 2, 60, 0, 0, false), true);
+
+        // when
+        String html = engine.process(RESULTS, context(twins, true));
+        String plain = engine.process(RESULTS, context(found(), true));
+
+        // then
+        assertThat(html.split("Codes of this offer:", -1)).hasSize(3);
+        assertThat(plain).doesNotContain("Codes of this offer:");
     }
 
     @Test
     void summaryShowsTheMedianFromFourOffersAndNoPriceWhenNothingIsInStock() {
         // given
         InventorySearchResult.Found withMedian = new InventorySearchResult.Found(MatchedBy.EAN, PRODUCT, List.of(), List.of(),
-                new PriceSummary(389.0, 410.5, 4, 40, 0, 0), true);
+                new PriceSummary(389.0, 389.0, 410.5, 4, 40, 0, 0, false), true);
         InventorySearchResult.Found withoutStock = new InventorySearchResult.Found(MatchedBy.EAN, PRODUCT, List.of(), List.of(),
-                new PriceSummary(0, 0, 0, 0, 0, 0), true);
+                new PriceSummary(0, 0, 0, 0, 0, 0, 0, false), true);
 
         // when
         String median = engine.process(RESULTS, context(withMedian, true));
@@ -125,6 +226,36 @@ class InventoryResultsRenderingTest {
         assertThat(html.split("cl-inv-code-info", -1)).hasSize(3);
         assertThat(html.split("cl-inv-code-warning", -1)).hasSize(2);
         assertThat(html).doesNotContain(">5901234123457</code>");
+    }
+
+    /** The page opened from an order item hands the chosen offer straight back to it. */
+    @Test
+    void selectionModeAddsAChooseButtonCarryingTheOfferToTheOrderItem() {
+        // given
+        Context context = context(found(), true);
+        context.setVariable("selection", new OfferSelection("ORD-7", "item-3"));
+
+        // when
+        String html = engine.process(RESULTS, context);
+
+        // then
+        assertThat(html).contains("action=\"/dashboard/orders/ORD-7/assign-supplier\"")
+                .contains("name=\"itemId\" value=\"item-3\"")
+                .contains("name=\"supplier\" value=\"manual-nowak\"")
+                .contains("name=\"cost\" value=\"389.0\"")
+                .contains("name=\"manufacturerCode\" value=\"910-006559\"")
+                .contains(">Choose<");
+        // an offer nobody can deliver, and the warehouse row, are not something to assign
+        assertThat(html.split(">Choose<", -1)).hasSize(4);
+    }
+
+    @Test
+    void withoutTheSelectionParameterTheTableHasNoActionColumn() {
+        // when
+        String html = engine.process(RESULTS, context(found(), true));
+
+        // then
+        assertThat(html).doesNotContain("assign-supplier").doesNotContain(">Choose<").doesNotContain("cl-inv-col-pick");
     }
 
     @Test

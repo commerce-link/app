@@ -27,6 +27,7 @@ public class InventoryPageController {
 
     static final int MIN_QUERY_LENGTH = 3;
     static final String MANAGE_SUPPLIERS_URL = "/dashboard/store/suppliers";
+    static final String CONNECTION_URL_PREFIX = MANAGE_SUPPLIERS_URL + "/";
     static final String WAREHOUSE_URL = "/dashboard/warehouse";
     private static final String PAGE_PATH = "/dashboard/inventory";
 
@@ -38,8 +39,10 @@ public class InventoryPageController {
     private final TechnicalInventoryViewFactory technicalViewFactory;
 
     @GetMapping(PAGE_PATH)
-    public String page(@RequestParam(value = "q", required = false) String q, Model model) {
+    public String page(@RequestParam(value = "q", required = false) String q,
+                       @RequestParam(value = "for", required = false) String selection, Model model) {
         addCommonAttributes(model);
+        addSelection(selection, model);
         String query = normalize(q);
         model.addAttribute("query", query);
         if (!query.isEmpty()) {
@@ -79,8 +82,11 @@ public class InventoryPageController {
     }
 
     @GetMapping(PAGE_PATH + "/search")
-    public String search(@RequestParam(value = "q", required = false) String q, Model model, HttpServletResponse response) {
+    public String search(@RequestParam(value = "q", required = false) String q,
+                         @RequestParam(value = "for", required = false) String selection,
+                         Model model, HttpServletResponse response) {
         addCommonAttributes(model);
+        addSelection(selection, model);
         String query = normalize(q);
         model.addAttribute("query", query);
         if (!addSearchResult(query, model)) {
@@ -115,11 +121,20 @@ public class InventoryPageController {
         return true;
     }
 
+    /**
+     * Picking a source is only meaningful for someone who owns the order; the super admin's search spans
+     * every store and has nothing to assign it to.
+     */
+    private void addSelection(String value, Model model) {
+        model.addAttribute("selection", isSuperAdmin() ? null : OfferSelection.parse(value));
+    }
+
     private void addCommonAttributes(Model model) {
         model.addAttribute("superAdmin", isSuperAdmin());
         model.addAttribute("canManageSuppliers", CustomSecurityContext.hasRole("ADMIN"));
         model.addAttribute("manageSuppliersUrl", MANAGE_SUPPLIERS_URL);
         model.addAttribute("warehouseUrl", WAREHOUSE_URL);
+        model.addAttribute("connectionUrlPrefix", CONNECTION_URL_PREFIX);
     }
 
     private static boolean isSuperAdmin() {
