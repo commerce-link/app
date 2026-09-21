@@ -8,13 +8,16 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.MessageSource;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.server.ResponseStatusException;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.CategoryDefinitionType;
+import pl.commercelink.products.PimCategoryOptions;
 import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogDetailsService;
@@ -23,6 +26,7 @@ import pl.commercelink.products.ProductRepository;
 import pl.commercelink.starter.security.model.CustomUser;
 import pl.commercelink.web.catalog.CatalogAccess;
 import pl.commercelink.web.catalog.CatalogRow;
+import pl.commercelink.web.catalog.CategoryRow;
 import pl.commercelink.web.dtos.CatalogSettingsForm;
 
 import java.util.List;
@@ -61,6 +65,10 @@ class CatalogsControllerTest {
     private CatalogAccess access;
     @Mock
     private ProductRepository productRepository;
+    @Mock
+    private PimCategoryOptions pimCategoryOptions;
+    @Mock
+    private MarketplaceConnections marketplaces;
 
     private MockMvc mvc;
 
@@ -70,8 +78,9 @@ class CatalogsControllerTest {
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(user, null, List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))));
         lenient().when(messageSource.getMessage(eq("catalog.schedule.default"), any(), any(Locale.class))).thenReturn("default");
-        mvc = MockMvcBuilders.standaloneSetup(
-                new CatalogsController(catalogRepository, messageSource, detailsService, access, productRepository)).build();
+        lenient().when(marketplaces.displayName(anyString())).thenAnswer(invocation -> invocation.getArgument(0));
+        mvc = MockMvcBuilders.standaloneSetup(new CatalogsController(catalogRepository, messageSource, detailsService,
+                access, productRepository, pimCategoryOptions, marketplaces)).build();
     }
 
     @AfterEach
@@ -266,5 +275,69 @@ class CatalogsControllerTest {
         mvc.perform(get("/dashboard/catalogs/c1/delete")).andExpect(redirectedUrl("/dashboard/catalogs/c1/settings"))
                 .andExpect(flash().attribute("catalogError", "protected"));
         verify(productRepository, never()).findAll(any(ProductCatalog.class));
+    }
+
+    @Test
+    void catalogPageListsCategoriesInSequenceOrderWithProductCounts() throws Exception {
+        // given
+        ProductCatalog catalog = new ProductCatalog(STORE_ID, "Parts");
+        CategoryDefinition cpu = new CategoryDefinition().withName("CPU").withGeneratedId().withSequenceNumber(2);
+        CategoryDefinition gpu = new CategoryDefinition().withName("GPU").withGeneratedId().withSequenceNumber(1);
+        catalog.getCategories().addAll(List.of(cpu, gpu));
+        when(access.requireCatalog(STORE_ID, "c1")).thenReturn(catalog);
+        when(pimCategoryOptions.namesOf(any())).thenReturn(List.of());
+        when(productRepository.findAll(gpu.getCategoryId()))
+                .thenReturn(List.of(new Product(gpu.getCategoryId(), "p", "1", "m", "b", "l", "n", "Default")));
+        when(productRepository.findAll(cpu.getCategoryId())).thenReturn(List.of());
+
+        // when
+        var result = mvc.perform(get("/dashboard/catalogs/c1")).andExpect(status().isOk())
+                .andExpect(view().name("catalog/catalog")).andReturn();
+
+        // then
+        @SuppressWarnings("unchecked")
+        List<CategoryRow> rows = (List<CategoryRow>) result.getModelAndView().getModel().get("categories");
+        assertThat(rows).extracting(CategoryRow::name).containsExactly("GPU", "CPU");
+        assertThat(rows.get(0).productsCount()).isEqualTo(1);
+        assertThat(result.getModelAndView().getModel().get("productsTotal")).isEqualTo(1);
+    }
+
+    @Test
+    void anAutomaticCategoryIsNotCountedAgainstTheProductsTable() throws Exception {
+        // given
+        ProductCatalog catalog = new ProductCatalog(STORE_ID, "Parts");
+        CategoryDefinition os = new CategoryDefinition().withName("OS").withGeneratedId();
+        os.setType(CategoryDefinitionType.Dynamic);
+        catalog.getCategories().add(os);
+        when(access.requireCatalog(STORE_ID, "c1")).thenReturn(catalog);
+        when(pimCategoryOptions.namesOf(any())).thenReturn(List.of());
+
+        // when
+        var result = mvc.perform(get("/dashboard/catalogs/c1")).andExpect(status().isOk()).andReturn();
+
+        // then
+        assertThat(result.getModelAndView().getModel().get("productsTotal")).isEqualTo(0);
+        verify(productRepository, never()).findAll(anyString());
+    }
+
+    @Test
+    void theCatalogPageLinksToItsSettingsAndTheNewCategory() throws Exception {
+        // given
+        when(access.requireCatalog(STORE_ID, "c1")).thenReturn(new ProductCatalog(STORE_ID, "Parts"));
+
+        // when / then
+        mvc.perform(get("/dashboard/catalogs/c1")).andExpect(status().isOk())
+                .andExpect(model().attribute("settingsHref", "/dashboard/catalogs/c1/settings"))
+                .andExpect(model().attribute("addCategoryHref", "/dashboard/catalogs/c1/category/new"))
+                .andExpect(model().attribute("scheduleText", "default"));
+    }
+
+    @Test
+    void unknownCatalogIs404() throws Exception {
+        // given
+        when(access.requireCatalog(STORE_ID, "nope")).thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND));
+
+        // when / then
+        mvc.perform(get("/dashboard/catalogs/nope")).andExpect(status().isNotFound());
     }
 }

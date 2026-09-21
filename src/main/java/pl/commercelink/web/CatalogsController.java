@@ -15,6 +15,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.inventory.supplier.ErrorMessage;
+import pl.commercelink.products.CategoryDefinition;
+import pl.commercelink.products.CategoryDefinitionType;
+import pl.commercelink.products.PimCategoryOptions;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogDetailsService;
 import pl.commercelink.products.ProductCatalogRepository;
@@ -26,6 +29,7 @@ import pl.commercelink.starter.util.UniqueIdentifierGenerator;
 import pl.commercelink.web.catalog.CatalogAccess;
 import pl.commercelink.web.catalog.CatalogPaths;
 import pl.commercelink.web.catalog.CatalogRow;
+import pl.commercelink.web.catalog.CategoryRow;
 import pl.commercelink.web.dtos.CatalogSettingsForm;
 import pl.commercelink.web.settings.ConfirmAction;
 import pl.commercelink.web.settings.SettingsFlash;
@@ -57,6 +61,8 @@ public class CatalogsController {
     private final ProductCatalogDetailsService detailsService;
     private final CatalogAccess access;
     private final ProductRepository productRepository;
+    private final PimCategoryOptions pimCategoryOptions;
+    private final MarketplaceConnections marketplaces;
 
     @GetMapping("/dashboard/catalogs")
     public String catalogs(Model model, Locale locale) {
@@ -66,6 +72,25 @@ public class CatalogsController {
                 .toList();
         model.addAttribute("catalogs", rows);
         return "catalog/catalogs";
+    }
+
+    @GetMapping("/dashboard/catalogs/{catalogId}")
+    public String catalog(@PathVariable String catalogId, Model model, Locale locale) {
+        ProductCatalog catalog = access.requireCatalog(CustomSecurityContext.getStoreId(), catalogId);
+        List<CategoryRow> rows = catalog.getCategories().stream()
+                .sorted(Comparator.comparingInt(CategoryDefinition::getSequenceNumber))
+                .map(category -> CategoryRow.of(catalog, category, pimCategoryOptions.namesOf(category.getPimCategoryIds()),
+                        // An automatic category has no rows in the products table: its list is computed from the inventory.
+                        category.hasType(CategoryDefinitionType.Dynamic) ? List.of() : productRepository.findAll(category.getCategoryId()),
+                        marketplaces::displayName))
+                .toList();
+        model.addAttribute("catalog", catalog);
+        model.addAttribute("categories", rows);
+        model.addAttribute("productsTotal", rows.stream().mapToInt(row -> row.productsCount() == null ? 0 : row.productsCount()).sum());
+        model.addAttribute("scheduleText", scheduleText(catalog.getPricelistSchedule(), locale));
+        model.addAttribute("settingsHref", CatalogPaths.catalogSettings(catalogId));
+        model.addAttribute("addCategoryHref", CatalogPaths.newCategory(catalogId));
+        return "catalog/catalog";
     }
 
     @GetMapping("/dashboard/catalogs/new")
