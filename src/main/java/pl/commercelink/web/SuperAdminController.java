@@ -1,5 +1,6 @@
 package pl.commercelink.web;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.MessageSource;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -12,6 +13,7 @@ import pl.commercelink.starter.security.UserRole;
 import pl.commercelink.stores.CreateStoreRequest;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoreCopyService;
+import pl.commercelink.stores.StoreApiKeyService;
 import pl.commercelink.stores.StoreCreationService;
 import pl.commercelink.stores.StoreDeletionService;
 import pl.commercelink.stores.StoreForm;
@@ -20,12 +22,16 @@ import pl.commercelink.web.settings.StoreSettingsOverviewFactory;
 
 import java.util.*;
 
+@Slf4j
 @PreAuthorize("hasRole('SUPER_ADMIN')")
 @Controller
 public class SuperAdminController {
 
     @Autowired
     private StoresRepository storesRepository;
+
+    @Autowired
+    private StoreApiKeyService storeApiKeyService;
 
     @Autowired
     private MessageSource messageSource;
@@ -81,20 +87,34 @@ public class SuperAdminController {
 
     @PostMapping("/dashboard/store/create")
     public String createStore(@RequestParam String name,
-                              @RequestParam(required = false) String apiKey,
                               Locale locale,
                               RedirectAttributes redirectAttributes) {
         try {
-            Store store = storeCreationService.createStore(CreateStoreRequest.bare(name, apiKey));
+            Store store = storeCreationService.createStore(CreateStoreRequest.bare(name));
             redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("store.create.success", null, locale));
+            redirectAttributes.addFlashAttribute("generatedApiKey", store.getPlaintextApiKey());
             return String.format("redirect:/dashboard/store/%s", store.getStoreId());
         } catch (Exception e) {
-            System.err.println("[StoreCreation] Failed to create store '" + name + "': " + e.getMessage());
-            e.printStackTrace();
+            log.error("Failed to create store '{}'", name, e);
             redirectAttributes.addFlashAttribute("errorMessage",
                     messageSource.getMessage("store.create.error", null, locale));
             return "redirect:/dashboard/store/create";
         }
+    }
+
+    @PostMapping("/dashboard/store/{storeId}/regenerate-api-key")
+    public String regenerateApiKey(@PathVariable String storeId,
+                                   Locale locale,
+                                   RedirectAttributes redirectAttributes) {
+        try {
+            String apiKey = storeApiKeyService.regenerate(storeId);
+            redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("store.apikey.regenerated", null, locale));
+            redirectAttributes.addFlashAttribute("generatedApiKey", apiKey);
+        } catch (Exception e) {
+            log.error("Failed to regenerate API key for store '{}'", storeId, e);
+            redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage("store.apikey.error", null, locale));
+        }
+        return String.format("redirect:/dashboard/store/%s", storeId);
     }
 
     @GetMapping("/dashboard/store/{storeId}/copy")
@@ -121,8 +141,7 @@ public class SuperAdminController {
                     messageSource.getMessage("store.copy.success", new Object[]{newStoreName}, locale));
             return String.format("redirect:/dashboard/store/%s", newStore.getStoreId());
         } catch (Exception e) {
-            System.err.println("[StoreCopy] Failed to copy store " + storeId + ": " + e.getMessage());
-            e.printStackTrace();
+            log.error("Failed to copy store {}", storeId, e);
             redirectAttributes.addFlashAttribute("errorMessage",
                     messageSource.getMessage("store.copy.error", null, locale));
             return String.format("redirect:/dashboard/store/%s/copy", storeId);
@@ -153,7 +172,7 @@ public class SuperAdminController {
                         messageSource.getMessage("store.delete.error", null, locale));
             }
         } catch (Exception e) {
-            System.err.println("[StoreDeletion] Failed to delete store " + storeId + ": " + e.getMessage());
+            log.error("Failed to delete store {}", storeId, e);
             redirectAttributes.addFlashAttribute("errorMessage",
                     messageSource.getMessage("store.delete.error", null, locale));
         }
@@ -167,8 +186,7 @@ public class SuperAdminController {
             redirectAttributes.addFlashAttribute("successMessage",
                     messageSource.getMessage("store.cleanup.success", new Object[]{deletedCount}, locale));
         } catch (Exception e) {
-            System.err.println("[OrphanedProductCleanup] Failed: " + e.getMessage());
-            e.printStackTrace();
+            log.error("Orphaned product cleanup failed", e);
             redirectAttributes.addFlashAttribute("errorMessage",
                     messageSource.getMessage("store.cleanup.error", null, locale));
         }

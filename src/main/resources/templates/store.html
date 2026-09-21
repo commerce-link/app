@@ -19,9 +19,20 @@
                             <span class="icon is-small" aria-hidden="true"><i class="fas fa-copy"></i></span>
                             <span th:text="#{store.copy}"></span>
                         </a>
+                        <form th:action="@{'/dashboard/store/' + ${form.store.storeId} + '/regenerate-api-key'}" method="post" class="cl-inline-form">
+                            <button type="submit" class="cl-button">
+                                <span class="icon is-small" aria-hidden="true"><i class="fas fa-key"></i></span>
+                                <span th:text="#{store.apikey.regenerate}"></span>
+                            </button>
+                        </form>
                     </div>
                 </div>
             </header>
+
+            <div class="notification is-warning" th:if="${generatedApiKey}">
+                <p th:text="#{store.apikey.regenerated}"></p>
+                <pre th:text="${generatedApiKey}"></pre>
+            </div>
 
             <div th:replace="~{fragments/screen-intro :: panel('store', 'fas fa-cog')}"></div>
 
