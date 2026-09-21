@@ -704,10 +704,12 @@
         clip: auto;
     }
 
+    /* wraps rather than clips: at 320px the three labels do not fit on one line */
     .cl-inv-page .cl-inv-offers thead tr {
         display: flex;
         align-items: center;
-        gap: 16px;
+        flex-wrap: wrap;
+        gap: 0 16px;
         padding: 0;
         background: var(--cl-surface-2);
         border-top: 1px solid var(--cl-line);
@@ -723,6 +725,11 @@
     .cl-inv-page .cl-inv-offers thead th:first-child {
         flex: 1 1 auto;
         padding: 10px 0 10px 16px;
+    }
+
+    /* a wrapped label keeps the row's left inset instead of hanging under the sort buttons */
+    .cl-inv-page .cl-inv-offers thead th:not(:first-child) {
+        padding-block: 0 10px;
     }
 
     .cl-inv-page .cl-inv-offers thead th:last-child {
