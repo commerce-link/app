@@ -8,11 +8,15 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import pl.commercelink.marketplace.api.MarketplaceProvider;
 import pl.commercelink.marketplace.api.MarketplaceReturn;
+import pl.commercelink.scheduling.ScheduledExecutionCounter;
+import pl.commercelink.scheduling.ScheduledExecution;
 import pl.commercelink.stores.Store;
 import pl.commercelink.starter.util.ElapsedTime;
 import pl.commercelink.stores.StoresRepository;
 
 import java.util.List;
+
+import static org.apache.commons.lang3.StringUtils.isBlank;
 
 @Component
 @ConditionalOnProperty(name = "application.env", havingValue = "prod", matchIfMissing = false)
@@ -23,6 +27,7 @@ public class MarketplaceReturnsImportEventListener {
     private final StoresRepository storesRepository;
     private final MarketplaceReturnImporter marketplaceReturnImporter;
     private final MarketplaceProviderFactory providerFactory;
+    private final ScheduledExecutionCounter scheduledExecutionCounter;
 
     @Value("${marketplace.returns.enabled:true}")
     private boolean returnsEnabled = true;
@@ -39,15 +44,20 @@ public class MarketplaceReturnsImportEventListener {
             return;
         }
         String marketplace = payload.getMarketplace();
-        List<Store> stores = storesRepository.findAll()
-                .stream()
-                .filter(s -> s.hasActiveMarketplaceIntegration(marketplace))
-                .toList();
-        log.info("Marketplace {} returns import started: stores={}", marketplace, stores.size());
+        if (isBlank(payload.getStoreId())) {
+            log.error("Marketplace {} returns import rejected: the message names no store", marketplace);
+            return;
+        }
+        Store store = storesRepository.findById(payload.getStoreId());
+        if (store == null || !store.hasActiveMarketplaceIntegration(marketplace)) {
+            log.warn("Marketplace {} returns import skipped store {}: no active integration", marketplace, payload.getStoreId());
+            return;
+        }
+        log.info("Marketplace {} returns import started: store={}", marketplace, store.getStoreId());
         ElapsedTime elapsed = ElapsedTime.started();
-        stores.forEach(s -> importReturns(s, marketplace));
-        log.info("Marketplace {} returns import finished: stores={} importDurationInMs={}",
-                marketplace, stores.size(), elapsed.inMillis());
+        importReturns(store, marketplace);
+        log.info("Marketplace {} returns import finished: store={} importDurationInMs={}",
+                marketplace, store.getStoreId(), elapsed.inMillis());
     }
 
     // marketplaces without a returns API are skipped silently: MarketplaceProvider.returns() is empty for them
@@ -71,19 +81,29 @@ public class MarketplaceReturnsImportEventListener {
             log.info("Marketplace {} returns import store={}: fetched={} fetchDurationInMs={}"
                             + " importDurationInMs={}",
                     marketplace, store.getStoreId(), fetched.size(), fetchDurationInMs, elapsed.inMillis());
+            scheduledExecutionCounter.countCompleted(store.getStoreId(), ScheduledExecution.RETURNS_IMPORT, marketplace);
         });
     }
 
-    /** Scheduler payload: {"marketplace":"Allegro"}. */
     public static class MarketplaceReturnsImportPayload {
 
         private String marketplace;
+        private String storeId;
 
         public MarketplaceReturnsImportPayload() {
         }
 
+        public MarketplaceReturnsImportPayload(String marketplace, String storeId) {
+            this.marketplace = marketplace;
+            this.storeId = storeId;
+        }
+
         public String getMarketplace() {
             return marketplace;
+        }
+
+        public String getStoreId() {
+            return storeId;
         }
     }
 }

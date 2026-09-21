@@ -3,7 +3,6 @@ package pl.commercelink.inventory.supplier;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import pl.commercelink.inventory.InventoryRepository;
-import pl.commercelink.inventory.supplier.manual.ManualSupplierInfos;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.FulfilmentConfiguration;
 import pl.commercelink.stores.Store;
@@ -70,14 +69,16 @@ public class SupplierConnectionViewFactory {
                 : storeFeeds.get(identity.toLowerCase(Locale.ROOT));
         return new SupplierConnectionView(
                 identity,
-                manual ? null : identity,
-                manual ? ManualSupplierInfos.label(identity) : identity,
+                manual ? null : SupplierIdentity.typeOf(identity),
+                SupplierLabels.labelOf(connection),
                 connection.getMode(),
                 connection.isIncludeInPricing(),
                 connection.isIncludeInFulfilment(),
                 manual ? connection.isEnabled() : true,
                 feed,
                 connection.getFeedSchedule(),
+                connection.routingExternalSupplierId(),
+                connection.getBillingShortcut(),
                 manual || supplierRegistry.exists(identity));
     }
 

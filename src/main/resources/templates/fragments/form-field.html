@@ -1,0 +1,16 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!--/* Shorthands for fields without a help text. One implementation lives in fragments/settings-form (textField,
+       selectField); these only pass a null help, so both names render the same markup. The id equals the name, so an
+       error summary can link to the field with #name; errorKey is the message key of the field's error, or null. */-->
+<div th:fragment="input(name, labelKey, value, type, autocomplete, required, errorKey)"
+     th:replace="~{fragments/settings-form :: textField(${name}, ${labelKey}, ${value}, ${type}, ${autocomplete}, ${required}, ${errorKey}, null)}"></div>
+
+<!--/* options is a list of PickerOption(value, label). */-->
+<div th:fragment="select(name, labelKey, value, options, autocomplete, required, errorKey)"
+     th:replace="~{fragments/settings-form :: selectField(${name}, ${labelKey}, ${value}, ${options}, ${autocomplete}, ${required}, ${errorKey}, null)}"></div>
+
+</body>
+</html>

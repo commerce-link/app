@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import pl.commercelink.inventory.deliveries.DeliveriesRepository;
 import pl.commercelink.inventory.deliveries.Delivery;
+import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.orders.*;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.starter.util.PaginationUtil;
@@ -27,6 +28,9 @@ public class WebController {
 
     @Autowired
     private DeliveriesRepository deliveriesRepository;
+
+    @Autowired
+    private SupplierLabels supplierLabels;
 
     private static final int CLIENTS_PAGE_SIZE = 25;
 
@@ -105,6 +109,7 @@ public class WebController {
         model.addAttribute("unpaidDeliveriesAmountNet", unpaidDeliveriesAmountNet);
         model.addAttribute("paymentSources", PaymentSource.values());
         model.addAttribute("unpaidDeliveriesAmountGross", unpaidDeliveriesAmountGross);
+        model.addAttribute("supplierLabels", supplierLabels.forStoreId(getStoreId()));
 
         return "payments";
     }

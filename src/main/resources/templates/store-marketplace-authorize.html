@@ -1,0 +1,74 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+<div layout:fragment="content">
+    <section class="cl-page">
+        <div class="cl-page-body">
+            <div th:replace="~{fragments/settings-header :: subpage(${marketplacesHref}, ${backLabel}, ${pageTitle})}"></div>
+            <div th:replace="~{fragments/settings-form :: savedAlert}"></div>
+
+            <div class="cl-stack">
+                <div th:if="${authorizeError != null}" class="cl-alert is-bad">
+                    <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
+                    <p class="cl-alert-text" th:text="${authorizeError}"></p>
+                </div>
+                <div th:if="${authorizeInfo != null}" class="cl-alert is-warn">
+                    <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+                    <p class="cl-alert-text" th:text="${authorizeInfo}"></p>
+                </div>
+
+                <!--/* No code yet: say what connecting does and start it. */-->
+                <form th:if="${pending == null}" class="cl-form" method="post" th:action="@{${startAction}}">
+                    <div class="cl-card">
+                        <p class="cl-card-body" th:text="${connected} ? #{store.marketplace.authorize.connectedIntro(${displayName})}
+                                                                      : #{store.marketplace.authorize.intro(${displayName})}"></p>
+                        <div class="cl-card-footer">
+                            <button type="submit" class="cl-button is-primary"
+                                    th:text="${connected} ? #{store.marketplace.authorize.reconnect} : #{store.marketplace.authorize.start}"></button>
+                            <a class="cl-button" th:href="@{${marketplacesHref}}" th:text="#{general.cancel}"></a>
+                        </div>
+                    </div>
+                </form>
+
+                <!--/* A code is waiting: the operator confirms it on the marketplace's page, the script asks for the result. */-->
+                <form th:if="${pending != null}" id="authorize-check" class="cl-form" method="post" th:action="@{${checkAction}}"
+                      data-cl-device-authorization
+                      th:attr="data-status-url=@{${statusAction}}, data-interval=${pending.intervalSeconds()},
+                               data-expires-at=${pending.expiresAt().toEpochMilli()}, data-error-message=#{form.save.failed}">
+                    <div class="cl-card">
+                        <fieldset class="cl-fieldset">
+                            <legend class="cl-fieldset-title" th:text="#{store.marketplace.authorize.steps.title(${displayName})}"></legend>
+                            <ol class="cl-steps">
+                                <li>
+                                    <span th:text="#{store.marketplace.authorize.steps.open(${displayName})}"></span>
+                                    <a class="cl-button" th:href="${pending.openUri()}" target="_blank" rel="noopener noreferrer">
+                                        <span th:text="#{store.marketplace.authorize.open(${displayName})}"></span>
+                                        <i class="fas fa-external-link-alt" aria-hidden="true"></i>
+                                    </a>
+                                </li>
+                                <li>
+                                    <span th:text="#{store.marketplace.authorize.steps.code}"></span>
+                                    <code class="cl-code" th:text="${pending.userCode()}"></code>
+                                    <span th:text="#{store.marketplace.authorize.steps.confirm}"></span>
+                                </li>
+                                <li th:text="#{store.marketplace.authorize.steps.back}"></li>
+                            </ol>
+                            <p class="cl-help" role="status" data-cl-device-status
+                               th:text="#{store.marketplace.authorize.waiting(${displayName}, ${expiresAtText})}"></p>
+                        </fieldset>
+                        <div class="cl-card-footer">
+                            <button type="submit" class="cl-button is-primary" th:text="#{store.marketplace.authorize.check}"></button>
+                            <button type="submit" class="cl-button" form="authorize-restart" th:text="#{store.marketplace.authorize.restart}"></button>
+                        </div>
+                    </div>
+                </form>
+                <form th:if="${pending != null}" id="authorize-restart" method="post" th:action="@{${startAction}}" hidden></form>
+            </div>
+        </div>
+    </section>
+    <script th:src="@{/js/device-authorization.js}" defer></script>
+</div>
+</body>
+</html>

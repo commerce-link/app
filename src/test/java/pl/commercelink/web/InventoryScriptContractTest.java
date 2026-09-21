@@ -36,24 +36,34 @@ class InventoryScriptContractTest {
         }
     }
 
+    /**
+     * The status tones and the `.cl-status` pill are part of the shared design system; this page only adds
+     * the tint behind the cheapest row. Redefining either here would fork the design system on one screen.
+     */
     @Test
-    void styleSheetDefinesTheStatusTokensSharedWithTheSettingsPages() throws Exception {
+    void statusTonesComeFromTheSharedStyleSheetAndOnlyTheCheapestRowTintIsLocal() throws Exception {
         // given
+        String shared = read("src/main/resources/static/css/commercelink.css");
         String css = read("src/main/resources/static/css/inventory.css");
 
         // when / then
-        assertThat(css)
-                .contains("--cl-ok: #1d6b45").contains("--cl-warn: #8a4b00").contains(".cl-status.is-ok")
-                .contains("prefers-reduced-motion").contains("@media screen and (max-width: 719px)");
+        assertThat(shared)
+                .contains("--cl-ok: #1d6b45").contains("--cl-warn: #8a4b00").contains("--cl-info: #1b4db1")
+                .contains(".cl-status.is-ok").contains(".cl-status.is-info").contains(".cl-status.is-neutral");
+        // page-scoped spacing for the pill inside a table cell stays here; the pill itself must not be redefined
+        assertThat(css).contains("--cl-ok-tint")
+                .doesNotContain("--cl-ok:").doesNotContain("--cl-warn:").doesNotContain("--cl-info:")
+                .doesNotContain("\n.cl-status {").doesNotContain(".cl-status::before").doesNotContain(".cl-status.is-");
     }
 
     @Test
-    void styleSheetKeepsInfoStatusOnTokensAndDefinesTheCheapestRowTint() throws Exception {
+    void styleSheetUsesTheSharedTonesAndKeepsItsResponsiveRules() throws Exception {
         // given
         String css = read("src/main/resources/static/css/inventory.css");
 
         // when / then
-        assertThat(css).contains(".cl-status.is-info").contains("var(--cl-info)").contains("--cl-ok-tint");
+        assertThat(css).contains("var(--cl-info)").contains("var(--cl-ok-tint)")
+                .contains("prefers-reduced-motion").contains("@media screen and (max-width: 719px)");
     }
 
     @Test

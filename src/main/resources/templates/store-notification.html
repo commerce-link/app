@@ -3,64 +3,72 @@
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
       layout:decorate="~{layout}">
 <body>
-
 <div layout:fragment="content">
+    <section class="cl-page">
+        <div class="cl-page-body">
+            <div th:replace="~{fragments/settings-header :: header(false, null)}"></div>
+            <div th:replace="~{fragments/settings-form :: savedAlert}"></div>
 
-    <section class="section">
-        <div class="container">
+            <div class="cl-stack">
+                <form th:fragment="senderForm" id="notification-sender-form" class="cl-form"
+                      th:action="@{${formAction}}" th:object="${form}" method="post" novalidate data-cl-async
+                      th:attr="data-success-message=${savedMessage}, data-error-message=#{form.save.failed}">
+                    <div th:replace="~{fragments/settings-form :: errorSummary('notification-sender-errors', ${errors}, null)}"></div>
 
-            <h1 class="title" th:text="#{store.notification}"></h1>
+                    <div class="cl-card">
+                        <fieldset class="cl-fieldset">
+                            <legend class="cl-fieldset-title" th:text="#{store.notification.sender.title}"></legend>
+                            <div class="cl-form-grid">
+                                <div class="cl-span-3" th:insert="~{fragments/settings-form :: textField('senderName', 'store.notification.senderName', *{senderName}, 'text', 'off', false, ${errors['senderName']}, #{store.notification.senderName.help(${senderPreviewName}, ${senderEmail})})}"></div>
+                                <div class="cl-span-3" th:insert="~{fragments/settings-form :: textField('replyToEmail', 'store.notification.replyToEmail', *{replyToEmail}, 'email', 'off', false, ${errors['replyToEmail']}, #{store.notification.replyToEmail.help})}"></div>
+                            </div>
+                        </fieldset>
+                        <div class="cl-card-footer">
+                            <button class="cl-button is-primary" type="submit" th:text="#{form.save.changes}"></button>
+                        </div>
+                    </div>
+                </form>
 
-            <form th:action="@{/dashboard/store/notification/edit}" th:object="${form}" method="post">
+                <section class="cl-card" aria-labelledby="customer-messages-title">
+                    <div class="cl-card-head">
+                        <h2 class="cl-card-title" id="customer-messages-title" th:text="#{store.notification.messages.title}"></h2>
+                        <a class="cl-link-button" th:href="@{${templatesHref}}">
+                            <span th:text="#{store.notification.messages.templates}"></span>
+                            <i class="fas fa-chevron-right" aria-hidden="true"></i>
+                        </a>
+                    </div>
+                    <p class="cl-card-desc"
+                       th:text="#{store.notification.messages.summary(${overview.sentCount()}, ${overview.totalCount()})}"></p>
 
-                <input type="hidden" th:field="*{store.storeId}"/>
-
-                <!-- Client Notification Config Section -->
-                <div class="box">
-                    <h2 class="subtitle" th:text="#{store.client.notification.config}"></h2>
-
-                    <div class="field">
-                        <label class="label" th:text="#{store.sender.name}"></label>
-                        <div class="control">
-                            <input class="input" type="text" th:field="*{store.clientNotificationsConfiguration.senderName}"
-                                   th:placeholder="#{store.sender.name}" />
+                    <div th:if="${overview.brokenCount() > 0}" class="cl-alert is-warn">
+                        <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+                        <div>
+                            <p class="cl-alert-title" th:text="#{store.emailTemplates.broken.title}"></p>
+                            <p class="cl-alert-text">
+                                <span th:text="#{store.notification.messages.broken.text}"></span>
+                                <a th:href="@{${templatesHref}}" th:text="#{store.notification.messages.broken.link}"></a>
+                            </p>
                         </div>
                     </div>
 
-                    <div class="field">
-                        <label class="label" th:text="#{store.reply.to.email}"></label>
-                        <div class="control">
-                            <input class="input" type="text" th:field="*{store.clientNotificationsConfiguration.replyToEmail}"
-                                   th:placeholder="#{store.reply.to.email}" />
+                    <div th:if="${overview.addressChangeBlocked()}" class="cl-alert is-warn">
+                        <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+                        <div>
+                            <p class="cl-alert-title" th:text="#{store.notification.messages.addressChange.title}"></p>
+                            <p class="cl-alert-text">
+                                <span th:text="#{store.notification.messages.addressChange.text}"></span>
+                                <a th:href="@{${fulfilmentHref}}" th:text="#{store.notification.messages.addressChange.link}"></a>
+                            </p>
                         </div>
                     </div>
-
-                    <div class="field">
-                        <label class="label" th:text="#{store.enabled.templates}"></label>
-                        <div class="content">
-                            <ul>
-                                <li th:each="entry : *{store.clientNotificationsConfiguration.supportedTemplates}"
-                                    th:text="${entry.key}"></li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="field is-grouped">
-                    <div class="control">
-                        <button class="button is-primary" type="button" onclick="confirmSave(this)"
-                                th:text="#{general.save}"></button>
-                    </div>
-                    <div class="control">
-                        <a th:href="@{/dashboard/store}" class="button is-light" th:text="#{general.cancel}"></a>
-                    </div>
-                </div>
-            </form>
-
+                </section>
+            </div>
         </div>
     </section>
-
+    <script th:if="${!errors.isEmpty()}">
+        document.getElementById('notification-sender-errors').focus();
+    </script>
+    <script th:src="@{/js/async-form.js}" defer></script>
 </div>
-
 </body>
 </html>

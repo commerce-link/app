@@ -19,6 +19,10 @@ public class MarketplaceIntegration {
     private LocalDateTime lastFetchedAt;
     @DynamoDBAttribute(attributeName = "loggedIn")
     private boolean loggedIn;
+    @DynamoDBAttribute(attributeName = "ordersImportSchedule")
+    private String ordersImportSchedule;
+    @DynamoDBAttribute(attributeName = "returnsImportSchedule")
+    private String returnsImportSchedule;
 
     public MarketplaceIntegration() {
     }
@@ -50,5 +54,21 @@ public class MarketplaceIntegration {
 
     public void setLoggedIn(boolean loggedIn) {
         this.loggedIn = loggedIn;
+    }
+
+    public String getOrdersImportSchedule() {
+        return ordersImportSchedule;
+    }
+
+    public void setOrdersImportSchedule(String ordersImportSchedule) {
+        this.ordersImportSchedule = ordersImportSchedule;
+    }
+
+    public String getReturnsImportSchedule() {
+        return returnsImportSchedule;
+    }
+
+    public void setReturnsImportSchedule(String returnsImportSchedule) {
+        this.returnsImportSchedule = returnsImportSchedule;
     }
 }

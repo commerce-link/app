@@ -3,86 +3,49 @@
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
       layout:decorate="~{layout}">
 <body>
-
 <div layout:fragment="content">
-    <section class="section">
-        <div class="container">
+    <section class="cl-page">
+        <div class="cl-page-body">
+            <div th:replace="~{fragments/settings-header :: subpage(${centersHref}, ${backLabel}, ${pageTitle})}"></div>
 
-            <h1 class="title" th:text="${rmaCenter.rmaCenterId} != null ? #{rma.edit.center} : #{rma.add.new.center}"></h1>
+            <form th:fragment="centerForm" id="rma-center-form" class="cl-form"
+                  th:action="@{${formAction}}" th:object="${form}" method="post" novalidate data-cl-async
+                  th:attr="data-cl-redirect=${redirectTo}, data-error-message=#{form.save.failed}">
+                <div th:replace="~{fragments/settings-form :: errorSummary('rma-center-errors', ${errors}, null)}"></div>
 
-            <form th:object="${rmaCenter}" th:action="@{/dashboard/store/rma-centers/save}" method="post">
-
-                <input type="hidden" th:field="*{rmaCenterId}" />
-                <input type="hidden" th:field="*{storeId}" />
-
-                <div class="box">
-                    <div class="field">
-                        <label class="label" th:text="#{general.provider.name}"></label>
-                        <div class="control">
-                            <input class="input" th:field="*{provider}" required />
+                <div class="cl-card">
+                    <fieldset class="cl-fieldset">
+                        <legend class="cl-fieldset-title" th:text="#{rma.center.section.address}"></legend>
+                        <div class="cl-form-grid">
+                            <!--/* The supplier comes first: it is what the centre is found by when goods go back, and
+                                   it is the row's title on the list. */-->
+                            <div class="cl-span-3" th:insert="~{fragments/form-field :: select('provider', 'general.provider.name', *{provider}, ${providerOptions}, 'off', true, ${errors['provider']})}"></div>
+                            <div class="cl-span-3" th:insert="~{fragments/settings-form :: textField('companyName', 'rma.center.companyName', *{companyName}, 'text', 'organization', true, ${errors['companyName']}, null)}"></div>
+                            <div th:insert="~{fragments/settings-form :: textField('streetAndNumber', 'order.address.street', *{streetAndNumber}, 'text', 'street-address', true, ${errors['streetAndNumber']}, null)}"></div>
+                            <div class="cl-span-2" th:insert="~{fragments/settings-form :: textField('postalCode', 'order.address.postal', *{postalCode}, 'text', 'postal-code', true, ${errors['postalCode']}, null)}"></div>
+                            <div class="cl-span-2" th:insert="~{fragments/settings-form :: textField('city', 'order.address.city', *{city}, 'text', 'address-level2', true, ${errors['city']}, null)}"></div>
+                            <div class="cl-span-2" th:insert="~{fragments/form-field :: select('country', 'order.address.country', *{country}, ${countries}, 'country', true, ${errors['country']})}"></div>
                         </div>
-                    </div>
-
-                    <hr/>
-
-                    <h2 class="subtitle" th:text="#{order.shipping.details}"></h2>
-
-                    <div class="columns is-multiline">
-                        <div class="column is-half">
-                            <label class="label" th:text="#{order.address.company}"></label>
-                            <input class="input" th:field="*{shippingDetails.companyName}" th:placeholder="#{order.address.company}" />
+                    </fieldset>
+                    <fieldset class="cl-fieldset">
+                        <legend class="cl-fieldset-title" th:text="#{rma.center.section.contact}"></legend>
+                        <div class="cl-form-grid">
+                            <div class="cl-span-3" th:insert="~{fragments/settings-form :: textField('phone', 'order.address.phone', *{phone}, 'tel', 'tel', true, ${errors['phone']}, #{rma.center.phone.help})}"></div>
+                            <div class="cl-span-3" th:insert="~{fragments/settings-form :: textField('email', 'order.address.email', *{email}, 'email', 'email', false, ${errors['email']}, null)}"></div>
                         </div>
-
-                        <div class="column is-half">
-                            <label class="label" th:text="#{address.street}"></label>
-                            <input class="input" th:field="*{shippingDetails.streetAndNumber}" th:placeholder="#{address.street}" />
-                        </div>
-
-                        <div class="column is-one-quarter">
-                            <label class="label" th:text="#{address.postal.code}"></label>
-                            <input class="input" th:field="*{shippingDetails.postalCode}" placeholder="00-000" th:title="#{shipping.postalCode.invalid}" />
-                        </div>
-
-                        <div class="column is-one-quarter">
-                            <label class="label" th:text="#{address.city}"></label>
-                            <input class="input" th:field="*{shippingDetails.city}" th:placeholder="#{address.city}" />
-                        </div>
-
-                        <div class="column is-one-quarter">
-                            <label class="label" th:text="#{address.country}"></label>
-                            <input class="input" th:field="*{shippingDetails.country}" th:placeholder="#{address.country}" />
-                        </div>
-
-                        <div class="column is-one-quarter">
-                            <label class="label" th:text="#{person.phone}"></label>
-                            <input class="input"
-                                   th:field="*{shippingDetails.phone}"
-                                   pattern="[0-9+ ]{9,15}"
-                                   placeholder="+48 123 456 789"
-                                   th:title="#{shipping.phone.invalid}" />
-                        </div>
-
-                        <div class="column is-half">
-                            <label class="label" th:text="#{person.email}"></label>
-                            <input class="input" type="email" th:field="*{shippingDetails.email}" placeholder="contact@example.com" />
-                        </div>
-                    </div>
-
-                    <div class="field is-grouped mt-4">
-                        <div class="control">
-                            <button type="submit" class="button is-primary">
-                                <span th:text="${rmaCenter.rmaCenterId} != null ? #{order.items.action.update} : #{general.create}"></span>
-                            </button>
-                        </div>
-                        <div class="control">
-                            <a th:href="@{/dashboard/store/rma-centers}" class="button is-light" th:text="#{general.cancel}"></a>
-                        </div>
+                    </fieldset>
+                    <div class="cl-card-footer">
+                        <button class="cl-button is-primary" type="submit" th:text="#{rma.center.save}"></button>
+                        <a class="cl-button" th:href="@{${centersHref}}" th:text="#{general.cancel}"></a>
                     </div>
                 </div>
             </form>
-
         </div>
     </section>
+    <script th:if="${!errors.isEmpty()}">
+        document.getElementById('rma-center-errors').focus();
+    </script>
+    <script th:src="@{/js/async-form.js}" defer></script>
 </div>
 </body>
 </html>

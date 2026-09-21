@@ -29,7 +29,7 @@ mvn test -Dtest=ClassName#methodName  # Run specific test method
 **DynamoDB**: Runs locally via **AWS NoSQL Workbench** at `http://localhost:8000`.
 **Other AWS services** (S3, SQS, etc.): Simulated by **LocalStack** at `http://localhost:4566`. Configuration in `application-local.properties`.
 
-**Schema Migration**: Managed by **Mongock** (`io.mongock:mongock-springboot-v3` + `io.mongock:dynamodb-springboot-driver`). Migrations live in `src/main/java/pl/commercelink/migration/` as `@ChangeUnit` classes with an incrementing `V###` prefix (currently V001–V011: table creation, local seeds, optimistic-lock backfill, supplier-connection migration, order-item position backfill, store registration backfill, taxonomy mappings table, claimed-delivery-id index, shipment trackings index table). They execute automatically on application startup. Mongock tracks applied changes in the `AppMigrationsHistory` table (configurable via `mongock.migration-repository-name`) and uses `mongockLock` for distributed locking. Mongock autoconfiguration and `DynamoDbMigrationSupport` (helpers like `createTableIfAbsent`) come from the shared starter library.
+**Schema Migration**: Managed by **Mongock** (`io.mongock:mongock-springboot-v3` + `io.mongock:dynamodb-springboot-driver`). Migrations live in `src/main/java/pl/commercelink/migration/` as `@ChangeUnit` classes with an incrementing `V###` prefix (currently V001–V015: table creation, local seeds, optimistic-lock backfill, supplier-connection migration, order-item position backfill, local bootstrap seed, service flag, store registration backfill, taxonomy mappings table, claimed-delivery-id index, order filters table and shipment trackings table (two `V011` classes with distinct change-unit ids), client verifications table, store notifications moved to their own table, marketplace import schedules, daily schedule execution counts table; the next one is `V016`). They execute automatically on application startup. Mongock tracks applied changes in the `AppMigrationsHistory` table (configurable via `mongock.migration-repository-name`) and uses `mongockLock` for distributed locking. Mongock autoconfiguration and `DynamoDbMigrationSupport` (helpers like `createTableIfAbsent`) come from the shared starter library.
 **Verify**: `aws dynamodb list-tables --endpoint-url http://localhost:8000`
 
 ## Coding Conventions
@@ -37,8 +37,9 @@ mvn test -Dtest=ClassName#methodName  # Run specific test method
 - **Lombok**: Prefer Lombok to remove boilerplate. Use `@RequiredArgsConstructor` (with `access = AccessLevel.PACKAGE`/`PRIVATE` to match the intended constructor visibility) for constructors that are pure `final`-field assignment, and `@Getter`/`@Value`/`@Builder` where they fit. Don't use it where the constructor has real logic (e.g. transforming varargs) or where a `record` already removes the boilerplate. Concretely: `@Slf4j` instead of a hand-written `LoggerFactory` field; `@Getter`/`@Setter` (class-level or per field) on DynamoDB entities and `@DynamoDBDocument` beans instead of hand-written accessors — the mapper needs bean-style accessors and Lombok generates exactly those (keep explicit methods only where they carry logic or `@DynamoDBIgnore`); `@NoArgsConstructor` + `@AllArgsConstructor` for Jackson/DynamoDB beans; `@RequiredArgsConstructor` with `final` fields for Spring beans instead of `@Autowired` field injection when touching a class anyway.
 - **Logging**: SLF4J via Lombok `@Slf4j` (field `log`); never `System.out`/`System.err`, never a manual `LoggerFactory`. Sentry (`logback-spring.xml`: `minimumEventLevel=ERROR`, `minimumBreadcrumbLevel=INFO`) turns **ERROR into an alertable event** and INFO/WARN into breadcrumbs only. Therefore: `log.error` for anything an operator must react to (a money-moving decision that was dropped or refused, a message that cannot be processed, a misconfiguration), `log.warn` for expected skip paths (idempotent no-ops, "already sent", "not found — will retry next poll"), no INFO on hot paths. Successes are not logged.
 - **Comments**: Code should be self-explanatory — never comment *what* the code does; refactor instead. Comments that explain *why* are welcome when the reason is not visible in the code itself: an ordering that must not change (e.g. "persist before publish, otherwise a failed save leaves a real refund with no record"), an external-system quirk (API returns 422 instead of 404), a deliberate deviation from the obvious approach, or a business rule fixed by the customer. Keep them short, in English, next to the line they protect; prefer a well-named test that pins the behaviour over a comment when both are possible.
-- **UI**: Thymeleaf templates in `src/main/resources/templates/`, styled with Bulma CSS.
-- **Email templates**: Stored per store in DynamoDB (`EmailTemplates` table) and rendered at runtime with Mustache by `EmailClient` — there are no `.mustache` files in resources.
+- **UI**: Thymeleaf templates in `src/main/resources/templates/`, styled with Bulma CSS. Redesigned dashboard screens use the `cl-*` layer in `static/css/commercelink.css` on top of Bulma.
+- **Store settings pages** (`/dashboard/store/**`): one controller per page, view objects in `web/settings/`, form DTOs with a `validate()` returning `Map<field, messageKey>` in `web/dtos/`. The store comes from the session for `ADMIN` (`/dashboard/store/x`) or from the path for `SUPER_ADMIN` (`/dashboard/store/{storeId}/x`), never from the form; build both with `SettingsPaths.store(storeId, "/x")` and answer an unknown store or record with `ResponseStatusException(NOT_FOUND)`. Forms post to the page's own address. A form with `data-cl-async` is sent by `static/js/async-form.js` with `X-Requested-With: fetch` (`SettingsPaths.isAsync`); the controller then returns only the form fragment, 422 with errors or 200 with the saved values, instead of a redirect; each template includes `async-form.js` itself. Outcome messages after a redirect go through `SettingsFlash` (`onRedirect`, or `forNextPage` when the script navigates), shown by `settings-form :: savedAlert`. Destructive actions are confirmed with `fragments/confirm-dialog` and, without JavaScript, the `settings-confirm` page (`ConfirmAction`), so nothing is deleted by a GET; the only write on a GET is giving old records their missing ids (warehouse, shipping), through `OptimisticLockingExecutor`. The visual rules and components are in the local `docs/reference/ui-design-system.md`.
+- **Email templates**: Stored per store in DynamoDB (`EmailTemplates` table) and rendered at runtime with Mustache by `EmailClient` — there are no `.mustache` files in resources. A store without its own copy of a template gets the one of the shared pool, the store `default` (`EmailTemplatesRepository.DEFAULT_STORE`); content equal to the default is not copied into the store. `EmailTemplate.type` is stored as text: a record whose type is no longer an `EmailNotificationType` is skipped when a store's templates are listed, and a template without subject or body is not sent.
 - **Localization**: `LocalizedEnum` interface. Polish is primary language. Messages in `messages_pl.properties` / `messages_en.properties`.
 - **DTOs**: Controllers use DTOs (in `web/dtos/`) with factory methods like `OrderDto.from(Order order)`.
 - **Error handling**: `GlobalExceptionHandler` catches common exceptions. Sentry logs errors automatically.
@@ -99,7 +100,7 @@ The app depends only on contract and shared libraries, never on adapter implemen
 
 ## Terminology
 
-- **Supplier**: A distributor or retailer that supplies goods/inventory. There is **no `Supplier` enum** — suppliers are identified by name (`String`) with a `SupplierInfo` record (name, type, accuracy score, origin, shipping policy) provided by each adapter's `SupplierProviderDescriptor`. `SupplierRegistry` collects all descriptors from `ServiceLoader` and adds three built-in entries: `Amazon`, `Warehouse` (internal), `Other` (fallback). `SupplierType` is `Distributor` or `Retailer`.
+- **Supplier**: A distributor or retailer that supplies goods/inventory. There is **no `Supplier` enum** — suppliers are identified by name (`String`) with a `SupplierInfo` record (name, type, accuracy score, origin, shipping policy) provided by each adapter's `SupplierProviderDescriptor`. `SupplierRegistry` collects all descriptors from `ServiceLoader` and adds two built-in entries: `Warehouse` (internal), `Other` (fallback). `SupplierType` is `Distributor` or `Retailer`.
 - **Provider**: Any pluggable integration (suppliers, marketplaces, payments, shipping, invoicing, printing) using the `provider-api` plugin pattern.
 
 ## Architecture
@@ -133,6 +134,7 @@ All entities use `@DynamoDBTable`, `@DynamoDBHashKey`, `@DynamoDBRangeKey` annot
 | WarehouseDocumentItems | `WarehouseDocumentItem` | documentId | itemId | GSI `DeliveryIdIndex` |
 | WarehouseDocumentSequences | `WarehouseDocumentSequence` | storeId | sequenceKey | |
 | TaxonomyCategoryMappings | `CategoryMapping` | supplier | rawCategory | |
+| DailyScheduleExecutionCounts | `DailyScheduleExecutionCount` | storeId | counterKey | |
 
 Mongock additionally owns `AppMigrationsHistory` and `mongockLock` (no entity classes). Product information tables (PIM index, brands, queue, category matches) live in the PIM microservice, not in the app — the app consumes the index via HTTP (`/PIM/Index`).
 
@@ -169,6 +171,32 @@ Async work is driven through `@SqsListener` methods. Queue names follow `{domain
 - Hourly: `PimCatalogRegistry` — refresh PIM caches
 - Hourly: `DemoStoreCleanupJob` — clean up demo stores
 - Hourly: `DropshipTrackingSweepScheduler` — local-only trigger for the dropship tracking sweep; in prod the trigger is instead `supplier-dropship-tracking-sweep-queue`, sent by EventBridge Scheduler with no payload and consumed by `DropshipTrackingSweepListener`
+
+### Scheduled Execution Counters
+
+Per-store schedules (orders import, returns import, supplier feed, pricelist) are billed by how often they actually ran, so every completed execution is counted in the `DailyScheduleExecutionCounts` table. One item per store, day, execution type and target (the marketplace, supplier or catalog the schedule belongs to), with the day cut in `EventBridgeSchedules.TIMEZONE`, Europe/Warsaw. The range key is `<date>#<TYPE>#<target>`, so a store's day or month is one `begins_with` query:
+
+```
+storeId     counterKey                           executionDate  executionType   target        executionCount
+uma2dqukxr  2026-09-17#ORDERS_IMPORT#Allegro     2026-09-17     ORDERS_IMPORT   Allegro       144
+uma2dqukxr  2026-09-17#ORDERS_IMPORT#Empik       2026-09-17     ORDERS_IMPORT   Empik         3
+uma2dqukxr  2026-09-17#SUPPLIER_FEED#Wortmann    2026-09-17     SUPPLIER_FEED   Wortmann      1
+```
+
+Totals are never stored: per-type and monthly figures are sums on read (`ScheduleExecutionUsage`, via `ScheduleExecutionUsageService.monthlyUsage` / `dailyUsage`), so they cannot drift from the counts. Enum constant names are part of the key, so renaming a `ScheduledExecution` constant orphans its history.
+
+`ScheduledExecutionCounter.countCompleted(...)` is called as the last step of the success path in each SQS listener, so only runs that did their work are counted:
+
+| `ScheduledExecution` | Counted in | Counted when | Not counted |
+|---|---|---|---|
+| `ORDERS_IMPORT` | `MarketplaceOrdersImportEventListener` | orders fetched and the store's `lastFetchedAt` saved | store unknown or without an active integration, no provider, fetch or import threw |
+| `RETURNS_IMPORT` | `MarketplaceReturnsImportEventListener` | returns fetched and imported | same skips as orders, plus marketplaces whose provider has no returns API, plus the `marketplace.returns.enabled=false` kill switch |
+| `SUPPLIER_FEED` | `SqsFeedLoaderEventListener` | the store feed load returned normally | global feeds (no store), configuration-not-ready retries, load threw |
+| `PRICELIST` | `PricelistEventListener` | pricelist saved and the pricelist event published | generation, save or publish threw |
+
+Manual triggers that go through the same queues (e.g. `StoreSupplierFeedScheduler.triggerImmediateImport`) count like scheduled runs; there is no way to tell them apart from the payload. Standard SQS queues are at-least-once, so a redelivered message can count a run twice; this is accepted rather than deduplicated.
+
+Each execution is one atomic `UpdateItem` in `DailyScheduleExecutionCountRepository`: `ADD #count :one` raises `executionCount` and `SET` writes the date, type and target, creating the item on the first execution of the day. Concurrent app instances never lose a count. The repository does not extend `DynamoDbRepository`, so there is no `save()` that could overwrite a count from a stale copy. A failed increment is logged at ERROR and swallowed: rethrowing would make SQS redeliver the message and rerun the whole import. Counts are billing data and outlive the store: `StoreDeletionService` does not touch them, so a store deleted mid-month can still be invoiced for the days it ran. The listeners are prod-only (`application.env=prod`); locally they run through the `cl` script's patches.
 
 ### Security
 

@@ -7,7 +7,8 @@ import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
-import pl.commercelink.inventory.supplier.manual.ManualSupplierInfos;
+import pl.commercelink.inventory.supplier.SupplierLabelMap;
+import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
@@ -41,6 +42,7 @@ public class InventorySearch {
     private final PimCatalog pimCatalog;
     private final TaxonomyCache taxonomyCache;
     private final Warehouse warehouse;
+    private final SupplierLabels supplierLabels;
 
     public InventorySearchResult search(String storeId, String query) {
         Store store = storesRepository.findById(storeId);
@@ -51,15 +53,16 @@ public class InventorySearch {
         StockQueryService stock = store != null && !store.hasIntegration(IntegrationType.WMS_PROVIDER)
                 ? warehouse.stockQueryService(storeId)
                 : null;
-        return run(query, inventory.withEnabledSuppliersOnly(storeId), modes::get, storeId, stock);
+        return run(query, inventory.withEnabledSuppliersOnly(storeId), modes::get, supplierLabels.forStore(store), storeId, stock);
     }
 
     public InventorySearchResult searchGlobal(String query) {
-        return run(query, inventory.withGlobalData(), supplier -> ConnectionMode.GLOBAL, null, null);
+        // offers span every store here, so no connection labels apply: identities fall back to their legacy shape
+        return run(query, inventory.withGlobalData(), supplier -> ConnectionMode.GLOBAL, supplierLabels.forStore(null), null, null);
     }
 
     private InventorySearchResult run(String query, InventoryView view, Function<String, ConnectionMode> modeOf,
-                                      String storeId, StockQueryService stock) {
+                                      SupplierLabelMap labels, String storeId, StockQueryService stock) {
         Match match = firstMatch(query, view);
         List<WarehouseItemView> warehouseItems = stock == null
                 ? List.of()
@@ -74,7 +77,7 @@ public class InventorySearch {
                 items.isEmpty() ? warehouseItems.stream().map(WarehouseItemView::getMfn).toList() : items.stream().map(InventoryItem::mfn).toList());
         ProductHeader product = match == null ? warehouseHeader(query, codes) : header(match.inventory(), codes);
         ProductCodes anchor = new ProductCodes(product.ean(), product.mfn());
-        List<OfferRow> offers = offers(items, modeOf, anchor);
+        List<OfferRow> offers = offers(items, modeOf, labels, anchor);
         List<WarehouseRow> rows = warehouseRows(warehouseItems, anchor);
         return new InventorySearchResult.Found(matchedBy, product, offers, rows, prices(offers, rows), stock != null);
     }
@@ -107,7 +110,8 @@ public class InventorySearch {
         return mfn == null ? List.of() : List.of(mfn);
     }
 
-    private List<OfferRow> offers(List<InventoryItem> items, Function<String, ConnectionMode> modeOf, ProductCodes product) {
+    private List<OfferRow> offers(List<InventoryItem> items, Function<String, ConnectionMode> modeOf,
+                                  SupplierLabelMap labels, ProductCodes product) {
         // an offer nobody can deliver is not a price anyone can buy at, so it neither wins nor leads the list
         double lowestNet = items.stream().filter(item -> item.qty() > 0)
                 .mapToDouble(InventoryItem::netPrice).filter(price -> price > 0).min().orElse(0);
@@ -117,7 +121,7 @@ public class InventorySearch {
                         .thenComparingDouble(InventoryItem::netPrice))
                 .map(item -> new OfferRow(
                         item.supplier(),
-                        ManualSupplierInfos.label(item.supplier()),
+                        labels.of(item.supplier()),
                         modeOf.apply(item.supplier()),
                         item.ean(),
                         item.mfn(),

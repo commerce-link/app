@@ -66,28 +66,47 @@ public class ProviderFactory<D extends ProviderDescriptor<T>, T> {
         return get(store, store.getConfigurationValue(integrationType));
     }
 
+    /** Registry key of the descriptor serving this provider name; supplier factories map an identity to its type. */
+    protected String descriptorNameFor(String providerName) {
+        return providerName;
+    }
+
+    /** Name under which this provider's configuration is stored; supplier factories use the identity itself. */
+    protected String credentialNameFor(String providerName, D descriptor) {
+        return resolveCredentialName(descriptor);
+    }
+
+    /**
+     * Name the configuration is stored under when the adapter is gone and there is no descriptor to ask. Factories
+     * that decorate the name (marketplaces append a suffix) must override this, otherwise an uninstalled adapter
+     * would be read and deleted under a name that belongs to another integration.
+     */
+    protected String credentialNameWithoutDescriptor(String providerName) {
+        return providerName;
+    }
+
     public T get(Store store, String providerName) {
         D descriptor = getDescriptor(providerName);
         if (descriptor == null) {
             return null;
         }
         Map<String, String> config = loadConfiguration(store, providerName);
-        Map<String, Object> context = buildContext(store, descriptor);
+        Map<String, Object> context = buildContext(store, descriptor, credentialNameFor(providerName, descriptor));
         return descriptor.create(config, context);
     }
 
-    protected Map<String, Object> buildContext(Store store, D descriptor) {
+    protected Map<String, Object> buildContext(Store store, D descriptor, String credentialName) {
         return switch (descriptor.authConfig()) {
             case AuthConfig.None none -> Map.of();
-            case AuthConfig.OAuth2 oauth2 -> buildOAuth2Context(store, descriptor, oauth2);
+            case AuthConfig.OAuth2 oauth2 -> buildOAuth2Context(store, descriptor, oauth2, credentialName);
         };
     }
 
     private Map<String, Object> buildOAuth2Context(
-            Store store, D descriptor, AuthConfig.OAuth2 oauth2) {
+            Store store, D descriptor, AuthConfig.OAuth2 oauth2, String credentialName) {
         String apiUrl = oauth2.apiUrl();
 
-        ConfigurableOAuth2AuthorizationService authService = createAuthService(store, descriptor, oauth2);
+        ConfigurableOAuth2AuthorizationService authService = createAuthService(store, descriptor, oauth2, credentialName);
 
         RestApi.Builder restApiBuilder = RestApi.builder(apiUrl);
         oauth2DefaultHeaders(oauth2).forEach(restApiBuilder::defaultHeader);
@@ -100,9 +119,9 @@ public class ProviderFactory<D extends ProviderDescriptor<T>, T> {
         return Map.of("restApi", restApiWithRetry);
     }
 
-    ConfigurableOAuth2AuthorizationService createAuthService(Store store, D descriptor, AuthConfig.OAuth2 oauth2) {
+    ConfigurableOAuth2AuthorizationService createAuthService(Store store, D descriptor, AuthConfig.OAuth2 oauth2,
+            String credentialName) {
         String apiUrl = oauth2.apiUrl();
-        String credentialName = resolveCredentialName(descriptor);
 
         return new ConfigurableOAuth2AuthorizationService(
                 credentialStore, tokenStore,
@@ -110,11 +129,14 @@ public class ProviderFactory<D extends ProviderDescriptor<T>, T> {
                 resolveAuthEndpoint(apiUrl, oauth2.authEndpointPath()),
                 resolveAuthEndpoint(apiUrl, oauth2.refreshEndpointPath()),
                 oauth2.refreshTokenExpirationSeconds(),
-                storeId -> {
-                    Store s = storesRepository.findById(storeId);
-                    onAuthorizationLost(s, descriptor);
-                    storesRepository.save(s);
-                });
+                storeId -> handleAuthorizationLost(storeId, descriptor));
+    }
+
+    void handleAuthorizationLost(String storeId, D descriptor) {
+        Store store = storesRepository.findById(storeId);
+        onAuthorizationLost(store, descriptor);
+        storesRepository.save(store);
+        afterAuthorizationLostSaved(store, descriptor);
     }
 
     public static String resolveAuthEndpoint(String apiUrl, String path) {
@@ -135,17 +157,22 @@ public class ProviderFactory<D extends ProviderDescriptor<T>, T> {
     protected void onAuthorizationLost(Store store, D descriptor) {
     }
 
+    protected void afterAuthorizationLostSaved(Store store, D descriptor) {
+    }
+
     protected String resolveCredentialName(D descriptor) {
         return descriptor.name();
     }
 
     public D getDescriptor(String name) {
-        return descriptors.get(name);
+        return name == null ? null : descriptors.get(descriptorNameFor(name));
     }
 
     public Map<String, String> loadConfiguration(Store store, String providerName) {
-        D descriptor = descriptors.get(providerName);
-        String configName = descriptor != null ? resolveCredentialName(descriptor) : providerName;
+        D descriptor = getDescriptor(providerName);
+        String configName = descriptor != null
+                ? credentialNameFor(providerName, descriptor)
+                : credentialNameWithoutDescriptor(providerName);
         return configurationManager.loadConfiguration(store, configName);
     }
 
@@ -155,20 +182,32 @@ public class ProviderFactory<D extends ProviderDescriptor<T>, T> {
 
     public Map<String, String> loadConfigurationForUI(Store store) {
         String providerName = store.getConfigurationValue(integrationType);
-        D descriptor = descriptors.get(providerName);
+        D descriptor = getDescriptor(providerName);
         if (descriptor == null) {
             return new HashMap<>();
         }
-        String configName = resolveCredentialName(descriptor);
+        String configName = credentialNameFor(providerName, descriptor);
         return configurationManager.getConfigurationForUI(store, configName, descriptor);
     }
 
-    public void deleteConfiguration(Store store, String providerName) {
-        D descriptor = descriptors.get(providerName);
+    /** Settings of one named provider, secrets present but blanked; for integrations with several providers per store. */
+    public Map<String, String> loadConfigurationForUI(Store store, String providerName) {
+        D descriptor = getDescriptor(providerName);
         if (descriptor == null) {
+            return new HashMap<>();
+        }
+        return configurationManager.getConfigurationForUI(store, credentialNameFor(providerName, descriptor), descriptor);
+    }
+
+    public void deleteConfiguration(Store store, String providerName) {
+        D descriptor = getDescriptor(providerName);
+        if (descriptor == null) {
+            // The adapter is gone, so its auth kind is unknown: the secret goes under the name it is loaded by
+            // (loadConfiguration), OAuth2 tokens of an uninstalled adapter cannot be told apart.
+            configurationManager.deleteConfiguration(store, credentialNameWithoutDescriptor(providerName));
             return;
         }
-        String configName = resolveCredentialName(descriptor);
+        String configName = credentialNameFor(providerName, descriptor);
         configurationManager.deleteConfiguration(store, configName);
 
         if (descriptor.authConfig() instanceof AuthConfig.OAuth2
@@ -180,9 +219,9 @@ public class ProviderFactory<D extends ProviderDescriptor<T>, T> {
     }
 
     public void saveConfiguration(Store store, String providerName, Map<String, String> configuration) {
-        D descriptor = descriptors.get(providerName);
+        D descriptor = getDescriptor(providerName);
         if (descriptor != null && configuration != null) {
-            String configName = resolveCredentialName(descriptor);
+            String configName = credentialNameFor(providerName, descriptor);
             boolean persisted = configurationManager.saveConfiguration(store, configName, descriptor, configuration);
             if (persisted) {
                 seedRefreshToken(store, descriptor, configName, configuration);
@@ -206,14 +245,14 @@ public class ProviderFactory<D extends ProviderDescriptor<T>, T> {
     }
 
     public void seedRefreshToken(Store store, String providerName, String refreshToken) {
-        D descriptor = descriptors.get(providerName);
+        D descriptor = getDescriptor(providerName);
         if (descriptor == null || refreshToken == null || refreshToken.isBlank()) {
             return;
         }
         if (!(descriptor.authConfig() instanceof AuthConfig.OAuth2 oauth2) || tokenStore == null) {
             return;
         }
-        storeRefreshToken(store, resolveCredentialName(descriptor), oauth2, refreshToken);
+        storeRefreshToken(store, credentialNameFor(providerName, descriptor), oauth2, refreshToken);
     }
 
     public List<String> deviceAuthProviders() {

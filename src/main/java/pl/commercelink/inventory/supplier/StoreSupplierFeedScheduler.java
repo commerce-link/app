@@ -32,7 +32,7 @@ public class StoreSupplierFeedScheduler {
     public void schedule(String storeId, String supplierName, String feedSchedule) {
         schedules.put(
                 scheduleName(storeId, supplierName),
-                PollingSchedule.storedOrRandomNightly(feedSchedule).awsExpression(),
+                PollingSchedule.storedOrRandomNightly(feedSchedule).withRandomStart().awsExpression(),
                 feedImportQueueArn,
                 ConversionUtil.toJson(feedImportRequest(storeId, supplierName)));
     }

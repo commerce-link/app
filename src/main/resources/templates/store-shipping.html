@@ -3,279 +3,174 @@
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
       layout:decorate="~{layout}">
 <body>
-
 <div layout:fragment="content">
+    <section class="cl-page">
+        <div class="cl-page-body">
+            <div th:replace="~{fragments/settings-header :: header(false, null)}"></div>
+            <div th:replace="~{fragments/settings-form :: savedAlert}"></div>
 
-    <section class="section">
-        <div class="container">
-
-            <div class="is-flex is-align-items-center mb-4" style="gap: 0.6rem">
-                <h1 class="title mb-0" th:text="#{store.shipping.title}">Shipping Configuration</h1>
-                <button th:replace="~{fragments/screen-intro :: toggle}"></button>
-            </div>
-
-            <div th:replace="~{fragments/screen-intro :: panel('shipping', 'fas fa-shipping-fast')}"></div>
-
-            <div th:replace="~{fragments/integration-panel :: panel(${connectedIntegrations}, ${availableProviders}, ${selectedProviderName}, #{store.shipping.provider.label}, ${form.providerConfiguration}, 'shipping', ${form.store.storeId}, false)}"></div>
-
-            <div class="box mt-4" th:if="${shippingWebhookUrl != null}">
-                <h2 class="subtitle" th:text="#{store.shipping.webhook.title}">Webhook notifications</h2>
-                <p class="mb-3" th:text="#{store.shipping.webhook.lead}"></p>
-                <div class="notification is-warning is-light" th:if="${webhookTokenMissing}" th:text="#{store.shipping.webhook.tokenMissing}"></div>
-                <div class="field">
-                    <label class="label" th:text="#{store.shipping.webhook.url}"></label>
-                    <div class="control">
-                        <input class="input" type="text" readonly th:value="${shippingWebhookUrl}" onclick="this.select()"/>
-                    </div>
-                </div>
-                <p class="help" th:text="#{store.shipping.webhook.token}"></p>
-                <p class="help" th:text="#{store.shipping.webhook.states}"></p>
-                <p class="help" th:text="#{store.shipping.webhook.help}"></p>
-            </div>
-
-            <!-- Authorized Carriers Section -->
-            <div class="box mt-4">
-                <h2 class="subtitle" th:text="#{store.shipping.carriers.title}">Authorized Carriers</h2>
-
-                <div th:if="${not #lists.isEmpty(form.store.shippingConfiguration.authorizedCarriers)}" class="mb-4">
-                    <p class="has-text-weight-semibold mb-2" th:text="#{store.shipping.carriers.current}">Currently authorized:</p>
-                    <div class="tags">
-                        <span class="tag is-medium" th:each="carrier : ${form.store.shippingConfiguration.authorizedCarriers}"
-                              th:text="${carrier.displayName}"></span>
-                    </div>
-                </div>
-
-                <form th:action="@{/dashboard/store/shipping/carriers/fetch}" method="post">
-                    <input type="hidden" name="storeId" th:value="${form.store.storeId}"/>
-                    <div class="field">
-                        <div class="control">
-                            <button class="button is-info" type="button" onclick="confirmSave(this)"
-                                    th:text="#{store.shipping.carriers.fetch}">Fetch Available Carriers</button>
+            <div class="cl-stack">
+                <!--/* Courier account: read-only here, chosen and filled in on its own page (as the invoicing system). */-->
+                <section class="cl-card is-status" id="shipping-account" aria-labelledby="shipping-account-title"
+                         th:with="ok=${account.configured() and !webhookTokenMissing}">
+                    <div class="cl-card-head">
+                        <h2 class="cl-card-title" id="shipping-account-title">
+                            <i class="fas" th:classappend="${ok} ? 'fa-check-circle is-ok' : 'fa-exclamation-triangle is-warn'"
+                               aria-hidden="true"></i>
+                            <span th:if="${ok}" th:text="#{store.shipping.account.status.ok(${account.displayName()})}"></span>
+                            <span th:if="${account.configured() and webhookTokenMissing}"
+                                  th:text="#{store.shipping.account.status.unverified(${account.displayName()})}"></span>
+                            <span th:unless="${account.chosen()}" th:text="#{store.shipping.account.none.title}"></span>
+                            <span th:if="${account.chosen() and !account.installed()}"
+                                  th:text="#{store.shipping.account.missing.title(${account.providerName()})}"></span>
+                            <span th:if="${account.installed() and !account.configured()}"
+                                  th:text="#{store.shipping.account.status.incomplete(${account.displayName()})}"></span>
+                        </h2>
+                        <div class="cl-list-actions">
+                            <a class="cl-link-button" th:href="@{${accountHref}}"
+                               th:text="${!account.chosen()} ? #{store.shipping.account.connect}
+                                        : (${account.installed() and !account.configured()} ? #{store.shipping.account.complete} : #{store.shipping.account.change})"></a>
+                            <a th:if="${account.chosen()}" class="cl-link-button is-danger" th:href="@{${disconnectHref}}"
+                               data-cl-confirm th:text="#{store.shipping.account.disconnect}"
+                               th:attr="data-cl-confirm-title=#{store.shipping.account.disconnect.title(${account.displayName()})},
+                                        data-cl-confirm-message=#{store.shipping.account.disconnect.message},
+                                        data-cl-confirm-action=#{store.shipping.account.disconnect.action}"></a>
                         </div>
                     </div>
-                </form>
+                    <p class="cl-card-desc" th:classappend="${account.configured() and webhookTokenMissing} ? 'is-warn'"
+                       th:text="${ok} ? #{store.shipping.account.status.ok.text(${account.displayName()})}
+                                : (${account.configured()} ? #{store.shipping.account.status.unverified.text}
+                                : (${!account.chosen()} ? #{store.shipping.account.none.text}
+                                : (${!account.installed()} ? #{store.shipping.account.missing.text} : #{store.shipping.account.incomplete.text})))"></p>
+                </section>
 
-                <form th:if="${availableCarriers != null}" th:action="@{/dashboard/store/shipping/carriers/save}" method="post">
-                    <input type="hidden" name="storeId" th:value="${form.store.storeId}"/>
-
-                    <table class="table is-fullwidth is-striped">
-                        <thead>
-                        <tr>
-                            <th style="width: 60px"></th>
-                            <th th:text="#{fulfilment.name}">Name</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        <tr th:each="carrier, stat : ${availableCarriers}">
-                            <td style="text-align:center;">
-                                <input type="checkbox"
-                                       th:name="'carriers[' + ${stat.index} + '].selected'"
-                                       th:checked="${carrier.selected}"
-                                       value="true"/>
-                                <input type="hidden" th:name="'carriers[' + ${stat.index} + '].id'" th:value="${carrier.id}"/>
-                                <input type="hidden" th:name="'carriers[' + ${stat.index} + '].name'" th:value="${carrier.name}"/>
-                                <input type="hidden" th:name="'carriers[' + ${stat.index} + '].displayName'" th:value="${carrier.displayName}"/>
-                            </td>
-                            <td th:text="${carrier.displayName}"></td>
-                        </tr>
-                        </tbody>
-                    </table>
-
-                    <div class="field is-grouped">
-                        <div class="control">
-                            <button class="button is-primary" type="button" onclick="confirmSave(this)"
-                                    th:text="#{general.save}">Save</button>
+                <section class="cl-card" id="shipping-carriers" aria-labelledby="shipping-carriers-title">
+                    <div class="cl-card-head">
+                        <h2 class="cl-card-title" id="shipping-carriers-title" th:text="#{store.shipping.carriers.title}"></h2>
+                        <!--/* One setting, like the label sender: a text action; "+ Add" buttons belong to list cards. */-->
+                        <div th:if="${account.configured()}" class="cl-list-actions">
+                            <a class="cl-link-button" th:href="@{${carriersHref}}" th:text="#{store.shipping.carriers.choose}"
+                               th:attr="aria-label=#{store.shipping.carriers.change.label}"></a>
                         </div>
                     </div>
-                </form>
-            </div>
+                    <p class="cl-card-desc" th:text="#{store.shipping.carriers.description}"></p>
+                    <p th:unless="${carriers.isEmpty()}" class="cl-card-body" th:text="${#strings.listJoin(carriers, ' · ')}"></p>
+                    <p th:if="${carriers.isEmpty() and account.configured()}" class="cl-list-empty"
+                       th:text="#{store.shipping.carriers.empty(${account.displayName()})}"></p>
+                    <p th:if="${carriers.isEmpty() and !account.configured()}" class="cl-list-empty"
+                       th:text="#{store.shipping.carriers.noAccount}"></p>
+                </section>
 
-            <form th:action="@{/dashboard/store/shipping/pickup-sender/save}" th:object="${form}" method="post" class="mt-4">
-                <input type="hidden" th:field="*{store.storeId}"/>
-
-                <div class="box">
-                    <h2 class="subtitle" th:text="#{shipping.pickup.addresses}"></h2>
-                    <table class="table is-fullwidth is-striped">
-                        <thead>
-                        <tr>
-                            <th th:text="#{bank.default}"></th>
-                            <th th:text="#{order.address.company}"></th>
-                            <th th:text="#{order.address.street}"></th>
-                            <th th:text="#{order.address.postal}"></th>
-                            <th th:text="#{order.address.city}"></th>
-                            <th th:text="#{order.address.country}"></th>
-                            <th th:text="#{order.address.email}"></th>
-                            <th th:text="#{order.address.phone}"></th>
-                        </tr>
-                        </thead>
-
-                        <tbody>
-                        <tr th:each="ship, stat : *{store.shippingConfiguration.pickUpAddresses}">
-                            <td style="text-align:center;">
-                                <input type="radio" name="defaultPickupAddressId"
-                                       th:value="*{store.shippingConfiguration.pickUpAddresses[__${stat.index}__].id}"
-                                       th:checked="${ship._default}"/>
-                            </td>
-                            <input type="hidden" th:field="*{store.shippingConfiguration.pickUpAddresses[__${stat.index}__].id}" />
-                            <td><input class="input"
-                                       th:field="*{store.shippingConfiguration.pickUpAddresses[__${stat.index}__].companyName}"/></td>
-                            <td><input class="input"
-                                       th:field="*{store.shippingConfiguration.pickUpAddresses[__${stat.index}__].streetAndNumber}"/></td>
-                            <td><input class="input"
-                                       th:field="*{store.shippingConfiguration.pickUpAddresses[__${stat.index}__].postalCode}"
-                                       pattern="^\d{2}-\d{3}$"
-                                       th:title="#{shipping.postalCode.invalid}"/></td>
-                            <td><input class="input"
-                                       th:field="*{store.shippingConfiguration.pickUpAddresses[__${stat.index}__].city}"/></td>
-                            <td><input class="input"
-                                       th:field="*{store.shippingConfiguration.pickUpAddresses[__${stat.index}__].country}"/></td>
-                            <td><input class="input"
-                                       type="email"
-                                       th:field="*{store.shippingConfiguration.pickUpAddresses[__${stat.index}__].email}"
-                                       th:title="#{billing.email.invalid}"/></td>
-                            <td><input class="input"
-                                       th:field="*{store.shippingConfiguration.pickUpAddresses[__${stat.index}__].phone}"
-                                       pattern="[0-9+ ]{9,15}"
-                                       th:title="#{shipping.phone.invalid}"/>
-                            </td>
-                        </tr>
-                        </tbody>
-                    </table>
-
-                    <h2 class="subtitle" th:text="#{shipping.sender.addresses}"></h2>
-                    <table class="table is-fullwidth is-striped">
-                        <thead>
-                        <tr>
-                            <th th:text="#{bank.default}"></th>
-                            <th th:text="#{order.address.company}"></th>
-                            <th th:text="#{order.address.street}"></th>
-                            <th th:text="#{order.address.postal}"></th>
-                            <th th:text="#{order.address.city}"></th>
-                            <th th:text="#{order.address.country}"></th>
-                            <th th:text="#{order.address.email}"></th>
-                            <th th:text="#{order.address.phone}"></th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        <tr th:each="ship, stat : *{store.shippingConfiguration.senderAddresses}">
-                            <td style="text-align: center;">
-                                <input type="radio" name="defaultSenderAddressId"
-                                       th:value="*{store.shippingConfiguration.senderAddresses[__${stat.index}__].id}"
-                                       th:checked="${ship._default}"/>
-                            </td>
-                            <input type="hidden"
-                                   th:field="*{store.shippingConfiguration.senderAddresses[__${stat.index}__].id}" />
-                            <td><input class="input"
-                                       th:field="*{store.shippingConfiguration.senderAddresses[__${stat.index}__].companyName}"/></td>
-                            <td><input class="input"
-                                       th:field="*{store.shippingConfiguration.senderAddresses[__${stat.index}__].streetAndNumber}"/></td>
-                            <td><input class="input"
-                                       th:field="*{store.shippingConfiguration.senderAddresses[__${stat.index}__].postalCode}"
-                                       pattern="^\d{2}-\d{3}$"
-                                       th:title="#{shipping.postalCode.invalid}"/></td>
-                            <td><input class="input"
-                                       th:field="*{store.shippingConfiguration.senderAddresses[__${stat.index}__].city}"/></td>
-                            <td><input class="input"
-                                       th:field="*{store.shippingConfiguration.senderAddresses[__${stat.index}__].country}"/></td>
-                            <td><input class="input"
-                                       type="email"
-                                       th:field="*{store.shippingConfiguration.senderAddresses[__${stat.index}__].email}"
-                                       th:title="#{billing.email.invalid}"/></td>
-                            <td><input class="input"
-                                       th:field="*{store.shippingConfiguration.senderAddresses[__${stat.index}__].phone}"
-                                       pattern="[0-9+ ]{9,15}"
-                                       th:title="#{shipping.phone.invalid}"/></td>
-                        </tr>
-                        </tbody>
-                    </table>
-
-                    <div class="field is-grouped">
-                        <div class="control">
-                            <button class="button is-primary" type="submit" th:text="#{general.save}"></button>
-                        </div>
+                <section class="cl-card" id="shipping-addresses" aria-labelledby="shipping-addresses-title">
+                    <div class="cl-card-head">
+                        <h2 class="cl-card-title" id="shipping-addresses-title" th:text="#{store.shipping.addresses.title}"></h2>
+                        <a class="cl-button" th:href="@{${newAddressHref}}">
+                            <i class="fas fa-plus" aria-hidden="true"></i>
+                            <span th:text="#{store.warehouse.addresses.add}"></span>
+                        </a>
                     </div>
-                </div>
-            </form>
-
-            <div class="mt-4">
-                <div class="box">
-                    <h2 class="subtitle" th:text="#{shipping.package.templates}"></h2>
-
-                    <table class="table is-fullwidth is-striped">
-                        <thead>
-                        <tr>
-                            <th style="width: 80px" th:text="#{bank.default}"></th>
-                            <th th:text="#{fulfilment.name}"></th>
-                            <th th:text="#{general.actions}"></th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        <tr th:each="tpl, tplStat : *{form.store.shippingConfiguration.packageTemplates}">
-                            <td style="text-align: center;">
-                                <span th:if="${tpl.default}" class="tag is-success" th:text="#{general.yes}"></span>
-                                <span th:if="${!tpl.default}" class="has-text-grey" th:text="#{general.no}"></span>
-                            </td>
-                            <td><span th:text="*{tpl.name}" /></td>
-                            <td>
-                                <div class="dropdown is-hoverable is-right">
-                                    <div class="dropdown-trigger">
-                                        <button class="button is-small is-ghost"
-                                                aria-haspopup="true"
-                                                aria-controls="shipping-template-actions">
-                <span class="icon is-small">
-                    <i class="fas fa-ellipsis-v" aria-hidden="true"></i>
-                </span>
-                                        </button>
-                                    </div>
-
-                                    <div class="dropdown-menu" role="menu">
-                                        <div class="dropdown-content">
-                                            <a th:if="${tpl.isComplete()}" class="dropdown-item"
-                                               th:href="@{/dashboard/store/shipping/templates/edit(templateId=${tpl.id})}"
-                                               th:text="#{shipping.package.template.edit}">
-                                            </a>
-                                            <form th:if="${!tpl.default}" th:action="@{/dashboard/store/shipping/templates/default}" method="post">
-                                                <input type="hidden" name="storeId" th:value="${form.store.storeId}"/>
-                                                <input type="hidden" name="templateId" th:value="${tpl.id}"/>
-                                                <button type="submit"
-                                                        class="dropdown-item button is-ghost is-shadowless has-text-left"
-                                                        style="width:100%;text-decoration:none;">
-                                                    <span th:text="#{shipping.save.as.default}"></span>
-                                                </button>
-                                            </form>
-                                            <hr class="dropdown-divider">
-                                            <form th:action="@{/dashboard/store/shipping/templates/delete}" method="post">
-                                                <input type="hidden" name="storeId" th:value="${form.store.storeId}"/>
-                                                <input type="hidden" name="templateId" th:value="${tpl.id}"/>
-                                                <button type="button"
-                                                        class="dropdown-item button is-ghost is-shadowless has-text-left has-text-danger"
-                                                        style="width:100%;text-decoration:none;"
-                                                        onclick="confirmDelete(this)">
-                                                    <span th:text="#{general.delete}"></span>
-                                                </button>
-                                            </form>
-
-                                        </div>
-                                    </div>
+                    <p class="cl-card-desc" th:text="#{store.shipping.addresses.description}"></p>
+                    <ul th:unless="${addresses.isEmpty()}" class="cl-list">
+                        <li class="cl-list-item" th:each="address : ${addresses}"
+                            th:with="name=${#strings.isEmpty(address.title())} ? #{settings.list.untitled} : ${address.title()}">
+                            <div>
+                                <div class="cl-list-title">
+                                    <span th:text="${name}"></span>
+                                    <span th:if="${address.isDefault()}" class="cl-status is-info" th:text="#{settings.list.default}"></span>
+                                    <span th:unless="${address.complete()}" class="cl-status is-warn" th:text="#{settings.list.incomplete}"></span>
+                                    <form th:if="${!address.isDefault() and address.complete()}" class="cl-list-title-action" method="post"
+                                          th:action="@{${address.defaultHref()}}">
+                                        <button type="submit" class="cl-link-button" th:text="#{settings.list.makeDefault}"
+                                                th:attr="aria-label=#{settings.list.makeDefault.for(${name})}"></button>
+                                    </form>
                                 </div>
-                            </td>
+                                <p th:if="${address.addressLine() != null}" class="cl-list-desc" th:text="${address.addressLine()}"></p>
+                                <p th:if="${address.contactLine() != null and address.complete()}" class="cl-list-desc" th:text="${address.contactLine()}"></p>
+                                <p th:unless="${address.complete()}" class="cl-list-desc is-warn"
+                                   th:text="#{store.warehouse.addresses.missing(${#strings.listJoin(#messages.listMsg(address.missingFieldKeys()), ', ')})}"></p>
+                            </div>
+                            <div class="cl-list-actions">
+                                <a class="cl-link-button" th:href="@{${address.editHref()}}"
+                                   th:text="${address.complete()} ? #{settings.list.edit} : #{settings.list.complete}"
+                                   th:attr="aria-label=${address.complete()} ? #{settings.list.edit.for(${name})} : #{settings.list.complete.for(${name})}"></a>
+                                <a class="cl-link-button is-danger" th:href="@{${address.deleteHref()}}" data-cl-confirm
+                                   th:text="#{settings.list.delete}"
+                                   th:attr="aria-label=#{settings.list.delete.for(${name})},
+                                            data-cl-confirm-title=#{store.shipping.address.delete.title(${name})},
+                                            data-cl-confirm-message=${address.isDefault()} ? #{store.shipping.address.delete.message.default} : #{store.shipping.address.delete.message},
+                                            data-cl-confirm-action=#{store.shipping.address.delete.action}"></a>
+                            </div>
+                        </li>
+                    </ul>
+                    <p th:if="${addresses.isEmpty()}" class="cl-list-empty" th:text="#{store.shipping.addresses.empty}"></p>
+                </section>
 
-                        </tr>
-                        </tbody>
-                    </table>
-                    <div class="field is-grouped mt-4">
-                        <a class="button is-primary" th:href="@{/dashboard/store/shipping/templates/new}" th:text="#{shipping.package.template.add}"></a>
+                <section class="cl-card" id="shipping-sender" aria-labelledby="shipping-sender-title">
+                    <div class="cl-card-head">
+                        <h2 class="cl-card-title" id="shipping-sender-title" th:text="#{store.shipping.sender.title}"></h2>
+                        <div class="cl-list-actions">
+                            <a class="cl-link-button" th:href="@{${senderHref}}" th:text="#{store.shipping.sender.change}"
+                               th:attr="aria-label=#{store.shipping.sender.change.label}"></a>
+                        </div>
                     </div>
-                </div>
+                    <p class="cl-card-desc" th:text="#{store.shipping.sender.description}"></p>
+                    <p th:if="${sender == null}" class="cl-card-body" th:text="#{store.shipping.sender.pickup}"></p>
+                    <p th:if="${sender != null}" class="cl-card-body">
+                        <span class="cl-card-body-title" th:text="${sender.title()}"></span>
+                        <span th:if="${sender.addressLine() != null}" class="cl-card-body-line" th:text="${sender.addressLine()}"></span>
+                    </p>
+                </section>
+
+                <section class="cl-card" id="shipping-templates" aria-labelledby="shipping-templates-title">
+                    <div class="cl-card-head">
+                        <h2 class="cl-card-title" id="shipping-templates-title" th:text="#{store.shipping.templates.title}"></h2>
+                        <a class="cl-button" th:href="@{${newTemplateHref}}">
+                            <i class="fas fa-plus" aria-hidden="true"></i>
+                            <span th:text="#{store.shipping.templates.add}"></span>
+                        </a>
+                    </div>
+                    <p class="cl-card-desc" th:text="#{store.shipping.templates.description}"></p>
+                    <ul th:unless="${templates.isEmpty()}" class="cl-list">
+                        <li class="cl-list-item" th:each="template : ${templates}"
+                            th:with="name=${#strings.isEmpty(template.name())} ? #{settings.list.untitled} : ${template.name()}">
+                            <div>
+                                <div class="cl-list-title">
+                                    <span th:text="${name}"></span>
+                                    <span th:if="${template.isDefault()}" class="cl-status is-info" th:text="#{settings.list.default}"></span>
+                                    <span th:if="${template.forReturns()}" class="cl-status is-neutral" th:text="#{store.shipping.templates.returns}"></span>
+                                    <span th:unless="${template.complete()}" class="cl-status is-warn" th:text="#{settings.list.incomplete}"></span>
+                                    <form th:if="${!template.isDefault() and template.complete()}" class="cl-list-title-action" method="post"
+                                          th:action="@{${template.defaultHref()}}">
+                                        <button type="submit" class="cl-link-button" th:text="#{settings.list.makeDefault}"
+                                                th:attr="aria-label=#{settings.list.makeDefault.for(${name})}"></button>
+                                    </form>
+                                </div>
+                                <p th:each="parcel : ${template.parcels()}" class="cl-list-desc cl-tabular" th:text="${parcel}"></p>
+                                <p th:unless="${template.complete()}" class="cl-list-desc is-warn"
+                                   th:text="${template.parcels().isEmpty()} ? #{store.shipping.templates.noParcels} : #{store.shipping.templates.incompleteParcel}"></p>
+                            </div>
+                            <div class="cl-list-actions">
+                                <a class="cl-link-button" th:href="@{${template.editHref()}}"
+                                   th:text="${template.complete()} ? #{settings.list.edit} : #{settings.list.complete}"
+                                   th:attr="aria-label=${template.complete()} ? #{settings.list.edit.for(${name})} : #{settings.list.complete.for(${name})}"></a>
+                                <a class="cl-link-button is-danger" th:href="@{${template.deleteHref()}}" data-cl-confirm
+                                   th:text="#{settings.list.delete}"
+                                   th:attr="aria-label=#{settings.list.delete.for(${name})},
+                                            data-cl-confirm-title=#{store.shipping.template.delete.title(${name})},
+                                            data-cl-confirm-message=${template.forReturns()} ? #{store.shipping.template.delete.message.returns} : #{store.shipping.template.delete.message},
+                                            data-cl-confirm-action=#{store.shipping.template.delete.action}"></a>
+                            </div>
+                        </li>
+                    </ul>
+                    <p th:if="${templates.isEmpty()}" class="cl-list-empty" th:text="#{store.shipping.templates.empty}"></p>
+                    <p th:unless="${templates.isEmpty()}" class="cl-card-desc cl-card-note" th:text="#{store.shipping.templates.returnsHelp}"></p>
+                </section>
             </div>
 
-            <div class="field mt-4">
-                <a th:href="@{/dashboard/store}" class="button is-light" th:text="#{general.cancel}"></a>
-            </div>
+            <dialog th:replace="~{fragments/confirm-dialog :: dialog}"></dialog>
         </div>
     </section>
-
+    <script th:src="@{/js/confirm-dialog.js}" defer></script>
 </div>
-
 </body>
 </html>

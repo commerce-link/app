@@ -60,6 +60,17 @@ class StoreSupplierFeedSchedulerTest {
     }
 
     @Test
+    void anIntervalChosenByTheShopStartsAtARandomMinuteWithinIt() {
+        // when
+        scheduler.schedule("store-1", "Acme", "0/30 * * * ? *");
+
+        // then
+        ArgumentCaptor<String> expression = ArgumentCaptor.forClass(String.class);
+        verify(schedules).put(eq("supplier-feed-store-1-acme"), expression.capture(), eq(QUEUE_ARN), anyString());
+        assertThat(expression.getValue()).matches("cron\\((\\d|[12]\\d)/30 \\* \\* \\* \\? \\*\\)");
+    }
+
+    @Test
     void createsScheduleWithTheSuppliedCron() {
         // when
         scheduler.schedule("store-1", "Ingram Micro", "0/30 9-17 * * ? *");
@@ -147,5 +158,18 @@ class StoreSupplierFeedSchedulerTest {
 
         // then
         verify(schedules).delete("supplier-feed-store-1-acme");
+    }
+
+    @Test
+    void scheduleNameOfATokenedIdentityStaysWithinEventBridgeLimits() {
+        // when
+        scheduler.schedule("oh4d5y15it", "IngramMicro-k7f3a9c2", "0 6 * * ? *");
+
+        // then
+        ArgumentCaptor<String> name = ArgumentCaptor.forClass(String.class);
+        verify(schedules).put(name.capture(), anyString(), anyString(), anyString());
+        assertThat(name.getValue()).isEqualTo("supplier-feed-oh4d5y15it-ingrammicro-k7f3a9c2")
+                .hasSizeLessThanOrEqualTo(64)
+                .matches("^[0-9a-zA-Z-_.]+$");
     }
 }

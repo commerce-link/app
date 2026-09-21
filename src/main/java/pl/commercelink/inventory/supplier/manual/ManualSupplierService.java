@@ -1,9 +1,13 @@
 package pl.commercelink.inventory.supplier.manual;
 
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import pl.commercelink.inventory.StoreInventoryCache;
 import pl.commercelink.inventory.supplier.StoreFeedRepository;
+import pl.commercelink.inventory.supplier.SupplierConnectionValidator;
+import pl.commercelink.inventory.supplier.SupplierIdentity;
+import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.CsvRowParser;
 import pl.commercelink.starter.csv.CSVLoader;
@@ -19,31 +23,34 @@ import java.io.Reader;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.regex.Pattern;
 
 @Service
 @RequiredArgsConstructor
 public class ManualSupplierService {
 
-    private static final Pattern VALID_LABEL = Pattern.compile("^[A-Za-z0-9 _-]{1,60}$");
 
     private final StoresRepository storesRepository;
     private final StoreFeedRepository storeFeedRepository;
-    private final SupplierRegistry supplierRegistry;
     private final StoreInventoryCache storeInventoryCache;
+    private final SupplierRegistry supplierRegistry;
 
-    public record Result(boolean ok, String messageCode) {
+    public record Result(boolean ok, String messageCode, String identity) {
         public static Result success() {
-            return new Result(true, null);
+            return new Result(true, null, null);
+        }
+
+        public static Result created(String identity) {
+            return new Result(true, null, identity);
         }
 
         public static Result error(String messageCode) {
-            return new Result(false, messageCode);
+            return new Result(false, messageCode, null);
         }
     }
 
     public record ManualSelection(String identity, boolean enabled, boolean includeInPricing,
-                                  boolean includeInFulfilment) {
+                                  boolean includeInFulfilment, String externalSupplierId, String label,
+                                  String billingShortcut) {
     }
 
     public Result create(String storeId, String label) {
@@ -52,19 +59,71 @@ public class ManualSupplierService {
             return Result.error("store.manual.error.store.notfound");
         }
         String trimmed = label == null ? "" : label.trim();
-        if (!VALID_LABEL.matcher(trimmed).matches()) {
+        if (trimmed.isEmpty() || trimmed.length() > SupplierConnectionValidator.MAX_LABEL_LENGTH) {
             return Result.error("store.manual.error.name.invalid");
         }
-        String identity = ManualSupplierInfos.identityFor(trimmed);
-        if (collidesWithStatic(trimmed) || alreadyExists(store, identity)) {
+        if (reservedName(trimmed)) {
+            return Result.error("store.supplier.connection.error.label.reserved");
+        }
+        if (labelTaken(store, trimmed, null)) {
             return Result.error("store.manual.error.name.taken");
         }
+        String identity = freshIdentity(store);
+        if (identity == null) {
+            return Result.error("store.supplier.connection.error.identity.exhausted");
+        }
         StoreSupplierConnection connection = new StoreSupplierConnection(identity, ConnectionMode.MANUAL, true, true);
+        connection.setLabel(trimmed);
         connection.setEnabled(false);
         connections(store).add(connection);
         storesRepository.save(store);
         storeInventoryCache.evict(storeId);
-        return Result.success();
+        return Result.created(identity);
+    }
+
+    private String freshIdentity(Store store) {
+        return SupplierIdentity.firstFresh(this::newIdentity, candidate -> alreadyExists(store, candidate))
+                .orElse(null);
+    }
+
+    /** Seam for tests that need a deterministic collision. */
+    String newIdentity() {
+        return SupplierIdentity.newInstance(SupplierIdentity.MANUAL_TYPE);
+    }
+
+    // Labels are unique across every connection of the store, whatever its mode, so the operator
+    // never sees two rows with the same name.
+    private boolean labelTaken(Store store, String label, String exceptIdentity) {
+        return connections(store).stream()
+                .filter(connection -> !connection.getSupplierName().equals(exceptIdentity))
+                .anyMatch(connection -> SupplierLabels.labelOf(connection).equalsIgnoreCase(label));
+    }
+
+    /**
+     * Why a name cannot be given to a manual supplier (null when it can), checked before anything is written so a form
+     * that also uploads a file saves both or neither. exceptIdentity is the supplier being renamed, or null for a new one.
+     */
+    public String labelProblem(Store store, String exceptIdentity, String label) {
+        String trimmed = StringUtils.trimToNull(label);
+        if (trimmed == null || trimmed.length() > SupplierConnectionValidator.MAX_LABEL_LENGTH) {
+            return "store.manual.error.name.invalid";
+        }
+        if (reservedName(trimmed)) {
+            return "store.supplier.connection.error.label.reserved";
+        }
+        if (labelTaken(store, trimmed, exceptIdentity)) {
+            return "store.manual.error.name.taken";
+        }
+        return null;
+    }
+
+    /** Whether a price list has at least one row the feed loader would load, checked before it is stored. */
+    public boolean isLoadable(byte[] csvBytes) {
+        return hasAtLeastOneLoadableRow(SupplierIdentity.MANUAL_TYPE, csvBytes);
+    }
+
+    public boolean hasFeed(String storeId, String identity) {
+        return storeFeedRepository.canRead(storeId, identity, "csv");
     }
 
     public Result delete(String storeId, String identity) {
@@ -96,10 +155,21 @@ public class ManualSupplierService {
         return Result.success();
     }
 
-    public void applySelections(String storeId, List<ManualSelection> selections) {
+    /**
+     * Every rename is validated before anything is written: a label the operator cannot have is a
+     * rejected save, not a silently dropped field. Validation runs over the whole batch first so a
+     * bad label in one selection never leaves the others half-applied.
+     */
+    public Result applySelections(String storeId, List<ManualSelection> selections) {
         Store store = storesRepository.findById(storeId);
         if (store == null) {
-            return;
+            return Result.error("store.manual.error.store.notfound");
+        }
+        for (ManualSelection selection : selections) {
+            Result rejected = rejectLabel(store, selection);
+            if (rejected != null) {
+                return rejected;
+            }
         }
         for (ManualSelection selection : selections) {
             for (StoreSupplierConnection connection : connections(store)) {
@@ -109,15 +179,46 @@ public class ManualSupplierService {
                     connection.setEnabled(selection.enabled() && hasFeed);
                     connection.setIncludeInPricing(selection.includeInPricing());
                     connection.setIncludeInFulfilment(selection.includeInFulfilment());
+                    connection.setExternalSupplierId(StringUtils.trimToNull(selection.externalSupplierId()));
+                    connection.setBillingShortcut(StringUtils.trimToNull(selection.billingShortcut()));
+                    String label = submittedLabel(selection);
+                    if (label != null) {
+                        connection.setLabel(label);
+                    }
                 }
             }
         }
         storesRepository.save(store);
         storeInventoryCache.evict(storeId);
+        return Result.success();
     }
 
-    private boolean collidesWithStatic(String label) {
-        return supplierRegistry.getAllSupplierNames().stream().anyMatch(label::equalsIgnoreCase);
+    // An absent label field means "leave the name alone"; a present but unusable one is an error.
+    private Result rejectLabel(Store store, ManualSelection selection) {
+        if (selection.label() == null) {
+            return null;
+        }
+        String label = submittedLabel(selection);
+        if (label == null || label.length() > SupplierConnectionValidator.MAX_LABEL_LENGTH) {
+            return Result.error("store.manual.error.name.invalid");
+        }
+        if (reservedName(label)) {
+            return Result.error("store.supplier.connection.error.label.reserved");
+        }
+        if (labelTaken(store, label, selection.identity())) {
+            return Result.error("store.manual.error.name.taken");
+        }
+        return null;
+    }
+
+    // A manual supplier named like a built-in entry or an external supplier type would show up as
+    // a duplicate row in every supplier select, so every registry name is off limits here.
+    private boolean reservedName(String label) {
+        return supplierRegistry.getAllSupplierNames().stream().anyMatch(name -> name.equalsIgnoreCase(label));
+    }
+
+    private String submittedLabel(ManualSelection selection) {
+        return StringUtils.trimToNull(selection.label());
     }
 
     private boolean alreadyExists(Store store, String identity) {

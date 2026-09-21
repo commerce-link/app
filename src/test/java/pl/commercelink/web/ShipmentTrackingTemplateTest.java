@@ -13,6 +13,7 @@ class ShipmentTrackingTemplateTest {
 
     private static final Path ORDER_DETAILS = Path.of("src/main/resources/templates/orderDetails.html");
     private static final Path STORE_SHIPPING = Path.of("src/main/resources/templates/store-shipping.html");
+    private static final Path SHIPPING_ACCOUNT = Path.of("src/main/resources/templates/store-shipping-account.html");
     private static final Path MESSAGES_PL = Path.of("src/main/resources/messages_pl.properties");
     private static final Path MESSAGES_EN = Path.of("src/main/resources/messages_en.properties");
 
@@ -21,14 +22,13 @@ class ShipmentTrackingTemplateTest {
             "order.shipment.tracking.status.PENDING",
             "order.shipment.tracking.status.ACTIVE",
             "order.shipment.tracking.status.FAILED",
-            "store.shipping.title",
-            "store.shipping.webhook.title",
-            "store.shipping.webhook.lead",
-            "store.shipping.webhook.url",
-            "store.shipping.webhook.token",
-            "store.shipping.webhook.states",
-            "store.shipping.webhook.help",
-            "store.shipping.webhook.tokenMissing");
+            "store.shipping.account.webhook",
+            "store.shipping.account.webhook.help",
+            "store.shipping.account.webhook.steps.states",
+            "store.shipping.account.webhook.steps.token",
+            "store.shipping.account.webhookToken.help",
+            "store.shipping.account.status.unverified",
+            "store.shipping.account.status.unverified.text");
 
     private static String read(Path path) throws Exception {
         return Files.readString(path, StandardCharsets.UTF_8);
@@ -55,15 +55,15 @@ class ShipmentTrackingTemplateTest {
     }
 
     @Test
-    void shippingConfigurationShowsWebhookUrlOnlyForSelectedProvider() throws Exception {
+    void theCourierAccountPageShowsTheWebhookAddressOfEveryProviderThatHasOne() throws Exception {
         // when
-        String html = read(STORE_SHIPPING);
+        String account = read(SHIPPING_ACCOUNT);
+        String hub = read(STORE_SHIPPING);
 
         // then
-        assertThat(html).contains("${shippingWebhookUrl}");
-        assertThat(html).contains("th:if=\"${shippingWebhookUrl != null}\"");
-        assertThat(html).contains("#{store.shipping.webhook.title}");
-        assertThat(html).contains("th:if=\"${webhookTokenMissing}\"");
+        assertThat(account).contains("th:if=\"${webhooks[provider.name()] != null}\"");
+        assertThat(account).contains("settings-form :: copyField('webhook-'");
+        assertThat(hub).contains("#{store.shipping.account.status.unverified(");
     }
 
     @Test
@@ -79,21 +79,18 @@ class ShipmentTrackingTemplateTest {
         }
     }
 
+    /** The Furgonetka webhook guidance moved from the shipping screen guide to the courier account page. */
     @Test
-    void shippingScreenHasHelpPanelWithFurgonetkaGuidance() throws Exception {
+    void theCourierAccountPageGuidesTheWebhookSetup() throws Exception {
         // when
-        String html = read(STORE_SHIPPING);
+        String html = read(STORE_SHIPPING.resolveSibling("store-shipping-account.html"));
         String pl = read(MESSAGES_PL);
         String en = read(MESSAGES_EN);
 
         // then
-        assertThat(html).contains("~{fragments/screen-intro :: panel('shipping'");
-        assertThat(html).contains("~{fragments/screen-intro :: toggle}");
-        for (String suffix : List.of("title", "lead", "item1", "item1.text", "item2", "item2.text", "item3", "item3.text")) {
-            assertThat(pl).contains("\nintro.shipping." + suffix + "=");
-            assertThat(en).contains("\nintro.shipping." + suffix + "=");
-        }
-        assertThat(pl).contains("Furgonetk");
-        assertThat(en).contains("Furgonetka");
+        assertThat(read(STORE_SHIPPING)).doesNotContain("screen-intro");
+        assertThat(html).contains("store.shipping.account.webhook.steps.states");
+        assertThat(pl).contains("\nstore.shipping.account.webhook.steps.states=");
+        assertThat(en).contains("\nstore.shipping.account.webhook.steps.states=");
     }
 }

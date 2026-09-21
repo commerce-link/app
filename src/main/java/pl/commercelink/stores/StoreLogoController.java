@@ -18,6 +18,9 @@ public class StoreLogoController {
     @GetMapping("/StoreLogo/{storeId}")
     public ResponseEntity<?> getStoreLogo(@PathVariable String storeId) {
         String location = storesRepository.findLogoLocationWithExtension(storeId);
+        if (location == null) {
+            return ResponseEntity.notFound().build();
+        }
         try {
             byte[] data = storesRepository.getLogoResponse(storeId);
             if (data == null) {

@@ -1,5 +1,6 @@
 package pl.commercelink.orders.rma;
 
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import pl.commercelink.orders.Shipment;
@@ -16,13 +17,16 @@ import java.util.stream.Collectors;
 @Service
 public class RMAShippingService {
 
+    /** Package templates offered to a customer returning goods are the ones named with this prefix. */
+    public static final String RETURN_TEMPLATE_PREFIX = "RMA - ";
+
     @Autowired
     private ShippingService shippingService;
 
     public List<RMAReturnOption> getAvailableReturnOptions(Store store) {
         return store.getPackageTemplates()
                 .stream()
-                .filter(template -> template.getName().startsWith("RMA - "))
+                .filter(template -> StringUtils.startsWith(template.getName(), RETURN_TEMPLATE_PREFIX))
                 .map(RMAReturnOption::from)
                 .collect(Collectors.toList());
     }

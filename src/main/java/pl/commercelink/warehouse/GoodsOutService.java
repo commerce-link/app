@@ -76,12 +76,12 @@ class GoodsOutService {
 
         Store store = storesRepository.findById(order.getStoreId());
         WarehouseConfiguration warehouseConfiguration = store.getWarehouseConfiguration();
-        if (warehouseConfiguration == null || !warehouseConfiguration.isComplete()) {
-            return OperationResult.failure("Warehouse configuration is missing for store: " + order.getStoreId());
+        if (warehouseConfiguration == null || !warehouseConfiguration.isDocumentsGenerationEnabled()) {
+            return OperationResult.success();
         }
 
-        if (!warehouseConfiguration.isDocumentsGenerationEnabled()) {
-            return OperationResult.success();
+        if (!warehouseConfiguration.isComplete()) {
+            return OperationResult.failure("Warehouse configuration is missing for store: " + order.getStoreId());
         }
 
         return triggerGoodsOutDocumentGeneration(order, store, warehouseConfiguration, warehouseItems, createdBy);

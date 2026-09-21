@@ -29,6 +29,20 @@ class OrderTest {
     }
 
     @Test
+    @DisplayName("canBeSplit allows every status before realization and none from realization on")
+    void canBeSplitDependsOnStatus() {
+        for (OrderStatus status : OrderStatus.values()) {
+            // given
+            Order order = new Order("store-1");
+            order.setStatus(status);
+
+            // when / then
+            boolean expected = status.isOneOf(OrderStatus.New, OrderStatus.Blocked, OrderStatus.Assembly, OrderStatus.Assembled);
+            assertThat(order.canBeSplit()).as(status.name()).isEqualTo(expected);
+        }
+    }
+
+    @Test
     @DisplayName("createClientOrderUrl builds the public status page link under the given domain")
     void createClientOrderUrlBuildsPublicLink() {
         // given
@@ -229,6 +243,24 @@ class OrderTest {
         order.setBillingDetails(new BillingDetails());
         order.setStatus(OrderStatus.New);
         return order;
+    }
+
+    @Test
+    @DisplayName("createSplit keeps the supplier the marketplace routed to")
+    void splitOrderKeepsTheSupplierTheMarketplaceRoutedTo() {
+        // given
+        Order order = new Order("store-1");
+        order.setOrderId("order-1");
+        order.setBillingDetails(new BillingDetails());
+        order.setShippingDetails(new ShippingDetails());
+        order.setExternalSupplierId("2");
+
+        // when
+        Order split = order.createSplit();
+
+        // then
+        assertThat(split.getExternalSupplierId()).isEqualTo("2");
+        assertThat(split.isBoundToExternalSupplier()).isTrue();
     }
 
     @Test

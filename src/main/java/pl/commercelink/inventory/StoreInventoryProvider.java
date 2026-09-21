@@ -10,7 +10,6 @@ import pl.commercelink.inventory.supplier.SupplierProviderFactory;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
 import pl.commercelink.inventory.supplier.api.SupplierProviderDescriptor;
 import pl.commercelink.inventory.supplier.manual.ManualSupplierDescriptor;
-import pl.commercelink.inventory.supplier.manual.ManualSupplierInfos;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoreSupplierConnection;
@@ -81,7 +80,7 @@ public class StoreInventoryProvider {
             }
             SupplierProviderDescriptor descriptor = descriptorFor(connection);
             if (descriptor != null) {
-                ownItems.addAll(storeFeedItemLoader.load(storeId, descriptor, sellRates));
+                ownItems.addAll(storeFeedItemLoader.load(storeId, connection.getSupplierName(), descriptor, sellRates));
             }
         }
 
@@ -89,9 +88,10 @@ public class StoreInventoryProvider {
     }
 
     private SupplierProviderDescriptor descriptorFor(StoreSupplierConnection connection) {
+        String identity = connection.getSupplierName();
         if (connection.getMode() == ConnectionMode.MANUAL) {
-            return new ManualSupplierDescriptor(ManualSupplierInfos.label(connection.getSupplierName()));
+            return ManualSupplierDescriptor.forIdentity(identity);
         }
-        return supplierProviderFactory.getDescriptor(connection.getSupplierName());
+        return supplierProviderFactory.getDescriptor(identity);
     }
 }

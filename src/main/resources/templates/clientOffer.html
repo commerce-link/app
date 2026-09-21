@@ -141,7 +141,7 @@
 
     <div th:if="false">
         <form th:fragment="variantForm(line)" class="variant-form" th:action="@{|${offerPath}/select-variant|}" method="post"
-              th:style="'--payment-primary-color:' + ${branding.primaryColor}">
+              th:style="${#strings.isEmpty(branding.safePrimaryColor)} ? null : '--payment-primary-color:' + ${branding.safePrimaryColor}">
             <input type="hidden" name="groupId" th:value="${line.groupId()}" />
             <div class="variant-head"><span class="tag is-info is-light" th:text="#{offers.variant.choose}"></span></div>
             <div class="variant-pick">
@@ -246,7 +246,7 @@
                             <div th:replace="~{fragments/billing-shipping-form :: billingShippingForm(${form})}"></div>
 
                             <div class="field" style="margin-top: 20px">
-                                <button class="button is-primary" type="submit" th:style="'background-color:' + ${branding.primaryColor}" th:text="#{general.submit}"></button>
+                                <button class="button is-primary" type="submit" th:style="${#strings.isEmpty(branding.safePrimaryColor)} ? null : 'background-color:' + ${branding.safePrimaryColor}" th:text="#{general.submit}"></button>
                             </div>
                         </form>
                     </div>
@@ -391,15 +391,15 @@
                                 <strong th:text="#{bank.iban} + ':'"></strong>
                                 <span th:text="${bankAccount.iban}"></span>
                             </li>
-                            <li class="mb-2">
+                            <li class="mb-2" th:if="${!#strings.isEmpty(bankAccount.swiftCode)}">
                                 <strong th:text="#{bank.swift} + ':'"></strong>
                                 <span th:text="${bankAccount.swiftCode}"></span>
                             </li>
-                            <li class="mb-2">
+                            <li class="mb-2" th:if="${!#strings.isEmpty(bankAccount.bankName)}">
                                 <strong th:text="#{bank.name} + ':'"></strong>
                                 <span th:text="${bankAccount.bankName}"></span>
                             </li>
-                            <li class="mb-2">
+                            <li class="mb-2" th:if="${!#strings.isEmpty(bankAccount.currency)}">
                                 <strong th:text="#{bank.currency} + ':'"></strong>
                                 <span th:text="${bankAccount.currency}"></span>
                             </li>
@@ -416,7 +416,8 @@
 
                         <div th:if="${#lists.size(paymentOptions) > 1}" class="box payment-method-box"
                              th:classappend="${!submitted} ? 'is-locked' : ''"
-                             th:style="'padding: 1.5rem; margin-top: 1rem; --payment-primary-color:' + ${branding.primaryColor}">
+                             style="padding: 1.5rem; margin-top: 1rem;"
+                             th:styleappend="${#strings.isEmpty(branding.safePrimaryColor)} ? null : '--payment-primary-color:' + ${branding.safePrimaryColor}">
                             <p class="label" th:text="#{offer.payment.method.title}"></p>
                             <div class="columns is-multiline is-mobile is-variable is-2">
                                 <div class="column is-half" th:each="option : ${paymentOptions}">
@@ -446,7 +447,8 @@
                               th:attr="data-tooltip=${!submitted} ? #{offer.payment.locked.notice} : null">
                             <button type="submit" class="button is-primary"
                                     th:disabled="${!submitted}"
-                                    th:style="'background-color:' + ${branding.primaryColor} + ' !important; color: #fff; width: 100%; margin-top: 1rem;'">
+                                    style="width: 100%; margin-top: 1rem;"
+                                    th:styleappend="${#strings.isEmpty(branding.safePrimaryColor)} ? null : 'background-color:' + ${branding.safePrimaryColor} + ' !important; color: #fff;'">
                                 <span th:text="#{offer.payment.btn.text}">Order and pay</span>
                             </button>
                         </span>

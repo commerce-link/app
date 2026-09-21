@@ -11,6 +11,8 @@ import pl.commercelink.marketplace.api.MarketplaceProvider;
 import pl.commercelink.marketplace.api.MarketplaceReturn;
 import pl.commercelink.marketplace.api.MarketplaceReturnStatus;
 import pl.commercelink.marketplace.api.MarketplaceReturns;
+import pl.commercelink.scheduling.ScheduledExecutionCounter;
+import pl.commercelink.scheduling.ScheduledExecution;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 
@@ -28,6 +30,7 @@ import static org.mockito.Mockito.when;
 class MarketplaceReturnsImportEventListenerTest {
 
     private static final String MARKETPLACE = "Allegro";
+    private static final String STORE_ID = "store-1";
 
     @Mock private StoresRepository storesRepository;
     @Mock private MarketplaceReturnImporter marketplaceReturnImporter;
@@ -35,6 +38,7 @@ class MarketplaceReturnsImportEventListenerTest {
     @Mock private Store store;
     @Mock private MarketplaceProvider provider;
     @Mock private MarketplaceReturns returns;
+    @Mock private ScheduledExecutionCounter scheduledExecutionCounter;
 
     @InjectMocks
     private MarketplaceReturnsImportEventListener listener;
@@ -43,43 +47,45 @@ class MarketplaceReturnsImportEventListenerTest {
             MarketplaceReturnStatus.DECLARED, LocalDateTime.now(), List.of(), List.of());
 
     private void stubActiveStore() {
-        when(storesRepository.findAll()).thenReturn(List.of(store));
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(store.hasActiveMarketplaceIntegration(MARKETPLACE)).thenReturn(true);
+        when(store.getStoreId()).thenReturn(STORE_ID);
         when(providerFactory.get(store, MARKETPLACE)).thenReturn(provider);
     }
 
-    // Deserialized through the real Jackson ObjectMapper, the same path the scheduler message travels
-    // in production, so the test also pins that the configured EventBridge input still parses.
-    private static MarketplaceReturnsImportEventListener.MarketplaceReturnsImportPayload payload() throws Exception {
-        return new ObjectMapper().readValue("{\"marketplace\":\"" + MARKETPLACE + "\"}",
-                MarketplaceReturnsImportEventListener.MarketplaceReturnsImportPayload.class);
+    private static MarketplaceReturnsImportEventListener.MarketplaceReturnsImportPayload payload(String json) throws Exception {
+        return new ObjectMapper().readValue(json, MarketplaceReturnsImportEventListener.MarketplaceReturnsImportPayload.class);
+    }
+
+    private static MarketplaceReturnsImportEventListener.MarketplaceReturnsImportPayload addressedPayload() throws Exception {
+        return payload("{\"marketplace\":\"" + MARKETPLACE + "\",\"storeId\":\"" + STORE_ID + "\"}");
     }
 
     @Test
-    void schedulerPayloadCarriesOnlyTheMarketplace() throws Exception {
-        // given: exactly the input configured on the EventBridge schedule
-        String input = "{\"marketplace\":\"Allegro\"}";
-
+    void schedulerPayloadCarriesTheMarketplaceAndTheStore() throws Exception {
         // when
-        MarketplaceReturnsImportEventListener.MarketplaceReturnsImportPayload parsed = new ObjectMapper()
-                .readValue(input, MarketplaceReturnsImportEventListener.MarketplaceReturnsImportPayload.class);
+        MarketplaceReturnsImportEventListener.MarketplaceReturnsImportPayload parsed =
+                payload("{\"marketplace\":\"Allegro\",\"storeId\":\"store-1\"}");
 
         // then
         assertEquals("Allegro", parsed.getMarketplace());
+        assertEquals("store-1", parsed.getStoreId());
     }
 
     @Test
-    void everyFetchedReturnIsImportedForEachConnectedStore() throws Exception {
+    void everyFetchedReturnIsImportedForTheAddressedStore() throws Exception {
         // given
         stubActiveStore();
         when(provider.returns()).thenReturn(Optional.of(returns));
         when(returns.fetchReturns()).thenReturn(List.of(aReturn));
 
         // when
-        listener.handleMessage(payload());
+        listener.handleMessage(addressedPayload());
 
         // then
         verify(marketplaceReturnImporter).importReturn(store, MARKETPLACE, aReturn);
+        verify(scheduledExecutionCounter).countCompleted(STORE_ID, ScheduledExecution.RETURNS_IMPORT, MARKETPLACE);
+        verify(storesRepository, never()).findAll();
     }
 
     @Test
@@ -89,24 +95,48 @@ class MarketplaceReturnsImportEventListenerTest {
         when(provider.returns()).thenReturn(Optional.empty());
 
         // when
-        listener.handleMessage(payload());
+        listener.handleMessage(addressedPayload());
 
         // then
         verifyNoInteractions(marketplaceReturnImporter);
+        verifyNoInteractions(scheduledExecutionCounter);
     }
 
     @Test
-    void storesWithoutAnActiveIntegrationAreSkipped() throws Exception {
+    void aStoreWithoutAnActiveIntegrationIsSkipped() throws Exception {
         // given
-        when(storesRepository.findAll()).thenReturn(List.of(store));
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(store.hasActiveMarketplaceIntegration(MARKETPLACE)).thenReturn(false);
 
         // when
-        listener.handleMessage(payload());
+        listener.handleMessage(addressedPayload());
 
         // then
         verifyNoInteractions(providerFactory);
         verifyNoInteractions(marketplaceReturnImporter);
+        verifyNoInteractions(scheduledExecutionCounter);
+    }
+
+    @Test
+    void anUnknownStoreIsSkipped() throws Exception {
+        // given
+        when(storesRepository.findById("missing")).thenReturn(null);
+
+        // when
+        listener.handleMessage(payload("{\"marketplace\":\"Allegro\",\"storeId\":\"missing\"}"));
+
+        // then
+        verifyNoInteractions(providerFactory);
+    }
+
+    @Test
+    void aMessageWithoutAStoreIsRejectedInsteadOfImportingEveryStore() throws Exception {
+        // when
+        listener.handleMessage(payload("{\"marketplace\":\"Allegro\"}"));
+
+        // then
+        verifyNoInteractions(storesRepository);
+        verifyNoInteractions(providerFactory);
     }
 
     @Test
@@ -115,7 +145,7 @@ class MarketplaceReturnsImportEventListenerTest {
         ReflectionTestUtils.setField(listener, "returnsEnabled", false);
 
         // when
-        listener.handleMessage(payload());
+        listener.handleMessage(addressedPayload());
 
         // then
         verifyNoInteractions(storesRepository);

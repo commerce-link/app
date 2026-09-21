@@ -11,7 +11,7 @@ import java.util.TreeMap;
 
 /**
  * SupplierProvider catalog: {@link SupplierInfo} metadata for every discovered supplier plus the
- * built-in non-plugin entities (Amazon, Warehouse, Other). The list of supplier providers
+ * built-in non-plugin entities (Warehouse, Other). The list of supplier providers
  * lives in {@link SupplierProviderFactory}; this registry only owns catalog metadata.
  */
 @Component
@@ -27,11 +27,13 @@ public class SupplierRegistry {
 
     public SupplierRegistry(SupplierProviderFactory supplierProviderFactory) {
         for (SupplierProviderDescriptor descriptor : supplierProviderFactory.availableProviders()) {
-            register(descriptor.supplierInfo());
+            SupplierInfo info = descriptor.supplierInfo();
+            if (!SupplierIdentity.isValidTypeName(info.name())) {
+                // The identity separator would make `Type-token` ambiguous; fail at boot, not on first order.
+                throw new IllegalStateException("Supplier type name must not contain '-' or ':': " + info.name());
+            }
+            register(info);
         }
-        register(new SupplierInfo("Amazon", SupplierType.Retailer, 1, "PL",
-                new ShippingPolicy(new ShippingTerms(2, new ShippingCostPolicy.Free())),
-                "https://www.amazon.pl/gp/your-account/order-details?ie=UTF8&orderID=%s"));
         register(new SupplierInfo("Warehouse", SupplierType.Distributor, 1, "PL",
                 new ShippingPolicy(new ShippingTerms(1, new ShippingCostPolicy.Free()))));
         register(OTHER_ENTITY);
@@ -42,17 +44,22 @@ public class SupplierRegistry {
     }
 
     public SupplierInfo get(String supplierName) {
-        return suppliers.getOrDefault(supplierName, defaultFor(supplierName));
+        String type = SupplierIdentity.typeOf(supplierName);
+        SupplierInfo info = type == null ? null : suppliers.get(type);
+        if (info == null) {
+            return defaultFor(supplierName);
+        }
+        return info.withName(supplierName);
     }
 
     private SupplierInfo defaultFor(String supplierName) {
-        return ManualSupplierInfos.isManual(supplierName)
+        return SupplierIdentity.isManual(supplierName)
                 ? ManualSupplierInfos.forIdentity(supplierName)
                 : OTHER_ENTITY;
     }
 
     public boolean exists(String supplierName) {
-        return suppliers.containsKey(supplierName);
+        return supplierName != null && suppliers.containsKey(SupplierIdentity.typeOf(supplierName));
     }
 
     public Collection<String> getAllSupplierNames() {

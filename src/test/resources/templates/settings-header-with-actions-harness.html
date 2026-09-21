@@ -1,0 +1,8 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:replace="~{fragments/settings-header :: header(true, ~{::settingsActions})}">
+    <a th:ref="settingsActions" href="/dashboard/store/rma-centers/new" class="button is-link is-light">Dodaj centrum</a>
+</div>
+</body>
+</html>

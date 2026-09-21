@@ -36,7 +36,7 @@ class CheckoutRestApi {
     @GetMapping("/Store/{storeId}/Checkout/DeliveryOptions")
     public List<DeliveryOption> getDeliveryOptions(@PathVariable("storeId") String storeId) {
         Store store = storesRepository.findById(storeId);
-        return store.getCheckoutConfiguration().getDeliveryOptions();
+        return store.getCheckoutConfiguration().getActiveDeliveryOptions();
     }
 
 }

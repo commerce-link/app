@@ -18,6 +18,7 @@ import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 
 import java.lang.reflect.Field;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -29,6 +30,7 @@ import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -320,7 +322,7 @@ class ProviderFactoryTest {
         ProviderFactory<OAuth2Descriptor, Object> factory = factoryWith(descriptor);
 
         // when
-        Map<String, Object> context = factory.buildContext(store, descriptor);
+        Map<String, Object> context = factory.buildContext(store, descriptor, descriptor.name());
 
         // then
         assertTrue(context.get("restApi") instanceof RestApiWithRetry);
@@ -334,7 +336,7 @@ class ProviderFactoryTest {
         // given
         OAuth2WithContentTypeDescriptor descriptor = new OAuth2WithContentTypeDescriptor();
         ProviderFactory<OAuth2Descriptor, Object> factory = factoryWith(descriptor);
-        Map<String, Object> context = factory.buildContext(store, descriptor);
+        Map<String, Object> context = factory.buildContext(store, descriptor, descriptor.name());
         RestApiWithRetry restApi = (RestApiWithRetry) context.get("restApi");
 
         // when
@@ -360,6 +362,33 @@ class ProviderFactoryTest {
     }
 
     @Test
+    void savesTheStoreBeforeFollowingUpOnALostAuthorization() {
+        // given
+        OAuth2Descriptor descriptor = new OAuth2Descriptor();
+        List<String> calls = new ArrayList<>();
+        ProviderFactory<OAuth2Descriptor, Object> factory = new ProviderFactory<>(OAuth2Descriptor.class, null,
+                configurationManager, credentialStore, tokenStore, storesRepository) {
+            @Override
+            protected void onAuthorizationLost(Store lostStore, OAuth2Descriptor lostDescriptor) {
+                calls.add("onAuthorizationLost");
+            }
+
+            @Override
+            protected void afterAuthorizationLostSaved(Store lostStore, OAuth2Descriptor lostDescriptor) {
+                calls.add("afterAuthorizationLostSaved");
+            }
+        };
+        when(storesRepository.findById("store-1")).thenReturn(store);
+        doAnswer(invocation -> calls.add("save")).when(storesRepository).save(store);
+
+        // when
+        factory.handleAuthorizationLost("store-1", descriptor);
+
+        // then
+        assertEquals(List.of("onAuthorizationLost", "save", "afterAuthorizationLostSaved"), calls);
+    }
+
+    @Test
     void createAuthServiceResolvesRelativeAuthAndAbsoluteRefreshEndpoints() throws Exception {
         // given
         OAuth2Descriptor descriptor = new OAuth2Descriptor();
@@ -369,7 +398,7 @@ class ProviderFactoryTest {
                 7776000L, "application/vnd.allegro.public.v1+json", "refreshToken");
 
         // when
-        ConfigurableOAuth2AuthorizationService authService = factory.createAuthService(store, descriptor, oauth2);
+        ConfigurableOAuth2AuthorizationService authService = factory.createAuthService(store, descriptor, oauth2, descriptor.name());
 
         // then
         String[] endpoints = authEndpointsOf(authService);
@@ -414,5 +443,23 @@ class ProviderFactoryTest {
                 (String) authorizationEndpointField.get(authService),
                 (String) refreshTokenEndpointField.get(authService)
         };
+    }
+
+    /** An integration whose adapter is gone kept its secret after disconnecting; it is deleted by name now. */
+    @Test
+    void disconnectingAnIntegrationWhoseAdapterIsGoneDeletesItsSecretByName() {
+        // given
+        pl.commercelink.starter.secrets.SecretsManager secretsManager = org.mockito.Mockito.mock(pl.commercelink.starter.secrets.SecretsManager.class);
+        ProviderFactory<OAuth2Descriptor, Object> factory = new ProviderFactory<>(OAuth2Descriptor.class, null,
+                new ProviderConfigurationManager(secretsManager), credentialStore, tokenStore, storesRepository);
+        Store realStore = new Store();
+        realStore.setStoreId("store-1");
+        when(secretsManager.exists("store-1-paynow")).thenReturn(true);
+
+        // when
+        factory.deleteConfiguration(realStore, "paynow");
+
+        // then
+        org.mockito.Mockito.verify(secretsManager).deleteSecret("store-1-paynow");
     }
 }

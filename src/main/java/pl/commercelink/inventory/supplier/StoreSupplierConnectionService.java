@@ -1,6 +1,7 @@
 package pl.commercelink.inventory.supplier;
 
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import pl.commercelink.inventory.supplier.api.SupplierProviderDescriptor;
 import pl.commercelink.provider.ProviderConfigurationManager;
@@ -13,9 +14,11 @@ import pl.commercelink.stores.StoreSupplierConnection;
 import pl.commercelink.stores.SupplierSelectionForm;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -38,28 +41,53 @@ public class StoreSupplierConnectionService {
         return fields;
     }
 
-    public Map<String, Map<String, String>> configurationsForUI(Store store) {
-        Map<String, Map<String, String>> configs = new LinkedHashMap<>();
-        for (SupplierProviderDescriptor descriptor : supplierProviderFactory.availableProviders()) {
-            String name = descriptor.supplierInfo().name();
-            configs.put(name, configurationManager.getConfigurationForUI(store, name, descriptor));
-        }
-        return configs;
-    }
-
-    // The template needs to tell "no stored configuration" apart from "stored configuration whose
-    // password is masked to blank" -- getConfigurationForUI() makes both look identical, so this
-    // publishes the same notion connectOrUpdate()/storedConfigFor() already use to decide
-    // preservedPassword, without exposing the configuration values themselves.
-    public Set<String> suppliersWithStoredConfiguration(Store store) {
-        Set<String> stored = new LinkedHashSet<>();
-        for (SupplierProviderDescriptor descriptor : supplierProviderFactory.availableProviders()) {
-            String name = descriptor.supplierInfo().name();
-            if (hasStoredConfiguration(store, name)) {
-                stored.add(name);
+    /**
+     * Connections that cannot work as saved: an own connection missing a required access detail, or a global one in a
+     * store that may no longer use the global configuration. The suppliers page marks them and offers to complete them.
+     */
+    public Set<String> incompleteConnections(Store store) {
+        Set<String> incomplete = new LinkedHashSet<>();
+        for (StoreSupplierConnection connection : existingConfiguration(store).getSupplierConnections()) {
+            String identity = connection.getSupplierName();
+            if (connection.getMode() == ConnectionMode.GLOBAL && !store.canUseGlobalSuppliers()) {
+                incomplete.add(identity);
+            } else if (connection.getMode() == ConnectionMode.OWN) {
+                SupplierProviderDescriptor descriptor = supplierProviderFactory.getDescriptor(identity);
+                if (descriptor == null) {
+                    continue;
+                }
+                Map<String, String> stored = configurationManager.loadConfiguration(store, identity);
+                boolean missing = descriptor.configurationFields().stream()
+                        .filter(ProviderField::required)
+                        .anyMatch(field -> StringUtils.isBlank(stored.get(field.key())));
+                if (missing) {
+                    incomplete.add(identity);
+                }
             }
         }
-        return stored;
+        return incomplete;
+    }
+
+    /** Keys of the secrets saved for one own connection, which its form may leave empty to keep them. */
+    public Set<String> storedSecretKeys(Store store, String identity) {
+        SupplierProviderDescriptor descriptor = supplierProviderFactory.getDescriptor(identity);
+        if (descriptor == null) {
+            return Set.of();
+        }
+        Map<String, String> stored = configurationManager.loadConfiguration(store, identity);
+        Set<String> keys = new LinkedHashSet<>();
+        for (ProviderField field : descriptor.configurationFields()) {
+            if (field.type() == ProviderField.FieldType.PASSWORD && StringUtils.isNotBlank(stored.get(field.key()))) {
+                keys.add(field.key());
+            }
+        }
+        return keys;
+    }
+
+    /** The saved settings of one own connection with its secrets blanked, for its form. */
+    public Map<String, String> storedSettings(Store store, String identity) {
+        SupplierProviderDescriptor descriptor = supplierProviderFactory.getDescriptor(identity);
+        return descriptor == null ? Map.of() : configurationManager.getConfigurationForUI(store, identity, descriptor);
     }
 
     public ConnectionUpdateResult connectOrUpdate(Store existingStore, SupplierSelectionForm selection,
@@ -68,29 +96,116 @@ public class StoreSupplierConnectionService {
         ConnectionMode mode = canUseGlobal
                 ? (selection.getMode() != null ? selection.getMode() : ConnectionMode.GLOBAL)
                 : ConnectionMode.OWN;
-        StoreSupplierConnection edited = new StoreSupplierConnection(
-                selection.getSupplierName(), mode,
+
+        Resolved resolved = resolveIdentity(existingStore, selection, mode);
+        if (resolved.error() != null) {
+            return ConnectionUpdateResult.errors(List.of(resolved.error()));
+        }
+        String identity = resolved.identity();
+
+        StoreSupplierConnection edited = new StoreSupplierConnection(identity, mode,
                 selection.isIncludeInPricing(), selection.isIncludeInFulfilment());
+        // GLOBAL suppliers never route marketplace orders (see StoreSupplierConnection
+        // .routingExternalSupplierId), so switching a connection to GLOBAL drops its id too.
+        edited.setExternalSupplierId(mode == ConnectionMode.GLOBAL
+                ? null
+                : StringUtils.trimToNull(selection.getExternalSupplierId()));
         if (mode == ConnectionMode.OWN) {
             edited.setFeedSchedule(PollingSchedule.normalizeOrNull(selection.getFeedSchedule()));
+            edited.setLabel(StringUtils.trimToNull(selection.getLabel()));
+            edited.setBillingShortcut(StringUtils.trimToNull(selection.getBillingShortcut()));
         }
 
-        List<StoreSupplierConnection> connections = connectionsWithout(existingStore, selection.getSupplierName());
-        connections.add(edited);
-
-        Map<String, Map<String, String>> config = Map.of(selection.getSupplierName(), submittedConfig);
+        List<StoreSupplierConnection> others = connectionsWithout(existingStore, identity);
+        List<ErrorMessage> errors = new ArrayList<>(validator.validateLabel(
+                edited, others.stream().map(SupplierLabels::labelOf).toList()));
+        Map<String, Map<String, String>> config = Map.of(identity, submittedConfig);
         // Only the edited connection is validated: a broken entry belonging to another supplier
         // must not block this one.
-        List<ErrorMessage> errors = validator.validate(
-                canUseGlobal, List.of(edited), configurationFields(), config, storedConfigFor(existingStore, edited));
+        errors.addAll(validator.validate(
+                canUseGlobal, List.of(edited), configurationFields(), config, storedConfigFor(existingStore, edited)));
         if (!errors.isEmpty()) {
             return ConnectionUpdateResult.errors(errors);
         }
-        return persist(existingStore, connections, config);
+        List<StoreSupplierConnection> connections = new ArrayList<>(others);
+        connections.add(edited);
+        return persist(existingStore, connections, config, identity);
     }
 
-    public ConnectionUpdateResult disconnect(Store existingStore, String supplierName) {
-        return persist(existingStore, connectionsWithout(existingStore, supplierName), Map.of());
+    private record Resolved(String identity, ErrorMessage error) {
+        static Resolved ok(String identity) {
+            return new Resolved(identity, null);
+        }
+
+        static Resolved fail(String code, Object... args) {
+            return new Resolved(null, ErrorMessage.of(code, args));
+        }
+    }
+
+    // Create: the form carries the adapter type in supplierName; GLOBAL keeps the type as identity
+    // (one per store), OWN gets a fresh `Type-token`. Edit: the form carries the identity, which
+    // never changes; a tokened identity cannot turn GLOBAL because GLOBAL identities are bare types.
+    private Resolved resolveIdentity(Store existingStore, SupplierSelectionForm selection, ConnectionMode mode) {
+        String identity = StringUtils.trimToNull(selection.getIdentity());
+        if (identity != null) {
+            StoreSupplierConnection existing = existingConfiguration(existingStore).getSupplierConnections().stream()
+                    .filter(connection -> connection.getSupplierName().equals(identity))
+                    .findFirst().orElse(null);
+            if (existing == null) {
+                return Resolved.fail("store.supplier.connection.error.not.found", identity);
+            }
+            // SupplierConnectionView.canSwitchMode() knows this rule only on the client side; the
+            // server must enforce it too, because the endpoint is reachable without the modal.
+            if (existing.getMode() == ConnectionMode.MANUAL) {
+                return Resolved.fail("store.supplier.connection.error.manual.locked");
+            }
+            if (mode == ConnectionMode.GLOBAL && SupplierIdentity.hasToken(identity)) {
+                return Resolved.fail("store.supplier.connection.error.mode.locked");
+            }
+            return Resolved.ok(identity);
+        }
+        String type = StringUtils.trimToNull(selection.getSupplierName());
+        if (!isRegisteredType(type)) {
+            return Resolved.fail("store.supplier.connection.error.unknown.supplier", String.valueOf(type));
+        }
+        if (mode == ConnectionMode.GLOBAL) {
+            StoreSupplierConnection sameName = existingConfiguration(existingStore).getSupplierConnections().stream()
+                    .filter(connection -> connection.getSupplierName().equalsIgnoreCase(type))
+                    .findFirst().orElse(null);
+            if (sameName == null) {
+                return Resolved.ok(type);
+            }
+            // Legacy stores connect a supplier as OWN under its bare type name; telling them it is
+            // "already connected in global mode" would point them at the wrong screen.
+            return sameName.getMode() == ConnectionMode.OWN
+                    ? Resolved.fail("store.supplier.connection.error.global.own.exists", type)
+                    : Resolved.fail("store.supplier.connection.error.global.duplicate", type);
+        }
+        Set<String> used = new HashSet<>();
+        for (StoreSupplierConnection connection : existingConfiguration(existingStore).getSupplierConnections()) {
+            used.add(connection.getSupplierName().toLowerCase(Locale.ROOT));
+        }
+        return SupplierIdentity.firstFresh(() -> newIdentity(type),
+                        candidate -> used.contains(candidate.toLowerCase(Locale.ROOT)))
+                .map(Resolved::ok)
+                .orElseGet(() -> Resolved.fail("store.supplier.connection.error.identity.exhausted"));
+    }
+
+    /** Seam for tests that need a deterministic collision. */
+    String newIdentity(String type) {
+        return SupplierIdentity.newInstance(type);
+    }
+
+    // getDescriptor() resolves its argument through SupplierIdentity.typeOf, so "Kosatec-evil" would
+    // hand back the Kosatec descriptor and let the operator forge an identity (GLOBAL) or blow up on
+    // newInstance() (OWN). The shape check comes first; once the name is a bare type, the registry
+    // lookup that follows is an exact hit, so the two together are the membership test.
+    private boolean isRegisteredType(String type) {
+        return SupplierIdentity.isValidTypeName(type) && supplierProviderFactory.getDescriptor(type) != null;
+    }
+
+    public ConnectionUpdateResult disconnect(Store existingStore, String identity) {
+        return persist(existingStore, connectionsWithout(existingStore, identity), Map.of(), null);
     }
 
     public ConnectionUpdateResult applyStoreSettings(Store existingStore, FulfilmentConfiguration submitted,
@@ -111,32 +226,35 @@ public class StoreSupplierConnectionService {
         if (!outcome.success()) {
             return ConnectionUpdateResult.errors(UPDATE_FAILED);
         }
-        return ConnectionUpdateResult.ok(outcome.added(), outcome.removed(), outcome.rescheduled());
+        return ConnectionUpdateResult.ok(null, outcome.added(), outcome.removed(), outcome.rescheduled());
     }
 
     private ConnectionUpdateResult persist(Store existingStore, List<StoreSupplierConnection> connections,
-                                           Map<String, Map<String, String>> config) {
+                                           Map<String, Map<String, String>> config, String identity) {
         FulfilmentConfiguration submitted = existingConfiguration(existingStore).withConnections(connections);
         StoreSupplierConnectionPersister.PersistOutcome outcome = persister.persist(existingStore, submitted, config);
         if (!outcome.success()) {
             return ConnectionUpdateResult.errors(UPDATE_FAILED);
         }
-        return ConnectionUpdateResult.ok(outcome.added(), outcome.removed(), outcome.rescheduled());
+        return ConnectionUpdateResult.ok(identity, outcome.added(), outcome.removed(), outcome.rescheduled());
     }
 
-    // Case-insensitive on purpose: identities here always come from the supplier registry, which
-    // is also what StoreSupplierConnectionPersister compares by exact (case-sensitive) match when
-    // it works out what was added and removed. The two must keep agreeing on case, or an edit
-    // whose casing differs from what is stored would look like an add plus a remove and delete
-    // the supplier's secret.
-    private List<StoreSupplierConnection> connectionsWithout(Store existingStore, String supplierName) {
+    // Exact match: identities are either registry type names (fixed casing) or generated tokens,
+    // and the persister diffs them exactly too, so an edit never looks like an add plus a remove.
+    private List<StoreSupplierConnection> connectionsWithout(Store existingStore, String identity) {
         List<StoreSupplierConnection> connections = new ArrayList<>();
         for (StoreSupplierConnection connection : existingConfiguration(existingStore).getSupplierConnections()) {
-            if (!connection.getSupplierName().equalsIgnoreCase(supplierName)) {
+            if (!connection.getSupplierName().equals(identity)) {
                 connections.add(connection);
             }
         }
         return connections;
+    }
+
+    private List<StoreSupplierConnection> ownConnections(Store store) {
+        return existingConfiguration(store).getSupplierConnections().stream()
+                .filter(connection -> connection.getMode() == ConnectionMode.OWN)
+                .toList();
     }
 
     // A store without any fulfilment configuration yet (e.g. connecting its first supplier)
@@ -158,14 +276,14 @@ public class StoreSupplierConnectionService {
         return !configurationManager.loadConfiguration(existingStore, supplierName).isEmpty();
     }
 
-    public record ConnectionUpdateResult(List<ErrorMessage> errors, Set<String> added, Set<String> removed,
-                                         Set<String> rescheduled) {
+    public record ConnectionUpdateResult(List<ErrorMessage> errors, String identity, Set<String> added,
+                                         Set<String> removed, Set<String> rescheduled) {
         static ConnectionUpdateResult errors(List<ErrorMessage> errors) {
-            return new ConnectionUpdateResult(errors, Set.of(), Set.of(), Set.of());
+            return new ConnectionUpdateResult(errors, null, Set.of(), Set.of(), Set.of());
         }
 
-        static ConnectionUpdateResult ok(Set<String> added, Set<String> removed, Set<String> rescheduled) {
-            return new ConnectionUpdateResult(List.of(), added, removed, rescheduled);
+        static ConnectionUpdateResult ok(String identity, Set<String> added, Set<String> removed, Set<String> rescheduled) {
+            return new ConnectionUpdateResult(List.of(), identity, added, removed, rescheduled);
         }
 
         public boolean hasErrors() {

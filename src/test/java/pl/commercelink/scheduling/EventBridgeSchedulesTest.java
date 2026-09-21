@@ -117,6 +117,7 @@ class EventBridgeSchedulesTest {
         assertThat(request.getValue().scheduleExpressionTimezone()).isEqualTo("Europe/Warsaw");
         assertThat(request.getValue().target().arn()).isEqualTo(TARGET_ARN);
         assertThat(request.getValue().target().roleArn()).isEqualTo(ROLE_ARN);
+        assertThat(request.getValue().flexibleTimeWindow().mode()).isEqualTo(FlexibleTimeWindowMode.OFF);
     }
 
     @Test

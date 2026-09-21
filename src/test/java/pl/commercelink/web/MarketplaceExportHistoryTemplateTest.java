@@ -16,7 +16,7 @@ import org.thymeleaf.web.servlet.JakartaServletWebApplication;
 import pl.commercelink.marketplace.MarketplaceExportRunHeader;
 import pl.commercelink.marketplace.MarketplaceExportRunId;
 import pl.commercelink.marketplace.MarketplaceOfferSnapshot;
-import pl.commercelink.web.dtos.ConnectedIntegration;
+import pl.commercelink.web.settings.MarketplaceExportRunView;
 
 import java.text.MessageFormat;
 import java.util.ArrayList;
@@ -44,12 +44,13 @@ class MarketplaceExportHistoryTemplateTest {
 
         // then
         assertThat(html).contains("pim-A");
-        assertThat(html).contains("3503");
+        assertThat(html).contains("3 503");
         assertThat(html).contains("VALIDATION_ERROR");
         assertThat(html).contains("price out of range");
+        assertThat(html).contains("Odrzucona");
         assertThat(html).contains("Zakończony");
         assertThat(html).contains("/dashboard/store/marketplaces/exports/allegro/catalog-1/" + RUN_ID + "/file");
-        assertThat(html).contains("Otwórz surowy plik");
+        assertThat(html).contains("Pobierz plik CSV");
         assertThat(html).doesNotContain("<pre>");
         assertThat(html).doesNotContain("??");
     }
@@ -64,8 +65,8 @@ class MarketplaceExportHistoryTemplateTest {
         String html = templateEngine().process("store-marketplace-export-run", context);
 
         // then
-        assertThat(html).contains(">2026-08-13 01:31:05<");
-        assertThat(html).doesNotContain(">8213415334_2026-08-13_01-31-05<");
+        assertThat(html).contains("Allegro · katalog Główny · 2026-08-13 01:31:05");
+        assertThat(html).doesNotContain("8213415334_2026-08-13_01-31-05<");
     }
 
     @Test
@@ -79,7 +80,9 @@ class MarketplaceExportHistoryTemplateTest {
 
         // then
         assertThat(html).contains("Nieudany");
+        assertThat(html).contains("Eksport przerwany");
         assertThat(html).contains("marketplace unavailable");
+        assertThat(html).contains("Przebieg nie zawiera ofert.");
         assertThat(html).doesNotContain("Zakończony");
         assertThat(html).doesNotContain("??");
     }
@@ -114,68 +117,35 @@ class MarketplaceExportHistoryTemplateTest {
     }
 
     @Test
-    void rendersTheProductIdSearchBoxAboveTheRowsTable() {
+    void opensOnTheRejectionsAndOffersAFilterAndASearchAboveTheTable() {
         // given
-        WebContext context = runDetailsContext(rows(3), false);
+        List<MarketplaceOfferSnapshot> rows = new ArrayList<>(rows(3));
+        rows.add(MarketplaceOfferSnapshot.rejectedWithoutOffer("pim-X", "EAN_INVALID", "bad EAN"));
+        rows.add(MarketplaceOfferSnapshot.removalPending("pim-Y", 999L, 2));
+        WebContext context = runDetailsContext(rows, false);
 
         // when
         String html = templateEngine().process("store-marketplace-export-run", context);
 
         // then
-        assertThat(html).contains("id=\"exportRowsSearch\"");
-        assertThat(html).contains("class=\"input is-small\"");
-        assertThat(html).contains("Szukaj po PIM ID produktu");
-        assertThat(html).contains("class=\"export-row\"");
-        assertThat(html).contains("class=\"export-row-pim-id\"");
-        assertThat(html).contains("getElementById('exportRowsSearch')");
-        assertThat(html).contains("is-hidden");
+        assertThat(html).contains("data-cl-filter-default=\"rejected\"");
+        assertThat(html).contains("data-cl-filter=\"removal-pending\"");
+        assertThat(html).contains("Zdejmowana · próba 2");
+        assertThat(html).contains("data-cl-table-search");
+        assertThat(html).contains("<th scope=\"col\"");
+        assertThat(html).contains("/js/table-filter.js");
         assertThat(html).doesNotContain("??");
-        assertThat(html.indexOf("exportRowsSearch")).isLessThan(html.indexOf("<table"));
+        assertThat(html.indexOf("data-cl-table-search")).isLessThan(html.indexOf("<table"));
     }
 
     @Test
-    void linksToTheMarketplaceExportHistoryPageNextToTheDisconnectButtonOfTheMarketplacePanel() {
+    void opensOnEveryOfferWhenNothingWasRejected() {
         // when
-        String html = renderIntegrationPanel("marketplace", false);
+        String html = templateEngine().process("store-marketplace-export-run", runDetailsContext(rows(3), false));
 
         // then
-        assertThat(html).contains("Zobacz historię eksportu");
-        assertThat(html).contains("href=\"/dashboard/store/marketplaces/exports/allegro\"");
-        assertThat(html).doesNotContain("#marketplace-export-history");
-        assertThat(html).contains("Rozłącz");
-        assertThat(html).doesNotContain("??");
-    }
-
-    @Test
-    void linksToTheExportHistoryOfTheViewedStoreForASuperAdmin() {
-        // when
-        String html = renderIntegrationPanel("marketplace", true);
-
-        // then
-        assertThat(html).contains("href=\"/dashboard/store/store-1/marketplaces/exports/allegro\"");
-        assertThat(html).doesNotContain("??");
-    }
-
-    @Test
-    void hidesTheExportHistoryLinkOnPanelsOtherThanMarketplace() {
-        // when / then
-        assertThat(renderIntegrationPanel("shipping", false)).doesNotContain("Zobacz historię eksportu");
-        assertThat(renderIntegrationPanel("payments", false)).doesNotContain("Zobacz historię eksportu");
-        assertThat(renderIntegrationPanel("invoicing", false)).doesNotContain("Zobacz historię eksportu");
-        assertThat(renderIntegrationPanel("printing", false)).doesNotContain("Zobacz historię eksportu");
-    }
-
-    @Test
-    void marketplacesPageNoLongerRendersTheExportHistoryTable() {
-        // when
-        String html = renderMarketplacesPage();
-
-        // then
-        assertThat(html).doesNotContain("id=\"marketplace-export-history\"");
-        assertThat(html).doesNotContain("Historia eksportów ofert");
-        assertThat(html).doesNotContain("Brak zapisanych przebiegów eksportu.");
-        assertThat(html).contains("Zobacz historię eksportu");
-        assertThat(html).doesNotContain("??");
+        assertThat(html).contains("data-cl-filter-default=\"all\"");
+        assertThat(html).doesNotContain("data-cl-filter=\"rejected\"");
     }
 
     @Test
@@ -237,21 +207,20 @@ class MarketplaceExportHistoryTemplateTest {
         assertThat(html).doesNotContain("??");
     }
 
+    /** A run file names its catalog by id; the page shows the catalog's name, and the id of a deleted catalog. */
     @Test
-    void dropsTheMarketplaceColumnAndKeepsTheCatalogOneOnTheHistoryPage() {
+    void namesTheCatalogOfEachRunAndKeepsTheIdOfADeletedOne() {
         // given
         WebContext context = historyContext(List.of(
-                new MarketplaceExportRunHeader("allegro", "catalog-1", RUN_ID, false)));
+                new MarketplaceExportRunHeader("allegro", "catalog-1", RUN_ID, false),
+                new MarketplaceExportRunHeader("allegro", "catalog-gone", RUN_ID, false)));
 
         // when
         String html = renderHistoryPage(context);
 
         // then
-        assertThat(html).contains("Data przebiegu");
-        assertThat(html).contains("Katalog");
-        assertThat(html).contains("Status");
-        assertThat(html).doesNotContain("<th>Marketplace</th>");
-        assertThat(countHeaderCells(html)).isEqualTo(3);
+        assertThat(html).contains("Katalog: Główny").contains("Katalog: catalog-gone");
+        assertThat(html).contains(">Zakończony<").doesNotContain("<table");
     }
 
     @Test
@@ -264,14 +233,14 @@ class MarketplaceExportHistoryTemplateTest {
 
         // then
         assertThat(html).contains("href=\"/dashboard/store/marketplaces\"");
-        assertThat(html).contains("Powrót");
+        assertThat(html).contains("<h1 class=\"cl-page-title\">Historia eksportu · Allegro</h1>");
     }
 
     @Test
     void linksBackToTheViewedStoreMarketplacesPageForASuperAdmin() {
         // given
         WebContext context = historyContext(List.of());
-        context.setVariable("isSuperAdmin", true);
+        context.setVariable("marketplacesHref", "/dashboard/store/store-1/marketplaces");
 
         // when
         String html = renderHistoryPage(context);
@@ -321,21 +290,16 @@ class MarketplaceExportHistoryTemplateTest {
         context.setVariable("exportRuns", runs);
         context.setVariable("runLimit", 25);
         context.setVariable("isSuperAdmin", false);
+        context.setVariable("displayName", "Allegro");
+        context.setVariable("catalogNames", Map.of("catalog-1", "Główny"));
+        context.setVariable("marketplacesHref", "/dashboard/store/marketplaces");
+        context.setVariable("backLabel", "Marketplaces");
+        context.setVariable("pageTitle", "Historia eksportu · Allegro");
         return context;
     }
 
     private String renderHistoryPage(WebContext context) {
         return templateEngine().process("store-marketplace-export-history", context);
-    }
-
-    private String renderMarketplacesPage() {
-        WebContext context = webContext();
-        context.setVariable("connectedIntegrations", List.of(new ConnectedIntegration("allegro", true)));
-        context.setVariable("availableProviders", List.of());
-        context.setVariable("selectedProviderName", "allegro");
-        context.setVariable("form", new StubStoreForm());
-        context.setVariable("isSuperAdmin", false);
-        return templateEngine().process("store-marketplaces", context);
     }
 
     private List<MarketplaceExportRunHeader> headers(int count) {
@@ -347,36 +311,24 @@ class MarketplaceExportHistoryTemplateTest {
         return headers;
     }
 
-    private int countHeaderCells(String html) {
-        return html.split("<th>", -1).length - 1;
-    }
-
     private WebContext runDetailsContext(List<MarketplaceOfferSnapshot> rows, boolean failed) {
         WebContext context = webContext();
         context.setVariable("runId", RUN_ID);
         context.setVariable("runTimestamp", MarketplaceExportRunId.readable(RUN_ID));
         context.setVariable("failed", failed);
-        context.setVariable("rows", rows);
+        context.setVariable("view", MarketplaceExportRunView.of(rows));
+        context.setVariable("fileHref", "/dashboard/store/marketplaces/exports/allegro/catalog-1/" + RUN_ID + "/file");
         context.setVariable("marketplace", "allegro");
         context.setVariable("catalogId", "catalog-1");
         context.setVariable("storeId", "store-1");
         context.setVariable("isSuperAdmin", false);
+        context.setVariable("displayName", "Allegro");
+        context.setVariable("catalogName", "Główny");
+        context.setVariable("historyHref", "/dashboard/store/marketplaces/exports/allegro");
+        context.setVariable("historyLabel", "Historia eksportu · Allegro");
         return context;
     }
 
-    private String renderIntegrationPanel(String providerType, boolean superAdmin) {
-        WebContext context = webContext();
-        context.setVariable("isSuperAdmin", superAdmin);
-        context.setVariable("connectedIntegrations", List.of(new ConnectedIntegration("allegro", true)));
-        context.setVariable("providers", List.of());
-        context.setVariable("selectedProviderName", "allegro");
-        context.setVariable("selectLabel", "Marketplace");
-        context.setVariable("providerConfiguration", Map.of());
-        context.setVariable("providerType", providerType);
-        context.setVariable("storeId", "store-1");
-        context.setVariable("showDefault", false);
-        return templateEngine().process("fragments/integration-panel", context);
-    }
 
     private List<MarketplaceOfferSnapshot> rows(int count) {
         List<MarketplaceOfferSnapshot> rows = new ArrayList<>();
@@ -401,24 +353,6 @@ class MarketplaceExportHistoryTemplateTest {
         engine.setTemplateResolver(resolver);
         engine.setMessageResolver(new PolishMessages());
         return engine;
-    }
-
-    public static class StubStoreForm {
-
-        public Map<String, String> getProviderConfiguration() {
-            return Map.of();
-        }
-
-        public StubStore getStore() {
-            return new StubStore();
-        }
-    }
-
-    public static class StubStore {
-
-        public String getStoreId() {
-            return "store-1";
-        }
     }
 
     private static class PolishMessages implements IMessageResolver {

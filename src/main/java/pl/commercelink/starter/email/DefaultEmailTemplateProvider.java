@@ -17,7 +17,7 @@ public class DefaultEmailTemplateProvider implements EmailTemplateProvider {
     public EmailTemplate getTemplate(String storeId, String templateName) {
         EmailTemplate template = emailTemplatesRepository.findByTemplateName(storeId, templateName);
         if (template == null) {
-            template = emailTemplatesRepository.findByTemplateName("default", templateName);
+            template = emailTemplatesRepository.findByTemplateName(EmailTemplatesRepository.DEFAULT_STORE, templateName);
         }
         return template;
     }

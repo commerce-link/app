@@ -18,7 +18,7 @@ import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
-import pl.commercelink.pricelist.PricelistEventScheduler;
+import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.products.*;
 import pl.commercelink.products.brand.BrandMapper;
 import pl.commercelink.products.filters.InventoryFilterType;
@@ -61,7 +61,7 @@ public class ProductCatalogController {
     private StoresRepository storesRepository;
 
     @Autowired
-    private PricelistEventScheduler pricelistEventScheduler;
+    private ProductCatalogDetailsService productCatalogDetailsService;
 
     @Autowired
     private BrandMapper brandMapper;
@@ -71,6 +71,9 @@ public class ProductCatalogController {
 
     @Autowired
     private MessageSource messageSource;
+
+    @Autowired
+    private SupplierLabels supplierLabels;
     private static final int CATALOGS_PAGE_SIZE = 25;
     private static final int PRODUCTS_PAGE_SIZE = 25;
 
@@ -95,35 +98,34 @@ public class ProductCatalogController {
 
     private String showEditProductCatalog(Model model, ProductCatalog productCatalog) {
         model.addAttribute("productCatalog", productCatalog);
+        model.addAttribute("scheduleMinIntervalMinutes", productCatalogDetailsService.minIntervalMinutes());
         return "catalogDetails";
     }
 
     @PostMapping("/dashboard/catalogs/{catalogId}/delete")
-    public String deleteCatalog(@PathVariable String catalogId) {
-        ProductCatalog productCatalog = productCatalogRepository.findById(getStoreId(), catalogId);
-        pricelistEventScheduler.deleteSchedule(productCatalog.getStoreId(), catalogId);
-
-        List<Product> products = productRepository.findAll(productCatalog);
-        productRepository.delete(products);
-        productCatalogRepository.delete(productCatalog);
+    public String deleteCatalog(@PathVariable String catalogId, RedirectAttributes redirectAttributes) {
+        ProductCatalogDetailsService.UpdateResult result = productCatalogDetailsService.delete(getStoreId(), catalogId);
+        if (result.hasErrors()) {
+            redirectAttributes.addFlashAttribute("errorMessage", join(result));
+            return "redirect:/dashboard/catalogs/" + catalogId;
+        }
         return "redirect:/dashboard/catalogs";
     }
 
     @PostMapping("/dashboard/catalogs/{catalogId}")
-    public String saveCatalogDetails(@PathVariable String catalogId, @ModelAttribute ProductCatalog productCatalog, Model model) {
-        ProductCatalog catalog = productCatalogRepository.findById(getStoreId(), catalogId);
-        if (catalog == null) {
-            pricelistEventScheduler.createRecurringSchedule(getStoreId(), catalogId);
-
-            catalog = productCatalog;
+    public String saveCatalogDetails(@PathVariable String catalogId, @ModelAttribute ProductCatalog productCatalog,
+                                     RedirectAttributes redirectAttributes) {
+        ProductCatalogDetailsService.UpdateResult result = productCatalogDetailsService.save(getStoreId(), catalogId, productCatalog);
+        if (result.hasErrors()) {
+            redirectAttributes.addFlashAttribute("errorMessage", join(result));
         }
-
-        catalog.setName(productCatalog.getName());
-        catalog.setDeletionProtection(productCatalog.isDeletionProtection());
-
-        productCatalogRepository.save(catalog);
-
         return "redirect:/dashboard/catalogs/" + catalogId;
+    }
+
+    private String join(ProductCatalogDetailsService.UpdateResult result) {
+        return result.errors().stream()
+                .map(error -> messageSource.getMessage(error.code(), error.args(), LocaleContextHolder.getLocale()))
+                .collect(Collectors.joining(" "));
     }
 
     @GetMapping("/dashboard/catalogs/{catalogId}/category/new")
@@ -302,6 +304,8 @@ public class ProductCatalogController {
 
         model.addAttribute("brands", brands);
         model.addAttribute("productRecommendations", paginatedRecommendations);
+        // Alternative suppliers are connection identities; the table shows the operator's label.
+        model.addAttribute("supplierLabels", supplierLabels.forStoreId(getStoreId()));
         model.addAttribute("categoryId", categoryId);
         model.addAttribute("paginationParams", paginationParams);
 

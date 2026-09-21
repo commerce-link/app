@@ -8,6 +8,9 @@
     const collapseToggle = document.getElementById('clCollapseToggle');
     const userToggle = document.getElementById('clUserToggle');
     const userMenu = document.getElementById('clUserMenu');
+    const notificationsToggle = document.getElementById('clNotificationsToggle');
+    const notificationsMenu = document.getElementById('clNotificationsMenu');
+    const popovers = [];
 
     let lastFocused = null;
 
@@ -59,12 +62,96 @@
         }
     }
 
-    function closeUserMenu() {
-        if (!userMenu || userMenu.hidden) {
+    function bindPopover(toggle, menu, onOpen) {
+        if (!toggle || !menu) {
             return;
         }
-        userMenu.hidden = true;
-        userToggle.setAttribute('aria-expanded', 'false');
+        const popover = {
+            close: function (returnFocus) {
+                if (menu.hidden) {
+                    return;
+                }
+                menu.hidden = true;
+                toggle.setAttribute('aria-expanded', 'false');
+                if (returnFocus) {
+                    toggle.focus();
+                }
+            }
+        };
+        popovers.push(popover);
+
+        toggle.addEventListener('click', function (event) {
+            event.stopPropagation();
+            if (!menu.hidden) {
+                popover.close(false);
+                return;
+            }
+            popovers.forEach(function (other) {
+                if (other !== popover) {
+                    other.close(false);
+                }
+            });
+            menu.hidden = false;
+            toggle.setAttribute('aria-expanded', 'true');
+            if (onOpen) {
+                onOpen(menu);
+            }
+        });
+        document.addEventListener('click', function (event) {
+            if (!menu.contains(event.target)) {
+                popover.close(false);
+            }
+        });
+        document.addEventListener('keydown', function (event) {
+            if (event.key === 'Escape' && !menu.hidden) {
+                popover.close(true);
+            }
+        });
+    }
+
+    let notificationsRequestId = 0;
+
+    function loadNotifications(menu) {
+        const loading = menu.querySelector('[data-notifications-loading]');
+        const failure = menu.querySelector('[data-notifications-error]');
+        const body = menu.querySelector('[data-notifications-body]');
+        // a request counter so a slow, superseded response cannot overwrite what a later open already rendered
+        const requestId = ++notificationsRequestId;
+        loading.hidden = false;
+        failure.hidden = true;
+        body.replaceChildren();
+        fetch(notificationsToggle.dataset.dropdownHref, { credentials: 'same-origin' })
+            .then(function (response) {
+                if (!response.ok) {
+                    throw new Error('Notifications dropdown answered ' + response.status);
+                }
+                return response.text();
+            })
+            .then(function (html) {
+                if (requestId !== notificationsRequestId) {
+                    return;
+                }
+                const doc = new DOMParser().parseFromString(html, 'text/html');
+                // an expired session answers with the login page, which must not end up inside the panel
+                const panel = doc.querySelector('[data-notifications-dropdown]');
+                if (!panel) {
+                    throw new Error('Notifications dropdown answered with an unexpected page');
+                }
+                const here = window.location.pathname + window.location.search;
+                panel.querySelectorAll('input[name="redirect"]').forEach(function (input) {
+                    input.value = here;
+                });
+                loading.hidden = true;
+                body.replaceChildren(panel);
+            })
+            .catch(function () {
+                if (requestId !== notificationsRequestId) {
+                    return;
+                }
+                loading.hidden = true;
+                body.replaceChildren();
+                failure.hidden = false;
+            });
     }
 
     if (drawerToggle && sidebar) {
@@ -107,24 +194,12 @@
         });
     }
 
-    if (userToggle && userMenu) {
-        userToggle.addEventListener('click', function (event) {
-            event.stopPropagation();
-            const opening = userMenu.hidden;
-            userMenu.hidden = !opening;
-            userToggle.setAttribute('aria-expanded', String(opening));
-        });
-        document.addEventListener('click', function (event) {
-            if (!userMenu.contains(event.target)) {
-                closeUserMenu();
-            }
-        });
-    }
+    bindPopover(userToggle, userMenu);
+    bindPopover(notificationsToggle, notificationsMenu, loadNotifications);
 
     document.addEventListener('keydown', function (event) {
         if (event.key === 'Escape') {
             closeDrawer();
-            closeUserMenu();
         }
     });
 })();

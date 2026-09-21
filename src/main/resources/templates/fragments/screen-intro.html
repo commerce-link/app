@@ -160,6 +160,9 @@
             .screen-intro { transition: none; }
             .screen-intro-toggle.is-pulsing { animation: none; }
         }
+        @media screen and (max-width: 1023px) {
+            .screen-intro-toggle, .screen-intro-close { width: 44px; height: 44px; }
+        }
         @media screen and (max-width: 640px) {
             .screen-intro-body { padding-right: 2.6rem; }
             .screen-intro-footer { padding-left: 1.6rem; }

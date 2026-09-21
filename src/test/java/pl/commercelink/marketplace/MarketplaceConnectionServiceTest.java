@@ -1,0 +1,556 @@
+package pl.commercelink.marketplace;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
+import pl.commercelink.inventory.supplier.ErrorMessage;
+import pl.commercelink.notifications.StoreNotificationService;
+import pl.commercelink.marketplace.api.MarketplaceProvider;
+import pl.commercelink.marketplace.api.MarketplaceProviderDescriptor;
+import pl.commercelink.provider.ProviderConfigurationManager;
+import pl.commercelink.provider.api.ProviderField;
+import pl.commercelink.stores.MarketplaceIntegration;
+import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoreNotificationType;
+import pl.commercelink.stores.StoresRepository;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
+class MarketplaceConnectionServiceTest {
+
+    private static final MarketplaceProviderDescriptor ALLEGRO = descriptor("Allegro", "Allegro.pl", false,
+            new ProviderField("clientId", "Client ID", ProviderField.FieldType.TEXT, true, ""),
+            new ProviderField("clientSecret", "Client Secret", ProviderField.FieldType.PASSWORD, true, ""));
+    private static final MarketplaceProviderDescriptor EMPIK = descriptor("Empik", "EmpikPlace", true,
+            new ProviderField("apiKey", "API Key", ProviderField.FieldType.PASSWORD, true, ""));
+
+    @Mock
+    private StoresRepository storesRepository;
+    @Mock
+    private MarketplaceProviderFactory providerFactory;
+    @Mock
+    private ProviderConfigurationManager configurationManager;
+    @Mock
+    private MarketplaceOrdersImportScheduler ordersImportScheduler;
+    @Mock
+    private MarketplaceReturnsImportScheduler returnsImportScheduler;
+    @Mock
+    private StoreNotificationService notificationService;
+
+    private MarketplaceConnectionService service;
+    private Store store;
+
+    @BeforeEach
+    void setUp() {
+        service = new MarketplaceConnectionService(storesRepository, providerFactory, configurationManager,
+                ordersImportScheduler, returnsImportScheduler, notificationService, 5);
+        store = new Store();
+        store.setStoreId("store-1");
+        when(providerFactory.availableProviders()).thenReturn(List.of(ALLEGRO, EMPIK));
+        when(providerFactory.getDescriptor("Allegro")).thenReturn(ALLEGRO);
+        when(providerFactory.getDescriptor("Empik")).thenReturn(EMPIK);
+        when(providerFactory.deviceAuthProviders()).thenReturn(List.of("Allegro"));
+        when(providerFactory.loadConfiguration(any(), anyString())).thenReturn(new HashMap<>());
+        when(providerFactory.resolveCredentialName(ALLEGRO)).thenReturn("allegro_marketplace");
+        when(providerFactory.resolveCredentialName(EMPIK)).thenReturn("empik_marketplace");
+        when(providerFactory.resolveCredentialName("Allegro")).thenReturn("allegro_marketplace");
+        when(providerFactory.resolveCredentialName("Empik")).thenReturn("empik_marketplace");
+    }
+
+    @Test
+    void connectsANewMarketplaceWithItsCredentialsAndSchedule() {
+        // when
+        MarketplaceConnectionService.ConnectionUpdateResult result = service.connectOrUpdate(store, "Empik", Map.of("apiKey", "secret"), " 0/15 * * * ? * ", "");
+
+        // then
+        assertThat(result.hasErrors()).isFalse();
+        verify(providerFactory).saveConfiguration(store, "Empik", Map.of("apiKey", "secret"));
+        MarketplaceIntegration integration = store.getMarketplaceIntegration("Empik");
+        assertThat(integration.isLoggedIn()).isTrue();
+        assertThat(integration.getOrdersImportSchedule()).isEqualTo("0/15 * * * ? *");
+        verify(ordersImportScheduler).apply("store-1", "Empik", "0/15 * * * ? *");
+        verify(storesRepository).save(store);
+    }
+
+    @Test
+    void aDeviceAuthMarketplaceStartsAsAwaitingAuthorization() {
+        // when
+        service.connectOrUpdate(store, "Allegro", Map.of("clientId", "id", "clientSecret", "s"), "", "");
+
+        // then
+        assertThat(store.getMarketplaceIntegration("Allegro").isLoggedIn()).isFalse();
+        verify(storesRepository).save(store);
+    }
+
+    @Test
+    void aNewMarketplaceWithoutAScheduleStillGetsTheDefaultOne() {
+        // when
+        service.connectOrUpdate(store, "Empik", Map.of("apiKey", "secret"), "", "");
+
+        // then
+        verify(ordersImportScheduler).apply("store-1", "Empik", null);
+        assertThat(store.getMarketplaceIntegration("Empik").getOrdersImportSchedule()).isNull();
+    }
+
+    @Test
+    void anExistingMarketplaceWithoutAScheduleIsNotRescheduledOnEveryEdit() {
+        // given
+        store.getMarketplaces().add(new MarketplaceIntegration("Empik"));
+        when(providerFactory.loadConfiguration(store, "Empik")).thenReturn(Map.of("apiKey", "stored"));
+
+        // when
+        service.connectOrUpdate(store, "Empik", Map.of("apiKey", ""), "", "");
+
+        // then
+        verify(ordersImportScheduler, never()).apply(any(), any(), any());
+    }
+
+    @Test
+    void anUnchangedScheduleIsNotSentToTheSchedulerAgain() {
+        // given
+        MarketplaceIntegration existing = new MarketplaceIntegration("Empik");
+        existing.setOrdersImportSchedule("0/15 * * * ? *");
+        store.getMarketplaces().add(existing);
+        when(providerFactory.loadConfiguration(store, "Empik")).thenReturn(Map.of("apiKey", "stored"));
+
+        // when
+        MarketplaceConnectionService.ConnectionUpdateResult result = service.connectOrUpdate(store, "Empik", Map.of("apiKey", ""), "0/15  * * * ? *", "");
+
+        // then
+        assertThat(result.hasErrors()).isFalse();
+        verify(ordersImportScheduler, never()).apply(any(), any(), any());
+        verify(providerFactory).saveConfiguration(store, "Empik", Map.of("apiKey", ""));
+        verify(storesRepository).save(store);
+    }
+
+    @Test
+    void clearingTheScheduleFallsBackToTheDefaultOne() {
+        // given
+        MarketplaceIntegration existing = new MarketplaceIntegration("Empik");
+        existing.setOrdersImportSchedule("0/15 * * * ? *");
+        store.getMarketplaces().add(existing);
+        when(providerFactory.loadConfiguration(store, "Empik")).thenReturn(Map.of("apiKey", "stored"));
+
+        // when
+        service.connectOrUpdate(store, "Empik", Map.of(), "   ", "");
+
+        // then
+        verify(ordersImportScheduler).apply("store-1", "Empik", null);
+        assertThat(existing.getOrdersImportSchedule()).isNull();
+    }
+
+    @Test
+    void aBlankRequiredPasswordIsAnErrorOnlyWithoutAStoredSecret() {
+        // when
+        MarketplaceConnectionService.ConnectionUpdateResult result = service.connectOrUpdate(store, "Empik", Map.of("apiKey", ""), "", "");
+
+        // then
+        assertThat(result.errors()).extracting(ErrorMessage::code)
+                .containsExactly("store.marketplaces.error.requires.field");
+        assertThat(result.errors().get(0).args()).containsExactly("Empik", "API Key");
+        verify(providerFactory, never()).saveConfiguration(any(), any(), any());
+        verify(storesRepository, never()).save(any());
+    }
+
+    @Test
+    void rejectsAScheduleBelowTheFloorWithoutTouchingAnything() {
+        // when
+        MarketplaceConnectionService.ConnectionUpdateResult result = service.connectOrUpdate(store, "Empik", Map.of("apiKey", "secret"), "0/2 * * * ? *", "");
+
+        // then
+        assertThat(result.errors()).extracting(ErrorMessage::code)
+                .containsExactly("store.marketplaces.import.schedule.error.too.frequent");
+        assertThat(result.errors().get(0).args()).containsExactly("Empik", "0/2 * * * ? *", 5);
+        verify(providerFactory, never()).saveConfiguration(any(), any(), any());
+        verify(ordersImportScheduler, never()).apply(any(), any(), any());
+        verify(storesRepository, never()).save(any());
+    }
+
+    @Test
+    void rejectsAnInvalidScheduleExpression() {
+        // when
+        MarketplaceConnectionService.ConnectionUpdateResult result = service.connectOrUpdate(store, "Empik", Map.of("apiKey", "secret"), "every 5 minutes", "");
+
+        // then
+        assertThat(result.errors()).extracting(ErrorMessage::code)
+                .containsExactly("store.marketplaces.import.schedule.error.invalid");
+        verify(storesRepository, never()).save(any());
+    }
+
+    @Test
+    void rejectsAnUnknownMarketplace() {
+        // when
+        MarketplaceConnectionService.ConnectionUpdateResult result = service.connectOrUpdate(store, "Ebay", Map.of(), "", "");
+
+        // then
+        assertThat(result.errors()).extracting(ErrorMessage::code).containsExactly("store.marketplaces.error.unknown");
+        verify(storesRepository, never()).save(any());
+    }
+
+    @Test
+    void disconnectingDropsCredentialsIntegrationAndSchedule() {
+        // given
+        store.getMarketplaces().add(new MarketplaceIntegration("Empik"));
+
+        // when
+        MarketplaceConnectionService.ConnectionUpdateResult result = service.disconnect(store, "Empik");
+
+        // then
+        assertThat(result.hasErrors()).isFalse();
+        verify(providerFactory).deleteConfiguration(store, "Empik");
+        assertThat(store.getMarketplaceIntegration("Empik")).isNull();
+        verify(ordersImportScheduler).delete("store-1", "Empik");
+        verify(storesRepository).save(store);
+    }
+
+    @Test
+    void disconnectingAMarketplaceThatIsNotConnectedIsAnError() {
+        // when
+        MarketplaceConnectionService.ConnectionUpdateResult result = service.disconnect(store, "Empik");
+
+        // then
+        assertThat(result.errors()).extracting(ErrorMessage::code)
+                .containsExactly("store.marketplaces.import.schedule.error.missing");
+        verify(storesRepository, never()).save(any());
+    }
+
+    @Test
+    void aFailedStoreSaveRestoresTheSecretAndTheScheduleAndReportsTheFailure() {
+        // given
+        ProviderConfigurationManager.SecretSnapshot secretBefore =
+                new ProviderConfigurationManager.SecretSnapshot(false, null);
+        when(configurationManager.snapshot(store, "empik_marketplace")).thenReturn(secretBefore);
+        when(ordersImportScheduler.snapshot("store-1", "Empik")).thenReturn(Optional.empty());
+        doThrow(new RuntimeException("dynamo down")).when(storesRepository).save(store);
+
+        // when
+        MarketplaceConnectionService.ConnectionUpdateResult result = service.connectOrUpdate(store, "Empik", Map.of("apiKey", "secret"), "0/15 * * * ? *", "");
+
+        // then
+        assertThat(result.errors()).extracting(ErrorMessage::code).containsExactly("store.marketplaces.error.update.failed");
+        var order = inOrder(providerFactory, ordersImportScheduler, storesRepository, configurationManager);
+        order.verify(providerFactory).saveConfiguration(store, "Empik", Map.of("apiKey", "secret"));
+        order.verify(ordersImportScheduler).apply("store-1", "Empik", "0/15 * * * ? *");
+        order.verify(storesRepository).save(store);
+        order.verify(ordersImportScheduler).restore("store-1", "Empik", Optional.empty());
+        order.verify(configurationManager).restore(store, "empik_marketplace", secretBefore);
+    }
+
+    @Test
+    void aFailedScheduleUpdateRestoresTheSecretButNotAScheduleItNeverTouched() {
+        // given
+        ProviderConfigurationManager.SecretSnapshot secretBefore =
+                new ProviderConfigurationManager.SecretSnapshot(true, Map.of("apiKey", "old"));
+        when(configurationManager.snapshot(store, "empik_marketplace")).thenReturn(secretBefore);
+        when(ordersImportScheduler.snapshot("store-1", "Empik")).thenReturn(Optional.of("cron(0 9 * * ? *)"));
+        doThrow(new RuntimeException("eventbridge down")).when(ordersImportScheduler).apply(any(), any(), any());
+
+        // when
+        MarketplaceConnectionService.ConnectionUpdateResult result = service.connectOrUpdate(store, "Empik", Map.of("apiKey", "new"), "0/15 * * * ? *", "");
+
+        // then
+        assertThat(result.hasErrors()).isTrue();
+        verify(ordersImportScheduler).restore("store-1", "Empik", Optional.of("cron(0 9 * * ? *)"));
+        verify(configurationManager).restore(store, "empik_marketplace", secretBefore);
+        verify(storesRepository, never()).save(any());
+    }
+
+    @Test
+    void aSuccessfulSaveRestoresNothing() {
+        // given
+        when(configurationManager.snapshot(any(), anyString()))
+                .thenReturn(new ProviderConfigurationManager.SecretSnapshot(false, null));
+
+        // when
+        service.connectOrUpdate(store, "Empik", Map.of("apiKey", "secret"), "0/15 * * * ? *", "");
+
+        // then
+        verify(configurationManager, never()).restore(any(), anyString(), any());
+        verify(ordersImportScheduler, never()).restore(anyString(), anyString(), any());
+    }
+
+    @Test
+    void aFailedDisconnectPutsTheSecretAndTheScheduleBack() {
+        // given
+        store.getMarketplaces().add(new MarketplaceIntegration("Empik"));
+        ProviderConfigurationManager.SecretSnapshot secretBefore =
+                new ProviderConfigurationManager.SecretSnapshot(true, Map.of("apiKey", "old"));
+        when(configurationManager.snapshot(store, "empik_marketplace")).thenReturn(secretBefore);
+        when(ordersImportScheduler.snapshot("store-1", "Empik")).thenReturn(Optional.of("cron(0/15 * * * ? *)"));
+        doThrow(new RuntimeException("dynamo down")).when(storesRepository).save(store);
+
+        // when
+        MarketplaceConnectionService.ConnectionUpdateResult result = service.disconnect(store, "Empik");
+
+        // then
+        assertThat(result.errors()).extracting(ErrorMessage::code).containsExactly("store.marketplaces.error.update.failed");
+        verify(ordersImportScheduler).restore("store-1", "Empik", Optional.of("cron(0/15 * * * ? *)"));
+        verify(configurationManager).restore(store, "empik_marketplace", secretBefore);
+    }
+
+    @Test
+    void aNewMarketplaceGetsAReturnsScheduleTooAndAStoredCronIsKept() {
+        // when
+        service.connectOrUpdate(store, "Empik", Map.of("apiKey", "secret"), "", " 0 8 * * ? * ");
+
+        // then
+        verify(returnsImportScheduler).apply("store-1", "Empik", "0 8 * * ? *");
+        assertThat(store.getMarketplaceIntegration("Empik").getReturnsImportSchedule()).isEqualTo("0 8 * * ? *");
+    }
+
+    @Test
+    void anUnchangedReturnsScheduleIsNotSentToTheSchedulerAgain() {
+        // given
+        MarketplaceIntegration existing = new MarketplaceIntegration("Empik");
+        existing.setReturnsImportSchedule("0 8 * * ? *");
+        store.getMarketplaces().add(existing);
+        when(providerFactory.loadConfiguration(store, "Empik")).thenReturn(Map.of("apiKey", "stored"));
+
+        // when
+        service.connectOrUpdate(store, "Empik", Map.of(), "", "0 8 * * ? *");
+
+        // then
+        verify(returnsImportScheduler, never()).apply(any(), any(), any());
+    }
+
+    @Test
+    void anInvalidReturnsScheduleIsReportedUnderItsOwnKey() {
+        // when
+        MarketplaceConnectionService.ConnectionUpdateResult result = service.connectOrUpdate(
+                store, "Empik", Map.of("apiKey", "secret"), "", "0/2 * * * ? *");
+
+        // then
+        assertThat(result.errors()).extracting(ErrorMessage::code)
+                .containsExactly("store.marketplaces.returns.schedule.error.too.frequent");
+        verify(returnsImportScheduler, never()).apply(any(), any(), any());
+        verify(storesRepository, never()).save(any());
+    }
+
+    @Test
+    void aFailedStoreSaveRestoresTheReturnsScheduleAsWell() {
+        // given
+        when(configurationManager.snapshot(any(), anyString()))
+                .thenReturn(new ProviderConfigurationManager.SecretSnapshot(false, null));
+        when(returnsImportScheduler.snapshot("store-1", "Empik")).thenReturn(Optional.of("cron(0 8 * * ? *)"));
+        doThrow(new RuntimeException("dynamo down")).when(storesRepository).save(store);
+
+        // when
+        service.connectOrUpdate(store, "Empik", Map.of("apiKey", "secret"), "", "0 9 * * ? *");
+
+        // then
+        verify(returnsImportScheduler).restore("store-1", "Empik", Optional.of("cron(0 8 * * ? *)"));
+    }
+
+    /**
+     * Without a descriptor there is nothing to derive the credential name from, yet the secret is deleted all the
+     * same, so a failed disconnect has to be able to put it back.
+     */
+    @Test
+    void aFailedDisconnectOfAMarketplaceWhoseAdapterIsGonePutsItsSecretBack() {
+        // given
+        store.getMarketplaces().add(new MarketplaceIntegration("Ceneo"));
+        when(providerFactory.getDescriptor("Ceneo")).thenReturn(null);
+        when(providerFactory.resolveCredentialName("Ceneo")).thenReturn("ceneo_marketplace");
+        ProviderConfigurationManager.SecretSnapshot secretBefore =
+                new ProviderConfigurationManager.SecretSnapshot(true, Map.of("apiKey", "old"));
+        when(configurationManager.snapshot(store, "ceneo_marketplace")).thenReturn(secretBefore);
+        doThrow(new RuntimeException("dynamo down")).when(storesRepository).save(store);
+
+        // when
+        MarketplaceConnectionService.ConnectionUpdateResult result = service.disconnect(store, "Ceneo");
+
+        // then
+        assertThat(result.errors()).extracting(ErrorMessage::code).containsExactly("store.marketplaces.error.update.failed");
+        verify(configurationManager).restore(store, "ceneo_marketplace", secretBefore);
+    }
+
+    @Test
+    void disconnectingDropsTheReturnsScheduleToo() {
+        // given
+        store.getMarketplaces().add(new MarketplaceIntegration("Empik"));
+
+        // when
+        service.disconnect(store, "Empik");
+
+        // then
+        verify(returnsImportScheduler).delete("store-1", "Empik");
+    }
+
+    @Test
+    void aMarketplaceWithoutAReturnsApiGetsNoReturnsScheduleAndItsReturnsCronIsIgnored() {
+        // when
+        MarketplaceConnectionService.ConnectionUpdateResult result = service.connectOrUpdate(
+                store, "Allegro", Map.of("clientId", "id", "clientSecret", "s"), "", "not a cron");
+
+        // then
+        assertThat(result.hasErrors()).isFalse();
+        verify(returnsImportScheduler, never()).apply(any(), any(), any());
+        assertThat(store.getMarketplaceIntegration("Allegro").getReturnsImportSchedule()).isNull();
+    }
+
+    @Test
+    void disconnectingAMarketplaceWhoseAdapterIsGoneDeletesTheReturnsScheduleToo() {
+        // given
+        store.getMarketplaces().add(new MarketplaceIntegration("Empik"));
+        when(providerFactory.getDescriptor("Empik")).thenReturn(null);
+
+        // when
+        service.disconnect(store, "Empik");
+
+        // then
+        verify(returnsImportScheduler).delete("store-1", "Empik");
+        verify(ordersImportScheduler).delete("store-1", "Empik");
+    }
+
+    @Test
+    void disconnectingAMarketplaceWithoutAReturnsApiLeavesTheReturnsSchedulerAlone() {
+        // given
+        store.getMarketplaces().add(new MarketplaceIntegration("Allegro"));
+
+        // when
+        service.disconnect(store, "Allegro");
+
+        // then
+        verify(returnsImportScheduler, never()).delete(any(), any());
+        verify(ordersImportScheduler).delete("store-1", "Allegro");
+    }
+
+    @Test
+    void theReturnsDefaultIntervalComesFromItsScheduler() {
+        // given
+        when(returnsImportScheduler.defaultIntervalMinutes()).thenReturn(60);
+
+        // when / then
+        assertThat(service.returnsDefaultIntervalMinutes()).isEqualTo(60);
+    }
+
+    @Test
+    void resavingCredentialsOfAMarketplaceWithoutDeviceAuthClearsItsExpiredConnectionNotificationAfterTheSave() {
+        // given
+        store.getMarketplaces().add(new MarketplaceIntegration("Empik"));
+
+        // when
+        MarketplaceConnectionService.ConnectionUpdateResult result = service.connectOrUpdate(
+                store, "Empik", Map.of("apiKey", "fresh"), "", "");
+
+        // then
+        assertThat(result.hasErrors()).isFalse();
+        assertThat(store.getMarketplaceIntegration("Empik").isLoggedIn()).isTrue();
+        var order = inOrder(storesRepository, notificationService);
+        order.verify(storesRepository).save(store);
+        order.verify(notificationService).resolve("store-1", StoreNotificationType.UNAUTHENTICATED, "empik_marketplace");
+    }
+
+    @Test
+    void resavingCredentialsOfADeviceAuthMarketplaceKeepsTheNotificationUntilItIsAuthorizedAgain() {
+        // given
+        store.getMarketplaces().add(new MarketplaceIntegration("Allegro"));
+
+        // when
+        service.connectOrUpdate(store, "Allegro", Map.of("clientId", "id", "clientSecret", "s"), "", "");
+
+        // then
+        verify(notificationService, never()).resolve(any(), any(), any());
+    }
+
+    @Test
+    void disconnectingClearsTheExpiredConnectionNotificationAfterTheSave() {
+        // given
+        store.getMarketplaces().add(new MarketplaceIntegration("Allegro"));
+
+        // when
+        service.disconnect(store, "Allegro");
+
+        // then
+        var order = inOrder(storesRepository, notificationService);
+        order.verify(storesRepository).save(store);
+        order.verify(notificationService).resolve("store-1", StoreNotificationType.UNAUTHENTICATED, "allegro_marketplace");
+    }
+
+    @Test
+    void aFailedSaveLeavesTheNotificationInPlace() {
+        // given
+        store.getMarketplaces().add(new MarketplaceIntegration("Empik"));
+        doThrow(new RuntimeException("dynamo down")).when(storesRepository).save(store);
+
+        // when
+        service.connectOrUpdate(store, "Empik", Map.of("apiKey", "fresh"), "", "");
+        service.disconnect(store, "Empik");
+
+        // then
+        verify(notificationService, never()).resolve(any(), any(), any());
+    }
+
+    @Test
+    void aNotificationThatCannotBeClearedDoesNotTurnASavedConnectionIntoAFailure() {
+        // given
+        store.getMarketplaces().add(new MarketplaceIntegration("Empik"));
+        doThrow(new RuntimeException("dynamo down")).when(notificationService).resolve(any(), any(), any());
+
+        // when
+        MarketplaceConnectionService.ConnectionUpdateResult result = service.connectOrUpdate(
+                store, "Empik", Map.of("apiKey", "fresh"), "", "");
+
+        // then
+        assertThat(result.hasErrors()).isFalse();
+        verify(configurationManager, never()).restore(any(), anyString(), any());
+    }
+
+
+    @Test
+    void theDefaultIntervalComesFromTheScheduler() {
+        // given
+        when(ordersImportScheduler.defaultIntervalMinutes()).thenReturn(10);
+
+        // when / then
+        assertThat(service.defaultIntervalMinutes()).isEqualTo(10);
+    }
+
+    private static MarketplaceProviderDescriptor descriptor(String name, String displayName, boolean supportsReturns,
+                                                            ProviderField... fields) {
+        return new MarketplaceProviderDescriptor() {
+            @Override
+            public String name() {
+                return name;
+            }
+
+            @Override
+            public boolean supportsReturns() {
+                return supportsReturns;
+            }
+
+            @Override
+            public String displayName() {
+                return displayName;
+            }
+
+            @Override
+            public List<ProviderField> configurationFields() {
+                return List.of(fields);
+            }
+
+            @Override
+            public MarketplaceProvider create(Map<String, String> configuration) {
+                return null;
+            }
+        };
+    }
+}

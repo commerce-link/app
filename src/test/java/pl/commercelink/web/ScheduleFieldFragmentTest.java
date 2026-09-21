@@ -20,7 +20,7 @@ class ScheduleFieldFragmentTest {
     @Test
     void theInputFragmentSubmitsUnderTheNameTheSupplierFormExpects() {
         // when
-        String html = render("input('feedSchedule', '0 5 * * ? *', 5)");
+        String html = render("input('feedSchedule', '0 5 * * ? *', 5, #{store.supplier.schedule.summary.default}, 'minutes,hours,days')");
 
         // then
         assertThat(html).contains("name=\"feedSchedule\"");
@@ -31,7 +31,7 @@ class ScheduleFieldFragmentTest {
     @Test
     void theInputFragmentResolvesEveryMessageItUses() {
         // when
-        String html = render("input('feedSchedule', '', 5)");
+        String html = render("input('feedSchedule', '', 5, #{store.supplier.schedule.summary.default}, 'minutes,hours,days')");
 
         // then
         assertThat(html).doesNotContain("??");
@@ -41,7 +41,7 @@ class ScheduleFieldFragmentTest {
     @Test
     void theExpressionTravelsInAHiddenFieldWithNoCronInputForTheOperator() {
         // the builder is the only way to set a schedule; a raw cron field was dropped on purpose
-        String html = render("input('feedSchedule', '0 5 * * ? *', 5)");
+        String html = render("input('feedSchedule', '0 5 * * ? *', 5, #{store.supplier.schedule.summary.default}, 'minutes,hours,days')");
 
         // then
         assertThat(html).containsPattern("<input type=\"hidden\" class=\"schedule-input\"[^>]*name=\"feedSchedule\"");
@@ -52,7 +52,7 @@ class ScheduleFieldFragmentTest {
     @Test
     void theInputFragmentOffersThreeModesAndNoConflictWarning() {
         // when
-        String html = render("input('feedSchedule', '', 5)");
+        String html = render("input('feedSchedule', '', 5, #{store.supplier.schedule.summary.default}, 'minutes,hours,days')");
 
         // then
         assertThat(html).contains("data-mode=\"default\"");
@@ -64,16 +64,45 @@ class ScheduleFieldFragmentTest {
     }
 
     @Test
-    void theStyleFragmentKeepsTheModeToggleFlushWithTheRestOfTheModal() {
-        // the screen's body is a Bulma `.content` block, whose `.content ul` typography indents any
-        // plain list by 2em and pushes it down by 1em -- and a tabs bar is built from a plain list,
-        // so without this reset the mode toggle alone sits inset from every other control
-        String html = render("style");
+    void theInputFragmentCarriesTheDefaultTextAndUnitsItWasGiven() {
+        // when
+        String html = render("input('schedule', '', 5, #{store.marketplaces.schedule.summary.default(10)}, 'minutes,hours')");
 
         // then
-        assertThat(html).contains(".schedule-field .tabs ul");
-        assertThat(html).contains("margin: 0");
-        assertThat(html).contains("list-style: none");
+        assertThat(html).contains("data-default-text=\"Default — every 10 min\"");
+        assertThat(html).contains("data-units=\"minutes,hours\"");
+        assertThat(html).doesNotContain("once a day");
+    }
+
+    @Test
+    void theScriptReadsTheDefaultTextAndUnitsOffTheFieldInsteadOfHardCodingThem() {
+        // when
+        String html = render("script");
+
+        // then
+        assertThat(html).contains("field.getAttribute('data-default-text')");
+        assertThat(html).contains("field.getAttribute('data-units')");
+        assertThat(html).contains("if (units.indexOf(option.value) < 0) { option.remove(); }");
+        assertThat(html).contains("function offers(unit, value)");
+    }
+
+    /**
+     * The mode toggle used to be a Bulma tabs bar built from a plain list, which the page's `.content` typography indented;
+     * it is now a group of pressed/unpressed buttons, and the hours are toggle chips the script marks with aria-pressed.
+     */
+    @Test
+    void theModesAreToggleButtonsAndTheHoursToggleChips() {
+        // when
+        String input = render("input('feedSchedule', '0 5 * * ? *', 5, 'Default', 'minutes,hours,days')");
+        String script = render("script");
+
+        // then
+        assertThat(input).contains("class=\"cl-segmented schedule-modes\" role=\"group\"")
+                .contains("<button type=\"button\" class=\"cl-segment\" data-mode=\"at\" aria-pressed=\"false\"")
+                .doesNotContain("<ul").doesNotContain("tabs is-toggle");
+        assertThat(script).contains("button.className = 'cl-chip';")
+                .contains("querySelectorAll('[aria-pressed=\"true\"]')")
+                .doesNotContain("is-link");
     }
 
     @Test
@@ -89,5 +118,19 @@ class ScheduleFieldFragmentTest {
         // a stored expression the builder cannot show is named, with the expression itself
         assertThat(html).contains("The stored schedule ({0}) does not fit the builder.");
         assertThat(html).contains("window.scheduleField");
+    }
+
+    /** Without JavaScript the stored schedule is still named, and the mode buttons that could not work are hidden. */
+    @Test
+    void theSummaryOfTheStoredScheduleIsRenderedByTheServerAndTheModesWaitForTheScript() {
+        // when
+        String every = render("input('feedSchedule', '0/30 * * * ? *', 5, 'Default text', 'minutes,hours,days')");
+        String unset = render("input('feedSchedule', null, 5, 'Default text', 'minutes,hours,days')");
+
+        // then
+        assertThat(every).containsPattern("<p class=\"cl-help schedule-summary\" aria-live=\"polite\">Every 30 min</p>");
+        assertThat(unset).contains(">Default text</p>");
+        assertThat(every).contains("class=\"cl-segmented schedule-modes\" role=\"group\"").contains("hidden");
+        assertThat(render("script")).contains("modes.hidden = false");
     }
 }

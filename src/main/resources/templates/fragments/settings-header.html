@@ -1,0 +1,35 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<header th:fragment="header(intro, actions)" th:if="${settingsPage != null}" class="cl-page-header">
+    <a th:if="${settingsPage.homeHref() != null}" class="cl-back" th:href="@{${settingsPage.homeHref()}}">
+        <span class="icon is-small" aria-hidden="true"><i class="fas fa-chevron-left"></i></span>
+        <span th:text="#{nav.settings}"></span>
+    </a>
+    <div class="cl-page-header-row">
+        <h1 class="cl-page-title" th:text="#{${settingsPage.tile().titleKey()}}"></h1>
+        <th:block th:if="${intro}">
+            <button th:replace="~{fragments/screen-intro :: toggle}"></button>
+        </th:block>
+        <div th:if="${actions != null}" class="cl-page-actions">
+            <th:block th:replace="${actions}"></th:block>
+        </div>
+    </div>
+    <div class="cl-page-lead" th:text="#{${settingsPage.tile().descriptionKey()}}"></div>
+</header>
+
+<!--/* Header of a page below a settings page (a record's form, a confirmation): back to the parent page, own title. */-->
+<!--/* A div, not a header element: "header" is also the name of the fragment above and would select both. */-->
+<div th:fragment="subpage(backHref, backLabel, title)" class="cl-page-header">
+    <a class="cl-back" th:href="@{${backHref}}">
+        <span class="icon is-small" aria-hidden="true"><i class="fas fa-chevron-left"></i></span>
+        <span th:text="${backLabel}"></span>
+    </a>
+    <div class="cl-page-header-row">
+        <h1 class="cl-page-title" th:text="${title}"></h1>
+    </div>
+</div>
+
+</body>
+</html>

@@ -82,4 +82,16 @@ class LayoutShellTemplateTest {
         // then
         assertThat(html).contains("/js/navigation.js");
     }
+
+    /** async-form.js blames the connection only when the request failed; an answered 403 or 500 gets this message. */
+    @Test
+    void givesSaveWithoutReloadingAMessageForServerErrors() throws Exception {
+        // when
+        String layout = layout();
+        String script = Files.readString(Path.of("src/main/resources/static/js/async-form.js"), StandardCharsets.UTF_8);
+
+        // then
+        assertThat(layout).contains("<body th:attr=\"data-cl-server-error=#{form.save.serverError}\">");
+        assertThat(script).contains("document.body.getAttribute('data-cl-server-error')");
+    }
 }

@@ -3,47 +3,154 @@
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
       layout:decorate="~{layout}">
 <body>
-
 <div layout:fragment="content">
+    <section class="cl-page">
+        <div class="cl-page-body">
+            <div th:replace="~{fragments/settings-header :: header(false, null)}"></div>
+            <div th:replace="~{fragments/settings-form :: savedAlert}"></div>
 
-    <section class="section">
-        <div class="container">
+            <!--/* Both cards are one fragment: saving without reloading replaces them together, so the readiness list
+                   never shows the carrier from before the save. */-->
+            <form th:fragment="rmaForm" id="store-rma-form" class="cl-form cl-stack" th:action="@{${formAction}}" method="post"
+                  novalidate data-cl-async
+                  th:attr="data-success-message=${savedMessage}, data-error-message=#{form.save.failed}">
+                <div th:replace="~{fragments/settings-form :: errorSummary('store-rma-errors', ${errors}, null)}"></div>
 
-            <h1 class="title" th:text="#{store.rma.settings}"></h1>
+                <!--/* A status, not a setting: tinted and flat so it does not read as a card to fill in, and above the
+                       form because "do returns work?" is the first question on this page. Collapsed while everything
+                       is ready; opened, with what is missing, otherwise. */-->
+                <section class="cl-card is-status" aria-labelledby="rma-readiness-title"
+                         th:with="ready=${readiness.ready()}">
+                    <div class="cl-card-head">
+                        <h2 class="cl-card-title" id="rma-readiness-title">
+                            <i class="fas" th:classappend="${ready} ? 'fa-check-circle is-ok' : 'fa-exclamation-triangle is-warn'"
+                               aria-hidden="true"></i>
+                            <span th:text="${ready} ? #{rma.settings.readiness.ok}
+                                    : (${readiness.blocked()} ? #{rma.settings.readiness.notReady} : #{rma.settings.readiness.attention})"></span>
+                        </h2>
+                    </div>
+                    <th:block th:unless="${ready}">
+                        <ul th:replace="~{store-rma :: readinessList(true)}"></ul>
+                    </th:block>
+                    <details th:if="${ready}" class="cl-disclosure" id="rma-readiness-details">
+                        <summary th:text="#{rma.settings.readiness.details}"></summary>
+                        <ul th:replace="~{store-rma :: readinessList(false)}"></ul>
+                    </details>
+                </section>
 
-            <form th:action="@{/dashboard/store/rma}" th:object="${form}" method="post">
+                <div class="cl-card">
+                    <div class="cl-card-head">
+                        <h2 class="cl-card-title" th:text="#{rma.settings.carrier.title}"></h2>
+                    </div>
+                    <p class="cl-card-desc" th:text="#{rma.settings.carrier.help}"></p>
 
-                <input type="hidden" th:field="*{store.storeId}"/>
-
-                <div class="box">
-                    <div class="field">
-                        <label class="label" th:text="#{store.default.carrier.type}"></label>
-                        <div class="control">
-                            <div class="select">
-                                <select th:field="*{store.rmaConfiguration.carrier.name}">
-                                    <option value="" th:text="#{general.select}"></option>
-                                    <option th:each="type : ${carrierTypes}" th:value="${type.name}" th:text="${type.displayName}"></option>
-                                </select>
-                            </div>
+                    <div th:unless="${hasAuthorizedCarriers}" class="cl-alert is-warn">
+                        <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+                        <div>
+                            <p class="cl-alert-title" th:text="#{rma.settings.none.title}"></p>
+                            <p class="cl-alert-text">
+                                <span th:text="#{rma.settings.none.text}"></span>
+                                <a th:href="@{${readiness.shippingHref()}}" th:text="#{rma.settings.none.link}"></a>
+                            </p>
                         </div>
                     </div>
+
+                    <th:block th:if="${hasAuthorizedCarriers}">
+                        <div th:if="${readiness.carrierLabel() == null}" class="cl-alert is-warn">
+                            <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+                            <div>
+                                <p class="cl-alert-title" th:text="#{rma.settings.off.title}"></p>
+                                <p class="cl-alert-text" th:text="#{rma.settings.off.text}"></p>
+                            </div>
+                        </div>
+                        <div th:if="${readiness.carrierLabel() != null and !readiness.carrierAuthorized()}" class="cl-alert is-warn">
+                            <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+                            <div>
+                                <p class="cl-alert-title" th:text="#{rma.settings.stale.title(${readiness.carrierLabel()})}"></p>
+                                <p class="cl-alert-text" th:text="#{rma.settings.stale.text}"></p>
+                            </div>
+                        </div>
+
+                        <!--/* A select, like every other single choice in the settings: a shipping account can offer a
+                               dozen or more carrier services, so the list length is not ours to bound. */-->
+                        <div class="cl-card-body">
+                            <div th:replace="~{fragments/form-field :: select('carrierId', 'rma.settings.carrier.label', ${carrierId}, ${carrierOptions}, 'off', true, ${errors['carrierId']})}"></div>
+                        </div>
+                        <div class="cl-card-footer">
+                            <button class="cl-button is-primary" type="submit" th:text="#{form.save.changes}"></button>
+                        </div>
+                    </th:block>
                 </div>
 
-                <div class="field is-grouped">
-                    <div class="control">
-                        <button class="button is-primary" type="button" onclick="confirmSave(this)"
-                                th:text="#{general.save}"></button>
-                    </div>
-                    <div class="control">
-                        <a th:href="@{/dashboard/store}" class="button is-light" th:text="#{general.cancel}"></a>
-                    </div>
-                </div>
             </form>
-
         </div>
     </section>
 
-</div>
+    <th:block th:if="false">
+        <!--/* onlyMissing: while returns do not work only what blocks them is listed, so the form below stays in view. */-->
+        <ul th:fragment="readinessList(onlyMissing)" class="cl-list" aria-labelledby="rma-readiness-title">
+            <li class="cl-list-item" th:if="${!onlyMissing or !readiness.carrierReady()}">
+                <div>
+                    <div class="cl-list-title">
+                        <span th:text="#{rma.settings.readiness.carrier}"></span>
+                        <span th:if="${readiness.carrierLabel() != null and !readiness.carrierAuthorized()}" class="cl-status is-warn"
+                              th:text="#{rma.settings.readiness.unauthorized}"></span>
+                        <th:block th:unless="${readiness.carrierLabel() != null and !readiness.carrierAuthorized()}">
+                            <span th:replace="~{store-rma :: readinessPill(${readiness.carrierReady()})}"></span>
+                        </th:block>
+                    </div>
+                    <p th:if="${readiness.carrierReady()}" class="cl-list-desc"
+                       th:text="${readiness.carrierLabel()}"></p>
+                    <p th:if="${readiness.carrierLabel() == null}" class="cl-list-desc is-warn"
+                       th:text="#{rma.settings.readiness.carrier.missing}"></p>
+                    <p th:if="${readiness.carrierLabel() != null and !readiness.carrierAuthorized()}"
+                       class="cl-list-desc is-warn"
+                       th:text="#{rma.settings.readiness.carrier.stale(${readiness.carrierLabel()})}"></p>
+                </div>
+            </li>
+            <li class="cl-list-item" th:if="${!onlyMissing or !readiness.templatesReady()}">
+                <div>
+                    <div class="cl-list-title">
+                        <span th:text="#{rma.settings.readiness.templates}"></span>
+                        <span th:replace="~{store-rma :: readinessPill(${readiness.templatesReady()})}"></span>
+                    </div>
+                    <p th:if="${readiness.templatesReady()}" class="cl-list-desc"
+                       th:text="${#strings.listJoin(readiness.returnTemplates(), ', ')}"></p>
+                    <p th:unless="${readiness.templatesReady()}" class="cl-list-desc is-warn"
+                       th:text="#{rma.settings.readiness.templates.missing}"></p>
+                </div>
+                <div th:unless="${readiness.templatesReady()}" class="cl-list-actions">
+                    <a class="cl-link-button" th:href="@{${readiness.shippingHref()}}"
+                       th:text="#{rma.settings.readiness.fix}"
+                       th:attr="aria-label=#{rma.settings.readiness.fix.for(#{rma.settings.readiness.templates})}"></a>
+                </div>
+            </li>
+            <li class="cl-list-item" th:if="${!onlyMissing or !readiness.addressReady()}">
+                <div>
+                    <div class="cl-list-title">
+                        <span th:text="#{rma.settings.readiness.address}"></span>
+                        <span th:replace="~{store-rma :: readinessPill(${readiness.addressReady()})}"></span>
+                    </div>
+                    <p th:if="${readiness.addressReady()}" class="cl-list-desc"
+                       th:text="${readiness.receivingAddress()}"></p>
+                    <p th:unless="${readiness.addressReady()}" class="cl-list-desc is-warn"
+                       th:text="#{rma.settings.readiness.address.missing}"></p>
+                </div>
+                <div th:unless="${readiness.addressReady()}" class="cl-list-actions">
+                    <a class="cl-link-button" th:href="@{${readiness.shippingHref()}}"
+                       th:text="#{rma.settings.readiness.fix}"
+                       th:attr="aria-label=#{rma.settings.readiness.fix.for(#{rma.settings.readiness.address})}"></a>
+                </div>
+            </li>
+        </ul>
+        <span th:fragment="readinessPill(ready)" class="cl-status" th:classappend="${ready} ? 'is-ok' : 'is-warn'"
+              th:text="${ready} ? #{rma.settings.readiness.ready} : #{rma.settings.readiness.missing}"></span>
+    </th:block>
 
+    <script th:if="${!errors.isEmpty()}">
+        document.getElementById('store-rma-errors').focus();
+    </script>
+    <script th:src="@{/js/async-form.js}" defer></script>
+</div>
 </body>
 </html>

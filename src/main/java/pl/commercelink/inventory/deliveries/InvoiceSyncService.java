@@ -129,7 +129,7 @@ public class InvoiceSyncService {
 
         String shortcut = preview.getInvoiceShortcut();
         if (StringUtils.isNotBlank(shortcut)) {
-            delivery.setProvider(shortcut);
+            delivery.setCounterpartyShortcut(shortcut);
         }
 
         delivery.increaseTotalCost(allocationsCostDelta);

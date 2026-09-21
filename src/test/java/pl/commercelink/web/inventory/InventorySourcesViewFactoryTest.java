@@ -45,7 +45,7 @@ class InventorySourcesViewFactoryTest {
     }
 
     private SupplierConnectionView view(String identity, String label, ConnectionMode mode, LocalDateTime feed) {
-        return new SupplierConnectionView(identity, identity, label, mode, true, true, true, feed, null, true);
+        return new SupplierConnectionView(identity, identity, label, mode, true, true, true, feed, null, null, null, true);
     }
 
     private Store storeWith(List<StoreSupplierConnection> connections, List<SupplierConnectionView> external,

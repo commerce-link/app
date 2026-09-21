@@ -20,6 +20,7 @@ import pl.commercelink.inventory.deliveries.DropshipPurchaseService;
 import pl.commercelink.inventory.deliveries.DropshipRejection;
 import pl.commercelink.inventory.deliveries.PurchaseSubmission;
 import pl.commercelink.inventory.deliveries.SupplierPurchaseService;
+import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrderItemsRepository;
@@ -45,6 +46,7 @@ public class DropshipController extends BaseController {
     private final DropshipPurchaseService dropshipPurchaseService;
     private final DeliveryTaxResolver deliveryTaxResolver;
     private final MessageSource messageSource;
+    private final SupplierLabels supplierLabels;
 
     @GetMapping("/dashboard/orders/{orderId}/dropship")
     @PreAuthorize("hasRole('ADMIN')")
@@ -279,6 +281,7 @@ public class DropshipController extends BaseController {
         model.addAttribute("order", order);
         model.addAttribute("consignee", order.getShippingDetails());
         model.addAttribute("isSuperAdmin", isSuperAdmin());
+        model.addAttribute("supplierLabels", supplierLabels.forStoreId(storeId));
         boolean requiresApproval = supplierPurchaseService.requiresApproval(storeId, form.getProvider());
         model.addAttribute("requiresApproval", requiresApproval);
         model.addAttribute("pickupShipment", DropshipPurchaseService.pickupShipment(order).orElse(null));

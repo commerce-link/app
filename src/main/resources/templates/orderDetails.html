@@ -155,6 +155,21 @@
                     <span th:if="${order.source?.type != null}" th:text="' (' + ${order.source.type} + ')'" class="is-size-6 has-text-grey"></span>
                 </p>
             </div>
+            <div class="column" th:if="${routedSupplier != null}">
+                <p class="heading" th:text="#{order.routed.supplier}"></p>
+                <p class="title is-5 mb-1" th:if="${routedSupplier.matched}">
+                    <span th:text="${routedSupplier.supplierName}"></span>
+                    <span class="tag is-light ml-1" th:if="${routedSupplier.providerType != null and routedSupplier.providerType != 'manual'}" th:text="${routedSupplier.providerType}"></span>
+                    <span class="is-size-6 has-text-grey"
+                          th:text="' (' + #{${routedSupplier.modeKey}} + ', ' + #{order.routed.supplier.external.no} + ' ' + ${routedSupplier.externalSupplierId} + ')'"></span>
+                </p>
+                <p class="title is-5 mb-1 has-text-danger" th:unless="${routedSupplier.matched}" th:text="#{order.routed.supplier.unmatched}"></p>
+                <p class="is-size-7 has-text-grey" th:unless="${routedSupplier.matched}"
+                   th:text="#{order.routed.supplier.external.no} + ' ' + ${routedSupplier.externalSupplierId}"></p>
+                <p class="is-size-7 has-text-danger"
+                   th:if="${routedSupplier.matched and !(routedSupplier.enabled and routedSupplier.includeInFulfilment)}"
+                   th:text="#{order.routed.supplier.not.in.fulfilment}"></p>
+            </div>
         </div>
     </div>
 
@@ -326,6 +341,7 @@
     <form id="orderItemsForm" method="post" th:object="${orderItemsForm}" th:attr="data-order-id=${order.orderId}">
         <input type="hidden" name="position" th:value="${#lists.size(orderItemsForm.orderItems)}"
                th:attr="data-default-position=${#lists.size(orderItemsForm.orderItems)}"/>
+        <input type="hidden" name="targetOrderId" id="targetOrderIdInput"/>
         <h2 class="subtitle" th:text="#{order.items}"></h2>
         <div class="box mb-5">
             <div class="table-container mb-4">
@@ -368,7 +384,8 @@
                             <span th:if="${item.manufacturerCode}" class="copyable" th:text="${item.manufacturerCode}" th:data-copy="${item.manufacturerCode}" onclick="copyToClipboard(this)"></span>
                         </td>
                         <td>
-                            <a th:if="${item.deliveryId != null}" th:href="@{${@deliveryRedirectResolver.resolveFor(order, item)}}" th:text="${item.shortenedDeliveryId}"></a>
+                            <a th:if="${item.deliveryId != null}" th:href="@{${@deliveryRedirectResolver.resolveFor(order, item)}}"
+                               th:text="${supplierLabels.has(item.deliveryId)} ? ${supplierLabels.of(item.deliveryId)} : ${item.shortenedDeliveryId}"></a>
                         </td>
                         <td>
                             <span th:if="${item.serialNo}" class="copyable truncate-serial" th:text="${item.serialNo}" th:title="${item.serialNo}" th:data-copy="${item.serialNo}" onclick="copyToClipboard(this)"></span>
@@ -467,16 +484,40 @@
                             <option value="moveSelectedItemsToTheWarehouse" th:disabled="${hasDropshipItems}" th:title="${hasDropshipItems} ? #{order.items.action.move.warehouse.dropship} : ''" th:text="#{order.items.action.move.warehouse}"></option>
                             <option value="moveSelectedItemsToTheWarehouseForRMA" th:disabled="${hasDropshipItems}" th:title="${hasDropshipItems} ? #{order.items.action.move.warehouse.dropship} : ''" th:text="#{order.items.action.move.warehouse.rma}"></option>
                             <option value="splitOrder" th:disabled="${!canSplitOrder}" th:text="#{order.items.action.split}"></option>
+                            <option value="moveItemsToOrder" th:disabled="${!canSplitOrder}" th:text="#{order.items.action.move.to.order}"></option>
                             <option th:unless="${isInvoiced}" value="removeSelectedItemsFromOrder" th:disabled="${hasDropshipItems}" th:title="${hasDropshipItems} ? #{order.items.action.dropship.locked} : ''" th:text="#{order.items.action.remove.from.order}"></option>
                         </select>
                     </div>
-                    <button class="button is-primary is-small" type="button" th:disabled="${isCompletedOrder or hasWarehouseDocument or !hasAvailableItemActions}" onclick="confirmSave(this, submitOrderItemsForm)" th:text="#{general.execute}"></button>
+                    <button class="button is-primary is-small" type="button" th:disabled="${isCompletedOrder or hasWarehouseDocument or !hasAvailableItemActions}" onclick="executeOrderItemsAction(this)" th:text="#{general.execute}"></button>
                     <button class="button is-info is-small" type="button" th:disabled="${isCompletedOrder or hasWarehouseDocument or isInvoiced or hasDropshipItems}" th:title="${hasDropshipItems} ? #{order.items.action.dropship.locked} : ''" onclick="toggleOrderItemModal(true)" th:text="#{offers.add.items}"></button>
                     <button class="button is-info is-small" type="button" th:disabled="${isCompletedOrder or isNewOrder or #lists.isEmpty(serialUpdateItems)}" onclick="toggleSerialUpdateModal(true)" th:text="#{order.update.serial.no}"></button>
                 </div>
             </div>
         </div>
     </form>
+
+    <div id="moveToOrderModal" class="modal">
+        <div class="modal-background" onclick="toggleMoveToOrderModal(false)"></div>
+        <div class="modal-card">
+            <header class="modal-card-head">
+                <p class="modal-card-title" th:text="#{order.items.action.move.to.order}"></p>
+                <button type="button" class="delete" aria-label="close" onclick="toggleMoveToOrderModal(false)"></button>
+            </header>
+            <section class="modal-card-body">
+                <div class="field">
+                    <label class="label" th:text="#{order.items.move.to.order.target}"></label>
+                    <div class="control">
+                        <input type="text" id="moveToOrderIdInput" class="input" placeholder=""/>
+                    </div>
+                    <p class="help" th:text="#{order.items.move.to.order.hint}"></p>
+                </div>
+            </section>
+            <footer class="modal-card-foot">
+                <button class="button is-primary" type="button" onclick="confirmMoveToOrder()" th:text="#{general.execute}"></button>
+                <button class="button" type="button" onclick="toggleMoveToOrderModal(false)" th:text="#{general.cancel}"></button>
+            </footer>
+        </div>
+    </div>
 
     <div id="serialUpdateModal" class="modal">
         <div class="modal-background" onclick="toggleSerialUpdateModal(false)"></div>
@@ -568,12 +609,7 @@
                            th:attr="data-template=#{order.item.price.net.hint}"></p>
                     </div>
 
-                    <div class="field">
-                        <label class="label" th:text="#{order.item.supplier}"></label>
-                        <div class="control">
-                            <input class="input" type="text" id="quickAssignSupplier" name="supplier" required/>
-                        </div>
-                    </div>
+                    <div th:replace="~{fragments/supplier-choice :: field('quickAssignSupplier', ${assignableSuppliers}, true)}"></div>
                 </section>
 
                 <footer class="modal-card-foot">
@@ -1420,6 +1456,36 @@
             form.submit();
         }
 
+        function executeOrderItemsAction(button) {
+            if (document.getElementById('action-select').value === 'moveItemsToOrder') {
+                toggleMoveToOrderModal(true);
+                return;
+            }
+            confirmSave(button, submitOrderItemsForm);
+        }
+
+        function toggleMoveToOrderModal(show) {
+            const modal = document.getElementById('moveToOrderModal');
+            modal.classList.toggle('is-active', show);
+            if (show) {
+                const input = document.getElementById('moveToOrderIdInput');
+                input.value = '';
+                input.focus();
+            }
+        }
+
+        function confirmMoveToOrder() {
+            const input = document.getElementById('moveToOrderIdInput');
+            const targetOrderId = input.value.trim();
+            if (!targetOrderId) {
+                input.classList.add('is-danger');
+                input.focus();
+                return;
+            }
+            document.getElementById('targetOrderIdInput').value = targetOrderId;
+            submitOrderItemsForm();
+        }
+
         function toggleOrderItemModal(show) {
             toggleAddItemModal(show);
         }
@@ -1637,7 +1703,7 @@
                 });
             highlightQuickAssignSku();
             document.getElementById('quickAssignPrice').value = '';
-            document.getElementById('quickAssignSupplier').value = '';
+            resetSupplierChoice('quickAssignSupplier');
             document.getElementById('quickAssignPrice').setAttribute('data-tax', button.getAttribute('data-tax') || '');
             setQuickAssignPriceType('net');
             toggleQuickAssignModal(true);

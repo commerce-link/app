@@ -3,7 +3,6 @@ package pl.commercelink.inventory.search;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -12,6 +11,7 @@ import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
+import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
 import pl.commercelink.invoicing.api.Price;
@@ -64,7 +64,6 @@ class InventorySearchTest {
     @Mock
     private Warehouse warehouse;
 
-    @InjectMocks
     private InventorySearch search;
 
     @Mock
@@ -77,6 +76,9 @@ class InventorySearchTest {
 
     @BeforeEach
     void setUp() {
+        // the label map is real: resolving a connection's label is part of what a search returns
+        search = new InventorySearch(inventory, storesRepository, pimCatalog, taxonomyCache, warehouse,
+                new SupplierLabels(storesRepository));
         store = mock(Store.class);
         StoreSupplierConnection elko = mock(StoreSupplierConnection.class);
         when(elko.getSupplierName()).thenReturn("Elko");
@@ -130,6 +132,39 @@ class InventorySearchTest {
         assertThat(found.matchedBy()).isEqualTo(MatchedBy.EAN);
         assertThat(found.supplierOffers()).extracting(OfferRow::supplier).containsExactly("Elko");
         assertThat(found.supplierOffers().get(0).mode()).isEqualTo(ConnectionMode.GLOBAL);
+    }
+
+    @Test
+    void offerCarriesTheConnectionLabelAndFallsBackToTheIdentityWithoutOne() {
+        // given -- one connection named by the operator, one left with the default name
+        StoreSupplierConnection own = mock(StoreSupplierConnection.class);
+        when(own.getSupplierName()).thenReturn("Kosatec-k7f3a9c2");
+        when(own.getMode()).thenReturn(ConnectionMode.OWN);
+        when(own.getLabel()).thenReturn("Kosatec Wrocław");
+        StoreSupplierConnection elko = mock(StoreSupplierConnection.class);
+        when(elko.getSupplierName()).thenReturn("Elko");
+        when(elko.getMode()).thenReturn(ConnectionMode.GLOBAL);
+        when(store.getSupplierConnections()).thenReturn(List.of(own, elko));
+        when(view.findByEan(EAN)).thenReturn(offers(offer("Kosatec-k7f3a9c2", 100.0, 5), offer("Elko", 110.0, 5)));
+
+        // when
+        InventorySearchResult.Found found = (InventorySearchResult.Found) search.search(STORE_ID, EAN);
+
+        // then
+        assertThat(found.supplierOffers()).extracting(OfferRow::supplierLabel)
+                .containsExactly("Kosatec Wrocław", "Elko");
+    }
+
+    @Test
+    void globalSearchLabelsOffersByTheirIdentityBecauseItSpansStores() {
+        // given
+        when(view.findByEan(EAN)).thenReturn(offers(offer("Kosatec-k7f3a9c2", 100.0, 5)));
+
+        // when
+        InventorySearchResult.Found found = (InventorySearchResult.Found) search.searchGlobal(EAN);
+
+        // then
+        assertThat(found.supplierOffers()).extracting(OfferRow::supplierLabel).containsExactly("Kosatec-k7f3a9c2");
     }
 
     @Test

@@ -348,7 +348,7 @@ class DropshipTemplateTest {
         assertThat(html).contains(
                 "<select id=\"action-select\" th:disabled=\"${isCompletedOrder or hasWarehouseDocument or !hasAvailableItemActions}\">");
         assertThat(html).contains(
-                "th:disabled=\"${isCompletedOrder or hasWarehouseDocument or !hasAvailableItemActions}\" onclick=\"confirmSave(this, submitOrderItemsForm)\"");
+                "th:disabled=\"${isCompletedOrder or hasWarehouseDocument or !hasAvailableItemActions}\" onclick=\"executeOrderItemsAction(this)\"");
     }
 
     @Test

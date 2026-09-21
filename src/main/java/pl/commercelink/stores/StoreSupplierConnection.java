@@ -23,8 +23,16 @@ public class StoreSupplierConnection {
     @DynamoDBAttribute(attributeName = "enabled")
     private boolean enabled = true;
 
+    @DynamoDBAttribute(attributeName = "externalSupplierId")
+    private String externalSupplierId;
     @DynamoDBAttribute(attributeName = "feedSchedule")
     private String feedSchedule;
+
+    @DynamoDBAttribute(attributeName = "label")
+    private String label;
+
+    @DynamoDBAttribute(attributeName = "billingShortcut")
+    private String billingShortcut;
 
     public StoreSupplierConnection() {
     }
@@ -81,11 +89,42 @@ public class StoreSupplierConnection {
         this.enabled = enabled;
     }
 
+    public String getExternalSupplierId() {
+        return externalSupplierId;
+    }
+
+    // A GLOBAL connection is the platform's shared supplier, not a vendor of this store's own
+    // marketplace, so it never takes part in marketplace routing. connectOrUpdate() never stores
+    // an id on one; this keeps every reader consistent with that rule whatever is in the table.
+    public String routingExternalSupplierId() {
+        return mode == ConnectionMode.GLOBAL ? null : externalSupplierId;
+    }
+
+    public void setExternalSupplierId(String externalSupplierId) {
+        this.externalSupplierId = externalSupplierId;
+    }
+
     public String getFeedSchedule() {
         return feedSchedule;
     }
 
     public void setFeedSchedule(String feedSchedule) {
         this.feedSchedule = feedSchedule;
+    }
+
+    public String getLabel() {
+        return label;
+    }
+
+    public void setLabel(String label) {
+        this.label = label;
+    }
+
+    public String getBillingShortcut() {
+        return billingShortcut;
+    }
+
+    public void setBillingShortcut(String billingShortcut) {
+        this.billingShortcut = billingShortcut;
     }
 }

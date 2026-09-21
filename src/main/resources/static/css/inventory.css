@@ -1,17 +1,9 @@
 /* Inventory page. Content sits inside Bulma's .content wrapper (layout.html), so rules touching headings, lists,
    tables and definition lists are prefixed with .cl-inv-page to outweigh .content h1/ul/table. */
 
-/* Status tokens and .cl-status are shared with feature/store-settings-redesign (same names and values);
-   whichever branch merges second drops its copy in favour of commercelink.css. */
+/* Status tokens and .cl-status live in commercelink.css; only the tint this page adds is defined here. */
 :root {
-    --cl-ok: #1d6b45;
-    --cl-ok-soft: #e3f4ea;
-    --cl-warn: #8a4b00;
-    --cl-warn-soft: #fdf0dc;
-    --cl-info: #1b4db1;
-    --cl-info-soft: #e6edfb;
-    --cl-bad: #a61b1b;
-    --cl-bad-soft: #fbe7e7;
+    /* barely-there green wash behind the cheapest offer: --cl-ok-soft reads as a status chip on a table row */
     --cl-ok-tint: #f3f8f5;
 }
 
@@ -20,48 +12,6 @@
    the `hidden` attribute to hide/show these elements, so pin it here with higher specificity. */
 .cl-inv-page [hidden] {
     display: none !important;
-}
-
-.cl-status {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    max-width: 100%;
-    padding: 2px 9px;
-    border-radius: 999px;
-    font-size: 12px;
-    font-weight: 600;
-    line-height: 1.5;
-    overflow-wrap: anywhere;
-}
-
-.cl-status::before {
-    content: "";
-    flex: 0 0 auto;
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: currentColor;
-}
-
-.cl-status.is-ok {
-    color: var(--cl-ok);
-    background: var(--cl-ok-soft);
-}
-
-.cl-status.is-neutral {
-    color: var(--cl-ink-2);
-    background: var(--cl-surface-2);
-}
-
-.cl-status.is-warn {
-    color: var(--cl-warn);
-    background: var(--cl-warn-soft);
-}
-
-.cl-status.is-info {
-    color: var(--cl-info);
-    background: var(--cl-info-soft);
 }
 
 .cl-inv-page {
