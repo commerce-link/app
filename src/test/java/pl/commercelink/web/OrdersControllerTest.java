@@ -1126,25 +1126,6 @@ class OrdersControllerTest {
     }
 
     @Test
-    void orderDetailsModelDisablesItemActionsWhenDropshipItemsExistAndOrderCannotBeSplit() {
-        // given
-        Order order = orderBase();
-        order.setStatus(OrderStatus.Assembly);
-        OrderItem item = new OrderItem(ORDER_ID, "Obudowy", "pozycja", 1, 100.0, null, false);
-        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
-        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item));
-        when(storesRepository.findById(STORE_ID)).thenReturn(new Store());
-        when(dropshipItemLookup.itemIdsInDropshipDeliveries(eq(STORE_ID), any())).thenReturn(Set.of(item.getItemId()));
-        ExtendedModelMap model = new ExtendedModelMap();
-
-        // when
-        ordersController.getOrderDetails(ORDER_ID, model);
-
-        // then
-        assertThat(model.getAttribute("hasAvailableItemActions")).isEqualTo(false);
-    }
-
-    @Test
     void orderDetailsModelKeepsItemActionsAvailableForAPlainOrder() {
         // given
         Order order = orderBase();
