@@ -177,6 +177,11 @@ public abstract class Item implements Delivered {
     }
 
     @DynamoDBIgnore
+    public boolean canBeMovedToAnotherOrder() {
+        return isReleasable() || hasOneOfTheStatuses(FulfilmentStatus.Ordered, FulfilmentStatus.Delivered);
+    }
+
+    @DynamoDBIgnore
     public boolean isReadyForAllocation() {
         return hasOneOfTheStatuses(FulfilmentStatus.New) && hasAllocationDetails();
     }
