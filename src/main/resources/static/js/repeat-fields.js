@@ -69,6 +69,8 @@
             var item = holder.firstElementChild;
             template.parentNode.insertBefore(item, template);
             renumber(container);
+            // Announced before the focus is placed: variant-fields.js may still switch parts of the new group off.
+            item.dispatchEvent(new CustomEvent('cl:repeat-added', { bubbles: true }));
             var first = item.querySelector('input, select, textarea');
             if (first) {
                 first.focus();
