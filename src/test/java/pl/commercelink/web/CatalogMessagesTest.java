@@ -11,6 +11,7 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -18,6 +19,8 @@ class CatalogMessagesTest {
 
     /** A lone apostrophe in a MessageFormat pattern swallows the placeholder that follows it; a doubled one prints. */
     private static final Pattern LONE_APOSTROPHE = Pattern.compile("(?<!')'(?!')");
+
+    private static final Pattern DOUBLED_APOSTROPHE = Pattern.compile("''");
 
     private static Map<String, String> catalogMessages(String file) throws Exception {
         Properties properties = new Properties();
@@ -37,21 +40,42 @@ class CatalogMessagesTest {
     }
 
     @Test
-    void noCatalogMessageWithAPlaceholderHidesItBehindAnApostrophe() throws Exception {
+    void noCatalogMessageWithAPlaceholderHidesItBehindAnApostrophe() {
         // given
-        Set<String> broken = java.util.stream.Stream.of("messages_pl.properties", "messages_en.properties")
-                .flatMap(file -> {
-                    try {
-                        return catalogMessages(file).entrySet().stream();
-                    } catch (Exception e) {
-                        throw new IllegalStateException(e);
-                    }
-                })
+        Set<String> broken = Stream.of("messages_pl.properties", "messages_en.properties")
+                .flatMap(CatalogMessagesTest::messagesOf)
                 .filter(entry -> entry.getValue().contains("{") && LONE_APOSTROPHE.matcher(entry.getValue()).find())
                 .map(Map.Entry::getKey)
                 .collect(Collectors.toSet());
 
         // when / then
         assertThat(broken).isEmpty();
+    }
+
+    /**
+     * The mirror image of the rule above. The application's {@code ResourceBundleMessageSource}
+     * ({@code starter} LocalizationConfig) leaves {@code alwaysUseMessageFormat} off and nothing sets
+     * {@code spring.messages.always-use-message-format}, so a message resolved without arguments is returned raw:
+     * doubling the apostrophe in a text that has no placeholder would print it as two characters on the page.
+     */
+    @Test
+    void noCatalogMessageWithoutAPlaceholderDoublesItsApostrophe() {
+        // given
+        Set<String> broken = Stream.of("messages_pl.properties", "messages_en.properties")
+                .flatMap(CatalogMessagesTest::messagesOf)
+                .filter(entry -> !entry.getValue().contains("{") && DOUBLED_APOSTROPHE.matcher(entry.getValue()).find())
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toSet());
+
+        // when / then
+        assertThat(broken).isEmpty();
+    }
+
+    private static Stream<Map.Entry<String, String>> messagesOf(String file) {
+        try {
+            return catalogMessages(file).entrySet().stream();
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
     }
 }

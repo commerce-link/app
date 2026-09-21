@@ -35,7 +35,7 @@ class CategoryRowTest {
         assertThat(row.dynamic()).isFalse();
         assertThat(row.productsCount()).isEqualTo(3);
         assertThat(row.labelsCount()).isEqualTo(2);
-        assertThat(row.labelsOutsideCount()).isEqualTo(1);
+        assertThat(row.productsOutsideLabels()).isEqualTo(1);
         assertThat(row.marketplaceNames()).containsExactly("ALLEGRO");
         assertThat(row.deletable()).isFalse();
         assertThat(row.href()).isEqualTo("/dashboard/catalogs/" + catalog.getCatalogId() + "/category/" + gpu.getCategoryId());

@@ -41,8 +41,8 @@
                                 <a th:href="@{${category.href()}}" th:text="${category.name()}"></a>
                                 <span th:if="${category.dynamic()}" class="cl-status is-info" th:text="#{catalog.category.type.Dynamic}"></span>
                                 <span th:unless="${category.hasPimMapping()}" class="cl-status is-warn" th:text="#{catalog.category.noPim}"></span>
-                                <span th:if="${category.labelsOutsideCount() > 0}" class="cl-status is-warn"
-                                      th:text="#{catalog.category.labelsOutside(${category.labelsOutsideCount()})}"></span>
+                                <span th:if="${category.productsOutsideLabels() > 0}" class="cl-status is-warn"
+                                      th:text="#{catalog.category.labelsOutside(${category.productsOutsideLabels()})}"></span>
                             </div>
                             <p class="cl-list-desc">
                                 <span th:text="${category.hasPimMapping()} ? #{catalog.category.row.pim(${#strings.listJoin(category.pimCategoryNames(), ', ')})} : #{catalog.category.row.pim.none}"></span>

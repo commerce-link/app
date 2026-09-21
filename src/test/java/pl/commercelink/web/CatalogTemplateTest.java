@@ -9,6 +9,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -72,7 +73,7 @@ class CatalogTemplateTest {
     }
 
     private static int occurrences(String html, String needle) {
-        return html.split(java.util.regex.Pattern.quote(needle), -1).length - 1;
+        return html.split(Pattern.quote(needle), -1).length - 1;
     }
 
     @Test
@@ -95,6 +96,8 @@ class CatalogTemplateTest {
         // then
         assertThat(occurrences(html, "/dashboard/catalogs/c1/category/k1/delete")).isEqualTo(1);
         assertThat(html).doesNotContain("/dashboard/catalogs/c1/category/k2/delete");
-        assertThat(html).contains("Automatic").contains("Products from the inventory").contains("Labels outside the list: 1");
+        assertThat(html).contains("Automatic").contains("Products from the inventory")
+                .contains("Products with a label outside the list: 1")
+                .contains("Marketplaces: Allegro, Empik");
     }
 }

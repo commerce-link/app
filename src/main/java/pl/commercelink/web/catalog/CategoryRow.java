@@ -11,12 +11,14 @@ import java.util.function.Function;
 
 /** One category on the catalog page. productsCount is null for an automatic category (its list is computed on demand). */
 public record CategoryRow(String id, String name, boolean dynamic, List<String> pimCategoryNames, Integer productsCount,
-                          int labelsCount, int labelsOutsideCount, List<String> marketplaceNames, int maxQty,
+                          int labelsCount, int productsOutsideLabels, List<String> marketplaceNames, int maxQty,
                           boolean required, boolean deletable, String href, String settingsHref, String deleteHref) {
 
     public static CategoryRow of(ProductCatalog catalog, CategoryDefinition category, List<String> pimNames,
                                  List<Product> products, Function<String, String> marketplaceDisplayName) {
         boolean dynamic = category.hasType(CategoryDefinitionType.Dynamic);
+        // Products, not labels: a product whose label is not on the list falls out of the price list, and two of them
+        // can share one unlisted label.
         int outside = category.hasGrouping()
                 ? (int) products.stream().filter(p -> !category.getGroupingOrder().contains(p.getLabel())).count()
                 : 0;
