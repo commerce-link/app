@@ -19,7 +19,15 @@ public class CatalogSettingsForm {
 
     private String name;
     private String pricelistSchedule;
-    private boolean deletionProtection = true;
+    /** False by default: an unticked checkbox sends nothing, so anything else could never be switched off. */
+    private boolean deletionProtection;
+
+    /** A catalog starts protected, the way ProductCatalog does; the operator unticks the box to be able to delete it. */
+    public static CatalogSettingsForm forNewCatalog() {
+        CatalogSettingsForm form = new CatalogSettingsForm();
+        form.deletionProtection = true;
+        return form;
+    }
 
     public static CatalogSettingsForm from(ProductCatalog catalog) {
         CatalogSettingsForm form = new CatalogSettingsForm();

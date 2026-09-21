@@ -64,7 +64,7 @@ public class CatalogsController {
 
     @GetMapping("/dashboard/catalogs/new")
     public String newCatalog(Model model, Locale locale) {
-        return renderSettings(null, new CatalogSettingsForm(), Map.of(), model, locale);
+        return renderSettings(null, CatalogSettingsForm.forNewCatalog(), Map.of(), model, locale);
     }
 
     @PostMapping("/dashboard/catalogs/new")

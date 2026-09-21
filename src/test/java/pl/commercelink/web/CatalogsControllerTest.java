@@ -4,6 +4,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.MessageSource;
@@ -21,6 +22,7 @@ import pl.commercelink.products.ProductRepository;
 import pl.commercelink.starter.security.model.CustomUser;
 import pl.commercelink.web.catalog.CatalogAccess;
 import pl.commercelink.web.catalog.CatalogRow;
+import pl.commercelink.web.dtos.CatalogSettingsForm;
 
 import java.util.List;
 import java.util.Locale;
@@ -155,5 +157,35 @@ class CatalogsControllerTest {
         // when / then
         mvc.perform(post("/dashboard/catalogs/c1/delete")).andExpect(redirectedUrl("/dashboard/catalogs"))
                 .andExpect(flash().attribute("settingsSavedMessage", "Deleted"));
+    }
+
+    @Test
+    void untickingTheProtectionSavesItOff() throws Exception {
+        // given
+        when(detailsService.minIntervalMinutes()).thenReturn(5);
+        ProductCatalog catalog = new ProductCatalog(STORE_ID, "Parts");
+        when(access.requireCatalog(STORE_ID, "c1")).thenReturn(catalog);
+        when(detailsService.save(eq(STORE_ID), eq("c1"), any())).thenReturn(new ProductCatalogDetailsService.UpdateResult(List.of()));
+
+        // when
+        mvc.perform(post("/dashboard/catalogs/c1/settings").param("name", "Parts")).andExpect(status().isFound());
+
+        // then
+        ArgumentCaptor<ProductCatalog> submitted = ArgumentCaptor.forClass(ProductCatalog.class);
+        verify(detailsService).save(eq(STORE_ID), eq("c1"), submitted.capture());
+        assertThat(submitted.getValue().isDeletionProtection()).isFalse();
+    }
+
+    @Test
+    void aNewCatalogStartsProtected() throws Exception {
+        // given
+        when(detailsService.minIntervalMinutes()).thenReturn(5);
+
+        // when
+        var result = mvc.perform(get("/dashboard/catalogs/new")).andExpect(status().isOk()).andReturn();
+
+        // then
+        CatalogSettingsForm form = (CatalogSettingsForm) result.getModelAndView().getModel().get("form");
+        assertThat(form.isDeletionProtection()).isTrue();
     }
 }
