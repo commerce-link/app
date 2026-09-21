@@ -52,6 +52,39 @@ class CatalogSettingsFormTest {
     }
 
     @Test
+    void aNameLongerThanTheLimitIsRejected() {
+        // given
+        CatalogSettingsForm form = new CatalogSettingsForm();
+        form.setName("P".repeat(121));
+
+        // when
+        Map<String, String> errors = form.validate(5);
+
+        // then
+        assertThat(errors).containsEntry("name", "catalog.name.tooLong");
+    }
+
+    @Test
+    void aNameAtTheLimitPasses() {
+        // given
+        CatalogSettingsForm form = new CatalogSettingsForm();
+        form.setName("P".repeat(120));
+
+        // when / then
+        assertThat(form.validate(5)).isEmpty();
+    }
+
+    @Test
+    void toCatalogTrimsTheName() {
+        // given
+        CatalogSettingsForm form = new CatalogSettingsForm();
+        form.setName("  Parts  ");
+
+        // when / then
+        assertThat(form.toCatalog("store", "c1").getName()).isEqualTo("Parts");
+    }
+
+    @Test
     void emptyScheduleMeansTheDefaultAndPasses() {
         // given
         CatalogSettingsForm form = new CatalogSettingsForm();

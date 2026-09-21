@@ -46,6 +46,12 @@ public class CatalogsController {
     private static final String SETTINGS_VIEW = "catalog/catalog-settings";
     private static final String SETTINGS_FRAGMENT = SETTINGS_VIEW + " :: settingsForm";
 
+    /**
+     * Outcome of a refused catalog action, shown by the catalog page itself. Catalog pages never use the layout's
+     * errorMessage banner, which is Bulma markup outside the redesigned page body.
+     */
+    static final String ERROR_FLASH = "catalogError";
+
     private final ProductCatalogRepository catalogRepository;
     private final MessageSource messageSource;
     private final ProductCatalogDetailsService detailsService;
@@ -118,8 +124,13 @@ public class CatalogsController {
     }
 
     @GetMapping("/dashboard/catalogs/{catalogId}/delete")
-    public String confirmDeleteCatalog(@PathVariable String catalogId, Model model, Locale locale) {
+    public String confirmDeleteCatalog(@PathVariable String catalogId, Model model, Locale locale,
+                                       RedirectAttributes redirectAttributes) {
         ProductCatalog catalog = access.requireCatalog(CustomSecurityContext.getStoreId(), catalogId);
+        // Confirming something the POST would refuse anyway only wastes the operator's click.
+        if (catalog.isDeletionProtection()) {
+            return refuseDeletion(catalog, catalogId, locale, redirectAttributes);
+        }
         model.addAttribute("confirm", new ConfirmAction(
                 messageSource.getMessage("catalog.delete.title", new Object[]{catalog.getName()}, locale),
                 messageSource.getMessage("catalog.delete.message",
@@ -135,18 +146,22 @@ public class CatalogsController {
         String storeId = CustomSecurityContext.getStoreId();
         ProductCatalog catalog = access.requireCatalog(storeId, catalogId);
         if (catalog.isDeletionProtection()) {
-            redirectAttributes.addFlashAttribute("errorMessage",
-                    messageSource.getMessage("catalog.delete.protected", new Object[]{catalog.getName()}, locale));
-            return "redirect:" + CatalogPaths.catalogSettings(catalogId);
+            return refuseDeletion(catalog, catalogId, locale, redirectAttributes);
         }
         ProductCatalogDetailsService.UpdateResult result = detailsService.delete(storeId, catalogId);
         if (result.hasErrors()) {
             ErrorMessage error = result.errors().get(0);
-            redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage(error.code(), error.args(), locale));
+            redirectAttributes.addFlashAttribute(ERROR_FLASH, messageSource.getMessage(error.code(), error.args(), locale));
             return "redirect:" + CatalogPaths.catalogSettings(catalogId);
         }
         SettingsFlash.onRedirect(redirectAttributes, messageSource.getMessage("catalog.deleted", new Object[]{catalog.getName()}, locale));
         return "redirect:" + CatalogPaths.catalogs();
+    }
+
+    private String refuseDeletion(ProductCatalog catalog, String catalogId, Locale locale, RedirectAttributes redirectAttributes) {
+        redirectAttributes.addFlashAttribute(ERROR_FLASH,
+                messageSource.getMessage("catalog.delete.protected", new Object[]{catalog.getName()}, locale));
+        return "redirect:" + CatalogPaths.catalogSettings(catalogId);
     }
 
     /** "co 30 min" / "codziennie o 06:00" from the saved expression; the default schedule has its own sentence. */

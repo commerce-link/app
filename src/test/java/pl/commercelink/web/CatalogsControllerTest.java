@@ -15,6 +15,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.CategoryDefinitionType;
+import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogDetailsService;
 import pl.commercelink.products.ProductCatalogRepository;
@@ -31,6 +32,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasKey;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -141,7 +143,7 @@ class CatalogsControllerTest {
 
         // when / then
         mvc.perform(post("/dashboard/catalogs/c1/delete")).andExpect(redirectedUrl("/dashboard/catalogs/c1/settings"))
-                .andExpect(flash().attribute("errorMessage", "protected"));
+                .andExpect(flash().attribute("catalogError", "protected"));
         verify(detailsService, never()).delete(any(), any());
     }
 
@@ -187,5 +189,82 @@ class CatalogsControllerTest {
         // then
         CatalogSettingsForm form = (CatalogSettingsForm) result.getModelAndView().getModel().get("form");
         assertThat(form.isDeletionProtection()).isTrue();
+    }
+
+    @Test
+    void aNewCatalogIsSavedUnderAFreshIdAndOpensIt() throws Exception {
+        // given
+        when(detailsService.minIntervalMinutes()).thenReturn(5);
+        when(detailsService.save(eq(STORE_ID), anyString(), any())).thenReturn(new ProductCatalogDetailsService.UpdateResult(List.of()));
+        when(messageSource.getMessage(eq("catalog.created"), any(), any(Locale.class))).thenReturn("Created");
+
+        // when
+        var result = mvc.perform(post("/dashboard/catalogs/new").param("name", "Parts"))
+                .andExpect(status().isFound())
+                .andExpect(flash().attribute("settingsSavedMessage", "Created"))
+                .andReturn();
+
+        // then
+        ArgumentCaptor<String> catalogId = ArgumentCaptor.forClass(String.class);
+        verify(detailsService).save(eq(STORE_ID), catalogId.capture(), any());
+        assertThat(catalogId.getValue()).isNotBlank();
+        assertThat(result.getResponse().getRedirectedUrl()).isEqualTo("/dashboard/catalogs/" + catalogId.getValue());
+    }
+
+    @Test
+    void aNewCatalogWithoutANameAnswers422WithTheFormFragment() throws Exception {
+        // given
+        when(detailsService.minIntervalMinutes()).thenReturn(5);
+
+        // when / then
+        mvc.perform(post("/dashboard/catalogs/new").header("X-Requested-With", "fetch").param("name", "  "))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(view().name("catalog/catalog-settings :: settingsForm"))
+                .andExpect(model().attribute("errors", hasKey("name")));
+        verify(detailsService, never()).save(any(), any(), any());
+    }
+
+    @Test
+    void aProtectedCatalogIsNotOfferedForDeletion() throws Exception {
+        // given
+        when(detailsService.minIntervalMinutes()).thenReturn(5);
+        when(access.requireCatalog(STORE_ID, "c1")).thenReturn(new ProductCatalog(STORE_ID, "Parts"));
+
+        // when
+        var result = mvc.perform(get("/dashboard/catalogs/c1/settings")).andExpect(status().isOk())
+                .andExpect(view().name("catalog/catalog-settings")).andReturn();
+
+        // then
+        assertThat(result.getModelAndView().getModel()).containsEntry("deleteHref", null);
+        verify(productRepository, never()).findAll(any(ProductCatalog.class));
+    }
+
+    @Test
+    void anUnprotectedCatalogIsOfferedForDeletionWithItsCounts() throws Exception {
+        // given
+        when(detailsService.minIntervalMinutes()).thenReturn(5);
+        ProductCatalog catalog = new ProductCatalog(STORE_ID, "Parts");
+        catalog.setDeletionProtection(false);
+        catalog.getCategories().add(new CategoryDefinition().withName("GPU").withGeneratedId());
+        when(access.requireCatalog(STORE_ID, catalog.getCatalogId())).thenReturn(catalog);
+        when(productRepository.findAll(catalog)).thenReturn(List.of(new Product("k1"), new Product("k1")));
+
+        // when / then
+        mvc.perform(get("/dashboard/catalogs/" + catalog.getCatalogId() + "/settings")).andExpect(status().isOk())
+                .andExpect(model().attribute("deleteHref", "/dashboard/catalogs/" + catalog.getCatalogId() + "/delete"))
+                .andExpect(model().attribute("categoriesCount", 1))
+                .andExpect(model().attribute("productsCount", 2));
+    }
+
+    @Test
+    void theDeleteConfirmationIsRefusedForAProtectedCatalog() throws Exception {
+        // given
+        when(access.requireCatalog(STORE_ID, "c1")).thenReturn(new ProductCatalog(STORE_ID, "Parts"));
+        when(messageSource.getMessage(eq("catalog.delete.protected"), any(), any(Locale.class))).thenReturn("protected");
+
+        // when / then
+        mvc.perform(get("/dashboard/catalogs/c1/delete")).andExpect(redirectedUrl("/dashboard/catalogs/c1/settings"))
+                .andExpect(flash().attribute("catalogError", "protected"));
+        verify(productRepository, never()).findAll(any(ProductCatalog.class));
     }
 }

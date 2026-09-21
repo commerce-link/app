@@ -2,10 +2,12 @@ package pl.commercelink.web;
 
 import org.junit.jupiter.api.Test;
 import org.thymeleaf.context.Context;
+import pl.commercelink.web.dtos.CatalogSettingsForm;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -31,9 +33,55 @@ class CatalogSettingsTemplateTest {
     }
 
     @Test
+    void showsTheOutcomeOfACatalogActionInThePageBody() throws Exception {
+        // when / then
+        assertThat(page()).contains("settings-form :: savedAlert").contains("th:if=\"${catalogError}\"")
+                .contains("class=\"cl-alert is-bad\" role=\"status\"").contains("cl-alert-text")
+                .doesNotContain("errorMessage").doesNotContain("notification is-");
+    }
+
+    @Test
     void hasNoReadonlyIdFields() throws Exception {
         // when / then
         assertThat(page()).doesNotContain("storeId").doesNotContain("catalogId\"").doesNotContain("readonly");
+    }
+
+    /** The page as the controller renders it for an unprotected catalog, so the delete link is on it. */
+    private static String rendered() {
+        CatalogSettingsForm form = new CatalogSettingsForm();
+        form.setName("Parts");
+        Context context = new Context();
+        context.setVariables(Map.of(
+                "form", form,
+                "errors", Map.of(),
+                "existing", true,
+                "deleteHref", "/dashboard/catalogs/c1/delete",
+                "formAction", "/dashboard/catalogs/c1/settings",
+                "backHref", "/dashboard/catalogs/c1",
+                "backLabel", "Parts",
+                "pageTitle", "Catalog settings",
+                "scheduleMinIntervalMinutes", 5));
+        context.setVariable("categoriesCount", 2);
+        context.setVariable("productsCount", 7);
+        context.setVariable("catalogError", null);
+        context.setVariable("redirectTo", null);
+        return EnglishFragmentTemplateEngine.create().process("catalog/catalog-settings", context);
+    }
+
+    private static int occurrences(String html, String needle) {
+        return html.split(java.util.regex.Pattern.quote(needle), -1).length - 1;
+    }
+
+    @Test
+    void theDeleteActionIsRenderedOnceInsideTheHeader() {
+        // when
+        String html = rendered();
+
+        // then
+        assertThat(occurrences(html, "/dashboard/catalogs/c1/delete")).isEqualTo(1);
+        assertThat(occurrences(html, "<h1")).isEqualTo(1);
+        assertThat(html.indexOf("cl-page-actions")).isLessThan(html.indexOf("/dashboard/catalogs/c1/delete"));
+        assertThat(html).doesNotContain("??");
     }
 
     @Test

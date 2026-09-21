@@ -18,6 +18,13 @@
                 </th:block>
             </div>
 
+            <div th:replace="~{fragments/settings-form :: savedAlert}"></div>
+            <!--/* Outcome of a refused catalog action, in the page body; the layout banner is Bulma markup. */-->
+            <div th:if="${catalogError}" class="cl-alert is-bad" role="status">
+                <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
+                <p class="cl-alert-text" th:text="${catalogError}"></p>
+            </div>
+
             <form th:fragment="settingsForm" id="catalog-settings-form" class="cl-form" th:action="@{${formAction}}" th:object="${form}"
                   method="post" novalidate data-cl-async data-cl-schedule-auto
                   th:attr="data-cl-redirect=${redirectTo}, data-error-message=#{form.save.failed}">
