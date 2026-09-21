@@ -454,7 +454,7 @@ public class OrdersController extends BaseController {
         model.addAttribute("canOrderShipment", !order.getStatus().isOneOf(OrderStatus.New, OrderStatus.Blocked, OrderStatus.Assembly));
         model.addAttribute("canDeleteOrder", order.hasStatus(OrderStatus.New) && orderItems.isEmpty() && !order.isInvoiced());
         model.addAttribute("canCancelOrder", order.canBeCancelled(orderItems));
-        boolean canSplitOrder = order.canBeSplit() && orderItems.size() > 1;
+        boolean canSplitOrder = order.canBeSplit() && !orderItems.isEmpty();
         model.addAttribute("canSplitOrder", canSplitOrder);
         model.addAttribute("fulfilmentTypeLocked", !order.canChangeFulfilmentType(orderItems));
         model.addAttribute("hasWarehouseDocument", order.getDocumentByType(DocumentType.GoodsIssue).isPresent());

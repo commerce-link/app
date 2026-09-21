@@ -721,6 +721,27 @@ class OrdersManagerTest {
     }
 
     @Test
+    @DisplayName("splitOrder moves every item when all of them are selected, leaving the original empty")
+    void splitOrderMovesAllItemsWhenAllAreSelected() {
+        // given
+        Order original = splittableOrder(300.0);
+        OrderItem itemA = allocatedItem("item-a", "CPU-A", "Acme", "5900000000001", "MFN-A", 100.0);
+        OrderItem itemB = allocatedItem("item-b", "CPU-B", "AcmeB", "5900000000002", "MFN-B", 200.0);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(original);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(itemA, itemB));
+
+        // when
+        Order newOrder = ordersManager.splitOrder(STORE_ID, ORDER_ID, List.of("item-a", "item-b"));
+
+        // then
+        verify(orderItemsRepository, times(2)).save(any(OrderItem.class));
+        verify(orderItemsRepository).delete(itemA);
+        verify(orderItemsRepository).delete(itemB);
+        assertThat(newOrder.getTotalPrice()).isEqualTo(300.0);
+        assertThat(original.getTotalPrice()).isEqualTo(0.0);
+    }
+
+    @Test
     @DisplayName("splitOrder refuses to move an item fulfilled through a dropship delivery")
     void splitOrderRefusesDropshipItems() {
         // given
