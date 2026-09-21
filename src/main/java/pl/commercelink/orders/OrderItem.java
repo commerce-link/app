@@ -76,6 +76,7 @@ public class OrderItem extends Item {
             source.getSerialNo(),
             source.getStatus()
         );
+        this.setClaimedDeliveryId(source.getClaimedDeliveryId());
     }
 
     public void markAsWarehouseFulfilled() {

@@ -670,8 +670,8 @@ class OrdersManagerTest {
     }
 
     @Test
-    @DisplayName("splitOrder refuses to move an item already Ordered from a supplier")
-    void splitOrderRefusesItemsAlreadyOrderedFromASupplier() {
+    @DisplayName("splitOrder moves an item already Ordered from a supplier keeping its delivery claim")
+    void splitOrderMovesItemsAlreadyOrderedFromASupplier() {
         // given
         Order original = splittableOrder(300.0);
         OrderItem itemA = allocatedItem("item-a", "CPU-A", "Acme", "5900000000001", "MFN-A", 100.0);
@@ -680,18 +680,23 @@ class OrdersManagerTest {
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(original);
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(itemA, itemB));
 
-        // when / then
-        assertThatThrownBy(() -> ordersManager.splitOrder(STORE_ID, ORDER_ID, List.of(itemB.getItemId())))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessage("split.order.items.have.fulfilment");
-        verify(ordersRepository, never()).save(any());
-        verify(orderItemsRepository, never()).save(any(OrderItem.class));
-        verify(orderItemsRepository, never()).delete(any(OrderItem.class));
+        // when
+        Order newOrder = ordersManager.splitOrder(STORE_ID, ORDER_ID, List.of(itemB.getItemId()));
+
+        // then
+        ArgumentCaptor<OrderItem> movedCaptor = ArgumentCaptor.forClass(OrderItem.class);
+        verify(orderItemsRepository).save(movedCaptor.capture());
+        OrderItem moved = movedCaptor.getValue();
+        assertThat(moved.getOrderId()).isEqualTo(newOrder.getOrderId());
+        assertThat(moved.getStatus()).isEqualTo(FulfilmentStatus.Ordered);
+        assertThat(moved.getDeliveryId()).isEqualTo("d-1");
+        assertThat(moved.getClaimedDeliveryId()).isEqualTo("d-1");
+        verify(orderItemsRepository).delete(itemB);
     }
 
     @Test
-    @DisplayName("splitOrder refuses to move a Delivered item")
-    void splitOrderRefusesDeliveredItems() {
+    @DisplayName("splitOrder moves a Delivered item")
+    void splitOrderMovesDeliveredItems() {
         // given
         Order original = splittableOrder(300.0);
         OrderItem itemA = allocatedItem("item-a", "CPU-A", "Acme", "5900000000001", "MFN-A", 100.0);
@@ -701,13 +706,56 @@ class OrdersManagerTest {
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(original);
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(itemA, itemB));
 
+        // when
+        Order newOrder = ordersManager.splitOrder(STORE_ID, ORDER_ID, List.of(itemB.getItemId()));
+
+        // then
+        ArgumentCaptor<OrderItem> movedCaptor = ArgumentCaptor.forClass(OrderItem.class);
+        verify(orderItemsRepository).save(movedCaptor.capture());
+        OrderItem moved = movedCaptor.getValue();
+        assertThat(moved.getOrderId()).isEqualTo(newOrder.getOrderId());
+        assertThat(moved.getStatus()).isEqualTo(FulfilmentStatus.Delivered);
+        assertThat(moved.getClaimedDeliveryId()).isEqualTo("d-1");
+        verify(orderItemsRepository).delete(itemB);
+    }
+
+    @Test
+    @DisplayName("splitOrder refuses to move an item fulfilled through a dropship delivery")
+    void splitOrderRefusesDropshipItems() {
+        // given
+        Order original = splittableOrder(300.0);
+        OrderItem itemA = allocatedItem("item-a", "CPU-A", "Acme", "5900000000001", "MFN-A", 100.0);
+        OrderItem itemB = allocatedItem("item-b", "CPU-B", "AcmeB", "5900000000002", "MFN-B", 200.0);
+        itemB.markAsOrdered("d-dropship", 200.0);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(original);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(itemA, itemB));
+        when(dropshipItemLookup.itemIdsInDropshipDeliveries(eq(STORE_ID), any())).thenReturn(Set.of("item-b"));
+
+        // when / then
+        assertThatThrownBy(() -> ordersManager.splitOrder(STORE_ID, ORDER_ID, List.of(itemB.getItemId())))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("split.order.items.in.dropship");
+        verify(ordersRepository, never()).save(any());
+        verify(orderItemsRepository, never()).save(any(OrderItem.class));
+        verify(orderItemsRepository, never()).delete(any(OrderItem.class));
+    }
+
+    @Test
+    @DisplayName("splitOrder still refuses an item claimed in a delivery before purchase")
+    void splitOrderRefusesClaimedItems() {
+        // given
+        Order original = splittableOrder(300.0);
+        OrderItem itemA = allocatedItem("item-a", "CPU-A", "Acme", "5900000000001", "MFN-A", 100.0);
+        OrderItem itemB = allocatedItem("item-b", "CPU-B", "AcmeB", "5900000000002", "MFN-B", 200.0);
+        itemB.markAsClaimed("d-1");
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(original);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(itemA, itemB));
+
         // when / then
         assertThatThrownBy(() -> ordersManager.splitOrder(STORE_ID, ORDER_ID, List.of(itemB.getItemId())))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("split.order.items.have.fulfilment");
-        verify(ordersRepository, never()).save(any());
         verify(orderItemsRepository, never()).save(any(OrderItem.class));
-        verify(orderItemsRepository, never()).delete(any(OrderItem.class));
     }
 
     private Order splittableOrder(double totalPrice) {
