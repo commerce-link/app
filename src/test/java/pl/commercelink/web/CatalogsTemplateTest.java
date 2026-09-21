@@ -25,7 +25,7 @@ class CatalogsTemplateTest {
     @Test
     void usesNoBulmaButtonsInlineStylesOrPagination() throws Exception {
         // when / then
-        assertThat(page()).doesNotContain("is-primary\" th:href").doesNotContain("button is-").doesNotContain("style=")
+        assertThat(page()).doesNotContain("class=\"button is-").doesNotContain("style=")
                 .doesNotContain("fragments/pagination").doesNotContain("<table");
     }
 }

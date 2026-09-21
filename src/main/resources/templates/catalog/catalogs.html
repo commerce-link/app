@@ -44,7 +44,7 @@
                 </ul>
                 <p class="cl-list-empty" th:if="${catalogs.isEmpty()}">
                     <span th:text="#{catalog.list.empty}"></span>
-                    <a class="cl-button" th:href="@{/dashboard/catalogs/new}" th:text="#{catalog.add}"></a>
+                    <a class="cl-button is-primary" th:href="@{/dashboard/catalogs/new}" th:text="#{catalog.add}"></a>
                 </p>
             </section>
         </div>
