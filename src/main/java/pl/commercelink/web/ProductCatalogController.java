@@ -4,7 +4,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.MessageSource;
-import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -13,11 +12,8 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
 import pl.commercelink.starter.dynamodb.Metadata;
-import pl.commercelink.inventory.Inventory;
-import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.products.*;
 import pl.commercelink.products.brand.BrandMapper;
-import pl.commercelink.products.filters.InventoryFilterType;
 import pl.commercelink.stores.MarketplaceIntegration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
@@ -40,9 +36,6 @@ public class ProductCatalogController {
     private ProductCatalogRepository productCatalogRepository;
 
     @Autowired
-    private Inventory inventory;
-
-    @Autowired
     private PimCatalog pimCatalog;
 
     @Autowired
@@ -59,144 +52,6 @@ public class ProductCatalogController {
 
     @Autowired
     private MessageSource messageSource;
-
-    private static final int PRODUCTS_PAGE_SIZE = 25;
-
-    @GetMapping("/dashboard/catalogs/{catalogId}/category/new")
-    public String newCategory(@PathVariable("catalogId") String catalogId, Model model) throws IllegalAccessException, InstantiationException {
-        ProductCatalog productCatalog = productCatalogRepository.findById(getStoreId(), catalogId);
-
-        StockDefinition defaultStockDefinition = new StockDefinition(1, 10, 30);
-        PriceDefinition defaultPriceDefinition = new PriceDefinition(1.00, 0, 0, 0, 0, PriceDefinition.DEFAULT_PRICING_GROUP);
-        MarketplaceDefinition defaultMarketplaceDefinition = new MarketplaceDefinition(null, 1.00, 30, 5, 3, 0, 0);
-        AvailabilityDefinition defaultAvailabilityDefinition = new AvailabilityDefinition(3, 1);
-
-        CategoryDefinition categoryDefinition = new CategoryDefinition()
-                .withName(null)
-                .withGeneratedId()
-                .withSequenceNumber(productCatalog.getNextSequenceNumber())
-                .withStockDefinition(defaultStockDefinition)
-                .withPriceDefinition(defaultPriceDefinition)
-                .withMarketplaceDefinition(defaultMarketplaceDefinition)
-                .withAvailabilityDefinition(defaultAvailabilityDefinition);
-
-        return showEditCategoryDefinitionForm(catalogId, model, categoryDefinition, false);
-    }
-
-    @GetMapping("/dashboard/catalogs/{catalogId}/category/{categoryId}")
-    public String editCategory(@PathVariable("catalogId") String catalogId, @PathVariable("categoryId") String categoryId, Model model) throws IllegalAccessException, InstantiationException {
-        ProductCatalog productCatalog = productCatalogRepository.findById(getStoreId(), catalogId);
-        CategoryDefinition categoryDefinition = productCatalog.findCategoryDefinition(categoryId);
-        return showEditCategoryDefinitionForm(catalogId, model, categoryDefinition, true);
-    }
-
-    private String showEditCategoryDefinitionForm(String catalogId, Model model, CategoryDefinition categoryDefinition, boolean isEdit) throws IllegalAccessException, InstantiationException {
-        // this is a hack, we inject empty values to make fields editable and then filter out during saving
-        categoryDefinition.getPriceDefinitions().add(new PriceDefinition());
-        categoryDefinition.getMarketplaceDefinitions().add(new MarketplaceDefinition());
-        // this is a hack, we inject empty values to make fields editable and then filter out during saving
-        categoryDefinition.getGroupingOrder().add("");
-        categoryDefinition.getGroupingOrder().add("");
-        // this is a hack, we inject empty values to make fields editable and then filter out during saving
-        List<Metadata> metadata = new LinkedList<>();
-        metadata.add(new Metadata());
-        metadata.add(new Metadata());
-        metadata.add(new Metadata());
-
-        InventoryDefinition defaultInventoryDefinition = new InventoryDefinition(InventoryFilterType.BRAND_NAME, metadata);
-        categoryDefinition.getInventoryDefinitions().add(defaultInventoryDefinition);
-
-        // this is a hack, we inject empty values to make fields editable and then filter out during saving
-        categoryDefinition.getInventoryDefinitions().forEach(d -> d.getMetadata().add(new Metadata()));
-
-        Store store = storesRepository.findById(getStoreId());
-
-        model.addAttribute("inventoryFilterTypes", InventoryFilterType.values());
-        model.addAttribute("inventoryDefinitionFilters", InventoryFilterType.getInstances());
-        List<PimCategoryOptions.CategoryOption> categoryOptions = pimCategoryOptions.leafOptionsUnder(
-                store.getEnabledCategories(), categoryDefinition.getPimCategoryIds());
-        model.addAttribute("categoryOptions", categoryOptions);
-        model.addAttribute("categoryAncestors", pimCategoryOptions.ancestorsOf(
-                categoryOptions.stream().map(PimCategoryOptions.CategoryOption::id).toList()));
-        model.addAttribute("selectedCategoryOptions", selectedOptions(categoryDefinition));
-        model.addAttribute("categoryDefinitionTypes", CategoryDefinitionType.values());
-        model.addAttribute("categoryDefinition", categoryDefinition);
-        model.addAttribute("catalogId", catalogId);
-        model.addAttribute("marketplaceTypes", store.getMarketplaces().stream().map(MarketplaceIntegration::getName).toList());
-        model.addAttribute("edit", isEdit);
-
-        return "catalogDetails_categoryDefinition";
-    }
-
-    private List<PimCategoryOptions.CategoryOption> selectedOptions(CategoryDefinition categoryDefinition) {
-        return pimCategoryOptions.optionsOf(categoryDefinition.getPimCategoryIds());
-    }
-
-    private String displayCategories(CategoryDefinition definition) {
-        if (!definition.hasCategoryMapping()) {
-            return StringUtils.defaultString(definition.getCategory());
-        }
-        return String.join(", ", pimCategoryOptions.namesOf(definition.getPimCategoryIds()));
-    }
-
-    @PostMapping("/dashboard/catalogs/{catalogId}/category")
-    public String saveCategoryDefinition(@PathVariable String catalogId, @ModelAttribute CategoryDefinition categoryDefinition, Model model, RedirectAttributes redirectAttributes) {
-        if (StringUtils.isBlank(categoryDefinition.getCategory())) {
-            categoryDefinition.setCategory(null);
-        }
-        if (categoryDefinition.isComplete()) {
-            // Save the category definition
-            ProductCatalog productCatalog = productCatalogRepository.findById(getStoreId(), catalogId);
-            productCatalog.addOrUpdateCategoryDefinition(categoryDefinition);
-            productCatalogRepository.save(productCatalog);
-            warnWhenCategoryHasNoInventory(categoryDefinition, redirectAttributes);
-        } else {
-            throw new RuntimeException("Category definition is not complete");
-        }
-
-        return "redirect:/dashboard/catalogs/" + catalogId;
-    }
-
-    private void warnWhenCategoryHasNoInventory(CategoryDefinition categoryDefinition, RedirectAttributes redirectAttributes) {
-        if (!categoryDefinition.hasType(CategoryDefinitionType.Dynamic)) {
-            return;
-        }
-        if (!categoryDefinition.hasCategoryMapping()) {
-            redirectAttributes.addFlashAttribute("warningMessage", messageSource.getMessage(
-                    "catalog.category.noMapping", null, LocaleContextHolder.getLocale()));
-            return;
-        }
-        Map<String, Collection<MatchedInventory>> matchesByCategoryId = inventory.withEnabledSuppliersOnly(getStoreId())
-                .findAllByProductCategoryIds(categoryDefinition.getPimCategoryIds());
-        List<String> emptyCategoryIds = categoryDefinition.getPimCategoryIds().stream()
-                .filter(id -> matchesByCategoryId.getOrDefault(id, List.of()).stream().noneMatch(MatchedInventory::hasAnyOffers))
-                .toList();
-        if (!emptyCategoryIds.isEmpty()) {
-            redirectAttributes.addFlashAttribute("warningMessage", messageSource.getMessage(
-                    "catalog.category.emptyInventory",
-                    new Object[]{String.join(", ", pimCategoryOptions.namesOf(emptyCategoryIds))},
-                    LocaleContextHolder.getLocale()));
-        }
-    }
-
-    @PostMapping("/dashboard/catalogs/{catalogId}/category/{categoryId}/delete")
-    public String deleteCategoryDefinition(@PathVariable String catalogId, @PathVariable String categoryId) {
-        ProductCatalog productCatalog = productCatalogRepository.findById(getStoreId(), catalogId);
-        CategoryDefinition removedCategoryDefinition = productCatalog.removeCategoryDefinition(categoryId);
-
-        boolean keepProducts = removedCategoryDefinition.hasCategoryMapping()
-                && productCatalog.getCategories().stream()
-                .anyMatch(c -> c.getPimCategoryIds().stream()
-                        .anyMatch(removedCategoryDefinition.getPimCategoryIds()::contains));
-        if (!keepProducts) {
-            List<Product> products = productRepository.findAll(removedCategoryDefinition.getCategoryId());
-            productRepository.delete(products);
-        }
-
-        productCatalogRepository.save(productCatalog);
-
-        return "redirect:/dashboard/catalogs/" + catalogId;
-    }
 
     @GetMapping("/dashboard/catalogs/{catalogId}/category/{categoryId}/products/new")
     public String newProduct(@PathVariable String catalogId, @PathVariable String categoryId, Model model) {
