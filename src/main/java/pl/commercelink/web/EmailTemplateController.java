@@ -1,184 +1,311 @@
 package pl.commercelink.web;
 
-import org.apache.commons.lang3.StringUtils;
-import org.springframework.beans.factory.annotation.Autowired;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
+import org.springframework.context.MessageSource;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.*;
-import pl.commercelink.starter.util.ConversionUtil;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.orders.notifications.EmailNotificationType;
+import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.stores.ClientNotificationsConfiguration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
-import pl.commercelink.templates.EmailAttachment;
 import pl.commercelink.templates.EmailTemplate;
-import pl.commercelink.templates.EmailTemplateForm;
 import pl.commercelink.templates.EmailTemplatesRepository;
-import pl.commercelink.starter.security.CustomSecurityContext;
+import pl.commercelink.web.dtos.EmailTemplateForm;
+import pl.commercelink.web.settings.ConfirmAction;
+import pl.commercelink.web.settings.EmailTemplateParameter;
+import pl.commercelink.web.settings.EmailTemplateView;
+import pl.commercelink.web.settings.NotificationOverview;
+import pl.commercelink.web.settings.SettingsFlash;
+import pl.commercelink.web.settings.SettingsPaths;
 
 import java.util.Arrays;
-import java.util.LinkedList;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
+/**
+ * Settings › Email templates: the emails a store sends to its customers. The page lists every type; each is edited on
+ * its own page, whose save writes that one template only. A store without its own copy of a template sends the shared
+ * default one ({@link EmailTemplatesRepository#DEFAULT_STORE}); saving content equal to it keeps it that way, and
+ * "restore" deletes the store's copy. The store comes from the session (ADMIN) or the path (SUPER_ADMIN).
+ */
 @Controller
+@RequiredArgsConstructor
 public class EmailTemplateController {
 
-    @Autowired
-    private StoresRepository storesRepository;
+    private static final String LIST_VIEW = "store-email-templates";
+    private static final String VIEW = "store-email-template";
+    private static final String FORM_FRAGMENT = VIEW + " :: templateForm";
 
-    @Autowired
-    private EmailTemplatesRepository emailTemplatesRepository;
+    private final StoresRepository storesRepository;
+    private final EmailTemplatesRepository emailTemplatesRepository;
+    private final MessageSource messageSource;
 
     @GetMapping("/dashboard/store/email-templates")
     @PreAuthorize("hasRole('ADMIN')")
-    public String emailTemplatesAdmin(@RequestParam(value = "selectedType", required = false) String selectedType, Model model) {
-        return renderEmailTemplates(getStoreId(), selectedType, false, model);
+    public String templates(@RequestParam(value = "selectedType", required = false) String selectedType, Model model) {
+        return list(CustomSecurityContext.getStoreId(), selectedType, model);
     }
 
     @GetMapping("/dashboard/store/{storeId}/email-templates")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public String emailTemplatesSuperAdmin(@PathVariable String storeId, @RequestParam(value = "selectedType", required = false) String selectedType, Model model) {
-        return renderEmailTemplates(storeId, selectedType, true, model);
+    public String superAdminTemplates(@PathVariable String storeId,
+                                      @RequestParam(value = "selectedType", required = false) String selectedType, Model model) {
+        return list(storeId, selectedType, model);
     }
 
-    @PostMapping("/dashboard/store/email-templates/save")
+    @GetMapping("/dashboard/store/email-templates/{type}")
     @PreAuthorize("hasRole('ADMIN')")
-    public String saveTemplatesAdmin(@ModelAttribute EmailTemplateForm form, @RequestParam("selectedType") String selectedType) {
-        saveTemplates(getStoreId(), form);
-        return "redirect:/dashboard/store/email-templates?selectedType=" + selectedType;
+    public String editTemplate(@PathVariable String type, Model model, Locale locale) {
+        return showEdit(CustomSecurityContext.getStoreId(), type, model, locale);
     }
 
-    @PostMapping("/dashboard/store/{storeId}/email-templates/save")
+    @GetMapping("/dashboard/store/{storeId}/email-templates/{type}")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public String saveTemplatesSuperAdmin(@PathVariable String storeId, @ModelAttribute EmailTemplateForm form, @RequestParam("selectedType") String selectedType) {
-        saveTemplates(storeId, form);
-        return String.format("redirect:/dashboard/store/%s/email-templates?selectedType=%s", storeId, selectedType);
+    public String superAdminEditTemplate(@PathVariable String storeId, @PathVariable String type, Model model, Locale locale) {
+        return showEdit(storeId, type, model, locale);
     }
 
-    @PostMapping("/dashboard/store/email-templates/enable-notification")
+    @PostMapping("/dashboard/store/email-templates/{type}")
     @PreAuthorize("hasRole('ADMIN')")
-    public String enableNotificationAdmin(@RequestParam("type") String type) {
-        enableNotification(getStoreId(), type);
-        return "redirect:/dashboard/store/email-templates?selectedType=" + type;
+    public String saveTemplate(@PathVariable String type, @ModelAttribute EmailTemplateForm form,
+                               @RequestHeader(value = SettingsPaths.ASYNC_HEADER, required = false) String requestedWith,
+                               Model model, Locale locale, RedirectAttributes redirectAttributes,
+                               HttpServletRequest request, HttpServletResponse response) {
+        return save(CustomSecurityContext.getStoreId(), type, form, SettingsPaths.isAsync(requestedWith), model, locale,
+                redirectAttributes, request, response);
     }
 
-    @PostMapping("/dashboard/store/{storeId}/email-templates/enable-notification")
+    @PostMapping("/dashboard/store/{storeId}/email-templates/{type}")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public String enableNotificationSuperAdmin(@PathVariable String storeId, @RequestParam("type") String type) {
-        enableNotification(storeId, type);
-        return String.format("redirect:/dashboard/store/%s/email-templates?selectedType=%s", storeId, type);
+    public String superAdminSaveTemplate(@PathVariable String storeId, @PathVariable String type,
+                                         @ModelAttribute EmailTemplateForm form,
+                                         @RequestHeader(value = SettingsPaths.ASYNC_HEADER, required = false) String requestedWith,
+                                         Model model, Locale locale, RedirectAttributes redirectAttributes,
+                                         HttpServletRequest request, HttpServletResponse response) {
+        return save(storeId, type, form, SettingsPaths.isAsync(requestedWith), model, locale, redirectAttributes, request,
+                response);
     }
 
-    @PostMapping("/dashboard/store/email-templates/disable-notification")
+    @GetMapping("/dashboard/store/email-templates/{type}/restore")
     @PreAuthorize("hasRole('ADMIN')")
-    public String disableNotificationAdmin(@RequestParam("type") String type) {
-        disableNotification(getStoreId(), type);
-        return "redirect:/dashboard/store/email-templates?selectedType=" + type;
+    public String confirmRestore(@PathVariable String type, Model model, Locale locale) {
+        return confirmRestore(CustomSecurityContext.getStoreId(), type, model, locale);
     }
 
-    @PostMapping("/dashboard/store/{storeId}/email-templates/disable-notification")
+    @GetMapping("/dashboard/store/{storeId}/email-templates/{type}/restore")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public String disableNotificationSuperAdmin(@PathVariable String storeId, @RequestParam("type") String type) {
-        disableNotification(storeId, type);
-        return String.format("redirect:/dashboard/store/%s/email-templates?selectedType=%s", storeId, type);
+    public String superAdminConfirmRestore(@PathVariable String storeId, @PathVariable String type, Model model, Locale locale) {
+        return confirmRestore(storeId, type, model, locale);
     }
 
-    private String renderEmailTemplates(String storeId, String selectedType, boolean isSuperAdmin, Model model) {
-        Store store = storesRepository.findById(storeId);
-        List<EmailTemplate> emailTemplates = new LinkedList<>();
-        ClientNotificationsConfiguration clientNotificationsConfiguration = store.getClientNotificationsConfiguration();
+    @PostMapping("/dashboard/store/email-templates/{type}/restore")
+    @PreAuthorize("hasRole('ADMIN')")
+    public String restoreDefault(@PathVariable String type, Locale locale, RedirectAttributes redirectAttributes) {
+        return restore(CustomSecurityContext.getStoreId(), type, locale, redirectAttributes);
+    }
 
-        if (clientNotificationsConfiguration == null) {
-            clientNotificationsConfiguration = new ClientNotificationsConfiguration();
-            store.setClientNotificationsConfiguration(clientNotificationsConfiguration);
+    @PostMapping("/dashboard/store/{storeId}/email-templates/{type}/restore")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public String superAdminRestoreDefault(@PathVariable String storeId, @PathVariable String type, Locale locale,
+                                           RedirectAttributes redirectAttributes) {
+        return restore(storeId, type, locale, redirectAttributes);
+    }
+
+    private String list(String storeId, String selectedType, Model model) {
+        Store store = requireStore(storeId);
+        // Links from before the list had one page per type.
+        EmailNotificationType selected = typeOrNull(selectedType);
+        if (selected != null) {
+            return "redirect:" + typePath(storeId, selected);
         }
+        ClientNotificationsConfiguration configuration = configurationOf(store);
+        List<EmailTemplateView.Group> groups = EmailTemplateView.forStore(configuration,
+                emailTemplatesRepository.findAllOfStore(storeId),
+                emailTemplatesRepository.findAllOfStore(EmailTemplatesRepository.DEFAULT_STORE), basePath(storeId));
+        List<EmailTemplateView> all = groups.stream().flatMap(group -> group.items().stream()).toList();
+        model.addAttribute("groups", groups);
+        model.addAttribute("enabledCount", all.stream().filter(EmailTemplateView::enabled).count());
+        model.addAttribute("totalCount", all.size());
+        model.addAttribute("anyBroken", all.stream().anyMatch(EmailTemplateView::broken));
+        return LIST_VIEW;
+    }
 
-        for (EmailNotificationType type : EmailNotificationType.values()) {
-            String templateName = store.getClientNotificationsConfiguration().getTemplateName(type);
-            if (store.getClientNotificationsConfiguration().supports(type)) {
-                EmailTemplate emailTemplate = emailTemplatesRepository.findByTemplateName(storeId, templateName);
-                // If store template is not found, fallback to default template
-                if (emailTemplate == null) {
-                    emailTemplate = emailTemplatesRepository.findByTemplateName("default", templateName);
-                }
+    private String showEdit(String storeId, String typeName, Model model, Locale locale) {
+        Store store = requireStore(storeId);
+        EmailNotificationType type = requireType(typeName);
+        ClientNotificationsConfiguration configuration = configurationOf(store);
+        String name = templateName(configuration, type);
+        EmailTemplate own = emailTemplatesRepository.findByTemplateName(storeId, name);
+        EmailTemplate fallback = emailTemplatesRepository.findByTemplateName(EmailTemplatesRepository.DEFAULT_STORE, name);
+        EmailTemplateForm form = EmailTemplateForm.from(own != null ? own : fallback, configuration.supports(type));
+        return render(store, type, form, Map.of(), own, fallback, model, locale);
+    }
 
-                emailTemplate.setAttachments(ConversionUtil.join(emailTemplate.getAttachments(), Arrays.asList(new EmailAttachment(), new EmailAttachment(), new EmailAttachment())));
-                emailTemplate.setBccAddresses(ConversionUtil.join(emailTemplate.getBccAddresses(), Arrays.asList("", "")));
-                emailTemplates.add(emailTemplate);
-            } else {
-                emailTemplates.add(new EmailTemplate());
+    private String save(String storeId, String typeName, EmailTemplateForm form, boolean async, Model model, Locale locale,
+                        RedirectAttributes redirectAttributes, HttpServletRequest request, HttpServletResponse response) {
+        Store store = requireStore(storeId);
+        EmailNotificationType type = requireType(typeName);
+        ClientNotificationsConfiguration configuration = configurationOf(store);
+        String name = templateName(configuration, type);
+        EmailTemplate own = emailTemplatesRepository.findByTemplateName(storeId, name);
+        EmailTemplate fallback = emailTemplatesRepository.findByTemplateName(EmailTemplatesRepository.DEFAULT_STORE, name);
+
+        Map<String, String> errors = form.validate();
+        if (!errors.isEmpty()) {
+            String view = render(store, type, form, errors, own, fallback, model, locale);
+            if (async) {
+                response.setStatus(HttpStatus.UNPROCESSABLE_ENTITY.value());
+                return FORM_FRAGMENT;
             }
+            return view;
         }
 
-        model.addAttribute("form", new EmailTemplateForm(emailTemplates));
-        model.addAttribute("store", store);
-        model.addAttribute("notificationTypes", EmailNotificationType.values());
-        model.addAttribute("selectedType", selectedType);
-        model.addAttribute("isSuperAdmin", isSuperAdmin);
-
-        return "emailTemplates";
-    }
-
-    private void saveTemplates(String storeId, EmailTemplateForm form) {
-        Store store = storesRepository.findById(storeId);
-
-        for (EmailTemplate templateInput : form.getEmailTemplates()) {
-            if (!templateInput.isComplete()) continue;
-            EmailTemplate existingStoreTemplate = emailTemplatesRepository.findByTemplateName(storeId, templateInput.getTemplateName());
-
-            if (existingStoreTemplate == null) {
-                // New store template
-                EmailNotificationType notificationType = templateInput.getType();
-
-                existingStoreTemplate = new EmailTemplate();
-                existingStoreTemplate.setStoreId(storeId);
-                existingStoreTemplate.setTemplateName(notificationType.getTemplateName());
-                existingStoreTemplate.setType(notificationType);
-
-                // Update store configuration
-                store.getClientNotificationsConfiguration().enableNotification(existingStoreTemplate.getType(), notificationType.getTemplateName());
-            }
-
-            existingStoreTemplate.setSubject(templateInput.getSubject());
-            existingStoreTemplate.setTextBody(templateInput.getTextBody());
-            existingStoreTemplate.setAttachments(templateInput.getAttachments().stream()
-                    .filter(EmailAttachment::isComplete)
-                    .collect(Collectors.toList()));
-            existingStoreTemplate.setBccAddresses(templateInput.getBccAddresses().stream()
-                    .filter(StringUtils::isNotBlank)
-                    .collect(Collectors.toList()));
-
-            emailTemplatesRepository.save(existingStoreTemplate);
+        // Content equal to the default one is not copied into the store, so it keeps getting the default's updates.
+        boolean keepsDefault = own == null && (form.sameContentAs(fallback) || !form.hasContent());
+        // Switching off with an emptied form must not blank the store's copy: another flow can switch the email back on.
+        boolean keepsOwn = own != null && !form.isEnabled() && !form.hasContent();
+        if (!keepsDefault && !keepsOwn) {
+            EmailTemplate template = own != null ? own : newTemplate(storeId, name, type);
+            form.applyTo(template);
+            emailTemplatesRepository.save(template);
+            own = template;
         }
-
+        if (form.isEnabled()) {
+            configuration.enableNotification(type, name);
+        } else {
+            configuration.disableNotification(type);
+        }
         storesRepository.save(store);
+
+        String listPath = basePath(storeId);
+        String message = messageSource.getMessage(form.isEnabled() ? "store.emailTemplate.saved" : "store.emailTemplate.saved.off",
+                new Object[]{label(type, locale)}, locale);
+        if (async) {
+            SettingsFlash.forNextPage(request, response, listPath, message);
+            render(store, type, form, Map.of(), own, fallback, model, locale);
+            model.addAttribute("redirectTo", listPath);
+            return FORM_FRAGMENT;
+        }
+        SettingsFlash.onRedirect(redirectAttributes, message);
+        return "redirect:" + listPath;
     }
 
-    private void enableNotification(String storeId, String type) {
-        EmailNotificationType notificationType = EmailNotificationType.valueOf(type);
-        Store store = storesRepository.findById(storeId);
+    private String confirmRestore(String storeId, String typeName, Model model, Locale locale) {
+        EmailNotificationType type = requireType(typeName);
+        requireStore(storeId);
+        model.addAttribute("confirm", new ConfirmAction(
+                messageSource.getMessage("store.emailTemplate.restore.title", new Object[]{label(type, locale)}, locale),
+                messageSource.getMessage("store.emailTemplate.restore.message", null, locale),
+                messageSource.getMessage("store.emailTemplate.restore.action", null, locale),
+                typePath(storeId, type) + "/restore",
+                typePath(storeId, type)));
+        model.addAttribute("backLabel", label(type, locale));
+        return "settings-confirm";
+    }
 
+    private String restore(String storeId, String typeName, Locale locale, RedirectAttributes redirectAttributes) {
+        EmailNotificationType type = requireType(typeName);
+        String name = templateName(configurationOf(requireStore(storeId)), type);
+        EmailTemplate own = emailTemplatesRepository.findByTemplateName(storeId, name);
+        // Without a default there would be nothing left to send, so the store's copy stays.
+        if (own != null && emailTemplatesRepository.findByTemplateName(EmailTemplatesRepository.DEFAULT_STORE, name) != null) {
+            emailTemplatesRepository.delete(own);
+            SettingsFlash.onRedirect(redirectAttributes, messageSource.getMessage("store.emailTemplate.restored",
+                    new Object[]{label(type, locale)}, locale));
+        }
+        return "redirect:" + typePath(storeId, type);
+    }
+
+    private String render(Store store, EmailNotificationType type, EmailTemplateForm form, Map<String, String> errors,
+                          EmailTemplate own, EmailTemplate fallback, Model model, Locale locale) {
+        String storeId = store.getStoreId();
+        model.addAttribute("form", form);
+        model.addAttribute("errors", errors);
+        model.addAttribute("errorLabels", form.errorLabels((number, field) -> messageSource.getMessage(
+                "store.emailTemplate.attachment.field", new Object[]{number,
+                        messageSource.getMessage("store.emailTemplate.attachment." + field, null, locale)}, locale)));
+        model.addAttribute("formAction", typePath(storeId, type));
+        model.addAttribute("pageTitle", label(type, locale));
+        model.addAttribute("source", own != null ? EmailTemplateView.Source.OWN
+                : fallback != null ? EmailTemplateView.Source.DEFAULT : EmailTemplateView.Source.NONE);
+        model.addAttribute("restorable", own != null && fallback != null);
+        model.addAttribute("restoreHref", typePath(storeId, type) + "/restore");
+        // Switching one of these off while customers may change the address disables that feature.
+        model.addAttribute("requiredForAddressChange", NotificationOverview.ADDRESS_CHANGE_TYPES.contains(type)
+                && NotificationOverview.addressChangeOn(store));
+        model.addAttribute("fulfilmentHref", SettingsPaths.store(storeId, "/fulfilment") + "#client-order-page");
+        model.addAttribute("parameters", EmailTemplateParameter.of(type));
+        model.addAttribute("extrasOpen", form.hasExtras()
+                || errors.keySet().stream().anyMatch(field -> field.equals("bccAddresses") || field.startsWith("attachment-")));
+        model.addAttribute("listHref", basePath(storeId));
+        model.addAttribute("backLabel", messageSource.getMessage("nav.emailTemplates", null, locale));
+        return VIEW;
+    }
+
+    private static EmailTemplate newTemplate(String storeId, String name, EmailNotificationType type) {
+        EmailTemplate template = new EmailTemplate();
+        template.setStoreId(storeId);
+        template.setTemplateName(name);
+        template.setType(type);
+        return template;
+    }
+
+    private static ClientNotificationsConfiguration configurationOf(Store store) {
         if (store.getClientNotificationsConfiguration() == null) {
             store.setClientNotificationsConfiguration(new ClientNotificationsConfiguration());
         }
-
-        // Assign default template if not yet configured
-        store.getClientNotificationsConfiguration().enableNotification(notificationType, notificationType.getTemplateName());
-
-        storesRepository.save(store);
+        return store.getClientNotificationsConfiguration();
     }
 
-    private void disableNotification(String storeId, String type) {
-        EmailNotificationType notificationType = EmailNotificationType.valueOf(type);
+    private static String templateName(ClientNotificationsConfiguration configuration, EmailNotificationType type) {
+        return EmailTemplateView.templateName(configuration, type);
+    }
 
+    private String label(EmailNotificationType type, Locale locale) {
+        return messageSource.getMessage(EmailTemplateView.labelKey(type), null, type.name(), locale);
+    }
+
+    private static String basePath(String storeId) {
+        return SettingsPaths.store(storeId, "/email-templates");
+    }
+
+    private static String typePath(String storeId, EmailNotificationType type) {
+        return basePath(storeId) + "/" + type.name();
+    }
+
+    private static EmailNotificationType typeOrNull(String name) {
+        return Arrays.stream(EmailNotificationType.values()).filter(type -> type.name().equals(name)).findFirst().orElse(null);
+    }
+
+    private static EmailNotificationType requireType(String name) {
+        EmailNotificationType type = typeOrNull(name);
+        if (type == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+        return type;
+    }
+
+    private Store requireStore(String storeId) {
         Store store = storesRepository.findById(storeId);
-        store.getClientNotificationsConfiguration().disableNotification(notificationType);
-        storesRepository.save(store);
-    }
-
-    private String getStoreId() {
-        return CustomSecurityContext.getStoreId();
+        if (store == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+        return store;
     }
 }

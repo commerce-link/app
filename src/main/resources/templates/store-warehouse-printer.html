@@ -1,0 +1,89 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+<div layout:fragment="content">
+    <section class="cl-page">
+        <div class="cl-page-body">
+            <div th:replace="~{fragments/settings-header :: subpage(${warehouseHref}, ${backLabel}, ${pageTitle})}"></div>
+
+            <form th:fragment="printerForm" id="warehouse-printer-form" class="cl-form"
+                  th:action="@{${formAction}}" th:object="${form}" method="post" novalidate data-cl-async
+                  th:attr="data-cl-redirect=${redirectTo}, data-error-message=#{form.save.failed}">
+                <div th:replace="~{fragments/settings-form :: errorSummary('warehouse-printer-errors', ${errors}, ${errorLabels})}"></div>
+
+                <div class="cl-card">
+                    <fieldset class="cl-fieldset">
+                        <legend class="cl-fieldset-title" th:text="#{store.warehouse.printer.section}"></legend>
+                        <div class="cl-form-grid">
+                            <div class="cl-span-3 cl-field">
+                                <label class="cl-label" for="type" th:text="#{store.warehouse.printer.type}"></label>
+                                <select class="cl-select" id="type" name="type" data-cl-variant-select="printer-type"
+                                        th:classappend="${errors['type'] != null} ? 'is-invalid'"
+                                        th:attr="aria-invalid=${errors['type'] != null ? 'true' : null},
+                                                 aria-describedby=${errors['type'] != null ? 'type-error' : null}">
+                                    <!--/* A stored type whose adapter is no longer installed matches no option; without the empty option
+                                           the browser would silently pick the first type and saving would change it. */-->
+                                    <option th:unless="${knownType}" value=""
+                                            th:text="#{store.warehouse.printer.type.choose}"></option>
+                                    <option th:each="printerType : ${types}" th:value="${printerType.name()}"
+                                            th:text="${printerType.displayName()}" th:selected="${printerType.name() == form.type}"></option>
+                                </select>
+                                <p th:if="${errors['type'] != null}" class="cl-field-error" id="type-error">
+                                    <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                                    <span th:text="#{${errors['type']}}"></span>
+                                </p>
+                            </div>
+                            <div class="cl-span-3" th:insert="~{fragments/settings-form :: textField('name', 'store.warehouse.printer.name', *{name}, 'text', 'off', true, ${errors['name']}, #{store.warehouse.printer.name.help})}"></div>
+                        </div>
+                    </fieldset>
+
+                    <fieldset th:each="printerType : ${types}" class="cl-fieldset" data-cl-variant-group="printer-type"
+                              th:attr="data-cl-variant=${printerType.name()}">
+                        <legend class="cl-fieldset-title" th:text="#{store.warehouse.printer.settings(${printerType.displayName()})}"></legend>
+                        <div class="cl-form-grid">
+                            <div class="cl-span-2 cl-field" th:each="field : ${printerType.fields()}"
+                                 th:with="id=${T(pl.commercelink.web.dtos.WarehousePrinterForm).fieldId(printerType.name(), field)},
+                                          secret=${field.type().name() == 'PASSWORD'},
+                                          error=${errors.get(id)},
+                                          example=${!secret and field.placeholder() != null and !#strings.isEmpty(field.placeholder())}">
+                                <label class="cl-label" th:for="${id}">
+                                    <span th:text="${field.label()}"></span>
+                                    <span th:unless="${field.required()}" class="cl-optional" th:text="#{form.optional}"></span>
+                                </label>
+                                <input class="cl-input" th:classappend="${error != null} ? 'is-invalid'"
+                                       th:id="${id}" th:name="${T(pl.commercelink.web.dtos.WarehousePrinterForm).fieldName(printerType.name(), field)}"
+                                       th:type="${secret ? 'password' : (field.type().name() == 'URL' ? 'url' : 'text')}"
+                                       th:value="${form.value(printerType.name(), field)}"
+                                       th:attr="autocomplete=${secret ? 'new-password' : 'off'},
+                                                inputmode=${field.type().name() == 'NUMBER' ? 'decimal' : null},
+                                                placeholder=${secret and storedSecretIds.contains(id) ? #messages.msg('store.warehouse.printer.secret.stored') : null},
+                                                aria-invalid=${error != null ? 'true' : null},
+                                                aria-describedby=${(example or error != null) ? ((example ? id + '-help' : '') + (example and error != null ? ' ' : '') + (error != null ? id + '-error' : '')) : null}"/>
+                                <p th:if="${example}" class="cl-help" th:id="${id} + '-help'"
+                                   th:text="#{store.warehouse.printer.setting.example(${field.placeholder()})}"></p>
+                                <p th:if="${error != null}" class="cl-field-error" th:id="${id} + '-error'">
+                                    <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                                    <span th:text="#{${error}}"></span>
+                                </p>
+                            </div>
+                        </div>
+                    </fieldset>
+
+                    <div class="cl-card-footer">
+                        <button class="cl-button is-primary" type="submit" th:text="#{store.warehouse.printer.save}"></button>
+                        <a class="cl-button" th:href="@{${warehouseHref}}" th:text="#{general.cancel}"></a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </section>
+    <script th:if="${!errors.isEmpty()}">
+        document.getElementById('warehouse-printer-errors').focus();
+    </script>
+    <script th:src="@{/js/async-form.js}" defer></script>
+    <script th:src="@{/js/variant-fields.js}" defer></script>
+</div>
+</body>
+</html>

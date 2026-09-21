@@ -1,0 +1,190 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+<div layout:fragment="content">
+    <section class="cl-page">
+        <div class="cl-page-body">
+            <div th:replace="~{fragments/settings-header :: subpage(${suppliersHref}, ${backLabel}, ${pageTitle})}"></div>
+
+            <!--/* One form for an integration and a price list: static/js/variant-fields.js shows the fields of the chosen
+                   supplier (data-cl-variant) and mode (data-cl-variant-when) and disables the others, so they are not sent.
+                   Without JavaScript every field shows and the server reads only those of the chosen supplier and mode. */-->
+            <form th:fragment="supplierForm" id="supplier-form" class="cl-form" data-cl-schedule-auto
+                  th:action="@{${formAction}}" th:object="${form}" method="post" enctype="multipart/form-data" novalidate data-cl-async
+                  th:attr="data-cl-redirect=${redirectTo}, data-error-message=#{form.save.failed}">
+                <div th:replace="~{fragments/settings-form :: errorSummary('supplier-errors', ${errors}, ${errorLabels})}"></div>
+                <div th:if="${failure != null}" class="cl-alert is-bad" data-cl-error-summary tabindex="-1">
+                    <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
+                    <p class="cl-alert-text" th:text="${failure}"></p>
+                </div>
+                <div th:if="${globalNotAllowed}" class="cl-alert is-warn">
+                    <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+                    <p class="cl-alert-text" th:text="#{store.suppliers.globalNotAllowed}"></p>
+                </div>
+
+                <div class="cl-card">
+                    <fieldset class="cl-fieldset">
+                        <legend class="cl-fieldset-title" th:text="#{store.suppliers.section.supplier}"></legend>
+
+                        <div th:unless="${editing}" class="cl-field" th:with="error=${errors['providerName']}">
+                            <label class="cl-label" for="providerName" th:text="#{store.suppliers.provider}"></label>
+                            <select class="cl-select" id="providerName" name="providerName" data-cl-variant-select="supplier"
+                                    th:classappend="${error != null} ? 'is-invalid'"
+                                    th:attr="aria-invalid=${error != null ? 'true' : null},
+                                             aria-describedby=${error != null ? 'providerName-help providerName-error' : 'providerName-help'}">
+                                <option th:unless="${providerKnown}" value="" th:text="#{store.suppliers.provider.choose}"></option>
+                                <option th:each="type : ${types}" th:value="${type}" th:text="${type}"
+                                        th:selected="${type == form.providerName}"></option>
+                                <option th:if="${csvOption}" th:value="${T(pl.commercelink.web.dtos.SupplierSettingsForm).CSV}"
+                                        th:text="#{store.suppliers.provider.csv}" th:selected="${form.csv()}"></option>
+                            </select>
+                            <p class="cl-help" id="providerName-help" th:text="#{store.suppliers.provider.help}"></p>
+                            <p th:if="${error != null}" class="cl-field-error" id="providerName-error">
+                                <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                                <span th:text="#{${error}}"></span>
+                            </p>
+                        </div>
+                        <th:block th:if="${editing}">
+                            <input type="hidden" name="providerName" data-cl-variant-select="supplier" th:value="*{providerName}"/>
+                            <p class="cl-help" th:text="${form.csv()} ? #{store.suppliers.source.csv} : #{store.suppliers.integration(*{providerName})}"></p>
+                        </th:block>
+
+                        <fieldset th:if="${canChooseMode}" class="cl-choice-group" id="mode" tabindex="-1"
+                                  data-cl-variant-when="supplier!=|manual"
+                                  th:with="error=${errors['mode']}">
+                            <legend class="cl-label" th:text="#{store.suppliers.mode}"></legend>
+                            <label class="cl-choice" th:each="mode : ${ {'OWN', 'GLOBAL'} }">
+                                <input type="radio" name="mode" data-cl-variant-select="mode" th:value="${mode}"
+                                       th:checked="${mode == form.mode}"
+                                       th:attr="aria-describedby='mode-' + ${mode} + '-description'"/>
+                                <span class="cl-choice-text">
+                                    <span class="cl-choice-title" th:text="#{'store.suppliers.mode.' + ${mode}}"></span>
+                                    <span class="cl-choice-description" th:id="'mode-' + ${mode} + '-description'"
+                                          th:text="#{'store.suppliers.mode.' + ${mode} + '.description'}"></span>
+                                </span>
+                            </label>
+                            <div th:if="${warnLeavingOwn}" class="cl-alert is-warn" data-cl-variant-when="mode=GLOBAL">
+                                <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+                                <p class="cl-alert-text" th:text="#{store.supplier.mode.warning}"></p>
+                            </div>
+                            <p th:if="${error != null}" class="cl-field-error" id="mode-error">
+                                <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                                <span th:text="#{${error}}"></span>
+                            </p>
+                        </fieldset>
+                        <input th:if="${!canChooseMode and !form.csv()}" type="hidden" name="mode" data-cl-variant-select="mode"
+                               th:value="*{mode}"/>
+
+                        <!--/* Groups below wait for the supplier choice (an empty choice hides them), so a new supplier starts
+                               with one question instead of a form whose parts may not apply. */-->
+                        <fieldset class="cl-choice-group" data-cl-variant-when="supplier!= mode!=GLOBAL">
+                            <div th:replace="~{fragments/settings-form :: textField('label', 'store.suppliers.label', *{label}, 'text', 'off', true, ${errors['label']}, #{store.suppliers.label.help})}"></div>
+                        </fieldset>
+                    </fieldset>
+
+                    <th:block th:each="type : ${types}" th:with="typeFields=${fields.get(type)}">
+                        <fieldset th:if="${typeFields != null and !typeFields.isEmpty()}" class="cl-fieldset"
+                                  data-cl-variant-when="mode!=GLOBAL"
+                                  th:attr="data-cl-variant-group=${editing ? null : 'supplier'}, data-cl-variant=${editing ? null : type}">
+                            <legend class="cl-fieldset-title" th:text="#{store.suppliers.credentials(${type})}"></legend>
+                            <div class="cl-form-grid">
+                                <!--/* One per row: adapter settings are independent of each other (§6.1). */-->
+                                <div class="cl-span-4 cl-field" th:each="field : ${typeFields}"
+                                     th:with="id=${T(pl.commercelink.web.dtos.IntegrationSettingsForm).fieldId(type, field)},
+                                              secret=${field.type().name() == 'PASSWORD'},
+                                              error=${errors.get(id)},
+                                              stored=${storedSecretIds.contains(id)},
+                                              exampleText=${T(pl.commercelink.web.settings.ProviderFieldText).example(field)},
+                                              example=${exampleText != null}">
+                                    <label class="cl-label" th:for="${id}">
+                                        <span th:text="${T(pl.commercelink.web.settings.ProviderFieldText).label(field)}"></span>
+                                        <span th:unless="${field.required()}" class="cl-optional" th:text="#{form.optional}"></span>
+                                    </label>
+                                    <input class="cl-input" th:classappend="${error != null} ? 'is-invalid'"
+                                           th:id="${id}" th:name="${T(pl.commercelink.web.dtos.IntegrationSettingsForm).fieldName(type, field)}"
+                                           th:type="${secret ? 'password' : (field.type().name() == 'URL' ? 'url' : 'text')}"
+                                           th:value="${form.value(type, field)}"
+                                           th:attr="autocomplete=${secret ? 'new-password' : 'off'},
+                                                    inputmode=${field.type().name() == 'NUMBER' ? 'decimal' : null},
+                                                    aria-invalid=${error != null ? 'true' : null},
+                                                    aria-describedby=${(example or stored or error != null) ? ((example or stored ? id + '-help' : '') + ((example or stored) and error != null ? ' ' : '') + (error != null ? id + '-error' : '')) : null}"/>
+                                    <p th:if="${stored}" class="cl-help" th:id="${id} + '-help'" th:text="#{integration.secret.stored}"></p>
+                                    <p th:if="${example and !stored}" class="cl-help" th:id="${id} + '-help'"
+                                       th:text="#{integration.setting.example(${exampleText})}"></p>
+                                    <p th:if="${error != null}" class="cl-field-error" th:id="${id} + '-error'">
+                                        <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                                        <span th:text="#{${error}}"></span>
+                                    </p>
+                                </div>
+                            </div>
+                        </fieldset>
+                    </th:block>
+
+                    <fieldset th:unless="${editing and form.csv()}" class="cl-fieldset" data-cl-variant-when="supplier!=|manual mode!=GLOBAL">
+                        <legend class="cl-fieldset-title" th:text="#{store.suppliers.schedule.section}"></legend>
+                        <div class="cl-field" id="feedSchedule" tabindex="-1" th:with="error=${errors['feedSchedule']}">
+                            <span class="cl-label" id="feedSchedule-label" th:text="#{store.supplier.feed.schedule}"></span>
+                            <div th:replace="~{fragments/schedule-field :: input('feedSchedule', *{feedSchedule}, ${scheduleMinIntervalMinutes}, #{store.supplier.schedule.summary.default}, 'minutes,hours,days')}"></div>
+                            <p th:if="${error != null}" class="cl-field-error" id="feedSchedule-error">
+                                <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                                <span th:text="#{${error}}"></span>
+                            </p>
+                        </div>
+                    </fieldset>
+
+                    <fieldset th:if="${csvOption or form.csv()}" class="cl-fieldset" data-cl-variant-when="supplier=manual">
+                        <legend class="cl-fieldset-title" th:text="#{store.suppliers.file.section}"></legend>
+                        <div class="cl-field" th:with="error=${errors['file']}">
+                            <label class="cl-label" for="file">
+                                <span th:text="#{store.suppliers.file}"></span>
+                                <span class="cl-optional" th:text="#{form.optional}"></span>
+                            </label>
+                            <div class="cl-file-row">
+                                <input class="cl-file" type="file" id="file" name="file" accept=".csv,text/csv"
+                                       th:classappend="${error != null} ? 'is-invalid'"
+                                       th:attr="aria-invalid=${error != null ? 'true' : null},
+                                                aria-describedby='file-help' + (${error != null} ? ' file-error' : '')"/>
+                            </div>
+                            <p class="cl-help" id="file-help"
+                               th:text="${hasFeed} ? #{store.suppliers.file.replace} : #{store.suppliers.file.help}"></p>
+                            <p th:if="${error != null}" class="cl-field-error" id="file-error">
+                                <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                                <span th:text="#{${error}}"></span>
+                            </p>
+                        </div>
+                        <div th:replace="~{fragments/settings-form :: check('enabled', 'store.suppliers.enabled', *{enabled}, 'store.suppliers.enabled.description', null)}"></div>
+                    </fieldset>
+
+                    <fieldset class="cl-fieldset" data-cl-variant-when="supplier!=">
+                        <legend class="cl-fieldset-title" th:text="#{store.suppliers.usage.section}"></legend>
+                        <div th:replace="~{fragments/settings-form :: check('includeInPricing', 'store.suppliers.includeInPricing', *{includeInPricing}, 'store.suppliers.includeInPricing.description', null)}"></div>
+                        <div th:replace="~{fragments/settings-form :: check('includeInFulfilment', 'store.suppliers.includeInFulfilment', *{includeInFulfilment}, 'store.suppliers.includeInFulfilment.description', null)}"></div>
+                    </fieldset>
+
+                    <fieldset class="cl-fieldset" data-cl-variant-when="supplier!= mode!=GLOBAL">
+                        <legend class="cl-fieldset-title" th:text="#{store.suppliers.ids.section}"></legend>
+                        <div class="cl-form-grid">
+                            <div class="cl-span-3" th:insert="~{fragments/settings-form :: textField('externalSupplierId', 'store.supplier.external.id', *{externalSupplierId}, 'text', 'off', false, ${errors['externalSupplierId']}, #{store.suppliers.externalId.help})}"></div>
+                            <div class="cl-span-3" th:insert="~{fragments/settings-form :: textField('billingShortcut', 'store.supplier.billing.shortcut', *{billingShortcut}, 'text', 'off', false, ${errors['billingShortcut']}, #{store.suppliers.billingShortcut.help})}"></div>
+                        </div>
+                    </fieldset>
+
+                    <div class="cl-card-footer">
+                        <button class="cl-button is-primary" type="submit" th:text="#{store.suppliers.save}"></button>
+                        <a class="cl-button" th:href="@{${suppliersHref}}" th:text="#{general.cancel}"></a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </section>
+    <script th:if="${!errors.isEmpty()}">
+        document.getElementById('supplier-errors').focus();
+    </script>
+    <script th:replace="~{fragments/schedule-field :: script}"></script>
+    <script th:src="@{/js/async-form.js}" defer></script>
+    <script th:src="@{/js/variant-fields.js}" defer></script>
+</div>
+</body>
+</html>

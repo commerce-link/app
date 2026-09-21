@@ -111,11 +111,96 @@ public class Store {
     }
 
     @DynamoDBIgnore
+    public Optional<ShippingDetails> findShippingDetails(String id) {
+        return shippingDetails.stream().filter(details -> id.equals(details.getId())).findFirst();
+    }
+
+    @DynamoDBIgnore
+    public void addShippingDetails(ShippingDetails details, boolean makeDefault) {
+        if (isBlank(details.getId())) {
+            details.setId(UUID.randomUUID().toString());
+        }
+        boolean becomesDefault = makeDefault || shippingDetails.stream().noneMatch(ShippingDetails::is_default);
+        if (becomesDefault) {
+            shippingDetails.forEach(other -> other.set_default(false));
+        }
+        details.set_default(becomesDefault);
+        shippingDetails.add(details);
+    }
+
+    @DynamoDBIgnore
+    public boolean makeDefaultShippingDetails(String id) {
+        if (findShippingDetails(id).isEmpty()) {
+            return false;
+        }
+        shippingDetails.forEach(details -> details.set_default(id.equals(details.getId())));
+        return true;
+    }
+
+    @DynamoDBIgnore
+    public boolean removeShippingDetails(String id) {
+        boolean removed = shippingDetails.removeIf(details -> id.equals(details.getId()));
+        if (removed && !shippingDetails.isEmpty() && shippingDetails.stream().noneMatch(ShippingDetails::is_default)) {
+            shippingDetails.getFirst().set_default(true);
+        }
+        return removed;
+    }
+
+    @DynamoDBIgnore
+    public boolean assignMissingShippingDetailsIds() {
+        boolean changed = false;
+        for (ShippingDetails details : shippingDetails) {
+            if (isBlank(details.getId())) {
+                details.setId(UUID.randomUUID().toString());
+                changed = true;
+            }
+        }
+        return changed;
+    }
+
+    @DynamoDBIgnore
     public BankAccount getDefaultBankAccount() {
         return bankAccounts.stream()
                 .filter(BankAccount::is_default)
                 .findFirst()
                 .orElse(null);
+    }
+
+    @DynamoDBIgnore
+    public Optional<BankAccount> findBankAccount(String id) {
+        return bankAccounts.stream().filter(account -> id != null && id.equals(account.getId())).findFirst();
+    }
+
+    /** The first account becomes the default: only the default one is read (offer transfer details, cash on delivery). */
+    @DynamoDBIgnore
+    public void addBankAccount(BankAccount account, boolean makeDefault) {
+        if (isBlank(account.getId())) {
+            account.setId(UUID.randomUUID().toString());
+        }
+        boolean becomesDefault = makeDefault || bankAccounts.stream().noneMatch(BankAccount::is_default);
+        if (becomesDefault) {
+            bankAccounts.forEach(other -> other.set_default(false));
+        }
+        account.set_default(becomesDefault);
+        bankAccounts.add(account);
+    }
+
+    @DynamoDBIgnore
+    public boolean makeDefaultBankAccount(String id) {
+        if (findBankAccount(id).isEmpty()) {
+            return false;
+        }
+        bankAccounts.forEach(account -> account.set_default(id.equals(account.getId())));
+        return true;
+    }
+
+    @DynamoDBIgnore
+    public boolean removeBankAccount(String id) {
+        boolean removed = bankAccounts.removeIf(account -> id.equals(account.getId()));
+        if (removed && !bankAccounts.isEmpty() && bankAccounts.stream().noneMatch(BankAccount::is_default)) {
+            bankAccounts.getFirst().set_default(true);
+        }
+        return removed;
     }
 
     @DynamoDBIgnore

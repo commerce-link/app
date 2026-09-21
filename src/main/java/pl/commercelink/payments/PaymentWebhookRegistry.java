@@ -22,6 +22,9 @@ import java.util.stream.Collectors;
 @Configuration
 public class PaymentWebhookRegistry {
 
+    /** Followed by the path of the provider's webhook binding; shown to the store admin on the payment gateway page. */
+    public static final String WEBHOOK_PATH_PREFIX = "/Store/{storeId}/Webhooks/Payments/";
+
     private final BasketsRepository basketsRepository;
     private final OrdersManager ordersManager;
     private final RouterFunction<ServerResponse> routes;
@@ -35,7 +38,7 @@ public class PaymentWebhookRegistry {
 
         this.routes = EventBindingRegistrar.forDescriptors(paymentProviderFactory.availableProviders())
                 .<PaymentWebhookResult>withWebhooks(
-                        "/Store/{storeId}/Webhooks/Payments/",
+                        WEBHOOK_PATH_PREFIX,
                         (descriptor, storeId) -> paymentProviderFactory.loadConfiguration(
                                 storesRepository.findById(storeId), descriptor.name()),
                         (descriptor, storeId, result) -> {

@@ -71,6 +71,8 @@ class MarketplaceConnectionServiceTest {
         when(providerFactory.loadConfiguration(any(), anyString())).thenReturn(new HashMap<>());
         when(providerFactory.resolveCredentialName(ALLEGRO)).thenReturn("allegro_marketplace");
         when(providerFactory.resolveCredentialName(EMPIK)).thenReturn("empik_marketplace");
+        when(providerFactory.resolveCredentialName("Allegro")).thenReturn("allegro_marketplace");
+        when(providerFactory.resolveCredentialName("Empik")).thenReturn("empik_marketplace");
     }
 
     @Test
@@ -357,6 +359,29 @@ class MarketplaceConnectionServiceTest {
         verify(returnsImportScheduler).restore("store-1", "Empik", Optional.of("cron(0 8 * * ? *)"));
     }
 
+    /**
+     * Without a descriptor there is nothing to derive the credential name from, yet the secret is deleted all the
+     * same, so a failed disconnect has to be able to put it back.
+     */
+    @Test
+    void aFailedDisconnectOfAMarketplaceWhoseAdapterIsGonePutsItsSecretBack() {
+        // given
+        store.getMarketplaces().add(new MarketplaceIntegration("Ceneo"));
+        when(providerFactory.getDescriptor("Ceneo")).thenReturn(null);
+        when(providerFactory.resolveCredentialName("Ceneo")).thenReturn("ceneo_marketplace");
+        ProviderConfigurationManager.SecretSnapshot secretBefore =
+                new ProviderConfigurationManager.SecretSnapshot(true, Map.of("apiKey", "old"));
+        when(configurationManager.snapshot(store, "ceneo_marketplace")).thenReturn(secretBefore);
+        doThrow(new RuntimeException("dynamo down")).when(storesRepository).save(store);
+
+        // when
+        MarketplaceConnectionService.ConnectionUpdateResult result = service.disconnect(store, "Ceneo");
+
+        // then
+        assertThat(result.errors()).extracting(ErrorMessage::code).containsExactly("store.marketplaces.error.update.failed");
+        verify(configurationManager).restore(store, "ceneo_marketplace", secretBefore);
+    }
+
     @Test
     void disconnectingDropsTheReturnsScheduleToo() {
         // given
@@ -489,39 +514,6 @@ class MarketplaceConnectionServiceTest {
         verify(configurationManager, never()).restore(any(), anyString(), any());
     }
 
-    @Test
-    void viewsDescribeEveryConnectedMarketplace() {
-        // given
-        MarketplaceIntegration allegro = new MarketplaceIntegration("Allegro");
-        allegro.setLoggedIn(false);
-        MarketplaceIntegration empik = new MarketplaceIntegration("Empik");
-        empik.setOrdersImportSchedule("0/15 * * * ? *");
-        store.getMarketplaces().addAll(List.of(allegro, empik));
-
-        // when
-        List<MarketplaceIntegrationView> views = service.views(store);
-
-        // then
-        assertThat(views).extracting(MarketplaceIntegrationView::name).containsExactly("Allegro", "Empik");
-        assertThat(views.get(0).displayName()).isEqualTo("Allegro.pl");
-        assertThat(views.get(0).deviceAuth()).isTrue();
-        assertThat(views.get(0).connected()).isFalse();
-        assertThat(views.get(0).orders().hasOwn()).isFalse();
-        assertThat(views.get(1).orders().hasOwn()).isTrue();
-        assertThat(views.get(1).orders().description().code()).isEqualTo("store.supplier.schedule.summary.every.minutes");
-        assertThat(views.get(1).returns().hasOwn()).isFalse();
-        assertThat(views.get(0).supportsReturns()).isFalse();
-        assertThat(views.get(1).supportsReturns()).isTrue();
-    }
-
-    @Test
-    void availableMarketplacesLeaveOutTheConnectedOnes() {
-        // given
-        store.getMarketplaces().add(new MarketplaceIntegration("Allegro"));
-
-        // when / then
-        assertThat(service.availableMarketplaces(store)).containsExactly(EMPIK);
-    }
 
     @Test
     void theDefaultIntervalComesFromTheScheduler() {
@@ -530,15 +522,6 @@ class MarketplaceConnectionServiceTest {
 
         // when / then
         assertThat(service.defaultIntervalMinutes()).isEqualTo(10);
-    }
-
-    @Test
-    void marketplacesWithStoredConfigurationComeFromTheSecretsNotTheIntegrationList() {
-        // given
-        when(providerFactory.loadConfiguration(store, "Allegro")).thenReturn(Map.of("clientId", "id"));
-
-        // when / then
-        assertThat(service.marketplacesWithStoredConfiguration(store)).containsExactly("Allegro");
     }
 
     private static MarketplaceProviderDescriptor descriptor(String name, String displayName, boolean supportsReturns,

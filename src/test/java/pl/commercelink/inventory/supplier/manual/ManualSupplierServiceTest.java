@@ -437,4 +437,35 @@ class ManualSupplierServiceTest {
         assertEquals("store.manual.error.supplier.notfound", result.messageCode());
         verify(storeFeedRepository, never()).store(anyString(), anyString(), any(), anyString());
     }
+
+    @Test
+    void aNameIsCheckedBeforeAnythingIsWritten() {
+        // given
+        Store store = storeWith(new StoreSupplierConnection("Kosatec", ConnectionMode.OWN, true, true),
+                new StoreSupplierConnection("manual-abcd1234", ConnectionMode.MANUAL, true, true));
+        store.getSupplierConnections().get(1).setLabel("Hurtownia");
+        lenient().when(supplierRegistry.getAllSupplierNames()).thenReturn(List.of("Warehouse", "Acme"));
+
+        // when / then
+        assertEquals("store.manual.error.name.invalid", service.labelProblem(store, null, " "));
+        assertEquals("store.manual.error.name.invalid", service.labelProblem(store, null, "x".repeat(61)));
+        assertEquals("store.supplier.connection.error.label.reserved", service.labelProblem(store, null, "acme"));
+        assertEquals("store.manual.error.name.taken", service.labelProblem(store, null, "kosatec"));
+        assertEquals(null, service.labelProblem(store, "manual-abcd1234", "Hurtownia"));
+        assertEquals(null, service.labelProblem(store, null, "Nowa hurtownia"));
+        verify(storesRepository, never()).save(any());
+    }
+
+    @Test
+    void aPriceListNeedsOneRowTheFeedLoaderWouldLoad() {
+        // given
+        byte[] valid = ("ean;mfn;brand;name;category;net_price;currency;qty;lead_time_days\n"
+                + "5901234123457;K-1;Kowal;Kabel HDMI;Kable;10.50;PLN;5;2\n").getBytes(StandardCharsets.UTF_8);
+        byte[] headerOnly = "ean;mfn;brand;name;category;net_price;currency;qty;lead_time_days\n".getBytes(StandardCharsets.UTF_8);
+
+        // when / then
+        assertTrue(service.isLoadable(valid));
+        assertFalse(service.isLoadable(headerOnly));
+        verify(storeFeedRepository, never()).store(anyString(), anyString(), any(), anyString());
+    }
 }

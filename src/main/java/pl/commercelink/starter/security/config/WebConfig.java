@@ -61,15 +61,14 @@ public class WebConfig {
                                 "/dashboard/store/shipping/**",
                                 "/dashboard/store/notification/**",
                                 "/dashboard/store/fulfilment/**",
-                                "/dashboard/store/manual-supplier/**",
+                                "/dashboard/store/suppliers/**",
                                 "/dashboard/store/payments/**",
                                 "/dashboard/store/marketplaces/**",
                                 "/dashboard/store/company-details/**",
                                 "/dashboard/store/email-templates/**",
                                 "/dashboard/store/rma/**",
                                 "/dashboard/store/rma-centers/**",
-                                "/dashboard/store/report/**",
-                                "/dashboard/store/integrations/**"
+                                "/dashboard/store/report/**"
                         );
             }
 

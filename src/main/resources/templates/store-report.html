@@ -3,45 +3,91 @@
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
       layout:decorate="~{layout}">
 <body>
-
 <div layout:fragment="content">
     <section class="cl-page">
         <div class="cl-page-body">
             <div th:replace="~{fragments/settings-header :: header(false, null)}"></div>
+            <div th:replace="~{fragments/settings-form :: savedAlert}"></div>
 
-            <form th:action="@{/dashboard/store/report}" th:object="${form}" method="post">
-                <input type="hidden" th:field="*{store.storeId}"/>
+            <!-- One card per integration. The switch saves at once (it submits the opposite state), so nothing waits
+                 for a separate Save button between the switch and the details it reveals. -->
+            <form th:fragment="reportingForm" id="reporting-form" class="cl-form cl-card is-wide"
+                  th:action="@{${formAction}}" method="post" novalidate data-cl-async
+                  th:attr="data-success-message=${savedMessage}, data-error-message=#{form.save.failed}">
+                <input type="hidden" name="googleAdsEnabled" th:value="${!form.googleAdsEnabled}">
+                <div class="cl-card-head">
+                    <h2 class="cl-card-title" id="google-ads-title" th:text="#{store.reporting.googleAds.title}"></h2>
+                    <button type="submit" class="cl-switch" id="google-ads-switch" role="switch"
+                            th:attr="aria-checked=${form.googleAdsEnabled}" aria-labelledby="google-ads-title">
+                        <span class="cl-swap" th:classappend="${form.googleAdsEnabled} ? 'is-swapped'" aria-hidden="true">
+                            <span class="cl-swap-a" th:text="#{store.reporting.googleAds.off}"></span>
+                            <span class="cl-swap-b" th:text="#{store.reporting.googleAds.on}"></span>
+                        </span>
+                        <span class="cl-switch-track" aria-hidden="true"><span class="cl-switch-thumb"></span></span>
+                    </button>
+                </div>
+                <p class="cl-card-desc" th:text="#{store.reporting.googleAds.enable.description}"></p>
 
-                <div class="box">
-                    <div class="field">
-                        <label class="checkbox">
-                            <input type="checkbox" th:field="*{store.reportingConfiguration.googleAdsEnabled}">
-                            <strong th:text="#{store.reporting.enable.google.ads}"></strong>
-                        </label>
-                    </div>
-
-                    <div class="field" th:if="*{store.reportingConfiguration.googleAdsEnabled}">
-                        <label class="label" th:text="#{store.reporting.google.ads.url}"></label>
-                        <div class="control">
-                            <input class="input"
-                                   type="text"
-                                   readonly
-                                   th:value="${apiDomain + '/Store/' + form.store.storeId + '/Reporting/Google/Conversions/' + form.store.reportingConfiguration.googleAdsToken}">
+                <div th:if="${conversionsAddress != null}" class="cl-card-body">
+                    <div class="cl-field" data-cl-copy-field
+                         th:attr="data-value=${conversionsAddress.url()}, data-masked=${conversionsAddress.masked()}">
+                        <span class="cl-label" id="conversions-address-label" th:text="#{store.reporting.googleAds.address}"></span>
+                        <span class="cl-copy-value" data-cl-copy-value hidden aria-labelledby="conversions-address-label"></span>
+                        <details class="cl-copy-fallback" data-cl-copy-fallback>
+                            <summary th:text="#{store.reporting.googleAds.address.show}"></summary>
+                            <span class="cl-copy-value" th:text="${conversionsAddress.url()}"></span>
+                        </details>
+                        <span class="cl-visually-hidden" role="status" data-cl-copy-status></span>
+                        <div class="cl-copy-actions">
+                            <button type="button" class="cl-button" data-cl-copy-button hidden
+                                    th:attr="data-copied-text=#{store.reporting.googleAds.address.copied}">
+                                <span class="cl-swap" aria-hidden="true">
+                                    <span class="cl-swap-a"><i class="fas fa-copy"></i></span>
+                                    <span class="cl-swap-b cl-copy-done"><i class="fas fa-check"></i></span>
+                                </span>
+                                <span th:text="#{store.reporting.googleAds.address.copy}"></span>
+                            </button>
+                            <button type="button" class="cl-button" data-cl-reveal-button hidden>
+                                <span class="cl-swap">
+                                    <span class="cl-swap-a"><i class="fas fa-eye" aria-hidden="true"></i><span th:text="#{store.reporting.googleAds.address.reveal}"></span></span>
+                                    <span class="cl-swap-b"><i class="fas fa-eye-slash" aria-hidden="true"></i><span th:text="#{store.reporting.googleAds.address.hide}"></span></span>
+                                </span>
+                            </button>
+                            <a class="cl-button cl-copy-actions-end" id="google-ads-new-address" th:href="@{${newAddressHref}}" data-cl-confirm data-cl-confirm-async data-cl-confirm-tone="primary"
+                               th:attr="data-cl-confirm-title=#{store.reporting.googleAds.newAddress.confirm.title},
+                                        data-cl-confirm-message=#{store.reporting.googleAds.newAddress.confirm.message},
+                                        data-cl-confirm-action=#{store.reporting.googleAds.newAddress.confirm.action}"
+                               ><i class="fas fa-sync-alt" aria-hidden="true"></i><span th:text="#{store.reporting.googleAds.newAddress}"></span></a>
                         </div>
+                        <p class="cl-help" th:text="#{store.reporting.googleAds.address.help}"></p>
                     </div>
                 </div>
 
-                <div class="field is-grouped">
-                    <div class="control">
-                        <button class="button is-primary" type="submit" th:text="#{general.save}"></button>
+                <details th:if="${conversionsAddress != null}" class="cl-disclosure" id="google-ads-setup" th:open="${setupOpen}">
+                    <summary th:text="#{store.reporting.googleAds.steps.title}"></summary>
+                    <div class="cl-disclosure-body">
+                        <ol class="cl-steps">
+                            <li>
+                                <span th:text="#{store.reporting.googleAds.steps.conversion}"></span>
+                                <code class="cl-code" th:text="${conversionName}"></code>
+                                <span th:text="#{store.reporting.googleAds.steps.conversion.exact}"></span>
+                            </li>
+                            <li th:text="#{store.reporting.googleAds.steps.autoTagging}"></li>
+                            <li th:text="#{store.reporting.googleAds.steps.schedule}"></li>
+                        </ol>
+                        <p th:if="${reportsHref != null}" class="cl-help cl-steps-note">
+                            <span th:text="#{store.reporting.googleAds.earlierDays}"></span>
+                            <a th:href="@{${reportsHref}}" th:text="#{store.reporting.googleAds.earlierDays.link}"></a>
+                        </p>
                     </div>
-                    <div class="control">
-                        <a th:href="@{/dashboard/store}" class="button is-light" th:text="#{general.cancel}"></a>
-                    </div>
-                </div>
+                </details>
             </form>
+            <dialog th:replace="~{fragments/confirm-dialog :: dialog}"></dialog>
         </div>
     </section>
+    <script th:src="@{/js/async-form.js}" defer></script>
+    <script th:src="@{/js/copy-field.js}" defer></script>
+    <script th:src="@{/js/confirm-dialog.js}" defer></script>
 </div>
 </body>
 </html>

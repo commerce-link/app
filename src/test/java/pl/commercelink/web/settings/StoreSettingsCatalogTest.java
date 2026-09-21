@@ -30,7 +30,7 @@ class StoreSettingsCatalogTest {
         List<SettingsTile> tiles = allTiles();
 
         // then
-        assertThat(tiles).hasSize(14);
+        assertThat(tiles).hasSize(15);
         assertThat(tiles).extracting(SettingsTile::key).doesNotHaveDuplicates();
         assertThat(tiles).extracting(SettingsTile::icon).doesNotHaveDuplicates();
         assertThat(tiles).extracting(SettingsTile::relativePath).doesNotHaveDuplicates();
@@ -53,6 +53,7 @@ class StoreSettingsCatalogTest {
     void findsATileOnlyByItsExactRelativePath() {
         // when / then
         assertThat(StoreSettingsCatalog.tileAt("/warehouse")).map(SettingsTile::key).contains("warehouse");
+        assertThat(StoreSettingsCatalog.tileAt("/suppliers")).map(SettingsTile::key).contains("suppliers");
         assertThat(StoreSettingsCatalog.tileAt("/rma-centers/new")).isEmpty();
         assertThat(StoreSettingsCatalog.tileAt("")).isEmpty();
     }
@@ -83,13 +84,13 @@ class StoreSettingsCatalogTest {
         // then
         List<SettingsTileView> adminTiles = adminSections.stream().flatMap(section -> section.tiles().stream()).toList();
         assertThat(adminSections).hasSize(6);
-        assertThat(adminTiles).hasSize(14);
+        assertThat(adminTiles).hasSize(15);
         assertThat(adminTiles).filteredOn(tile -> tile.tile().key().equals("warehouse"))
                 .extracting(SettingsTileView::href).containsExactly("/dashboard/store/warehouse");
 
         List<SettingsTileView> superAdminTiles =
                 superAdminSections.stream().flatMap(section -> section.tiles().stream()).toList();
-        assertThat(superAdminTiles).hasSize(13);
+        assertThat(superAdminTiles).hasSize(14);
         assertThat(superAdminTiles).noneMatch(tile -> tile.tile().key().equals("rmaCenters"));
         assertThat(superAdminTiles).filteredOn(tile -> tile.tile().key().equals("warehouse"))
                 .extracting(SettingsTileView::href).containsExactly("/dashboard/store/store-1/warehouse");

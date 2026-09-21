@@ -107,9 +107,13 @@ public class StoreSupplierConnectionPersister {
     }
 
     private void saveStore(Store existingStore, FulfilmentConfiguration submitted) {
+        FulfilmentConfiguration previous = existingStore.getFulfilmentConfiguration();
+        boolean wasOn = previous != null && previous.isClientShippingAddressChangeEnabled();
         existingStore.setFulfilmentConfiguration(submitted);
         // Turning the feature on without its two e-mail types enabled would leave a button that can never send a code.
-        if (submitted.isClientShippingAddressChangeEnabled()) {
+        // Only at that moment: a later save (fulfilment, any supplier change) must not undo an admin who switched one off
+        // on the email templates page, which warns about the consequence.
+        if (submitted.isClientShippingAddressChangeEnabled() && !wasOn) {
             existingStore.enableClientShippingAddressChangeNotifications();
         }
         storesRepository.save(existingStore);

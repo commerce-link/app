@@ -110,7 +110,7 @@ class GoodsOutServiceTest {
     }
 
     @Test
-    @DisplayName("issueGoodsOut fails when warehouse configuration is missing or not complete")
+    @DisplayName("issueGoodsOut fails when documents generation is on but the warehouse configuration is not complete")
     void issueGoodsOutFailsWhenWarehouseConfigurationIsMissing() {
         // given
         Order order = orderWithoutDocuments();
@@ -118,6 +118,7 @@ class GoodsOutServiceTest {
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item));
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(store.getWarehouseConfiguration()).thenReturn(warehouseConfiguration);
+        when(warehouseConfiguration.isDocumentsGenerationEnabled()).thenReturn(true);
         when(warehouseConfiguration.isComplete()).thenReturn(false);
 
         // when
@@ -150,6 +151,45 @@ class GoodsOutServiceTest {
         assertThat(result.hasPayload()).isFalse();
         verify(warehouse, never()).goodsOutHandler(any());
         verify(ordersRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("issueGoodsOut succeeds when documents generation is off even though warehouse and cost centre ids are empty")
+    void issueGoodsOutSucceedsWithoutWarehouseIdsWhenDocumentsGenerationIsDisabled() {
+        // given
+        Order order = orderWithoutDocuments();
+        OrderItem item = productItem("item-1");
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item));
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(store.getWarehouseConfiguration()).thenReturn(warehouseConfiguration);
+        when(warehouseConfiguration.isComplete()).thenReturn(false);
+        when(warehouseConfiguration.isDocumentsGenerationEnabled()).thenReturn(false);
+
+        // when
+        OperationResult<Document> result = goodsOutService.issueGoodsOut(order, CREATED_BY);
+
+        // then
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(result.hasPayload()).isFalse();
+        verify(warehouse, never()).goodsOutHandler(any());
+    }
+
+    @Test
+    @DisplayName("issueGoodsOut succeeds when the store never configured the warehouse")
+    void issueGoodsOutSucceedsWhenTheStoreHasNoWarehouseConfiguration() {
+        // given
+        Order order = orderWithoutDocuments();
+        OrderItem item = productItem("item-1");
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item));
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(store.getWarehouseConfiguration()).thenReturn(null);
+
+        // when
+        OperationResult<Document> result = goodsOutService.issueGoodsOut(order, CREATED_BY);
+
+        // then
+        assertThat(result.isSuccess()).isTrue();
+        verify(warehouse, never()).goodsOutHandler(any());
     }
 
     @Test

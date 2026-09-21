@@ -71,6 +71,26 @@ class StoreSupplierConnectionPersisterTest {
     }
 
     @Test
+    void aSaveWhileTheFeatureIsAlreadyOnDoesNotSwitchBackAnEmailTheAdminTurnedOff() {
+        // given
+        Store existing = storeWith(true);
+        existing.getFulfilmentConfiguration().setClientOrderPageEnabled(true);
+        existing.getFulfilmentConfiguration().setClientShippingAddressChangeEnabled(true);
+        existing.enableClientShippingAddressChangeNotifications();
+        existing.getClientNotificationsConfiguration().disableNotification(EmailNotificationType.ORDER_SHIPPING_ADDRESS_CHANGED);
+        FulfilmentConfiguration submitted = configWith(true);
+        submitted.setClientOrderPageEnabled(true);
+        submitted.setClientShippingAddressChangeEnabled(true);
+
+        // when
+        persister.persist(existing, submitted, Map.of());
+
+        // then
+        assertThat(existing.supportsNotification(EmailNotificationType.ORDER_SHIPPING_ADDRESS_CHANGED)).isFalse();
+        assertThat(existing.supportsNotification(EmailNotificationType.CLIENT_VERIFICATION_CODE)).isTrue();
+    }
+
+    @Test
     void persistEnablesClientAddressChangeNotificationsWhenFeatureTurnedOn() {
         // given
         Store existing = storeWith(true);

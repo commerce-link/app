@@ -1,0 +1,58 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+<div layout:fragment="content">
+    <section class="cl-page">
+        <div class="cl-page-body">
+            <div th:replace="~{fragments/settings-header :: header(false, null)}"></div>
+            <div th:replace="~{fragments/settings-form :: savedAlert}"></div>
+
+            <div class="cl-stack">
+                <section class="cl-card" id="email-templates" aria-labelledby="email-templates-title">
+                    <div class="cl-card-head">
+                        <h2 class="cl-card-title" id="email-templates-title" th:text="#{store.emailTemplates.title}"></h2>
+                    </div>
+                    <p class="cl-card-desc" th:text="#{store.emailTemplates.description(${enabledCount}, ${totalCount})}"></p>
+
+                    <div th:if="${anyBroken}" class="cl-alert is-warn">
+                        <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+                        <div>
+                            <p class="cl-alert-title" th:text="#{store.emailTemplates.broken.title}"></p>
+                            <p class="cl-alert-text" th:text="#{store.emailTemplates.broken.text}"></p>
+                        </div>
+                    </div>
+
+                    <th:block th:each="group, groupStat : ${groups}">
+                        <h3 class="cl-list-group" th:id="'email-group-' + ${groupStat.index}" th:text="#{${group.labelKey()}}"></h3>
+                        <ul class="cl-list" th:attr="aria-labelledby='email-group-' + ${groupStat.index}">
+                            <li class="cl-list-item" th:each="item : ${group.items()}" th:id="'email-' + ${item.type().name()}">
+                                <div>
+                                    <div class="cl-list-title">
+                                        <span th:text="#{${item.labelKey()}}"></span>
+                                        <span th:if="${item.enabled()}" class="cl-status is-ok" th:text="#{store.emailTemplates.enabled}"></span>
+                                        <span th:unless="${item.enabled()}" class="cl-status is-neutral" th:text="#{store.emailTemplates.disabled}"></span>
+                                    </div>
+                                    <p th:if="${item.source().name() != 'NONE'}" class="cl-list-desc"
+                                       th:text="${item.subject() != null ? #messages.msg('store.emailTemplates.subject', item.subject()) + ' · ' : ''}
+                                                + (${item.source().name() == 'OWN'} ? #{store.emailTemplates.source.own} : #{store.emailTemplates.source.default})"></p>
+                                    <p th:if="${item.broken()}" class="cl-list-desc is-warn" th:text="#{store.emailTemplates.missing}"></p>
+                                    <p th:if="${item.source().name() == 'NONE' and !item.enabled()}" class="cl-list-desc"
+                                       th:text="#{store.emailTemplates.missing.off}"></p>
+                                </div>
+                                <div class="cl-list-actions">
+                                    <a class="cl-link-button" th:href="@{${item.editHref()}}"
+                                       th:text="${item.broken()} ? #{settings.list.complete} : #{settings.list.edit}"
+                                       th:attr="aria-label=${item.broken()} ? #{settings.list.complete.for(${#messages.msg(item.labelKey())})} : #{settings.list.edit.for(${#messages.msg(item.labelKey())})}"></a>
+                                </div>
+                            </li>
+                        </ul>
+                    </th:block>
+                </section>
+            </div>
+        </div>
+    </section>
+</div>
+</body>
+</html>
