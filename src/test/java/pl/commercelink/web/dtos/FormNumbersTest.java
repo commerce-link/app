@@ -1,0 +1,37 @@
+package pl.commercelink.web.dtos;
+
+import org.junit.jupiter.api.Test;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+class FormNumbersTest {
+
+    @Test
+    void parsesIntegersWithSpacesAndRejectsGarbage() {
+        // when / then
+        assertThat(FormNumbers.integer(" 1 193 ")).contains(1193);
+        assertThat(FormNumbers.integer("12")).contains(12);
+        assertThat(FormNumbers.integer("")).isEmpty();
+        assertThat(FormNumbers.integer(null)).isEmpty();
+        assertThat(FormNumbers.integer("1,5")).isEmpty();
+        assertThat(FormNumbers.integer("abc")).isEmpty();
+    }
+
+    @Test
+    void parsesDecimalsWithCommaOrDot() {
+        // when / then
+        assertThat(FormNumbers.decimal("1,10")).contains(1.10);
+        assertThat(FormNumbers.decimal("1.05")).contains(1.05);
+        assertThat(FormNumbers.decimal("2 500,00")).contains(2500.0);
+        assertThat(FormNumbers.decimal("x")).isEmpty();
+    }
+
+    @Test
+    void formatsPolishStyle() {
+        // when / then
+        assertThat(FormNumbers.format(1312)).isEqualTo("1 312,00");
+        assertThat(FormNumbers.format(0.5)).isEqualTo("0,50");
+        assertThat(FormNumbers.formatInt(1193)).isEqualTo("1 193");
+        assertThat(FormNumbers.formatInt(58)).isEqualTo("58");
+    }
+}

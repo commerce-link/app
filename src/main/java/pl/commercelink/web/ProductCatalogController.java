@@ -12,7 +12,6 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
-import pl.commercelink.starter.util.PaginationUtil;
 import pl.commercelink.starter.dynamodb.Metadata;
 import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.MatchedInventory;
@@ -64,17 +63,7 @@ public class ProductCatalogController {
     @Autowired
     private MessageSource messageSource;
 
-    private static final int CATALOGS_PAGE_SIZE = 25;
     private static final int PRODUCTS_PAGE_SIZE = 25;
-
-    @GetMapping("/dashboard/catalogs")
-    public String catalogs(Model model, @RequestParam(required = false, defaultValue = "1") int page) {
-        List<ProductCatalog> productCatalogs = productCatalogRepository.findAll(getStoreId());
-        List<ProductCatalog> paginatedProductCatalogs = PaginationUtil.paginate(productCatalogs, page, CATALOGS_PAGE_SIZE, model);
-        model.addAttribute("productCatalogs", paginatedProductCatalogs);
-
-        return "catalogs";
-    }
 
     @GetMapping("/dashboard/catalogs/new")
     public String newCatalog(Model model) {
