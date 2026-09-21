@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import pl.commercelink.orders.BillingDetails;
+import pl.commercelink.starter.util.ApiKeyGenerator;
 import pl.commercelink.starter.util.UniqueIdentifierGenerator;
 
 import java.time.Instant;
@@ -20,7 +21,8 @@ public class StoreCreationService {
         Store store = new Store();
         store.setStoreId(generateFreeStoreId());
         store.setName(request.name());
-        store.setApiKey(request.apiKey());
+        String apiKey = ApiKeyGenerator.generate();
+        store.setApiKeyHash(ApiKeyGenerator.hash(apiKey));
         store.setCreatedAt(Instant.now().toString());
         if (StringUtils.isNotBlank(request.ownerEmail())) {
             BillingDetails billingDetails = new BillingDetails();
@@ -39,6 +41,8 @@ public class StoreCreationService {
                 throw new StoreSeedingException(store.getStoreId(), e);
             }
         }
+        // Set the transient plaintext only after every save so it is never persisted.
+        store.setPlaintextApiKey(apiKey);
         return store;
     }
 

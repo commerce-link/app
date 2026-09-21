@@ -41,6 +41,10 @@ public class Store {
     private List<Integration> integrations = new LinkedList<>();
     @DynamoDBAttribute(attributeName = "apiKey")
     private String apiKey;
+    @DynamoDBAttribute(attributeName = "apiKeyHash")
+    private String apiKeyHash;
+    // One-time plaintext key surfaced right after (re)generation; never persisted.
+    private transient String plaintextApiKey;
     @DynamoDBAttribute(attributeName = "fulfilment")
     private FulfilmentConfiguration fulfilmentConfiguration;
     @DynamoDBAttribute(attributeName = "billingDetails")
@@ -309,6 +313,23 @@ public class Store {
 
     public void setApiKey(String apiKey) {
         this.apiKey = apiKey;
+    }
+
+    public String getApiKeyHash() {
+        return apiKeyHash;
+    }
+
+    public void setApiKeyHash(String apiKeyHash) {
+        this.apiKeyHash = apiKeyHash;
+    }
+
+    @DynamoDBIgnore
+    public String getPlaintextApiKey() {
+        return plaintextApiKey;
+    }
+
+    public void setPlaintextApiKey(String plaintextApiKey) {
+        this.plaintextApiKey = plaintextApiKey;
     }
 
     public FulfilmentConfiguration getFulfilmentConfiguration() {

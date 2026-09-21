@@ -82,6 +82,7 @@ public class StoreCopyService {
         target.setClientNotificationsConfiguration(source.getClientNotificationsConfiguration());
 
         target.setApiKey(null);
+        target.setApiKeyHash(null);
         target.setBankAccounts(new LinkedList<>());
         target.setMarketplaces(new LinkedList<>());
         target.setIntegrations(new LinkedList<>());

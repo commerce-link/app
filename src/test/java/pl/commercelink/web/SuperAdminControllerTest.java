@@ -11,6 +11,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 import pl.commercelink.products.OrphanedProductCleanupService;
 import pl.commercelink.stores.CreateStoreRequest;
 import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoreApiKeyService;
 import pl.commercelink.stores.StoreCopyService;
 import pl.commercelink.stores.StoreCreationService;
 import pl.commercelink.stores.StoreDeletionService;
@@ -33,6 +34,7 @@ class SuperAdminControllerTest {
     @Mock private OrphanedProductCleanupService orphanedProductCleanupService;
     @Mock private StoreDeletionService storeDeletionService;
     @Mock private StoreCreationService storeCreationService;
+    @Mock private StoreApiKeyService storeApiKeyService;
     @InjectMocks private SuperAdminController controller;
 
     private final Locale locale = Locale.forLanguageTag("pl");
@@ -196,28 +198,28 @@ class SuperAdminControllerTest {
         // given
         Store created = new Store();
         created.setStoreId("srv-gen-001");
-        when(storeCreationService.createStore(CreateStoreRequest.bare("Nowy sklep", "key-9"))).thenReturn(created);
+        when(storeCreationService.createStore(CreateStoreRequest.bare("Nowy sklep"))).thenReturn(created);
         RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
 
         // when
-        String view = controller.createStore("Nowy sklep", "key-9", locale, redirectAttributes);
+        String view = controller.createStore("Nowy sklep", locale, redirectAttributes);
 
         // then
         assertEquals("redirect:/dashboard/store/srv-gen-001", view);
-        verify(storeCreationService).createStore(CreateStoreRequest.bare("Nowy sklep", "key-9"));
+        verify(storeCreationService).createStore(CreateStoreRequest.bare("Nowy sklep"));
         verifyNoMoreInteractions(storeCreationService);
     }
 
     @Test
     void createStoreShowsErrorFlashWhenCreationFails() {
         // given
-        when(storeCreationService.createStore(CreateStoreRequest.bare("Nowy sklep", null)))
+        when(storeCreationService.createStore(CreateStoreRequest.bare("Nowy sklep")))
                 .thenThrow(new IllegalStateException("Could not generate a unique store id"));
         when(messageSource.getMessage("store.create.error", null, locale)).thenReturn("Błąd tworzenia");
         RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
 
         // when
-        String view = controller.createStore("Nowy sklep", null, locale, redirectAttributes);
+        String view = controller.createStore("Nowy sklep", locale, redirectAttributes);
 
         // then
         assertEquals("redirect:/dashboard/store/create", view);
