@@ -8,12 +8,14 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.MessageSource;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.server.ResponseStatusException;
 import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.inventory.InventoryView;
@@ -588,10 +590,63 @@ class CatalogProductsControllerTest {
                         .param("name", "New name").param("ean", "4719331361600").param("manufacturerCode", "m")
                         .param("availabilityType", "BasedOnSupply").param("pricingGroup", "Default")
                         .param("enabled", "true"))
-                .andExpect(redirectedUrl(categoryPath()))
+                .andExpect(redirectedUrl(categoryPath() + "?status=active"))
                 .andExpect(flash().attribute("settingsSavedMessage", "product.saved"));
         assertThat(existing.getName()).isEqualTo("New name");
         verify(productRepository).save(existing);
+    }
+
+    /** The status filter shown on the category page travels through the hidden field and survives the redirect back. */
+    @Test
+    void savedProductRedirectsKeepingTheStatusFilterItCameFrom() throws Exception {
+        // given
+        gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
+        Product existing = new Product(gpu.getCategoryId(), "pim-1", "4719331361600", "m", "b", "l", "Old", "Default");
+        existing.setProductId("p1");
+        when(access.requireProduct(gpu, "p1")).thenReturn(existing);
+        PimEntry same = mock(PimEntry.class);
+        when(same.pimId()).thenReturn("pim-1");
+        when(pimCatalog.findByGtinOrMpn("4719331361600", "m")).thenReturn(Optional.of(same));
+
+        // when / then
+        mvc.perform(post(categoryPath() + "/products/p1").param("status", "disabled")
+                        .param("name", "New name").param("ean", "4719331361600").param("manufacturerCode", "m")
+                        .param("availabilityType", "BasedOnSupply").param("pricingGroup", "Default")
+                        .param("enabled", "true"))
+                .andExpect(redirectedUrl(categoryPath() + "?status=disabled"));
+    }
+
+    /**
+     * The DTO carries only the fields the page edits; everything else the entity holds (its page number, its optimistic
+     * lock, and the identity the controller — not the form — assigns) must survive a save untouched.
+     */
+    @Test
+    void savingAProductKeepsFieldsOutsideTheForm() throws Exception {
+        // given
+        gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
+        Product existing = new Product(gpu.getCategoryId(), "pim-1", "4719331361600", "m", "b", "l", "Old", "Default");
+        existing.setProductId("p1");
+        existing.setProductPage("<p>Old description</p>");
+        existing.setVersion(7L);
+        when(access.requireProduct(gpu, "p1")).thenReturn(existing);
+        PimEntry same = mock(PimEntry.class);
+        when(same.pimId()).thenReturn("pim-1");
+        when(pimCatalog.findByGtinOrMpn("4719331361600", "m")).thenReturn(Optional.of(same));
+
+        // when
+        mvc.perform(post(categoryPath() + "/products/p1")
+                        .param("name", "New name").param("ean", "4719331361600").param("manufacturerCode", "m")
+                        .param("availabilityType", "BasedOnSupply").param("pricingGroup", "Default")
+                        .param("enabled", "true"))
+                .andExpect(redirectedUrl(categoryPath() + "?status=active"));
+
+        // then
+        ArgumentCaptor<Product> saved = ArgumentCaptor.forClass(Product.class);
+        verify(productRepository).save(saved.capture());
+        assertThat(saved.getValue().getCategoryId()).isEqualTo(gpu.getCategoryId());
+        assertThat(saved.getValue().getProductId()).isEqualTo("p1");
+        assertThat(saved.getValue().getProductPage()).isEqualTo("<p>Old description</p>");
+        assertThat(saved.getValue().getVersion()).isEqualTo(7L);
     }
 
     @Test
@@ -609,7 +664,7 @@ class CatalogProductsControllerTest {
                         .param("name", "MSI RTX 5070").param("ean", "4719331361600").param("manufacturerCode", "MFN-1")
                         .param("availabilityType", "BasedOnSupply").param("pricingGroup", "Default")
                         .param("enabled", "true"))
-                .andExpect(redirectedUrl(categoryPath()))
+                .andExpect(redirectedUrl(categoryPath() + "?status=active"))
                 .andExpect(flash().attribute("settingsSavedMessage", "product.added"));
 
         // then
@@ -631,9 +686,9 @@ class CatalogProductsControllerTest {
         when(access.requireProduct(gpu, "p1")).thenReturn(existing);
 
         // when / then
-        mvc.perform(saveService().param("service", "true")).andExpect(redirectedUrl(categoryPath()));
+        mvc.perform(saveService().param("service", "true")).andExpect(redirectedUrl(categoryPath() + "?status=active"));
         assertThat(existing.isService()).isTrue();
-        mvc.perform(saveService()).andExpect(redirectedUrl(categoryPath()));
+        mvc.perform(saveService()).andExpect(redirectedUrl(categoryPath() + "?status=active"));
         assertThat(existing.isService()).isFalse();
     }
 
@@ -691,6 +746,24 @@ class CatalogProductsControllerTest {
         mvc.perform(post(categoryPath() + "/products/p1").param("name", "n"))
                 .andExpect(redirectedUrl(categoryPath()));
         verify(productRepository, never()).save(any(Product.class));
+    }
+
+    /**
+     * The category being automatic must not hide that the product itself does not exist: a stray link or a bookmark
+     * to a product that was never there (or has since been removed) is a 404, not a redirect that reads as "found it,
+     * but you can't touch it here".
+     */
+    @Test
+    void missingProductInAnAutomaticCategoryIs404NotARedirect() throws Exception {
+        // given
+        gpu.setType(CategoryDefinitionType.Dynamic);
+        when(access.requireProduct(gpu, "missing")).thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND));
+
+        // when / then
+        mvc.perform(get(categoryPath() + "/products/missing")).andExpect(status().isNotFound());
+        mvc.perform(post(categoryPath() + "/products/missing").param("name", "n")).andExpect(status().isNotFound());
+        mvc.perform(get(categoryPath() + "/products/missing/delete")).andExpect(status().isNotFound());
+        mvc.perform(post(categoryPath() + "/products/missing/delete")).andExpect(status().isNotFound());
     }
 
     /** A mistake in a folded section must not stay folded, or the summary links to a field nobody can see. */

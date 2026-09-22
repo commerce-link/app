@@ -291,8 +291,9 @@ public class CatalogProductsController {
 
     @GetMapping("/dashboard/catalogs/{catalogId}/category/{categoryId}/products/new")
     public String newProduct(@PathVariable String catalogId, @PathVariable String categoryId,
-                             @RequestParam(required = false) String ean, Model model, Locale locale,
-                             RedirectAttributes redirectAttributes) {
+                             @RequestParam(required = false) String ean,
+                             @RequestParam(required = false, defaultValue = "active") String status, Model model,
+                             Locale locale, RedirectAttributes redirectAttributes) {
         ProductCatalog catalog = access.requireCatalog(storeId(), catalogId);
         CategoryDefinition category = access.requireCategory(catalog, categoryId);
         String refused = refuseAutomatic(category, catalogId, categoryId, locale, redirectAttributes);
@@ -300,9 +301,10 @@ public class CatalogProductsController {
             return refused;
         }
         Store store = storesRepository.findById(storeId());
+        String currentStatus = statusFilter(status);
         if (StringUtils.isBlank(ean)) {
             return renderProduct(catalog, category, store, null, ProductForm.forNewProduct(), null, Map.of(), null,
-                    model, locale);
+                    currentStatus, model, locale);
         }
         MatchedInventory matched = inventory.withEnabledSuppliersOnly(storeId()).findByEan(ean);
         // The link was followed from a list read earlier; a product can leave the inventory in the meantime, and that
@@ -310,7 +312,7 @@ public class CatalogProductsController {
         if (matched.isEmpty()) {
             return renderProduct(catalog, category, store, null, ProductForm.forNewProduct(), null, Map.of(),
                     messageSource.getMessage("catalog.products.new.eanNotInInventory", new Object[]{ean}, locale),
-                    model, locale);
+                    currentStatus, model, locale);
         }
         InventoryKey key = matched.getInventoryKey();
         Optional<PimEntry> entry = pimCatalog.findByPimIdOrGtinsOrMpns(key.getId(), key.getProductEans(), key.getProductCodes());
@@ -319,12 +321,14 @@ public class CatalogProductsController {
         // Nothing is saved yet, so there is no identity to protect: the PIM entry is resolved again when it is.
         form.setExistingPimId(null);
         form.setExistingLabel(null);
-        return renderProduct(catalog, category, store, null, form, prefilled.getPimId(), Map.of(), null, model, locale);
+        return renderProduct(catalog, category, store, null, form, prefilled.getPimId(), Map.of(), null,
+                currentStatus, model, locale);
     }
 
     @PostMapping("/dashboard/catalogs/{catalogId}/category/{categoryId}/products/new")
     public String createProduct(@PathVariable String catalogId, @PathVariable String categoryId,
                                 @ModelAttribute ProductForm form,
+                                @RequestParam(required = false, defaultValue = "active") String status,
                                 @RequestHeader(value = SettingsPaths.ASYNC_HEADER, required = false) String requestedWith,
                                 Model model, Locale locale, RedirectAttributes redirectAttributes,
                                 HttpServletRequest request, HttpServletResponse response) {
@@ -336,13 +340,14 @@ public class CatalogProductsController {
         }
         Store store = storesRepository.findById(storeId());
         boolean async = SettingsPaths.isAsync(requestedWith);
+        String currentStatus = statusFilter(status);
         form.setExistingPimId(null);
         form.setExistingLabel(null);
         Map<String, String> errors = form.validate(category.getGroupingOrder(), pricingGroups(category),
                 marketplaceNames(store), this::pimIdFor);
         if (!errors.isEmpty()) {
-            return rejected(renderProduct(catalog, category, store, null, form, null, errors, null, model, locale),
-                    PRODUCT_FRAGMENT, async, response);
+            return rejected(renderProduct(catalog, category, store, null, form, null, errors, null, currentStatus,
+                    model, locale), PRODUCT_FRAGMENT, async, response);
         }
         Product product = form.toNewProduct(category.getCategoryId());
         pimCatalog.findByGtinOrMpn(product.getEan(), product.getManufacturerCode()).ifPresent(entry -> {
@@ -350,41 +355,47 @@ public class CatalogProductsController {
             product.setBrand(brandMapper.unifyBrand(entry.brand()));
         });
         productRepository.save(product);
-        return saved(CatalogPaths.category(catalogId, categoryId),
+        return saved(CatalogPaths.category(catalogId, categoryId) + "?status=" + currentStatus,
                 messageSource.getMessage("product.added", new Object[]{product.getName()}, locale), async, model,
                 redirectAttributes, request, response, PRODUCT_FRAGMENT,
-                () -> renderProduct(catalog, category, store, null, form, product.getPimId(), Map.of(), null, model, locale));
+                () -> renderProduct(catalog, category, store, null, form, product.getPimId(), Map.of(), null,
+                        currentStatus, model, locale));
     }
 
     @GetMapping("/dashboard/catalogs/{catalogId}/category/{categoryId}/products/{productId}")
     public String product(@PathVariable String catalogId, @PathVariable String categoryId, @PathVariable String productId,
-                          Model model, Locale locale, RedirectAttributes redirectAttributes) {
+                          @RequestParam(required = false, defaultValue = "active") String status, Model model,
+                          Locale locale, RedirectAttributes redirectAttributes) {
         ProductCatalog catalog = access.requireCatalog(storeId(), catalogId);
         CategoryDefinition category = access.requireCategory(catalog, categoryId);
+        // A missing product is a 404 regardless of the category's type; only once it is known to exist can the
+        // category being automatic (nothing to edit there) redirect instead.
+        Product product = access.requireProduct(category, productId);
         String refused = refuseAutomatic(category, catalogId, categoryId, locale, redirectAttributes);
         if (refused != null) {
             return refused;
         }
-        Product product = access.requireProduct(category, productId);
         return renderProduct(catalog, category, storesRepository.findById(storeId()), product, ProductForm.from(product),
-                product.getPimId(), Map.of(), null, model, locale);
+                product.getPimId(), Map.of(), null, statusFilter(status), model, locale);
     }
 
     @PostMapping("/dashboard/catalogs/{catalogId}/category/{categoryId}/products/{productId}")
     public String saveProduct(@PathVariable String catalogId, @PathVariable String categoryId, @PathVariable String productId,
                               @ModelAttribute ProductForm form,
+                              @RequestParam(required = false, defaultValue = "active") String status,
                               @RequestHeader(value = SettingsPaths.ASYNC_HEADER, required = false) String requestedWith,
                               Model model, Locale locale, RedirectAttributes redirectAttributes,
                               HttpServletRequest request, HttpServletResponse response) {
         ProductCatalog catalog = access.requireCatalog(storeId(), catalogId);
         CategoryDefinition category = access.requireCategory(catalog, categoryId);
+        Product product = access.requireProduct(category, productId);
         String refused = refuseAutomatic(category, catalogId, categoryId, locale, redirectAttributes);
         if (refused != null) {
             return refused;
         }
-        Product product = access.requireProduct(category, productId);
         Store store = storesRepository.findById(storeId());
         boolean async = SettingsPaths.isAsync(requestedWith);
+        String currentStatus = statusFilter(status);
         // Identity and brand belong to the saved product, not to the request: a forged PIM id would let the offer of
         // this product claim another entry.
         form.setExistingPimId(product.getPimId());
@@ -393,15 +404,15 @@ public class CatalogProductsController {
                 marketplaceNames(store), this::pimIdFor);
         if (!errors.isEmpty()) {
             return rejected(renderProduct(catalog, category, store, product, form, product.getPimId(), errors, null,
-                    model, locale), PRODUCT_FRAGMENT, async, response);
+                    currentStatus, model, locale), PRODUCT_FRAGMENT, async, response);
         }
         form.applyTo(product);
         productRepository.save(product);
-        return saved(CatalogPaths.category(catalogId, categoryId),
+        return saved(CatalogPaths.category(catalogId, categoryId) + "?status=" + currentStatus,
                 messageSource.getMessage("product.saved", new Object[]{product.getName()}, locale), async, model,
                 redirectAttributes, request, response, PRODUCT_FRAGMENT,
                 () -> renderProduct(catalog, category, store, product, form, product.getPimId(), Map.of(), null,
-                        model, locale));
+                        currentStatus, model, locale));
     }
 
     @GetMapping("/dashboard/catalogs/{catalogId}/category/{categoryId}/products/{productId}/delete")
@@ -410,11 +421,11 @@ public class CatalogProductsController {
                                        RedirectAttributes redirectAttributes) {
         ProductCatalog catalog = access.requireCatalog(storeId(), catalogId);
         CategoryDefinition category = access.requireCategory(catalog, categoryId);
+        Product product = access.requireProduct(category, productId);
         String refused = refuseAutomatic(category, catalogId, categoryId, locale, redirectAttributes);
         if (refused != null) {
             return refused;
         }
-        Product product = access.requireProduct(category, productId);
         model.addAttribute("confirm", new ConfirmAction(
                 messageSource.getMessage("product.delete.title", new Object[]{product.getName()}, locale),
                 messageSource.getMessage("product.delete.message", null, locale),
@@ -430,11 +441,11 @@ public class CatalogProductsController {
                                 @PathVariable String productId, Locale locale, RedirectAttributes redirectAttributes) {
         ProductCatalog catalog = access.requireCatalog(storeId(), catalogId);
         CategoryDefinition category = access.requireCategory(catalog, categoryId);
+        Product product = access.requireProduct(category, productId);
         String refused = refuseAutomatic(category, catalogId, categoryId, locale, redirectAttributes);
         if (refused != null) {
             return refused;
         }
-        Product product = access.requireProduct(category, productId);
         productRepository.delete(product);
         SettingsFlash.onRedirect(redirectAttributes,
                 messageSource.getMessage("product.deleted", new Object[]{product.getName()}, locale));
@@ -451,13 +462,15 @@ public class CatalogProductsController {
     }
 
     /**
-     * @param existing the saved product, or null for one being created
-     * @param pimId    the entry the product resolves to, or null when it has none; never taken from the form
-     * @param notice   a sentence about how the form was filled (an EAN the inventory no longer has), or null
+     * @param existing     the saved product, or null for one being created
+     * @param pimId        the entry the product resolves to, or null when it has none; never taken from the form
+     * @param notice       a sentence about how the form was filled (an EAN the inventory no longer has), or null
+     * @param statusFilter the status the category page was showing when this page was reached, carried through the
+     *                     form so the redirect after a save returns to the same filter
      */
     private String renderProduct(ProductCatalog catalog, CategoryDefinition category, Store store, Product existing,
-                                 ProductForm form, String pimId, Map<String, String> errors, String notice, Model model,
-                                 Locale locale) {
+                                 ProductForm form, String pimId, Map<String, String> errors, String notice,
+                                 String statusFilter, Model model, Locale locale) {
         boolean edit = existing != null;
         String catalogId = catalog.getCatalogId();
         String categoryId = category.getCategoryId();
@@ -470,6 +483,7 @@ public class CatalogProductsController {
         model.addAttribute("catalog", catalog);
         model.addAttribute("category", category);
         model.addAttribute("prefillNotice", notice);
+        model.addAttribute("statusFilter", statusFilter);
         model.addAttribute("labels", category.getGroupingOrder());
         model.addAttribute("pricingGroups", pricingGroups(category));
         model.addAttribute("availabilityTypes", Arrays.stream(ProductAvailabilityType.values()).map(Enum::name).toList());

@@ -29,6 +29,9 @@
                 <div th:replace="~{fragments/settings-form :: errorSummary('product-errors', ${errors}, null)}"></div>
                 <!--/* Identity the operator does not type: taken from PIM or from the inventory the product came from. */-->
                 <input type="hidden" name="brand" th:value="*{brand}">
+                <!--/* The status filter the category page was showing when this page was reached, so a save or an add
+                       returns to the same filter instead of always landing on "active". */-->
+                <input type="hidden" name="status" th:value="${statusFilter}">
                 <div class="cl-card">
                     <fieldset class="cl-fieldset">
                         <legend class="cl-fieldset-title" th:text="#{product.page.section.product}"></legend>
@@ -56,6 +59,15 @@
                                     </p>
                                 </div>
                                 <div th:if="${labels.isEmpty()}" th:insert="~{fragments/settings-form :: textField('label', 'product.label', *{label}, 'text', 'off', false, ${errors['label']}, null)}"></div>
+                            </div>
+                            <!--/* Display only: the value the operator sees is carried to the server by the hidden
+                                   "brand" input above, so this field has no name of its own. */-->
+                            <div class="cl-span-3">
+                                <div class="cl-field">
+                                    <label class="cl-label" for="brandDisplay" th:text="#{product.brand}"></label>
+                                    <input class="cl-input" type="text" id="brandDisplay" readonly
+                                           th:value="${#strings.isEmpty(form.brand)} ? '—' : ${form.brand}">
+                                </div>
                             </div>
                             <div class="cl-span-6">
                                 <div th:replace="~{fragments/settings-form :: check('enabled', 'product.page.enabled', *{enabled}, 'product.page.enabled.desc', null)}"></div>
