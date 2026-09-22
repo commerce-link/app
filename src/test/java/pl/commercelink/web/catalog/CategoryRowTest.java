@@ -3,6 +3,7 @@ package pl.commercelink.web.catalog;
 import org.junit.jupiter.api.Test;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.CategoryDefinitionType;
+import pl.commercelink.products.CategoryDefinitions;
 import pl.commercelink.products.MarketplaceDefinition;
 import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductCatalog;
@@ -29,13 +30,16 @@ class CategoryRowTest {
 
         // when
         CategoryRow row = CategoryRow.of(catalog, gpu, List.of("Graphics cards"),
-                List.of(product("RTX 5060"), product("RTX 5070"), product("RTX 4060")), name -> name.toUpperCase());
+                List.of(product("RTX 5060"), product("RTX 5070"), product("RTX 4060")), name -> name.toUpperCase(),
+                new CategoryDefinitions.DeletionPreview(false, 3));
 
         // then
         assertThat(row.dynamic()).isFalse();
         assertThat(row.productsCount()).isEqualTo(3);
         assertThat(row.labelsCount()).isEqualTo(2);
         assertThat(row.productsOutsideLabels()).isEqualTo(1);
+        assertThat(row.productsKept()).isFalse();
+        assertThat(row.productsToDelete()).isEqualTo(3);
         assertThat(row.marketplaceNames()).containsExactly("ALLEGRO");
         assertThat(row.deletable()).isFalse();
         assertThat(row.href()).isEqualTo("/dashboard/catalogs/" + catalog.getCatalogId() + "/category/" + gpu.getCategoryId());
@@ -49,12 +53,14 @@ class CategoryRowTest {
         os.setDeletionProtection(false);
 
         // when
-        CategoryRow row = CategoryRow.of(new ProductCatalog("store", "Parts"), os, List.of(), List.of(), n -> n);
+        CategoryRow row = CategoryRow.of(new ProductCatalog("store", "Parts"), os, List.of(), List.of(), n -> n,
+                new CategoryDefinitions.DeletionPreview(true, 0));
 
         // then
         assertThat(row.dynamic()).isTrue();
         assertThat(row.productsCount()).isNull();
         assertThat(row.deletable()).isTrue();
         assertThat(row.pimCategoryNames()).isEmpty();
+        assertThat(row.productsKept()).isTrue();
     }
 }

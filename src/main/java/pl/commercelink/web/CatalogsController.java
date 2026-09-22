@@ -17,7 +17,9 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.inventory.supplier.ErrorMessage;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.CategoryDefinitionType;
+import pl.commercelink.products.CategoryDefinitions;
 import pl.commercelink.products.PimCategoryOptions;
+import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogDetailsService;
 import pl.commercelink.products.ProductCatalogRepository;
@@ -63,6 +65,7 @@ public class CatalogsController {
     private final ProductRepository productRepository;
     private final PimCategoryOptions pimCategoryOptions;
     private final MarketplaceConnections marketplaces;
+    private final CategoryDefinitions definitions;
 
     @GetMapping("/dashboard/catalogs")
     public String catalogs(Model model, Locale locale) {
@@ -79,10 +82,14 @@ public class CatalogsController {
         ProductCatalog catalog = access.requireCatalog(CustomSecurityContext.getStoreId(), catalogId);
         List<CategoryRow> rows = catalog.getCategories().stream()
                 .sorted(Comparator.comparingInt(CategoryDefinition::getSequenceNumber))
-                .map(category -> CategoryRow.of(catalog, category, pimCategoryOptions.namesOf(category.getPimCategoryIds()),
-                        // An automatic category has no rows in the products table: its list is computed from the inventory.
-                        category.hasType(CategoryDefinitionType.Dynamic) ? List.of() : productRepository.findAll(category.getCategoryId()),
-                        marketplaces::displayName))
+                .map(category -> {
+                    // An automatic category has no rows in the products table: its list is computed from the inventory.
+                    List<Product> products = category.hasType(CategoryDefinitionType.Dynamic)
+                            ? List.of() : productRepository.findAll(category.getCategoryId());
+                    // The same products answer the count and the deletion preview, so the row costs one read.
+                    return CategoryRow.of(catalog, category, pimCategoryOptions.namesOf(category.getPimCategoryIds()),
+                            products, marketplaces::displayName, definitions.deletionPreview(catalog, category, products));
+                })
                 .toList();
         model.addAttribute("catalog", catalog);
         model.addAttribute("categories", rows);

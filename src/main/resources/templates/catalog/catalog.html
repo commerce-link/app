@@ -59,13 +59,14 @@
                         <div class="cl-list-actions">
                             <a class="cl-link-button" th:href="@{${category.settingsHref()}}" th:text="#{catalog.settings}"
                                th:attr="aria-label=#{catalog.settings.for(${category.name()})}"></a>
-                            <!--/* The dialog only has what the page knows; the confirmation page behind the link says whether
-                                   the products survive, which needs the other categories of the catalog. */-->
+                            <!--/* The dialog says what the confirmation page behind the link says: an automatic category
+                                   deletes no products, and a manual one keeps them when another category shares its PIM
+                                   categories. */-->
                             <a th:if="${category.deletable()}" class="cl-link-button is-danger" th:href="@{${category.deleteHref()}}" data-cl-confirm
                                th:text="#{settings.list.delete}"
                                th:attr="aria-label=#{settings.list.delete.for(${category.name()})},
                                         data-cl-confirm-title=#{catalog.category.delete.title(${category.name()})},
-                                        data-cl-confirm-message=${category.productsCount() != null} ? #{catalog.category.delete.message(${category.productsCount()})} : #{catalog.category.delete.message.dynamic},
+                                        data-cl-confirm-message=${category.dynamic()} ? #{catalog.category.delete.message.dynamic} : (${category.productsKept()} ? #{catalog.category.delete.message.kept} : #{catalog.category.delete.message(${category.productsToDelete()})}),
                                         data-cl-confirm-action=#{catalog.category.delete}"></a>
                         </div>
                     </li>

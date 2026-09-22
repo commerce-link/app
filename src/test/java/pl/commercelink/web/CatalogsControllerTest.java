@@ -17,6 +17,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.server.ResponseStatusException;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.CategoryDefinitionType;
+import pl.commercelink.products.CategoryDefinitions;
 import pl.commercelink.products.PimCategoryOptions;
 import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductCatalog;
@@ -80,7 +81,8 @@ class CatalogsControllerTest {
         lenient().when(messageSource.getMessage(eq("catalog.schedule.default"), any(), any(Locale.class))).thenReturn("default");
         lenient().when(marketplaces.displayName(anyString())).thenAnswer(invocation -> invocation.getArgument(0));
         mvc = MockMvcBuilders.standaloneSetup(new CatalogsController(catalogRepository, messageSource, detailsService,
-                access, productRepository, pimCategoryOptions, marketplaces)).build();
+                access, productRepository, pimCategoryOptions, marketplaces,
+                new CategoryDefinitions(catalogRepository, productRepository))).build();
     }
 
     @AfterEach
@@ -300,6 +302,43 @@ class CatalogsControllerTest {
         assertThat(rows).extracting(CategoryRow::name).containsExactly("GPU", "CPU");
         assertThat(rows.get(0).productsCount()).isEqualTo(1);
         assertThat(result.getModelAndView().getModel().get("productsTotal")).isEqualTo(1);
+    }
+
+    /**
+     * Removing a category keeps its products when another category of the catalog is mapped to one of the same PIM
+     * categories. The dialog on the catalog page must say the same as the confirmation page behind the link.
+     */
+    @Test
+    void theCatalogPageSaysWhetherDeletingACategoryWouldKeepItsProducts() throws Exception {
+        // given
+        ProductCatalog catalog = new ProductCatalog(STORE_ID, "Parts");
+        CategoryDefinition gpu = managed("GPU", "pim-gpu");
+        CategoryDefinition gaming = managed("Gaming", "pim-gpu");
+        CategoryDefinition cpu = managed("CPU", "pim-cpu");
+        catalog.getCategories().addAll(List.of(gpu, gaming, cpu));
+        when(access.requireCatalog(STORE_ID, "c1")).thenReturn(catalog);
+        when(pimCategoryOptions.namesOf(any())).thenReturn(List.of());
+        when(productRepository.findAll(gpu.getCategoryId())).thenReturn(List.of());
+        when(productRepository.findAll(gaming.getCategoryId())).thenReturn(List.of());
+        when(productRepository.findAll(cpu.getCategoryId()))
+                .thenReturn(List.of(new Product(cpu.getCategoryId(), "p", "1", "m", "b", "l", "n", "Default")));
+
+        // when
+        var result = mvc.perform(get("/dashboard/catalogs/c1")).andExpect(status().isOk()).andReturn();
+
+        // then
+        @SuppressWarnings("unchecked")
+        List<CategoryRow> rows = (List<CategoryRow>) result.getModelAndView().getModel().get("categories");
+        assertThat(rows.get(0).productsKept()).isTrue();
+        assertThat(rows.get(0).productsToDelete()).isZero();
+        assertThat(rows.get(2).productsKept()).isFalse();
+        assertThat(rows.get(2).productsToDelete()).isEqualTo(1);
+    }
+
+    private static CategoryDefinition managed(String name, String pimCategoryId) {
+        CategoryDefinition category = new CategoryDefinition().withName(name).withGeneratedId();
+        category.setPimCategoryIds(List.of(pimCategoryId));
+        return category;
     }
 
     @Test

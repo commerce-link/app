@@ -100,6 +100,12 @@ public class CategoryDefinitions {
         return new DeletionPreview(kept, kept ? 0 : products.findAll(category.getCategoryId()).size());
     }
 
+    /** The same preview for a caller that has the products of the category in hand: the decision, without a second read. */
+    public DeletionPreview deletionPreview(ProductCatalog catalog, CategoryDefinition category, List<Product> categoryProducts) {
+        boolean kept = productsSurviveRemoval(catalog, category);
+        return new DeletionPreview(kept, kept ? 0 : categoryProducts.size());
+    }
+
     public RemoveResult remove(ProductCatalog catalog, CategoryDefinition category) {
         if (category.isDeletionProtection()) {
             throw new IllegalStateException("Category " + category.getCategoryId() + " is protected from deletion");

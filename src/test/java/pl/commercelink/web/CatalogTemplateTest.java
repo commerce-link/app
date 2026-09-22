@@ -51,18 +51,28 @@ class CatalogTemplateTest {
                 .doesNotContain("confirmDelete(");
     }
 
-    /** The page as the controller renders it: one manual category with a delete link, one automatic without. */
+    /**
+     * The page as the controller renders it: a manual category whose products the deletion takes with it, an automatic
+     * one protected from deletion, a manual one whose products another category keeps alive, and an automatic one that
+     * can be deleted.
+     */
     private static String rendered() {
         ProductCatalog catalog = new ProductCatalog("store-1", "Parts");
-        CategoryRow gpu = new CategoryRow("k1", "GPU", false, List.of("Graphics cards"), 245, 10, 1,
+        CategoryRow gpu = new CategoryRow("k1", "GPU", false, List.of("Graphics cards"), 245, false, 245, 10, 1,
                 List.of("Allegro", "Empik"), 1, true, true, "/dashboard/catalogs/c1/category/k1",
                 "/dashboard/catalogs/c1/category/k1/settings", "/dashboard/catalogs/c1/category/k1/delete");
-        CategoryRow os = new CategoryRow("k2", "OS", true, List.of(), null, 0, 0, List.of(), 1, false, false,
+        CategoryRow os = new CategoryRow("k2", "OS", true, List.of(), null, false, 0, 0, 0, List.of(), 1, false, false,
                 "/dashboard/catalogs/c1/category/k2", "/dashboard/catalogs/c1/category/k2/settings",
                 "/dashboard/catalogs/c1/category/k2/delete");
+        CategoryRow cpu = new CategoryRow("k3", "CPU", false, List.of("Processors"), 12, true, 0, 0, 0, List.of(), 1,
+                false, true, "/dashboard/catalogs/c1/category/k3", "/dashboard/catalogs/c1/category/k3/settings",
+                "/dashboard/catalogs/c1/category/k3/delete");
+        CategoryRow drivers = new CategoryRow("k4", "Drivers", true, List.of("Drivers"), null, false, 0, 0, 0,
+                List.of(), 1, false, true, "/dashboard/catalogs/c1/category/k4",
+                "/dashboard/catalogs/c1/category/k4/settings", "/dashboard/catalogs/c1/category/k4/delete");
         Context context = new Context();
         context.setVariable("catalog", catalog);
-        context.setVariable("categories", List.of(gpu, os));
+        context.setVariable("categories", List.of(gpu, os, cpu, drivers));
         context.setVariable("productsTotal", 245);
         context.setVariable("scheduleText", "every 30 minutes");
         context.setVariable("settingsHref", "/dashboard/catalogs/c1/settings");
@@ -86,6 +96,21 @@ class CatalogTemplateTest {
         assertThat(occurrences(html, "/dashboard/catalogs/c1/category/new")).isEqualTo(1);
         assertThat(html.indexOf("cl-page-actions")).isLessThan(html.indexOf("/dashboard/catalogs/c1/category/new"));
         assertThat(html).doesNotContain("??");
+    }
+
+    /**
+     * Products outlive a category whose PIM categories another category of the catalog uses too; the dialog says so
+     * instead of promising a deletion the confirmation page behind it would contradict.
+     */
+    @Test
+    void theDeleteDialogSaysWhetherTheProductsSurviveTheCategory() {
+        // when
+        String html = rendered();
+
+        // then
+        assertThat(html).contains("The products are kept \u2014 another category uses the same PIM categories.")
+                .contains("This removes 245 products of this category.")
+                .contains("The list of this category is worked out from the inventory");
     }
 
     @Test
