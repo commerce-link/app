@@ -135,6 +135,24 @@ class CatalogScriptContractTest {
                 }""");
     }
 
+    /**
+     * The name of a product is a link sitting right above the codes of the same cell, so colour alone may not be what
+     * tells it apart from them (WCAG 1.4.1), and a segment with no matches may not be tinted below the contrast its
+     * size needs.
+     */
+    @Test
+    void aLinkInATableCellIsUnderlinedAndNoSegmentIsTintedBelowTheContrastThreshold() throws Exception {
+        // given
+        String css = read("src/main/resources/static/css/commercelink.css");
+
+        // then
+        assertThat(css).contains("""
+                .cl-page .cl-table .cl-table-key a {
+                    color: var(--cl-ink);
+                    text-decoration: underline;""");
+        assertThat(css).doesNotContain(".cl-segment[data-count=\"0\"] {");
+    }
+
     @Test
     void repeatFieldsAnnounceAddedGroupsAndVariantFieldsListen() throws Exception {
         // given

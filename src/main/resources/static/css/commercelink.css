@@ -1352,6 +1352,12 @@ body.cl-drawer-open .cl-sidebar {
     color: var(--cl-ink-2);
 }
 
+.cl-page .cl-card .cl-card-desc a {
+    color: var(--cl-accent-ink);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
 .cl-page .cl-card .cl-card-body {
     margin: 0;
     padding: 16px 20px;
@@ -3400,9 +3406,13 @@ a.cl-link-button:hover {
     color: var(--cl-ink-3);
 }
 
+/* A quiet underline, not none: the codes under the name are text of the same cell, and telling the link from them
+   by colour alone is below the 3:1 that would allow it (WCAG 1.4.1). It turns into the accent one on hover. */
 .cl-page .cl-table .cl-table-key a {
     color: var(--cl-ink);
-    text-decoration: none;
+    text-decoration: underline;
+    text-decoration-color: var(--cl-ink-3);
+    text-underline-offset: 3px;
 }
 
 .cl-page .cl-table .cl-table-key a:hover {
@@ -3433,14 +3443,9 @@ a.cl-link-button:hover {
     margin-left: 4px;
 }
 
-/* --- Catalog: Segment with zero matches (stays clickable but recedes) --- */
-.cl-segment[data-count="0"] {
-    color: var(--cl-ink-3);
-}
-
-.cl-segment[data-count="0"][aria-pressed="true"] {
-    color: var(--cl-accent-ink);
-}
+/* --- Catalog: Segment with zero matches --- */
+/* The count next to the name already says there is nothing to show; tinting the name as well took it to 4.47:1 on
+   the segmented background, below the 4.5:1 this size needs, and no darker grey token stands between the two. */
 
 /* --- Catalog: Toolbar in two rows (status segments across the top, category and search below) --- */
 .cl-page .cl-table-toolbar.is-stacked {
