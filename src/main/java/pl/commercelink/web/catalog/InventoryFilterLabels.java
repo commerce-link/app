@@ -10,8 +10,11 @@ import pl.commercelink.web.dtos.RecommendationFiltersForm.MetadataForm;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 
 import static pl.commercelink.products.filters.InventoryFilterType.BRAND_NAME;
 import static pl.commercelink.products.filters.InventoryFilterType.EAN_NOT_EQ;
@@ -111,6 +114,31 @@ public final class InventoryFilterLabels {
     /** The values of a kind as variant-fields.js reads them: "A|B|C". */
     public static String variants(Kind kind) {
         return String.join("|", ORDER.stream().filter(type -> kindOf(type) == kind).map(InventoryFilterType::name).toList());
+    }
+
+    /**
+     * The metadata keys the typed fields of this filter write. An unknown row may not be renamed onto one of them: the
+     * pair would be written twice and, on the next load, the row would overwrite the typed field without a word. The
+     * "by brand" filters name their keys in the brand lines, so a text that does not parse simply owns nothing — its
+     * own error already stops the save.
+     */
+    public static Set<String> typedKeys(FilterForm form) {
+        Optional<InventoryFilterType> type = form.parsedType();
+        if (type.isEmpty()) {
+            return Set.of();
+        }
+        switch (kindOf(type.get())) {
+            case LIST:
+                return Set.of(LIST_KEYS.get(type.get()));
+            case PRICE_RANGE:
+                return Set.of(MIN_PRICE, MAX_PRICE);
+            default:
+                try {
+                    return new LinkedHashSet<>(parseBrandLines(form.getBrandLines()).keySet());
+                } catch (BrandLineException e) {
+                    return Set.of();
+                }
+        }
     }
 
     public static FilterForm fromDefinition(InventoryDefinition definition) {

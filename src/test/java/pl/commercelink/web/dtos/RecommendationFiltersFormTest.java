@@ -39,6 +39,72 @@ class RecommendationFiltersFormTest {
         assertThat(errors).containsExactly(Map.entry("filter-0-unknown-0-key", "catalog.filter.unknown.key.required"));
     }
 
+    /**
+     * The typed fields of a filter own their metadata keys; an unknown row renamed onto one of them would be written
+     * twice and, on the next load, overwrite the typed field without a word.
+     */
+    @Test
+    void anUnknownRowMayNotTakeOverTheKeyOfATypedField() {
+        // given
+        RecommendationFiltersForm form = new RecommendationFiltersForm();
+        RecommendationFiltersForm.FilterForm brands = filter("BRAND_NAME");
+        brands.setValues("MSI");
+        brands.getUnknown().add(pair("brands", "ASUS"));
+        RecommendationFiltersForm.FilterForm prices = filter("PRICE_RANGE");
+        prices.setMinPrice("900");
+        prices.getUnknown().add(pair(" MaxPrice ", "1"));
+        RecommendationFiltersForm.FilterForm lines = filter("PRODUCT_LINE_BY_BRAND");
+        lines.setBrandLines("Gigabyte: Windforce");
+        lines.getUnknown().add(pair("gigabyte", "Gaming OC"));
+        form.getFilters().addAll(List.of(brands, prices, lines));
+
+        // when
+        Map<String, String> errors = form.validate();
+
+        // then
+        assertThat(errors).containsOnly(
+                Map.entry("filter-0-unknown-0-key", "catalog.filter.unknown.key.taken"),
+                Map.entry("filter-1-unknown-0-key", "catalog.filter.unknown.key.taken"),
+                Map.entry("filter-2-unknown-0-key", "catalog.filter.unknown.key.taken"));
+    }
+
+    @Test
+    void anUnknownRowWithAKeyOfItsOwnIsAccepted() {
+        // given
+        RecommendationFiltersForm form = new RecommendationFiltersForm();
+        RecommendationFiltersForm.FilterForm brands = filter("BRAND_NAME");
+        brands.setValues("MSI");
+        brands.getUnknown().add(pair("Legacy", "x"));
+        form.getFilters().add(brands);
+
+        // when / then
+        assertThat(form.validate()).isEmpty();
+    }
+
+    /** A broken brand-lines field has no brands to compare against; its own error already stops the save. */
+    @Test
+    void anUnknownRowIsNotCheckedAgainstBrandLinesThatDoNotParse() {
+        // given
+        RecommendationFiltersForm form = new RecommendationFiltersForm();
+        RecommendationFiltersForm.FilterForm lines = filter("PRODUCT_LINE_BY_BRAND");
+        lines.setBrandLines("Gigabyte Windforce");
+        lines.getUnknown().add(pair("Legacy", "x"));
+        form.getFilters().add(lines);
+
+        // when
+        Map<String, String> errors = form.validate();
+
+        // then
+        assertThat(errors).containsOnlyKeys("filter-0-brandLines");
+    }
+
+    private static RecommendationFiltersForm.MetadataForm pair(String key, String value) {
+        RecommendationFiltersForm.MetadataForm row = new RecommendationFiltersForm.MetadataForm();
+        row.setKey(key);
+        row.setValue(value);
+        return row;
+    }
+
     @Test
     void emptyListIsValidAndMeansNoFilters() {
         // given

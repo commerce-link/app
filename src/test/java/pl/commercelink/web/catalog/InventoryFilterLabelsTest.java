@@ -187,6 +187,41 @@ class InventoryFilterLabelsTest {
         assertThat(InventoryFilterLabels.toMetadata(form)).extracting(Metadata::getKey).containsExactly("Brands", "Legacy");
     }
 
+    @Test
+    void theTypedKeysOfAFilterAreTheOnesItsOwnFieldsWrite() {
+        // given
+        RecommendationFiltersForm.FilterForm brands = unknownOf("Legacy", "x");
+        RecommendationFiltersForm.FilterForm prices = new RecommendationFiltersForm.FilterForm();
+        prices.setType("PRICE_RANGE");
+        RecommendationFiltersForm.FilterForm lines = new RecommendationFiltersForm.FilterForm();
+        lines.setType("PRODUCT_LINE_BY_BRAND");
+        lines.setBrandLines("Gigabyte: Windforce\nMSI: Ventus");
+        RecommendationFiltersForm.FilterForm broken = new RecommendationFiltersForm.FilterForm();
+        broken.setType("PRODUCT_LINE_BY_BRAND");
+        broken.setBrandLines("Gigabyte Windforce");
+
+        // when / then
+        assertThat(InventoryFilterLabels.typedKeys(brands)).containsExactly("Brands");
+        assertThat(InventoryFilterLabels.typedKeys(prices)).containsExactlyInAnyOrder("MinPrice", "MaxPrice");
+        assertThat(InventoryFilterLabels.typedKeys(lines)).containsExactlyInAnyOrder("Gigabyte", "MSI");
+        assertThat(InventoryFilterLabels.typedKeys(broken)).isEmpty();
+    }
+
+    /** The round trip of a row whose key belongs to nobody else: saved as typed, with the typed field beside it. */
+    @Test
+    void anUnknownRowWithAKeyOfItsOwnSurvivesTheRoundTrip() {
+        // given
+        RecommendationFiltersForm.FilterForm form = unknownOf("Legacy", "x");
+
+        // when
+        RecommendationFiltersForm.FilterForm reloaded = InventoryFilterLabels.fromDefinition(
+                new InventoryDefinition(InventoryFilterType.BRAND_NAME, InventoryFilterLabels.toMetadata(form)));
+
+        // then
+        assertThat(reloaded.getValues()).isEqualTo("MSI");
+        assertThat(reloaded.getUnknown()).extracting(RecommendationFiltersForm.MetadataForm::getKey).containsExactly("Legacy");
+    }
+
     private static RecommendationFiltersForm.FilterForm unknownOf(String key, String value) {
         RecommendationFiltersForm.FilterForm form = new RecommendationFiltersForm.FilterForm();
         form.setType("BRAND_NAME");

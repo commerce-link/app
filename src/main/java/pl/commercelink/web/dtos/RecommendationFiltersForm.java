@@ -13,6 +13,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -92,17 +93,24 @@ public class RecommendationFiltersForm {
                 case PRICE_RANGE -> validatePrices(errors, index, filter);
                 case BY_BRAND -> validateBrandLines(errors, index, filter);
             }
-            validateUnknown(errors, index, filter);
+            validateUnknown(errors, index, filter, InventoryFilterLabels.typedKeys(filter));
         }
         return errors;
     }
 
     /** A row is removed by clearing it, so an empty row is fine; a value left without a key would lose the value. */
-    private static void validateUnknown(Map<String, String> errors, int index, FilterForm filter) {
+    private static void validateUnknown(Map<String, String> errors, int index, FilterForm filter, Set<String> typedKeys) {
         for (int row = 0; row < filter.unknown.size(); row++) {
             MetadataForm pair = filter.unknown.get(row);
-            if (pair != null && StringUtils.isBlank(pair.getKey()) && StringUtils.isNotBlank(pair.getValue())) {
-                errors.put(unknownFieldId(index, row, "key"), "catalog.filter.unknown.key.required");
+            if (pair == null) {
+                continue;
+            }
+            if (StringUtils.isBlank(pair.getKey())) {
+                if (StringUtils.isNotBlank(pair.getValue())) {
+                    errors.put(unknownFieldId(index, row, "key"), "catalog.filter.unknown.key.required");
+                }
+            } else if (typedKeys.stream().anyMatch(typed -> typed.equalsIgnoreCase(pair.getKey().trim()))) {
+                errors.put(unknownFieldId(index, row, "key"), "catalog.filter.unknown.key.taken");
             }
         }
     }
