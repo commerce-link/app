@@ -22,6 +22,7 @@ import pl.commercelink.clientaccess.ClientVerificationService;
 import pl.commercelink.clientaccess.ClientVerificationSubject;
 import pl.commercelink.orders.BillingDetails;
 import pl.commercelink.orders.ClientShippingAddressChangeException;
+import pl.commercelink.orders.ClientPreferredShippingDateService;
 import pl.commercelink.orders.ClientShippingAddressChangeService;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItemsRepository;
@@ -69,6 +70,8 @@ class ClientOrderControllerTest {
     private ClientVerificationRateLimiter clientVerificationRateLimiter;
     @Mock
     private ClientShippingAddressChangeService addressChangeService;
+    @Mock
+    private ClientPreferredShippingDateService preferredShippingDateService;
     @Mock
     private MessageSource messageSource;
 

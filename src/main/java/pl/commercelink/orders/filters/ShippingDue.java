@@ -10,11 +10,11 @@ public enum ShippingDue {
     Overdue,
     Unscheduled;
 
-    boolean covers(LocalDate estimatedShippingAt, LocalDate today) {
+    boolean covers(LocalDate shippingDueAt, LocalDate today) {
         return switch (this) {
-            case DueToday -> estimatedShippingAt != null && !estimatedShippingAt.isAfter(today);
-            case Overdue -> estimatedShippingAt != null && estimatedShippingAt.isBefore(today);
-            case Unscheduled -> estimatedShippingAt == null;
+            case DueToday -> shippingDueAt != null && !shippingDueAt.isAfter(today);
+            case Overdue -> shippingDueAt != null && shippingDueAt.isBefore(today);
+            case Unscheduled -> shippingDueAt == null;
         };
     }
 

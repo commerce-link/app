@@ -13,6 +13,7 @@
                         <th th:text="#{order.source}"></th>
                         <th th:text="#{orders.ordered.at.date}"></th>
                         <th th:text="#{order.shipped.at}"></th>
+                        <th th:text="#{order.preferred.shipping.short}"></th>
                         <th th:text="#{order.status}"></th>
                         <th th:text="#{order.warehouse.document}"></th>
                         <th th:text="#{order.billing.document}"></th>
@@ -31,6 +32,7 @@
                         <td th:text="${order.source?.type ?: '-'}"></td>
                         <td th:text="${#temporals.format(order.orderedAt, 'yyyy-MM-dd')}"></td>
                         <td th:text="${order.estimatedShippingAt}"></td>
+                        <td th:text="${order.preferredShippingAt != null ? order.preferredShippingAt : '-'}"></td>
                         <td th:text="${enumI18n.localize(order.status)}"></td>
                         <td th:with="goodsIssue=${order.getDocumentByType(T(pl.commercelink.documents.DocumentType).GoodsIssue)}">
                             <a th:if="${goodsIssue.isPresent()}" th:href="${goodsIssue.get().viewUrl}" th:text="${goodsIssue.get().number}"></a>

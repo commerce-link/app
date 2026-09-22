@@ -134,6 +134,16 @@
             border-bottom: 1px solid #edf0f3;
         }
         .date-row:last-of-type { border-bottom: 0; }
+        .preferred-shipping {
+            margin-top: 0.75rem;
+            padding-top: 0.5rem;
+            border-top: 1px solid #edf0f3;
+        }
+        .preferred-shipping .button.is-text {
+            height: auto;
+            text-decoration: underline;
+            color: var(--client-primary-color, #485fc7);
+        }
         .address-panel {
             margin-top: 0.75rem;
             padding: 1rem 1.25rem 1.25rem;
@@ -513,6 +523,39 @@
                     </th:block>
                     <p class="is-size-7 has-text-grey" th:if="${!view.cancelled and !view.hasEstimatedDates()}" th:text="#{client.order.dates.unknown}"></p>
                     <p class="is-size-7 has-text-grey" th:if="${view.cancelled}" th:text="#{client.order.dates.cancelled}"></p>
+
+                    <div class="preferred-shipping" th:if="${view.preferredShippingVisible}">
+                        <div class="date-row">
+                            <span class="has-text-grey" th:text="${view.personalCollection} ? #{client.order.preferred.shipping.collection} : #{client.order.preferred.shipping.shipping}"></span>
+                            <span class="has-text-weight-semibold" th:if="${view.preferredShippingAt != null}" th:text="${#temporals.format(view.preferredShippingAt, 'd MMMM')}"></span>
+                            <span class="has-text-grey" th:if="${view.preferredShippingAt == null}" th:text="#{client.order.preferred.shipping.unset}"></span>
+                        </div>
+                        <th:block th:if="${view.preferredShippingEditable}">
+                            <p class="is-size-7 has-text-grey mt-3" th:text="#{client.order.preferred.shipping.hint(${#temporals.format(view.estimatedShippingAt, 'd MMMM')}, ${#temporals.format(view.preferredShippingWindowEnd, 'd MMMM')})}"></p>
+                            <form method="post" class="mt-2"
+                                  th:action="@{/store/{storeId}/client/order/{orderId}/preferred-shipping(storeId=${store.storeId},orderId=${view.orderId})}">
+                                <div class="field has-addons">
+                                    <div class="control is-expanded">
+                                        <input id="preferredShippingDate" name="date" type="date" class="input is-small" required
+                                               th:value="${view.preferredShippingAt}"
+                                               th:min="${view.estimatedShippingAt}"
+                                               th:max="${view.preferredShippingWindowEnd}"
+                                               th:data-weekend-message="#{client.order.preferred.shipping.error.weekend}">
+                                    </div>
+                                    <div class="control">
+                                        <button type="submit" class="button is-primary is-small"
+                                                th:style="${#strings.isEmpty(branding.safePrimaryColor)} ? null : 'background-color:' + ${branding.safePrimaryColor} + ' !important; color: #fff;'"
+                                                th:text="#{client.order.preferred.shipping.submit}"></button>
+                                    </div>
+                                </div>
+                            </form>
+                            <form method="post" th:if="${view.preferredShippingAt != null}"
+                                  th:action="@{/store/{storeId}/client/order/{orderId}/preferred-shipping(storeId=${store.storeId},orderId=${view.orderId})}">
+                                <button type="submit" class="button is-text is-small px-0" th:text="#{client.order.preferred.shipping.clear}"></button>
+                            </form>
+                        </th:block>
+                        <p class="is-size-7 has-text-grey mt-2" th:unless="${view.preferredShippingEditable}" th:text="#{client.order.preferred.shipping.locked}"></p>
+                    </div>
                 </div>
 
                 <div class="box">
@@ -577,6 +620,20 @@
                     <h2 class="title is-5 mb-2" th:text="#{client.order.contact}"></h2>
                     <p th:utext="#{client.order.contact.text('<a href=&quot;mailto:' + ${view.contactEmail} + '&quot;>' + ${view.contactEmail} + '</a>', '<strong>' + ${view.shortOrderId} + '</strong>')}"></p>
                 </div>
+
+                <script>
+                    document.addEventListener("DOMContentLoaded", function () {
+                        const input = document.getElementById("preferredShippingDate");
+                        if (!input) return;
+                        function validate() {
+                            const day = input.valueAsDate ? input.valueAsDate.getUTCDay() : -1;
+                            input.setCustomValidity(day === 0 || day === 6 ? input.dataset.weekendMessage : "");
+                        }
+                        input.addEventListener("input", validate);
+                        input.addEventListener("change", function () { validate(); input.reportValidity(); });
+                        validate();
+                    });
+                </script>
 
                 <div class="image-preview mt-2 field has-text-centered" th:if="${branding.logo != null}">
                     <img th:src="@{'/StoreLogo/' + ${store.storeId}}"

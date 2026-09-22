@@ -34,6 +34,8 @@ public class FulfilmentConfiguration {
     private boolean clientOrderPageEnabled = false;
     @DynamoDBAttribute(attributeName = "clientShippingAddressChangeEnabled")
     private boolean clientShippingAddressChangeEnabled = false;
+    @DynamoDBAttribute(attributeName = "clientPreferredShippingDateEnabled")
+    private boolean clientPreferredShippingDateEnabled = false;
 
     public FulfilmentConfiguration() {
     }
@@ -126,6 +128,14 @@ public class FulfilmentConfiguration {
         this.clientShippingAddressChangeEnabled = clientShippingAddressChangeEnabled;
     }
 
+    public boolean isClientPreferredShippingDateEnabled() {
+        return clientPreferredShippingDateEnabled;
+    }
+
+    public void setClientPreferredShippingDateEnabled(boolean clientPreferredShippingDateEnabled) {
+        this.clientPreferredShippingDateEnabled = clientPreferredShippingDateEnabled;
+    }
+
     /**
      * Returns a copy carrying the given connection list. Used by the per-supplier save paths: the
      * persister computes what changed by comparing the store's current configuration against the
@@ -143,6 +153,7 @@ public class FulfilmentConfiguration {
         copy.setInventoryCacheTtlMinutes(inventoryCacheTtlMinutes);
         copy.setClientOrderPageEnabled(clientOrderPageEnabled);
         copy.setClientShippingAddressChangeEnabled(clientShippingAddressChangeEnabled);
+        copy.setClientPreferredShippingDateEnabled(clientPreferredShippingDateEnabled);
         copy.setSupplierConnections(new ArrayList<>(connections));
         return copy;
     }

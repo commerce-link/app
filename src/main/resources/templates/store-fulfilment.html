@@ -68,6 +68,7 @@
                             <div th:replace="~{fragments/settings-form :: check('clientOrderPageEnabled', 'store.fulfilment.orderPage.enable', *{clientOrderPageEnabled}, 'store.fulfilment.orderPage.description', 'fulfilment-address-change')}"></div>
                             <div id="fulfilment-address-change" class="cl-reveal">
                                 <div th:replace="~{fragments/settings-form :: check('clientShippingAddressChangeEnabled', 'store.fulfilment.addressChange.enable', *{clientShippingAddressChangeEnabled}, 'store.fulfilment.addressChange.description', null)}"></div>
+                                <div th:replace="~{fragments/settings-form :: check('clientPreferredShippingDateEnabled', 'store.fulfilment.preferredDate.enable', *{clientPreferredShippingDateEnabled}, 'store.fulfilment.preferredDate.description', null)}"></div>
                             </div>
                         </fieldset>
 

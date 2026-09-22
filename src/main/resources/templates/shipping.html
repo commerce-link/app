@@ -8,6 +8,11 @@
 
     <h1 class="title" th:text="#{shipping.title}"></h1>
 
+    <div class="notification is-warning" th:if="${preferredShippingWarning != null}">
+        <span class="icon"><i class="fas fa-exclamation-triangle"></i></span>
+        <span th:text="#{shipping.preferred.shipping.warning(${preferredShippingWarning})}"></span>
+    </div>
+
     <form th:action="@{${shippingForm.shippingTemplateAction}}" th:object="${shippingForm}" method="post" class="box">
         <div class="field" th:if="${shippingEntityId}">
             <label class="label" th:text="${shippingForm.shippingEntityType}"></label>
