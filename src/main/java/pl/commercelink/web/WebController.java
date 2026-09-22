@@ -7,27 +7,12 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import pl.commercelink.inventory.Inventory;
-import pl.commercelink.inventory.InventoryKey;
-import pl.commercelink.inventory.InventoryView;
-import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.inventory.deliveries.DeliveriesRepository;
 import pl.commercelink.inventory.deliveries.Delivery;
 import pl.commercelink.inventory.supplier.SupplierLabels;
-import pl.commercelink.inventory.supplier.SupplierRegistry;
-import pl.commercelink.warehouse.api.Warehouse;
 import pl.commercelink.orders.*;
-import pl.commercelink.pim.api.PimCatalog;
-import pl.commercelink.pim.api.PimEntry;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.starter.util.PaginationUtil;
-import pl.commercelink.stores.Store;
-import pl.commercelink.stores.StoreSupplierConnection;
-import pl.commercelink.stores.StoresRepository;
-import pl.commercelink.taxonomy.Taxonomy;
-import pl.commercelink.taxonomy.TaxonomyCache;
-import pl.commercelink.web.dtos.InventoryItemView;
-import pl.commercelink.web.dtos.StoreSupplierView;
 
 import java.time.LocalDate;
 import java.util.*;
@@ -39,28 +24,10 @@ import static org.apache.commons.lang3.StringUtils.isNotBlank;
 public class WebController {
 
     @Autowired
-    private Inventory inventory;
-
-    @Autowired
     private OrdersRepository ordersRepository;
 
     @Autowired
-    private StoresRepository storesRepository;
-
-    @Autowired
     private DeliveriesRepository deliveriesRepository;
-
-    @Autowired
-    private TaxonomyCache taxonomyCache;
-
-    @Autowired
-    private PimCatalog pimCatalog;
-
-    @Autowired
-    private SupplierRegistry supplierRegistry;
-
-    @Autowired
-    private Warehouse warehouse;
 
     @Autowired
     private SupplierLabels supplierLabels;
@@ -145,96 +112,6 @@ public class WebController {
         model.addAttribute("supplierLabels", supplierLabels.forStoreId(getStoreId()));
 
         return "payments";
-    }
-
-    @GetMapping("/dashboard/inventory")
-    public String inventory(Model model) {
-        return mapInventory(model, inventory);
-    }
-
-    @GetMapping("/dashboard/inventory/check-price")
-    public String checkProductPrice(
-            @RequestParam(value = "mfn", required = false) String productCode,
-            @RequestParam(value = "ean", required = false) String ean,
-            @RequestParam(value = "pimId", required = false) String pimId,
-            Model model) {
-
-        InventoryView inventoryView = inventory.withEnabledSuppliersAndWarehouseData(getStoreId());
-
-        MatchedInventory matchedInventory = null;
-        if (pimId != null && !pimId.isEmpty()) {
-            Optional<PimEntry> pimEntry = pimCatalog.findByPimId(pimId);
-            if (pimEntry.isPresent()) {
-                matchedInventory = inventoryView.findByInventoryKey(InventoryKey.fromPimEntry(pimEntry.get()));
-            }
-        } else if (productCode != null && !productCode.isEmpty()) {
-            matchedInventory = inventoryView.findByProductCode(productCode);
-        } else if (ean != null && !ean.isEmpty()) {
-            matchedInventory = inventoryView.findByEan(ean);
-        }
-
-        mapProductPrice(model, matchedInventory, notSealedWarehouseItems(matchedInventory));
-        return mapInventory(model, inventory);
-    }
-
-    private List<InventoryItemView> notSealedWarehouseItems(MatchedInventory matchedInventory) {
-        if (matchedInventory == null) {
-            return List.of();
-        }
-        return warehouse.stockQueryService(getStoreId())
-                .searchNotSealedAvailableByMfns(getStoreId(), matchedInventory.getMfnCodes())
-                .stream()
-                .map(InventoryItemView::from)
-                .toList();
-    }
-
-    private String mapInventory(Model model, Inventory _inventory) {
-        Store store = getStoreId() != null ? storesRepository.findById(getStoreId()) : null;
-        List<String> enabledSuppliers = store != null ?
-                new ArrayList<>(store.getEnabledProviders()) :
-                new ArrayList<>(supplierRegistry.getAllSupplierNames());
-        enabledSuppliers.add(SupplierRegistry.WAREHOUSE);
-
-        List<StoreSupplierView> storeSuppliers = store != null ?
-                store.getSupplierConnections()
-                        .stream()
-                        .filter(StoreSupplierConnection::isEnabled)
-                        .map(StoreSupplierView::from)
-                        .toList() :
-                List.of();
-
-        model.addAttribute("enabledSuppliers", enabledSuppliers);
-        model.addAttribute("storeSuppliers", storeSuppliers);
-        model.addAttribute("inventorySize", _inventory.size());
-        model.addAttribute("taxonomyFileName", taxonomyCache.getFileName());
-        model.addAttribute("taxonomySize", taxonomyCache.size());
-        model.addAttribute("pimIndexSize", pimCatalog.findAll().size());
-        // `store` is already loaded (and null-guarded) above; forStoreId(getStoreId()) only worked
-        // for the super admin because findById(null) happens to return null.
-        model.addAttribute("supplierLabels", supplierLabels.forStore(store));
-
-        return "inventory";
-    }
-
-    private void mapProductPrice(Model model, MatchedInventory matchedInventory, List<InventoryItemView> notSealedWarehouseItems) {
-        if (matchedInventory != null && matchedInventory.hasAnyOffers()) {
-            Taxonomy taxonomy = matchedInventory.getTaxonomy();
-
-            model.addAttribute("ean", taxonomy.ean());
-            model.addAttribute("mfn", taxonomy.mfn());
-            model.addAttribute("name", taxonomy.name());
-            model.addAttribute("brand", taxonomy.brand());
-            model.addAttribute("lowestGrossPrice", matchedInventory.getLowestPrice().grossValue());
-            model.addAttribute("medianGrossPrice", matchedInventory.getMedianPrice().grossValue());
-            model.addAttribute("totalAvailableQty", matchedInventory.getTotalAvailableQty());
-            List<InventoryItemView> inventoryItems = new ArrayList<>(matchedInventory.getInventoryItems().stream()
-                    .map(InventoryItemView::from)
-                    .toList());
-            inventoryItems.addAll(notSealedWarehouseItems);
-            model.addAttribute("inventoryItems", inventoryItems);
-        } else {
-            model.addAttribute("error", "Product not found");
-        }
     }
 
     private String getStoreId() {

@@ -1,5 +1,7 @@
 package pl.commercelink.inventory;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -12,12 +14,15 @@ import pl.commercelink.stores.SupplierScope;
 import pl.commercelink.taxonomy.TaxonomyCache;
 import pl.commercelink.warehouse.api.Warehouse;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.function.Predicate;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -37,6 +42,11 @@ public class Inventory {
     // Per supplier, the feed version last attempted (successful load or markSeen) — not a guarantee of
     // held inventory; drives the scheduler's "is there a newer feed to load?" check.
     private final ConcurrentHashMap<String, LocalDateTime> lastUpdateDateBySupplier = new ConcurrentHashMap<>();
+
+    private final Cache<StatisticsKey, InventoryStatistics> statisticsCache = Caffeine.newBuilder()
+            .maximumSize(1_000)
+            .expireAfterWrite(Duration.ofMinutes(2))
+            .build();
 
     void init(List<List<InventoryItem>> rawFeeds) {
         load(
@@ -141,6 +151,30 @@ public class Inventory {
         return names::contains;
     }
 
+    public InventoryStatistics storeStatistics(String storeId) {
+        Store store = storesRepository.findById(storeId);
+        if (store == null) {
+            return InventoryStatistics.EMPTY;
+        }
+        Set<String> enabledGlobal = store.getGlobalSupplierNames().stream()
+                .filter(Objects::nonNull)
+                .collect(Collectors.toUnmodifiableSet());
+        List<String> ownFingerprint = ownConnectionFingerprint(store);
+        StatisticsKey key = new StatisticsKey(storeId, globalInventory.version(), enabledGlobal, ownFingerprint);
+        // ownInventory() decodes the whole Redis-cached own feed, so it must run only on a cache miss
+        return statisticsCache.get(key, k -> {
+            StoreInventory own = storeInventoryProvider.ownInventory(store);
+            return InventoryStatisticsCalculator.calculate(globalInventory.index(), enabledGlobal::contains, own.index());
+        });
+    }
+
+    private static List<String> ownConnectionFingerprint(Store store) {
+        return store.getOwnAndManualConnections().stream()
+                .map(connection -> connection.getSupplierName() + ":" + connection.getMode() + ":" + connection.isEnabled())
+                .sorted()
+                .toList();
+    }
+
     public int size() {
         return globalInventory.size();
     }
@@ -156,5 +190,8 @@ public class Inventory {
 
     public Collection<String> getMatchedSuppliers() {
         return lastUpdateDateBySupplier.keySet();
+    }
+
+    private record StatisticsKey(String storeId, long globalVersion, Set<String> enabledGlobalSuppliers, List<String> ownConnectionFingerprint) {
     }
 }

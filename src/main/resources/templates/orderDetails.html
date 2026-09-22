@@ -194,6 +194,13 @@
                                     </div>
                                 </div>
                                 <div class="field">
+                                    <label class="label" th:text="#{order.preferred.shipping}"></label>
+                                    <div class="control">
+                                        <input class="input" type="date" th:field="*{preferredShippingAt}" th:disabled="${isCompletedOrder}"/>
+                                    </div>
+                                    <p class="help" th:text="#{order.preferred.shipping.help}"></p>
+                                </div>
+                                <div class="field">
                                     <label class="label" th:text="#{order.status}"></label>
                                     <div class="control">
                                         <div class="select">

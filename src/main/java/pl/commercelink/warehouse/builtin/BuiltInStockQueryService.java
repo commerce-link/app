@@ -3,10 +3,13 @@ package pl.commercelink.warehouse.builtin;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.warehouse.api.StockQueryService;
+import pl.commercelink.warehouse.api.StockSummary;
 import pl.commercelink.warehouse.api.WarehouseItemView;
 
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 class BuiltInStockQueryService implements StockQueryService {
@@ -67,6 +70,34 @@ class BuiltInStockQueryService implements StockQueryService {
             return null;
         }
         return fromInternal(warehouseItem);
+    }
+
+    @Override
+    public List<WarehouseItemView> searchAllAvailableByMfns(String storeId, Collection<String> mfns) {
+        return warehouseRepository.findAllAvailableByMfns(storeId, mfns)
+                .stream()
+                .map(this::fromInternal)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public StockSummary summarizeAvailable(String storeId) {
+        List<WarehouseItem> items = warehouseRepository.findAllFiltered(storeId, null,
+                List.of(FulfilmentStatus.Ordered, FulfilmentStatus.Delivered));
+        Set<String> products = new HashSet<>();
+        int inStockQty = 0;
+        int inDeliveryQty = 0;
+        for (WarehouseItem item : items) {
+            if (item.getManufacturerCode() != null) {
+                products.add(item.getManufacturerCode());
+            }
+            if (item.getStatus() == FulfilmentStatus.Ordered) {
+                inDeliveryQty += item.getQty();
+            } else {
+                inStockQty += item.getQty();
+            }
+        }
+        return new StockSummary(products.size(), inStockQty, inDeliveryQty);
     }
 
     private WarehouseItemView fromInternal(WarehouseItem warehouseItem) {

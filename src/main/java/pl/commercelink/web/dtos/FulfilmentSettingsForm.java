@@ -28,6 +28,7 @@ public class FulfilmentSettingsForm {
     private boolean automatedFulfilment;
     private boolean clientOrderPageEnabled;
     private boolean clientShippingAddressChangeEnabled;
+    private boolean clientPreferredShippingDateEnabled;
 
     public static FulfilmentSettingsForm from(Store store) {
         FulfilmentConfiguration config = store.getFulfilmentConfiguration() != null
@@ -40,6 +41,7 @@ public class FulfilmentSettingsForm {
         form.automatedFulfilment = config.isAutomatedFulfilment();
         form.clientOrderPageEnabled = config.isClientOrderPageEnabled();
         form.clientShippingAddressChangeEnabled = config.isClientShippingAddressChangeEnabled();
+        form.clientPreferredShippingDateEnabled = config.isClientPreferredShippingDateEnabled();
         return form;
     }
 
@@ -68,6 +70,7 @@ public class FulfilmentSettingsForm {
         config.setAutomatedFulfilment(automatedFulfilment);
         config.setClientOrderPageEnabled(clientOrderPageEnabled);
         config.setClientShippingAddressChangeEnabled(clientShippingAddressChangeEnabled);
+        config.setClientPreferredShippingDateEnabled(clientPreferredShippingDateEnabled);
         return config;
     }
 

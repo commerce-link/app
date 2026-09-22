@@ -598,6 +598,7 @@ public class OrdersController extends BaseController {
         existingOrder.setEmailNotificationsEnabled(updatedOrder.isEmailNotificationsEnabled());
         existingOrder.setEstimatedAssemblyAt(updatedOrder.getEstimatedAssemblyAt());
         existingOrder.setEstimatedShippingAt(updatedOrder.getEstimatedShippingAt());
+        existingOrder.setPreferredShippingAt(updatedOrder.getPreferredShippingAt());
         existingOrder.setAffiliateId(updatedOrder.getAffiliateId());
         existingOrder.setGclid(updatedOrder.getGclid());
         existingOrder.setComment(updatedOrder.getComment());
