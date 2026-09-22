@@ -76,6 +76,22 @@ class CategoryPageTemplateTest {
 
     /** The page as the controller renders it: two manual products, one of them with a label outside the list. */
     private static String rendered(boolean dynamic) {
+        ProductRow listed = new ProductRow("p1", "MSI RTX 5070", "1", "MFN-1", "pim-1", "MSI", "RTX 5070", false,
+                "Default", List.of("Allegro"), ProductStatus.ACTIVE, Set.of("marketplace", "stock"),
+                "msi rtx 5070", dynamic ? null : "/dashboard/catalogs/c1/category/k1/products/p1",
+                dynamic ? "2 749,00" : null);
+        ProductRow outside = new ProductRow("p2", "ASUS RTX 5060", "2", null, null, "ASUS", "RTX 5060", true,
+                "Default", List.of(), ProductStatus.NO_PIM, Set.of(), "asus rtx 5060",
+                dynamic ? null : "/dashboard/catalogs/c1/category/k1/products/p2", dynamic ? "1 999,00" : null);
+        return rendered(dynamic, List.of(listed, outside));
+    }
+
+    /** The manual page with rows of the test's own making. */
+    private static String renderedWith(List<ProductRow> rows) {
+        return rendered(false, rows);
+    }
+
+    private static String rendered(boolean dynamic, List<ProductRow> rows) {
         ProductCatalog catalog = new ProductCatalog("store-1", "Parts");
         catalog.setCatalogId("c1");
         CategoryDefinition gpu = new CategoryDefinition().withName("GPU").withGeneratedId();
@@ -85,14 +101,7 @@ class CategoryPageTemplateTest {
             gpu.setType(CategoryDefinitionType.Dynamic);
             gpu.setPimCategoryIds(List.of("pim-gpu"));
         }
-        ProductRow listed = new ProductRow("p1", "MSI RTX 5070", "1", "MFN-1", "pim-1", "MSI", "RTX 5070", false,
-                "Default", List.of("Allegro"), ProductStatus.ACTIVE, Set.of("marketplace", "stock"),
-                "msi rtx 5070", dynamic ? null : "/dashboard/catalogs/c1/category/k1/products/p1",
-                dynamic ? "2 749,00" : null);
-        ProductRow outside = new ProductRow("p2", "ASUS RTX 5060", "2", null, null, "ASUS", "RTX 5060", true,
-                "Default", List.of(), ProductStatus.NO_PIM, Set.of(), "asus rtx 5060",
-                dynamic ? null : "/dashboard/catalogs/c1/category/k1/products/p2", dynamic ? "1 999,00" : null);
-        CategoryPageModel page = CategoryPageModel.of(List.of(listed, outside), gpu);
+        CategoryPageModel page = CategoryPageModel.of(rows, gpu);
         Context context = new Context();
         context.setVariable("catalog", catalog);
         context.setVariable("category", gpu);
@@ -145,6 +154,31 @@ class CategoryPageTemplateTest {
         assertThat(html).contains("MSI RTX 5070").contains("Outside the list").contains("No PIM")
                 .contains("value=\"p1\"").contains("action=\"/dashboard/catalogs/c1/category/k1/products/bulk\"")
                 .contains("name=\"status\" value=\"active\"");
+    }
+
+    /** A product known only by its manufacturer code: the line under its name states what it has, not "EAN null". */
+    @Test
+    void aProductWithoutAnEanShowsItsManufacturerCodeAlone() {
+        // given
+        ProductRow mfnOnly = new ProductRow("p3", "Gigabyte RTX 5050", null, "MFN-3", null, "Gigabyte", "RTX 5070",
+                false, "Default", List.of(), ProductStatus.ACTIVE, Set.of(), "gigabyte rtx 5050",
+                "/dashboard/catalogs/c1/category/k1/products/p3", null);
+
+        // when
+        String html = renderedWith(List.of(mfnOnly));
+
+        // then
+        assertThat(html).doesNotContain("EAN null").doesNotContain("· MFN-3").contains(">MFN-3<");
+    }
+
+    /** The same product with an EAN: the codes stay on one line, separated. */
+    @Test
+    void aProductWithAnEanAndAManufacturerCodeShowsBothSeparated() {
+        // when
+        String html = rendered(false);
+
+        // then
+        assertThat(html).contains("EAN 1").contains("· MFN-1").contains("· PIM pim-1");
     }
 
     @Test
