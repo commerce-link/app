@@ -31,7 +31,10 @@ class SupplierLabelTemplatesTest {
         assertThat(template("dropshipCreate.html")).contains("supplierLabels.of(form.provider)");
         assertThat(template("dropshipConfirmation.html")).contains("supplierLabels.of(form.provider)");
         assertThat(template("payments.html")).contains("supplierLabels.of(delivery.provider)");
-        assertThat(template("inventory.html")).contains("supplierLabels.of(item.supplier)");
+        // the inventory page resolves the label once per offer in InventorySearch (OfferRow#supplierLabel),
+        // because a global search spans stores and has no single label map to read in the template
+        assertThat(template("fragments/inventory-results.html")).contains("offer.supplierLabel()")
+                .doesNotContain("${offer.supplier}");
     }
 
     @Test

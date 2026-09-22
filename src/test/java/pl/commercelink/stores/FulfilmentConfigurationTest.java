@@ -41,6 +41,7 @@ class FulfilmentConfigurationTest {
         source.setInventoryCacheTtlMinutes(42);
         source.setClientOrderPageEnabled(true);
         source.setClientShippingAddressChangeEnabled(true);
+        source.setClientPreferredShippingDateEnabled(true);
         source.setSupplierConnections(new ArrayList<>(List.of(
                 new StoreSupplierConnection("Elko", ConnectionMode.OWN, true, true))));
 
@@ -59,6 +60,7 @@ class FulfilmentConfigurationTest {
         assertEquals(42, copy.getInventoryCacheTtlMinutes());
         assertTrue(copy.isClientOrderPageEnabled());
         assertTrue(copy.isClientShippingAddressChangeEnabled());
+        assertTrue(copy.isClientPreferredShippingDateEnabled());
         assertEquals(List.of("Kosatec"),
                 copy.getSupplierConnections().stream().map(StoreSupplierConnection::getSupplierName).toList());
         assertEquals(List.of("Elko"),

@@ -7,19 +7,30 @@
 
 <div th:fragment="panel(screen, icon)" class="screen-intro" th:attr="data-intro-panel=${screen}" hidden>
     <style>
+        /* Collapses by animating the row track to 0fr: a fixed max-height cut the footer off
+           whenever the copy wrapped past it, which it does on a phone. */
         .screen-intro {
             position: relative;
+            display: grid;
+            grid-template-rows: 1fr;
             background: #ffffff;
             border: 1px solid #d5dcf5;
             border-radius: 10px;
             box-shadow: 0 4px 16px rgba(72, 95, 199, 0.09);
             margin-bottom: 1.4rem;
             overflow: hidden;
-            max-height: 640px;
-            transition: max-height 0.35s ease, opacity 0.3s ease, margin-bottom 0.35s ease;
+            transition: grid-template-rows 0.35s ease, opacity 0.3s ease, margin-bottom 0.35s ease;
+        }
+        /* `display: grid` above outranks the UA rule for the attribute, so restate it. */
+        .screen-intro[hidden] {
+            display: none;
+        }
+        .screen-intro-inner {
+            min-height: 0;
+            overflow: hidden;
         }
         .screen-intro.is-closing {
-            max-height: 0;
+            grid-template-rows: 0fr;
             opacity: 0;
             margin-bottom: 0;
             border-width: 0;
@@ -173,6 +184,7 @@
     <button type="button" class="screen-intro-close" onclick="dismissScreenIntro()" th:attr="aria-label=#{general.close}">
         <i class="fas fa-times"></i>
     </button>
+    <div class="screen-intro-inner">
     <div class="screen-intro-body">
         <div class="screen-intro-icon" aria-hidden="true">
             <i th:class="${icon}"></i>
@@ -195,6 +207,7 @@
     <div class="screen-intro-footer">
         <button type="button" class="button is-link" onclick="dismissScreenIntro()" th:text="#{intro.dismiss}"></button>
         <span class="screen-intro-hint" th:text="#{intro.hint}"></span>
+    </div>
     </div>
 
     <script>

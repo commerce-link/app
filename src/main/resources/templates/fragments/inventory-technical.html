@@ -1,0 +1,49 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<div th:fragment="technical" class="cl-inv-summary" data-inventory-fragment="technical">
+    <ul class="cl-stat-grid">
+        <li class="cl-stat">
+            <span class="cl-eyebrow" th:text="#{inventory.tech.globalInventory}"></span>
+            <span class="cl-stat-value" th:text="${#numbers.formatInteger(technical.globalInventorySize(), 1, 'WHITESPACE')}"></span>
+            <span class="cl-stat-hint" th:text="#{inventory.tech.globalInventory.hint}"></span>
+        </li>
+        <li class="cl-stat">
+            <span class="cl-eyebrow" th:text="#{inventory.tech.taxonomy}"></span>
+            <span class="cl-stat-value" th:text="${#numbers.formatInteger(technical.taxonomySize(), 1, 'WHITESPACE')}"></span>
+            <span class="cl-stat-hint" th:text="#{inventory.tech.taxonomy.hint}"></span>
+            <span class="cl-stat-hint cl-inv-break" th:text="${technical.taxonomyFileName()}"></span>
+        </li>
+        <li class="cl-stat">
+            <span class="cl-eyebrow" th:text="#{inventory.tech.pim}"></span>
+            <span class="cl-stat-value" th:text="${#numbers.formatInteger(technical.pimIndexSize(), 1, 'WHITESPACE')}"></span>
+            <span class="cl-stat-hint" th:text="#{inventory.tech.pim.hint}"></span>
+        </li>
+    </ul>
+
+    <section class="cl-card" aria-labelledby="inventory-tech-feeds">
+        <h2 class="cl-eyebrow cl-inv-card-title" id="inventory-tech-feeds" th:text="#{inventory.tech.feeds}"></h2>
+        <p th:if="${technical.feeds().isEmpty()}" class="cl-inv-muted cl-inv-card-body" th:text="#{inventory.tech.feeds.empty}"></p>
+        <div th:unless="${technical.feeds().isEmpty()}" class="cl-inv-table-wrap">
+            <table class="cl-table">
+                <thead>
+                <tr>
+                    <th scope="col" th:text="#{inventory.tech.supplier}"></th>
+                    <th scope="col" th:text="#{inventory.tech.loadedAt}"></th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="feed : ${technical.feeds()}">
+                    <td th:text="${feed.supplier()}"></td>
+                    <td th:title="${feed.loadedAt().toString().replace('T', ' ')}"
+                        th:text="${#messages.msgWithParams(feed.age().messageKey(), feed.age().args())}"></td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+
+</body>
+</html>

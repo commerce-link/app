@@ -8,10 +8,12 @@ import pl.commercelink.inventory.supplier.api.InventoryItem;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.taxonomy.Categories;
 import pl.commercelink.warehouse.api.ItemCondition;
+import pl.commercelink.warehouse.api.StockSummary;
 import pl.commercelink.warehouse.api.WarehouseItemView;
 
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.when;
 
@@ -113,6 +115,43 @@ class BuiltInStockQueryServiceTest {
 
         // then
         assertEquals(openBox.getItemId(), view.getItemId());
+    }
+
+    @Test
+    void searchAllAvailableReturnsSealedAndNotSealedItemsFromOneRepositoryCall() {
+        // given
+        WarehouseItem sealed = anAvailableItem(20.0);
+        WarehouseItem damaged = anAvailableItem(20.0);
+        damaged.setCondition(ItemCondition.Damaged);
+        when(warehouseRepository.findAllAvailableByMfns("store-1", List.of("MFN-1"))).thenReturn(List.of(sealed, damaged));
+
+        // when
+        List<WarehouseItemView> views = new BuiltInStockQueryService(warehouseRepository)
+                .searchAllAvailableByMfns("store-1", List.of("MFN-1"));
+
+        // then
+        assertThat(views).extracting(WarehouseItemView::getItemId)
+                .containsExactly(sealed.getItemId(), damaged.getItemId());
+    }
+
+    @Test
+    void summarizeAvailableCountsDistinctProductsAndSplitsQuantityByStatus() {
+        // given
+        WarehouseItem delivered = anAvailableItem(20.0);
+        delivered.setQty(3);
+        WarehouseItem sameProductOrdered = anAvailableItem(20.0);
+        sameProductOrdered.setQty(2);
+        sameProductOrdered.setStatus(FulfilmentStatus.Ordered);
+        WarehouseItem otherProduct = new WarehouseItem("store-1", "delivery-2", Categories.UNCATEGORIZED, "Other", "5900000000001", "MFN-2", 10.0, 4);
+        otherProduct.setStatus(FulfilmentStatus.Delivered);
+        when(warehouseRepository.findAllFiltered("store-1", null, List.of(FulfilmentStatus.Ordered, FulfilmentStatus.Delivered)))
+                .thenReturn(List.of(delivered, sameProductOrdered, otherProduct));
+
+        // when
+        StockSummary summary = new BuiltInStockQueryService(warehouseRepository).summarizeAvailable("store-1");
+
+        // then
+        assertThat(summary).isEqualTo(new StockSummary(2, 7, 2));
     }
 
     private InventoryItem firstInventoryItem() {

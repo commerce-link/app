@@ -56,9 +56,13 @@ public class ClientOrderView {
     private final BankAccount bankAccount;
     private final String contactEmail;
     private final boolean shippingAddressEditable;
+    private final LocalDate preferredShippingAt;
+    private final boolean preferredShippingEditable;
+    private final boolean preferredShippingOffered;
+    private final LocalDate preferredShippingWindowEnd;
 
     private ClientOrderView(Order order, List<OrderItem> orderItems, Store store, CategoryLocalizer categoryLocalizer,
-                            boolean shippingAddressEditable) {
+                            boolean shippingAddressEditable, boolean preferredShippingEditable) {
         this.orderId = order.getOrderId();
         this.shortOrderId = order.getShortenedOrderId();
         this.orderedAt = order.getOrderedAt();
@@ -100,15 +104,19 @@ public class ClientOrderView {
         this.bankAccount = store.getDefaultBankAccount();
         this.contactEmail = store.getClientContactEmail();
         this.shippingAddressEditable = shippingAddressEditable;
+        this.preferredShippingAt = order.getPreferredShippingAt();
+        this.preferredShippingEditable = preferredShippingEditable;
+        this.preferredShippingOffered = store.isClientPreferredShippingDateEnabled();
+        this.preferredShippingWindowEnd = order.getPreferredShippingWindowEnd();
     }
 
     public static ClientOrderView from(Order order, List<OrderItem> orderItems, Store store, CategoryLocalizer categoryLocalizer) {
-        return new ClientOrderView(order, orderItems, store, categoryLocalizer, false);
+        return new ClientOrderView(order, orderItems, store, categoryLocalizer, false, false);
     }
 
     public static ClientOrderView from(Order order, List<OrderItem> orderItems, Store store, CategoryLocalizer categoryLocalizer,
-                                       boolean shippingAddressEditable) {
-        return new ClientOrderView(order, orderItems, store, categoryLocalizer, shippingAddressEditable);
+                                       boolean shippingAddressEditable, boolean preferredShippingEditable) {
+        return new ClientOrderView(order, orderItems, store, categoryLocalizer, shippingAddressEditable, preferredShippingEditable);
     }
 
     public int getProductCount() {
@@ -117,6 +125,10 @@ public class ClientOrderView {
 
     public boolean hasEstimatedDates() {
         return estimatedAssemblyAt != null || estimatedShippingAt != null;
+    }
+
+    public boolean isPreferredShippingVisible() {
+        return !cancelled && (preferredShippingAt != null || preferredShippingEditable);
     }
 
     public boolean isFullyPaid() {

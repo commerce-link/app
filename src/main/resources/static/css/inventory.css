@@ -1,0 +1,860 @@
+/* Inventory page. Everything the rest of the panel already has — page frame, cards, buttons, inputs, alerts,
+   tables, stat tiles, skeletons, spinner — comes from commercelink.css; this sheet only holds what exists
+   nowhere else: the sources bar, the search card, the result states and the offers table.
+   Content sits inside Bulma's .content wrapper (layout.html), so rules touching headings, lists, tables and
+   definition lists are prefixed with .cl-inv-page to outweigh .content h1/ul/table. */
+
+:root {
+    /* barely-there green wash behind the cheapest offer: --cl-ok-soft reads as a status chip on a table row */
+}
+
+/* Several rules below (.cl-inv-errorbar, .cl-inv-load-error, ...) set their own `display`, which beats
+   the UA [hidden] rule at equal specificity once the source order tips their way; JS relies on toggling
+   the `hidden` attribute to hide/show these elements, so pin it here with higher specificity. */
+.cl-inv-page [hidden] {
+    display: none !important;
+}
+
+/* .cl-page-body gives the 1200px width, .cl-page the bottom padding; this page only adds its top inset. */
+.cl-inv-page {
+    padding-block: 24px 40px;
+    color: var(--cl-ink);
+}
+
+/* the only .cl-card here is the super admin's feed card, which follows the tiles */
+.cl-inv-page .cl-card {
+    margin-top: 12px;
+}
+
+.cl-inv-page ul,
+.cl-inv-page dl {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+/* Beat Bulma's .content ul/dl:not(:last-child) and h2/h3:not(:first-child) margins: equal specificity,
+   later in the cascade (inventory.css is linked after Bulma). */
+.cl-inv-page ul:not(:last-child),
+.cl-inv-page dl:not(:last-child) {
+    margin-bottom: 0;
+}
+
+.cl-inv-page h2:not(:first-child),
+.cl-inv-page h3:not(:first-child) {
+    margin-top: 0;
+}
+
+.cl-inv-page li + li {
+    margin-top: 0;
+}
+
+.cl-inv-page dd {
+    margin: 0;
+}
+
+.cl-inv-muted {
+    color: var(--cl-ink-3);
+}
+
+.cl-inv-break {
+    overflow-wrap: anywhere;
+}
+
+/* Summary */
+.cl-inv-summary-slot {
+    margin-bottom: 16px;
+}
+
+/* Skeleton sizes for the tiles and the inline warehouse figure; the block itself is .cl-skeleton. */
+.cl-inv-skeleton-label {
+    width: 55%;
+    height: 11px;
+}
+
+.cl-inv-skeleton-number {
+    width: 45%;
+    height: 26px;
+    margin-top: 6px;
+}
+
+.cl-inv-skeleton-hint {
+    width: 70%;
+    height: 11px;
+    margin-top: 6px;
+}
+
+.cl-inv-skeleton-inline {
+    display: inline-block;
+    width: 90px;
+    height: 12px;
+    vertical-align: middle;
+}
+
+/* Sources bar */
+.cl-inv-sources {
+    margin-top: 12px;
+    border: 1px solid var(--cl-line);
+    border-radius: var(--cl-radius);
+    background: var(--cl-surface);
+    box-shadow: var(--cl-shadow-card);
+}
+
+.cl-inv-sources-bar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    min-height: 52px;
+    padding: 8px 14px;
+}
+
+.cl-inv-issues {
+    min-width: 0;
+    font-size: 13.5px;
+    color: var(--cl-ink);
+    overflow-wrap: anywhere;
+}
+
+.cl-inv-issues strong {
+    font-weight: 600;
+}
+
+.cl-inv-count {
+    display: inline-grid;
+    place-items: center;
+    min-width: 22px;
+    height: 22px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: var(--cl-info-soft);
+    color: var(--cl-info);
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+}
+
+.cl-inv-more {
+    margin-left: 4px;
+    font-weight: 600;
+    color: var(--cl-ink-2);
+}
+
+.cl-inv-sources-actions {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.cl-inv-toggle svg {
+    transition: transform .15s ease;
+}
+
+.cl-inv-toggle.is-expanded svg {
+    transform: rotate(180deg);
+}
+
+.cl-inv-iconbtn {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border: 1px solid var(--cl-line);
+    border-radius: var(--cl-radius);
+    background: var(--cl-surface);
+    color: var(--cl-accent-ink);
+}
+
+.cl-inv-iconbtn:hover {
+    border-color: var(--cl-accent);
+    color: var(--cl-accent);
+}
+
+.cl-inv-iconbtn:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
+}
+
+.cl-inv-sources-list {
+    border-top: 1px solid var(--cl-line);
+}
+
+.cl-inv-page .cl-inv-group-title {
+    margin: 0;
+    padding: 6px 14px;
+    background: var(--cl-surface-2);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--cl-ink-3);
+}
+
+.cl-inv-page .cl-inv-source-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+    padding: 10px 14px;
+    border-top: 1px solid var(--cl-line);
+}
+
+.cl-inv-page .cl-inv-source-row:hover {
+    background: var(--cl-surface-2);
+}
+
+.cl-inv-source-name {
+    font-weight: 600;
+}
+
+.cl-inv-mode {
+    padding: 1px 7px;
+    border-radius: 4px;
+    background: var(--cl-surface-2);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--cl-ink-2);
+}
+
+.cl-inv-source-meta {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    font-size: 13px;
+    color: var(--cl-ink-2);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Built by the script when a background fragment fails to load, so it stands on its own instead of
+   inside a card: it keeps the alert's tone but carries its own border and spacing. */
+.cl-inv-page .cl-inv-load-error {
+    align-items: center;
+    margin: 0;
+    border-color: var(--cl-line);
+    border-left-color: var(--cl-bad);
+    border-radius: var(--cl-radius);
+}
+
+/* Search */
+.cl-inv-search-card {
+    border: 1px solid var(--cl-line);
+    border-radius: var(--cl-radius);
+    background: var(--cl-surface);
+    box-shadow: var(--cl-shadow-card);
+}
+
+.cl-inv-search {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 14px;
+}
+
+/* the submit sits next to the field, so it takes the field's height rather than the 36px of a card footer */
+.cl-inv-search .cl-button {
+    height: 40px;
+}
+
+.cl-inv-search-field {
+    position: relative;
+    flex: 1 1 260px;
+    min-width: 0;
+}
+
+.cl-inv-search-icon {
+    position: absolute;
+    top: 50%;
+    left: 12px;
+    transform: translateY(-50%);
+    color: var(--cl-ink-3);
+    pointer-events: none;
+}
+
+/* room for the lupe on the left and the clear button on the right */
+.cl-inv-search-field .cl-input {
+    padding: 0 40px 0 36px;
+}
+
+.cl-inv-clear {
+    position: absolute;
+    top: 50%;
+    right: 4px;
+    transform: translateY(-50%);
+    width: 32px;
+    height: 32px;
+    border: 0;
+    border-radius: 6px;
+    background: none;
+    color: var(--cl-ink-3);
+    cursor: pointer;
+}
+
+.cl-inv-clear:hover {
+    background: var(--cl-surface-2);
+    color: var(--cl-ink);
+}
+
+.cl-inv-clear:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
+}
+
+.cl-inv-page .cl-inv-search .cl-field-error {
+    flex-basis: 100%;
+}
+
+/* The search error is part of the card, not a free-standing message: it spans the card and is divided
+   from the form by a line instead of floating with a margin and rounded corners. */
+.cl-inv-page .cl-inv-errorbar {
+    align-items: center;
+    margin: 0;
+    padding: 12px 14px;
+    border-top: 1px solid var(--cl-line);
+    border-radius: 0;
+}
+
+.cl-inv-page .cl-inv-errorbar .cl-alert-text {
+    flex: 1 1 220px;
+    margin: 0;
+    font-size: 1rem;
+}
+
+/* Results */
+#inventory-results {
+    border-top: 1px solid var(--cl-line);
+}
+
+.cl-inv-results-region {
+    position: relative;
+}
+
+.cl-inv-spinner-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding-top: 48px;
+}
+
+.cl-inv-spinner-overlay::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: var(--cl-surface);
+    opacity: .72;
+}
+
+.cl-inv-spinner-overlay .cl-spinner {
+    position: relative;
+}
+
+.cl-inv-page .cl-inv-empty {
+    padding: 28px 16px;
+    text-align: center;
+    color: var(--cl-ink-2);
+}
+
+.cl-inv-empty-icon {
+    display: grid;
+    place-items: center;
+    width: 46px;
+    height: 46px;
+    margin: 0 auto 10px;
+    border-radius: 50%;
+    background: var(--cl-surface-2);
+    color: var(--cl-ink-3);
+    font-size: 18px;
+}
+
+.cl-inv-page .cl-inv-empty-title {
+    margin: 0 0 4px;
+    font-size: 16px;
+    font-weight: 650;
+    color: var(--cl-ink);
+}
+
+.cl-inv-page .cl-inv-empty p {
+    margin: 0 auto;
+    max-width: 60ch;
+}
+
+.cl-inv-page .cl-inv-tips {
+    display: inline-block;
+    margin: 12px 0 0;
+    padding-left: 18px;
+    list-style: disc;
+    text-align: left;
+    font-size: 13.5px;
+}
+
+/* Higher specificity than both Bulma's and the generic .cl-inv-page ul:not(:last-child) reset above,
+   so the 12px top margin this list needs stays effective regardless of source order. */
+.cl-inv-page .cl-inv-tips:not(:last-child) {
+    margin-bottom: 0;
+}
+
+.cl-inv-page .cl-inv-empty .cl-button {
+    margin-top: 14px;
+}
+
+.cl-inv-page .cl-inv-state {
+    padding: 14px;
+}
+
+.cl-inv-product {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 10px 14px;
+    padding: 16px;
+}
+
+.cl-inv-product-main {
+    flex: 1 1 300px;
+    min-width: 0;
+}
+
+.cl-inv-page .cl-inv-product-name {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 650;
+    line-height: 1.3;
+    color: var(--cl-ink);
+}
+
+.cl-inv-page .cl-inv-codes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 16px;
+    margin-top: 4px;
+    font-size: 13px;
+    color: var(--cl-ink-2);
+    font-variant-numeric: tabular-nums;
+}
+
+.cl-inv-page .cl-inv-codes > div {
+    display: flex;
+    gap: 4px;
+}
+
+.cl-inv-page .cl-inv-codes dd {
+    font-weight: 600;
+    color: var(--cl-ink);
+    overflow-wrap: anywhere;
+}
+
+.cl-inv-page .cl-inv-found .cl-inv-product {
+    padding-bottom: 4px;
+}
+
+.cl-inv-page .cl-inv-price-summary {
+    display: flex;
+    flex-wrap: wrap;
+    row-gap: 2px;
+    margin: 0;
+    padding: 0 16px 12px;
+    font-size: 14px;
+    color: var(--cl-ink-2);
+}
+
+.cl-inv-price-summary > span {
+    white-space: nowrap;
+}
+
+/* the separator trails an item instead of leading the next one, so a wrapped line never starts with a dot */
+.cl-inv-price-summary > span:not(:last-child)::after {
+    content: "\00B7";
+    margin: 0 10px;
+    color: var(--cl-ink-3);
+}
+
+.cl-inv-price-summary b {
+    white-space: nowrap;
+    font-weight: 650;
+    font-variant-numeric: tabular-nums;
+    color: var(--cl-ink);
+}
+
+.cl-inv-price-summary b.is-ok {
+    color: var(--cl-ok);
+}
+
+/* Offers table: the shared .cl-table, inset to the 16px the card uses elsewhere, with a sticky header. */
+.cl-inv-table-wrap {
+    overflow-x: auto;
+}
+
+.cl-inv-page .cl-table :is(th, td):first-child {
+    padding-left: 16px;
+}
+
+.cl-inv-page .cl-table :is(th, td):last-child {
+    padding-right: 16px;
+}
+
+/* from 720px the offers render as a table; an overflow container would stop the header from sticking under the
+   top bar, so the wrapper only scrolls on narrower screens (where offers are cards anyway) */
+@media screen and (min-width: 720px) {
+    .cl-inv-table-wrap {
+        overflow: visible;
+    }
+
+    .cl-inv-page .cl-inv-offers thead th {
+        position: sticky;
+        top: var(--cl-topbar-height);
+        z-index: 1;
+    }
+}
+
+.cl-inv-offers {
+    table-layout: fixed;
+}
+
+.cl-inv-col-price {
+    width: 150px;
+}
+
+.cl-inv-col-delivery {
+    width: 130px;
+}
+
+.cl-inv-col-total {
+    width: 140px;
+}
+
+.cl-inv-col-qty {
+    width: 110px;
+}
+
+.cl-inv-col-lead {
+    width: 90px;
+}
+
+
+.cl-inv-page .cl-table td .cl-status,
+.cl-inv-page .cl-table td .cl-inv-mode {
+    margin-left: 6px;
+}
+
+.cl-inv-page .cl-table .cl-inv-code {
+    padding: 0;
+    background: none;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--cl-ink-2);
+    overflow-wrap: anywhere;
+}
+
+.cl-inv-code-info {
+    display: block;
+    margin-top: 3px;
+    font-size: 12.5px;
+    color: var(--cl-ink-3);
+}
+
+.cl-inv-page .cl-inv-code-warning {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    margin-top: 4px;
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--cl-warn);
+    overflow-wrap: anywhere;
+}
+
+.cl-inv-page .cl-inv-code-warning .cl-inv-code {
+    color: var(--cl-warn);
+}
+
+.cl-inv-code-warning svg {
+    flex: 0 0 auto;
+}
+
+.cl-inv-price {
+    font-weight: 650;
+}
+
+.cl-inv-page .cl-inv-offers tbody tr.cl-inv-offer:hover td {
+    background: var(--cl-surface-2);
+}
+
+/* The cheapest offer is marked, not coloured: a tinted row read as an endorsement of a figure the page
+   cannot vouch for, and the delivered total is a calculation, not a status. */
+.cl-inv-page .cl-inv-offer.is-cheapest .cl-inv-total-cell .cl-inv-price {
+    font-weight: 700;
+}
+
+/* Secondary figure under a price: the gross equivalent, or the order value that makes shipping free. */
+.cl-inv-price-alt {
+    display: block;
+    margin-top: 2px;
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--cl-ink-2);
+}
+
+/* The headline price names one offer; when that offer is a doubtful match the caveat sits with it. */
+.cl-inv-page .cl-inv-summary-warning {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin: 0 0 4px;
+    color: var(--cl-warn);
+    font-size: 13px;
+}
+
+.cl-inv-page .cl-inv-summary-warning svg {
+    flex: 0 0 auto;
+    margin-top: 2px;
+}
+
+.cl-inv-page .cl-inv-source-link {
+    color: inherit;
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+}
+
+.cl-inv-page .cl-inv-source-link:hover,
+.cl-inv-page .cl-inv-source-link:focus-visible {
+    color: var(--cl-accent-ink);
+    border-bottom-color: currentColor;
+}
+
+.cl-inv-page .cl-inv-offer.is-dim td,
+.cl-inv-page .cl-inv-offer.is-dim strong {
+    color: var(--cl-ink-3);
+}
+
+/* Technical card (super admin) */
+.cl-inv-page .cl-inv-card-title {
+    padding: 12px 16px;
+}
+
+.cl-inv-card-body {
+    margin: 0;
+    padding: 0 16px 14px;
+}
+
+/* Results headings are non-interactive focus targets (script moves focus there after a search purely
+   for screen-reader announcement), so they never get the interactive-element outline treatment. */
+.cl-inv-page [data-inventory-results-heading]:focus {
+    outline: none;
+}
+
+@media screen and (max-width: 1023px) {
+    .cl-inv-iconbtn {
+        width: 44px;
+        height: 44px;
+    }
+
+    .cl-inv-search .cl-button {
+        height: 44px;
+    }
+
+    .cl-inv-col-price {
+        width: 130px;
+    }
+
+    .cl-inv-col-delivery {
+        width: 112px;
+    }
+
+    .cl-inv-col-total {
+        width: 124px;
+    }
+
+    .cl-inv-col-qty {
+        width: 96px;
+    }
+
+    .cl-inv-col-lead {
+        width: 78px;
+    }
+
+    .cl-inv-clear {
+        width: 44px;
+        height: 44px;
+        right: 0;
+    }
+
+    .cl-inv-search-field .cl-input {
+        padding-right: 48px;
+    }
+}
+
+@media screen and (max-width: 719px) {
+    .cl-inv-page {
+        padding-block: 16px 32px;
+    }
+
+    .cl-inv-issues {
+        display: none;
+    }
+
+    .cl-inv-sources-actions {
+        flex-basis: 100%;
+        justify-content: space-between;
+        margin-left: 0;
+    }
+
+    .cl-inv-search .cl-button.is-primary {
+        flex: 1 1 100%;
+    }
+
+    .cl-inv-source-meta {
+        margin-left: 0;
+        flex-basis: 100%;
+    }
+
+    /* the delivered price made these segments too long to hold on one line at 390px */
+    .cl-inv-price-summary > span {
+        flex-basis: 100%;
+        white-space: normal;
+    }
+
+    .cl-inv-price-summary > span:not(:last-child)::after {
+        content: none;
+    }
+
+    /* Offers become cards: source and price on the first line, quantity under the price, code notes across
+       the whole card. Unlike the shared table's card mode the header stays — as a slim sort bar — because
+       sorting the offers is the point of this table and the shared mode hides `thead` from sight. */
+    .cl-inv-page .cl-inv-offers,
+    .cl-inv-page .cl-inv-offers thead,
+    .cl-inv-page .cl-inv-offers tbody,
+    .cl-inv-page .cl-inv-offers tr {
+        display: block;
+        width: 100%;
+    }
+
+    .cl-inv-page .cl-inv-offers colgroup {
+        display: none;
+    }
+
+    .cl-inv-page .cl-inv-offers thead {
+        position: static;
+        width: auto;
+        height: auto;
+        overflow: visible;
+        clip: auto;
+    }
+
+    /* Once the offers are cards the header row is no longer a header, so it says what it now is and its
+       buttons look like buttons: a bare row of column names read as a broken fragment above the first
+       card, and nothing suggested the labels could be tapped. */
+    .cl-inv-page .cl-inv-offers thead tr {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 10px 16px;
+        background: var(--cl-surface-2);
+        border-top: 1px solid var(--cl-line);
+    }
+
+    .cl-inv-page .cl-inv-offers thead tr::before {
+        content: attr(data-sort-label);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: .06em;
+        text-transform: uppercase;
+        color: var(--cl-ink-2);
+    }
+
+    .cl-inv-page .cl-inv-offers thead th {
+        display: block;
+        padding: 0;
+        border: 0;
+        background: none;
+    }
+
+    /* the source column has nothing to sort by */
+    .cl-inv-page .cl-inv-offers thead th:first-child {
+        display: none;
+    }
+
+    .cl-inv-page .cl-inv-offers thead .cl-table-sort {
+        min-height: 44px;
+        padding: 0 10px;
+        border: 1px solid var(--cl-line);
+        border-radius: 999px;
+        background: var(--cl-surface);
+        font-size: 12px;
+        text-transform: none;
+        letter-spacing: 0;
+    }
+
+    .cl-inv-page .cl-inv-offers thead th[aria-sort="ascending"] .cl-table-sort,
+    .cl-inv-page .cl-inv-offers thead th[aria-sort="descending"] .cl-table-sort {
+        border-color: var(--cl-accent);
+    }
+
+    /* the marker sits outside the button on a wide table; inside the chip it would fall off the edge */
+    .cl-inv-page .cl-inv-offers thead .cl-table-sort::after {
+        position: static;
+        margin: 0 0 0 6px;
+    }
+
+    .cl-inv-page .cl-inv-offers tr.cl-inv-offer {
+        display: block;
+        padding: 12px 16px;
+        border-top: 1px solid var(--cl-line);
+    }
+
+    /* label on the left, figure on the right: six columns only stay readable when each one says what it is */
+    .cl-inv-page .cl-inv-offers tr.cl-inv-offer td {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 0 12px;
+        padding: 2px 0;
+        border: 0;
+        background: none;
+        text-align: right;
+    }
+
+    /* the gross price and the free-shipping threshold take their own line under the figure they explain */
+    .cl-inv-page .cl-inv-offers tr.cl-inv-offer td .cl-inv-price-alt {
+        flex: 1 0 100%;
+        text-align: right;
+    }
+
+    .cl-inv-page .cl-inv-offers tr.cl-inv-offer td[data-label]::before {
+        content: attr(data-label);
+        flex: 0 0 auto;
+        color: var(--cl-ink-2);
+        font-size: 13px;
+        font-weight: 400;
+        text-align: left;
+    }
+
+    .cl-inv-page .cl-inv-offers tr.cl-inv-offer td.cl-inv-source-cell {
+        display: block;
+        margin-bottom: 6px;
+        text-align: left;
+    }
+
+    .cl-inv-page .cl-inv-offers .cl-inv-code-info,
+    .cl-inv-page .cl-inv-offers .cl-inv-code-warning {
+        margin-top: 2px;
+    }
+
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cl-inv-toggle svg {
+        transition: none;
+    }
+}

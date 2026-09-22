@@ -13,10 +13,16 @@ public class GlobalMatchedInventory {
 
     private volatile Collection<MatchedInventory> matched = new LinkedList<>();
     private volatile InventoryIndex index;
+    private volatile long version;
 
     public synchronized void replace(Collection<MatchedInventory> matched) {
         this.matched = matched;
         this.index = null;
+        this.version++;
+    }
+
+    public long version() {
+        return version;
     }
 
     public Collection<MatchedInventory> all() {

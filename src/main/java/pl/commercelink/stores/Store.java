@@ -547,6 +547,13 @@ public class Store {
     }
 
     @DynamoDBIgnore
+    public boolean isClientPreferredShippingDateEnabled() {
+        return isClientOrderPageEnabled() && Optional.ofNullable(fulfilmentConfiguration)
+                .map(FulfilmentConfiguration::isClientPreferredShippingDateEnabled)
+                .orElse(false);
+    }
+
+    @DynamoDBIgnore
     public List<String> getEnabledCategories() {
         return Optional.ofNullable(fulfilmentConfiguration)
                 .map(FulfilmentConfiguration::getEnabledCategories)
