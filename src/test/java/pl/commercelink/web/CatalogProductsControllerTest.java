@@ -680,6 +680,37 @@ class CatalogProductsControllerTest {
         verify(pimCatalog, never()).findByGtinOrMpn(any(), any());
     }
 
+    /**
+     * The inventory knows the product by its EAN but the catalogue has no entry under that key: the manufacturer code
+     * the operator has just corrected in the review is the last thing left to ask about, so it is asked.
+     */
+    @Test
+    void saveStillAsksAboutTheCorrectedCodeWhenTheInventoryKeyResolvesToNothing() throws Exception {
+        // given
+        gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
+        InventoryKey key = new InventoryKey(Set.of("5901234567890"), Set.of());
+        MatchedInventory matched = mock(MatchedInventory.class);
+        when(matched.isEmpty()).thenReturn(false);
+        when(matched.getInventoryKey()).thenReturn(key);
+        when(inventoryView.findByInventoryKey(any())).thenReturn(matched);
+        when(pimCatalog.findByPimIdOrGtinsOrMpns(key.getId(), key.getProductEans(), key.getProductCodes()))
+                .thenReturn(Optional.empty());
+        PimEntry entry = mock(PimEntry.class);
+        when(entry.pimId()).thenReturn("pim-5");
+        when(pimCatalog.findByGtinOrMpn("5901234567890", "MFN-9")).thenReturn(Optional.of(entry));
+
+        // when
+        mvc.perform(post(categoryPath() + "/products/add/save")
+                        .param("products[0].name", "MSI RTX 5070").param("products[0].ean", "5901234567890")
+                        .param("products[0].manufacturerCode", "MFN-9").param("products[0].pricingGroup", "Default"))
+                .andExpect(redirectedUrl(categoryPath()));
+
+        // then
+        ArgumentCaptor<Product> saved = ArgumentCaptor.forClass(Product.class);
+        verify(productRepository).save(saved.capture());
+        assertThat(saved.getValue().getPimId()).isEqualTo("pim-5");
+    }
+
     /** A product that left the inventory between the review and the save is still asked about by its own two codes. */
     @Test
     void saveFallsBackToTheSubmittedIdentifiersWhenTheInventoryNoLongerHasTheProduct() throws Exception {

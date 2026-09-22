@@ -467,16 +467,23 @@ public class CatalogProductsController {
      * The PIM entry of a product being added, resolved the way the review resolved it: through the inventory key the
      * suppliers know the item by, which carries every EAN and product code listed under it. Asking with the two
      * identifiers of the row alone would miss an entry the catalogue holds under a sibling code, and the product would
-     * be saved without a pim id -- out of the price list and out of every marketplace offer. A product the inventory no
-     * longer has (it can leave between the review and the save) is still asked about by its own two codes.
+     * be saved without a pim id -- out of the price list and out of every marketplace offer.
+     *
+     * <p>The row's own two codes are asked about whenever the key answers nothing: the product may have left the
+     * inventory between the review and the save, and the key the inventory does know it by may not carry the
+     * identifier the operator has just corrected in the review.
      */
     private Optional<PimEntry> pimEntryOf(InventoryView inventory, InventoryKey key, Product product) {
         MatchedInventory matched = inventory.findByInventoryKey(key);
-        if (matched.isEmpty()) {
-            return pimCatalog.findByGtinOrMpn(product.getEan(), product.getManufacturerCode());
+        if (!matched.isEmpty()) {
+            InventoryKey known = matched.getInventoryKey();
+            Optional<PimEntry> byInventoryKey = pimCatalog.findByPimIdOrGtinsOrMpns(
+                    known.getId(), known.getProductEans(), known.getProductCodes());
+            if (byInventoryKey.isPresent()) {
+                return byInventoryKey;
+            }
         }
-        InventoryKey known = matched.getInventoryKey();
-        return pimCatalog.findByPimIdOrGtinsOrMpns(known.getId(), known.getProductEans(), known.getProductCodes());
+        return pimCatalog.findByGtinOrMpn(product.getEan(), product.getManufacturerCode());
     }
 
     /** The PIM entry the submitted identifiers point at, which the saved product's own entry is compared with. */
