@@ -100,6 +100,11 @@ public class CategoryPricingForm {
         return form;
     }
 
+    /** The id of a field of one price group: also its error key, so the error summary can link to the field. */
+    public static String fieldId(int index, String field) {
+        return "group-" + index + "-" + field;
+    }
+
     /** @param productsInGroup how many products of the category are in a group; asked only about the removed ones */
     public Map<String, String> validate(Function<String, Integer> productsInGroup) {
         Map<String, String> errors = new LinkedHashMap<>();
@@ -119,20 +124,19 @@ public class CategoryPricingForm {
         Set<String> seen = new HashSet<>();
         for (int index = 0; index < groups.size(); index++) {
             PriceGroupForm group = groups.get(index);
-            String prefix = "groups[" + index + "].";
-            if (FormRules.requireText(errors, prefix + "name", group.name, "catalog.category.pricing.group.name.required")
+            if (FormRules.requireText(errors, fieldId(index, "name"), group.name, "catalog.category.pricing.group.name.required")
                     && !seen.add(group.name.trim().toLowerCase())) {
-                errors.put(prefix + "name", "catalog.category.pricing.group.duplicate");
+                errors.put(fieldId(index, "name"), "catalog.category.pricing.group.duplicate");
             }
             if (FormNumbers.decimal(group.multiplier).filter(value -> value > 0).isEmpty()) {
-                errors.put(prefix + "multiplier", "catalog.category.pricing.multiplier.invalid");
+                errors.put(fieldId(index, "multiplier"), "catalog.category.pricing.multiplier.invalid");
             }
-            nonNegative(errors, prefix + "minProfit", group.minProfit);
-            nonNegative(errors, prefix + "critical", group.critical);
-            nonNegative(errors, prefix + "low", group.low);
-            nonNegative(errors, prefix + "medium", group.medium);
+            nonNegative(errors, fieldId(index, "minProfit"), group.minProfit);
+            nonNegative(errors, fieldId(index, "critical"), group.critical);
+            nonNegative(errors, fieldId(index, "low"), group.low);
+            nonNegative(errors, fieldId(index, "medium"), group.medium);
             if (StringUtils.isNotBlank(group.priceMatch) && FormNumbers.decimal(group.priceMatch).filter(value -> value >= 0).isEmpty()) {
-                errors.put(prefix + "priceMatch", "catalog.category.pricing.priceMatch.invalid");
+                errors.put(fieldId(index, "priceMatch"), "catalog.category.pricing.priceMatch.invalid");
             }
         }
         if (groups.stream().noneMatch(PriceGroupForm::isDefault)) {

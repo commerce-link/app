@@ -91,8 +91,8 @@ class CategoryPricingFormTest {
         Map<String, String> errors = form.validate(group -> 0);
 
         // then
-        assertThat(errors).containsEntry("groups[1].name", "catalog.category.pricing.group.duplicate")
-                .containsEntry("groups[1].multiplier", "catalog.category.pricing.multiplier.invalid");
+        assertThat(errors).containsEntry("group-1-name", "catalog.category.pricing.group.duplicate")
+                .containsEntry("group-1-multiplier", "catalog.category.pricing.multiplier.invalid");
     }
 
     @Test

@@ -84,7 +84,7 @@
         <span th:if="${isDefault}" class="cl-status is-info" th:text="#{catalog.category.pricing.group.default}"></span>
     </legend>
     <div class="cl-form-grid">
-        <div class="cl-span-2 cl-field" th:with="id=${'group-' + index + '-name'}, error=${errors.get(prefix + 'name')}">
+        <div class="cl-span-2 cl-field" th:with="id=${'group-' + index + '-name'}, error=${errors.get(id)}">
             <label class="cl-label" th:for="${id}" th:text="#{catalog.category.pricing.group.name}"></label>
             <input class="cl-input" type="text" autocomplete="off" th:classappend="${error != null} ? 'is-invalid'"
                    th:id="${id}" th:name="${prefix + 'name'}" th:value="${group?.name}" th:readonly="${isDefault}"
@@ -96,7 +96,7 @@
         </div>
         <th:block th:each="field : ${ {'multiplier', 'minProfit'} }">
             <div class="cl-span-2 cl-field"
-                 th:with="id=${'group-' + index + '-' + field}, error=${errors.get(prefix + field)}">
+                 th:with="id=${'group-' + index + '-' + field}, error=${errors.get(id)}">
                 <label class="cl-label" th:for="${id}" th:text="#{'catalog.category.pricing.group.' + ${field}}"></label>
                 <input class="cl-input" type="text" inputmode="decimal" autocomplete="off"
                        th:classappend="${error != null} ? 'is-invalid'"
@@ -114,7 +114,7 @@
         </div>
         <th:block th:each="field : ${ {'critical', 'low', 'medium'} }">
             <div class="cl-span-2 cl-field"
-                 th:with="id=${'group-' + index + '-' + field}, error=${errors.get(prefix + field)}">
+                 th:with="id=${'group-' + index + '-' + field}, error=${errors.get(id)}">
                 <label class="cl-label" th:for="${id}" th:text="#{'catalog.category.pricing.adjustment.' + ${field}}"></label>
                 <input class="cl-input" type="text" inputmode="numeric" autocomplete="off"
                        th:classappend="${error != null} ? 'is-invalid'"
@@ -141,7 +141,7 @@
                            th:value="${group?.labelMatch}"/>
                 </div>
                 <div class="cl-span-3 cl-field"
-                     th:with="id=${'group-' + index + '-priceMatch'}, error=${errors.get(prefix + 'priceMatch')}">
+                     th:with="id=${'group-' + index + '-priceMatch'}, error=${errors.get(id)}">
                     <label class="cl-label" th:for="${id}">
                         <span th:text="#{catalog.category.pricing.priceMatch}"></span>
                         <span class="cl-optional" th:text="#{form.optional}"></span>

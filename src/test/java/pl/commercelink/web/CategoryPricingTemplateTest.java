@@ -99,10 +99,12 @@ class CategoryPricingTemplateTest {
     @Test
     void anErrorOfOneGroupIsShownAtItsOwnField() {
         // when
-        String html = rendered(Map.of("groups[1].multiplier", "catalog.category.pricing.multiplier.invalid"));
+        String html = rendered(Map.of("group-1-multiplier", "catalog.category.pricing.multiplier.invalid"));
 
         // then
         assertThat(html).contains("The multiplier must be greater than 0").contains("id=\"group-1-multiplier-error\"");
         assertThat(occurrences(html, "cl-field-error")).isEqualTo(1);
+        // the summary link and the field it names, so the error key doubles as the id repeat-fields.js renumbers
+        assertThat(html).contains("href=\"#group-1-multiplier\"").contains("id=\"group-1-multiplier\"");
     }
 }
