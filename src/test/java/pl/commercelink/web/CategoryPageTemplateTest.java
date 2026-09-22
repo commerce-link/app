@@ -188,7 +188,7 @@ class CategoryPageTemplateTest {
 
         // then
         assertThat(html).contains("<span class=\"cl-segment-count\">1</span>")
-                .contains("Approved for a marketplace (1)").contains("With a maximum price (0)")
+                .contains("Listed on marketplaces (1)").contains("With a maximum price (0)")
                 .contains("RTX 5070 (1)").contains("RTX 5060 (1)").contains("Label: all (2)");
     }
 

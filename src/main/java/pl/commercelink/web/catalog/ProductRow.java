@@ -2,6 +2,7 @@ package pl.commercelink.web.catalog;
 
 import org.apache.commons.lang3.StringUtils;
 import pl.commercelink.products.CategoryDefinition;
+import pl.commercelink.products.MarketplaceDefinition;
 import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductRecommendation;
 import pl.commercelink.web.dtos.FormNumbers;
@@ -24,7 +25,7 @@ public record ProductRow(String id, String name, String ean, String mfn, String 
     public static ProductRow of(Product product, CategoryDefinition category, String catalogId,
                                 Function<String, String> marketplaceDisplayName) {
         Set<String> features = new LinkedHashSet<>();
-        if (!product.getMarketplaces().isEmpty()) {
+        if (exported(product, category)) {
             features.add("marketplace");
         }
         if (product.getStockExpectedQty() > 0) {
@@ -62,6 +63,25 @@ public record ProductRow(String id, String name, String ean, String mfn, String 
     /** The value of the row's feature attribute; the filter group is declared multi-valued, so it splits on spaces. */
     public String featuresAttribute() {
         return String.join(" ", features);
+    }
+
+    /**
+     * Whether {@link pl.commercelink.marketplace.MarketplaceOfferExportEventListener} would publish this product to at
+     * least one marketplace: the export walks the category's definitions, skips the ones that are switched off or
+     * incomplete, reads the enabled products that have a PIM entry and, for a definition exporting a selection only,
+     * keeps the ones approved for it. Everything the export decides per run -- the store's integrations, the catalog's
+     * export switch, the price list and the quantity rules -- is left out; the mark answers "the catalogue lets it out",
+     * not "it went out last night".
+     */
+    private static boolean exported(Product product, CategoryDefinition category) {
+        if (!product.isEnabled() || StringUtils.isBlank(product.getPimId())) {
+            return false;
+        }
+        return category.getMarketplaceDefinitions().stream()
+                .filter(MarketplaceDefinition::isEnabled)
+                .filter(MarketplaceDefinition::isComplete)
+                .anyMatch(definition -> !definition.isExportSelectedProducts()
+                        || product.isApprovedForMarketplace(definition.getName()));
     }
 
     private static boolean outside(CategoryDefinition category, String label) {

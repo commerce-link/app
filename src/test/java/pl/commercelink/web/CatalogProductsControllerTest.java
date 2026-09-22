@@ -27,6 +27,7 @@ import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.CategoryDefinitionType;
+import pl.commercelink.products.MarketplaceDefinition;
 import pl.commercelink.products.PimCategoryOptions;
 import pl.commercelink.products.PriceDefinition;
 import pl.commercelink.products.Product;
@@ -223,6 +224,33 @@ class CatalogProductsControllerTest {
         assertThat(page.rows()).isEmpty();
         verify(recommendationEngine, never()).getRecommendations(any(), any());
         verify(inventory, never()).withEnabledSuppliersOnly(anyString());
+    }
+
+    /**
+     * The "Wystawiane na marketplace" count is what the export would publish: with a definition that exports the whole
+     * category every enabled product with a PIM entry is counted, approved or not, and a product the export skips is
+     * not counted although it still carries an approval in the "Marketplace'y" column.
+     */
+    @Test
+    void theMarketplaceCountIsWhatTheExportWouldPublish() throws Exception {
+        // given
+        MarketplaceDefinition allegro = new MarketplaceDefinition("allegro", 1.2, 0, 0, 0, 0, 1);
+        gpu.getMarketplaceDefinitions().add(allegro);
+        Product listed = new Product(gpu.getCategoryId(), "pim-1", "1", "m", "MSI", "RTX 5070", "MSI RTX 5070", "Default");
+        Product withoutPim = new Product(gpu.getCategoryId(), null, "2", "m", "ASUS", "RTX 5060", "ASUS RTX 5060", "Default");
+        withoutPim.setMarketplaces(List.of("allegro"));
+        when(productRepository.findAll(gpu.getCategoryId())).thenReturn(List.of(listed, withoutPim));
+
+        // when
+        var result = mvc.perform(get(categoryPath())).andExpect(status().isOk()).andReturn();
+
+        // then
+        CategoryPageModel page = (CategoryPageModel) result.getModelAndView().getModel().get("page");
+        assertThat(page.featureCounts()).containsEntry("marketplace", 1);
+        assertThat(page.rows()).filteredOn(row -> row.features().contains("marketplace"))
+                .extracting(ProductRow::name).containsExactly("MSI RTX 5070");
+        assertThat(page.rows()).filteredOn(row -> !row.marketplaceNames().isEmpty())
+                .extracting(ProductRow::name).containsExactly("ASUS RTX 5060");
     }
 
     @Test
