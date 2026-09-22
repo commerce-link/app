@@ -11,7 +11,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ProductsBulkAddFormTest {
 
     private static Product product(String name, String label, String group) {
-        return new Product("cat", "pim", "1", "m", "b", label, name, group);
+        return new Product("cat", "pim", "4719331361600", "m", "b", label, name, group);
+    }
+
+    private static Product withIdentifiers(String ean, String manufacturerCode) {
+        return new Product("cat", "pim", ean, manufacturerCode, "b", "RTX 5070", "MSI RTX 5070", "Default");
     }
 
     @Test
@@ -27,6 +31,28 @@ class ProductsBulkAddFormTest {
         assertThat(errors).containsEntry("product-0-name", "product.error.name.required")
                 .containsEntry("product-1-label", "product.error.label.notInList")
                 .containsEntry("product-1-pricingGroup", "product.error.group.unknown");
+    }
+
+    /**
+     * The identifiers are editable here, so they are checked here, by the rules the product page uses: a product is
+     * known by its EAN or by its manufacturer code, and an EAN that is given is 8--14 digits.
+     */
+    @Test
+    void aRowNeedsAnIdentifierAndAnEanOfEightToFourteenDigits() {
+        // given
+        ProductsBulkAddForm form = ProductsBulkAddForm.of(List.of(
+                withIdentifiers(null, null), withIdentifiers("12345", null), withIdentifiers(null, "MFN-1")));
+
+        // when
+        Map<String, String> errors = form.validate(List.of(), List.of("Default"));
+
+        // then
+        assertThat(errors).containsEntry("product-0-ean", "product.error.identifier.required")
+                // Either field would fix a row with no identifier at all, so both are marked and both are linkable.
+                .containsEntry("product-0-manufacturerCode", "product.error.identifier.required")
+                .containsEntry("product-1-ean", "product.error.ean.invalid")
+                .doesNotContainKey("product-1-manufacturerCode")
+                .doesNotContainKey("product-2-ean");
     }
 
     /** The key of an error is the id of the field it belongs to, so the summary can link to it. */

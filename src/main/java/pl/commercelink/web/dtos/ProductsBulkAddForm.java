@@ -84,6 +84,16 @@ public class ProductsBulkAddForm {
             if (StringUtils.isBlank(row.getName())) {
                 errors.put(fieldId(index, "name"), "product.error.name.required");
             }
+            // The review edits the identifiers, so it checks them by the same rules as the product page. A row with
+            // neither of them is a mistake of both fields -- either one fixes it -- so both are marked and the error
+            // summary links to whichever the operator wants to fill in.
+            String identifierError = ProductForm.identifierError(row.getEan(), row.getManufacturerCode());
+            if (identifierError != null) {
+                errors.put(fieldId(index, "ean"), identifierError);
+            }
+            if (ProductForm.IDENTIFIER_REQUIRED.equals(identifierError)) {
+                errors.put(fieldId(index, "manufacturerCode"), identifierError);
+            }
             if (!categoryLabels.isEmpty() && !categoryLabels.contains(row.getLabel())) {
                 errors.put(fieldId(index, "label"), "product.error.label.notInList");
             }

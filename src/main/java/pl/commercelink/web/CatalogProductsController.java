@@ -68,6 +68,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.TreeMap;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 /**
@@ -275,6 +276,7 @@ public class CatalogProductsController {
         List<InventoryKey> alreadyInCategory = new ArrayList<>(productRepository.findAll(category.getCategoryId()).stream()
                 .map(InventoryKey::fromProduct)
                 .toList());
+        InventoryView enabled = inventory.withEnabledSuppliersOnly(storeId());
         int added = 0;
         for (ProductsBulkAddForm.Row row : form.getProducts()) {
             // The category and the id are the application's to give, and so is the PIM entry: a pim id taken from the
@@ -284,7 +286,7 @@ public class CatalogProductsController {
             if (alreadyInCategory.stream().anyMatch(key::matches)) {
                 continue;
             }
-            pimCatalog.findByGtinOrMpn(product.getEan(), product.getManufacturerCode()).ifPresent(entry -> {
+            pimEntryOf(enabled, key, product).ifPresent(entry -> {
                 product.setPimId(entry.pimId());
                 product.setBrand(brandMapper.unifyBrand(entry.brand()));
             });
@@ -461,6 +463,29 @@ public class CatalogProductsController {
         return "redirect:" + CatalogPaths.category(catalogId, categoryId);
     }
 
+    /**
+     * The PIM entry of a product being added, resolved the way the review resolved it: through the inventory key the
+     * suppliers know the item by, which carries every EAN and product code listed under it. Asking with the two
+     * identifiers of the row alone would miss an entry the catalogue holds under a sibling code, and the product would
+     * be saved without a pim id -- out of the price list and out of every marketplace offer.
+     *
+     * <p>The row's own two codes are asked about whenever the key answers nothing: the product may have left the
+     * inventory between the review and the save, and the key the inventory does know it by may not carry the
+     * identifier the operator has just corrected in the review.
+     */
+    private Optional<PimEntry> pimEntryOf(InventoryView inventory, InventoryKey key, Product product) {
+        MatchedInventory matched = inventory.findByInventoryKey(key);
+        if (!matched.isEmpty()) {
+            InventoryKey known = matched.getInventoryKey();
+            Optional<PimEntry> byInventoryKey = pimCatalog.findByPimIdOrGtinsOrMpns(
+                    known.getId(), known.getProductEans(), known.getProductCodes());
+            if (byInventoryKey.isPresent()) {
+                return byInventoryKey;
+            }
+        }
+        return pimCatalog.findByGtinOrMpn(product.getEan(), product.getManufacturerCode());
+    }
+
     /** The PIM entry the submitted identifiers point at, which the saved product's own entry is compared with. */
     private Optional<String> pimIdFor(ProductForm.PimCheck check) {
         return pimCatalog.findByGtinOrMpn(check.ean(), check.mfn()).map(PimEntry::pimId);
@@ -511,6 +536,7 @@ public class CatalogProductsController {
                 ? existing.getName() : messageSource.getMessage("product.page.new", null, locale));
         model.addAttribute("deleteHref", edit
                 ? CatalogPaths.productDelete(catalogId, categoryId, existing.getProductId()) : null);
+        model.addAttribute("productId", edit ? existing.getProductId() : null);
         model.addAttribute("lead", lead(form, pimId, locale));
         // Rarely used sections open by themselves when they hold something, and whenever they hold a mistake to fix.
         model.addAttribute("openStock", form.hasStockOrMarketplaceValues()
@@ -603,17 +629,24 @@ public class CatalogProductsController {
     private List<ProductRow> rowsOf(ProductCatalog catalog, CategoryDefinition category) {
         if (category.hasType(CategoryDefinitionType.Dynamic)) {
             // Without PIM categories the engine has nothing to match, and reading the inventory would be wasted work.
+            // The engine answers in its own order (brand, then price); both kinds of category read the same way.
             return category.hasCategoryMapping()
                     ? recommendationEngine.getRecommendations(category, inventory.withEnabledSuppliersOnly(storeId())).stream()
+                            .sorted(byLabelThenName(ProductRecommendation::getLabel, ProductRecommendation::getName))
                             .map(recommendation -> ProductRow.ofRecommendation(recommendation, category))
                             .toList()
                     : List.of();
         }
         return productRepository.findAll(category.getCategoryId()).stream()
-                .sorted(Comparator.comparing(Product::getLabel, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER))
-                        .thenComparing(Product::getName, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)))
+                .sorted(byLabelThenName(Product::getLabel, Product::getName))
                 .map(product -> ProductRow.of(product, category, catalog.getCatalogId(), marketplaces::displayName))
                 .toList();
+    }
+
+    /** The order of every product list: by label, then by name, regardless of case; a missing value goes last. */
+    private static <T> Comparator<T> byLabelThenName(Function<T, String> label, Function<T, String> name) {
+        return Comparator.comparing(label, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER))
+                .thenComparing(name, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER));
     }
 
     private String save(List<Product> products, boolean enabled) {

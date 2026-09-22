@@ -3762,6 +3762,11 @@ a.cl-link-button:hover {
     vertical-align: middle;
 }
 
+/* The product cell of the bulk review holds the brand and then the two identifier fields, one under the other. */
+.cl-page .cl-table.is-editable tbody th .cl-input {
+    margin-top: 6px;
+}
+
 .cl-page .cl-table.is-compact thead th,
 .cl-page .cl-table.is-compact td,
 .cl-page .cl-table.is-compact tbody th {

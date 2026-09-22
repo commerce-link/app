@@ -27,6 +27,7 @@ import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.CategoryDefinitionType;
+import pl.commercelink.products.MarketplaceDefinition;
 import pl.commercelink.products.PimCategoryOptions;
 import pl.commercelink.products.PriceDefinition;
 import pl.commercelink.products.Product;
@@ -52,6 +53,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasEntry;
@@ -88,6 +90,8 @@ class CatalogProductsControllerTest {
     private Inventory inventory;
     @Mock
     private InventoryView inventoryView;
+    @Mock
+    private MatchedInventory emptyInventory;
     @Mock
     private MarketplaceConnections marketplaces;
     @Mock
@@ -126,6 +130,10 @@ class CatalogProductsControllerTest {
         lenient().when(marketplaces.displayName(anyString())).thenAnswer(call -> call.getArgument(0));
         lenient().when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenAnswer(call -> call.getArgument(0));
         lenient().when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        // The save looks every row up in the inventory; by default nothing is there and the PIM is asked directly.
+        lenient().when(emptyInventory.isEmpty()).thenReturn(true);
+        lenient().when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(inventoryView);
+        lenient().when(inventoryView.findByInventoryKey(any())).thenReturn(emptyInventory);
         lenient().when(store.getMarketplaces()).thenReturn(List.of());
         lenient().when(store.getEnabledCategories()).thenReturn(List.of());
         lenient().when(pimCategoryOptions.namedOptions(any(), any())).thenReturn(List.of());
@@ -223,6 +231,93 @@ class CatalogProductsControllerTest {
         assertThat(page.rows()).isEmpty();
         verify(recommendationEngine, never()).getRecommendations(any(), any());
         verify(inventory, never()).withEnabledSuppliersOnly(anyString());
+    }
+
+    /**
+     * The "Wystawiane na marketplace" count is what the export would publish: with a definition that exports the whole
+     * category every enabled product with a PIM entry is counted, approved or not, and a product the export skips is
+     * not counted although it still carries an approval in the "Marketplace'y" column.
+     */
+    @Test
+    void theMarketplaceCountIsWhatTheExportWouldPublish() throws Exception {
+        // given
+        MarketplaceDefinition allegro = new MarketplaceDefinition("allegro", 1.2, 0, 0, 0, 0, 1);
+        gpu.getMarketplaceDefinitions().add(allegro);
+        Product listed = new Product(gpu.getCategoryId(), "pim-1", "1", "m", "MSI", "RTX 5070", "MSI RTX 5070", "Default");
+        Product withoutPim = new Product(gpu.getCategoryId(), null, "2", "m", "ASUS", "RTX 5060", "ASUS RTX 5060", "Default");
+        withoutPim.setMarketplaces(List.of("allegro"));
+        when(productRepository.findAll(gpu.getCategoryId())).thenReturn(List.of(listed, withoutPim));
+
+        // when
+        var result = mvc.perform(get(categoryPath())).andExpect(status().isOk()).andReturn();
+
+        // then
+        CategoryPageModel page = (CategoryPageModel) result.getModelAndView().getModel().get("page");
+        assertThat(page.featureCounts()).containsEntry("marketplace", 1);
+        assertThat(page.rows()).filteredOn(row -> row.features().contains("marketplace"))
+                .extracting(ProductRow::name).containsExactly("MSI RTX 5070");
+        assertThat(page.rows()).filteredOn(row -> !row.marketplaceNames().isEmpty())
+                .extracting(ProductRow::name).containsExactly("ASUS RTX 5060");
+    }
+
+    /**
+     * The old {@code ?status=MarketplaceEligible} view of an automatic category listed every mapped proposal, which the
+     * export never published: {@code MarketplaceOfferExportEventListener} reads a category's offers from
+     * {@code productRepository.findAllProductsWithPimId}, and an automatic category has no products of its own. The
+     * view is therefore not brought back; its address stays a working link that opens the whole list.
+     */
+    @Test
+    void theLegacyMarketplaceViewOfAnAutomaticCategoryOpensTheWholeList() throws Exception {
+        // given
+        gpu.setType(CategoryDefinitionType.Dynamic);
+        gpu.setPimCategoryIds(List.of("pim-gpu"));
+        gpu.getMarketplaceDefinitions().add(new MarketplaceDefinition("allegro", 1.2, 0, 0, 0, 0, 1));
+        ProductRecommendation recommendation = mock(ProductRecommendation.class);
+        when(recommendation.hasPimId()).thenReturn(true);
+        when(recommendation.getName()).thenReturn("MSI RTX 5070");
+        when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(inventoryView);
+        when(recommendationEngine.getRecommendations(gpu, inventoryView)).thenReturn(List.of(recommendation));
+
+        // when
+        var result = mvc.perform(get(categoryPath()).param("status", "all").param("feature", "marketplace"))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        // then
+        CategoryPageModel page = (CategoryPageModel) result.getModelAndView().getModel().get("page");
+        assertThat(page.rows()).extracting(ProductRow::name).containsExactly("MSI RTX 5070");
+        assertThat(page.featureCounts()).containsEntry("marketplace", 0);
+    }
+
+    /** Both kinds of category read the same way: by label, then by name, regardless of case. */
+    @Test
+    void automaticCategoryRowsAreSortedByLabelThenNameLikeAManualOne() throws Exception {
+        // given
+        gpu.setType(CategoryDefinitionType.Dynamic);
+        gpu.setPimCategoryIds(List.of("pim-gpu"));
+        List<ProductRecommendation> engineOrder = List.of(
+                recommendation("RTX 5070", "msi rtx 5070"),
+                recommendation("RTX 5060", "Zotac RTX 5060"),
+                recommendation("RTX 5060", "ASUS RTX 5060"),
+                recommendation("RTX 5070", "Gigabyte RTX 5070"));
+        when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(inventoryView);
+        when(recommendationEngine.getRecommendations(gpu, inventoryView)).thenReturn(engineOrder);
+
+        // when
+        var result = mvc.perform(get(categoryPath())).andExpect(status().isOk()).andReturn();
+
+        // then
+        CategoryPageModel page = (CategoryPageModel) result.getModelAndView().getModel().get("page");
+        assertThat(page.rows()).extracting(ProductRow::name)
+                .containsExactly("ASUS RTX 5060", "Zotac RTX 5060", "Gigabyte RTX 5070", "msi rtx 5070");
+    }
+
+    private static ProductRecommendation recommendation(String label, String name) {
+        ProductRecommendation recommendation = mock(ProductRecommendation.class);
+        lenient().when(recommendation.hasPimId()).thenReturn(true);
+        lenient().when(recommendation.getLabel()).thenReturn(label);
+        lenient().when(recommendation.getName()).thenReturn(name);
+        return recommendation;
     }
 
     @Test
@@ -388,12 +483,12 @@ class CatalogProductsControllerTest {
         // given
         gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
         // Product normalises the identifiers it is given, so the lookup asks with the unified code.
-        when(pimCatalog.findByGtinOrMpn("1", "M")).thenReturn(Optional.empty());
+        when(pimCatalog.findByGtinOrMpn("5901234567890", "M")).thenReturn(Optional.empty());
 
         // when / then
         mvc.perform(post(categoryPath() + "/products/add/save")
                         .param("products[0].categoryId", "someone-elses").param("products[0].productId", "forged")
-                        .param("products[0].name", "X").param("products[0].ean", "1")
+                        .param("products[0].name", "X").param("products[0].ean", "5901234567890")
                         .param("products[0].manufacturerCode", "m").param("products[0].label", "L")
                         .param("products[0].pricingGroup", "Default"))
                 .andExpect(redirectedUrl(categoryPath()))
@@ -415,14 +510,14 @@ class CatalogProductsControllerTest {
         PimEntry entry = mock(PimEntry.class);
         when(entry.pimId()).thenReturn("pim-9");
         when(entry.brand()).thenReturn("msi");
-        when(pimCatalog.findByGtinOrMpn("1", "M")).thenReturn(Optional.of(entry));
+        when(pimCatalog.findByGtinOrMpn("5901234567890", "M")).thenReturn(Optional.of(entry));
         when(brandMapper.unifyBrand("msi")).thenReturn("MSI");
 
         // when
         mvc.perform(post(categoryPath() + "/products/add/save")
                         .param("products[0].pimId", "forged").param("products[0].version", "9")
                         .param("products[0].productPage", "<p>forged</p>").param("products[0].enabled", "false")
-                        .param("products[0].name", "X").param("products[0].ean", "1")
+                        .param("products[0].name", "X").param("products[0].ean", "5901234567890")
                         .param("products[0].manufacturerCode", "m").param("products[0].brand", "Fake")
                         .param("products[0].label", "L").param("products[0].pricingGroup", "Default"))
                 .andExpect(redirectedUrl(categoryPath()));
@@ -446,11 +541,11 @@ class CatalogProductsControllerTest {
         // given
         gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
         when(productRepository.findAll(gpu.getCategoryId())).thenReturn(List.of(
-                new Product(gpu.getCategoryId(), "pim", "1", "MFN-1", "MSI", "L", "MSI RTX 5070", "Default")));
+                new Product(gpu.getCategoryId(), "pim", "5901234567890", "MFN-1", "MSI", "L", "MSI RTX 5070", "Default")));
 
         // when / then
         mvc.perform(post(categoryPath() + "/products/add/save")
-                        .param("products[0].name", "MSI RTX 5070").param("products[0].ean", "1")
+                        .param("products[0].name", "MSI RTX 5070").param("products[0].ean", "5901234567890")
                         .param("products[0].manufacturerCode", "MFN-1").param("products[0].pricingGroup", "Default"))
                 .andExpect(redirectedUrl(categoryPath()))
                 .andExpect(flash().attribute("settingsSavedMessage", "catalog.products.added.none"));
@@ -464,14 +559,14 @@ class CatalogProductsControllerTest {
         // given
         gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
         when(productRepository.findAll(gpu.getCategoryId())).thenReturn(List.of(
-                new Product(gpu.getCategoryId(), "pim", "1", "MFN-1", "MSI", "L", "MSI RTX 5070", "Default")));
-        when(pimCatalog.findByGtinOrMpn("2", null)).thenReturn(Optional.empty());
+                new Product(gpu.getCategoryId(), "pim", "5901234567890", "MFN-1", "MSI", "L", "MSI RTX 5070", "Default")));
+        when(pimCatalog.findByGtinOrMpn("5901234567891", null)).thenReturn(Optional.empty());
 
         // when / then
         mvc.perform(post(categoryPath() + "/products/add/save")
-                        .param("products[0].name", "MSI RTX 5070").param("products[0].ean", "1")
+                        .param("products[0].name", "MSI RTX 5070").param("products[0].ean", "5901234567890")
                         .param("products[0].manufacturerCode", "MFN-1").param("products[0].pricingGroup", "Default")
-                        .param("products[1].name", "ASUS RTX 5060").param("products[1].ean", "2")
+                        .param("products[1].name", "ASUS RTX 5060").param("products[1].ean", "5901234567891")
                         .param("products[1].pricingGroup", "Default"))
                 .andExpect(redirectedUrl(categoryPath()));
         ArgumentCaptor<Product> saved = ArgumentCaptor.forClass(Product.class);
@@ -485,18 +580,157 @@ class CatalogProductsControllerTest {
     void saveLeavesTheProductWithoutAPimIdWhenThePimDoesNotKnowIt() throws Exception {
         // given
         gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
-        when(pimCatalog.findByGtinOrMpn("1", null)).thenReturn(Optional.empty());
+        when(pimCatalog.findByGtinOrMpn("5901234567890", null)).thenReturn(Optional.empty());
 
         // when
         mvc.perform(post(categoryPath() + "/products/add/save")
                         .param("products[0].pimId", "forged").param("products[0].name", "X")
-                        .param("products[0].ean", "1").param("products[0].pricingGroup", "Default"))
+                        .param("products[0].ean", "5901234567890").param("products[0].pricingGroup", "Default"))
                 .andExpect(redirectedUrl(categoryPath()));
 
         // then
         ArgumentCaptor<Product> saved = ArgumentCaptor.forClass(Product.class);
         verify(productRepository).save(saved.capture());
         assertThat(saved.getValue().getPimId()).isNull();
+    }
+
+    /**
+     * The identifiers are editable in the review, and they decide which PIM entry the product resolves to: what the
+     * review sends is what is saved and what the catalogue is asked about.
+     */
+    @Test
+    void anEanCorrectedInTheReviewIsTheOneThatIsSaved() throws Exception {
+        // given
+        gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
+        PimEntry entry = mock(PimEntry.class);
+        when(entry.pimId()).thenReturn("pim-9");
+        when(entry.brand()).thenReturn("msi");
+        when(pimCatalog.findByGtinOrMpn("5901234567899", "MFN-9")).thenReturn(Optional.of(entry));
+        when(brandMapper.unifyBrand("msi")).thenReturn("MSI");
+
+        // when
+        mvc.perform(post(categoryPath() + "/products/add/save")
+                        .param("products[0].name", "MSI RTX 5070").param("products[0].ean", "5901234567899")
+                        .param("products[0].manufacturerCode", "MFN-9").param("products[0].pricingGroup", "Default"))
+                .andExpect(redirectedUrl(categoryPath()));
+
+        // then
+        ArgumentCaptor<Product> saved = ArgumentCaptor.forClass(Product.class);
+        verify(productRepository).save(saved.capture());
+        assertThat(saved.getValue().getEan()).isEqualTo("5901234567899");
+        assertThat(saved.getValue().getManufacturerCode()).isEqualTo("MFN-9");
+        assertThat(saved.getValue().getPimId()).isEqualTo("pim-9");
+    }
+
+    /** A wrong identifier is refused where it is typed, instead of creating a product nothing can be matched to. */
+    @Test
+    @SuppressWarnings("unchecked")
+    void aRowWithoutAnIdentifierOrWithAMalformedEanComesBackToTheReview() throws Exception {
+        // given
+        gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
+
+        // when
+        var result = mvc.perform(post(categoryPath() + "/products/add/save")
+                        .param("products[0].name", "X").param("products[0].pricingGroup", "Default")
+                        .param("products[1].name", "Y").param("products[1].ean", "12345")
+                        .param("products[1].pricingGroup", "Default"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(view().name("catalog/products-add-review"))
+                .andReturn();
+
+        // then
+        assertThat((Map<String, String>) result.getModelAndView().getModel().get("errors"))
+                .containsEntry("product-0-ean", "product.error.identifier.required")
+                .containsEntry("product-1-ean", "product.error.ean.invalid");
+        verify(productRepository, never()).save(any(Product.class));
+    }
+
+    /**
+     * The review resolves a proposal through the whole inventory key -- every EAN and product code the suppliers list
+     * the item under -- and the save must not be narrower, or a product whose PIM entry is known only by a sibling
+     * identifier would be written without a pim id and drop out of the price list.
+     */
+    @Test
+    void saveResolvesThePimEntryThroughTheWholeInventoryKey() throws Exception {
+        // given
+        gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
+        InventoryKey key = new InventoryKey(Set.of("5901234567890", "4719331361600"), Set.of("MFN-1"));
+        MatchedInventory matched = mock(MatchedInventory.class);
+        when(matched.isEmpty()).thenReturn(false);
+        when(matched.getInventoryKey()).thenReturn(key);
+        when(inventoryView.findByInventoryKey(any())).thenReturn(matched);
+        PimEntry entry = mock(PimEntry.class);
+        when(entry.pimId()).thenReturn("pim-9");
+        when(entry.brand()).thenReturn("msi");
+        when(pimCatalog.findByPimIdOrGtinsOrMpns(key.getId(), key.getProductEans(), key.getProductCodes()))
+                .thenReturn(Optional.of(entry));
+        when(brandMapper.unifyBrand("msi")).thenReturn("MSI");
+
+        // when
+        mvc.perform(post(categoryPath() + "/products/add/save")
+                        .param("products[0].name", "MSI RTX 5070").param("products[0].ean", "5901234567890")
+                        .param("products[0].pricingGroup", "Default"))
+                .andExpect(redirectedUrl(categoryPath()));
+
+        // then
+        ArgumentCaptor<Product> saved = ArgumentCaptor.forClass(Product.class);
+        verify(productRepository).save(saved.capture());
+        assertThat(saved.getValue().getPimId()).isEqualTo("pim-9");
+        assertThat(saved.getValue().getBrand()).isEqualTo("MSI");
+        verify(pimCatalog, never()).findByGtinOrMpn(any(), any());
+    }
+
+    /**
+     * The inventory knows the product by its EAN but the catalogue has no entry under that key: the manufacturer code
+     * the operator has just corrected in the review is the last thing left to ask about, so it is asked.
+     */
+    @Test
+    void saveStillAsksAboutTheCorrectedCodeWhenTheInventoryKeyResolvesToNothing() throws Exception {
+        // given
+        gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
+        InventoryKey key = new InventoryKey(Set.of("5901234567890"), Set.of());
+        MatchedInventory matched = mock(MatchedInventory.class);
+        when(matched.isEmpty()).thenReturn(false);
+        when(matched.getInventoryKey()).thenReturn(key);
+        when(inventoryView.findByInventoryKey(any())).thenReturn(matched);
+        when(pimCatalog.findByPimIdOrGtinsOrMpns(key.getId(), key.getProductEans(), key.getProductCodes()))
+                .thenReturn(Optional.empty());
+        PimEntry entry = mock(PimEntry.class);
+        when(entry.pimId()).thenReturn("pim-5");
+        when(pimCatalog.findByGtinOrMpn("5901234567890", "MFN-9")).thenReturn(Optional.of(entry));
+
+        // when
+        mvc.perform(post(categoryPath() + "/products/add/save")
+                        .param("products[0].name", "MSI RTX 5070").param("products[0].ean", "5901234567890")
+                        .param("products[0].manufacturerCode", "MFN-9").param("products[0].pricingGroup", "Default"))
+                .andExpect(redirectedUrl(categoryPath()));
+
+        // then
+        ArgumentCaptor<Product> saved = ArgumentCaptor.forClass(Product.class);
+        verify(productRepository).save(saved.capture());
+        assertThat(saved.getValue().getPimId()).isEqualTo("pim-5");
+    }
+
+    /** A product that left the inventory between the review and the save is still asked about by its own two codes. */
+    @Test
+    void saveFallsBackToTheSubmittedIdentifiersWhenTheInventoryNoLongerHasTheProduct() throws Exception {
+        // given
+        gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
+        PimEntry entry = mock(PimEntry.class);
+        when(entry.pimId()).thenReturn("pim-7");
+        when(pimCatalog.findByGtinOrMpn("5901234567890", "MFN-1")).thenReturn(Optional.of(entry));
+
+        // when
+        mvc.perform(post(categoryPath() + "/products/add/save")
+                        .param("products[0].name", "MSI RTX 5070").param("products[0].ean", "5901234567890")
+                        .param("products[0].manufacturerCode", "MFN-1").param("products[0].pricingGroup", "Default"))
+                .andExpect(redirectedUrl(categoryPath()));
+
+        // then
+        ArgumentCaptor<Product> saved = ArgumentCaptor.forClass(Product.class);
+        verify(productRepository).save(saved.capture());
+        assertThat(saved.getValue().getPimId()).isEqualTo("pim-7");
+        verify(pimCatalog, never()).findByPimIdOrGtinsOrMpns(any(), any(), any());
     }
 
     /** Selecting every proposal of a large category posts more rows than Spring grows a list to by default. */
@@ -508,7 +742,7 @@ class CatalogProductsControllerTest {
         MockHttpServletRequestBuilder request = post(categoryPath() + "/products/add/save");
         for (int index = 0; index < 300; index++) {
             request.param("products[" + index + "].name", "Product " + index)
-                    .param("products[" + index + "].ean", String.valueOf(index))
+                    .param("products[" + index + "].ean", String.format("59012345%05d", index))
                     .param("products[" + index + "].pricingGroup", "Default");
         }
 
@@ -569,7 +803,8 @@ class CatalogProductsControllerTest {
 
         // when
         var result = mvc.perform(post(categoryPath() + "/products/add/save")
-                        .param("products[0].name", "X").param("products[0].pricingGroup", "Nope"))
+                        .param("products[0].name", "X").param("products[0].ean", "5901234567890")
+                        .param("products[0].pricingGroup", "Nope"))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(view().name("catalog/products-add-review"))
                 .andReturn();
@@ -667,6 +902,23 @@ class CatalogProductsControllerTest {
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(model().attribute("errors", hasEntry("ean", "product.error.pim.changed")));
         verify(productRepository, never()).save(any(Product.class));
+    }
+
+    /** The page of a saved product states the id; a product being created has none yet. */
+    @Test
+    void theProductPageCarriesTheIdOfASavedProductOnly() throws Exception {
+        // given
+        Product product = new Product(gpu.getCategoryId(), "pim", "5901234567890", "m", "MSI", "L", "MSI RTX 5070", "Default");
+        product.setProductId("p-1");
+        when(access.requireProduct(gpu, "p-1")).thenReturn(product);
+
+        // when / then
+        mvc.perform(get(categoryPath() + "/products/p-1"))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("productId", "p-1"));
+        mvc.perform(get(categoryPath() + "/products/new"))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("productId", nullValue()));
     }
 
     @Test

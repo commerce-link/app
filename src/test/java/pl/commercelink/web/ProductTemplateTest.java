@@ -136,6 +136,7 @@ class ProductTemplateTest {
         variables.put("pageTitle", "Gigabyte RTX 5080");
         variables.put("lead", "EAN 4719331361600 &middot; PIM pim-1");
         variables.put("deleteHref", edit ? "/dashboard/catalogs/c1/category/k1/products/p1/delete" : null);
+        variables.put("productId", edit ? "p1" : null);
         variables.put("openStock", false);
         variables.put("openClient", true);
         variables.put("redirectTo", null);
@@ -154,6 +155,14 @@ class ProductTemplateTest {
         assertThat(occurrences(html, "/dashboard/catalogs/c1/category/k1/products/p1/delete")).isEqualTo(1);
         assertThat(html.indexOf("cl-page-actions")).isLessThan(html.indexOf("/products/p1/delete"));
         assertThat(html).doesNotContain("??");
+    }
+
+    /** Support conversations quote the product id; a saved product states it instead of hiding it in the address. */
+    @Test
+    void aSavedProductStatesItsIdAndANewOneHasNone() {
+        // when / then
+        assertThat(rendered(true)).contains("ID: p1");
+        assertThat(rendered(false)).doesNotContain("ID: ");
     }
 
     @Test

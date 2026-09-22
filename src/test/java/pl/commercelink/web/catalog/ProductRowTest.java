@@ -2,9 +2,11 @@ package pl.commercelink.web.catalog;
 
 import org.junit.jupiter.api.Test;
 import pl.commercelink.products.CategoryDefinition;
+import pl.commercelink.products.MarketplaceDefinition;
 import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductRecommendation;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -27,6 +29,19 @@ class ProductRowTest {
         return category;
     }
 
+    /** A definition the export accepts: named, with a markup and a warehouse criterion, so {@code isComplete}. */
+    private static MarketplaceDefinition definition(String name, boolean exportSelectedProducts) {
+        MarketplaceDefinition definition = new MarketplaceDefinition(name, 1.2, 0, 0, 0, 0, 1);
+        definition.setExportSelectedProducts(exportSelectedProducts);
+        return definition;
+    }
+
+    private static CategoryDefinition categoryWith(MarketplaceDefinition... definitions) {
+        CategoryDefinition category = category("RTX 5080");
+        category.setMarketplaceDefinitions(new ArrayList<>(List.of(definitions)));
+        return category;
+    }
+
     @Test
     void activeProductWithMarketplacesAndFeatures() {
         // given
@@ -36,7 +51,7 @@ class ProductRowTest {
         p.setSuggestedRetailPrice(4999);
 
         // when
-        ProductRow row = ProductRow.of(p, category("RTX 5080"), "c1", name -> name.toUpperCase());
+        ProductRow row = ProductRow.of(p, categoryWith(definition("allegro", true)), "c1", name -> name.toUpperCase());
 
         // then
         assertThat(row.status()).isEqualTo(ProductStatus.ACTIVE);
@@ -65,6 +80,73 @@ class ProductRowTest {
         assertThat(ProductRow.of(noPim, gpu, "c1", n -> n).status()).isEqualTo(ProductStatus.NO_PIM);
         assertThat(ProductRow.of(product(), gpu, "c1", n -> n).labelOutside()).isTrue();
         assertThat(ProductRow.of(service, gpu, "c1", n -> n).features()).contains("service");
+    }
+
+    /**
+     * The mark means "the export would publish it", which is what the old {@code MarketplaceEligible} view listed: a
+     * definition that exports the whole category takes every enabled product with a PIM id, a definition that exports
+     * a selection takes only the approved ones, and a category with no usable definition exports nothing at all.
+     */
+    @Test
+    void theMarketplaceMarkFollowsWhatTheExportWouldPublish() {
+        // given
+        Product approved = product();
+        approved.setMarketplaces(List.of("allegro"));
+        Product notApproved = product();
+
+        // when / then
+        assertThat(ProductRow.of(notApproved, categoryWith(definition("allegro", false)), "c1", n -> n).features())
+                .contains("marketplace");
+        assertThat(ProductRow.of(notApproved, categoryWith(definition("allegro", true)), "c1", n -> n).features())
+                .doesNotContain("marketplace");
+        assertThat(ProductRow.of(approved, categoryWith(definition("allegro", true)), "c1", n -> n).features())
+                .contains("marketplace");
+        assertThat(ProductRow.of(approved, category("RTX 5080"), "c1", n -> n).features())
+                .doesNotContain("marketplace");
+    }
+
+    /** A definition switched off is the one gate the export applies per definition, so it publishes nothing. */
+    @Test
+    void aDisabledMarketplaceDefinitionMarksNothing() {
+        // given
+        MarketplaceDefinition disabled = definition("allegro", false);
+        disabled.setEnabled(false);
+
+        // when / then
+        assertThat(ProductRow.of(product(), categoryWith(disabled), "c1", n -> n).features())
+                .doesNotContain("marketplace");
+    }
+
+    /**
+     * An enabled definition without a markup and a quantity rule still reaches the export: the only completeness gate
+     * is catalog-wide ({@code ProductCatalog.isMarketplaceExportEnabled}), not per definition, and the old
+     * {@code MarketplaceEligible} view counted such a definition too ({@code hasEnabledMarketplaceDefinitions}).
+     */
+    @Test
+    void anEnabledButIncompleteMarketplaceDefinitionStillMarks() {
+        // given
+        MarketplaceDefinition incomplete = new MarketplaceDefinition("empik", 0, 0, 0, 0, 0, 0);
+
+        // when / then
+        assertThat(ProductRow.of(product(), categoryWith(incomplete), "c1", n -> n).features())
+                .contains("marketplace");
+    }
+
+    /** The export reads enabled products with a PIM id only, so neither half of that is marked. */
+    @Test
+    void aDisabledProductOrOneWithoutAPimEntryIsNeverMarked() {
+        // given
+        Product disabled = product();
+        disabled.setEnabled(false);
+        disabled.setMarketplaces(List.of("allegro"));
+        Product noPim = product();
+        noPim.setPimId(null);
+        noPim.setMarketplaces(List.of("allegro"));
+        CategoryDefinition exporting = categoryWith(definition("allegro", false));
+
+        // when / then
+        assertThat(ProductRow.of(disabled, exporting, "c1", n -> n).features()).doesNotContain("marketplace");
+        assertThat(ProductRow.of(noPim, exporting, "c1", n -> n).features()).doesNotContain("marketplace");
     }
 
     /** A category without a label list has no "outside" label: the catalog page counts such products the same way. */
