@@ -437,6 +437,49 @@ class CatalogProductsControllerTest {
         assertThat(saved.getValue().isEnabled()).isTrue();
     }
 
+    /**
+     * The review of one selection can be sent twice (Back, a double click), and the review step only skips what the
+     * category had when it was rendered: the save makes the same decision again, against the category as it is now.
+     */
+    @Test
+    void saveSkipsProductsTheCategoryAlreadyHasAndSaysNothingWasAdded() throws Exception {
+        // given
+        gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
+        when(productRepository.findAll(gpu.getCategoryId())).thenReturn(List.of(
+                new Product(gpu.getCategoryId(), "pim", "1", "MFN-1", "MSI", "L", "MSI RTX 5070", "Default")));
+
+        // when / then
+        mvc.perform(post(categoryPath() + "/products/add/save")
+                        .param("products[0].name", "MSI RTX 5070").param("products[0].ean", "1")
+                        .param("products[0].manufacturerCode", "MFN-1").param("products[0].pricingGroup", "Default"))
+                .andExpect(redirectedUrl(categoryPath()))
+                .andExpect(flash().attribute("settingsSavedMessage", "catalog.products.added.none"));
+        verify(productRepository, never()).save(any(Product.class));
+        verify(pimCatalog, never()).findByGtinOrMpn(any(), any());
+    }
+
+    /** A selection where only some rows are new: the outcome counts what was added, not what was sent. */
+    @Test
+    void saveCountsOnlyTheProductsItActuallyAdded() throws Exception {
+        // given
+        gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
+        when(productRepository.findAll(gpu.getCategoryId())).thenReturn(List.of(
+                new Product(gpu.getCategoryId(), "pim", "1", "MFN-1", "MSI", "L", "MSI RTX 5070", "Default")));
+        when(pimCatalog.findByGtinOrMpn("2", null)).thenReturn(Optional.empty());
+
+        // when / then
+        mvc.perform(post(categoryPath() + "/products/add/save")
+                        .param("products[0].name", "MSI RTX 5070").param("products[0].ean", "1")
+                        .param("products[0].manufacturerCode", "MFN-1").param("products[0].pricingGroup", "Default")
+                        .param("products[1].name", "ASUS RTX 5060").param("products[1].ean", "2")
+                        .param("products[1].pricingGroup", "Default"))
+                .andExpect(redirectedUrl(categoryPath()));
+        ArgumentCaptor<Product> saved = ArgumentCaptor.forClass(Product.class);
+        verify(productRepository).save(saved.capture());
+        assertThat(saved.getValue().getName()).isEqualTo("ASUS RTX 5060");
+        verify(messageSource).getMessage(eq("catalog.products.added"), eq(new Object[]{1}), any(Locale.class));
+    }
+
     /** Without an entry in the PIM the product is saved without a pim id; the one from the request is never used. */
     @Test
     void saveLeavesTheProductWithoutAPimIdWhenThePimDoesNotKnowIt() throws Exception {

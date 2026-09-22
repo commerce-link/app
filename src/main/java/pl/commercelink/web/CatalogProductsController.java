@@ -270,18 +270,31 @@ public class CatalogProductsController {
             response.setStatus(HttpStatus.UNPROCESSABLE_ENTITY.value());
             return renderReview(catalog, category, form, List.of(), List.of(), errors, model, locale);
         }
+        // The review skipped what the category had when it was rendered; the same review sent again (Back, a double
+        // click) is decided here once more, against the category as it is now.
+        List<InventoryKey> alreadyInCategory = new ArrayList<>(productRepository.findAll(category.getCategoryId()).stream()
+                .map(InventoryKey::fromProduct)
+                .toList());
+        int added = 0;
         for (ProductsBulkAddForm.Row row : form.getProducts()) {
             // The category and the id are the application's to give, and so is the PIM entry: a pim id taken from the
             // form would bind the product to an arbitrary entry of the catalog.
             Product product = row.toProduct(category.getCategoryId());
+            InventoryKey key = InventoryKey.fromProduct(product);
+            if (alreadyInCategory.stream().anyMatch(key::matches)) {
+                continue;
+            }
             pimCatalog.findByGtinOrMpn(product.getEan(), product.getManufacturerCode()).ifPresent(entry -> {
                 product.setPimId(entry.pimId());
                 product.setBrand(brandMapper.unifyBrand(entry.brand()));
             });
             productRepository.save(product);
+            alreadyInCategory.add(key);
+            added++;
         }
-        SettingsFlash.onRedirect(redirectAttributes,
-                messageSource.getMessage("catalog.products.added", new Object[]{form.getProducts().size()}, locale));
+        SettingsFlash.onRedirect(redirectAttributes, added == 0
+                ? messageSource.getMessage("catalog.products.added.none", null, locale)
+                : messageSource.getMessage("catalog.products.added", new Object[]{added}, locale));
         return "redirect:" + CatalogPaths.category(catalogId, categoryId);
     }
 
