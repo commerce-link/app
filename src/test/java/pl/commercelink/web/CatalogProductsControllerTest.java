@@ -559,7 +559,7 @@ class CatalogProductsControllerTest {
         // given
         gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
         when(productRepository.findAll(gpu.getCategoryId())).thenReturn(List.of(
-                new Product(gpu.getCategoryId(), "pim", "1", "MFN-1", "MSI", "L", "MSI RTX 5070", "Default")));
+                new Product(gpu.getCategoryId(), "pim", "5901234567890", "MFN-1", "MSI", "L", "MSI RTX 5070", "Default")));
         when(pimCatalog.findByGtinOrMpn("5901234567891", null)).thenReturn(Optional.empty());
 
         // when / then
