@@ -59,6 +59,40 @@ class InventoryFilterLabelsTest {
                 .containsExactly(Tuple.tuple("MinPrice", "900"), Tuple.tuple("MaxPrice", "2147483647"));
     }
 
+    /**
+     * The filter parses its bounds with Integer.parseInt, so a typed group separator ("5 000", the format the panel
+     * itself prints) has to be gone by the time it is saved — otherwise the filter throws and drops every product.
+     */
+    @Test
+    void priceBoundsAreStoredAsTheParsedNumber() {
+        // given
+        RecommendationFiltersForm.FilterForm form = new RecommendationFiltersForm.FilterForm();
+        form.setType("PRICE_RANGE");
+        form.setMinPrice("5 000");
+        form.setMaxPrice("12 500");
+
+        // when
+        List<Metadata> metadata = InventoryFilterLabels.toMetadata(form);
+
+        // then
+        assertThat(metadata).extracting(Metadata::getKey, Metadata::getValue)
+                .containsExactly(Tuple.tuple("MinPrice", "5000"), Tuple.tuple("MaxPrice", "12500"));
+        assertThat(metadata).allSatisfy(entry -> assertThat(Integer.parseInt(entry.getValue())).isPositive());
+    }
+
+    @Test
+    void anEmptyBoundIsStoredAsTheValueTheFilterReadsAsNoBound() {
+        // given
+        RecommendationFiltersForm.FilterForm form = new RecommendationFiltersForm.FilterForm();
+        form.setType("PRICE_RANGE");
+        form.setMinPrice("");
+        form.setMaxPrice(null);
+
+        // when / then
+        assertThat(InventoryFilterLabels.toMetadata(form)).extracting(Metadata::getKey, Metadata::getValue)
+                .containsExactly(Tuple.tuple("MinPrice", "0"), Tuple.tuple("MaxPrice", "2147483647"));
+    }
+
     /** The bounds the filter reads as "no bound" are shown as empty fields, not as 0 and 2147483647. */
     @Test
     void openPriceBoundsAreShownAsEmptyFields() {

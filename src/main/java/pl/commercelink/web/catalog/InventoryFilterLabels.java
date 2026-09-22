@@ -4,6 +4,7 @@ import org.apache.commons.lang3.StringUtils;
 import pl.commercelink.products.InventoryDefinition;
 import pl.commercelink.products.filters.InventoryFilterType;
 import pl.commercelink.starter.dynamodb.Metadata;
+import pl.commercelink.web.dtos.FormNumbers;
 import pl.commercelink.web.dtos.RecommendationFiltersForm.FilterForm;
 
 import java.util.ArrayList;
@@ -146,10 +147,8 @@ public final class InventoryFilterLabels {
             case LIST -> metadata.add(new Metadata(LIST_KEYS.get(type), StringUtils.trim(form.getValues())));
             // Both bounds are written even when only one was typed: the filter runs only with each of its keys present.
             case PRICE_RANGE -> {
-                metadata.add(new Metadata(MIN_PRICE,
-                        StringUtils.isBlank(form.getMinPrice()) ? NO_MIN_PRICE : form.getMinPrice().trim()));
-                metadata.add(new Metadata(MAX_PRICE,
-                        StringUtils.isBlank(form.getMaxPrice()) ? NO_MAX_PRICE : form.getMaxPrice().trim()));
+                metadata.add(new Metadata(MIN_PRICE, bound(form.getMinPrice(), NO_MIN_PRICE)));
+                metadata.add(new Metadata(MAX_PRICE, bound(form.getMaxPrice(), NO_MAX_PRICE)));
             }
             case BY_BRAND -> parseBrandLines(form.getBrandLines())
                     .forEach((brand, values) -> metadata.add(new Metadata(brand, values)));
@@ -160,6 +159,15 @@ public final class InventoryFilterLabels {
             metadata.add(new Metadata(form.getUnknownKeys().get(index), form.getUnknownValues().get(index)));
         }
         return metadata;
+    }
+
+    /**
+     * The number as the filter reads it, not as it was typed: PriceRangeInventoryFilter parses the value with
+     * Integer.parseInt, and a group separator ("5 000", which the panel itself prints) would make it throw — and a
+     * throwing filter silently drops every product instead of saying anything.
+     */
+    private static String bound(String typed, String noBound) {
+        return FormNumbers.integer(typed).map(String::valueOf).orElse(noBound);
     }
 
     /** One "Brand: value, value" line per brand; empty lines are skipped, a line without a colon is an error with its number. */
