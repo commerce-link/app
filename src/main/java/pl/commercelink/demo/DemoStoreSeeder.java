@@ -206,7 +206,7 @@ public class DemoStoreSeeder implements StoreSeeder {
         applyDemoInvoicingConfiguration(store);
         applyDemoFulfilmentDefaults(store);
         List<CatalogSeedRow> rows = loadFilteredRows();
-        seedStoreData(store.getStoreId(), rows);
+        seedStoreData(store.getStoreId(), rows, false);
         enableAcmeBDropship(store, ACME_B);
         saveSupplierRmaCenters(store.getStoreId());
         saveCompletedOrders(store, rows);
@@ -218,14 +218,25 @@ public class DemoStoreSeeder implements StoreSeeder {
         Store store = Objects.requireNonNullElseGet(mapper.load(Store.class, storeId), Store::new);
         applyStoreConfiguration(store, storeId, storeName, demo);
         connectSecondAcmeB(store);
+        connectDemoMarketplaces(store);
         enableDevInvoicing(store, invoicingProviderFactory);
         mapper.save(store);
         List<CatalogSeedRow> rows = loadFilteredRows();
-        seedStoreData(storeId, rows);
+        seedStoreData(storeId, rows, true);
         enableAcmeBDropship(store, ACME_B);
         enableAcmeBDropship(store, ACME_B_SECOND);
         saveInvoicingFixtures(storeId, rows);
         return store;
+    }
+
+    /**
+     * Marketplaces of the local store, connected on paper: no marketplace adapter is installed locally, so the names
+     * are the labels. Only the local store gets them — a store registered on the demo environment would otherwise be
+     * connected to Allegro without credentials, and its pricelist runs would queue offer exports for it.
+     */
+    private static void connectDemoMarketplaces(Store store) {
+        store.connectMarketplace(DEMO_MARKETPLACE, false);
+        store.connectMarketplace(DEMO_MARKETPLACE_SPARE, false);
     }
 
     private static void connectSecondAcmeB(Store store) {
@@ -284,7 +295,14 @@ public class DemoStoreSeeder implements StoreSeeder {
         return filterSimulationRows(CatalogSeed.load(), simulationSuppliersAvailable());
     }
 
-    private void seedStoreData(String storeId, List<CatalogSeedRow> rows) {
+    /**
+     * @param localShowcase whether this is the local store, whose catalog carries what the catalog screens need to
+     *                      show (an automatic category, labels, a second pricing group, a marketplace definition and
+     *                      products in every state). A store seeded on registration gets the plain catalog: it has no
+     *                      marketplace credentials, and a category exporting to one would make every pricelist run
+     *                      queue an offer export nobody can send.
+     */
+    private void seedStoreData(String storeId, List<CatalogSeedRow> rows, boolean localShowcase) {
         DynamoDBMapper mapper = new DynamoDBMapper(dynamoDB);
 
         savePricelist(storeId);
@@ -297,8 +315,8 @@ public class DemoStoreSeeder implements StoreSeeder {
                 .withSaveBehavior(DynamoDBMapperConfig.SaveBehavior.CLOBBER)
                 .build();
 
-        saveCatalog(mapper, clobber, rows, storeId);
-        saveProducts(mapper, rows, storeId);
+        saveCatalog(mapper, clobber, rows, storeId, localShowcase);
+        saveProducts(mapper, rows, storeId, localShowcase);
         saveWarehouseItems(mapper, rows, storeId);
         saveRmaCenter(mapper, clobber, storeId);
         saveOrders(mapper, clobber, storeId, rows);
@@ -347,11 +365,6 @@ public class DemoStoreSeeder implements StoreSeeder {
         RMAConfiguration rma = Objects.requireNonNullElseGet(store.getRmaConfiguration(), RMAConfiguration::new);
         rma.setCarrier(carrier());
         store.setRmaConfiguration(rma);
-
-        // No marketplace adapter is installed locally, so these are connections on paper: enough for the category
-        // marketplace definitions and the product approvals to have something to point at.
-        store.connectMarketplace(DEMO_MARKETPLACE, false);
-        store.connectMarketplace(DEMO_MARKETPLACE_SPARE, false);
     }
 
     static void applyDemoWarehouseId(Store store) {
@@ -392,8 +405,9 @@ public class DemoStoreSeeder implements StoreSeeder {
         store.setFulfilmentConfiguration(fulfilment);
     }
 
-    private void saveCatalog(DynamoDBMapper mapper, DynamoDBMapperConfig clobber, List<CatalogSeedRow> rows, String storeId) {
-        List<CategoryDefinition> categories = buildCategoryDefinitions(rows, storeId);
+    private void saveCatalog(DynamoDBMapper mapper, DynamoDBMapperConfig clobber, List<CatalogSeedRow> rows, String storeId,
+                            boolean localShowcase) {
+        List<CategoryDefinition> categories = buildCategoryDefinitions(rows, storeId, localShowcase);
 
         ProductCatalog catalog = new ProductCatalog();
         catalog.setStoreId(storeId);
@@ -404,11 +418,16 @@ public class DemoStoreSeeder implements StoreSeeder {
         mapper.save(catalog, clobber);
     }
 
-    private void saveProducts(DynamoDBMapper mapper, List<CatalogSeedRow> rows, String storeId) {
-        mapper.batchSave(buildProducts(rows, storeId));
+    private void saveProducts(DynamoDBMapper mapper, List<CatalogSeedRow> rows, String storeId, boolean localShowcase) {
+        mapper.batchSave(buildProducts(rows, storeId, localShowcase));
     }
 
+    /** The products of a store seeded on registration: enabled, known to the PIM, approved nowhere. */
     static List<Product> buildProducts(List<CatalogSeedRow> rows, String storeId) {
+        return buildProducts(rows, storeId, false);
+    }
+
+    static List<Product> buildProducts(List<CatalogSeedRow> rows, String storeId, boolean localShowcase) {
         List<Product> products = new ArrayList<>();
         for (CatalogSeedRow row : rows) {
             if (!row.inCatalog()) {
@@ -419,7 +438,7 @@ public class DemoStoreSeeder implements StoreSeeder {
             product.setProductId("prod-" + row.pimId());
             product.setEnabled(true);
             product.setEstimatedDeliveryDays(row.estimatedDeliveryDays());
-            if (SHOWCASE_CATEGORY.equals(row.category())) {
+            if (localShowcase && SHOWCASE_CATEGORY.equals(row.category())) {
                 showcaseProduct(product, row);
             }
             products.add(product);
@@ -1285,7 +1304,13 @@ public class DemoStoreSeeder implements StoreSeeder {
         return item;
     }
 
+    /** The catalog of a store seeded on registration: the categories of the feed, nothing added for the local screens. */
     static List<CategoryDefinition> buildCategoryDefinitions(List<CatalogSeedRow> rows, String storeId) {
+        return buildCategoryDefinitions(rows, storeId, false);
+    }
+
+    static List<CategoryDefinition> buildCategoryDefinitions(List<CatalogSeedRow> rows, String storeId,
+                                                            boolean localShowcase) {
         Map<String, String> pimCategoryIdByCategory = rows.stream()
                 .filter(row -> !row.pimCategoryId().isBlank())
                 .collect(Collectors.toMap(CatalogSeedRow::category, CatalogSeedRow::pimCategoryId, (first, second) -> first));
@@ -1310,12 +1335,14 @@ public class DemoStoreSeeder implements StoreSeeder {
             if (pimCategoryId != null) {
                 definition.setPimCategoryIds(new LinkedList<>(List.of(pimCategoryId)));
             }
-            if (SHOWCASE_CATEGORY.equals(category)) {
+            if (localShowcase && SHOWCASE_CATEGORY.equals(category)) {
                 showcaseCategory(definition);
             }
             categories.add(definition);
         }
-        categories.add(automaticCategory(storeId, ++sequence));
+        if (localShowcase) {
+            categories.add(automaticCategory(storeId, ++sequence));
+        }
         return categories;
     }
 

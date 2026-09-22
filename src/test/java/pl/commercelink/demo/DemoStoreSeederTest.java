@@ -253,12 +253,12 @@ class DemoStoreSeederTest {
     }
 
     @Test
-    void seedGivesTheCatalogScreensAnAutomaticCategoryLabelsASecondPricingGroupAndAMarketplace() {
+    void localSeedGivesTheCatalogScreensAnAutomaticCategoryLabelsASecondPricingGroupAndAMarketplace() {
         // given
         List<CatalogSeedRow> rows = CatalogSeed.load();
 
         // when
-        List<CategoryDefinition> definitions = DemoStoreSeeder.buildCategoryDefinitions(rows, "store-1");
+        List<CategoryDefinition> definitions = DemoStoreSeeder.buildCategoryDefinitions(rows, "store-1", true);
 
         // then
         CategoryDefinition automatic = definitions.stream()
@@ -283,7 +283,7 @@ class DemoStoreSeederTest {
         List<CatalogSeedRow> rows = CatalogSeed.load();
 
         // when
-        List<Product> products = DemoStoreSeeder.buildProducts(rows, "store-1").stream()
+        List<Product> products = DemoStoreSeeder.buildProducts(rows, "store-1", true).stream()
                 .filter(p -> p.getCategoryId().equals(CatalogSeed.categoryId(DemoStoreSeeder.SHOWCASE_CATEGORY, "store-1")))
                 .toList();
 
@@ -296,6 +296,33 @@ class DemoStoreSeederTest {
         assertEquals(List.of(DemoStoreSeeder.DEMO_MARKETPLACE), approved.getMarketplaces());
         assertEquals(DemoStoreSeeder.SHOWCASE_PRICING_GROUP, approved.getPricingGroup());
         assertTrue(approved.getStockExpectedQty() > 0);
+    }
+
+    /**
+     * The seeder is also the StoreSeeder of a demo registration. Such a store has no marketplace credentials, so it
+     * may get neither a connection nor a category exporting to one: an exporting category would make every pricelist
+     * run queue an offer export for a marketplace nobody can talk to.
+     */
+    @Test
+    void storeSeededOnRegistrationGetsNoMarketplaceConnectionAndNoCategoryExportingToOne() {
+        // given
+        Store store = new Store();
+        List<CatalogSeedRow> rows = CatalogSeed.load();
+
+        // when
+        DemoStoreSeeder.applyStoreConfiguration(store, "store-1", "Sklep demo", null);
+        List<CategoryDefinition> definitions = DemoStoreSeeder.buildCategoryDefinitions(rows, "store-1");
+        List<Product> products = DemoStoreSeeder.buildProducts(rows, "store-1");
+
+        // then
+        assertTrue(store.getMarketplaces().isEmpty());
+        assertTrue(definitions.stream().allMatch(d -> d.getMarketplaceDefinitions().isEmpty()));
+        assertTrue(products.stream().allMatch(p -> p.getMarketplaces().isEmpty()));
+        // and nothing else of the local showcase either: every category is manual and every product sellable
+        assertTrue(definitions.stream().allMatch(d -> d.hasType(CategoryDefinitionType.Managed)));
+        assertTrue(definitions.stream().allMatch(d -> d.getGroupingOrder().isEmpty()));
+        assertTrue(products.stream().allMatch(Product::isEnabled));
+        assertTrue(products.stream().allMatch(p -> p.getPimId() != null));
     }
 
     @Test
