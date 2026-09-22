@@ -276,6 +276,7 @@ public class CatalogProductsController {
         List<InventoryKey> alreadyInCategory = new ArrayList<>(productRepository.findAll(category.getCategoryId()).stream()
                 .map(InventoryKey::fromProduct)
                 .toList());
+        InventoryView enabled = inventory.withEnabledSuppliersOnly(storeId());
         int added = 0;
         for (ProductsBulkAddForm.Row row : form.getProducts()) {
             // The category and the id are the application's to give, and so is the PIM entry: a pim id taken from the
@@ -285,7 +286,7 @@ public class CatalogProductsController {
             if (alreadyInCategory.stream().anyMatch(key::matches)) {
                 continue;
             }
-            pimCatalog.findByGtinOrMpn(product.getEan(), product.getManufacturerCode()).ifPresent(entry -> {
+            pimEntryOf(enabled, key, product).ifPresent(entry -> {
                 product.setPimId(entry.pimId());
                 product.setBrand(brandMapper.unifyBrand(entry.brand()));
             });
@@ -460,6 +461,22 @@ public class CatalogProductsController {
         SettingsFlash.onRedirect(redirectAttributes,
                 messageSource.getMessage("product.deleted", new Object[]{product.getName()}, locale));
         return "redirect:" + CatalogPaths.category(catalogId, categoryId);
+    }
+
+    /**
+     * The PIM entry of a product being added, resolved the way the review resolved it: through the inventory key the
+     * suppliers know the item by, which carries every EAN and product code listed under it. Asking with the two
+     * identifiers of the row alone would miss an entry the catalogue holds under a sibling code, and the product would
+     * be saved without a pim id -- out of the price list and out of every marketplace offer. A product the inventory no
+     * longer has (it can leave between the review and the save) is still asked about by its own two codes.
+     */
+    private Optional<PimEntry> pimEntryOf(InventoryView inventory, InventoryKey key, Product product) {
+        MatchedInventory matched = inventory.findByInventoryKey(key);
+        if (matched.isEmpty()) {
+            return pimCatalog.findByGtinOrMpn(product.getEan(), product.getManufacturerCode());
+        }
+        InventoryKey known = matched.getInventoryKey();
+        return pimCatalog.findByPimIdOrGtinsOrMpns(known.getId(), known.getProductEans(), known.getProductCodes());
     }
 
     /** The PIM entry the submitted identifiers point at, which the saved product's own entry is compared with. */

@@ -53,6 +53,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasEntry;
@@ -89,6 +90,8 @@ class CatalogProductsControllerTest {
     private Inventory inventory;
     @Mock
     private InventoryView inventoryView;
+    @Mock
+    private MatchedInventory emptyInventory;
     @Mock
     private MarketplaceConnections marketplaces;
     @Mock
@@ -127,6 +130,10 @@ class CatalogProductsControllerTest {
         lenient().when(marketplaces.displayName(anyString())).thenAnswer(call -> call.getArgument(0));
         lenient().when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenAnswer(call -> call.getArgument(0));
         lenient().when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        // The save looks every row up in the inventory; by default nothing is there and the PIM is asked directly.
+        lenient().when(emptyInventory.isEmpty()).thenReturn(true);
+        lenient().when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(inventoryView);
+        lenient().when(inventoryView.findByInventoryKey(any())).thenReturn(emptyInventory);
         lenient().when(store.getMarketplaces()).thenReturn(List.of());
         lenient().when(store.getEnabledCategories()).thenReturn(List.of());
         lenient().when(pimCategoryOptions.namedOptions(any(), any())).thenReturn(List.of());
@@ -636,6 +643,63 @@ class CatalogProductsControllerTest {
                 .containsEntry("product-0-ean", "product.error.identifier.required")
                 .containsEntry("product-1-ean", "product.error.ean.invalid");
         verify(productRepository, never()).save(any(Product.class));
+    }
+
+    /**
+     * The review resolves a proposal through the whole inventory key -- every EAN and product code the suppliers list
+     * the item under -- and the save must not be narrower, or a product whose PIM entry is known only by a sibling
+     * identifier would be written without a pim id and drop out of the price list.
+     */
+    @Test
+    void saveResolvesThePimEntryThroughTheWholeInventoryKey() throws Exception {
+        // given
+        gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
+        InventoryKey key = new InventoryKey(Set.of("5901234567890", "4719331361600"), Set.of("MFN-1"));
+        MatchedInventory matched = mock(MatchedInventory.class);
+        when(matched.isEmpty()).thenReturn(false);
+        when(matched.getInventoryKey()).thenReturn(key);
+        when(inventoryView.findByInventoryKey(any())).thenReturn(matched);
+        PimEntry entry = mock(PimEntry.class);
+        when(entry.pimId()).thenReturn("pim-9");
+        when(entry.brand()).thenReturn("msi");
+        when(pimCatalog.findByPimIdOrGtinsOrMpns(key.getId(), key.getProductEans(), key.getProductCodes()))
+                .thenReturn(Optional.of(entry));
+        when(brandMapper.unifyBrand("msi")).thenReturn("MSI");
+
+        // when
+        mvc.perform(post(categoryPath() + "/products/add/save")
+                        .param("products[0].name", "MSI RTX 5070").param("products[0].ean", "5901234567890")
+                        .param("products[0].pricingGroup", "Default"))
+                .andExpect(redirectedUrl(categoryPath()));
+
+        // then
+        ArgumentCaptor<Product> saved = ArgumentCaptor.forClass(Product.class);
+        verify(productRepository).save(saved.capture());
+        assertThat(saved.getValue().getPimId()).isEqualTo("pim-9");
+        assertThat(saved.getValue().getBrand()).isEqualTo("MSI");
+        verify(pimCatalog, never()).findByGtinOrMpn(any(), any());
+    }
+
+    /** A product that left the inventory between the review and the save is still asked about by its own two codes. */
+    @Test
+    void saveFallsBackToTheSubmittedIdentifiersWhenTheInventoryNoLongerHasTheProduct() throws Exception {
+        // given
+        gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
+        PimEntry entry = mock(PimEntry.class);
+        when(entry.pimId()).thenReturn("pim-7");
+        when(pimCatalog.findByGtinOrMpn("5901234567890", "MFN-1")).thenReturn(Optional.of(entry));
+
+        // when
+        mvc.perform(post(categoryPath() + "/products/add/save")
+                        .param("products[0].name", "MSI RTX 5070").param("products[0].ean", "5901234567890")
+                        .param("products[0].manufacturerCode", "MFN-1").param("products[0].pricingGroup", "Default"))
+                .andExpect(redirectedUrl(categoryPath()));
+
+        // then
+        ArgumentCaptor<Product> saved = ArgumentCaptor.forClass(Product.class);
+        verify(productRepository).save(saved.capture());
+        assertThat(saved.getValue().getPimId()).isEqualTo("pim-7");
+        verify(pimCatalog, never()).findByPimIdOrGtinsOrMpns(any(), any(), any());
     }
 
     /** Selecting every proposal of a large category posts more rows than Spring grows a list to by default. */
