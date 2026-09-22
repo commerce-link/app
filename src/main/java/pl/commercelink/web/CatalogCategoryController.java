@@ -19,6 +19,7 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.web.util.HtmlUtils;
 import pl.commercelink.inventory.Inventory;
+import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.CategoryDefinitionType;
 import pl.commercelink.products.CategoryDefinitions;
@@ -47,6 +48,7 @@ import pl.commercelink.web.settings.SettingsFlash;
 import pl.commercelink.web.settings.SettingsPaths;
 
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -91,6 +93,9 @@ public class CatalogCategoryController {
 
     /** Said once on the page of a category that was just created, which carries the defaults nobody chose. */
     private static final String NOTICE_FLASH = "categoryNotice";
+
+    /** What a successful save could not refuse but the operator should know; shown beside the saved message. */
+    private static final String WARNING_FLASH = "catalogWarning";
 
     private final CatalogAccess access;
     private final CategoryDefinitions definitions;
@@ -138,14 +143,24 @@ public class CatalogCategoryController {
         String message = messageSource.getMessage("catalog.category.created", new Object[]{created.getName()}, locale);
         // The fresh category has a pricing nobody chose, so its page says so once.
         String notice = messageSource.getMessage("catalog.category.created.defaults", null, locale);
+        String warning = emptyListWarning(form, locale);
         if (async) {
-            SettingsFlash.forNextPage(request, response, next, Map.of(SettingsFlash.SAVED_MESSAGE, message, NOTICE_FLASH, notice));
+            Map<String, String> flash = new LinkedHashMap<>();
+            flash.put(SettingsFlash.SAVED_MESSAGE, message);
+            flash.put(NOTICE_FLASH, notice);
+            if (warning != null) {
+                flash.put(WARNING_FLASH, warning);
+            }
+            SettingsFlash.forNextPage(request, response, next, flash);
             renderBasics(catalog, null, form, Map.of(), model, locale);
             model.addAttribute("redirectTo", next);
             return BASICS_FRAGMENT;
         }
         SettingsFlash.onRedirect(redirectAttributes, message);
         redirectAttributes.addFlashAttribute(NOTICE_FLASH, notice);
+        if (warning != null) {
+            redirectAttributes.addFlashAttribute(WARNING_FLASH, warning);
+        }
         return "redirect:" + next;
     }
 
@@ -174,8 +189,9 @@ public class CatalogCategoryController {
         if (becomesDynamic) {
             message += " " + messageSource.getMessage("catalog.category.type.changed.dynamic", null, locale);
         }
-        return saved(CatalogPaths.categorySettings(catalogId, categoryId), message, async, model, redirectAttributes, request,
-                response, BASICS_FRAGMENT, () -> renderBasics(catalog, category, form, Map.of(), model, locale));
+        return saved(CatalogPaths.categorySettings(catalogId, categoryId), message, emptyListWarning(form, locale), async, model,
+                redirectAttributes, request, response, BASICS_FRAGMENT,
+                () -> renderBasics(catalog, category, form, Map.of(), model, locale));
     }
 
     @GetMapping("/dashboard/catalogs/{catalogId}/category/{categoryId}/settings/pricing")
@@ -534,14 +550,67 @@ public class CatalogCategoryController {
     /** Success: with JavaScript the form answers 200 + data-cl-redirect and the script navigates; otherwise a PRG redirect. */
     private String saved(String nextPath, String message, boolean async, Model model, RedirectAttributes redirectAttributes,
                          HttpServletRequest request, HttpServletResponse response, String fragment, Supplier<String> rerender) {
+        return saved(nextPath, message, null, async, model, redirectAttributes, request, response, fragment, rerender);
+    }
+
+    /** The same with something the save could not refuse: the warning travels to the page the save returns to. */
+    private String saved(String nextPath, String message, String warning, boolean async, Model model,
+                         RedirectAttributes redirectAttributes, HttpServletRequest request, HttpServletResponse response,
+                         String fragment, Supplier<String> rerender) {
         if (async) {
-            SettingsFlash.forNextPage(request, response, nextPath, message);
+            Map<String, String> flash = new LinkedHashMap<>();
+            flash.put(SettingsFlash.SAVED_MESSAGE, message);
+            if (warning != null) {
+                flash.put(WARNING_FLASH, warning);
+            }
+            SettingsFlash.forNextPage(request, response, nextPath, flash);
             rerender.get();
             model.addAttribute("redirectTo", nextPath);
             return fragment;
         }
         SettingsFlash.onRedirect(redirectAttributes, message);
+        if (warning != null) {
+            redirectAttributes.addFlashAttribute(WARNING_FLASH, warning);
+        }
         return "redirect:" + nextPath;
+    }
+
+    /**
+     * What the saved basics say about the list of products the category will have. Only an automatic category is
+     * checked: a manual one is given its products by hand, so neither the mapping nor the inventory decides its list.
+     * The form is read rather than the saved category: it carries exactly what the save has just written.
+     */
+    private String emptyListWarning(CategoryBasicsForm form, Locale locale) {
+        if (!form.isDynamic()) {
+            return null;
+        }
+        List<String> mapped = form.getPimCategoryIds().stream().filter(StringUtils::isNotBlank).toList();
+        if (mapped.isEmpty()) {
+            return messageSource.getMessage("catalog.category.noMapping", null, locale);
+        }
+        List<String> empty = withoutInventory(mapped);
+        if (empty.isEmpty()) {
+            return null;
+        }
+        return messageSource.getMessage("catalog.category.emptyInventory",
+                new Object[]{String.join(", ", pimCategoryOptions.namesOf(empty))}, locale);
+    }
+
+    /**
+     * Which of the mapped PIM categories no enabled supplier offers anything in. The answer costs a pass over the
+     * inventory, so it is asked only for a non-empty mapping; an inventory that cannot answer only costs the warning.
+     */
+    private List<String> withoutInventory(List<String> pimCategoryIds) {
+        try {
+            Map<String, Collection<MatchedInventory>> matches =
+                    inventory.withEnabledSuppliersOnly(storeId()).findAllByProductCategoryIds(pimCategoryIds);
+            return pimCategoryIds.stream()
+                    .filter(id -> matches.getOrDefault(id, List.of()).stream().noneMatch(MatchedInventory::hasAnyOffers))
+                    .toList();
+        } catch (RuntimeException e) {
+            log.warn("Cannot check the inventory of the PIM categories {}", pimCategoryIds, e);
+            return List.of();
+        }
     }
 
     private static String storeId() {

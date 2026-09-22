@@ -9,6 +9,7 @@
             <div th:replace="~{fragments/settings-header :: subpageWithActions(${backHref}, ${category.name}, #{catalog.category.settings.title}, #{catalog.category.settings.lead}, null)}"></div>
 
             <div th:replace="~{fragments/settings-form :: savedAlert}"></div>
+            <div th:replace="~{fragments/settings-form :: warnAlert}"></div>
 
             <ul class="cl-tile-grid">
                 <li>

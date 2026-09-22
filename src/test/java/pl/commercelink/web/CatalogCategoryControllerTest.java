@@ -16,6 +16,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.servlet.support.RequestContextUtils;
 import pl.commercelink.products.AvailabilityDefinition;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.CategoryDefinitionType;
@@ -25,6 +26,7 @@ import pl.commercelink.products.PimCategoryOptions;
 import pl.commercelink.products.PriceDefinition;
 import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.InventoryView;
+import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.products.InventoryDefinition;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductRecommendationEngine;
@@ -253,6 +255,121 @@ class CatalogCategoryControllerTest {
         mvc.perform(post("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/basics")
                         .param("name", "GPU").param("type", "Dynamic").param("maxQty", "1"))
                 .andExpect(flash().attribute("settingsSavedMessage", "Saved. Manual products go in 7 days."));
+    }
+
+    /** An automatic category builds its list from the PIM mapping, so saving one without a mapping saves an empty list. */
+    @Test
+    void savingAnAutomaticCategoryWithoutAPimMappingWarnsThatItsListWillBeEmpty() throws Exception {
+        // given
+        CategoryDefinition gpu = categoryOf("GPU");
+        when(messageSource.getMessage(eq("catalog.category.noMapping"), any(), any(Locale.class))).thenReturn("No mapping");
+
+        // when / then
+        mvc.perform(post("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/basics")
+                        .param("name", "GPU").param("type", "Dynamic").param("maxQty", "1"))
+                .andExpect(flash().attribute("catalogWarning", "No mapping"));
+        verify(inventory, never()).withEnabledSuppliersOnly(any());
+    }
+
+    @Test
+    void savingAnAutomaticCategoryNamesThePimCategoriesWithoutAnyInventory() throws Exception {
+        // given
+        CategoryDefinition gpu = categoryOf("GPU");
+        InventoryView view = mock(InventoryView.class);
+        when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(view);
+        MatchedInventory offered = mock(MatchedInventory.class);
+        when(offered.hasAnyOffers()).thenReturn(true);
+        when(view.findAllByProductCategoryIds(List.of("pim-1", "pim-2")))
+                .thenReturn(Map.of("pim-1", List.of(offered), "pim-2", List.of()));
+        when(pimCategoryOptions.namesOf(List.of("pim-2"))).thenReturn(List.of("Coolers"));
+        when(messageSource.getMessage(eq("catalog.category.emptyInventory"), any(), any(Locale.class)))
+                .thenAnswer(call -> "empty: " + ((Object[]) call.getArgument(1))[0]);
+
+        // when / then
+        mvc.perform(post("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/basics")
+                        .param("name", "GPU").param("type", "Dynamic").param("maxQty", "1")
+                        .param("pimCategoryIds[0]", "pim-1").param("pimCategoryIds[1]", "pim-2"))
+                .andExpect(flash().attribute("catalogWarning", "empty: Coolers"));
+    }
+
+    @Test
+    void savingAnAutomaticCategoryWhosePimCategoriesAllHaveProductsWarnsAboutNothing() throws Exception {
+        // given
+        CategoryDefinition gpu = categoryOf("GPU");
+        InventoryView view = mock(InventoryView.class);
+        when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(view);
+        MatchedInventory offered = mock(MatchedInventory.class);
+        when(offered.hasAnyOffers()).thenReturn(true);
+        when(view.findAllByProductCategoryIds(List.of("pim-1"))).thenReturn(Map.of("pim-1", List.of(offered)));
+
+        // when / then
+        mvc.perform(post("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/basics")
+                        .param("name", "GPU").param("type", "Dynamic").param("maxQty", "1")
+                        .param("pimCategoryIds[0]", "pim-1"))
+                .andExpect(flash().attributeCount(1));
+    }
+
+    /** A manual category is given its products by hand, so what the inventory holds is not a reason to warn. */
+    @Test
+    void savingAManualCategoryWarnsAboutNothing() throws Exception {
+        // given
+        CategoryDefinition gpu = categoryOf("GPU");
+
+        // when / then
+        mvc.perform(post("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/basics")
+                        .param("name", "GPU").param("type", "Managed").param("maxQty", "1"))
+                .andExpect(flash().attributeCount(1));
+        verify(inventory, never()).withEnabledSuppliersOnly(any());
+    }
+
+    /** The warning costs a pass over the inventory; an inventory that cannot answer must not take the save down. */
+    @Test
+    void theBasicsAreSavedEvenWhenTheInventoryCannotBeAsked() throws Exception {
+        // given
+        CategoryDefinition gpu = categoryOf("GPU");
+        InventoryView view = mock(InventoryView.class);
+        when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(view);
+        when(view.findAllByProductCategoryIds(List.of("pim-1"))).thenThrow(new IllegalStateException("PIM is down"));
+
+        // when / then
+        mvc.perform(post("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/basics")
+                        .param("name", "GPU").param("type", "Dynamic").param("maxQty", "1")
+                        .param("pimCategoryIds[0]", "pim-1"))
+                .andExpect(redirectedUrl("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings"))
+                .andExpect(flash().attributeCount(1));
+    }
+
+    @Test
+    void creatingAnAutomaticCategoryWithoutAPimMappingCarriesTheWarningToItsPage() throws Exception {
+        // given
+        when(access.requireCatalog(STORE_ID, "c1")).thenReturn(catalog);
+        CategoryDefinition created = new CategoryDefinition().withName("CPU").withGeneratedId();
+        when(definitions.create(eq(catalog), any())).thenReturn(created);
+        when(messageSource.getMessage(eq("catalog.category.noMapping"), any(), any(Locale.class))).thenReturn("No mapping");
+
+        // when / then
+        mvc.perform(post("/dashboard/catalogs/c1/category/new")
+                        .param("name", "CPU").param("type", "Dynamic").param("maxQty", "1"))
+                .andExpect(redirectedUrl("/dashboard/catalogs/c1/category/" + created.getCategoryId()))
+                .andExpect(flash().attribute("catalogWarning", "No mapping"));
+    }
+
+    /** Without a reload the page is not redirected, so the warning is stored for the address the script opens. */
+    @Test
+    void anAsyncSaveStoresTheWarningForThePageItOpens() throws Exception {
+        // given
+        CategoryDefinition gpu = categoryOf("GPU");
+        when(messageSource.getMessage(eq("catalog.category.noMapping"), any(), any(Locale.class))).thenReturn("No mapping");
+
+        // when
+        MvcResult result = mvc.perform(post("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/basics")
+                        .header("X-Requested-With", "fetch")
+                        .param("name", "GPU").param("type", "Dynamic").param("maxQty", "1"))
+                .andExpect(status().isOk()).andReturn();
+
+        // then
+        Map<String, Object> flash = RequestContextUtils.getOutputFlashMap(result.getRequest());
+        assertThat(flash).containsEntry("catalogWarning", "No mapping");
     }
 
     @Test

@@ -30,6 +30,7 @@
             </div>
 
             <div th:replace="~{fragments/settings-form :: savedAlert}"></div>
+            <div th:replace="~{fragments/settings-form :: warnAlert}"></div>
             <div th:if="${categoryNotice}" class="cl-alert is-info" role="status">
                 <i class="fas fa-info-circle cl-alert-icon" aria-hidden="true"></i>
                 <p class="cl-alert-text" th:text="${categoryNotice}"></p>
