@@ -27,6 +27,20 @@
         return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     }
 
+    // Where the focus goes after the last row of a nested container: that container has no "Add" of its own, and
+    // without this the fallback found nothing and the focus fell out of the form onto <body>. The "Remove" of the row
+    // that holds the container is the nearest control still on the page.
+    function hostRemove(container) {
+        var host = container.closest('[data-cl-repeat-item]');
+        var outer = host && host.closest('[data-cl-repeat]');
+        if (!outer) {
+            return null;
+        }
+        return owned(outer, '[data-cl-repeat-remove]', host).filter(function (button) {
+            return !button.hidden;
+        })[0];
+    }
+
     function renumber(container) {
         var prefix = container.getAttribute('data-cl-repeat');
         var idPrefix = container.getAttribute('data-cl-repeat-id');
@@ -45,7 +59,7 @@
                 'data-cl-variant-when'].forEach(function (attribute) {
                 item.querySelectorAll('[' + attribute + ']').forEach(function (element) {
                     element.setAttribute(attribute, element.getAttribute(attribute)
-                        .replace(new RegExp(idPrefix + '-\\d+-', 'g'), idPrefix + '-' + index + '-'));
+                        .replace(new RegExp(escaped(idPrefix) + '-\\d+-', 'g'), idPrefix + '-' + index + '-'));
                 });
             });
             owned(container, '[data-cl-repeat-number]', item).forEach(function (number) {
@@ -108,7 +122,8 @@
             if (status) {
                 status.textContent = status.getAttribute('data-template').replace('@N@', String(position + 1));
             }
-            var focus = (next && next.querySelector('input, select, textarea')) || owned(owner, '[data-cl-repeat-add]')[0];
+            var focus = (next && next.querySelector('input, select, textarea'))
+                || hostRemove(owner) || owned(owner, '[data-cl-repeat-add]')[0];
             if (focus) {
                 focus.focus();
             }
