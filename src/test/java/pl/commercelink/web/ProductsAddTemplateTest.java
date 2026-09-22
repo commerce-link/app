@@ -122,17 +122,18 @@ class ProductsAddTemplateTest {
                 .contains("Enter the name of the product.").doesNotContain("??");
     }
 
+    /** The pim id is never posted back: the save resolves the entry itself, so a forged one cannot claim another. */
     @Test
-    void theReviewPostsTheIdentityOfEachProductButNeverItsCategory() {
+    void theReviewPostsWhatItEditsButNeitherTheCategoryNorThePimEntry() {
         // given
         String html = renderedReview(Map.of());
 
         // then
         assertThat(html).contains("name=\"products[0].ean\"").contains("name=\"products[0].manufacturerCode\"")
-                .contains("name=\"products[0].pimId\"").contains("name=\"products[0].availabilityType\"")
+                .contains("name=\"products[0].brand\"").contains("name=\"products[0].availabilityType\"")
                 .contains("name=\"products[0].pricingGroup\"").contains("id=\"products\"")
                 .contains("action=\"/dashboard/catalogs/c1/category/k1/products/add/save\"")
-                .doesNotContain("categoryId").doesNotContain("productId");
+                .doesNotContain("products[0].pimId").doesNotContain("categoryId").doesNotContain("productId");
     }
 
     private static String renderedProposals() {
@@ -163,7 +164,7 @@ class ProductsAddTemplateTest {
     private static String renderedReview(Map<String, String> errors) {
         Product product = new Product("k1", "pim-1", "5901234567890", "MFN-1", "MSI", "RTX 5070", "MSI RTX 5070", "Default");
         Context context = baseContext();
-        context.setVariable("form", new ProductsBulkAddForm(List.of(product)));
+        context.setVariable("form", ProductsBulkAddForm.of(List.of(product)));
         context.setVariable("errors", errors);
         context.setVariable("labels", List.of("RTX 5060", "RTX 5070"));
         context.setVariable("pricingGroups", List.of("Default", "Premium"));

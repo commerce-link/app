@@ -68,7 +68,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.TreeMap;
-import java.util.UUID;
 import java.util.function.Supplier;
 
 /**
@@ -252,7 +251,7 @@ public class CatalogProductsController {
             Optional<PimEntry> entry = pimCatalog.findByPimIdOrGtinsOrMpns(key.getId(), key.getProductEans(), key.getProductCodes());
             products.add(new ProductRecommendation(category, matched, entry).toProduct());
         }
-        return renderReview(catalog, category, new ProductsBulkAddForm(products), skipped, skippedExisting, Map.of(),
+        return renderReview(catalog, category, ProductsBulkAddForm.of(products), skipped, skippedExisting, Map.of(),
                 model, locale);
     }
 
@@ -271,17 +270,14 @@ public class CatalogProductsController {
             response.setStatus(HttpStatus.UNPROCESSABLE_ENTITY.value());
             return renderReview(catalog, category, form, List.of(), List.of(), errors, model, locale);
         }
-        for (Product product : form.getProducts()) {
-            // The category and the id are the application's to give: a product grown by the binder has neither, and an
-            // id taken from the form would let a forged one overwrite another product.
-            product.setCategoryId(category.getCategoryId());
-            product.setProductId(UUID.randomUUID().toString());
-            if (StringUtils.isBlank(product.getPimId())) {
-                pimCatalog.findByGtinOrMpn(product.getEan(), product.getManufacturerCode()).ifPresent(entry -> {
-                    product.setPimId(entry.pimId());
-                    product.setBrand(brandMapper.unifyBrand(entry.brand()));
-                });
-            }
+        for (ProductsBulkAddForm.Row row : form.getProducts()) {
+            // The category and the id are the application's to give, and so is the PIM entry: a pim id taken from the
+            // form would bind the product to an arbitrary entry of the catalog.
+            Product product = row.toProduct(category.getCategoryId());
+            pimCatalog.findByGtinOrMpn(product.getEan(), product.getManufacturerCode()).ifPresent(entry -> {
+                product.setPimId(entry.pimId());
+                product.setBrand(brandMapper.unifyBrand(entry.brand()));
+            });
             productRepository.save(product);
         }
         SettingsFlash.onRedirect(redirectAttributes,

@@ -376,7 +376,7 @@ class CatalogProductsControllerTest {
         assertThat((List<String>) result.getModelAndView().getModel().get("skipped")).containsExactly("2");
         assertThat((List<String>) result.getModelAndView().getModel().get("skippedExisting")).isEmpty();
         assertThat(((ProductsBulkAddForm) result.getModelAndView().getModel().get("form")).getProducts())
-                .extracting(Product::getName).containsExactly("MSI RTX 5070");
+                .extracting(ProductsBulkAddForm.Row::getName).containsExactly("MSI RTX 5070");
     }
 
     /**
@@ -402,6 +402,58 @@ class CatalogProductsControllerTest {
         verify(productRepository).save(saved.capture());
         assertThat(saved.getValue().getCategoryId()).isEqualTo(gpu.getCategoryId());
         assertThat(saved.getValue().getProductId()).isNotBlank().isNotEqualTo("forged");
+    }
+
+    /**
+     * The review posts a row of its own, not a product: the PIM entry is resolved here, so a forged pim id cannot
+     * bind the product to another entry, and a property the review never shows is not part of the form at all.
+     */
+    @Test
+    void saveResolvesThePimEntryItselfAndIgnoresWhatTheReviewDoesNotEdit() throws Exception {
+        // given
+        gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
+        PimEntry entry = mock(PimEntry.class);
+        when(entry.pimId()).thenReturn("pim-9");
+        when(entry.brand()).thenReturn("msi");
+        when(pimCatalog.findByGtinOrMpn("1", "M")).thenReturn(Optional.of(entry));
+        when(brandMapper.unifyBrand("msi")).thenReturn("MSI");
+
+        // when
+        mvc.perform(post(categoryPath() + "/products/add/save")
+                        .param("products[0].pimId", "forged").param("products[0].version", "9")
+                        .param("products[0].productPage", "<p>forged</p>").param("products[0].enabled", "false")
+                        .param("products[0].name", "X").param("products[0].ean", "1")
+                        .param("products[0].manufacturerCode", "m").param("products[0].brand", "Fake")
+                        .param("products[0].label", "L").param("products[0].pricingGroup", "Default"))
+                .andExpect(redirectedUrl(categoryPath()));
+
+        // then
+        ArgumentCaptor<Product> saved = ArgumentCaptor.forClass(Product.class);
+        verify(productRepository).save(saved.capture());
+        assertThat(saved.getValue().getPimId()).isEqualTo("pim-9");
+        assertThat(saved.getValue().getBrand()).isEqualTo("MSI");
+        assertThat(saved.getValue().getProductPage()).isNull();
+        assertThat(saved.getValue().getVersion()).isNull();
+        assertThat(saved.getValue().isEnabled()).isTrue();
+    }
+
+    /** Without an entry in the PIM the product is saved without a pim id; the one from the request is never used. */
+    @Test
+    void saveLeavesTheProductWithoutAPimIdWhenThePimDoesNotKnowIt() throws Exception {
+        // given
+        gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
+        when(pimCatalog.findByGtinOrMpn("1", null)).thenReturn(Optional.empty());
+
+        // when
+        mvc.perform(post(categoryPath() + "/products/add/save")
+                        .param("products[0].pimId", "forged").param("products[0].name", "X")
+                        .param("products[0].ean", "1").param("products[0].pricingGroup", "Default"))
+                .andExpect(redirectedUrl(categoryPath()));
+
+        // then
+        ArgumentCaptor<Product> saved = ArgumentCaptor.forClass(Product.class);
+        verify(productRepository).save(saved.capture());
+        assertThat(saved.getValue().getPimId()).isNull();
     }
 
     /** Selecting every proposal of a large category posts more rows than Spring grows a list to by default. */

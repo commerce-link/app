@@ -41,7 +41,7 @@
                                      labelId=${T(pl.commercelink.web.dtos.ProductsBulkAddForm).fieldId(status.index, 'label')},
                                      groupId=${T(pl.commercelink.web.dtos.ProductsBulkAddForm).fieldId(status.index, 'pricingGroup')}">
                             <th scope="row" class="cl-table-key" th:attr="data-label=#{catalog.products.column.product}">
-                                <input type="hidden" th:name="${prefix + 'pimId'}" th:value="${product.pimId}">
+                                <!--/* The PIM entry is not posted back: it is resolved again when the row is saved. */-->
                                 <input type="hidden" th:name="${prefix + 'brand'}" th:value="${product.brand}">
                                 <input type="hidden" th:name="${prefix + 'ean'}" th:value="${product.ean}">
                                 <input type="hidden" th:name="${prefix + 'manufacturerCode'}" th:value="${product.manufacturerCode}">

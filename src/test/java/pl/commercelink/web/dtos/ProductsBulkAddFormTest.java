@@ -17,7 +17,7 @@ class ProductsBulkAddFormTest {
     @Test
     void namesAreRequiredAndLabelsMustComeFromTheListWhenTheCategoryHasOne() {
         // given
-        ProductsBulkAddForm form = new ProductsBulkAddForm(
+        ProductsBulkAddForm form = ProductsBulkAddForm.of(
                 List.of(product("", "RTX 5070", "Default"), product("X", "RTX 4060", "Nope")));
 
         // when
@@ -39,9 +39,9 @@ class ProductsBulkAddFormTest {
     @Test
     void withoutCategoryLabelsAnyLabelPassesAndAnEmptyListIsAnError() {
         // when / then
-        assertThat(new ProductsBulkAddForm(List.of(product("X", "anything", "Default")))
+        assertThat(ProductsBulkAddForm.of(List.of(product("X", "anything", "Default")))
                 .validate(List.of(), List.of("Default"))).isEmpty();
-        assertThat(new ProductsBulkAddForm(List.of()).validate(List.of(), List.of("Default")))
+        assertThat(ProductsBulkAddForm.of(List.of()).validate(List.of(), List.of("Default")))
                 .containsEntry("products", "catalog.products.review.none");
     }
 }

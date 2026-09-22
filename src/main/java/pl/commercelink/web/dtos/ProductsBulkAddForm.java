@@ -4,24 +4,65 @@ import lombok.Getter;
 import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
 import pl.commercelink.products.Product;
+import pl.commercelink.products.ProductAvailabilityType;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /** The products picked from the inventory, as the review table posts them back: one row per product. */
 @Getter
 @Setter
 public class ProductsBulkAddForm {
 
-    private List<Product> products = new ArrayList<>();
+    /**
+     * One row of the review table. It carries only what the review shows or edits, so nothing else of a product can
+     * be set from the request; the identity of the product -- its category, its id and its PIM entry -- is the
+     * application's to give when the row is saved.
+     */
+    @Getter
+    @Setter
+    public static class Row {
 
-    public ProductsBulkAddForm() {
+        private String ean;
+        private String manufacturerCode;
+        private String brand;
+        private String name;
+        private String label;
+        private String pricingGroup;
+        private ProductAvailabilityType availabilityType;
+
+        public Row() {
+        }
+
+        private Row(Product product) {
+            this.ean = product.getEan();
+            this.manufacturerCode = product.getManufacturerCode();
+            this.brand = product.getBrand();
+            this.name = product.getName();
+            this.label = product.getLabel();
+            this.pricingGroup = product.getPricingGroup();
+            this.availabilityType = product.getAvailabilityType();
+        }
+
+        /** The product as it is created; the PIM entry is resolved by the controller, never taken from the row. */
+        public Product toProduct(String categoryId) {
+            Product product = new Product(categoryId, null, ean, manufacturerCode, brand, label, name, pricingGroup);
+            if (availabilityType != null) {
+                product.setAvailabilityType(availabilityType);
+            }
+            return product;
+        }
     }
 
-    public ProductsBulkAddForm(List<Product> products) {
-        this.products = products;
+    private List<Row> products = new ArrayList<>();
+
+    public static ProductsBulkAddForm of(List<Product> products) {
+        ProductsBulkAddForm form = new ProductsBulkAddForm();
+        form.setProducts(products.stream().map(Row::new).collect(Collectors.toCollection(ArrayList::new)));
+        return form;
     }
 
     /** The id of a field of the row at {@code index}; an error is keyed by it, so the summary links to the field. */
@@ -39,14 +80,14 @@ public class ProductsBulkAddForm {
             errors.put("products", "catalog.products.review.none");
         }
         for (int index = 0; index < products.size(); index++) {
-            Product product = products.get(index);
-            if (StringUtils.isBlank(product.getName())) {
+            Row row = products.get(index);
+            if (StringUtils.isBlank(row.getName())) {
                 errors.put(fieldId(index, "name"), "product.error.name.required");
             }
-            if (!categoryLabels.isEmpty() && !categoryLabels.contains(product.getLabel())) {
+            if (!categoryLabels.isEmpty() && !categoryLabels.contains(row.getLabel())) {
                 errors.put(fieldId(index, "label"), "product.error.label.notInList");
             }
-            if (pricingGroups.stream().noneMatch(group -> group.equalsIgnoreCase(product.getPricingGroup()))) {
+            if (pricingGroups.stream().noneMatch(group -> group.equalsIgnoreCase(row.getPricingGroup()))) {
                 errors.put(fieldId(index, "pricingGroup"), "product.error.group.unknown");
             }
         }
