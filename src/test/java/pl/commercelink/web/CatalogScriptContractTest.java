@@ -117,6 +117,24 @@ class CatalogScriptContractTest {
         assertThat(Files.exists(Path.of("src/main/java/pl/commercelink/web/ProductCatalogController.java"))).isFalse();
     }
 
+    /**
+     * The product column asks for 300 px so the name and the codes stand apart; unguarded, that minimum was wider
+     * than the page itself on a narrow window and in card mode, which is horizontal scrolling on every catalog table.
+     */
+    @Test
+    void productColumnAsksForItsMinimumWidthOnlyOnAWideViewport() throws Exception {
+        // given
+        String css = read("src/main/resources/static/css/commercelink.css");
+
+        // then
+        assertThat(css).contains("""
+                @media screen and (min-width: 1100px) {
+                    .cl-page .cl-table.is-products .cl-table-key {
+                        min-width: 300px;
+                    }
+                }""");
+    }
+
     @Test
     void repeatFieldsAnnounceAddedGroupsAndVariantFieldsListen() throws Exception {
         // given

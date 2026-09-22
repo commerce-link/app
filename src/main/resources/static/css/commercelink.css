@@ -3758,8 +3758,12 @@ a.cl-link-button:hover {
     gap: 4px;
 }
 
-.cl-page .cl-table.is-products .cl-table-key {
-    min-width: 300px;
+/* Room for the name and the codes only where the table has it: on a narrower page (and in card mode, where the
+   cell is a block) the fixed minimum was wider than the card and pushed the page into horizontal scrolling. */
+@media screen and (min-width: 1100px) {
+    .cl-page .cl-table.is-products .cl-table-key {
+        min-width: 300px;
+    }
 }
 
 .cl-page .cl-table .cl-table-empty {
