@@ -228,6 +228,34 @@ class CatalogCategoryControllerTest {
         assertThat(basics.getValue().labels()).containsExactly("RTX 5060");
     }
 
+    /** Two categories of the catalog carry the same name from before the check; saving one unchanged may not be refused. */
+    @Test
+    void aCategoryThatAlreadySharesItsNameIsStillSaved() throws Exception {
+        // given
+        CategoryDefinition gpu = categoryOf("GPU");
+        catalog.getCategories().add(new CategoryDefinition().withName("GPU").withGeneratedId());
+
+        // when / then
+        mvc.perform(post("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/basics")
+                        .param("name", "GPU").param("type", "Managed").param("maxQty", "1"))
+                .andExpect(redirectedUrl("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings"));
+        verify(definitions).saveBasics(eq(catalog), eq(gpu), any());
+    }
+
+    @Test
+    void renamingACategoryOntoAnotherOnesNameIsRefused() throws Exception {
+        // given
+        CategoryDefinition gpu = categoryOf("GPU");
+        catalog.getCategories().add(new CategoryDefinition().withName("CPU").withGeneratedId());
+
+        // when / then
+        mvc.perform(post("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/basics")
+                        .param("name", "cpu").param("type", "Managed").param("maxQty", "1"))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("errors", hasEntry("name", "catalog.category.name.duplicate")));
+        verify(definitions, never()).saveBasics(any(), any(), any());
+    }
+
     /** An unticked protection box is not posted at all; the save must switch the protection off, not keep the old value. */
     @Test
     void savingBasicsWithoutTheProtectionBoxSwitchesTheProtectionOff() throws Exception {

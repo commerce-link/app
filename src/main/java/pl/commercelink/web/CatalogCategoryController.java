@@ -134,7 +134,7 @@ public class CatalogCategoryController {
                                  HttpServletRequest request, HttpServletResponse response) {
         ProductCatalog catalog = access.requireCatalog(storeId(), catalogId);
         boolean async = SettingsPaths.isAsync(requestedWith);
-        Map<String, String> errors = form.validate(otherNames(catalog, null));
+        Map<String, String> errors = form.validate(otherNames(catalog, null), null);
         if (!errors.isEmpty()) {
             return rejected(renderBasics(catalog, null, form, errors, model, locale), BASICS_FRAGMENT, async, response);
         }
@@ -179,7 +179,7 @@ public class CatalogCategoryController {
         ProductCatalog catalog = access.requireCatalog(storeId(), catalogId);
         CategoryDefinition category = access.requireCategory(catalog, categoryId);
         boolean async = SettingsPaths.isAsync(requestedWith);
-        Map<String, String> errors = form.validate(otherNames(catalog, category));
+        Map<String, String> errors = form.validate(otherNames(catalog, category), category.getName());
         if (!errors.isEmpty()) {
             return rejected(renderBasics(catalog, category, form, errors, model, locale), BASICS_FRAGMENT, async, response);
         }

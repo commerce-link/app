@@ -29,7 +29,7 @@ class CategoryBasicsFormTest {
         CategoryBasicsForm form = valid();
 
         // when
-        Map<String, String> errors = form.validate(Set.of("CPU"));
+        Map<String, String> errors = form.validate(Set.of("CPU"), null);
         CategoryDefinitions.Basics basics = form.toBasics();
 
         // then
@@ -47,7 +47,31 @@ class CategoryBasicsFormTest {
         form.setName("cpu");
 
         // when / then
-        assertThat(form.validate(Set.of("CPU"))).containsEntry("name", "catalog.category.name.duplicate");
+        assertThat(form.validate(Set.of("CPU"), null)).containsEntry("name", "catalog.category.name.duplicate");
+    }
+
+    /**
+     * Categories saved before the name was checked may share one; the check may not stop such a category from being
+     * saved at all, only from being renamed onto a name another one carries.
+     */
+    @Test
+    void anExistingDuplicateNameIsAcceptedWhileItIsNotChanged() {
+        // given
+        CategoryBasicsForm form = valid();
+        form.setName(" gpu ");
+
+        // when / then
+        assertThat(form.validate(Set.of("GPU"), "GPU")).isEmpty();
+    }
+
+    @Test
+    void renamingOntoTheNameOfAnotherCategoryIsRefused() {
+        // given
+        CategoryBasicsForm form = valid();
+        form.setName("CPU");
+
+        // when / then
+        assertThat(form.validate(Set.of("CPU"), "GPU")).containsEntry("name", "catalog.category.name.duplicate");
     }
 
     @Test
@@ -58,7 +82,7 @@ class CategoryBasicsFormTest {
         form.setMaxQty("0");
 
         // when
-        Map<String, String> errors = form.validate(Set.of());
+        Map<String, String> errors = form.validate(Set.of(), null);
 
         // then
         assertThat(errors).containsEntry("sequenceNumber", "catalog.category.sequence.invalid")
@@ -72,7 +96,7 @@ class CategoryBasicsFormTest {
         form.setSequenceNumber("");
 
         // when / then
-        assertThat(form.validate(Set.of())).isEmpty();
+        assertThat(form.validate(Set.of(), null)).isEmpty();
         assertThat(form.toBasics().sequenceNumber()).isZero();
     }
 
@@ -83,7 +107,7 @@ class CategoryBasicsFormTest {
         form.setLabels(List.of("RTX 5060", " RTX 5060 ", ""));
 
         // when / then
-        assertThat(form.validate(Set.of())).containsEntry("labels", "catalog.category.labels.duplicate");
+        assertThat(form.validate(Set.of(), null)).containsEntry("labels", "catalog.category.labels.duplicate");
     }
 
     @Test
@@ -93,7 +117,7 @@ class CategoryBasicsFormTest {
         form.setType("Weird");
 
         // when / then
-        assertThat(form.validate(Set.of())).containsEntry("type", "catalog.category.type.invalid");
+        assertThat(form.validate(Set.of(), null)).containsEntry("type", "catalog.category.type.invalid");
     }
 
     @Test

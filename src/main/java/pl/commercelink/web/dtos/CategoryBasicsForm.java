@@ -51,10 +51,16 @@ public class CategoryBasicsForm {
         return form;
     }
 
-    /** @param otherNames names of the other categories of the catalog (the edited one excluded), for the uniqueness check */
-    public Map<String, String> validate(Set<String> otherNames) {
+    /**
+     * @param otherNames  names of the other categories of the catalog (the edited one excluded), for the uniqueness check
+     * @param currentName the name the edited category carries today, null when creating. A category that already shares
+     *                    its name with another one (saved before the check existed) may be saved as it is; only taking
+     *                    over another category's name is refused.
+     */
+    public Map<String, String> validate(Set<String> otherNames, String currentName) {
         Map<String, String> errors = new LinkedHashMap<>();
         if (FormRules.requireText(errors, "name", name, "catalog.category.name.required")
+                && !StringUtils.trimToEmpty(currentName).equalsIgnoreCase(name.trim())
                 && otherNames.stream().anyMatch(other -> other != null && other.trim().equalsIgnoreCase(name.trim()))) {
             errors.put("name", "catalog.category.name.duplicate");
         }
