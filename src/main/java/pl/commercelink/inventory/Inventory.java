@@ -34,9 +34,8 @@ public class Inventory {
     private final StoreInventoryProvider storeInventoryProvider;
     private final GlobalMatchedInventory globalInventory;
 
-    // Per supplier, the feed version last *attempted* — set on a successful load and by markSeen() when a
-    // feed was skipped (failed/empty). It is not a guarantee of currently-held inventory; it drives the
-    // scheduler's "is there a newer feed to load?" check.
+    // Per supplier, the feed version last attempted (successful load or markSeen) — not a guarantee of
+    // held inventory; drives the scheduler's "is there a newer feed to load?" check.
     private final ConcurrentHashMap<String, LocalDateTime> lastUpdateDateBySupplier = new ConcurrentHashMap<>();
 
     void init(List<List<InventoryItem>> rawFeeds) {
@@ -150,8 +149,7 @@ public class Inventory {
         return lastUpdateDateBySupplier.getOrDefault(supplierName, LocalDateTime.now().minusDays(365));
     }
 
-    // Record that this feed version was already attempted without applying it, so a feed that failed
-    // to parse (or yielded nothing) is not re-fetched every cycle. A newer feed file lifts the marker.
+    // Mark a feed version attempted without applying it, so a skipped feed isn't re-parsed every cycle.
     public void markSeen(String supplierName, LocalDateTime feedLastModified) {
         lastUpdateDateBySupplier.put(supplierName, feedLastModified);
     }

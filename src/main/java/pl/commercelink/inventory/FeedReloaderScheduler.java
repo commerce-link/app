@@ -47,9 +47,7 @@ public class FeedReloaderScheduler {
                 List<InventoryItem> items = fetchItems(supplierDescriptor).stream()
                         .flatMap(item -> item.toLocalCurrency(ExchangeRates.LOCAL_CURRENCY, sellRates.get(item.currency())).stream())
                         .collect(Collectors.toList());
-                // A feed that yields no items (failed/rejected parse, or an empty download) must not wipe
-                // the supplier: keep the previously loaded inventory. Mark this feed version as seen so
-                // it is not re-parsed every cycle; a newer feed file lifts the marker and retries.
+                // Don't wipe the supplier on an empty/failed feed; markSeen stops it re-parsing until the file changes.
                 if (items.isEmpty()) {
                     log.warn("Feed for supplier {} produced no items; keeping previous inventory and "
                             + "not retrying until the feed file changes", supplierName);

@@ -70,9 +70,7 @@ public class XmlProductFeedLoader {
     private <V extends XmlItem> List<InventoryItem> parse(Class<V> itemClass, String itemElementName, SupplierInfo supplierInfo, Reader reader, int taxonomyPenalty)
             throws JAXBException, XMLStreamException {
         XMLInputFactory xif = XMLInputFactory.newFactory();
-        // Feeds are attacker-influenceable, so reject DTDs (and thus all internal/external entities)
-        // and external entity resolution — this closes XXE, SSRF via external entities, and
-        // entity-expansion ("billion laughs") DoS.
+        // Reject DTDs/external entities: feeds are attacker-influenceable (XXE, SSRF, billion-laughs).
         xif.setProperty(XMLInputFactory.SUPPORT_DTD, false);
         xif.setProperty(XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, false);
         XMLStreamReader xsr = xif.createXMLStreamReader(reader);
