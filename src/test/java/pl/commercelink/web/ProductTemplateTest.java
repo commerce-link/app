@@ -1,0 +1,240 @@
+package pl.commercelink.web;
+
+import org.junit.jupiter.api.Test;
+import org.thymeleaf.context.Context;
+import pl.commercelink.products.CategoryDefinition;
+import pl.commercelink.products.Product;
+import pl.commercelink.products.ProductAvailabilityType;
+import pl.commercelink.products.ProductCustomAttribute;
+import pl.commercelink.products.ProductCustomAttributeFilter;
+import pl.commercelink.web.dtos.ProductForm;
+
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.regex.Pattern;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+class ProductTemplateTest {
+
+    private static String page() throws Exception {
+        return Files.readString(Path.of("src/main/resources/templates/catalog/product.html"), StandardCharsets.UTF_8);
+    }
+
+    private static int occurrences(String html, String needle) {
+        return html.split(Pattern.quote(needle), -1).length - 1;
+    }
+
+    @Test
+    void savesWithoutReloadAndAsksTheServerAgainOnAnError() throws Exception {
+        // when / then
+        assertThat(page()).contains("th:fragment=\"productForm\"").contains("id=\"product-form\"").contains("data-cl-async")
+                .contains("data-cl-redirect=${redirectTo}").contains("@{/js/async-form.js}")
+                .contains("errorSummary('product-errors'");
+    }
+
+    @Test
+    void theWayThePriceIsSetIsRadiosAndTheOfferFieldsFollowThem() throws Exception {
+        // given
+        String page = page();
+
+        // then
+        assertThat(page).contains("data-cl-variant-select=\"availability\"")
+                .contains("@{/js/variant-fields.js}");
+        assertThat(occurrences(page, "data-cl-variant-when=\"availability=BasedOnSupply\"")).isEqualTo(3);
+    }
+
+    @Test
+    void theRarelyUsedSectionsAreTwoDisclosuresOpenedByTheServer() throws Exception {
+        // given
+        String page = page();
+
+        // then
+        assertThat(occurrences(page, "cl-disclosure cl-card-extras")).isEqualTo(2);
+        assertThat(page).contains("id=\"product-extras-stock\"").contains("th:open=\"${openStock}\"")
+                .contains("id=\"product-extras-client\"").contains("th:open=\"${openClient}\"");
+    }
+
+    @Test
+    void everyRepeatedListCarriesATemplateANoscriptSpareAndItsScript() throws Exception {
+        // given
+        String page = page();
+
+        // then
+        assertThat(page).contains("data-cl-repeat=\"quickFilters\"").contains("data-cl-repeat=\"customAttributes\"")
+                .contains("data-cl-repeat=\"customAttributesFilters\"").contains("data-cl-repeat=\"metadata\"")
+                .contains("@{/js/repeat-fields.js}");
+        assertThat(occurrences(page, "data-cl-repeat-template")).isEqualTo(4);
+        assertThat(occurrences(page, "<noscript>")).isEqualTo(4);
+    }
+
+    @Test
+    void theCustomFilterCategoryGoesThroughTheSharedPicker() throws Exception {
+        // when / then
+        assertThat(page()).contains("category-picker :: picker(")
+                .contains("category-picker :: pickerScript(${productCategories}, ${categoryAncestors})");
+    }
+
+    @Test
+    void theFlagsAreCheckboxesAndTheDeletionIsConfirmed() throws Exception {
+        // when / then
+        assertThat(page()).contains("settings-form :: check('enabled'").contains("settings-form :: check('service'")
+                .contains("data-cl-confirm").contains("confirm-dialog :: dialog").contains("@{/js/confirm-dialog.js}");
+    }
+
+    @Test
+    void carriesNoInlineStyleNoTableAndNoTooltip() throws Exception {
+        // given
+        String page = page();
+
+        // then
+        assertThat(page).doesNotContain("style=").doesNotContain("<table").doesNotContain("cl-tooltip")
+                .doesNotContain("is-link").doesNotContain("notification");
+    }
+
+    /** The page as the controller renders it for a saved product with one attribute and one custom filter. */
+    private static String rendered(boolean edit) {
+        return rendered(edit, Map.of());
+    }
+
+    private static String rendered(boolean edit, Map<String, String> errors) {
+        Product product = new Product("k1", "pim-1", "4719331361600", "GV-N5080", "Gigabyte", "RTX 5080",
+                "Gigabyte RTX 5080", "Default");
+        product.setProductId("p1");
+        ProductCustomAttribute attribute = new ProductCustomAttribute();
+        attribute.setName("chipset");
+        attribute.setValue("GB203");
+        product.getCustomAttributes().add(attribute);
+        ProductCustomAttributeFilter filter = new ProductCustomAttributeFilter();
+        filter.setCategory("Płyty główne");
+        filter.setName("Socket");
+        filter.setValue("AM5");
+        filter.setOperator("=");
+        product.getCustomAttributesFilters().add(filter);
+        ProductForm form = ProductForm.from(product);
+        CategoryDefinition category = new CategoryDefinition().withName("GPU");
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("form", form);
+        variables.put("errors", errors);
+        variables.put("existing", edit);
+        variables.put("category", category);
+        variables.put("prefillNotice", null);
+        variables.put("labels", List.of("RTX 5080", "RTX 5090"));
+        variables.put("pricingGroups", List.of("Default", "Ultra Premium"));
+        variables.put("availabilityTypes", Arrays.stream(ProductAvailabilityType.values()).map(Enum::name).toList());
+        variables.put("storeMarketplaces", List.of(Map.of("name", "allegro", "displayName", "Allegro")));
+        variables.put("productCategories", List.of());
+        variables.put("categoryAncestors", List.of());
+        variables.put("formAction", "/dashboard/catalogs/c1/category/k1/products/p1");
+        variables.put("backHref", "/dashboard/catalogs/c1/category/k1");
+        variables.put("pageTitle", "Gigabyte RTX 5080");
+        variables.put("lead", "EAN 4719331361600 &middot; PIM pim-1");
+        variables.put("deleteHref", edit ? "/dashboard/catalogs/c1/category/k1/products/p1/delete" : null);
+        variables.put("openStock", false);
+        variables.put("openClient", true);
+        variables.put("redirectTo", null);
+        Context context = new Context();
+        context.setVariables(variables);
+        return EnglishFragmentTemplateEngine.create().process("catalog/product", context);
+    }
+
+    @Test
+    void theHeaderCarriesOneTitleAndTheDeleteLinkOnce() {
+        // when
+        String html = rendered(true);
+
+        // then
+        assertThat(occurrences(html, "<h1")).isEqualTo(1);
+        assertThat(occurrences(html, "/dashboard/catalogs/c1/category/k1/products/p1/delete")).isEqualTo(1);
+        assertThat(html.indexOf("cl-page-actions")).isLessThan(html.indexOf("/products/p1/delete"));
+        assertThat(html).doesNotContain("??");
+    }
+
+    @Test
+    void aNewProductHasNoDeleteLinkAndOffersTheAddButton() {
+        // when
+        String html = rendered(false);
+
+        // then
+        assertThat(html).doesNotContain("/products/p1/delete").contains("Add the product").doesNotContain("Save the product");
+    }
+
+    @Test
+    void theSavedValuesAndTheRepeatedRowsComeBackWithTheirFieldIds() {
+        // when
+        String html = rendered(true);
+
+        // then
+        assertThat(html).contains("value=\"Gigabyte RTX 5080\"").contains("value=\"4719331361600\"")
+                .contains("name=\"brand\"").contains("value=\"Gigabyte\"");
+        assertThat(html).contains("id=\"customAttribute-0-name\"").contains("name=\"customAttributes[0].name\"")
+                .contains("id=\"customAttributeFilter-0-name\"").contains("name=\"customAttributesFilters[0].name\"")
+                .contains("name=\"customAttributesFilters[0].category\"");
+        assertThat(occurrences(html, "type=\"radio\"")).isEqualTo(ProductAvailabilityType.values().length);
+        assertThat(html).contains("<option value=\"=\" selected");
+    }
+
+    @Test
+    void anErrorIsShownAtTheFieldItsKeyNames() {
+        // given
+        Product product = new Product("k1", "pim-1", "4719331361600", "GV-N5080", "Gigabyte", "RTX 5080", "X", "Default");
+        product.setProductId("p1");
+        product.getCustomAttributes().add(new ProductCustomAttribute());
+        ProductForm form = ProductForm.from(product);
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("form", form);
+        variables.put("errors", Map.of("name", "product.error.name.required",
+                ProductForm.fieldId(ProductForm.ATTRIBUTE, 0, "name"), "product.error.attribute.incomplete"));
+        variables.put("existing", true);
+        variables.put("category", new CategoryDefinition().withName("GPU"));
+        variables.put("prefillNotice", "EAN 1 is no longer in the inventory");
+        variables.put("labels", List.of());
+        variables.put("pricingGroups", List.of("Default"));
+        variables.put("availabilityTypes", List.of("BasedOnSupply"));
+        variables.put("storeMarketplaces", List.of());
+        variables.put("productCategories", List.of());
+        variables.put("categoryAncestors", List.of());
+        variables.put("formAction", "/dashboard/catalogs/c1/category/k1/products/p1");
+        variables.put("backHref", "/dashboard/catalogs/c1/category/k1");
+        variables.put("pageTitle", "X");
+        variables.put("lead", "EAN 4719331361600");
+        variables.put("deleteHref", null);
+        variables.put("openStock", false);
+        variables.put("openClient", true);
+        variables.put("redirectTo", null);
+        Context context = new Context();
+        context.setVariables(variables);
+
+        // when
+        String html = EnglishFragmentTemplateEngine.create().process("catalog/product", context);
+
+        // then
+        assertThat(html).contains("href=\"#name\"").contains("href=\"#customAttribute-0-name\"")
+                .contains("id=\"customAttribute-0-name\"").contains("cl-alert is-warn")
+                .contains("EAN 1 is no longer in the inventory").doesNotContain("??");
+    }
+
+    /** The error summary links to "#" + the key of the error, so every key the form can produce must be an id here. */
+    @Test
+    void everyErrorKeyNamesAnElementOfThePage() {
+        // given
+        List<String> fields = List.of("name", "ean", "label", "availabilityType", "suggestedRetailPrice",
+                "maxRetailPrice", "estimatedDeliveryDays", "pricingGroup", "stockExpectedQty", "restockPricePromo",
+                "restockPriceStandard", "marketplaces");
+        Map<String, String> errors = new LinkedHashMap<>();
+        fields.forEach(field -> errors.put(field, "product.error.amount.invalid"));
+
+        // when
+        String html = rendered(true, errors);
+
+        // then
+        assertThat(fields).allSatisfy(field -> assertThat(html).contains("id=\"" + field + "\""));
+        assertThat(html).doesNotContain("??");
+    }
+}

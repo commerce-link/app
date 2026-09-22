@@ -22,13 +22,14 @@ class CatalogMessagesTest {
 
     private static final Pattern DOUBLED_APOSTROPHE = Pattern.compile("''");
 
+    /** The messages of the catalog pages: their own keys and the product keys the product page reads. */
     private static Map<String, String> catalogMessages(String file) throws Exception {
         Properties properties = new Properties();
         try (Reader reader = Files.newBufferedReader(Path.of("src/main/resources", file), StandardCharsets.UTF_8)) {
             properties.load(reader);
         }
         return properties.stringPropertyNames().stream()
-                .filter(key -> key.startsWith("catalog."))
+                .filter(key -> key.startsWith("catalog.") || key.startsWith("product."))
                 .collect(Collectors.toMap(key -> key, properties::getProperty));
     }
 

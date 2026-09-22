@@ -22,6 +22,7 @@ import pl.commercelink.inventory.supplier.SupplierLabelMap;
 import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.pim.api.PimCatalog;
+import pl.commercelink.pim.api.PimEntry;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.CategoryDefinitionType;
 import pl.commercelink.products.PimCategoryOptions;
@@ -33,12 +34,16 @@ import pl.commercelink.products.ProductRecommendationEngine;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.products.brand.BrandMapper;
 import pl.commercelink.starter.security.model.CustomUser;
+import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.web.catalog.CatalogAccess;
+import pl.commercelink.web.settings.ConfirmAction;
 import pl.commercelink.web.catalog.CategoryPageModel;
 import pl.commercelink.web.catalog.ProductRow;
 import pl.commercelink.web.catalog.ProductStatus;
 import pl.commercelink.web.catalog.RecommendationRow;
+import pl.commercelink.web.dtos.ProductForm;
 import pl.commercelink.web.dtos.ProductsBulkAddForm;
 
 import java.util.List;
@@ -47,6 +52,8 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.hasEntry;
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -93,6 +100,10 @@ class CatalogProductsControllerTest {
     private BrandMapper brandMapper;
     @Mock
     private MessageSource messageSource;
+    @Mock
+    private StoresRepository storesRepository;
+    @Mock
+    private Store store;
 
     private ProductCatalog catalog;
     private CategoryDefinition gpu;
@@ -112,7 +123,12 @@ class CatalogProductsControllerTest {
         lenient().when(pimCategoryOptions.namesOf(any())).thenReturn(List.of());
         lenient().when(marketplaces.displayName(anyString())).thenAnswer(call -> call.getArgument(0));
         lenient().when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenAnswer(call -> call.getArgument(0));
-        mvc = MockMvcBuilders.standaloneSetup(new CatalogProductsController(access, productRepository,
+        lenient().when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        lenient().when(store.getMarketplaces()).thenReturn(List.of());
+        lenient().when(store.getEnabledCategories()).thenReturn(List.of());
+        lenient().when(pimCategoryOptions.namedOptions(any(), any())).thenReturn(List.of());
+        lenient().when(pimCategoryOptions.ancestorsOfNames(any())).thenReturn(List.of());
+        mvc = MockMvcBuilders.standaloneSetup(new CatalogProductsController(access, productRepository, storesRepository,
                 recommendationEngine, inventory, marketplaces, pimCategoryOptions, supplierLabels, pimCatalog,
                 brandMapper, messageSource)).build();
     }
@@ -464,6 +480,237 @@ class CatalogProductsControllerTest {
         // then
         assertThat((Map<String, String>) result.getModelAndView().getModel().get("errors"))
                 .containsEntry("product-0-pricingGroup", "product.error.group.unknown");
+        verify(productRepository, never()).save(any(Product.class));
+    }
+
+    @Test
+    void newProductStartsFromAnEmptyActiveFormWithTheDefaultPricingGroup() throws Exception {
+        // when
+        var result = mvc.perform(get(categoryPath() + "/products/new"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("catalog/product"))
+                .andExpect(model().attribute("existing", false))
+                .andExpect(model().attribute("formAction", categoryPath() + "/products/new"))
+                .andExpect(model().attribute("deleteHref", nullValue()))
+                .andReturn();
+
+        // then
+        ProductForm form = (ProductForm) result.getModelAndView().getModel().get("form");
+        assertThat(form.isEnabled()).isTrue();
+        assertThat(form.getPricingGroup()).isEqualTo(PriceDefinition.DEFAULT_PRICING_GROUP);
+        verify(inventory, never()).withEnabledSuppliersOnly(anyString());
+    }
+
+    @Test
+    void newProductFromTheInventoryIsPrefilledButStillCountsAsNew() throws Exception {
+        // given
+        gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
+        when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(inventoryView);
+        MatchedInventory found = mock(MatchedInventory.class);
+        when(found.isEmpty()).thenReturn(false);
+        when(found.getInventoryKey()).thenReturn(new InventoryKey("1", "MFN-1"));
+        when(found.getTaxonomy()).thenReturn(new Taxonomy("1", "MFN-1", "MSI", "MSI RTX 5070", "GPU", 1, null, null));
+        when(found.getLowestPrice()).thenReturn(Price.fromGross(2749));
+        when(inventoryView.findByEan("1")).thenReturn(found);
+        when(pimCatalog.findByPimIdOrGtinsOrMpns(any(), any(), any())).thenReturn(Optional.empty());
+
+        // when
+        var result = mvc.perform(get(categoryPath() + "/products/new").param("ean", "1"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("catalog/product"))
+                .andExpect(model().attribute("existing", false))
+                .andReturn();
+
+        // then
+        ProductForm form = (ProductForm) result.getModelAndView().getModel().get("form");
+        assertThat(form.getName()).isEqualTo("MSI RTX 5070");
+        assertThat(form.getEan()).isEqualTo("1");
+        assertThat(form.getBrand()).isEqualTo("MSI");
+        assertThat(form.getExistingPimId()).isNull();
+        assertThat(result.getModelAndView().getModel().get("prefillNotice")).isNull();
+    }
+
+    /** An address carrying an EAN the inventory no longer has must not be an error page: the form still opens. */
+    @Test
+    void newProductFromAnEanOutsideTheInventoryOpensTheEmptyFormWithANotice() throws Exception {
+        // given
+        when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(inventoryView);
+        MatchedInventory missing = mock(MatchedInventory.class);
+        when(missing.isEmpty()).thenReturn(true);
+        when(inventoryView.findByEan("999")).thenReturn(missing);
+
+        // when
+        var result = mvc.perform(get(categoryPath() + "/products/new").param("ean", "999"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("catalog/product"))
+                .andExpect(model().attribute("prefillNotice", "catalog.products.new.eanNotInInventory"))
+                .andReturn();
+
+        // then
+        ProductForm form = (ProductForm) result.getModelAndView().getModel().get("form");
+        assertThat(form.getEan()).isNull();
+        assertThat(form.isEnabled()).isTrue();
+    }
+
+    @Test
+    void savingAProductThatWouldMatchAnotherPimEntryIsRejected() throws Exception {
+        // given
+        gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
+        Product existing = new Product(gpu.getCategoryId(), "pim-1", "4719331361600", "m", "b", "l", "n", "Default");
+        existing.setProductId("p1");
+        when(access.requireProduct(gpu, "p1")).thenReturn(existing);
+        PimEntry other = mock(PimEntry.class);
+        when(other.pimId()).thenReturn("pim-2");
+        when(pimCatalog.findByGtinOrMpn("4719331361601", "m")).thenReturn(Optional.of(other));
+
+        // when / then
+        mvc.perform(post(categoryPath() + "/products/p1").header("X-Requested-With", "fetch")
+                        .param("name", "n").param("ean", "4719331361601").param("manufacturerCode", "m")
+                        .param("availabilityType", "BasedOnSupply").param("pricingGroup", "Default"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(model().attribute("errors", hasEntry("ean", "product.error.pim.changed")));
+        verify(productRepository, never()).save(any(Product.class));
+    }
+
+    @Test
+    void savedProductRedirectsToTheCategoryWithAFlash() throws Exception {
+        // given
+        gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
+        Product existing = new Product(gpu.getCategoryId(), "pim-1", "4719331361600", "m", "b", "l", "Old", "Default");
+        existing.setProductId("p1");
+        when(access.requireProduct(gpu, "p1")).thenReturn(existing);
+        PimEntry same = mock(PimEntry.class);
+        when(same.pimId()).thenReturn("pim-1");
+        when(pimCatalog.findByGtinOrMpn("4719331361600", "m")).thenReturn(Optional.of(same));
+
+        // when / then
+        mvc.perform(post(categoryPath() + "/products/p1")
+                        .param("name", "New name").param("ean", "4719331361600").param("manufacturerCode", "m")
+                        .param("availabilityType", "BasedOnSupply").param("pricingGroup", "Default")
+                        .param("enabled", "true"))
+                .andExpect(redirectedUrl(categoryPath()))
+                .andExpect(flash().attribute("settingsSavedMessage", "product.saved"));
+        assertThat(existing.getName()).isEqualTo("New name");
+        verify(productRepository).save(existing);
+    }
+
+    @Test
+    void createdProductTakesItsPimEntryAndBrandFromTheCatalog() throws Exception {
+        // given
+        gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
+        PimEntry entry = mock(PimEntry.class);
+        when(entry.pimId()).thenReturn("pim-9");
+        when(entry.brand()).thenReturn("msi");
+        when(pimCatalog.findByGtinOrMpn("4719331361600", "MFN-1")).thenReturn(Optional.of(entry));
+        when(brandMapper.unifyBrand("msi")).thenReturn("MSI");
+
+        // when
+        mvc.perform(post(categoryPath() + "/products/new")
+                        .param("name", "MSI RTX 5070").param("ean", "4719331361600").param("manufacturerCode", "MFN-1")
+                        .param("availabilityType", "BasedOnSupply").param("pricingGroup", "Default")
+                        .param("enabled", "true"))
+                .andExpect(redirectedUrl(categoryPath()))
+                .andExpect(flash().attribute("settingsSavedMessage", "product.added"));
+
+        // then
+        ArgumentCaptor<Product> saved = ArgumentCaptor.forClass(Product.class);
+        verify(productRepository).save(saved.capture());
+        assertThat(saved.getValue().getCategoryId()).isEqualTo(gpu.getCategoryId());
+        assertThat(saved.getValue().getProductId()).isNotBlank();
+        assertThat(saved.getValue().getPimId()).isEqualTo("pim-9");
+        assertThat(saved.getValue().getBrand()).isEqualTo("MSI");
+        assertThat(saved.getValue().isEnabled()).isTrue();
+    }
+
+    @Test
+    void serviceFlagFollowsTheCheckbox() throws Exception {
+        // given
+        gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
+        Product existing = new Product(gpu.getCategoryId(), null, "4719331361600", "m", "b", "l", "Assembly", "Default");
+        existing.setProductId("p1");
+        when(access.requireProduct(gpu, "p1")).thenReturn(existing);
+
+        // when / then
+        mvc.perform(saveService().param("service", "true")).andExpect(redirectedUrl(categoryPath()));
+        assertThat(existing.isService()).isTrue();
+        mvc.perform(saveService()).andExpect(redirectedUrl(categoryPath()));
+        assertThat(existing.isService()).isFalse();
+    }
+
+    /** The same save without the checkbox, which an unticked box does not send. */
+    private MockHttpServletRequestBuilder saveService() {
+        return post(categoryPath() + "/products/p1")
+                .param("name", "Assembly").param("ean", "4719331361600").param("availabilityType", "BasedOnSupply")
+                .param("pricingGroup", "Default");
+    }
+
+    @Test
+    void deletingAProductGoesThroughTheConfirmationEndpoint() throws Exception {
+        // given
+        Product existing = new Product(gpu.getCategoryId(), "pim-1", "4719331361600", "m", "b", "l", "n", "Default");
+        existing.setProductId("p1");
+        when(access.requireProduct(gpu, "p1")).thenReturn(existing);
+
+        // when / then
+        mvc.perform(get(categoryPath() + "/products/p1/delete")).andExpect(view().name("settings-confirm"));
+        verify(productRepository, never()).delete(any(Product.class));
+        mvc.perform(post(categoryPath() + "/products/p1/delete"))
+                .andExpect(redirectedUrl(categoryPath()))
+                .andExpect(flash().attribute("settingsSavedMessage", "product.deleted"));
+        verify(productRepository).delete(existing);
+    }
+
+    @Test
+    void theConfirmationPageAsksAboutTheProductAndPostsToItsOwnAddress() throws Exception {
+        // given
+        Product existing = new Product(gpu.getCategoryId(), "pim-1", "4719331361600", "m", "b", "l", "RTX 5070", "Default");
+        existing.setProductId("p1");
+        when(access.requireProduct(gpu, "p1")).thenReturn(existing);
+
+        // when
+        var result = mvc.perform(get(categoryPath() + "/products/p1/delete")).andReturn();
+
+        // then
+        ConfirmAction confirm = (ConfirmAction) result.getModelAndView().getModel().get("confirm");
+        assertThat(confirm.actionPath()).isEqualTo(categoryPath() + "/products/p1/delete");
+        assertThat(confirm.cancelPath()).isEqualTo(categoryPath() + "/products/p1");
+        assertThat(confirm.destructive()).isTrue();
+        assertThat(result.getModelAndView().getModel().get("backLabel")).isEqualTo("RTX 5070");
+    }
+
+    /** An automatic category computes its list from the inventory, so a product saved there would show up nowhere. */
+    @Test
+    void anAutomaticCategoryRefusesEveryProductAction() throws Exception {
+        // given
+        gpu.setType(CategoryDefinitionType.Dynamic);
+
+        // when / then
+        mvc.perform(get(categoryPath() + "/products/new"))
+                .andExpect(redirectedUrl(categoryPath()))
+                .andExpect(flash().attribute("catalogError", "catalog.products.add.dynamic"));
+        mvc.perform(post(categoryPath() + "/products/p1").param("name", "n"))
+                .andExpect(redirectedUrl(categoryPath()));
+        verify(productRepository, never()).save(any(Product.class));
+    }
+
+    /** A mistake in a folded section must not stay folded, or the summary links to a field nobody can see. */
+    @Test
+    void anUnfinishedCustomFilterOpensTheSectionItSitsIn() throws Exception {
+        // given
+        gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
+        Product existing = new Product(gpu.getCategoryId(), null, "4719331361600", "m", "b", "l", "n", "Default");
+        existing.setProductId("p1");
+        when(access.requireProduct(gpu, "p1")).thenReturn(existing);
+
+        // when / then
+        mvc.perform(post(categoryPath() + "/products/p1").header("X-Requested-With", "fetch")
+                        .param("name", "n").param("ean", "4719331361600").param("availabilityType", "BasedOnSupply")
+                        .param("pricingGroup", "Default").param("customAttributesFilters[0].name", "Socket"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(model().attribute("errors",
+                        hasEntry("customAttributeFilter-0-name", "product.error.filter.incomplete")))
+                .andExpect(model().attribute("openClient", true))
+                .andExpect(model().attribute("openStock", false));
         verify(productRepository, never()).save(any(Product.class));
     }
 }
