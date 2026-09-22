@@ -134,6 +134,21 @@ public class ProductForm {
     }
 
     /**
+     * What is wrong with the identifiers of a product, or null when nothing is: a product is known by its EAN or by
+     * its manufacturer code, and an EAN that is given is 8--14 digits. The bulk-add review edits the same two fields
+     * and answers with the same messages.
+     */
+    static String identifierError(String ean, String manufacturerCode) {
+        if (StringUtils.isBlank(ean) && StringUtils.isBlank(manufacturerCode)) {
+            return "product.error.identifier.required";
+        }
+        if (StringUtils.isNotBlank(ean) && !ean.trim().matches("\\d{8,14}")) {
+            return "product.error.ean.invalid";
+        }
+        return null;
+    }
+
+    /**
      * @param categoryLabels   the labels the category offers, or empty when it groups by nothing and any label passes
      * @param pricingGroups    the pricing groups of the category; the product must land in one of them
      * @param storeMarketplaces the marketplaces the store is connected to; only those may approve the product
@@ -143,10 +158,9 @@ public class ProductForm {
                                         List<String> storeMarketplaces, Function<PimCheck, Optional<String>> pimIdFor) {
         Map<String, String> errors = new LinkedHashMap<>();
         FormRules.requireText(errors, "name", name, "product.error.name.required");
-        if (StringUtils.isBlank(ean) && StringUtils.isBlank(manufacturerCode)) {
-            errors.put("ean", "product.error.identifier.required");
-        } else if (StringUtils.isNotBlank(ean) && !ean.trim().matches("\\d{8,14}")) {
-            errors.put("ean", "product.error.ean.invalid");
+        String identifierError = identifierError(ean, manufacturerCode);
+        if (identifierError != null) {
+            errors.put("ean", identifierError);
         } else if (StringUtils.isNotBlank(existingPimId)) {
             Optional<String> resolved = pimIdFor.apply(
                     new PimCheck(StringUtils.trimToNull(ean), StringUtils.trimToNull(manufacturerCode)));

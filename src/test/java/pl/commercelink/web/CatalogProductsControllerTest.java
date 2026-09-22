@@ -476,12 +476,12 @@ class CatalogProductsControllerTest {
         // given
         gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
         // Product normalises the identifiers it is given, so the lookup asks with the unified code.
-        when(pimCatalog.findByGtinOrMpn("1", "M")).thenReturn(Optional.empty());
+        when(pimCatalog.findByGtinOrMpn("5901234567890", "M")).thenReturn(Optional.empty());
 
         // when / then
         mvc.perform(post(categoryPath() + "/products/add/save")
                         .param("products[0].categoryId", "someone-elses").param("products[0].productId", "forged")
-                        .param("products[0].name", "X").param("products[0].ean", "1")
+                        .param("products[0].name", "X").param("products[0].ean", "5901234567890")
                         .param("products[0].manufacturerCode", "m").param("products[0].label", "L")
                         .param("products[0].pricingGroup", "Default"))
                 .andExpect(redirectedUrl(categoryPath()))
@@ -503,14 +503,14 @@ class CatalogProductsControllerTest {
         PimEntry entry = mock(PimEntry.class);
         when(entry.pimId()).thenReturn("pim-9");
         when(entry.brand()).thenReturn("msi");
-        when(pimCatalog.findByGtinOrMpn("1", "M")).thenReturn(Optional.of(entry));
+        when(pimCatalog.findByGtinOrMpn("5901234567890", "M")).thenReturn(Optional.of(entry));
         when(brandMapper.unifyBrand("msi")).thenReturn("MSI");
 
         // when
         mvc.perform(post(categoryPath() + "/products/add/save")
                         .param("products[0].pimId", "forged").param("products[0].version", "9")
                         .param("products[0].productPage", "<p>forged</p>").param("products[0].enabled", "false")
-                        .param("products[0].name", "X").param("products[0].ean", "1")
+                        .param("products[0].name", "X").param("products[0].ean", "5901234567890")
                         .param("products[0].manufacturerCode", "m").param("products[0].brand", "Fake")
                         .param("products[0].label", "L").param("products[0].pricingGroup", "Default"))
                 .andExpect(redirectedUrl(categoryPath()));
@@ -534,11 +534,11 @@ class CatalogProductsControllerTest {
         // given
         gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
         when(productRepository.findAll(gpu.getCategoryId())).thenReturn(List.of(
-                new Product(gpu.getCategoryId(), "pim", "1", "MFN-1", "MSI", "L", "MSI RTX 5070", "Default")));
+                new Product(gpu.getCategoryId(), "pim", "5901234567890", "MFN-1", "MSI", "L", "MSI RTX 5070", "Default")));
 
         // when / then
         mvc.perform(post(categoryPath() + "/products/add/save")
-                        .param("products[0].name", "MSI RTX 5070").param("products[0].ean", "1")
+                        .param("products[0].name", "MSI RTX 5070").param("products[0].ean", "5901234567890")
                         .param("products[0].manufacturerCode", "MFN-1").param("products[0].pricingGroup", "Default"))
                 .andExpect(redirectedUrl(categoryPath()))
                 .andExpect(flash().attribute("settingsSavedMessage", "catalog.products.added.none"));
@@ -553,13 +553,13 @@ class CatalogProductsControllerTest {
         gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
         when(productRepository.findAll(gpu.getCategoryId())).thenReturn(List.of(
                 new Product(gpu.getCategoryId(), "pim", "1", "MFN-1", "MSI", "L", "MSI RTX 5070", "Default")));
-        when(pimCatalog.findByGtinOrMpn("2", null)).thenReturn(Optional.empty());
+        when(pimCatalog.findByGtinOrMpn("5901234567891", null)).thenReturn(Optional.empty());
 
         // when / then
         mvc.perform(post(categoryPath() + "/products/add/save")
-                        .param("products[0].name", "MSI RTX 5070").param("products[0].ean", "1")
+                        .param("products[0].name", "MSI RTX 5070").param("products[0].ean", "5901234567890")
                         .param("products[0].manufacturerCode", "MFN-1").param("products[0].pricingGroup", "Default")
-                        .param("products[1].name", "ASUS RTX 5060").param("products[1].ean", "2")
+                        .param("products[1].name", "ASUS RTX 5060").param("products[1].ean", "5901234567891")
                         .param("products[1].pricingGroup", "Default"))
                 .andExpect(redirectedUrl(categoryPath()));
         ArgumentCaptor<Product> saved = ArgumentCaptor.forClass(Product.class);
@@ -573,18 +573,69 @@ class CatalogProductsControllerTest {
     void saveLeavesTheProductWithoutAPimIdWhenThePimDoesNotKnowIt() throws Exception {
         // given
         gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
-        when(pimCatalog.findByGtinOrMpn("1", null)).thenReturn(Optional.empty());
+        when(pimCatalog.findByGtinOrMpn("5901234567890", null)).thenReturn(Optional.empty());
 
         // when
         mvc.perform(post(categoryPath() + "/products/add/save")
                         .param("products[0].pimId", "forged").param("products[0].name", "X")
-                        .param("products[0].ean", "1").param("products[0].pricingGroup", "Default"))
+                        .param("products[0].ean", "5901234567890").param("products[0].pricingGroup", "Default"))
                 .andExpect(redirectedUrl(categoryPath()));
 
         // then
         ArgumentCaptor<Product> saved = ArgumentCaptor.forClass(Product.class);
         verify(productRepository).save(saved.capture());
         assertThat(saved.getValue().getPimId()).isNull();
+    }
+
+    /**
+     * The identifiers are editable in the review, and they decide which PIM entry the product resolves to: what the
+     * review sends is what is saved and what the catalogue is asked about.
+     */
+    @Test
+    void anEanCorrectedInTheReviewIsTheOneThatIsSaved() throws Exception {
+        // given
+        gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
+        PimEntry entry = mock(PimEntry.class);
+        when(entry.pimId()).thenReturn("pim-9");
+        when(entry.brand()).thenReturn("msi");
+        when(pimCatalog.findByGtinOrMpn("5901234567899", "MFN-9")).thenReturn(Optional.of(entry));
+        when(brandMapper.unifyBrand("msi")).thenReturn("MSI");
+
+        // when
+        mvc.perform(post(categoryPath() + "/products/add/save")
+                        .param("products[0].name", "MSI RTX 5070").param("products[0].ean", "5901234567899")
+                        .param("products[0].manufacturerCode", "MFN-9").param("products[0].pricingGroup", "Default"))
+                .andExpect(redirectedUrl(categoryPath()));
+
+        // then
+        ArgumentCaptor<Product> saved = ArgumentCaptor.forClass(Product.class);
+        verify(productRepository).save(saved.capture());
+        assertThat(saved.getValue().getEan()).isEqualTo("5901234567899");
+        assertThat(saved.getValue().getManufacturerCode()).isEqualTo("MFN-9");
+        assertThat(saved.getValue().getPimId()).isEqualTo("pim-9");
+    }
+
+    /** A wrong identifier is refused where it is typed, instead of creating a product nothing can be matched to. */
+    @Test
+    @SuppressWarnings("unchecked")
+    void aRowWithoutAnIdentifierOrWithAMalformedEanComesBackToTheReview() throws Exception {
+        // given
+        gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
+
+        // when
+        var result = mvc.perform(post(categoryPath() + "/products/add/save")
+                        .param("products[0].name", "X").param("products[0].pricingGroup", "Default")
+                        .param("products[1].name", "Y").param("products[1].ean", "12345")
+                        .param("products[1].pricingGroup", "Default"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(view().name("catalog/products-add-review"))
+                .andReturn();
+
+        // then
+        assertThat((Map<String, String>) result.getModelAndView().getModel().get("errors"))
+                .containsEntry("product-0-ean", "product.error.identifier.required")
+                .containsEntry("product-1-ean", "product.error.ean.invalid");
+        verify(productRepository, never()).save(any(Product.class));
     }
 
     /** Selecting every proposal of a large category posts more rows than Spring grows a list to by default. */
@@ -596,7 +647,7 @@ class CatalogProductsControllerTest {
         MockHttpServletRequestBuilder request = post(categoryPath() + "/products/add/save");
         for (int index = 0; index < 300; index++) {
             request.param("products[" + index + "].name", "Product " + index)
-                    .param("products[" + index + "].ean", String.valueOf(index))
+                    .param("products[" + index + "].ean", String.format("59012345%05d", index))
                     .param("products[" + index + "].pricingGroup", "Default");
         }
 
@@ -657,7 +708,8 @@ class CatalogProductsControllerTest {
 
         // when
         var result = mvc.perform(post(categoryPath() + "/products/add/save")
-                        .param("products[0].name", "X").param("products[0].pricingGroup", "Nope"))
+                        .param("products[0].name", "X").param("products[0].ean", "5901234567890")
+                        .param("products[0].pricingGroup", "Nope"))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(view().name("catalog/products-add-review"))
                 .andReturn();

@@ -84,6 +84,11 @@ public class ProductsBulkAddForm {
             if (StringUtils.isBlank(row.getName())) {
                 errors.put(fieldId(index, "name"), "product.error.name.required");
             }
+            // The review edits the identifiers, so it checks them by the same rules as the product page.
+            String identifierError = ProductForm.identifierError(row.getEan(), row.getManufacturerCode());
+            if (identifierError != null) {
+                errors.put(fieldId(index, "ean"), identifierError);
+            }
             if (!categoryLabels.isEmpty() && !categoryLabels.contains(row.getLabel())) {
                 errors.put(fieldId(index, "label"), "product.error.label.notInList");
             }

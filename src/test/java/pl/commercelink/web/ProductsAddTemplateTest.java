@@ -136,6 +136,24 @@ class ProductsAddTemplateTest {
                 .doesNotContain("products[0].pimId").doesNotContain("categoryId").doesNotContain("productId");
     }
 
+    /**
+     * The identifiers decide which PIM entry the product resolves to, and a proposal can carry the wrong one; the
+     * review is the last place to correct it, so both are text fields with an error slot of their own.
+     */
+    @Test
+    void theReviewEditsTheEanAndTheManufacturerCode() {
+        // given
+        String html = renderedReview(Map.of("product-0-ean", "An EAN is 8\u201314 digits."));
+
+        // then
+        assertThat(html).contains("id=\"product-0-ean\"").contains("id=\"product-0-manufacturerCode\"")
+                .contains("href=\"#product-0-ean\"").contains("An EAN is 8\u201314 digits.")
+                .contains("value=\"5901234567890\"").contains("value=\"MFN-1\"").contains(">MSI<")
+                .doesNotContain("type=\"hidden\" name=\"products[0].ean\"")
+                .doesNotContain("type=\"hidden\" name=\"products[0].manufacturerCode\"")
+                .doesNotContain("??");
+    }
+
     private static String renderedProposals() {
         RecommendationRow listed = new RecommendationRow("1", "MSI RTX 5070", "MSI", "MFN-1", true, "2 749,00",
                 List.of("Acme", "Elko"), "5901234567890", "msi rtx 5070 1 mfn-1 msi",
