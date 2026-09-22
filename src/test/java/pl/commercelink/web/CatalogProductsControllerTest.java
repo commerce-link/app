@@ -253,6 +253,35 @@ class CatalogProductsControllerTest {
                 .extracting(ProductRow::name).containsExactly("ASUS RTX 5060");
     }
 
+    /**
+     * The old {@code ?status=MarketplaceEligible} view of an automatic category listed every mapped proposal, which the
+     * export never published: {@code MarketplaceOfferExportEventListener} reads a category's offers from
+     * {@code productRepository.findAllProductsWithPimId}, and an automatic category has no products of its own. The
+     * view is therefore not brought back; its address stays a working link that opens the whole list.
+     */
+    @Test
+    void theLegacyMarketplaceViewOfAnAutomaticCategoryOpensTheWholeList() throws Exception {
+        // given
+        gpu.setType(CategoryDefinitionType.Dynamic);
+        gpu.setPimCategoryIds(List.of("pim-gpu"));
+        gpu.getMarketplaceDefinitions().add(new MarketplaceDefinition("allegro", 1.2, 0, 0, 0, 0, 1));
+        ProductRecommendation recommendation = mock(ProductRecommendation.class);
+        when(recommendation.hasPimId()).thenReturn(true);
+        when(recommendation.getName()).thenReturn("MSI RTX 5070");
+        when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(inventoryView);
+        when(recommendationEngine.getRecommendations(gpu, inventoryView)).thenReturn(List.of(recommendation));
+
+        // when
+        var result = mvc.perform(get(categoryPath()).param("status", "all").param("feature", "marketplace"))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        // then
+        CategoryPageModel page = (CategoryPageModel) result.getModelAndView().getModel().get("page");
+        assertThat(page.rows()).extracting(ProductRow::name).containsExactly("MSI RTX 5070");
+        assertThat(page.featureCounts()).containsEntry("marketplace", 0);
+    }
+
     @Test
     void bulkDisableSavesEachProductAndReportsTheCount() throws Exception {
         // given

@@ -192,6 +192,21 @@ class CategoryPageTemplateTest {
                 .contains("RTX 5070 (1)").contains("RTX 5060 (1)").contains("Label: all (2)");
     }
 
+    /**
+     * An automatic category offers no "Pokaż" select: the export publishes a category's own products and an automatic
+     * category has none, so there is no marketplace subset to show. Without the select the filter script never puts the
+     * "feature" group into its state, and the legacy {@code feature=marketplace} address simply opens the whole list.
+     */
+    @Test
+    void theAutomaticPageOffersNoFeatureSelect() {
+        // when
+        String html = rendered(true);
+
+        // then
+        assertThat(html).doesNotContain("feature-filter").doesNotContain("data-cl-filter-group=\"feature\"")
+                .contains("MSI RTX 5070").contains("ASUS RTX 5060");
+    }
+
     @Test
     void theAutomaticPageIsPricedAndOffersNothingToSelectOrAdd() {
         // when
