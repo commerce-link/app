@@ -14,40 +14,47 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.web.util.HtmlUtils;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.CategoryDefinitionType;
 import pl.commercelink.products.CategoryDefinitions;
+import pl.commercelink.products.MarketplaceDefinition;
 import pl.commercelink.products.PimCategoryOptions;
 import pl.commercelink.products.PriceDefinition;
 import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.starter.security.CustomSecurityContext;
+import pl.commercelink.stores.MarketplaceIntegration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.catalog.CatalogAccess;
 import pl.commercelink.web.catalog.CatalogPaths;
 import pl.commercelink.web.catalog.CategoryTypeLabels;
+import pl.commercelink.web.catalog.MarketplaceDefinitionRow;
 import pl.commercelink.web.dtos.CategoryBasicsForm;
 import pl.commercelink.web.dtos.CategoryPricingForm;
+import pl.commercelink.web.dtos.MarketplaceDefinitionForm;
 import pl.commercelink.web.settings.ConfirmAction;
 import pl.commercelink.web.settings.SettingsFlash;
 import pl.commercelink.web.settings.SettingsPaths;
 
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 /**
- * A catalog category: its settings hub, the Basics and Pricing pages and deleting the category. The products of the
- * category live in CatalogProductsController.
+ * A catalog category: its settings hub, the Basics, Pricing and Marketplaces pages and deleting the category. The
+ * products of the category live in CatalogProductsController.
  */
 @Controller
 @PreAuthorize("hasRole('ADMIN')")
@@ -60,6 +67,9 @@ public class CatalogCategoryController {
     private static final String PRICING_VIEW = "catalog/category-pricing";
     private static final String PRICING_FRAGMENT = PRICING_VIEW + " :: pricingForm";
 
+    private static final String MARKETPLACE_VIEW = "catalog/category-marketplace";
+    private static final String MARKETPLACE_FRAGMENT = MARKETPLACE_VIEW + " :: marketplaceForm";
+
     /** Outcome of a refused category action, shown by the catalog page in its body; the layout banner is Bulma markup. */
     private static final String ERROR_FLASH = "catalogError";
 
@@ -71,6 +81,7 @@ public class CatalogCategoryController {
     private final ProductRepository productRepository;
     private final StoresRepository storesRepository;
     private final PimCategoryOptions pimCategoryOptions;
+    private final MarketplaceConnections marketplaces;
     private final MessageSource messageSource;
 
     @GetMapping("/dashboard/catalogs/{catalogId}/category/{categoryId}/settings")
@@ -199,6 +210,130 @@ public class CatalogCategoryController {
         model.addAttribute("lead", HtmlUtils.htmlEscape(category.getName()) + " · "
                 + messageSource.getMessage("catalog.category.pricing.lead", null, locale));
         return PRICING_VIEW;
+    }
+
+    @GetMapping("/dashboard/catalogs/{catalogId}/category/{categoryId}/settings/marketplaces")
+    public String marketplaces(@PathVariable String catalogId, @PathVariable String categoryId, Model model, Locale locale) {
+        ProductCatalog catalog = access.requireCatalog(storeId(), catalogId);
+        CategoryDefinition category = access.requireCategory(catalog, categoryId);
+        Store store = storesRepository.findById(storeId());
+        List<Product> products = productRepository.findAll(categoryId);
+        List<String> connected = store.getMarketplaces().stream().map(MarketplaceIntegration::getName).toList();
+        List<MarketplaceDefinitionRow> rows = connected.stream()
+                .map(name -> MarketplaceDefinitionRow.of(catalogId, categoryId, name, marketplaces.displayName(name),
+                        category.getCategoryDefinition(name), approved(products, name), true))
+                .sorted(Comparator.comparing(MarketplaceDefinitionRow::displayName, String.CASE_INSENSITIVE_ORDER))
+                .toList();
+        // Definitions left behind by a marketplace the store no longer has, and the nameless ones no export can use.
+        List<MarketplaceDefinitionRow> orphans = category.getMarketplaceDefinitions().stream()
+                .filter(definition -> definition.getName() == null || !connected.contains(definition.getName()))
+                .map(definition -> MarketplaceDefinitionRow.of(catalogId, categoryId, definition.getName(),
+                        definition.getName() == null ? null : marketplaces.displayName(definition.getName()),
+                        Optional.of(definition), 0, false))
+                .toList();
+        model.addAttribute("catalog", catalog);
+        model.addAttribute("category", category);
+        model.addAttribute("rows", rows);
+        model.addAttribute("orphans", orphans);
+        model.addAttribute("storeMarketplacesHref", SettingsPaths.store(storeId(), "/marketplaces"));
+        model.addAttribute("backHref", CatalogPaths.categorySettings(catalogId, categoryId));
+        model.addAttribute("backLabel", messageSource.getMessage("catalog.category.settings.title", null, locale));
+        model.addAttribute("lead", HtmlUtils.htmlEscape(category.getName()) + " · "
+                + messageSource.getMessage("catalog.category.marketplaces.lead", null, locale));
+        return "catalog/category-marketplaces";
+    }
+
+    @GetMapping("/dashboard/catalogs/{catalogId}/category/{categoryId}/settings/marketplaces/{name}")
+    public String marketplace(@PathVariable String catalogId, @PathVariable String categoryId, @PathVariable String name,
+                              Model model, Locale locale) {
+        ProductCatalog catalog = access.requireCatalog(storeId(), catalogId);
+        CategoryDefinition category = access.requireCategory(catalog, categoryId);
+        String marketplace = access.requireMarketplace(storesRepository.findById(storeId()), name);
+        MarketplaceDefinitionForm form = category.getCategoryDefinition(marketplace).map(MarketplaceDefinitionForm::from)
+                .orElseGet(MarketplaceDefinitionForm::empty);
+        return renderMarketplace(catalog, category, marketplace, form, Map.of(), model, locale);
+    }
+
+    @PostMapping("/dashboard/catalogs/{catalogId}/category/{categoryId}/settings/marketplaces/{name}")
+    public String saveMarketplace(@PathVariable String catalogId, @PathVariable String categoryId, @PathVariable String name,
+                                  @ModelAttribute MarketplaceDefinitionForm form,
+                                  @RequestHeader(value = SettingsPaths.ASYNC_HEADER, required = false) String requestedWith,
+                                  Model model, Locale locale, RedirectAttributes redirectAttributes,
+                                  HttpServletRequest request, HttpServletResponse response) {
+        ProductCatalog catalog = access.requireCatalog(storeId(), catalogId);
+        CategoryDefinition category = access.requireCategory(catalog, categoryId);
+        String marketplace = access.requireMarketplace(storesRepository.findById(storeId()), name);
+        boolean async = SettingsPaths.isAsync(requestedWith);
+        Map<String, String> errors = form.validate();
+        if (!errors.isEmpty()) {
+            return rejected(renderMarketplace(catalog, category, marketplace, form, errors, model, locale),
+                    MARKETPLACE_FRAGMENT, async, response);
+        }
+        definitions.saveMarketplace(catalog, category, form.toDefinition(marketplace));
+        return saved(CatalogPaths.categoryMarketplaces(catalogId, categoryId),
+                messageSource.getMessage("catalog.category.marketplace.saved",
+                        new Object[]{marketplaces.displayName(marketplace)}, locale),
+                async, model, redirectAttributes, request, response, MARKETPLACE_FRAGMENT,
+                () -> renderMarketplace(catalog, category, marketplace, form, Map.of(), model, locale));
+    }
+
+    @GetMapping("/dashboard/catalogs/{catalogId}/category/{categoryId}/settings/marketplaces/{name}/delete")
+    public String confirmRemoveMarketplace(@PathVariable String catalogId, @PathVariable String categoryId,
+                                           @PathVariable String name, Model model, Locale locale) {
+        ProductCatalog catalog = access.requireCatalog(storeId(), catalogId);
+        CategoryDefinition category = access.requireCategory(catalog, categoryId);
+        String shown = shownName(name, locale);
+        model.addAttribute("confirm", new ConfirmAction(
+                messageSource.getMessage("catalog.category.marketplace.delete.title", new Object[]{shown}, locale),
+                messageSource.getMessage("catalog.category.marketplace.delete.message", null, locale),
+                messageSource.getMessage("catalog.category.marketplace.delete", null, locale),
+                CatalogPaths.categoryMarketplaceDelete(catalogId, categoryId, name),
+                CatalogPaths.categoryMarketplaces(catalogId, categoryId)));
+        model.addAttribute("backLabel", messageSource.getMessage("catalog.category.marketplaces.title", null, locale));
+        return "settings-confirm";
+    }
+
+    @PostMapping("/dashboard/catalogs/{catalogId}/category/{categoryId}/settings/marketplaces/{name}/delete")
+    public String removeMarketplace(@PathVariable String catalogId, @PathVariable String categoryId, @PathVariable String name,
+                                    Locale locale, RedirectAttributes redirectAttributes) {
+        ProductCatalog catalog = access.requireCatalog(storeId(), catalogId);
+        CategoryDefinition category = access.requireCategory(catalog, categoryId);
+        String target = MarketplaceDefinitionRow.UNNAMED.equals(name) ? null : name;
+        if (category.getMarketplaceDefinitions().stream().noneMatch(definition -> Objects.equals(definition.getName(), target))) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+        definitions.removeMarketplace(catalog, category, target);
+        SettingsFlash.onRedirect(redirectAttributes, messageSource.getMessage("catalog.category.marketplace.deleted",
+                new Object[]{shownName(name, locale)}, locale));
+        return "redirect:" + CatalogPaths.categoryMarketplaces(catalogId, categoryId);
+    }
+
+    /** A definition saved without a name has none to show, so it is named like any other untitled record. */
+    private String shownName(String name, Locale locale) {
+        return MarketplaceDefinitionRow.UNNAMED.equals(name)
+                ? messageSource.getMessage("settings.list.untitled", null, locale) : marketplaces.displayName(name);
+    }
+
+    private String renderMarketplace(ProductCatalog catalog, CategoryDefinition category, String marketplace,
+                                     MarketplaceDefinitionForm form, Map<String, String> errors, Model model, Locale locale) {
+        String displayName = marketplaces.displayName(marketplace);
+        model.addAttribute("form", form);
+        model.addAttribute("errors", errors);
+        model.addAttribute("catalog", catalog);
+        model.addAttribute("category", category);
+        model.addAttribute("marketplaceName", displayName);
+        model.addAttribute("approvedProducts", approved(productRepository.findAll(category.getCategoryId()), marketplace));
+        model.addAttribute("formAction",
+                CatalogPaths.categoryMarketplace(catalog.getCatalogId(), category.getCategoryId(), marketplace));
+        model.addAttribute("backHref", CatalogPaths.categoryMarketplaces(catalog.getCatalogId(), category.getCategoryId()));
+        model.addAttribute("backLabel", messageSource.getMessage("catalog.category.marketplaces.title", null, locale));
+        model.addAttribute("lead", HtmlUtils.htmlEscape(category.getName()) + " · " + messageSource.getMessage(
+                "catalog.category.marketplace.lead", new Object[]{HtmlUtils.htmlEscape(displayName)}, locale));
+        return MARKETPLACE_VIEW;
+    }
+
+    private static int approved(List<Product> products, String marketplace) {
+        return (int) products.stream().filter(product -> product.isApprovedForMarketplace(marketplace)).count();
     }
 
     @GetMapping("/dashboard/catalogs/{catalogId}/category/{categoryId}/delete")

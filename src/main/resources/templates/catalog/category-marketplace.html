@@ -1,0 +1,81 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+<div layout:fragment="content">
+    <section class="cl-page">
+        <div class="cl-page-body">
+            <div th:replace="~{fragments/settings-header :: subpageWithActions(${backHref}, ${backLabel}, ${marketplaceName}, ${lead}, null)}"></div>
+
+            <form th:fragment="marketplaceForm" id="marketplace-definition-form" class="cl-form" th:action="@{${formAction}}"
+                  th:object="${form}" method="post" novalidate data-cl-async
+                  th:attr="data-cl-redirect=${redirectTo}, data-error-message=#{form.save.failed}">
+                <div th:replace="~{fragments/settings-form :: errorSummary('marketplace-definition-errors', ${errors}, null)}"></div>
+                <div class="cl-card">
+                    <fieldset class="cl-fieldset">
+                        <legend class="cl-fieldset-title" th:text="#{catalog.category.marketplace.export}"></legend>
+                        <div class="cl-form-grid">
+                            <div class="cl-span-6">
+                                <!--/* Written out instead of settings-form :: check: the label names the marketplace. */-->
+                                <div class="cl-check-field">
+                                    <label class="cl-check">
+                                        <input type="checkbox" id="enabled" name="enabled" value="true" th:checked="*{enabled}"
+                                               aria-describedby="enabled-description"/>
+                                        <span th:text="#{catalog.category.marketplace.enabled(${marketplaceName})}"></span>
+                                    </label>
+                                    <p class="cl-check-description" id="enabled-description"
+                                       th:text="#{catalog.category.marketplace.enabled.desc}"></p>
+                                </div>
+                            </div>
+                            <div class="cl-span-2" th:insert="~{fragments/settings-form :: textField('markup', 'catalog.category.marketplace.markup', *{markup}, 'text', 'off', true, ${errors['markup']}, #{catalog.category.marketplace.markup.help})}"></div>
+                        </div>
+                    </fieldset>
+                    <fieldset class="cl-fieldset" id="conditions" tabindex="-1">
+                        <legend class="cl-fieldset-title" th:text="#{catalog.category.marketplace.conditions}"></legend>
+                        <p class="cl-help" th:text="#{catalog.category.marketplace.conditions.help}"></p>
+                        <p th:if="${errors['conditions'] != null}" class="cl-field-error">
+                            <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                            <span th:text="#{${errors['conditions']}}"></span>
+                        </p>
+                        <div class="cl-form-grid">
+                            <div class="cl-span-6"><span class="cl-label" th:text="#{catalog.category.marketplace.warehouse}"></span></div>
+                            <div class="cl-span-2" th:insert="~{fragments/settings-form :: textField('minWarehouseQty', 'catalog.category.marketplace.minWarehouseQty', *{minWarehouseQty}, 'text', 'off', false, ${errors['minWarehouseQty']}, #{catalog.category.marketplace.minWarehouseQty.help})}"></div>
+                            <div class="cl-span-6"><span class="cl-label" th:text="#{catalog.category.marketplace.distributors}"></span></div>
+                            <div class="cl-span-2" th:insert="~{fragments/settings-form :: textField('minQtyPerDistributor', 'catalog.category.marketplace.minQtyPerDistributor', *{minQtyPerDistributor}, 'text', 'off', false, ${errors['minQtyPerDistributor']}, null)}"></div>
+                            <div class="cl-span-2" th:insert="~{fragments/settings-form :: textField('minNumOfDistributors', 'catalog.category.marketplace.minNumOfDistributors', *{minNumOfDistributors}, 'text', 'off', false, ${errors['minNumOfDistributors']}, null)}"></div>
+                            <div class="cl-span-2" th:insert="~{fragments/settings-form :: textField('minNumOfLocalDistributors', 'catalog.category.marketplace.minNumOfLocalDistributors', *{minNumOfLocalDistributors}, 'text', 'off', false, ${errors['minNumOfLocalDistributors']}, null)}"></div>
+                            <div class="cl-span-2" th:insert="~{fragments/settings-form :: textField('minDistributorsQty', 'catalog.category.marketplace.minDistributorsQty', *{minDistributorsQty}, 'text', 'off', false, ${errors['minDistributorsQty']}, null)}"></div>
+                        </div>
+                    </fieldset>
+                    <fieldset class="cl-fieldset">
+                        <legend class="cl-fieldset-title" th:text="#{catalog.category.marketplace.which}"></legend>
+                        <div class="cl-form-grid">
+                            <div class="cl-span-6">
+                                <div class="cl-check-field">
+                                    <label class="cl-check">
+                                        <input type="checkbox" id="exportSelectedProducts" name="exportSelectedProducts" value="true"
+                                               th:checked="*{exportSelectedProducts}" aria-describedby="exportSelectedProducts-description"/>
+                                        <span th:text="#{catalog.category.marketplace.selected}"></span>
+                                    </label>
+                                    <p class="cl-check-description" id="exportSelectedProducts-description"
+                                       th:text="#{catalog.category.marketplace.selected.desc(${marketplaceName}, ${approvedProducts})}"></p>
+                                </div>
+                            </div>
+                        </div>
+                    </fieldset>
+                    <div class="cl-card-footer">
+                        <button class="cl-button is-primary" type="submit" th:text="#{catalog.category.marketplace.save}"></button>
+                        <a class="cl-button" th:href="@{${backHref}}" th:text="#{general.cancel}"></a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </section>
+    <script th:if="${!errors.isEmpty()}">
+        document.getElementById('marketplace-definition-errors').focus();
+    </script>
+    <script th:src="@{/js/async-form.js}" defer></script>
+</div>
+</body>
+</html>

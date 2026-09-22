@@ -8,25 +8,30 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.MessageSource;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.server.ResponseStatusException;
 import pl.commercelink.products.AvailabilityDefinition;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.CategoryDefinitionType;
 import pl.commercelink.products.CategoryDefinitions;
+import pl.commercelink.products.MarketplaceDefinition;
 import pl.commercelink.products.PimCategoryOptions;
 import pl.commercelink.products.PriceDefinition;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.products.StockDefinition;
 import pl.commercelink.starter.security.model.CustomUser;
+import pl.commercelink.stores.MarketplaceIntegration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.catalog.CatalogAccess;
+import pl.commercelink.web.catalog.MarketplaceDefinitionRow;
 import pl.commercelink.web.dtos.CategoryBasicsForm;
 import pl.commercelink.web.dtos.CategoryPricingForm;
 import pl.commercelink.web.settings.ConfirmAction;
@@ -41,6 +46,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -68,6 +74,8 @@ class CatalogCategoryControllerTest {
     @Mock
     private PimCategoryOptions pimCategoryOptions;
     @Mock
+    private MarketplaceConnections marketplaces;
+    @Mock
     private MessageSource messageSource;
     @Mock
     private Store store;
@@ -90,7 +98,7 @@ class CatalogCategoryControllerTest {
         lenient().when(productRepository.findAll(any(String.class))).thenReturn(List.of());
         lenient().when(messageSource.getMessage(any(String.class), any(), any(Locale.class))).thenAnswer(call -> call.getArgument(0));
         mvc = MockMvcBuilders.standaloneSetup(new CatalogCategoryController(access, definitions, productRepository,
-                storesRepository, pimCategoryOptions, messageSource)).build();
+                storesRepository, pimCategoryOptions, marketplaces, messageSource)).build();
     }
 
     @AfterEach
@@ -385,5 +393,84 @@ class CatalogCategoryControllerTest {
                 .andExpect(model().attribute("existing", true))
                 .andExpect(model().attribute("formAction", "/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/basics"));
         verify(productRepository).findAll(gpu.getCategoryId());
+    }
+
+    @Test
+    void marketplacesPageListsStoreMarketplacesAndOrphanedDefinitions() throws Exception {
+        // given
+        CategoryDefinition gpu = new CategoryDefinition().withName("GPU").withGeneratedId()
+                .withMarketplaceDefinition(new MarketplaceDefinition("allegro", 1.1, 5, 1, 2, 1, 3))
+                .withMarketplaceDefinition(new MarketplaceDefinition(null, 1.0, 0, 5, 3, 0, 0));
+        when(access.requireCatalog(STORE_ID, "c1")).thenReturn(catalog);
+        when(access.requireCategory(catalog, gpu.getCategoryId())).thenReturn(gpu);
+        MarketplaceIntegration allegro = mock(MarketplaceIntegration.class);
+        when(allegro.getName()).thenReturn("allegro");
+        MarketplaceIntegration empik = mock(MarketplaceIntegration.class);
+        when(empik.getName()).thenReturn("empik");
+        when(store.getMarketplaces()).thenReturn(List.of(allegro, empik));
+        when(marketplaces.displayName("allegro")).thenReturn("Allegro");
+        when(marketplaces.displayName("empik")).thenReturn("Empik");
+
+        // when
+        MvcResult result = mvc.perform(get("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/marketplaces"))
+                .andExpect(status().isOk()).andReturn();
+
+        // then
+        @SuppressWarnings("unchecked")
+        List<MarketplaceDefinitionRow> rows = (List<MarketplaceDefinitionRow>) result.getModelAndView().getModel().get("rows");
+        assertThat(rows).extracting(MarketplaceDefinitionRow::displayName).containsExactly("Allegro", "Empik");
+        assertThat(rows.get(0).state()).isEqualTo(MarketplaceDefinitionRow.State.EXPORTING);
+        assertThat(rows.get(1).state()).isEqualTo(MarketplaceDefinitionRow.State.NOT_CONFIGURED);
+        @SuppressWarnings("unchecked")
+        List<MarketplaceDefinitionRow> orphans = (List<MarketplaceDefinitionRow>) result.getModelAndView().getModel().get("orphans");
+        assertThat(orphans).hasSize(1);
+        assertThat(orphans.get(0).deleteHref()).endsWith("/settings/marketplaces/_unnamed_/delete");
+    }
+
+    @Test
+    void savingADefinitionForAMarketplaceTheStoreDoesNotHaveIs404() throws Exception {
+        // given
+        CategoryDefinition gpu = new CategoryDefinition().withName("GPU").withGeneratedId();
+        when(access.requireCatalog(STORE_ID, "c1")).thenReturn(catalog);
+        when(access.requireCategory(catalog, gpu.getCategoryId())).thenReturn(gpu);
+        when(access.requireMarketplace(store, "empik")).thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND));
+
+        // when / then
+        mvc.perform(post("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/marketplaces/empik").param("markup", "1,1"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void untickingTheExportBoxTurnsTheDefinitionOff() throws Exception {
+        // given — an unticked checkbox is absent from the POST, so the bound form must read it as "off"
+        CategoryDefinition gpu = new CategoryDefinition().withName("GPU").withGeneratedId()
+                .withMarketplaceDefinition(new MarketplaceDefinition("allegro", 1.1, 5, 1, 2, 1, 3));
+        when(access.requireCatalog(STORE_ID, "c1")).thenReturn(catalog);
+        when(access.requireCategory(catalog, gpu.getCategoryId())).thenReturn(gpu);
+        when(access.requireMarketplace(store, "allegro")).thenReturn("allegro");
+
+        // when / then
+        mvc.perform(post("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/marketplaces/allegro")
+                        .param("markup", "1,10").param("minWarehouseQty", "3").param("minQtyPerDistributor", "0")
+                        .param("minNumOfDistributors", "0").param("minNumOfLocalDistributors", "0")
+                        .param("minDistributorsQty", "0"))
+                .andExpect(redirectedUrl("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/marketplaces"));
+        verify(definitions).saveMarketplace(eq(catalog), eq(gpu),
+                argThat(definition -> !definition.isEnabled() && definition.getMinWarehouseQty() == 3));
+    }
+
+    @Test
+    void removingTheUnnamedDefinitionRemovesExactlyTheOneWithoutAName() throws Exception {
+        // given
+        CategoryDefinition gpu = new CategoryDefinition().withName("GPU").withGeneratedId()
+                .withMarketplaceDefinition(new MarketplaceDefinition(null, 1.0, 0, 5, 3, 0, 0));
+        when(access.requireCatalog(STORE_ID, "c1")).thenReturn(catalog);
+        when(access.requireCategory(catalog, gpu.getCategoryId())).thenReturn(gpu);
+        when(messageSource.getMessage(any(String.class), any(), any(Locale.class))).thenReturn("x");
+
+        // when / then
+        mvc.perform(post("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/marketplaces/_unnamed_/delete"))
+                .andExpect(redirectedUrl("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/marketplaces"));
+        verify(definitions).removeMarketplace(catalog, gpu, null);
     }
 }
