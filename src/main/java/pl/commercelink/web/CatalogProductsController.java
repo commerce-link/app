@@ -68,6 +68,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.TreeMap;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 /**
@@ -603,17 +604,24 @@ public class CatalogProductsController {
     private List<ProductRow> rowsOf(ProductCatalog catalog, CategoryDefinition category) {
         if (category.hasType(CategoryDefinitionType.Dynamic)) {
             // Without PIM categories the engine has nothing to match, and reading the inventory would be wasted work.
+            // The engine answers in its own order (brand, then price); both kinds of category read the same way.
             return category.hasCategoryMapping()
                     ? recommendationEngine.getRecommendations(category, inventory.withEnabledSuppliersOnly(storeId())).stream()
+                            .sorted(byLabelThenName(ProductRecommendation::getLabel, ProductRecommendation::getName))
                             .map(recommendation -> ProductRow.ofRecommendation(recommendation, category))
                             .toList()
                     : List.of();
         }
         return productRepository.findAll(category.getCategoryId()).stream()
-                .sorted(Comparator.comparing(Product::getLabel, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER))
-                        .thenComparing(Product::getName, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)))
+                .sorted(byLabelThenName(Product::getLabel, Product::getName))
                 .map(product -> ProductRow.of(product, category, catalog.getCatalogId(), marketplaces::displayName))
                 .toList();
+    }
+
+    /** The order of every product list: by label, then by name, regardless of case; a missing value goes last. */
+    private static <T> Comparator<T> byLabelThenName(Function<T, String> label, Function<T, String> name) {
+        return Comparator.comparing(label, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER))
+                .thenComparing(name, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER));
     }
 
     private String save(List<Product> products, boolean enabled) {

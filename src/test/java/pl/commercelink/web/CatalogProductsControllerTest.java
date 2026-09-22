@@ -282,6 +282,37 @@ class CatalogProductsControllerTest {
         assertThat(page.featureCounts()).containsEntry("marketplace", 0);
     }
 
+    /** Both kinds of category read the same way: by label, then by name, regardless of case. */
+    @Test
+    void automaticCategoryRowsAreSortedByLabelThenNameLikeAManualOne() throws Exception {
+        // given
+        gpu.setType(CategoryDefinitionType.Dynamic);
+        gpu.setPimCategoryIds(List.of("pim-gpu"));
+        List<ProductRecommendation> engineOrder = List.of(
+                recommendation("RTX 5070", "msi rtx 5070"),
+                recommendation("RTX 5060", "Zotac RTX 5060"),
+                recommendation("RTX 5060", "ASUS RTX 5060"),
+                recommendation("RTX 5070", "Gigabyte RTX 5070"));
+        when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(inventoryView);
+        when(recommendationEngine.getRecommendations(gpu, inventoryView)).thenReturn(engineOrder);
+
+        // when
+        var result = mvc.perform(get(categoryPath())).andExpect(status().isOk()).andReturn();
+
+        // then
+        CategoryPageModel page = (CategoryPageModel) result.getModelAndView().getModel().get("page");
+        assertThat(page.rows()).extracting(ProductRow::name)
+                .containsExactly("ASUS RTX 5060", "Zotac RTX 5060", "Gigabyte RTX 5070", "msi rtx 5070");
+    }
+
+    private static ProductRecommendation recommendation(String label, String name) {
+        ProductRecommendation recommendation = mock(ProductRecommendation.class);
+        lenient().when(recommendation.hasPimId()).thenReturn(true);
+        lenient().when(recommendation.getLabel()).thenReturn(label);
+        lenient().when(recommendation.getName()).thenReturn(name);
+        return recommendation;
+    }
+
     @Test
     void bulkDisableSavesEachProductAndReportsTheCount() throws Exception {
         // given
