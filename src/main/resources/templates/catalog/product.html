@@ -18,6 +18,9 @@
                 </th:block>
             </div>
 
+            <!--/* The id support conversations quote; it is only in the address otherwise. */-->
+            <p th:if="${productId != null}" class="cl-help" th:text="#{product.page.id(${productId})}"></p>
+
             <div th:if="${prefillNotice != null}" class="cl-alert is-warn" role="status">
                 <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
                 <p class="cl-alert-text" th:text="${prefillNotice}"></p>

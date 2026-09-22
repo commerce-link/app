@@ -873,6 +873,23 @@ class CatalogProductsControllerTest {
         verify(productRepository, never()).save(any(Product.class));
     }
 
+    /** The page of a saved product states the id; a product being created has none yet. */
+    @Test
+    void theProductPageCarriesTheIdOfASavedProductOnly() throws Exception {
+        // given
+        Product product = new Product(gpu.getCategoryId(), "pim", "5901234567890", "m", "MSI", "L", "MSI RTX 5070", "Default");
+        product.setProductId("p-1");
+        when(access.requireProduct(gpu, "p-1")).thenReturn(product);
+
+        // when / then
+        mvc.perform(get(categoryPath() + "/products/p-1"))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("productId", "p-1"));
+        mvc.perform(get(categoryPath() + "/products/new"))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("productId", nullValue()));
+    }
+
     @Test
     void savedProductRedirectsToTheCategoryWithAFlash() throws Exception {
         // given

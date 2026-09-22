@@ -529,6 +529,7 @@ public class CatalogProductsController {
                 ? existing.getName() : messageSource.getMessage("product.page.new", null, locale));
         model.addAttribute("deleteHref", edit
                 ? CatalogPaths.productDelete(catalogId, categoryId, existing.getProductId()) : null);
+        model.addAttribute("productId", edit ? existing.getProductId() : null);
         model.addAttribute("lead", lead(form, pimId, locale));
         // Rarely used sections open by themselves when they hold something, and whenever they hold a mistake to fix.
         model.addAttribute("openStock", form.hasStockOrMarketplaceValues()
