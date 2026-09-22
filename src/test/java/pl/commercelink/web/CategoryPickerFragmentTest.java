@@ -111,6 +111,8 @@ class CategoryPickerFragmentTest {
         // then
         assertThat(html).contains("/dashboard/store/categories");
         assertThat(html).doesNotContain("??catalog.category");
+        assertThat(html).contains("cl-alert is-warn");
+        assertThat(html).doesNotContain("notification is-warning");
     }
 
     @Test
@@ -368,7 +370,7 @@ class CategoryPickerFragmentTest {
 
         // then
         int definitionIndex = html.indexOf("window.pickerHelpers =");
-        int consumerIndex = html.indexOf("const {format, normalize, breadcrumbs, pathElement: optionPath} = window.pickerHelpers;");
+        int consumerIndex = html.indexOf("const {format, normalize, breadcrumbs, pathElement: optionPath, menuOf, initialiseOn} = window.pickerHelpers;");
         assertThat(definitionIndex).isNotNegative();
         assertThat(consumerIndex).isNotNegative();
         assertThat(definitionIndex).isLessThan(consumerIndex);
@@ -387,7 +389,7 @@ class CategoryPickerFragmentTest {
 
         // then
         int definitionIndex = html.indexOf("window.pickerHelpers =");
-        int consumerIndex = html.indexOf("const {format, normalize, breadcrumbs, pathElement: optionPath} = window.pickerHelpers;");
+        int consumerIndex = html.indexOf("const {format, normalize, breadcrumbs, pathElement: optionPath, menuOf, initialiseOn} = window.pickerHelpers;");
         assertThat(definitionIndex).isNotNegative();
         assertThat(consumerIndex).isNotNegative();
         assertThat(definitionIndex).isLessThan(consumerIndex);
@@ -469,6 +471,39 @@ class CategoryPickerFragmentTest {
     }
 
     @Test
+    void pickersAreRenderedInTheNewDesignWithoutBulmaWidgetsOrInlineStyles() {
+        // when
+        String single = render("category", "Procesory", false, true);
+        String multi = renderMulti(List.of(new PimCategoryOptions.CategoryOption("194", "Klawiatury", null)), false);
+
+        // then
+        assertThat(single).contains("class=\"cl-picker\"").contains("cl-picker-trigger").contains("cl-picker-menu");
+        assertThat(multi).contains("class=\"cl-picker\"").contains("cl-chip-list").contains("cl-chip-tag-remove");
+        assertThat(single).doesNotContain("class=\"dropdown").doesNotContain("<style").doesNotContain("button is-");
+        assertThat(multi).doesNotContain("class=\"dropdown").doesNotContain("<style").doesNotContain("tag is-delete");
+    }
+
+    @Test
+    void pickerScriptsCarryNoInlineStylesAndInitialiseRowsAddedLater() {
+        // given
+        Context context = new Context();
+        context.setVariable("categories", List.of(new PimCategoryOptions.CategoryOption("1", "Stoly", null)));
+        context.setVariable("ancestors", List.of());
+
+        // when
+        String single = templateEngine().process(
+                "<div th:replace=\"~{fragments/category-picker :: pickerScript(${categories}, ${ancestors})}\"></div>", context);
+        String multi = templateEngine().process(
+                "<div th:replace=\"~{fragments/category-picker :: multiPickerScript(${categories}, ${ancestors})}\"></div>", context);
+
+        // then
+        assertThat(single).doesNotContain("<style").contains("cl:repeat-added").contains("cl:form-replaced")
+                .contains("dataset.pickerReady");
+        assertThat(multi).doesNotContain("<style").contains("cl:repeat-added").contains("cl:form-replaced")
+                .contains("dataset.pickerReady");
+    }
+
+    @Test
     void breadcrumbsCollapseTheirMiddleAndFeedTheSearchIndex() {
         // given
         Context context = new Context();
@@ -480,10 +515,10 @@ class CategoryPickerFragmentTest {
                 "<div th:replace=\"~{fragments/category-picker :: multiPickerScript(${options}, ${ancestors})}\"></div>", context);
 
         // then — the row keeps the path above the name, collapses deep paths and searches over both
-        assertThat(html).contains("category-path");
-        assertThat(html).contains("category-name");
+        assertThat(html).contains("cl-picker-path");
+        assertThat(html).contains("cl-picker-name");
         assertThat(html).contains("names.length > maxLevels");
         assertThat(html).contains("haystack: normalize(option.name + ' ' + path)");
-        assertThat(html).contains("chip-path");
+        assertThat(html).contains("cl-chip-tag-path");
     }
 }

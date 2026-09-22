@@ -5,210 +5,76 @@
 <span th:fragment="categoryName(value)"
       th:text="${value}"></span>
 
-<div th:fragment="emptyHint(categories)" th:if="${#lists.isEmpty(categories)}"
-     class="notification is-warning is-light">
-    <span th:text="#{catalog.category.noneEnabled}"></span>
-    <a th:href="@{/dashboard/store/categories}" th:text="#{catalog.category.noneEnabled.action}"></a>
+<div th:fragment="emptyHint(categories)" th:if="${#lists.isEmpty(categories)}" class="cl-alert is-warn">
+    <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+    <p class="cl-alert-text">
+        <span th:text="#{catalog.category.noneEnabled}"></span>
+        <a th:href="@{/dashboard/store/categories}" th:text="#{catalog.category.noneEnabled.action}"></a>
+    </p>
 </div>
 
-<div th:fragment="picker(fieldName, selected, disabled, required)" class="category-picker">
+<div th:fragment="picker(fieldName, selected, disabled, required)" class="cl-picker">
     <input type="hidden" th:name="${fieldName}" th:value="${selected}" data-picker-value>
 
-    <div th:if="${disabled}" class="control">
-        <input class="input" type="text" disabled th:value="${selected}">
-    </div>
+    <input th:if="${disabled}" class="cl-input" type="text" disabled th:value="${selected}">
 
-    <div th:unless="${disabled}" class="dropdown is-fullwidth" data-category-picker
+    <div th:unless="${disabled}" class="cl-picker-field" data-category-picker
          th:attr="data-picker-required=${required} ? 'true' : null">
-        <div class="dropdown-trigger">
-            <button type="button" class="button is-fullwidth" data-picker-trigger aria-haspopup="listbox">
-                <span data-picker-label th:text="${#strings.isEmpty(selected)} ? #{catalog.category.unset} : ${selected}"></span>
-                <span class="icon is-small">
-                    <i class="fas fa-angle-down"></i>
-                </span>
-            </button>
-        </div>
-        <div class="dropdown-menu" role="listbox">
-            <div class="dropdown-content">
-                <div class="dropdown-item">
-                    <div class="control has-icons-left">
-                        <input class="input" type="search" autocomplete="off" data-picker-search
-                               th:placeholder="#{catalog.category.filter}">
-                        <span class="icon is-small is-left">
-                            <i class="fas fa-search"></i>
-                        </span>
-                    </div>
-                </div>
-                <div data-picker-list></div>
-                <div class="dropdown-item">
-                    <p class="help" data-picker-count></p>
-                </div>
-            </div>
+        <button type="button" class="cl-picker-trigger" data-picker-trigger
+                aria-haspopup="listbox" aria-expanded="false">
+            <span data-picker-label th:text="${#strings.isEmpty(selected)} ? #{catalog.category.unset} : ${selected}"></span>
+            <span class="icon is-small">
+                <i class="fas fa-angle-down"></i>
+            </span>
+        </button>
+        <div class="cl-picker-menu" role="listbox" hidden>
+            <input class="cl-input cl-picker-search" type="search" autocomplete="off" data-picker-search
+                   th:placeholder="#{catalog.category.filter}">
+            <div class="cl-picker-list" data-picker-list></div>
+            <p class="cl-help cl-picker-count" data-picker-count></p>
         </div>
     </div>
 </div>
 
-<div th:fragment="multiPicker(fieldName, selectedOptions, required)" class="category-picker">
+<div th:fragment="multiPicker(fieldName, selectedOptions, required)" class="cl-picker">
     <span data-picker-values>
         <input type="hidden" th:each="option : ${selectedOptions}"
                th:name="${fieldName}" th:value="${option.id}" th:attr="data-name=${option.name}">
     </span>
 
-    <div class="dropdown is-fullwidth" data-category-multi-picker
+    <div class="cl-picker-field" data-category-multi-picker
          th:attr="data-picker-required=${required} ? 'true' : null, data-picker-field=${fieldName}">
-        <div class="dropdown-trigger">
-            <button type="button" class="button is-fullwidth" data-picker-trigger aria-haspopup="listbox">
-                <span data-picker-label
-                      th:text="${#lists.isEmpty(selectedOptions)} ? #{catalog.category.unset} : #{catalog.category.selectedCount(${#lists.size(selectedOptions)})}"></span>
-                <span class="icon is-small"><i class="fas fa-angle-down"></i></span>
-            </button>
-        </div>
-        <div class="dropdown-menu" role="listbox">
-            <div class="dropdown-content">
-                <div class="dropdown-item">
-                    <div class="control has-icons-left">
-                        <input class="input" type="search" autocomplete="off" data-picker-search
-                               th:placeholder="#{catalog.category.filter}">
-                        <span class="icon is-small is-left"><i class="fas fa-search"></i></span>
-                    </div>
-                </div>
-                <div data-picker-list></div>
-                <div class="dropdown-item"><p class="help" data-picker-count></p></div>
-            </div>
+        <button type="button" class="cl-picker-trigger" data-picker-trigger
+                aria-haspopup="listbox" aria-expanded="false">
+            <span data-picker-label
+                  th:text="${#lists.isEmpty(selectedOptions)} ? #{catalog.category.unset} : #{catalog.category.selectedCount(${#lists.size(selectedOptions)})}"></span>
+            <span class="icon is-small"><i class="fas fa-angle-down"></i></span>
+        </button>
+        <div class="cl-picker-menu" role="listbox" hidden>
+            <input class="cl-input cl-picker-search" type="search" autocomplete="off" data-picker-search
+                   th:placeholder="#{catalog.category.filter}">
+            <div class="cl-picker-list" data-picker-list></div>
+            <p class="cl-help cl-picker-count" data-picker-count></p>
         </div>
     </div>
 
-    <div class="field is-grouped is-grouped-multiline" data-picker-chips>
-        <div class="control" th:each="option : ${selectedOptions}">
-            <span class="tags has-addons">
-                <span class="tag is-link is-light" th:text="${option.name}"></span>
-                <a class="tag is-delete" th:attr="data-chip-remove=${option.id}"></a>
-            </span>
-        </div>
-    </div>
+    <ul class="cl-chip-list" data-picker-chips>
+        <li class="cl-chip-tag" th:each="option : ${selectedOptions}">
+            <span th:text="${option.name}"></span>
+            <button type="button" class="cl-chip-tag-remove"
+                    th:attr="data-chip-remove=${option.id}, aria-label=#{catalog.category.pim.remove(${option.name})}">&times;</button>
+        </li>
+    </ul>
 </div>
 
 <th:block th:fragment="pickerHelpers">
-    <style>
-        .category-picker .dropdown-trigger .button {
-            justify-content: space-between;
-            font-weight: 400;
-        }
-
-        /* Fill the field like the inputs next to it, so a whole breadcrumb fits on one line. */
-        .category-picker .dropdown,
-        .category-picker .dropdown-trigger {
-            display: block;
-            width: 100%;
-        }
-
-        /* The menu floats, so in narrow form columns it may still overflow the trigger to stay readable. */
-        .category-picker .dropdown-menu {
-            width: 100%;
-            min-width: min(34rem, 90vw);
-        }
-
-        .category-picker [data-picker-list] {
-            max-height: 20rem;
-            overflow-y: auto;
-            border-top: 1px solid #dbdbdb;
-            border-bottom: 1px solid #dbdbdb;
-        }
-
-        .category-picker .dropdown-item.is-active {
-            background-color: #eef3ff;
-            color: #363636;
-        }
-
-        .category-picker .dropdown-item {
-            white-space: normal;
-            padding-right: 1rem;
-        }
-
-        .category-picker .dropdown-item.is-selected {
-            font-weight: 600;
-        }
-
-        .category-picker .picker-option-checkbox {
-            pointer-events: none;
-            margin-right: 0.5rem;
-            vertical-align: baseline;
-        }
-
-        /* Two-line row: muted ancestor path on top, leaf name below. Both clipped so the row height stays put. */
-        .category-picker .dropdown-item[role="option"] {
-            display: flex;
-            align-items: flex-start;
-            line-height: 1.3;
-            padding-top: 0.375rem;
-            padding-bottom: 0.375rem;
-        }
-
-        .category-picker .picker-option-text {
-            flex: 1;
-            min-width: 0;
-        }
-
-        .category-picker .category-path,
-        .category-picker .category-name {
-            display: block;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-
-        .category-picker .category-path {
-            font-size: 0.75rem;
-            font-weight: 400;
-            color: #7a7a7a;
-        }
-
-        .category-picker .dropdown-item.is-selected .category-path {
-            font-weight: 400;
-        }
-
-        /* A chip carries the whole path, so it wraps onto another line instead of clipping it. */
-        .category-picker [data-picker-chips] .tag.is-link {
-            height: auto;
-            white-space: normal;
-            text-align: left;
-            padding-top: 0.25rem;
-            padding-bottom: 0.25rem;
-        }
-
-        .category-picker .chip-path {
-            color: #6b7280;
-            font-size: 0.75rem;
-            margin-right: 0.35rem;
-        }
-
-        .category-picker [data-picker-label] {
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-
-        .category-picker [data-picker-chips] {
-            margin-top: 0.5rem;
-            margin-bottom: 0;
-        }
-
-        .category-picker [data-picker-chips]:empty {
-            display: none;
-        }
-
-
-        .category-picker .help {
-            margin-top: 0;
-        }
-    </style>
     <script>
         window.pickerHelpers = {
             format: (template, ...values) =>
                     values.reduce((text, value, index) => text.replace('{' + index + '}', value), template),
             normalize: text => text.toLowerCase()
-                    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-                    .replace(/\u0142/g, 'l'),
+                    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+                    .replace(/ł/g, 'l'),
             // Only branch nodes travel with the page; a leaf's breadcrumb is walked from its parentId chain here.
             breadcrumbs: (ancestors, separator = ' > ', maxLevels = 3) => {
                 const branchById = new Map(ancestors.map(branch => [branch.id, branch]));
@@ -228,7 +94,7 @@
                     const names = namesOf(option);
                     // Deeper than three levels collapses the middle: "Elektronika > … > Akcesoria telefoniczne".
                     const shortened = names.length > maxLevels
-                            ? [names[0], '\u2026', names[names.length - 1]]
+                            ? [names[0], '…', names[names.length - 1]]
                             : names;
                     return {path: names.join(separator), shortPath: shortened.join(separator)};
                 };
@@ -238,10 +104,26 @@
                     return document.createDocumentFragment();
                 }
                 const path = document.createElement('span');
-                path.className = 'category-path';
+                path.className = 'cl-picker-path';
                 path.title = option.path;
                 path.textContent = option.shortPath;
                 return path;
+            },
+            // The menu is a plain popover: hidden carries the state, aria-expanded reports it.
+            menuOf: picker => picker.querySelector('.cl-picker-menu'),
+            // Pickers arrive with the page, inside a repeat row added by JavaScript and inside a form
+            // replaced after an async save, so every entry point initialises the ones it can reach.
+            initialiseOn: (selector, setUp) => {
+                const initialise = scope => {
+                    if (scope.matches && scope.matches(selector)) {
+                        setUp(scope);
+                    }
+                    scope.querySelectorAll(selector).forEach(setUp);
+                };
+                ['cl:repeat-added', 'cl:form-replaced'].forEach(eventName =>
+                        document.addEventListener(eventName, event =>
+                                initialise(event.target instanceof Element ? event.target : document)));
+                initialise(document);
             }
         };
     </script>
@@ -260,16 +142,23 @@
                 count: /*[[#{catalog.category.count}]]*/ '',
                 unset: /*[[#{catalog.category.unset}]]*/ ''
             };
-            const {format, normalize, breadcrumbs, pathElement: optionPath} = window.pickerHelpers;
+            const {format, normalize, breadcrumbs, pathElement: optionPath, menuOf, initialiseOn} = window.pickerHelpers;
             const breadcrumbOf = breadcrumbs(categoryAncestors);
 
             const setUp = picker => {
+                // A repeat row or a replaced form may hand us a picker that is already wired.
+                if (picker.dataset.pickerReady) {
+                    return;
+                }
+                picker.dataset.pickerReady = 'true';
+
                 const field = picker.parentElement.querySelector('[data-picker-value]');
                 const trigger = picker.querySelector('[data-picker-trigger]');
                 const label = picker.querySelector('[data-picker-label]');
                 const search = picker.querySelector('[data-picker-search]');
                 const list = picker.querySelector('[data-picker-list]');
                 const counter = picker.querySelector('[data-picker-count]');
+                const menu = menuOf(picker);
 
                 const options = categories.map(category => {
                     const {path, shortPath} = breadcrumbOf(category);
@@ -294,22 +183,21 @@
 
                 const select = option => {
                     field.value = option.value;
-                    trigger.classList.remove('is-danger');
+                    trigger.classList.remove('is-invalid');
                     showSelection();
                     close();
                 };
 
                 const appendChunk = () => {
                     matches.slice(shown.length, shown.length + CHUNK).forEach(option => {
-                        const item = document.createElement('a');
-                        item.className = 'dropdown-item';
-                        item.href = '#';
+                        const item = document.createElement('div');
+                        item.className = 'cl-picker-option';
                         item.setAttribute('role', 'option');
                         const text = document.createElement('span');
                         text.className = 'picker-option-text';
                         text.appendChild(optionPath(option));
                         const name = document.createElement('span');
-                        name.className = 'category-name';
+                        name.className = 'cl-picker-name';
                         name.textContent = option.label;
                         text.appendChild(name);
                         item.appendChild(text);
@@ -334,7 +222,7 @@
 
                     if (!matches.length) {
                         const empty = document.createElement('div');
-                        empty.className = 'dropdown-item has-text-grey';
+                        empty.className = 'cl-picker-empty';
                         empty.textContent = messages.empty;
                         list.appendChild(empty);
                     }
@@ -350,7 +238,7 @@
                 });
 
                 const highlightActive = () => {
-                    Array.from(list.querySelectorAll('.dropdown-item[role="option"]')).forEach((item, index) => {
+                    Array.from(list.querySelectorAll('.cl-picker-option[role="option"]')).forEach((item, index) => {
                         item.classList.toggle('is-active', index === active);
                         if (index === active) {
                             item.scrollIntoView({block: 'nearest'});
@@ -369,16 +257,22 @@
                     highlightActive();
                 };
 
+                const isOpen = () => !menu.hidden;
+
                 const open = () => {
-                    picker.classList.add('is-active');
+                    menu.hidden = false;
+                    trigger.setAttribute('aria-expanded', 'true');
                     search.value = '';
                     render();
                     search.focus();
                 };
 
-                const close = () => picker.classList.remove('is-active');
+                const close = () => {
+                    menu.hidden = true;
+                    trigger.setAttribute('aria-expanded', 'false');
+                };
 
-                trigger.addEventListener('click', () => picker.classList.contains('is-active') ? close() : open());
+                trigger.addEventListener('click', () => isOpen() ? close() : open());
                 search.addEventListener('input', render);
 
                 search.addEventListener('keydown', event => {
@@ -411,16 +305,17 @@
                     field.form.addEventListener('submit', event => {
                         if (!field.value) {
                             event.preventDefault();
-                            trigger.classList.add('is-danger');
+                            trigger.classList.add('is-invalid');
                             open();
                         }
                     });
                 }
 
                 showSelection();
+                close();
             };
 
-            document.querySelectorAll('[data-category-picker]').forEach(setUp);
+            initialiseOn('[data-category-picker]', setUp);
         })();
     </script>
 </th:block>
@@ -437,13 +332,20 @@
                 empty: /*[[#{catalog.category.empty}]]*/ '',
                 count: /*[[#{catalog.category.count}]]*/ '',
                 unset: /*[[#{catalog.category.unset}]]*/ '',
-                selectedCount: /*[[#{catalog.category.selectedCount}]]*/ ''
+                selectedCount: /*[[#{catalog.category.selectedCount}]]*/ '',
+                remove: /*[[#{catalog.category.pim.remove}]]*/ ''
             };
-            const {format, normalize, breadcrumbs, pathElement: optionPath} = window.pickerHelpers;
+            const {format, normalize, breadcrumbs, pathElement: optionPath, menuOf, initialiseOn} = window.pickerHelpers;
             const breadcrumbOf = breadcrumbs(categoryAncestors);
 
             const setUp = picker => {
-                const root = picker.closest('.category-picker');
+                // A repeat row or a replaced form may hand us a picker that is already wired.
+                if (picker.dataset.pickerReady) {
+                    return;
+                }
+                picker.dataset.pickerReady = 'true';
+
+                const root = picker.closest('.cl-picker');
                 const values = root.querySelector('[data-picker-values]');
                 const fieldName = picker.dataset.pickerField;
                 const selected = new Map();
@@ -467,6 +369,7 @@
                 const list = picker.querySelector('[data-picker-list]');
                 const counter = picker.querySelector('[data-picker-count]');
                 const chips = root.querySelector('[data-picker-chips]');
+                const menu = menuOf(picker);
 
                 const entries = options.map(option => {
                     const {path, shortPath} = breadcrumbOf(option);
@@ -491,7 +394,7 @@
                 };
 
                 const renderSelectionState = () => {
-                    Array.from(list.querySelectorAll('.dropdown-item[role="option"]')).forEach(item => {
+                    Array.from(list.querySelectorAll('.cl-picker-option[role="option"]')).forEach(item => {
                         const isSelected = selected.has(item.dataset.value);
                         item.classList.toggle('is-selected', isSelected);
                         const checkbox = item.querySelector('.picker-option-checkbox');
@@ -507,34 +410,30 @@
                     }
                     chips.innerHTML = '';
                     selected.forEach((name, id) => {
-                        const control = document.createElement('div');
-                        control.className = 'control';
-                        const tags = document.createElement('span');
-                        tags.className = 'tags has-addons';
-                        const tag = document.createElement('span');
-                        tag.className = 'tag is-link is-light';
+                        const chip = document.createElement('li');
+                        chip.className = 'cl-chip-tag';
                         const entry = entriesByValue.get(id);
                         if (entry && entry.path) {
                             const path = document.createElement('span');
-                            path.className = 'chip-path';
-                            path.textContent = entry.path + ' \u203a';
-                            tag.appendChild(path);
+                            path.className = 'cl-chip-tag-path';
+                            path.textContent = entry.path;
+                            chip.appendChild(path);
                         }
                         const chipName = document.createElement('span');
-                        chipName.className = 'chip-name';
                         chipName.textContent = name;
-                        tag.appendChild(chipName);
-                        const remove = document.createElement('a');
-                        remove.className = 'tag is-delete';
-                        remove.href = '#';
+                        chip.appendChild(chipName);
+                        const remove = document.createElement('button');
+                        remove.type = 'button';
+                        remove.className = 'cl-chip-tag-remove';
+                        remove.textContent = '×';
+                        remove.setAttribute('aria-label', format(messages.remove, name));
                         remove.dataset.chipRemove = id;
                         remove.addEventListener('click', event => {
                             event.preventDefault();
                             toggle({value: id, label: name});
                         });
-                        tags.append(tag, remove);
-                        control.appendChild(tags);
-                        chips.appendChild(control);
+                        chip.appendChild(remove);
+                        chips.appendChild(chip);
                     });
                 };
 
@@ -544,7 +443,7 @@
                     } else {
                         selected.set(option.value, option.label);
                     }
-                    trigger.classList.remove('is-danger');
+                    trigger.classList.remove('is-invalid');
                     syncHiddenInputs();
                     showSelection();
                     renderSelectionState();
@@ -553,9 +452,8 @@
 
                 const appendChunk = () => {
                     matches.slice(shown.length, shown.length + CHUNK).forEach(option => {
-                        const item = document.createElement('a');
-                        item.className = 'dropdown-item';
-                        item.href = '#';
+                        const item = document.createElement('div');
+                        item.className = 'cl-picker-option';
                         item.setAttribute('role', 'option');
                         item.dataset.value = option.value;
                         item.classList.toggle('is-selected', selected.has(option.value));
@@ -568,7 +466,7 @@
                         text.className = 'picker-option-text';
                         text.appendChild(optionPath(option));
                         const name = document.createElement('span');
-                        name.className = 'category-name';
+                        name.className = 'cl-picker-name';
                         name.textContent = option.label;
                         text.appendChild(name);
                         item.append(checkbox, text);
@@ -593,7 +491,7 @@
 
                     if (!matches.length) {
                         const empty = document.createElement('div');
-                        empty.className = 'dropdown-item has-text-grey';
+                        empty.className = 'cl-picker-empty';
                         empty.textContent = messages.empty;
                         list.appendChild(empty);
                     }
@@ -609,7 +507,7 @@
                 });
 
                 const highlightActive = () => {
-                    Array.from(list.querySelectorAll('.dropdown-item[role="option"]')).forEach((item, index) => {
+                    Array.from(list.querySelectorAll('.cl-picker-option[role="option"]')).forEach((item, index) => {
                         item.classList.toggle('is-active', index === active);
                         if (index === active) {
                             item.scrollIntoView({block: 'nearest'});
@@ -628,16 +526,22 @@
                     highlightActive();
                 };
 
+                const isOpen = () => !menu.hidden;
+
                 const open = () => {
-                    picker.classList.add('is-active');
+                    menu.hidden = false;
+                    trigger.setAttribute('aria-expanded', 'true');
                     search.value = '';
                     render();
                     search.focus();
                 };
 
-                const close = () => picker.classList.remove('is-active');
+                const close = () => {
+                    menu.hidden = true;
+                    trigger.setAttribute('aria-expanded', 'false');
+                };
 
-                trigger.addEventListener('click', () => picker.classList.contains('is-active') ? close() : open());
+                trigger.addEventListener('click', () => isOpen() ? close() : open());
                 search.addEventListener('input', render);
 
                 search.addEventListener('keydown', event => {
@@ -671,7 +575,7 @@
                     form.addEventListener('submit', event => {
                         if (selected.size === 0) {
                             event.preventDefault();
-                            trigger.classList.add('is-danger');
+                            trigger.classList.add('is-invalid');
                             open();
                         }
                     });
@@ -679,9 +583,10 @@
 
                 showSelection();
                 renderChips();
+                close();
             };
 
-            document.querySelectorAll('[data-category-multi-picker]').forEach(setUp);
+            initialiseOn('[data-category-multi-picker]', setUp);
         })();
     </script>
 </th:block>

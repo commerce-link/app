@@ -3579,6 +3579,113 @@ a.cl-link-button:hover {
     color: var(--cl-bad);
 }
 
+/* The hidden inputs of the multi picker travel in a span, which would otherwise take a grid row of its own. */
+.cl-page .cl-picker > [data-picker-values] {
+    display: none;
+}
+
+/* The menu floats over the form, so a whole breadcrumb stays readable even in a narrow form column. */
+.cl-page .cl-picker-field {
+    position: relative;
+}
+
+.cl-page .cl-picker-trigger > [data-picker-label] {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cl-page .cl-picker-trigger.is-invalid {
+    border-color: var(--cl-bad);
+}
+
+.cl-page .cl-picker-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    z-index: var(--cl-z-pop);
+    width: 100%;
+    min-width: min(34rem, 90vw);
+    padding: var(--cl-gap-related) 0;
+    background: var(--cl-surface);
+    border: 1px solid var(--cl-line);
+    border-radius: var(--cl-radius);
+    box-shadow: var(--cl-shadow);
+}
+
+.cl-page .cl-picker-menu[hidden] {
+    display: none;
+}
+
+.cl-page .cl-picker-search {
+    width: calc(100% - 2 * var(--cl-gap-related));
+    margin: 0 var(--cl-gap-related);
+}
+
+.cl-page .cl-picker-list {
+    max-height: 20rem;
+    overflow-y: auto;
+    margin-top: var(--cl-gap-related);
+    border-top: 1px solid var(--cl-line);
+    border-bottom: 1px solid var(--cl-line);
+}
+
+/* Two-line row: muted ancestor path on top, leaf name below. Both clipped so the row height stays put. */
+.cl-page .cl-picker-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 6px 16px;
+    line-height: 1.3;
+    color: var(--cl-ink);
+    cursor: pointer;
+    white-space: normal;
+}
+
+.cl-page .cl-picker-option:hover,
+.cl-page .cl-picker-option.is-active {
+    background: var(--cl-accent-soft);
+}
+
+.cl-page .cl-picker-option.is-selected {
+    font-weight: 600;
+}
+
+.cl-page .cl-picker-option .picker-option-checkbox {
+    pointer-events: none;
+    margin-top: 3px;
+}
+
+.cl-page .cl-picker-option .picker-option-text {
+    flex: 1;
+    min-width: 0;
+}
+
+.cl-page .cl-picker-path,
+.cl-page .cl-picker-name {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cl-page .cl-picker-path {
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--cl-ink-3);
+}
+
+.cl-page .cl-picker-empty {
+    padding: 6px 16px;
+    color: var(--cl-ink-3);
+}
+
+.cl-page .cl-picker-menu .cl-picker-count {
+    margin: var(--cl-gap-attached) 16px 0;
+    font-size: 13px;
+    color: var(--cl-ink-2);
+}
+
 /* --- Catalog: One-field repeat rows (labels list): numbered lines instead of a fieldset per entry --- */
 .cl-page .cl-repeat-lines {
     display: grid;

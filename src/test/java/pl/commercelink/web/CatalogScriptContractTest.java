@@ -70,6 +70,53 @@ class CatalogScriptContractTest {
         assertThat(script).contains("aria-sort").contains("data-sort-key").contains("cl-table-sort");
     }
 
+    /**
+     * The redesigned screens are built from the `cl-*` layer: a Bulma widget class, a browser dialog or an inline
+     * style on one of them is a regression back to the old catalog, not a local styling choice.
+     */
+    @Test
+    void newTemplatesUseNoBulmaWidgetsOrInlineStyles() throws Exception {
+        // given
+        Path dir = Path.of("src/main/resources/templates/catalog");
+
+        // when / then
+        try (var files = Files.list(dir)) {
+            for (Path file : files.toList()) {
+                String html = Files.readString(file, StandardCharsets.UTF_8);
+                assertThat(html).as(file + " has no inline style").doesNotContain(" style=\"");
+                assertThat(html).as(file + " has no Bulma widgets")
+                        .doesNotContain("class=\"dropdown")
+                        .doesNotContain("class=\"notification")
+                        .doesNotContain("class=\"box\"")
+                        // Bulma's own button, not the design system's cl-button / cl-link-button, which carry the
+                        // same is-primary / is-danger modifiers
+                        .doesNotContain("class=\"button")
+                        .doesNotContain("class=\"tag");
+                assertThat(html).as(file + " has no browser dialogs")
+                        .doesNotContain("alert(").doesNotContain("confirm(");
+            }
+        }
+    }
+
+    /** The tree picker is shared with the product page, so it follows the same rules as the catalog templates. */
+    @Test
+    void theSharedCategoryPickerCarriesNoBulmaWidgetsOrInlineStyles() throws Exception {
+        // given
+        String html = read("src/main/resources/templates/fragments/category-picker.html");
+
+        // then
+        assertThat(html).doesNotContain("<style").doesNotContain("class=\"dropdown")
+                .doesNotContain("class=\"notification").doesNotContain("tag is-delete");
+    }
+
+    @Test
+    void oldCatalogTemplatesAreGone() {
+        // when / then
+        assertThat(Files.exists(Path.of("src/main/resources/templates/catalogDetails.html"))).isFalse();
+        assertThat(Files.exists(Path.of("src/main/resources/templates/catalogs.html"))).isFalse();
+        assertThat(Files.exists(Path.of("src/main/java/pl/commercelink/web/ProductCatalogController.java"))).isFalse();
+    }
+
     @Test
     void repeatFieldsAnnounceAddedGroupsAndVariantFieldsListen() throws Exception {
         // given
