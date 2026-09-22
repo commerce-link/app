@@ -211,46 +211,6 @@ public class ProductCatalogController {
         return "redirect:/dashboard/catalogs/" + catalogId + "/category/" + categoryId + "/products";
     }
 
-    @PostMapping("/dashboard/catalogs/{catalogId}/category/{categoryId}/products/bulk-execute")
-    public String bulkExecuteProducts(@PathVariable String catalogId, @PathVariable String categoryId,
-                                     @RequestParam(required = false) List<String> productIds, @RequestParam String action,
-                                     RedirectAttributes redirectAttributes, Locale locale,
-                                     @RequestParam(value = "status", defaultValue = "Enabled") String status) {
-
-        if (productIds == null || productIds.isEmpty()) {
-            redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage("bulk.execute.no.items.selected", null, locale));
-            return "redirect:/dashboard/catalogs/" + catalogId + "/category/" + categoryId + "/products?status=" + status;
-        }
-
-        List<Product> products = productIds.stream()
-                .map(productId -> productRepository.findByProductId(categoryId, productId))
-                .collect(Collectors.toList());
-
-        switch (action.toLowerCase()) {
-            case "enable":
-                update(products, true);
-                break;
-            case "disable":
-                update(products, false);
-                break;
-            case "delete":
-                products.forEach(productRepository::delete);
-                break;
-            default:
-                throw new IllegalArgumentException("Invalid action: " + action);
-        }
-
-        redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage("general.success", null, locale));
-        return "redirect:/dashboard/catalogs/" + catalogId + "/category/" + categoryId + "/products?status=" + status;
-    }
-
-    private void update(List<Product> products, boolean enabled) {
-        products.forEach(product -> {
-            product.setEnabled(enabled);
-            productRepository.save(product);
-        });
-    }
-
     private String getStoreId() {
         return CustomSecurityContext.getStoreId();
     }
