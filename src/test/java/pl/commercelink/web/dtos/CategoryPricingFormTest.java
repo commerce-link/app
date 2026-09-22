@@ -163,6 +163,26 @@ class CategoryPricingFormTest {
         assertThat(form.getGroups().get(1).autoSummaryKey()).isEqualTo("catalog.category.pricing.auto.summary.price");
     }
 
+    /**
+     * PriceDefinition.matches refuses a blank labelMatch before it ever looks at the price, so a group with only a
+     * price threshold assigns nothing. The summary says that instead of reading like a working rule.
+     */
+    @Test
+    void aPriceThresholdWithoutALabelIsReportedAsAssigningNothing() {
+        // given
+        CategoryPricingForm form = valid();
+        CategoryPricingForm.PriceGroupForm priceOnly = form.getGroups().get(1);
+
+        // when / then
+        assertThat(priceOnly.isAutoSummaryInactive()).isFalse();
+        priceOnly.setLabelMatch("  ");
+        assertThat(priceOnly.isAutoSummaryInactive()).isTrue();
+        assertThat(priceOnly.autoSummaryKey()).isEqualTo("catalog.category.pricing.auto.summary.price");
+        priceOnly.setPriceMatch("");
+        assertThat(priceOnly.isAutoSummaryInactive()).isFalse();
+        assertThat(priceOnly.autoSummaryKey()).isNull();
+    }
+
     private static PriceDefinition withPriceMatch(PriceDefinition definition, double priceMatch) {
         definition.setPriceMatch(priceMatch);
         return definition;

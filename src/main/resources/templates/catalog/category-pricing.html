@@ -83,8 +83,10 @@
         <span th:text="#{catalog.category.pricing.group}"></span>
         <span data-cl-repeat-number th:text="${number}"></span>
         <span th:if="${isDefault}" class="cl-status is-info" th:text="#{catalog.category.pricing.group.default}"></span>
-        <!--/* What the group picks up by itself, in the legend: the order of the groups is only readable with it. */-->
-        <span th:if="${group != null and group.autoSummaryKey() != null}" class="cl-status is-neutral"
+        <!--/* What the group picks up by itself, in the legend: the order of the groups is only readable with it.
+               A price threshold without a label assigns nothing, so that combination is a warning, not a summary. */-->
+        <span th:if="${group != null and group.autoSummaryKey() != null}" class="cl-status"
+              th:classappend="${group.autoSummaryInactive} ? 'is-warn' : 'is-neutral'"
               th:text="#{${group.autoSummaryKey()}(${group.labelMatch}, ${group.priceMatch})}"></span>
     </legend>
     <div class="cl-form-grid">

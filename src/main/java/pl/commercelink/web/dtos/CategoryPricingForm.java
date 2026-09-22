@@ -61,6 +61,14 @@ public class CategoryPricingForm {
             return price ? "catalog.category.pricing.auto.summary.price" : null;
         }
 
+        /**
+         * A price threshold on its own never assigns anything: PriceDefinition.matches refuses a blank labelMatch
+         * before it looks at the price. The legend says so with a warning pill instead of reading like a working rule.
+         */
+        public boolean isAutoSummaryInactive() {
+            return StringUtils.isBlank(labelMatch) && StringUtils.isNotBlank(priceMatch);
+        }
+
         static PriceGroupForm from(PriceDefinition definition) {
             PriceGroupForm form = new PriceGroupForm();
             form.name = definition.getPricingGroup();

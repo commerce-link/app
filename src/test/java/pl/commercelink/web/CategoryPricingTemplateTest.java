@@ -110,6 +110,38 @@ class CategoryPricingTemplateTest {
         assertThat(occurrences(html, "cl-status is-info")).isEqualTo(1);
     }
 
+    /** The form as the controller renders it for a group that has only a price threshold, which assigns nothing. */
+    private static String renderedWithAPriceOnlyGroup() {
+        CategoryDefinition gpu = new CategoryDefinition().withName("GPU").withGeneratedId()
+                .withStockDefinition(new StockDefinition(1, 10, 30))
+                .withAvailabilityDefinition(new AvailabilityDefinition(3, 1))
+                .withPriceDefinition(new PriceDefinition(1.05, 49, 0, 0, 0, "Default"))
+                .withPriceDefinition(new PriceDefinition(1.08, 99, 30, 20, 10, "Premium"));
+        gpu.getPriceDefinitions().get(1).setPriceMatch(2500);
+        Context context = new Context();
+        context.setVariable("form", CategoryPricingForm.from(gpu));
+        context.setVariable("errors", Map.of());
+        context.setVariable("category", gpu);
+        context.setVariable("formAction", "/dashboard/catalogs/c1/category/k1/settings/pricing");
+        context.setVariable("backHref", "/dashboard/catalogs/c1/category/k1/settings");
+        context.setVariable("backLabel", "Category settings");
+        context.setVariable("lead", "GPU \u00b7 pricing");
+        context.setVariable("redirectTo", null);
+        return EnglishFragmentTemplateEngine.create().process("catalog/category-pricing", Set.of("pricingForm"), context);
+    }
+
+    @Test
+    void aPriceThresholdWithoutALabelIsFlaggedInTheLegendInsteadOfReadingLikeARule() {
+        // when
+        String html = renderedWithAPriceOnlyGroup();
+
+        // then
+        assertThat(html).contains("price threshold without a label");
+        assertThat(occurrences(html, "cl-status is-warn")).isEqualTo(1);
+        assertThat(occurrences(html, "cl-status is-neutral")).isEqualTo(0);
+        assertThat(html).doesNotContain("??");
+    }
+
     @Test
     void anErrorOfOneGroupIsShownAtItsOwnField() {
         // when
