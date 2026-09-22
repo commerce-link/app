@@ -42,6 +42,7 @@ import pl.commercelink.orders.rma.RMAStatus;
 import pl.commercelink.products.AvailabilityDefinition;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.CategoryDefinitionType;
+import pl.commercelink.products.MarketplaceDefinition;
 import pl.commercelink.products.PriceDefinition;
 import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductCatalog;
@@ -161,6 +162,25 @@ public class DemoStoreSeeder implements StoreSeeder {
     static final String DEV_PURCHASE_INVOICE_ID_PREFIX = "dev-pur-";
     private static final String SIM_LABEL_PREFIX = "Symulacja: ";
     private static final String ENABLED_CATEGORY_GROUP = "Komputery i urządzenia peryferyjne";
+    /**
+     * The catalog screens need what the plain seed has nowhere: an automatic category, a category with labels, a
+     * second pricing group and a marketplace definition, plus products that are disabled, unknown to the PIM or
+     * labelled outside the list. All of it is put on CPU and on one extra automatic category.
+     */
+    static final String SHOWCASE_CATEGORY = "CPU";
+    static final List<String> SHOWCASE_LABELS = List.of("Intel LGA 1851", "AMD AM5");
+    static final String SHOWCASE_PRICING_GROUP = "Premium";
+    /** Marketplaces the demo store is "connected" to; no adapter is installed locally, so the names are the labels. */
+    static final String DEMO_MARKETPLACE = "Allegro";
+    static final String DEMO_MARKETPLACE_SPARE = "Empik";
+    /** The automatic category: its list is computed from the inventory, so it maps to PIM categories that have offers. */
+    static final String AUTOMATIC_CATEGORY = "Cooling";
+    static final String AUTOMATIC_CATEGORY_NAME = "Chłodzenie i wentylacja";
+    private static final List<String> AUTOMATIC_PIM_CATEGORY_IDS = List.of("921", "1571");
+    private static final String SHOWCASE_APPROVED_PIM_ID = "local-seed-0001";
+    private static final String SHOWCASE_LABELLED_PIM_ID = "local-seed-0062";
+    private static final String SHOWCASE_DISABLED_PIM_ID = "local-seed-0063";
+    private static final String SHOWCASE_WITHOUT_PIM_ID = "local-seed-0064";
     private static final String PRICELIST_TEMPLATE = "/local-init/s3/stores/uma2dqukxr/pricelists/cat-local-01/seed.csv";
     private static final String CARRIER_ID = "local-carrier-01";
     private static final String CARRIER_NAME = "local";
@@ -327,6 +347,11 @@ public class DemoStoreSeeder implements StoreSeeder {
         RMAConfiguration rma = Objects.requireNonNullElseGet(store.getRmaConfiguration(), RMAConfiguration::new);
         rma.setCarrier(carrier());
         store.setRmaConfiguration(rma);
+
+        // No marketplace adapter is installed locally, so these are connections on paper: enough for the category
+        // marketplace definitions and the product approvals to have something to point at.
+        store.connectMarketplace(DEMO_MARKETPLACE, false);
+        store.connectMarketplace(DEMO_MARKETPLACE_SPARE, false);
     }
 
     static void applyDemoWarehouseId(Store store) {
@@ -394,9 +419,36 @@ public class DemoStoreSeeder implements StoreSeeder {
             product.setProductId("prod-" + row.pimId());
             product.setEnabled(true);
             product.setEstimatedDeliveryDays(row.estimatedDeliveryDays());
+            if (SHOWCASE_CATEGORY.equals(row.category())) {
+                showcaseProduct(product, row);
+            }
             products.add(product);
         }
         return products;
+    }
+
+    /**
+     * One product per state the category page can show: approved for the marketplace and expecting stock, disabled,
+     * and one the PIM does not know. The product left with its feed label is the one whose label is outside the
+     * category's list, which is exactly the case no screen used to show.
+     */
+    private static void showcaseProduct(Product product, CatalogSeedRow row) {
+        switch (row.pimId()) {
+            case SHOWCASE_APPROVED_PIM_ID -> {
+                product.setLabel(SHOWCASE_LABELS.get(1));
+                product.setPricingGroup(SHOWCASE_PRICING_GROUP);
+                product.setStockExpectedQty(5);
+                product.setMarketplaces(new LinkedList<>(List.of(DEMO_MARKETPLACE)));
+            }
+            case SHOWCASE_LABELLED_PIM_ID -> product.setLabel(SHOWCASE_LABELS.get(0));
+            case SHOWCASE_DISABLED_PIM_ID -> {
+                product.setLabel(SHOWCASE_LABELS.get(1));
+                product.setEnabled(false);
+            }
+            case SHOWCASE_WITHOUT_PIM_ID -> product.setPimId(null);
+            default -> {
+            }
+        }
     }
 
     private void saveWarehouseItems(DynamoDBMapper mapper, List<CatalogSeedRow> rows, String storeId) {
@@ -1258,9 +1310,43 @@ public class DemoStoreSeeder implements StoreSeeder {
             if (pimCategoryId != null) {
                 definition.setPimCategoryIds(new LinkedList<>(List.of(pimCategoryId)));
             }
+            if (SHOWCASE_CATEGORY.equals(category)) {
+                showcaseCategory(definition);
+            }
             categories.add(definition);
         }
+        categories.add(automaticCategory(storeId, ++sequence));
         return categories;
+    }
+
+    /** Labels, a second pricing group picked by label and a marketplace definition — the parts of a category no other seeded one has. */
+    private static void showcaseCategory(CategoryDefinition definition) {
+        definition.setGroupingOrder(new LinkedList<>(SHOWCASE_LABELS));
+        PriceDefinition premium = new PriceDefinition(1.25, 20, 0, 0, 0, SHOWCASE_PRICING_GROUP);
+        premium.setLabelMatch(SHOWCASE_LABELS.get(1));
+        definition.getPriceDefinitions().add(premium);
+        // Exports only approved products, so the approval checkbox of the product page has a visible effect.
+        MarketplaceDefinition marketplace = new MarketplaceDefinition(DEMO_MARKETPLACE, 1.10, 0, 0, 0, 0, 3);
+        marketplace.setExportSelectedProducts(true);
+        definition.getMarketplaceDefinitions().add(marketplace);
+    }
+
+    private static CategoryDefinition automaticCategory(String storeId, int sequence) {
+        CategoryDefinition definition = new CategoryDefinition();
+        definition.setCategoryId(CatalogSeed.categoryId(AUTOMATIC_CATEGORY, storeId));
+        definition.setName(AUTOMATIC_CATEGORY_NAME);
+        definition.setCategory(AUTOMATIC_CATEGORY);
+        definition.setType(CategoryDefinitionType.Dynamic);
+        definition.setRequiredDuringOrder(false);
+        definition.setSequenceNumber(sequence);
+        definition.setMaxQty(2);
+        definition.setDeletionProtection(false);
+        definition.setStockDefinition(new StockDefinition(2, 5, 20));
+        definition.setAvailabilityDefinition(new AvailabilityDefinition(1, 1));
+        definition.setPriceDefinitions(new LinkedList<>(List.of(
+                new PriceDefinition(1.15, 10, 0, 0, 0, PriceDefinition.DEFAULT_PRICING_GROUP))));
+        definition.setPimCategoryIds(new LinkedList<>(AUTOMATIC_PIM_CATEGORY_IDS));
+        return definition;
     }
 
     private static List<String> distinctCategories(List<CatalogSeedRow> rows) {

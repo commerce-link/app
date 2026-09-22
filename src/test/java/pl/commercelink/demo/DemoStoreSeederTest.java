@@ -23,6 +23,9 @@ import pl.commercelink.orders.rma.RMAStatus;
 import pl.commercelink.warehouse.builtin.WarehouseDocument;
 import pl.commercelink.warehouse.builtin.WarehouseItem;
 import pl.commercelink.products.CategoryDefinition;
+import pl.commercelink.products.CategoryDefinitionType;
+import pl.commercelink.products.MarketplaceDefinition;
+import pl.commercelink.products.PriceDefinition;
 import pl.commercelink.products.Product;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
@@ -247,6 +250,52 @@ class DemoStoreSeederTest {
         // then
         assertEquals(List.of("Komputery i urządzenia peryferyjne"),
                 store.getFulfilmentConfiguration().getEnabledCategories());
+    }
+
+    @Test
+    void seedGivesTheCatalogScreensAnAutomaticCategoryLabelsASecondPricingGroupAndAMarketplace() {
+        // given
+        List<CatalogSeedRow> rows = CatalogSeed.load();
+
+        // when
+        List<CategoryDefinition> definitions = DemoStoreSeeder.buildCategoryDefinitions(rows, "store-1");
+
+        // then
+        CategoryDefinition automatic = definitions.stream()
+                .filter(d -> DemoStoreSeeder.AUTOMATIC_CATEGORY.equals(d.getCategory())).findFirst().orElseThrow();
+        assertEquals(DemoStoreSeeder.AUTOMATIC_CATEGORY_NAME, automatic.getName());
+        assertTrue(automatic.hasType(CategoryDefinitionType.Dynamic));
+        assertTrue(automatic.hasCategoryMapping());
+
+        CategoryDefinition showcase = definitions.stream()
+                .filter(d -> DemoStoreSeeder.SHOWCASE_CATEGORY.equals(d.getCategory())).findFirst().orElseThrow();
+        assertEquals(DemoStoreSeeder.SHOWCASE_LABELS, showcase.getGroupingOrder());
+        assertEquals(List.of(PriceDefinition.DEFAULT_PRICING_GROUP, DemoStoreSeeder.SHOWCASE_PRICING_GROUP),
+                showcase.getPriceDefinitions().stream().map(PriceDefinition::getPricingGroup).toList());
+        assertEquals(List.of(DemoStoreSeeder.DEMO_MARKETPLACE),
+                showcase.getMarketplaceDefinitions().stream().map(MarketplaceDefinition::getName).toList());
+        assertTrue(showcase.getMarketplaceDefinitions().get(0).isComplete());
+    }
+
+    @Test
+    void seededShowcaseCategoryHasOneProductOfEachStateTheCategoryPageShows() {
+        // given
+        List<CatalogSeedRow> rows = CatalogSeed.load();
+
+        // when
+        List<Product> products = DemoStoreSeeder.buildProducts(rows, "store-1").stream()
+                .filter(p -> p.getCategoryId().equals(CatalogSeed.categoryId(DemoStoreSeeder.SHOWCASE_CATEGORY, "store-1")))
+                .toList();
+
+        // then
+        assertEquals(1, products.stream().filter(p -> !p.isEnabled()).count());
+        assertEquals(1, products.stream().filter(p -> p.getPimId() == null).count());
+        assertEquals(1, products.stream()
+                .filter(p -> !DemoStoreSeeder.SHOWCASE_LABELS.contains(p.getLabel())).count());
+        Product approved = products.stream().filter(p -> !p.getMarketplaces().isEmpty()).findFirst().orElseThrow();
+        assertEquals(List.of(DemoStoreSeeder.DEMO_MARKETPLACE), approved.getMarketplaces());
+        assertEquals(DemoStoreSeeder.SHOWCASE_PRICING_GROUP, approved.getPricingGroup());
+        assertTrue(approved.getStockExpectedQty() > 0);
     }
 
     @Test
