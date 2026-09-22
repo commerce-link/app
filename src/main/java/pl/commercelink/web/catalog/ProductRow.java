@@ -67,11 +67,13 @@ public record ProductRow(String id, String name, String ean, String mfn, String 
 
     /**
      * Whether {@link pl.commercelink.marketplace.MarketplaceOfferExportEventListener} would publish this product to at
-     * least one marketplace: the export walks the category's definitions, skips the ones that are switched off or
-     * incomplete, reads the enabled products that have a PIM entry and, for a definition exporting a selection only,
-     * keeps the ones approved for it. Everything the export decides per run -- the store's integrations, the catalog's
-     * export switch, the price list and the quantity rules -- is left out; the mark answers "the catalogue lets it out",
-     * not "it went out last night".
+     * least one marketplace. The export applies exactly one gate per definition -- it is enabled -- then reads the
+     * enabled products that have a PIM entry and, for a definition exporting a selection only, keeps the ones approved
+     * for it. An incomplete definition is therefore marked as well: completeness is checked catalog-wide, in
+     * {@code ProductCatalog.isMarketplaceExportEnabled}, and is deliberately not modelled here, because it says whether
+     * the catalog exports to that marketplace at all, not whether this category's product would be in the run. The
+     * rest of what the export decides per run -- the store's integrations, the price list and the quantity rules -- is
+     * left out for the same reason: the mark answers "the catalogue lets it out", not "it went out last night".
      */
     private static boolean exported(Product product, CategoryDefinition category) {
         if (!product.isEnabled() || StringUtils.isBlank(product.getPimId())) {
@@ -79,7 +81,6 @@ public record ProductRow(String id, String name, String ean, String mfn, String 
         }
         return category.getMarketplaceDefinitions().stream()
                 .filter(MarketplaceDefinition::isEnabled)
-                .filter(MarketplaceDefinition::isComplete)
                 .anyMatch(definition -> !definition.isExportSelectedProducts()
                         || product.isApprovedForMarketplace(definition.getName()));
     }

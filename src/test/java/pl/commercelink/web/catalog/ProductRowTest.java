@@ -105,17 +105,31 @@ class ProductRowTest {
                 .doesNotContain("marketplace");
     }
 
-    /** A definition the export skips -- switched off, or without a markup and a quantity rule -- publishes nothing. */
+    /** A definition switched off is the one gate the export applies per definition, so it publishes nothing. */
     @Test
-    void aDisabledOrIncompleteMarketplaceDefinitionMarksNothing() {
+    void aDisabledMarketplaceDefinitionMarksNothing() {
         // given
         MarketplaceDefinition disabled = definition("allegro", false);
         disabled.setEnabled(false);
+
+        // when / then
+        assertThat(ProductRow.of(product(), categoryWith(disabled), "c1", n -> n).features())
+                .doesNotContain("marketplace");
+    }
+
+    /**
+     * An enabled definition without a markup and a quantity rule still reaches the export: the only completeness gate
+     * is catalog-wide ({@code ProductCatalog.isMarketplaceExportEnabled}), not per definition, and the old
+     * {@code MarketplaceEligible} view counted such a definition too ({@code hasEnabledMarketplaceDefinitions}).
+     */
+    @Test
+    void anEnabledButIncompleteMarketplaceDefinitionStillMarks() {
+        // given
         MarketplaceDefinition incomplete = new MarketplaceDefinition("empik", 0, 0, 0, 0, 0, 0);
 
         // when / then
-        assertThat(ProductRow.of(product(), categoryWith(disabled, incomplete), "c1", n -> n).features())
-                .doesNotContain("marketplace");
+        assertThat(ProductRow.of(product(), categoryWith(incomplete), "c1", n -> n).features())
+                .contains("marketplace");
     }
 
     /** The export reads enabled products with a PIM id only, so neither half of that is marked. */
