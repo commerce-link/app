@@ -133,6 +133,9 @@ public class ProductForm {
         return repeatId + "-" + index + "-" + field;
     }
 
+    /** Neither identifier was given; either one of the two fields would fix it, so both may carry the message. */
+    static final String IDENTIFIER_REQUIRED = "product.error.identifier.required";
+
     /**
      * What is wrong with the identifiers of a product, or null when nothing is: a product is known by its EAN or by
      * its manufacturer code, and an EAN that is given is 8--14 digits. The bulk-add review edits the same two fields
@@ -140,7 +143,7 @@ public class ProductForm {
      */
     static String identifierError(String ean, String manufacturerCode) {
         if (StringUtils.isBlank(ean) && StringUtils.isBlank(manufacturerCode)) {
-            return "product.error.identifier.required";
+            return IDENTIFIER_REQUIRED;
         }
         if (StringUtils.isNotBlank(ean) && !ean.trim().matches("\\d{8,14}")) {
             return "product.error.ean.invalid";

@@ -48,7 +48,10 @@ class ProductsBulkAddFormTest {
 
         // then
         assertThat(errors).containsEntry("product-0-ean", "product.error.identifier.required")
+                // Either field would fix a row with no identifier at all, so both are marked and both are linkable.
+                .containsEntry("product-0-manufacturerCode", "product.error.identifier.required")
                 .containsEntry("product-1-ean", "product.error.ean.invalid")
+                .doesNotContainKey("product-1-manufacturerCode")
                 .doesNotContainKey("product-2-ean");
     }
 
