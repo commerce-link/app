@@ -120,19 +120,21 @@ class CatalogScriptContractTest {
     /**
      * The product column asks for 300 px so the name and the codes stand apart; unguarded, that minimum was wider
      * than the page itself on a narrow window and in card mode, which is horizontal scrolling on every catalog table.
+     * The guard uses a breakpoint of the design system (720 / 1024 / 1216), not one of its own.
      */
     @Test
-    void productColumnAsksForItsMinimumWidthOnlyOnAWideViewport() throws Exception {
+    void productColumnAsksForItsMinimumWidthOnlyOnTheWidestBreakpoint() throws Exception {
         // given
         String css = read("src/main/resources/static/css/commercelink.css");
 
         // then
         assertThat(css).contains("""
-                @media screen and (min-width: 1100px) {
+                @media screen and (min-width: 1216px) {
                     .cl-page .cl-table.is-products .cl-table-key {
                         min-width: 300px;
                     }
                 }""");
+        assertThat(css).doesNotContain("min-width: 1100px");
     }
 
     /**
