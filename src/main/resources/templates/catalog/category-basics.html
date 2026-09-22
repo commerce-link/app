@@ -35,6 +35,8 @@
                                 </div>
                             </div>
                         </div>
+                        <!--/* Plain, selectable text: support asks for this id, and nothing may post it back. */-->
+                        <p th:if="${existing}" class="cl-help" th:text="#{catalog.category.id(${category.categoryId})}"></p>
                     </fieldset>
                     <fieldset class="cl-fieldset">
                         <legend class="cl-fieldset-title" th:text="#{catalog.category.type.section}"></legend>

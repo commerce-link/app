@@ -67,7 +67,10 @@ class CategoryBasicsTemplateTest {
 
     /** The page as the controller renders it for an existing, unprotected category with one label. */
     private static String rendered() {
-        CategoryDefinition gpu = new CategoryDefinition().withName("GPU").withGeneratedId();
+        return renderedFor(new CategoryDefinition().withName("GPU").withGeneratedId());
+    }
+
+    private static String renderedFor(CategoryDefinition gpu) {
         CategoryBasicsForm form = CategoryBasicsForm.from(gpu);
         form.setLabels(List.of("RTX 5060"));
         Context context = new Context();
@@ -105,6 +108,25 @@ class CategoryBasicsTemplateTest {
         assertThat(occurrences(html, "/dashboard/catalogs/c1/category/k1/delete")).isEqualTo(1);
         assertThat(html.indexOf("cl-page-actions")).isLessThan(html.indexOf("/dashboard/catalogs/c1/category/k1/delete"));
         assertThat(html).doesNotContain("??");
+    }
+
+    /** Support is given a category id over the phone; the Basics page must show it, as text rather than as a field. */
+    @Test
+    void theCategoryIdIsOnThePageAsPlainText() {
+        // given
+        CategoryDefinition gpu = new CategoryDefinition().withName("GPU").withGeneratedId();
+
+        // when
+        String html = renderedFor(gpu);
+
+        // then
+        assertThat(html).contains("ID: " + gpu.getCategoryId()).doesNotContain("readonly");
+    }
+
+    @Test
+    void theCategoryIdLineIsLeftOutOfTheNewCategoryForm() throws Exception {
+        // when / then
+        assertThat(page()).contains("th:if=\"${existing}\"");
     }
 
     @Test

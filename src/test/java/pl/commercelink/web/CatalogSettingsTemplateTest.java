@@ -64,6 +64,7 @@ class CatalogSettingsTemplateTest {
         context.setVariable("categoriesCount", 2);
         context.setVariable("productsCount", 7);
         context.setVariable("catalogError", null);
+        context.setVariable("catalogId", "c1");
         context.setVariable("redirectTo", null);
         return EnglishFragmentTemplateEngine.create().process("catalog/catalog-settings", context);
     }
@@ -82,6 +83,22 @@ class CatalogSettingsTemplateTest {
         assertThat(occurrences(html, "<h1")).isEqualTo(1);
         assertThat(html.indexOf("cl-page-actions")).isLessThan(html.indexOf("/dashboard/catalogs/c1/delete"));
         assertThat(html).doesNotContain("??");
+    }
+
+    /** Support is given a catalog id over the phone; the page it is on must show it, as text rather than as a field. */
+    @Test
+    void theCatalogIdIsOnThePageAsPlainText() {
+        // when
+        String html = rendered();
+
+        // then
+        assertThat(html).contains("ID: c1").doesNotContain("readonly");
+    }
+
+    @Test
+    void theCatalogIdLineIsLeftOutWhileTheCatalogDoesNotExistYet() throws Exception {
+        // when / then
+        assertThat(page()).contains("th:if=\"${catalogId != null}\"");
     }
 
     @Test

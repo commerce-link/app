@@ -35,6 +35,8 @@
                         <div class="cl-form-grid">
                             <div class="cl-span-4" th:insert="~{fragments/settings-form :: textField('name', 'catalog.name', *{name}, 'text', 'off', true, ${errors['name']}, null)}"></div>
                         </div>
+                        <!--/* Plain, selectable text: support asks for this id, and nothing may post it back. */-->
+                        <p th:if="${catalogId != null}" class="cl-help" th:text="#{catalog.id(${catalogId})}"></p>
                     </fieldset>
                     <fieldset class="cl-fieldset">
                         <legend class="cl-fieldset-title" th:text="#{catalog.settings.section.pricelist}"></legend>

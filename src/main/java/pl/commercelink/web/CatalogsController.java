@@ -224,6 +224,8 @@ public class CatalogsController {
         model.addAttribute("form", form);
         model.addAttribute("errors", errors);
         model.addAttribute("existing", edit);
+        // Support asks for the catalog id, which is otherwise only in the address bar.
+        model.addAttribute("catalogId", edit ? existing.getCatalogId() : null);
         model.addAttribute("scheduleMinIntervalMinutes", detailsService.minIntervalMinutes());
         model.addAttribute("formAction", edit ? CatalogPaths.catalogSettings(existing.getCatalogId()) : CatalogPaths.newCatalog());
         model.addAttribute("backHref", edit ? CatalogPaths.catalog(existing.getCatalogId()) : CatalogPaths.catalogs());
