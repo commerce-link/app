@@ -1,5 +1,6 @@
 package pl.commercelink.taxonomy;
 
+import org.springframework.context.annotation.DependsOn;
 import org.springframework.stereotype.Component;
 
 import java.util.Collection;
@@ -14,6 +15,7 @@ import java.util.stream.Stream;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
 @Component
+@DependsOn("initializingBeanRunner")
 public class TaxonomyCatalog {
 
     private final TaxonomyCatalogRepository repository;
