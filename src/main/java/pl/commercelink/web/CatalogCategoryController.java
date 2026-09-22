@@ -3,6 +3,7 @@ package pl.commercelink.web;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.context.MessageSource;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -19,6 +20,7 @@ import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.CategoryDefinitionType;
 import pl.commercelink.products.CategoryDefinitions;
 import pl.commercelink.products.PimCategoryOptions;
+import pl.commercelink.products.PriceDefinition;
 import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductRepository;
@@ -29,6 +31,7 @@ import pl.commercelink.web.catalog.CatalogAccess;
 import pl.commercelink.web.catalog.CatalogPaths;
 import pl.commercelink.web.catalog.CategoryTypeLabels;
 import pl.commercelink.web.dtos.CategoryBasicsForm;
+import pl.commercelink.web.dtos.CategoryPricingForm;
 import pl.commercelink.web.settings.ConfirmAction;
 import pl.commercelink.web.settings.SettingsFlash;
 import pl.commercelink.web.settings.SettingsPaths;
@@ -43,8 +46,8 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 /**
- * A catalog category: its settings hub, the Basics page and deleting the category. The products of the category live
- * in CatalogProductsController.
+ * A catalog category: its settings hub, the Basics and Pricing pages and deleting the category. The products of the
+ * category live in CatalogProductsController.
  */
 @Controller
 @PreAuthorize("hasRole('ADMIN')")
@@ -53,6 +56,9 @@ public class CatalogCategoryController {
 
     private static final String BASICS_VIEW = "catalog/category-basics";
     private static final String BASICS_FRAGMENT = BASICS_VIEW + " :: basicsForm";
+
+    private static final String PRICING_VIEW = "catalog/category-pricing";
+    private static final String PRICING_FRAGMENT = PRICING_VIEW + " :: pricingForm";
 
     /** Outcome of a refused category action, shown by the catalog page in its body; the layout banner is Bulma markup. */
     private static final String ERROR_FLASH = "catalogError";
@@ -141,6 +147,58 @@ public class CatalogCategoryController {
         }
         return saved(CatalogPaths.categorySettings(catalogId, categoryId), message, async, model, redirectAttributes, request,
                 response, BASICS_FRAGMENT, () -> renderBasics(catalog, category, form, Map.of(), model, locale));
+    }
+
+    @GetMapping("/dashboard/catalogs/{catalogId}/category/{categoryId}/settings/pricing")
+    public String pricing(@PathVariable String catalogId, @PathVariable String categoryId, Model model, Locale locale) {
+        ProductCatalog catalog = access.requireCatalog(storeId(), catalogId);
+        CategoryDefinition category = access.requireCategory(catalog, categoryId);
+        return renderPricing(catalog, category, CategoryPricingForm.from(category), Map.of(), model, locale);
+    }
+
+    @PostMapping("/dashboard/catalogs/{catalogId}/category/{categoryId}/settings/pricing")
+    public String savePricing(@PathVariable String catalogId, @PathVariable String categoryId, @ModelAttribute CategoryPricingForm form,
+                              @RequestHeader(value = SettingsPaths.ASYNC_HEADER, required = false) String requestedWith,
+                              Model model, Locale locale, RedirectAttributes redirectAttributes,
+                              HttpServletRequest request, HttpServletResponse response) {
+        ProductCatalog catalog = access.requireCatalog(storeId(), catalogId);
+        CategoryDefinition category = access.requireCategory(catalog, categoryId);
+        boolean async = SettingsPaths.isAsync(requestedWith);
+        form.setRemovedGroups(removedGroups(category, form));
+        Map<String, String> errors = form.validate(group -> definitions.productsInPriceGroup(category, group));
+        if (!errors.isEmpty()) {
+            return rejected(renderPricing(catalog, category, form, errors, model, locale), PRICING_FRAGMENT, async, response);
+        }
+        definitions.savePricing(catalog, category, form.toStock(), form.toAvailability(), form.toGroups());
+        return saved(CatalogPaths.categorySettings(catalogId, categoryId),
+                messageSource.getMessage("catalog.category.pricing.saved", new Object[]{category.getName()}, locale),
+                async, model, redirectAttributes, request, response, PRICING_FRAGMENT,
+                () -> renderPricing(catalog, category, form, Map.of(), model, locale));
+    }
+
+    /**
+     * The page deletes a price group by dropping its fields, so the removal is what the saved category still has and the
+     * form no longer carries. Only these groups are looked up in the products, never the ones that came back.
+     */
+    private static List<String> removedGroups(CategoryDefinition category, CategoryPricingForm form) {
+        Set<String> submitted = form.getGroups().stream()
+                .map(group -> StringUtils.defaultString(group.getName()).trim().toLowerCase()).collect(Collectors.toSet());
+        return category.getPriceDefinitions().stream().map(PriceDefinition::getPricingGroup).filter(Objects::nonNull)
+                .filter(name -> !submitted.contains(name.trim().toLowerCase())).toList();
+    }
+
+    private String renderPricing(ProductCatalog catalog, CategoryDefinition category, CategoryPricingForm form,
+                                 Map<String, String> errors, Model model, Locale locale) {
+        model.addAttribute("form", form);
+        model.addAttribute("errors", errors);
+        model.addAttribute("catalog", catalog);
+        model.addAttribute("category", category);
+        model.addAttribute("formAction", CatalogPaths.categoryPricing(catalog.getCatalogId(), category.getCategoryId()));
+        model.addAttribute("backHref", CatalogPaths.categorySettings(catalog.getCatalogId(), category.getCategoryId()));
+        model.addAttribute("backLabel", messageSource.getMessage("catalog.category.settings.title", null, locale));
+        model.addAttribute("lead", HtmlUtils.htmlEscape(category.getName()) + " · "
+                + messageSource.getMessage("catalog.category.pricing.lead", null, locale));
+        return PRICING_VIEW;
     }
 
     @GetMapping("/dashboard/catalogs/{catalogId}/category/{categoryId}/delete")

@@ -14,17 +14,21 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import pl.commercelink.products.AvailabilityDefinition;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.CategoryDefinitionType;
 import pl.commercelink.products.CategoryDefinitions;
 import pl.commercelink.products.PimCategoryOptions;
+import pl.commercelink.products.PriceDefinition;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductRepository;
+import pl.commercelink.products.StockDefinition;
 import pl.commercelink.starter.security.model.CustomUser;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.catalog.CatalogAccess;
 import pl.commercelink.web.dtos.CategoryBasicsForm;
+import pl.commercelink.web.dtos.CategoryPricingForm;
 import pl.commercelink.web.settings.ConfirmAction;
 
 import java.util.List;
@@ -34,6 +38,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasEntry;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -305,6 +310,66 @@ class CatalogCategoryControllerTest {
         // then
         assertThat(confirmationOf(result).message()).isEqualTo("computed");
         verify(definitions, never()).deletionPreview(any(), any());
+    }
+
+    @Test
+    void thePricingFormIsBuiltFromTheSavedCategory() throws Exception {
+        // given
+        CategoryDefinition gpu = categoryOf("GPU");
+        gpu.withStockDefinition(new StockDefinition(2, 4, 10)).withAvailabilityDefinition(new AvailabilityDefinition(3, 1))
+                .withPriceDefinition(new PriceDefinition(1.05, 49, 0, 0, 0, "Default"));
+
+        // when
+        MvcResult result = mvc.perform(get("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/pricing"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("catalog/category-pricing"))
+                .andExpect(model().attribute("formAction", "/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/pricing"))
+                .andExpect(model().attribute("backHref", "/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings"))
+                .andReturn();
+
+        // then
+        CategoryPricingForm form = (CategoryPricingForm) result.getModelAndView().getModel().get("form");
+        assertThat(form.getCritical()).isEqualTo("2");
+        assertThat(form.getGroups()).extracting(CategoryPricingForm.PriceGroupForm::getName).containsExactly("Default");
+    }
+
+    /** A group is removed by leaving its fields out of the post, so only the groups that did not come back are looked up. */
+    @Test
+    void pricingRemovedGroupsAreComputedFromTheDefinitionBeforeValidation() throws Exception {
+        // given
+        CategoryDefinition gpu = categoryOf("GPU");
+        gpu.withPriceDefinition(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"))
+                .withPriceDefinition(new PriceDefinition(1.1, 0, 0, 0, 0, "Premium"));
+        when(definitions.productsInPriceGroup(gpu, "Premium")).thenReturn(4);
+
+        // when / then
+        mvc.perform(post("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/pricing")
+                        .header("X-Requested-With", "fetch")
+                        .param("critical", "1").param("low", "10").param("high", "30").param("minQty", "3").param("minProviders", "1")
+                        .param("groups[0].name", "Default").param("groups[0].multiplier", "1,00").param("groups[0].minProfit", "0")
+                        .param("groups[0].critical", "0").param("groups[0].low", "0").param("groups[0].medium", "0"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(view().name("catalog/category-pricing :: pricingForm"))
+                .andExpect(model().attribute("errors", hasEntry("groups", "catalog.category.pricing.group.inUse")));
+        verify(definitions, never()).savePricing(any(), any(), any(), any(), any());
+        verify(definitions, never()).productsInPriceGroup(gpu, "Default");
+    }
+
+    @Test
+    void validPricingIsSavedThroughTheService() throws Exception {
+        // given
+        CategoryDefinition gpu = categoryOf("GPU");
+        when(messageSource.getMessage(eq("catalog.category.pricing.saved"), any(), any(Locale.class))).thenReturn("Saved");
+
+        // when / then
+        mvc.perform(post("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/pricing")
+                        .param("critical", "1").param("low", "10").param("high", "30").param("minQty", "3").param("minProviders", "1")
+                        .param("groups[0].name", "Default").param("groups[0].multiplier", "1,05").param("groups[0].minProfit", "49")
+                        .param("groups[0].critical", "0").param("groups[0].low", "0").param("groups[0].medium", "0"))
+                .andExpect(redirectedUrl("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings"))
+                .andExpect(flash().attribute("settingsSavedMessage", "Saved"));
+        verify(definitions).savePricing(eq(catalog), eq(gpu), any(StockDefinition.class), any(AvailabilityDefinition.class),
+                argThat(groups -> groups.size() == 1 && groups.get(0).getMultiplier() == 1.05));
     }
 
     @Test
