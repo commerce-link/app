@@ -4,6 +4,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.MessageSource;
@@ -13,24 +14,36 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import pl.commercelink.inventory.Inventory;
+import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.inventory.InventoryView;
+import pl.commercelink.inventory.MatchedInventory;
+import pl.commercelink.inventory.supplier.SupplierLabelMap;
+import pl.commercelink.inventory.supplier.SupplierLabels;
+import pl.commercelink.invoicing.api.Price;
+import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.CategoryDefinitionType;
 import pl.commercelink.products.PimCategoryOptions;
+import pl.commercelink.products.PriceDefinition;
 import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductRecommendation;
 import pl.commercelink.products.ProductRecommendationEngine;
 import pl.commercelink.products.ProductRepository;
+import pl.commercelink.products.brand.BrandMapper;
 import pl.commercelink.starter.security.model.CustomUser;
+import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.web.catalog.CatalogAccess;
 import pl.commercelink.web.catalog.CategoryPageModel;
 import pl.commercelink.web.catalog.ProductRow;
 import pl.commercelink.web.catalog.ProductStatus;
+import pl.commercelink.web.catalog.RecommendationRow;
+import pl.commercelink.web.dtos.ProductsBulkAddForm;
 
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -69,6 +82,14 @@ class CatalogProductsControllerTest {
     @Mock
     private PimCategoryOptions pimCategoryOptions;
     @Mock
+    private SupplierLabels supplierLabels;
+    @Mock
+    private SupplierLabelMap supplierLabelMap;
+    @Mock
+    private PimCatalog pimCatalog;
+    @Mock
+    private BrandMapper brandMapper;
+    @Mock
     private MessageSource messageSource;
 
     private ProductCatalog catalog;
@@ -90,7 +111,8 @@ class CatalogProductsControllerTest {
         lenient().when(marketplaces.displayName(anyString())).thenAnswer(call -> call.getArgument(0));
         lenient().when(messageSource.getMessage(anyString(), any(), any(Locale.class))).thenAnswer(call -> call.getArgument(0));
         mvc = MockMvcBuilders.standaloneSetup(new CatalogProductsController(access, productRepository,
-                recommendationEngine, inventory, marketplaces, pimCategoryOptions, messageSource)).build();
+                recommendationEngine, inventory, marketplaces, pimCategoryOptions, supplierLabels, pimCatalog,
+                brandMapper, messageSource)).build();
     }
 
     @AfterEach
@@ -244,6 +266,135 @@ class CatalogProductsControllerTest {
         // when / then
         mvc.perform(post(categoryPath() + "/products/bulk").param("action", "enable").param("productIds", "foreign"))
                 .andExpect(redirectedUrl(categoryPath() + "?status=active"));
+        verify(productRepository, never()).save(any(Product.class));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void theProposalsAreRowsOfTheRecommendationEngineCountedByBrand() throws Exception {
+        // given
+        gpu.setPimCategoryIds(List.of("pim-gpu"));
+        ProductRecommendation recommendation = mock(ProductRecommendation.class);
+        when(recommendation.getEan()).thenReturn("1");
+        when(recommendation.getName()).thenReturn("MSI RTX 5070");
+        when(recommendation.getBrand()).thenReturn("MSI");
+        when(recommendation.getManufacturerCode()).thenReturn("MFN-1");
+        when(recommendation.getLowestGrossPrice()).thenReturn(2749.0);
+        when(recommendation.getAlternativeSuppliers()).thenReturn(List.of("Acme"));
+        when(recommendation.getAlternativeEans()).thenReturn(List.of("1", "2"));
+        when(recommendation.getAlternativeProductCodes()).thenReturn(List.of("MFN-1"));
+        when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(inventoryView);
+        when(recommendationEngine.getRecommendations(gpu, inventoryView)).thenReturn(List.of(recommendation));
+        when(supplierLabels.forStoreId(STORE_ID)).thenReturn(supplierLabelMap);
+        when(supplierLabelMap.of("Acme")).thenReturn("Acme Parts");
+
+        // when
+        var result = mvc.perform(get(categoryPath() + "/products/add"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("catalog/products-add"))
+                .andExpect(model().attribute("hasMapping", true))
+                .andExpect(model().attribute("reviewAction", categoryPath() + "/products/add/review"))
+                .andReturn();
+
+        // then
+        List<RecommendationRow> rows = (List<RecommendationRow>) result.getModelAndView().getModel().get("rows");
+        assertThat(rows).singleElement().satisfies(row -> {
+            assertThat(row.lowestGrossPrice()).isEqualTo("2 749,00");
+            assertThat(row.suppliers()).containsExactly("Acme Parts");
+            assertThat(row.alternatives()).isEqualTo("2");
+            assertThat(row.addHref()).isEqualTo(categoryPath() + "/products/new?ean=1");
+        });
+        assertThat((Map<String, Long>) result.getModelAndView().getModel().get("brandCounts")).containsEntry("MSI", 1L);
+    }
+
+    /** Without PIM categories the engine has nothing to match, so the page says so instead of asking the inventory. */
+    @Test
+    void aCategoryWithoutAPimMappingProposesNothingAndReadsNoInventory() throws Exception {
+        // when / then
+        mvc.perform(get(categoryPath() + "/products/add"))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("hasMapping", false))
+                .andExpect(model().attribute("rows", List.of()));
+        verify(recommendationEngine, never()).getRecommendations(any(), any());
+        verify(inventory, never()).withEnabledSuppliersOnly(anyString());
+        verify(supplierLabels, never()).forStoreId(anyString());
+    }
+
+    @Test
+    void reviewingNothingComesBackToTheProposalsWithAnError() throws Exception {
+        // when / then
+        mvc.perform(post(categoryPath() + "/products/add/review"))
+                .andExpect(redirectedUrl(categoryPath() + "/products/add"))
+                .andExpect(flash().attribute("catalogError", "catalog.products.review.none"));
+        verify(inventory, never()).withEnabledSuppliersOnly(anyString());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void reviewSkipsEansMissingFromInventoryAndListsThem() throws Exception {
+        // given
+        when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(inventoryView);
+        MatchedInventory found = mock(MatchedInventory.class);
+        when(found.isEmpty()).thenReturn(false);
+        when(found.getInventoryKey()).thenReturn(new InventoryKey("1", "MFN-1"));
+        when(found.getTaxonomy()).thenReturn(new Taxonomy("1", "MFN-1", "MSI", "MSI RTX 5070", "GPU", 1, null, null));
+        when(found.getLowestPrice()).thenReturn(Price.fromGross(2749));
+        MatchedInventory missing = mock(MatchedInventory.class);
+        when(missing.isEmpty()).thenReturn(true);
+        when(inventoryView.findByEan("1")).thenReturn(found);
+        when(inventoryView.findByEan("2")).thenReturn(missing);
+        when(pimCatalog.findByPimIdOrGtinsOrMpns(any(), any(), any())).thenReturn(Optional.empty());
+
+        // when
+        var result = mvc.perform(post(categoryPath() + "/products/add/review").param("eans", "1", "2"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("catalog/products-add-review"))
+                .andExpect(model().attribute("saveAction", categoryPath() + "/products/add/save"))
+                .andReturn();
+
+        // then
+        assertThat((List<String>) result.getModelAndView().getModel().get("skipped")).containsExactly("2");
+        assertThat(((ProductsBulkAddForm) result.getModelAndView().getModel().get("form")).getProducts())
+                .extracting(Product::getName).containsExactly("MSI RTX 5070");
+    }
+
+    /** The products land in the category of the address; a category id smuggled into the form is never read. */
+    @Test
+    void saveIgnoresTheSubmittedCategoryIdAndUsesThePathCategory() throws Exception {
+        // given
+        gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
+        // Product normalises the identifiers it is given, so the lookup asks with the unified code.
+        when(pimCatalog.findByGtinOrMpn("1", "M")).thenReturn(Optional.empty());
+
+        // when / then
+        mvc.perform(post(categoryPath() + "/products/add/save")
+                        .param("products[0].categoryId", "someone-elses")
+                        .param("products[0].name", "X").param("products[0].ean", "1")
+                        .param("products[0].manufacturerCode", "m").param("products[0].label", "L")
+                        .param("products[0].pricingGroup", "Default"))
+                .andExpect(redirectedUrl(categoryPath()))
+                .andExpect(flash().attribute("settingsSavedMessage", "catalog.products.added"));
+        ArgumentCaptor<Product> saved = ArgumentCaptor.forClass(Product.class);
+        verify(productRepository).save(saved.capture());
+        assertThat(saved.getValue().getCategoryId()).isEqualTo(gpu.getCategoryId());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void saveWithAnUnknownPricingGroupRerendersTheReviewWith422() throws Exception {
+        // given
+        gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
+
+        // when
+        var result = mvc.perform(post(categoryPath() + "/products/add/save")
+                        .param("products[0].name", "X").param("products[0].pricingGroup", "Nope"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(view().name("catalog/products-add-review"))
+                .andReturn();
+
+        // then
+        assertThat((Map<String, String>) result.getModelAndView().getModel().get("errors"))
+                .containsEntry("product-0-pricingGroup", "product.error.group.unknown");
         verify(productRepository, never()).save(any(Product.class));
     }
 }

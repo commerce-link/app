@@ -1,0 +1,145 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+<div layout:fragment="content">
+    <section class="cl-page">
+        <div class="cl-page-body is-wide">
+            <!--/* The lead and the actions are defined inside the replaced element: the header pulls them in as its
+                   slots, and the body of a th:replace host is dropped, so they are never rendered twice. */-->
+            <div th:replace="~{fragments/settings-header :: subpageWithActions(${backHref}, ${category.name},
+                    #{catalog.products.add.title}, ~{::addLead}, ~{::addActions})}">
+                <th:block th:fragment="addLead">
+                    <span th:text="#{catalog.products.add.lead(${pimNames})}"></span>
+                    <span th:text="' ' + #{catalog.products.add.filters(${filtersCount})}"></span>
+                    <a th:href="@{${filtersHref}}" th:text="#{settings.list.edit}"></a>
+                </th:block>
+                <th:block th:fragment="addActions">
+                    <a class="cl-button" th:href="@{${newProductHref}}">
+                        <span class="icon is-small" aria-hidden="true"><i class="fas fa-pencil-alt"></i></span>
+                        <span th:text="#{catalog.products.addManually}"></span>
+                    </a>
+                </th:block>
+            </div>
+
+            <!--/* Outcome of a refused action, in the page body; the layout banner is Bulma markup. */-->
+            <div th:if="${catalogError}" class="cl-alert is-bad" role="status">
+                <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
+                <p class="cl-alert-text" th:text="${catalogError}"></p>
+            </div>
+            <div th:unless="${hasMapping}" class="cl-alert is-warn">
+                <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+                <p class="cl-alert-text">
+                    <span th:text="#{catalog.products.add.noPim}"></span>
+                    <a th:href="@{${basicsHref}}" th:text="#{catalog.products.dynamic.noPim.action}"></a>
+                </p>
+            </div>
+
+            <section th:if="${hasMapping}" class="cl-card" aria-labelledby="proposals-title">
+                <h2 class="cl-visually-hidden" id="proposals-title" th:text="#{catalog.products.add.proposals}"></h2>
+
+                <!--/* Brands are single values: a brand with a space in it ("Kingston Fury") must match only itself,
+                       so the group is never declared in data-cl-filter-multi. */-->
+                <div th:unless="${rows.isEmpty()}" data-cl-table-filter data-cl-filter-default="brand:all">
+                    <div class="cl-table-toolbar">
+                        <div class="cl-toolbar-row" data-cl-filter-controls hidden>
+                            <label class="cl-visually-hidden" for="brand-filter" th:text="#{product.brand}"></label>
+                            <select class="cl-select is-compact" id="brand-filter" data-cl-filter-group="brand" data-cl-filter-select>
+                                <option value="all" th:attr="data-count=${rows.size()}, data-label=#{catalog.products.add.brand.all}"
+                                        th:text="#{catalog.products.add.brand.all} + ' (' + ${rows.size()} + ')'"></option>
+                                <option th:each="brand : ${brandCounts}" th:value="${brand.key}"
+                                        th:attr="data-count=${brand.value}, data-label=${brand.key}"
+                                        th:text="${brand.key} + ' (' + ${brand.value} + ')'"></option>
+                            </select>
+                            <input class="cl-input cl-table-search" type="search" autocomplete="off" data-cl-table-search
+                                   th:placeholder="#{catalog.products.add.search}" th:attr="aria-label=#{catalog.products.add.search}">
+                        </div>
+                    </div>
+
+                    <!--/* The bar declares no bulk action for the script: what is added are the checked rows of the
+                           form below, which the button submits itself, so table-select.js only shows the bar and
+                           keeps the count. */-->
+                    <div class="cl-selection-bar" hidden data-cl-selection-bar>
+                        <span class="cl-selection-count" role="status" data-cl-selection-count
+                              th:attr="data-template=#{catalog.products.selected('{n}')}"></span>
+                        <div class="cl-selection-actions">
+                            <button type="submit" form="add-products-form" class="cl-button is-primary">
+                                <span class="icon is-small" aria-hidden="true"><i class="fas fa-plus"></i></span>
+                                <span th:text="#{catalog.products.add.selected}"></span>
+                            </button>
+                            <button type="button" class="cl-link-button cl-selection-clear" data-cl-select-clear
+                                    th:text="#{catalog.products.clear}"></button>
+                        </div>
+                    </div>
+
+                    <form id="add-products-form" method="post" th:action="@{${reviewAction}}">
+                        <table class="cl-table is-products" data-cl-select-table="true">
+                            <thead>
+                            <tr>
+                                <th scope="col" class="cl-table-check">
+                                    <input type="checkbox" class="cl-check-input" data-cl-select-all hidden
+                                           th:attr="aria-label=#{catalog.products.selectAll}">
+                                </th>
+                                <th scope="col" aria-sort="none">
+                                    <button type="button" class="cl-table-sort" data-sort-key="name" th:text="#{catalog.products.column.product}"></button>
+                                </th>
+                                <th scope="col" aria-sort="none">
+                                    <button type="button" class="cl-table-sort" data-sort-key="brand" th:text="#{product.brand}"></button>
+                                </th>
+                                <th scope="col" class="is-numeric" aria-sort="none">
+                                    <button type="button" class="cl-table-sort" data-sort-key="price" th:text="#{catalog.products.column.price}"></button>
+                                </th>
+                                <th scope="col" th:text="#{catalog.products.add.suppliers}"></th>
+                                <th scope="col"><span class="cl-visually-hidden" th:text="#{general.actions}"></span></th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="row : ${rows}"
+                                th:attr="data-cl-filter-brand=${row.brand()}, data-cl-search=${row.searchText()},
+                                         data-sort-name=${row.name()}, data-sort-price=${row.lowestGrossPrice()}">
+                                <td class="cl-table-check">
+                                    <input type="checkbox" class="cl-check-input" name="eans" data-cl-select-row hidden
+                                           th:value="${row.ean()}" th:attr="aria-label=#{catalog.products.select(${row.name()})}">
+                                </td>
+                                <th scope="row" class="cl-table-key" th:attr="data-label=#{catalog.products.column.product}">
+                                    <span th:text="${row.name()}"></span>
+                                    <span th:unless="${row.hasPim()}" class="cl-status is-warn" th:text="#{catalog.products.add.noPimEntry}"></span>
+                                    <span class="cl-table-sub">
+                                        <span th:text="'EAN ' + ${row.ean()}"></span><span th:if="${row.mfn() != null}" th:text="' · ' + ${row.mfn()}"></span><span th:unless="${#strings.isEmpty(row.alternatives())}" th:text="' · ' + ${row.alternatives()}"></span>
+                                    </span>
+                                </th>
+                                <td th:attr="data-label=#{product.brand}" th:text="${row.brand()}"></td>
+                                <td class="is-numeric" th:attr="data-label=#{catalog.products.column.price}"
+                                    th:text="${row.lowestGrossPrice()} + ' PLN'"></td>
+                                <td th:attr="data-label=#{catalog.products.add.suppliers}"
+                                    th:text="${#strings.listJoin(row.suppliers(), ', ')}"></td>
+                                <td class="cl-table-actions">
+                                    <a class="cl-link-button" th:href="@{${row.addHref()}}" th:text="#{catalog.products.add.andEdit}"
+                                       th:attr="aria-label=#{catalog.products.add.andEdit.for(${row.name()})}"></a>
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </form>
+
+                    <p class="cl-list-empty" data-cl-filter-empty hidden>
+                        <span th:text="#{catalog.products.filter.empty}"></span>
+                        <button type="button" class="cl-link-button" data-cl-filter-clear th:text="#{catalog.products.filter.clear}"></button>
+                    </p>
+                </div>
+
+                <p class="cl-list-empty" th:if="${rows.isEmpty()}">
+                    <span th:text="#{catalog.products.add.empty}"></span>
+                    <a th:href="@{${filtersHref}}" th:text="#{catalog.category.filters.title}"></a>
+                </p>
+            </section>
+            <noscript><p class="cl-help" th:text="#{catalog.products.add.noscript}"></p></noscript>
+        </div>
+    </section>
+    <script th:src="@{/js/table-filter.js}" defer></script>
+    <script th:src="@{/js/table-sort.js}" defer></script>
+    <script th:src="@{/js/table-select.js}" defer></script>
+</div>
+</body>
+</html>

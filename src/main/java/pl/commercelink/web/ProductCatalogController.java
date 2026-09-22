@@ -3,12 +3,10 @@ package pl.commercelink.web;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.MessageSource;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
 import pl.commercelink.starter.dynamodb.Metadata;
@@ -18,7 +16,6 @@ import pl.commercelink.stores.MarketplaceIntegration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.starter.security.CustomSecurityContext;
-import pl.commercelink.web.dtos.ProductsBulkAddForm;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -50,9 +47,6 @@ public class ProductCatalogController {
     @Value("${application.env}")
     private String env;
 
-    @Autowired
-    private MessageSource messageSource;
-
     @GetMapping("/dashboard/catalogs/{catalogId}/category/{categoryId}/products/new")
     public String newProduct(@PathVariable String catalogId, @PathVariable String categoryId, Model model) {
         ProductCatalog productCatalog = productCatalogRepository.findById(getStoreId(), catalogId);
@@ -60,26 +54,6 @@ public class ProductCatalogController {
 
         Product product = new Product(categoryDefinition.getCategoryId());
         return showEditProductForm( model,catalogId, product, categoryDefinition);
-    }
-
-    @PostMapping("/dashboard/catalogs/{catalogId}/category/{categoryId}/products/bulk-create")
-    public String createProducts(@PathVariable String catalogId, @PathVariable String categoryId,
-                                 @ModelAttribute ProductsBulkAddForm form,
-                                 RedirectAttributes redirectAttributes, Locale locale) {
-        form.getProducts().forEach(product -> {
-            if (StringUtils.isBlank(product.getPimId())) {
-                pimCatalog.findByGtinOrMpn(product.getEan(), product.getManufacturerCode())
-                        .ifPresent(entry -> {
-                            product.setPimId(entry.pimId());
-                            product.setBrand(brandMapper.unifyBrand(entry.brand()));
-                        });
-            }
-            productRepository.save(product);
-        });
-
-        redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage(
-                "catalog.category.product.bulk.add.success", new Object[]{form.getProducts().size()}, locale));
-        return "redirect:/dashboard/catalogs/" + catalogId + "/category/" + categoryId + "/recommendations";
     }
 
     @GetMapping("/dashboard/catalogs/{catalogId}/category/{categoryId}/products/{productId}")
