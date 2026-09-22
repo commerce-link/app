@@ -69,63 +69,86 @@
 
 <th:block th:fragment="pickerHelpers">
     <script>
-        window.pickerHelpers = {
-            format: (template, ...values) =>
-                    values.reduce((text, value, index) => text.replace('{' + index + '}', value), template),
-            normalize: text => text.toLowerCase()
-                    .normalize('NFD').replace(/[̀-ͯ]/g, '')
-                    .replace(/ł/g, 'l'),
-            // Only branch nodes travel with the page; a leaf's breadcrumb is walked from its parentId chain here.
-            breadcrumbs: (ancestors, separator = ' > ', maxLevels = 3) => {
-                const branchById = new Map(ancestors.map(branch => [branch.id, branch]));
-                const namesOf = option => {
-                    const names = [];
-                    const visited = new Set();
-                    let parentId = option.parentId;
-                    while (parentId && branchById.has(parentId) && !visited.has(parentId)) {
-                        visited.add(parentId);
-                        const parent = branchById.get(parentId);
-                        names.unshift(parent.name);
-                        parentId = parent.parentId;
-                    }
-                    return names;
-                };
-                return option => {
-                    const names = namesOf(option);
-                    // Deeper than three levels collapses the middle: "Elektronika > … > Akcesoria telefoniczne".
-                    const shortened = names.length > maxLevels
-                            ? [names[0], '…', names[names.length - 1]]
-                            : names;
-                    return {path: names.join(separator), shortPath: shortened.join(separator)};
-                };
-            },
-            pathElement: option => {
-                if (!option.path) {
-                    return document.createDocumentFragment();
+        (function () {
+            const closeMenu = picker => {
+                const menu = picker.querySelector('.cl-picker-menu');
+                if (menu) {
+                    menu.hidden = true;
                 }
-                const path = document.createElement('span');
-                path.className = 'cl-picker-path';
-                path.title = option.path;
-                path.textContent = option.shortPath;
-                return path;
-            },
-            // The menu is a plain popover: hidden carries the state, aria-expanded reports it.
-            menuOf: picker => picker.querySelector('.cl-picker-menu'),
-            // Pickers arrive with the page, inside a repeat row added by JavaScript and inside a form
-            // replaced after an async save, so every entry point initialises the ones it can reach.
-            initialiseOn: (selector, setUp) => {
-                const initialise = scope => {
-                    if (scope.matches && scope.matches(selector)) {
-                        setUp(scope);
+                const trigger = picker.querySelector('[data-picker-trigger]');
+                if (trigger) {
+                    trigger.setAttribute('aria-expanded', 'false');
+                }
+            };
+
+            window.pickerHelpers = {
+                format: (template, ...values) =>
+                        values.reduce((text, value, index) => text.replace('{' + index + '}', value), template),
+                normalize: text => text.toLowerCase()
+                        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+                        .replace(/\u0142/g, 'l'),
+                // Only branch nodes travel with the page; a leaf's breadcrumb is walked from its parentId chain here.
+                breadcrumbs: (ancestors, separator = ' > ', maxLevels = 3) => {
+                    const branchById = new Map(ancestors.map(branch => [branch.id, branch]));
+                    const namesOf = option => {
+                        const names = [];
+                        const visited = new Set();
+                        let parentId = option.parentId;
+                        while (parentId && branchById.has(parentId) && !visited.has(parentId)) {
+                            visited.add(parentId);
+                            const parent = branchById.get(parentId);
+                            names.unshift(parent.name);
+                            parentId = parent.parentId;
+                        }
+                        return names;
+                    };
+                    return option => {
+                        const names = namesOf(option);
+                        // Deeper than three levels collapses the middle: "Elektronika > … > Akcesoria telefoniczne".
+                        const shortened = names.length > maxLevels
+                                ? [names[0], '\u2026', names[names.length - 1]]
+                                : names;
+                        return {path: names.join(separator), shortPath: shortened.join(separator)};
+                    };
+                },
+                pathElement: option => {
+                    if (!option.path) {
+                        return document.createDocumentFragment();
                     }
-                    scope.querySelectorAll(selector).forEach(setUp);
-                };
-                ['cl:repeat-added', 'cl:form-replaced'].forEach(eventName =>
-                        document.addEventListener(eventName, event =>
-                                initialise(event.target instanceof Element ? event.target : document)));
-                initialise(document);
-            }
-        };
+                    const path = document.createElement('span');
+                    path.className = 'cl-picker-path';
+                    path.title = option.path;
+                    path.textContent = option.shortPath;
+                    return path;
+                },
+                // The menu is a plain popover: hidden carries the state, aria-expanded reports it.
+                menuOf: picker => picker.querySelector('.cl-picker-menu'),
+                closeMenu: closeMenu,
+                // Pickers arrive with the page, inside a repeat row added by JavaScript and inside a form
+                // replaced after an async save, so every entry point initialises the ones it can reach.
+                initialiseOn: (selector, setUp) => {
+                    const initialise = scope => {
+                        if (scope.matches && scope.matches(selector)) {
+                            setUp(scope);
+                        }
+                        scope.querySelectorAll(selector).forEach(setUp);
+                    };
+                    ['cl:repeat-added', 'cl:form-replaced'].forEach(eventName =>
+                            document.addEventListener(eventName, event =>
+                                    initialise(event.target instanceof Element ? event.target : document)));
+                    // Exactly one outside-click listener per script block, reading the pickers that are in the
+                    // document when the click happens. One registered per picker would stay bound after an async
+                    // save replaced the form, holding the detached fields alive and adding a listener per save.
+                    document.addEventListener('click', event =>
+                            document.querySelectorAll(selector + '[data-picker-ready]').forEach(picker => {
+                                if (!picker.contains(event.target)) {
+                                    closeMenu(picker);
+                                }
+                            }));
+                    initialise(document);
+                }
+            };
+        })();
     </script>
 </th:block>
 
@@ -142,7 +165,7 @@
                 count: /*[[#{catalog.category.count}]]*/ '',
                 unset: /*[[#{catalog.category.unset}]]*/ ''
             };
-            const {format, normalize, breadcrumbs, pathElement: optionPath, menuOf, initialiseOn} = window.pickerHelpers;
+            const {format, normalize, breadcrumbs, pathElement: optionPath, menuOf, closeMenu, initialiseOn} = window.pickerHelpers;
             const breadcrumbOf = breadcrumbs(categoryAncestors);
 
             const setUp = picker => {
@@ -267,10 +290,7 @@
                     search.focus();
                 };
 
-                const close = () => {
-                    menu.hidden = true;
-                    trigger.setAttribute('aria-expanded', 'false');
-                };
+                const close = () => closeMenu(picker);
 
                 trigger.addEventListener('click', () => isOpen() ? close() : open());
                 search.addEventListener('input', render);
@@ -292,12 +312,6 @@
                     } else if (event.key === 'Escape') {
                         close();
                         trigger.focus();
-                    }
-                });
-
-                document.addEventListener('click', event => {
-                    if (!picker.contains(event.target)) {
-                        close();
                     }
                 });
 
@@ -335,7 +349,7 @@
                 selectedCount: /*[[#{catalog.category.selectedCount}]]*/ '',
                 remove: /*[[#{catalog.category.pim.remove}]]*/ ''
             };
-            const {format, normalize, breadcrumbs, pathElement: optionPath, menuOf, initialiseOn} = window.pickerHelpers;
+            const {format, normalize, breadcrumbs, pathElement: optionPath, menuOf, closeMenu, initialiseOn} = window.pickerHelpers;
             const breadcrumbOf = breadcrumbs(categoryAncestors);
 
             const setUp = picker => {
@@ -425,7 +439,7 @@
                         const remove = document.createElement('button');
                         remove.type = 'button';
                         remove.className = 'cl-chip-tag-remove';
-                        remove.textContent = '×';
+                        remove.textContent = '\u00d7';
                         remove.setAttribute('aria-label', format(messages.remove, name));
                         remove.dataset.chipRemove = id;
                         remove.addEventListener('click', event => {
@@ -536,10 +550,7 @@
                     search.focus();
                 };
 
-                const close = () => {
-                    menu.hidden = true;
-                    trigger.setAttribute('aria-expanded', 'false');
-                };
+                const close = () => closeMenu(picker);
 
                 trigger.addEventListener('click', () => isOpen() ? close() : open());
                 search.addEventListener('input', render);
@@ -561,12 +572,6 @@
                     } else if (event.key === 'Escape') {
                         close();
                         trigger.focus();
-                    }
-                });
-
-                document.addEventListener('click', event => {
-                    if (!picker.contains(event.target)) {
-                        close();
                     }
                 });
 

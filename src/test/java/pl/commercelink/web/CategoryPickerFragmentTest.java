@@ -370,7 +370,7 @@ class CategoryPickerFragmentTest {
 
         // then
         int definitionIndex = html.indexOf("window.pickerHelpers =");
-        int consumerIndex = html.indexOf("const {format, normalize, breadcrumbs, pathElement: optionPath, menuOf, initialiseOn} = window.pickerHelpers;");
+        int consumerIndex = html.indexOf("const {format, normalize, breadcrumbs, pathElement: optionPath, menuOf, closeMenu, initialiseOn} = window.pickerHelpers;");
         assertThat(definitionIndex).isNotNegative();
         assertThat(consumerIndex).isNotNegative();
         assertThat(definitionIndex).isLessThan(consumerIndex);
@@ -389,7 +389,7 @@ class CategoryPickerFragmentTest {
 
         // then
         int definitionIndex = html.indexOf("window.pickerHelpers =");
-        int consumerIndex = html.indexOf("const {format, normalize, breadcrumbs, pathElement: optionPath, menuOf, initialiseOn} = window.pickerHelpers;");
+        int consumerIndex = html.indexOf("const {format, normalize, breadcrumbs, pathElement: optionPath, menuOf, closeMenu, initialiseOn} = window.pickerHelpers;");
         assertThat(definitionIndex).isNotNegative();
         assertThat(consumerIndex).isNotNegative();
         assertThat(definitionIndex).isLessThan(consumerIndex);
@@ -501,6 +501,39 @@ class CategoryPickerFragmentTest {
                 .contains("dataset.pickerReady");
         assertThat(multi).doesNotContain("<style").contains("cl:repeat-added").contains("cl:form-replaced")
                 .contains("dataset.pickerReady");
+    }
+
+    /**
+     * One outside-click listener per script block, not one per picker: a listener registered inside the set-up of
+     * each picker stays bound to the document after an async save replaces the form, so every save would leave a
+     * listener behind holding its detached fields alive.
+     */
+    @Test
+    void eachPickerScriptRegistersOneSharedOutsideClickListener() {
+        // given
+        Context context = new Context();
+        context.setVariable("categories", List.of(new PimCategoryOptions.CategoryOption("1", "Stoly", null)));
+        context.setVariable("ancestors", List.of());
+
+        // when
+        String single = templateEngine().process(
+                "<div th:replace=\"~{fragments/category-picker :: pickerScript(${categories}, ${ancestors})}\"></div>", context);
+        String multi = templateEngine().process(
+                "<div th:replace=\"~{fragments/category-picker :: multiPickerScript(${categories}, ${ancestors})}\"></div>", context);
+
+        // then
+        assertThat(occurrences(single, "document.addEventListener('click'")).isEqualTo(1);
+        assertThat(occurrences(multi, "document.addEventListener('click'")).isEqualTo(1);
+        assertThat(single).contains("[data-picker-ready]").contains("closeMenu(picker)");
+        assertThat(multi).contains("[data-picker-ready]").contains("closeMenu(picker)");
+    }
+
+    private static int occurrences(String text, String token) {
+        int count = 0;
+        for (int at = text.indexOf(token); at >= 0; at = text.indexOf(token, at + token.length())) {
+            count++;
+        }
+        return count;
     }
 
     @Test
