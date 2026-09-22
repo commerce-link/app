@@ -112,7 +112,7 @@ class CategoryBasicsTemplateTest {
 
     /** Support is given a category id over the phone; the Basics page must show it, as text rather than as a field. */
     @Test
-    void theCategoryIdIsOnThePageAsPlainText() {
+    void theCategoryIdStandsUnderThePageTitleAsPlainText() {
         // given
         CategoryDefinition gpu = new CategoryDefinition().withName("GPU").withGeneratedId();
 
@@ -121,6 +121,9 @@ class CategoryBasicsTemplateTest {
 
         // then
         assertThat(html).contains("ID: " + gpu.getCategoryId()).doesNotContain("readonly");
+        // one placement across the catalog screens: in the header, after the title block, before the form
+        assertThat(html.indexOf("cl-page-title")).isLessThan(html.indexOf("ID: " + gpu.getCategoryId()));
+        assertThat(html.indexOf("ID: " + gpu.getCategoryId())).isLessThan(html.indexOf("<form"));
     }
 
     @Test

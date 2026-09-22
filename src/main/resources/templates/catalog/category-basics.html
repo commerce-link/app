@@ -15,6 +15,9 @@
                        th:text="#{catalog.category.delete}"></a>
                 </th:block>
             </div>
+            <!--/* Under the page title, one placement across the catalog screens: plain, selectable text, because
+                   support asks for this id over the phone and a form field would invite posting it back. */-->
+            <p th:if="${existing}" class="cl-help" th:text="#{catalog.category.id(${category.categoryId})}"></p>
 
             <form th:fragment="basicsForm" id="category-basics-form" class="cl-form" th:action="@{${formAction}}" th:object="${form}"
                   method="post" novalidate data-cl-async th:attr="data-cl-redirect=${redirectTo}, data-error-message=#{form.save.failed}">
@@ -35,8 +38,6 @@
                                 </div>
                             </div>
                         </div>
-                        <!--/* Plain, selectable text: support asks for this id, and nothing may post it back. */-->
-                        <p th:if="${existing}" class="cl-help" th:text="#{catalog.category.id(${category.categoryId})}"></p>
                     </fieldset>
                     <fieldset class="cl-fieldset">
                         <legend class="cl-fieldset-title" th:text="#{catalog.category.type.section}"></legend>

@@ -17,6 +17,9 @@
                                 data-cl-confirm-action=#{catalog.delete}"></a>
                 </th:block>
             </div>
+            <!--/* Under the page title, one placement across the catalog screens: plain, selectable text, because
+                   support asks for this id over the phone and a form field would invite posting it back. */-->
+            <p th:if="${catalogId != null}" class="cl-help" th:text="#{catalog.id(${catalogId})}"></p>
 
             <div th:replace="~{fragments/settings-form :: savedAlert}"></div>
             <!--/* Outcome of a refused catalog action, in the page body; the layout banner is Bulma markup. */-->
@@ -35,8 +38,6 @@
                         <div class="cl-form-grid">
                             <div class="cl-span-4" th:insert="~{fragments/settings-form :: textField('name', 'catalog.name', *{name}, 'text', 'off', true, ${errors['name']}, null)}"></div>
                         </div>
-                        <!--/* Plain, selectable text: support asks for this id, and nothing may post it back. */-->
-                        <p th:if="${catalogId != null}" class="cl-help" th:text="#{catalog.id(${catalogId})}"></p>
                     </fieldset>
                     <fieldset class="cl-fieldset">
                         <legend class="cl-fieldset-title" th:text="#{catalog.settings.section.pricelist}"></legend>

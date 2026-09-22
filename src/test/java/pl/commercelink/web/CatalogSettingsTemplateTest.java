@@ -87,12 +87,15 @@ class CatalogSettingsTemplateTest {
 
     /** Support is given a catalog id over the phone; the page it is on must show it, as text rather than as a field. */
     @Test
-    void theCatalogIdIsOnThePageAsPlainText() {
+    void theCatalogIdStandsUnderThePageTitleAsPlainText() {
         // when
         String html = rendered();
 
         // then
         assertThat(html).contains("ID: c1").doesNotContain("readonly");
+        // one placement across the catalog screens: in the header, after the title block, before the form
+        assertThat(html.indexOf("cl-page-title")).isLessThan(html.indexOf("ID: c1"));
+        assertThat(html.indexOf("ID: c1")).isLessThan(html.indexOf("<form"));
     }
 
     @Test
