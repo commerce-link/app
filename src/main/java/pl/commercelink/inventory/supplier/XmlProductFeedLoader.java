@@ -2,6 +2,7 @@ package pl.commercelink.inventory.supplier;
 
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
 import pl.commercelink.inventory.InventoryRepository;
@@ -24,6 +25,7 @@ import java.io.Reader;
 import java.util.LinkedList;
 import java.util.List;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 public class XmlProductFeedLoader {
@@ -38,13 +40,13 @@ public class XmlProductFeedLoader {
         try (Reader reader = inventoryRepository.read(supplierName, "xml")) {
             return parse(itemClass, itemElementName, supplierInfo, reader, 0);
         } catch (JAXBException | XMLStreamException e) {
-            System.out.println("Skipping feed file: " + supplierName + " as it can't be deserialized.");
+            log.error("Skipping feed for supplier {}: content cannot be deserialized (malformed or rejected); previous inventory is kept", supplierName, e);
             return new LinkedList<>();
         } catch (NoSuchBucketException | NoSuchKeyException | FileNotFoundException e) {
-            System.out.println("Skipping feed file: " + supplierName + " as it does not exists or is unreadable.");
+            log.warn("Skipping feed for supplier {}: feed file not found or unreadable; previous inventory is kept", supplierName);
             return new LinkedList<>();
         } catch (IOException e) {
-            System.out.println("Skipping feed file: " + supplierName + " as it can't be read.");
+            log.error("Skipping feed for supplier {}: feed file could not be read; previous inventory is kept", supplierName, e);
             return new LinkedList<>();
         }
     }
@@ -54,13 +56,13 @@ public class XmlProductFeedLoader {
         try (Reader reader = storeFeedRepository.read(storeId, supplierName, "xml")) {
             return parse(itemClass, itemElementName, supplierInfo, reader, taxonomyPenalty);
         } catch (JAXBException | XMLStreamException e) {
-            System.out.println("Skipping store feed file: " + storeId + "/" + supplierName + " as it can't be deserialized.");
+            log.error("Skipping store feed for {}/{}: content cannot be deserialized (malformed or rejected)", storeId, supplierName, e);
             return new LinkedList<>();
         } catch (NoSuchBucketException | NoSuchKeyException | FileNotFoundException e) {
-            System.out.println("Skipping store feed file: " + storeId + "/" + supplierName + " as it does not exists or is unreadable.");
+            log.warn("Skipping store feed for {}/{}: feed file not found or unreadable", storeId, supplierName);
             return new LinkedList<>();
         } catch (IOException e) {
-            System.out.println("Skipping store feed file: " + storeId + "/" + supplierName + " as it can't be read.");
+            log.error("Skipping store feed for {}/{}: feed file could not be read", storeId, supplierName, e);
             return new LinkedList<>();
         }
     }
@@ -68,6 +70,11 @@ public class XmlProductFeedLoader {
     private <V extends XmlItem> List<InventoryItem> parse(Class<V> itemClass, String itemElementName, SupplierInfo supplierInfo, Reader reader, int taxonomyPenalty)
             throws JAXBException, XMLStreamException {
         XMLInputFactory xif = XMLInputFactory.newFactory();
+        // Feeds are attacker-influenceable, so reject DTDs (and thus all internal/external entities)
+        // and external entity resolution — this closes XXE, SSRF via external entities, and
+        // entity-expansion ("billion laughs") DoS.
+        xif.setProperty(XMLInputFactory.SUPPORT_DTD, false);
+        xif.setProperty(XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, false);
         XMLStreamReader xsr = xif.createXMLStreamReader(reader);
 
         JAXBContext jaxbContext = JAXBContext.newInstance(itemClass);
