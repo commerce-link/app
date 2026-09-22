@@ -102,6 +102,7 @@ class CategoryMarketplacesTemplateTest {
                 .contains("From distributors: 5 pcs. in total, 1 at each of at least 2 (1 local)")
                 .contains("Approved products only: 14")
                 .contains("<span class=\"cl-status is-ok\">Listing</span>")
+                .contains(">Edit</a>").contains("aria-label=\"Edit: Allegro\"")
                 .contains("href=\"/dashboard/catalogs/c1/category/k1/settings/marketplaces/Allegro\"");
         assertThat(html).doesNotContain("??");
     }
@@ -120,6 +121,9 @@ class CategoryMarketplacesTemplateTest {
                 .contains("A condition is missing").contains(">Complete</a>")
                 .contains("Not configured — the products of this category are not listed there.")
                 .contains(">Configure</a>");
+        // the accessible name repeats the visible text, which depends on the state (WCAG 2.5.3)
+        assertThat(html).contains("aria-label=\"Complete: Morele\"").contains("aria-label=\"Configure: CS-Cart\"")
+                .doesNotContain("aria-label=\"Edit: Morele\"").doesNotContain("aria-label=\"Edit: CS-Cart\"");
         // the marketplace without a definition has nothing to delete
         assertThat(html).contains("aria-label=\"Delete: Morele\"").doesNotContain("aria-label=\"Delete: CS-Cart\"");
     }

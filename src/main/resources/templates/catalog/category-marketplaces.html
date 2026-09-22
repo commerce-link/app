@@ -43,9 +43,10 @@
                             </p>
                         </div>
                         <div class="cl-list-actions">
+                            <!--/* The accessible name follows the visible text (WCAG 2.5.3): "Skonfiguruj", "Uzupełnij" or "Edytuj". */-->
                             <a class="cl-link-button" th:href="@{${row.editHref()}}"
                                th:text="${row.state().name() == 'NOT_CONFIGURED'} ? #{catalog.category.marketplace.configure} : (${row.state().name() == 'INCOMPLETE'} ? #{settings.list.complete} : #{settings.list.edit})"
-                               th:attr="aria-label=#{settings.list.edit.for(${row.displayName()})}"></a>
+                               th:attr="aria-label=${row.state().name() == 'NOT_CONFIGURED'} ? #{catalog.category.marketplace.configure.for(${row.displayName()})} : (${row.state().name() == 'INCOMPLETE'} ? #{settings.list.complete.for(${row.displayName()})} : #{settings.list.edit.for(${row.displayName()})})"></a>
                             <a th:if="${row.hasDefinition()}" class="cl-link-button is-danger" th:href="@{${row.deleteHref()}}"
                                data-cl-confirm th:text="#{settings.list.delete}"
                                th:attr="aria-label=#{settings.list.delete.for(${row.displayName()})},
