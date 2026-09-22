@@ -10,6 +10,7 @@ import pl.commercelink.orders.*;
 import pl.commercelink.shipping.AbstractShippingController;
 import pl.commercelink.shipping.ShipmentTrackingSubscriber;
 
+import java.time.LocalDate;
 import java.util.Collections;
 import java.util.List;
 import pl.commercelink.shipping.DeliveryTarget;
@@ -41,6 +42,15 @@ public class OrdersShippingController extends AbstractShippingController {
         }
         ShippingForm form = new ShippingForm(orderId, "orders");
         return renderShippingForm(getStore(), form, Collections.singletonList(order.getShippingDetails()), model);
+    }
+
+    @Override
+    protected String renderShippingForm(Store store, ShippingForm form, List<ShippingDetails> shippingDetailsList, Model model) {
+        Order order = ordersRepository.findById(getStoreId(), form.getShippingEntityId());
+        if (order.isCourierBookingEarlierThanPreferred(LocalDate.now())) {
+            model.addAttribute("preferredShippingWarning", order.getPreferredShippingAt());
+        }
+        return super.renderShippingForm(store, form, shippingDetailsList, model);
     }
 
     @Override

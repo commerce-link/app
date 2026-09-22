@@ -22,6 +22,8 @@ import static org.apache.commons.lang3.StringUtils.isNotBlank;
 @DynamoDBTable(tableName = "Orders")
 public class Order {
 
+    public static final int PREFERRED_SHIPPING_WINDOW_DAYS = 14;
+
     @DynamoDBHashKey(attributeName = "storeId")
     @DynamoDBIndexHashKey(globalSecondaryIndexNames = {"StoreIdOrderedAtIndex", "ExternalOrderIdIndex"}, attributeName = "storeId")
     private String storeId;
@@ -63,6 +65,12 @@ public class Order {
     @DynamoDBTypeConverted(converter = DynamoDbLocalDateConverter.class)
     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
     private LocalDate estimatedShippingAt;
+    @DynamoDBAttribute(attributeName = "preferredShippingAt")
+    @DynamoDBTypeConverted(converter = DynamoDbLocalDateConverter.class)
+    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+    @Getter
+    @Setter
+    private LocalDate preferredShippingAt;
     @DynamoDBAttribute(attributeName = "emailNotificationsEnabled")
     private boolean emailNotificationsEnabled;
 
@@ -722,6 +730,36 @@ public class Order {
             }
         }
         return date;
+    }
+
+    @DynamoDBIgnore
+    public LocalDate getShippingDueAt() {
+        return preferredShippingAt != null ? preferredShippingAt : estimatedShippingAt;
+    }
+
+    @DynamoDBIgnore
+    public boolean isCourierBookingEarlierThanPreferred(LocalDate today) {
+        return preferredShippingAt != null && today.isBefore(preferredShippingAt);
+    }
+
+    @DynamoDBIgnore
+    public boolean canClientSetPreferredShippingAt() {
+        return estimatedShippingAt != null
+                && hasOneOfStatuses(OrderStatus.Assembly, OrderStatus.Assembled, OrderStatus.Realization);
+    }
+
+    @DynamoDBIgnore
+    public LocalDate getPreferredShippingWindowEnd() {
+        return estimatedShippingAt == null ? null : estimatedShippingAt.plusDays(PREFERRED_SHIPPING_WINDOW_DAYS);
+    }
+
+    @DynamoDBIgnore
+    public boolean isWithinPreferredShippingWindow(LocalDate date) {
+        return estimatedShippingAt != null
+                && !date.isBefore(estimatedShippingAt)
+                && !date.isAfter(getPreferredShippingWindowEnd())
+                && date.getDayOfWeek() != DayOfWeek.SATURDAY
+                && date.getDayOfWeek() != DayOfWeek.SUNDAY;
     }
 
     @DynamoDBIgnore

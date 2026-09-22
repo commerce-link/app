@@ -18,6 +18,8 @@ import pl.commercelink.clientaccess.ClientVerificationPurpose;
 import pl.commercelink.clientaccess.ClientVerificationRateLimiter;
 import pl.commercelink.clientaccess.ClientVerificationService;
 import pl.commercelink.clientaccess.ClientVerificationSubject;
+import pl.commercelink.orders.ClientPreferredShippingDateException;
+import pl.commercelink.orders.ClientPreferredShippingDateService;
 import pl.commercelink.orders.ClientShippingAddressChangeException;
 import pl.commercelink.orders.ClientShippingAddressChangeService;
 import pl.commercelink.orders.Order;
@@ -31,8 +33,11 @@ import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.taxonomy.CategoryLocalizer;
 import pl.commercelink.web.dtos.ClientOrderView;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.Locale;
 
+import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 @Controller
@@ -43,6 +48,7 @@ public class ClientOrderController {
     private static final String NOT_FOUND = "error/404";
     static final String ADDRESS_STEP_CODE = "code";
     static final String ADDRESS_STEP_EDIT = "edit";
+    private static final String PREFERRED_SHIPPING_ERROR_PREFIX = "client.order.preferred.shipping.error.";
 
     private final OrdersRepository ordersRepository;
     private final OrderItemsRepository orderItemsRepository;
@@ -51,6 +57,7 @@ public class ClientOrderController {
     private final ClientVerificationService clientVerificationService;
     private final ClientVerificationRateLimiter clientVerificationRateLimiter;
     private final ClientShippingAddressChangeService addressChangeService;
+    private final ClientPreferredShippingDateService preferredShippingDateService;
     private final MessageSource messageSource;
 
     @GetMapping("")
@@ -70,8 +77,9 @@ public class ClientOrderController {
             prepareCodeStep(context, verificationId, editable, model, locale);
         }
 
+        boolean preferredShippingEditable = preferredShippingDateService.isEditable(context.order(), context.store());
         ClientOrderView view = ClientOrderView.from(context.order(), orderItemsRepository.findByOrderId(orderId), context.store(),
-                categoryLocalizer, editable);
+                categoryLocalizer, editable, preferredShippingEditable);
         model.addAttribute("view", view);
         addStore(model, context.store());
 
@@ -152,6 +160,33 @@ public class ClientOrderController {
         return "redirect:" + context.basePath();
     }
 
+    @PostMapping("preferred-shipping")
+    public String changePreferredShipping(@PathVariable("storeId") String storeId, @PathVariable("orderId") String orderId,
+                                          @RequestParam(value = "date", required = false) String date,
+                                          RedirectAttributes redirectAttributes, Locale locale) {
+        ClientOrderContext context = load(storeId, orderId);
+        if (context == null) {
+            return NOT_FOUND;
+        }
+
+        LocalDate requested;
+        try {
+            requested = isBlank(date) ? null : LocalDate.parse(date.trim());
+        } catch (DateTimeParseException e) {
+            return redirectWithErrorKey(context, redirectAttributes, PREFERRED_SHIPPING_ERROR_PREFIX + "invalid.date", locale);
+        }
+
+        try {
+            preferredShippingDateService.change(context.order(), requested, context.store());
+        } catch (ClientPreferredShippingDateException e) {
+            return redirectWithErrorKey(context, redirectAttributes, PREFERRED_SHIPPING_ERROR_PREFIX + reasonToKey(e.getReason().name()), locale);
+        }
+
+        String successKey = requested == null ? "client.order.preferred.shipping.cleared" : "client.order.preferred.shipping.success";
+        redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage(successKey, null, locale));
+        return "redirect:" + context.basePath();
+    }
+
     private void prepareCodeStep(ClientOrderContext context, String verificationId, boolean editable, Model model, Locale locale) {
         if (!editable) {
             model.addAttribute("errorMessage", errorMessage(ClientShippingAddressChangeException.Reason.NOT_EDITABLE.name(), locale));
@@ -201,12 +236,20 @@ public class ClientOrderController {
     }
 
     private String redirectWithError(ClientOrderContext context, RedirectAttributes redirectAttributes, Locale locale, String reason) {
-        redirectAttributes.addFlashAttribute("errorMessage", errorMessage(reason, locale));
+        return redirectWithErrorKey(context, redirectAttributes, "client.order.address.error." + reasonToKey(reason), locale);
+    }
+
+    private String redirectWithErrorKey(ClientOrderContext context, RedirectAttributes redirectAttributes, String key, Locale locale) {
+        redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage(key, null, locale));
         return "redirect:" + context.basePath();
     }
 
     private String errorMessage(String reason, Locale locale) {
-        return messageSource.getMessage("client.order.address.error." + reason.toLowerCase().replace('_', '.'), null, locale);
+        return messageSource.getMessage("client.order.address.error." + reasonToKey(reason), null, locale);
+    }
+
+    private static String reasonToKey(String reason) {
+        return reason.toLowerCase().replace('_', '.');
     }
 
     private static String clientIp(HttpServletRequest request) {
