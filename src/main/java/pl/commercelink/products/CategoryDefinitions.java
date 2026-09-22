@@ -29,6 +29,10 @@ public class CategoryDefinitions {
     public record RemoveResult(boolean productsKept, int productsDeleted) {
     }
 
+    /** What remove() will do, for the confirmation page: the same decision, made in the same place, without deleting. */
+    public record DeletionPreview(boolean productsKept, int productsToDelete) {
+    }
+
     private final ProductCatalogRepository catalogs;
     private final ProductRepository products;
 
@@ -91,13 +95,17 @@ public class CategoryDefinitions {
         sortAndSave(catalog);
     }
 
+    public DeletionPreview deletionPreview(ProductCatalog catalog, CategoryDefinition category) {
+        boolean kept = productsSurviveRemoval(catalog, category);
+        return new DeletionPreview(kept, kept ? 0 : products.findAll(category.getCategoryId()).size());
+    }
+
     public RemoveResult remove(ProductCatalog catalog, CategoryDefinition category) {
         if (category.isDeletionProtection()) {
             throw new IllegalStateException("Category " + category.getCategoryId() + " is protected from deletion");
         }
+        boolean kept = productsSurviveRemoval(catalog, category);
         catalog.getCategories().remove(category);
-        boolean kept = category.hasCategoryMapping() && catalog.getCategories().stream()
-                .anyMatch(other -> other.getPimCategoryIds().stream().anyMatch(category.getPimCategoryIds()::contains));
         int deleted = 0;
         if (!kept) {
             List<Product> orphaned = products.findAll(category.getCategoryId());
@@ -108,6 +116,13 @@ public class CategoryDefinitions {
         }
         catalogs.save(catalog);
         return new RemoveResult(kept, deleted);
+    }
+
+    /** The products outlive the category when another category of the catalog is mapped to one of its PIM categories. */
+    private boolean productsSurviveRemoval(ProductCatalog catalog, CategoryDefinition category) {
+        return category.hasCategoryMapping() && catalog.getCategories().stream()
+                .filter(other -> other != category)
+                .anyMatch(other -> other.getPimCategoryIds().stream().anyMatch(category.getPimCategoryIds()::contains));
     }
 
     public boolean priceGroupInUse(CategoryDefinition category, String group) {

@@ -172,18 +172,16 @@ public class CatalogCategoryController {
         return "redirect:" + CatalogPaths.catalog(catalogId);
     }
 
-    /** What the deletion takes with it: nothing for a computed list, nothing when a twin category keeps the products. */
+    /** What the deletion takes with it: nothing for a computed list, otherwise whatever the service says it will remove. */
     private String deletionMessage(ProductCatalog catalog, CategoryDefinition category, Locale locale) {
         if (category.hasType(CategoryDefinitionType.Dynamic)) {
             return messageSource.getMessage("catalog.category.delete.message.dynamic", null, locale);
         }
-        boolean kept = category.hasCategoryMapping() && catalog.getCategories().stream()
-                .filter(other -> other != category)
-                .anyMatch(other -> other.getPimCategoryIds().stream().anyMatch(category.getPimCategoryIds()::contains));
-        return kept
+        CategoryDefinitions.DeletionPreview preview = definitions.deletionPreview(catalog, category);
+        return preview.productsKept()
                 ? messageSource.getMessage("catalog.category.delete.message.kept", null, locale)
                 : messageSource.getMessage("catalog.category.delete.message",
-                        new Object[]{productRepository.findAll(category.getCategoryId()).size()}, locale);
+                        new Object[]{preview.productsToDelete()}, locale);
     }
 
     private String renderBasics(ProductCatalog catalog, CategoryDefinition existing, CategoryBasicsForm form,

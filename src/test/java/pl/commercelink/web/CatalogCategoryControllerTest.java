@@ -261,13 +261,10 @@ class CatalogCategoryControllerTest {
     }
 
     @Test
-    void confirmationPageSaysProductsAreKeptWhenAnotherCategorySharesThePimCategory() throws Exception {
+    void confirmationPageSaysProductsAreKeptWhenTheServiceWouldKeepThem() throws Exception {
         // given
         CategoryDefinition gpu = categoryOf("GPU");
-        gpu.setPimCategoryIds(List.of("pim-gpu"));
-        CategoryDefinition twin = new CategoryDefinition().withName("GPU 2").withGeneratedId();
-        twin.setPimCategoryIds(List.of("pim-gpu"));
-        catalog.getCategories().add(twin);
+        when(definitions.deletionPreview(catalog, gpu)).thenReturn(new CategoryDefinitions.DeletionPreview(true, 0));
         when(messageSource.getMessage(eq("catalog.category.delete.message.kept"), any(), any(Locale.class))).thenReturn("kept");
         when(messageSource.getMessage(eq("catalog.category.delete.title"), any(), any(Locale.class))).thenReturn("title");
         when(messageSource.getMessage(eq("catalog.category.delete"), any(), any(Locale.class))).thenReturn("delete");
@@ -278,6 +275,21 @@ class CatalogCategoryControllerTest {
 
         // then
         assertThat(confirmationOf(result).message()).isEqualTo("kept");
+    }
+
+    @Test
+    void confirmationPageCountsTheProductsTheServiceWouldDelete() throws Exception {
+        // given
+        CategoryDefinition gpu = categoryOf("GPU");
+        when(definitions.deletionPreview(catalog, gpu)).thenReturn(new CategoryDefinitions.DeletionPreview(false, 3));
+        when(messageSource.getMessage(eq("catalog.category.delete.message"), any(), any(Locale.class)))
+                .thenAnswer(call -> "deletes " + ((Object[]) call.getArgument(1))[0]);
+
+        // when
+        MvcResult result = mvc.perform(get("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/delete")).andReturn();
+
+        // then
+        assertThat(confirmationOf(result).message()).isEqualTo("deletes 3");
     }
 
     @Test
@@ -292,7 +304,7 @@ class CatalogCategoryControllerTest {
 
         // then
         assertThat(confirmationOf(result).message()).isEqualTo("computed");
-        verify(productRepository, never()).findAll(any(String.class));
+        verify(definitions, never()).deletionPreview(any(), any());
     }
 
     @Test

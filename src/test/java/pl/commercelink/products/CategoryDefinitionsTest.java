@@ -148,6 +148,48 @@ class CategoryDefinitionsTest {
     }
 
     @Test
+    void deletionPreviewSaysProductsAreKeptExactlyWhenRemoveKeepsThem() {
+        // given
+        gpu.setDeletionProtection(false);
+        gpu.setPimCategoryIds(List.of("pim-gpu"));
+        CategoryDefinition twin = new CategoryDefinition().withName("GPU 2").withGeneratedId();
+        twin.setPimCategoryIds(List.of("pim-gpu"));
+        catalog.getCategories().add(twin);
+
+        // when
+        CategoryDefinitions.DeletionPreview preview = definitions.deletionPreview(catalog, gpu);
+        CategoryDefinitions.RemoveResult result = definitions.remove(catalog, gpu);
+
+        // then
+        assertThat(preview.productsKept()).isTrue();
+        assertThat(preview.productsToDelete()).isZero();
+        assertThat(result.productsKept()).isEqualTo(preview.productsKept());
+        verify(products, never()).delete(any(List.class));
+    }
+
+    @Test
+    void deletionPreviewCountsTheProductsRemoveWillDeleteWhenNoOtherCategoryOwnsThem() {
+        // given
+        gpu.setDeletionProtection(false);
+        gpu.setPimCategoryIds(List.of("pim-gpu"));
+        List<Product> owned = List.of(
+                new Product(gpu.getCategoryId(), "p1", "1", "m", "b", "l", "n", "Default"),
+                new Product(gpu.getCategoryId(), "p2", "2", "m", "b", "l", "n", "Default"));
+        when(products.findAll(gpu.getCategoryId())).thenReturn(owned);
+
+        // when
+        CategoryDefinitions.DeletionPreview preview = definitions.deletionPreview(catalog, gpu);
+        CategoryDefinitions.RemoveResult result = definitions.remove(catalog, gpu);
+
+        // then
+        assertThat(preview.productsKept()).isFalse();
+        assertThat(preview.productsToDelete()).isEqualTo(2);
+        assertThat(result.productsKept()).isEqualTo(preview.productsKept());
+        assertThat(result.productsDeleted()).isEqualTo(preview.productsToDelete());
+        verify(products).delete(owned);
+    }
+
+    @Test
     void protectedCategoryCannotBeRemoved() {
         // when / then
         assertThatThrownBy(() -> definitions.remove(catalog, gpu)).isInstanceOf(IllegalStateException.class);
