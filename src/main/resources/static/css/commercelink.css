@@ -3718,6 +3718,15 @@ a.cl-link-button:hover {
     position: static;
 }
 
+/* an unknown metadata pair of a recommendation filter: the pill, the key, the value and the remove of the row */
+.cl-page .cl-repeat-line.is-unknown {
+    grid-template-columns: auto 1fr 1fr auto;
+}
+
+.cl-page .cl-repeat-line.is-unknown .cl-field-error {
+    grid-column: 1 / -1;
+}
+
 .cl-page .cl-repeat-lines .cl-repeat-add {
     margin-top: 4px;
 }
@@ -3847,6 +3856,14 @@ a.cl-link-button:hover {
     .cl-page .cl-repeat-line .cl-repeat-remove {
         grid-column: 2;
         justify-self: start;
+    }
+
+    .cl-page .cl-repeat-line.is-unknown {
+        grid-template-columns: 1fr;
+    }
+
+    .cl-page .cl-repeat-line.is-unknown .cl-repeat-remove {
+        grid-column: 1;
     }
 
     .cl-page .cl-table.is-editable td {

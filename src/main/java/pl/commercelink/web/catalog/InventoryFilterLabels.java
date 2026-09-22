@@ -6,6 +6,7 @@ import pl.commercelink.products.filters.InventoryFilterType;
 import pl.commercelink.starter.dynamodb.Metadata;
 import pl.commercelink.web.dtos.FormNumbers;
 import pl.commercelink.web.dtos.RecommendationFiltersForm.FilterForm;
+import pl.commercelink.web.dtos.RecommendationFiltersForm.MetadataForm;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -24,7 +25,8 @@ import static pl.commercelink.products.filters.InventoryFilterType.PRODUCT_TITLE
 /**
  * How the recommendation filter form maps onto InventoryDefinition metadata. The keys are the ones the filter classes
  * read (Brands, MinPrice/MaxPrice, Keywords, Eans); the "by brand" filters use the brand name as the key, which the form
- * shows as one "Brand: value, value" line per brand. Metadata the form does not understand is carried along untouched.
+ * shows as one "Brand: value, value" line per brand. Metadata the form does not understand becomes an editable key/value
+ * row, so a filter written by hand can be corrected or cleaned up instead of travelling along unseen.
  */
 public final class InventoryFilterLabels {
 
@@ -153,11 +155,10 @@ public final class InventoryFilterLabels {
             case BY_BRAND -> parseBrandLines(form.getBrandLines())
                     .forEach((brand, values) -> metadata.add(new Metadata(brand, values)));
         }
-        // The hidden pair comes from the page, so a post carrying only half of it drops the odd key instead of failing.
-        int kept = Math.min(form.getUnknownKeys().size(), form.getUnknownValues().size());
-        for (int index = 0; index < kept; index++) {
-            metadata.add(new Metadata(form.getUnknownKeys().get(index), form.getUnknownValues().get(index)));
-        }
+        // A row of the page whose key came back empty is a removed row, and a gap in the posted indexes binds as null.
+        form.getUnknown().stream()
+                .filter(pair -> pair != null && StringUtils.isNotBlank(pair.getKey()))
+                .forEach(pair -> metadata.add(new Metadata(pair.getKey().trim(), StringUtils.defaultString(pair.getValue()))));
         return metadata;
     }
 
@@ -193,7 +194,9 @@ public final class InventoryFilterLabels {
     }
 
     private static void keepUnknown(FilterForm form, Metadata entry) {
-        form.getUnknownKeys().add(entry.getKey());
-        form.getUnknownValues().add(entry.getValue());
+        MetadataForm pair = new MetadataForm();
+        pair.setKey(entry.getKey());
+        pair.setValue(entry.getValue());
+        form.getUnknown().add(pair);
     }
 }

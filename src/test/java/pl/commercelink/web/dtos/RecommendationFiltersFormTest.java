@@ -19,6 +19,26 @@ class RecommendationFiltersFormTest {
         return form;
     }
 
+    /** A row is removed by clearing it; a value left without a key is a mistake, not a removal. */
+    @Test
+    void anUnknownRowWithAValueButNoKeyIsRefusedAtItsOwnField() {
+        // given
+        RecommendationFiltersForm form = new RecommendationFiltersForm();
+        RecommendationFiltersForm.FilterForm brands = filter("BRAND_NAME");
+        brands.setValues("MSI");
+        RecommendationFiltersForm.MetadataForm nameless = new RecommendationFiltersForm.MetadataForm();
+        nameless.setValue("x");
+        RecommendationFiltersForm.MetadataForm emptied = new RecommendationFiltersForm.MetadataForm();
+        brands.getUnknown().addAll(List.of(nameless, emptied));
+        form.getFilters().add(brands);
+
+        // when
+        Map<String, String> errors = form.validate();
+
+        // then
+        assertThat(errors).containsExactly(Map.entry("filter-0-unknown-0-key", "catalog.filter.unknown.key.required"));
+    }
+
     @Test
     void emptyListIsValidAndMeansNoFilters() {
         // given

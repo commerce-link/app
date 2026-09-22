@@ -92,7 +92,8 @@ class CategoryFiltersTemplateTest {
                 .contains("Selected brands only").contains("Brands, separated by commas");
         // the "no maximum" bound is an empty field, not the number the filter reads as no bound
         assertThat(html).doesNotContain("2147483647").doesNotContain("??");
-        assertThat(occurrences(html, "data-cl-repeat-remove")).isEqualTo(4);
+        // three filters, the blank template and the row of the one unknown metadata pair
+        assertThat(occurrences(html, "data-cl-repeat-remove")).isEqualTo(5);
     }
 
     /** Without JavaScript every kind is on the page, so the field shared by a kind keeps a label of its own kind. */
@@ -105,15 +106,25 @@ class CategoryFiltersTemplateTest {
         assertThat(html).contains("<span data-cl-variant-when=\"filter-1-kind=BRAND_NAME\">Brands, separated by commas</span>");
     }
 
-    /** Metadata the form does not understand travels back untouched, so a hand-made filter is not silently pruned. */
+    /** Metadata the form does not understand is editable and removable, so a hand-made filter can be cleaned up. */
     @Test
-    void metadataTheFormDoesNotUnderstandIsCarriedInHiddenFields() {
+    void metadataTheFormDoesNotUnderstandIsAnEditableRowWithAPill() {
         // when
         String html = rendered(Map.of());
 
         // then
-        assertThat(html).contains("name=\"filters[0].unknownKeys[0]\"").contains("value=\"Legacy\"")
-                .contains("name=\"filters[0].unknownValues[0]\"");
+        assertThat(html).contains("name=\"filters[0].unknown[0].key\"").contains("value=\"Legacy\"")
+                .contains("name=\"filters[0].unknown[0].value\"").contains("id=\"filter-0-unknown-0-key\"")
+                .contains("cl-status is-warn").contains("Unknown field")
+                .doesNotContain("type=\"hidden\"");
+    }
+
+    /** The rows are renumbered by repeat-fields.js like any other repeated row, so a removal leaves no gap. */
+    @Test
+    void theUnknownRowsAreTheirOwnRepeatedGroup() throws Exception {
+        // when / then
+        assertThat(page()).contains("data-cl-repeat=\"unknown\"").contains("data-cl-repeat-id=\"unknown\"")
+                .contains("data-cl-repeat-min=\"0\"");
     }
 
     @Test

@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class InventoryFilterLabelsTest {
@@ -134,7 +135,7 @@ class InventoryFilterLabelsTest {
     }
 
     @Test
-    void unknownMetadataIsKeptAsideNotDropped() {
+    void unknownMetadataIsOfferedAsAnEditableRowNotDropped() {
         // given
         InventoryDefinition odd = new InventoryDefinition(InventoryFilterType.BRAND_NAME,
                 List.of(new Metadata("Brands", "MSI"), new Metadata("Legacy", "x")));
@@ -143,21 +144,58 @@ class InventoryFilterLabelsTest {
         RecommendationFiltersForm.FilterForm form = InventoryFilterLabels.fromDefinition(odd);
 
         // then
-        assertThat(form.getUnknownKeys()).containsExactly("Legacy");
+        assertThat(form.getUnknown()).extracting(RecommendationFiltersForm.MetadataForm::getKey).containsExactly("Legacy");
+        assertThat(form.getUnknown()).extracting(RecommendationFiltersForm.MetadataForm::getValue).containsExactly("x");
         assertThat(InventoryFilterLabels.toMetadata(form)).extracting(Metadata::getKey).containsExactly("Brands", "Legacy");
     }
 
-    /** The hidden key and value are one pair per row of the page; a post carrying only half of one is not a server error. */
     @Test
-    void anUnknownKeyWithoutItsValueIsDropped() {
+    void anEditedUnknownRowIsSavedUnderItsNewKeyAndValue() {
         // given
+        RecommendationFiltersForm.FilterForm form = unknownOf("Legacy", "x");
+        form.getUnknown().get(0).setKey(" Heritage ");
+        form.getUnknown().get(0).setValue("y");
+
+        // when / then
+        assertThat(InventoryFilterLabels.toMetadata(form))
+                .extracting(Metadata::getKey, Metadata::getValue)
+                .containsExactly(tuple("Brands", "MSI"), tuple("Heritage", "y"));
+    }
+
+    /** The page removes a row by dropping its fields; a row whose key came back empty is the removal. */
+    @Test
+    void anUnknownRowWithoutAKeyIsDropped() {
+        // given
+        RecommendationFiltersForm.FilterForm removed = unknownOf("Legacy", "x");
+        removed.getUnknown().get(0).setKey(" ");
+        RecommendationFiltersForm.FilterForm gone = unknownOf("Legacy", "x");
+        gone.getUnknown().clear();
+
+        // when / then
+        assertThat(InventoryFilterLabels.toMetadata(removed)).extracting(Metadata::getKey).containsExactly("Brands");
+        assertThat(InventoryFilterLabels.toMetadata(gone)).extracting(Metadata::getKey).containsExactly("Brands");
+    }
+
+    /** A gap in the posted indexes leaves a null row; it is a removed row, not a server error. */
+    @Test
+    void aMissingUnknownRowIsDropped() {
+        // given
+        RecommendationFiltersForm.FilterForm form = unknownOf("Legacy", "x");
+        form.getUnknown().add(0, null);
+
+        // when / then
+        assertThat(InventoryFilterLabels.toMetadata(form)).extracting(Metadata::getKey).containsExactly("Brands", "Legacy");
+    }
+
+    private static RecommendationFiltersForm.FilterForm unknownOf(String key, String value) {
         RecommendationFiltersForm.FilterForm form = new RecommendationFiltersForm.FilterForm();
         form.setType("BRAND_NAME");
         form.setValues("MSI");
-        form.getUnknownKeys().add("Legacy");
-
-        // when / then
-        assertThat(InventoryFilterLabels.toMetadata(form)).extracting(Metadata::getKey).containsExactly("Brands");
+        RecommendationFiltersForm.MetadataForm row = new RecommendationFiltersForm.MetadataForm();
+        row.setKey(key);
+        row.setValue(value);
+        form.getUnknown().add(row);
+        return form;
     }
 
     @Test

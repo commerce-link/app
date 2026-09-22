@@ -159,20 +159,48 @@
             </div>
         </div>
     </fieldset>
-    <!--/* Metadata this page has no field for travels back untouched, so a filter written by hand is not pruned. */-->
-    <th:block th:if="${filter != null}">
-        <!--/* th:each runs before th:if on one element, so the loop sits inside the block that knows the filter is there. */-->
-        <th:block th:each="key, stat : ${filter.unknownKeys}">
-            <input type="hidden" th:name="${prefix + 'unknownKeys[' + stat.index + ']'}" th:value="${key}"/>
-            <input type="hidden" th:name="${prefix + 'unknownValues[' + stat.index + ']'}" th:value="${filter.unknownValues[stat.index]}"/>
+    <!--/* Metadata this page has no field for: one editable row each, so a filter written by hand can be corrected or
+           cleaned up. The rows are their own repeated group, which repeat-fields.js renumbers inside the filter. */-->
+    <div th:if="${filter != null and !filter.unknown.isEmpty()}" class="cl-repeat cl-repeat-lines"
+         data-cl-repeat="unknown" data-cl-repeat-id="unknown" data-cl-repeat-min="0">
+        <p class="cl-help" th:text="#{catalog.filter.unknown.help}"></p>
+        <!--/* th:insert runs before th:each on one element, so the loop sits on its own block. */-->
+        <th:block th:each="pair, row : ${filter.unknown}">
+            <div class="cl-repeat-line is-unknown" data-cl-repeat-item
+                 th:insert="~{catalog/category-filters :: unknownRow(${index}, ${row.index}, ${row.count}, ${prefix}, ${pair})}"></div>
         </th:block>
-    </th:block>
-    <p th:if="${filter != null and !filter.unknownKeys.isEmpty()}" class="cl-help is-warn"
-       th:text="#{catalog.filter.unknown(${#strings.listJoin(filter.unknownKeys, ', ')})}"></p>
+        <!--/* No "Add": the rows exist because the filter carries them, and a new pair belongs in the typed fields. */-->
+        <span class="cl-visually-hidden" role="status" data-cl-repeat-status
+              th:attr="data-template=#{catalog.filter.unknown.removed('@N@')}"></span>
+    </div>
     <button type="button" class="cl-link-button is-danger cl-repeat-remove" data-cl-repeat-remove hidden
             th:text="#{catalog.category.filters.removeShort}"
             th:attr="aria-label=#{catalog.category.filters.remove(${number})},
                      data-cl-repeat-label=#{catalog.category.filters.remove('@N@')}"></button>
+</th:block>
+
+<!--/* One metadata pair the filter carries but the typed fields do not cover: its key and its value, both editable,
+       and the row is removed by the "Remove" beside it. The ids carry both indexes, which repeat-fields.js renumbers. */-->
+<th:block th:fragment="unknownRow(index, row, number, prefix, pair)"
+          th:with="keyId=${'filter-' + index + '-unknown-' + row + '-key'},
+                   valueId=${'filter-' + index + '-unknown-' + row + '-value'}, keyError=${errors.get(keyId)}">
+    <span class="cl-status is-warn" th:text="#{catalog.filter.unknown.pill}"></span>
+    <label class="cl-visually-hidden" th:for="${keyId}" th:text="#{catalog.filter.unknown.key}"></label>
+    <input class="cl-input" type="text" autocomplete="off" th:classappend="${keyError != null} ? 'is-invalid'"
+           th:id="${keyId}" th:name="${prefix + 'unknown[' + row + '].key'}" th:value="${pair?.key}"
+           th:attr="aria-invalid=${keyError != null ? 'true' : null},
+                    aria-describedby=${keyError != null ? keyId + '-error' : null}"/>
+    <label class="cl-visually-hidden" th:for="${valueId}" th:text="#{catalog.filter.unknown.value}"></label>
+    <input class="cl-input" type="text" autocomplete="off" th:id="${valueId}"
+           th:name="${prefix + 'unknown[' + row + '].value'}" th:value="${pair?.value}"/>
+    <button type="button" class="cl-link-button is-danger cl-repeat-remove" data-cl-repeat-remove hidden
+            th:text="#{settings.list.delete}"
+            th:attr="aria-label=#{catalog.filter.unknown.remove(${number})},
+                     data-cl-repeat-label=#{catalog.filter.unknown.remove('@N@')}"></button>
+    <p th:if="${keyError != null}" class="cl-field-error" th:id="${keyId} + '-error'">
+        <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+        <span th:text="${keyError}"></span>
+    </p>
 </th:block>
 
 <!--/* The label or the help of the field shared by the filters of one kind: one text per type of the kind, of which

@@ -5,13 +5,26 @@
 // and the variant group names (data-cl-repeat-id + '-<index>-' + name) stay unique.
 // Without JavaScript both buttons stay hidden and the page offers one spare blank item instead (inside <noscript>).
 // [data-cl-repeat-min] on the container is the fewest items it keeps (1 by default; 0 for optional ones, e.g. attachments).
+// A container may sit inside an item of another one; its prefix is then the tail of the field name ("unknown" in
+// "filters[2].unknown[0].key") and each container renumbers only the rows, numbers and buttons it owns.
 (function () {
     'use strict';
 
     function items(container) {
-        return Array.prototype.filter.call(container.querySelectorAll('[data-cl-repeat-item]'), function (item) {
-            return item.closest('[data-cl-repeat]') === container;
+        return owned(container, '[data-cl-repeat-item]');
+    }
+
+    // Only what this container owns: a repeated group may sit inside an item of another one (the unknown metadata rows
+    // of a recommendation filter), and each container renumbers its own rows, never its neighbour's. The search starts
+    // at `root` (one item) when given, but what counts as owned is always the nearest container of the element.
+    function owned(container, selector, root) {
+        return Array.prototype.filter.call((root || container).querySelectorAll(selector), function (element) {
+            return element.closest('[data-cl-repeat]') === container;
         });
+    }
+
+    function escaped(text) {
+        return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     }
 
     function renumber(container) {
@@ -20,8 +33,11 @@
         var all = items(container);
         var min = parseInt(container.getAttribute('data-cl-repeat-min') || '1', 10);
         all.forEach(function (item, index) {
+            // The prefix of a nested container is the tail of the name ("filters[2].unknown[0].key"), so the match is
+            // anchored at the start or at a dot rather than at the start only.
+            var names = new RegExp('(^|\\.)' + escaped(prefix) + '\\[\\d+\\]');
             item.querySelectorAll('[name]').forEach(function (field) {
-                field.name = field.name.replace(new RegExp('^' + prefix + '\\[\\d+\\]'), prefix + '[' + index + ']');
+                field.name = field.name.replace(names, '$1' + prefix + '[' + index + ']');
             });
             // The variant attributes carry the same prefix-<index>- name, so the fields of a group keep following
             // their own choice after a renumbering (two groups sharing a name would follow the first select).
@@ -32,10 +48,10 @@
                         .replace(new RegExp(idPrefix + '-\\d+-', 'g'), idPrefix + '-' + index + '-'));
                 });
             });
-            item.querySelectorAll('[data-cl-repeat-number]').forEach(function (number) {
+            owned(container, '[data-cl-repeat-number]', item).forEach(function (number) {
                 number.textContent = String(index + 1);
             });
-            item.querySelectorAll('[data-cl-repeat-remove]').forEach(function (button) {
+            owned(container, '[data-cl-repeat-remove]', item).forEach(function (button) {
                 button.hidden = all.length <= min;
                 // "Remove parcel 2", not two identical "Remove parcel" buttons for a screen reader.
                 var label = button.getAttribute('data-cl-repeat-label');
@@ -44,7 +60,7 @@
                 }
             });
         });
-        container.querySelectorAll('[data-cl-repeat-add]').forEach(function (button) {
+        owned(container, '[data-cl-repeat-add]').forEach(function (button) {
             button.hidden = false;
         });
     }
@@ -65,7 +81,7 @@
         var remove = event.target.closest('[data-cl-repeat-remove]');
         if (add) {
             var container = add.closest('[data-cl-repeat]');
-            var template = container.querySelector('template[data-cl-repeat-template]');
+            var template = owned(container, 'template[data-cl-repeat-template]')[0];
             var index = items(container).length;
             var html = template.innerHTML.replace(/@INDEX@/g, String(index)).replace(/@NUMBER@/g, String(index + 1));
             var holder = document.createElement('div');
@@ -88,11 +104,11 @@
             removed.remove();
             renumber(owner);
             // Focus moves to the neighbouring group without saying why; the status names what went.
-            var status = owner.querySelector('[data-cl-repeat-status]');
+            var status = owned(owner, '[data-cl-repeat-status]')[0];
             if (status) {
                 status.textContent = status.getAttribute('data-template').replace('@N@', String(position + 1));
             }
-            var focus = (next && next.querySelector('input, select, textarea')) || owner.querySelector('[data-cl-repeat-add]');
+            var focus = (next && next.querySelector('input, select, textarea')) || owned(owner, '[data-cl-repeat-add]')[0];
             if (focus) {
                 focus.focus();
             }

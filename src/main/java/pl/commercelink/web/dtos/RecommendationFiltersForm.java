@@ -24,6 +24,15 @@ import java.util.stream.Collectors;
 @Setter
 public class RecommendationFiltersForm {
 
+    /** One metadata pair the typed fields of the filter do not cover, edited as it is stored. */
+    @Getter
+    @Setter
+    public static class MetadataForm {
+
+        private String key;
+        private String value;
+    }
+
     @Getter
     @Setter
     public static class FilterForm {
@@ -33,9 +42,11 @@ public class RecommendationFiltersForm {
         private String minPrice;
         private String maxPrice;
         private String brandLines;
-        /** Metadata of the saved filter that the form has no field for; posted back so nothing is lost on a save. */
-        private List<String> unknownKeys = new ArrayList<>();
-        private List<String> unknownValues = new ArrayList<>();
+        /**
+         * Metadata of the saved filter that the form has no field for. Shown as editable rows rather than kept out of
+         * sight: a filter written by hand must be readable, correctable and removable from the page that saves it.
+         */
+        private List<MetadataForm> unknown = new ArrayList<>();
 
         public Optional<InventoryFilterType> parsedType() {
             try {
@@ -62,6 +73,11 @@ public class RecommendationFiltersForm {
         return "filter-" + index + "-" + field;
     }
 
+    /** The id of a field of one unknown metadata row; repeat-fields.js renumbers both indexes. */
+    public static String unknownFieldId(int index, int row, String field) {
+        return fieldId(index, "unknown-" + row + "-" + field);
+    }
+
     public Map<String, String> validate() {
         Map<String, String> errors = new LinkedHashMap<>();
         for (int index = 0; index < filters.size(); index++) {
@@ -76,8 +92,19 @@ public class RecommendationFiltersForm {
                 case PRICE_RANGE -> validatePrices(errors, index, filter);
                 case BY_BRAND -> validateBrandLines(errors, index, filter);
             }
+            validateUnknown(errors, index, filter);
         }
         return errors;
+    }
+
+    /** A row is removed by clearing it, so an empty row is fine; a value left without a key would lose the value. */
+    private static void validateUnknown(Map<String, String> errors, int index, FilterForm filter) {
+        for (int row = 0; row < filter.unknown.size(); row++) {
+            MetadataForm pair = filter.unknown.get(row);
+            if (pair != null && StringUtils.isBlank(pair.getKey()) && StringUtils.isNotBlank(pair.getValue())) {
+                errors.put(unknownFieldId(index, row, "key"), "catalog.filter.unknown.key.required");
+            }
+        }
     }
 
     private static void validatePrices(Map<String, String> errors, int index, FilterForm filter) {
