@@ -125,4 +125,46 @@ class CategoryPricingFormTest {
         assertThat(form.getGroups().get(1).getMinProfit()).isEqualTo("99");
         assertThat(form.getCritical()).isEqualTo("2");
     }
+
+    /**
+     * A product is assigned to the first group whose rules it matches, and the saved order is the matching order
+     * (price threshold first, then the name). Listing the groups alphabetically hid which one wins.
+     */
+    @Test
+    void fromKeepsTheGroupsInTheOrderTheyAreMatchedIn() {
+        // given
+        CategoryDefinition category = new CategoryDefinition().withName("GPU").withGeneratedId();
+        category.setPriceDefinitions(List.of(withPriceMatch(new PriceDefinition(1.02, 0, 0, 0, 0, "Alpha"), 0),
+                withPriceMatch(new PriceDefinition(1.2, 0, 0, 0, 0, "Zeta"), 5000),
+                new PriceDefinition(1.05, 49, 0, 0, 0, "Default")));
+
+        // when
+        CategoryPricingForm form = CategoryPricingForm.from(category);
+
+        // then
+        assertThat(category.getPriceDefinitions()).extracting(PriceDefinition::getPricingGroup)
+                .containsExactly("Zeta", "Alpha", "Default");
+        assertThat(form.getGroups()).extracting(CategoryPricingForm.PriceGroupForm::getName)
+                .containsExactly("Default", "Zeta", "Alpha");
+    }
+
+    @Test
+    void aGroupSummarisesItsAutomaticAssignmentOnlyWhenItHasOne() {
+        // given
+        CategoryPricingForm form = valid();
+
+        // when / then
+        assertThat(form.getGroups().get(0).autoSummaryKey()).isNull();
+        assertThat(form.getGroups().get(1).autoSummaryKey()).isEqualTo("catalog.category.pricing.auto.summary.both");
+        form.getGroups().get(1).setPriceMatch("");
+        assertThat(form.getGroups().get(1).autoSummaryKey()).isEqualTo("catalog.category.pricing.auto.summary.label");
+        form.getGroups().get(1).setLabelMatch(" ");
+        form.getGroups().get(1).setPriceMatch("2 500,00");
+        assertThat(form.getGroups().get(1).autoSummaryKey()).isEqualTo("catalog.category.pricing.auto.summary.price");
+    }
+
+    private static PriceDefinition withPriceMatch(PriceDefinition definition, double priceMatch) {
+        definition.setPriceMatch(priceMatch);
+        return definition;
+    }
 }

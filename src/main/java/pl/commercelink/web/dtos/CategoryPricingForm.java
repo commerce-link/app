@@ -22,6 +22,7 @@ import java.util.stream.Collectors;
 /**
  * The "Pricing" page of a category: stock thresholds, availability and the price groups. The "Default" group is required
  * (products without another assignment land there and ProductPricingStrategy throws without it) and always listed first.
+ * The others keep the order the category stores them in, which is the order ProductRecommendation matches them in.
  */
 @Getter
 @Setter
@@ -42,6 +43,22 @@ public class CategoryPricingForm {
 
         public boolean isDefault() {
             return PriceDefinition.DEFAULT_PRICING_GROUP.equalsIgnoreCase(StringUtils.trim(name));
+        }
+
+        /**
+         * The message the legend says what the group picks up by itself with, or null when nothing is set. One key per
+         * combination rather than a built sentence: both halves are translated, and so is what joins them.
+         */
+        public String autoSummaryKey() {
+            boolean label = StringUtils.isNotBlank(labelMatch);
+            boolean price = StringUtils.isNotBlank(priceMatch);
+            if (label && price) {
+                return "catalog.category.pricing.auto.summary.both";
+            }
+            if (label) {
+                return "catalog.category.pricing.auto.summary.label";
+            }
+            return price ? "catalog.category.pricing.auto.summary.price" : null;
         }
 
         static PriceGroupForm from(PriceDefinition definition) {
@@ -87,10 +104,10 @@ public class CategoryPricingForm {
         form.high = String.valueOf(stock.getHighStockThreshold());
         form.minQty = String.valueOf(availability.getTotalMinQty());
         form.minProviders = String.valueOf(availability.getMinNumberOfProviders());
+        // Only "Default" is moved: re-sorting the rest would hide which group a product is picked up by first.
         form.groups = category.getPriceDefinitions().stream()
                 .map(PriceGroupForm::from)
-                .sorted(Comparator.comparing((PriceGroupForm group) -> !group.isDefault())
-                        .thenComparing(group -> StringUtils.defaultString(group.name), String.CASE_INSENSITIVE_ORDER))
+                .sorted(Comparator.comparing((PriceGroupForm group) -> !group.isDefault()))
                 .collect(Collectors.toCollection(ArrayList::new));
         if (form.groups.stream().noneMatch(PriceGroupForm::isDefault)) {
             PriceGroupForm missing = new PriceGroupForm();

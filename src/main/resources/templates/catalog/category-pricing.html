@@ -33,6 +33,7 @@
                     <fieldset class="cl-fieldset" id="groups" tabindex="-1">
                         <legend class="cl-fieldset-title" th:text="#{catalog.category.pricing.groups}"></legend>
                         <p class="cl-help" th:text="#{catalog.category.pricing.groups.help}"></p>
+                        <p class="cl-help" th:text="#{catalog.category.pricing.groups.order.help}"></p>
                         <p th:if="${errors['groups'] != null}" class="cl-field-error">
                             <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
                             <span th:text="#{${errors['groups']}}"></span>
@@ -82,6 +83,9 @@
         <span th:text="#{catalog.category.pricing.group}"></span>
         <span data-cl-repeat-number th:text="${number}"></span>
         <span th:if="${isDefault}" class="cl-status is-info" th:text="#{catalog.category.pricing.group.default}"></span>
+        <!--/* What the group picks up by itself, in the legend: the order of the groups is only readable with it. */-->
+        <span th:if="${group != null and group.autoSummaryKey() != null}" class="cl-status is-neutral"
+              th:text="#{${group.autoSummaryKey()}(${group.labelMatch}, ${group.priceMatch})}"></span>
     </legend>
     <div class="cl-form-grid">
         <div class="cl-span-2 cl-field" th:with="id=${'group-' + index + '-name'}, error=${errors.get(id)}">

@@ -96,6 +96,20 @@ class CategoryPricingTemplateTest {
         assertThat(html).doesNotContain("??");
     }
 
+    /** Which group wins is the order of the list, so the page says the rule and each group shows what it matches. */
+    @Test
+    void theGroupsSayHowTheyAreMatchedAndInWhatOrder() {
+        // when
+        String html = rendered(Map.of());
+
+        // then
+        assertThat(html).contains("the first group from the top");
+        assertThat(html).contains("label RTX 5070 \u00b7 price from 2 500,00 PLN");
+        // the Default pill and the summary of the one matched group, both in the legends
+        assertThat(occurrences(html, "cl-status is-neutral")).isEqualTo(1);
+        assertThat(occurrences(html, "cl-status is-info")).isEqualTo(1);
+    }
+
     @Test
     void anErrorOfOneGroupIsShownAtItsOwnField() {
         // when
