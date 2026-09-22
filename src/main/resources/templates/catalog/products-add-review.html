@@ -15,6 +15,11 @@
                 <p class="cl-alert-text"
                    th:text="#{catalog.products.review.skipped(${skipped.size()}, ${#strings.listJoin(skipped, ', ')})}"></p>
             </div>
+            <div th:unless="${skippedExisting.isEmpty()}" class="cl-alert is-warn">
+                <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+                <p class="cl-alert-text"
+                   th:text="#{catalog.products.review.skipped.existing(${skippedExisting.size()}, ${#strings.listJoin(skippedExisting, ', ')})}"></p>
+            </div>
 
             <!--/* No th:field: the id of every field is the key of its error, so the summary links straight to it.
                    The category is not posted at all -- the products are saved into the category of the address. */-->

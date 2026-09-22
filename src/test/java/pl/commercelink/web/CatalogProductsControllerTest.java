@@ -12,6 +12,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.InventoryKey;
@@ -52,6 +53,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -354,13 +356,17 @@ class CatalogProductsControllerTest {
 
         // then
         assertThat((List<String>) result.getModelAndView().getModel().get("skipped")).containsExactly("2");
+        assertThat((List<String>) result.getModelAndView().getModel().get("skippedExisting")).isEmpty();
         assertThat(((ProductsBulkAddForm) result.getModelAndView().getModel().get("form")).getProducts())
                 .extracting(Product::getName).containsExactly("MSI RTX 5070");
     }
 
-    /** The products land in the category of the address; a category id smuggled into the form is never read. */
+    /**
+     * The category and the id are the application's to give: a product grown by the binder carries neither, and a
+     * category or an id smuggled into the form would let it land on -- or overwrite -- somebody else's record.
+     */
     @Test
-    void saveIgnoresTheSubmittedCategoryIdAndUsesThePathCategory() throws Exception {
+    void saveGivesEachProductAnIdOfItsOwnAndIgnoresTheSubmittedCategoryAndId() throws Exception {
         // given
         gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
         // Product normalises the identifiers it is given, so the lookup asks with the unified code.
@@ -368,7 +374,7 @@ class CatalogProductsControllerTest {
 
         // when / then
         mvc.perform(post(categoryPath() + "/products/add/save")
-                        .param("products[0].categoryId", "someone-elses")
+                        .param("products[0].categoryId", "someone-elses").param("products[0].productId", "forged")
                         .param("products[0].name", "X").param("products[0].ean", "1")
                         .param("products[0].manufacturerCode", "m").param("products[0].label", "L")
                         .param("products[0].pricingGroup", "Default"))
@@ -377,6 +383,69 @@ class CatalogProductsControllerTest {
         ArgumentCaptor<Product> saved = ArgumentCaptor.forClass(Product.class);
         verify(productRepository).save(saved.capture());
         assertThat(saved.getValue().getCategoryId()).isEqualTo(gpu.getCategoryId());
+        assertThat(saved.getValue().getProductId()).isNotBlank().isNotEqualTo("forged");
+    }
+
+    /** Selecting every proposal of a large category posts more rows than Spring grows a list to by default. */
+    @Test
+    void saveBindsMoreProductsThanTheDefaultCollectionLimit() throws Exception {
+        // given
+        gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
+        when(pimCatalog.findByGtinOrMpn(any(), any())).thenReturn(Optional.empty());
+        MockHttpServletRequestBuilder request = post(categoryPath() + "/products/add/save");
+        for (int index = 0; index < 300; index++) {
+            request.param("products[" + index + "].name", "Product " + index)
+                    .param("products[" + index + "].ean", String.valueOf(index))
+                    .param("products[" + index + "].pricingGroup", "Default");
+        }
+
+        // when / then
+        mvc.perform(request).andExpect(redirectedUrl(categoryPath()));
+        verify(productRepository, times(300)).save(any(Product.class));
+    }
+
+    /**
+     * An automatic category computes its products from the inventory, so a product added by hand would show up
+     * neither on its page nor among the proposals.
+     */
+    @Test
+    void anAutomaticCategoryTakesNoProductsAddedByHand() throws Exception {
+        // given
+        gpu.setType(CategoryDefinitionType.Dynamic);
+
+        // when / then
+        for (String path : List.of("/products/add", "/products/add/review", "/products/add/save")) {
+            mvc.perform(path.endsWith("/add") ? get(categoryPath() + path) : post(categoryPath() + path))
+                    .andExpect(redirectedUrl(categoryPath()))
+                    .andExpect(flash().attribute("catalogError", "catalog.products.add.dynamic"));
+        }
+        verify(productRepository, never()).save(any(Product.class));
+        verify(inventory, never()).withEnabledSuppliersOnly(anyString());
+    }
+
+    /** The same selection sent twice (Back, a double click) must not add the product a second time. */
+    @Test
+    @SuppressWarnings("unchecked")
+    void reviewSkipsProductsTheCategoryAlreadyHas() throws Exception {
+        // given
+        when(productRepository.findAll(gpu.getCategoryId())).thenReturn(List.of(
+                new Product(gpu.getCategoryId(), "pim", "1", "MFN-1", "MSI", "RTX 5070", "MSI RTX 5070", "Default")));
+        when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(inventoryView);
+        MatchedInventory found = mock(MatchedInventory.class);
+        when(found.isEmpty()).thenReturn(false);
+        when(found.getInventoryKey()).thenReturn(new InventoryKey("1", "MFN-1"));
+        when(inventoryView.findByEan("1")).thenReturn(found);
+
+        // when
+        var result = mvc.perform(post(categoryPath() + "/products/add/review").param("eans", "1"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("catalog/products-add-review"))
+                .andReturn();
+
+        // then
+        assertThat((List<String>) result.getModelAndView().getModel().get("skippedExisting")).containsExactly("1");
+        assertThat(((ProductsBulkAddForm) result.getModelAndView().getModel().get("form")).getProducts()).isEmpty();
+        verify(pimCatalog, never()).findByPimIdOrGtinsOrMpns(any(), any(), any());
     }
 
     @Test

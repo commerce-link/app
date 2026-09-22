@@ -132,7 +132,7 @@ class ProductsAddTemplateTest {
                 .contains("name=\"products[0].pimId\"").contains("name=\"products[0].availabilityType\"")
                 .contains("name=\"products[0].pricingGroup\"").contains("id=\"products\"")
                 .contains("action=\"/dashboard/catalogs/c1/category/k1/products/add/save\"")
-                .doesNotContain("categoryId");
+                .doesNotContain("categoryId").doesNotContain("productId");
     }
 
     private static String renderedProposals() {
@@ -168,6 +168,7 @@ class ProductsAddTemplateTest {
         context.setVariable("labels", List.of("RTX 5060", "RTX 5070"));
         context.setVariable("pricingGroups", List.of("Default", "Premium"));
         context.setVariable("skipped", List.of());
+        context.setVariable("skippedExisting", List.of());
         context.setVariable("saveAction", "/dashboard/catalogs/c1/category/k1/products/add/save");
         context.setVariable("backHref", "/dashboard/catalogs/c1/category/k1/products/add");
         return EnglishFragmentTemplateEngine.create().process("catalog/products-add-review", context);

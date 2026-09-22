@@ -8,7 +8,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.InitBinder;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -54,6 +56,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.TreeMap;
+import java.util.UUID;
 
 /**
  * Products of a catalog category: the category page (the products table with its filters), the bulk actions on it and
@@ -72,6 +75,9 @@ public class CatalogProductsController {
      */
     private static final String LABEL_DEFAULT = " label:" + ALL;
 
+    /** A category proposes hundreds of products and every one of them can be selected, well past Spring's default 256. */
+    private static final int MAX_ADDED_PRODUCTS = 5000;
+
     private final CatalogAccess access;
     private final ProductRepository productRepository;
     private final ProductRecommendationEngine recommendationEngine;
@@ -82,6 +88,16 @@ public class CatalogProductsController {
     private final PimCatalog pimCatalog;
     private final BrandMapper brandMapper;
     private final MessageSource messageSource;
+
+    /**
+     * Raised for the review form, whose list grows to one entry per selected proposal; Spring stops at 256 by default
+     * and a category proposing more than that would answer a full selection with an error. Set for every binder of
+     * this controller: the target is not known yet when the binder is initialised, and nothing else here binds a list.
+     */
+    @InitBinder
+    void allowLargeSelections(WebDataBinder binder) {
+        binder.setAutoGrowCollectionLimit(MAX_ADDED_PRODUCTS);
+    }
 
     @GetMapping("/dashboard/catalogs/{catalogId}/category/{categoryId}")
     public String category(@PathVariable String catalogId, @PathVariable String categoryId,
@@ -148,9 +164,14 @@ public class CatalogProductsController {
     }
 
     @GetMapping("/dashboard/catalogs/{catalogId}/category/{categoryId}/products/add")
-    public String addProducts(@PathVariable String catalogId, @PathVariable String categoryId, Model model) {
+    public String addProducts(@PathVariable String catalogId, @PathVariable String categoryId, Model model,
+                              Locale locale, RedirectAttributes redirectAttributes) {
         ProductCatalog catalog = access.requireCatalog(storeId(), catalogId);
         CategoryDefinition category = access.requireCategory(catalog, categoryId);
+        String refused = refuseAutomatic(category, catalogId, categoryId, locale, redirectAttributes);
+        if (refused != null) {
+            return refused;
+        }
         // Without PIM categories the engine has nothing to match, and reading the inventory would be wasted work.
         List<RecommendationRow> rows = List.of();
         if (category.hasCategoryMapping()) {
@@ -182,14 +203,23 @@ public class CatalogProductsController {
                                  RedirectAttributes redirectAttributes) {
         ProductCatalog catalog = access.requireCatalog(storeId(), catalogId);
         CategoryDefinition category = access.requireCategory(catalog, categoryId);
+        String refused = refuseAutomatic(category, catalogId, categoryId, locale, redirectAttributes);
+        if (refused != null) {
+            return refused;
+        }
         if (eans == null || eans.isEmpty()) {
             redirectAttributes.addFlashAttribute(CatalogsController.ERROR_FLASH,
                     messageSource.getMessage("catalog.products.review.none", null, locale));
             return "redirect:" + CatalogPaths.productsAdd(catalogId, categoryId);
         }
         InventoryView enabled = inventory.withEnabledSuppliersOnly(storeId());
+        // Read once: the same selection sent twice (Back, a double click) must not add the product a second time.
+        List<InventoryKey> alreadyInCategory = productRepository.findAll(category.getCategoryId()).stream()
+                .map(InventoryKey::fromProduct)
+                .toList();
         List<Product> products = new ArrayList<>();
         List<String> skipped = new ArrayList<>();
+        List<String> skippedExisting = new ArrayList<>();
         for (String ean : eans) {
             MatchedInventory matched = enabled.findByEan(ean);
             // The proposals were read before the page was shown; a product can leave the inventory in the meantime.
@@ -198,10 +228,15 @@ public class CatalogProductsController {
                 continue;
             }
             InventoryKey key = matched.getInventoryKey();
+            if (alreadyInCategory.stream().anyMatch(key::matches)) {
+                skippedExisting.add(ean);
+                continue;
+            }
             Optional<PimEntry> entry = pimCatalog.findByPimIdOrGtinsOrMpns(key.getId(), key.getProductEans(), key.getProductCodes());
             products.add(new ProductRecommendation(category, matched, entry).toProduct());
         }
-        return renderReview(catalog, category, new ProductsBulkAddForm(products), skipped, Map.of(), model, locale);
+        return renderReview(catalog, category, new ProductsBulkAddForm(products), skipped, skippedExisting, Map.of(),
+                model, locale);
     }
 
     @PostMapping("/dashboard/catalogs/{catalogId}/category/{categoryId}/products/add/save")
@@ -210,14 +245,20 @@ public class CatalogProductsController {
                                RedirectAttributes redirectAttributes, HttpServletResponse response) {
         ProductCatalog catalog = access.requireCatalog(storeId(), catalogId);
         CategoryDefinition category = access.requireCategory(catalog, categoryId);
+        String refused = refuseAutomatic(category, catalogId, categoryId, locale, redirectAttributes);
+        if (refused != null) {
+            return refused;
+        }
         Map<String, String> errors = form.validate(category.getGroupingOrder(), pricingGroups(category));
         if (!errors.isEmpty()) {
             response.setStatus(HttpStatus.UNPROCESSABLE_ENTITY.value());
-            return renderReview(catalog, category, form, List.of(), errors, model, locale);
+            return renderReview(catalog, category, form, List.of(), List.of(), errors, model, locale);
         }
         for (Product product : form.getProducts()) {
-            // The category is the one in the address; what the form carried is never asked (rule of the settings pages).
+            // The category and the id are the application's to give: a product grown by the binder has neither, and an
+            // id taken from the form would let a forged one overwrite another product.
             product.setCategoryId(category.getCategoryId());
+            product.setProductId(UUID.randomUUID().toString());
             if (StringUtils.isBlank(product.getPimId())) {
                 pimCatalog.findByGtinOrMpn(product.getEan(), product.getManufacturerCode()).ifPresent(entry -> {
                     product.setPimId(entry.pimId());
@@ -233,7 +274,8 @@ public class CatalogProductsController {
 
     /** @param errors field id to message key; the page is given the texts, as the summary links to the fields. */
     private String renderReview(ProductCatalog catalog, CategoryDefinition category, ProductsBulkAddForm form,
-                                List<String> skipped, Map<String, String> errors, Model model, Locale locale) {
+                                List<String> skipped, List<String> skippedExisting, Map<String, String> errors,
+                                Model model, Locale locale) {
         Map<String, String> texts = new LinkedHashMap<>();
         errors.forEach((field, key) -> texts.put(field, messageSource.getMessage(key, null, locale)));
         model.addAttribute("form", form);
@@ -243,9 +285,24 @@ public class CatalogProductsController {
         model.addAttribute("labels", category.getGroupingOrder());
         model.addAttribute("pricingGroups", pricingGroups(category));
         model.addAttribute("skipped", skipped);
+        model.addAttribute("skippedExisting", skippedExisting);
         model.addAttribute("saveAction", CatalogPaths.productsAddSave(catalog.getCatalogId(), category.getCategoryId()));
         model.addAttribute("backHref", CatalogPaths.productsAdd(catalog.getCatalogId(), category.getCategoryId()));
         return "catalog/products-add-review";
+    }
+
+    /**
+     * Products are added by hand to a manual category only: an automatic one computes its products from the inventory,
+     * so a saved product would show up neither there nor among the proposals.
+     */
+    private String refuseAutomatic(CategoryDefinition category, String catalogId, String categoryId, Locale locale,
+                                   RedirectAttributes redirectAttributes) {
+        if (!category.hasType(CategoryDefinitionType.Dynamic)) {
+            return null;
+        }
+        redirectAttributes.addFlashAttribute(CatalogsController.ERROR_FLASH,
+                messageSource.getMessage("catalog.products.add.dynamic", null, locale));
+        return "redirect:" + CatalogPaths.category(catalogId, categoryId);
     }
 
     private static List<String> pricingGroups(CategoryDefinition category) {
