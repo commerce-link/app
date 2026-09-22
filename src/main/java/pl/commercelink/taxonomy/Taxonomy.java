@@ -2,6 +2,9 @@ package pl.commercelink.taxonomy;
 
 import pl.commercelink.inventory.supplier.api.SupplierProduct;
 
+import java.util.Collection;
+import java.util.Map;
+
 public record Taxonomy(String ean, String mfn, String brand, String name,
                        String category, int dataAccuracyScore,
                        Integer netWeightInGrams, Integer grossWeightInGrams,
@@ -38,5 +41,32 @@ public record Taxonomy(String ean, String mfn, String brand, String name,
                 && mfn != null && !mfn.isEmpty()
                 && brand != null && !brand.isEmpty()
                 && name != null && !name.isEmpty();
+    }
+
+    public static boolean hasCategory(Taxonomy taxonomy) {
+        return taxonomy != null
+                && taxonomy.category() != null
+                && !taxonomy.category().isBlank();
+    }
+
+    public static Taxonomy preferred(Taxonomy current, Taxonomy candidate) {
+        if (candidate == null) {
+            return current;
+        }
+        if (current == null) {
+            return candidate;
+        }
+        if (hasCategory(candidate) != hasCategory(current)) {
+            return hasCategory(candidate) ? candidate : current;
+        }
+        return candidate.dataAccuracyScore() < current.dataAccuracyScore() ? candidate : current;
+    }
+
+    public static Taxonomy bestOf(Collection<String> productCodes, Map<String, Taxonomy> byMfn) {
+        Taxonomy best = EMPTY;
+        for (String productCode : productCodes) {
+            best = preferred(best, byMfn.get(productCode));
+        }
+        return best;
     }
 }

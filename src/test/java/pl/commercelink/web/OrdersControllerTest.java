@@ -54,7 +54,7 @@ import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoreSupplierConnection;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.taxonomy.Taxonomy;
-import pl.commercelink.taxonomy.TaxonomyCache;
+import pl.commercelink.taxonomy.TaxonomyCatalog;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -107,7 +107,7 @@ class OrdersControllerTest {
     @Mock
     private ShipmentTrackingSubscriber shipmentTrackingSubscriber;
     @Mock
-    private TaxonomyCache taxonomyCache;
+    private TaxonomyCatalog taxonomyCatalog;
     @Mock
     private StoreCategories storeCategories;
     @Mock
@@ -865,7 +865,7 @@ class OrdersControllerTest {
         when(orderItemsRepository.findById(ORDER_ID, item.getItemId())).thenReturn(item);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(routedOrder("2"));
         when(storesRepository.findById(STORE_ID)).thenReturn(storeRouting("Acme", "2"));
-        when(taxonomyCache.findByMfn("MFN-2")).thenReturn(
+        when(taxonomyCatalog.findByMfn("MFN-2")).thenReturn(
                 new Taxonomy("5901234123457", "MFN-2", "Brand", "Name", "Laptopy", 5, null, null, "raw"));
 
         // when
@@ -929,7 +929,7 @@ class OrdersControllerTest {
         when(orderItemsRepository.findById(ORDER_ID, item.getItemId())).thenReturn(item);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(routedOrder(null));
         when(storesRepository.findById(STORE_ID)).thenReturn(storeRouting("Acme", "2"));
-        when(taxonomyCache.findByMfn("MFN-2")).thenReturn(
+        when(taxonomyCatalog.findByMfn("MFN-2")).thenReturn(
                 new Taxonomy("5901234123457", "MFN-2", "Brand", "Name", "Laptopy", 5, null, null, "raw"));
 
         // when

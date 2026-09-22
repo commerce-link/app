@@ -14,7 +14,7 @@ import static org.mockito.Mockito.when;
 class TaxonomyResolverTest {
 
     @Mock
-    private TaxonomyCache taxonomyCache;
+    private TaxonomyCatalog taxonomyCatalog;
 
     @InjectMocks
     private TaxonomyResolver taxonomyResolver;
@@ -22,7 +22,7 @@ class TaxonomyResolverTest {
     @Test
     void hitReturnsResolvedNameAndCategoryKey() {
         // given
-        when(taxonomyCache.findByMfn("MFN-1")).thenReturn(taxonomy("Resolved Name", "CPU"));
+        when(taxonomyCatalog.findByMfn("MFN-1")).thenReturn(taxonomy("Resolved Name", "CPU"));
 
         // when
         ResolvedProduct resolved = taxonomyResolver.resolve("MFN-1", "Fallback Name", "Laptops");
@@ -37,7 +37,7 @@ class TaxonomyResolverTest {
     @Test
     void missYieldsNoCategoryId() {
         // given
-        when(taxonomyCache.findByMfn("MFN-1")).thenReturn(null);
+        when(taxonomyCatalog.findByMfn("MFN-1")).thenReturn(null);
 
         // when
         ResolvedProduct resolved = taxonomyResolver.resolve("MFN-1", "Fallback Name", "Laptops");
@@ -49,7 +49,7 @@ class TaxonomyResolverTest {
     @Test
     void missFallsBackToProvidedNameAndCategoryKey() {
         // given
-        when(taxonomyCache.findByMfn("MFN-1")).thenReturn(null);
+        when(taxonomyCatalog.findByMfn("MFN-1")).thenReturn(null);
 
         // when
         ResolvedProduct resolved = taxonomyResolver.resolve("MFN-1", "Fallback Name", "Laptops");
@@ -62,7 +62,7 @@ class TaxonomyResolverTest {
     @Test
     void blankCategoryFallsBackToProvidedCategoryKey() {
         // given
-        when(taxonomyCache.findByMfn("MFN-1")).thenReturn(taxonomy("Resolved Name", " "));
+        when(taxonomyCatalog.findByMfn("MFN-1")).thenReturn(taxonomy("Resolved Name", " "));
 
         // when
         ResolvedProduct resolved = taxonomyResolver.resolve("MFN-1", "Fallback Name", "Laptops");
@@ -75,7 +75,7 @@ class TaxonomyResolverTest {
     @Test
     void nullCategoryWithNullFallbackYieldsNullCategory() {
         // given
-        when(taxonomyCache.findByMfn("MFN-1")).thenReturn(taxonomy("Resolved Name", null));
+        when(taxonomyCatalog.findByMfn("MFN-1")).thenReturn(taxonomy("Resolved Name", null));
 
         // when
         ResolvedProduct resolved = taxonomyResolver.resolve("MFN-1", "Fallback Name", null);

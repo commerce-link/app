@@ -19,7 +19,7 @@ import pl.commercelink.stores.IntegrationType;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.taxonomy.Taxonomy;
-import pl.commercelink.taxonomy.TaxonomyCache;
+import pl.commercelink.taxonomy.TaxonomyCatalog;
 import pl.commercelink.warehouse.api.StockQueryService;
 import pl.commercelink.warehouse.api.Warehouse;
 import pl.commercelink.warehouse.api.WarehouseItemView;
@@ -47,7 +47,7 @@ public class InventorySearch {
     private final Inventory inventory;
     private final StoresRepository storesRepository;
     private final PimCatalog pimCatalog;
-    private final TaxonomyCache taxonomyCache;
+    private final TaxonomyCatalog taxonomyCatalog;
     private final Warehouse warehouse;
     private final SupplierLabels supplierLabels;
     private final SupplierRegistry supplierRegistry;
@@ -226,7 +226,7 @@ public class InventorySearch {
 
     private ProductHeader warehouseHeader(String query, ProductCodes codes) {
         String mfn = unifyMfn(query);
-        Taxonomy taxonomy = mfn == null ? null : taxonomyCache.findByMfn(mfn);
+        Taxonomy taxonomy = mfn == null ? null : taxonomyCatalog.findByMfn(mfn);
         if (taxonomy != null) {
             ProductCodes shown = codes.orElse(taxonomy.ean(), taxonomy.mfn());
             return new ProductHeader(taxonomy.name(), taxonomy.brand(), shown.ean(), shown.code());
@@ -236,7 +236,7 @@ public class InventorySearch {
 
     private InventorySearchResult known(String query) {
         String mfn = unifyMfn(query);
-        Taxonomy taxonomy = mfn == null ? null : taxonomyCache.findByMfn(mfn);
+        Taxonomy taxonomy = mfn == null ? null : taxonomyCatalog.findByMfn(mfn);
         if (taxonomy != null) {
             return new InventorySearchResult.KnownWithoutOffers(MatchedBy.MFN,
                     new ProductHeader(taxonomy.name(), taxonomy.brand(), taxonomy.ean(), taxonomy.mfn()));

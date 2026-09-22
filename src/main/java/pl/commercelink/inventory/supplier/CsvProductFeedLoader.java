@@ -10,7 +10,6 @@ import pl.commercelink.inventory.InventoryRepository;
 
 import java.io.IOException;
 import java.io.Reader;
-import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -50,15 +49,10 @@ public class CsvProductFeedLoader {
     }
 
     private List<InventoryItem> parseRows(CsvRowParser parser, Character separator, Reader reader, String supplierName, int taxonomyPenalty) {
-        List<InventoryItem> res = new ArrayList<>();
-        FeedParseStats stats = new FeedParseStats(supplierName);
+        FeedRowBatcher batcher = new FeedRowBatcher(feedRowProcessor, taxonomyPenalty, new FeedParseStats(supplierName));
         new CSVLoader(reader).readRows(separator, row ->
-                parser.tryParse(row)
-                        .ifPresentOrElse(
-                                parsed -> feedRowProcessor.process(parsed, taxonomyPenalty, stats).ifPresent(res::add),
-                                stats::markInvalid));
-        stats.log();
-        return dataCleanup.run(res);
+                parser.tryParse(row).ifPresentOrElse(batcher::accept, batcher::markInvalid));
+        return dataCleanup.run(batcher.finish());
     }
 
 }

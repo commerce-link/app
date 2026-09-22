@@ -5,14 +5,14 @@ import org.springframework.stereotype.Component;
 @Component
 public class TaxonomyResolver {
 
-    private final TaxonomyCache taxonomyCache;
+    private final TaxonomyCatalog catalog;
 
-    public TaxonomyResolver(TaxonomyCache taxonomyCache) {
-        this.taxonomyCache = taxonomyCache;
+    public TaxonomyResolver(TaxonomyCatalog catalog) {
+        this.catalog = catalog;
     }
 
     public ResolvedProduct resolve(String mfn, String fallbackName, String fallbackCategory) {
-        Taxonomy taxonomy = taxonomyCache.findByMfn(mfn);
+        Taxonomy taxonomy = catalog.findByMfn(mfn);
 
         if (taxonomy == null) {
             return new ResolvedProduct(mfn, fallbackName, fallbackCategory, null);

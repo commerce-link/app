@@ -29,7 +29,7 @@ mvn test -Dtest=ClassName#methodName  # Run specific test method
 **DynamoDB**: Runs locally via **AWS NoSQL Workbench** at `http://localhost:8000`.
 **Other AWS services** (S3, SQS, etc.): Simulated by **LocalStack** at `http://localhost:4566`. Configuration in `application-local.properties`.
 
-**Schema Migration**: Managed by **Mongock** (`io.mongock:mongock-springboot-v3` + `io.mongock:dynamodb-springboot-driver`). Migrations live in `src/main/java/pl/commercelink/migration/` as `@ChangeUnit` classes with an incrementing `V###` prefix (currently V001–V015: table creation, local seeds, optimistic-lock backfill, supplier-connection migration, order-item position backfill, local bootstrap seed, service flag, store registration backfill, taxonomy mappings table, claimed-delivery-id index, order filters table and shipment trackings table (two `V011` classes with distinct change-unit ids), client verifications table, store notifications moved to their own table, marketplace import schedules, daily schedule execution counts table; the next one is `V016`). They execute automatically on application startup. Mongock tracks applied changes in the `AppMigrationsHistory` table (configurable via `mongock.migration-repository-name`) and uses `mongockLock` for distributed locking. Mongock autoconfiguration and `DynamoDbMigrationSupport` (helpers like `createTableIfAbsent`) come from the shared starter library.
+**Schema Migration**: Managed by **Mongock** (`io.mongock:mongock-springboot-v3` + `io.mongock:dynamodb-springboot-driver`). Migrations live in `src/main/java/pl/commercelink/migration/` as `@ChangeUnit` classes with an incrementing `V###` prefix (currently V001–V017: table creation, local seeds, optimistic-lock backfill, supplier-connection migration, order-item position backfill, local bootstrap seed, service flag, store registration backfill, taxonomy mappings table, claimed-delivery-id index, order filters table and shipment trackings table (two `V011` classes with distinct change-unit ids), client verifications table, store notifications moved to their own table, marketplace import schedules, daily schedule execution counts table, taxonomy catalog and pending-categorization tables, taxonomy catalog seeded from the newest daily file; the next one is `V018`). They execute automatically on application startup. Mongock tracks applied changes in the `AppMigrationsHistory` table (configurable via `mongock.migration-repository-name`) and uses `mongockLock` for distributed locking. Mongock autoconfiguration and `DynamoDbMigrationSupport` (helpers like `createTableIfAbsent`) come from the shared starter library.
 **Verify**: `aws dynamodb list-tables --endpoint-url http://localhost:8000`
 
 ## Coding Conventions
@@ -90,7 +90,7 @@ The app depends only on contract and shared libraries, never on adapter implemen
 | `shipping/` | Shipping orchestration: `ShippingService`, provider factory, webhook registry, shipment cancellation |
 | `starter/` | Remaining in-app shared utilities: `csv`, `dynamodb`, `email`, `rest`, `security`, `storage`, `util` (see note below) |
 | `stores/` | Store (tenant) configuration: branding, checkout, shipping, invoicing, RMA, integrations, printers |
-| `taxonomy/` | Category taxonomy: parser, generator, resolver, localization, `mapping/` supplier category mappings |
+| `taxonomy/` | Product catalog and category taxonomy: DynamoDB-backed `TaxonomyCatalog`, chunked `TaxonomyMerge`, pending-categorization queue, parser, daily-file generator, resolver, localization, `mapping/` supplier category mappings |
 | `templates/` | Email template storage (DynamoDB-backed) |
 | `users/` | AWS Cognito integration (`CognitoConfig`, `CognitoUserService`) |
 | `warehouse/` | Built-in warehouse: stock levels, goods in/out, restock suggestions, warehouse fulfilment |
@@ -133,7 +133,9 @@ All entities use `@DynamoDBTable`, `@DynamoDBHashKey`, `@DynamoDBRangeKey` annot
 | WarehouseDocuments | `WarehouseDocument` | storeId | documentId | GSI `DeliveryIdIndex`, `CreatedAtIndex`, `OrderIdIndex`, `RMAIdIndex` |
 | WarehouseDocumentItems | `WarehouseDocumentItem` | documentId | itemId | GSI `DeliveryIdIndex` |
 | WarehouseDocumentSequences | `WarehouseDocumentSequence` | storeId | sequenceKey | |
+| Taxonomy | `TaxonomyItem` | mfn | — | none, by design |
 | TaxonomyCategoryMappings | `CategoryMapping` | supplier | rawCategory | |
+| TaxonomyCategoryPending | `PendingCategorization` | mfn | — | |
 | DailyScheduleExecutionCounts | `DailyScheduleExecutionCount` | storeId | counterKey | |
 
 Mongock additionally owns `AppMigrationsHistory` and `mongockLock` (no entity classes). Product information tables (PIM index, brands, queue, category matches) live in the PIM microservice, not in the app — the app consumes the index via HTTP (`/PIM/Index`).

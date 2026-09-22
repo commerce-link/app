@@ -6,7 +6,6 @@ import pl.commercelink.inventory.supplier.api.SupplierType;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.taxonomy.Taxonomy;
-import pl.commercelink.taxonomy.TaxonomyCache;
 
 import java.util.*;
 import java.util.function.Predicate;
@@ -21,26 +20,21 @@ public class MatchedInventory {
 
     private InventoryKey key;
     private Collection<InventoryItem> inventoryItems = new LinkedHashSet<>();
-    private TaxonomyCache taxonomyCache;
+    private Taxonomy taxonomy = Taxonomy.EMPTY;
     private SupplierRegistry supplierRegistry;
 
-    public MatchedInventory(InventoryKey key, TaxonomyCache taxonomyCache, SupplierRegistry supplierRegistry) {
+    public MatchedInventory(InventoryKey key, SupplierRegistry supplierRegistry) {
         this.key = key;
-        this.taxonomyCache = taxonomyCache;
         this.supplierRegistry = supplierRegistry;
     }
 
-    public MatchedInventory(InventoryKey key, InventoryItem inventoryItem, TaxonomyCache taxonomyCache, SupplierRegistry supplierRegistry) {
-        this.key = key;
-        this.taxonomyCache = taxonomyCache;
-        this.supplierRegistry = supplierRegistry;
+    public MatchedInventory(InventoryKey key, InventoryItem inventoryItem, SupplierRegistry supplierRegistry) {
+        this(key, supplierRegistry);
         addAlternativeInventoryItem(inventoryItem);
     }
 
-    public MatchedInventory(InventoryKey key, Collection<InventoryItem> inventoryItems, TaxonomyCache taxonomyCache, SupplierRegistry supplierRegistry) {
-        this.key = key;
-        this.taxonomyCache = taxonomyCache;
-        this.supplierRegistry = supplierRegistry;
+    public MatchedInventory(InventoryKey key, Collection<InventoryItem> inventoryItems, SupplierRegistry supplierRegistry) {
+        this(key, supplierRegistry);
         addAlternativeInventoryItems(inventoryItems);
     }
 
@@ -227,7 +221,8 @@ public class MatchedInventory {
     }
 
     public MatchedInventory atPricePoint(long grossPrice) {
-        MatchedInventory filtered = new MatchedInventory(key, taxonomyCache, supplierRegistry);
+        MatchedInventory filtered = new MatchedInventory(key, supplierRegistry);
+        filtered.taxonomy = taxonomy;
         inventoryItems.stream()
                 .filter(i -> Price.fromNet(i.netPrice()).grossValue() <= grossPrice)
                 .forEach(filtered.inventoryItems::add);
@@ -262,7 +257,7 @@ public class MatchedInventory {
     }
 
     public static MatchedInventory empty(InventoryKey inventoryKey) {
-        return new MatchedInventory(inventoryKey, null, null);
+        return new MatchedInventory(inventoryKey, (SupplierRegistry) null);
     }
 
     void addAlternativeInventoryItems(Collection<? extends InventoryItem> items) {
@@ -276,7 +271,11 @@ public class MatchedInventory {
     }
 
     public Taxonomy getTaxonomy() {
-        return taxonomyCache.find(key);
+        return taxonomy;
+    }
+
+    public void adoptTaxonomy(Taxonomy candidate) {
+        taxonomy = Taxonomy.preferred(taxonomy, candidate);
     }
 
     public int size() {

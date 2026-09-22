@@ -32,6 +32,7 @@ class GroupInventorySource implements InventorySource {
             return;
         }
         result.getInventoryKey().merge(best.getInventoryKey());
+        result.adoptTaxonomy(best.getTaxonomy());
         for (InventoryItem item : best.getInventoryItems()) {
             if (enabledSupplier.test(item.supplier())) {
                 result.addAlternativeInventoryItem(item);

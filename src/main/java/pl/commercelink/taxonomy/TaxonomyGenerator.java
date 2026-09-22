@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimCategory;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -18,7 +19,7 @@ public class TaxonomyGenerator {
     private static final String LANG = "pl";
 
     @Autowired
-    private TaxonomyCache taxonomyCache;
+    private TaxonomyCatalog taxonomyCatalog;
 
     @Autowired
     private TaxonomyRepository taxonomyRepository;
@@ -36,10 +37,8 @@ public class TaxonomyGenerator {
         Map<String, String> idToName = pimCatalog.allCategories().stream()
                 .filter(category -> LANG.equals(category.lang()) && category.id() != null && category.name() != null)
                 .collect(Collectors.toMap(PimCategory::id, PimCategory::name, (first, second) -> first));
-        List<Taxonomy> categorized = taxonomyCache.getTaxonomies().stream()
-                .filter(TaxonomyCache::hasCategory)
-                .map(taxonomy -> refreshCategoryName(taxonomy, idToName))
-                .toList();
+        List<Taxonomy> categorized = new ArrayList<>();
+        taxonomyCatalog.forEachCategorized(taxonomy -> categorized.add(refreshCategoryName(taxonomy, idToName)));
         taxonomyRepository.save(categorized);
     }
 
