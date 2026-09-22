@@ -3,6 +3,7 @@ package pl.commercelink.web;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.context.MessageSource;
 import org.springframework.http.HttpStatus;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.web.util.HtmlUtils;
+import pl.commercelink.inventory.Inventory;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.CategoryDefinitionType;
 import pl.commercelink.products.CategoryDefinitions;
@@ -25,6 +27,7 @@ import pl.commercelink.products.PimCategoryOptions;
 import pl.commercelink.products.PriceDefinition;
 import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductCatalog;
+import pl.commercelink.products.ProductRecommendationEngine;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.stores.MarketplaceIntegration;
@@ -33,16 +36,19 @@ import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.catalog.CatalogAccess;
 import pl.commercelink.web.catalog.CatalogPaths;
 import pl.commercelink.web.catalog.CategoryTypeLabels;
+import pl.commercelink.web.catalog.InventoryFilterLabels;
 import pl.commercelink.web.catalog.MarketplaceDefinitionRow;
 import pl.commercelink.web.dtos.CategoryBasicsForm;
 import pl.commercelink.web.dtos.CategoryPricingForm;
 import pl.commercelink.web.dtos.MarketplaceDefinitionForm;
+import pl.commercelink.web.dtos.RecommendationFiltersForm;
 import pl.commercelink.web.settings.ConfirmAction;
 import pl.commercelink.web.settings.SettingsFlash;
 import pl.commercelink.web.settings.SettingsPaths;
 
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -53,10 +59,11 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 /**
- * A catalog category: its settings hub, the Basics, Pricing and Marketplaces pages and deleting the category. The
- * products of the category live in CatalogProductsController.
+ * A catalog category: its settings hub, the Basics, Pricing, Marketplaces and Recommendation filters pages and deleting
+ * the category. The products of the category live in CatalogProductsController.
  */
 @Controller
+@Slf4j
 @PreAuthorize("hasRole('ADMIN')")
 @RequiredArgsConstructor
 public class CatalogCategoryController {
@@ -70,6 +77,15 @@ public class CatalogCategoryController {
     private static final String MARKETPLACE_VIEW = "catalog/category-marketplace";
     private static final String MARKETPLACE_FRAGMENT = MARKETPLACE_VIEW + " :: marketplaceForm";
 
+    private static final String FILTERS_VIEW = "catalog/category-filters";
+    private static final String FILTERS_FRAGMENT = FILTERS_VIEW + " :: filtersForm";
+
+    /** The error message of a broken brand line carries its number, which no message key can hold. */
+    private static final String BRAND_LINE_ERROR = "catalog.filter.brandLines.line";
+
+    /** No count of the matching products: the inventory could not answer. */
+    private static final int UNKNOWN_MATCH_COUNT = -1;
+
     /** Outcome of a refused category action, shown by the catalog page in its body; the layout banner is Bulma markup. */
     private static final String ERROR_FLASH = "catalogError";
 
@@ -82,6 +98,8 @@ public class CatalogCategoryController {
     private final StoresRepository storesRepository;
     private final PimCategoryOptions pimCategoryOptions;
     private final MarketplaceConnections marketplaces;
+    private final ProductRecommendationEngine recommendationEngine;
+    private final Inventory inventory;
     private final MessageSource messageSource;
 
     @GetMapping("/dashboard/catalogs/{catalogId}/category/{categoryId}/settings")
@@ -334,6 +352,87 @@ public class CatalogCategoryController {
 
     private static int approved(List<Product> products, String marketplace) {
         return (int) products.stream().filter(product -> product.isApprovedForMarketplace(marketplace)).count();
+    }
+
+    @GetMapping("/dashboard/catalogs/{catalogId}/category/{categoryId}/settings/filters")
+    public String filters(@PathVariable String catalogId, @PathVariable String categoryId, Model model, Locale locale) {
+        ProductCatalog catalog = access.requireCatalog(storeId(), catalogId);
+        CategoryDefinition category = access.requireCategory(catalog, categoryId);
+        return renderFilters(catalog, category, RecommendationFiltersForm.from(category), Map.of(), model, locale);
+    }
+
+    @PostMapping("/dashboard/catalogs/{catalogId}/category/{categoryId}/settings/filters")
+    public String saveFilters(@PathVariable String catalogId, @PathVariable String categoryId,
+                              @ModelAttribute RecommendationFiltersForm form,
+                              @RequestHeader(value = SettingsPaths.ASYNC_HEADER, required = false) String requestedWith,
+                              Model model, Locale locale, RedirectAttributes redirectAttributes,
+                              HttpServletRequest request, HttpServletResponse response) {
+        ProductCatalog catalog = access.requireCatalog(storeId(), catalogId);
+        CategoryDefinition category = access.requireCategory(catalog, categoryId);
+        boolean async = SettingsPaths.isAsync(requestedWith);
+        Map<String, String> errors = form.validate();
+        if (!errors.isEmpty()) {
+            return rejected(renderFilters(catalog, category, form, errors, model, locale), FILTERS_FRAGMENT, async, response);
+        }
+        definitions.saveFilters(catalog, category, form.toDefinitions());
+        return saved(CatalogPaths.categorySettings(catalogId, categoryId),
+                messageSource.getMessage("catalog.category.filters.saved", new Object[]{category.getName()}, locale),
+                async, model, redirectAttributes, request, response, FILTERS_FRAGMENT,
+                () -> renderFilters(catalog, category, form, Map.of(), model, locale));
+    }
+
+    private String renderFilters(ProductCatalog catalog, CategoryDefinition category, RecommendationFiltersForm form,
+                                 Map<String, String> errors, Model model, Locale locale) {
+        model.addAttribute("form", form);
+        model.addAttribute("errors", translated(errors, locale));
+        model.addAttribute("catalog", catalog);
+        model.addAttribute("category", category);
+        model.addAttribute("filterTypes", InventoryFilterLabels.options());
+        model.addAttribute("listVariants", InventoryFilterLabels.variants(InventoryFilterLabels.Kind.LIST));
+        model.addAttribute("brandVariants", InventoryFilterLabels.variants(InventoryFilterLabels.Kind.BY_BRAND));
+        model.addAttribute("formAction", CatalogPaths.categoryFilters(catalog.getCatalogId(), category.getCategoryId()));
+        model.addAttribute("backHref", CatalogPaths.categorySettings(catalog.getCatalogId(), category.getCategoryId()));
+        model.addAttribute("backLabel", messageSource.getMessage("catalog.category.settings.title", null, locale));
+        model.addAttribute("lead", filtersLead(catalog, category, locale));
+        return FILTERS_VIEW;
+    }
+
+    /** The error of a line of the brand lines names the line, so the page is given the texts instead of the keys. */
+    private Map<String, String> translated(Map<String, String> errors, Locale locale) {
+        Map<String, String> texts = new LinkedHashMap<>();
+        errors.forEach((field, key) -> texts.put(field, key.startsWith(BRAND_LINE_ERROR + ":")
+                ? messageSource.getMessage(BRAND_LINE_ERROR, new Object[]{key.substring(key.indexOf(':') + 1)}, locale)
+                : messageSource.getMessage(key, null, locale)));
+        return texts;
+    }
+
+    /** How many products the filters let through today, linked to the page that adds them; left out when unknown. */
+    private String filtersLead(ProductCatalog catalog, CategoryDefinition category, Locale locale) {
+        String lead = HtmlUtils.htmlEscape(category.getName()) + " · "
+                + messageSource.getMessage("catalog.category.filters.lead", null, locale);
+        int matching = matchingProducts(category);
+        if (matching == UNKNOWN_MATCH_COUNT) {
+            return lead;
+        }
+        return lead + " <a href=\"" + CatalogPaths.productsAdd(catalog.getCatalogId(), category.getCategoryId()) + "\">"
+                + HtmlUtils.htmlEscape(messageSource.getMessage("catalog.category.filters.matching", new Object[]{matching}, locale))
+                + "</a>";
+    }
+
+    /**
+     * The count is a pass over the inventory on every render of the page, the failed saves included; the page is rare
+     * enough for that. Nothing of the page depends on the count, so an inventory that cannot answer only costs the line.
+     */
+    private int matchingProducts(CategoryDefinition category) {
+        if (!category.hasCategoryMapping()) {
+            return 0;
+        }
+        try {
+            return recommendationEngine.getRecommendations(category, inventory.withEnabledSuppliersOnly(storeId())).size();
+        } catch (RuntimeException e) {
+            log.warn("Cannot count the products matching the filters of category {}", category.getCategoryId(), e);
+            return UNKNOWN_MATCH_COUNT;
+        }
     }
 
     @GetMapping("/dashboard/catalogs/{catalogId}/category/{categoryId}/delete")

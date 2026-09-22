@@ -1,7 +1,8 @@
 // Repeatable groups of fields (the parcels of a package template). A container [data-cl-repeat="prefix"] holds items
 // [data-cl-repeat-item]; a <template data-cl-repeat-template> inside it is a blank item with @INDEX@ and @NUMBER@
 // placeholders (not __X__: Thymeleaf reads that as a preprocessing expression). [data-cl-repeat-add] appends one, [data-cl-repeat-remove] removes its item. After each change the items
-// are renumbered, so the posted names stay a gapless list (prefix[0].x, prefix[1].x) and the ids stay unique.
+// are renumbered, so the posted names stay a gapless list (prefix[0].x, prefix[1].x) and the ids, the aria references
+// and the variant group names (data-cl-repeat-id + '-<index>-' + name) stay unique.
 // Without JavaScript both buttons stay hidden and the page offers one spare blank item instead (inside <noscript>).
 // [data-cl-repeat-min] on the container is the fewest items it keeps (1 by default; 0 for optional ones, e.g. attachments).
 (function () {
@@ -22,7 +23,10 @@
             item.querySelectorAll('[name]').forEach(function (field) {
                 field.name = field.name.replace(new RegExp('^' + prefix + '\\[\\d+\\]'), prefix + '[' + index + ']');
             });
-            ['id', 'for', 'aria-describedby', 'aria-labelledby'].forEach(function (attribute) {
+            // The variant attributes carry the same prefix-<index>- name, so the fields of a group keep following
+            // their own choice after a renumbering (two groups sharing a name would follow the first select).
+            ['id', 'for', 'aria-describedby', 'aria-labelledby', 'data-cl-variant-select', 'data-cl-variant-group',
+                'data-cl-variant-when'].forEach(function (attribute) {
                 item.querySelectorAll('[' + attribute + ']').forEach(function (element) {
                     element.setAttribute(attribute, element.getAttribute(attribute)
                         .replace(new RegExp(idPrefix + '-\\d+-', 'g'), idPrefix + '-' + index + '-'));

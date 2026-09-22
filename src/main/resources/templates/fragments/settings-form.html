@@ -19,6 +19,22 @@
     </div>
 </div>
 
+<!--/* Error summary of a form whose messages are already translated (a message whose text carries a number the key
+       cannot hold, e.g. the line of a broken brand line). Same markup as errorSummary; errors maps a field id to the
+       text of its error. */-->
+<div th:fragment="errorSummaryText(id, errors)" th:if="${!errors.isEmpty()}" th:id="${id}" class="cl-alert is-bad"
+     tabindex="-1" data-cl-error-summary>
+    <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
+    <div>
+        <p class="cl-alert-title" th:text="#{form.errors.title}"></p>
+        <ul class="cl-alert-list">
+            <li th:each="error : ${errors}">
+                <a th:href="'#' + ${error.key}" th:text="${error.value}"></a>
+            </li>
+        </ul>
+    </div>
+</div>
+
 <!--/* Labelled input with an optional help text (already resolved, or null) read out with the field. Not named "input":
        a fragment name is also an element selector and would pull in every input of this file. */-->
 <div th:fragment="textField(name, labelKey, value, type, autocomplete, required, errorKey, help)" class="cl-field">

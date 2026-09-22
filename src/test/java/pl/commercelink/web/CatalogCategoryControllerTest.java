@@ -23,9 +23,15 @@ import pl.commercelink.products.CategoryDefinitions;
 import pl.commercelink.products.MarketplaceDefinition;
 import pl.commercelink.products.PimCategoryOptions;
 import pl.commercelink.products.PriceDefinition;
+import pl.commercelink.inventory.Inventory;
+import pl.commercelink.inventory.InventoryView;
+import pl.commercelink.products.InventoryDefinition;
 import pl.commercelink.products.ProductCatalog;
+import pl.commercelink.products.ProductRecommendationEngine;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.products.StockDefinition;
+import pl.commercelink.products.filters.InventoryFilterType;
+import pl.commercelink.starter.dynamodb.Metadata;
 import pl.commercelink.starter.security.model.CustomUser;
 import pl.commercelink.stores.MarketplaceIntegration;
 import pl.commercelink.stores.Store;
@@ -34,6 +40,7 @@ import pl.commercelink.web.catalog.CatalogAccess;
 import pl.commercelink.web.catalog.MarketplaceDefinitionRow;
 import pl.commercelink.web.dtos.CategoryBasicsForm;
 import pl.commercelink.web.dtos.CategoryPricingForm;
+import pl.commercelink.web.dtos.RecommendationFiltersForm;
 import pl.commercelink.web.settings.ConfirmAction;
 
 import java.util.List;
@@ -63,6 +70,8 @@ class CatalogCategoryControllerTest {
 
     private static final String STORE_ID = "store-1";
 
+    private static final String BRAND_LINE_KEY = "catalog.filter.brandLines.line";
+
     @Mock
     private CatalogAccess access;
     @Mock
@@ -75,6 +84,10 @@ class CatalogCategoryControllerTest {
     private PimCategoryOptions pimCategoryOptions;
     @Mock
     private MarketplaceConnections marketplaces;
+    @Mock
+    private ProductRecommendationEngine recommendationEngine;
+    @Mock
+    private Inventory inventory;
     @Mock
     private MessageSource messageSource;
     @Mock
@@ -98,7 +111,7 @@ class CatalogCategoryControllerTest {
         lenient().when(productRepository.findAll(any(String.class))).thenReturn(List.of());
         lenient().when(messageSource.getMessage(any(String.class), any(), any(Locale.class))).thenAnswer(call -> call.getArgument(0));
         mvc = MockMvcBuilders.standaloneSetup(new CatalogCategoryController(access, definitions, productRepository,
-                storesRepository, pimCategoryOptions, marketplaces, messageSource)).build();
+                storesRepository, pimCategoryOptions, marketplaces, recommendationEngine, inventory, messageSource)).build();
     }
 
     @AfterEach
@@ -378,6 +391,81 @@ class CatalogCategoryControllerTest {
                 .andExpect(flash().attribute("settingsSavedMessage", "Saved"));
         verify(definitions).savePricing(eq(catalog), eq(gpu), any(StockDefinition.class), any(AvailabilityDefinition.class),
                 argThat(groups -> groups.size() == 1 && groups.get(0).getMultiplier() == 1.05));
+    }
+
+    @Test
+    void theFiltersFormIsBuiltFromTheSavedDefinitions() throws Exception {
+        // given
+        CategoryDefinition gpu = categoryOf("GPU");
+        gpu.getInventoryDefinitions().add(new InventoryDefinition(InventoryFilterType.BRAND_NAME,
+                List.of(new Metadata("Brands", "MSI, ASUS"))));
+
+        // when
+        MvcResult result = mvc.perform(get("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/filters"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("catalog/category-filters"))
+                .andExpect(model().attribute("formAction", "/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/filters"))
+                .andExpect(model().attribute("backHref", "/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings"))
+                .andReturn();
+
+        // then
+        RecommendationFiltersForm form = (RecommendationFiltersForm) result.getModelAndView().getModel().get("form");
+        assertThat(form.getFilters()).extracting(RecommendationFiltersForm.FilterForm::getValues).containsExactly("MSI, ASUS");
+        // a category without PIM categories has nothing to count, so the inventory is not read at all
+        verify(inventory, never()).withEnabledSuppliersOnly(any());
+    }
+
+    /** The count in the lead is a pass over the inventory; an inventory that cannot answer must not take the page down. */
+    @Test
+    void theFiltersPageOpensWhenTheRecommendationsCannotBeCounted() throws Exception {
+        // given
+        CategoryDefinition gpu = categoryOf("GPU");
+        gpu.setPimCategoryIds(List.of("pim-1"));
+        InventoryView view = mock(InventoryView.class);
+        when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(view);
+        when(recommendationEngine.getRecommendations(gpu, view)).thenThrow(new IllegalStateException("PIM is down"));
+        when(messageSource.getMessage(eq("catalog.category.filters.lead"), any(), any(Locale.class))).thenReturn("filters");
+
+        // when / then
+        mvc.perform(get("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/filters"))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("lead", "GPU \u00b7 filters"));
+    }
+
+    @Test
+    void validFiltersAreSavedThroughTheService() throws Exception {
+        // given
+        CategoryDefinition gpu = categoryOf("GPU");
+        when(messageSource.getMessage(eq("catalog.category.filters.saved"), any(), any(Locale.class))).thenReturn("Saved");
+
+        // when / then
+        mvc.perform(post("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/filters")
+                        .param("filters[0].type", "BRAND_NAME").param("filters[0].values", "MSI, ASUS")
+                        .param("filters[1].type", "PRICE_RANGE").param("filters[1].minPrice", "900"))
+                .andExpect(redirectedUrl("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings"))
+                .andExpect(flash().attribute("settingsSavedMessage", "Saved"));
+        ArgumentCaptor<List<InventoryDefinition>> filters = ArgumentCaptor.forClass(List.class);
+        verify(definitions).saveFilters(eq(catalog), eq(gpu), filters.capture());
+        assertThat(filters.getValue()).extracting(InventoryDefinition::getType)
+                .containsExactly(InventoryFilterType.BRAND_NAME, InventoryFilterType.PRICE_RANGE);
+        assertThat(filters.getValue()).allMatch(InventoryDefinition::isComplete);
+    }
+
+    /** The line of a broken brand line is part of the message, so the page is given the text instead of the key. */
+    @Test
+    void brandLineErrorIsTranslatedWithTheLineNumber() throws Exception {
+        // given
+        CategoryDefinition gpu = categoryOf("GPU");
+        when(messageSource.getMessage(eq(BRAND_LINE_KEY), eq(new Object[]{"2"}), any(Locale.class))).thenReturn("Line 2 broken");
+
+        // when / then
+        mvc.perform(post("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/filters")
+                        .header("X-Requested-With", "fetch")
+                        .param("filters[0].type", "PRODUCT_LINE_BY_BRAND").param("filters[0].brandLines", "Gigabyte: Eagle\nMSI Ventus"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(view().name("catalog/category-filters :: filtersForm"))
+                .andExpect(model().attribute("errors", hasEntry("filter-0-brandLines", "Line 2 broken")));
+        verify(definitions, never()).saveFilters(any(), any(), any());
     }
 
     @Test
