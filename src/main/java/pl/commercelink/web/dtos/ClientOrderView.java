@@ -58,6 +58,7 @@ public class ClientOrderView {
     private final boolean shippingAddressEditable;
     private final LocalDate preferredShippingAt;
     private final boolean preferredShippingEditable;
+    private final boolean preferredShippingOffered;
     private final LocalDate preferredShippingWindowEnd;
 
     private ClientOrderView(Order order, List<OrderItem> orderItems, Store store, CategoryLocalizer categoryLocalizer,
@@ -105,6 +106,7 @@ public class ClientOrderView {
         this.shippingAddressEditable = shippingAddressEditable;
         this.preferredShippingAt = order.getPreferredShippingAt();
         this.preferredShippingEditable = preferredShippingEditable;
+        this.preferredShippingOffered = store.isClientPreferredShippingDateEnabled();
         this.preferredShippingWindowEnd = order.getPreferredShippingWindowEnd();
     }
 

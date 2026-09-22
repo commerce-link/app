@@ -521,7 +521,10 @@
                         </div>
                         <p class="is-size-7 has-text-grey mt-3" th:text="#{client.order.dates.note}"></p>
                     </th:block>
-                    <p class="is-size-7 has-text-grey" th:if="${!view.cancelled and !view.hasEstimatedDates()}" th:text="#{client.order.dates.unknown}"></p>
+                    <p class="is-size-7 has-text-grey" th:if="${!view.cancelled and !view.hasEstimatedDates()}">
+                        <span th:text="#{client.order.dates.unknown}"></span>
+                        <span th:if="${view.preferredShippingOffered}" th:text="#{client.order.dates.unknown.preferred}"></span>
+                    </p>
                     <p class="is-size-7 has-text-grey" th:if="${view.cancelled}" th:text="#{client.order.dates.cancelled}"></p>
 
                     <div class="preferred-shipping" th:if="${view.preferredShippingVisible}">
