@@ -153,6 +153,22 @@ class CatalogScriptContractTest {
         assertThat(css).doesNotContain(".cl-segment[data-count=\"0\"] {");
     }
 
+    /**
+     * In card mode the column name stands in an 84 px column beside the value. The cell of a number does not wrap
+     * (the number must not break), and that applied to the name as well, which then ran under the value.
+     */
+    @Test
+    void columnNameOfACardCellWrapsInsteadOfRunningUnderTheValue() throws Exception {
+        // given
+        String css = read("src/main/resources/static/css/commercelink.css");
+
+        // when
+        String rule = css.split("\\.cl-page \\.cl-table :is\\(tbody th, td\\)::before \\{")[1].split("}")[0];
+
+        // then
+        assertThat(rule).contains("content: attr(data-label);").contains("white-space: normal;");
+    }
+
     @Test
     void repeatFieldsAnnounceAddedGroupsAndVariantFieldsListen() throws Exception {
         // given

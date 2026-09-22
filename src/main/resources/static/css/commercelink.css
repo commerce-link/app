@@ -3116,6 +3116,9 @@ a.cl-link-button:hover {
         font-size: 12.5px;
         font-weight: 400;
         color: var(--cl-ink-2);
+        /* A column name longer than its 84 px ("Najniższa cena brutto") wraps instead of running under the value:
+           the cell of a number keeps white-space: nowrap for the number itself. */
+        white-space: normal;
     }
 
     .cl-page .cl-table td.is-empty {
