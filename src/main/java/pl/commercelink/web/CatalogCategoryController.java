@@ -17,7 +17,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
-import org.springframework.web.util.HtmlUtils;
 import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.products.CategoryDefinition;
@@ -241,7 +240,7 @@ public class CatalogCategoryController {
         model.addAttribute("formAction", CatalogPaths.categoryPricing(catalog.getCatalogId(), category.getCategoryId()));
         model.addAttribute("backHref", CatalogPaths.categorySettings(catalog.getCatalogId(), category.getCategoryId()));
         model.addAttribute("backLabel", messageSource.getMessage("catalog.category.settings.title", null, locale));
-        model.addAttribute("lead", HtmlUtils.htmlEscape(category.getName()) + " · "
+        model.addAttribute("lead", category.getName() + " · "
                 + messageSource.getMessage("catalog.category.pricing.lead", null, locale));
         return PRICING_VIEW;
     }
@@ -272,7 +271,7 @@ public class CatalogCategoryController {
         model.addAttribute("storeMarketplacesHref", SettingsPaths.store(storeId(), "/marketplaces"));
         model.addAttribute("backHref", CatalogPaths.categorySettings(catalogId, categoryId));
         model.addAttribute("backLabel", messageSource.getMessage("catalog.category.settings.title", null, locale));
-        model.addAttribute("lead", HtmlUtils.htmlEscape(category.getName()) + " · "
+        model.addAttribute("lead", category.getName() + " · "
                 + messageSource.getMessage("catalog.category.marketplaces.lead", null, locale));
         return "catalog/category-marketplaces";
     }
@@ -361,8 +360,8 @@ public class CatalogCategoryController {
                 CatalogPaths.categoryMarketplace(catalog.getCatalogId(), category.getCategoryId(), marketplace));
         model.addAttribute("backHref", CatalogPaths.categoryMarketplaces(catalog.getCatalogId(), category.getCategoryId()));
         model.addAttribute("backLabel", messageSource.getMessage("catalog.category.marketplaces.title", null, locale));
-        model.addAttribute("lead", HtmlUtils.htmlEscape(category.getName()) + " · " + messageSource.getMessage(
-                "catalog.category.marketplace.lead", new Object[]{HtmlUtils.htmlEscape(displayName)}, locale));
+        model.addAttribute("lead", category.getName() + " · " + messageSource.getMessage(
+                "catalog.category.marketplace.lead", new Object[]{displayName}, locale));
         return MARKETPLACE_VIEW;
     }
 
@@ -409,7 +408,12 @@ public class CatalogCategoryController {
         model.addAttribute("formAction", CatalogPaths.categoryFilters(catalog.getCatalogId(), category.getCategoryId()));
         model.addAttribute("backHref", CatalogPaths.categorySettings(catalog.getCatalogId(), category.getCategoryId()));
         model.addAttribute("backLabel", messageSource.getMessage("catalog.category.settings.title", null, locale));
-        model.addAttribute("lead", filtersLead(catalog, category, locale));
+        // The lead is a block of the template: the name as text and, when known, the count linked to adding products.
+        int matching = matchingProducts(category);
+        if (matching != UNKNOWN_MATCH_COUNT) {
+            model.addAttribute("matchingProducts", matching);
+        }
+        model.addAttribute("productsAddHref", CatalogPaths.productsAdd(catalog.getCatalogId(), category.getCategoryId()));
         return FILTERS_VIEW;
     }
 
@@ -420,19 +424,6 @@ public class CatalogCategoryController {
                 ? messageSource.getMessage(BRAND_LINE_ERROR, new Object[]{key.substring(key.indexOf(':') + 1)}, locale)
                 : messageSource.getMessage(key, null, locale)));
         return texts;
-    }
-
-    /** How many products the filters let through today, linked to the page that adds them; left out when unknown. */
-    private String filtersLead(ProductCatalog catalog, CategoryDefinition category, Locale locale) {
-        String lead = HtmlUtils.htmlEscape(category.getName()) + " · "
-                + messageSource.getMessage("catalog.category.filters.lead", null, locale);
-        int matching = matchingProducts(category);
-        if (matching == UNKNOWN_MATCH_COUNT) {
-            return lead;
-        }
-        return lead + " <a href=\"" + CatalogPaths.productsAdd(catalog.getCatalogId(), category.getCategoryId()) + "\">"
-                + HtmlUtils.htmlEscape(messageSource.getMessage("catalog.category.filters.matching", new Object[]{matching}, locale))
-                + "</a>";
     }
 
     /**
@@ -521,7 +512,7 @@ public class CatalogCategoryController {
         model.addAttribute("pageTitle",
                 messageSource.getMessage(edit ? "catalog.category.basics.title" : "catalog.category.new.title", null, locale));
         model.addAttribute("lead", edit
-                ? HtmlUtils.htmlEscape(existing.getName()) + " · " + messageSource.getMessage("catalog.category.basics.lead", null, locale)
+                ? existing.getName() + " · " + messageSource.getMessage("catalog.category.basics.lead", null, locale)
                 : messageSource.getMessage("catalog.category.new.lead", null, locale));
         // An automatic category has no rows in the products table: its list is computed from the inventory.
         List<Product> products = edit && existing.hasType(CategoryDefinitionType.Managed)

@@ -19,7 +19,6 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
-import org.springframework.web.util.HtmlUtils;
 import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.inventory.InventoryView;
@@ -537,7 +536,7 @@ public class CatalogProductsController {
         model.addAttribute("deleteHref", edit
                 ? CatalogPaths.productDelete(catalogId, categoryId, existing.getProductId()) : null);
         model.addAttribute("productId", edit ? existing.getProductId() : null);
-        model.addAttribute("lead", lead(form, pimId, locale));
+        model.addAttribute("leadParts", lead(form, pimId, locale));
         // Rarely used sections open by themselves when they hold something, and whenever they hold a mistake to fix.
         model.addAttribute("openStock", form.hasStockOrMarketplaceValues()
                 || errors.containsKey("stockExpectedQty") || errors.containsKey("restockPricePromo")
@@ -548,24 +547,29 @@ public class CatalogProductsController {
         return PRODUCT_VIEW;
     }
 
-    /** What the product is, in one line: its identifiers, its PIM entry (or that it has none) and its brand. */
-    private String lead(ProductForm form, String pimId, Locale locale) {
-        List<String> parts = new ArrayList<>();
+    /** One part of the line under the product title; {@code warn} shows it as a warning pill. */
+    public record LeadPart(String text, boolean warn) {
+    }
+
+    /**
+     * What the product is, in one line: its identifiers, its PIM entry (or that it has none) and its brand. Plain text
+     * parts; the template escapes them and draws the missing entry as a pill.
+     */
+    private List<LeadPart> lead(ProductForm form, String pimId, Locale locale) {
+        List<LeadPart> parts = new ArrayList<>();
         if (StringUtils.isNotBlank(form.getEan())) {
-            parts.add("EAN " + HtmlUtils.htmlEscape(form.getEan()));
+            parts.add(new LeadPart("EAN " + form.getEan(), false));
         }
         if (StringUtils.isNotBlank(form.getManufacturerCode())) {
-            parts.add(HtmlUtils.htmlEscape(form.getManufacturerCode()));
+            parts.add(new LeadPart(form.getManufacturerCode(), false));
         }
         parts.add(StringUtils.isNotBlank(pimId)
-                ? "PIM " + HtmlUtils.htmlEscape(pimId)
-                : "<span class=\"cl-status is-warn\">"
-                        + HtmlUtils.htmlEscape(messageSource.getMessage("catalog.products.add.noPimEntry", null, locale))
-                        + "</span>");
+                ? new LeadPart("PIM " + pimId, false)
+                : new LeadPart(messageSource.getMessage("catalog.products.add.noPimEntry", null, locale), true));
         if (StringUtils.isNotBlank(form.getBrand())) {
-            parts.add(HtmlUtils.htmlEscape(form.getBrand()));
+            parts.add(new LeadPart(form.getBrand(), false));
         }
-        return String.join(" \u00b7 ", parts);
+        return parts;
     }
 
     private String rejected(String view, String fragment, boolean async, HttpServletResponse response) {

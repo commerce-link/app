@@ -104,6 +104,11 @@ class ProductTemplateTest {
     }
 
     private static String rendered(boolean edit, Map<String, String> errors) {
+        return rendered(edit, errors, List.of(new CatalogProductsController.LeadPart("EAN 4719331361600", false),
+                new CatalogProductsController.LeadPart("PIM pim-1", false)));
+    }
+
+    private static String rendered(boolean edit, Map<String, String> errors, List<CatalogProductsController.LeadPart> lead) {
         Product product = new Product("k1", "pim-1", "4719331361600", "GV-N5080", "Gigabyte", "RTX 5080",
                 "Gigabyte RTX 5080", "Default");
         product.setProductId("p1");
@@ -134,7 +139,7 @@ class ProductTemplateTest {
         variables.put("formAction", "/dashboard/catalogs/c1/category/k1/products/p1");
         variables.put("backHref", "/dashboard/catalogs/c1/category/k1");
         variables.put("pageTitle", "Gigabyte RTX 5080");
-        variables.put("lead", "EAN 4719331361600 &middot; PIM pim-1");
+        variables.put("leadParts", lead);
         variables.put("deleteHref", edit ? "/dashboard/catalogs/c1/category/k1/products/p1/delete" : null);
         variables.put("productId", edit ? "p1" : null);
         variables.put("openStock", false);
@@ -212,7 +217,7 @@ class ProductTemplateTest {
         variables.put("formAction", "/dashboard/catalogs/c1/category/k1/products/p1");
         variables.put("backHref", "/dashboard/catalogs/c1/category/k1");
         variables.put("pageTitle", "X");
-        variables.put("lead", "EAN 4719331361600");
+        variables.put("leadParts", List.of(new CatalogProductsController.LeadPart("EAN 4719331361600", false)));
         variables.put("deleteHref", null);
         variables.put("openStock", false);
         variables.put("openClient", true);
@@ -245,5 +250,25 @@ class ProductTemplateTest {
         // then
         assertThat(fields).allSatisfy(field -> assertThat(html).contains("id=\"" + field + "\""));
         assertThat(html).doesNotContain("??");
+    }
+
+    /**
+     * The line under the title is a block of the template: the brand and the codes come from the operator and are
+     * shown as text, and "no PIM entry" is a pill of the design system, not markup built in the controller (D-M50).
+     */
+    @Test
+    void theLeadShowsTheIdentifiersAsTextAndAMissingPimEntryAsAPill() {
+        // when
+        String html = rendered(true, Map.of(), List.of(new CatalogProductsController.LeadPart("EAN 1", false),
+                new CatalogProductsController.LeadPart("No PIM entry", true),
+                new CatalogProductsController.LeadPart("<b>Brand</b>", false)));
+
+        // then
+        int open = html.indexOf("<p class=\"cl-page-lead\">");
+        String lead = html.substring(open, html.indexOf("</p>", open));
+        assertThat(lead).contains("EAN 1").contains(" · ").contains("<span class=\"cl-status is-warn\">No PIM entry</span>")
+                .contains("&lt;b&gt;Brand&lt;/b&gt;").doesNotContain("<b>");
+        assertThat(lead.indexOf("EAN 1")).isLessThan(lead.indexOf("No PIM entry"));
+        assertThat(lead.indexOf("No PIM entry")).isLessThan(lead.indexOf("Brand"));
     }
 }

@@ -551,6 +551,9 @@ class CatalogCategoryControllerTest {
                 .andExpect(view().name("catalog/category-filters"))
                 .andExpect(model().attribute("formAction", "/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/filters"))
                 .andExpect(model().attribute("backHref", "/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings"))
+                .andExpect(model().attribute("matchingProducts", 0))
+                .andExpect(model().attribute("productsAddHref", "/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/products/add"))
+                .andExpect(model().attributeDoesNotExist("lead"))
                 .andReturn();
 
         // then
@@ -569,12 +572,11 @@ class CatalogCategoryControllerTest {
         InventoryView view = mock(InventoryView.class);
         when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(view);
         when(recommendationEngine.getRecommendations(gpu, view)).thenThrow(new IllegalStateException("PIM is down"));
-        when(messageSource.getMessage(eq("catalog.category.filters.lead"), any(), any(Locale.class))).thenReturn("filters");
 
         // when / then
         mvc.perform(get("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/filters"))
                 .andExpect(status().isOk())
-                .andExpect(model().attribute("lead", "GPU \u00b7 filters"));
+                .andExpect(model().attributeDoesNotExist("matchingProducts"));
     }
 
     @Test

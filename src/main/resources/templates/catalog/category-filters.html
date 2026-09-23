@@ -6,7 +6,16 @@
 <div layout:fragment="content">
     <section class="cl-page">
         <div class="cl-page-body">
-            <div th:replace="~{fragments/settings-header :: subpageWithActions(${backHref}, ${backLabel}, #{catalog.category.filters.title}, ${lead}, null)}"></div>
+            <!--/* The lead is defined inside the replaced element: the header pulls it in as its slot, and the body of a
+                   th:replace host is dropped, so it is never rendered twice. */-->
+            <div th:replace="~{fragments/settings-header :: subpageWithActions(${backHref}, ${backLabel}, #{catalog.category.filters.title},
+                    ~{::filtersLead}, null)}">
+                <th:block th:fragment="filtersLead">
+                    <span th:text="${category.name} + ' · ' + #{catalog.category.filters.lead}"></span>
+                    <a th:if="${matchingProducts != null}" th:href="@{${productsAddHref}}"
+                       th:text="#{catalog.category.filters.matching(${matchingProducts})}"></a>
+                </th:block>
+            </div>
 
             <form th:fragment="filtersForm" id="category-filters-form" class="cl-form is-wide" th:action="@{${formAction}}"
                   th:object="${form}" method="post" novalidate data-cl-async

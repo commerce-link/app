@@ -56,4 +56,29 @@ class SettingsHeaderFragmentTest {
         assertThat(pillIndex).isGreaterThan(leadOpen).isLessThan(leadClose);
         assertThat(html.substring(leadOpen, leadClose)).contains("PIM: Graphics cards");
     }
+
+    /** A lead given as text is text: a category named with markup shows the markup, it does not render it (D-M50). */
+    @Test
+    void subpageWithActionsRendersATextLeadAsText() {
+        // given
+        Context context = new Context();
+        context.setVariable("lead", "<b>GPU</b> · pricing");
+        String template = "<div th:replace=\"~{fragments/settings-header :: subpageWithActions('/back', 'Back', 'Title', ${lead}, null)}\"></div>";
+
+        // when
+        String html = EnglishFragmentTemplateEngine.create().process(template, context);
+
+        // then
+        assertThat(html).contains("<p class=\"cl-page-lead\">&lt;b&gt;GPU&lt;/b&gt; · pricing</p>").doesNotContain("<b>");
+    }
+
+    @Test
+    void theHeaderFragmentRendersNoLeadAsUnescapedHtml() throws Exception {
+        // given
+        String fragment = java.nio.file.Files.readString(
+                java.nio.file.Path.of("src/main/resources/templates/fragments/settings-header.html"));
+
+        // then
+        assertThat(fragment).doesNotContain("th:utext");
+    }
 }

@@ -921,6 +921,25 @@ class CatalogProductsControllerTest {
                 .andExpect(model().attribute("productId", nullValue()));
     }
 
+    /** The lead travels as plain parts; the template escapes them, so nothing here is HTML (D-M50). */
+    @Test
+    void theProductPageLeadIsGivenAsPlainTextParts() throws Exception {
+        // given
+        Product product = new Product(gpu.getCategoryId(), "pim-7", "5901234567890", "M<1>", "<b>MSI</b>", "L", "MSI RTX 5070", "Default");
+        product.setProductId("p-1");
+        when(access.requireProduct(gpu, "p-1")).thenReturn(product);
+
+        // when / then
+        mvc.perform(get(categoryPath() + "/products/p-1"))
+                .andExpect(status().isOk())
+                .andExpect(model().attributeDoesNotExist("lead"))
+                .andExpect(model().attribute("leadParts", List.of(
+                        new CatalogProductsController.LeadPart("EAN 5901234567890", false),
+                        new CatalogProductsController.LeadPart("M<1>", false),
+                        new CatalogProductsController.LeadPart("PIM pim-7", false),
+                        new CatalogProductsController.LeadPart("<b>MSI</b>", false))));
+    }
+
     @Test
     void savedProductRedirectsToTheCategoryWithAFlash() throws Exception {
         // given

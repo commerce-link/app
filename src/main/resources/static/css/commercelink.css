@@ -629,6 +629,14 @@ body.cl-drawer-open .cl-sidebar {
     color: var(--cl-ink-2);
 }
 
+/* A link in the line under a title ("Dziś pasuje: 8 produktów", "Edytuj") looks like a link in a row description: the
+   Bulma link colour without an underline was 1.33:1 against the text around it (WCAG 1.4.1). */
+.cl-page .cl-page-lead a {
+    color: var(--cl-accent-ink);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
 .cl-page .cl-back {
     display: inline-flex;
     align-items: center;

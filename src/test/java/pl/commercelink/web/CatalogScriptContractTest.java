@@ -267,4 +267,23 @@ class CatalogScriptContractTest {
                     margin-left: 4px;
                     color: var(--cl-ink-2);""");
     }
+
+    /**
+     * A link in the line under a page title ("Dziś pasuje: 8 produktów", "Edytuj") sat in the Bulma link colour without
+     * an underline, 1.33:1 against the text around it (axe link-in-text-block, D-C3). It looks like a link in a row
+     * description.
+     */
+    @Test
+    void aLinkInThePageLeadIsUnderlinedLikeALinkInARowDescription() throws Exception {
+        // given
+        String css = read("src/main/resources/static/css/commercelink.css");
+
+        // then
+        assertThat(css).contains("""
+                .cl-page .cl-page-lead a {
+                    color: var(--cl-accent-ink);
+                    text-decoration: underline;
+                    text-underline-offset: 2px;
+                }""");
+    }
 }
