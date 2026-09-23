@@ -230,84 +230,84 @@
                             <!--/* Each list of this section is a group of its own, headed and explained like the quick
                                    filters above (D-I9); the rows inside are fieldsets numbered by the script. */-->
                             <fieldset class="cl-fieldset">
-                            <legend class="cl-fieldset-title" th:text="#{product.page.attributes.title}"></legend>
-                            <p class="cl-help" th:text="#{product.page.attributes.help}"></p>
-                            <div class="cl-repeat" data-cl-repeat="customAttributes" data-cl-repeat-id="customAttribute"
-                                 data-cl-repeat-min="0">
-                                <th:block th:each="attribute, stat : *{customAttributes}">
-                                    <fieldset class="cl-fieldset" data-cl-repeat-item
-                                              th:insert="~{catalog/product :: pairFields('customAttributes', 'customAttribute', #{product.compatibility.tags}, 'name', #{catalog.metadata.name}, 'value', #{catalog.metadata.value}, ${stat.index}, ${stat.count}, ${attribute?.name}, ${attribute?.value})}"></fieldset>
-                                </th:block>
-                                <template data-cl-repeat-template>
-                                    <fieldset class="cl-fieldset" data-cl-repeat-item
-                                              th:insert="~{catalog/product :: pairFields('customAttributes', 'customAttribute', #{product.compatibility.tags}, 'name', #{catalog.metadata.name}, 'value', #{catalog.metadata.value}, '@INDEX@', '@NUMBER@', null, null)}"></fieldset>
-                                </template>
-                                <noscript>
-                                    <fieldset class="cl-fieldset"
-                                              th:insert="~{catalog/product :: pairFields('customAttributes', 'customAttribute', #{product.compatibility.tags}, 'name', #{catalog.metadata.name}, 'value', #{catalog.metadata.value}, ${form.customAttributes.size()}, ${form.customAttributes.size() + 1}, null, null)}"></fieldset>
-                                </noscript>
-                                <div class="cl-repeat-add">
-                                    <button type="button" class="cl-button" data-cl-repeat-add hidden>
-                                        <i class="fas fa-plus" aria-hidden="true"></i>
-                                        <span th:text="#{product.page.attribute.add}"></span>
-                                    </button>
-                                    <span class="cl-visually-hidden" role="status" data-cl-repeat-status
-                                          th:attr="data-template=#{product.page.row.removed('@N@')}"></span>
+                                <legend class="cl-fieldset-title" th:text="#{product.page.attributes.title}"></legend>
+                                <p class="cl-help" th:text="#{product.page.attributes.help}"></p>
+                                <div class="cl-repeat" data-cl-repeat="customAttributes" data-cl-repeat-id="customAttribute"
+                                     data-cl-repeat-min="0">
+                                    <th:block th:each="attribute, stat : *{customAttributes}">
+                                        <fieldset class="cl-fieldset" data-cl-repeat-item
+                                                  th:insert="~{catalog/product :: pairFields('customAttributes', 'customAttribute', #{product.compatibility.tags}, 'name', #{catalog.metadata.name}, 'value', #{catalog.metadata.value}, ${stat.index}, ${stat.count}, ${attribute?.name}, ${attribute?.value})}"></fieldset>
+                                    </th:block>
+                                    <template data-cl-repeat-template>
+                                        <fieldset class="cl-fieldset" data-cl-repeat-item
+                                                  th:insert="~{catalog/product :: pairFields('customAttributes', 'customAttribute', #{product.compatibility.tags}, 'name', #{catalog.metadata.name}, 'value', #{catalog.metadata.value}, '@INDEX@', '@NUMBER@', null, null)}"></fieldset>
+                                    </template>
+                                    <noscript>
+                                        <fieldset class="cl-fieldset"
+                                                  th:insert="~{catalog/product :: pairFields('customAttributes', 'customAttribute', #{product.compatibility.tags}, 'name', #{catalog.metadata.name}, 'value', #{catalog.metadata.value}, ${form.customAttributes.size()}, ${form.customAttributes.size() + 1}, null, null)}"></fieldset>
+                                    </noscript>
+                                    <div class="cl-repeat-add">
+                                        <button type="button" class="cl-button" data-cl-repeat-add hidden>
+                                            <i class="fas fa-plus" aria-hidden="true"></i>
+                                            <span th:text="#{product.page.attribute.add}"></span>
+                                        </button>
+                                        <span class="cl-visually-hidden" role="status" data-cl-repeat-status
+                                              th:attr="data-template=#{product.page.row.removed('@N@')}"></span>
+                                    </div>
                                 </div>
-                            </div>
                             </fieldset>
                             <fieldset class="cl-fieldset">
-                            <legend class="cl-fieldset-title" th:text="#{product.compatibility.filter}"></legend>
-                            <p class="cl-help" th:text="#{product.page.filter.help}"></p>
-                            <div class="cl-repeat" data-cl-repeat="customAttributesFilters"
-                                 data-cl-repeat-id="customAttributeFilter" data-cl-repeat-min="0">
-                                <th:block th:each="filter, stat : *{customAttributesFilters}">
-                                    <fieldset class="cl-fieldset" data-cl-repeat-item
-                                              th:insert="~{catalog/product :: filterFields(${stat.index}, ${stat.count}, ${filter})}"></fieldset>
-                                </th:block>
-                                <template data-cl-repeat-template>
-                                    <fieldset class="cl-fieldset" data-cl-repeat-item
-                                              th:insert="~{catalog/product :: filterFields('@INDEX@', '@NUMBER@', null)}"></fieldset>
-                                </template>
-                                <noscript>
-                                    <fieldset class="cl-fieldset"
-                                              th:insert="~{catalog/product :: filterFields(${form.customAttributesFilters.size()}, ${form.customAttributesFilters.size() + 1}, null)}"></fieldset>
-                                </noscript>
-                                <div class="cl-repeat-add">
-                                    <button type="button" class="cl-button" data-cl-repeat-add hidden>
-                                        <i class="fas fa-plus" aria-hidden="true"></i>
-                                        <span th:text="#{product.page.filter.add}"></span>
-                                    </button>
-                                    <span class="cl-visually-hidden" role="status" data-cl-repeat-status
-                                          th:attr="data-template=#{product.page.row.removed('@N@')}"></span>
+                                <legend class="cl-fieldset-title" th:text="#{product.compatibility.filter}"></legend>
+                                <p class="cl-help" th:text="#{product.page.filter.help}"></p>
+                                <div class="cl-repeat" data-cl-repeat="customAttributesFilters"
+                                     data-cl-repeat-id="customAttributeFilter" data-cl-repeat-min="0">
+                                    <th:block th:each="filter, stat : *{customAttributesFilters}">
+                                        <fieldset class="cl-fieldset" data-cl-repeat-item
+                                                  th:insert="~{catalog/product :: filterFields(${stat.index}, ${stat.count}, ${filter})}"></fieldset>
+                                    </th:block>
+                                    <template data-cl-repeat-template>
+                                        <fieldset class="cl-fieldset" data-cl-repeat-item
+                                                  th:insert="~{catalog/product :: filterFields('@INDEX@', '@NUMBER@', null)}"></fieldset>
+                                    </template>
+                                    <noscript>
+                                        <fieldset class="cl-fieldset"
+                                                  th:insert="~{catalog/product :: filterFields(${form.customAttributesFilters.size()}, ${form.customAttributesFilters.size() + 1}, null)}"></fieldset>
+                                    </noscript>
+                                    <div class="cl-repeat-add">
+                                        <button type="button" class="cl-button" data-cl-repeat-add hidden>
+                                            <i class="fas fa-plus" aria-hidden="true"></i>
+                                            <span th:text="#{product.page.filter.add}"></span>
+                                        </button>
+                                        <span class="cl-visually-hidden" role="status" data-cl-repeat-status
+                                              th:attr="data-template=#{product.page.row.removed('@N@')}"></span>
+                                    </div>
                                 </div>
-                            </div>
                             </fieldset>
                             <fieldset class="cl-fieldset">
-                            <legend class="cl-fieldset-title" th:text="#{product.metadata}"></legend>
-                            <p class="cl-help" th:text="#{product.page.metadata.help}"></p>
-                            <div class="cl-repeat" data-cl-repeat="metadata" data-cl-repeat-id="metadata" data-cl-repeat-min="0">
-                                <th:block th:each="entry, stat : *{metadata}">
-                                    <fieldset class="cl-fieldset" data-cl-repeat-item
-                                              th:insert="~{catalog/product :: pairFields('metadata', 'metadata', #{product.metadata}, 'key', #{catalog.metadata.key}, 'value', #{catalog.metadata.value}, ${stat.index}, ${stat.count}, ${entry?.key}, ${entry?.value})}"></fieldset>
-                                </th:block>
-                                <template data-cl-repeat-template>
-                                    <fieldset class="cl-fieldset" data-cl-repeat-item
-                                              th:insert="~{catalog/product :: pairFields('metadata', 'metadata', #{product.metadata}, 'key', #{catalog.metadata.key}, 'value', #{catalog.metadata.value}, '@INDEX@', '@NUMBER@', null, null)}"></fieldset>
-                                </template>
-                                <noscript>
-                                    <fieldset class="cl-fieldset"
-                                              th:insert="~{catalog/product :: pairFields('metadata', 'metadata', #{product.metadata}, 'key', #{catalog.metadata.key}, 'value', #{catalog.metadata.value}, ${form.metadata.size()}, ${form.metadata.size() + 1}, null, null)}"></fieldset>
-                                </noscript>
-                                <div class="cl-repeat-add">
-                                    <button type="button" class="cl-button" data-cl-repeat-add hidden>
-                                        <i class="fas fa-plus" aria-hidden="true"></i>
-                                        <span th:text="#{product.page.metadata.add}"></span>
-                                    </button>
-                                    <span class="cl-visually-hidden" role="status" data-cl-repeat-status
-                                          th:attr="data-template=#{product.page.row.removed('@N@')}"></span>
+                                <legend class="cl-fieldset-title" th:text="#{product.metadata}"></legend>
+                                <p class="cl-help" th:text="#{product.page.metadata.help}"></p>
+                                <div class="cl-repeat" data-cl-repeat="metadata" data-cl-repeat-id="metadata" data-cl-repeat-min="0">
+                                    <th:block th:each="entry, stat : *{metadata}">
+                                        <fieldset class="cl-fieldset" data-cl-repeat-item
+                                                  th:insert="~{catalog/product :: pairFields('metadata', 'metadata', #{product.metadata}, 'key', #{catalog.metadata.key}, 'value', #{catalog.metadata.value}, ${stat.index}, ${stat.count}, ${entry?.key}, ${entry?.value})}"></fieldset>
+                                    </th:block>
+                                    <template data-cl-repeat-template>
+                                        <fieldset class="cl-fieldset" data-cl-repeat-item
+                                                  th:insert="~{catalog/product :: pairFields('metadata', 'metadata', #{product.metadata}, 'key', #{catalog.metadata.key}, 'value', #{catalog.metadata.value}, '@INDEX@', '@NUMBER@', null, null)}"></fieldset>
+                                    </template>
+                                    <noscript>
+                                        <fieldset class="cl-fieldset"
+                                                  th:insert="~{catalog/product :: pairFields('metadata', 'metadata', #{product.metadata}, 'key', #{catalog.metadata.key}, 'value', #{catalog.metadata.value}, ${form.metadata.size()}, ${form.metadata.size() + 1}, null, null)}"></fieldset>
+                                    </noscript>
+                                    <div class="cl-repeat-add">
+                                        <button type="button" class="cl-button" data-cl-repeat-add hidden>
+                                            <i class="fas fa-plus" aria-hidden="true"></i>
+                                            <span th:text="#{product.page.metadata.add}"></span>
+                                        </button>
+                                        <span class="cl-visually-hidden" role="status" data-cl-repeat-status
+                                              th:attr="data-template=#{product.page.row.removed('@N@')}"></span>
+                                    </div>
                                 </div>
-                            </div>
                             </fieldset>
                         </div>
                     </details>

@@ -144,7 +144,7 @@ public class ProductForm {
         existingEan = saved == null ? null : saved.getEan();
         existingManufacturerCode = saved == null ? null : saved.getManufacturerCode();
         existingPricingGroup = saved == null ? null : saved.getPricingGroup();
-        existingMarketplaces = saved == null ? List.of() : List.copyOf(saved.getMarketplaces());
+        existingMarketplaces = saved == null ? List.of() : new ArrayList<>(saved.getMarketplaces());
     }
 
     /**
