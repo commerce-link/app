@@ -3925,12 +3925,37 @@ a.cl-link-button:hover {
     gap: 4px;
 }
 
-/* Room for the name and the codes only on the widest breakpoint of the design system: on a narrower page (and in
-   card mode, where the cell is a block) the fixed minimum was wider than the card and pushed the page into
-   horizontal scrolling. Below it the column takes the width its content asks for, like every other one. */
-@media screen and (min-width: 1216px) {
+/* A floor for the name and the codes that the other columns always leave room for: 300 px from 1216 px was wider than
+   the room left beside the sidebar up to about 1300 px, and the page scrolled sideways (D-I8). Above the floor the
+   column takes whatever the table has left. Below 720 px the cell is a block of the card and needs no floor. */
+@media screen and (min-width: 720px) {
     .cl-page .cl-table.is-products .cl-table-key {
-        min-width: 300px;
+        min-width: 11rem;
+    }
+}
+
+/* An EAN is read and compared digit by digit: it wraps before or after, never inside (D-M52). */
+.cl-page .cl-table .cl-table-code {
+    white-space: nowrap;
+}
+
+/* 720-1023 px: no sidebar, but seven columns and a narrow window. The column of marketplaces gives way (the filter
+   "Wystawiane na marketplace" and the product page still tell it; in card mode below 720 px it is back) and the column
+   names and the row action ("Dodaj i edytuj") wrap, so the name and the EAN of a product keep a readable column instead
+   of one word per line (D-M52). */
+@media screen and (min-width: 720px) and (max-width: 1023px) {
+    .cl-page .cl-table.is-products .is-secondary-column {
+        display: none;
+    }
+
+    .cl-page .cl-table.is-products thead th,
+    .cl-page .cl-table.is-products .cl-table-actions {
+        white-space: normal;
+    }
+
+    /* a wrapped column name lines up with its values, not in the middle of the button */
+    .cl-page .cl-table.is-products .cl-table-sort {
+        text-align: inherit;
     }
 }
 

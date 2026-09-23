@@ -129,23 +129,42 @@ class CatalogScriptContractTest {
     }
 
     /**
-     * The product column asks for 300 px so the name and the codes stand apart; unguarded, that minimum was wider
-     * than the page itself on a narrow window and in card mode, which is horizontal scrolling on every catalog table.
-     * The guard uses a breakpoint of the design system (720 / 1024 / 1216), not one of its own.
+     * The product column asked for 300 px from 1216 px, where the sidebar takes 264 px: the table was then wider than
+     * its card up to about 1300 px and the page scrolled sideways at 1216--1231 px (D-I8). Its floor is now one the
+     * other columns always leave room for, from 720 px (a breakpoint of the design system, 720 / 1024 / 1216), and above
+     * the floor the column takes whatever the table has left, as before.
      */
     @Test
-    void productColumnAsksForItsMinimumWidthOnlyOnTheWidestBreakpoint() throws Exception {
+    void productColumnAsksOnlyForAMinimumTheOtherColumnsLeaveRoomFor() throws Exception {
         // given
         String css = read("src/main/resources/static/css/commercelink.css");
 
         // then
         assertThat(css).contains("""
-                @media screen and (min-width: 1216px) {
+                @media screen and (min-width: 720px) {
                     .cl-page .cl-table.is-products .cl-table-key {
-                        min-width: 300px;
-                    }
-                }""");
-        assertThat(css).doesNotContain("min-width: 1100px");
+                        min-width: 11rem;
+                    }""");
+        assertThat(css).doesNotContain("min-width: 300px").doesNotContain("min-width: 1100px");
+    }
+
+    /**
+     * Between 720 and 1023 px the product table has no sidebar to share the width with, but seven columns: the column of
+     * marketplaces gives way (the filter "Wystawiane na marketplace" and the product page still tell it), the column
+     * names wrap, and an EAN never breaks inside the number (D-I8, D-M52). In card mode below 720 px the column is back.
+     */
+    @Test
+    void theProductTableMakesRoomForTheNameAndTheEanBetween720And1023() throws Exception {
+        // given
+        String css = read("src/main/resources/static/css/commercelink.css");
+        assertThat(css).contains("@media screen and (min-width: 720px) and (max-width: 1023px) {");
+        String tablet = css.substring(css.indexOf("@media screen and (min-width: 720px) and (max-width: 1023px) {"));
+        tablet = tablet.substring(0, tablet.indexOf("\n}\n") + 3);
+
+        // then
+        assertThat(tablet).contains(".cl-page .cl-table.is-products .is-secondary-column {\n        display: none;")
+                .contains(".cl-page .cl-table.is-products thead th,\n    .cl-page .cl-table.is-products .cl-table-actions {\n        white-space: normal;");
+        assertThat(rule(css, ".cl-page .cl-table .cl-table-code")).contains("white-space: nowrap;");
     }
 
     /**

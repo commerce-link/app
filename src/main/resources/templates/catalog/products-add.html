@@ -110,7 +110,7 @@
                                     <span th:text="${row.name()}"></span>
                                     <span th:unless="${row.hasPim()}" class="cl-status is-warn" th:text="#{catalog.products.add.noPimEntry}"></span>
                                     <span class="cl-table-sub">
-                                        <span th:text="'EAN ' + ${row.ean()}"></span><span th:if="${row.mfn() != null}" th:text="' · ' + ${row.mfn()}"></span><span th:unless="${#strings.isEmpty(row.alternatives())}" th:text="' · ' + ${row.alternatives()}"></span>
+                                        <span class="cl-table-code" th:text="'EAN ' + ${row.ean()}"></span><span th:if="${row.mfn() != null}" th:text="' · ' + ${row.mfn()}"></span><span th:unless="${#strings.isEmpty(row.alternatives())}" th:text="' · ' + ${row.alternatives()}"></span>
                                     </span>
                                 </th>
                                 <td th:attr="data-label=#{product.brand}" th:text="${row.brand()}"></td>

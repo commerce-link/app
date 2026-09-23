@@ -140,7 +140,7 @@
                         <th th:unless="${page.dynamic()}" scope="col" aria-sort="none">
                             <button type="button" class="cl-table-sort" data-sort-key="group" th:text="#{product.pricing.group}"></button>
                         </th>
-                        <th th:unless="${page.dynamic()}" scope="col" th:text="#{catalog.products.column.marketplaces}"></th>
+                        <th th:unless="${page.dynamic()}" scope="col" class="is-secondary-column" th:text="#{catalog.products.column.marketplaces}"></th>
                         <th th:if="${page.dynamic()}" scope="col" class="is-numeric" aria-sort="none">
                             <button type="button" class="cl-table-sort" data-sort-key="price" th:text="#{catalog.products.column.price}"></button>
                         </th>
@@ -163,7 +163,7 @@
                             <span th:if="${row.href() == null}" th:text="${row.name()}"></span>
                             <span class="cl-table-sub">
                                 <!--/* A product can be known by its manufacturer code alone: each code states itself, and the separator belongs to the one before it. */-->
-                                <span th:if="${row.ean() != null}" th:text="'EAN ' + ${row.ean()}"></span><span th:if="${row.mfn() != null}" th:text="(${row.ean() != null} ? ' · ' : '') + ${row.mfn()}"></span><span th:if="${row.pimId() != null}" th:text="(${row.ean() != null or row.mfn() != null} ? ' · ' : '') + 'PIM ' + ${row.pimId()}"></span>
+                                <span th:if="${row.ean() != null}" class="cl-table-code" th:text="'EAN ' + ${row.ean()}"></span><span th:if="${row.mfn() != null}" th:text="(${row.ean() != null} ? ' · ' : '') + ${row.mfn()}"></span><span th:if="${row.pimId() != null}" th:text="(${row.ean() != null or row.mfn() != null} ? ' · ' : '') + 'PIM ' + ${row.pimId()}"></span>
                             </span>
                         </th>
                         <td th:attr="data-label=#{product.brand}" th:text="${row.brand()}"></td>
@@ -172,7 +172,7 @@
                             <span th:if="${row.labelOutside()}" class="cl-status is-warn" th:text="#{catalog.products.label.outside}"></span>
                         </td>
                         <td th:unless="${page.dynamic()}" th:attr="data-label=#{product.pricing.group}" th:text="${row.pricingGroup()}"></td>
-                        <td th:unless="${page.dynamic()}" th:attr="data-label=#{catalog.products.column.marketplaces}">
+                        <td th:unless="${page.dynamic()}" class="is-secondary-column" th:attr="data-label=#{catalog.products.column.marketplaces}">
                             <span class="cl-table-pills" th:unless="${row.marketplaceNames().isEmpty()}">
                                 <span class="cl-status is-neutral" th:each="m : ${row.marketplaceNames()}" th:text="${m}"></span>
                             </span>

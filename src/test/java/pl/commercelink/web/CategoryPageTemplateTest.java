@@ -171,6 +171,18 @@ class CategoryPageTemplateTest {
                 .containsPattern("<label class=\"cl-check-target\">\\s*<input type=\"checkbox\" class=\"cl-check-input\" data-cl-select-row");
     }
 
+    /** The marketplaces column is the one a table between 720 and 1023 px drops; an EAN is a code that never breaks. */
+    @Test
+    void theMarketplacesColumnIsSecondaryAndTheEanIsACode() {
+        // when
+        String html = rendered(false);
+
+        // then
+        assertThat(occurrences(html, "class=\"is-secondary-column\"")).isEqualTo(3);
+        assertThat(html).containsPattern("<th scope=\"col\" class=\"is-secondary-column\">Marketplaces</th>")
+                .containsPattern("<span class=\"cl-table-code\">EAN \\d+</span>");
+    }
+
     /** A product known only by its manufacturer code: the line under its name states what it has, not "EAN null". */
     @Test
     void aProductWithoutAnEanShowsItsManufacturerCodeAlone() {
