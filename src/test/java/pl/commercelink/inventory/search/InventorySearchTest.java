@@ -29,7 +29,7 @@ import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoreSupplierConnection;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.taxonomy.Taxonomy;
-import pl.commercelink.taxonomy.TaxonomyCache;
+import pl.commercelink.taxonomy.TaxonomyCatalog;
 import pl.commercelink.warehouse.api.ItemCondition;
 import pl.commercelink.warehouse.api.StockQueryService;
 import pl.commercelink.warehouse.api.Warehouse;
@@ -65,7 +65,7 @@ class InventorySearchTest {
     @Mock
     private PimCatalog pimCatalog;
     @Mock
-    private TaxonomyCache taxonomyCatalog;
+    private TaxonomyCatalog taxonomyCatalog;
     @Mock
     private Warehouse warehouse;
 

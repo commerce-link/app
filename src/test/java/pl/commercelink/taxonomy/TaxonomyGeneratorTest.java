@@ -9,8 +9,11 @@ import pl.commercelink.pim.api.PimCatalog;
 
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -18,7 +21,7 @@ import static org.mockito.Mockito.when;
 class TaxonomyGeneratorTest {
 
     @Mock
-    private TaxonomyCache taxonomyCache;
+    private TaxonomyCatalog taxonomyCatalog;
     @Mock
     private TaxonomyRepository taxonomyRepository;
     @Mock
@@ -27,11 +30,13 @@ class TaxonomyGeneratorTest {
     private TaxonomyGenerator generator;
 
     @Test
-    void savesOnlyCategorizedTaxonomies() {
+    void savesTheCategorizedRowsTheCatalogStreams() {
         // given
         Taxonomy categorized = new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", "CPU", 5, null, null);
-        Taxonomy pending = new Taxonomy("1234567890124", "MFN-2", "Brand", "Name", null, 5, null, null);
-        when(taxonomyCache.getTaxonomies()).thenReturn(List.of(categorized, pending));
+        doAnswer(invocation -> {
+            invocation.<Consumer<Taxonomy>>getArgument(0).accept(categorized);
+            return null;
+        }).when(taxonomyCatalog).forEachCategorized(any());
         when(pimCatalog.allCategories()).thenReturn(List.of());
 
         // when

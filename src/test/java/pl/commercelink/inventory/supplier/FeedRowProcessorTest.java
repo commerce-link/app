@@ -10,7 +10,7 @@ import pl.commercelink.inventory.supplier.api.InventoryItem;
 import pl.commercelink.inventory.supplier.api.ParsedRow;
 import pl.commercelink.inventory.supplier.api.SupplierProduct;
 import pl.commercelink.taxonomy.Taxonomy;
-import pl.commercelink.taxonomy.TaxonomyCache;
+import pl.commercelink.taxonomy.TaxonomyCatalog;
 import pl.commercelink.taxonomy.TaxonomyCategoryEnrichment;
 import pl.commercelink.taxonomy.TaxonomyMerge;
 
@@ -31,7 +31,7 @@ class FeedRowProcessorTest {
     @Mock
     private DataCorrection dataCorrection;
     @Mock
-    private TaxonomyCache taxonomyCatalog;
+    private TaxonomyCatalog taxonomyCatalog;
     @Mock
     private TaxonomyCategoryEnrichment enrichment;
     @Mock

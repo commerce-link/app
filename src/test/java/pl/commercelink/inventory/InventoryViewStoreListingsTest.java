@@ -18,7 +18,7 @@ import pl.commercelink.products.ProductRecommendationEngine;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
-import pl.commercelink.taxonomy.TaxonomyCache;
+import pl.commercelink.taxonomy.TaxonomyCatalog;
 import pl.commercelink.warehouse.api.StockQueryService;
 import pl.commercelink.warehouse.api.Warehouse;
 import pl.commercelink.warehouse.api.WarehouseItemView;
@@ -53,7 +53,7 @@ class InventoryViewStoreListingsTest {
     @Mock
     private InventoryAutoDiscovery autoDiscovery;
     @Mock
-    private TaxonomyCache taxonomyCatalog;
+    private TaxonomyCatalog taxonomyCatalog;
     @Mock
     private SupplierRegistry supplierRegistry;
     @Mock

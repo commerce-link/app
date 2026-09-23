@@ -11,7 +11,7 @@ import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.stores.SupplierScope;
-import pl.commercelink.taxonomy.TaxonomyCache;
+import pl.commercelink.taxonomy.TaxonomyCatalog;
 import pl.commercelink.warehouse.api.Warehouse;
 
 import java.time.Duration;
@@ -34,7 +34,7 @@ public class Inventory {
     private final Warehouse warehouse;
     private final StoresRepository storesRepository;
     private final InventoryAutoDiscovery autoDiscovery;
-    private final TaxonomyCache taxonomyCatalog;
+    private final TaxonomyCatalog taxonomyCatalog;
     private final SupplierRegistry supplierRegistry;
     private final StoreInventoryProvider storeInventoryProvider;
     private final GlobalMatchedInventory globalInventory;

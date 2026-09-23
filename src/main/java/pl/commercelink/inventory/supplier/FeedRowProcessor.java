@@ -6,7 +6,7 @@ import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
 import pl.commercelink.inventory.supplier.api.ParsedRow;
 import pl.commercelink.taxonomy.Taxonomy;
-import pl.commercelink.taxonomy.TaxonomyCache;
+import pl.commercelink.taxonomy.TaxonomyCatalog;
 import pl.commercelink.taxonomy.TaxonomyCategoryEnrichment;
 import pl.commercelink.taxonomy.TaxonomyMerge;
 
@@ -18,7 +18,7 @@ import java.util.List;
 class FeedRowProcessor {
 
     private final DataCorrection dataCorrection;
-    private final TaxonomyCache taxonomyCatalog;
+    private final TaxonomyCatalog taxonomyCatalog;
     private final TaxonomyCategoryEnrichment enrichment;
 
     List<InventoryItem> process(List<ParsedRow> rows, int taxonomyPenalty, FeedParseStats stats) {

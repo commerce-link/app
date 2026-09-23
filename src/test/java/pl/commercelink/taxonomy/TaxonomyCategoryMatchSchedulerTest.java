@@ -41,7 +41,7 @@ class TaxonomyCategoryMatchSchedulerTest {
     private PendingCategorizationRepository pendingRepository;
 
     @Mock
-    private TaxonomyCache catalog;
+    private TaxonomyCatalog catalog;
 
     @Mock
     private PimCatalog pimCatalog;

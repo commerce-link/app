@@ -17,13 +17,13 @@ import java.util.Map;
 class TaxonomyCategoryMatchScheduler {
 
     private final PendingCategorizationRepository pendingRepository;
-    private final TaxonomyCache catalog;
+    private final TaxonomyCatalog catalog;
     private final PimCatalog pimCatalog;
     private final TaxonomyCategoryMatchProperties properties;
     private final TaxonomyCategoryEnrichment enrichment;
     private final CategoryMappingCache mappingCache;
 
-    TaxonomyCategoryMatchScheduler(PendingCategorizationRepository pendingRepository, TaxonomyCache catalog,
+    TaxonomyCategoryMatchScheduler(PendingCategorizationRepository pendingRepository, TaxonomyCatalog catalog,
                                    PimCatalog pimCatalog, TaxonomyCategoryMatchProperties properties,
                                    TaxonomyCategoryEnrichment enrichment, CategoryMappingCache mappingCache) {
         this.pendingRepository = pendingRepository;

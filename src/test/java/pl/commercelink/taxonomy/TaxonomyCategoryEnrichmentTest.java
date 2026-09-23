@@ -27,7 +27,7 @@ class TaxonomyCategoryEnrichmentTest {
     private static final int PENDING_CAP = 2;
 
     @Mock
-    private TaxonomyCache catalog;
+    private TaxonomyCatalog catalog;
 
     @Mock
     private PendingCategorizationRepository pendingRepository;

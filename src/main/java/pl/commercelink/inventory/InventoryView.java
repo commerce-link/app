@@ -3,7 +3,7 @@ package pl.commercelink.inventory;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.products.Product;
 import pl.commercelink.taxonomy.Taxonomy;
-import pl.commercelink.taxonomy.TaxonomyCache;
+import pl.commercelink.taxonomy.TaxonomyCatalog;
 
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -17,12 +17,12 @@ public class InventoryView {
 
     private final InventoryIndex globalIndex;
     private final InventoryIndex ownIndex;
-    private final TaxonomyCache taxonomyCatalog;
+    private final TaxonomyCatalog taxonomyCatalog;
     private final SupplierRegistry supplierRegistry;
     private final List<InventorySource> sources;
 
     InventoryView(InventoryIndex globalIndex, InventoryIndex ownIndex,
-                  TaxonomyCache taxonomyCatalog, SupplierRegistry supplierRegistry, InventorySource... sources) {
+                  TaxonomyCatalog taxonomyCatalog, SupplierRegistry supplierRegistry, InventorySource... sources) {
         this.globalIndex = globalIndex;
         this.ownIndex = ownIndex;
         this.taxonomyCatalog = taxonomyCatalog;

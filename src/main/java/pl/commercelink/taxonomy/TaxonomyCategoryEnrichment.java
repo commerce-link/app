@@ -17,13 +17,13 @@ public class TaxonomyCategoryEnrichment {
 
     private static final int UNKNOWN = -1;
 
-    private final TaxonomyCache catalog;
+    private final TaxonomyCatalog catalog;
     private final PendingCategorizationRepository pendingRepository;
     private final TaxonomyCategoryMatchProperties properties;
     private final CategoryMappingCache mappingCache;
     private final AtomicInteger pendingSize = new AtomicInteger(UNKNOWN);
 
-    TaxonomyCategoryEnrichment(TaxonomyCache catalog, PendingCategorizationRepository pendingRepository,
+    TaxonomyCategoryEnrichment(TaxonomyCatalog catalog, PendingCategorizationRepository pendingRepository,
                                TaxonomyCategoryMatchProperties properties, CategoryMappingCache mappingCache) {
         this.catalog = catalog;
         this.pendingRepository = pendingRepository;

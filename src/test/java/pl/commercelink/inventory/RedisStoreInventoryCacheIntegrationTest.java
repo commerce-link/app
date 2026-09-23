@@ -17,7 +17,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
-import pl.commercelink.taxonomy.TaxonomyCache;
+import pl.commercelink.taxonomy.TaxonomyCatalog;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -39,7 +39,7 @@ class RedisStoreInventoryCacheIntegrationTest {
     static LettuceConnectionFactory factory;
     static StringRedisTemplate redisTemplate;
 
-    private final TaxonomyCache taxonomyCatalog = Mockito.mock(TaxonomyCache.class);
+    private final TaxonomyCatalog taxonomyCatalog = Mockito.mock(TaxonomyCatalog.class);
     private final SupplierRegistry supplierRegistry = Mockito.mock(SupplierRegistry.class);
     private final ObjectMapper objectMapper = Jackson2ObjectMapperBuilder.json().build();
 

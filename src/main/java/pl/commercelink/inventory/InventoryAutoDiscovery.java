@@ -6,7 +6,7 @@ import pl.commercelink.inventory.supplier.api.InventoryItem;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
 import pl.commercelink.taxonomy.Taxonomy;
-import pl.commercelink.taxonomy.TaxonomyCache;
+import pl.commercelink.taxonomy.TaxonomyCatalog;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -15,10 +15,10 @@ import java.util.stream.Collectors;
 class InventoryAutoDiscovery {
 
     private PimCatalog pimCatalog;
-    private TaxonomyCache taxonomyCatalog;
+    private TaxonomyCatalog taxonomyCatalog;
     private SupplierRegistry supplierRegistry;
 
-    public InventoryAutoDiscovery(PimCatalog pimCatalog, TaxonomyCache taxonomyCatalog, SupplierRegistry supplierRegistry) {
+    public InventoryAutoDiscovery(PimCatalog pimCatalog, TaxonomyCatalog taxonomyCatalog, SupplierRegistry supplierRegistry) {
         this.pimCatalog = pimCatalog;
         this.taxonomyCatalog = taxonomyCatalog;
         this.supplierRegistry = supplierRegistry;
