@@ -21,7 +21,7 @@ class TaxonomyMergeTest {
         merge.apply(taxonomy("MFN-1", 5, 1300));
 
         // then
-        assertEquals(1300, merge.knownFor("MFN-1").netWeightInGrams());
+        assertEquals(1300, merge.latest("MFN-1").netWeightInGrams());
     }
 
     @Test
@@ -33,7 +33,7 @@ class TaxonomyMergeTest {
         merge.apply(taxonomyNamed("MFN-1", 1, null, "BetterName"));
 
         // then
-        Taxonomy result = merge.knownFor("MFN-1");
+        Taxonomy result = merge.latest("MFN-1");
         assertEquals("BetterName", result.name());
         assertEquals(1300, result.netWeightInGrams());
     }
@@ -47,7 +47,7 @@ class TaxonomyMergeTest {
         merge.apply(taxonomyNamed("MFN-1", 1, 1500, "BetterName"));
 
         // then
-        Taxonomy result = merge.knownFor("MFN-1");
+        Taxonomy result = merge.latest("MFN-1");
         assertEquals("BetterName", result.name());
         assertEquals(1500, result.netWeightInGrams());
     }
@@ -61,7 +61,7 @@ class TaxonomyMergeTest {
         merge.apply(taxonomyNamed("MFN-1", 10, 1300, "WorseName"));
 
         // then
-        Taxonomy result = merge.knownFor("MFN-1");
+        Taxonomy result = merge.latest("MFN-1");
         assertEquals("BestName", result.name());
         assertEquals(1300, result.netWeightInGrams());
     }
@@ -75,7 +75,7 @@ class TaxonomyMergeTest {
         merge.apply(taxonomy("MFN-1", 5, 1300));
 
         // then
-        assertEquals(1300, merge.knownFor("MFN-1").netWeightInGrams());
+        assertEquals(1300, merge.latest("MFN-1").netWeightInGrams());
     }
 
     @Test
@@ -100,7 +100,7 @@ class TaxonomyMergeTest {
         merge.apply(new Taxonomy("E", "MFN1", "B", "N", null, 10, null, 200));
 
         // then
-        Taxonomy result = merge.knownFor("MFN1");
+        Taxonomy result = merge.latest("MFN1");
         assertThat(result.netWeightInGrams()).isEqualTo(100);
         assertThat(result.grossWeightInGrams()).isEqualTo(200);
     }
@@ -114,7 +114,7 @@ class TaxonomyMergeTest {
         merge.apply(new Taxonomy("E", "MFN1", "B", "N", null, 2, 999, null));
 
         // then
-        Taxonomy result = merge.knownFor("MFN1");
+        Taxonomy result = merge.latest("MFN1");
         assertThat(result.netWeightInGrams()).isEqualTo(999);
         assertThat(result.grossWeightInGrams()).isEqualTo(200);
     }
@@ -128,7 +128,7 @@ class TaxonomyMergeTest {
         merge.apply(new Taxonomy("E", "MFN1", "B", "N", null, 5, 150, 250));
 
         // then
-        Taxonomy result = merge.knownFor("MFN1");
+        Taxonomy result = merge.latest("MFN1");
         assertThat(result.netWeightInGrams()).isEqualTo(150);
         assertThat(result.grossWeightInGrams()).isEqualTo(250);
     }
@@ -142,7 +142,7 @@ class TaxonomyMergeTest {
         merge.apply(uncategorized("MFN-1", 1));
 
         // then
-        Taxonomy result = merge.knownFor("MFN-1");
+        Taxonomy result = merge.latest("MFN-1");
         assertEquals("CPU", result.category());
         assertEquals(10, result.dataAccuracyScore());
     }
@@ -156,7 +156,7 @@ class TaxonomyMergeTest {
         merge.apply(categorized("MFN-1", "CPU", 10));
 
         // then
-        assertEquals("CPU", merge.knownFor("MFN-1").category());
+        assertEquals("CPU", merge.latest("MFN-1").category());
     }
 
     @Test
@@ -168,7 +168,7 @@ class TaxonomyMergeTest {
         merge.apply(categorized("MFN-1", "CPU", 10));
 
         // then
-        assertEquals("CPU", merge.knownFor("MFN-1").category());
+        assertEquals("CPU", merge.latest("MFN-1").category());
     }
 
     @Test
@@ -180,7 +180,7 @@ class TaxonomyMergeTest {
         merge.apply(categorized("MFN-1", "GPU", 1));
 
         // then
-        assertEquals("GPU", merge.knownFor("MFN-1").category());
+        assertEquals("GPU", merge.latest("MFN-1").category());
     }
 
     @Test
@@ -192,7 +192,7 @@ class TaxonomyMergeTest {
         merge.apply(categorized("MFN-1", "CPU", 10));
 
         // then
-        Taxonomy result = merge.knownFor("MFN-1");
+        Taxonomy result = merge.latest("MFN-1");
         assertEquals("CPU", result.category());
         assertEquals(777, result.netWeightInGrams());
     }
@@ -207,7 +207,7 @@ class TaxonomyMergeTest {
         merge.apply(new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", null, 1, 300, null, "Second"));
 
         // then
-        Taxonomy result = merge.knownFor("MFN-1");
+        Taxonomy result = merge.latest("MFN-1");
         assertEquals(300, result.netWeightInGrams());
         assertEquals(500, result.grossWeightInGrams());
         assertEquals("Second", result.rawCategory());
@@ -223,7 +223,7 @@ class TaxonomyMergeTest {
         merge.apply(new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", "CPU", 1, 300, null, "Raw", "999"));
 
         // then
-        Taxonomy result = merge.knownFor("MFN-1");
+        Taxonomy result = merge.latest("MFN-1");
         assertEquals(300, result.netWeightInGrams());
         assertEquals(500, result.grossWeightInGrams());
         assertEquals("999", result.categoryId());
@@ -240,7 +240,7 @@ class TaxonomyMergeTest {
                 "Karty graficzne", 0, null, null, "Raw", null));
 
         // then
-        Taxonomy result = merge.knownFor("MFN-1");
+        Taxonomy result = merge.latest("MFN-1");
         assertEquals("Karty graficzne", result.category());
         assertNull(result.categoryId());
     }
@@ -256,7 +256,7 @@ class TaxonomyMergeTest {
         merge.apply(input);
 
         // then
-        assertThat(merge.knownFor("MFN-ZERO")).isEqualTo(input);
+        assertThat(merge.latest("MFN-ZERO")).isEqualTo(input);
     }
 
     @Test
@@ -269,7 +269,7 @@ class TaxonomyMergeTest {
         merge.apply(categorized("MFN-1", "CPU", 10));
 
         // then
-        assertEquals("CPU", merge.knownFor("MFN-1").category());
+        assertEquals("CPU", merge.latest("MFN-1").category());
         assertThat(merge.changed()).hasSize(1);
     }
 

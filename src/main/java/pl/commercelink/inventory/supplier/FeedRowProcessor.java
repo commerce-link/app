@@ -30,22 +30,21 @@ class FeedRowProcessor {
         TaxonomyMerge merge = taxonomyCatalog.openMerge(candidates.stream().map(c -> c.product().mfn()).toList());
         List<InventoryItem> accepted = new ArrayList<>();
         for (Candidate candidate : candidates) {
-            Taxonomy fromFeed = candidate.product();
-            Taxonomy enriched = enrichment.enrich(fromFeed, merge.knownFor(fromFeed.mfn()));
-            Taxonomy ranked = StoreFeedTaxonomy.deprioritized(enriched, taxonomyPenalty);
+            Taxonomy record = StoreFeedTaxonomy.deprioritized(
+                    enrichment.enrich(candidate.product(), merge.latest(candidate.product().mfn())), taxonomyPenalty);
 
-            if (enriched.isProcessable()) {
-                merge.apply(ranked);
+            if (record.isProcessable()) {
+                merge.apply(record);
                 stats.markImported();
-                if (!Taxonomy.hasCategory(fromFeed)) {
+                if (!Taxonomy.hasCategory(candidate.product())) {
                     stats.markImportedCategorized();
                 }
                 accepted.add(candidate.item());
-            } else if (enrichment.isPendingEligible(enriched)) {
-                merge.apply(ranked);
-                enrichment.addPending(ranked, mappingScopeOf(stats.supplierName()));
+            } else if (enrichment.isPendingEligible(record)) {
+                merge.apply(record);
+                enrichment.addPending(record, mappingScopeOf(stats.supplierName()));
                 stats.markCategorizationScheduled();
-            } else if (enrichment.hasIdentificationData(enriched)) {
+            } else if (enrichment.hasIdentificationData(record)) {
                 stats.markCategorizationPostponed();
             } else {
                 stats.markIncomplete();
