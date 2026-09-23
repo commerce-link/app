@@ -46,6 +46,7 @@ import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.catalog.CatalogAccess;
 import pl.commercelink.web.catalog.CatalogPaths;
+import pl.commercelink.web.catalog.CategoryFilter;
 import pl.commercelink.web.catalog.CategoryPageModel;
 import pl.commercelink.web.catalog.CategoryTypeLabels;
 import pl.commercelink.web.catalog.ProductRow;
@@ -84,10 +85,12 @@ public class CatalogProductsController {
     private static final String ALL = "all";
 
     /**
+     * What the page shows without a filter in its address. The script starts from the address and drops a parameter
+     * only when it is back at this default, so "Wszystkie" (and any other status) stays in the address across a reload.
      * The label group is declared so its value travels in the address, but never filled in here: the default is a
      * space-separated list of {@code group:value} pairs and a label may contain a space ("RTX 5080 Ti").
      */
-    private static final String LABEL_DEFAULT = " label:" + ALL;
+    private static final String FILTER_DEFAULT = "status:" + CategoryFilter.DEFAULT_STATUS + " feature:" + ALL + " label:" + ALL;
 
     /** A category proposes hundreds of products and every one of them can be selected, well past Spring's default 256. */
     private static final int MAX_ADDED_PRODUCTS = 5000;
@@ -119,21 +122,21 @@ public class CatalogProductsController {
 
     @GetMapping("/dashboard/catalogs/{catalogId}/category/{categoryId}")
     public String category(@PathVariable String catalogId, @PathVariable String categoryId,
-                           @RequestParam(required = false, defaultValue = "active") String status,
-                           @RequestParam(required = false, defaultValue = ALL) String feature,
+                           @RequestParam(required = false) String status, @RequestParam(required = false) String feature,
+                           @RequestParam(required = false) String label, @RequestParam(required = false) String q,
                            Model model) {
         ProductCatalog catalog = access.requireCatalog(storeId(), catalogId);
         CategoryDefinition category = access.requireCategory(catalog, categoryId);
         CategoryPageModel page = CategoryPageModel.of(rowsOf(catalog, category), category);
-        String startStatus = statusFilter(status);
         model.addAttribute("catalog", catalog);
         model.addAttribute("category", category);
         model.addAttribute("page", page);
         model.addAttribute("statuses", ProductStatus.values());
         model.addAttribute("features", CategoryPageModel.FEATURES);
-        model.addAttribute("filterDefault", "status:" + startStatus
-                + " feature:" + (CategoryPageModel.FEATURES.contains(feature) ? feature : ALL) + LABEL_DEFAULT);
-        model.addAttribute("statusFilter", startStatus);
+        model.addAttribute("filterDefault", FILTER_DEFAULT);
+        // The filter the page was opened with, for the links to a product; the script keeps them in step with the
+        // address as the operator changes the filter.
+        model.addAttribute("filterQuery", CategoryFilter.of(status, feature, label, q).query());
         model.addAttribute("typeLabelKey", CategoryTypeLabels.labelKey(category.getType()));
         model.addAttribute("typeTone", CategoryTypeLabels.tone(category.getType()));
         model.addAttribute("pimNames", String.join(", ", pimCategoryOptions.namesOf(category.getPimCategoryIds())));
@@ -155,18 +158,27 @@ public class CatalogProductsController {
     @PostMapping("/dashboard/catalogs/{catalogId}/category/{categoryId}/products/bulk")
     public String bulk(@PathVariable String catalogId, @PathVariable String categoryId,
                        @RequestParam String action, @RequestParam(required = false) List<String> productIds,
-                       @RequestParam(required = false, defaultValue = "active") String status,
+                       @RequestParam(required = false) String status, @RequestParam(required = false) String feature,
+                       @RequestParam(required = false) String label, @RequestParam(required = false) String q,
                        Locale locale, RedirectAttributes redirectAttributes) {
         ProductCatalog catalog = access.requireCatalog(storeId(), catalogId);
         CategoryDefinition category = access.requireCategory(catalog, categoryId);
-        String back = "redirect:" + CatalogPaths.category(catalogId, categoryId) + "?status=" + statusFilter(status);
+        // An automatic category computes its list; whatever a hand-made POST names there is not the operator's to change.
+        String refused = refuseAutomatic(category, catalogId, categoryId, locale, redirectAttributes);
+        if (refused != null) {
+            return refused;
+        }
+        // The form copies the page's address into itself; only the filter the page understands comes back.
+        String back = "redirect:" + CatalogPaths.category(catalogId, categoryId) + CategoryFilter.of(status, feature, label, q).query();
         if (productIds == null || productIds.isEmpty()) {
             redirectAttributes.addFlashAttribute(CatalogsController.ERROR_FLASH,
                     messageSource.getMessage("catalog.products.bulk.none", null, locale));
             return back;
         }
-        // Read by the category's own key, so an id smuggled in from another category simply finds nothing.
-        List<Product> products = productIds.stream()
+        // Read by the category's own key, so an id smuggled in from another category simply finds nothing; such an
+        // id (or one deleted in the meantime) is skipped and counted in the outcome, not passed over in silence.
+        List<String> requested = productIds.stream().distinct().toList();
+        List<Product> products = requested.stream()
                 .map(productId -> productRepository.findByProductId(category.getCategoryId(), productId))
                 .filter(Objects::nonNull)
                 .toList();
@@ -176,8 +188,15 @@ public class CatalogProductsController {
             case "delete" -> delete(products);
             default -> throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
         };
-        SettingsFlash.onRedirect(redirectAttributes,
-                messageSource.getMessage(messageKey, new Object[]{products.size()}, locale));
+        int skipped = requested.size() - products.size();
+        String message = skipped > 0
+                ? messageSource.getMessage(messageKey + ".skipped", new Object[]{products.size(), skipped}, locale)
+                : messageSource.getMessage(messageKey, new Object[]{products.size()}, locale);
+        if (products.isEmpty()) {
+            redirectAttributes.addFlashAttribute(CatalogsController.WARNING_FLASH, message);
+        } else {
+            SettingsFlash.onRedirect(redirectAttributes, message);
+        }
         return back;
     }
 
@@ -295,17 +314,23 @@ public class CatalogProductsController {
             alreadyInCategory.add(key);
             added++;
         }
-        SettingsFlash.onRedirect(redirectAttributes, added == 0
-                ? messageSource.getMessage("catalog.products.added.none", null, locale)
-                : messageSource.getMessage("catalog.products.added", new Object[]{added}, locale));
+        // Nothing saved is not a success: the category page shows it in its warning alert.
+        if (added == 0) {
+            redirectAttributes.addFlashAttribute(CatalogsController.WARNING_FLASH,
+                    messageSource.getMessage("catalog.products.added.none", null, locale));
+        } else {
+            SettingsFlash.onRedirect(redirectAttributes,
+                    messageSource.getMessage("catalog.products.added", new Object[]{added}, locale));
+        }
         return "redirect:" + CatalogPaths.category(catalogId, categoryId);
     }
 
     @GetMapping("/dashboard/catalogs/{catalogId}/category/{categoryId}/products/new")
     public String newProduct(@PathVariable String catalogId, @PathVariable String categoryId,
                              @RequestParam(required = false) String ean,
-                             @RequestParam(required = false, defaultValue = "active") String status, Model model,
-                             Locale locale, RedirectAttributes redirectAttributes) {
+                             @RequestParam(required = false) String status, @RequestParam(required = false) String feature,
+                             @RequestParam(required = false) String label, @RequestParam(required = false) String q,
+                             Model model, Locale locale, RedirectAttributes redirectAttributes) {
         ProductCatalog catalog = access.requireCatalog(storeId(), catalogId);
         CategoryDefinition category = access.requireCategory(catalog, categoryId);
         String refused = refuseAutomatic(category, catalogId, categoryId, locale, redirectAttributes);
@@ -313,10 +338,10 @@ public class CatalogProductsController {
             return refused;
         }
         Store store = storesRepository.findById(storeId());
-        String currentStatus = statusFilter(status);
+        CategoryFilter currentFilter = CategoryFilter.of(status, feature, label, q);
         if (StringUtils.isBlank(ean)) {
             return renderProduct(catalog, category, store, null, ProductForm.forNewProduct(), null, Map.of(), null,
-                    currentStatus, model, locale);
+                    currentFilter, model, locale);
         }
         MatchedInventory matched = inventory.withEnabledSuppliersOnly(storeId()).findByEan(ean);
         // The link was followed from a list read earlier; a product can leave the inventory in the meantime, and that
@@ -324,7 +349,7 @@ public class CatalogProductsController {
         if (matched.isEmpty()) {
             return renderProduct(catalog, category, store, null, ProductForm.forNewProduct(), null, Map.of(),
                     messageSource.getMessage("catalog.products.new.eanNotInInventory", new Object[]{ean}, locale),
-                    currentStatus, model, locale);
+                    currentFilter, model, locale);
         }
         InventoryKey key = matched.getInventoryKey();
         Optional<PimEntry> entry = pimCatalog.findByPimIdOrGtinsOrMpns(key.getId(), key.getProductEans(), key.getProductCodes());
@@ -334,13 +359,15 @@ public class CatalogProductsController {
         form.setExistingPimId(null);
         form.setExistingLabel(null);
         return renderProduct(catalog, category, store, null, form, prefilled.getPimId(), Map.of(), null,
-                currentStatus, model, locale);
+                currentFilter, model, locale);
     }
 
     @PostMapping("/dashboard/catalogs/{catalogId}/category/{categoryId}/products/new")
     public String createProduct(@PathVariable String catalogId, @PathVariable String categoryId,
                                 @ModelAttribute ProductForm form,
-                                @RequestParam(required = false, defaultValue = "active") String status,
+                                @RequestParam(required = false) String status,
+                                @RequestParam(required = false) String feature,
+                                @RequestParam(required = false) String filterLabel, @RequestParam(required = false) String q,
                                 @RequestHeader(value = SettingsPaths.ASYNC_HEADER, required = false) String requestedWith,
                                 Model model, Locale locale, RedirectAttributes redirectAttributes,
                                 HttpServletRequest request, HttpServletResponse response) {
@@ -352,13 +379,14 @@ public class CatalogProductsController {
         }
         Store store = storesRepository.findById(storeId());
         boolean async = SettingsPaths.isAsync(requestedWith);
-        String currentStatus = statusFilter(status);
+        // "label" is the product's own field in this form, so the label of the list travels as "filterLabel".
+        CategoryFilter currentFilter = CategoryFilter.of(status, feature, filterLabel, q);
         form.setExistingPimId(null);
         form.setExistingLabel(null);
         Map<String, String> errors = form.validate(category.getGroupingOrder(), pricingGroups(category),
                 marketplaceNames(store), this::pimIdFor);
         if (!errors.isEmpty()) {
-            return rejected(renderProduct(catalog, category, store, null, form, null, errors, null, currentStatus,
+            return rejected(renderProduct(catalog, category, store, null, form, null, errors, null, currentFilter,
                     model, locale), PRODUCT_FRAGMENT, async, response);
         }
         Product product = form.toNewProduct(category.getCategoryId());
@@ -367,17 +395,18 @@ public class CatalogProductsController {
             product.setBrand(brandMapper.unifyBrand(entry.brand()));
         });
         productRepository.save(product);
-        return saved(CatalogPaths.category(catalogId, categoryId) + "?status=" + currentStatus,
+        return saved(CatalogPaths.category(catalogId, categoryId) + currentFilter.query(),
                 messageSource.getMessage("product.added", new Object[]{product.getName()}, locale), async, model,
                 redirectAttributes, request, response, PRODUCT_FRAGMENT,
                 () -> renderProduct(catalog, category, store, null, form, product.getPimId(), Map.of(), null,
-                        currentStatus, model, locale));
+                        currentFilter, model, locale));
     }
 
     @GetMapping("/dashboard/catalogs/{catalogId}/category/{categoryId}/products/{productId}")
     public String product(@PathVariable String catalogId, @PathVariable String categoryId, @PathVariable String productId,
-                          @RequestParam(required = false, defaultValue = "active") String status, Model model,
-                          Locale locale, RedirectAttributes redirectAttributes) {
+                          @RequestParam(required = false) String status, @RequestParam(required = false) String feature,
+                          @RequestParam(required = false) String label, @RequestParam(required = false) String q,
+                          Model model, Locale locale, RedirectAttributes redirectAttributes) {
         ProductCatalog catalog = access.requireCatalog(storeId(), catalogId);
         CategoryDefinition category = access.requireCategory(catalog, categoryId);
         // A missing product is a 404 regardless of the category's type; only once it is known to exist can the
@@ -388,13 +417,15 @@ public class CatalogProductsController {
             return refused;
         }
         return renderProduct(catalog, category, storesRepository.findById(storeId()), product, ProductForm.from(product),
-                product.getPimId(), Map.of(), null, statusFilter(status), model, locale);
+                product.getPimId(), Map.of(), null, CategoryFilter.of(status, feature, label, q), model, locale);
     }
 
     @PostMapping("/dashboard/catalogs/{catalogId}/category/{categoryId}/products/{productId}")
     public String saveProduct(@PathVariable String catalogId, @PathVariable String categoryId, @PathVariable String productId,
                               @ModelAttribute ProductForm form,
-                              @RequestParam(required = false, defaultValue = "active") String status,
+                              @RequestParam(required = false) String status,
+                              @RequestParam(required = false) String feature,
+                              @RequestParam(required = false) String filterLabel, @RequestParam(required = false) String q,
                               @RequestHeader(value = SettingsPaths.ASYNC_HEADER, required = false) String requestedWith,
                               Model model, Locale locale, RedirectAttributes redirectAttributes,
                               HttpServletRequest request, HttpServletResponse response) {
@@ -407,7 +438,8 @@ public class CatalogProductsController {
         }
         Store store = storesRepository.findById(storeId());
         boolean async = SettingsPaths.isAsync(requestedWith);
-        String currentStatus = statusFilter(status);
+        // "label" is the product's own field in this form, so the label of the list travels as "filterLabel".
+        CategoryFilter currentFilter = CategoryFilter.of(status, feature, filterLabel, q);
         // Identity and brand belong to the saved product, not to the request: a forged PIM id would let the offer of
         // this product claim another entry.
         form.setExistingPimId(product.getPimId());
@@ -416,15 +448,15 @@ public class CatalogProductsController {
                 marketplaceNames(store), this::pimIdFor);
         if (!errors.isEmpty()) {
             return rejected(renderProduct(catalog, category, store, product, form, product.getPimId(), errors, null,
-                    currentStatus, model, locale), PRODUCT_FRAGMENT, async, response);
+                    currentFilter, model, locale), PRODUCT_FRAGMENT, async, response);
         }
         form.applyTo(product);
         productRepository.save(product);
-        return saved(CatalogPaths.category(catalogId, categoryId) + "?status=" + currentStatus,
+        return saved(CatalogPaths.category(catalogId, categoryId) + currentFilter.query(),
                 messageSource.getMessage("product.saved", new Object[]{product.getName()}, locale), async, model,
                 redirectAttributes, request, response, PRODUCT_FRAGMENT,
                 () -> renderProduct(catalog, category, store, product, form, product.getPimId(), Map.of(), null,
-                        currentStatus, model, locale));
+                        currentFilter, model, locale));
     }
 
     @GetMapping("/dashboard/catalogs/{catalogId}/category/{categoryId}/products/{productId}/delete")
@@ -500,12 +532,12 @@ public class CatalogProductsController {
      * @param existing     the saved product, or null for one being created
      * @param pimId        the entry the product resolves to, or null when it has none; never taken from the form
      * @param notice       a sentence about how the form was filled (an EAN the inventory no longer has), or null
-     * @param statusFilter the status the category page was showing when this page was reached, carried through the
-     *                     form so the redirect after a save returns to the same filter
+     * @param filter       the filter the category page was showing when this page was reached, carried through the
+     *                     form so the redirect after a save (and the way back) returns to the same list
      */
     private String renderProduct(ProductCatalog catalog, CategoryDefinition category, Store store, Product existing,
                                  ProductForm form, String pimId, Map<String, String> errors, String notice,
-                                 String statusFilter, Model model, Locale locale) {
+                                 CategoryFilter filter, Model model, Locale locale) {
         boolean edit = existing != null;
         String catalogId = catalog.getCatalogId();
         String categoryId = category.getCategoryId();
@@ -518,7 +550,7 @@ public class CatalogProductsController {
         model.addAttribute("catalog", catalog);
         model.addAttribute("category", category);
         model.addAttribute("prefillNotice", notice);
-        model.addAttribute("statusFilter", statusFilter);
+        model.addAttribute("filter", filter);
         model.addAttribute("labels", category.getGroupingOrder());
         model.addAttribute("pricingGroups", pricingGroups(category));
         model.addAttribute("availabilityTypes", Arrays.stream(ProductAvailabilityType.values()).map(Enum::name).toList());
@@ -532,7 +564,7 @@ public class CatalogProductsController {
         model.addAttribute("formAction", edit
                 ? CatalogPaths.product(catalogId, categoryId, existing.getProductId())
                 : CatalogPaths.newProduct(catalogId, categoryId));
-        model.addAttribute("backHref", CatalogPaths.category(catalogId, categoryId));
+        model.addAttribute("backHref", CatalogPaths.category(catalogId, categoryId) + filter.query());
         model.addAttribute("pageTitle", edit
                 ? existing.getName() : messageSource.getMessage("product.page.new", null, locale));
         model.addAttribute("deleteHref", edit
@@ -671,11 +703,6 @@ public class CatalogProductsController {
     private String delete(List<Product> products) {
         products.forEach(productRepository::delete);
         return "catalog.products.bulk.deleted";
-    }
-
-    /** Only a filter the page offers comes back in the address; anything else starts on the active products. */
-    private static String statusFilter(String status) {
-        return ProductStatus.fromFilter(status) != null || ALL.equals(status) ? status : "active";
     }
 
     private static String storeId() {

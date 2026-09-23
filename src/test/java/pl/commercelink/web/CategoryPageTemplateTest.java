@@ -109,7 +109,7 @@ class CategoryPageTemplateTest {
         context.setVariable("statuses", ProductStatus.values());
         context.setVariable("features", CategoryPageModel.FEATURES);
         context.setVariable("filterDefault", "status:active feature:all label:all");
-        context.setVariable("statusFilter", "active");
+        context.setVariable("filterQuery", "?status=all");
         context.setVariable("typeLabelKey", CategoryTypeLabels.labelKey(gpu.getType()));
         context.setVariable("typeTone", CategoryTypeLabels.tone(gpu.getType()));
         context.setVariable("pimNames", "Graphics cards");
@@ -152,8 +152,7 @@ class CategoryPageTemplateTest {
         assertThat(html.indexOf("cl-page-actions")).isLessThan(html.indexOf("/products/add"));
         assertThat(html).contains("Manual").doesNotContain("??");
         assertThat(html).contains("MSI RTX 5070").contains("Outside the list").contains("No PIM")
-                .contains("value=\"p1\"").contains("action=\"/dashboard/catalogs/c1/category/k1/products/bulk\"")
-                .contains("name=\"status\" value=\"active\"");
+                .contains("value=\"p1\"").contains("action=\"/dashboard/catalogs/c1/category/k1/products/bulk\"");
     }
 
     /**
@@ -254,5 +253,97 @@ class CategoryPageTemplateTest {
                 .doesNotContain("data-cl-selection-bar").doesNotContain("/products/add");
         assertThat(html).contains("data-sort-price=\"2 749,00\"").contains("2 749,00 PLN")
                 .contains("Lowest gross price").doesNotContain("??");
+    }
+
+    /**
+     * The bulk form renders no filter of its own: the script copies the address, which is the filter as the operator
+     * left it, and a status rendered by the server would be the one the page was opened with.
+     */
+    @Test
+    void theBulkFormCarriesNoFilterOfItsOwn() {
+        // when
+        String html = rendered(false);
+
+        // then
+        String form = html.substring(html.indexOf("<form"), html.indexOf("</form>"));
+        assertThat(form).doesNotContain("name=\"status\"");
+    }
+
+    /** A row opens its product with the filter of the page, so the save comes back to it (QA 15.10). */
+    @Test
+    void aRowLinkCarriesTheFilterOfThePage() {
+        // when
+        String html = rendered(false);
+
+        // then
+        assertThat(html).contains("href=\"/dashboard/catalogs/c1/category/k1/products/p1?status=all\" data-cl-filter-carry")
+                .contains("href=\"/dashboard/catalogs/c1/category/k1/products/new?status=all\" data-cl-filter-carry");
+    }
+
+    /**
+     * A segment is read as "Active: 1", not "Active1". The separator is inline text of no size: a visually hidden span
+     * is taken out of the flow, and Chromium then pads it with spaces in the name ("Active : 1").
+     */
+    @Test
+    void aSegmentNamesItsCountApartFromItsLabel() {
+        // when
+        String html = rendered(false);
+
+        // then
+        assertThat(html).contains("<span>Active</span><span class=\"cl-segment-sep\">: </span><span class=\"cl-segment-count\">1</span>")
+                .contains("<span>All</span><span class=\"cl-segment-sep\">: </span><span class=\"cl-segment-count\">2</span>");
+    }
+
+    /** The column is the label of the category's list, as in the mock-up; "product label" is the product page's field. */
+    @Test
+    void theLabelColumnIsCalledLabel() {
+        // when
+        String html = rendered(false);
+
+        // then
+        assertThat(html).contains("data-sort-key=\"label\">Label</button>").contains("data-label=\"Label\"")
+                .doesNotContain("Product label");
+    }
+
+    /** An automatic category is defined by its recommendation filters: the lead says how many it has. */
+    @Test
+    void theLeadOfAnAutomaticCategoryCountsItsRecommendationFilters() {
+        // when / then
+        assertThat(rendered(true)).contains("Recommendation filters: 0");
+        assertThat(rendered(false)).doesNotContain("Recommendation filters");
+    }
+
+    /** The currency is a message, not a literal of the template. */
+    @Test
+    void thePriceCurrencyComesFromTheMessages() throws Exception {
+        // when / then
+        assertThat(page()).doesNotContain("PLN");
+        assertThat(rendered(true)).contains("2 749,00 PLN");
+    }
+
+    /** The placeholder fits a narrow field; the full description is the field's name. */
+    @Test
+    void theSearchHasAShortPlaceholderAndAFullNameAndLivesInTheAddress() {
+        // when
+        String html = rendered(false);
+
+        // then
+        assertThat(html).contains("data-cl-table-search=\"q\"").contains("placeholder=\"Search products\"")
+                .contains("aria-label=\"Search products: name, EAN, code, PIM, brand\"");
+    }
+
+    /**
+     * The count is announced from a region that is always in the page; a live region that appears in the same frame as
+     * its text is often skipped. The bar keeps the visible count.
+     */
+    @Test
+    void theSelectionIsAnnouncedFromAPermanentRegionOutsideTheBar() {
+        // when
+        String html = rendered(false);
+
+        // then
+        assertThat(html).containsPattern("<p class=\"cl-visually-hidden\" role=\"status\" data-cl-selection-status></p>\\s*<div class=\"cl-selection-bar\"");
+        String bar = html.substring(html.indexOf("data-cl-selection-bar"), html.indexOf("cl-selection-actions"));
+        assertThat(bar).doesNotContain("role=\"status\"");
     }
 }

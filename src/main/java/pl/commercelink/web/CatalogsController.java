@@ -58,6 +58,9 @@ public class CatalogsController {
      */
     static final String ERROR_FLASH = "catalogError";
 
+    /** An action that went through but changed nothing: not a success, rendered by the catalog pages' warning alert. */
+    static final String WARNING_FLASH = "catalogWarning";
+
     private final ProductCatalogRepository catalogRepository;
     private final MessageSource messageSource;
     private final ProductCatalogDetailsService detailsService;

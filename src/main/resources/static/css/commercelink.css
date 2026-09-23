@@ -3519,6 +3519,29 @@ a.cl-link-button:hover {
     white-space: nowrap;
 }
 
+/* The ": " between a segment's label and its count, so the button is named "Aktywne: 2", not "Aktywne2". Inline text of
+   no size rather than .cl-visually-hidden: an absolutely positioned span leaves the flow, and Chromium then pads it
+   with spaces in the accessible name ("Aktywne : 2"). */
+.cl-page .cl-segment .cl-segment-sep {
+    font-size: 0;
+}
+
+/* A segment with nothing to show (DS "Filtr wielowymiarowy": dimmed, but still a button). The grey is --cl-ink-2 let
+   15% towards the control's own --cl-surface-2: 4.9:1 there, above AA -- --cl-ink-3 would be 4.47:1. The weight drops
+   too, so the dimming does not rest on the colour alone; hover brings the ink back like on any segment. */
+.cl-page .cl-segment[data-count="0"]:not([aria-pressed="true"]) {
+    color: color-mix(in srgb, var(--cl-ink-2) 85%, var(--cl-surface-2));
+    font-weight: 400;
+}
+
+.cl-page .cl-segment[data-count="0"]:not([aria-pressed="true"]) .cl-segment-count {
+    color: inherit;
+}
+
+.cl-page .cl-segment[data-count="0"]:not([aria-pressed="true"]):hover {
+    color: var(--cl-ink);
+}
+
 .cl-page .cl-table-toolbar .cl-toolbar-filters {
     display: flex;
     flex-wrap: wrap;

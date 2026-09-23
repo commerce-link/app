@@ -227,6 +227,20 @@ class ProductsAddTemplateTest {
                 .doesNotContain("??");
     }
 
+    /** The currency of a proposal's price is a message; the selection is announced from a region always in the page. */
+    @Test
+    void theCurrencyIsAMessageAndTheSelectionIsAnnouncedFromAPermanentRegion() throws Exception {
+        // when
+        String html = renderedProposals();
+
+        // then
+        assertThat(source("products-add")).doesNotContain("PLN");
+        assertThat(html).contains("2 749,00 PLN")
+                .containsPattern("<p class=\"cl-visually-hidden\" role=\"status\" data-cl-selection-status></p>\\s*<div class=\"cl-selection-bar\"");
+        String bar = html.substring(html.indexOf("data-cl-selection-bar"), html.indexOf("cl-selection-actions"));
+        assertThat(bar).doesNotContain("role=\"status\"");
+    }
+
     private static String renderedProposals() {
         RecommendationRow listed = new RecommendationRow("1", "MSI RTX 5070", "MSI", "MFN-1", true, "2 749,00",
                 List.of("Acme", "Elko"), "5901234567890", "msi rtx 5070 1 mfn-1 msi",

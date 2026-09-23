@@ -174,7 +174,9 @@ class CatalogProductsControllerTest {
         CategoryPageModel page = (CategoryPageModel) result.getModelAndView().getModel().get("page");
         assertThat(page.rows()).extracting(ProductRow::name).containsExactly("ASUS RTX 5060", "MSI RTX 5070");
         assertThat(page.statusCounts()).containsEntry(ProductStatus.ACTIVE, 1).containsEntry(ProductStatus.DISABLED, 1);
-        assertThat(result.getModelAndView().getModel().get("filterDefault")).isEqualTo("status:disabled feature:all label:all");
+        // The default is what the page shows without a filter in the address; the script starts from the address and
+        // drops a parameter only when it equals this default, so "status=all" (and "status=disabled") stay in it.
+        assertThat(result.getModelAndView().getModel().get("filterDefault")).isEqualTo("status:active feature:all label:all");
         verify(recommendationEngine, never()).getRecommendations(any(), any());
     }
 
@@ -191,6 +193,18 @@ class CatalogProductsControllerTest {
         mvc.perform(get(categoryPath()).param("status", "deleted").param("feature", "colour").param("label", "RTX 5070"))
                 .andExpect(status().isOk())
                 .andExpect(model().attribute("filterDefault", "status:active feature:all label:all"));
+    }
+
+    /** The row links and the product pages behind them know the filter to come back to. */
+    @Test
+    void theCategoryPageCarriesItsFilterIntoTheProductLinks() throws Exception {
+        // given
+        when(productRepository.findAll(gpu.getCategoryId())).thenReturn(List.of());
+
+        // when / then
+        mvc.perform(get(categoryPath()).param("status", "all").param("feature", "stock").param("label", "RTX 5070")
+                        .param("q", "msi"))
+                .andExpect(model().attribute("filterQuery", "?status=all&feature=stock&label=RTX+5070&q=msi"));
     }
 
     @Test
@@ -334,16 +348,88 @@ class CatalogProductsControllerTest {
         a.setProductId("p1");
         when(productRepository.findByProductId(gpu.getCategoryId(), "p1")).thenReturn(a);
         when(productRepository.findByProductId(gpu.getCategoryId(), "missing")).thenReturn(null);
-        when(messageSource.getMessage(eq("catalog.products.bulk.disabled"), eq(new Object[]{1}), any(Locale.class)))
-                .thenReturn("Disabled 1");
+        when(messageSource.getMessage(eq("catalog.products.bulk.disabled.skipped"), eq(new Object[]{1, 1}), any(Locale.class)))
+                .thenReturn("Disabled 1, skipped 1");
 
         // when / then
         mvc.perform(post(categoryPath() + "/products/bulk")
                         .param("action", "disable").param("productIds", "p1", "missing").param("status", "active"))
                 .andExpect(redirectedUrl(categoryPath() + "?status=active"))
-                .andExpect(flash().attribute("settingsSavedMessage", "Disabled 1"));
+                .andExpect(flash().attribute("settingsSavedMessage", "Disabled 1, skipped 1"));
         assertThat(a.isEnabled()).isFalse();
         verify(productRepository).save(a);
+    }
+
+    /** Every product was found: the sentence says how many changed and nothing about skipped ones. */
+    @Test
+    void bulkEnableReportsTheCountAlone() throws Exception {
+        // given
+        Product a = new Product(gpu.getCategoryId(), "pim", "1", "m", "MSI", "l", "n", "Default");
+        a.setProductId("p1");
+        a.setEnabled(false);
+        when(productRepository.findByProductId(gpu.getCategoryId(), "p1")).thenReturn(a);
+
+        // when / then
+        mvc.perform(post(categoryPath() + "/products/bulk").param("action", "enable").param("productIds", "p1", "p1"))
+                .andExpect(flash().attribute("settingsSavedMessage", "catalog.products.bulk.enabled"));
+        verify(messageSource).getMessage(eq("catalog.products.bulk.enabled"), eq(new Object[]{1}), any(Locale.class));
+    }
+
+    /** An automatic category computes its list: a hand-made POST must not enable, disable or delete leftovers in it. */
+    @Test
+    void bulkIsRefusedForAnAutomaticCategory() throws Exception {
+        // given
+        gpu.setType(CategoryDefinitionType.Dynamic);
+
+        // when / then
+        mvc.perform(post(categoryPath() + "/products/bulk").param("action", "disable").param("productIds", "p1"))
+                .andExpect(redirectedUrl(categoryPath()))
+                .andExpect(flash().attribute("catalogError", "catalog.products.add.dynamic"));
+        verify(productRepository, never()).findByProductId(any(), any());
+        verify(productRepository, never()).save(any(Product.class));
+        verify(productRepository, never()).delete(any(Product.class));
+    }
+
+    /** Nothing changed is not a success: the outcome is the warning alert, and it still names what was skipped. */
+    @Test
+    void aBulkActionThatChangesNothingWarns() throws Exception {
+        // given
+        when(productRepository.findByProductId(gpu.getCategoryId(), "foreign")).thenReturn(null);
+
+        // when / then
+        mvc.perform(post(categoryPath() + "/products/bulk").param("action", "delete").param("productIds", "foreign"))
+                .andExpect(flash().attribute("catalogWarning", "catalog.products.bulk.deleted.skipped"))
+                .andExpect(flash().attribute("settingsSavedMessage", nullValue()));
+        verify(messageSource).getMessage(eq("catalog.products.bulk.deleted.skipped"), eq(new Object[]{0, 1}), any(Locale.class));
+    }
+
+    /**
+     * The bulk form copies the address of the page into itself; the redirect echoes back only the filter the page
+     * understands -- status, "Pokaż", label and search -- each re-validated and encoded, and nothing else.
+     */
+    @Test
+    void bulkReturnsToTheFilterItWasSentFrom() throws Exception {
+        // given
+        Product a = new Product(gpu.getCategoryId(), "pim", "1", "m", "MSI", "l", "n", "Default");
+        a.setProductId("p1");
+        when(productRepository.findByProductId(gpu.getCategoryId(), "p1")).thenReturn(a);
+
+        // when / then
+        mvc.perform(post(categoryPath() + "/products/bulk").param("action", "disable").param("productIds", "p1")
+                        .param("status", "all").param("feature", "srp").param("label", "RTX 5080 Ti")
+                        .param("q", "ryzen 7").param("next", "https://example.com"))
+                .andExpect(redirectedUrl(categoryPath() + "?status=all&feature=srp&label=RTX+5080+Ti&q=ryzen+7"));
+    }
+
+    /** A value from the address can neither add a header nor pick a filter the page does not offer. */
+    @Test
+    void aFilterValueCannotBreakOutOfTheRedirect() throws Exception {
+        // when / then
+        mvc.perform(post(categoryPath() + "/products/bulk").param("action", "enable")
+                        .param("status", "deleted").param("feature", "colour")
+                        .param("label", "a\r\nSet-Cookie: x=1").param("q", "a&status=all"))
+                .andExpect(redirectedUrl(categoryPath()
+                        + "?status=active&label=a%0D%0ASet-Cookie%3A+x%3D1&q=a%26status%3Dall"));
     }
 
     @Test
@@ -555,7 +641,8 @@ class CatalogProductsControllerTest {
                         .param("products[0].name", "MSI RTX 5070").param("products[0].ean", "5901234567890")
                         .param("products[0].manufacturerCode", "MFN-1").param("products[0].pricingGroup", "Default"))
                 .andExpect(redirectedUrl(categoryPath()))
-                .andExpect(flash().attribute("settingsSavedMessage", "catalog.products.added.none"));
+                .andExpect(flash().attribute("catalogWarning", "catalog.products.added.none"))
+                .andExpect(flash().attribute("settingsSavedMessage", nullValue()));
         verify(productRepository, never()).save(any(Product.class));
         verify(pimCatalog, never()).findByGtinOrMpn(any(), any());
     }
@@ -992,6 +1079,52 @@ class CatalogProductsControllerTest {
                         .param("availabilityType", "BasedOnSupply").param("pricingGroup", "Default")
                         .param("enabled", "true"))
                 .andExpect(redirectedUrl(categoryPath() + "?status=disabled"));
+    }
+
+    /**
+     * The whole filter comes back, not only the status. The label travels as {@code filterLabel}: {@code label} is the
+     * product's own field in the form.
+     */
+    @Test
+    void savedProductRedirectsKeepingTheWholeFilterItCameFrom() throws Exception {
+        // given
+        gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
+        Product existing = new Product(gpu.getCategoryId(), "pim-1", "4719331361600", "m", "b", "l", "Old", "Default");
+        existing.setProductId("p1");
+        when(access.requireProduct(gpu, "p1")).thenReturn(existing);
+        PimEntry same = mock(PimEntry.class);
+        when(same.pimId()).thenReturn("pim-1");
+        when(pimCatalog.findByGtinOrMpn("4719331361600", "m")).thenReturn(Optional.of(same));
+
+        // when / then
+        mvc.perform(post(categoryPath() + "/products/p1").param("status", "all").param("feature", "stock")
+                        .param("filterLabel", "RTX 5070").param("q", "msi")
+                        .param("name", "New name").param("ean", "4719331361600").param("manufacturerCode", "m")
+                        .param("label", "l").param("availabilityType", "BasedOnSupply").param("pricingGroup", "Default")
+                        .param("enabled", "true"))
+                .andExpect(redirectedUrl(categoryPath() + "?status=all&feature=stock&label=RTX+5070&q=msi"));
+        assertThat(existing.getLabel()).isEqualTo("l");
+    }
+
+    /** Opened from a filtered list, the product page keeps that filter for its form and for its way back. */
+    @Test
+    void theProductPageKeepsTheFilterItWasOpenedFrom() throws Exception {
+        // given
+        Product existing = new Product(gpu.getCategoryId(), "pim-1", "4719331361600", "m", "b", "l", "Old", "Default");
+        existing.setProductId("p1");
+        when(access.requireProduct(gpu, "p1")).thenReturn(existing);
+
+        // when
+        var result = mvc.perform(get(categoryPath() + "/products/p1").param("status", "disabled").param("label", "RTX 5070"))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("backHref", categoryPath() + "?status=disabled&label=RTX+5070"))
+                .andReturn();
+
+        // then
+        pl.commercelink.web.catalog.CategoryFilter filter =
+                (pl.commercelink.web.catalog.CategoryFilter) result.getModelAndView().getModel().get("filter");
+        assertThat(filter.status()).isEqualTo("disabled");
+        assertThat(filter.label()).isEqualTo("RTX 5070");
     }
 
     /**

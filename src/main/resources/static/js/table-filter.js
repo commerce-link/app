@@ -16,9 +16,12 @@
 // because reading the label back out of the text would eat a legitimate trailing "(n)" in the label itself.
 //
 // The state of the groups named in [data-cl-filter-default="status:active feature:all"] lives in the URL
-// (history.replaceState) and starts from there; a bare default ("rejected") is the value of the "status" group and
-// stays out of the URL. Each change dispatches "cl:table-filtered" on the container so table-select.js can drop hidden
-// rows from the selection.
+// (history.replaceState) and starts from there; a group leaves the URL only when it is back at the value its default
+// names, so "all" is kept whenever the default is something else. A bare default ("rejected") is the value of the
+// "status" group and stays out of the URL. A search field that names a parameter ([data-cl-table-search="q"]) keeps
+// its text in the URL under that name as well. Links marked [data-cl-filter-carry] inside the container follow the
+// URL's query, so a page opened from the list knows the filter to come back to. Each change dispatches
+// "cl:table-filtered" on the container so table-select.js can drop hidden rows from the selection.
 (function () {
     'use strict';
 
@@ -111,39 +114,70 @@
         });
     }
 
-    // Only the groups written as "group:value" in the default; a page on the legacy single-group markup keeps the
-    // address it was opened with.
-    function declared(container) {
-        var groups = [];
+    // Only the groups written as "group:value" in the default, with that value; a page on the legacy single-group
+    // markup keeps the address it was opened with.
+    function declaredDefaults(container) {
+        var initial = {};
         (container.getAttribute('data-cl-filter-default') || '').split(/\s+/).forEach(function (pair) {
             var parts = pair.split(':');
             if (parts.length === 2) {
-                groups.push(parts[0]);
+                initial[parts[0]] = parts[1];
             }
         });
-        return groups;
+        return initial;
     }
 
-    function remember(container, state) {
-        var groups = declared(container);
-        if (groups.length === 0 || !window.history || !window.history.replaceState) {
+    function declared(container) {
+        return Object.keys(declaredDefaults(container));
+    }
+
+    // The URL parameter the search keeps its text in, or null when the field names none.
+    function searchParam(container) {
+        var search = container.querySelector('[data-cl-table-search]');
+        var name = search ? search.getAttribute('data-cl-table-search') : null;
+        return name ? name : null;
+    }
+
+    function remember(container, state, needle) {
+        var initial = declaredDefaults(container);
+        var groups = Object.keys(initial);
+        var param = searchParam(container);
+        if ((groups.length === 0 && !param) || !window.history || !window.history.replaceState) {
             return;
         }
         var url = new URL(window.location.href);
         groups.forEach(function (group) {
-            if (!(group in state) || state[group] === 'all') {
+            // A value is dropped only when it is what the page shows anyway: "all" is a filter like any other when
+            // the default is "active", and must survive a reload.
+            if (!(group in state) || state[group] === initial[group]) {
                 url.searchParams.delete(group);
             } else {
                 url.searchParams.set(group, state[group]);
             }
         });
+        if (param) {
+            if (needle === '') {
+                url.searchParams.delete(param);
+            } else {
+                url.searchParams.set(param, needle);
+            }
+        }
         window.history.replaceState(null, '', url.toString());
+    }
+
+    // Links to pages that come back to this list take the list's filter along.
+    function carry(container) {
+        container.querySelectorAll('a[data-cl-filter-carry]').forEach(function (link) {
+            var target = new URL(link.getAttribute('href'), window.location.href);
+            link.setAttribute('href', target.pathname + window.location.search);
+        });
     }
 
     function apply(container) {
         var state = selected(container);
         var search = container.querySelector('[data-cl-table-search]');
-        var needle = search ? search.value.trim().toLowerCase() : '';
+        var text = search ? search.value.trim() : '';
+        var needle = text.toLowerCase();
         var all = rows(container);
         var multi = multiGroups(container);
         var shown = 0;
@@ -159,7 +193,8 @@
             empty.hidden = shown > 0;
         }
         recount(container, all, state, needle, multi);
-        remember(container, state);
+        remember(container, state, text);
+        carry(container);
         container.dispatchEvent(new CustomEvent('cl:table-filtered', { bubbles: true, detail: { shown: shown, state: state } }));
     }
 
@@ -246,6 +281,14 @@
         Object.keys(state).forEach(function (group) {
             press(container, group, state[group]);
         });
+        var param = searchParam(container);
+        var search = container.querySelector('[data-cl-table-search]');
+        if (param && search) {
+            var start = new URL(window.location.href).searchParams.get(param);
+            if (start !== null) {
+                search.value = start;
+            }
+        }
         apply(container);
     }
 

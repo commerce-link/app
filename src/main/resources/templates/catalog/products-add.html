@@ -60,8 +60,10 @@
                     <!--/* The bar declares no bulk action for the script: what is added are the checked rows of the
                            form below, which the button submits itself, so table-select.js only shows the bar and
                            keeps the count. */-->
+                    <!--/* Announced from a region always in the page; the bar keeps the visible count. */-->
+                    <p class="cl-visually-hidden" role="status" data-cl-selection-status></p>
                     <div class="cl-selection-bar" hidden data-cl-selection-bar>
-                        <span class="cl-selection-count" role="status" data-cl-selection-count
+                        <span class="cl-selection-count" data-cl-selection-count
                               th:attr="data-template=#{catalog.products.selected('{n}')}"></span>
                         <div class="cl-selection-actions">
                             <button type="submit" form="add-products-form" class="cl-button is-primary">
@@ -115,7 +117,7 @@
                                 </th>
                                 <td th:attr="data-label=#{product.brand}" th:text="${row.brand()}"></td>
                                 <td class="is-numeric" th:attr="data-label=#{catalog.products.column.price}"
-                                    th:text="${row.lowestGrossPrice()} + ' PLN'"></td>
+                                    th:text="#{general.currency.amount(${row.lowestGrossPrice()})}"></td>
                                 <td th:attr="data-label=#{catalog.products.add.suppliers}"
                                     th:text="${#strings.listJoin(row.suppliers(), ', ')}"></td>
                                 <td class="cl-table-actions">

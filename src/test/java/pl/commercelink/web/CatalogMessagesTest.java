@@ -72,6 +72,27 @@ class CatalogMessagesTest {
         assertThat(broken).isEmpty();
     }
 
+    /**
+     * D-M47: the catalog templates show an amount through {@code general.currency.amount}, not a literal " PLN"; the
+     * key lives outside the catalog prefixes, so both languages are checked here. {@code general.currency} itself is
+     * the word "Waluta" of other forms and is left as it is.
+     */
+    @Test
+    void theAmountWithItsCurrencyIsAMessageInBothLanguages() throws Exception {
+        // given
+        Properties polish = new Properties();
+        Properties english = new Properties();
+        try (Reader pl = Files.newBufferedReader(Path.of("src/main/resources/messages_pl.properties"), StandardCharsets.UTF_8);
+             Reader en = Files.newBufferedReader(Path.of("src/main/resources/messages_en.properties"), StandardCharsets.UTF_8)) {
+            polish.load(pl);
+            english.load(en);
+        }
+
+        // when / then
+        assertThat(polish.getProperty("general.currency.amount")).isEqualTo("{0} PLN");
+        assertThat(english.getProperty("general.currency.amount")).isEqualTo("{0} PLN");
+    }
+
     private static Stream<Map.Entry<String, String>> messagesOf(String file) {
         try {
             return catalogMessages(file).entrySet().stream();

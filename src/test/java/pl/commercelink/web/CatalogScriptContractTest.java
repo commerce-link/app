@@ -456,4 +456,77 @@ class CatalogScriptContractTest {
                 .contains("left: 100%;").contains("right: auto;");
         assertThat(rule(css, ".cl-page .cl-table th.is-numeric .cl-table-sort::after")).contains("right: 100%;");
     }
+
+    /**
+     * RF-9: a group leaves the address only when it is back at its default -- "Wszystkie" is a filter like any other
+     * and must survive a reload. The export run declares no "group:value" pair, so its address is never touched.
+     */
+    @Test
+    void theFilterDropsAParameterOnlyWhenItIsBackAtItsDefault() throws Exception {
+        // given
+        String script = read("src/main/resources/static/js/table-filter.js");
+
+        // then
+        assertThat(script).doesNotContain("state[group] === 'all') {\n                url.searchParams.delete")
+                .contains("state[group] === initial[group]");
+    }
+
+    /**
+     * RF-10: the search is kept in the address under the name its field declares ({@code data-cl-table-search="q"}),
+     * and a link marked {@code data-cl-filter-carry} follows the address, so a product opened from the list knows the
+     * filter to come back to.
+     */
+    @Test
+    void theFilterKeepsTheSearchInTheAddressAndCarriesItIntoMarkedLinks() throws Exception {
+        // given
+        String script = read("src/main/resources/static/js/table-filter.js");
+
+        // then
+        assertThat(script).contains("getAttribute('data-cl-table-search')").contains("a[data-cl-filter-carry]")
+                .contains("window.location.search");
+    }
+
+    /**
+     * RF-10/D-M7, D-M16, D-M19: the bulk form takes the address along, the count is announced from a region that is
+     * always there, and "Odznacz" leaves the focus on "Zaznacz widoczne" rather than on a bar that disappears.
+     */
+    @Test
+    void theSelectionCopiesTheAddressAnnouncesFromAPermanentRegionAndKeepsTheFocus() throws Exception {
+        // given
+        String script = read("src/main/resources/static/js/table-select.js");
+
+        // then
+        assertThat(script).contains("window.location.search").contains("data-cl-selection-status")
+                .containsPattern("all\\.focus\\(\\)");
+    }
+
+    /**
+     * QA 11.3: a segment with nothing to show is dimmed but stays a button, and its text keeps AA contrast on the
+     * tinted control (--cl-ink-3 on --cl-surface-2 is 4.47:1).
+     */
+    @Test
+    void aSegmentWithNothingToShowIsDimmedAboveTheContrastThreshold() throws Exception {
+        // given
+        String css = read("src/main/resources/static/css/commercelink.css");
+
+        // when
+        String dimmed = rule(css, ".cl-page .cl-segment[data-count=\"0\"]:not([aria-pressed=\"true\"])");
+
+        // then
+        assertThat(dimmed).isNotBlank().doesNotContain("--cl-ink-3").doesNotContain("opacity")
+                .doesNotContain("pointer-events");
+    }
+
+    /** D-M17: the separator between a segment's label and its count is spoken but takes no room and stays in the flow. */
+    @Test
+    void theSegmentSeparatorIsInlineTextOfNoSize() throws Exception {
+        // given
+        String css = read("src/main/resources/static/css/commercelink.css");
+
+        // when
+        String separator = rule(css, ".cl-page .cl-segment .cl-segment-sep");
+
+        // then
+        assertThat(separator).contains("font-size: 0").doesNotContain("position").doesNotContain("display");
+    }
 }

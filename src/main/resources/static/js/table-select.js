@@ -7,6 +7,12 @@
 // number of checked rows. Such a button does nothing at all when the page has no usable dialog -- an action worth
 // confirming is not worth doing unconfirmed. Rows hidden by table-filter.js (event cl:table-filtered) are dropped from
 // the selection so a bulk action never touches what the operator cannot see. Without JavaScript nothing here is shown.
+//
+// The count is announced from [data-cl-selection-status] (a visually hidden role=status that is always in the page,
+// outside the bar -- a live region revealed in the same frame as its text is often not read); it speaks only when the
+// count changes, never on load. The bulk form takes the page's query string along (the filter as the operator left it,
+// kept in the address by table-filter.js), so the redirect after the action can come back to it. "Clear" moves the
+// focus to the header checkbox, as the bar it was pressed in disappears.
 (function () {
     'use strict';
 
@@ -30,6 +36,23 @@
         return card.querySelector('[data-cl-selection-bar]');
     }
 
+    function statusOf(table) {
+        var card = table.closest('.cl-card') || document;
+        return card.querySelector('[data-cl-selection-status]');
+    }
+
+    // The first call only notes the count: a page that loads with nothing selected has nothing to announce.
+    function announce(table, text, count) {
+        var status = statusOf(table);
+        if (!status || status.getAttribute('data-count') === String(count)) {
+            return;
+        }
+        if (status.hasAttribute('data-count')) {
+            status.textContent = text;
+        }
+        status.setAttribute('data-count', String(count));
+    }
+
     function refresh(table) {
         var bar = barOf(table);
         var selected = checked(table);
@@ -51,8 +74,29 @@
         bar.hidden = selected.length === 0;
         var count = bar.querySelector('[data-cl-selection-count]');
         if (count) {
-            count.textContent = (count.getAttribute('data-template') || '{n}').replace('{n}', String(selected.length));
+            var text = (count.getAttribute('data-template') || '{n}').replace('{n}', String(selected.length));
+            count.textContent = text;
+            announce(table, text, selected.length);
         }
+    }
+
+    // The page's query string, as hidden inputs: the server echoes back the filter it understands and nothing else.
+    // The names the form itself posts are never taken from the address.
+    function carryAddress(form) {
+        form.querySelectorAll('input[data-cl-select-carried]').forEach(function (old) {
+            old.remove();
+        });
+        new URLSearchParams(window.location.search).forEach(function (value, name) {
+            if (name === 'action' || name === 'productIds') {
+                return;
+            }
+            var input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = name;
+            input.value = value;
+            input.setAttribute('data-cl-select-carried', '');
+            form.appendChild(input);
+        });
     }
 
     function submit(table, action) {
@@ -75,6 +119,7 @@
             input.value = box.value;
             form.appendChild(input);
         });
+        carryAddress(form);
         form.submit();
     }
 
@@ -142,6 +187,11 @@
                 if (event.target.closest('[data-cl-select-clear]')) {
                     rowsOf(table).forEach(function (box) { box.checked = false; });
                     refresh(table);
+                    // The bar, and the button in it, is hidden now; the focus would fall to the body.
+                    var all = table.querySelector('[data-cl-select-all]');
+                    if (all) {
+                        all.focus();
+                    }
                     return;
                 }
                 var action = event.target.closest('[data-cl-select-action]');

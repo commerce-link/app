@@ -14,6 +14,8 @@
                     <span class="cl-status" th:classappend="${typeTone}" th:text="#{${typeLabelKey}}"></span>
                     <span th:text="' ' + (${#strings.isEmpty(pimNames)} ? #{catalog.category.row.pim.none} : #{catalog.category.row.pim(${pimNames})})"></span>
                     <th:block th:if="${!category.groupingOrder.isEmpty()}"><span> · </span><span th:text="#{catalog.category.row.labels(${category.groupingOrder.size()})}"></span></th:block>
+                    <!--/* An automatic category is defined by its PIM categories and its recommendation filters. */-->
+                    <th:block th:if="${page.dynamic()}"><span> · </span><span th:text="#{catalog.category.row.filters(${category.inventoryDefinitions.size()})}"></span></th:block>
                     <span> · </span>
                     <span th:text="${categoryMarketplaceNames.isEmpty()} ? #{catalog.category.row.marketplaces.none} : #{catalog.category.row.marketplaces(${#strings.listJoin(categoryMarketplaceNames, ', ')})}"></span>
                 </th:block>
@@ -59,11 +61,11 @@
                         <div class="cl-segmented" role="group" th:attr="aria-label=#{catalog.products.status}">
                             <button type="button" class="cl-segment" th:each="s : ${statuses}" data-cl-filter-group="status"
                                     aria-pressed="false" th:attr="data-cl-filter=${s.filter()}, data-count=${page.statusCounts().get(s)}">
-                                <span th:text="#{${s.labelKey()}}"></span><span class="cl-segment-count" th:text="${page.statusCounts().get(s)}"></span>
+                                <span th:text="#{${s.labelKey()}}"></span><span class="cl-segment-sep">: </span><span class="cl-segment-count" th:text="${page.statusCounts().get(s)}"></span>
                             </button>
                             <button type="button" class="cl-segment" data-cl-filter-group="status" data-cl-filter="all"
                                     aria-pressed="false" th:attr="data-count=${page.total()}">
-                                <span th:text="#{catalog.products.status.all}"></span><span class="cl-segment-count" th:text="${page.total()}"></span>
+                                <span th:text="#{catalog.products.status.all}"></span><span class="cl-segment-sep">: </span><span class="cl-segment-count" th:text="${page.total()}"></span>
                             </button>
                         </div>
                     </div>
@@ -88,13 +90,18 @@
                                         th:text="#{'catalog.products.feature.' + ${f}} + ' (' + ${page.featureCounts().get(f)} + ')'"></option>
                             </select>
                         </th:block>
-                        <input class="cl-input cl-table-search" type="search" autocomplete="off" data-cl-table-search
-                               th:placeholder="#{catalog.products.search}" th:attr="aria-label=#{catalog.products.search}">
+                        <!--/* The placeholder fits a 280 px field; the name says what the search looks through. The value
+                               lives in the address as "q", so a product saved or a bulk action comes back to it. */-->
+                        <input class="cl-input cl-table-search" type="search" autocomplete="off" data-cl-table-search="q"
+                               th:placeholder="#{catalog.products.search.placeholder}" th:attr="aria-label=#{catalog.products.search}">
                     </div>
                 </div>
 
+                <!--/* The count is announced from a region that is always in the page: one that appears in the same
+                       frame as its text is often skipped by a screen reader. The bar keeps the visible count. */-->
+                <p th:unless="${page.dynamic()}" class="cl-visually-hidden" role="status" data-cl-selection-status></p>
                 <div th:unless="${page.dynamic()}" class="cl-selection-bar" hidden data-cl-selection-bar>
-                    <span class="cl-selection-count" role="status" data-cl-selection-count
+                    <span class="cl-selection-count" data-cl-selection-count
                           th:attr="data-template=#{catalog.products.selected('{n}')}"></span>
                     <div class="cl-selection-actions">
                         <button type="button" class="cl-button" data-cl-select-action="enable">
@@ -135,7 +142,7 @@
                             <button type="button" class="cl-table-sort" data-sort-key="brand" th:text="#{product.brand}"></button>
                         </th>
                         <th scope="col" aria-sort="none">
-                            <button type="button" class="cl-table-sort" data-sort-key="label" th:text="#{product.label}"></button>
+                            <button type="button" class="cl-table-sort" data-sort-key="label" th:text="#{catalog.products.label}"></button>
                         </th>
                         <th th:unless="${page.dynamic()}" scope="col" aria-sort="none">
                             <button type="button" class="cl-table-sort" data-sort-key="group" th:text="#{product.pricing.group}"></button>
@@ -159,7 +166,9 @@
                             </label>
                         </td>
                         <th scope="row" class="cl-table-key" th:attr="data-label=#{catalog.products.column.product}">
-                            <a th:if="${row.href() != null}" th:href="@{${row.href()}}" th:text="${row.name()}"></a>
+                            <!--/* The link carries the filter of the list; table-filter.js keeps it in step with the address. */-->
+                            <a th:if="${row.href() != null}" th:href="@{${row.href() + (filterQuery ?: '')}}" data-cl-filter-carry
+                               th:text="${row.name()}"></a>
                             <span th:if="${row.href() == null}" th:text="${row.name()}"></span>
                             <span class="cl-table-sub">
                                 <!--/* A product can be known by its manufacturer code alone: each code states itself, and the separator belongs to the one before it. */-->
@@ -167,7 +176,7 @@
                             </span>
                         </th>
                         <td th:attr="data-label=#{product.brand}" th:text="${row.brand()}"></td>
-                        <td th:attr="data-label=#{product.label}">
+                        <td th:attr="data-label=#{catalog.products.label}">
                             <span th:text="${row.label()}"></span>
                             <span th:if="${row.labelOutside()}" class="cl-status is-warn" th:text="#{catalog.products.label.outside}"></span>
                         </td>
@@ -179,7 +188,7 @@
                             <span class="cl-table-empty" th:if="${row.marketplaceNames().isEmpty()}">—</span>
                         </td>
                         <td th:if="${page.dynamic()}" class="is-numeric" th:attr="data-label=#{catalog.products.column.price}"
-                            th:text="${row.lowestGrossPrice()} + ' PLN'"></td>
+                            th:text="#{general.currency.amount(${row.lowestGrossPrice()})}"></td>
                         <td th:attr="data-label=#{catalog.products.column.status}">
                             <span class="cl-status" th:classappend="${row.status().tone()}" th:text="#{${row.status().pillKey()}}"></span>
                         </td>
@@ -194,21 +203,21 @@
                 <p class="cl-list-empty" th:if="${page.rows().isEmpty() and !page.dynamic()}">
                     <span th:text="#{catalog.products.empty}"></span>
                     <a class="cl-button is-primary" th:href="@{${addHref}}" th:text="#{catalog.products.add}"></a>
-                    <a class="cl-link-button" th:href="@{${newProductHref}}" th:text="#{catalog.products.addManually}"></a>
+                    <a class="cl-link-button" th:href="@{${newProductHref + (filterQuery ?: '')}}" data-cl-filter-carry
+                       th:text="#{catalog.products.addManually}"></a>
                 </p>
                 <p class="cl-list-empty" th:if="${page.rows().isEmpty() and page.dynamic() and page.hasMapping()}"
                    th:text="#{catalog.products.empty.dynamic}"></p>
                 <p class="cl-card-desc cl-card-note" th:unless="${page.dynamic() or page.rows().isEmpty()}">
                     <span th:text="#{catalog.products.note.manual}"></span>
-                    <a th:href="@{${newProductHref}}" th:text="#{catalog.products.addManually}"></a>
+                    <a th:href="@{${newProductHref + (filterQuery ?: '')}}" data-cl-filter-carry th:text="#{catalog.products.addManually}"></a>
                 </p>
                 <p class="cl-card-desc cl-card-note" th:if="${page.dynamic()}" th:text="#{catalog.products.note.dynamic}"></p>
 
-                <!--/* The bulk form carries nothing but the filter to come back to; table-select.js adds the action and
-                       the checked ids before it submits. */-->
-                <form th:unless="${page.dynamic()}" data-cl-select-form method="post" th:action="@{${bulkAction}}" hidden>
-                    <input type="hidden" name="status" th:value="${statusFilter}">
-                </form>
+                <!--/* The bulk form carries nothing of its own: table-select.js adds the action, the checked ids and the
+                       page's address (the filter as the operator left it, which the redirect comes back to) before it
+                       submits. A status rendered here would be the one the page was opened with. */-->
+                <form th:unless="${page.dynamic()}" data-cl-select-form method="post" th:action="@{${bulkAction}}" hidden></form>
             </section>
             <noscript><p class="cl-help" th:text="#{catalog.products.noscript}"></p></noscript>
             <dialog th:replace="~{fragments/confirm-dialog :: dialog}"></dialog>
