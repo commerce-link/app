@@ -1,5 +1,6 @@
 package pl.commercelink.web.dtos;
 
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
@@ -65,12 +66,22 @@ public class ProductForm {
     private List<ProductCustomAttribute> customAttributes = new ArrayList<>();
     private List<ProductCustomAttributeFilter> customAttributesFilters = new ArrayList<>();
     private List<Metadata> metadata = new ArrayList<>();
-    /** Set by the controller from the saved product (never trusted from the request); null for a new product. */
+    /**
+     * Set by the controller from the saved product (never trusted from the request); null for a new product.
+     * Unbindable (N1): rememberSaved runs before validate() in both POSTs, so a request value was always overwritten
+     * before it could matter, but a setter reachable from the request is one refactor away from being trusted.
+     */
+    @Setter(AccessLevel.NONE)
     private String existingPimId;
+    @Setter(AccessLevel.NONE)
     private String existingLabel;
+    @Setter(AccessLevel.NONE)
     private String existingEan;
+    @Setter(AccessLevel.NONE)
     private String existingManufacturerCode;
+    @Setter(AccessLevel.NONE)
     private String existingPricingGroup;
+    @Setter(AccessLevel.NONE)
     private List<String> existingMarketplaces = List.of();
 
     /**

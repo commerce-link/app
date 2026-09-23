@@ -1,6 +1,8 @@
 package pl.commercelink.web.dtos;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.MutablePropertyValues;
+import org.springframework.web.bind.WebDataBinder;
 import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductAvailabilityType;
 import pl.commercelink.products.ProductCustomAttribute;
@@ -109,7 +111,7 @@ class ProductFormTest {
     void changingTheIdentifierToAnotherPimEntryIsAnError() {
         // given
         ProductForm form = valid();
-        form.setExistingPimId("pim-1");
+        form.rememberSaved(new Product("cat", "pim-1", null, null, null, null, null, null));
 
         // when / then
         assertThat(form.validate(LABELS, GROUPS, MARKETPLACES, check -> Optional.of("pim-2")))
@@ -126,7 +128,7 @@ class ProductFormTest {
         // when / then
         assertThat(form.validate(LABELS, GROUPS, MARKETPLACES, check -> Optional.of("pim-1")))
                 .containsEntry("label", "product.error.label.notInList");
-        form.setExistingLabel("RTX 4060");
+        form.rememberSaved(new Product("cat", null, null, null, null, "RTX 4060", null, null));
         assertThat(form.validate(LABELS, GROUPS, MARKETPLACES, check -> Optional.of("pim-1"))).isEmpty();
     }
 
@@ -353,6 +355,37 @@ class ProductFormTest {
                 .containsEntry("pricingGroup", "product.error.group.unknown");
         assertThat(created.validate(LABELS, GROUPS, MARKETPLACES, check -> Optional.of("pim-1")))
                 .containsEntry("pricingGroup", "product.error.group.unknown");
+    }
+
+    /**
+     * N1: the "existing*" fields are set by rememberSaved() from the saved product and are never meant to come from
+     * the request; a setter reachable from a POST would be trusted the day some other code path stops calling
+     * rememberSaved() first. binder.bind() is the request path itself, so this pins the field as request-proof rather
+     * than trusting the call order in the controller.
+     */
+    @Test
+    void existingFieldsAreNotBindableFromTheRequest() {
+        // given
+        ProductForm target = ProductForm.from(saved("pim-1", "4719331361600", "GV-N5080"));
+        WebDataBinder binder = new WebDataBinder(target);
+        MutablePropertyValues posted = new MutablePropertyValues(Map.of(
+                "existingPimId", "forged-pim",
+                "existingEan", "0000000000000",
+                "existingManufacturerCode", "FORGED",
+                "existingPricingGroup", "Forged",
+                "existingLabel", "Forged label"));
+        posted.add("existingMarketplaces", new String[]{"forged-marketplace"});
+
+        // when
+        binder.bind(posted);
+
+        // then
+        assertThat(target.getExistingPimId()).isEqualTo("pim-1");
+        assertThat(target.getExistingEan()).isEqualTo("4719331361600");
+        assertThat(target.getExistingManufacturerCode()).isEqualTo("GV-N5080");
+        assertThat(target.getExistingPricingGroup()).isEqualTo("Ultra Premium");
+        assertThat(target.getExistingLabel()).isEqualTo("RTX 5080");
+        assertThat(target.getExistingMarketplaces()).containsExactly("allegro");
     }
 
     /**

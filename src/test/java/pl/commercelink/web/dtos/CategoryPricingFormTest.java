@@ -233,6 +233,41 @@ class CategoryPricingFormTest {
         assertThat(form.toGroups().get(0).getMultiplier()).isEqualTo(1.125);
     }
 
+    /** N2: a price threshold of three decimals survives a save of the page that does not touch it, like the multiplier. */
+    @Test
+    void aPriceThresholdOfThreeDecimalsSurvivesASaveThatDoesNotTouchIt() {
+        // given
+        PriceDefinition definition = new PriceDefinition(1.0, 49, 0, 0, 0, "Default");
+        definition.setLabelMatch("RTX 5070");
+        definition.setPriceMatch(1234.567);
+        CategoryDefinition gpu = new CategoryDefinition().withName("GPU").withGeneratedId().withPriceDefinition(definition);
+
+        // when
+        CategoryPricingForm form = CategoryPricingForm.from(gpu);
+
+        // then
+        assertThat(form.getGroups().get(0).getPriceMatch()).isEqualTo("1234,567");
+        assertThat(form.validate(group -> 0)).isEmpty();
+        assertThat(form.toGroups().get(0).getPriceMatch()).isEqualTo(1234.567);
+    }
+
+    /** N2: a whole-number threshold still displays with two decimals, the way the multiplier field does. */
+    @Test
+    void aWholeNumberPriceThresholdIsShownWithTwoDecimals() {
+        // given
+        PriceDefinition definition = new PriceDefinition(1.0, 49, 0, 0, 0, "Default");
+        definition.setLabelMatch("RTX 5070");
+        definition.setPriceMatch(2500);
+        CategoryDefinition gpu = new CategoryDefinition().withName("GPU").withGeneratedId().withPriceDefinition(definition);
+
+        // when
+        CategoryPricingForm form = CategoryPricingForm.from(gpu);
+
+        // then
+        assertThat(form.getGroups().get(0).getPriceMatch()).isEqualTo("2500,00");
+        assertThat(form.toGroups().get(0).getPriceMatch()).isEqualTo(2500.0);
+    }
+
     @Test
     void removingAGroupStillUsedByProductsIsAnError() {
         // given

@@ -90,7 +90,9 @@ public class CategoryPricingForm {
             form.low = String.valueOf(definition.getLowStockPriceAdjustment());
             form.medium = String.valueOf(definition.getMediumStockPriceAdjustment());
             form.labelMatch = definition.getLabelMatch();
-            form.priceMatch = definition.getPriceMatch() > 0 ? FormNumbers.format(definition.getPriceMatch()) : "";
+            // Lossless like the multiplier and the markup (N2, F8): FormNumbers.format rounds to two decimals, which
+            // would silently change the threshold on a save that never touched the field.
+            form.priceMatch = definition.getPriceMatch() > 0 ? FormNumbers.formatDecimalField(definition.getPriceMatch()) : "";
             return form;
         }
 

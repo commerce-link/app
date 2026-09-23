@@ -91,7 +91,8 @@ class CategoryPricingTemplateTest {
         // then
         assertThat(html).contains("name=\"groups[0].name\"").contains("value=\"Default\"")
                 .contains("name=\"groups[1].multiplier\"").contains("value=\"1,08\"")
-                .contains("name=\"groups[1].priceMatch\"").contains("value=\"2 500,00\"")
+                // N2: priceMatch is formatted like the multiplier now (FormNumbers.formatDecimalField), no grouping space.
+                .contains("name=\"groups[1].priceMatch\"").contains("value=\"2500,00\"")
                 .contains("name=\"groups[1].labelMatch\"").contains("value=\"RTX 5070\"");
         assertThat(occurrences(html, "readonly=\"readonly\"")).isEqualTo(1);
         assertThat(occurrences(html, "data-cl-repeat-remove")).isEqualTo(2);
@@ -106,7 +107,8 @@ class CategoryPricingTemplateTest {
 
         // then
         assertThat(html).contains("the first group from the top");
-        assertThat(html).contains("label RTX 5070 \u00b7 price from 2 500,00 PLN");
+        // N2: the legend reuses the same lossless field value as the input, so it reads without a grouping space.
+        assertThat(html).contains("label RTX 5070 \u00b7 price from 2500,00 PLN");
         // the Default pill and the summary of the one matched group, both in the legends
         assertThat(occurrences(html, "cl-status is-neutral")).isEqualTo(1);
         assertThat(occurrences(html, "cl-status is-info")).isEqualTo(1);
