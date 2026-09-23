@@ -286,4 +286,54 @@ class CatalogScriptContractTest {
                     text-underline-offset: 2px;
                 }""");
     }
+
+    /** The chip's remove button had the browser's default focus ring; it gets the one of a link button (D-M23). */
+    @Test
+    void theChipRemoveButtonAndAListTitleLinkShowTheDesignSystemFocusRing() throws Exception {
+        // given
+        String css = read("src/main/resources/static/css/commercelink.css");
+
+        // then
+        assertThat(css).contains("""
+                .cl-page .cl-chip-tag-remove:focus-visible,
+                .cl-page .cl-list-title a:focus-visible {
+                    outline: 2px solid var(--cl-accent);
+                    outline-offset: 2px;""");
+    }
+
+    /**
+     * Every class of the catalog templates and the shared tree picker belongs to the design system (`cl-*` with its
+     * `is-*` modifiers) or to the icon font; `picker-option-*` and raw sizes/colours in their rules were not (D-M44).
+     */
+    @Test
+    void catalogTemplatesUseOnlyDesignSystemClassesAndTheirRulesUseTokens() throws Exception {
+        // given
+        List<Path> templates;
+        try (var files = Files.list(Path.of("src/main/resources/templates/catalog"))) {
+            templates = new java.util.ArrayList<>(files.toList());
+        }
+        templates.add(Path.of("src/main/resources/templates/fragments/category-picker.html"));
+        java.util.regex.Pattern classes = java.util.regex.Pattern.compile("class=\"([^\"$]*)\"|className = '([^']*)'");
+        String css = read("src/main/resources/static/css/commercelink.css");
+
+        // when / then
+        for (Path file : templates) {
+            java.util.regex.Matcher matcher = classes.matcher(Files.readString(file, StandardCharsets.UTF_8));
+            while (matcher.find()) {
+                String value = matcher.group(1) != null ? matcher.group(1) : matcher.group(2);
+                for (String token : value.trim().split("\\s+")) {
+                    assertThat(token).as(file + " class " + token)
+                            .matches("cl-[a-z0-9-]+|is-[a-z0-9-]+|fas|fa-[a-z0-9-]+|icon");
+                }
+            }
+        }
+        assertThat(css).doesNotContain("picker-option-checkbox").doesNotContain(".picker-option-text")
+                .doesNotContain("font-size: 11.5px");
+        assertThat(css).contains("""
+                .cl-page .cl-selection-bar .cl-button.is-primary {
+                    background: var(--cl-accent);
+                    color: var(--cl-surface);""");
+        String chipRemove = css.split("\\.cl-page \\.cl-chip-tag-remove \\{")[1].split("}")[0];
+        assertThat(chipRemove).contains("border-radius: calc(var(--cl-radius) - 2px);");
+    }
 }

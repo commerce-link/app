@@ -3379,7 +3379,7 @@ a.cl-link-button:hover {
 /* the primary action keeps its accent fill */
 .cl-page .cl-selection-bar .cl-button.is-primary {
     background: var(--cl-accent);
-    color: #fff;
+    color: var(--cl-surface);
     border-color: var(--cl-accent);
 }
 
@@ -3453,7 +3453,7 @@ a.cl-link-button:hover {
 
 .cl-page .cl-table .cl-table-sub .cl-status {
     margin-top: 4px;
-    font-size: 11.5px;
+    font-size: 12px;
     padding: 1px 8px;
 }
 
@@ -3589,7 +3589,7 @@ a.cl-link-button:hover {
     height: 24px;
     margin: -2px 0;
     border: 0;
-    border-radius: 6px;
+    border-radius: calc(var(--cl-radius) - 2px);
     background: transparent;
     color: var(--cl-ink-2);
     font: inherit;
@@ -3601,6 +3601,14 @@ a.cl-link-button:hover {
 .cl-page .cl-chip-tag-remove:hover {
     background: var(--cl-surface);
     color: var(--cl-bad);
+}
+
+/* The focus ring of a link button, instead of the browser's default one. */
+.cl-page .cl-chip-tag-remove:focus-visible,
+.cl-page .cl-list-title a:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
+    border-radius: 4px;
 }
 
 /* The hidden inputs of the multi picker travel in a span, which would otherwise take a grid row of its own. */
