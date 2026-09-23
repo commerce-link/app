@@ -1,6 +1,7 @@
 package pl.commercelink.inventory;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import pl.commercelink.financials.ExchangeRates;
@@ -18,6 +19,7 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class FeedReloaderScheduler {
@@ -45,7 +47,14 @@ public class FeedReloaderScheduler {
                 List<InventoryItem> items = fetchItems(supplierDescriptor).stream()
                         .flatMap(item -> item.toLocalCurrency(ExchangeRates.LOCAL_CURRENCY, sellRates.get(item.currency())).stream())
                         .collect(Collectors.toList());
-                updatesBySupplier.put(supplierName, items);
+                // Don't wipe the supplier on an empty/failed feed; markSeen stops it re-parsing until the file changes.
+                if (items.isEmpty()) {
+                    log.warn("Feed for supplier {} produced no items; keeping previous inventory and "
+                            + "not retrying until the feed file changes", supplierName);
+                    inventory.markSeen(supplierName, lastModified);
+                } else {
+                    updatesBySupplier.put(supplierName, items);
+                }
             }
         }
 

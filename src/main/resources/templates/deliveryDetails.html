@@ -45,6 +45,12 @@
                                 <input type="hidden" th:field="*{provider}"/>
                             </div>
                         </div>
+                        <div class="field" th:if="${!#strings.isEmpty(delivery.counterpartyShortcut)}">
+                            <label class="label" th:text="#{deliveries.counterpartyShortcut}"></label>
+                            <div class="control">
+                                <span th:text="${delivery.counterpartyShortcut}"></span>
+                            </div>
+                        </div>
                         <div class="field">
                             <label class="label" th:text="#{deliveries.statuses}"></label>
                             <div class="control">
