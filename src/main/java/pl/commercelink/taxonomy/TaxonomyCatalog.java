@@ -40,14 +40,14 @@ public class TaxonomyCatalog {
         return Taxonomy.bestOf(productCodes, findByMfns(productCodes));
     }
 
-    public TaxonomyMerge startMerge(Collection<String> mfns) {
+    public TaxonomyMerge openMerge(Collection<String> mfns) {
         return new TaxonomyMerge(findByMfns(mfns));
     }
 
     public void commit(TaxonomyMerge merge) {
         List<Taxonomy> keptCategory = new ArrayList<>();
         for (Taxonomy merged : merge.changed()) {
-            Taxonomy seen = merge.seen(merged.mfn());
+            Taxonomy seen = merge.stored(merged.mfn());
             if (Taxonomy.hasCategory(seen)) {
                 keptCategory.add(merged);
             } else {

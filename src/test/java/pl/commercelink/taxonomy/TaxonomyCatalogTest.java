@@ -94,9 +94,9 @@ class TaxonomyCatalogTest {
         Taxonomy untouched = new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", "CPU", 10, null, null);
         Taxonomy improved = new Taxonomy("1234567890123", "MFN-2", "Brand", "Name2", "GPU", 10, null, null);
         when(repository.findAll(List.of("MFN-1", "MFN-2"))).thenReturn(Map.of("MFN-1", untouched, "MFN-2", improved));
-        TaxonomyMerge merge = catalog.startMerge(List.of("MFN-1", "MFN-2"));
-        merge.add(untouched);
-        merge.add(new Taxonomy("1234567890123", "MFN-2", "Brand", "Better", "GPU", 1, null, null));
+        TaxonomyMerge merge = catalog.openMerge(List.of("MFN-1", "MFN-2"));
+        merge.apply(untouched);
+        merge.apply(new Taxonomy("1234567890123", "MFN-2", "Brand", "Better", "GPU", 1, null, null));
 
         // when
         catalog.commit(merge);
@@ -114,9 +114,9 @@ class TaxonomyCatalogTest {
         Taxonomy pending = new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", null, 10, null, null);
         when(repository.findAll(List.of("MFN-1"))).thenReturn(Map.of("MFN-1", pending));
         when(repository.saveIfCategoryUnchanged(any(), any())).thenReturn(true);
-        TaxonomyMerge merge = catalog.startMerge(List.of("MFN-1"));
+        TaxonomyMerge merge = catalog.openMerge(List.of("MFN-1"));
         Taxonomy improved = new Taxonomy("1234567890123", "MFN-1", "Brand", "Better", null, 1, null, null);
-        merge.add(improved);
+        merge.apply(improved);
 
         // when
         catalog.commit(merge);
@@ -135,8 +135,8 @@ class TaxonomyCatalogTest {
         when(repository.findAll(List.of("MFN-1"))).thenReturn(Map.of("MFN-1", pending));
         when(repository.saveIfCategoryUnchanged(any(), any())).thenReturn(false, true);
         when(repository.find("MFN-1")).thenReturn(categorizedMeanwhile);
-        TaxonomyMerge merge = catalog.startMerge(List.of("MFN-1"));
-        merge.add(new Taxonomy("1234567890123", "MFN-1", "Brand", "Better", null, 1, null, null));
+        TaxonomyMerge merge = catalog.openMerge(List.of("MFN-1"));
+        merge.apply(new Taxonomy("1234567890123", "MFN-1", "Brand", "Better", null, 1, null, null));
 
         // when
         catalog.commit(merge);

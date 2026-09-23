@@ -15,19 +15,19 @@ public class TaxonomyMerge {
         this.stored = stored;
     }
 
-    public Taxonomy current(String mfn) {
+    public Taxonomy knownFor(String mfn) {
         Taxonomy candidate = merged.get(mfn);
         return candidate != null ? candidate : stored.get(mfn);
     }
 
-    public void add(Taxonomy candidate) {
+    public void apply(Taxonomy candidate) {
         if (candidate == null || isBlank(candidate.mfn())) {
             return;
         }
-        merged.put(candidate.mfn(), TaxonomyCatalog.mergeOf(current(candidate.mfn()), candidate));
+        merged.put(candidate.mfn(), TaxonomyCatalog.mergeOf(knownFor(candidate.mfn()), candidate));
     }
 
-    Taxonomy seen(String mfn) {
+    Taxonomy stored(String mfn) {
         return stored.get(mfn);
     }
 

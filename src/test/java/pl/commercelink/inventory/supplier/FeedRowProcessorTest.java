@@ -68,7 +68,7 @@ class FeedRowProcessorTest {
 
         // then
         assertThat(result).containsExactly(sellableItem);
-        verify(merge).add(categorizedTaxonomy);
+        verify(merge).apply(categorizedTaxonomy);
         verify(taxonomyCatalog).commit(merge);
         verify(stats).markImported();
         verify(stats, never()).markImportedCategorized();
@@ -89,7 +89,7 @@ class FeedRowProcessorTest {
         // then
         assertThat(result).isEmpty();
         verify(enrichment).addPending(pendingTaxonomy, "Acme");
-        verify(merge).add(pendingTaxonomy);
+        verify(merge).apply(pendingTaxonomy);
         verify(stats).markCategorizationScheduled();
         verify(stats, never()).markCategorizationPostponed();
         verify(stats, never()).markIncomplete();
@@ -140,7 +140,7 @@ class FeedRowProcessorTest {
         // then
         assertThat(result).isEmpty();
         verify(enrichment, never()).addPending(any(), any());
-        verify(merge, never()).add(any());
+        verify(merge, never()).apply(any());
         verify(stats).markCategorizationPostponed();
         verify(stats, never()).markIncomplete();
         verify(stats, never()).markCategorizationScheduled();
@@ -160,7 +160,7 @@ class FeedRowProcessorTest {
         // then
         assertThat(result).isEmpty();
         verify(enrichment, never()).addPending(any(), any());
-        verify(merge, never()).add(any());
+        verify(merge, never()).apply(any());
         verify(stats).markIncomplete();
         verify(stats, never()).markCategorizationPostponed();
         verify(stats, never()).markCategorizationScheduled();
@@ -171,7 +171,7 @@ class FeedRowProcessorTest {
         // given
         givenMerge();
         Taxonomy stored = new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", "CPU", 3, null, null);
-        when(merge.current("MFN-1")).thenReturn(stored);
+        when(merge.knownFor("MFN-1")).thenReturn(stored);
         when(dataCorrection.run(sellableItem)).thenReturn(sellableItem);
         when(dataCorrection.run(feedProduct)).thenReturn(pendingTaxonomy);
         when(enrichment.enrich(pendingTaxonomy, stored)).thenReturn(categorizedTaxonomy);
@@ -181,7 +181,7 @@ class FeedRowProcessorTest {
 
         // then
         assertThat(result).containsExactly(sellableItem);
-        verify(merge).add(categorizedTaxonomy);
+        verify(merge).apply(categorizedTaxonomy);
         verify(stats).markImportedCategorized();
         verify(stats).markImported();
     }
@@ -220,7 +220,7 @@ class FeedRowProcessorTest {
 
         // then
         assertThat(result).isEmpty();
-        verify(taxonomyCatalog, never()).startMerge(any());
+        verify(taxonomyCatalog, never()).openMerge(any());
         verify(taxonomyCatalog, never()).commit(any());
         verify(enrichment, never()).addPending(any(), any());
         verify(stats).markInvalid();
@@ -239,7 +239,7 @@ class FeedRowProcessorTest {
         processor.process(List.of(row()), 1000, stats);
 
         // then
-        verify(merge).add(eq(StoreFeedTaxonomy.deprioritized(categorizedTaxonomy, 1000)));
+        verify(merge).apply(eq(StoreFeedTaxonomy.deprioritized(categorizedTaxonomy, 1000)));
     }
 
     @Test
@@ -265,7 +265,7 @@ class FeedRowProcessorTest {
 
         // then
         assertThat(result).containsExactly(sellableItem, secondItem);
-        verify(taxonomyCatalog, times(1)).startMerge(List.of("MFN-1", "MFN-2"));
+        verify(taxonomyCatalog, times(1)).openMerge(List.of("MFN-1", "MFN-2"));
         verify(taxonomyCatalog, times(1)).commit(merge);
     }
 
@@ -276,7 +276,7 @@ class FeedRowProcessorTest {
 
         // then
         assertThat(result).isEmpty();
-        verify(taxonomyCatalog, never()).startMerge(any());
+        verify(taxonomyCatalog, never()).openMerge(any());
     }
 
     private ParsedRow row() {
@@ -284,7 +284,7 @@ class FeedRowProcessorTest {
     }
 
     private void givenMerge() {
-        when(taxonomyCatalog.startMerge(any())).thenReturn(merge);
+        when(taxonomyCatalog.openMerge(any())).thenReturn(merge);
     }
 
     private void givenPendingRow() {
