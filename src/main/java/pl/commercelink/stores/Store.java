@@ -31,6 +31,8 @@ public class Store {
     private Branding branding;
     @DynamoDBAttribute(attributeName = "invoicing")
     private InvoicingConfiguration invoicingConfiguration;
+    @DynamoDBAttribute(attributeName = "receipts")
+    private ReceiptConfiguration receiptConfiguration;
     @DynamoDBAttribute(attributeName = "marketplaces")
     private List<MarketplaceIntegration> marketplaces = new LinkedList<>();
     @DynamoDBAttribute(attributeName = "payments")
@@ -372,6 +374,17 @@ public class Store {
 
     public void setInvoicingConfiguration(InvoicingConfiguration invoicingConfiguration) {
         this.invoicingConfiguration = invoicingConfiguration;
+    }
+
+    public ReceiptConfiguration getReceiptConfiguration() {
+        if (receiptConfiguration == null) {
+            receiptConfiguration = new ReceiptConfiguration();
+        }
+        return receiptConfiguration;
+    }
+
+    public void setReceiptConfiguration(ReceiptConfiguration receiptConfiguration) {
+        this.receiptConfiguration = receiptConfiguration;
     }
 
     public ClientNotificationsConfiguration getClientNotificationsConfiguration() {
