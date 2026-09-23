@@ -241,4 +241,30 @@ class CatalogScriptContractTest {
                     }
                 }""");
     }
+
+    /**
+     * `--cl-ink-3` reaches 4.5:1 on white only: on the tinted backgrounds of the catalog it fell to 4.04:1 (the accent
+     * soft of a chip, an active picker option, a selected row) and 4.47:1 (the segmented control), below AA for text of
+     * that size. Those four contexts use `--cl-ink-2` (6.37:1), D-C2.
+     */
+    @Test
+    void mutedTextOnATintedBackgroundUsesTheDarkerGrey() throws Exception {
+        // given
+        String css = read("src/main/resources/static/css/commercelink.css");
+
+        // then
+        assertThat(css).contains("""
+                .cl-page .cl-table tr.is-selected .cl-table-sub {
+                    color: var(--cl-ink-2);""");
+        assertThat(css).contains("""
+                .cl-page .cl-chip-tag-path {
+                    color: var(--cl-ink-2);""");
+        assertThat(css).contains("""
+                .cl-page .cl-picker-option:is(:hover, .is-active) .cl-picker-path {
+                    color: var(--cl-ink-2);""");
+        assertThat(css).contains("""
+                .cl-segment-count {
+                    margin-left: 4px;
+                    color: var(--cl-ink-2);""");
+    }
 }
