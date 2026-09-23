@@ -1048,6 +1048,35 @@ class CatalogProductsControllerTest {
         assertThat(existing.getPimId()).isEqualTo("pim-1");
     }
 
+    /**
+     * OD-2 + OD-6: a save that leaves the pricing group and the approvals alone keeps a group the category no longer
+     * lists and an approval for a marketplace the store is no longer connected to.
+     */
+    @Test
+    void savingWithoutTouchingThemKeepsAGroupOutsideTheListAndAnUnconnectedApproval() throws Exception {
+        // given
+        gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
+        Product existing = new Product(gpu.getCategoryId(), null, "4719331361600", "m", "b", "l", "n", "Ultra");
+        existing.setProductId("p1");
+        existing.setMarketplaces(new java.util.LinkedList<>(List.of("Morele")));
+        when(access.requireProduct(gpu, "p1")).thenReturn(existing);
+        MarketplaceIntegration allegro = new MarketplaceIntegration();
+        allegro.setName("Allegro");
+        when(store.getMarketplaces()).thenReturn(List.of(allegro));
+
+        // when
+        mvc.perform(post(categoryPath() + "/products/p1")
+                        .param("name", "n").param("ean", "4719331361600").param("manufacturerCode", "m")
+                        .param("availabilityType", "BasedOnSupply").param("pricingGroup", "Ultra")
+                        .param("marketplaces", "Allegro").param("marketplaces", "Morele"))
+                .andExpect(redirectedUrl(categoryPath() + "?status=active"));
+
+        // then
+        verify(productRepository).save(existing);
+        assertThat(existing.getPricingGroup()).isEqualTo("Ultra");
+        assertThat(existing.getMarketplaces()).containsExactly("Allegro", "Morele");
+    }
+
     /** The page of a saved product states the id; a product being created has none yet. */
     @Test
     void theProductPageCarriesTheIdOfASavedProductOnly() throws Exception {

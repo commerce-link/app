@@ -327,4 +327,50 @@ class ProductFormTest {
                 .containsOnlyKeys("customAttributeFilter-0-operator")
                 .containsEntry("customAttributeFilter-0-operator", "product.error.filter.incomplete");
     }
+
+    /**
+     * OD-2: a product priced by a group its category no longer lists (or lists in another case) keeps it through a
+     * save that leaves the field alone; only a group newly chosen must come from the list.
+     */
+    @Test
+    void aSavedPricingGroupOutsideTheListPassesWhileANewOneMustBeListed() {
+        // given
+        Product ultra = saved("pim-1", "4719331361600", "GV-N5080");
+        ultra.setPricingGroup("Ultra");
+        ProductForm kept = ProductForm.from(ultra);
+        Product lowerCase = saved("pim-1", "4719331361600", "GV-N5080");
+        lowerCase.setPricingGroup("ultra premium");
+        ProductForm keptLowerCase = ProductForm.from(lowerCase);
+        ProductForm changed = ProductForm.from(ultra);
+        changed.setPricingGroup("Mega");
+        ProductForm created = valid();
+        created.setPricingGroup("Ultra");
+
+        // when / then
+        assertThat(kept.validate(LABELS, GROUPS, MARKETPLACES, check -> Optional.of("pim-1"))).isEmpty();
+        assertThat(keptLowerCase.validate(LABELS, GROUPS, MARKETPLACES, check -> Optional.of("pim-1"))).isEmpty();
+        assertThat(changed.validate(LABELS, GROUPS, MARKETPLACES, check -> Optional.of("pim-1")))
+                .containsEntry("pricingGroup", "product.error.group.unknown");
+        assertThat(created.validate(LABELS, GROUPS, MARKETPLACES, check -> Optional.of("pim-1")))
+                .containsEntry("pricingGroup", "product.error.group.unknown");
+    }
+
+    /**
+     * OD-6: an approval for a marketplace the store is no longer connected to comes back with the form and stays;
+     * approving a marketplace the store does not have is still refused.
+     */
+    @Test
+    void anApprovalForAnUnconnectedMarketplaceSurvivesWhileANewOneIsRefused() {
+        // given
+        Product product = saved("pim-1", "4719331361600", "GV-N5080");
+        product.setMarketplaces(new java.util.LinkedList<>(List.of("allegro", "Morele")));
+        ProductForm kept = ProductForm.from(product);
+        ProductForm added = ProductForm.from(product);
+        added.setMarketplaces(List.of("allegro", "Morele", "Wish"));
+
+        // when / then
+        assertThat(kept.validate(LABELS, GROUPS, MARKETPLACES, check -> Optional.of("pim-1"))).isEmpty();
+        assertThat(added.validate(LABELS, GROUPS, MARKETPLACES, check -> Optional.of("pim-1")))
+                .containsEntry("marketplaces", "product.error.marketplace.unknown");
+    }
 }

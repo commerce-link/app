@@ -124,8 +124,17 @@
                                     <select class="cl-select" id="pricingGroup" name="pricingGroup"
                                             th:classappend="${errors['pricingGroup'] != null} ? 'is-invalid'"
                                             th:attr="aria-invalid=${errors['pricingGroup'] != null} ? 'true' : null">
-                                        <option th:each="group : ${pricingGroups}" th:value="${group}" th:text="${group}"
-                                                th:selected="${group == form.pricingGroup}"></option>
+                                        <!--/* Matched regardless of case, as the price list matches it; the value goes back
+                                               as saved, so a save that leaves the field alone changes nothing. */-->
+                                        <option th:each="group : ${pricingGroups}"
+                                                th:with="chosen=${form.pricingGroup != null and #strings.equalsIgnoreCase(group, form.pricingGroup)}"
+                                                th:value="${chosen} ? ${form.pricingGroup} : ${group}" th:text="${group}"
+                                                th:selected="${chosen}"></option>
+                                        <!--/* The group the product is priced by stays choosable although the category no
+                                               longer lists it: the select must not fall back to another group, and so to
+                                               another price, by itself. A new product has no saved group to keep. */-->
+                                        <option th:if="${existing and form.pricingGroup != null and !form.pricingGroupListedIn(pricingGroups)}"
+                                                th:value="${form.pricingGroup}" th:text="#{product.pricing.group.outside(${form.pricingGroup})}" selected></option>
                                     </select>
                                     <p class="cl-help" th:text="#{product.page.group.help}"></p>
                                     <p th:if="${errors['pricingGroup'] != null}" class="cl-field-error">
@@ -147,6 +156,11 @@
                                 <div class="cl-span-6">
                                     <div class="cl-field" id="marketplaces" tabindex="-1">
                                         <span class="cl-label" th:text="#{product.page.marketplaces}"></span>
+                                        <!--/* An approval for a marketplace the store is no longer connected to has no box
+                                               here; it travels hidden, so a save does not drop it without a word. */-->
+                                        <input th:each="kept : ${form.marketplaces}"
+                                               th:unless="${storeMarketplaces.![get('name')].contains(kept)}"
+                                               type="hidden" name="marketplaces" th:value="${kept}">
                                         <ul class="cl-check-columns" th:unless="${storeMarketplaces.isEmpty()}">
                                             <li th:each="marketplace : ${storeMarketplaces}">
                                                 <label class="cl-check">

@@ -316,4 +316,34 @@ class ProductTemplateTest {
         assertThat(nameField).doesNotContain("is-invalid");
         assertThat(occurrences(html, "cl-field-error")).isEqualTo(1);
     }
+
+    /**
+     * OD-2: the select shows the group the product is priced by. One the category no longer lists is an option of its
+     * own, marked as outside the list, instead of the select falling back to the first group; one listed in another
+     * case is selected and posted back as saved.
+     */
+    @Test
+    void theSavedPricingGroupIsSelectedEvenOutsideTheListOrInAnotherCase() {
+        // when
+        String outside = rendered(true, form -> form.setPricingGroup("Ultra"));
+        String otherCase = rendered(true, form -> form.setPricingGroup("ultra premium"));
+        String created = rendered(false, form -> form.setPricingGroup("Ultra"));
+
+        // then
+        assertThat(outside).contains("<option value=\"Ultra\" selected>Ultra (outside the list)</option>");
+        assertThat(otherCase).contains("<option value=\"ultra premium\" selected=\"selected\">Ultra Premium</option>")
+                .doesNotContain("(outside the list)");
+        assertThat(created).doesNotContain("Ultra (outside the list)");
+    }
+
+    /** OD-6: approvals for marketplaces the store no longer has come back hidden, so a save does not drop them. */
+    @Test
+    void approvalsForUnconnectedMarketplacesTravelHidden() {
+        // when
+        String html = rendered(true, form -> form.setMarketplaces(List.of("allegro", "Morele")));
+
+        // then
+        assertThat(html).contains("<input type=\"hidden\" name=\"marketplaces\" value=\"Morele\">")
+                .doesNotContain("<input type=\"hidden\" name=\"marketplaces\" value=\"allegro\">");
+    }
 }

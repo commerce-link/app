@@ -70,6 +70,8 @@ public class ProductForm {
     private String existingLabel;
     private String existingEan;
     private String existingManufacturerCode;
+    private String existingPricingGroup;
+    private List<String> existingMarketplaces = List.of();
 
     /**
      * The lists are read without a null check everywhere below, and a request can hand a list property an empty value,
@@ -141,6 +143,17 @@ public class ProductForm {
         existingLabel = saved == null ? null : saved.getLabel();
         existingEan = saved == null ? null : saved.getEan();
         existingManufacturerCode = saved == null ? null : saved.getManufacturerCode();
+        existingPricingGroup = saved == null ? null : saved.getPricingGroup();
+        existingMarketplaces = saved == null ? List.of() : List.copyOf(saved.getMarketplaces());
+    }
+
+    /**
+     * Whether the chosen pricing group is one of the category's, regardless of case (the price list matches groups
+     * that way). The page offers a group outside the list as an option of its own, so the select never falls back
+     * to another group -- and another price -- by itself (OD-2).
+     */
+    public boolean pricingGroupListedIn(List<String> pricingGroups) {
+        return pricingGroup != null && pricingGroups.stream().anyMatch(group -> group.equalsIgnoreCase(pricingGroup));
     }
 
     /** The id of a field of the row at {@code index}; an error is keyed by it, so the summary links to the field. */
@@ -223,10 +236,13 @@ public class ProductForm {
                 && minimumPrice.filter(value -> value > 0).isEmpty()) {
             errors.put("suggestedRetailPrice", "product.error.srp.requiredForFixed");
         }
-        if (pricingGroup == null || pricingGroups.stream().noneMatch(group -> group.equalsIgnoreCase(pricingGroup))) {
+        // The group the product was saved with stays allowed although the category no longer lists it, like the label.
+        if (!pricingGroupListedIn(pricingGroups) && (pricingGroup == null || !pricingGroup.equals(existingPricingGroup))) {
             errors.put("pricingGroup", "product.error.group.unknown");
         }
-        if (!storeMarketplaces.containsAll(marketplaces)) {
+        // An approval for a marketplace the store has been disconnected from comes back hidden and stays (OD-6);
+        // only a marketplace newly approved must be one the store is connected to.
+        if (!marketplaces.stream().allMatch(name -> storeMarketplaces.contains(name) || existingMarketplaces.contains(name))) {
             errors.put("marketplaces", "product.error.marketplace.unknown");
         }
         for (int index = 0; index < customAttributes.size(); index++) {
