@@ -383,6 +383,30 @@ class CatalogScriptContractTest {
         assertThat(rule(css, ".cl-page .cl-table.is-editable tbody th .cl-input")).contains("display: block;");
         assertThat(rule(css, ".cl-page .cl-table.is-editable tbody th .cl-label")).contains("display: block;");
         assertThat(rule(css, ".cl-page .cl-table.is-editable tbody th.cl-table-key")).contains("display: block;");
+        // the floor of the product cell is a table-column floor: in card mode it was wider than a 320 px card
+        assertThat(css).contains("""
+                .cl-page .cl-table.is-editable tbody th {
+                    vertical-align: middle;
+                    white-space: normal;
+                }""");
+        assertThat(css).contains("""
+                @media screen and (min-width: 720px) {
+                    .cl-page .cl-table.is-editable tbody th {
+                        min-width: 12rem;
+                    }
+                }""");
+    }
+
+    /** Below 720 px the table search is 44 px by the frame's rule for every field below 1024 px; no copy of it. */
+    @Test
+    void theTableSearchHasNoHeightOfItsOwnOnAPhone() throws Exception {
+        // given
+        String css = read("src/main/resources/static/css/commercelink.css");
+        String phone = css.substring(css.indexOf("@media screen and (max-width: 719px) {\n    .cl-page .cl-table-toolbar {"));
+        phone = phone.substring(0, phone.indexOf("\n}\n"));
+
+        // then
+        assertThat(phone).contains(".cl-page .cl-table-search {\n        width: 100%;\n    }");
     }
 
     /**

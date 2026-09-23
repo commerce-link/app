@@ -3079,7 +3079,6 @@ a.cl-link-button:hover {
 
     .cl-page .cl-table-search {
         width: 100%;
-        height: 44px;
     }
 
     .cl-page .cl-table thead {
@@ -3847,7 +3846,14 @@ a.cl-link-button:hover {
 .cl-page .cl-table.is-editable tbody th {
     vertical-align: middle;
     white-space: normal;
-    min-width: 12rem;
+}
+
+/* A floor for the product column of the table; in card mode (< 720 px) the cell is the width of the card, which on a
+   320 px screen is narrower than the floor. */
+@media screen and (min-width: 720px) {
+    .cl-page .cl-table.is-editable tbody th {
+        min-width: 12rem;
+    }
 }
 
 .cl-page .cl-table.is-editable tbody th .cl-label {

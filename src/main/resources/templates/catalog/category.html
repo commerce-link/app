@@ -163,7 +163,7 @@
                             <span th:if="${row.href() == null}" th:text="${row.name()}"></span>
                             <span class="cl-table-sub">
                                 <!--/* A product can be known by its manufacturer code alone: each code states itself, and the separator belongs to the one before it. */-->
-                                <span th:if="${row.ean() != null}" class="cl-table-code" th:text="'EAN ' + ${row.ean()}"></span><span th:if="${row.mfn() != null}" th:text="(${row.ean() != null} ? ' · ' : '') + ${row.mfn()}"></span><span th:if="${row.pimId() != null}" th:text="(${row.ean() != null or row.mfn() != null} ? ' · ' : '') + 'PIM ' + ${row.pimId()}"></span>
+                                <span th:if="${row.ean() != null}" class="cl-table-code" th:text="'EAN ' + ${row.ean()}"></span><span th:if="${row.mfn() != null}"><th:block th:text="${row.ean() != null} ? ' · ' : ''"></th:block><span class="cl-table-code" th:text="${row.mfn()}"></span></span><span th:if="${row.pimId() != null}" th:text="(${row.ean() != null or row.mfn() != null} ? ' · ' : '') + 'PIM ' + ${row.pimId()}"></span>
                             </span>
                         </th>
                         <td th:attr="data-label=#{product.brand}" th:text="${row.brand()}"></td>

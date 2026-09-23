@@ -205,7 +205,17 @@ class CategoryPageTemplateTest {
         String html = rendered(false);
 
         // then
-        assertThat(html).contains("EAN 1").contains("· MFN-1").contains("· PIM pim-1");
+        assertThat(html).contains("EAN 1").contains(" · <span class=\"cl-table-code\">MFN-1</span>").contains("· PIM pim-1");
+    }
+
+    /** A manufacturer code breaks at its hyphens ("MFN-" / "CLEAR-01") unless it is a code; the separator may wrap. */
+    @Test
+    void theManufacturerCodeIsACodeAndItsSeparatorStaysOutsideIt() {
+        // when
+        String html = rendered(false);
+
+        // then
+        assertThat(html).containsPattern("<span> · <span class=\"cl-table-code\">MFN-1</span></span>");
     }
 
     @Test

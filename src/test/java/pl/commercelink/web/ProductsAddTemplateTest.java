@@ -107,6 +107,17 @@ class ProductsAddTemplateTest {
                 .containsPattern("<label class=\"cl-check-target\">\\s*<input type=\"checkbox\" class=\"cl-check-input\" name=\"eans\"");
     }
 
+    /** Both codes of a proposal are kept whole: an EAN and a manufacturer code never break inside. */
+    @Test
+    void theEanAndTheManufacturerCodeOfAProposalAreCodes() {
+        // when
+        String html = renderedProposals();
+
+        // then
+        assertThat(html).contains("<span class=\"cl-table-code\">EAN 1</span>")
+                .contains("<span> · <span class=\"cl-table-code\">MFN-1</span></span>");
+    }
+
     @Test
     void theProposalsPostTheCheckedEansToTheReview() {
         // given

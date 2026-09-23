@@ -53,6 +53,7 @@ final class FormRules {
         Map<String, String> summary = new LinkedHashMap<>();
         texts.forEach((field, text) -> {
             Matcher row = rowField.matcher(field);
+            // a String, not a number: MessageFormat would group the digits of a number by locale ("1 000")
             summary.put(field, row.matches() ? line.apply(String.valueOf(Integer.parseInt(row.group(1)) + 1), text) : text);
         });
         return summary;
