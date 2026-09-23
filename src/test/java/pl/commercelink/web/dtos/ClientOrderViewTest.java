@@ -21,13 +21,16 @@ import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.stores.BankAccount;
 import pl.commercelink.stores.ClientNotificationsConfiguration;
 import pl.commercelink.stores.DeliveryOption;
+import pl.commercelink.stores.FulfilmentConfiguration;
 import pl.commercelink.stores.ShippingConfiguration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.taxonomy.CategoryLocalizer;
 
+import java.time.DayOfWeek;
 import java.time.LocalDateTime;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -364,6 +367,29 @@ class ClientOrderViewTest {
         // then
         assertThat(preferred.getContactEmail()).isEqualTo("pomoc@sklep.pl");
         assertThat(fallback.getContactEmail()).isEqualTo("biuro@sklep.pl");
+    }
+
+    @Test
+    @DisplayName("from lists the days the store allows for the order's shipment type, as ISO numbers for the date input")
+    void fromExposesPreferredShippingDaysOfTheShipmentType() {
+        // given
+        Order collection = order(OrderStatus.Assembly);
+        collection.addShipment(new Shipment(ShipmentType.PersonalCollection));
+        Order courier = order(OrderStatus.Assembly);
+        courier.addShipment(new Shipment(ShipmentType.Courier));
+        Store store = store();
+        FulfilmentConfiguration configuration = new FulfilmentConfiguration();
+        configuration.setPreferredShippingDays(Map.of("PersonalCollection", List.of("SATURDAY", "MONDAY")));
+        store.setFulfilmentConfiguration(configuration);
+
+        // when
+        ClientOrderView collectionView = ClientOrderView.from(collection, List.of(), store, categoryLocalizer);
+        ClientOrderView courierView = ClientOrderView.from(courier, List.of(), store, categoryLocalizer);
+
+        // then
+        assertThat(collectionView.getPreferredShippingDays()).containsExactly(DayOfWeek.MONDAY, DayOfWeek.SATURDAY);
+        assertThat(collectionView.getPreferredShippingDayNumbers()).isEqualTo("1,6");
+        assertThat(courierView.getPreferredShippingDayNumbers()).isEqualTo("1,2,3,4,5");
     }
 
     private static Order order(OrderStatus status) {

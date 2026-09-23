@@ -68,7 +68,42 @@
                             <div th:replace="~{fragments/settings-form :: check('clientOrderPageEnabled', 'store.fulfilment.orderPage.enable', *{clientOrderPageEnabled}, 'store.fulfilment.orderPage.description', 'fulfilment-address-change')}"></div>
                             <div id="fulfilment-address-change" class="cl-reveal">
                                 <div th:replace="~{fragments/settings-form :: check('clientShippingAddressChangeEnabled', 'store.fulfilment.addressChange.enable', *{clientShippingAddressChangeEnabled}, 'store.fulfilment.addressChange.description', null)}"></div>
-                                <div th:replace="~{fragments/settings-form :: check('clientPreferredShippingDateEnabled', 'store.fulfilment.preferredDate.enable', *{clientPreferredShippingDateEnabled}, 'store.fulfilment.preferredDate.description', null)}"></div>
+                                <div th:replace="~{fragments/settings-form :: check('clientPreferredShippingDateEnabled', 'store.fulfilment.preferredDate.enable', *{clientPreferredShippingDateEnabled}, 'store.fulfilment.preferredDate.description', 'fulfilment-preferred-days')}"></div>
+                                <div id="fulfilment-preferred-days" class="cl-reveal">
+                                    <fieldset class="cl-choice-group" id="preferredShippingDays" tabindex="-1"
+                                              th:attr="aria-label=#{store.fulfilment.preferredDays.title},
+                                                       aria-invalid=${errors['preferredShippingDays'] != null ? 'true' : null},
+                                                       aria-describedby='preferredShippingDays-help' + (${errors['preferredShippingDays'] != null} ? ' preferredShippingDays-error' : '')">
+                                        <p class="cl-help" id="preferredShippingDays-help" th:text="#{store.fulfilment.preferredDays.description}"></p>
+                                        <table class="cl-table">
+                                            <thead>
+                                            <tr>
+                                                <th scope="col" th:text="#{store.fulfilment.preferredDays.type}"></th>
+                                                <th scope="col" th:each="day : ${T(java.time.DayOfWeek).values()}"
+                                                    th:text="#{'DayOfWeek.short.' + ${day.name()}}"
+                                                    th:attr="abbr=#{'DayOfWeek.' + ${day.name()}}"></th>
+                                            </tr>
+                                            </thead>
+                                            <tbody>
+                                            <tr th:each="type : ${T(pl.commercelink.orders.ShipmentType).values()}">
+                                                <th scope="row" th:text="#{'ShipmentType.' + ${type.name()}}"></th>
+                                                <td th:each="day : ${T(java.time.DayOfWeek).values()}">
+                                                    <label class="cl-check">
+                                                        <input type="checkbox" th:name="'preferredShippingDays[' + ${type.name()} + ']'"
+                                                               th:value="${day.name()}"
+                                                               th:checked="${form.hasPreferredShippingDay(type.name(), day.name())}"
+                                                               th:attr="aria-label=#{'ShipmentType.' + ${type.name()}} + ', ' + #{'DayOfWeek.' + ${day.name()}}"/>
+                                                    </label>
+                                                </td>
+                                            </tr>
+                                            </tbody>
+                                        </table>
+                                        <p th:if="${errors['preferredShippingDays'] != null}" class="cl-field-error" id="preferredShippingDays-error">
+                                            <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                                            <span th:text="#{${errors['preferredShippingDays']}}"></span>
+                                        </p>
+                                    </fieldset>
+                                </div>
                             </div>
                         </fieldset>
 

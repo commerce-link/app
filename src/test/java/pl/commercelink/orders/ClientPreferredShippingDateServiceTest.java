@@ -11,6 +11,8 @@ import pl.commercelink.stores.FulfilmentConfiguration;
 import pl.commercelink.stores.Store;
 
 import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -80,6 +82,43 @@ class ClientPreferredShippingDateServiceTest {
 
         // when / then
         assertThatThrownBy(() -> service.change(order, ESTIMATED.minusDays(1), store(true, true)))
+                .isInstanceOf(ClientPreferredShippingDateException.class)
+                .extracting(e -> ((ClientPreferredShippingDateException) e).getReason())
+                .isEqualTo(Reason.INVALID_DATE);
+        verify(ordersRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("change accepts a saturday for personal collection when the store allows it")
+    void changeAcceptsSaturdayForPersonalCollectionWhenConfigured() {
+        // given
+        Order order = editableOrder();
+        order.addShipment(new Shipment(ShipmentType.PersonalCollection));
+        Store store = store(true, true);
+        store.getFulfilmentConfiguration().setPreferredShippingDays(
+                Map.of(ShipmentType.PersonalCollection.name(), List.of("MONDAY", "SATURDAY")));
+        LocalDate saturday = ESTIMATED.plusDays(5);
+
+        // when
+        service.change(order, saturday, store);
+
+        // then
+        assertThat(order.getPreferredShippingAt()).isEqualTo(saturday);
+        verify(ordersRepository).save(order);
+    }
+
+    @Test
+    @DisplayName("change rejects a saturday for a courier order when only personal collection allows it")
+    void changeRejectsSaturdayForCourierWhenOnlyCollectionAllowsIt() {
+        // given
+        Order order = editableOrder();
+        order.addShipment(new Shipment(ShipmentType.Courier));
+        Store store = store(true, true);
+        store.getFulfilmentConfiguration().setPreferredShippingDays(
+                Map.of(ShipmentType.PersonalCollection.name(), List.of("MONDAY", "SATURDAY")));
+
+        // when / then
+        assertThatThrownBy(() -> service.change(order, ESTIMATED.plusDays(5), store))
                 .isInstanceOf(ClientPreferredShippingDateException.class)
                 .extracting(e -> ((ClientPreferredShippingDateException) e).getReason())
                 .isEqualTo(Reason.INVALID_DATE);
