@@ -98,12 +98,18 @@
        th:text="#{${descriptionKey}}"></p>
 </div>
 
-<!--/* Outcome of an action that returned to this page (flash settingsSavedMessage), inside the page body instead of
-       the full-width banner of the layout. */-->
-<div th:fragment="savedAlert" th:if="${settingsSavedMessage != null}" class="cl-alert is-ok" role="status" data-cl-saved-alert>
-    <i class="fas fa-check-circle cl-alert-icon" aria-hidden="true"></i>
-    <p class="cl-alert-title" th:text="${settingsSavedMessage}"></p>
-</div>
+<!--/* Outcome of an action that returned to this page (flash settingsSavedMessage, or settingsErrorMessage when the
+       action was refused instead of applied), inside the page body instead of the full-width banner of the layout. */-->
+<th:block th:fragment="savedAlert">
+    <div th:if="${settingsSavedMessage != null}" class="cl-alert is-ok" role="status" data-cl-saved-alert>
+        <i class="fas fa-check-circle cl-alert-icon" aria-hidden="true"></i>
+        <p class="cl-alert-title" th:text="${settingsSavedMessage}"></p>
+    </div>
+    <div th:if="${settingsErrorMessage != null}" class="cl-alert is-bad" role="status" data-cl-saved-alert>
+        <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
+        <p class="cl-alert-title" th:text="${settingsErrorMessage}"></p>
+    </div>
+</th:block>
 
 </body>
 </html>

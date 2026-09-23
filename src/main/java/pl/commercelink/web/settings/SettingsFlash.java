@@ -14,11 +14,18 @@ public final class SettingsFlash {
 
     public static final String SAVED_MESSAGE = "settingsSavedMessage";
 
+    /** An action refused instead of applied (a disconnect blocked by something still in flight): shown as is-bad. */
+    public static final String ERROR_MESSAGE = "settingsErrorMessage";
+
     private SettingsFlash() {
     }
 
     public static void onRedirect(RedirectAttributes redirectAttributes, String message) {
         redirectAttributes.addFlashAttribute(SAVED_MESSAGE, message);
+    }
+
+    public static void errorOnRedirect(RedirectAttributes redirectAttributes, String message) {
+        redirectAttributes.addFlashAttribute(ERROR_MESSAGE, message);
     }
 
     /**
