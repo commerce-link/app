@@ -1,6 +1,7 @@
 package pl.commercelink.receipts;
 
 import io.awspring.cloud.sqs.operations.SqsTemplate;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.time.Clock;
@@ -18,6 +19,7 @@ public class ReceiptWorkPublisher {
     private final SqsTemplate sqsTemplate;
     private final Clock clock;
 
+    @Autowired
     public ReceiptWorkPublisher(SqsTemplate sqsTemplate) {
         this(sqsTemplate, Clock.systemUTC());
     }
