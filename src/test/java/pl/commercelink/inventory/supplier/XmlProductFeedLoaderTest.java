@@ -18,7 +18,7 @@ import pl.commercelink.inventory.supplier.api.XmlItem;
 import java.io.Reader;
 import java.io.StringReader;
 import java.util.List;
-import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -50,7 +50,11 @@ class XmlProductFeedLoaderTest {
         // given
         when(inventoryRepository.read("acme", "xml")).thenReturn(reader(
                 "<products><product><ean>111</ean></product><product><ean>222</ean></product></products>"));
-        when(feedRowProcessor.process(any(), anyInt(), any())).thenReturn(Optional.empty());
+        AtomicInteger rowsHandedOver = new AtomicInteger();
+        when(feedRowProcessor.process(any(), anyInt(), any())).thenAnswer(invocation -> {
+            rowsHandedOver.addAndGet(((List<ParsedRow>) invocation.getArgument(0)).size());
+            return List.of();
+        });
         when(dataCleanup.run(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         // when
@@ -58,7 +62,8 @@ class XmlProductFeedLoaderTest {
 
         // then
         assertThat(result).isEmpty();
-        verify(feedRowProcessor, times(2)).process(any(), anyInt(), any());
+        verify(feedRowProcessor, times(1)).process(any(), anyInt(), any());
+        assertThat(rowsHandedOver.get()).isEqualTo(2);
     }
 
     @Test
