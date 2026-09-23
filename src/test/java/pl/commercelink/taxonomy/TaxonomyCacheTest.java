@@ -471,8 +471,8 @@ class TaxonomyCacheTest {
         TaxonomyMerge merge = cache.openMerge(Arrays.asList("MFN-1", null, "", "   "));
 
         // then
-        assertEquals("CPU", merge.knownFor("MFN-1").category());
-        assertNull(merge.knownFor(null));
+        assertEquals("CPU", merge.latest("MFN-1").category());
+        assertNull(merge.latest(null));
     }
 
     @Test

@@ -15,7 +15,7 @@ public class TaxonomyMerge {
         this.stored = stored;
     }
 
-    public Taxonomy knownFor(String mfn) {
+    public Taxonomy latest(String mfn) {
         Taxonomy candidate = merged.get(mfn);
         return candidate != null ? candidate : stored.get(mfn);
     }
@@ -24,7 +24,7 @@ public class TaxonomyMerge {
         if (candidate == null || isBlank(candidate.mfn())) {
             return;
         }
-        merged.put(candidate.mfn(), TaxonomyCache.mergeOf(knownFor(candidate.mfn()), candidate));
+        merged.put(candidate.mfn(), TaxonomyCache.mergeOf(latest(candidate.mfn()), candidate));
     }
 
     List<Taxonomy> changed() {

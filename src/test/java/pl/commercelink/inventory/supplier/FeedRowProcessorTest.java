@@ -171,7 +171,7 @@ class FeedRowProcessorTest {
         // given
         givenMerge();
         Taxonomy stored = new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", "CPU", 3, null, null);
-        when(merge.knownFor("MFN-1")).thenReturn(stored);
+        when(merge.latest("MFN-1")).thenReturn(stored);
         when(dataCorrection.run(sellableItem)).thenReturn(sellableItem);
         when(dataCorrection.run(feedProduct)).thenReturn(pendingTaxonomy);
         when(enrichment.enrich(pendingTaxonomy, stored)).thenReturn(categorizedTaxonomy);
