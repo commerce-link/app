@@ -85,17 +85,26 @@ public class ReceiptProcessor {
                 default -> {
                 }
             }
-            try {
-                effects.apply(storeId, receiptKey);
-            } catch (RuntimeException e) {
-                effectsFailed = true;
-                log.error("Effects of fiscalised receipt {} failed; retrying later", receiptKey, e);
+            // issue()/poll() may have lost the lease mid-flight (stolen, or simply expired); re-read from the
+            // store rather than trust anything decided earlier in this call — effects must never run for an
+            // attempt this call no longer owns.
+            if (holdsLease(storeId, receiptKey, owner)) {
+                try {
+                    effects.apply(storeId, receiptKey);
+                } catch (RuntimeException e) {
+                    effectsFailed = true;
+                    log.error("Effects of fiscalised receipt {} failed; retrying later", receiptKey, e);
+                }
             }
         } catch (RuntimeException e) {
             log.error("Receipt attempt {} could not be processed", receiptKey, e);
         } finally {
             finish(storeId, receiptKey, owner, effectsFailed);
         }
+    }
+
+    private boolean holdsLease(String storeId, String receiptKey, String owner) {
+        return attempts.find(storeId, receiptKey).filter(a -> owner.equals(a.getLeaseOwner())).isPresent();
     }
 
     /**
@@ -233,19 +242,21 @@ public class ReceiptProcessor {
         }
     }
 
+    /**
+     * An attempt this call no longer owns (lease stolen or expired and re-taken) is left untouched: no reschedule,
+     * no alert sync, no lease change — the real owner's {@code finish} is the only one allowed to decide those.
+     */
     private void finish(String storeId, String receiptKey, String owner, boolean effectsFailed) {
         Instant now = clock.instant();
-        ReceiptAttempt[] result = new ReceiptAttempt[1];
         attempts.update(storeId, receiptKey, a -> {
             if (!owner.equals(a.getLeaseOwner())) {
                 log.error("Receipt attempt {} lost its lease while being processed", receiptKey);
-            } else {
-                a.setLeaseOwner(null);
-                a.setLeaseUntil(null);
+                return false;
             }
+            a.setLeaseOwner(null);
+            a.setLeaseUntil(null);
             reschedule(a, now, effectsFailed);
             alerts.sync(a, ReceiptAttentionEvaluator.evaluate(a, now));
-            result[0] = a;
             return true;
         });
     }

@@ -170,6 +170,42 @@ class ReceiptEffectsTest {
     }
 
     @Test
+    void aConcurrentMarketplaceClaimIsNotOverriddenByALoserOfTheSameCasRetry() {
+        fiscalised("https://paragony.pl/r/1");
+        attempts.update(STORE_ID, KEY, a -> {
+            a.setDocumentAttachedAt(clock.instant());
+            a.setDocumentLinkedAt(clock.instant());
+            a.setEmailClaimedAt(clock.instant());   // keep this run's only claim attempt the marketplace one
+            return true;
+        });
+        Instant otherClaim = Instant.parse("2026-09-23T12:30:00Z");
+        attempts.interleaveOnce(a -> a.setMarketplaceNotifiedAt(otherClaim));
+
+        effects.apply(STORE_ID, KEY);
+
+        verify(lifecycleEvents, never()).publish(any(), any());
+        assertThat(attempts.find(STORE_ID, KEY).orElseThrow().getMarketplaceNotifiedAt()).isEqualTo(otherClaim);
+    }
+
+    @Test
+    void aConcurrentEmailClaimIsNotOverriddenByALoserOfTheSameCasRetry() {
+        fiscalised("https://paragony.pl/r/1");
+        attempts.update(STORE_ID, KEY, a -> {
+            a.setDocumentAttachedAt(clock.instant());
+            a.setDocumentLinkedAt(clock.instant());
+            a.setMarketplaceNotifiedAt(clock.instant());   // keep this run's only claim attempt the e-mail one
+            return true;
+        });
+        Instant otherClaim = Instant.parse("2026-09-23T12:30:00Z");
+        attempts.interleaveOnce(a -> a.setEmailClaimedAt(otherClaim));
+
+        effects.apply(STORE_ID, KEY);
+
+        verify(emailClient, never()).send(any(), any(), any());
+        assertThat(attempts.find(STORE_ID, KEY).orElseThrow().getEmailClaimedAt()).isEqualTo(otherClaim);
+    }
+
+    @Test
     void attemptsThatAreNotFiscalisedHaveNoEffects() {
         fiscalised("u");
         attempts.update(STORE_ID, KEY, a -> {

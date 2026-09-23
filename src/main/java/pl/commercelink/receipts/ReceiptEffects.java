@@ -141,8 +141,14 @@ public class ReceiptEffects {
     }
 
     private void notifyMarketplace(String storeId, String receiptKey, Order order) {
+        // The flag is reset at the start of every predicate run, not just set on a win: update() retries this
+        // predicate on a version conflict, and a value written by an earlier, losing try (that also happened to
+        // see the claim as free) must not survive into a retry that correctly finds the claim already taken.
+        // update() only ever saves the LAST run's outcome, so resetting first makes the flag exactly answer
+        // "did the run that actually got saved claim it".
         boolean[] claimed = new boolean[1];
         attempts.update(storeId, receiptKey, a -> {
+            claimed[0] = false;
             if (a.getMarketplaceNotifiedAt() != null) {
                 return false;
             }
@@ -156,8 +162,10 @@ public class ReceiptEffects {
     }
 
     private void sendEmail(String storeId, String receiptKey) {
+        // Same reset-per-run rule as notifyMarketplace's claim, for the same reason.
         ReceiptAttempt[] claimed = new ReceiptAttempt[1];
         attempts.update(storeId, receiptKey, a -> {
+            claimed[0] = null;
             if (a.getEmailClaimedAt() != null || a.getDocumentUrl() == null) {
                 return false;
             }

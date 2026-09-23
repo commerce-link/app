@@ -137,6 +137,7 @@ class ReceiptProcessorTest {
         // The lease can be lost between acquire() succeeding and the issueCalls++ write that guards the actual
         // provider call (e.g. a slow order lookup letting the lease expire under us). Arm the steal as a side
         // effect of the order lookup stillQualifies() makes, right before that guarding write.
+        Instant expectedNextCheckAt = stored().getNextCheckAt();
         when(orders.findById(STORE_ID, ORDER_ID)).thenAnswer(i -> {
             attempts.interleaveOnce(a -> {
                 a.setLeaseOwner("stealer");
@@ -149,6 +150,25 @@ class ReceiptProcessorTest {
 
         assertThat(provider.issueCalls.get()).isZero();
         assertThat(stored().getLeaseOwner()).isEqualTo("stealer");
+        // Neither the effects step nor finish() may act for an attempt this call no longer owns: the stealer's
+        // own run decides the schedule and the alert, not ours.
+        verify(effects, never()).apply(STORE_ID, KEY);
+        assertThat(stored().getNextCheckAt()).isEqualTo(expectedNextCheckAt);
+        assertThat(stored().getAttention()).isNull();
+    }
+
+    @Test
+    void aLeaseExpiredButNotStolenBeforeIssueAbortsWithoutCallingTheProvider() {
+        // Nobody took the lease over, but time passed (a slow order lookup) so it lapsed by the time the guard
+        // right before the provider call re-checks it: still our owner id, but no longer "leased at now".
+        when(orders.findById(STORE_ID, ORDER_ID)).thenAnswer(i -> {
+            clock.advance(ReceiptProcessor.LEASE.plusSeconds(1));
+            return order;
+        });
+
+        processor.process(STORE_ID, KEY);
+
+        assertThat(provider.issueCalls.get()).isZero();
     }
 
     @Test
