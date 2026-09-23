@@ -468,19 +468,19 @@ class TaxonomyCacheTest {
         store(categorized("MFN-1", "CPU", 5));
 
         // when
-        TaxonomyMerge merge = cache.startMerge(Arrays.asList("MFN-1", null, "", "   "));
+        TaxonomyMerge merge = cache.openMerge(Arrays.asList("MFN-1", null, "", "   "));
 
         // then
-        assertEquals("CPU", merge.current("MFN-1").category());
-        assertNull(merge.current(null));
+        assertEquals("CPU", merge.knownFor("MFN-1").category());
+        assertNull(merge.knownFor(null));
     }
 
     @Test
     void commitKeepsACategoryThatArrivedWhileTheChunkWasInFlight() {
         // given
         store(uncategorized("MFN-1", 5));
-        TaxonomyMerge merge = cache.startMerge(List.of("MFN-1"));
-        merge.add(uncategorized("MFN-1", 3));
+        TaxonomyMerge merge = cache.openMerge(List.of("MFN-1"));
+        merge.apply(uncategorized("MFN-1", 3));
 
         // when
         cache.updateCategory("MFN-1", "CPU", "301");
@@ -511,8 +511,8 @@ class TaxonomyCacheTest {
     }
 
     private void store(Taxonomy... incoming) {
-        TaxonomyMerge merge = cache.startMerge(Arrays.stream(incoming).map(Taxonomy::mfn).toList());
-        Arrays.stream(incoming).forEach(merge::add);
+        TaxonomyMerge merge = cache.openMerge(Arrays.stream(incoming).map(Taxonomy::mfn).toList());
+        Arrays.stream(incoming).forEach(merge::apply);
         cache.commit(merge);
     }
 

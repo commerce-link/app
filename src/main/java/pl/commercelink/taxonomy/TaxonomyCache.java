@@ -120,7 +120,7 @@ public class TaxonomyCache {
         return found;
     }
 
-    public TaxonomyMerge startMerge(Collection<String> mfns) {
+    public TaxonomyMerge openMerge(Collection<String> mfns) {
         return new TaxonomyMerge(findByMfns(mfns));
     }
 

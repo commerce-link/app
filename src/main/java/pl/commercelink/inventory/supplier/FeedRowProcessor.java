@@ -27,24 +27,25 @@ class FeedRowProcessor {
             return List.of();
         }
 
-        TaxonomyMerge merge = taxonomyCache.startMerge(candidates.stream().map(c -> c.product().mfn()).toList());
+        TaxonomyMerge merge = taxonomyCache.openMerge(candidates.stream().map(c -> c.product().mfn()).toList());
         List<InventoryItem> accepted = new ArrayList<>();
         for (Candidate candidate : candidates) {
-            Taxonomy taxonomy = enrichment.enrich(candidate.product(), merge.current(candidate.product().mfn()));
-            Taxonomy deprioritized = StoreFeedTaxonomy.deprioritized(taxonomy, taxonomyPenalty);
+            Taxonomy fromFeed = candidate.product();
+            Taxonomy enriched = enrichment.enrich(fromFeed, merge.knownFor(fromFeed.mfn()));
+            Taxonomy ranked = StoreFeedTaxonomy.deprioritized(enriched, taxonomyPenalty);
 
-            if (taxonomy.isProcessable()) {
-                merge.add(deprioritized);
+            if (enriched.isProcessable()) {
+                merge.apply(ranked);
                 stats.markImported();
-                if (!Taxonomy.hasCategory(candidate.product())) {
+                if (!Taxonomy.hasCategory(fromFeed)) {
                     stats.markImportedCategorized();
                 }
                 accepted.add(candidate.item());
-            } else if (enrichment.isPendingEligible(taxonomy)) {
-                merge.add(deprioritized);
-                enrichment.addPending(deprioritized, mappingScopeOf(stats.supplierName()));
+            } else if (enrichment.isPendingEligible(enriched)) {
+                merge.apply(ranked);
+                enrichment.addPending(ranked, mappingScopeOf(stats.supplierName()));
                 stats.markCategorizationScheduled();
-            } else if (enrichment.hasIdentificationData(taxonomy)) {
+            } else if (enrichment.hasIdentificationData(enriched)) {
                 stats.markCategorizationPostponed();
             } else {
                 stats.markIncomplete();
