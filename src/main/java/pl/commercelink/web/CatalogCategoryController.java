@@ -315,6 +315,8 @@ public class CatalogCategoryController {
                                            @PathVariable String name, Model model, Locale locale) {
         ProductCatalog catalog = access.requireCatalog(storeId(), catalogId);
         CategoryDefinition category = access.requireCategory(catalog, categoryId);
+        // The same guard as the POST: the page never offers to remove a definition the category does not have.
+        requireDefinition(category, name);
         String shown = shownName(name, locale);
         model.addAttribute("confirm", new ConfirmAction(
                 messageSource.getMessage("catalog.category.marketplace.delete.title", new Object[]{shown}, locale),
@@ -331,14 +333,24 @@ public class CatalogCategoryController {
                                     Locale locale, RedirectAttributes redirectAttributes) {
         ProductCatalog catalog = access.requireCatalog(storeId(), catalogId);
         CategoryDefinition category = access.requireCategory(catalog, categoryId);
-        String target = MarketplaceDefinitionRow.UNNAMED.equals(name) ? null : name;
-        if (category.getMarketplaceDefinitions().stream().noneMatch(definition -> Objects.equals(definition.getName(), target))) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
-        }
+        String target = requireDefinition(category, name);
         definitions.removeMarketplace(catalog, category, target);
         SettingsFlash.onRedirect(redirectAttributes, messageSource.getMessage("catalog.category.marketplace.deleted",
                 new Object[]{shownName(name, locale)}, locale));
         return "redirect:" + CatalogPaths.categoryMarketplaces(catalogId, categoryId);
+    }
+
+    /**
+     * The name of the category's definition the address points at ({@code null} for the one saved without a name), or a
+     * 404 when the category has no such definition. An orphan -- a definition for a marketplace the store no longer
+     * has -- is found here on purpose: removing it is what its row offers.
+     */
+    private static String requireDefinition(CategoryDefinition category, String name) {
+        String target = MarketplaceDefinitionRow.UNNAMED.equals(name) ? null : name;
+        if (category.getMarketplaceDefinitions().stream().noneMatch(definition -> Objects.equals(definition.getName(), target))) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+        return target;
     }
 
     /** A definition saved without a name has none to show, so it is named like any other untitled record. */
@@ -446,9 +458,14 @@ public class CatalogCategoryController {
     }
 
     @GetMapping("/dashboard/catalogs/{catalogId}/category/{categoryId}/delete")
-    public String confirmDelete(@PathVariable String catalogId, @PathVariable String categoryId, Model model, Locale locale) {
+    public String confirmDelete(@PathVariable String catalogId, @PathVariable String categoryId, Model model, Locale locale,
+                                RedirectAttributes redirectAttributes) {
         ProductCatalog catalog = access.requireCatalog(storeId(), catalogId);
         CategoryDefinition category = access.requireCategory(catalog, categoryId);
+        // The same refusal as the POST (ruling 5a): a protected category gets no page with a button that cannot work.
+        if (category.isDeletionProtection()) {
+            return refuseDeletion(catalogId, category, locale, redirectAttributes);
+        }
         model.addAttribute("confirm", new ConfirmAction(
                 messageSource.getMessage("catalog.category.delete.title", new Object[]{category.getName()}, locale),
                 deletionMessage(catalog, category, locale),
@@ -464,13 +481,18 @@ public class CatalogCategoryController {
         ProductCatalog catalog = access.requireCatalog(storeId(), catalogId);
         CategoryDefinition category = access.requireCategory(catalog, categoryId);
         if (category.isDeletionProtection()) {
-            redirectAttributes.addFlashAttribute(ERROR_FLASH,
-                    messageSource.getMessage("catalog.category.delete.protected", new Object[]{category.getName()}, locale));
-            return "redirect:" + CatalogPaths.catalog(catalogId);
+            return refuseDeletion(catalogId, category, locale, redirectAttributes);
         }
         definitions.remove(catalog, category);
         SettingsFlash.onRedirect(redirectAttributes,
                 messageSource.getMessage("catalog.category.deleted", new Object[]{category.getName()}, locale));
+        return "redirect:" + CatalogPaths.catalog(catalogId);
+    }
+
+    private String refuseDeletion(String catalogId, CategoryDefinition category, Locale locale,
+                                  RedirectAttributes redirectAttributes) {
+        redirectAttributes.addFlashAttribute(ERROR_FLASH,
+                messageSource.getMessage("catalog.category.delete.protected", new Object[]{category.getName()}, locale));
         return "redirect:" + CatalogPaths.catalog(catalogId);
     }
 

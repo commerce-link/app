@@ -435,6 +435,7 @@ class CatalogCategoryControllerTest {
     void confirmationPageSaysProductsAreKeptWhenTheServiceWouldKeepThem() throws Exception {
         // given
         CategoryDefinition gpu = categoryOf("GPU");
+        gpu.setDeletionProtection(false);
         when(definitions.deletionPreview(catalog, gpu)).thenReturn(new CategoryDefinitions.DeletionPreview(true, 0));
         when(messageSource.getMessage(eq("catalog.category.delete.message.kept"), any(), any(Locale.class))).thenReturn("kept");
         when(messageSource.getMessage(eq("catalog.category.delete.title"), any(), any(Locale.class))).thenReturn("title");
@@ -452,6 +453,7 @@ class CatalogCategoryControllerTest {
     void confirmationPageCountsTheProductsTheServiceWouldDelete() throws Exception {
         // given
         CategoryDefinition gpu = categoryOf("GPU");
+        gpu.setDeletionProtection(false);
         when(definitions.deletionPreview(catalog, gpu)).thenReturn(new CategoryDefinitions.DeletionPreview(false, 3));
         when(messageSource.getMessage(eq("catalog.category.delete.message"), any(), any(Locale.class)))
                 .thenAnswer(call -> "deletes " + ((Object[]) call.getArgument(1))[0]);
@@ -468,6 +470,7 @@ class CatalogCategoryControllerTest {
         // given
         CategoryDefinition os = categoryOf("OS");
         os.setType(CategoryDefinitionType.Dynamic);
+        os.setDeletionProtection(false);
         when(messageSource.getMessage(eq("catalog.category.delete.message.dynamic"), any(), any(Locale.class))).thenReturn("computed");
 
         // when
@@ -726,5 +729,53 @@ class CatalogCategoryControllerTest {
         mvc.perform(post("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/marketplaces/_unnamed_/delete"))
                 .andExpect(redirectedUrl("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/marketplaces"));
         verify(definitions).removeMarketplace(catalog, gpu, null);
+    }
+
+    /** The confirmation page asks nothing the POST would refuse: a protected category is refused already here (5a). */
+    @Test
+    void confirmingDeletionOfAProtectedCategoryIsRefused() throws Exception {
+        // given
+        CategoryDefinition gpu = categoryOf("GPU");
+        gpu.setDeletionProtection(true);
+        when(messageSource.getMessage(eq("catalog.category.delete.protected"), any(), any(Locale.class))).thenReturn("protected");
+
+        // when / then
+        mvc.perform(get("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/delete"))
+                .andExpect(redirectedUrl("/dashboard/catalogs/c1")).andExpect(flash().attribute("catalogError", "protected"));
+        verify(definitions, never()).deletionPreview(any(), any());
+    }
+
+    /** A definition the category does not have has nothing to remove: the confirmation is a 404, as its POST is. */
+    @Test
+    void confirmingRemovalOfAnUnknownMarketplaceIs404() throws Exception {
+        // given
+        CategoryDefinition gpu = new CategoryDefinition().withName("GPU").withGeneratedId()
+                .withMarketplaceDefinition(new MarketplaceDefinition("allegro", 1.0, 0, 5, 3, 0, 0));
+        when(access.requireCatalog(STORE_ID, "c1")).thenReturn(catalog);
+        when(access.requireCategory(catalog, gpu.getCategoryId())).thenReturn(gpu);
+
+        // when / then
+        mvc.perform(get("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/marketplaces/Nope/delete"))
+                .andExpect(status().isNotFound());
+        mvc.perform(get("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/marketplaces/_unnamed_/delete"))
+                .andExpect(status().isNotFound());
+    }
+
+    /** An orphan -- a definition of a marketplace the store no longer has, or one without a name -- can be removed. */
+    @Test
+    void confirmingRemovalOfAnOrphanedDefinitionShowsTheConfirmation() throws Exception {
+        // given
+        CategoryDefinition gpu = new CategoryDefinition().withName("GPU").withGeneratedId()
+                .withMarketplaceDefinition(new MarketplaceDefinition(null, 1.0, 0, 5, 3, 0, 0))
+                .withMarketplaceDefinition(new MarketplaceDefinition("gone", 1.0, 0, 5, 3, 0, 0));
+        when(access.requireCatalog(STORE_ID, "c1")).thenReturn(catalog);
+        when(access.requireCategory(catalog, gpu.getCategoryId())).thenReturn(gpu);
+        when(messageSource.getMessage(any(String.class), any(), any(Locale.class))).thenReturn("x");
+
+        // when / then
+        mvc.perform(get("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/marketplaces/_unnamed_/delete"))
+                .andExpect(status().isOk()).andExpect(view().name("settings-confirm"));
+        mvc.perform(get("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/marketplaces/gone/delete"))
+                .andExpect(status().isOk()).andExpect(view().name("settings-confirm"));
     }
 }
