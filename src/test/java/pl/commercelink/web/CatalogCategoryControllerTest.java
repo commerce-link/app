@@ -63,6 +63,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -528,6 +529,59 @@ class CatalogCategoryControllerTest {
                 .andExpect(model().attribute("errors", hasEntry("groups", "catalog.category.pricing.group.inUse")));
         verify(definitions, never()).savePricing(any(), any(), any());
         verify(definitions, never()).productsInPriceGroup(gpu, "Default");
+    }
+
+    /**
+     * RF-19: the refused removal answers 422 with the group back on the form, every rule of it and marked as in use.
+     * NEW-1: a name is asked about once, however many rules of it were dropped.
+     */
+    @Test
+    void aRefusedRemovalOfAGroupInUseKeepsTheGroupOnTheForm() throws Exception {
+        // given
+        CategoryDefinition gpu = categoryOf("GPU");
+        gpu.withPriceDefinition(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
+        PriceDefinition first = new PriceDefinition(1.1, 0, 0, 0, 0, "Premium");
+        first.setLabelMatch("RTX 5080");
+        PriceDefinition second = new PriceDefinition(1.1, 0, 0, 0, 0, "Premium");
+        second.setLabelMatch("RTX 5070");
+        gpu.withPriceDefinition(first).withPriceDefinition(second);
+        when(definitions.productsInPriceGroup(gpu, "Premium")).thenReturn(4);
+
+        // when
+        MvcResult result = mvc.perform(withParams(post("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/pricing")
+                        .header("X-Requested-With", "fetch"), PRICING))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(model().attribute("errors", hasEntry("groups", "catalog.category.pricing.group.inUse")))
+                .andReturn();
+
+        // then
+        CategoryPricingForm form = (CategoryPricingForm) result.getModelAndView().getModel().get("form");
+        assertThat(form.getGroups()).extracting(CategoryPricingForm.PriceGroupForm::getName)
+                .containsExactly("Default", "Premium", "Premium");
+        assertThat(form.getGroups()).extracting(CategoryPricingForm.PriceGroupForm::isInUse).containsExactly(false, true, true);
+        assertThat(form.getGroups()).extracting(CategoryPricingForm.PriceGroupForm::getLabelMatch)
+                .containsExactly(null, "RTX 5080", "RTX 5070");
+        verify(definitions, times(1)).productsInPriceGroup(gpu, "Premium");
+        verify(definitions, never()).savePricing(any(), any(), any());
+    }
+
+    /** NEW-1: one rule of a repeated group dropped while another stays is no removal of the group. */
+    @Test
+    void droppingOneRuleOfAGroupThatKeepsAnotherRemovesNothing() throws Exception {
+        // given
+        CategoryDefinition gpu = categoryOf("GPU");
+        when(messageSource.getMessage(eq("catalog.category.pricing.saved"), any(), any(Locale.class))).thenReturn("Saved");
+        gpu.withPriceDefinition(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"))
+                .withPriceDefinition(new PriceDefinition(1.1, 0, 0, 0, 0, "Premium"))
+                .withPriceDefinition(new PriceDefinition(1.1, 0, 0, 0, 0, "Premium"));
+
+        // when / then
+        mvc.perform(withParams(post("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/pricing"), PRICING)
+                        .param("groups[1].name", "premium").param("groups[1].multiplier", "1,10").param("groups[1].minProfit", "0")
+                        .param("groups[1].critical", "0").param("groups[1].low", "0").param("groups[1].medium", "0"))
+                .andExpect(redirectedUrl("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings"));
+        verify(definitions, never()).productsInPriceGroup(any(), any());
+        verify(definitions).savePricing(eq(catalog), eq(gpu), argThat(pricing -> pricing.groups().size() == 2));
     }
 
     @Test

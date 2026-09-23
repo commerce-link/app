@@ -3,9 +3,11 @@ package pl.commercelink.web.dtos;
 import org.junit.jupiter.api.Test;
 import pl.commercelink.products.AvailabilityDefinition;
 import pl.commercelink.products.CategoryDefinition;
+import pl.commercelink.products.MonitoryPricingFixture;
 import pl.commercelink.products.PriceDefinition;
 import pl.commercelink.products.StockDefinition;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -81,18 +83,133 @@ class CategoryPricingFormTest {
     }
 
     @Test
-    void groupNamesAreUniqueAndMultiplierPositive() {
+    void theSameRuleOfOneGroupTwiceIsAnErrorAndTheMultiplierMustBePositive() {
         // given
         CategoryPricingForm form = valid();
-        form.getGroups().get(1).setName("default");
         form.getGroups().get(1).setMultiplier("0");
+        form.setGroups(List.of(form.getGroups().get(0), form.getGroups().get(1),
+                group(" premium ", "1,08", " rtx 5070 ", "2500")));
 
         // when
         Map<String, String> errors = form.validate(group -> 0);
 
         // then
-        assertThat(errors).containsEntry("group-1-name", "catalog.category.pricing.group.duplicate")
+        assertThat(errors).containsEntry("group-2-name", "catalog.category.pricing.group.duplicate")
                 .containsEntry("group-1-multiplier", "catalog.category.pricing.multiplier.invalid");
+    }
+
+    /**
+     * NEW-1: on production one group is several rules ("Ultra Premium" for six label and price pairs). Rows of one
+     * name are one group as long as their rules differ; the price is taken from the first row of the name.
+     */
+    @Test
+    void sameGroupWithDifferentLabelRulesIsAccepted() {
+        // given
+        CategoryPricingForm form = valid();
+        form.setGroups(List.of(form.getGroups().get(0), form.getGroups().get(1),
+                group("Premium", "1.08", "RTX 5080", "2 500,00"), group("PREMIUM ", "1,08", "RTX 5070", "3000")));
+
+        // when
+        Map<String, String> errors = form.validate(group -> 0);
+
+        // then
+        assertThat(errors).isEmpty();
+        assertThat(form.toGroups()).extracting(PriceDefinition::getPricingGroup)
+                .containsExactly("Default", "Premium", "Premium", "PREMIUM");
+    }
+
+    /** Only the first row of a name prices anything, so a row with other parameters would be silently ignored. */
+    @Test
+    void sameGroupWithDifferentMultipliersIsRejected() {
+        // given
+        CategoryPricingForm form = valid();
+        form.setGroups(List.of(form.getGroups().get(0), form.getGroups().get(1),
+                group("Premium", "1,10", "RTX 5080", "2500")));
+
+        // when
+        Map<String, String> errors = form.validate(group -> 0);
+
+        // then
+        assertThat(errors).containsOnlyKeys("group-2-multiplier")
+                .containsEntry("group-2-multiplier", CategoryPricingForm.PARAMETERS_DIFFER);
+        assertThat(form.errorArguments("group-2-multiplier")).containsExactly("Premium", "3", "2");
+        assertThat(form.errorArguments("group-1-multiplier")).isEmpty();
+    }
+
+    /** The error stands at the first parameter that differs, so the summary link lands on the value to change. */
+    @Test
+    void theErrorOfDifferentParametersStandsAtTheFirstOneThatDiffers() {
+        // given
+        CategoryPricingForm form = valid();
+        CategoryPricingForm.PriceGroupForm other = group("Premium", "1,080", "RTX 5080", "2500");
+        other.setMedium("11");
+        other.setLow("21");
+        form.setGroups(List.of(form.getGroups().get(0), form.getGroups().get(1), other));
+
+        // when
+        Map<String, String> errors = form.validate(group -> 0);
+
+        // then
+        assertThat(errors).containsOnlyKeys("group-2-low");
+    }
+
+    /** A row whose parameter is mistyped says so at the field; comparing it with its group would only repeat that. */
+    @Test
+    void aMistypedParameterIsNotComparedWithTheGroup() {
+        // given
+        CategoryPricingForm form = valid();
+        CategoryPricingForm.PriceGroupForm other = group("Premium", "1,08", "RTX 5080", "2500");
+        other.setMinProfit("abc");
+        form.setGroups(List.of(form.getGroups().get(0), form.getGroups().get(1), other));
+
+        // when / then
+        assertThat(form.validate(group -> 0)).containsOnlyKeys("group-2-minProfit")
+                .containsEntry("group-2-minProfit", "catalog.category.pricing.amount.invalid");
+    }
+
+    /** The eleven definitions of production "Monitory" pass the check and come back as they were, in the same order. */
+    @Test
+    void theProductionMonitoryPricingSavesUnchanged() {
+        // given
+        CategoryDefinition monitory = MonitoryPricingFixture.monitory();
+        List<PriceDefinition> stored = MonitoryPricingFixture.definitions();
+
+        // when
+        CategoryPricingForm form = CategoryPricingForm.from(monitory);
+        Map<String, String> errors = form.validate(group -> 0);
+        // what CategoryDefinitions.Pricing.applyTo does with the groups of the form
+        monitory.setPriceDefinitions(form.toPricing().groups());
+
+        // then
+        assertThat(errors).isEmpty();
+        assertThat(monitory.getPriceDefinitions()).usingRecursiveFieldByFieldElementComparator().containsExactlyElementsOf(stored);
+    }
+
+    /** The rows of a repeated group are marked on the page, all of them, wherever they stand in the list. */
+    @Test
+    void theRowsOfARepeatedGroupAreMarked() {
+        // given
+        CategoryPricingForm form = CategoryPricingForm.from(MonitoryPricingFixture.monitory());
+
+        // when / then
+        assertThat(form.getGroups()).extracting(form::repeatsAGroup)
+                .containsExactly(false, true, true, true, true, true, true, true, true, true, true);
+    }
+
+    /** RF-2: a multiplier of three decimals survives a save of the page that does not touch it. */
+    @Test
+    void aMultiplierOfThreeDecimalsSurvivesASaveThatDoesNotTouchIt() {
+        // given
+        CategoryDefinition gpu = new CategoryDefinition().withName("GPU").withGeneratedId()
+                .withPriceDefinition(new PriceDefinition(1.125, 49, 0, 0, 0, "Default"));
+
+        // when
+        CategoryPricingForm form = CategoryPricingForm.from(gpu);
+
+        // then
+        assertThat(form.getGroups().get(0).getMultiplier()).isEqualTo("1,125");
+        assertThat(form.validate(group -> 0)).isEmpty();
+        assertThat(form.toGroups().get(0).getMultiplier()).isEqualTo(1.125);
     }
 
     @Test
@@ -104,6 +221,48 @@ class CategoryPricingFormTest {
         // when / then
         assertThat(form.validate(group -> group.equals("Ultra Premium") ? 12 : 0))
                 .containsEntry("groups", "catalog.category.pricing.group.inUse");
+        assertThat(form.getGroupInUse()).isEqualTo("Ultra Premium");
+    }
+
+    /**
+     * RF-19: the refused removal puts the group back on the form, every rule of it, marked as in use, so "keep it"
+     * is what the page already shows. The rows go to the end: the errors of the other rows keep their numbers.
+     */
+    @Test
+    void aGroupRefusedForBeingInUseComesBackOnTheForm() {
+        // given
+        CategoryDefinition monitory = MonitoryPricingFixture.monitory();
+        CategoryPricingForm form = CategoryPricingForm.from(monitory);
+        form.setGroups(new ArrayList<>(form.getGroups().stream().filter(group -> !group.getName().equals("Premium")).toList()));
+        form.setRemovedGroups(List.of("Premium"));
+        form.validate(group -> group.equals("Premium") ? 3 : 0);
+
+        // when
+        form.restoreGroupInUse(monitory.getPriceDefinitions());
+
+        // then
+        assertThat(form.getGroups()).hasSize(11);
+        assertThat(form.getGroups().subList(7, 11)).allSatisfy(group -> {
+            assertThat(group.getName()).isEqualTo("Premium");
+            assertThat(group.isInUse()).isTrue();
+        });
+        assertThat(form.getGroups().subList(7, 11)).extracting(CategoryPricingForm.PriceGroupForm::getLabelMatch)
+                .containsExactly("1440p, Ultrawide, 144+ Hz", "4K, 32\", 144+ Hz", "1440p, 27\", 240+ Hz", "4K, 27\", 144+ Hz");
+        assertThat(form.getGroups().subList(0, 7)).noneMatch(CategoryPricingForm.PriceGroupForm::isInUse);
+    }
+
+    @Test
+    void nothingComesBackWhenNoRemovalWasRefused() {
+        // given
+        CategoryDefinition monitory = MonitoryPricingFixture.monitory();
+        CategoryPricingForm form = CategoryPricingForm.from(monitory);
+        form.validate(group -> 0);
+
+        // when
+        form.restoreGroupInUse(monitory.getPriceDefinitions());
+
+        // then
+        assertThat(form.getGroups()).hasSize(11).noneMatch(CategoryPricingForm.PriceGroupForm::isInUse);
     }
 
     @Test
@@ -181,6 +340,19 @@ class CategoryPricingFormTest {
         priceOnly.setPriceMatch("");
         assertThat(priceOnly.isAutoSummaryInactive()).isFalse();
         assertThat(priceOnly.autoSummaryKey()).isNull();
+    }
+
+    private static CategoryPricingForm.PriceGroupForm group(String name, String multiplier, String label, String priceMatch) {
+        CategoryPricingForm.PriceGroupForm group = new CategoryPricingForm.PriceGroupForm();
+        group.setName(name);
+        group.setMultiplier(multiplier);
+        group.setMinProfit("99");
+        group.setCritical("30");
+        group.setLow("20");
+        group.setMedium("10");
+        group.setLabelMatch(label);
+        group.setPriceMatch(priceMatch);
+        return group;
     }
 
     private static PriceDefinition withPriceMatch(PriceDefinition definition, double priceMatch) {

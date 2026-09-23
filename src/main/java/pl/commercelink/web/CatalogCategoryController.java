@@ -239,6 +239,7 @@ public class CatalogCategoryController {
         form.setRemovedGroups(removedGroups(category, form));
         Map<String, String> errors = form.validate(group -> definitions.productsInPriceGroup(category, group));
         if (!errors.isEmpty()) {
+            form.restoreGroupInUse(category.getPriceDefinitions());
             return rejected(renderPricing(catalog, category, form, errors, model, locale), PRICING_FRAGMENT, async, response);
         }
         try {
@@ -255,13 +256,18 @@ public class CatalogCategoryController {
 
     /**
      * The page deletes a price group by dropping its fields, so the removal is what the saved category still has and the
-     * form no longer carries. Only these groups are looked up in the products, never the ones that came back.
+     * form no longer carries. Only these groups are looked up in the products, never the ones that came back. A group
+     * is a name (NEW-1: one group may be several rules), so it is removed only when no row carries the name any more,
+     * and it is looked up once however many of its rules went.
      */
     private static List<String> removedGroups(CategoryDefinition category, CategoryPricingForm form) {
         Set<String> submitted = form.getGroups().stream()
                 .map(group -> StringUtils.defaultString(group.getName()).trim().toLowerCase()).collect(Collectors.toSet());
         return category.getPriceDefinitions().stream().map(PriceDefinition::getPricingGroup).filter(Objects::nonNull)
-                .filter(name -> !submitted.contains(name.trim().toLowerCase())).toList();
+                .filter(name -> !submitted.contains(name.trim().toLowerCase()))
+                .collect(Collectors.toMap(name -> name.trim().toLowerCase(), name -> name, (first, other) -> first,
+                        LinkedHashMap::new))
+                .values().stream().toList();
     }
 
     private String renderPricing(ProductCatalog catalog, CategoryDefinition category, CategoryPricingForm form,

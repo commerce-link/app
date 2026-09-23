@@ -1,5 +1,6 @@
 package pl.commercelink.web.dtos;
 
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
@@ -10,10 +11,13 @@ import pl.commercelink.products.PriceDefinition;
 import pl.commercelink.products.StockDefinition;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -24,6 +28,10 @@ import java.util.stream.Collectors;
  * The "Pricing" page of a category: stock thresholds, availability and the price groups. The "Default" group is required
  * (products without another assignment land there and ProductPricingStrategy throws without it) and always listed first.
  * The others keep the order the category stores them in, which is the order ProductRecommendation matches them in.
+ * <p>
+ * One group may be several rows (NEW-1, as production "Monitory" uses it): the same name with another rule — label and
+ * price threshold. Pricing takes the parameters of the first row of a name (CategoryDefinition.findPriceDefinition), so
+ * every row of a name must carry the same parameters, and no two rows of a name the same rule.
  */
 @Getter
 @Setter
@@ -41,6 +49,9 @@ public class CategoryPricingForm {
         private String medium = "0";
         private String labelMatch;
         private String priceMatch;
+        /** Put back on the form by a refused removal (RF-19); never bound from a request. */
+        @Setter(AccessLevel.NONE)
+        private boolean inUse;
 
         public boolean isDefault() {
             return PriceDefinition.DEFAULT_PRICING_GROUP.equalsIgnoreCase(StringUtils.trim(name));
@@ -83,6 +94,34 @@ public class CategoryPricingForm {
             return form;
         }
 
+        /** The name that makes rows one group: pricing looks a group up ignoring case, and a stray space is no new group. */
+        String groupKey() {
+            return StringUtils.normalizeSpace(StringUtils.defaultString(name)).toLowerCase(Locale.ROOT);
+        }
+
+        /** What picks the row: its label and price threshold as PriceDefinition.matches compares them. */
+        Optional<List<Object>> rule() {
+            Optional<Double> threshold = StringUtils.isBlank(priceMatch) ? Optional.of(0d) : FormNumbers.decimal(priceMatch);
+            return threshold.map(value -> List.<Object>of(StringUtils.trimToEmpty(labelMatch).toLowerCase(Locale.ROOT), value));
+        }
+
+        /** The price parameters, by field, in the order of the page; empty when one of them is mistyped. */
+        Optional<Map<String, Number>> parameters() {
+            Optional<Double> parsedMultiplier = FormNumbers.decimal(multiplier);
+            List<Optional<Integer>> amounts = List.of(FormNumbers.integer(minProfit), FormNumbers.integer(critical),
+                    FormNumbers.integer(low), FormNumbers.integer(medium));
+            if (parsedMultiplier.isEmpty() || amounts.stream().anyMatch(Optional::isEmpty)) {
+                return Optional.empty();
+            }
+            Map<String, Number> parameters = new LinkedHashMap<>();
+            parameters.put("multiplier", parsedMultiplier.get());
+            parameters.put("minProfit", amounts.get(0).get());
+            parameters.put("critical", amounts.get(1).get());
+            parameters.put("low", amounts.get(2).get());
+            parameters.put("medium", amounts.get(3).get());
+            return Optional.of(parameters);
+        }
+
         PriceDefinition toDefinition() {
             PriceDefinition definition = new PriceDefinition(FormNumbers.decimal(multiplier).orElse(0d),
                     FormNumbers.integer(minProfit).orElse(0), FormNumbers.integer(critical).orElse(0),
@@ -94,6 +133,9 @@ public class CategoryPricingForm {
         }
     }
 
+    /** The error of a row whose parameters differ from the first row of its group: "{0}" the group, "{1}" and "{2}" rows. */
+    public static final String PARAMETERS_DIFFER = "catalog.category.pricing.group.parameters";
+
     private String critical;
     private String low;
     private String high;
@@ -102,6 +144,13 @@ public class CategoryPricingForm {
     private List<PriceGroupForm> groups = new ArrayList<>();
     /** Names of the groups of the saved category that the posted form no longer carries; filled in by the controller. */
     private List<String> removedGroups = new ArrayList<>();
+    /** The removed group validate() found still used by products; filled in by validate(), never bound from a request. */
+    @Setter(AccessLevel.NONE)
+    private String groupInUse;
+    /** The arguments of the error messages that carry some, by field id; filled in by validate(). */
+    @Getter(AccessLevel.NONE)
+    @Setter(AccessLevel.NONE)
+    private Map<String, Object[]> errorArguments = new HashMap<>();
 
     public static CategoryPricingForm from(CategoryDefinition category) {
         CategoryPricingForm form = new CategoryPricingForm();
@@ -147,12 +196,19 @@ public class CategoryPricingForm {
         atLeastOne(errors, "minQty", minQty, "catalog.category.pricing.availability.invalid");
         atLeastOne(errors, "minProviders", minProviders, "catalog.category.pricing.availability.invalid");
 
-        Set<String> seen = new HashSet<>();
+        errorArguments.clear();
+        Map<String, Integer> firstRowOfGroup = new HashMap<>();
+        Set<List<Object>> rules = new HashSet<>();
         for (int index = 0; index < groups.size(); index++) {
             PriceGroupForm group = groups.get(index);
-            if (FormRules.requireText(errors, fieldId(index, "name"), group.name, "catalog.category.pricing.group.name.required")
-                    && !seen.add(group.name.trim().toLowerCase())) {
-                errors.put(fieldId(index, "name"), "catalog.category.pricing.group.duplicate");
+            if (FormRules.requireText(errors, fieldId(index, "name"), group.name, "catalog.category.pricing.group.name.required")) {
+                Integer first = firstRowOfGroup.putIfAbsent(group.groupKey(), index);
+                Optional<List<Object>> rule = group.rule();
+                if (rule.isPresent() && !rules.add(List.<Object>of(group.groupKey(), rule.get()))) {
+                    errors.put(fieldId(index, "name"), "catalog.category.pricing.group.duplicate");
+                } else if (first != null) {
+                    sameParametersAsTheGroup(errors, index, group, first);
+                }
             }
             if (FormNumbers.decimal(group.multiplier).filter(value -> value > 0).isEmpty()) {
                 errors.put(fieldId(index, "multiplier"), "catalog.category.pricing.multiplier.invalid");
@@ -172,10 +228,66 @@ public class CategoryPricingForm {
             // Each question is a full read of the products table, so the first group still in use ends the search.
             if (StringUtils.isNotBlank(removed) && productsInGroup.apply(removed.trim()) > 0) {
                 errors.put("groups", "catalog.category.pricing.group.inUse");
+                groupInUse = removed.trim();
                 break;
             }
         }
         return errors;
+    }
+
+    /**
+     * A row repeating a group must price like its first row, which is the one pricing uses; the error stands at the
+     * first parameter that differs. A mistyped parameter is left to its own message.
+     */
+    private void sameParametersAsTheGroup(Map<String, String> errors, int index, PriceGroupForm group, int first) {
+        Optional<Map<String, Number>> own = group.parameters();
+        Optional<Map<String, Number>> ofGroup = groups.get(first).parameters();
+        if (own.isEmpty() || ofGroup.isEmpty()) {
+            return;
+        }
+        own.get().keySet().stream()
+                .filter(field -> Double.compare(own.get().get(field).doubleValue(), ofGroup.get().get(field).doubleValue()) != 0)
+                .findFirst()
+                .ifPresent(field -> {
+                    errors.put(fieldId(index, field), PARAMETERS_DIFFER);
+                    // Strings, not numbers: MessageFormat would group the digits of a number by locale ("1 000").
+                    errorArguments.put(fieldId(index, field), new Object[]{StringUtils.normalizeSpace(group.name),
+                            String.valueOf(index + 1), String.valueOf(first + 1)});
+                });
+    }
+
+    /** The arguments of the message of the error at the field; none for a message without placeholders. */
+    public Object[] errorArguments(String field) {
+        return errorArguments.getOrDefault(field, new Object[0]);
+    }
+
+    /** The arguments of every error message that carries some, by field id, for the error summary. */
+    public Map<String, Object[]> errorArgumentsByField() {
+        return Collections.unmodifiableMap(errorArguments);
+    }
+
+    /** The row shares its group with another row: the page marks it as one more rule of that group. */
+    public boolean repeatsAGroup(PriceGroupForm group) {
+        return StringUtils.isNotBlank(group.name)
+                && groups.stream().filter(other -> other.groupKey().equals(group.groupKey())).count() > 1;
+    }
+
+    /**
+     * RF-19: a removal refused because products use the group puts the group back, every stored row of it, marked as
+     * in use, so the form shows what "keep it" keeps. At the end, so the errors of the other rows keep their numbers.
+     */
+    public void restoreGroupInUse(List<PriceDefinition> saved) {
+        if (groupInUse == null) {
+            return;
+        }
+        groups = new ArrayList<>(groups);
+        saved.stream().filter(definition -> definition.getPricingGroup() != null
+                        && definition.getPricingGroup().trim().equalsIgnoreCase(groupInUse))
+                .map(PriceGroupForm::from)
+                .forEach(group -> {
+                    group.inUse = true;
+                    groups.add(group);
+                });
     }
 
     /** The section CategoryDefinitions applies to the category: the groups in the order of the form. */

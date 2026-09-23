@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.thymeleaf.context.Context;
 import pl.commercelink.products.AvailabilityDefinition;
 import pl.commercelink.products.CategoryDefinition;
+import pl.commercelink.products.MonitoryPricingFixture;
 import pl.commercelink.products.PriceDefinition;
 import pl.commercelink.products.StockDefinition;
 import pl.commercelink.web.dtos.CategoryPricingForm;
@@ -11,6 +12,7 @@ import pl.commercelink.web.dtos.CategoryPricingForm;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -32,7 +34,7 @@ class CategoryPricingTemplateTest {
         // when / then
         assertThat(page()).contains("th:fragment=\"pricingForm\"").contains("id=\"category-pricing-form\"")
                 .contains("data-cl-async").contains("data-cl-redirect=${redirectTo}").contains("@{/js/async-form.js}")
-                .contains("errorSummary('category-pricing-errors'");
+                .contains("errorSummaryWithArguments('category-pricing-errors'");
     }
 
     @Test
@@ -152,5 +154,76 @@ class CategoryPricingTemplateTest {
         assertThat(occurrences(html, "cl-field-error")).isEqualTo(1);
         // the summary link and the field it names, so the error key doubles as the id repeat-fields.js renumbers
         assertThat(html).contains("href=\"#group-1-multiplier\"").contains("id=\"group-1-multiplier\"");
+    }
+
+    private static String rendered(CategoryPricingForm form, Map<String, String> errors) {
+        Context context = new Context();
+        context.setVariable("form", form);
+        context.setVariable("errors", errors);
+        context.setVariable("formAction", "/dashboard/catalogs/c1/category/k1/settings/pricing");
+        context.setVariable("backHref", "/dashboard/catalogs/c1/category/k1/settings");
+        context.setVariable("backLabel", "Category settings");
+        context.setVariable("lead", "Monitory \u00b7 pricing");
+        context.setVariable("redirectTo", null);
+        return EnglishFragmentTemplateEngine.create().process("catalog/category-pricing", Set.of("pricingForm"), context);
+    }
+
+    /**
+     * NEW-1: the production "Monitory" pricing, eleven rows of which ten share two names. Every row keeps its values
+     * and its place, and each row of a repeated group says it is one more rule of that group.
+     */
+    @Test
+    void theProductionMonitoryPricingShowsEveryRuleOfARepeatedGroupAsSuch() {
+        // given
+        CategoryPricingForm form = CategoryPricingForm.from(MonitoryPricingFixture.monitory());
+
+        // when
+        String html = rendered(form, form.validate(group -> 0));
+
+        // then
+        assertThat(html).doesNotContain("cl-alert is-bad").doesNotContain("??");
+        assertThat(occurrences(html, "same group, another rule")).isEqualTo(10);
+        assertThat(html).contains("name=\"groups[0].name\"").contains("name=\"groups[10].name\"")
+                .doesNotContain("name=\"groups[11].name\"");
+        // the first rule after Default is the first stored one, with its parameters as saved
+        assertThat(html).containsPattern("name=\"groups\\[1]\\.labelMatch\"\\s+value=\"1440p, Ultrawide, 240\\+ Hz\"")
+                .containsPattern("name=\"groups\\[1]\\.multiplier\"\\s+value=\"1,10\"")
+                .containsPattern("name=\"groups\\[10]\\.labelMatch\"\\s+value=\"4K, 27&quot;, 144\\+ Hz\"")
+                .containsPattern("name=\"groups\\[10]\\.multiplier\"\\s+value=\"1,08\"");
+    }
+
+    /** The message of a row whose parameters differ from its group names the group and both rows, at the field and above. */
+    @Test
+    void aRowWithOtherParametersThanItsGroupSaysWhichRowsDiffer() {
+        // given
+        CategoryPricingForm form = CategoryPricingForm.from(MonitoryPricingFixture.monitory());
+        form.getGroups().get(3).setMultiplier("1,2");
+
+        // when
+        String html = rendered(form, form.validate(group -> 0));
+
+        // then
+        String message = "Group Ultra Premium has different parameters in row 4 than in row 2 \u2014 the price is taken from the first.";
+        assertThat(occurrences(html, message)).isEqualTo(2);
+        assertThat(html).contains("href=\"#group-3-multiplier\"").contains("id=\"group-3-multiplier-error\"");
+    }
+
+    /** RF-19: the group refused for being in use is back on the form, marked, so the operator sees what is kept. */
+    @Test
+    void aGroupRefusedForBeingInUseIsShownAgainAndMarked() {
+        // given
+        CategoryPricingForm form = CategoryPricingForm.from(MonitoryPricingFixture.monitory());
+        form.setGroups(new java.util.ArrayList<>(form.getGroups().subList(0, 7)));
+        form.setRemovedGroups(List.of("Premium"));
+        Map<String, String> errors = form.validate(group -> 2);
+        form.restoreGroupInUse(MonitoryPricingFixture.monitory().getPriceDefinitions());
+
+        // when
+        String html = rendered(form, errors);
+
+        // then
+        assertThat(html).contains("The removed group is used by products");
+        assertThat(occurrences(html, ">in use<")).isEqualTo(4);
+        assertThat(html).contains("name=\"groups[10].name\"").doesNotContain("??");
     }
 }

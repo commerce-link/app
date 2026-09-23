@@ -19,6 +19,21 @@
     </div>
 </div>
 
+<!--/* Error summary of a form whose message keys may carry arguments (e.g. the rows of a price group that disagree).
+       Same markup as errorSummary; arguments maps a field id to the arguments of its message, absent when none. */-->
+<div th:fragment="errorSummaryWithArguments(id, errors, arguments)" th:if="${!errors.isEmpty()}" th:id="${id}"
+     class="cl-alert is-bad" tabindex="-1" data-cl-error-summary>
+    <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
+    <div>
+        <p class="cl-alert-title" th:text="#{form.errors.title}"></p>
+        <ul class="cl-alert-list">
+            <li th:each="error : ${errors}">
+                <a th:href="'#' + ${error.key}" th:text="${#messages.msgWithParams(error.value, arguments[error.key])}"></a>
+            </li>
+        </ul>
+    </div>
+</div>
+
 <!--/* Error summary of a form whose messages are already translated (a message whose text carries a number the key
        cannot hold, e.g. the line of a broken brand line). Same markup as errorSummary; errors maps a field id to the
        text of its error. */-->
