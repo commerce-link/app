@@ -54,7 +54,7 @@
                     <a class="button is-primary" href="/dashboard/store/create" th:text="#{store.create}"></a>
                 </div>
                 <div class="control">
-                    <form action="/dashboard/stores/cleanup-products" method="post" style="display:inline">
+                    <form th:action="@{/dashboard/stores/cleanup-products}" method="post" style="display:inline">
                         <button type="submit" class="button is-warning" th:text="#{store.cleanup.button}"></button>
                     </form>
                 </div>

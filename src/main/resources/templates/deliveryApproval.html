@@ -119,7 +119,9 @@
                     }
                     approvalValidationPassed = false;
                     refreshApprovalSubmitState();
-                    fetch(area.dataset.validateUrl, {method: 'POST'})
+                    // The validate POST is under /dashboard, so send the CSRF token from the approve form.
+                    const csrf = document.querySelector('#approval-approve-form input[name="_csrf"]');
+                    fetch(area.dataset.validateUrl, {method: 'POST', headers: csrf ? {'X-CSRF-TOKEN': csrf.value} : {}})
                         .then(function (response) {
                             if (!response.ok) {
                                 throw new Error('HTTP ' + response.status);

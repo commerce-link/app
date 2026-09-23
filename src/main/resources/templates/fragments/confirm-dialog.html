@@ -7,6 +7,7 @@
 <dialog th:fragment="dialog" class="cl-dialog" id="cl-confirm-dialog" aria-labelledby="cl-confirm-title"
         aria-describedby="cl-confirm-message">
     <form method="post">
+        <input type="hidden" name="_csrf" th:value="${_csrf.token}"/>
         <h2 class="cl-dialog-title" id="cl-confirm-title"></h2>
         <p class="cl-dialog-message" id="cl-confirm-message"></p>
         <div class="cl-dialog-actions">

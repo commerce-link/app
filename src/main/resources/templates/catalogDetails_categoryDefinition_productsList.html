@@ -93,6 +93,8 @@
             </div>
         </form>
         <form id="bulkForm" method="post">
+            <!-- submitted via a button th:formaction, so the form has no th:action to inject the token -->
+            <input type="hidden" name="_csrf" th:value="${_csrf.token}"/>
             <div style="overflow-x: auto;">
                 <table class="table is-striped is-hoverable is-fullwidth">
                     <thead>

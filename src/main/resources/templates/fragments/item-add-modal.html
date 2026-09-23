@@ -750,6 +750,7 @@
             const form = document.createElement('form');
             form.method = 'post';
             form.action = itemAddModalRoot().getAttribute('data-add-items-url');
+            window.clCsrf.appendTo(form);
             Object.entries(params).forEach(([name, value]) => {
                 const input = document.createElement('input');
                 input.type = 'hidden';

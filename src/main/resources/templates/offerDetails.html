@@ -40,6 +40,7 @@
     </h1>
 
     <form id="offerForm" th:object="${offer}" method="post">
+        <input type="hidden" name="_csrf" th:value="${_csrf.token}"/>
         <input type="hidden" th:field="*{storeId}" />
         <input type="hidden" th:field="*{type}" />
 
