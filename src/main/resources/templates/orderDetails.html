@@ -346,8 +346,6 @@
     </div>
 
     <form id="orderItemsForm" method="post" th:object="${orderItemsForm}" th:attr="data-order-id=${order.orderId}">
-        <input type="hidden" name="position" th:value="${#lists.size(orderItemsForm.orderItems)}"
-               th:attr="data-default-position=${#lists.size(orderItemsForm.orderItems)}"/>
         <input type="hidden" name="targetOrderId" id="targetOrderIdInput"/>
         <h2 class="subtitle" th:text="#{order.items}"></h2>
         <div class="box mb-5">
@@ -373,7 +371,7 @@
                     </thead>
                     <tbody id="orderItemsRows">
                     <tr th:each="item, iterStat : *{orderItems}"
-                        th:attr="data-category=${item.category},data-position=${item.position},data-service=${item.service}">
+                        th:attr="data-category=${item.category}">
                         <td style="width: 60px;">
                             <input type="checkbox" th:field="*{orderItems[__${iterStat.index}__].selected}" th:disabled="${isCompletedOrder or hasWarehouseDocument}"/>
                             <input type="hidden" th:field="*{orderItems[__${iterStat.index}__].orderId}"/>
@@ -1496,19 +1494,6 @@
         function toggleOrderItemModal(show) {
             toggleAddItemModal(show);
         }
-
-        window.resolveAddItemPosition = function (category) {
-            const positionInput = document.querySelector('#orderItemsForm input[name="position"]');
-            let position = positionInput ? positionInput.dataset.defaultPosition : 0;
-            if (category) {
-                document.querySelectorAll('#orderItemsRows tr[data-category]').forEach(row => {
-                    if (row.dataset.service !== 'true' && row.dataset.category === category) {
-                        position = row.dataset.position;
-                    }
-                });
-            }
-            return position;
-        };
 
         function toggleReceiptModal(show) {
             const modal = document.getElementById('receiptModal');

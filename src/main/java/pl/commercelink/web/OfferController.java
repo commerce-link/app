@@ -14,7 +14,7 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.baskets.*;
 import pl.commercelink.inventory.Inventory;
-import pl.commercelink.inventory.InventoryKey;
+import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.invoicing.InvoicingService;
 import pl.commercelink.offer.imports.OfferImporter;
@@ -29,6 +29,7 @@ import pl.commercelink.products.StoreCategories;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
+import pl.commercelink.web.dtos.AddItemsForm;
 import pl.commercelink.web.dtos.OfferCreationDto;
 import pl.commercelink.web.dtos.OfferTableRow;
 
@@ -293,18 +294,25 @@ public class OfferController {
         return "redirect:" + op.getInvoiceUrl();
     }
 
-    @PostMapping("/dashboard/offer/{offerId}/add-item/pricelist")
-    public String addOfferItemFromPriceList(@PathVariable String offerId,
-                                            @RequestParam String catalogId,
-                                            @RequestParam String pimId,
-                                            @RequestParam(defaultValue = "1") long qty) {
+    @PostMapping("/dashboard/offer/{offerId}/add-items")
+    public String addOfferItems(@PathVariable String offerId, @ModelAttribute AddItemsForm form) {
         Basket basket = basketsRepository.findById(getStoreId(), offerId).get();
+        boolean consolidated = !basket.isShowPrices();
+        InventoryView inventoryView = inventory.withEnabledSuppliersOnly(getStoreId());
+        Map<String, Map<String, Integer>> sequenceNumbersByCatalog = new HashMap<>();
 
-        AvailabilityAndPrice availabilityAndPrice = pricelistFinder.findByPimId(getStoreId(), catalogId, pimId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-
-        BasketItem basketItem = BasketItem.of(availabilityAndPrice, qty, catalogId, !basket.isShowPrices());
-        basket.addBasketItemInCategoryOrder(basketItem, catalogCategorySequenceNumbers(catalogId));
+        for (AddItemsForm.Entry entry : form.entries()) {
+            if (entry.isFromPricelist()) {
+                AvailabilityAndPrice availabilityAndPrice = pricelistFinder.findByPimId(getStoreId(), entry.getCatalogId(), entry.getPimId())
+                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+                BasketItem basketItem = BasketItem.of(availabilityAndPrice, entry.getQty(), entry.getCatalogId(), consolidated);
+                basket.addBasketItemInCategoryOrder(basketItem,
+                        sequenceNumbersByCatalog.computeIfAbsent(entry.getCatalogId(), this::catalogCategorySequenceNumbers));
+            } else {
+                MatchedInventory matchedInventory = inventoryView.findByInventoryKey(entry.inventoryKey());
+                basket.addBasketItem(BasketItem.of(matchedInventory, entry.getQty(), consolidated));
+            }
+        }
         save(basket);
 
         return "redirect:/dashboard/offer/" + offerId;
@@ -313,22 +321,6 @@ public class OfferController {
     private Map<String, Integer> catalogCategorySequenceNumbers(String catalogId) {
         ProductCatalog catalog = productCatalogRepository.findById(getStoreId(), catalogId);
         return catalog == null ? Map.of() : catalog.getCategorySequenceNumbers();
-    }
-
-    @PostMapping("/dashboard/offer/{offerId}/add-item/inventory")
-    public String addOfferItemFromInventory(@PathVariable String offerId,
-                                            @RequestParam(required = false, defaultValue = "") String itemEan,
-                                            @RequestParam(required = false, defaultValue = "") String itemManufacturerCode,
-                                            @RequestParam(defaultValue = "1") long qty) {
-        Basket basket = basketsRepository.findById(getStoreId(), offerId).get();
-
-        MatchedInventory matchedInventory = inventory.withEnabledSuppliersOnly(getStoreId())
-                .findByInventoryKey(new InventoryKey(itemEan.trim(), itemManufacturerCode.trim()));
-
-        basket.addBasketItem(BasketItem.of(matchedInventory, qty, !basket.isShowPrices()));
-        save(basket);
-
-        return "redirect:/dashboard/offer/" + offerId;
     }
 
     @PostMapping("/dashboard/offer/{offerId}/remove-item/{index}")
