@@ -27,10 +27,13 @@
                     </a>
                 </div>
                 <ul class="cl-list" th:if="${!catalogs.isEmpty()}">
-                    <li class="cl-list-item" th:each="catalog : ${catalogs}">
+                    <!--/* A catalog saved without a name by the old form (RF-24) still gets link text to click and a name to
+                           be read out with, as the other settings lists do. */-->
+                    <li class="cl-list-item" th:each="catalog : ${catalogs}"
+                        th:with="name=${#strings.isEmpty(catalog.name())} ? #{settings.list.untitled} : ${catalog.name()}">
                         <div>
                             <div class="cl-list-title">
-                                <a th:href="@{${catalog.href()}}" th:text="${catalog.name()}"></a>
+                                <a th:href="@{${catalog.href()}}" th:text="${name}"></a>
                                 <span th:if="${catalog.protectedFromDeletion()}" class="cl-status is-neutral" th:text="#{catalog.protected}"></span>
                             </div>
                             <p class="cl-list-desc"
@@ -38,7 +41,7 @@
                         </div>
                         <div class="cl-list-actions">
                             <a class="cl-link-button" th:href="@{${catalog.settingsHref()}}" th:text="#{catalog.settings}"
-                               th:attr="aria-label=#{catalog.settings.for(${catalog.name()})}"></a>
+                               th:attr="aria-label=#{catalog.settings.for(${name})}"></a>
                         </div>
                     </li>
                 </ul>
