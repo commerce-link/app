@@ -55,7 +55,6 @@ import pl.commercelink.web.catalog.CategoryTypeLabels;
 import pl.commercelink.web.catalog.ProductRow;
 import pl.commercelink.web.catalog.ProductStatus;
 import pl.commercelink.web.catalog.RecommendationRow;
-import pl.commercelink.web.dtos.CategoryPricingForm;
 import pl.commercelink.web.dtos.ProductForm;
 import pl.commercelink.web.dtos.ProductsBulkAddForm;
 import pl.commercelink.web.settings.ConfirmAction;
@@ -700,17 +699,8 @@ public class CatalogProductsController {
         return "redirect:" + CatalogPaths.category(catalogId, categoryId);
     }
 
-    /**
-     * The groups a product may be priced by, once per group: two rows of the same group spelled with another case or
-     * spacing (N8, e.g. "Ultra Premium" and "ultra  premium") are the same group to pricing, and listing both in the
-     * select would show what looks like a duplicate until the product is re-saved. The first spelling wins, matching
-     * how {@link pl.commercelink.web.dtos.CategoryPricingForm#toGroups()} stores the rows of a group.
-     */
     private static List<String> pricingGroups(CategoryDefinition category) {
-        Map<String, String> bySpelling = new LinkedHashMap<>();
-        category.getPriceDefinitions().stream().map(PriceDefinition::getPricingGroup)
-                .forEach(group -> bySpelling.putIfAbsent(CategoryPricingForm.groupKey(group), group));
-        return List.copyOf(bySpelling.values());
+        return category.getPriceDefinitions().stream().map(PriceDefinition::getPricingGroup).distinct().toList();
     }
 
     private List<ProductRow> rowsOf(ProductCatalog catalog, CategoryDefinition category) {

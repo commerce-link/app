@@ -962,27 +962,6 @@ class CatalogProductsControllerTest {
         verify(inventory, never()).withEnabledSuppliersOnly(anyString());
     }
 
-    /**
-     * N8: two rows of the same group spelled with another case or spacing show as one option, the first spelling,
-     * until the page is answered otherwise -- a duplicate-looking pair in the select is what re-saving the category
-     * page used to leave behind.
-     */
-    @Test
-    @SuppressWarnings("unchecked")
-    void pricingGroupsOnTheFormAreDistinctByCaseAndSpacingKeepingTheFirstSpelling() throws Exception {
-        // given
-        gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Ultra Premium"));
-        gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "ultra  premium"));
-        gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
-
-        // when
-        var result = mvc.perform(get(categoryPath() + "/products/new")).andExpect(status().isOk()).andReturn();
-
-        // then
-        List<String> pricingGroups = (List<String>) result.getModelAndView().getModel().get("pricingGroups");
-        assertThat(pricingGroups).containsExactly("Ultra Premium", "Default");
-    }
-
     @Test
     void newProductFromTheInventoryIsPrefilledButStillCountsAsNew() throws Exception {
         // given
