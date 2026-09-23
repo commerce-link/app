@@ -33,11 +33,20 @@ public class ProviderCallLimiter {
     }
 
     public static ProviderCallLimiter unlimited() {
-        return new ProviderCallLimiter(new ProviderCallLimitProperties(Duration.ZERO, Map.of()));
+        return new ProviderCallLimiter(new ProviderCallLimitProperties(Duration.ZERO, Duration.ZERO, Map.of()));
     }
 
-    @SuppressWarnings("unchecked")
     public <T> T wrap(Class<T> type, String providerName, T target) {
+        return wrap(type, providerName, target, acquireTimeout);
+    }
+
+    /**
+     * Same as {@link #wrap(Class, String, Object)}, but waiting for a permit at most {@code acquireTimeout} instead
+     * of this instance's default — for a caller whose own deadline (e.g. an SQS message's visibility timeout) is
+     * shorter than the shared default wait.
+     */
+    @SuppressWarnings("unchecked")
+    public <T> T wrap(Class<T> type, String providerName, T target, Duration acquireTimeout) {
         if (target == null || !buckets.containsKey(providerName)) {
             return target;
         }
@@ -53,11 +62,16 @@ public class ProviderCallLimiter {
                 } catch (IllegalAccessException e) {
                     throw new IllegalStateException(e);
                 }
-            });
+            }, acquireTimeout);
         });
     }
 
     public <R> R call(String providerName, Supplier<R> call) {
+        return call(providerName, call, acquireTimeout);
+    }
+
+    /** Same as {@link #call(String, Supplier)}, but waiting for a permit at most {@code acquireTimeout}. */
+    public <R> R call(String providerName, Supplier<R> call, Duration acquireTimeout) {
         Bucket bucket = buckets.get(providerName);
         if (bucket == null) {
             return call.get();

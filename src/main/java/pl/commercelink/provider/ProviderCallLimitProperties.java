@@ -13,6 +13,9 @@ import java.util.Map;
 @ConfigurationProperties(prefix = "providers.call-limits")
 public record ProviderCallLimitProperties(
         @DefaultValue("PT2M") Duration acquireTimeout,
+        // Queue-driven invoicing (order-invoicing-queue.fifo, 30 s visibility, maxReceiveCount 1) must never wait
+        // longer than the message stays invisible, or the queue redelivers it while this call is still queued.
+        @DefaultValue("PT20S") Duration invoicingAcquireTimeout,
         Map<String, Limit> limits) {
 
     public ProviderCallLimitProperties {

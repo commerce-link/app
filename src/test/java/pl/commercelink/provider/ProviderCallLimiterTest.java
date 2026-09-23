@@ -22,7 +22,7 @@ class ProviderCallLimiterTest {
     }
 
     private static ProviderCallLimiter limiter(int maxConcurrent, int perMinute, Duration timeout) {
-        return new ProviderCallLimiter(new ProviderCallLimitProperties(timeout,
+        return new ProviderCallLimiter(new ProviderCallLimitProperties(timeout, timeout,
                 Map.of("fakturownia", new ProviderCallLimitProperties.Limit(maxConcurrent, perMinute))));
     }
 
@@ -110,6 +110,31 @@ class ProviderCallLimiterTest {
         Api api = () -> "hi";
 
         assertThat(limiter.wrap(Api.class, "other", api)).isSameAs(api);
+    }
+
+    @Test
+    void wrapWithACustomAcquireTimeoutNeverWaitsLongerThanItEvenWhenTheDefaultIsMuchLonger() throws Exception {
+        // The shared default wait is long (2 minutes, as receipts use); a queue-driven caller whose own visibility
+        // timeout is much shorter (invoicing: 20 s) must never be held past its own timeout regardless.
+        ProviderCallLimiter limiter = limiter(1, 1000, Duration.ofMinutes(2));
+        CountDownLatch inside = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        Thread holder = new Thread(() -> limiter.call("fakturownia", () -> {
+            inside.countDown();
+            await(release);
+            return null;
+        }));
+        holder.start();
+        inside.await();
+
+        Api api = limiter.wrap(Api.class, "fakturownia", () -> "hi", Duration.ofMillis(100));
+        long start = System.nanoTime();
+        assertThatThrownBy(api::hello).isInstanceOf(ProviderCallRejectedException.class);
+        long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
+
+        assertThat(elapsedMs).isLessThan(5000);   // nowhere near the default 2-minute wait
+        release.countDown();
+        holder.join(5000);
     }
 
     @Test
