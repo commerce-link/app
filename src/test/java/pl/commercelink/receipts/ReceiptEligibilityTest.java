@@ -1,0 +1,88 @@
+package pl.commercelink.receipts;
+
+import org.junit.jupiter.api.Test;
+import pl.commercelink.orders.Order;
+import pl.commercelink.orders.OrderSource;
+import pl.commercelink.orders.OrderSourceType;
+import pl.commercelink.orders.OrderStatus;
+import pl.commercelink.stores.IntegrationType;
+import pl.commercelink.stores.Store;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static pl.commercelink.receipts.ReceiptFixtures.*;
+
+class ReceiptEligibilityTest {
+
+    private final ReceiptProviderFactory factory = mock(ReceiptProviderFactory.class);
+    private final ReceiptEligibility eligibility = new ReceiptEligibility(factory);
+
+    private Store store() {
+        Store store = new Store();
+        store.setStoreId(STORE_ID);
+        store.setConfigurationValue(IntegrationType.RECEIPT_PROVIDER, FakeReceiptProviderDescriptor.NAME);
+        store.getReceiptConfiguration().enable(DELIVERED_AT.minusDays(1));
+        when(factory.getDescriptor(FakeReceiptProviderDescriptor.NAME)).thenReturn(new FakeReceiptProviderDescriptor());
+        return store;
+    }
+
+    @Test
+    void deliveredConsumerOrderSinceEnablingQualifies() {
+        assertThat(eligibility.automaticCandidate(store(), b2cOrder(100))).isTrue();
+    }
+
+    @Test
+    void ordersDeliveredBeforeEnablingDoNotQualify() {
+        Store store = store();
+        store.getReceiptConfiguration().disable();
+        store.getReceiptConfiguration().enable(DELIVERED_AT.plusMinutes(1));
+
+        assertThat(eligibility.automaticCandidate(store, b2cOrder(100))).isFalse();
+    }
+
+    @Test
+    void companyOrdersWithTaxIdDoNotQualify() {
+        Order order = b2cOrder(100);
+        order.getBillingDetails().setTaxId("5250000000");
+
+        assertThat(eligibility.automaticCandidate(store(), order)).isFalse();
+    }
+
+    @Test
+    void undeliveredZeroValueRmaAndUncoveredSourcesDoNotQualify() {
+        Order shipping = b2cOrder(100);
+        shipping.setStatus(OrderStatus.Shipping);
+        Order free = b2cOrder(0);
+        Order rma = b2cOrder(100);
+        rma.setSource(new OrderSource("RMA", OrderSourceType.Other));
+        Order pos = b2cOrder(100);
+        pos.setSource(new OrderSource("kasa", OrderSourceType.PointOfSale));
+
+        Store store = store();
+        assertThat(eligibility.automaticCandidate(store, shipping)).isFalse();
+        assertThat(eligibility.automaticCandidate(store, free)).isFalse();
+        assertThat(eligibility.automaticCandidate(store, rma)).isFalse();
+        assertThat(eligibility.automaticCandidate(store, pos)).isFalse();
+    }
+
+    @Test
+    void orderWithAClosingDocumentDoesNotQualify() {
+        Order order = b2cOrder(100);
+        order.addDocument(new pl.commercelink.documents.Document("x", "FV/1", null,
+                pl.commercelink.documents.DocumentType.InvoicePersonal));
+
+        assertThat(eligibility.automaticCandidate(store(), order)).isFalse();
+    }
+
+    @Test
+    void storeWithoutProviderOrSwitchedOffIsNotReady() {
+        Store off = store();
+        off.getReceiptConfiguration().disable();
+        Store noProvider = store();
+        noProvider.removeIntegration(IntegrationType.RECEIPT_PROVIDER);
+
+        assertThat(eligibility.storeReady(off)).isFalse();
+        assertThat(eligibility.storeReady(noProvider)).isFalse();
+    }
+}

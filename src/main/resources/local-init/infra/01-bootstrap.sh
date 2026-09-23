@@ -38,6 +38,14 @@ awslocal sqs create-queue --queue-name order-invoicing-dlq.fifo \
 awslocal sqs create-queue --queue-name order-invoicing-queue.fifo \
   --attributes '{"FifoQueue":"true","ContentBasedDeduplication":"false","VisibilityTimeout":"30","RedrivePolicy":"{\"deadLetterTargetArn\":\"arn:aws:sqs:eu-central-1:000000000000:order-invoicing-dlq.fifo\",\"maxReceiveCount\":\"1\"}"}'
 
+# E-receipts: one issuing call can take ~3.5 min (Fakturownia: up to 7 sequential calls with a 30 s timeout), so the
+# visibility is 600 s; the attempt's lease is what really keeps a second issue out. Provider errors never throw, so
+# the DLQ only catches crashing code.
+awslocal sqs create-queue --queue-name order-receipt-dlq.fifo \
+  --attributes FifoQueue=true,ContentBasedDeduplication=false,MessageRetentionPeriod=1209600
+awslocal sqs create-queue --queue-name order-receipt-queue.fifo \
+  --attributes '{"FifoQueue":"true","ContentBasedDeduplication":"false","VisibilityTimeout":"600","RedrivePolicy":"{\"deadLetterTargetArn\":\"arn:aws:sqs:eu-central-1:000000000000:order-receipt-dlq.fifo\",\"maxReceiveCount\":\"3\"}"}'
+
 ## SQS Queues - PIM-specific queues (manual SqsMessageListenerContainer, no auto-create)
 awslocal sqs create-queue --queue-name pim-entry-added-queue
 awslocal sqs create-queue --queue-name pim-entry-deleted-queue
