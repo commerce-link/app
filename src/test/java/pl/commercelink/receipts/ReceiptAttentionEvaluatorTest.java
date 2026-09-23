@@ -55,6 +55,32 @@ class ReceiptAttentionEvaluatorTest {
     }
 
     @Test
+    void providerUnavailableAlertsAfterThirtyMinutesWithNoIssueCallYet() {
+        Instant now = Instant.parse("2026-09-10T12:00:00Z");
+        ReceiptAttempt attempt = attempt(ReceiptAttemptState.ISSUING, now.minus(Duration.ofMinutes(31)));
+        attempt.setLastErrorAt(now.minus(Duration.ofMinutes(5)));
+
+        assertThat(ReceiptAttentionEvaluator.evaluate(attempt, now)).isEqualTo(ReceiptAttention.PROVIDER_UNAVAILABLE);
+    }
+
+    @Test
+    void providerUnavailableNeverAlertsBeforeThirtyMinutesOrWithoutAnErrorOrOnceIssueWasCalled() {
+        Instant now = Instant.parse("2026-09-10T12:00:00Z");
+
+        ReceiptAttempt tooSoon = attempt(ReceiptAttemptState.ISSUING, now.minus(Duration.ofMinutes(10)));
+        tooSoon.setLastErrorAt(now);
+        assertThat(ReceiptAttentionEvaluator.evaluate(tooSoon, now)).isNull();
+
+        ReceiptAttempt noErrorYet = attempt(ReceiptAttemptState.ISSUING, now.minus(Duration.ofMinutes(45)));
+        assertThat(ReceiptAttentionEvaluator.evaluate(noErrorYet, now)).isNull();
+
+        ReceiptAttempt oldEnoughButSent = attempt(ReceiptAttemptState.ISSUING, now.minus(Duration.ofMinutes(45)));
+        oldEnoughButSent.setLastErrorAt(now);
+        oldEnoughButSent.setIssueCalls(1);
+        assertThat(ReceiptAttentionEvaluator.evaluate(oldEnoughButSent, now)).isNull();
+    }
+
+    @Test
     void terminalProblemsAlert() {
         Instant now = Instant.parse("2026-09-10T12:00:00Z");
         ReceiptAttempt noLink = attempt(ReceiptAttemptState.FISCALISED, now);

@@ -11,6 +11,7 @@ public final class ReceiptAttentionEvaluator {
     static final int ISSUE_CALLS_BEFORE_ALERT = 6;
     static final Duration PENDING_ALERT_AFTER = Duration.ofHours(48);
     static final Duration MONTH_END_MIN_AGE = Duration.ofHours(1);
+    static final Duration PROVIDER_UNAVAILABLE_AFTER = Duration.ofMinutes(30);
     private static final ZoneId WARSAW = ZoneId.of("Europe/Warsaw");
 
     private ReceiptAttentionEvaluator() {
@@ -19,6 +20,7 @@ public final class ReceiptAttentionEvaluator {
     public static ReceiptAttention evaluate(ReceiptAttempt attempt, Instant now) {
         return switch (attempt.getState()) {
             case ISSUING -> attempt.isInvalidAfterSend() ? ReceiptAttention.INVALID_AFTER_SEND
+                    : providerUnavailable(attempt, now) ? ReceiptAttention.PROVIDER_UNAVAILABLE
                     : attempt.getIssueCalls() >= ISSUE_CALLS_BEFORE_ALERT ? ReceiptAttention.ISSUING_UNKNOWN : null;
             case PENDING -> pending(attempt, now);
             case FISCALISED -> attempt.getEmailClaimedAt() != null && attempt.getEmailSentAt() == null
@@ -28,6 +30,17 @@ public final class ReceiptAttentionEvaluator {
             case BLOCKED -> ReceiptAttention.BLOCKED;
             case CLOSED_MANUALLY -> null;
         };
+    }
+
+    /**
+     * The provider was never reached even once (issueCalls still 0) and has not been for a while: an adapter that
+     * is not installed, or a store configuration nobody will fix on its own, would otherwise retry silently forever.
+     */
+    private static boolean providerUnavailable(ReceiptAttempt attempt, Instant now) {
+        if (attempt.getIssueCalls() != 0 || attempt.getLastErrorAt() == null || attempt.getCreatedAt() == null) {
+            return false;
+        }
+        return Duration.between(attempt.getCreatedAt(), now).compareTo(PROVIDER_UNAVAILABLE_AFTER) > 0;
     }
 
     private static ReceiptAttention pending(ReceiptAttempt attempt, Instant now) {
