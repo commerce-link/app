@@ -14,6 +14,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.support.RequestContextUtils;
@@ -790,8 +791,7 @@ class CatalogCategoryControllerTest {
             "groups[0].name", "Default", "groups[0].multiplier", "1,00", "groups[0].minProfit", "0",
             "groups[0].critical", "0", "groups[0].low", "0", "groups[0].medium", "0"};
 
-    private static org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder withParams(
-            org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder request, String... pairs) {
+    private static MockHttpServletRequestBuilder withParams(MockHttpServletRequestBuilder request, String... pairs) {
         for (int i = 0; i < pairs.length; i += 2) {
             request.param(pairs[i], pairs[i + 1]);
         }
@@ -908,5 +908,20 @@ class CatalogCategoryControllerTest {
         // when / then
         mvc.perform(withParams(post("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/pricing"), PRICING))
                 .andExpect(status().isNotFound());
+    }
+
+    /** Protection switched on between the page's check and the save: refused like the up-front check, not a 500. */
+    @Test
+    void aCategoryProtectedMeanwhileIsRefusedLikeAProtectedOne() throws Exception {
+        // given
+        CategoryDefinition gpu = categoryOf("GPU");
+        gpu.setDeletionProtection(false);
+        doThrow(new IllegalStateException("protected")).when(definitions).remove(any(), any());
+
+        // when / then
+        mvc.perform(post("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/delete"))
+                .andExpect(redirectedUrl("/dashboard/catalogs/c1"))
+                .andExpect(flash().attribute("catalogError", "catalog.category.delete.protected"))
+                .andExpect(flash().attributeCount(1));
     }
 }

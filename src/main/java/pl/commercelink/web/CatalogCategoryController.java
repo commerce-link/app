@@ -533,6 +533,9 @@ public class CatalogCategoryController {
         }
         try {
             definitions.remove(catalog, category);
+        } catch (IllegalStateException e) {
+            // The protection was switched on between the check above and the save, which checks it again on its read.
+            return refuseDeletion(catalogId, category, locale, redirectAttributes);
         } catch (OptimisticLockingExhaustedException e) {
             redirectAttributes.addFlashAttribute(ERROR_FLASH, messageSource.getMessage(CONFLICT, null, locale));
             return "redirect:" + CatalogPaths.catalog(catalogId);

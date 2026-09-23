@@ -1,10 +1,10 @@
 package pl.commercelink.web;
 
+import com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -37,20 +37,25 @@ import pl.commercelink.products.ProductRecommendation;
 import pl.commercelink.products.ProductRecommendationEngine;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.products.brand.BrandMapper;
+import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.starter.security.model.CustomUser;
 import pl.commercelink.stores.MarketplaceIntegration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.taxonomy.Taxonomy;
+import pl.commercelink.testsupport.OptimisticLockingExecutorMocks;
 import pl.commercelink.web.catalog.CatalogAccess;
-import pl.commercelink.web.settings.ConfirmAction;
+import pl.commercelink.web.catalog.CategoryFilter;
 import pl.commercelink.web.catalog.CategoryPageModel;
 import pl.commercelink.web.catalog.ProductRow;
 import pl.commercelink.web.catalog.ProductStatus;
 import pl.commercelink.web.catalog.RecommendationRow;
 import pl.commercelink.web.dtos.ProductForm;
 import pl.commercelink.web.dtos.ProductsBulkAddForm;
+import pl.commercelink.web.settings.ConfirmAction;
 
+import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -114,6 +119,8 @@ class CatalogProductsControllerTest {
     private StoresRepository storesRepository;
     @Mock
     private Store store;
+    @Mock
+    private OptimisticLockingExecutor optimisticLockingExecutor;
 
     private ProductCatalog catalog;
     private CategoryDefinition gpu;
@@ -142,9 +149,11 @@ class CatalogProductsControllerTest {
         lenient().when(store.getEnabledCategories()).thenReturn(List.of());
         lenient().when(pimCategoryOptions.namedOptions(any(), any())).thenReturn(List.of());
         lenient().when(pimCategoryOptions.ancestorsOfNames(any())).thenReturn(List.of());
+        lenient().when(optimisticLockingExecutor.modifyAndSave(any(), any(), any()))
+                .thenAnswer(OptimisticLockingExecutorMocks.passThroughModifyAndSave());
         mvc = MockMvcBuilders.standaloneSetup(new CatalogProductsController(access, productRepository, storesRepository,
                 recommendationEngine, inventory, marketplaces, pimCategoryOptions, supplierLabels, pimCatalog,
-                brandMapper, messageSource)).build();
+                brandMapper, messageSource, optimisticLockingExecutor)).build();
     }
 
     @AfterEach
@@ -1061,7 +1070,7 @@ class CatalogProductsControllerTest {
         gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
         Product existing = new Product(gpu.getCategoryId(), null, "4719331361600", "m", "b", "l", "n", "Ultra");
         existing.setProductId("p1");
-        existing.setMarketplaces(new java.util.LinkedList<>(List.of("Morele")));
+        existing.setMarketplaces(new LinkedList<>(List.of("Morele")));
         when(access.requireProduct(gpu, "p1")).thenReturn(existing);
         MarketplaceIntegration allegro = new MarketplaceIntegration();
         allegro.setName("Allegro");
@@ -1189,8 +1198,8 @@ class CatalogProductsControllerTest {
                 .andReturn();
 
         // then
-        pl.commercelink.web.catalog.CategoryFilter filter =
-                (pl.commercelink.web.catalog.CategoryFilter) result.getModelAndView().getModel().get("filter");
+        CategoryFilter filter =
+                (CategoryFilter) result.getModelAndView().getModel().get("filter");
         assertThat(filter.status()).isEqualTo("disabled");
         assertThat(filter.label()).isEqualTo("RTX 5070");
     }
@@ -1406,7 +1415,7 @@ class CatalogProductsControllerTest {
     void aSecondCreateProductWithTheSameEanIsRefusedAndTheCategoryKeepsOneRecord() throws Exception {
         // given -- the repository remembers what it saved
         gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
-        List<Product> stored = new java.util.ArrayList<>();
+        List<Product> stored = new ArrayList<>();
         when(productRepository.findAll(gpu.getCategoryId())).thenAnswer(call -> List.copyOf(stored));
         doAnswer(call -> stored.add(call.getArgument(0))).when(productRepository).save(any(Product.class));
         var create = post(categoryPath() + "/products/new").header("X-Requested-With", "fetch")
@@ -1519,5 +1528,79 @@ class CatalogProductsControllerTest {
         ArgumentCaptor<Product> saved = ArgumentCaptor.forClass(Product.class);
         verify(productRepository).save(saved.capture());
         assertThat(saved.getValue().getProductId()).isEqualTo(review.toProduct(0, gpu.getCategoryId()).getProductId());
+    }
+
+    /**
+     * RF-6 follow-up: two rows of one review naming the same product (overlapping identifiers). The parallel request
+     * saved the first row; this one must remember its key, or the second row -- saved under an id of its own -- would
+     * add the product a second time.
+     */
+    @Test
+    void aRowLostToAParallelSaveStillGuardsTheRowsAfterIt() throws Exception {
+        // given
+        gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
+        doThrow(new ConditionalCheckFailedException("exists")).doNothing().when(productRepository).save(any(Product.class));
+
+        // when
+        mvc.perform(post(categoryPath() + "/products/add/save")
+                        .param("reviewId", "0b7a52d4-8a51-4a53-9f4d-2f7d2c0b8c11")
+                        .param("products[0].name", "X").param("products[0].ean", "5901234567890")
+                        .param("products[0].manufacturerCode", "m-1").param("products[0].pricingGroup", "Default")
+                        .param("products[1].name", "X bis").param("products[1].ean", "5901234567890")
+                        .param("products[1].manufacturerCode", "m-2").param("products[1].pricingGroup", "Default"))
+                .andExpect(flash().attribute("catalogWarning", "catalog.products.added.none"));
+
+        // then
+        verify(productRepository, times(1)).save(any(Product.class));
+    }
+
+    /**
+     * A bulk switch racing a save of the same product (another tab) re-reads the product and applies the switch to
+     * the fresh copy: the other save is kept, the switch lands, and nothing answers with a 500.
+     */
+    @Test
+    void bulkEnableReappliesTheSwitchToAProductSavedMeanwhile() throws Exception {
+        // given
+        Product stale = new Product(gpu.getCategoryId(), "pim", "1", "m", "MSI", "l", "Old name", "Default");
+        stale.setProductId("p1");
+        stale.setEnabled(false);
+        Product fresh = new Product(gpu.getCategoryId(), "pim", "1", "m", "MSI", "l", "Renamed meanwhile", "Default");
+        fresh.setProductId("p1");
+        fresh.setEnabled(false);
+        when(productRepository.findByProductId(gpu.getCategoryId(), "p1")).thenReturn(stale, fresh);
+        doThrow(new ConditionalCheckFailedException("version changed")).when(productRepository).save(stale);
+        doAnswer(OptimisticLockingExecutorMocks.retryingModifyAndSave(3))
+                .when(optimisticLockingExecutor).modifyAndSave(any(), any(), any());
+
+        // when / then
+        mvc.perform(post(categoryPath() + "/products/bulk").param("action", "enable").param("productIds", "p1"))
+                .andExpect(redirectedUrl(categoryPath() + "?status=active"))
+                .andExpect(flash().attribute("settingsSavedMessage", "catalog.products.bulk.enabled"));
+        verify(productRepository).save(fresh);
+        assertThat(fresh.isEnabled()).isTrue();
+        assertThat(fresh.getName()).isEqualTo("Renamed meanwhile");
+    }
+
+    /** A product that keeps changing under the switch is counted with the skipped ones instead of failing the request. */
+    @Test
+    void bulkDisableCountsAProductThatKeepsChangingAsSkipped() throws Exception {
+        // given
+        Product a = new Product(gpu.getCategoryId(), "pim", "1", "m", "MSI", "l", "n", "Default");
+        a.setProductId("p1");
+        Product b = new Product(gpu.getCategoryId(), "pim", "2", "m", "MSI", "l", "n", "Default");
+        b.setProductId("p2");
+        when(productRepository.findByProductId(gpu.getCategoryId(), "p1")).thenReturn(a);
+        when(productRepository.findByProductId(gpu.getCategoryId(), "p2")).thenReturn(b);
+        lenient().doThrow(new ConditionalCheckFailedException("version changed")).when(productRepository).save(b);
+        doAnswer(OptimisticLockingExecutorMocks.retryingModifyAndSave(3))
+                .when(optimisticLockingExecutor).modifyAndSave(any(), any(), any());
+        when(messageSource.getMessage(eq("catalog.products.bulk.disabled.skipped"), eq(new Object[]{1, 1}), any(Locale.class)))
+                .thenReturn("Disabled 1, skipped 1");
+
+        // when / then
+        mvc.perform(post(categoryPath() + "/products/bulk").param("action", "disable").param("productIds", "p1", "p2"))
+                .andExpect(redirectedUrl(categoryPath() + "?status=active"))
+                .andExpect(flash().attribute("settingsSavedMessage", "Disabled 1, skipped 1"));
+        assertThat(a.isEnabled()).isFalse();
     }
 }

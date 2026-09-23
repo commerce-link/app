@@ -15,6 +15,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.server.ResponseStatusException;
+import pl.commercelink.pricelist.PricelistEventScheduler;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.CategoryDefinitionType;
 import pl.commercelink.products.CategoryDefinitions;
@@ -31,6 +32,7 @@ import pl.commercelink.web.catalog.CatalogRow;
 import pl.commercelink.web.catalog.CategoryRow;
 import pl.commercelink.web.dtos.CatalogSettingsForm;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -40,6 +42,7 @@ import static org.hamcrest.Matchers.hasKey;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -403,11 +406,11 @@ class CatalogsControllerTest {
     @Test
     void twoPostsOfOneNewCatalogFormCreateOneCatalogAndOneSchedule() throws Exception {
         // given
-        java.util.Map<String, ProductCatalog> stored = new java.util.HashMap<>();
+        Map<String, ProductCatalog> stored = new HashMap<>();
         when(catalogRepository.findById(eq(STORE_ID), anyString())).thenAnswer(call -> stored.get(call.<String>getArgument(1)));
-        org.mockito.Mockito.doAnswer(call -> stored.put(call.<ProductCatalog>getArgument(0).getCatalogId(), call.getArgument(0)))
+        doAnswer(call -> stored.put(call.<ProductCatalog>getArgument(0).getCatalogId(), call.getArgument(0)))
                 .when(catalogRepository).save(any(ProductCatalog.class));
-        pl.commercelink.pricelist.PricelistEventScheduler scheduler = mock(pl.commercelink.pricelist.PricelistEventScheduler.class);
+        PricelistEventScheduler scheduler = mock(PricelistEventScheduler.class);
         ProductCatalogDetailsService realDetails = new ProductCatalogDetailsService(catalogRepository, productRepository, scheduler, 5);
         MockMvc withRealDetails = MockMvcBuilders.standaloneSetup(new CatalogsController(catalogRepository, messageSource,
                 realDetails, access, productRepository, pimCategoryOptions, marketplaces,

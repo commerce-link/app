@@ -41,6 +41,8 @@ import pl.commercelink.products.ProductRecommendation;
 import pl.commercelink.products.ProductRecommendationEngine;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.products.brand.BrandMapper;
+import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
+import pl.commercelink.starter.dynamodb.OptimisticLockingExhaustedException;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.stores.MarketplaceIntegration;
 import pl.commercelink.stores.Store;
@@ -70,6 +72,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -116,6 +119,7 @@ public class CatalogProductsController {
     private final PimCatalog pimCatalog;
     private final BrandMapper brandMapper;
     private final MessageSource messageSource;
+    private final OptimisticLockingExecutor optimisticLockingExecutor;
 
     /**
      * Raised for the review form, whose list grows to one entry per selected proposal; Spring stops at 256 by default
@@ -190,16 +194,17 @@ public class CatalogProductsController {
                 .filter(Objects::nonNull)
                 .toList();
         String messageKey = switch (action) {
-            case "enable" -> save(products, true);
-            case "disable" -> save(products, false);
-            case "delete" -> delete(products);
+            case "enable" -> "catalog.products.bulk.enabled";
+            case "disable" -> "catalog.products.bulk.disabled";
+            case "delete" -> "catalog.products.bulk.deleted";
             default -> throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
         };
-        int skipped = requested.size() - products.size();
+        int done = "delete".equals(action) ? delete(products) : setEnabled(products, "enable".equals(action));
+        int skipped = requested.size() - done;
         String message = skipped > 0
-                ? messageSource.getMessage(messageKey + ".skipped", new Object[]{products.size(), skipped}, locale)
-                : messageSource.getMessage(messageKey, new Object[]{products.size()}, locale);
-        if (products.isEmpty()) {
+                ? messageSource.getMessage(messageKey + ".skipped", new Object[]{done, skipped}, locale)
+                : messageSource.getMessage(messageKey, new Object[]{done}, locale);
+        if (done == 0) {
             redirectAttributes.addFlashAttribute(CatalogsController.WARNING_FLASH, message);
         } else {
             SettingsFlash.onRedirect(redirectAttributes, message);
@@ -321,7 +326,9 @@ public class CatalogProductsController {
                 productRepository.save(product);
             } catch (ConditionalCheckFailedException e) {
                 // The same review, saved by a parallel request that read the category at the same moment, wrote this
-                // row first under the same id: the category has it, exactly as if the read above had found it.
+                // row first under the same id: the category has it, exactly as if the read above had found it -- so
+                // its key guards the rows after it, as the key of a row saved here would.
+                alreadyInCategory.add(key);
                 continue;
             }
             alreadyInCategory.add(key);
@@ -720,17 +727,43 @@ public class CatalogProductsController {
                 .thenComparing(name, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER));
     }
 
-    private String save(List<Product> products, boolean enabled) {
-        products.forEach(product -> {
-            product.setEnabled(enabled);
-            productRepository.save(product);
-        });
-        return enabled ? "catalog.products.bulk.enabled" : "catalog.products.bulk.disabled";
+    /**
+     * Switches every product on or off and says how many were switched. The switch is one field, so a product another
+     * save changed in the meantime is read again and switched on that fresh copy (the other save is kept); the first
+     * attempt uses the product already read above, so an undisturbed switch costs no second read. A product deleted
+     * in the meantime, or one that keeps changing until the retries run out, is not switched and is counted with the
+     * skipped ones -- the request never fails for it.
+     */
+    private int setEnabled(List<Product> products, boolean enabled) {
+        int switched = 0;
+        for (Product product : products) {
+            AtomicReference<Product> alreadyRead = new AtomicReference<>(product);
+            try {
+                optimisticLockingExecutor.modifyAndSave(
+                        () -> Optional.ofNullable(alreadyRead.getAndSet(null))
+                                .orElseGet(() -> productRepository.findByProductId(product.getCategoryId(), product.getProductId())),
+                        current -> {
+                            if (current == null) {
+                                throw new ProductGoneException();
+                            }
+                            current.setEnabled(enabled);
+                        },
+                        productRepository::save);
+                switched++;
+            } catch (OptimisticLockingExhaustedException | ProductGoneException e) {
+                // counted as skipped by the caller
+            }
+        }
+        return switched;
     }
 
-    private String delete(List<Product> products) {
+    /** The product was deleted between the bulk action's read and the retry of its save. */
+    private static final class ProductGoneException extends RuntimeException {
+    }
+
+    private int delete(List<Product> products) {
         products.forEach(productRepository::delete);
-        return "catalog.products.bulk.deleted";
+        return products.size();
     }
 
     private static String storeId() {

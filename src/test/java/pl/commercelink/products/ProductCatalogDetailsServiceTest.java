@@ -1,5 +1,6 @@
 package pl.commercelink.products;
 
+import com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -224,7 +225,7 @@ class ProductCatalogDetailsServiceTest {
     void aCatalogCreatedByAParallelRequestIsReportedAsCreatedAndItsScheduleIsKept() {
         // given
         when(productCatalogRepository.findById(STORE_ID, "new-cat")).thenReturn(null);
-        doThrow(new com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException("exists"))
+        doThrow(new ConditionalCheckFailedException("exists"))
                 .when(productCatalogRepository).save(any());
 
         // when
@@ -241,7 +242,7 @@ class ProductCatalogDetailsServiceTest {
     void aConflictOnAnExistingCatalogIsStillAFailedSave() {
         // given
         when(productCatalogRepository.findById(STORE_ID, CATALOG_ID)).thenReturn(submittedCatalog("0 5 * * ? *"));
-        doThrow(new com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException("version changed"))
+        doThrow(new ConditionalCheckFailedException("version changed"))
                 .when(productCatalogRepository).save(any());
 
         // when
