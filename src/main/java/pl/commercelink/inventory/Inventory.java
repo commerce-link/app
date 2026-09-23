@@ -39,6 +39,8 @@ public class Inventory {
     private final StoreInventoryProvider storeInventoryProvider;
     private final GlobalMatchedInventory globalInventory;
 
+    // Per supplier, the feed version last attempted (successful load or markSeen) — not a guarantee of
+    // held inventory; drives the scheduler's "is there a newer feed to load?" check.
     private final ConcurrentHashMap<String, LocalDateTime> lastUpdateDateBySupplier = new ConcurrentHashMap<>();
 
     private final Cache<StatisticsKey, InventoryStatistics> statisticsCache = Caffeine.newBuilder()
@@ -179,6 +181,11 @@ public class Inventory {
 
     public LocalDateTime getLastUpdateDate(String supplierName) {
         return lastUpdateDateBySupplier.getOrDefault(supplierName, LocalDateTime.now().minusDays(365));
+    }
+
+    // Mark a feed version attempted without applying it, so a skipped feed isn't re-parsed every cycle.
+    public void markSeen(String supplierName, LocalDateTime feedLastModified) {
+        lastUpdateDateBySupplier.put(supplierName, feedLastModified);
     }
 
     public Collection<String> getMatchedSuppliers() {
