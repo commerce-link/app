@@ -129,11 +129,26 @@ public class ReceiptProcessor {
         String storeId = attempt.getStoreId();
         String key = attempt.getReceiptKey();
         if (attempt.getIssueCalls() == 0 && !stillQualifies(attempt)) {
-            attempts.update(storeId, key, a -> {
+            // stillQualifies() is exactly the slow window (an order lookup) in which the lease can be lost to
+            // another owner who has since bumped issueCalls and may be inside provider.issue right now — blocking
+            // unconditionally here would kill that attempt and its eventual result would be dropped by the merger
+            // (BLOCKED ignores everything), losing a real sale. Guard and read back the outcome exactly as the
+            // issueCalls guard below does: from the persisted attempt, never from a flag set inside the predicate.
+            Instant blockNow = clock.instant();
+            Optional<ReceiptAttempt> blocked = attempts.update(storeId, key, a -> {
+                if (!owner.equals(a.getLeaseOwner()) || !a.isLeasedAt(blockNow)
+                        || a.getState() != ReceiptAttemptState.ISSUING || a.getIssueCalls() != 0) {
+                    return false;
+                }
                 a.setState(ReceiptAttemptState.BLOCKED);
                 a.setBlockedReason(ReceiptBlockReason.NOT_ELIGIBLE.name());
                 return true;
             });
+            boolean blockedByUs = blocked.isPresent() && owner.equals(blocked.get().getLeaseOwner())
+                    && blocked.get().getState() == ReceiptAttemptState.BLOCKED;
+            if (!blockedByUs) {
+                log.warn("Receipt attempt {} lost its lease before it could be blocked as not eligible; leaving it untouched", key);
+            }
             return;
         }
         ReceiptProvider provider;

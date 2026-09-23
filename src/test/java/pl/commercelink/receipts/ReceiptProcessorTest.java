@@ -172,6 +172,29 @@ class ReceiptProcessorTest {
     }
 
     @Test
+    void aNotEligibleOrderDoesNotBlockAnAttemptWhoseLeaseWasStolenAndIsAlreadyBeingIssued() {
+        // stillQualifies() (called to decide NOT_ELIGIBLE) is the same slow window as the issueCalls guard's:
+        // if the lease is stolen and the new owner is already inside issue() by the time we get back, blocking
+        // the attempt here would kill it and drop that owner's eventual result (BLOCKED ignores everything).
+        order.setStatus(OrderStatus.Cancelled);
+        when(orders.findById(STORE_ID, ORDER_ID)).thenAnswer(i -> {
+            attempts.interleaveOnce(a -> {
+                a.setLeaseOwner("other");
+                a.setLeaseUntil(clock.instant().plus(ReceiptProcessor.LEASE));
+                a.setIssueCalls(1);
+            });
+            return order;
+        });
+
+        processor.process(STORE_ID, KEY);
+
+        assertThat(stored().getState()).isEqualTo(ReceiptAttemptState.ISSUING);
+        assertThat(stored().getIssueCalls()).isEqualTo(1);
+        assertThat(stored().getLeaseOwner()).isEqualTo("other");
+        assertThat(provider.issueCalls.get()).isZero();
+    }
+
+    @Test
     @Timeout(10)
     void redeliveryDuringIssueDoesNotCallIssueAgain() throws Exception {
         provider.issueGate = new CountDownLatch(1);
