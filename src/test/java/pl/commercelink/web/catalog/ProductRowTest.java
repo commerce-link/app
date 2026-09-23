@@ -8,12 +8,16 @@ import pl.commercelink.products.ProductRecommendation;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 class ProductRowTest {
+
+    /** The marketplaces the store is connected to; the export never reads a definition for any other. */
+    private static final Set<String> CONNECTED = Set.of("allegro", "empik");
 
     private static Product product() {
         Product p = new Product("cat-1", "pim-1", "4719331361600", "GV-N5080", "Gigabyte", "RTX 5080",
@@ -51,7 +55,7 @@ class ProductRowTest {
         p.setSuggestedRetailPrice(4999);
 
         // when
-        ProductRow row = ProductRow.of(p, categoryWith(definition("allegro", true)), "c1", name -> name.toUpperCase());
+        ProductRow row = ProductRow.of(p, categoryWith(definition("allegro", true)), "c1", name -> name.toUpperCase(), CONNECTED);
 
         // then
         assertThat(row.status()).isEqualTo(ProductStatus.ACTIVE);
@@ -76,10 +80,10 @@ class ProductRowTest {
         CategoryDefinition gpu = category("RTX 5070");
 
         // when / then
-        assertThat(ProductRow.of(disabled, gpu, "c1", n -> n).status()).isEqualTo(ProductStatus.DISABLED);
-        assertThat(ProductRow.of(noPim, gpu, "c1", n -> n).status()).isEqualTo(ProductStatus.NO_PIM);
-        assertThat(ProductRow.of(product(), gpu, "c1", n -> n).labelOutside()).isTrue();
-        assertThat(ProductRow.of(service, gpu, "c1", n -> n).features()).contains("service");
+        assertThat(ProductRow.of(disabled, gpu, "c1", n -> n, CONNECTED).status()).isEqualTo(ProductStatus.DISABLED);
+        assertThat(ProductRow.of(noPim, gpu, "c1", n -> n, CONNECTED).status()).isEqualTo(ProductStatus.NO_PIM);
+        assertThat(ProductRow.of(product(), gpu, "c1", n -> n, CONNECTED).labelOutside()).isTrue();
+        assertThat(ProductRow.of(service, gpu, "c1", n -> n, CONNECTED).features()).contains("service");
     }
 
     /**
@@ -95,14 +99,33 @@ class ProductRowTest {
         Product notApproved = product();
 
         // when / then
-        assertThat(ProductRow.of(notApproved, categoryWith(definition("allegro", false)), "c1", n -> n).features())
+        assertThat(ProductRow.of(notApproved, categoryWith(definition("allegro", false)), "c1", n -> n, CONNECTED).features())
                 .contains("marketplace");
-        assertThat(ProductRow.of(notApproved, categoryWith(definition("allegro", true)), "c1", n -> n).features())
+        assertThat(ProductRow.of(notApproved, categoryWith(definition("allegro", true)), "c1", n -> n, CONNECTED).features())
                 .doesNotContain("marketplace");
-        assertThat(ProductRow.of(approved, categoryWith(definition("allegro", true)), "c1", n -> n).features())
+        assertThat(ProductRow.of(approved, categoryWith(definition("allegro", true)), "c1", n -> n, CONNECTED).features())
                 .contains("marketplace");
-        assertThat(ProductRow.of(approved, category("RTX 5080"), "c1", n -> n).features())
+        assertThat(ProductRow.of(approved, category("RTX 5080"), "c1", n -> n, CONNECTED).features())
                 .doesNotContain("marketplace");
+    }
+
+    /**
+     * The export picks the definition by the name of a marketplace the store is connected to: a definition without a
+     * name (two of them on production) or for a marketplace the store no longer has never publishes anything.
+     */
+    @Test
+    void aDefinitionWithoutANameOrForAMarketplaceTheStoreLacksMarksNothing() {
+        // given
+        MarketplaceDefinition unnamed = definition(null, false);
+        MarketplaceDefinition gone = definition("morele", false);
+
+        // when / then
+        assertThat(ProductRow.of(product(), categoryWith(unnamed), "c1", n -> n, CONNECTED).features())
+                .doesNotContain("marketplace");
+        assertThat(ProductRow.of(product(), categoryWith(gone), "c1", n -> n, CONNECTED).features())
+                .doesNotContain("marketplace");
+        assertThat(ProductRow.of(product(), categoryWith(unnamed, gone, definition("empik", false)), "c1", n -> n,
+                CONNECTED).features()).contains("marketplace");
     }
 
     /** A definition switched off is the one gate the export applies per definition, so it publishes nothing. */
@@ -113,7 +136,7 @@ class ProductRowTest {
         disabled.setEnabled(false);
 
         // when / then
-        assertThat(ProductRow.of(product(), categoryWith(disabled), "c1", n -> n).features())
+        assertThat(ProductRow.of(product(), categoryWith(disabled), "c1", n -> n, CONNECTED).features())
                 .doesNotContain("marketplace");
     }
 
@@ -128,7 +151,7 @@ class ProductRowTest {
         MarketplaceDefinition incomplete = new MarketplaceDefinition("empik", 0, 0, 0, 0, 0, 0);
 
         // when / then
-        assertThat(ProductRow.of(product(), categoryWith(incomplete), "c1", n -> n).features())
+        assertThat(ProductRow.of(product(), categoryWith(incomplete), "c1", n -> n, CONNECTED).features())
                 .contains("marketplace");
     }
 
@@ -145,8 +168,8 @@ class ProductRowTest {
         CategoryDefinition exporting = categoryWith(definition("allegro", false));
 
         // when / then
-        assertThat(ProductRow.of(disabled, exporting, "c1", n -> n).features()).doesNotContain("marketplace");
-        assertThat(ProductRow.of(noPim, exporting, "c1", n -> n).features()).doesNotContain("marketplace");
+        assertThat(ProductRow.of(disabled, exporting, "c1", n -> n, CONNECTED).features()).doesNotContain("marketplace");
+        assertThat(ProductRow.of(noPim, exporting, "c1", n -> n, CONNECTED).features()).doesNotContain("marketplace");
     }
 
     /** A category without a label list has no "outside" label: the catalog page counts such products the same way. */
@@ -156,7 +179,7 @@ class ProductRowTest {
         CategoryDefinition gpu = category();
 
         // when / then
-        assertThat(ProductRow.of(product(), gpu, "c1", n -> n).labelOutside()).isFalse();
+        assertThat(ProductRow.of(product(), gpu, "c1", n -> n, CONNECTED).labelOutside()).isFalse();
     }
 
     @Test

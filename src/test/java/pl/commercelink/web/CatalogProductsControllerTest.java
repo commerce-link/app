@@ -37,6 +37,7 @@ import pl.commercelink.products.ProductRecommendationEngine;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.products.brand.BrandMapper;
 import pl.commercelink.starter.security.model.CustomUser;
+import pl.commercelink.stores.MarketplaceIntegration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.taxonomy.Taxonomy;
@@ -243,6 +244,12 @@ class CatalogProductsControllerTest {
         // given
         MarketplaceDefinition allegro = new MarketplaceDefinition("allegro", 1.2, 0, 0, 0, 0, 1);
         gpu.getMarketplaceDefinitions().add(allegro);
+        // Two definitions the export never reads (RF-14): one without a name, one for a marketplace the store lacks.
+        gpu.getMarketplaceDefinitions().add(new MarketplaceDefinition(null, 1.2, 0, 0, 0, 0, 1));
+        gpu.getMarketplaceDefinitions().add(new MarketplaceDefinition("empik", 1.2, 0, 0, 0, 0, 1));
+        MarketplaceIntegration connected = new MarketplaceIntegration();
+        connected.setName("allegro");
+        when(store.getMarketplaces()).thenReturn(List.of(connected));
         Product listed = new Product(gpu.getCategoryId(), "pim-1", "1", "m", "MSI", "RTX 5070", "MSI RTX 5070", "Default");
         Product withoutPim = new Product(gpu.getCategoryId(), null, "2", "m", "ASUS", "RTX 5060", "ASUS RTX 5060", "Default");
         withoutPim.setMarketplaces(List.of("allegro"));

@@ -22,10 +22,11 @@ public record ProductRow(String id, String name, String ean, String mfn, String 
                          boolean labelOutside, String pricingGroup, List<String> marketplaceNames, ProductStatus status,
                          Set<String> features, String searchText, String href, String lowestGrossPrice) {
 
+    /** @param connectedMarketplaces names of the marketplaces the store is connected to; the export reads no other */
     public static ProductRow of(Product product, CategoryDefinition category, String catalogId,
-                                Function<String, String> marketplaceDisplayName) {
+                                Function<String, String> marketplaceDisplayName, Set<String> connectedMarketplaces) {
         Set<String> features = new LinkedHashSet<>();
-        if (exported(product, category)) {
+        if (exported(product, category, connectedMarketplaces)) {
             features.add("marketplace");
         }
         if (product.getStockExpectedQty() > 0) {
@@ -67,19 +68,23 @@ public record ProductRow(String id, String name, String ean, String mfn, String 
 
     /**
      * Whether {@link pl.commercelink.marketplace.MarketplaceOfferExportEventListener} would publish this product to at
-     * least one marketplace. The export applies exactly one gate per definition -- it is enabled -- then reads the
-     * enabled products that have a PIM entry and, for a definition exporting a selection only, keeps the ones approved
-     * for it. An incomplete definition is therefore marked as well: completeness is checked catalog-wide, in
-     * {@code ProductCatalog.isMarketplaceExportEnabled}, and is deliberately not modelled here, because it says whether
-     * the catalog exports to that marketplace at all, not whether this category's product would be in the run. The
-     * rest of what the export decides per run -- the store's integrations, the price list and the quantity rules -- is
-     * left out for the same reason: the mark answers "the catalogue lets it out", not "it went out last night".
+     * least one marketplace. The export runs per marketplace the store is connected to and picks the category's
+     * definition by that marketplace's name, so a definition without a name, or for a marketplace the store is not
+     * connected to, is never read -- it marks nothing. Of the definitions it does read it applies exactly one gate --
+     * the definition is enabled -- then reads the enabled products that have a PIM entry and, for a definition
+     * exporting a selection only, keeps the ones approved for it. An incomplete definition is therefore marked as well:
+     * completeness is checked catalog-wide, in {@code ProductCatalog.isMarketplaceExportEnabled}, and is deliberately
+     * not modelled here, because it says whether the catalog exports to that marketplace at all, not whether this
+     * category's product would be in the run. The rest of what the export decides per run -- whether the integration
+     * is active, the price list and the quantity rules -- is left out for the same reason: the mark answers "the
+     * catalogue lets it out", not "it went out last night".
      */
-    private static boolean exported(Product product, CategoryDefinition category) {
+    private static boolean exported(Product product, CategoryDefinition category, Set<String> connectedMarketplaces) {
         if (!product.isEnabled() || StringUtils.isBlank(product.getPimId())) {
             return false;
         }
         return category.getMarketplaceDefinitions().stream()
+                .filter(definition -> definition.getName() != null && connectedMarketplaces.contains(definition.getName()))
                 .filter(MarketplaceDefinition::isEnabled)
                 .anyMatch(definition -> !definition.isExportSelectedProducts()
                         || product.isApprovedForMarketplace(definition.getName()));

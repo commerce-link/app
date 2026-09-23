@@ -6,6 +6,7 @@ import pl.commercelink.products.CategoryDefinitionType;
 import pl.commercelink.products.Product;
 
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -28,9 +29,9 @@ class CategoryPageModelTest {
         // given
         CategoryDefinition gpu = category("A", "B", "C");
         List<ProductRow> rows = List.of(
-                ProductRow.of(product("A", true), gpu, "c", n -> n),
-                ProductRow.of(product("A", false), gpu, "c", n -> n),
-                ProductRow.of(product("B", true), gpu, "c", n -> n));
+                ProductRow.of(product("A", true), gpu, "c", n -> n, Set.of()),
+                ProductRow.of(product("A", false), gpu, "c", n -> n, Set.of()),
+                ProductRow.of(product("B", true), gpu, "c", n -> n, Set.of()));
 
         // when
         CategoryPageModel model = CategoryPageModel.of(rows, gpu);
@@ -52,7 +53,7 @@ class CategoryPageModelTest {
     void labelsOutsideTheListAppearAtTheEndOfTheOptions() {
         // given
         CategoryDefinition gpu = category("A");
-        List<ProductRow> rows = List.of(ProductRow.of(product("Z", true), gpu, "c", n -> n));
+        List<ProductRow> rows = List.of(ProductRow.of(product("Z", true), gpu, "c", n -> n, Set.of()));
 
         // when / then
         assertThat(CategoryPageModel.of(rows, gpu).labelOptions())

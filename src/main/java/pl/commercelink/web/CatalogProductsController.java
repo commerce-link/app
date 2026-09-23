@@ -66,9 +66,11 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 /**
  * Products of a catalog category: the category page (the products table with its filters), the bulk actions on it,
@@ -643,9 +645,12 @@ public class CatalogProductsController {
                             .toList()
                     : List.of();
         }
+        Set<String> connected = marketplaceNames(storesRepository.findById(storeId())).stream()
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
         return productRepository.findAll(category.getCategoryId()).stream()
                 .sorted(byLabelThenName(Product::getLabel, Product::getName))
-                .map(product -> ProductRow.of(product, category, catalog.getCatalogId(), marketplaces::displayName))
+                .map(product -> ProductRow.of(product, category, catalog.getCatalogId(), marketplaces::displayName, connected))
                 .toList();
     }
 
