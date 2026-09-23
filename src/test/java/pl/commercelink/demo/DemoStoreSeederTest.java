@@ -29,12 +29,15 @@ import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrderSourceType;
 import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
+import pl.commercelink.receipts.ReceiptProviderFactory;
+import pl.commercelink.receipts.api.ReceiptProviderDescriptor;
 import pl.commercelink.stores.DemoStoreMetadata;
 import pl.commercelink.stores.IntegrationType;
 import pl.commercelink.stores.InvoicingConfiguration;
 import pl.commercelink.stores.Store;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -1067,6 +1070,51 @@ class DemoStoreSeederTest {
 
         // then
         assertEquals("fakturownia", store.getConfigurationValue(IntegrationType.INVOICING_PROVIDER));
+    }
+
+    @Test
+    void selectsDevReceiptsWhenTheAdapterIsOnTheClasspath() {
+        // given
+        Store store = new Store();
+        ReceiptProviderFactory factory = mock(ReceiptProviderFactory.class);
+        when(factory.getDescriptor("receipts-dev")).thenReturn(mock(ReceiptProviderDescriptor.class));
+
+        // when
+        DemoStoreSeeder.enableDevReceipts(store, factory, LocalDateTime.of(2026, 9, 23, 13, 0));
+
+        // then
+        assertEquals("receipts-dev", store.getConfigurationValue(IntegrationType.RECEIPT_PROVIDER));
+        assertTrue(store.getReceiptConfiguration().isEnabled());
+    }
+
+    @Test
+    void leavesReceiptsUntouchedWhenTheAdapterIsAbsent() {
+        // given
+        Store store = new Store();
+        ReceiptProviderFactory factory = mock(ReceiptProviderFactory.class);
+        when(factory.getDescriptor("receipts-dev")).thenReturn(null);
+
+        // when
+        DemoStoreSeeder.enableDevReceipts(store, factory, LocalDateTime.now());
+
+        // then
+        assertFalse(store.hasIntegration(IntegrationType.RECEIPT_PROVIDER));
+        assertFalse(store.getReceiptConfiguration().isEnabled());
+    }
+
+    @Test
+    void neverOverwritesAnExistingReceiptIntegration() {
+        // given
+        Store store = new Store();
+        store.setConfigurationValue(IntegrationType.RECEIPT_PROVIDER, "fakturownia");
+        ReceiptProviderFactory factory = mock(ReceiptProviderFactory.class);
+        when(factory.getDescriptor("receipts-dev")).thenReturn(mock(ReceiptProviderDescriptor.class));
+
+        // when
+        DemoStoreSeeder.enableDevReceipts(store, factory, LocalDateTime.now());
+
+        // then
+        assertEquals("fakturownia", store.getConfigurationValue(IntegrationType.RECEIPT_PROVIDER));
     }
 
     @Test

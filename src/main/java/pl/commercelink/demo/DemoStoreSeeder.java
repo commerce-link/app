@@ -46,6 +46,7 @@ import pl.commercelink.products.PriceDefinition;
 import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.StockDefinition;
+import pl.commercelink.receipts.ReceiptProviderFactory;
 import pl.commercelink.stores.AuthorizedCarrier;
 import pl.commercelink.stores.BankAccount;
 import pl.commercelink.stores.CheckoutConfiguration;
@@ -153,6 +154,8 @@ public class DemoStoreSeeder implements StoreSeeder {
     static final String ACME_B_PICKUP_POINTS_KNOB = "orderingPickupPointsEnabled";
     /** The dev invoicing adapter, present only under the `dev` Maven profile. */
     static final String DEV_INVOICING = "invoicing-dev";
+    /** The dev receipts adapter, present only under the `dev` Maven profile. */
+    static final String DEV_RECEIPTS = "receipts-dev";
     /**
      * Id prefix the invoicing-dev adapter uses for synthesised supplier invoices. Mirrored here so
      * a seeded invoice document matches what the adapter returns: InvoiceLinkingService then
@@ -173,6 +176,7 @@ public class DemoStoreSeeder implements StoreSeeder {
     private final SupplierRegistry supplierRegistry;
     private final SupplierProviderFactory supplierProviderFactory;
     private final InvoicingProviderFactory invoicingProviderFactory;
+    private final ReceiptProviderFactory receiptProviderFactory;
 
     @Value("${s3.bucket.stores}")
     String storesBucket;
@@ -181,6 +185,7 @@ public class DemoStoreSeeder implements StoreSeeder {
     public void seed(Store store) {
         applyStoreConfiguration(store, store.getStoreId(), store.getName(), store.getDemo());
         enableDevInvoicing(store, invoicingProviderFactory);
+        enableDevReceipts(store, receiptProviderFactory, LocalDateTime.now());
         applyDemoWarehouseId(store);
         applyDemoCompanyDetails(store);
         applyDemoInvoicingConfiguration(store);
@@ -199,6 +204,7 @@ public class DemoStoreSeeder implements StoreSeeder {
         applyStoreConfiguration(store, storeId, storeName, demo);
         connectSecondAcmeB(store);
         enableDevInvoicing(store, invoicingProviderFactory);
+        enableDevReceipts(store, receiptProviderFactory, LocalDateTime.now());
         mapper.save(store);
         List<CatalogSeedRow> rows = loadFilteredRows();
         seedStoreData(storeId, rows);
@@ -249,6 +255,23 @@ public class DemoStoreSeeder implements StoreSeeder {
             return;
         }
         store.setConfigurationValue(IntegrationType.INVOICING_PROVIDER, DEV_INVOICING);
+    }
+
+    /**
+     * Picks the in-memory receipts adapter for demo stores when it is on the classpath (dev profile
+     * only). Both guards matter: without the adapter on the classpath there is nothing to select,
+     * and a store that already has a receipt integration keeps it, so a real (e.g. Fakturownia)
+     * configuration is never replaced by the mock.
+     */
+    static void enableDevReceipts(Store store, ReceiptProviderFactory receiptProviderFactory, LocalDateTime now) {
+        if (receiptProviderFactory.getDescriptor(DEV_RECEIPTS) == null) {
+            return;
+        }
+        if (store.hasIntegration(IntegrationType.RECEIPT_PROVIDER)) {
+            return;
+        }
+        store.setConfigurationValue(IntegrationType.RECEIPT_PROVIDER, DEV_RECEIPTS);
+        store.getReceiptConfiguration().enable(now);
     }
 
     /**
