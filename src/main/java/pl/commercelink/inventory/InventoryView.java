@@ -2,6 +2,7 @@ package pl.commercelink.inventory;
 
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.products.Product;
+import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.taxonomy.TaxonomyCache;
 
 import java.util.Collection;
@@ -42,7 +43,11 @@ public class InventoryView {
     }
 
     public MatchedInventory findByInventoryKey(InventoryKey lookupKey) {
-        return assemble(lookupKey);
+        MatchedInventory matched = assemble(lookupKey);
+        if (matched.getTaxonomy() == Taxonomy.EMPTY) {
+            matched.adoptTaxonomy(taxonomyCache.findBest(matched.getInventoryKey().getProductCodes()));
+        }
+        return matched;
     }
 
     public Collection<MatchedInventory> findAllWithPimId() {
@@ -55,14 +60,18 @@ public class InventoryView {
     public Map<String, Collection<MatchedInventory>> findAllByProductCategoryIds(Collection<String> categoryIds) {
         Map<String, Collection<MatchedInventory>> matchesByCategoryId = new LinkedHashMap<>();
         categoryIds.forEach(categoryId -> matchesByCategoryId.put(categoryId, new LinkedList<>()));
-        listedKeys().forEach(key -> {
-            String categoryId = taxonomyCache.find(key).categoryId();
+        listedGroups().forEach(group -> {
+            String categoryId = group.getTaxonomy().categoryId();
             Collection<MatchedInventory> matches = categoryId == null ? null : matchesByCategoryId.get(categoryId);
             if (matches != null) {
-                matches.add(assemble(key));
+                matches.add(assemble(group.getInventoryKey()));
             }
         });
         return matchesByCategoryId;
+    }
+
+    private Stream<MatchedInventory> listedGroups() {
+        return new ListingInventory(globalIndex, ownIndex).groups();
     }
 
     private Stream<InventoryKey> listedKeys() {
@@ -70,7 +79,7 @@ public class InventoryView {
     }
 
     private MatchedInventory assemble(InventoryKey lookupKey) {
-        MatchedInventory result = new MatchedInventory(lookupKey.copy(), taxonomyCache, supplierRegistry);
+        MatchedInventory result = new MatchedInventory(lookupKey.copy(), supplierRegistry);
         for (InventorySource source : sources) {
             source.mergeInto(result, result.getInventoryKey());
         }

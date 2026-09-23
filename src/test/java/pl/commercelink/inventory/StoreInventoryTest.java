@@ -23,7 +23,7 @@ class StoreInventoryTest {
     @Test
     void itemsDelegateToIndexContents() {
         // given
-        MatchedInventory group = new MatchedInventory(new InventoryKey("E1", "M1"), List.of(), taxonomyCache, supplierRegistry);
+        MatchedInventory group = new MatchedInventory(new InventoryKey("E1", "M1"), List.of(), supplierRegistry);
         StoreInventory inventory = new StoreInventory(InventoryIndex.of(List.of(group)), LocalDateTime.now());
 
         // when
@@ -36,7 +36,7 @@ class StoreInventoryTest {
     @Test
     void exposesIndexForLookup() {
         // given
-        MatchedInventory group = new MatchedInventory(new InventoryKey("E1", "M1"), List.of(), taxonomyCache, supplierRegistry);
+        MatchedInventory group = new MatchedInventory(new InventoryKey("E1", "M1"), List.of(), supplierRegistry);
         StoreInventory inventory = new StoreInventory(InventoryIndex.of(List.of(group)), LocalDateTime.now());
 
         // when

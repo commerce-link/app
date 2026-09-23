@@ -22,7 +22,7 @@ class InventoryStatisticsCalculatorTest {
     private SupplierRegistry supplierRegistry;
 
     private MatchedInventory group(String ean, String mfn, InventoryItem... items) {
-        return new MatchedInventory(new InventoryKey(ean, mfn), List.of(items), taxonomyCache, supplierRegistry);
+        return new MatchedInventory(new InventoryKey(ean, mfn), List.of(items), supplierRegistry);
     }
 
     private InventoryItem item(String ean, String mfn, String supplier, int qty) {

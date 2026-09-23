@@ -111,11 +111,11 @@ class InventorySearchTest {
     }
 
     private MatchedInventory empty() {
-        return new MatchedInventory(new InventoryKey(), taxonomyCache, supplierRegistry);
+        return new MatchedInventory(new InventoryKey(), supplierRegistry);
     }
 
     private MatchedInventory offers(InventoryItem... items) {
-        return new MatchedInventory(new InventoryKey(EAN, MFN), List.of(items), taxonomyCache, supplierRegistry);
+        return new MatchedInventory(new InventoryKey(EAN, MFN), List.of(items), supplierRegistry);
     }
 
     private InventoryItem offer(String supplier, double netPrice, int qty) {
