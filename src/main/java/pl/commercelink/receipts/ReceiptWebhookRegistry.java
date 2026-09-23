@@ -121,6 +121,11 @@ public class ReceiptWebhookRegistry {
                     } catch (ProviderCallRejectedException e) {
                         log.warn("Receipt webhook of {} skipped: no call capacity; polling covers it", name());
                         return WebhookOutcome.empty();
+                    } catch (RuntimeException e) {
+                        // an executor exception must not escape as 500: Fakturownia retries an authentic call 25
+                        // times and then disables the webhook for the whole account; polling covers what is lost
+                        log.error("Receipt webhook of {} failed", name(), e);
+                        return WebhookOutcome.empty();
                     }
                     if (outcome.responseBody() instanceof WebhookStatusResponse status
                             && EventBindingRegistrar.REJECTED_STATUS.equals(status.status())) {

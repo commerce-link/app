@@ -15,7 +15,13 @@ import org.springframework.web.servlet.function.RouterFunction;
 import org.springframework.web.servlet.function.ServerRequest;
 import org.springframework.web.servlet.function.ServerResponse;
 import pl.commercelink.provider.ProviderCallLimiter;
+import pl.commercelink.provider.ProviderCallRejectedException;
+import pl.commercelink.provider.api.EventBinding;
+import pl.commercelink.provider.api.ProviderField;
+import pl.commercelink.provider.api.WebhookOutcome;
 import pl.commercelink.receipts.api.Receipt;
+import pl.commercelink.receipts.api.ReceiptProvider;
+import pl.commercelink.receipts.api.ReceiptProviderDescriptor;
 import pl.commercelink.receipts.api.ReceiptState;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
@@ -27,6 +33,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -59,10 +66,18 @@ class ReceiptWebhookRegistryTest {
     }
 
     private ServerResponse post(String path, String body) throws Exception {
+        return postTo(routes, path, body);
+    }
+
+    private ServerResponse postTo(RouterFunction<ServerResponse> targetRoutes, String path, String body) throws Exception {
         MockHttpServletRequest http = new MockHttpServletRequest("POST", path);
         http.setContent(body.getBytes());
         ServerRequest request = ServerRequest.create(http, messageConverters);
-        return routes.route(request).orElseThrow().handle(request);
+        return targetRoutes.route(request).orElseThrow().handle(request);
+    }
+
+    private RouterFunction<ServerResponse> routesWith(ProviderCallLimiter limiterToUse) {
+        return new ReceiptWebhookRegistry(providerFactory, storesRepository, updates, limiterToUse).receiptWebhookRoutes();
     }
 
     @Test
@@ -127,5 +142,70 @@ class ReceiptWebhookRegistryTest {
         // then
         assertThat(response.statusCode().value()).isEqualTo(200);
         verifyNoInteractions(updates);
+    }
+
+    @Test
+    void anExecutorThatThrowsIsAnsweredWith200AndNeverApplied() throws Exception {
+        // given: a provider whose webhook executor blows up (bad payload, provider bug, ...); this must never
+        // surface as 500, or Fakturownia retries the authentic call 25 times and disables the whole webhook
+        when(providerFactory.availableProviders()).thenReturn(List.of(new ThrowingReceiptProviderDescriptor()));
+        when(providerFactory.loadConfiguration(store, ThrowingReceiptProviderDescriptor.NAME)).thenReturn(Map.of());
+        RouterFunction<ServerResponse> throwingRoutes = routesWith(limiter);
+
+        // when
+        ServerResponse response = postTo(throwingRoutes, "/Store/s1/Webhooks/Receipts/throwing", "anything");
+
+        // then
+        assertThat(response.statusCode().value()).isEqualTo(200);
+        verifyNoInteractions(updates);
+    }
+
+    @Test
+    void aRejectedLimiterCallIsAnsweredWith200() throws Exception {
+        // given: no call capacity for this provider right now
+        ProviderCallLimiter rejecting = mock(ProviderCallLimiter.class);
+        when(rejecting.call(eq(FakeReceiptProviderDescriptor.NAME), any()))
+                .thenThrow(new ProviderCallRejectedException(FakeReceiptProviderDescriptor.NAME));
+        RouterFunction<ServerResponse> rejectingRoutes = routesWith(rejecting);
+
+        // when
+        ServerResponse response = postTo(rejectingRoutes, "/Store/s1/Webhooks/Receipts/test", "o1:R1;p1;FISCALISED");
+
+        // then
+        assertThat(response.statusCode().value()).isEqualTo(200);
+        verifyNoInteractions(updates);
+    }
+
+    /** Test-only descriptor whose single webhook executor always throws, to prove the registry survives it. */
+    private static final class ThrowingReceiptProviderDescriptor implements ReceiptProviderDescriptor {
+
+        static final String NAME = "throwing-receipts";
+
+        @Override
+        public String name() {
+            return NAME;
+        }
+
+        @Override
+        public String displayName() {
+            return "Throwing test receipts";
+        }
+
+        @Override
+        public List<ProviderField> configurationFields() {
+            return List.of();
+        }
+
+        @Override
+        public ReceiptProvider create(Map<String, String> configuration) {
+            throw new UnsupportedOperationException("not needed for this test");
+        }
+
+        @Override
+        public List<EventBinding<?>> bindings() {
+            return List.of(new EventBinding.WebhookBinding<Receipt>("throwing", (body, context) -> {
+                throw new IllegalStateException("boom");
+            }));
+        }
     }
 }
