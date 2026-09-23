@@ -1,8 +1,10 @@
 package pl.commercelink.taxonomy;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.DependsOn;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
@@ -15,6 +17,7 @@ import java.util.stream.Stream;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
 @Component
+@Slf4j
 @DependsOn("initializingBeanRunner")
 public class TaxonomyCatalog {
 
@@ -42,7 +45,27 @@ public class TaxonomyCatalog {
     }
 
     public void commit(TaxonomyMerge merge) {
-        repository.saveAll(merge.changed());
+        List<Taxonomy> keptCategory = new ArrayList<>();
+        for (Taxonomy merged : merge.changed()) {
+            Taxonomy seen = merge.seen(merged.mfn());
+            if (Taxonomy.hasCategory(seen)) {
+                keptCategory.add(merged);
+            } else {
+                writeGuardingAgainstAConcurrentCategory(merged, seen);
+            }
+        }
+        repository.saveAll(keptCategory);
+    }
+
+    private void writeGuardingAgainstAConcurrentCategory(Taxonomy merged, Taxonomy seen) {
+        if (repository.saveIfCategoryUnchanged(merged, seen)) {
+            return;
+        }
+        Taxonomy fresh = repository.find(merged.mfn());
+        if (!repository.saveIfCategoryUnchanged(mergeOf(fresh, merged), fresh)) {
+            log.warn("Taxonomy record kept changing while a feed chunk was in flight, left to the next import: mfn={}",
+                    merged.mfn());
+        }
     }
 
     public boolean updateCategory(String mfn, String category, String categoryId) {

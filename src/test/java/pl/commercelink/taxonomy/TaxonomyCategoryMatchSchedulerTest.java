@@ -10,6 +10,7 @@ import pl.commercelink.pim.api.CategoryMatchRequest;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.taxonomy.mapping.CategoryMappingCache;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -23,8 +24,10 @@ import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -51,6 +54,7 @@ class TaxonomyCategoryMatchSchedulerTest {
 
     private final List<PendingCategorization> pendingRows = new ArrayList<>();
     private final Map<String, Taxonomy> catalogRows = new HashMap<>();
+    private TaxonomyCategoryEnrichment enrichment;
 
     @BeforeEach
     void setUp() {
@@ -58,15 +62,23 @@ class TaxonomyCategoryMatchSchedulerTest {
         lenient().when(pendingRepository.count()).thenAnswer(invocation -> pendingRows.size());
         lenient().when(pendingRepository.find(anyString()))
                 .thenAnswer(invocation -> rowOf(invocation.getArgument(0)));
+        lenient().when(pendingRepository.claimAttempt(anyString(), anyInt())).thenAnswer(invocation -> {
+            PendingCategorization row = rowOf(invocation.getArgument(0));
+            if (row == null || row.attemptCount() != (int) invocation.getArgument(1)) {
+                return false;
+            }
+            row.setAttempts(row.attemptCount() + 1);
+            return true;
+        });
         lenient().doAnswer(invocation -> {
             PendingCategorization row = rowOf(invocation.getArgument(0));
-            row.setAttempts(row.attemptCount() + 1);
+            if (row != null) {
+                row.setAttempts(invocation.getArgument(1));
+            }
             return null;
-        }).when(pendingRepository).recordAttempt(anyString());
-        lenient().doAnswer(invocation -> {
-            pendingRows.removeIf(row -> row.getMfn().equals(invocation.getArgument(0)));
-            return null;
-        }).when(pendingRepository).remove(anyString());
+        }).when(pendingRepository).releaseAttempt(anyString(), anyInt());
+        lenient().when(pendingRepository.remove(anyString())).thenAnswer(invocation ->
+                pendingRows.removeIf(row -> row.getMfn().equals(invocation.getArgument(0))));
 
         lenient().when(catalog.findByMfns(any())).thenAnswer(invocation -> {
             Collection<String> wanted = invocation.getArgument(0);
@@ -186,16 +198,17 @@ class TaxonomyCategoryMatchSchedulerTest {
     }
 
     @Test
-    void pendingRowIsDroppedWhenTheCatalogHasNoRecordAtAll() {
+    void pendingRowIsKeptWhenTheCacheDoesNotKnowTheProductYet() {
         // given
-        pendingRows.add(pendingRow("MFN-GONE", null));
+        pendingRows.add(pendingRow("MFN-AWAITING-FEED", "Acme"));
 
         // when
         scheduler(properties(NO_LIMIT)).sweep();
 
         // then
         verify(pimCatalog, never()).submitCategoryMatch(any());
-        verify(pendingRepository).remove("MFN-GONE");
+        verify(pendingRepository, never()).remove("MFN-AWAITING-FEED");
+        assertThat(pendingRows).extracting(PendingCategorization::getMfn).containsExactly("MFN-AWAITING-FEED");
     }
 
     @Test
@@ -278,8 +291,7 @@ class TaxonomyCategoryMatchSchedulerTest {
     void zeroMaxAttemptsKeepsSubmittingForever() {
         // given
         givenPending("MFN-1", null, null);
-        TaxonomyCategoryMatchScheduler scheduler = scheduler(new TaxonomyCategoryMatchProperties(
-                NO_LIMIT, NO_LIMIT, new TaxonomyCategoryMatchProperties.Mapping(5, 0.9, 0.9, 20), 0));
+        TaxonomyCategoryMatchScheduler scheduler = scheduler(properties(NO_LIMIT, NO_LIMIT, 0, Duration.ofDays(7)));
 
         // when
         for (int i = 0; i < 10; i++) {
@@ -306,13 +318,87 @@ class TaxonomyCategoryMatchSchedulerTest {
         verify(pimCatalog, times(5)).submitCategoryMatch(any());
     }
 
+    @Test
+    void exhaustedRowsDoNotHoldThePendingCap() {
+        // given
+        givenPending("MFN-FRESH", null, null);
+        givenExhausted("MFN-BURNT-1", LocalDateTime.now());
+        givenExhausted("MFN-BURNT-2", LocalDateTime.now());
+
+        // when
+        scheduler(properties(NO_LIMIT)).sweep();
+
+        // then
+        assertThat(enrichment.pendingCount()).isEqualTo(1);
+    }
+
+    @Test
+    void exhaustedRowIsEvictedOnlyOnceItIsOlderThanTheRetryWindow() {
+        // given
+        givenExhausted("MFN-RECENT", LocalDateTime.now());
+        givenExhausted("MFN-STALE", LocalDateTime.now().minusDays(8));
+
+        // when
+        scheduler(properties(NO_LIMIT)).sweep();
+
+        // then
+        verify(pendingRepository).remove("MFN-STALE");
+        verify(pendingRepository, never()).remove("MFN-RECENT");
+    }
+
+    @Test
+    void rowAlreadyClaimedByAnotherInstanceIsNotSubmitted() {
+        // given
+        givenPending("MFN-TAKEN", null, null);
+        doReturn(false).when(pendingRepository).claimAttempt("MFN-TAKEN", 0);
+
+        // when
+        scheduler(properties(NO_LIMIT)).sweep();
+
+        // then
+        verify(pimCatalog, never()).submitCategoryMatch(any());
+    }
+
+    @Test
+    void leastTriedRowIsSubmittedFirst() {
+        // given
+        givenPending("MFN-TRIED-TWICE", null, null);
+        rowOf("MFN-TRIED-TWICE").setAttempts(2);
+        givenPending("MFN-UNTRIED", null, null);
+        rowOf("MFN-UNTRIED").setAttempts(0);
+        givenPending("MFN-TRIED-ONCE", null, null);
+        rowOf("MFN-TRIED-ONCE").setAttempts(1);
+
+        // when
+        scheduler(properties(1)).sweep();
+
+        // then
+        ArgumentCaptor<CategoryMatchRequest> captor = ArgumentCaptor.captor();
+        verify(pimCatalog).submitCategoryMatch(captor.capture());
+        assertThat(captor.getValue().mfn()).isEqualTo("MFN-UNTRIED");
+    }
+
+    private void givenExhausted(String mfn, LocalDateTime addedAt) {
+        givenPending(mfn, null, null);
+        PendingCategorization row = rowOf(mfn);
+        row.setAttempts(4);
+        row.setAddedAt(addedAt);
+    }
+
     private TaxonomyCategoryMatchScheduler scheduler(TaxonomyCategoryMatchProperties properties) {
+        enrichment = new TaxonomyCategoryEnrichment(catalog, pendingRepository, properties, mappingCache);
         return new TaxonomyCategoryMatchScheduler(pendingRepository, catalog, pimCatalog, properties,
-                new TaxonomyCategoryEnrichment(catalog, pendingRepository, properties, mappingCache), mappingCache);
+                enrichment, mappingCache);
     }
 
     private static TaxonomyCategoryMatchProperties properties(int maxSubmissionsPerRun) {
-        return new TaxonomyCategoryMatchProperties(NO_LIMIT, maxSubmissionsPerRun);
+        return properties(NO_LIMIT, maxSubmissionsPerRun, 4, Duration.ofDays(7));
+    }
+
+    private static TaxonomyCategoryMatchProperties properties(int pendingCap, int maxSubmissionsPerRun,
+                                                              int maxAttempts, Duration retryExhaustedAfter) {
+        return new TaxonomyCategoryMatchProperties(pendingCap, maxSubmissionsPerRun,
+                new TaxonomyCategoryMatchProperties.Mapping(5, 0.9, 0.9, 20), maxAttempts, retryExhaustedAfter);
     }
 
     private void givenPending(String mfn, String supplier, String rawCategory) {
@@ -330,7 +416,7 @@ class TaxonomyCategoryMatchSchedulerTest {
     }
 
     private PendingCategorization rowOf(String mfn) {
-        return pendingRows.stream().filter(row -> row.getMfn().equals(mfn)).findFirst().orElseThrow();
+        return pendingRows.stream().filter(row -> row.getMfn().equals(mfn)).findFirst().orElse(null);
     }
 
     private static String mfnWhere(IntPredicate trickleResidue) {

@@ -425,6 +425,23 @@ class InventoryViewStoreListingsTest {
     }
 
     @Test
+    void singleLookupAsksTheCatalogWhenTheIndexedGroupHasNoCategoryYet() {
+        // given
+        Taxonomy uncategorized = new Taxonomy(EAN, MFN, "Intel", "i7", null, 5, null, null);
+        Taxonomy justCategorized = new Taxonomy(EAN, MFN, "Intel", "i7", "Procesory", 5, null, null, null, "989");
+        stubGlobalIndex(List.of(categorized(new MatchedInventory(new InventoryKey(EAN, MFN),
+                List.of(item("AB Group", 1399.0)), supplierRegistry), uncategorized)));
+        when(taxonomyCatalog.findBest(any())).thenReturn(justCategorized);
+
+        // when
+        MatchedInventory matched = inventory.withGlobalData().findByProductCode(MFN);
+
+        // then
+        assertThat(matched.getTaxonomy().category()).isEqualTo("Procesory");
+        assertThat(matched.getTaxonomy().categoryId()).isEqualTo("989");
+    }
+
+    @Test
     void listingByCategoryNeverReadsTheCatalog() {
         // given
         storeWithGlobalAbGroupAndOwnAction();

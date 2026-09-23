@@ -8,6 +8,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.pim.api.CategoryMatchedEvent;
 import pl.commercelink.taxonomy.mapping.CategoryMappingCache;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -40,7 +41,7 @@ class TaxonomyCategoryEnrichmentTest {
     @BeforeEach
     void setUp() {
         enrichment = new TaxonomyCategoryEnrichment(catalog, pendingRepository,
-                new TaxonomyCategoryMatchProperties(PENDING_CAP, 10), mappingCache);
+                properties(PENDING_CAP), mappingCache);
     }
 
     @Test
@@ -132,6 +133,7 @@ class TaxonomyCategoryEnrichmentTest {
     @Test
     void applyMatchSetsTheCategoryAndClearsThePendingRow() {
         // given
+        pendingRowFor("MFN-1", "Acme");
         when(catalog.updateCategory("MFN-1", "CPU", "301")).thenReturn(true);
 
         // when
@@ -145,6 +147,7 @@ class TaxonomyCategoryEnrichmentTest {
     @Test
     void applyMatchAcceptsArbitraryCategoryName() {
         // given
+        pendingRowFor("MFN-1", "Acme");
         when(catalog.updateCategory("MFN-1", "Dowolna Kategoria", "999")).thenReturn(true);
 
         // when
@@ -275,6 +278,11 @@ class TaxonomyCategoryEnrichmentTest {
 
         // then
         verify(mappingCache).recordSample("Acme", "Karty graficzne", "301", "GPU");
+    }
+
+    private static TaxonomyCategoryMatchProperties properties(int pendingCap) {
+        return new TaxonomyCategoryMatchProperties(pendingCap, 10,
+                new TaxonomyCategoryMatchProperties.Mapping(5, 0.9, 0.9, 20), 4, Duration.ofDays(7));
     }
 
     private void pendingRowFor(String mfn, String supplier) {

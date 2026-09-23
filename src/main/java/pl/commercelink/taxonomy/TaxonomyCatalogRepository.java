@@ -2,10 +2,13 @@ package pl.commercelink.taxonomy;
 
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapper;
+import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBSaveExpression;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBScanExpression;
 import com.amazonaws.services.dynamodbv2.datamodeling.ScanResultPage;
 import com.amazonaws.services.dynamodbv2.model.AttributeValue;
+import com.amazonaws.services.dynamodbv2.model.ComparisonOperator;
 import com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException;
+import com.amazonaws.services.dynamodbv2.model.ExpectedAttributeValue;
 import com.amazonaws.services.dynamodbv2.model.UpdateItemRequest;
 import org.springframework.stereotype.Repository;
 import pl.commercelink.starter.dynamodb.DynamoDbRepository;
@@ -67,6 +70,29 @@ public class TaxonomyCatalogRepository extends DynamoDbRepository<TaxonomyItem> 
                     "Failed to write " + unprocessedCount(failures) + " taxonomy items",
                     failures.getFirst().getException());
         }
+    }
+
+    public boolean saveIfCategoryUnchanged(Taxonomy merged, Taxonomy seen) {
+        DynamoDBSaveExpression expression = new DynamoDBSaveExpression()
+                .withExpectedEntry(guardedAttribute(seen), expectedValue(seen));
+        try {
+            dynamoDBMapper.save(TaxonomyItem.from(merged), expression);
+            return true;
+        } catch (ConditionalCheckFailedException e) {
+            return false;
+        }
+    }
+
+    private static String guardedAttribute(Taxonomy seen) {
+        return seen == null ? TaxonomyItem.MFN : TaxonomyItem.CATEGORY;
+    }
+
+    private static ExpectedAttributeValue expectedValue(Taxonomy seen) {
+        if (!Taxonomy.hasCategory(seen)) {
+            return new ExpectedAttributeValue(false);
+        }
+        return new ExpectedAttributeValue(new AttributeValue(seen.category()))
+                .withComparisonOperator(ComparisonOperator.EQ);
     }
 
     private static int unprocessedCount(List<DynamoDBMapper.FailedBatch> failures) {

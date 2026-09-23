@@ -6,10 +6,13 @@ import com.amazonaws.services.dynamodbv2.datamodeling.ScanResultPage;
 import com.amazonaws.services.dynamodbv2.model.AttributeValue;
 import com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException;
 import com.amazonaws.services.dynamodbv2.model.DeleteItemRequest;
+import com.amazonaws.services.dynamodbv2.model.DeleteItemResult;
 import com.amazonaws.services.dynamodbv2.model.PutItemRequest;
+import com.amazonaws.services.dynamodbv2.model.ReturnValue;
 import com.amazonaws.services.dynamodbv2.model.ScanRequest;
 import com.amazonaws.services.dynamodbv2.model.Select;
 import com.amazonaws.services.dynamodbv2.model.UpdateItemRequest;
+import org.springframework.context.annotation.DependsOn;
 import org.springframework.stereotype.Repository;
 import pl.commercelink.starter.dynamodb.DynamoDbRepository;
 
@@ -21,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 
 @Repository
+@DependsOn("initializingBeanRunner")
 public class PendingCategorizationRepository extends DynamoDbRepository<PendingCategorization> {
 
     private static final int SCAN_PAGE_SIZE = 500;
@@ -54,19 +58,40 @@ public class PendingCategorizationRepository extends DynamoDbRepository<PendingC
         }
     }
 
-    public void recordAttempt(String mfn) {
-        amazonDynamoDB.updateItem(new UpdateItemRequest()
-                .withTableName(PendingCategorization.TABLE_NAME)
-                .withKey(Map.of(PendingCategorization.MFN, new AttributeValue(mfn)))
-                .withUpdateExpression("ADD #attempts :one")
-                .withExpressionAttributeNames(Map.of("#attempts", PendingCategorization.ATTEMPTS))
-                .withExpressionAttributeValues(Map.of(":one", new AttributeValue().withN("1"))));
+    public boolean claimAttempt(String mfn, int expectedAttempts) {
+        return setAttempts(mfn, expectedAttempts + 1, expectedAttempts);
     }
 
-    public void remove(String mfn) {
-        amazonDynamoDB.deleteItem(new DeleteItemRequest()
+    public void releaseAttempt(String mfn, int expectedAttempts) {
+        setAttempts(mfn, expectedAttempts, expectedAttempts + 1);
+    }
+
+    private boolean setAttempts(String mfn, int next, int expected) {
+        try {
+            amazonDynamoDB.updateItem(new UpdateItemRequest()
+                    .withTableName(PendingCategorization.TABLE_NAME)
+                    .withKey(Map.of(PendingCategorization.MFN, new AttributeValue(mfn)))
+                    .withUpdateExpression("SET #attempts = :next")
+                    .withConditionExpression(
+                            "attribute_exists(#mfn) AND (attribute_not_exists(#attempts) OR #attempts = :expected)")
+                    .withExpressionAttributeNames(Map.of(
+                            "#mfn", PendingCategorization.MFN,
+                            "#attempts", PendingCategorization.ATTEMPTS))
+                    .withExpressionAttributeValues(Map.of(
+                            ":next", new AttributeValue().withN(String.valueOf(next)),
+                            ":expected", new AttributeValue().withN(String.valueOf(expected)))));
+            return true;
+        } catch (ConditionalCheckFailedException e) {
+            return false;
+        }
+    }
+
+    public boolean remove(String mfn) {
+        DeleteItemResult result = amazonDynamoDB.deleteItem(new DeleteItemRequest()
                 .withTableName(PendingCategorization.TABLE_NAME)
-                .withKey(Map.of(PendingCategorization.MFN, new AttributeValue(mfn))));
+                .withKey(Map.of(PendingCategorization.MFN, new AttributeValue(mfn)))
+                .withReturnValues(ReturnValue.ALL_OLD));
+        return result.getAttributes() != null && !result.getAttributes().isEmpty();
     }
 
     public List<PendingCategorization> findAll() {

@@ -126,6 +126,10 @@ class StoreInventorySnapshotTest {
         assertEquals("MFN-1", restored.mfn());
         assertEquals("5900000000002", restored.ean());
         assertEquals(7, restored.dataAccuracyScore());
+        assertEquals(100, restored.netWeightInGrams());
+        assertEquals(200, restored.grossWeightInGrams());
+        assertEquals("Peryferia > Klawiatury", restored.rawCategory());
+        assertEquals(taxonomy, restored);
     }
 
     @Test

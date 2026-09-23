@@ -18,6 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -88,13 +89,14 @@ class TaxonomyCatalogTest {
     }
 
     @Test
-    void commitWritesOnlyTheRecordsTheMergeChanged() {
+    void commitBatchesOnlyTheCategorizedRecordsTheMergeChanged() {
         // given
-        Taxonomy stored = new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", "CPU", 10, null, null);
-        when(repository.findAll(List.of("MFN-1", "MFN-2"))).thenReturn(Map.of("MFN-1", stored));
+        Taxonomy untouched = new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", "CPU", 10, null, null);
+        Taxonomy improved = new Taxonomy("1234567890123", "MFN-2", "Brand", "Name2", "GPU", 10, null, null);
+        when(repository.findAll(List.of("MFN-1", "MFN-2"))).thenReturn(Map.of("MFN-1", untouched, "MFN-2", improved));
         TaxonomyMerge merge = catalog.startMerge(List.of("MFN-1", "MFN-2"));
-        merge.add(stored);
-        merge.add(new Taxonomy("1234567890123", "MFN-2", "Brand", "Name2", "GPU", 10, null, null));
+        merge.add(untouched);
+        merge.add(new Taxonomy("1234567890123", "MFN-2", "Brand", "Better", "GPU", 1, null, null));
 
         // when
         catalog.commit(merge);
@@ -103,6 +105,47 @@ class TaxonomyCatalogTest {
         ArgumentCaptor<List<Taxonomy>> written = ArgumentCaptor.captor();
         verify(repository).saveAll(written.capture());
         assertThat(written.getValue()).extracting(Taxonomy::mfn).containsExactly("MFN-2");
+        verify(repository, never()).saveIfCategoryUnchanged(any(), any());
+    }
+
+    @Test
+    void commitGuardsRecordsThatHadNoCategoryWhenTheChunkReadThem() {
+        // given
+        Taxonomy pending = new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", null, 10, null, null);
+        when(repository.findAll(List.of("MFN-1"))).thenReturn(Map.of("MFN-1", pending));
+        when(repository.saveIfCategoryUnchanged(any(), any())).thenReturn(true);
+        TaxonomyMerge merge = catalog.startMerge(List.of("MFN-1"));
+        Taxonomy improved = new Taxonomy("1234567890123", "MFN-1", "Brand", "Better", null, 1, null, null);
+        merge.add(improved);
+
+        // when
+        catalog.commit(merge);
+
+        // then
+        verify(repository).saveIfCategoryUnchanged(improved, pending);
+        verify(repository).saveAll(List.of());
+    }
+
+    @Test
+    void commitRetriesAgainstTheFreshRecordWhenACategoryLandedMidChunk() {
+        // given
+        Taxonomy pending = new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", null, 10, null, null);
+        Taxonomy categorizedMeanwhile =
+                new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", "CPU", 10, null, null, null, "301");
+        when(repository.findAll(List.of("MFN-1"))).thenReturn(Map.of("MFN-1", pending));
+        when(repository.saveIfCategoryUnchanged(any(), any())).thenReturn(false, true);
+        when(repository.find("MFN-1")).thenReturn(categorizedMeanwhile);
+        TaxonomyMerge merge = catalog.startMerge(List.of("MFN-1"));
+        merge.add(new Taxonomy("1234567890123", "MFN-1", "Brand", "Better", null, 1, null, null));
+
+        // when
+        catalog.commit(merge);
+
+        // then
+        ArgumentCaptor<Taxonomy> retried = ArgumentCaptor.captor();
+        verify(repository, times(2)).saveIfCategoryUnchanged(retried.capture(), any());
+        assertThat(retried.getValue().category()).isEqualTo("CPU");
+        assertThat(retried.getValue().categoryId()).isEqualTo("301");
     }
 
     @Test

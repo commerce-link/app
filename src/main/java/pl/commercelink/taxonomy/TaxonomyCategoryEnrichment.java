@@ -67,15 +67,18 @@ public class TaxonomyCategoryEnrichment {
         if (!catalog.updateCategory(event.mfn(), event.category(), event.categoryId())) {
             return;
         }
-        forget(event.mfn());
+        if (pending != null) {
+            forget(event.mfn());
+        }
         log.info("Category match applied: mfn={} category={} source={}",
                 event.mfn(), event.category(), event.source());
         learnMapping(event, pending);
     }
 
     void forget(String mfn) {
-        pendingRepository.remove(mfn);
-        adjustPendingSize(-1);
+        if (pendingRepository.remove(mfn)) {
+            adjustPendingSize(-1);
+        }
     }
 
     private void adjustPendingSize(int delta) {

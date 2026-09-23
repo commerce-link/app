@@ -3,38 +3,33 @@ package pl.commercelink.taxonomy;
 import org.junit.jupiter.api.Test;
 import pl.commercelink.taxonomy.TaxonomyCategoryMatchProperties.Mapping;
 
+import java.time.Duration;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class TaxonomyCategoryMatchPropertiesTest {
 
+    private static final Mapping MAPPING = new Mapping(5, 0.9, 0.9, 20);
+    private static final Duration RETRY_AFTER = Duration.ofDays(7);
+
     @Test
     void rejectsMaxSubmissionsPerRunBelowOne() {
         // when / then
-        assertThrows(IllegalArgumentException.class, () -> new TaxonomyCategoryMatchProperties(1000, 0));
-        assertThrows(IllegalArgumentException.class, () -> new TaxonomyCategoryMatchProperties(1000, -5));
+        assertThrows(IllegalArgumentException.class,
+                () -> new TaxonomyCategoryMatchProperties(1000, 0, MAPPING, 4, RETRY_AFTER));
+        assertThrows(IllegalArgumentException.class,
+                () -> new TaxonomyCategoryMatchProperties(1000, -5, MAPPING, 4, RETRY_AFTER));
     }
 
     @Test
     void acceptsASingleSubmissionPerRun() {
         // when
-        TaxonomyCategoryMatchProperties properties = new TaxonomyCategoryMatchProperties(1000, 1);
+        TaxonomyCategoryMatchProperties properties =
+                new TaxonomyCategoryMatchProperties(1000, 1, MAPPING, 4, RETRY_AFTER);
 
         // then
         assertEquals(1, properties.maxSubmissionsPerRun());
-    }
-
-    @Test
-    void mappingDefaultsAreAppliedByShortConstructor() {
-        // when
-        TaxonomyCategoryMatchProperties properties = new TaxonomyCategoryMatchProperties(1000, 10);
-
-        // then
-        assertEquals(5, properties.mapping().minSamples());
-        assertEquals(0.9, properties.mapping().minShare());
-        assertEquals(0.9, properties.mapping().minConfidence());
-        assertEquals(20, properties.mapping().trickleEvery());
-        assertEquals(4, properties.maxAttempts());
     }
 
     @Test
@@ -50,16 +45,25 @@ class TaxonomyCategoryMatchPropertiesTest {
     void rejectsNegativeMaxAttempts() {
         // when / then
         assertThrows(IllegalArgumentException.class,
-                () -> new TaxonomyCategoryMatchProperties(1000, 10, new Mapping(5, 0.9, 0.9, 20), -1));
+                () -> new TaxonomyCategoryMatchProperties(1000, 10, MAPPING, -1, RETRY_AFTER));
     }
 
     @Test
     void acceptsZeroMaxAttemptsAsDisabled() {
         // when
         TaxonomyCategoryMatchProperties properties =
-                new TaxonomyCategoryMatchProperties(1000, 10, new Mapping(5, 0.9, 0.9, 20), 0);
+                new TaxonomyCategoryMatchProperties(1000, 10, MAPPING, 0, RETRY_AFTER);
 
         // then
         assertEquals(0, properties.maxAttempts());
+    }
+
+    @Test
+    void rejectsANonPositiveRetryWindow() {
+        // when / then
+        assertThrows(IllegalArgumentException.class,
+                () -> new TaxonomyCategoryMatchProperties(1000, 10, MAPPING, 4, Duration.ZERO));
+        assertThrows(IllegalArgumentException.class,
+                () -> new TaxonomyCategoryMatchProperties(1000, 10, MAPPING, 4, Duration.ofDays(-1)));
     }
 }

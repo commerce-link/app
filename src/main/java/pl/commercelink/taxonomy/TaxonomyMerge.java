@@ -27,6 +27,10 @@ public class TaxonomyMerge {
         merged.put(candidate.mfn(), TaxonomyCatalog.mergeOf(current(candidate.mfn()), candidate));
     }
 
+    Taxonomy seen(String mfn) {
+        return stored.get(mfn);
+    }
+
     List<Taxonomy> changed() {
         return merged.entrySet().stream()
                 .filter(entry -> !entry.getValue().equals(stored.get(entry.getKey())))
