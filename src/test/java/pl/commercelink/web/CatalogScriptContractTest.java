@@ -299,7 +299,7 @@ class CatalogScriptContractTest {
     }
 
     /**
-     * A link in the line under a page title ("Dziś pasuje: 8 produktów", "Edytuj") sat in the Bulma link colour without
+     * A link in the line under a page title ("Do dodania dziś: 8", "Edytuj") sat in the Bulma link colour without
      * an underline, 1.33:1 against the text around it (axe link-in-text-block, D-C3). It looks like a link in a row
      * description.
      */

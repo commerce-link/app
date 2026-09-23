@@ -121,6 +121,27 @@ class CatalogsControllerTest {
         assertThat(rows.get(1).href()).isEqualTo("/dashboard/catalogs/" + parts.getCatalogId());
     }
 
+    /**
+     * D-M25/RF-30: the schedule text sits mid-sentence ("Cennik: {0}"), so a message that starts a sentence elsewhere
+     * ("Co 30 min") must be lower-cased here.
+     */
+    @Test
+    void scheduleTextLowercasesItsFirstLetterSoItReadsInsideASentence() {
+        // given
+        CatalogsController controller = new CatalogsController(catalogRepository, messageSource, detailsService,
+                access, productRepository, pimCategoryOptions, marketplaces,
+                new CategoryDefinitions(catalogRepository, productRepository, mock(OptimisticLockingExecutor.class)));
+        Locale polish = Locale.forLanguageTag("pl");
+        when(messageSource.getMessage(eq("store.supplier.schedule.summary.every.minutes"), any(), eq(polish)))
+                .thenReturn("Co 30 min");
+
+        // when
+        String text = controller.scheduleText("0/30 * * * ? *", polish);
+
+        // then
+        assertThat(text).isEqualTo("co 30 min");
+    }
+
     @Test
     void invalidSettingsAnswer422WithTheFormFragmentWhenAsync() throws Exception {
         // given

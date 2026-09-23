@@ -22,6 +22,17 @@ class CatalogMessagesTest {
 
     private static final Pattern DOUBLED_APOSTROPHE = Pattern.compile("''");
 
+    /**
+     * D-M25/RF-30: a {@code MessageFormat} placeholder immediately followed by "produkt"/"pozycja" and its endings
+     * reads wrong for most of the counts it can be given at runtime ("1 produktów", "3 produkty" are both
+     * ungrammatical), because Polish inflects the noun by count in three classes (1 / 2-4 / 5+) that a single
+     * placeholder cannot agree with. The fix is the label form ("Produkty do usunięcia: {0}") instead of a number
+     * directly in front of the noun. A literal digit written into the text (e.g. "Powyżej 0 produktów") is not
+     * flagged here: unlike a placeholder it never changes at runtime, so it is either right or wrong on its own.
+     */
+    private static final Pattern NUMBER_BEFORE_INFLECTED_NOUN =
+            Pattern.compile("\\{\\d+\\}\\s*(produkt(y|ów|u)?|pozycj(i|ę|e|a)?)\\b");
+
     /** The messages of the catalog pages: their own keys and the product keys the product page reads. */
     private static Map<String, String> catalogMessages(String file) throws Exception {
         Properties properties = new Properties();
@@ -91,6 +102,19 @@ class CatalogMessagesTest {
         // when / then
         assertThat(polish.getProperty("general.currency.amount")).isEqualTo("{0} PLN");
         assertThat(english.getProperty("general.currency.amount")).isEqualTo("{0} PLN");
+    }
+
+    /** D-M25/RF-30: no wrong Polish plural anywhere in a catalog message. */
+    @Test
+    void noPolishCatalogMessageInflectsAPluralNounDirectlyAfterItsNumberPlaceholder() throws Exception {
+        // given
+        Set<String> broken = catalogMessages("messages_pl.properties").entrySet().stream()
+                .filter(entry -> NUMBER_BEFORE_INFLECTED_NOUN.matcher(entry.getValue()).find())
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toSet());
+
+        // when / then
+        assertThat(broken).isEmpty();
     }
 
     private static Stream<Map.Entry<String, String>> messagesOf(String file) {

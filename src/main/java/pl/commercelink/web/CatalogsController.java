@@ -224,13 +224,29 @@ public class CatalogsController {
         return "redirect:" + CatalogPaths.catalogSettings(catalogId);
     }
 
-    /** "co 30 min" / "codziennie o 06:00" from the saved expression; the default schedule has its own sentence. */
+    /**
+     * "co 30 min" / "codziennie o 06:00" from the saved expression; the default schedule has its own sentence.
+     * <p>
+     * The catalog page reads this mid-sentence ("Cennik: {0}"), while {@code store.supplier.schedule.summary.*}
+     * starts a sentence of its own on the supplier schedule field, hence capitalised. The first letter is
+     * lower-cased here rather than in the shared key, so that the other screen keeps reading correctly (D-M25/RF-30).
+     */
     String scheduleText(String expression, Locale locale) {
+        String text;
         if (expression == null || expression.isBlank()) {
-            return messageSource.getMessage("catalog.schedule.default", null, locale);
+            text = messageSource.getMessage("catalog.schedule.default", null, locale);
+        } else {
+            PollingScheduleDescription description = PollingScheduleDescription.of(expression);
+            text = messageSource.getMessage(description.code(), description.messageArgs(), locale);
         }
-        PollingScheduleDescription description = PollingScheduleDescription.of(expression);
-        return messageSource.getMessage(description.code(), description.messageArgs(), locale);
+        return lowercaseFirstLetter(text, locale);
+    }
+
+    private static String lowercaseFirstLetter(String text, Locale locale) {
+        if (text == null || text.isEmpty()) {
+            return text;
+        }
+        return text.substring(0, 1).toLowerCase(locale) + text.substring(1);
     }
 
     /**

@@ -197,7 +197,7 @@ class CategoryFiltersTemplateTest {
         String lead = html.substring(html.indexOf("<p class=\"cl-page-lead\">"), html.indexOf("</p>", html.indexOf("<p class=\"cl-page-lead\">")));
         assertThat(lead).contains("&lt;b&gt;GPU&lt;/b&gt; · narrow down the products suggested from the inventory.")
                 .doesNotContain("<b>")
-                .contains("<a href=\"/dashboard/catalogs/c1/category/k1/products/add\">Matching today: 8 products</a>");
+                .contains("<a href=\"/dashboard/catalogs/c1/category/k1/products/add\">To add today: 8</a>");
     }
 
     @Test
@@ -207,6 +207,6 @@ class CategoryFiltersTemplateTest {
 
         // then
         assertThat(html).contains("GPU · narrow down the products suggested from the inventory.")
-                .doesNotContain("Matching today");
+                .doesNotContain("To add today");
     }
 }
