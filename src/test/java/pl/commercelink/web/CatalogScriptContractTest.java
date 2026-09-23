@@ -365,4 +365,52 @@ class CatalogScriptContractTest {
         assertThat(rule(css, ".cl-page .cl-table.is-editable tbody th .cl-label")).contains("display: block;");
         assertThat(rule(css, ".cl-page .cl-table.is-editable tbody th.cl-table-key")).contains("display: block;");
     }
+
+    /**
+     * Below 1024 px every control of the catalog tables is at least 44 px (design system §1.4): the row checkbox and
+     * "select visible" through the label around them, the sort buttons, the table search, the picker trigger and the
+     * fields of the review. The compact 36 px sizes apply only from 1024 px (D-I5, D-M22).
+     */
+    @Test
+    void catalogTableControlsAreTouchTargetsBelow1024AndCompactOnlyFromIt() throws Exception {
+        // given
+        String css = read("src/main/resources/static/css/commercelink.css");
+        assertThat(css).contains("/* --- Catalog: compact controls from 1024 px --- */")
+                .contains("/* --- Catalog: touch targets below 1024 px --- */");
+        String desktop = css.substring(css.indexOf("/* --- Catalog: compact controls from 1024 px --- */"));
+        desktop = desktop.substring(0, desktop.indexOf("\n}\n") + 3);
+        String touch = css.substring(css.indexOf("/* --- Catalog: touch targets below 1024 px --- */"));
+        touch = touch.substring(0, touch.indexOf("\n}\n") + 3);
+
+        // then
+        assertThat(rule(css, ".cl-page .cl-table .cl-check-target")).contains("width: 44px;").contains("height: 44px;");
+        assertThat(desktop).contains("@media screen and (min-width: 1024px) {")
+                .contains(".cl-page .cl-table .cl-check-target {").contains(".cl-page .cl-table-search {")
+                .contains(".cl-page .cl-table.is-editable .cl-select {").contains(".cl-page .cl-repeat-lines .cl-input {");
+        assertThat(touch).contains("@media screen and (max-width: 1023px) {")
+                .contains(".cl-page .cl-table-sort {").contains("min-height: 44px;").contains("min-width: 44px;")
+                .contains(".cl-page .cl-picker-trigger {");
+        // outside the two blocks nothing of the catalog tables is fixed at 36 px
+        String rest = css.replace(desktop, "");
+        assertThat(rule(rest, ".cl-page .cl-table-search")).doesNotContain("36px");
+        assertThat(rule(rest, ".cl-page .cl-table.is-editable .cl-input,\n.cl-page .cl-table.is-editable .cl-select"))
+                .doesNotContain("36px");
+        assertThat(rule(rest, ".cl-page .cl-repeat-lines .cl-input")).doesNotContain("36px");
+    }
+
+    /**
+     * The marker of a numeric column hung on the left of its name, where it met the marker of the column before it
+     * ("Marka ↕ ↕ Najniższa", D-M29); in a product table it hangs on the right like every other marker. Other tables
+     * (the offers of the inventory) keep theirs.
+     */
+    @Test
+    void theSortMarkerOfANumericColumnOfAProductTableHangsOnTheRight() throws Exception {
+        // given
+        String css = read("src/main/resources/static/css/commercelink.css");
+
+        // then
+        assertThat(rule(css, ".cl-page .cl-table.is-products th.is-numeric .cl-table-sort::after"))
+                .contains("left: 100%;").contains("right: auto;");
+        assertThat(rule(css, ".cl-page .cl-table th.is-numeric .cl-table-sort::after")).contains("right: 100%;");
+    }
 }

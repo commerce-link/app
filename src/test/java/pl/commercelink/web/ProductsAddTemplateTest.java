@@ -95,6 +95,18 @@ class ProductsAddTemplateTest {
                 .allSatisfy(option -> assertThat(option).contains("data-count=").contains("data-label="));
     }
 
+    /** The checkbox is 18 px; the label around it is the touch target (44 px below 1024 px, D-I5). */
+    @Test
+    void everyProposalCheckboxSitsInALabelThatIsItsTouchTarget() {
+        // when
+        String html = renderedProposals();
+
+        // then
+        assertThat(occurrences(html, "<label class=\"cl-check-target\">")).isEqualTo(3);
+        assertThat(html).containsPattern("<label class=\"cl-check-target\">\\s*<input type=\"checkbox\" class=\"cl-check-input\" data-cl-select-all")
+                .containsPattern("<label class=\"cl-check-target\">\\s*<input type=\"checkbox\" class=\"cl-check-input\" name=\"eans\"");
+    }
+
     @Test
     void theProposalsPostTheCheckedEansToTheReview() {
         // given

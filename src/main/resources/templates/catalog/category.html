@@ -123,8 +123,10 @@
                     <thead>
                     <tr>
                         <th th:unless="${page.dynamic()}" scope="col" class="cl-table-check">
-                            <input type="checkbox" class="cl-check-input" data-cl-select-all hidden
-                                   th:attr="aria-label=#{catalog.products.selectAll}">
+                            <label class="cl-check-target">
+                                <input type="checkbox" class="cl-check-input" data-cl-select-all hidden
+                                       th:attr="aria-label=#{catalog.products.selectAll}">
+                            </label>
                         </th>
                         <th scope="col" aria-sort="none">
                             <button type="button" class="cl-table-sort" data-sort-key="name" th:text="#{catalog.products.column.product}"></button>
@@ -151,8 +153,10 @@
                                  data-cl-filter-feature=${row.featuresAttribute()}, data-cl-search=${row.searchText()},
                                  data-sort-name=${row.name()}, data-sort-label=${row.label()}, data-sort-price=${row.lowestGrossPrice()}">
                         <td th:unless="${page.dynamic()}" class="cl-table-check">
-                            <input type="checkbox" class="cl-check-input" data-cl-select-row hidden th:value="${row.id()}"
-                                   th:attr="aria-label=#{catalog.products.select(${row.name()})}">
+                            <label class="cl-check-target">
+                                <input type="checkbox" class="cl-check-input" data-cl-select-row hidden th:value="${row.id()}"
+                                       th:attr="aria-label=#{catalog.products.select(${row.name()})}">
+                            </label>
                         </td>
                         <th scope="row" class="cl-table-key" th:attr="data-label=#{catalog.products.column.product}">
                             <a th:if="${row.href() != null}" th:href="@{${row.href()}}" th:text="${row.name()}"></a>

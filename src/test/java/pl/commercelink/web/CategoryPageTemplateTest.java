@@ -156,6 +156,21 @@ class CategoryPageTemplateTest {
                 .contains("name=\"status\" value=\"active\"");
     }
 
+    /**
+     * The checkbox itself is 18 px; the label around it is the target a finger taps (44 px below 1024 px, D-I5), for
+     * every row and for "select visible" alike.
+     */
+    @Test
+    void everyCheckboxOfTheTableSitsInALabelThatIsItsTouchTarget() {
+        // when
+        String html = rendered(false);
+
+        // then
+        assertThat(occurrences(html, "<label class=\"cl-check-target\">")).isEqualTo(3);
+        assertThat(html).containsPattern("<label class=\"cl-check-target\">\\s*<input type=\"checkbox\" class=\"cl-check-input\" data-cl-select-all")
+                .containsPattern("<label class=\"cl-check-target\">\\s*<input type=\"checkbox\" class=\"cl-check-input\" data-cl-select-row");
+    }
+
     /** A product known only by its manufacturer code: the line under its name states what it has, not "EAN null". */
     @Test
     void aProductWithoutAnEanShowsItsManufacturerCodeAlone() {

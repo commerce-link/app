@@ -2987,7 +2987,6 @@ a.cl-link-button:hover {
 
 .cl-page .cl-table-search {
     width: 280px;
-    height: 36px;
 }
 
 /* --cl-ink-2: the segmented control sits on --cl-surface-2, where --cl-ink-3 is 4.47:1, below AA; the pressed segment
@@ -3267,6 +3266,16 @@ a.cl-link-button:hover {
     outline-offset: 2px;
 }
 
+/* In a product table the marker of a numeric column hangs on the right as well: on the left it met the marker of the
+   column before it ("Marka ↕ ↕ Najniższa", D-M29). Outside the button either way, so the name of the column stays
+   aligned with its values and the marker adds nothing to the width of the table. */
+.cl-page .cl-table.is-products th.is-numeric .cl-table-sort::after {
+    left: 100%;
+    right: auto;
+    margin-left: 4px;
+    margin-right: 0;
+}
+
 /* Placeholder for a value still being fetched. Sized by the caller, so one block serves a label,
    a figure or an inline value. */
 .cl-skeleton {
@@ -3396,8 +3405,22 @@ a.cl-link-button:hover {
 .cl-page .cl-table .cl-check-input {
     width: 18px;
     height: 18px;
-    margin: 2px 0 0;
+    margin: 0;
     accent-color: var(--cl-accent);
+    cursor: pointer;
+}
+
+/* The label around a row checkbox is its touch target: 44 px (36 px from 1024 px) centred on the 18 px box. The negative
+   margin keeps the row and the header as tall as the box alone would make them; position: relative keeps the part of
+   the target that reaches over the next cell above that cell. */
+.cl-page .cl-table .cl-check-target {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    margin: -13px;
     cursor: pointer;
 }
 
@@ -3795,10 +3818,6 @@ a.cl-link-button:hover {
     margin-top: 4px;
 }
 
-.cl-page .cl-repeat-lines .cl-input {
-    height: 36px;
-}
-
 /* filters card: repeat groups sit under the card head like fieldsets (scoped to the catalog filters form so it does
    not indent the shipping/parcel template's own repeat list, D-M1) */
 #category-filters-form .cl-card > .cl-repeat {
@@ -3818,7 +3837,6 @@ a.cl-link-button:hover {
 
 .cl-page .cl-table.is-editable .cl-input,
 .cl-page .cl-table.is-editable .cl-select {
-    height: 36px;
     font-size: 14px;
     width: 100%;
 }
@@ -3853,6 +3871,49 @@ a.cl-link-button:hover {
 .cl-page .cl-table.is-compact td,
 .cl-page .cl-table.is-compact tbody th {
     padding: 8px 10px;
+}
+
+/* --- Catalog: compact controls from 1024 px --- */
+/* 36 px is the size of the dense catalog controls on a desktop; below 1024 px they keep the 44 px of every field and
+   control of the frame (design system §1.4), which a finger needs (D-I5, D-M22). */
+@media screen and (min-width: 1024px) {
+    .cl-page .cl-table-search {
+        height: 36px;
+    }
+
+    .cl-page .cl-table.is-editable .cl-input,
+    .cl-page .cl-table.is-editable .cl-select {
+        height: 36px;
+    }
+
+    .cl-page .cl-repeat-lines .cl-input {
+        height: 36px;
+    }
+
+    .cl-page .cl-table .cl-check-target {
+        width: 36px;
+        height: 36px;
+        margin: -9px;
+    }
+}
+
+/* --- Catalog: touch targets below 1024 px --- */
+/* A sort button is the name of its column, 19 px of text: below 1024 px it is 44 px tall and wide, the negative margin
+   keeps the header row at its height. The picker trigger grows from 40 to 44 px like the fields around it. */
+@media screen and (max-width: 1023px) {
+    .cl-page .cl-table-sort {
+        min-height: 44px;
+        min-width: 44px;
+        margin: -12px 0;
+    }
+
+    .cl-page .cl-table th.is-numeric .cl-table-sort {
+        justify-content: flex-end;
+    }
+
+    .cl-page .cl-picker-trigger {
+        min-height: 44px;
+    }
 }
 
 /* --- Catalog: Pills inside table cells wrap; empty marker --- */
@@ -4001,13 +4062,18 @@ a.cl-link-button:hover {
         position: relative;
     }
 
+    /* the 44 px target of the checkbox sits in the top-left corner of the card, inside it, the box level with the name */
     .cl-page .cl-table[data-cl-select-table] tbody td.cl-table-check {
         position: absolute;
-        top: 6px;
-        left: 8px;
+        top: 3px;
+        left: 0;
         width: auto;
         padding: 0;
         display: block;
+    }
+
+    .cl-page .cl-table[data-cl-select-table] tbody .cl-check-target {
+        margin: 0;
     }
 
     .cl-page .cl-table[data-cl-select-table] tbody td.cl-table-check::before {

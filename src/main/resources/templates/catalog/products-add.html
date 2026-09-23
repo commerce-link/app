@@ -78,8 +78,10 @@
                             <thead>
                             <tr>
                                 <th scope="col" class="cl-table-check">
-                                    <input type="checkbox" class="cl-check-input" data-cl-select-all hidden
-                                           th:attr="aria-label=#{catalog.products.selectAll}">
+                                    <label class="cl-check-target">
+                                        <input type="checkbox" class="cl-check-input" data-cl-select-all hidden
+                                               th:attr="aria-label=#{catalog.products.selectAll}">
+                                    </label>
                                 </th>
                                 <th scope="col" aria-sort="none">
                                     <button type="button" class="cl-table-sort" data-sort-key="name" th:text="#{catalog.products.column.product}"></button>
@@ -99,8 +101,10 @@
                                 th:attr="data-cl-filter-brand=${row.brand()}, data-cl-search=${row.searchText()},
                                          data-sort-name=${row.name()}, data-sort-price=${row.lowestGrossPrice()}">
                                 <td class="cl-table-check">
-                                    <input type="checkbox" class="cl-check-input" name="eans" data-cl-select-row hidden
-                                           th:value="${row.ean()}" th:attr="aria-label=#{catalog.products.select(${row.name()})}">
+                                    <label class="cl-check-target">
+                                        <input type="checkbox" class="cl-check-input" name="eans" data-cl-select-row hidden
+                                               th:value="${row.ean()}" th:attr="aria-label=#{catalog.products.select(${row.name()})}">
+                                    </label>
                                 </td>
                                 <th scope="row" class="cl-table-key" th:attr="data-label=#{catalog.products.column.product}">
                                     <span th:text="${row.name()}"></span>
