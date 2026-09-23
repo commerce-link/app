@@ -2,7 +2,11 @@ package pl.commercelink.products;
 
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
+import pl.commercelink.starter.dynamodb.OptimisticLockingExhaustedException;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -10,12 +14,22 @@ import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 /**
  * Saves one section of a category definition at a time (basics, pricing, one marketplace, filters) so the four settings
  * pages never overwrite each other. Sanitising rules match ProductCatalog.addOrUpdateCategoryDefinition: blank labels
  * and PIM ids are dropped, incomplete price groups/marketplaces/filters are rejected by the forms before they get here.
+ *
+ * <p>The whole catalog is one versioned DynamoDB item, so two saves of different sections (or of different categories)
+ * race for it. Every write therefore goes through {@link OptimisticLockingExecutor#modifyAndSave}: the catalog is read
+ * again, only the section is applied to that fresh read and the save is retried when another write got there first.
+ * The catalog and the category a caller passes in only say which record to change; they are never saved themselves.
+ * When the retries run out, {@link OptimisticLockingExhaustedException} reaches the caller, which answers with a
+ * message at the form. A later save of the same section still wins over an earlier one (no version travels with the
+ * forms, ruling D-M15/OD-7): this removes the error, it does not detect a lost update of one section.
  */
 @Service
 @RequiredArgsConstructor
@@ -26,6 +40,20 @@ public class CategoryDefinitions {
                          List<String> labels) {
     }
 
+    /**
+     * The Pricing page of a category: stock thresholds, availability and the price groups, applied as one section. The
+     * one place the saved groups are put on the category: their order is the one CategoryDefinition.setPriceDefinitions
+     * gives them, from the order of {@code groups} (the order of the form). Validation stays with the form.
+     */
+    public record Pricing(StockDefinition stock, AvailabilityDefinition availability, List<PriceDefinition> groups) {
+
+        void applyTo(CategoryDefinition category) {
+            category.setStockDefinition(stock);
+            category.setAvailabilityDefinition(availability);
+            category.setPriceDefinitions(new ArrayList<>(groups));
+        }
+    }
+
     public record RemoveResult(boolean productsKept, int productsDeleted) {
     }
 
@@ -33,31 +61,46 @@ public class CategoryDefinitions {
     public record DeletionPreview(boolean productsKept, int productsToDelete) {
     }
 
+    /** The catalog, or the category in it, is gone by the time the section is saved: another request removed it. */
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public static class CategoryNotFoundException extends RuntimeException {
+
+        public CategoryNotFoundException(String catalogId, String categoryId) {
+            super(categoryId == null ? "Catalog " + catalogId + " no longer exists"
+                    : "Category " + categoryId + " of catalog " + catalogId + " no longer exists");
+        }
+    }
+
     private final ProductCatalogRepository catalogs;
     private final ProductRepository products;
+    private final OptimisticLockingExecutor optimisticLockingExecutor;
 
     public CategoryDefinition create(ProductCatalog catalog, Basics basics) {
+        // Built once, outside the retried closure: a retry adds the same category, under the same id, to the fresh read.
         CategoryDefinition category = new CategoryDefinition()
                 .withGeneratedId()
-                .withSequenceNumber(basics.sequenceNumber() > 0 ? basics.sequenceNumber() : catalog.getNextSequenceNumber())
                 .withStockDefinition(new StockDefinition(1, 10, 30))
                 .withAvailabilityDefinition(new AvailabilityDefinition(3, 1))
                 .withPriceDefinition(new PriceDefinition(1.00, 0, 0, 0, 0, PriceDefinition.DEFAULT_PRICING_GROUP));
         applyBasics(category, basics);
-        catalog.getCategories().add(category);
-        sortAndSave(catalog);
+        modifyCatalog(catalog, fresh -> {
+            fresh.getCategories().removeIf(existing -> category.getCategoryId().equals(existing.getCategoryId()));
+            category.setSequenceNumber(basics.sequenceNumber() > 0 ? basics.sequenceNumber() : fresh.getNextSequenceNumber());
+            fresh.getCategories().add(category);
+        });
         return category;
     }
 
     public void saveBasics(ProductCatalog catalog, CategoryDefinition category, Basics basics) {
-        if (category.getType() != basics.type()) {
-            category.setTypeChangedAt(LocalDateTime.now());
-        }
-        applyBasics(category, basics);
-        if (basics.sequenceNumber() > 0) {
-            category.setSequenceNumber(basics.sequenceNumber());
-        }
-        sortAndSave(catalog);
+        modifyCategory(catalog, category, fresh -> {
+            if (fresh.getType() != basics.type()) {
+                fresh.setTypeChangedAt(LocalDateTime.now());
+            }
+            applyBasics(fresh, basics);
+            if (basics.sequenceNumber() > 0) {
+                fresh.setSequenceNumber(basics.sequenceNumber());
+            }
+        });
     }
 
     private void applyBasics(CategoryDefinition category, Basics basics) {
@@ -71,28 +114,23 @@ public class CategoryDefinitions {
         category.setGroupingOrder(distinctNonBlank(basics.labels()));
     }
 
-    public void savePricing(ProductCatalog catalog, CategoryDefinition category, StockDefinition stock,
-                            AvailabilityDefinition availability, List<PriceDefinition> groups) {
-        category.setStockDefinition(stock);
-        category.setAvailabilityDefinition(availability);
-        category.setPriceDefinitions(new ArrayList<>(groups));
-        sortAndSave(catalog);
+    public void savePricing(ProductCatalog catalog, CategoryDefinition category, Pricing pricing) {
+        modifyCategory(catalog, category, pricing::applyTo);
     }
 
     public void saveMarketplace(ProductCatalog catalog, CategoryDefinition category, MarketplaceDefinition definition) {
-        category.getMarketplaceDefinitions().removeIf(m -> Objects.equals(m.getName(), definition.getName()));
-        category.getMarketplaceDefinitions().add(definition);
-        sortAndSave(catalog);
+        modifyCategory(catalog, category, fresh -> {
+            fresh.getMarketplaceDefinitions().removeIf(m -> Objects.equals(m.getName(), definition.getName()));
+            fresh.getMarketplaceDefinitions().add(definition);
+        });
     }
 
     public void removeMarketplace(ProductCatalog catalog, CategoryDefinition category, String name) {
-        category.getMarketplaceDefinitions().removeIf(m -> Objects.equals(m.getName(), name));
-        sortAndSave(catalog);
+        modifyCategory(catalog, category, fresh -> fresh.getMarketplaceDefinitions().removeIf(m -> Objects.equals(m.getName(), name)));
     }
 
     public void saveFilters(ProductCatalog catalog, CategoryDefinition category, List<InventoryDefinition> filters) {
-        category.setInventoryDefinitions(new LinkedList<>(filters));
-        sortAndSave(catalog);
+        modifyCategory(catalog, category, fresh -> fresh.setInventoryDefinitions(new LinkedList<>(filters)));
     }
 
     public DeletionPreview deletionPreview(ProductCatalog catalog, CategoryDefinition category) {
@@ -106,22 +144,35 @@ public class CategoryDefinitions {
         return new DeletionPreview(kept, kept ? 0 : categoryProducts.size());
     }
 
+    /**
+     * The catalog is saved first and the products are deleted after, from the decision taken on the catalog that was
+     * saved: when the save keeps losing the race, the exception leaves every product where it was, and a retry never
+     * follows a deletion that already happened.
+     */
     public RemoveResult remove(ProductCatalog catalog, CategoryDefinition category) {
-        if (category.isDeletionProtection()) {
-            throw new IllegalStateException("Category " + category.getCategoryId() + " is protected from deletion");
-        }
-        boolean kept = productsSurviveRemoval(catalog, category);
-        catalog.getCategories().remove(category);
+        requireUnprotected(category);
+        AtomicBoolean kept = new AtomicBoolean();
+        modifyCatalog(catalog, fresh -> {
+            CategoryDefinition current = categoryIn(fresh, catalog.getCatalogId(), category.getCategoryId());
+            requireUnprotected(current);
+            kept.set(productsSurviveRemoval(fresh, current));
+            fresh.getCategories().remove(current);
+        });
         int deleted = 0;
-        if (!kept) {
+        if (!kept.get()) {
             List<Product> orphaned = products.findAll(category.getCategoryId());
             if (!orphaned.isEmpty()) {
                 products.delete(orphaned);
             }
             deleted = orphaned.size();
         }
-        catalogs.save(catalog);
-        return new RemoveResult(kept, deleted);
+        return new RemoveResult(kept.get(), deleted);
+    }
+
+    private static void requireUnprotected(CategoryDefinition category) {
+        if (category.isDeletionProtection()) {
+            throw new IllegalStateException("Category " + category.getCategoryId() + " is protected from deletion");
+        }
     }
 
     /** The products outlive the category when another category of the catalog is mapped to one of its PIM categories. */
@@ -141,9 +192,35 @@ public class CategoryDefinitions {
                 .count();
     }
 
-    private void sortAndSave(ProductCatalog catalog) {
-        catalog.getCategories().sort(Comparator.comparingInt(CategoryDefinition::getSequenceNumber));
-        catalogs.save(catalog);
+    /** Applies {@code section} to the category as a fresh read of the catalog holds it, and saves; retried on a conflict. */
+    private void modifyCategory(ProductCatalog catalog, CategoryDefinition category, Consumer<CategoryDefinition> section) {
+        modifyCatalog(catalog, fresh -> section.accept(categoryIn(fresh, catalog.getCatalogId(), category.getCategoryId())));
+    }
+
+    /** The closure may run more than once, each time on a new read: it must not depend on what an earlier run did. */
+    private void modifyCatalog(ProductCatalog catalog, Consumer<ProductCatalog> change) {
+        String storeId = catalog.getStoreId();
+        String catalogId = catalog.getCatalogId();
+        optimisticLockingExecutor.modifyAndSave(
+                () -> {
+                    ProductCatalog fresh = catalogs.findById(storeId, catalogId);
+                    if (fresh == null) {
+                        throw new CategoryNotFoundException(catalogId, null);
+                    }
+                    return fresh;
+                },
+                change,
+                fresh -> {
+                    fresh.getCategories().sort(Comparator.comparingInt(CategoryDefinition::getSequenceNumber));
+                    catalogs.save(fresh);
+                });
+    }
+
+    private static CategoryDefinition categoryIn(ProductCatalog catalog, String catalogId, String categoryId) {
+        return catalog.getCategories().stream()
+                .filter(category -> Objects.equals(category.getCategoryId(), categoryId))
+                .findFirst()
+                .orElseThrow(() -> new CategoryNotFoundException(catalogId, categoryId));
     }
 
     private static List<String> distinctNonBlank(List<String> values) {

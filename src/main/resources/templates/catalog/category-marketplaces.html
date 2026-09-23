@@ -9,6 +9,11 @@
             <div th:replace="~{fragments/settings-header :: subpageWithActions(${backHref}, ${backLabel}, #{catalog.category.marketplaces.title}, ${lead}, null)}"></div>
 
             <div th:replace="~{fragments/settings-form :: savedAlert}"></div>
+            <!--/* Outcome of a refused removal, in the page body; the layout banner is Bulma markup. */-->
+            <div th:if="${catalogError}" class="cl-alert is-bad" role="status">
+                <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
+                <p class="cl-alert-text" th:text="${catalogError}"></p>
+            </div>
             <div th:if="${rows.isEmpty()}" class="cl-alert is-warn">
                 <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
                 <p class="cl-alert-text">

@@ -24,6 +24,7 @@ import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogDetailsService;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.ProductRepository;
+import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.starter.security.model.CustomUser;
 import pl.commercelink.web.catalog.CatalogAccess;
 import pl.commercelink.web.catalog.CatalogRow;
@@ -40,6 +41,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -82,7 +84,7 @@ class CatalogsControllerTest {
         lenient().when(marketplaces.displayName(anyString())).thenAnswer(invocation -> invocation.getArgument(0));
         mvc = MockMvcBuilders.standaloneSetup(new CatalogsController(catalogRepository, messageSource, detailsService,
                 access, productRepository, pimCategoryOptions, marketplaces,
-                new CategoryDefinitions(catalogRepository, productRepository))).build();
+                new CategoryDefinitions(catalogRepository, productRepository, mock(OptimisticLockingExecutor.class)))).build();
     }
 
     @AfterEach

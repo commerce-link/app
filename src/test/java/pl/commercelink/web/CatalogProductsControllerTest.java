@@ -4,6 +4,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -62,6 +63,8 @@ import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -1393,5 +1396,42 @@ class CatalogProductsControllerTest {
                 .andExpect(model().attribute("openClient", true))
                 .andExpect(model().attribute("openStock", false));
         verify(productRepository, never()).save(any(Product.class));
+    }
+
+    /** D-I6 for a product: another save got there first, so this one is refused at the form instead of a 500. */
+    @Test
+    void aProductChangedMeanwhileAnswers422WithTheMessageAtTheForm() throws Exception {
+        // given
+        gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
+        Product existing = new Product(gpu.getCategoryId(), "pim-1", "4719331361600", "m", "b", "l", "Old", "Default");
+        existing.setProductId("p1");
+        when(access.requireProduct(gpu, "p1")).thenReturn(existing);
+        doThrow(new ConditionalCheckFailedException("version changed")).when(productRepository).save(existing);
+
+        // when / then
+        mvc.perform(post(categoryPath() + "/products/p1").header("X-Requested-With", "fetch")
+                        .param("name", "New name").param("ean", "4719331361600").param("manufacturerCode", "m")
+                        .param("availabilityType", "BasedOnSupply").param("pricingGroup", "Default").param("enabled", "true"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(view().name("catalog/product :: productForm"))
+                .andExpect(model().attribute("errors", hasEntry("product-form", "product.conflict")));
+    }
+
+    @Test
+    void aProductChangedMeanwhileWithoutJavaScriptAnswers422WithThePage() throws Exception {
+        // given
+        gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
+        Product existing = new Product(gpu.getCategoryId(), "pim-1", "4719331361600", "m", "b", "l", "Old", "Default");
+        existing.setProductId("p1");
+        when(access.requireProduct(gpu, "p1")).thenReturn(existing);
+        doThrow(new ConditionalCheckFailedException("version changed")).when(productRepository).save(existing);
+
+        // when / then
+        mvc.perform(post(categoryPath() + "/products/p1")
+                        .param("name", "New name").param("ean", "4719331361600").param("manufacturerCode", "m")
+                        .param("availabilityType", "BasedOnSupply").param("pricingGroup", "Default").param("enabled", "true"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(view().name("catalog/product"))
+                .andExpect(model().attribute("errors", hasEntry("product-form", "product.conflict")));
     }
 }

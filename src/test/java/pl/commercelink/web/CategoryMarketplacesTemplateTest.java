@@ -195,4 +195,25 @@ class CategoryMarketplacesTemplateTest {
         // then
         assertThat(html).contains("From distributors: 2 at each of at least 1 (0 local)").doesNotContain("in total");
     }
+
+    /** A refused removal (the catalog kept changing under it) comes back to this page with its reason in the body. */
+    @Test
+    void theListShowsTheRefusalItWasRedirectedWith() {
+        // given
+        Context context = new Context();
+        context.setVariable("rows", List.of());
+        context.setVariable("orphans", List.of());
+        context.setVariable("storeMarketplacesHref", "/dashboard/store/marketplaces");
+        context.setVariable("backHref", "/dashboard/catalogs/c1/category/k1/settings");
+        context.setVariable("backLabel", "Category settings");
+        context.setVariable("lead", "GPU · marketplaces");
+        context.setVariable("catalogError", "The settings changed in the meantime");
+
+        // when
+        String html = EnglishFragmentTemplateEngine.create()
+                .process("catalog/category-marketplaces", Set.of("div.cl-page-body"), context);
+
+        // then
+        assertThat(html).contains("class=\"cl-alert is-bad\"").contains("The settings changed in the meantime");
+    }
 }

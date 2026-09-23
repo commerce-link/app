@@ -2,6 +2,7 @@ package pl.commercelink.web;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.context.MessageSource;
@@ -97,6 +98,9 @@ public class CatalogProductsController {
 
     private static final String PRODUCT_VIEW = "catalog/product";
     private static final String PRODUCT_FRAGMENT = PRODUCT_VIEW + " :: productForm";
+
+    /** The id of the product form: the key of an error that belongs to the whole form, so the summary links to it. */
+    private static final String PRODUCT_FORM = "product-form";
 
     private final CatalogAccess access;
     private final ProductRepository productRepository;
@@ -450,7 +454,16 @@ public class CatalogProductsController {
                     currentFilter, model, locale), PRODUCT_FRAGMENT, async, response);
         }
         form.applyTo(product);
-        productRepository.save(product);
+        try {
+            productRepository.save(product);
+        } catch (ConditionalCheckFailedException e) {
+            // Another save of this product (another tab, a bulk action) got there first. No version travels with the
+            // form (ruling D-M15/OD-7), so this is the version read a moment ago losing the race, answered at the form.
+            response.setStatus(HttpStatus.UNPROCESSABLE_ENTITY.value());
+            String view = renderProduct(catalog, category, store, product, form, product.getPimId(),
+                    Map.of(PRODUCT_FORM, "product.conflict"), null, currentFilter, model, locale);
+            return async ? PRODUCT_FRAGMENT : view;
+        }
         return saved(CatalogPaths.category(catalogId, categoryId) + currentFilter.query(),
                 messageSource.getMessage("product.saved", new Object[]{product.getName()}, locale), async, model,
                 redirectAttributes, request, response, PRODUCT_FRAGMENT,

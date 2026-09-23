@@ -29,6 +29,7 @@ import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductRecommendationEngine;
 import pl.commercelink.products.ProductRepository;
+import pl.commercelink.starter.dynamodb.OptimisticLockingExhaustedException;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.stores.MarketplaceIntegration;
 import pl.commercelink.stores.Store;
@@ -81,6 +82,12 @@ public class CatalogCategoryController {
     private static final String FILTERS_VIEW = "catalog/category-filters";
     private static final String FILTERS_FRAGMENT = FILTERS_VIEW + " :: filtersForm";
 
+    /** The ids of the four forms, as the templates give them. */
+    private static final String BASICS_FORM = "category-basics-form";
+    private static final String PRICING_FORM = "category-pricing-form";
+    private static final String MARKETPLACE_FORM = "marketplace-definition-form";
+    private static final String FILTERS_FORM = "category-filters-form";
+
     /** The error message of a broken brand line carries its number, which no message key can hold. */
     private static final String BRAND_LINE_ERROR = "catalog.filter.brandLines.line";
 
@@ -95,6 +102,13 @@ public class CatalogCategoryController {
 
     /** What a successful save could not refuse but the operator should know; shown beside the saved message. */
     private static final String WARNING_FLASH = "catalogWarning";
+
+    /**
+     * The whole catalog is one versioned item, and a save that kept losing the race for it (another section or another
+     * category saved at the same moment, over and over) is reported against the form: its id is the error key, so the
+     * error summary links to the form, and the operator's values stay in the fields.
+     */
+    private static final String CONFLICT = "catalog.conflict";
 
     private final CatalogAccess access;
     private final CategoryDefinitions definitions;
@@ -137,7 +151,13 @@ public class CatalogCategoryController {
         if (!errors.isEmpty()) {
             return rejected(renderBasics(catalog, null, form, errors, model, locale), BASICS_FRAGMENT, async, response);
         }
-        CategoryDefinition created = definitions.create(catalog, form.toBasics());
+        CategoryDefinition created;
+        try {
+            created = definitions.create(catalog, form.toBasics());
+        } catch (OptimisticLockingExhaustedException e) {
+            return conflict(renderBasics(catalog, null, form, conflictAt(BASICS_FORM), model, locale), BASICS_FRAGMENT, async,
+                    response);
+        }
         String next = CatalogPaths.category(catalogId, created.getCategoryId());
         String message = messageSource.getMessage("catalog.category.created", new Object[]{created.getName()}, locale);
         // The fresh category has a pricing nobody chose, so its page says so once.
@@ -183,8 +203,16 @@ public class CatalogCategoryController {
             return rejected(renderBasics(catalog, category, form, errors, model, locale), BASICS_FRAGMENT, async, response);
         }
         boolean becomesDynamic = category.hasType(CategoryDefinitionType.Managed) && form.isDynamic();
-        definitions.saveBasics(catalog, category, form.toBasics());
-        String message = messageSource.getMessage("catalog.category.basics.saved", new Object[]{category.getName()}, locale);
+        CategoryDefinitions.Basics basics = form.toBasics();
+        try {
+            definitions.saveBasics(catalog, category, basics);
+        } catch (OptimisticLockingExhaustedException e) {
+            return conflict(renderBasics(catalog, category, form, conflictAt(BASICS_FORM), model, locale), BASICS_FRAGMENT, async,
+                    response);
+        }
+        // The service saves a fresh read of the catalog, so the name the category now has is the one just posted.
+        String message = messageSource.getMessage("catalog.category.basics.saved",
+                new Object[]{StringUtils.trimToNull(basics.name())}, locale);
         if (becomesDynamic) {
             message += " " + messageSource.getMessage("catalog.category.type.changed.dynamic", null, locale);
         }
@@ -213,7 +241,12 @@ public class CatalogCategoryController {
         if (!errors.isEmpty()) {
             return rejected(renderPricing(catalog, category, form, errors, model, locale), PRICING_FRAGMENT, async, response);
         }
-        definitions.savePricing(catalog, category, form.toStock(), form.toAvailability(), form.toGroups());
+        try {
+            definitions.savePricing(catalog, category, form.toPricing());
+        } catch (OptimisticLockingExhaustedException e) {
+            return conflict(renderPricing(catalog, category, form, conflictAt(PRICING_FORM), model, locale), PRICING_FRAGMENT,
+                    async, response);
+        }
         return saved(CatalogPaths.categorySettings(catalogId, categoryId),
                 messageSource.getMessage("catalog.category.pricing.saved", new Object[]{category.getName()}, locale),
                 async, model, redirectAttributes, request, response, PRICING_FRAGMENT,
@@ -302,7 +335,12 @@ public class CatalogCategoryController {
             return rejected(renderMarketplace(catalog, category, marketplace, form, errors, model, locale),
                     MARKETPLACE_FRAGMENT, async, response);
         }
-        definitions.saveMarketplace(catalog, category, form.toDefinition(marketplace));
+        try {
+            definitions.saveMarketplace(catalog, category, form.toDefinition(marketplace));
+        } catch (OptimisticLockingExhaustedException e) {
+            return conflict(renderMarketplace(catalog, category, marketplace, form, conflictAt(MARKETPLACE_FORM), model, locale),
+                    MARKETPLACE_FRAGMENT, async, response);
+        }
         return saved(CatalogPaths.categoryMarketplaces(catalogId, categoryId),
                 messageSource.getMessage("catalog.category.marketplace.saved",
                         new Object[]{marketplaces.displayName(marketplace)}, locale),
@@ -334,7 +372,12 @@ public class CatalogCategoryController {
         ProductCatalog catalog = access.requireCatalog(storeId(), catalogId);
         CategoryDefinition category = access.requireCategory(catalog, categoryId);
         String target = requireDefinition(category, name);
-        definitions.removeMarketplace(catalog, category, target);
+        try {
+            definitions.removeMarketplace(catalog, category, target);
+        } catch (OptimisticLockingExhaustedException e) {
+            redirectAttributes.addFlashAttribute(ERROR_FLASH, messageSource.getMessage(CONFLICT, null, locale));
+            return "redirect:" + CatalogPaths.categoryMarketplaces(catalogId, categoryId);
+        }
         SettingsFlash.onRedirect(redirectAttributes, messageSource.getMessage("catalog.category.marketplace.deleted",
                 new Object[]{shownName(name, locale)}, locale));
         return "redirect:" + CatalogPaths.categoryMarketplaces(catalogId, categoryId);
@@ -401,7 +444,12 @@ public class CatalogCategoryController {
         if (!errors.isEmpty()) {
             return rejected(renderFilters(catalog, category, form, errors, model, locale), FILTERS_FRAGMENT, async, response);
         }
-        definitions.saveFilters(catalog, category, form.toDefinitions());
+        try {
+            definitions.saveFilters(catalog, category, form.toDefinitions());
+        } catch (OptimisticLockingExhaustedException e) {
+            return conflict(renderFilters(catalog, category, form, conflictAt(FILTERS_FORM), model, locale), FILTERS_FRAGMENT,
+                    async, response);
+        }
         return saved(CatalogPaths.categorySettings(catalogId, categoryId),
                 messageSource.getMessage("catalog.category.filters.saved", new Object[]{category.getName()}, locale),
                 async, model, redirectAttributes, request, response, FILTERS_FRAGMENT,
@@ -483,7 +531,12 @@ public class CatalogCategoryController {
         if (category.isDeletionProtection()) {
             return refuseDeletion(catalogId, category, locale, redirectAttributes);
         }
-        definitions.remove(catalog, category);
+        try {
+            definitions.remove(catalog, category);
+        } catch (OptimisticLockingExhaustedException e) {
+            redirectAttributes.addFlashAttribute(ERROR_FLASH, messageSource.getMessage(CONFLICT, null, locale));
+            return "redirect:" + CatalogPaths.catalog(catalogId);
+        }
         SettingsFlash.onRedirect(redirectAttributes,
                 messageSource.getMessage("catalog.category.deleted", new Object[]{category.getName()}, locale));
         return "redirect:" + CatalogPaths.catalog(catalogId);
@@ -561,6 +614,17 @@ public class CatalogCategoryController {
             return fragment;
         }
         return view;
+    }
+
+    /** The error of a save that kept losing the race, keyed by the id of its form. */
+    private static Map<String, String> conflictAt(String formId) {
+        return Map.of(formId, CONFLICT);
+    }
+
+    /** A conflict is a refused save like any other (422), with or without JavaScript: nothing was written. */
+    private String conflict(String view, String fragment, boolean async, HttpServletResponse response) {
+        response.setStatus(HttpStatus.UNPROCESSABLE_ENTITY.value());
+        return async ? fragment : view;
     }
 
     /** Success: with JavaScript the form answers 200 + data-cl-redirect and the script navigates; otherwise a PRG redirect. */

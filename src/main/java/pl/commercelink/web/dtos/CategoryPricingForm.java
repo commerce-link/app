@@ -5,6 +5,7 @@ import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
 import pl.commercelink.products.AvailabilityDefinition;
 import pl.commercelink.products.CategoryDefinition;
+import pl.commercelink.products.CategoryDefinitions;
 import pl.commercelink.products.PriceDefinition;
 import pl.commercelink.products.StockDefinition;
 
@@ -175,6 +176,11 @@ public class CategoryPricingForm {
             }
         }
         return errors;
+    }
+
+    /** The section CategoryDefinitions applies to the category: the groups in the order of the form. */
+    public CategoryDefinitions.Pricing toPricing() {
+        return new CategoryDefinitions.Pricing(toStock(), toAvailability(), toGroups());
     }
 
     public StockDefinition toStock() {

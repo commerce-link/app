@@ -33,7 +33,9 @@ import pl.commercelink.products.ProductRecommendationEngine;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.products.StockDefinition;
 import pl.commercelink.products.filters.InventoryFilterType;
+import com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException;
 import pl.commercelink.starter.dynamodb.Metadata;
+import pl.commercelink.starter.dynamodb.OptimisticLockingExhaustedException;
 import pl.commercelink.starter.security.model.CustomUser;
 import pl.commercelink.stores.MarketplaceIntegration;
 import pl.commercelink.stores.Store;
@@ -54,6 +56,7 @@ import static org.hamcrest.Matchers.hasEntry;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -520,7 +523,7 @@ class CatalogCategoryControllerTest {
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(view().name("catalog/category-pricing :: pricingForm"))
                 .andExpect(model().attribute("errors", hasEntry("groups", "catalog.category.pricing.group.inUse")));
-        verify(definitions, never()).savePricing(any(), any(), any(), any(), any());
+        verify(definitions, never()).savePricing(any(), any(), any());
         verify(definitions, never()).productsInPriceGroup(gpu, "Default");
     }
 
@@ -537,8 +540,8 @@ class CatalogCategoryControllerTest {
                         .param("groups[0].critical", "0").param("groups[0].low", "0").param("groups[0].medium", "0"))
                 .andExpect(redirectedUrl("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings"))
                 .andExpect(flash().attribute("settingsSavedMessage", "Saved"));
-        verify(definitions).savePricing(eq(catalog), eq(gpu), any(StockDefinition.class), any(AvailabilityDefinition.class),
-                argThat(groups -> groups.size() == 1 && groups.get(0).getMultiplier() == 1.05));
+        verify(definitions).savePricing(eq(catalog), eq(gpu),
+                argThat(pricing -> pricing.groups().size() == 1 && pricing.groups().get(0).getMultiplier() == 1.05));
     }
 
     @Test
@@ -777,5 +780,133 @@ class CatalogCategoryControllerTest {
                 .andExpect(status().isOk()).andExpect(view().name("settings-confirm"));
         mvc.perform(get("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/marketplaces/gone/delete"))
                 .andExpect(status().isOk()).andExpect(view().name("settings-confirm"));
+    }
+
+    private static OptimisticLockingExhaustedException exhausted() {
+        return new OptimisticLockingExhaustedException(3, new ConditionalCheckFailedException("version changed"));
+    }
+
+    private static final String[] PRICING = {"critical", "1", "low", "10", "high", "30", "minQty", "3", "minProviders", "1",
+            "groups[0].name", "Default", "groups[0].multiplier", "1,00", "groups[0].minProfit", "0",
+            "groups[0].critical", "0", "groups[0].low", "0", "groups[0].medium", "0"};
+
+    private static org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder withParams(
+            org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder request, String... pairs) {
+        for (int i = 0; i < pairs.length; i += 2) {
+            request.param(pairs[i], pairs[i + 1]);
+        }
+        return request;
+    }
+
+    /** D-I6: a save that keeps losing the race for the catalog item is a message at the form, never a 500. */
+    @Test
+    void anAsyncPricingSaveThatKeepsLosingTheRaceAnswers422WithTheMessageAtTheForm() throws Exception {
+        // given
+        CategoryDefinition gpu = categoryOf("GPU");
+        doThrow(exhausted()).when(definitions).savePricing(any(), any(), any());
+
+        // when / then
+        mvc.perform(withParams(post("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/pricing")
+                        .header("X-Requested-With", "fetch"), PRICING))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(view().name("catalog/category-pricing :: pricingForm"))
+                .andExpect(model().attribute("errors", hasEntry("category-pricing-form", "catalog.conflict")));
+    }
+
+    @Test
+    void aBasicsSaveWithoutJavaScriptThatKeepsLosingTheRaceAnswers422WithThePage() throws Exception {
+        // given
+        CategoryDefinition gpu = categoryOf("GPU");
+        doThrow(exhausted()).when(definitions).saveBasics(any(), any(), any());
+
+        // when / then
+        mvc.perform(post("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/basics")
+                        .param("name", "GPU").param("type", "Managed").param("maxQty", "1"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(view().name("catalog/category-basics"))
+                .andExpect(model().attribute("errors", hasEntry("category-basics-form", "catalog.conflict")));
+    }
+
+    @Test
+    void aCategoryCreationThatKeepsLosingTheRaceAnswers422() throws Exception {
+        // given
+        when(access.requireCatalog(STORE_ID, "c1")).thenReturn(catalog);
+        doThrow(exhausted()).when(definitions).create(any(), any());
+
+        // when / then
+        mvc.perform(post("/dashboard/catalogs/c1/category/new").header("X-Requested-With", "fetch")
+                        .param("name", "CPU").param("type", "Managed").param("maxQty", "1"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(model().attribute("errors", hasEntry("category-basics-form", "catalog.conflict")));
+    }
+
+    @Test
+    void aMarketplaceSaveThatKeepsLosingTheRaceAnswers422() throws Exception {
+        // given
+        CategoryDefinition gpu = categoryOf("GPU");
+        when(access.requireMarketplace(store, "allegro")).thenReturn("allegro");
+        doThrow(exhausted()).when(definitions).saveMarketplace(any(), any(), any());
+
+        // when / then
+        mvc.perform(post("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/marketplaces/allegro")
+                        .header("X-Requested-With", "fetch")
+                        .param("markup", "1,10").param("minWarehouseQty", "3").param("minQtyPerDistributor", "0")
+                        .param("minNumOfDistributors", "0").param("minNumOfLocalDistributors", "0")
+                        .param("minDistributorsQty", "0"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(model().attribute("errors", hasEntry("marketplace-definition-form", "catalog.conflict")));
+    }
+
+    @Test
+    void aFiltersSaveThatKeepsLosingTheRaceAnswers422() throws Exception {
+        // given
+        CategoryDefinition gpu = categoryOf("GPU");
+        doThrow(exhausted()).when(definitions).saveFilters(any(), any(), any());
+
+        // when / then
+        mvc.perform(post("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/filters")
+                        .header("X-Requested-With", "fetch")
+                        .param("filters[0].type", "BRAND_NAME").param("filters[0].values", "MSI"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(model().attribute("errors", hasEntry("category-filters-form", "catalog.conflict")));
+    }
+
+    @Test
+    void aDeletionThatKeepsLosingTheRaceGoesBackToTheCatalogWithTheMessage() throws Exception {
+        // given
+        CategoryDefinition gpu = categoryOf("GPU");
+        gpu.setDeletionProtection(false);
+        doThrow(exhausted()).when(definitions).remove(any(), any());
+
+        // when / then
+        mvc.perform(post("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/delete"))
+                .andExpect(redirectedUrl("/dashboard/catalogs/c1"))
+                .andExpect(flash().attribute("catalogError", "catalog.conflict"))
+                .andExpect(flash().attributeCount(1));
+    }
+
+    @Test
+    void aMarketplaceRemovalThatKeepsLosingTheRaceGoesBackWithTheMessage() throws Exception {
+        // given
+        CategoryDefinition gpu = categoryOf("GPU");
+        gpu.withMarketplaceDefinition(new MarketplaceDefinition("allegro", 1.1, 5, 1, 2, 1, 3));
+        doThrow(exhausted()).when(definitions).removeMarketplace(any(), any(), any());
+
+        // when / then
+        mvc.perform(post("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/marketplaces/allegro/delete"))
+                .andExpect(redirectedUrl("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/marketplaces"))
+                .andExpect(flash().attribute("catalogError", "catalog.conflict"));
+    }
+
+    @Test
+    void aSectionOfACategoryRemovedMeanwhileIs404() throws Exception {
+        // given
+        CategoryDefinition gpu = categoryOf("GPU");
+        doThrow(new CategoryDefinitions.CategoryNotFoundException("c1", gpu.getCategoryId()))
+                .when(definitions).savePricing(any(), any(), any());
+
+        // when / then
+        mvc.perform(withParams(post("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/pricing"), PRICING))
+                .andExpect(status().isNotFound());
     }
 }
