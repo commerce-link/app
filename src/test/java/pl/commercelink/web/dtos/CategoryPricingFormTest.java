@@ -115,7 +115,28 @@ class CategoryPricingFormTest {
         // then
         assertThat(errors).isEmpty();
         assertThat(form.toGroups()).extracting(PriceDefinition::getPricingGroup)
-                .containsExactly("Default", "Premium", "Premium", "PREMIUM");
+                .containsExactly("Default", "Premium", "Premium", "Premium");
+    }
+
+    /** One group is stored under one spelling: the later rows take the name of the first row of their group. */
+    @Test
+    void theRowsOfOneGroupAreSavedUnderTheSpellingOfItsFirstRow() {
+        // given
+        CategoryPricingForm form = valid();
+        form.setGroups(List.of(form.getGroups().get(0), form.getGroups().get(1),
+                group(" PREMIUM ", "1,08", "RTX 5080", "2500"), group("premium  ", "1,08", "RTX 5090", "3000")));
+
+        // when / then
+        assertThat(form.validate(group -> 0)).isEmpty();
+        assertThat(form.toGroups()).extracting(PriceDefinition::getPricingGroup)
+                .containsExactly("Default", "Premium", "Premium", "Premium");
+    }
+
+    @Test
+    void theKeyOfAGroupIgnoresCaseAndSpaces() {
+        // when / then
+        assertThat(CategoryPricingForm.groupKey(" Ultra  Premium ")).isEqualTo(CategoryPricingForm.groupKey("ultra premium"));
+        assertThat(CategoryPricingForm.groupKey(null)).isEmpty();
     }
 
     /** Only the first row of a name prices anything, so a row with other parameters would be silently ignored. */

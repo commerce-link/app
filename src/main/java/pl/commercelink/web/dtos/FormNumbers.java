@@ -2,6 +2,7 @@ package pl.commercelink.web.dtos;
 
 import org.apache.commons.lang3.StringUtils;
 
+import java.math.BigDecimal;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.util.Locale;
@@ -52,11 +53,13 @@ public final class FormNumbers {
     }
 
     /**
-     * Multipliers and markups: at least two decimals ("1,10") and every further one the value has ("1,125"). A field is
-     * posted back as shown, so a digit cut off here would change the price on a save that never touched the field.
+     * Multipliers and markups: at least two decimals ("1,10") and every further one the value has ("1,125",
+     * "1,1234567"). A field is posted back as shown, so a digit rounded off here would change the price on a save that
+     * never touched the field; BigDecimal.valueOf gives the shortest decimal that reads back as the same double.
      */
     public static String formatDecimalField(double value) {
-        return new DecimalFormat("0.00####", POLISH).format(value);
+        BigDecimal decimal = BigDecimal.valueOf(value).stripTrailingZeros();
+        return decimal.setScale(Math.max(2, decimal.scale())).toPlainString().replace('.', ',');
     }
 
     private static String clean(String value) {

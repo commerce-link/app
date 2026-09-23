@@ -46,4 +46,14 @@ class FormNumbersTest {
         assertThat(FormNumbers.formatDecimalField(0.123456)).isEqualTo("0,123456");
         assertThat(FormNumbers.decimal(FormNumbers.formatDecimalField(1.125))).contains(1.125);
     }
+
+    /** Any value decimal() accepts is shown in full, so an untouched save never rounds it. */
+    @Test
+    void decimalFieldsRoundTripEveryDecimalAParsedValueHas() {
+        // when / then
+        assertThat(FormNumbers.formatDecimalField(1.1234567)).isEqualTo("1,1234567");
+        assertThat(FormNumbers.decimal(FormNumbers.formatDecimalField(1.1234567))).contains(1.1234567);
+        assertThat(FormNumbers.formatDecimalField(0.0000001)).isEqualTo("0,0000001");
+        assertThat(FormNumbers.formatDecimalField(12.5)).isEqualTo("12,50");
+    }
 }

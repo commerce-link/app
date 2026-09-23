@@ -262,10 +262,10 @@ public class CatalogCategoryController {
      */
     private static List<String> removedGroups(CategoryDefinition category, CategoryPricingForm form) {
         Set<String> submitted = form.getGroups().stream()
-                .map(group -> StringUtils.defaultString(group.getName()).trim().toLowerCase()).collect(Collectors.toSet());
+                .map(group -> CategoryPricingForm.groupKey(group.getName())).collect(Collectors.toSet());
         return category.getPriceDefinitions().stream().map(PriceDefinition::getPricingGroup).filter(Objects::nonNull)
-                .filter(name -> !submitted.contains(name.trim().toLowerCase()))
-                .collect(Collectors.toMap(name -> name.trim().toLowerCase(), name -> name, (first, other) -> first,
+                .filter(name -> !submitted.contains(CategoryPricingForm.groupKey(name)))
+                .collect(Collectors.toMap(CategoryPricingForm::groupKey, name -> name, (first, other) -> first,
                         LinkedHashMap::new))
                 .values().stream().toList();
     }

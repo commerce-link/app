@@ -584,6 +584,23 @@ class CatalogCategoryControllerTest {
         verify(definitions).savePricing(eq(catalog), eq(gpu), argThat(pricing -> pricing.groups().size() == 2));
     }
 
+    /** The removal check folds names as the validation does: a stored double space is the group the form still carries. */
+    @Test
+    void aStoredNameWithADoubleSpaceIsTheGroupTheFormStillCarries() throws Exception {
+        // given
+        CategoryDefinition gpu = categoryOf("GPU");
+        when(messageSource.getMessage(eq("catalog.category.pricing.saved"), any(), any(Locale.class))).thenReturn("Saved");
+        gpu.withPriceDefinition(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"))
+                .withPriceDefinition(new PriceDefinition(1.1, 0, 0, 0, 0, "Ultra  Premium"));
+
+        // when / then
+        mvc.perform(withParams(post("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/pricing"), PRICING)
+                        .param("groups[1].name", "Ultra Premium").param("groups[1].multiplier", "1,10").param("groups[1].minProfit", "0")
+                        .param("groups[1].critical", "0").param("groups[1].low", "0").param("groups[1].medium", "0"))
+                .andExpect(redirectedUrl("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings"));
+        verify(definitions, never()).productsInPriceGroup(any(), any());
+    }
+
     @Test
     void validPricingIsSavedThroughTheService() throws Exception {
         // given

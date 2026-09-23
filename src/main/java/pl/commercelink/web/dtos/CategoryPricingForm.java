@@ -94,9 +94,8 @@ public class CategoryPricingForm {
             return form;
         }
 
-        /** The name that makes rows one group: pricing looks a group up ignoring case, and a stray space is no new group. */
         String groupKey() {
-            return StringUtils.normalizeSpace(StringUtils.defaultString(name)).toLowerCase(Locale.ROOT);
+            return CategoryPricingForm.groupKey(name);
         }
 
         /** What picks the row: its label and price threshold as PriceDefinition.matches compares them. */
@@ -122,11 +121,12 @@ public class CategoryPricingForm {
             return Optional.of(parameters);
         }
 
-        PriceDefinition toDefinition() {
+        /** @param groupName the name the group is stored under, the spelling of its first row */
+        PriceDefinition toDefinition(String groupName) {
             PriceDefinition definition = new PriceDefinition(FormNumbers.decimal(multiplier).orElse(0d),
                     FormNumbers.integer(minProfit).orElse(0), FormNumbers.integer(critical).orElse(0),
                     FormNumbers.integer(low).orElse(0), FormNumbers.integer(medium).orElse(0),
-                    isDefault() ? PriceDefinition.DEFAULT_PRICING_GROUP : StringUtils.trim(name));
+                    isDefault() ? PriceDefinition.DEFAULT_PRICING_GROUP : groupName);
             definition.setLabelMatch(StringUtils.trimToNull(labelMatch));
             definition.setPriceMatch(FormNumbers.decimal(priceMatch).orElse(0d));
             return definition;
@@ -151,6 +151,14 @@ public class CategoryPricingForm {
     @Getter(AccessLevel.NONE)
     @Setter(AccessLevel.NONE)
     private Map<String, Object[]> errorArguments = new HashMap<>();
+
+    /**
+     * The name that makes rows one group, the same wherever groups are compared (validation, removal, the in-use check):
+     * pricing looks a group up ignoring case, and a stray or doubled space is no new group.
+     */
+    public static String groupKey(String name) {
+        return StringUtils.normalizeSpace(StringUtils.defaultString(name)).toLowerCase(Locale.ROOT);
+    }
 
     public static CategoryPricingForm from(CategoryDefinition category) {
         CategoryPricingForm form = new CategoryPricingForm();
@@ -282,7 +290,7 @@ public class CategoryPricingForm {
         }
         groups = new ArrayList<>(groups);
         saved.stream().filter(definition -> definition.getPricingGroup() != null
-                        && definition.getPricingGroup().trim().equalsIgnoreCase(groupInUse))
+                        && groupKey(definition.getPricingGroup()).equals(groupKey(groupInUse)))
                 .map(PriceGroupForm::from)
                 .forEach(group -> {
                     group.inUse = true;
@@ -304,8 +312,15 @@ public class CategoryPricingForm {
         return new AvailabilityDefinition(FormNumbers.integer(minQty).orElse(3), FormNumbers.integer(minProviders).orElse(1));
     }
 
+    /**
+     * The groups in the order of the form. The rows of one group are stored under the spelling of its first row, so
+     * every list of group names (the product page, the in-use check) sees one group once.
+     */
     public List<PriceDefinition> toGroups() {
-        return groups.stream().map(PriceGroupForm::toDefinition).toList();
+        Map<String, String> spelling = new HashMap<>();
+        return groups.stream()
+                .map(group -> group.toDefinition(spelling.computeIfAbsent(group.groupKey(), key -> StringUtils.trim(group.name))))
+                .toList();
     }
 
     /** Returns the number as typed, out of range or not, so a rule that compares two fields can still name the real problem. */
