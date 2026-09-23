@@ -894,6 +894,22 @@ class CatalogProductsControllerTest {
         verify(pimCatalog, never()).findByPimIdOrGtinsOrMpns(any(), any(), any());
     }
 
+    /** D-M48: a forged way of pricing is a mistake of its field, answered like any other with the review and 422. */
+    @Test
+    void aForgedAvailabilityInTheReviewComesBackAtItsFieldWith422() throws Exception {
+        // given
+        gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
+
+        // when / then
+        mvc.perform(post(categoryPath() + "/products/add/save")
+                        .param("products[0].name", "MSI RTX 5070").param("products[0].ean", "5901234567890")
+                        .param("products[0].pricingGroup", "Default").param("products[0].availabilityType", "Forged"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(model().attribute("errors",
+                        hasEntry("product-0-availabilityType", "product.error.availability.invalid")));
+        verify(productRepository, never()).save(any(Product.class));
+    }
+
     @Test
     @SuppressWarnings("unchecked")
     void saveWithAnUnknownPricingGroupRerendersTheReviewWith422() throws Exception {

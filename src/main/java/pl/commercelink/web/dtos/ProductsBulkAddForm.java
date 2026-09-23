@@ -4,7 +4,6 @@ import lombok.Getter;
 import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
 import pl.commercelink.products.Product;
-import pl.commercelink.products.ProductAvailabilityType;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -34,7 +33,11 @@ public class ProductsBulkAddForm {
         private String name;
         private String label;
         private String pricingGroup;
-        private ProductAvailabilityType availabilityType;
+        /**
+         * Text, not the enum: the review carries it in a hidden field, and a value no product can have is a mistake
+         * of the field (422 with the review) rather than a binding failure answered with a bare 400.
+         */
+        private String availabilityType;
 
         public Row() {
         }
@@ -46,14 +49,20 @@ public class ProductsBulkAddForm {
             this.name = product.getName();
             this.label = product.getLabel();
             this.pricingGroup = product.getPricingGroup();
-            this.availabilityType = product.getAvailabilityType();
+            this.availabilityType = product.getAvailabilityType() == null ? null : product.getAvailabilityType().name();
         }
 
-        /** The product as it is created; the PIM entry is resolved by the controller, never taken from the row. */
+        /**
+         * The product as it is created; the PIM entry is resolved by the controller, never taken from the row. The
+         * identifiers go through the setters, trimmed, as the product page saves them: the constructor stores them as
+         * posted, and an EAN with spaces around it would never match its PIM entry or the inventory again.
+         */
         public Product toProduct(String categoryId) {
-            Product product = new Product(categoryId, null, ean, manufacturerCode, brand, label, name, pricingGroup);
-            if (availabilityType != null) {
-                product.setAvailabilityType(availabilityType);
+            Product product = new Product(categoryId, null, null, null, brand, label, name, pricingGroup);
+            product.setEan(StringUtils.trimToNull(ean));
+            product.setManufacturerCode(StringUtils.trimToNull(manufacturerCode));
+            if (StringUtils.isNotBlank(availabilityType)) {
+                ProductForm.availabilityOf(availabilityType).ifPresent(product::setAvailabilityType);
             }
             return product;
         }
@@ -117,6 +126,10 @@ public class ProductsBulkAddForm {
             }
             if (pricingGroups.stream().noneMatch(group -> group.equalsIgnoreCase(row.getPricingGroup()))) {
                 errors.put(fieldId(index, "pricingGroup"), "product.error.group.unknown");
+            }
+            // Only a forged request carries another value: the review posts back the one the proposal was given.
+            if (StringUtils.isNotBlank(row.getAvailabilityType()) && ProductForm.availabilityOf(row.getAvailabilityType()).isEmpty()) {
+                errors.put(fieldId(index, "availabilityType"), "product.error.availability.invalid");
             }
         }
         return errors;

@@ -47,7 +47,9 @@
                                 <!--/* The PIM entry is not posted back: it is resolved again when the row is saved, from
                                        the identifiers as they are corrected here. */-->
                                 <input type="hidden" th:name="${prefix + 'brand'}" th:value="${product.brand}">
-                                <input type="hidden" th:name="${prefix + 'availabilityType'}" th:value="${product.availabilityType}">
+                                <!--/* The id is the key of its error, which only a forged value can raise. */-->
+                                <input type="hidden" th:name="${prefix + 'availabilityType'}" th:value="${product.availabilityType}"
+                                       th:id="${T(pl.commercelink.web.dtos.ProductsBulkAddForm).fieldId(status.index, 'availabilityType')}">
                                 <span th:text="${product.brand}"></span>
                                 <!--/* Each identifier under its own visible label: a placeholder is gone once the field
                                        holds a value, and the two codes look alike. */-->

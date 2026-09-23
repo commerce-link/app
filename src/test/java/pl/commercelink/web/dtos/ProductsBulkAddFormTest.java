@@ -2,7 +2,9 @@ package pl.commercelink.web.dtos;
 
 import org.junit.jupiter.api.Test;
 import pl.commercelink.products.Product;
+import pl.commercelink.products.ProductAvailabilityType;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -94,5 +96,54 @@ class ProductsBulkAddFormTest {
                 Map.entry("product-1-name", "Produkt 2: Podaj nazwę produktu."),
                 Map.entry("product-11-ean", "Produkt 12: Podaj EAN albo kod producenta."),
                 Map.entry("products", "Nie zaznaczono produktów."));
+    }
+
+    private static ProductsBulkAddForm.Row row(String ean, String manufacturerCode) {
+        ProductsBulkAddForm.Row row = new ProductsBulkAddForm.Row();
+        row.setName("MSI RTX 5070");
+        row.setEan(ean);
+        row.setManufacturerCode(manufacturerCode);
+        row.setPricingGroup("Default");
+        return row;
+    }
+
+    /**
+     * RF-3: the review posts the identifiers as typed; the product is saved with them normalised the way the product
+     * page saves them, or it would never match its PIM entry or the inventory again.
+     */
+    @Test
+    void aRowIsSavedWithItsIdentifiersNormalised() {
+        // when
+        Product spaced = row(" 5900000000101 ", " gv-n5080 oc ").toProduct("cat");
+        Product gtin14 = row("05900000000101", null).toProduct("cat");
+        Product blank = row("  ", "MFN-1").toProduct("cat");
+
+        // then
+        assertThat(spaced.getEan()).isEqualTo("5900000000101");
+        assertThat(spaced.getManufacturerCode()).isEqualTo("GV-N5080OC");
+        assertThat(gtin14.getEan()).isEqualTo("5900000000101");
+        assertThat(blank.getEan()).isNull();
+    }
+
+    /** D-M48: the way of pricing is posted as text; a value no product can have is an error of its field. */
+    @Test
+    void anUnknownAvailabilityIsAnErrorOfItsFieldAndAKnownOneIsApplied() {
+        // given
+        ProductsBulkAddForm.Row forged = row("5901234567890", null);
+        forged.setAvailabilityType("Forged");
+        ProductsBulkAddForm.Row fixed = row("5901234567891", null);
+        fixed.setAvailabilityType("AlwaysAvailable");
+        ProductsBulkAddForm form = new ProductsBulkAddForm();
+        form.setProducts(new ArrayList<>(List.of(forged, fixed)));
+
+        // when
+        Map<String, String> errors = form.validate(List.of(), List.of("Default"));
+
+        // then
+        assertThat(errors).containsOnlyKeys("product-0-availabilityType")
+                .containsEntry("product-0-availabilityType", "product.error.availability.invalid");
+        assertThat(fixed.toProduct("cat").getAvailabilityType()).isEqualTo(ProductAvailabilityType.AlwaysAvailable);
+        assertThat(row("5901234567892", null).toProduct("cat").getAvailabilityType())
+                .isEqualTo(ProductAvailabilityType.BasedOnSupply);
     }
 }

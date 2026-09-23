@@ -274,8 +274,13 @@ public class ProductForm {
     }
 
     private Optional<ProductAvailabilityType> parseAvailability() {
+        return availabilityOf(availabilityType);
+    }
+
+    /** The way of pricing a posted value names, or empty for a value no product can have. */
+    static Optional<ProductAvailabilityType> availabilityOf(String value) {
         try {
-            return Optional.of(ProductAvailabilityType.valueOf(StringUtils.defaultString(availabilityType)));
+            return Optional.of(ProductAvailabilityType.valueOf(StringUtils.defaultString(value)));
         } catch (IllegalArgumentException e) {
             return Optional.empty();
         }
