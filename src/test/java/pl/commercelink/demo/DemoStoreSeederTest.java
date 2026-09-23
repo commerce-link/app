@@ -11,6 +11,7 @@ import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
+import pl.commercelink.orders.notifications.EmailNotificationType;
 import pl.commercelink.documents.DocumentReason;
 import pl.commercelink.documents.DocumentType;
 import pl.commercelink.orders.event.EventType;
@@ -1115,6 +1116,38 @@ class DemoStoreSeederTest {
 
         // then
         assertEquals("fakturownia", store.getConfigurationValue(IntegrationType.RECEIPT_PROVIDER));
+    }
+
+    @Test
+    void enablingDevReceiptsForTheFirstTimeAlsoEnablesTheOrderReceiptEmail() {
+        // given
+        Store store = new Store();
+        ReceiptProviderFactory factory = mock(ReceiptProviderFactory.class);
+        when(factory.getDescriptor("receipts-dev")).thenReturn(mock(ReceiptProviderDescriptor.class));
+
+        // when
+        DemoStoreSeeder.enableDevReceipts(store, factory, LocalDateTime.of(2026, 9, 23, 13, 0));
+
+        // then
+        assertTrue(store.getClientNotificationsConfiguration().supports(EmailNotificationType.ORDER_RECEIPT));
+    }
+
+    @Test
+    void reEnablingDevReceiptsDoesNotReAddTheOrderReceiptEmailOnceTheStoreTurnedItOff() {
+        // given
+        Store store = new Store();
+        ReceiptProviderFactory factory = mock(ReceiptProviderFactory.class);
+        when(factory.getDescriptor("receipts-dev")).thenReturn(mock(ReceiptProviderDescriptor.class));
+        DemoStoreSeeder.enableDevReceipts(store, factory, LocalDateTime.of(2026, 9, 23, 13, 0));
+        store.getClientNotificationsConfiguration().disableNotification(EmailNotificationType.ORDER_RECEIPT);
+        store.getReceiptConfiguration().disable();
+
+        // when: receipts are re-seeded (e.g. re-running the seeder); enabledAt is already set, so it is not
+        // the first time anymore
+        DemoStoreSeeder.enableDevReceipts(store, factory, LocalDateTime.of(2026, 9, 24, 8, 0));
+
+        // then
+        assertFalse(store.getClientNotificationsConfiguration().supports(EmailNotificationType.ORDER_RECEIPT));
     }
 
     @Test

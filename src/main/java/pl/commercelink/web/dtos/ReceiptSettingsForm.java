@@ -3,8 +3,6 @@ package pl.commercelink.web.dtos;
 import lombok.Getter;
 import lombok.Setter;
 import pl.commercelink.orders.OrderSourceType;
-import pl.commercelink.orders.notifications.EmailNotificationType;
-import pl.commercelink.stores.ClientNotificationsConfiguration;
 import pl.commercelink.stores.ReceiptConfiguration;
 import pl.commercelink.stores.Store;
 
@@ -51,15 +49,7 @@ public class ReceiptSettingsForm {
         if (enabled) {
             configuration.enable(now);
             if (firstTime) {
-                ClientNotificationsConfiguration notifications = store.getClientNotificationsConfiguration();
-                if (notifications == null) {
-                    notifications = new ClientNotificationsConfiguration();
-                    store.setClientNotificationsConfiguration(notifications);
-                }
-                if (!notifications.supports(EmailNotificationType.ORDER_RECEIPT)) {
-                    notifications.enableNotification(EmailNotificationType.ORDER_RECEIPT,
-                            EmailNotificationType.ORDER_RECEIPT.getTemplateName());
-                }
+                store.enableOrderReceiptEmailNotification();
             }
         } else {
             configuration.disable();

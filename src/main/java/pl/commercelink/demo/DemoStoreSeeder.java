@@ -261,7 +261,9 @@ public class DemoStoreSeeder implements StoreSeeder {
      * Picks the in-memory receipts adapter for demo stores when it is on the classpath (dev profile
      * only). Both guards matter: without the adapter on the classpath there is nothing to select,
      * and a store that already has a receipt integration keeps it, so a real (e.g. Fakturownia)
-     * configuration is never replaced by the mock.
+     * configuration is never replaced by the mock. Enabling receipts for the first time also turns
+     * on the {@code ORDER_RECEIPT} e-mail, the same first-time rule the settings form applies, so the
+     * demo store's first fiscalised receipt does not raise a permanent {@code EMAIL_NOT_SENT} alert.
      */
     static void enableDevReceipts(Store store, ReceiptProviderFactory receiptProviderFactory, LocalDateTime now) {
         if (receiptProviderFactory.getDescriptor(DEV_RECEIPTS) == null) {
@@ -271,7 +273,11 @@ public class DemoStoreSeeder implements StoreSeeder {
             return;
         }
         store.setConfigurationValue(IntegrationType.RECEIPT_PROVIDER, DEV_RECEIPTS);
+        boolean firstTime = store.getReceiptConfiguration().getEnabledAt() == null;
         store.getReceiptConfiguration().enable(now);
+        if (firstTime) {
+            store.enableOrderReceiptEmailNotification();
+        }
     }
 
     /**
