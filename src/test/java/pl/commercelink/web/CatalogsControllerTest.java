@@ -136,6 +136,41 @@ class CatalogsControllerTest {
         verify(detailsService, never()).save(any(), any(), any());
     }
 
+    /**
+     * RF-27: a save the service could not complete (the repository or the schedule behind it failed) is no fault of
+     * the schedule field; it is shown as an alert above the form, with no field marked.
+     */
+    @Test
+    void aFailedSaveIsAnAlertAboveTheFormNotAnErrorOfTheSchedule() throws Exception {
+        // given
+        when(detailsService.minIntervalMinutes()).thenReturn(5);
+        when(access.requireCatalog(STORE_ID, "c1")).thenReturn(new ProductCatalog(STORE_ID, "Parts"));
+        when(detailsService.save(eq(STORE_ID), eq("c1"), any())).thenReturn(new ProductCatalogDetailsService.UpdateResult(
+                List.of(pl.commercelink.inventory.supplier.ErrorMessage.of("catalog.save.error.failed"))));
+
+        // when / then
+        mvc.perform(post("/dashboard/catalogs/c1/settings").header("X-Requested-With", "fetch").param("name", "Parts"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(view().name("catalog/catalog-settings :: settingsForm"))
+                .andExpect(model().attribute("errors", Map.of()))
+                .andExpect(model().attribute("formError", "catalog.save.error.failed"));
+    }
+
+    /** A schedule the service refuses (too frequent, unreadable) stays at the schedule field. */
+    @Test
+    void aScheduleTheServiceRefusesStaysAtTheScheduleField() throws Exception {
+        // given
+        when(detailsService.minIntervalMinutes()).thenReturn(5);
+        when(detailsService.save(eq(STORE_ID), anyString(), any())).thenReturn(new ProductCatalogDetailsService.UpdateResult(
+                List.of(pl.commercelink.inventory.supplier.ErrorMessage.of("catalog.pricelist.schedule.error.too.frequent", "rate(1 minute)", 5))));
+
+        // when / then
+        mvc.perform(post("/dashboard/catalogs/new").param("name", "Parts").param("newCatalogId", "k3y0000009"))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("errors", hasKey("pricelistSchedule")))
+                .andExpect(model().attributeDoesNotExist("formError"));
+    }
+
     @Test
     void savedSettingsRedirectToTheCatalogWithAFlash() throws Exception {
         // given

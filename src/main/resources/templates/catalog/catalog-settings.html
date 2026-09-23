@@ -32,6 +32,12 @@
                   method="post" novalidate data-cl-async data-cl-schedule-auto
                   th:attr="data-cl-redirect=${redirectTo}, data-error-message=#{form.save.failed}">
                 <div th:replace="~{fragments/settings-form :: errorSummary('catalog-settings-errors', ${errors}, null)}"></div>
+                <!--/* A save the service could not complete (RF-27) is no field's fault: the summary alert, without a field
+                       to link to. The errors map is empty then, so the two never show together. */-->
+                <div th:if="${formError != null}" id="catalog-settings-errors" class="cl-alert is-bad" tabindex="-1" data-cl-error-summary>
+                    <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
+                    <p class="cl-alert-text" th:text="#{${formError}}"></p>
+                </div>
                 <!--/* The id the new catalog gets, given with the page: the form sent twice names one catalog (RF-5). */-->
                 <input th:unless="${existing}" type="hidden" name="newCatalogId" th:value="*{newCatalogId}"/>
                 <div class="cl-card">
@@ -76,7 +82,7 @@
             <dialog th:replace="~{fragments/confirm-dialog :: dialog}"></dialog>
         </div>
     </section>
-    <script th:if="${!errors.isEmpty()}">
+    <script th:if="${!errors.isEmpty() or formError != null}">
         document.getElementById('catalog-settings-errors').focus();
     </script>
     <script th:replace="~{fragments/schedule-field :: script}"></script>

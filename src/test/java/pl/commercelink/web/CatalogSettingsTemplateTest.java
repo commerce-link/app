@@ -138,6 +138,30 @@ class CatalogSettingsTemplateTest {
         assertThat(html).contains("<input type=\"hidden\" name=\"newCatalogId\" value=\"k3y0000001\"");
     }
 
+    /** RF-27: a failed save is the form's summary alert with its message, and no field is marked. */
+    @Test
+    void aFailedSaveRendersAnAlertWithoutAFieldError() {
+        // given
+        CatalogSettingsForm form = new CatalogSettingsForm();
+        form.setName("Parts");
+        Context context = new Context();
+        context.setVariables(Map.of("form", form, "errors", Map.of(), "existing", true,
+                "formAction", "/dashboard/catalogs/c1/settings", "backHref", "/dashboard/catalogs/c1", "backLabel", "Parts",
+                "pageTitle", "Catalog settings", "scheduleMinIntervalMinutes", 5, "formError", "catalog.save.error.failed"));
+        context.setVariable("deleteHref", null);
+        context.setVariable("catalogId", "c1");
+        context.setVariable("redirectTo", null);
+
+        // when
+        String html = EnglishFragmentTemplateEngine.create().process("catalog/catalog-settings", context);
+
+        // then
+        assertThat(html).containsPattern("id=\"catalog-settings-errors\" class=\"cl-alert is-bad\"[^>]*data-cl-error-summary")
+                .contains("Failed to save the catalog. Please try again.")
+                .doesNotContain("pricelistSchedule-error").doesNotContain("is-invalid")
+                .contains("document.getElementById('catalog-settings-errors').focus()");
+    }
+
     @Test
     void anExistingCatalogPostsNoNewId() {
         // when / then

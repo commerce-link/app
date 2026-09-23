@@ -132,7 +132,7 @@ public class CatalogsController {
         ProductCatalogDetailsService.UpdateResult result =
                 detailsService.save(storeId, catalogId, form.toCatalog(storeId, catalogId));
         if (result.hasErrors()) {
-            return rejected(renderSettings(null, form, saveErrors(result), model, locale), SETTINGS_FRAGMENT, async, response);
+            return rejected(renderSettings(null, form, saveErrors(result, model), model, locale), SETTINGS_FRAGMENT, async, response);
         }
         String message = messageSource.getMessage("catalog.created", new Object[]{form.getName().trim()}, locale);
         return saved(CatalogPaths.catalog(catalogId), message, async, model, redirectAttributes, request, response,
@@ -176,7 +176,7 @@ public class CatalogsController {
         }
         ProductCatalogDetailsService.UpdateResult result = detailsService.save(storeId, catalogId, form.toCatalog(storeId, catalogId));
         if (result.hasErrors()) {
-            return rejected(renderSettings(catalog, form, saveErrors(result), model, locale), SETTINGS_FRAGMENT, async, response);
+            return rejected(renderSettings(catalog, form, saveErrors(result, model), model, locale), SETTINGS_FRAGMENT, async, response);
         }
         String message = messageSource.getMessage("catalog.saved", new Object[]{form.getName().trim()}, locale);
         return saved(CatalogPaths.catalog(catalogId), message, async, model, redirectAttributes, request, response,
@@ -235,16 +235,20 @@ public class CatalogsController {
 
     /**
      * The service rechecks the schedule and reports it with arguments; the summary above the form renders a key
-     * without them, so a schedule complaint is swapped for the placeholder-free variant shown under the field.
+     * without them, so a schedule complaint is swapped for the placeholder-free variant shown under the field. Any
+     * other refusal (the repository or the scheduler failed) is no field's fault: it goes to the model as formError,
+     * the alert above the form, and no field is marked.
      */
-    private Map<String, String> saveErrors(ProductCatalogDetailsService.UpdateResult result) {
+    private Map<String, String> saveErrors(ProductCatalogDetailsService.UpdateResult result, Model model) {
         String code = result.errors().get(0).code();
         if (code.equals("catalog.pricelist.schedule.error.too.frequent")) {
-            code = CatalogSettingsForm.scheduleErrorKey(InvalidScheduleException.Reason.TOO_FREQUENT);
-        } else if (code.equals("catalog.pricelist.schedule.error.invalid")) {
-            code = CatalogSettingsForm.scheduleErrorKey(InvalidScheduleException.Reason.SYNTAX);
+            return Map.of("pricelistSchedule", CatalogSettingsForm.scheduleErrorKey(InvalidScheduleException.Reason.TOO_FREQUENT));
         }
-        return Map.of("pricelistSchedule", code);
+        if (code.equals("catalog.pricelist.schedule.error.invalid")) {
+            return Map.of("pricelistSchedule", CatalogSettingsForm.scheduleErrorKey(InvalidScheduleException.Reason.SYNTAX));
+        }
+        model.addAttribute("formError", code);
+        return Map.of();
     }
 
     private String renderSettings(ProductCatalog existing, CatalogSettingsForm form, Map<String, String> errors, Model model, Locale locale) {
