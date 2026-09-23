@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--/* The delivery's supplier label, with the counterparty shortcut learned from an invoice sync underneath.
+       The sync never changes the supplier itself (app#197), so without this line the operator cannot see
+       which counterparty in the invoicing system the delivery was matched to. */-->
+<td th:fragment="cell(label, counterpartyShortcut)">
+    <span th:text="${label}"></span>
+    <p class="is-size-7 has-text-grey"
+       th:if="${!#strings.isEmpty(counterpartyShortcut) and counterpartyShortcut != label}"
+       th:text="#{deliveries.counterpartyShortcut.short} + ': ' + ${counterpartyShortcut}"></p>
+</td>
+</body>
+</html>
