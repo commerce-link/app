@@ -23,15 +23,18 @@ class CatalogMessagesTest {
     private static final Pattern DOUBLED_APOSTROPHE = Pattern.compile("''");
 
     /**
-     * D-M25/RF-30: a {@code MessageFormat} placeholder immediately followed by "produkt"/"pozycja" and its endings
-     * reads wrong for most of the counts it can be given at runtime ("1 produktów", "3 produkty" are both
-     * ungrammatical), because Polish inflects the noun by count in three classes (1 / 2-4 / 5+) that a single
-     * placeholder cannot agree with. The fix is the label form ("Produkty do usunięcia: {0}") instead of a number
-     * directly in front of the noun. A literal digit written into the text (e.g. "Powyżej 0 produktów") is not
-     * flagged here: unlike a placeholder it never changes at runtime, so it is either right or wrong on its own.
+     * D-M25/RF-30: a {@code MessageFormat} placeholder immediately followed by "produkt"/"pozycja"/"minuta" and
+     * their endings reads wrong for most of the counts it can be given at runtime ("1 produktów", "3 produkty",
+     * "{1} minut" are all ungrammatical for some count), because Polish inflects the noun by count in three
+     * classes (1 / 2-4 / 5+) that a single placeholder cannot agree with. The fix is either the label form
+     * ("Produkty do usunięcia: {0}") instead of a number directly in front of the noun, or the invariant
+     * abbreviation ("co {1} min", already the convention in {@code store.supplier.schedule.summary.*}) where the
+     * unit allows one. A literal digit written into the text (e.g. "Gdy wartość jest większa od 0, produkt...")
+     * is not flagged here: unlike a placeholder it never changes at runtime, so it is either right or wrong on its
+     * own, and is not the class of bug this test guards against.
      */
     private static final Pattern NUMBER_BEFORE_INFLECTED_NOUN =
-            Pattern.compile("\\{\\d+\\}\\s*(produkt(y|ów|u)?|pozycj(i|ę|e|a)?)\\b");
+            Pattern.compile("\\{\\d+\\}\\s*(produkt(y|ów|u)?|pozycj(i|ę|e|a)?|minut(a|y)?)\\b");
 
     /** The messages of the catalog pages: their own keys and the product keys the product page reads. */
     private static Map<String, String> catalogMessages(String file) throws Exception {
@@ -44,11 +47,42 @@ class CatalogMessagesTest {
                 .collect(Collectors.toMap(key -> key, properties::getProperty));
     }
 
+    /** The "what this screen is for" intro of the catalogs screen, outside the {@code catalog.}/{@code product.} prefixes. */
+    private static Map<String, String> introCatalogsMessages(String file) throws Exception {
+        Properties properties = new Properties();
+        try (Reader reader = Files.newBufferedReader(Path.of("src/main/resources", file), StandardCharsets.UTF_8)) {
+            properties.load(reader);
+        }
+        return properties.stringPropertyNames().stream()
+                .filter(key -> key.startsWith("intro.catalogs."))
+                .collect(Collectors.toMap(key -> key, properties::getProperty));
+    }
+
     @Test
     void polishAndEnglishDefineTheSameCatalogKeys() throws Exception {
         // when / then
         assertThat(catalogMessages("messages_pl.properties").keySet())
                 .isEqualTo(catalogMessages("messages_en.properties").keySet());
+    }
+
+    @Test
+    void polishAndEnglishDefineTheSameCatalogsIntroKeys() throws Exception {
+        // when / then
+        assertThat(introCatalogsMessages("messages_pl.properties").keySet())
+                .isEqualTo(introCatalogsMessages("messages_en.properties").keySet());
+    }
+
+    /**
+     * D-M31/OD-11: the catalogs intro describes catalog → categories → products; "mapowanie marek" /
+     * "brand mapping" is not a concept this redesign surfaces (spec §5.1), so it must not reappear here.
+     */
+    @Test
+    void theCatalogsIntroLeadDoesNotMentionBrandMapping() throws Exception {
+        // when / then
+        assertThat(introCatalogsMessages("messages_pl.properties").get("intro.catalogs.lead"))
+                .isNotNull().doesNotContain("mapowan");
+        assertThat(introCatalogsMessages("messages_en.properties").get("intro.catalogs.lead"))
+                .isNotNull().doesNotContainIgnoringCase("brand mapping");
     }
 
     @Test
