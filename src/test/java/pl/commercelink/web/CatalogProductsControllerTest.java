@@ -1188,6 +1188,41 @@ class CatalogProductsControllerTest {
         assertThat(saved.getValue().isEnabled()).isTrue();
     }
 
+    /**
+     * RF-1: "Dodaj i edytuj" shows the product with the PIM entry its inventory key resolves to; the save resolves it
+     * the same way, so an entry the catalogue holds under a sibling EAN of the key is not lost on the way.
+     */
+    @Test
+    void createProductResolvesThePimEntryThroughTheWholeInventoryKey() throws Exception {
+        // given
+        gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
+        InventoryKey key = new InventoryKey(Set.of("5901234567890", "4719331361600"), Set.of("MFN-1"));
+        MatchedInventory matched = mock(MatchedInventory.class);
+        when(matched.isEmpty()).thenReturn(false);
+        when(matched.getInventoryKey()).thenReturn(key);
+        when(inventoryView.findByInventoryKey(any())).thenReturn(matched);
+        PimEntry entry = mock(PimEntry.class);
+        when(entry.pimId()).thenReturn("pim-9");
+        when(entry.brand()).thenReturn("msi");
+        when(pimCatalog.findByPimIdOrGtinsOrMpns(key.getId(), key.getProductEans(), key.getProductCodes()))
+                .thenReturn(Optional.of(entry));
+        when(brandMapper.unifyBrand("msi")).thenReturn("MSI");
+
+        // when
+        mvc.perform(post(categoryPath() + "/products/new")
+                        .param("name", "MSI RTX 5070").param("ean", "5901234567890")
+                        .param("availabilityType", "BasedOnSupply").param("pricingGroup", "Default")
+                        .param("enabled", "true"))
+                .andExpect(redirectedUrl(categoryPath() + "?status=active"));
+
+        // then
+        ArgumentCaptor<Product> saved = ArgumentCaptor.forClass(Product.class);
+        verify(productRepository).save(saved.capture());
+        assertThat(saved.getValue().getPimId()).isEqualTo("pim-9");
+        assertThat(saved.getValue().getBrand()).isEqualTo("MSI");
+        verify(pimCatalog, never()).findByGtinOrMpn(any(), any());
+    }
+
     @Test
     void serviceFlagFollowsTheCheckbox() throws Exception {
         // given

@@ -390,7 +390,9 @@ public class CatalogProductsController {
                     model, locale), PRODUCT_FRAGMENT, async, response);
         }
         Product product = form.toNewProduct(category.getCategoryId());
-        pimCatalog.findByGtinOrMpn(product.getEan(), product.getManufacturerCode()).ifPresent(entry -> {
+        // Resolved the way the prefill and the review resolve it, through the whole inventory key: asked by its own
+        // two codes alone, an entry held under a sibling EAN would be missed and the product saved without a pim id.
+        pimEntryOf(inventory.withEnabledSuppliersOnly(storeId()), InventoryKey.fromProduct(product), product).ifPresent(entry -> {
             product.setPimId(entry.pimId());
             product.setBrand(brandMapper.unifyBrand(entry.brand()));
         });

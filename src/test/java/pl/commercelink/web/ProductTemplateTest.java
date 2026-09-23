@@ -17,6 +17,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -109,6 +110,17 @@ class ProductTemplateTest {
     }
 
     private static String rendered(boolean edit, Map<String, String> errors, List<CatalogProductsController.LeadPart> lead) {
+        return rendered(edit, errors, lead, form -> {
+        });
+    }
+
+    /** The same page with the form changed first, as a product prefilled or saved with other values would give it. */
+    private static String rendered(boolean edit, Consumer<ProductForm> change) {
+        return rendered(edit, Map.of(), List.of(new CatalogProductsController.LeadPart("EAN 4719331361600", false)), change);
+    }
+
+    private static String rendered(boolean edit, Map<String, String> errors, List<CatalogProductsController.LeadPart> lead,
+                                   Consumer<ProductForm> change) {
         Product product = new Product("k1", "pim-1", "4719331361600", "GV-N5080", "Gigabyte", "RTX 5080",
                 "Gigabyte RTX 5080", "Default");
         product.setProductId("p1");
@@ -123,6 +135,7 @@ class ProductTemplateTest {
         filter.setOperator("=");
         product.getCustomAttributesFilters().add(filter);
         ProductForm form = ProductForm.from(product);
+        change.accept(form);
         CategoryDefinition category = new CategoryDefinition().withName("GPU");
         Map<String, Object> variables = new HashMap<>();
         variables.put("form", form);
@@ -270,5 +283,20 @@ class ProductTemplateTest {
                 .contains("&lt;b&gt;Brand&lt;/b&gt;").doesNotContain("<b>");
         assertThat(lead.indexOf("EAN 1")).isLessThan(lead.indexOf("No PIM entry"));
         assertThat(lead.indexOf("No PIM entry")).isLessThan(lead.indexOf("Brand"));
+    }
+
+    /**
+     * RF-20: a product prefilled from the inventory may carry a label the category does not offer. Nothing is saved
+     * yet, so there is no label to keep: the select starts from "—" instead of an option the save would refuse.
+     */
+    @Test
+    void aNewProductOffersNoOptionOutsideTheLabelList() {
+        // when
+        String html = rendered(false, form -> form.setLabel("RTX 4060"));
+
+        // then
+        assertThat(html).doesNotContain("RTX 4060 (outside the list)").doesNotContain("value=\"RTX 4060\"");
+        assertThat(rendered(true, form -> form.setLabel("RTX 4060")))
+                .contains("<option value=\"RTX 4060\" selected>RTX 4060 (outside the list)</option>");
     }
 }

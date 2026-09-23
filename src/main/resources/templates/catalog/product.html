@@ -61,8 +61,10 @@
                                         <option th:each="option : ${labels}" th:value="${option}" th:text="${option}"
                                                 th:selected="${option == form.label}"></option>
                                         <!--/* The label the product was saved with stays choosable although the category
-                                               no longer offers it: nothing moves to another label by itself. */-->
-                                        <option th:if="${form.label != null and !labels.contains(form.label)}"
+                                               no longer offers it: nothing moves to another label by itself. A new
+                                               product has no saved label to keep, so a prefilled one outside the list
+                                               leaves the select on "—" instead of offering a value the save refuses. */-->
+                                        <option th:if="${existing and form.label != null and !labels.contains(form.label)}"
                                                 th:value="${form.label}" th:text="#{product.label.outside(${form.label})}" selected></option>
                                     </select>
                                     <p th:if="${errors['label'] != null}" class="cl-field-error">
