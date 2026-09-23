@@ -1398,6 +1398,50 @@ class CatalogProductsControllerTest {
         verify(productRepository, never()).save(any(Product.class));
     }
 
+    /**
+     * RF-5: the form posted twice (Back and send again, a double click without JavaScript) must not add the product
+     * twice. The second POST finds the first one in the category by the same identifiers the review uses.
+     */
+    @Test
+    void aSecondCreateProductWithTheSameEanIsRefusedAndTheCategoryKeepsOneRecord() throws Exception {
+        // given -- the repository remembers what it saved
+        gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
+        List<Product> stored = new java.util.ArrayList<>();
+        when(productRepository.findAll(gpu.getCategoryId())).thenAnswer(call -> List.copyOf(stored));
+        doAnswer(call -> stored.add(call.getArgument(0))).when(productRepository).save(any(Product.class));
+        var create = post(categoryPath() + "/products/new").header("X-Requested-With", "fetch")
+                .param("name", "MSI RTX 5070").param("ean", "4719331361600").param("manufacturerCode", "MFN-1")
+                .param("availabilityType", "BasedOnSupply").param("pricingGroup", "Default").param("enabled", "true");
+
+        // when
+        mvc.perform(create).andExpect(status().isOk());
+        mvc.perform(create)
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(view().name("catalog/product :: productForm"))
+                .andExpect(model().attribute("errors", hasEntry("ean", "product.error.duplicate")));
+
+        // then
+        assertThat(stored).hasSize(1);
+        verify(productRepository, times(1)).save(any(Product.class));
+    }
+
+    /** The guard compares the same way as the review: a product with the code alone is the same product too. */
+    @Test
+    void createProductIsRefusedWhenTheCategoryHasTheManufacturerCodeAlready() throws Exception {
+        // given
+        gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
+        when(productRepository.findAll(gpu.getCategoryId())).thenReturn(List.of(
+                new Product(gpu.getCategoryId(), null, null, "mfn-1", "MSI", null, "MSI RTX 5070", "Default")));
+
+        // when / then
+        mvc.perform(post(categoryPath() + "/products/new")
+                        .param("name", "MSI RTX 5070 OC").param("ean", "4719331361600").param("manufacturerCode", "MFN-1")
+                        .param("availabilityType", "BasedOnSupply").param("pricingGroup", "Default").param("enabled", "true"))
+                .andExpect(view().name("catalog/product"))
+                .andExpect(model().attribute("errors", hasEntry("ean", "product.error.duplicate")));
+        verify(productRepository, never()).save(any(Product.class));
+    }
+
     /** D-I6 for a product: another save got there first, so this one is refused at the form instead of a 500. */
     @Test
     void aProductChangedMeanwhileAnswers422WithTheMessageAtTheForm() throws Exception {

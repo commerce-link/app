@@ -102,6 +102,9 @@ public class CatalogProductsController {
     /** The id of the product form: the key of an error that belongs to the whole form, so the summary links to it. */
     private static final String PRODUCT_FORM = "product-form";
 
+    /** The product being created is in the category already (same EAN, manufacturer code or PIM entry). */
+    private static final String DUPLICATE = "product.error.duplicate";
+
     private final CatalogAccess access;
     private final ProductRepository productRepository;
     private final StoresRepository storesRepository;
@@ -392,6 +395,13 @@ public class CatalogProductsController {
                     model, locale), PRODUCT_FRAGMENT, async, response);
         }
         Product product = form.toNewProduct(category.getCategoryId());
+        // The same form sent again (Back, a double click without JavaScript) finds the product it added the first time,
+        // by the identifiers the review compares with: the category keeps one record, and the page says why not two.
+        InventoryKey key = InventoryKey.fromProduct(product);
+        if (productRepository.findAll(category.getCategoryId()).stream().map(InventoryKey::fromProduct).anyMatch(key::matches)) {
+            return rejected(renderProduct(catalog, category, store, null, form, null, Map.of("ean", DUPLICATE), null,
+                    currentFilter, model, locale), PRODUCT_FRAGMENT, async, response);
+        }
         // Resolved the way the prefill and the review resolve it, through the whole inventory key: asked by its own
         // two codes alone, an entry held under a sibling EAN would be missed and the product saved without a pim id.
         pimEntryOf(inventory.withEnabledSuppliersOnly(storeId()), InventoryKey.fromProduct(product), product).ifPresent(entry -> {
