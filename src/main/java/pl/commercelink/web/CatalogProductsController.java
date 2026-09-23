@@ -72,6 +72,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -525,7 +526,8 @@ public class CatalogProductsController {
         if (refused != null) {
             return refused;
         }
-        productRepository.delete(product);
+        // Deleted whatever its version: a save of the product landing after this page read it does not fail the delete.
+        productRepository.deleteWhateverItsVersion(product);
         SettingsFlash.onRedirect(redirectAttributes,
                 messageSource.getMessage("product.deleted", new Object[]{product.getName()}, locale));
         return "redirect:" + CatalogPaths.category(catalogId, categoryId);
@@ -733,36 +735,44 @@ public class CatalogProductsController {
      * attempt uses the product already read above, so an undisturbed switch costs no second read. A product deleted
      * in the meantime, or one that keeps changing until the retries run out, is not switched and is counted with the
      * skipped ones -- the request never fails for it.
+     *
+     * <p>Nothing is thrown from inside the executor: its Spring Retry proxy recovers ConditionalCheckFailedException
+     * only, and would hand any other exception out as an ExhaustedRetryException. A product found gone is reported
+     * through a flag instead, and the saver leaves it alone.
      */
     private int setEnabled(List<Product> products, boolean enabled) {
         int switched = 0;
         for (Product product : products) {
             AtomicReference<Product> alreadyRead = new AtomicReference<>(product);
+            AtomicBoolean gone = new AtomicBoolean();
             try {
                 optimisticLockingExecutor.modifyAndSave(
                         () -> Optional.ofNullable(alreadyRead.getAndSet(null))
                                 .orElseGet(() -> productRepository.findByProductId(product.getCategoryId(), product.getProductId())),
                         current -> {
-                            if (current == null) {
-                                throw new ProductGoneException();
+                            gone.set(current == null);
+                            if (current != null) {
+                                current.setEnabled(enabled);
                             }
-                            current.setEnabled(enabled);
                         },
-                        productRepository::save);
+                        current -> {
+                            if (current != null) {
+                                productRepository.save(current);
+                            }
+                        });
+            } catch (OptimisticLockingExhaustedException e) {
+                continue;
+            }
+            if (!gone.get()) {
                 switched++;
-            } catch (OptimisticLockingExhaustedException | ProductGoneException e) {
-                // counted as skipped by the caller
             }
         }
         return switched;
     }
 
-    /** The product was deleted between the bulk action's read and the retry of its save. */
-    private static final class ProductGoneException extends RuntimeException {
-    }
-
+    /** What the operator chose goes, even when it was saved meanwhile: the delete does not ask for the version it read. */
     private int delete(List<Product> products) {
-        products.forEach(productRepository::delete);
+        products.forEach(productRepository::deleteWhateverItsVersion);
         return products.size();
     }
 

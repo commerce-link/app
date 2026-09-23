@@ -30,6 +30,7 @@ import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.products.InventoryDefinition;
 import pl.commercelink.products.ProductCatalog;
+import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.ProductRecommendationEngine;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.products.StockDefinition;
@@ -38,6 +39,7 @@ import com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException;
 import pl.commercelink.starter.dynamodb.Metadata;
 import pl.commercelink.starter.dynamodb.OptimisticLockingExhaustedException;
 import pl.commercelink.starter.security.model.CustomUser;
+import pl.commercelink.testsupport.RetryingOptimisticLockingExecutor;
 import pl.commercelink.stores.MarketplaceIntegration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
@@ -923,5 +925,51 @@ class CatalogCategoryControllerTest {
                 .andExpect(redirectedUrl("/dashboard/catalogs/c1"))
                 .andExpect(flash().attribute("catalogError", "catalog.category.delete.protected"))
                 .andExpect(flash().attributeCount(1));
+    }
+
+    /**
+     * The same two races end to end, over the real CategoryDefinitions and the real Spring-Retry-proxied executor:
+     * the service's exception has to leave the executor as itself for the controller to answer it.
+     */
+    private MockMvc overTheRealExecutor(ProductCatalogRepository catalogs) {
+        CategoryDefinitions real = new CategoryDefinitions(catalogs, productRepository, RetryingOptimisticLockingExecutor.create());
+        return MockMvcBuilders.standaloneSetup(new CatalogCategoryController(access, real, productRepository,
+                storesRepository, pimCategoryOptions, marketplaces, recommendationEngine, inventory, messageSource)).build();
+    }
+
+    @Test
+    void aCategoryProtectedMeanwhileIsRefusedThroughTheRealExecutor() throws Exception {
+        // given -- the page read the category unprotected; the save reads it protected
+        CategoryDefinition gpu = categoryOf("GPU");
+        gpu.setDeletionProtection(false);
+        ProductCatalog saved = new ProductCatalog(STORE_ID, "Podzespoły");
+        saved.setCatalogId("c1");
+        CategoryDefinition protectedNow = new CategoryDefinition().withName("GPU");
+        protectedNow.setCategoryId(gpu.getCategoryId());
+        protectedNow.setDeletionProtection(true);
+        saved.getCategories().add(protectedNow);
+        ProductCatalogRepository catalogs = mock(ProductCatalogRepository.class);
+        when(catalogs.findById(STORE_ID, "c1")).thenReturn(saved);
+
+        // when / then
+        overTheRealExecutor(catalogs).perform(post("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/delete"))
+                .andExpect(redirectedUrl("/dashboard/catalogs/c1"))
+                .andExpect(flash().attribute("catalogError", "catalog.category.delete.protected"));
+        verify(catalogs, never()).save(any());
+    }
+
+    @Test
+    void aSectionOfACategoryRemovedMeanwhileIs404ThroughTheRealExecutor() throws Exception {
+        // given
+        CategoryDefinition gpu = categoryOf("GPU");
+        ProductCatalog saved = new ProductCatalog(STORE_ID, "Podzespoły");
+        saved.setCatalogId("c1");
+        ProductCatalogRepository catalogs = mock(ProductCatalogRepository.class);
+        when(catalogs.findById(STORE_ID, "c1")).thenReturn(saved);
+
+        // when / then
+        overTheRealExecutor(catalogs).perform(withParams(
+                        post("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/pricing"), PRICING))
+                .andExpect(status().isNotFound());
     }
 }

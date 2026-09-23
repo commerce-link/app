@@ -1,6 +1,7 @@
 package pl.commercelink.products;
 
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
+import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapperConfig;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBQueryExpression;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBScanExpression;
 import com.amazonaws.services.dynamodbv2.model.AttributeValue;
@@ -24,6 +25,19 @@ public class ProductRepository extends DynamoDbRepository<Product> {
 
     public ProductRepository(AmazonDynamoDB amazonDynamoDB) {
         super(amazonDynamoDB);
+    }
+
+    /**
+     * Deletes the product whatever version it has now. A plain delete of a versioned item is conditional on the
+     * version it was read with, so a save landing between the read and the delete fails it with
+     * ConditionalCheckFailedException. The deletions of the catalog screens (the bulk action, the product page, a
+     * removed category) delete what the operator chose regardless of an edit made meanwhile; an item already gone is
+     * no error.
+     */
+    public void deleteWhateverItsVersion(Product product) {
+        dynamoDBMapper.delete(product, DynamoDBMapperConfig.builder()
+                .withSaveBehavior(DynamoDBMapperConfig.SaveBehavior.CLOBBER)
+                .build());
     }
 
     public Product findByProductId(String categoryId, String productId) {

@@ -57,8 +57,9 @@ class CategoryDefinitionsTest {
         // Every section is applied to the catalog as read at the save; here that read answers the same object, so the
         // tests below can look at the category they passed in.
         lenient().when(catalogs.findById(catalog.getStoreId(), catalog.getCatalogId())).thenReturn(catalog);
+        // The answer behaves like the real proxy: conflicts retried, anything else wrapped (RetryingOptimisticLockingExecutorTest).
         lenient().when(optimisticLockingExecutor.modifyAndSave(any(), any(), any()))
-                .thenAnswer(OptimisticLockingExecutorMocks.passThroughModifyAndSave());
+                .thenAnswer(OptimisticLockingExecutorMocks.retryingModifyAndSave(3));
     }
 
     /** The catalog as another request left it: the same category, renamed by a save of the basics. */
@@ -124,7 +125,7 @@ class CategoryDefinitionsTest {
 
         // when / then
         assertThatThrownBy(() -> definitions.savePricing(catalog, gpu, premiumPricing()))
-                .isInstanceOf(CategoryDefinitions.CategoryNotFoundException.class);
+                .isExactlyInstanceOf(CategoryDefinitions.CategoryNotFoundException.class);
         verify(catalogs, never()).save(any());
     }
 
@@ -160,7 +161,7 @@ class CategoryDefinitionsTest {
         // then
         InOrder order = inOrder(catalogs, products);
         order.verify(catalogs).save(catalog);
-        order.verify(products).delete(owned);
+        order.verify(products).deleteWhateverItsVersion(owned.get(0));
     }
 
     @Test
@@ -184,7 +185,7 @@ class CategoryDefinitionsTest {
         assertThatThrownBy(() -> definitions.remove(catalog, gpu)).isInstanceOf(OptimisticLockingExhaustedException.class);
         verify(catalogs, times(3)).save(any());
         verify(products, never()).findAll(any(String.class));
-        verify(products, never()).delete(any(List.class));
+        verify(products, never()).deleteWhateverItsVersion(any());
     }
 
     @Test
@@ -287,7 +288,7 @@ class CategoryDefinitionsTest {
         // then
         assertThat(result.productsKept()).isTrue();
         assertThat(catalog.getCategories()).doesNotContain(gpu);
-        verify(products, never()).delete(any(List.class));
+        verify(products, never()).deleteWhateverItsVersion(any());
     }
 
     @Test
@@ -307,7 +308,7 @@ class CategoryDefinitionsTest {
         assertThat(preview.productsKept()).isTrue();
         assertThat(preview.productsToDelete()).isZero();
         assertThat(result.productsKept()).isEqualTo(preview.productsKept());
-        verify(products, never()).delete(any(List.class));
+        verify(products, never()).deleteWhateverItsVersion(any());
     }
 
     @Test
@@ -329,7 +330,7 @@ class CategoryDefinitionsTest {
         assertThat(preview.productsToDelete()).isEqualTo(2);
         assertThat(result.productsKept()).isEqualTo(preview.productsKept());
         assertThat(result.productsDeleted()).isEqualTo(preview.productsToDelete());
-        verify(products).delete(owned);
+        owned.forEach(product -> verify(products).deleteWhateverItsVersion(product));
     }
 
     @Test
@@ -349,5 +350,30 @@ class CategoryDefinitionsTest {
         // when / then
         assertThat(definitions.productsInPriceGroup(gpu, "Premium")).isEqualTo(1);
         assertThat(definitions.productsInPriceGroup(gpu, "Ultra")).isZero();
+    }
+
+    /** Protection switched on by another request between the page's check and the save: refused, nothing deleted. */
+    @Test
+    void aCategoryProtectedMeanwhileIsRefusedAndNothingIsDeleted() {
+        // given
+        gpu.setDeletionProtection(false);
+        ProductCatalog read = renamedMeanwhile();
+        read.getCategories().get(0).setDeletionProtection(true);
+        when(catalogs.findById(catalog.getStoreId(), catalog.getCatalogId())).thenReturn(read);
+
+        // when / then
+        assertThatThrownBy(() -> definitions.remove(catalog, gpu)).isExactlyInstanceOf(IllegalStateException.class);
+        verify(catalogs, never()).save(any());
+        verify(products, never()).findAll(any(String.class));
+    }
+
+    @Test
+    void aCatalogRemovedMeanwhileIsNotFound() {
+        // given
+        when(catalogs.findById(catalog.getStoreId(), catalog.getCatalogId())).thenReturn(null);
+
+        // when / then
+        assertThatThrownBy(() -> definitions.saveFilters(catalog, gpu, List.of()))
+                .isExactlyInstanceOf(CategoryDefinitions.CategoryNotFoundException.class);
     }
 }

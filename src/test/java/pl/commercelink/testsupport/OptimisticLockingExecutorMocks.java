@@ -2,6 +2,7 @@ package pl.commercelink.testsupport;
 
 import com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException;
 import org.mockito.stubbing.Answer;
+import org.springframework.retry.ExhaustedRetryException;
 import pl.commercelink.starter.dynamodb.OptimisticLockingExhaustedException;
 
 import java.util.function.Consumer;
@@ -40,9 +41,11 @@ public final class OptimisticLockingExecutorMocks {
     }
 
     /**
-     * What the Spring Retry proxy of OptimisticLockingExecutor does, without Spring: the whole load-modify-save runs
-     * again on a ConditionalCheckFailedException, and once {@code maxAttempts} are used up the @Recover method turns
-     * the last one into an OptimisticLockingExhaustedException.
+     * What the Spring Retry proxy of OptimisticLockingExecutor (starter 0.1.10) does, without Spring: the whole
+     * load-modify-save runs again on a ConditionalCheckFailedException, and once {@code maxAttempts} are used up the
+     * @Recover method turns the last one into an OptimisticLockingExhaustedException. Any other exception is not
+     * retried and, since no @Recover method takes it, comes out wrapped in an ExhaustedRetryException ("Cannot locate
+     * recovery method") -- never as itself. RetryingOptimisticLockingExecutor pins this against the real proxy.
      */
     @SuppressWarnings("unchecked")
     public static Answer<Object> retryingModifyAndSave(int maxAttempts) {
@@ -59,6 +62,8 @@ public final class OptimisticLockingExecutorMocks {
                     return entity;
                 } catch (ConditionalCheckFailedException e) {
                     last = e;
+                } catch (RuntimeException e) {
+                    throw new ExhaustedRetryException("Cannot locate recovery method", e);
                 }
             }
             throw new OptimisticLockingExhaustedException(maxAttempts, last);

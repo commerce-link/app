@@ -44,6 +44,7 @@ import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.testsupport.OptimisticLockingExecutorMocks;
+import pl.commercelink.testsupport.RetryingOptimisticLockingExecutor;
 import pl.commercelink.web.catalog.CatalogAccess;
 import pl.commercelink.web.catalog.CategoryFilter;
 import pl.commercelink.web.catalog.CategoryPageModel;
@@ -149,8 +150,9 @@ class CatalogProductsControllerTest {
         lenient().when(store.getEnabledCategories()).thenReturn(List.of());
         lenient().when(pimCategoryOptions.namedOptions(any(), any())).thenReturn(List.of());
         lenient().when(pimCategoryOptions.ancestorsOfNames(any())).thenReturn(List.of());
+        // Behaves like the real proxy: conflicts retried, anything else wrapped (RetryingOptimisticLockingExecutorTest).
         lenient().when(optimisticLockingExecutor.modifyAndSave(any(), any(), any()))
-                .thenAnswer(OptimisticLockingExecutorMocks.passThroughModifyAndSave());
+                .thenAnswer(OptimisticLockingExecutorMocks.retryingModifyAndSave(3));
         mvc = MockMvcBuilders.standaloneSetup(new CatalogProductsController(access, productRepository, storesRepository,
                 recommendationEngine, inventory, marketplaces, pimCategoryOptions, supplierLabels, pimCatalog,
                 brandMapper, messageSource, optimisticLockingExecutor)).build();
@@ -454,7 +456,7 @@ class CatalogProductsControllerTest {
         // when / then
         mvc.perform(post(categoryPath() + "/products/bulk").param("action", "delete").param("productIds", "p1"))
                 .andExpect(redirectedUrl(categoryPath() + "?status=active"));
-        verify(productRepository).delete(a);
+        verify(productRepository).deleteWhateverItsVersion(a);
     }
 
     @Test
@@ -1332,7 +1334,7 @@ class CatalogProductsControllerTest {
         mvc.perform(post(categoryPath() + "/products/p1/delete"))
                 .andExpect(redirectedUrl(categoryPath()))
                 .andExpect(flash().attribute("settingsSavedMessage", "product.deleted"));
-        verify(productRepository).delete(existing);
+        verify(productRepository).deleteWhateverItsVersion(existing);
     }
 
     @Test
@@ -1602,5 +1604,44 @@ class CatalogProductsControllerTest {
                 .andExpect(redirectedUrl(categoryPath() + "?status=active"))
                 .andExpect(flash().attribute("settingsSavedMessage", "Disabled 1, skipped 1"));
         assertThat(a.isEnabled()).isFalse();
+    }
+
+    /**
+     * A product deleted by another request while the switch was retried: skipped and counted, never a 500. Over the
+     * real Spring-Retry-proxied executor, which hands any exception other than a conflict out wrapped.
+     */
+    @Test
+    void bulkEnableCountsAProductDeletedMeanwhileAsSkippedThroughTheRealExecutor() throws Exception {
+        // given -- the bulk read finds it; the save conflicts; the retry's read finds it gone
+        Product stale = new Product(gpu.getCategoryId(), "pim", "1", "m", "MSI", "l", "n", "Default");
+        stale.setProductId("p1");
+        stale.setEnabled(false);
+        when(productRepository.findByProductId(gpu.getCategoryId(), "p1")).thenReturn(stale, (Product) null);
+        doThrow(new ConditionalCheckFailedException("version changed")).when(productRepository).save(stale);
+        when(messageSource.getMessage(eq("catalog.products.bulk.enabled.skipped"), eq(new Object[]{0, 1}), any(Locale.class)))
+                .thenReturn("Enabled 0, skipped 1");
+        MockMvc real = MockMvcBuilders.standaloneSetup(new CatalogProductsController(access, productRepository, storesRepository,
+                recommendationEngine, inventory, marketplaces, pimCategoryOptions, supplierLabels, pimCatalog,
+                brandMapper, messageSource, RetryingOptimisticLockingExecutor.create())).build();
+
+        // when / then
+        real.perform(post(categoryPath() + "/products/bulk").param("action", "enable").param("productIds", "p1"))
+                .andExpect(redirectedUrl(categoryPath() + "?status=active"))
+                .andExpect(flash().attribute("catalogWarning", "Enabled 0, skipped 1"));
+    }
+
+    /** A bulk deletion deletes what was chosen even when it was saved meanwhile: the delete does not ask for a version. */
+    @Test
+    void bulkDeleteDeletesWhateverTheVersionOfEachProduct() throws Exception {
+        // given
+        Product a = new Product(gpu.getCategoryId(), "pim", "1", "m", "MSI", "l", "n", "Default");
+        a.setProductId("p1");
+        when(productRepository.findByProductId(gpu.getCategoryId(), "p1")).thenReturn(a);
+
+        // when / then
+        mvc.perform(post(categoryPath() + "/products/bulk").param("action", "delete").param("productIds", "p1"))
+                .andExpect(flash().attribute("settingsSavedMessage", "catalog.products.bulk.deleted"));
+        verify(productRepository).deleteWhateverItsVersion(a);
+        verify(productRepository, never()).delete(any(Product.class));
     }
 }

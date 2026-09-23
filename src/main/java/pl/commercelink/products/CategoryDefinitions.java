@@ -14,8 +14,11 @@ import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -83,10 +86,11 @@ public class CategoryDefinitions {
                 .withAvailabilityDefinition(new AvailabilityDefinition(3, 1))
                 .withPriceDefinition(new PriceDefinition(1.00, 0, 0, 0, 0, PriceDefinition.DEFAULT_PRICING_GROUP));
         applyBasics(category, basics);
-        modifyCatalog(catalog, fresh -> {
+        modifyCatalog(catalog, null, fresh -> {
             fresh.getCategories().removeIf(existing -> category.getCategoryId().equals(existing.getCategoryId()));
             category.setSequenceNumber(basics.sequenceNumber() > 0 ? basics.sequenceNumber() : fresh.getNextSequenceNumber());
             fresh.getCategories().add(category);
+            return Outcome.APPLIED;
         });
         return category;
     }
@@ -152,18 +156,25 @@ public class CategoryDefinitions {
     public RemoveResult remove(ProductCatalog catalog, CategoryDefinition category) {
         requireUnprotected(category);
         AtomicBoolean kept = new AtomicBoolean();
-        modifyCatalog(catalog, fresh -> {
-            CategoryDefinition current = categoryIn(fresh, catalog.getCatalogId(), category.getCategoryId());
-            requireUnprotected(current);
-            kept.set(productsSurviveRemoval(fresh, current));
-            fresh.getCategories().remove(current);
+        modifyCatalog(catalog, category.getCategoryId(), fresh -> {
+            Optional<CategoryDefinition> current = categoryIn(fresh, category.getCategoryId());
+            if (current.isEmpty()) {
+                return Outcome.CATEGORY_GONE;
+            }
+            // Checked again on the read that is saved: protection may have been switched on since the page's check.
+            if (current.get().isDeletionProtection()) {
+                return Outcome.PROTECTED;
+            }
+            kept.set(productsSurviveRemoval(fresh, current.get()));
+            fresh.getCategories().remove(current.get());
+            return Outcome.APPLIED;
         });
         int deleted = 0;
         if (!kept.get()) {
             List<Product> orphaned = products.findAll(category.getCategoryId());
-            if (!orphaned.isEmpty()) {
-                products.delete(orphaned);
-            }
+            // Deleted whatever their version: a product saved between this read and its deletion goes with the
+            // category all the same, instead of failing the removal halfway through the list.
+            orphaned.forEach(products::deleteWhateverItsVersion);
             deleted = orphaned.size();
         }
         return new RemoveResult(kept.get(), deleted);
@@ -192,35 +203,55 @@ public class CategoryDefinitions {
                 .count();
     }
 
+    /** What a closure passed to the executor found on its read; the exceptions are thrown only once the executor is left. */
+    private enum Outcome { APPLIED, CATEGORY_GONE, PROTECTED }
+
     /** Applies {@code section} to the category as a fresh read of the catalog holds it, and saves; retried on a conflict. */
     private void modifyCategory(ProductCatalog catalog, CategoryDefinition category, Consumer<CategoryDefinition> section) {
-        modifyCatalog(catalog, fresh -> section.accept(categoryIn(fresh, catalog.getCatalogId(), category.getCategoryId())));
+        modifyCatalog(catalog, category.getCategoryId(), fresh -> categoryIn(fresh, category.getCategoryId())
+                .map(current -> {
+                    section.accept(current);
+                    return Outcome.APPLIED;
+                })
+                .orElse(Outcome.CATEGORY_GONE));
     }
 
-    /** The closure may run more than once, each time on a new read: it must not depend on what an earlier run did. */
-    private void modifyCatalog(ProductCatalog catalog, Consumer<ProductCatalog> change) {
+    /**
+     * The closure may run more than once, each time on a new read: it must not depend on what an earlier run did.
+     *
+     * <p>Nothing is thrown from inside the executor. Its Spring Retry proxy retries only
+     * ConditionalCheckFailedException and has a recovery method for that exception alone, so any other exception of a
+     * closure would reach the caller as an ExhaustedRetryException ("Cannot locate recovery method") and a catch or a
+     * {@code @ResponseStatus} of the original type would never apply. The closure reports what it found instead, the
+     * saver writes only an applied change, and the exception is thrown here, after the executor.
+     *
+     * @param categoryId the category the change needs, for the message of a missing one; null when it needs none
+     */
+    private void modifyCatalog(ProductCatalog catalog, String categoryId, Function<ProductCatalog, Outcome> change) {
         String storeId = catalog.getStoreId();
         String catalogId = catalog.getCatalogId();
+        AtomicReference<Outcome> outcome = new AtomicReference<>();
         optimisticLockingExecutor.modifyAndSave(
-                () -> {
-                    ProductCatalog fresh = catalogs.findById(storeId, catalogId);
-                    if (fresh == null) {
-                        throw new CategoryNotFoundException(catalogId, null);
-                    }
-                    return fresh;
-                },
-                change,
+                () -> catalogs.findById(storeId, catalogId),
+                fresh -> outcome.set(fresh == null ? Outcome.CATEGORY_GONE : change.apply(fresh)),
                 fresh -> {
-                    fresh.getCategories().sort(Comparator.comparingInt(CategoryDefinition::getSequenceNumber));
-                    catalogs.save(fresh);
+                    if (outcome.get() == Outcome.APPLIED) {
+                        fresh.getCategories().sort(Comparator.comparingInt(CategoryDefinition::getSequenceNumber));
+                        catalogs.save(fresh);
+                    }
                 });
+        switch (outcome.get()) {
+            case CATEGORY_GONE -> throw new CategoryNotFoundException(catalogId, categoryId);
+            case PROTECTED -> throw new IllegalStateException("Category " + categoryId + " is protected from deletion");
+            case APPLIED -> {
+            }
+        }
     }
 
-    private static CategoryDefinition categoryIn(ProductCatalog catalog, String catalogId, String categoryId) {
+    private static Optional<CategoryDefinition> categoryIn(ProductCatalog catalog, String categoryId) {
         return catalog.getCategories().stream()
                 .filter(category -> Objects.equals(category.getCategoryId(), categoryId))
-                .findFirst()
-                .orElseThrow(() -> new CategoryNotFoundException(catalogId, categoryId));
+                .findFirst();
     }
 
     private static List<String> distinctNonBlank(List<String> values) {
