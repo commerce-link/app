@@ -2,9 +2,17 @@
 <div id="itemAddModalId" class="modal"
      th:fragment="itemAddModal (entityId, actionPrefix)"
      th:attr="data-pricelist-url=@{/dashboard/pricelist},
-              data-add-pricelist-url=@{|${actionPrefix}/${entityId}/add-item/pricelist|},
-              data-add-inventory-url=@{|${actionPrefix}/${entityId}/add-item/inventory|},
-              data-days-suffix=#{item.add.days.suffix}">
+              data-add-items-url=@{|${actionPrefix}/${entityId}/add-items|},
+              data-days-suffix=#{item.add.days.suffix},
+              data-inventory-tag=#{item.add.list.inventory.tag},
+              data-inventory-price=#{item.add.list.inventory.price},
+              data-remove-label=#{item.add.list.remove},
+              data-qty-label=#{offers.quantity},
+              data-add-label=#{general.add},
+              data-submit-label=#{item.add.submit},
+              data-submit-count=#{item.add.submit.count},
+              data-summary=#{item.add.summary},
+              data-summary-unpriced=#{item.add.summary.unpriced}">
 
     <style>
         .item-add-scroll {
@@ -58,6 +66,144 @@
         .item-add-count {
             font-size: .78rem;
             color: #9aa1ab;
+        }
+        .item-add-check {
+            width: 16px;
+            height: 16px;
+            border: 1.5px solid #b5bcc7;
+            border-radius: 3px;
+            display: inline-grid;
+            place-items: center;
+            background: #fff;
+            color: #fff;
+            font-size: 11px;
+            line-height: 1;
+        }
+        tr.is-picked .item-add-check {
+            background: #485fc7;
+            border-color: #485fc7;
+        }
+        tr.is-picked .item-add-check::after {
+            content: "\2713";
+        }
+        .item-add-stepper {
+            display: inline-flex;
+            align-items: stretch;
+        }
+        .item-add-stepper button {
+            width: 26px;
+            border: 1px solid #dbdbdb;
+            background: #fff;
+            cursor: pointer;
+            font: inherit;
+            color: #4a4a4a;
+        }
+        .item-add-stepper button:first-child {
+            border-radius: 4px 0 0 4px;
+        }
+        .item-add-stepper button:last-child {
+            border-radius: 0 4px 4px 0;
+        }
+        .item-add-stepper input {
+            width: 40px;
+            height: 26px;
+            text-align: center;
+            border: 1px solid #dbdbdb;
+            border-left: 0;
+            border-right: 0;
+            font: inherit;
+            font-size: .8rem;
+        }
+        .item-add-row-add {
+            visibility: hidden;
+        }
+        tr:hover .item-add-row-add {
+            visibility: visible;
+        }
+        .item-add-basket {
+            border: 1px solid #dce4ee;
+            border-radius: 6px;
+            background: #f6f8fc;
+            margin-top: .75rem;
+        }
+        .item-add-basket-head {
+            display: flex;
+            align-items: center;
+            gap: .6rem;
+            padding: .5rem .75rem;
+            font-size: .75rem;
+            font-weight: 600;
+            letter-spacing: .04em;
+            text-transform: uppercase;
+            color: #47566a;
+            cursor: pointer;
+            user-select: none;
+        }
+        .item-add-basket-head .item-add-basket-n {
+            padding: 0 .45rem;
+            border-radius: 999px;
+            background: #485fc7;
+            color: #fff;
+            font-size: .7rem;
+        }
+        .item-add-basket-head .item-add-basket-clear {
+            margin-left: auto;
+            border: 0;
+            background: none;
+            color: #485fc7;
+            font: inherit;
+            font-size: .78rem;
+            cursor: pointer;
+            text-transform: none;
+            letter-spacing: 0;
+        }
+        .item-add-basket-head .item-add-chev {
+            display: inline-block;
+            color: #63748d;
+            transition: transform .15s;
+        }
+        .item-add-basket.is-collapsed .item-add-chev {
+            transform: rotate(-90deg);
+        }
+        .item-add-basket.is-collapsed .item-add-basket-body {
+            display: none;
+        }
+        .item-add-basket-body {
+            max-height: 190px;
+            overflow: auto;
+            background: #fff;
+            border-top: 1px solid #dce4ee;
+            border-radius: 0 0 6px 6px;
+        }
+        .item-add-basket-body td {
+            vertical-align: middle;
+            padding: .35rem .75rem;
+        }
+        .item-add-basket-remove {
+            border: 0;
+            background: none;
+            color: #63748d;
+            cursor: pointer;
+            font-size: 1rem;
+            line-height: 1;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+        .item-add-basket-remove:hover {
+            background: #feecf0;
+            color: #cc0f35;
+        }
+        .item-add-basket-empty {
+            padding: .85rem .75rem;
+            font-size: .78rem;
+            color: #9aa1ab;
+        }
+        .item-add-summary {
+            font-size: .85rem;
+            color: #47566a;
+        }
+        .item-add-summary strong {
+            color: #0e1721;
         }
     </style>
 
@@ -116,6 +262,7 @@
                     <table class="table is-fullwidth is-hoverable item-add-table mb-0">
                         <thead>
                         <tr>
+                            <th style="width: 32px;"></th>
                             <th class="item-add-sort" onclick="setItemAddSort('name')">
                                 <span th:text="#{order.item.name}"></span> <span class="item-add-arrow" id="itemAddArrowName"></span>
                             </th>
@@ -125,6 +272,7 @@
                             </th>
                             <th class="has-text-right" th:text="#{order.item.assign.sku.availability}"></th>
                             <th class="has-text-right" th:text="#{item.add.delivery}"></th>
+                            <th class="has-text-right" style="width: 120px;" th:text="#{offers.quantity}"></th>
                         </tr>
                         </thead>
                         <tbody id="itemAddRows"></tbody>
@@ -138,50 +286,73 @@
             </div>
 
             <div id="itemAddInventoryPane" style="display: none;">
-                <div class="field is-grouped" style="gap: 10px; align-items: center;">
+                <div class="field is-grouped is-flex-wrap-wrap" style="gap: 10px; align-items: flex-end;">
                     <div class="control">
                         <input class="input" type="text" id="itemAddEan" th:placeholder="#{inventory.ean.placeholder}"
-                               oninput="renderItemAddFooter()">
+                               oninput="renderItemAddInventoryButton()" onkeydown="if (event.key === 'Enter') { event.preventDefault(); addItemAddInventoryEntry(); }">
                     </div>
                     <div class="control">
                         <input class="input" type="text" id="itemAddMfn" th:placeholder="#{inventory.product.code.placeholder}"
-                               oninput="renderItemAddFooter()">
+                               oninput="renderItemAddInventoryButton()" onkeydown="if (event.key === 'Enter') { event.preventDefault(); addItemAddInventoryEntry(); }">
+                    </div>
+                    <div class="control">
+                        <div class="field has-addons mb-0">
+                            <div class="control">
+                                <button class="button" type="button" onclick="bumpItemAddQty(-1)">&minus;</button>
+                            </div>
+                            <div class="control">
+                                <input class="input has-text-centered" type="text" inputmode="numeric" id="itemAddQty" value="1"
+                                       style="width: 60px;" th:title="#{offers.quantity}">
+                            </div>
+                            <div class="control">
+                                <button class="button" type="button" onclick="bumpItemAddQty(1)">+</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="control">
+                        <button class="button is-info" type="button" id="itemAddInventoryAdd" disabled
+                                onclick="addItemAddInventoryEntry()" th:text="#{item.add.inventory.add}"></button>
                     </div>
                 </div>
                 <p class="help" th:text="#{item.add.inventory.hint}"></p>
             </div>
+
+            <div class="item-add-basket" id="itemAddBasket">
+                <div class="item-add-basket-head" onclick="toggleItemAddBasket()">
+                    <span class="item-add-chev">&#9662;</span>
+                    <span th:text="#{item.add.list.title}"></span>
+                    <span class="item-add-basket-n" id="itemAddBasketCount">0</span>
+                    <button type="button" class="item-add-basket-clear" onclick="event.stopPropagation(); clearItemAddPicked()"
+                            th:text="#{item.add.list.clear}"></button>
+                </div>
+                <div class="item-add-basket-body">
+                    <table class="table is-fullwidth item-add-table mb-0">
+                        <tbody id="itemAddBasketRows"></tbody>
+                    </table>
+                    <div class="item-add-basket-empty" id="itemAddBasketEmpty" th:text="#{item.add.list.empty}"></div>
+                </div>
+            </div>
         </section>
 
         <footer class="modal-card-foot is-justify-content-space-between is-flex-wrap-wrap" style="gap: .75rem;">
-            <div class="is-flex is-align-items-center is-flex-wrap-wrap" style="gap: .75rem;">
-                <div class="field has-addons mb-0">
-                    <div class="control">
-                        <button class="button" type="button" onclick="bumpItemAddQty(-1)">&minus;</button>
-                    </div>
-                    <div class="control">
-                        <input class="input has-text-centered" type="text" inputmode="numeric" id="itemAddQty" value="1"
-                               style="width: 60px;" th:title="#{offers.quantity}" oninput="renderItemAddFooter()">
-                    </div>
-                    <div class="control">
-                        <button class="button" type="button" onclick="bumpItemAddQty(1)">+</button>
-                    </div>
-                </div>
-                <button class="button is-primary" type="button" id="itemAddSubmit" disabled
-                        onclick="submitAddItem()" th:text="#{item.add.submit}"></button>
-                <button class="button" type="button" onclick="toggleAddItemModal(false)" th:text="#{general.close}"></button>
-            </div>
-            <span class="help" id="itemAddHint" th:text="#{item.add.select.hint}"
+            <span class="item-add-summary" id="itemAddHint" th:text="#{item.add.select.hint}"
                   th:attr="data-select-hint=#{item.add.select.hint}"></span>
+            <div class="is-flex is-align-items-center is-flex-wrap-wrap" style="gap: .75rem;">
+                <button class="button" type="button" onclick="toggleAddItemModal(false)" th:text="#{general.cancel}"></button>
+                <button class="button is-primary" type="button" id="itemAddSubmit" disabled
+                        onclick="submitAddItems()" th:text="#{item.add.submit}"></button>
+            </div>
         </footer>
     </div>
 
     <script th:inline="javascript">
+        // picked entries: {source: 'pricelist', catalogId, product, qty} or {source: 'inventory', ean, mfn, qty}
         const itemAdd = {
             data: [],
             cache: {},
             sortKey: 'price',
             sortDir: 1,
-            selected: null,
+            picked: [],
             tab: 'pricelist',
             loading: false,
             pending: false
@@ -206,7 +377,7 @@
             if (catalogSelect.value && !itemAdd.data.length) {
                 loadItemAddPricelist(catalogSelect.value);
             } else {
-                renderItemAddFooter();
+                renderItemAddBasket();
             }
         }
 
@@ -216,11 +387,10 @@
             document.getElementById('itemAddTabInventory').classList.toggle('is-active', tab === 'inventory');
             document.getElementById('itemAddPricelistPane').style.display = tab === 'pricelist' ? '' : 'none';
             document.getElementById('itemAddInventoryPane').style.display = tab === 'inventory' ? '' : 'none';
-            renderItemAddFooter();
+            if (tab === 'inventory') document.getElementById('itemAddEan').focus();
         }
 
         function onItemAddCatalogChange(select) {
-            itemAdd.selected = null;
             loadItemAddPricelist(select.value);
         }
 
@@ -307,11 +477,19 @@
             document.getElementById('itemAddArrowPrice').textContent =
                 itemAdd.sortKey === 'price' ? (itemAdd.sortDir === 1 ? '▲' : '▼') : '';
 
+            const catalogId = document.getElementById('itemAddCatalog').value;
             const tbody = document.getElementById('itemAddRows');
             tbody.innerHTML = '';
             rows.forEach(p => {
+                const entry = findItemAddPicked(catalogId, p);
                 const row = document.createElement('tr');
-                row.classList.toggle('is-picked', itemAdd.selected === p);
+                row.classList.toggle('is-picked', !!entry);
+
+                const checkCell = document.createElement('td');
+                const check = document.createElement('span');
+                check.className = 'item-add-check';
+                check.setAttribute('aria-hidden', 'true');
+                checkCell.appendChild(check);
 
                 const nameCell = document.createElement('td');
                 const nameLine = document.createElement('div');
@@ -341,8 +519,24 @@
                 deliveryCell.style.whiteSpace = 'nowrap';
                 deliveryCell.textContent = p.estimatedDeliveryDays + ' ' + itemAddModalRoot().getAttribute('data-days-suffix');
 
-                row.append(nameCell, categoryCell, priceCell, qtyCell, deliveryCell);
-                row.addEventListener('click', () => toggleItemAddPick(p));
+                const pickCell = document.createElement('td');
+                pickCell.className = 'has-text-right';
+                pickCell.style.whiteSpace = 'nowrap';
+                if (entry) {
+                    pickCell.appendChild(itemAddStepper(entry));
+                } else {
+                    const add = document.createElement('button');
+                    add.type = 'button';
+                    add.className = 'button is-small item-add-row-add';
+                    add.textContent = '+ ' + itemAddModalRoot().getAttribute('data-add-label');
+                    pickCell.appendChild(add);
+                }
+
+                row.append(checkCell, nameCell, categoryCell, priceCell, qtyCell, deliveryCell, pickCell);
+                row.addEventListener('click', event => {
+                    if (event.target.closest('.item-add-stepper')) return;
+                    toggleItemAddPick(catalogId, p);
+                });
                 tbody.appendChild(row);
             });
 
@@ -355,81 +549,207 @@
                 ? count.getAttribute('data-template').replace('{0}', rows.length).replace('{1}', itemAdd.data.length)
                 : '';
 
-            renderItemAddFooter();
+            renderItemAddBasket();
         }
 
-        function toggleItemAddPick(item) {
-            itemAdd.selected = itemAdd.selected === item ? null : item;
+        function findItemAddPicked(catalogId, product) {
+            return itemAdd.picked.find(e => e.source === 'pricelist' && e.catalogId === catalogId && e.product.pimId === product.pimId);
+        }
+
+        function toggleItemAddPick(catalogId, product) {
+            const entry = findItemAddPicked(catalogId, product);
+            if (entry) {
+                itemAdd.picked.splice(itemAdd.picked.indexOf(entry), 1);
+            } else {
+                itemAdd.picked.push({source: 'pricelist', catalogId: catalogId, product: product, qty: 1});
+                document.getElementById('itemAddBasket').classList.remove('is-collapsed');
+            }
             renderItemAddTable();
         }
 
-        function renderItemAddFooter() {
-            const submit = document.getElementById('itemAddSubmit');
-            const hint = document.getElementById('itemAddHint');
-            if (itemAdd.tab === 'pricelist') {
-                submit.disabled = itemAdd.pending || !itemAdd.selected;
-                if (itemAdd.selected) {
-                    const qty = Math.max(1, parseInt(document.getElementById('itemAddQty').value, 10) || 1);
-                    hint.innerHTML = '';
-                    const name = document.createElement('strong');
-                    name.textContent = itemAdd.selected.name;
-                    const price = document.createElement('span');
-                    price.className = 'has-text-link has-text-weight-semibold';
-                    price.textContent = qty > 1
-                        ? ' · ' + qty + ' × ' + formatItemAddPrice(itemAdd.selected.price) + ' = ' + formatItemAddPrice(qty * itemAdd.selected.price)
-                        : ' · ' + formatItemAddPrice(itemAdd.selected.price);
-                    hint.append(name, price);
-                } else {
-                    hint.textContent = hint.getAttribute('data-select-hint');
-                }
-            } else {
-                const ean = document.getElementById('itemAddEan').value.trim();
-                const mfn = document.getElementById('itemAddMfn').value.trim();
-                submit.disabled = itemAdd.pending || (!ean && !mfn);
-                hint.textContent = '';
-            }
+        function itemAddStepper(entry) {
+            const wrap = document.createElement('span');
+            wrap.className = 'item-add-stepper';
+            const minus = document.createElement('button');
+            minus.type = 'button';
+            minus.textContent = '−';
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.inputMode = 'numeric';
+            input.value = entry.qty;
+            input.setAttribute('aria-label', itemAddModalRoot().getAttribute('data-qty-label'));
+            const plus = document.createElement('button');
+            plus.type = 'button';
+            plus.textContent = '+';
+            minus.addEventListener('click', () => { entry.qty = Math.max(1, entry.qty - 1); renderItemAddTable(); });
+            plus.addEventListener('click', () => { entry.qty += 1; renderItemAddTable(); });
+            input.addEventListener('change', () => { entry.qty = Math.max(1, parseInt(input.value, 10) || 1); renderItemAddTable(); });
+            input.addEventListener('click', event => event.stopPropagation());
+            wrap.append(minus, input, plus);
+            return wrap;
         }
 
         function bumpItemAddQty(delta) {
             const input = document.getElementById('itemAddQty');
             input.value = Math.max(1, (parseInt(input.value, 10) || 1) + delta);
-            renderItemAddFooter();
         }
 
-        function itemAddPosition(category) {
-            return typeof window.resolveAddItemPosition === 'function' ? window.resolveAddItemPosition(category) : 0;
+        function renderItemAddInventoryButton() {
+            const ean = document.getElementById('itemAddEan').value.trim();
+            const mfn = document.getElementById('itemAddMfn').value.trim();
+            document.getElementById('itemAddInventoryAdd').disabled = !ean && !mfn;
         }
 
-        function submitAddItem() {
-            if (itemAdd.pending) return;
+        function addItemAddInventoryEntry() {
+            const ean = document.getElementById('itemAddEan').value.trim();
+            const mfn = document.getElementById('itemAddMfn').value.trim();
+            if (!ean && !mfn) return;
             const qty = Math.max(1, parseInt(document.getElementById('itemAddQty').value, 10) || 1);
-            const modal = itemAddModalRoot();
-
-            let url;
-            const params = {qty: qty};
-
-            if (itemAdd.tab === 'pricelist') {
-                if (!itemAdd.selected) return;
-                url = modal.getAttribute('data-add-pricelist-url');
-                params.catalogId = document.getElementById('itemAddCatalog').value;
-                params.pimId = itemAdd.selected.pimId;
-                params.position = itemAddPosition(itemAdd.selected.category);
+            const existing = itemAdd.picked.find(e => e.source === 'inventory' && e.ean === ean && e.mfn === mfn);
+            if (existing) {
+                existing.qty += qty;
             } else {
-                const ean = document.getElementById('itemAddEan').value.trim();
-                const mfn = document.getElementById('itemAddMfn').value.trim();
-                if (!ean && !mfn) return;
-                url = modal.getAttribute('data-add-inventory-url');
-                params.itemEan = ean;
-                params.itemManufacturerCode = mfn;
-                params.position = itemAddPosition(null);
+                itemAdd.picked.push({source: 'inventory', ean: ean, mfn: mfn, qty: qty});
             }
+            document.getElementById('itemAddEan').value = '';
+            document.getElementById('itemAddMfn').value = '';
+            document.getElementById('itemAddQty').value = '1';
+            document.getElementById('itemAddEan').focus();
+            document.getElementById('itemAddBasket').classList.remove('is-collapsed');
+            renderItemAddInventoryButton();
+            renderItemAddBasket();
+        }
+
+        function removeItemAddEntry(entry) {
+            itemAdd.picked.splice(itemAdd.picked.indexOf(entry), 1);
+            renderItemAddTable();
+        }
+
+        function clearItemAddPicked() {
+            itemAdd.picked = [];
+            renderItemAddTable();
+        }
+
+        function toggleItemAddBasket() {
+            document.getElementById('itemAddBasket').classList.toggle('is-collapsed');
+        }
+
+        function itemAddMessage(attribute, ...args) {
+            return args.reduce((text, value, index) => text.replace('{' + index + '}', value),
+                itemAddModalRoot().getAttribute(attribute));
+        }
+
+        function renderItemAddBasket() {
+            const modal = itemAddModalRoot();
+            const tbody = document.getElementById('itemAddBasketRows');
+            tbody.innerHTML = '';
+            itemAdd.picked.forEach(entry => {
+                const row = document.createElement('tr');
+                const fromInventory = entry.source === 'inventory';
+
+                const nameCell = document.createElement('td');
+                if (fromInventory) {
+                    const tag = document.createElement('span');
+                    tag.className = 'tag is-info is-light mr-2';
+                    tag.textContent = modal.getAttribute('data-inventory-tag');
+                    const code = document.createElement('span');
+                    code.className = 'item-add-sub';
+                    code.textContent = [entry.ean, entry.mfn].filter(v => v).join(' · ');
+                    nameCell.append(tag, code);
+                } else {
+                    const nameLine = document.createElement('div');
+                    nameLine.textContent = entry.product.name;
+                    const subLine = document.createElement('div');
+                    subLine.className = 'item-add-sub';
+                    subLine.textContent = [entry.product.category, entry.product.mfn].filter(v => v).join(' · ');
+                    nameCell.append(nameLine, subLine);
+                }
+
+                const qtyCell = document.createElement('td');
+                qtyCell.className = 'has-text-right';
+                qtyCell.style.whiteSpace = 'nowrap';
+                qtyCell.appendChild(itemAddStepper(entry));
+
+                const priceCell = document.createElement('td');
+                priceCell.className = 'has-text-right has-text-grey';
+                priceCell.style.whiteSpace = 'nowrap';
+                priceCell.textContent = fromInventory ? modal.getAttribute('data-inventory-price') : formatItemAddPrice(entry.product.price);
+
+                const totalCell = document.createElement('td');
+                totalCell.className = 'has-text-right has-text-weight-semibold';
+                totalCell.style.whiteSpace = 'nowrap';
+                totalCell.style.width = '110px';
+                totalCell.textContent = fromInventory ? '—' : formatItemAddPrice(entry.product.price * entry.qty);
+
+                const removeCell = document.createElement('td');
+                removeCell.className = 'has-text-right';
+                removeCell.style.width = '36px';
+                const remove = document.createElement('button');
+                remove.type = 'button';
+                remove.className = 'item-add-basket-remove';
+                remove.setAttribute('aria-label', modal.getAttribute('data-remove-label'));
+                remove.textContent = '×';
+                remove.addEventListener('click', () => removeItemAddEntry(entry));
+                removeCell.appendChild(remove);
+
+                row.append(nameCell, qtyCell, priceCell, totalCell, removeCell);
+                tbody.appendChild(row);
+            });
+
+            const count = itemAdd.picked.length;
+            document.getElementById('itemAddBasketEmpty').style.display = count ? 'none' : 'block';
+            document.getElementById('itemAddBasketCount').textContent = count;
+
+            const submit = document.getElementById('itemAddSubmit');
+            const hint = document.getElementById('itemAddHint');
+            if (!count) {
+                submit.textContent = modal.getAttribute('data-submit-label');
+                submit.disabled = true;
+                hint.textContent = hint.getAttribute('data-select-hint');
+                return;
+            }
+            const pieces = itemAdd.picked.reduce((sum, e) => sum + e.qty, 0);
+            const priced = itemAdd.picked.filter(e => e.source === 'pricelist');
+            const total = priced.reduce((sum, e) => sum + e.product.price * e.qty, 0);
+            const unpriced = count - priced.length;
+
+            hint.innerHTML = '';
+            const summary = document.createElement('strong');
+            summary.textContent = itemAddMessage('data-summary', count, pieces, formatItemAddPrice(total));
+            hint.appendChild(summary);
+            if (unpriced) {
+                const note = document.createElement('span');
+                note.className = 'help';
+                note.textContent = itemAddMessage('data-summary-unpriced', unpriced);
+                hint.appendChild(note);
+            }
+            submit.textContent = itemAddMessage('data-submit-count', count);
+            submit.disabled = itemAdd.pending;
+        }
+
+        function submitAddItems() {
+            if (itemAdd.pending || !itemAdd.picked.length) return;
+
+            const params = {};
+            itemAdd.picked.forEach((entry, index) => {
+                const prefix = 'items[' + index + '].';
+                params[prefix + 'source'] = entry.source;
+                params[prefix + 'qty'] = entry.qty;
+                if (entry.source === 'pricelist') {
+                    params[prefix + 'catalogId'] = entry.catalogId;
+                    params[prefix + 'pimId'] = entry.product.pimId;
+                } else {
+                    params[prefix + 'ean'] = entry.ean;
+                    params[prefix + 'mfn'] = entry.mfn;
+                }
+            });
 
             itemAdd.pending = true;
             document.getElementById('itemAddSubmit').classList.add('is-loading');
 
             const form = document.createElement('form');
             form.method = 'post';
-            form.action = url;
+            form.action = itemAddModalRoot().getAttribute('data-add-items-url');
             Object.entries(params).forEach(([name, value]) => {
                 const input = document.createElement('input');
                 input.type = 'hidden';

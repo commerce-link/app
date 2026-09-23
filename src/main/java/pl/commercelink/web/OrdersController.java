@@ -19,8 +19,7 @@ import pl.commercelink.baskets.BasketsRepository;
 import pl.commercelink.documents.Document;
 import pl.commercelink.documents.DocumentType;
 import pl.commercelink.inventory.Inventory;
-import pl.commercelink.inventory.InventoryKey;
-import pl.commercelink.inventory.MatchedInventory;
+import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.invoicing.InvoiceCreationEventPublisher;
 import pl.commercelink.orders.*;
@@ -56,6 +55,7 @@ import pl.commercelink.stores.MarketplaceIntegration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.warehouse.GoodsOutEventPublisher;
+import pl.commercelink.web.dtos.AddItemsForm;
 import pl.commercelink.web.dtos.AddPaymentForm;
 import pl.commercelink.web.dtos.RoutedSupplierView;
 import pl.commercelink.web.dtos.ClientDataDto;
@@ -366,35 +366,27 @@ public class OrdersController extends BaseController {
         return showOrderDetails(existingOrder, model);
     }
 
-    @PostMapping("/dashboard/orders/{orderId}/add-item/pricelist")
+    @PostMapping("/dashboard/orders/{orderId}/add-items")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String addOrderItemFromPriceList(@PathVariable String orderId,
-                                            @RequestParam String catalogId, @RequestParam String pimId,
-                                            @RequestParam(defaultValue = "1") int qty, @RequestParam int position) {
+    public String addOrderItems(@PathVariable String orderId, @ModelAttribute AddItemsForm form) {
         Store store = storesRepository.findById(getStoreId());
         Order order = ordersRepository.findById(getStoreId(), orderId);
+        InventoryView inventoryView = inventory.withEnabledSuppliersOnly(getStoreId());
 
-        AvailabilityAndPrice availabilityAndPrice = pricelistFinder.findByPimId(getStoreId(), catalogId, pimId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        // every entry is resolved before anything is saved, so an unknown pricelist row rejects the whole batch
+        List<OrderItemDraft> drafts = form.entries().stream()
+                .map(entry -> entry.isFromPricelist()
+                        ? OrderItemDraft.of(pricelistEntry(entry), entry.getQty())
+                        : OrderItemDraft.of(inventoryView.findByInventoryKey(entry.inventoryKey()), entry.getQty()))
+                .toList();
 
-        ordersManager.addOrderItem(store, order, availabilityAndPrice, qty, position);
+        ordersManager.addOrderItems(store, order, drafts);
         return "redirect:/dashboard/orders/" + orderId;
     }
 
-    @PostMapping("/dashboard/orders/{orderId}/add-item/inventory")
-    @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String addOrderItemFromInventory(@PathVariable String orderId,
-                                            @RequestParam(required = false, defaultValue = "") String itemEan,
-                                            @RequestParam(required = false, defaultValue = "") String itemManufacturerCode,
-                                            @RequestParam(defaultValue = "1") int qty, @RequestParam int position) {
-        Store store = storesRepository.findById(getStoreId());
-        Order order = ordersRepository.findById(getStoreId(), orderId);
-
-        MatchedInventory matchedInventory = inventory.withEnabledSuppliersOnly(getStoreId())
-                .findByInventoryKey(new InventoryKey(itemEan.trim(), itemManufacturerCode.trim()));
-        ordersManager.addOrderItem(store, order, matchedInventory, qty, position);
-
-        return "redirect:/dashboard/orders/" + orderId;
+    private AvailabilityAndPrice pricelistEntry(AddItemsForm.Entry entry) {
+        return pricelistFinder.findByPimId(getStoreId(), entry.getCatalogId(), entry.getPimId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
     }
 
     private String showOrderDetails(Order order, Model model) {

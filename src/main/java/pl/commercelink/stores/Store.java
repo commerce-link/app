@@ -6,10 +6,12 @@ import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBIgnore;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTable;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBVersionAttribute;
 import pl.commercelink.orders.BillingDetails;
+import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.notifications.EmailNotificationType;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 
+import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -551,6 +553,13 @@ public class Store {
         return isClientOrderPageEnabled() && Optional.ofNullable(fulfilmentConfiguration)
                 .map(FulfilmentConfiguration::isClientPreferredShippingDateEnabled)
                 .orElse(false);
+    }
+
+    @DynamoDBIgnore
+    public Set<DayOfWeek> preferredShippingDaysFor(ShipmentType type) {
+        return Optional.ofNullable(fulfilmentConfiguration)
+                .map(configuration -> configuration.preferredShippingDaysFor(type))
+                .orElse(FulfilmentConfiguration.DEFAULT_PREFERRED_SHIPPING_DAYS);
     }
 
     @DynamoDBIgnore

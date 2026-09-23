@@ -16,12 +16,14 @@ import org.springframework.context.MessageSource;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.ExtendedModelMap;
 import org.springframework.ui.Model;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 import pl.commercelink.baskets.Basket;
 import pl.commercelink.baskets.BasketItem;
 import pl.commercelink.baskets.BasketsRepository;
 import pl.commercelink.baskets.ContactDetails;
 import pl.commercelink.baskets.OfferItemReloader;
+import pl.commercelink.web.dtos.AddItemsForm;
 import pl.commercelink.web.dtos.OfferCreationDto;
 import pl.commercelink.inventory.Inventory;
 import pl.commercelink.inventory.InventoryView;
@@ -46,8 +48,10 @@ import java.util.Optional;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -240,8 +244,8 @@ class OfferControllerTest {
     }
 
     @Test
-    @DisplayName("addOfferItemFromPriceList appends a BasketItem built from the matching pricelist entry")
-    void addOfferItemFromPriceListAppendsBasketItemConstructedFromPricelistEntry() {
+    @DisplayName("addOfferItems appends a BasketItem built from the matching pricelist entry")
+    void addOfferItemsAppendsBasketItemConstructedFromPricelistEntry() {
         // given
         Basket basket = basketBase();
         AvailabilityAndPrice entry = new AvailabilityAndPrice(
@@ -251,7 +255,7 @@ class OfferControllerTest {
         when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));
 
         // when
-        offerController.addOfferItemFromPriceList(OFFER_ID, "cat-1", "pim-1", 1);
+        offerController.addOfferItems(OFFER_ID, form(AddItemsForm.Entry.fromPricelist("cat-1", "pim-1", 1)));
 
         // then
         ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
@@ -261,8 +265,8 @@ class OfferControllerTest {
     }
 
     @Test
-    @DisplayName("addOfferItemFromInventory appends a BasketItem built from matched inventory entry")
-    void addOfferItemFromInventoryAppendsBasketItemFromMatchedInventory() {
+    @DisplayName("addOfferItems appends a BasketItem built from matched inventory entry")
+    void addOfferItemsAppendsBasketItemFromMatchedInventory() {
         // given
         Basket basket = basketBase();
         MatchedInventory matchedInventory = MatchedInventory.empty(
@@ -272,7 +276,7 @@ class OfferControllerTest {
         when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));
 
         // when
-        offerController.addOfferItemFromInventory(OFFER_ID, "EAN-X", "MFN-X", 1);
+        offerController.addOfferItems(OFFER_ID, form(AddItemsForm.Entry.fromInventory("EAN-X", "MFN-X", 1)));
 
         // then
         ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
@@ -281,8 +285,8 @@ class OfferControllerTest {
     }
 
     @Test
-    @DisplayName("addOfferItemFromPriceList assigns next position after existing basket items")
-    void addOfferItemFromPriceListAssignsNextPositionAfterExistingItems() {
+    @DisplayName("addOfferItems assigns next position after existing basket items")
+    void addOfferItemsAssignsNextPositionAfterExistingItems() {
         // given
         Basket basket = basketBase();
         BasketItem existing = basketItem("MFN-A");
@@ -295,7 +299,7 @@ class OfferControllerTest {
         when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));
 
         // when
-        offerController.addOfferItemFromPriceList(OFFER_ID, "cat-1", "pim-1", 1);
+        offerController.addOfferItems(OFFER_ID, form(AddItemsForm.Entry.fromPricelist("cat-1", "pim-1", 1)));
 
         // then
         ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
@@ -306,8 +310,8 @@ class OfferControllerTest {
     }
 
     @Test
-    @DisplayName("addOfferItemFromPriceList inserts the product according to the catalog category order and survives reload")
-    void addOfferItemFromPriceListInsertsProductAccordingToCatalogCategoryOrder() {
+    @DisplayName("addOfferItems inserts the product according to the catalog category order and survives reload")
+    void addOfferItemsInsertsProductAccordingToCatalogCategoryOrder() {
         // given
         Basket basket = basketBase();
         BasketItem psu = basketItem("MFN-PSU", "PSU");
@@ -321,7 +325,7 @@ class OfferControllerTest {
                 catalog(categoryDefinition("Case", 1), categoryDefinition("PSU", 5)));
 
         // when
-        offerController.addOfferItemFromPriceList(OFFER_ID, "cat-1", "pim-1", 1);
+        offerController.addOfferItems(OFFER_ID, form(AddItemsForm.Entry.fromPricelist("cat-1", "pim-1", 1)));
 
         // then
         ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
@@ -339,8 +343,8 @@ class OfferControllerTest {
     }
 
     @Test
-    @DisplayName("addOfferItemFromPriceList appends after existing products of the same catalog category")
-    void addOfferItemFromPriceListAppendsAfterExistingProductsOfSameCategory() {
+    @DisplayName("addOfferItems appends after existing products of the same catalog category")
+    void addOfferItemsAppendsAfterExistingProductsOfSameCategory() {
         // given
         Basket basket = basketBase();
         BasketItem firstCase = basketItem("MFN-CASE-1", "Case");
@@ -355,7 +359,7 @@ class OfferControllerTest {
                 catalog(categoryDefinition("Case", 1), categoryDefinition("PSU", 5)));
 
         // when
-        offerController.addOfferItemFromPriceList(OFFER_ID, "cat-1", "pim-2", 1);
+        offerController.addOfferItems(OFFER_ID, form(AddItemsForm.Entry.fromPricelist("cat-1", "pim-2", 1)));
 
         // then
         ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
@@ -365,8 +369,8 @@ class OfferControllerTest {
     }
 
     @Test
-    @DisplayName("addOfferItemFromPriceList marks a row carrying the service flag as a service")
-    void addOfferItemFromPriceListMarksRowCarryingServiceFlagAsService() {
+    @DisplayName("addOfferItems marks a row carrying the service flag as a service")
+    void addOfferItemsMarksRowCarryingServiceFlagAsService() {
         // given
         Basket basket = basketBase();
         AvailabilityAndPrice entry = new AvailabilityAndPrice(
@@ -376,7 +380,7 @@ class OfferControllerTest {
         when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));
 
         // when
-        offerController.addOfferItemFromPriceList(OFFER_ID, "cat-1", "pim-1", 1);
+        offerController.addOfferItems(OFFER_ID, form(AddItemsForm.Entry.fromPricelist("cat-1", "pim-1", 1)));
 
         // then
         ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
@@ -387,8 +391,8 @@ class OfferControllerTest {
     }
 
     @Test
-    @DisplayName("addOfferItemFromPriceList keeps services in the service position band despite catalog sequence number")
-    void addOfferItemFromPriceListKeepsServicesInServiceBand() {
+    @DisplayName("addOfferItems keeps services in the service position band despite catalog sequence number")
+    void addOfferItemsKeepsServicesInServiceBand() {
         // given
         Basket basket = basketBase();
         AvailabilityAndPrice entry = new AvailabilityAndPrice(
@@ -400,7 +404,7 @@ class OfferControllerTest {
                 catalog(categoryDefinition("Usługi dodatkowe", 3)));
 
         // when
-        offerController.addOfferItemFromPriceList(OFFER_ID, "cat-1", "pim-1", 1);
+        offerController.addOfferItems(OFFER_ID, form(AddItemsForm.Entry.fromPricelist("cat-1", "pim-1", 1)));
 
         // then
         ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
@@ -447,6 +451,64 @@ class OfferControllerTest {
         // then
         assertThat(view).isEqualTo("offerDetails");
         assertThat((List<?>) model.getAttribute("deliveryOptions")).isEmpty();
+    }
+
+    @Test
+    @DisplayName("addOfferItems adds pricelist and inventory entries of one batch in the posted sequence and saves the offer once")
+    void addOfferItemsAddsPricelistAndInventoryEntriesInOneSave() {
+        // given
+        Basket basket = basketBase();
+        AvailabilityAndPrice laptop = new AvailabilityAndPrice(
+                "pim-1", "EAN-1", "MFN-1", "Brand", "GroupLabel", "Laptop",
+                "Laptops", 199L, 1L, 3, 0L, false);
+        AvailabilityAndPrice mouse = new AvailabilityAndPrice(
+                "pim-2", "EAN-2", "MFN-2", "Brand", "GroupLabel", "Mouse",
+                "Mice", 49L, 1L, 3, 0L, false);
+        when(pricelistFinder.findByPimId(STORE_ID, "cat-1", "pim-1")).thenReturn(Optional.of(laptop));
+        when(pricelistFinder.findByPimId(STORE_ID, "cat-1", "pim-2")).thenReturn(Optional.of(mouse));
+        when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(inventoryView);
+        when(inventoryView.findByInventoryKey(any())).thenReturn(MatchedInventory.empty(
+                new pl.commercelink.inventory.InventoryKey("EAN-X", "MFN-X")));
+        when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basket));
+
+        // when
+        offerController.addOfferItems(OFFER_ID, form(
+                AddItemsForm.Entry.fromPricelist("cat-1", "pim-1", 2),
+                AddItemsForm.Entry.fromInventory("EAN-X", "MFN-X", 1),
+                AddItemsForm.Entry.fromPricelist("cat-1", "pim-2", 1)));
+
+        // then
+        ArgumentCaptor<Basket> basketCaptor = ArgumentCaptor.forClass(Basket.class);
+        verify(basketsRepository).save(basketCaptor.capture());
+        List<BasketItem> savedItems = basketCaptor.getValue().getBasketItems();
+        assertThat(savedItems).extracting(BasketItem::getMfn).containsExactly("MFN-1", "MFN-X", "MFN-2");
+        assertThat(savedItems).extracting(BasketItem::getQty).containsExactly(2L, 1L, 1L);
+    }
+
+    @Test
+    @DisplayName("addOfferItems rejects the whole batch when one pricelist entry is unknown")
+    void addOfferItemsRejectsWholeBatchWhenPricelistEntryUnknown() {
+        // given
+        AvailabilityAndPrice laptop = new AvailabilityAndPrice(
+                "pim-1", "EAN-1", "MFN-1", "Brand", "GroupLabel", "Laptop",
+                "Laptops", 199L, 1L, 3, 0L, false);
+        when(pricelistFinder.findByPimId(STORE_ID, "cat-1", "pim-1")).thenReturn(Optional.of(laptop));
+        when(pricelistFinder.findByPimId(STORE_ID, "cat-1", "pim-missing")).thenReturn(Optional.empty());
+        when(basketsRepository.findById(STORE_ID, OFFER_ID)).thenReturn(Optional.of(basketBase()));
+        AddItemsForm form = form(
+                AddItemsForm.Entry.fromPricelist("cat-1", "pim-1", 1),
+                AddItemsForm.Entry.fromPricelist("cat-1", "pim-missing", 1));
+
+        // when / then
+        assertThatThrownBy(() -> offerController.addOfferItems(OFFER_ID, form))
+                .isInstanceOf(ResponseStatusException.class);
+        verify(basketsRepository, never()).save(any());
+    }
+
+    private AddItemsForm form(AddItemsForm.Entry... entries) {
+        AddItemsForm form = new AddItemsForm();
+        form.setItems(List.of(entries));
+        return form;
     }
 
     private Basket basketBase() {

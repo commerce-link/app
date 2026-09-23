@@ -754,12 +754,16 @@ public class Order {
     }
 
     @DynamoDBIgnore
-    public boolean isWithinPreferredShippingWindow(LocalDate date) {
+    public boolean isWithinPreferredShippingWindow(LocalDate date, Set<DayOfWeek> allowedDays) {
         return estimatedShippingAt != null
                 && !date.isBefore(estimatedShippingAt)
                 && !date.isAfter(getPreferredShippingWindowEnd())
-                && date.getDayOfWeek() != DayOfWeek.SATURDAY
-                && date.getDayOfWeek() != DayOfWeek.SUNDAY;
+                && allowedDays.contains(date.getDayOfWeek());
+    }
+
+    @DynamoDBIgnore
+    public ShipmentType getShipmentType() {
+        return firstShipment().map(Shipment::getType).orElse(ShipmentType.Courier);
     }
 
     @DynamoDBIgnore
