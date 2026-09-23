@@ -398,8 +398,11 @@ public class CatalogCategoryController {
 
     private String renderFilters(ProductCatalog catalog, CategoryDefinition category, RecommendationFiltersForm form,
                                  Map<String, String> errors, Model model, Locale locale) {
+        Map<String, String> texts = translated(errors, locale);
         model.addAttribute("form", form);
-        model.addAttribute("errors", translated(errors, locale));
+        model.addAttribute("errors", texts);
+        model.addAttribute("errorSummary", RecommendationFiltersForm.summary(texts, (number, text) ->
+                messageSource.getMessage(RecommendationFiltersForm.SUMMARY_LINE, new Object[]{number, text}, locale)));
         model.addAttribute("catalog", catalog);
         model.addAttribute("category", category);
         model.addAttribute("filterTypes", InventoryFilterLabels.options());

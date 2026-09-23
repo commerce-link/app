@@ -6,6 +6,7 @@ import pl.commercelink.products.InventoryDefinition;
 import pl.commercelink.products.filters.InventoryFilterType;
 import pl.commercelink.starter.dynamodb.Metadata;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -211,5 +212,26 @@ class RecommendationFiltersFormTest {
     void theFieldIdCarriesTheIndexAndTheFieldName() {
         // when / then
         assertThat(RecommendationFiltersForm.fieldId(2, "brandLines")).isEqualTo("filter-2-brandLines");
+    }
+
+    /**
+     * "Podaj co najmniej jedną wartość." can stand for several filters at once, so the error summary names the filter
+     * by the number its legend shows; an error of an unknown metadata row belongs to the filter that carries it.
+     */
+    @Test
+    void theErrorSummaryNamesTheFilterOfEveryErrorByTheNumberOfItsLegend() {
+        // given
+        Map<String, String> texts = new LinkedHashMap<>();
+        texts.put("filter-3-values", PolishMessages.text("catalog.filter.values.required"));
+        texts.put("filter-0-unknown-1-key", PolishMessages.text("catalog.filter.unknown.key.required"));
+
+        // when
+        Map<String, String> summary = RecommendationFiltersForm.summary(texts,
+                (number, text) -> PolishMessages.text(RecommendationFiltersForm.SUMMARY_LINE, number, text));
+
+        // then
+        assertThat(summary).containsExactly(
+                Map.entry("filter-3-values", "Filtr 4: Podaj co najmniej jedną wartość."),
+                Map.entry("filter-0-unknown-1-key", "Filtr 1: Podaj nazwę pola albo usuń wiersz."));
     }
 }

@@ -10,6 +10,8 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.BiFunction;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /** The products picked from the inventory, as the review table posts them back: one row per product. */
@@ -57,6 +59,11 @@ public class ProductsBulkAddForm {
         }
     }
 
+    /** The key of a line of the error summary: "Produkt {0}: {1}", the number of the row and the message of its field. */
+    public static final String SUMMARY_LINE = "catalog.products.review.error.n";
+
+    private static final Pattern ROW_FIELD = Pattern.compile("product-(\\d+)-.+");
+
     private List<Row> products = new ArrayList<>();
 
     public static ProductsBulkAddForm of(List<Product> products) {
@@ -68,6 +75,17 @@ public class ProductsBulkAddForm {
     /** The id of a field of the row at {@code index}; an error is keyed by it, so the summary links to the field. */
     public static String fieldId(int index, String field) {
         return "product-" + index + "-" + field;
+    }
+
+    /**
+     * The error summary of the review names the row of every error ("Produkt 2: Podaj nazwę produktu."), because the
+     * same message repeats row after row; the message at the field sits in its row and stays as it is.
+     *
+     * @param texts field id to the message shown at the field
+     * @param line  formats a summary line from the number of the row (from 1) and the message, see {@link #SUMMARY_LINE}
+     */
+    public static Map<String, String> summary(Map<String, String> texts, BiFunction<String, String, String> line) {
+        return FormRules.numberedSummary(texts, ROW_FIELD, line);
     }
 
     /**

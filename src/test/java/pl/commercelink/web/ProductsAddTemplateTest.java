@@ -78,7 +78,7 @@ class ProductsAddTemplateTest {
     void theReviewTableIsEditableAndSummarisesItsErrors() throws Exception {
         // when / then
         assertThat(source("products-add-review")).contains("cl-table is-compact is-editable")
-                .contains("errorSummaryText('review-errors', ${errors})")
+                .contains("errorSummaryText('review-errors', ${errorSummary})")
                 .contains("ProductsBulkAddForm).fieldId");
     }
 
@@ -120,6 +120,56 @@ class ProductsAddTemplateTest {
         assertThat(html).contains("href=\"#product-0-name\"").contains("id=\"product-0-name\"")
                 .contains("name=\"products[0].name\"").contains("aria-invalid=\"true\"")
                 .contains("Enter the name of the product.").doesNotContain("??");
+    }
+
+    /**
+     * A field in error points at its message (aria-describedby = the id of the message), so a screen reader reads why
+     * the field is invalid; the summary above the table carries the numbered lines the controller gives it.
+     */
+    @Test
+    void everyFieldInErrorIsDescribedByItsMessage() {
+        // given
+        Map<String, String> errors = new LinkedHashMap<>();
+        errors.put("product-0-ean", "Enter an EAN or a manufacturer code.");
+        errors.put("product-0-manufacturerCode", "Enter an EAN or a manufacturer code.");
+        errors.put("product-0-name", "Enter the name of the product.");
+        errors.put("product-0-label", "Choose a label from the list of the category.");
+        errors.put("product-0-pricingGroup", "Choose a pricing group of the category.");
+        Map<String, String> summary = new LinkedHashMap<>();
+        errors.forEach((field, text) -> summary.put(field, "Product 1: " + text));
+
+        // when
+        String html = renderedReview(errors, summary);
+
+        // then
+        for (String field : errors.keySet()) {
+            String control = tagsOf(html, "(?:input|select)").stream().filter(tag -> tag.contains("id=\"" + field + "\""))
+                    .findFirst().orElseThrow();
+            assertThat(control).as(field).contains("aria-invalid=\"true\"").contains("aria-describedby=\"" + field + "-error\"");
+            assertThat(html).as(field).containsPattern("<p [^>]*id=\"" + field + "-error\"[^>]*>");
+        }
+        assertThat(html).contains(">Product 1: Enter the name of the product.</a>")
+                .doesNotContain(">Product 1: Enter the name of the product.</p>");
+    }
+
+    @Test
+    void aFieldWithoutAnErrorIsDescribedByNothing() {
+        // when
+        String html = renderedReview(Map.of());
+
+        // then
+        assertThat(html).doesNotContain("aria-describedby").doesNotContain("-error\"");
+    }
+
+    /** A placeholder is gone once the field holds a value; the two identifiers are told apart by a visible label. */
+    @Test
+    void theIdentifierFieldsHaveVisibleLabels() {
+        // when
+        String html = renderedReview(Map.of());
+
+        // then
+        assertThat(html).containsPattern("<label class=\"cl-label\" for=\"product-0-ean\">EAN</label>")
+                .containsPattern("<label class=\"cl-label\" for=\"product-0-manufacturerCode\">[^<]+</label>");
     }
 
     /** The pim id is never posted back: the save resolves the entry itself, so a forged one cannot claim another. */
@@ -180,10 +230,15 @@ class ProductsAddTemplateTest {
     }
 
     private static String renderedReview(Map<String, String> errors) {
+        return renderedReview(errors, errors);
+    }
+
+    private static String renderedReview(Map<String, String> errors, Map<String, String> errorSummary) {
         Product product = new Product("k1", "pim-1", "5901234567890", "MFN-1", "MSI", "RTX 5070", "MSI RTX 5070", "Default");
         Context context = baseContext();
         context.setVariable("form", ProductsBulkAddForm.of(List.of(product)));
         context.setVariable("errors", errors);
+        context.setVariable("errorSummary", errorSummary);
         context.setVariable("labels", List.of("RTX 5060", "RTX 5070"));
         context.setVariable("pricingGroups", List.of("Default", "Premium"));
         context.setVariable("skipped", List.of());

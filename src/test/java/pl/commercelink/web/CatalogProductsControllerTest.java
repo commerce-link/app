@@ -642,6 +642,11 @@ class CatalogProductsControllerTest {
         assertThat((Map<String, String>) result.getModelAndView().getModel().get("errors"))
                 .containsEntry("product-0-ean", "product.error.identifier.required")
                 .containsEntry("product-1-ean", "product.error.ean.invalid");
+        // the summary names the row as the operator counts it; the message at the field stays without the number
+        assertThat((Map<String, String>) result.getModelAndView().getModel().get("errorSummary"))
+                .containsEntry("product-1-ean", "catalog.products.review.error.n");
+        verify(messageSource).getMessage(eq("catalog.products.review.error.n"), eq(new Object[]{"2", "product.error.ean.invalid"}),
+                any(Locale.class));
         verify(productRepository, never()).save(any(Product.class));
     }
 

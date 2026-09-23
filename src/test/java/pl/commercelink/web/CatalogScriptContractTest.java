@@ -15,6 +15,17 @@ class CatalogScriptContractTest {
         return Files.readString(Path.of(path), StandardCharsets.UTF_8);
     }
 
+    /** The declarations of every rule of the style sheet whose selector list is exactly {@code selector}, joined. */
+    private static String rule(String css, String selector) {
+        StringBuilder body = new StringBuilder();
+        java.util.regex.Matcher matcher = java.util.regex.Pattern
+                .compile("(?m)^\\s*" + java.util.regex.Pattern.quote(selector) + " \\{([^}]*)}").matcher(css);
+        while (matcher.find()) {
+            body.append(matcher.group(1));
+        }
+        return body.toString();
+    }
+
     private static final List<String> TABLE_SCRIPTS = List.of(
             "src/main/resources/static/js/table-filter.js",
             "src/main/resources/static/js/table-sort.js",
@@ -335,5 +346,23 @@ class CatalogScriptContractTest {
                     color: var(--cl-surface);""");
         String chipRemove = css.split("\\.cl-page \\.cl-chip-tag-remove \\{")[1].split("}")[0];
         assertThat(chipRemove).contains("border-radius: calc(var(--cl-radius) - 2px);");
+    }
+
+    /**
+     * The product cell of the review ("Uzupełnij dane") holds the brand and the two identifier fields. The cell did not
+     * wrap (the key column of every table), so the fields stood side by side and the manufacturer code ran under the
+     * label select of the next column, out of reach of the mouse (D-I2). They stand one under the other, each under
+     * its visible label (D-M32), in the table and in card mode alike.
+     */
+    @Test
+    void theIdentifierFieldsOfTheReviewStandOneUnderTheOther() throws Exception {
+        // given
+        String css = read("src/main/resources/static/css/commercelink.css");
+
+        // then
+        assertThat(rule(css, ".cl-page .cl-table.is-editable tbody th")).contains("white-space: normal;");
+        assertThat(rule(css, ".cl-page .cl-table.is-editable tbody th .cl-input")).contains("display: block;");
+        assertThat(rule(css, ".cl-page .cl-table.is-editable tbody th .cl-label")).contains("display: block;");
+        assertThat(rule(css, ".cl-page .cl-table.is-editable tbody th.cl-table-key")).contains("display: block;");
     }
 }

@@ -34,7 +34,7 @@ class CategoryFiltersTemplateTest {
         // when / then
         assertThat(page()).contains("th:fragment=\"filtersForm\"").contains("id=\"category-filters-form\"")
                 .contains("data-cl-async").contains("data-cl-redirect=${redirectTo}").contains("@{/js/async-form.js}")
-                .contains("errorSummaryText('category-filters-errors'");
+                .contains("errorSummaryText('category-filters-errors', ${errorSummary})");
     }
 
     @Test
@@ -67,6 +67,7 @@ class CategoryFiltersTemplateTest {
         Context context = new Context();
         context.setVariable("form", RecommendationFiltersForm.from(gpu));
         context.setVariable("errors", errors);
+        context.setVariable("errorSummary", errors);
         context.setVariable("category", gpu);
         context.setVariable("filterTypes", InventoryFilterLabels.options());
         context.setVariable("listVariants", InventoryFilterLabels.variants(InventoryFilterLabels.Kind.LIST));
@@ -167,6 +168,7 @@ class CategoryFiltersTemplateTest {
         Context context = new Context();
         context.setVariable("form", RecommendationFiltersForm.from(category));
         context.setVariable("errors", Map.of());
+        context.setVariable("errorSummary", Map.of());
         context.setVariable("category", category);
         context.setVariable("filterTypes", InventoryFilterLabels.options());
         context.setVariable("listVariants", InventoryFilterLabels.variants(InventoryFilterLabels.Kind.LIST));

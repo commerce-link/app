@@ -3823,13 +3823,30 @@ a.cl-link-button:hover {
     width: 100%;
 }
 
+/* The product cell of the bulk review holds the brand and then the two identifier fields, each under its label, one
+   under the other. It wraps, unlike the key column of a read-only table: kept on one line, the fields stood side by
+   side and the second one ran under the next column, out of reach of the mouse (D-I2). */
 .cl-page .cl-table.is-editable tbody th {
     vertical-align: middle;
+    white-space: normal;
+    min-width: 12rem;
 }
 
-/* The product cell of the bulk review holds the brand and then the two identifier fields, one under the other. */
+.cl-page .cl-table.is-editable tbody th .cl-label {
+    display: block;
+    margin-top: var(--cl-gap-related);
+    margin-bottom: var(--cl-gap-attached);
+    font-size: 12.5px;
+}
+
 .cl-page .cl-table.is-editable tbody th .cl-input {
-    margin-top: 6px;
+    display: block;
+}
+
+/* the product cell is a row header (600); its field errors read like those of the other cells */
+.cl-page .cl-table.is-editable .cl-field-error {
+    margin-top: var(--cl-gap-attached);
+    font-weight: 400;
 }
 
 .cl-page .cl-table.is-compact thead th,
@@ -3938,6 +3955,21 @@ a.cl-link-button:hover {
 
     .cl-page .cl-table.is-editable td {
         padding: 4px 0;
+    }
+
+    /* card mode: the product cell spans the card (brand, then each identifier under its label) instead of squeezing
+       both fields into the value column beside the column name */
+    .cl-page .cl-table.is-editable tbody th.cl-table-key {
+        display: block;
+        padding: 0 0 4px;
+    }
+
+    .cl-page .cl-table.is-editable tbody th.cl-table-key::before {
+        display: none;
+    }
+
+    .cl-page .cl-table.is-editable td > .cl-field-error {
+        grid-column: 2;
     }
 }
 

@@ -14,6 +14,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.BiFunction;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -58,6 +60,12 @@ public class RecommendationFiltersForm {
         }
     }
 
+    /** The key of a line of the error summary: "Filtr {0}: {1}", the number of the filter and the message of its field. */
+    public static final String SUMMARY_LINE = "catalog.filter.error.n";
+
+    /** A field of a filter, its unknown metadata rows included: they belong to the filter that carries them. */
+    private static final Pattern FILTER_FIELD = Pattern.compile("filter-(\\d+)-.+");
+
     private List<FilterForm> filters = new ArrayList<>();
 
     public static RecommendationFiltersForm from(CategoryDefinition category) {
@@ -77,6 +85,17 @@ public class RecommendationFiltersForm {
     /** The id of a field of one unknown metadata row; repeat-fields.js renumbers both indexes. */
     public static String unknownFieldId(int index, int row, String field) {
         return fieldId(index, "unknown-" + row + "-" + field);
+    }
+
+    /**
+     * The error summary names the filter of every error by the number its legend shows ("Filtr 4: Podaj co najmniej
+     * jedną wartość."), because the same message can stand for several filters; the message at the field stays as it is.
+     *
+     * @param texts field id to the message shown at the field
+     * @param line  formats a summary line from the number of the filter (from 1) and the message, see {@link #SUMMARY_LINE}
+     */
+    public static Map<String, String> summary(Map<String, String> texts, BiFunction<String, String, String> line) {
+        return FormRules.numberedSummary(texts, FILTER_FIELD, line);
     }
 
     public Map<String, String> validate() {

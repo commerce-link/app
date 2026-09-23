@@ -601,6 +601,8 @@ public class CatalogProductsController {
         errors.forEach((field, key) -> texts.put(field, messageSource.getMessage(key, null, locale)));
         model.addAttribute("form", form);
         model.addAttribute("errors", texts);
+        model.addAttribute("errorSummary", ProductsBulkAddForm.summary(texts, (number, text) ->
+                messageSource.getMessage(ProductsBulkAddForm.SUMMARY_LINE, new Object[]{number, text}, locale)));
         model.addAttribute("catalog", catalog);
         model.addAttribute("category", category);
         model.addAttribute("labels", category.getGroupingOrder());

@@ -615,6 +615,25 @@ class CatalogCategoryControllerTest {
         verify(definitions, never()).saveFilters(any(), any(), any());
     }
 
+    /** The summary names the filter by the number of its legend; the message at the field stays without it. */
+    @Test
+    void theFiltersErrorSummaryNamesTheFilterOfEveryError() throws Exception {
+        // given
+        CategoryDefinition gpu = categoryOf("GPU");
+        when(messageSource.getMessage(eq("catalog.filter.values.required"), any(), any(Locale.class))).thenReturn("Give a value.");
+        when(messageSource.getMessage(eq("catalog.filter.error.n"), eq(new Object[]{"2", "Give a value."}), any(Locale.class)))
+                .thenReturn("Filter 2: Give a value.");
+
+        // when / then
+        mvc.perform(post("/dashboard/catalogs/c1/category/" + gpu.getCategoryId() + "/settings/filters")
+                        .header("X-Requested-With", "fetch")
+                        .param("filters[0].type", "BRAND_NAME").param("filters[0].values", "MSI")
+                        .param("filters[1].type", "BRAND_NAME").param("filters[1].values", ""))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(model().attribute("errors", hasEntry("filter-1-values", "Give a value.")))
+                .andExpect(model().attribute("errorSummary", hasEntry("filter-1-values", "Filter 2: Give a value.")));
+    }
+
     @Test
     void theBasicsFormOfAManagedCategoryCountsItsProductsOnce() throws Exception {
         // given

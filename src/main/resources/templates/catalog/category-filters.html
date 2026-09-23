@@ -21,7 +21,7 @@
                   th:object="${form}" method="post" novalidate data-cl-async
                   th:attr="data-cl-redirect=${redirectTo}, data-error-message=#{form.save.failed}">
                 <!--/* The messages are already translated: the line of a broken brand line does not fit in a message key. */-->
-                <div th:replace="~{fragments/settings-form :: errorSummaryText('category-filters-errors', ${errors})}"></div>
+                <div th:replace="~{fragments/settings-form :: errorSummaryText('category-filters-errors', ${errorSummary})}"></div>
                 <div class="cl-card">
                     <div class="cl-card-head">
                         <h2 class="cl-card-title" th:text="#{catalog.category.filters.card}"></h2>

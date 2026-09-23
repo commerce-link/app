@@ -3,6 +3,7 @@ package pl.commercelink.web.dtos;
 import org.junit.jupiter.api.Test;
 import pl.commercelink.products.Product;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -69,5 +70,29 @@ class ProductsBulkAddFormTest {
                 .validate(List.of(), List.of("Default"))).isEmpty();
         assertThat(ProductsBulkAddForm.of(List.of()).validate(List.of(), List.of("Default")))
                 .containsEntry("products", "catalog.products.review.none");
+    }
+
+    /**
+     * One message repeats row after row ("Podaj nazwę produktu." three times), so the error summary names the row as
+     * the operator counts them; the message at the field sits in its row and stays as it is. An error of the whole
+     * form (nothing selected) belongs to no row.
+     */
+    @Test
+    void theErrorSummaryNamesTheRowOfEveryErrorCountedFromOne() {
+        // given
+        Map<String, String> texts = new LinkedHashMap<>();
+        texts.put("product-1-name", PolishMessages.text("product.error.name.required"));
+        texts.put("product-11-ean", PolishMessages.text("product.error.identifier.required"));
+        texts.put("products", PolishMessages.text("catalog.products.review.none"));
+
+        // when
+        Map<String, String> summary = ProductsBulkAddForm.summary(texts,
+                (number, text) -> PolishMessages.text(ProductsBulkAddForm.SUMMARY_LINE, number, text));
+
+        // then
+        assertThat(summary).containsExactly(
+                Map.entry("product-1-name", "Produkt 2: Podaj nazwę produktu."),
+                Map.entry("product-11-ean", "Produkt 12: Podaj EAN albo kod producenta."),
+                Map.entry("products", "Nie zaznaczono produktów."));
     }
 }
