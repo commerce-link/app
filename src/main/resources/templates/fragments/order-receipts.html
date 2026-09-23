@@ -1,0 +1,78 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!--/* The order screen's e-receipt section. orderDetails.html is still a plain Bulma page (no .cl-page ancestor), but
+       .cl-card/.cl-list/.cl-disclosure and friends are all styled as "`.cl-page` descendant" in commercelink.css, so
+       the fragment carries its own `.cl-page` wrapper purely for that CSS scoping (`.cl-status` itself is unscoped
+       and would work either way). `.cl-page` only adds bottom padding; it does not pull in the sidebar chrome. */-->
+<div th:fragment="section(view, orderId)" th:unless="${view.isEmpty()}" class="cl-page">
+    <section class="cl-card" aria-labelledby="order-receipts-title">
+        <div class="cl-card-head">
+            <h2 class="cl-card-title" id="order-receipts-title" th:text="#{receipts.section.title}"></h2>
+            <!--/* No button variant of confirm-dialog.js exists (only a[data-cl-confirm] -> a GET confirmation page),
+                   so "Wystaw ponownie" is a link, enhanced into the same on-page dialog with JavaScript. */-->
+            <a th:if="${view.canReissue()}" class="cl-link-button" data-cl-confirm
+               th:href="@{/dashboard/orders/{id}/receipts/reissue(id=${orderId})}"
+               th:text="#{receipts.action.reissue}"
+               th:attr="data-cl-confirm-title=#{receipts.action.reissue.confirm.title},
+                        data-cl-confirm-message=#{receipts.action.reissue.confirm.message},
+                        data-cl-confirm-action=#{receipts.action.reissue}"></a>
+        </div>
+        <ul class="cl-list">
+            <li class="cl-list-item" th:each="row, rowStat : ${view.rows()}">
+                <div>
+                    <p class="cl-list-title">
+                        <span th:text="${row.key()}"></span>
+                        <span class="cl-status" th:classappend="${row.statusTone()}">
+                            <span th:text="#{${row.statusKey()}}"></span>
+                        </span>
+                    </p>
+                    <p class="cl-list-desc" th:if="${row.documentUrl() != null}">
+                        <a th:href="${row.documentUrl()}" target="_blank" rel="noopener" th:text="#{receipts.document.open}"></a>
+                        <span th:if="${row.emailSentAt() != null}" th:text="' · ' + #{receipts.email.sent}"></span>
+                    </p>
+                    <p class="cl-list-desc is-warn" th:if="${row.problem() != null}" th:text="${row.problem()}"></p>
+                </div>
+                <div class="cl-list-actions">
+                    <form th:if="${row.canCheck()}" method="post"
+                          th:action="@{/dashboard/orders/{id}/receipts/check(id=${orderId})}">
+                        <input type="hidden" name="receiptKey" th:value="${row.key()}"/>
+                        <button type="submit" class="cl-link-button" th:text="#{receipts.action.check}"
+                                th:attr="aria-label=#{receipts.action.check} + ': ' + ${row.key()}"></button>
+                    </form>
+                    <!--/* details/summary, not .cl-disclosure: that class is styled as a full-width collapsible
+                           section at the bottom of a card, which does not fit a compact list-row action. Plain
+                           semantic HTML keeps it keyboard-operable and working without JavaScript; .cl-link-button on
+                           the summary only matches its look to "Sprawdź teraz" next to it. */-->
+                    <details th:if="${row.canClose()}">
+                        <summary class="cl-link-button" th:text="#{receipts.action.close}"
+                                 th:attr="aria-label=#{receipts.action.close} + ': ' + ${row.key()}"></summary>
+                        <form method="post" class="cl-form" th:action="@{/dashboard/orders/{id}/receipts/close(id=${orderId})}">
+                            <p class="cl-help" th:text="#{receipts.action.close.help}"></p>
+                            <input type="hidden" name="receiptKey" th:value="${row.key()}"/>
+                            <div class="cl-field">
+                                <label class="cl-label" th:for="'close-number-' + ${rowStat.index}" th:text="#{receipts.action.close.number}"></label>
+                                <input class="cl-input" type="text" name="number" required th:id="'close-number-' + ${rowStat.index}"/>
+                            </div>
+                            <div class="cl-field">
+                                <label class="cl-label" th:for="'close-link-' + ${rowStat.index}">
+                                    <span th:text="#{receipts.action.close.link}"></span>
+                                    <span class="cl-optional" th:text="#{form.optional}"></span>
+                                </label>
+                                <input class="cl-input" type="url" name="link" th:id="'close-link-' + ${rowStat.index}"/>
+                            </div>
+                            <button type="submit" class="cl-button is-primary" th:text="#{receipts.action.close.submit}"></button>
+                        </form>
+                    </details>
+                </div>
+            </li>
+        </ul>
+    </section>
+
+    <dialog th:replace="~{fragments/confirm-dialog :: dialog}"></dialog>
+    <script th:src="@{/js/confirm-dialog.js}" defer></script>
+</div>
+
+</body>
+</html>

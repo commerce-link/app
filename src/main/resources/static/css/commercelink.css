@@ -1475,6 +1475,11 @@ body.cl-drawer-open .cl-sidebar {
     background: var(--cl-info-soft);
 }
 
+.cl-status.is-bad {
+    color: var(--cl-bad);
+    background: var(--cl-bad-soft);
+}
+
 /* --cl-ink-2: --cl-ink-3 on --cl-surface-2 is 4.48:1 at 12 px, below AA */
 .cl-status.is-neutral {
     color: var(--cl-ink-2);

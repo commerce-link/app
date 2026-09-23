@@ -1,6 +1,7 @@
 package pl.commercelink.receipts;
 
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import pl.commercelink.documents.Document;
@@ -21,6 +22,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -85,6 +87,9 @@ public class ReceiptAttemptService {
 
     public ReceiptAttempt reissue(String storeId, String orderId, String actor) {
         List<ReceiptAttempt> existing = attempts.findByOrder(storeId, orderId);
+        if (existing.isEmpty()) {
+            throw new ReceiptActionException("receipts.action.reissue.none");
+        }
         if (existing.stream().anyMatch(a -> !a.getState().isDead())) {
             throw new ReceiptActionException("receipts.action.reissue.live");
         }
@@ -120,11 +125,26 @@ public class ReceiptAttemptService {
      * The operator resolved a hung attempt at the provider (e.g. fiscalised it by hand once) and records the result:
      * the order gets the operator's document and the attempt is never polled or issued again. Refused while the
      * processor holds the lease — an issue in flight may still order fiscalisation.
+     * <p>Retryable: if the order write below failed on an earlier call, the attempt is already {@code CLOSED_MANUALLY}
+     * with this same number, so the attempt update is skipped (nothing left to change) and only the idempotent order
+     * step is redone.
      */
     public void closeManually(String storeId, String receiptKey, String number, String link, String actor) {
+        if (StringUtils.isBlank(number)) {
+            throw new ReceiptActionException("receipts.action.close.numberRequired");
+        }
+        String receiptNumber = number.strip();
         Instant now = clock.instant();
         ReceiptAttempt[] closed = new ReceiptAttempt[1];
         attempts.update(storeId, receiptKey, a -> {
+            closed[0] = null;   // reset on every run: a value from an earlier, conflicting run must never survive (R3)
+            if (a.getState() == ReceiptAttemptState.CLOSED_MANUALLY) {
+                if (!Objects.equals(a.getReceiptNumber(), receiptNumber)) {
+                    throw new ReceiptActionException("receipts.action.close.notHung");
+                }
+                closed[0] = a;   // already closed with this number: an earlier call's order step failed, retry only that
+                return false;
+            }
             if (a.getState() != ReceiptAttemptState.ISSUING && a.getState() != ReceiptAttemptState.PENDING) {
                 throw new ReceiptActionException("receipts.action.close.notHung");
             }
@@ -132,7 +152,7 @@ public class ReceiptAttemptService {
                 throw new ReceiptActionException("receipts.action.close.busy");
             }
             a.setState(ReceiptAttemptState.CLOSED_MANUALLY);
-            a.setReceiptNumber(number);
+            a.setReceiptNumber(receiptNumber);
             a.setDocumentUrl(blankToNull(link));
             a.setLastError("Closed manually by " + actor);
             a.setLastErrorAt(now);
@@ -141,7 +161,7 @@ public class ReceiptAttemptService {
             return true;
         }).orElseThrow(() -> new ReceiptActionException("receipts.action.notFound"));
         ReceiptAttempt attempt = closed[0];
-        Document document = new Document(receiptKey, number, blankToNull(link), DocumentType.Receipt,
+        Document document = new Document(receiptKey, receiptNumber, blankToNull(link), DocumentType.Receipt,
                 LocalDate.now(clock));
         optimisticLockingExecutor.modifyAndSave(
                 () -> ordersRepository.findById(storeId, attempt.getOrderId()),
@@ -155,6 +175,12 @@ public class ReceiptAttemptService {
 
     public boolean hasLiveAttempt(String storeId, String orderId) {
         return attemptsOf(storeId, orderId).stream().anyMatch(a -> a.getState().isLive());
+    }
+
+    /** The order screen's e-receipt section: every attempt of the order and whether the operator may issue a new one. */
+    public ReceiptOrderView orderView(Order order, ReceiptAlerts alerts) {
+        return ReceiptOrderView.of(attemptsOf(order.getStoreId(), order.getOrderId()),
+                eligibility.orderQualifies(order), alerts, clock.instant());
     }
 
     void saveThroughLifecycle(Order order) {

@@ -36,6 +36,7 @@ class ReceiptAttemptServiceTest {
     private final OrderLifecycle lifecycle = mock(OrderLifecycle.class);
     private final MutableClock clock = MutableClock.at("2026-09-23T13:00:00Z");
     private final FakeReceiptProvider provider = new FakeReceiptProvider();
+    private final OptimisticLockingExecutor locking = mock(OptimisticLockingExecutor.class);
     private ReceiptAttemptService service;
     private Store store;
     private Order order;
@@ -52,15 +53,18 @@ class ReceiptAttemptServiceTest {
         when(orderItems.findByOrderId(ORDER_ID)).thenReturn(items(item("Mysz", 1, 100.00, 1.23)));
         when(factory.getDescriptor(FakeReceiptProviderDescriptor.NAME)).thenReturn(new FakeReceiptProviderDescriptor());
         when(factory.get(any(Store.class), anyString())).thenReturn(provider);
-        OptimisticLockingExecutor locking = mock(OptimisticLockingExecutor.class);
-        doAnswer(i -> {
-            Object entity = ((java.util.function.Supplier<?>) i.getArgument(0)).get();
-            ((java.util.function.Consumer<Object>) i.getArgument(1)).accept(entity);
-            ((java.util.function.Consumer<Object>) i.getArgument(2)).accept(entity);
-            return entity;
-        }).when(locking).modifyAndSave(any(), any(), any());
+        doAnswer(ReceiptAttemptServiceTest::modifyAndSave).when(locking).modifyAndSave(any(), any(), any());
         service = new ReceiptAttemptService(attempts, stores, orders, orderItems, factory,
                 new ReceiptRequestConverter(), new ReceiptEligibility(factory), publisher, locking, lifecycle, clock);
+    }
+
+    // Mirrors the real OptimisticLockingExecutor: load, modify, save — used both as the default stub and, in one
+    // test, as the second half of a stub chain whose first call throws (a failed order write).
+    private static Object modifyAndSave(org.mockito.invocation.InvocationOnMock i) {
+        Object entity = ((java.util.function.Supplier<?>) i.getArgument(0)).get();
+        ((java.util.function.Consumer<Object>) i.getArgument(1)).accept(entity);
+        ((java.util.function.Consumer<Object>) i.getArgument(2)).accept(entity);
+        return entity;
     }
 
     @Test
@@ -102,6 +106,14 @@ class ReceiptAttemptServiceTest {
 
         assertThat(service.startAutomatic(store, order).orElseThrow().getBlockedReason())
                 .isEqualTo(ReceiptBlockReason.PROVIDER_UNAVAILABLE.name());
+    }
+
+    @Test
+    void reissueIsRefusedWhenTheOrderHasNoAttemptsYet() {
+        assertThatThrownBy(() -> service.reissue(STORE_ID, ORDER_ID, "operator"))
+                .isInstanceOf(ReceiptActionException.class)
+                .extracting(e -> ((ReceiptActionException) e).getMessageKey())
+                .isEqualTo("receipts.action.reissue.none");
     }
 
     @Test
@@ -196,6 +208,56 @@ class ReceiptAttemptServiceTest {
         assertThatThrownBy(() -> service.closeManually(STORE_ID, ORDER_ID + ":R1", "1", null, "operator"))
                 .extracting(e -> ((ReceiptActionException) e).getMessageKey())
                 .isEqualTo("receipts.action.close.busy");
+    }
+
+    @Test
+    void closeManuallyRejectsABlankNumber() {
+        service.startAutomatic(store, order);
+
+        assertThatThrownBy(() -> service.closeManually(STORE_ID, ORDER_ID + ":R1", "   ", null, "operator"))
+                .isInstanceOf(ReceiptActionException.class)
+                .extracting(e -> ((ReceiptActionException) e).getMessageKey())
+                .isEqualTo("receipts.action.close.numberRequired");
+        assertThat(attempts.find(STORE_ID, ORDER_ID + ":R1").orElseThrow().getState())
+                .isEqualTo(ReceiptAttemptState.ISSUING);
+        verifyNoInteractions(locking);
+    }
+
+    @Test
+    void closeManuallyRetriesTheOrderStepAfterAFailedSaveWithoutDuplicatingTheDocument() {
+        service.startAutomatic(store, order);
+        doThrow(new RuntimeException("write conflict"))
+                .doAnswer(ReceiptAttemptServiceTest::modifyAndSave)
+                .when(locking).modifyAndSave(any(), any(), any());
+
+        // first call: the attempt is closed, but the order write fails
+        assertThatThrownBy(() -> service.closeManually(STORE_ID, ORDER_ID + ":R1", "PAR/1", null, "operator"))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessage("write conflict");
+        ReceiptAttempt afterFirstCall = attempts.find(STORE_ID, ORDER_ID + ":R1").orElseThrow();
+        assertThat(afterFirstCall.getState()).isEqualTo(ReceiptAttemptState.CLOSED_MANUALLY);
+        assertThat(afterFirstCall.getReceiptNumber()).isEqualTo("PAR/1");
+        assertThat(order.getDocuments()).isEmpty();
+        Long versionAfterFirstCall = afterFirstCall.getVersion();
+
+        // retry with the same number: the attempt is not touched again, only the order step is redone
+        service.closeManually(STORE_ID, ORDER_ID + ":R1", "PAR/1", null, "operator");
+
+        assertThat(order.getDocuments()).hasSize(1);
+        assertThat(order.getDocuments().get(0).getNumber()).isEqualTo("PAR/1");
+        assertThat(attempts.find(STORE_ID, ORDER_ID + ":R1").orElseThrow().getVersion()).isEqualTo(versionAfterFirstCall);
+        verify(locking, times(2)).modifyAndSave(any(), any(), any());
+    }
+
+    @Test
+    void closeManuallyRefusesARetryWithADifferentNumberThanTheOneAlreadyClosedWith() {
+        service.startAutomatic(store, order);
+        service.closeManually(STORE_ID, ORDER_ID + ":R1", "PAR/1", null, "operator");
+
+        assertThatThrownBy(() -> service.closeManually(STORE_ID, ORDER_ID + ":R1", "PAR/2", null, "operator"))
+                .isInstanceOf(ReceiptActionException.class)
+                .extracting(e -> ((ReceiptActionException) e).getMessageKey())
+                .isEqualTo("receipts.action.close.notHung");
     }
 
     @Test

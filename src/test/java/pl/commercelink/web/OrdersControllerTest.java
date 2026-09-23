@@ -48,6 +48,9 @@ import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrdersManager;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.StoreCategories;
+import pl.commercelink.receipts.ReceiptAlerts;
+import pl.commercelink.receipts.ReceiptAttempt;
+import pl.commercelink.receipts.ReceiptAttemptService;
 import pl.commercelink.web.dtos.OrderItemsForm;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.PositionGroup;
@@ -129,6 +132,10 @@ class OrdersControllerTest {
     private Inventory inventory;
     @Mock
     private InventoryView inventoryView;
+    @Mock
+    private ReceiptAttemptService receiptAttemptService;
+    @Mock
+    private ReceiptAlerts receiptAlerts;
 
     // Real resolver over the test classpath registry (`Stub` is a registered supplier type).
     @Spy
@@ -766,6 +773,75 @@ class OrdersControllerTest {
         assertThat(existingOrder.getDocuments()).hasSize(1);
         verify(ordersRepository, never()).save(any());
         verify(redirectAttributes).addFlashAttribute(eq("errorMessage"), eq("Cannot remove"));
+    }
+
+    @Test
+    @DisplayName("order details model drops the manual Receipt type from receiptTypes while an e-receipt attempt is live")
+    void orderDetailsHidesTheManualReceiptOptionWhileAnAttemptIsLive() {
+        // given
+        Order order = orderBase();
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
+        when(storesRepository.findById(STORE_ID)).thenReturn(new Store());
+        when(dropshipItemLookup.itemIdsInDropshipDeliveries(eq(STORE_ID), any())).thenReturn(Set.of());
+        when(receiptAttemptService.hasLiveAttempt(STORE_ID, ORDER_ID)).thenReturn(true);
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        ordersController.getOrderDetails(ORDER_ID, model);
+
+        // then
+        @SuppressWarnings("unchecked")
+        List<pl.commercelink.documents.DocumentType> receiptTypes =
+                (List<pl.commercelink.documents.DocumentType>) model.getAttribute("receiptTypes");
+        assertThat(receiptTypes).doesNotContain(pl.commercelink.documents.DocumentType.Receipt);
+        assertThat(receiptTypes).contains(pl.commercelink.documents.DocumentType.InvoicePersonal);
+    }
+
+    @Test
+    @DisplayName("removeDocument refuses to remove a document an e-receipt attempt issued automatically")
+    void removeDocumentRefusesAnAutomaticReceipt() {
+        // given
+        String receiptKey = ORDER_ID + ":R1";
+        Order existingOrder = orderBase();
+        existingOrder.addDocument(new pl.commercelink.documents.Document(
+                receiptKey, receiptKey, null, pl.commercelink.documents.DocumentType.Receipt));
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(existingOrder);
+        ReceiptAttempt attempt = new ReceiptAttempt();
+        attempt.setReceiptKey(receiptKey);
+        when(receiptAttemptService.attemptsOf(STORE_ID, ORDER_ID)).thenReturn(List.of(attempt));
+        when(messageSource.getMessage(eq("receipts.document.remove.automatic"), any(), eq(Locale.ENGLISH)))
+                .thenReturn("Cannot remove automatic receipt");
+
+        // when
+        String view = ordersController.removeDocument(ORDER_ID, pl.commercelink.documents.DocumentType.Receipt,
+                receiptKey, redirectAttributes, Locale.ENGLISH);
+
+        // then
+        assertThat(existingOrder.getDocuments()).hasSize(1);
+        verify(ordersRepository, never()).save(any());
+        verify(redirectAttributes).addFlashAttribute(eq("errorMessage"), eq("Cannot remove automatic receipt"));
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+    }
+
+    @Test
+    @DisplayName("addReceipt refuses to add a manual Receipt document while an e-receipt attempt is live")
+    void addReceiptRefusesAManualReceiptWhileAnAttemptIsLive() {
+        // given
+        when(receiptAttemptService.hasLiveAttempt(STORE_ID, ORDER_ID)).thenReturn(true);
+        when(messageSource.getMessage(eq("receipts.document.add.live"), any(), eq(Locale.ENGLISH)))
+                .thenReturn("An automatic receipt is already being issued");
+        pl.commercelink.documents.Document document = new pl.commercelink.documents.Document(
+                null, "PAR/1", null, pl.commercelink.documents.DocumentType.Receipt);
+
+        // when
+        String view = ordersController.addReceipt(ORDER_ID, document, Locale.ENGLISH, redirectAttributes);
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+        verify(redirectAttributes).addFlashAttribute(eq("errorMessage"), eq("An automatic receipt is already being issued"));
+        verifyNoInteractions(ordersRepository);
+        verifyNoInteractions(orderLifecycle);
     }
 
     @Test
