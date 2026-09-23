@@ -3,12 +3,14 @@ package pl.commercelink.receipts;
 import com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import pl.commercelink.documents.Document;
 import pl.commercelink.documents.DocumentType;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderLifecycleEventPublisher;
 import pl.commercelink.orders.OrderLifecycleEventType;
 import pl.commercelink.orders.OrdersRepository;
+import pl.commercelink.orders.event.OrderEvent;
 import pl.commercelink.orders.event.OrderEventsRepository;
 import pl.commercelink.orders.notifications.EmailNotificationType;
 import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
@@ -16,7 +18,11 @@ import pl.commercelink.starter.email.EmailClient;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.List;
+import java.util.TimeZone;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -88,6 +94,29 @@ class ReceiptEffectsTest {
         ReceiptAttempt done = attempts.find(STORE_ID, KEY).orElseThrow();
         assertThat(done.getEmailSentAt()).isNotNull();
         assertThat(ReceiptEffects.pending(done)).isFalse();
+    }
+
+    @Test
+    void theEmailOrderEventIsRecordedInTheServersLocalTimeNotTheClocksUtcZone() {
+        // The clock's own zone (Europe/Warsaw, see MutableClock.at) must not be what decides the timestamp -
+        // only the JVM's default zone may. Asia/Tokyo differs from both UTC and Europe/Warsaw, so this fails
+        // if the code falls back to either of those instead of the system default.
+        TimeZone original = TimeZone.getDefault();
+        TimeZone.setDefault(TimeZone.getTimeZone("Asia/Tokyo"));
+        try {
+            fiscalised("https://paragony.pl/r/1");
+
+            effects.apply(STORE_ID, KEY);
+
+            ArgumentCaptor<OrderEvent> captor = ArgumentCaptor.forClass(OrderEvent.class);
+            verify(orderEvents).save(captor.capture());
+            LocalDateTime local = captor.getValue().getCreatedAt();
+            assertThat(local).isEqualTo(LocalDateTime.ofInstant(clock.instant(), ZoneId.of("Asia/Tokyo")));
+            assertThat(local).isNotEqualTo(LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC));
+            assertThat(local).isNotEqualTo(LocalDateTime.ofInstant(clock.instant(), ZoneId.of("Europe/Warsaw")));
+        } finally {
+            TimeZone.setDefault(original);
+        }
     }
 
     @Test

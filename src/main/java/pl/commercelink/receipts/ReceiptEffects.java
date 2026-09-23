@@ -199,8 +199,12 @@ public class ReceiptEffects {
             return true;
         });
         if (delivered) {
+            // The rest of the app records OrderEvents in the server's local time (LocalDateTime.now()); the
+            // clock here is UTC, so the instant is converted through the system default zone rather than the
+            // clock's own zone to keep this event's timestamp consistent with every other OrderEvent.
             orderEventsRepository.save(new OrderEvent(attempt.getOrderId(), EventType.email,
-                    EmailNotificationType.ORDER_RECEIPT.name(), LocalDateTime.now(clock)));
+                    EmailNotificationType.ORDER_RECEIPT.name(),
+                    LocalDateTime.ofInstant(now, ZoneId.systemDefault())));
         }
     }
 
