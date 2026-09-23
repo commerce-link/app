@@ -57,7 +57,7 @@ class DeliveriesRepositoryTest {
         List<Delivery> deliveries = Arrays.asList(later, pending, earlier);
         when(dynamoDBMapper.query(eq(Delivery.class), any(DynamoDBQueryExpression.class))).thenReturn(paginatedQueryList);
         when(paginatedQueryList.iterator()).thenReturn(deliveries.iterator());
-        DeliveryFilter filter = new DeliveryFilter(null, null, null, null, null, true, false, false, false, false);
+        DeliveryFilter filter = new DeliveryFilter(null, null, null, null, null, null, true, false, false, false, false);
 
         // when
         List<Delivery> result = deliveriesRepository.searchActiveDeliveries("store-1", filter, 1, 25);
@@ -72,7 +72,7 @@ class DeliveriesRepositoryTest {
         // given
         when(dynamoDBMapper.scan(eq(Delivery.class), any(DynamoDBScanExpression.class))).thenReturn(paginatedScanList);
         when(paginatedScanList.iterator()).thenReturn(Collections.<Delivery>emptyList().iterator());
-        DeliveryFilter filter = new DeliveryFilter(null, null, null, null, null, true, false, false, false, true);
+        DeliveryFilter filter = new DeliveryFilter(null, null, null, null, null, null, true, false, false, false, true);
 
         // when
         deliveriesRepository.searchActiveDeliveries(filter, 1, 25);
@@ -89,7 +89,7 @@ class DeliveriesRepositoryTest {
         // given
         when(dynamoDBMapper.query(eq(Delivery.class), any(DynamoDBQueryExpression.class))).thenReturn(paginatedQueryList);
         when(paginatedQueryList.iterator()).thenReturn(Collections.<Delivery>emptyList().iterator());
-        DeliveryFilter filter = new DeliveryFilter(null, null, null, null, null, true, false, false, false, false);
+        DeliveryFilter filter = new DeliveryFilter(null, null, null, null, null, null, true, false, false, false, false);
 
         // when
         deliveriesRepository.searchActiveDeliveries("store-1", filter, 1, 25);
@@ -98,6 +98,41 @@ class DeliveriesRepositoryTest {
         ArgumentCaptor<DynamoDBQueryExpression<Delivery>> captured = ArgumentCaptor.forClass(DynamoDBQueryExpression.class);
         verify(dynamoDBMapper).query(eq(Delivery.class), captured.capture());
         assertThat(captured.getValue().getFilterExpression()).doesNotContain("connectionMode");
+    }
+
+    @Test
+    void counterpartyShortcutIsMatchedAsAFragmentOfTheSyncedShortcut() {
+        // given
+        when(dynamoDBMapper.query(eq(Delivery.class), any(DynamoDBQueryExpression.class))).thenReturn(paginatedQueryList);
+        when(paginatedQueryList.iterator()).thenReturn(Collections.<Delivery>emptyList().iterator());
+        DeliveryFilter filter = new DeliveryFilter(null, null, null, "  EuSarl ", null, null, true, false, false, false, false);
+
+        // when
+        deliveriesRepository.searchActiveDeliveries("store-1", filter, 1, 25);
+
+        // then
+        ArgumentCaptor<DynamoDBQueryExpression<Delivery>> captured = ArgumentCaptor.forClass(DynamoDBQueryExpression.class);
+        verify(dynamoDBMapper).query(eq(Delivery.class), captured.capture());
+        assertThat(captured.getValue().getFilterExpression())
+                .contains("contains(counterpartyShortcut, :counterpartyShortcut)");
+        assertThat(captured.getValue().getExpressionAttributeValues().get(":counterpartyShortcut").getS())
+                .isEqualTo("EuSarl");
+    }
+
+    @Test
+    void blankCounterpartyShortcutDoesNotFilter() {
+        // given
+        when(dynamoDBMapper.query(eq(Delivery.class), any(DynamoDBQueryExpression.class))).thenReturn(paginatedQueryList);
+        when(paginatedQueryList.iterator()).thenReturn(Collections.<Delivery>emptyList().iterator());
+        DeliveryFilter filter = new DeliveryFilter(null, null, null, "   ", null, null, true, false, false, false, false);
+
+        // when
+        deliveriesRepository.searchActiveDeliveries("store-1", filter, 1, 25);
+
+        // then
+        ArgumentCaptor<DynamoDBQueryExpression<Delivery>> captured = ArgumentCaptor.forClass(DynamoDBQueryExpression.class);
+        verify(dynamoDBMapper).query(eq(Delivery.class), captured.capture());
+        assertThat(captured.getValue().getFilterExpression()).doesNotContain("counterpartyShortcut");
     }
 
     @Test

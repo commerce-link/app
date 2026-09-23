@@ -9,7 +9,7 @@ class DeliveryFilterTest {
     @Test
     void carriesTheAwaitingApprovalFlag() {
         // given
-        DeliveryFilter filter = new DeliveryFilter(null, null, null, null, null, true, false, false, true, false);
+        DeliveryFilter filter = new DeliveryFilter(null, null, null, null, null, null, true, false, false, true, false);
 
         // when / then
         assertThat(filter.isAwaitingApproval()).isTrue();
@@ -18,7 +18,7 @@ class DeliveryFilterTest {
     @Test
     void defaultsToNotFilteringByApprovalState() {
         // given
-        DeliveryFilter filter = new DeliveryFilter(null, null, null, null, null, true, false, false, false, false);
+        DeliveryFilter filter = new DeliveryFilter(null, null, null, null, null, null, true, false, false, false, false);
 
         // when / then
         assertThat(filter.isAwaitingApproval()).isFalse();
@@ -27,7 +27,7 @@ class DeliveryFilterTest {
     @Test
     void carriesTheGlobalOnlyFlag() {
         // given
-        DeliveryFilter filter = new DeliveryFilter(null, null, null, null, null, true, false, false, false, true);
+        DeliveryFilter filter = new DeliveryFilter(null, null, null, null, null, null, true, false, false, false, true);
 
         // when / then
         assertThat(filter.isGlobalOnly()).isTrue();

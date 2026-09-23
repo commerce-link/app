@@ -100,7 +100,7 @@ class OrdersManagerTest {
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
 
         // when
-        ordersManager.addOrderItem(store, order, matchedInventory, 1, 0);
+        ordersManager.addOrderItems(store, order, List.of(OrderItemDraft.of(matchedInventory, 1)));
 
         // then
         ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
@@ -129,7 +129,7 @@ class OrdersManagerTest {
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
 
         // when
-        ordersManager.addOrderItem(store, order, matchedInventory, 1, 0);
+        ordersManager.addOrderItems(store, order, List.of(OrderItemDraft.of(matchedInventory, 1)));
 
         // then
         ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
@@ -152,7 +152,7 @@ class OrdersManagerTest {
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
 
         // when
-        ordersManager.addOrderItem(store, order, matchedInventory, 1, 0);
+        ordersManager.addOrderItems(store, order, List.of(OrderItemDraft.of(matchedInventory, 1)));
 
         // then
         ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
@@ -175,9 +175,11 @@ class OrdersManagerTest {
         when(matchedInventory.getEstimatedDeliveryDays()).thenReturn(0);
         when(store.isPositionConsolidationEnabled()).thenReturn(false);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(
+                productAt(0, "Laptops"), productAt(1, "Monitors"), productAt(2, "Mice")));
 
         // when
-        ordersManager.addOrderItem(store, order, matchedInventory, 1, 3);
+        ordersManager.addOrderItems(store, order, List.of(OrderItemDraft.of(matchedInventory, 1)));
 
         // then
         ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
@@ -201,7 +203,7 @@ class OrdersManagerTest {
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
 
         // when
-        ordersManager.addOrderItem(store, order, availability, 1, 0);
+        ordersManager.addOrderItems(store, order, List.of(OrderItemDraft.of(availability, 1)));
 
         // then
         ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
@@ -228,7 +230,7 @@ class OrdersManagerTest {
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
 
         // when
-        ordersManager.addOrderItem(store, order, availability, 3, 0);
+        ordersManager.addOrderItems(store, order, List.of(OrderItemDraft.of(availability, 3)));
 
         // then
         ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
@@ -250,16 +252,18 @@ class OrdersManagerTest {
                 "Usługi dodatkowe", 30L, 1L, 1, 0L, true);
         when(store.isPositionConsolidationEnabled()).thenReturn(false);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(
+                productAt(0, "Laptops"), productAt(1, "Monitors"), productAt(2, "Mice")));
 
         // when
-        ordersManager.addOrderItem(store, order, availability, 1, 3);
+        ordersManager.addOrderItems(store, order, List.of(OrderItemDraft.of(availability, 1)));
 
         // then
         ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
         verify(orderItemsRepository).save(itemCaptor.capture());
         OrderItem savedItem = itemCaptor.getValue();
         assertThat(savedItem.isService()).isTrue();
-        assertThat(savedItem.getPosition()).isEqualTo(PositionGroup.SERVICE_GROUP_START + 3);
+        assertThat(savedItem.getPosition()).isEqualTo(PositionGroup.SERVICE_GROUP_START);
         assertThat(savedItem.getDeliveryId()).isEqualTo(OrderItem.GENERIC_WAREHOUSE_ORDER_NO);
         assertThat(savedItem.getStatus()).isEqualTo(FulfilmentStatus.Delivered);
     }
@@ -274,9 +278,11 @@ class OrdersManagerTest {
                 "Services", 30L, 1L, 1, 0L, false);
         when(store.isPositionConsolidationEnabled()).thenReturn(false);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(
+                productAt(0, "Laptops"), productAt(1, "Monitors"), productAt(2, "Mice")));
 
         // when
-        ordersManager.addOrderItem(store, order, availability, 1, 3);
+        ordersManager.addOrderItems(store, order, List.of(OrderItemDraft.of(availability, 1)));
 
         // then
         ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
@@ -289,8 +295,8 @@ class OrdersManagerTest {
     }
 
     @Test
-    @DisplayName("addOrderItem stores the provided position and never scans existing items")
-    void addOrderItemStoresProvidedPositionWithoutScanningExistingItems() {
+    @DisplayName("addOrderItem joins the position of the last product of the same category")
+    void addOrderItemJoinsLastProductOfTheSameCategory() {
         // given
         Order order = orderWithTotalPrice(0.0);
         AvailabilityAndPrice availability = new AvailabilityAndPrice(
@@ -298,15 +304,16 @@ class OrdersManagerTest {
                 "Laptops", 200L, 10L, 5, 0L, false);
         when(store.isPositionConsolidationEnabled()).thenReturn(false);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(
+                productAt(0, "Laptops"), productAt(1, "Monitors"), productAt(2, "Laptops"), productAt(3, "Mice")));
 
         // when
-        ordersManager.addOrderItem(store, order, availability, 1, 4);
+        ordersManager.addOrderItems(store, order, List.of(OrderItemDraft.of(availability, 1)));
 
         // then
         ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
         verify(orderItemsRepository).save(itemCaptor.capture());
-        assertThat(itemCaptor.getValue().getPosition()).isEqualTo(4);
-        verify(orderItemsRepository, never()).findByOrderId(any());
+        assertThat(itemCaptor.getValue().getPosition()).isEqualTo(2);
     }
 
     @Test
@@ -1258,6 +1265,102 @@ class OrdersManagerTest {
         item.setDeliveryId("Elko");
         item.markAsInAllocation();
         return item;
+    }
+
+    @Test
+    @DisplayName("addOrderItems places each draft after the last product of its category or at the end of its band, saves the order once and runs fulfilment once for the batch")
+    void addOrderItemsAssignsPositionsSavesOrderOnceAndRunsFulfilmentOnce() {
+        // given
+        Order order = orderWithTotalPrice(0.0);
+        when(store.isPositionConsolidationEnabled()).thenReturn(false);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(productAt(0, "Laptops"), productAt(1, "Monitors")));
+
+        // when
+        ordersManager.addOrderItems(store, order, List.of(
+                OrderItemDraft.of(availability("pim-1", "MFN-L", "Laptops", 200L, false), 1),
+                OrderItemDraft.of(availability("pim-2", "MFN-M", "Mice", 50L, false), 2),
+                OrderItemDraft.of(availability("pim-3", "MFN-S", "Services", 30L, true), 1)));
+
+        // then
+        ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
+        verify(orderItemsRepository, times(3)).save(itemCaptor.capture());
+        List<OrderItem> saved = itemCaptor.getAllValues();
+        assertThat(saved).extracting(OrderItem::getSku).containsExactly("MFN-L", "MFN-M", "MFN-S");
+        assertThat(saved).extracting(OrderItem::getPosition).containsExactly(0, 2, PositionGroup.SERVICE_GROUP_START);
+        assertThat(saved.get(2).isService()).isTrue();
+        assertThat(saved.get(2).getStatus()).isNotEqualTo(FulfilmentStatus.New);
+
+        verify(ordersRepository, times(1)).save(order);
+        assertThat(order.getTotalPrice()).isEqualTo(330.0);
+        verify(automatedOrderFulfilment, times(1)).run(eq(STORE_ID), argThat(items -> items.size() == 3));
+    }
+
+    @Test
+    @DisplayName("addOrderItems lets a later draft join the position of an earlier draft of the same category")
+    void addOrderItemsGroupsDraftsOfTheSameCategoryWithinOneBatch() {
+        // given
+        Order order = orderWithTotalPrice(0.0);
+        when(store.isPositionConsolidationEnabled()).thenReturn(false);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(productAt(0, "Laptops")));
+
+        // when
+        ordersManager.addOrderItems(store, order, List.of(
+                OrderItemDraft.of(availability("pim-1", "MFN-1", "Mice", 10L, false), 1),
+                OrderItemDraft.of(availability("pim-2", "MFN-2", "Mice", 10L, false), 1)));
+
+        // then
+        ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
+        verify(orderItemsRepository, times(2)).save(itemCaptor.capture());
+        assertThat(itemCaptor.getAllValues()).extracting(OrderItem::getPosition).containsExactly(1, 1);
+    }
+
+    @Test
+    @DisplayName("addOrderItems puts a service after the existing services and ignores the delivery item at the end of the band")
+    void addOrderItemsPutsServiceAfterExistingServicesIgnoringDeliveryItem() {
+        // given
+        Order order = orderWithTotalPrice(0.0);
+        when(store.isPositionConsolidationEnabled()).thenReturn(false);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(
+                productAt(0, "Laptops"), serviceAt(PositionGroup.SERVICE_GROUP_START), serviceAt(PositionGroup.DELIVERY_POSITION)));
+
+        // when
+        ordersManager.addOrderItems(store, order, List.of(
+                OrderItemDraft.of(availability("pim-1", "MFN-S", "Services", 30L, true), 1)));
+
+        // then
+        ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
+        verify(orderItemsRepository).save(itemCaptor.capture());
+        assertThat(itemCaptor.getValue().getPosition()).isEqualTo(PositionGroup.SERVICE_GROUP_START + 1);
+    }
+
+    @Test
+    @DisplayName("addOrderItems with no drafts neither saves nor runs fulfilment")
+    void addOrderItemsWithoutDraftsDoesNothing() {
+        // given
+        Order order = orderWithTotalPrice(0.0);
+
+        // when
+        ordersManager.addOrderItems(store, order, List.of());
+
+        // then
+        verify(orderItemsRepository, never()).save(any());
+        verify(ordersRepository, never()).save(any());
+        verify(automatedOrderFulfilment, never()).run(any(), any());
+    }
+
+    private OrderItem productAt(int position, String category) {
+        return new OrderItem(ORDER_ID, category, "product", 1, 10.0, "SKU-" + position, false, position);
+    }
+
+    private OrderItem serviceAt(int position) {
+        OrderItem item = new OrderItem(ORDER_ID, "Services", "service", 1, 10.0, "SRV-" + position, false, position);
+        item.setService(true);
+        return item;
+    }
+
+    private AvailabilityAndPrice availability(String pimId, String mfn, String category, long price, boolean service) {
+        return new AvailabilityAndPrice(pimId, "EAN-" + mfn, mfn, "Brand", "Label", "name-" + mfn,
+                category, price, 10L, 2, 0L, service);
     }
 
     private Order orderWithTotalPrice(double totalPrice) {

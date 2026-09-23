@@ -4,21 +4,18 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.deliveries.DropshipItemLookup;
-import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.orders.fulfilment.AutomatedOrderFulfilment;
 import pl.commercelink.orders.fulfilment.ManualWarehouseItemFulfilment;
 import pl.commercelink.orders.fulfilment.OrderFulfilmentEventPublisher;
 import pl.commercelink.orders.notifications.OrderNotificationsEventPublisher;
-import pl.commercelink.pricelist.AvailabilityAndPrice;
-import pl.commercelink.taxonomy.Categories;
 import pl.commercelink.stores.Store;
-import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.warehouse.api.Reservation;
 import pl.commercelink.warehouse.api.ReservationRemovalItem;
 import pl.commercelink.warehouse.api.Warehouse;
 import pl.commercelink.warehouse.api.WarehouseItemView;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
@@ -52,61 +49,62 @@ public class OrdersManager {
     @Autowired
     private OrderNotificationsEventPublisher notificationEventPublisher;
 
-    public void addOrderItem(Store store, Order order, MatchedInventory matchedInventory, int qty, int position) {
-        OrderItem orderItem;
-        if (!matchedInventory.hasAnyOffers()) {
-            String mfn = matchedInventory.getInventoryKey().getProductCodes().iterator().next();
-            orderItem = new OrderItem(order.getOrderId(), Categories.UNCATEGORIZED, "", qty, 0, mfn, store.isPositionConsolidationEnabled(), position);
-        } else {
-            Taxonomy taxonomy = matchedInventory.getTaxonomy();
-            orderItem = new OrderItem(
-                    order.getOrderId(),
-                    StringUtils.isNotBlank(taxonomy.category()) ? taxonomy.category() : Categories.UNCATEGORIZED,
-                    taxonomy.name(),
-                    qty,
-                    matchedInventory.getMedianPrice().grossValue(),
-                    taxonomy.mfn(),
-                    store.isPositionConsolidationEnabled(),
-                    position
-            );
+    /**
+     * Places the drafts in the order in the given sequence: a product joins the last item of its
+     * category, anything else goes to the end of its band. The order is saved and the automated
+     * fulfilment runs once for the whole batch.
+     */
+    public void addOrderItems(Store store, Order order, List<OrderItemDraft> drafts) {
+        if (drafts.isEmpty()) {
+            return;
         }
-        if (orderItem.isService()) {
-            orderItem.setPosition(PositionGroup.SERVICE_GROUP_START + position);
-            orderItem.markAsWarehouseFulfilled();
-        }
-        orderItemsRepository.save(orderItem);
+        List<OrderItem> items = new ArrayList<>(orderItemsRepository.findByOrderId(order.getOrderId()));
+        List<OrderItem> added = new ArrayList<>();
 
-        order.increaseRealizationDays(orderItem, matchedInventory.getEstimatedDeliveryDays());
-        order.increaseTotalPrice(orderItem.getTotalPrice());
+        for (OrderItemDraft draft : drafts) {
+            OrderItem orderItem = new OrderItem(
+                    order.getOrderId(),
+                    draft.category(),
+                    draft.name(),
+                    draft.qty(),
+                    draft.price(),
+                    draft.sku(),
+                    store.isPositionConsolidationEnabled(),
+                    0
+            );
+            orderItem.setService(draft.service());
+            orderItem.setPosition(positionFor(items, orderItem));
+            if (orderItem.isService()) {
+                orderItem.markAsWarehouseFulfilled();
+            }
+            orderItemsRepository.save(orderItem);
+            items.add(orderItem);
+            added.add(orderItem);
+
+            order.increaseRealizationDays(orderItem, draft.estimatedDeliveryDays());
+            order.increaseTotalPrice(orderItem.getTotalPrice());
+        }
         ordersRepository.save(order);
 
-        automatedOrderFulfilment.run(order.getStoreId(), List.of(orderItem));
+        automatedOrderFulfilment.run(order.getStoreId(), added);
     }
 
-    public void addOrderItem(Store store, Order order, AvailabilityAndPrice availabilityAndPrice, int qty, int position) {
-        OrderItem orderItem = new OrderItem(
-                order.getOrderId(),
-                availabilityAndPrice.getCategory(),
-                availabilityAndPrice.getName(),
-                qty,
-                availabilityAndPrice.getPrice(),
-                availabilityAndPrice.getManufacturerCode(),
-                store.isPositionConsolidationEnabled(),
-                position
-        );
-        orderItem.setService(availabilityAndPrice.isService());
+    private int positionFor(List<OrderItem> items, OrderItem orderItem) {
         if (orderItem.isService()) {
-            orderItem.setPosition(PositionGroup.SERVICE_GROUP_START + position);
-            orderItem.markAsWarehouseFulfilled();
+            return items.stream()
+                    .filter(OrderItem::isService)
+                    .mapToInt(OrderItem::getPosition)
+                    .filter(p -> p >= PositionGroup.SERVICE_GROUP_START && p < PositionGroup.DELIVERY_POSITION)
+                    .max().orElse(PositionGroup.SERVICE_GROUP_START - 1) + 1;
         }
-
-        orderItemsRepository.save(orderItem);
-
-        order.increaseRealizationDays(orderItem, availabilityAndPrice.getEstimatedDeliveryDays());
-        order.increaseTotalPrice(orderItem.getTotalPrice());
-        ordersRepository.save(order);
-
-        automatedOrderFulfilment.run(order.getStoreId(), List.of(orderItem));
+        List<OrderItem> products = items.stream()
+                .filter(i -> !i.isService() && i.getPosition() < PositionGroup.SERVICE_GROUP_START)
+                .toList();
+        return products.stream()
+                .filter(i -> Objects.equals(i.getCategory(), orderItem.getCategory()))
+                .mapToInt(OrderItem::getPosition)
+                .max()
+                .orElseGet(() -> products.stream().mapToInt(OrderItem::getPosition).max().orElse(-1) + 1);
     }
 
     public void assignFromWarehouse(String storeId, String orderId, String itemId, String warehouseItemId) {
