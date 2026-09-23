@@ -7,14 +7,21 @@ import pl.commercelink.pim.api.CategoryMatchRequest;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.taxonomy.mapping.CategoryMappingCache;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
 @Component
 @Slf4j
 class TaxonomyCategoryMatchScheduler {
+
+    private static final Comparator<PendingCategorization> LEAST_TRIED_FIRST =
+            Comparator.comparingInt(PendingCategorization::attemptCount)
+                    .thenComparing(PendingCategorization::getAddedAt,
+                            Comparator.nullsFirst(Comparator.naturalOrder()))
+                    .thenComparing(PendingCategorization::getMfn);
 
     private final PendingCategorizationRepository pendingRepository;
     private final TaxonomyCache cache;
@@ -36,22 +43,29 @@ class TaxonomyCategoryMatchScheduler {
 
     @Scheduled(cron = "${taxonomy.category-match.sweep-cron:0 2-57/5 * * * ?}")
     void sweep() {
-        List<PendingCategorization> pending = new ArrayList<>(pendingRepository.findAll());
-        enrichment.pendingCountIs(pending.size());
+        List<PendingCategorization> pending = pendingRepository.findAll();
         if (pending.isEmpty()) {
+            enrichment.pendingCountIs(0);
             return;
         }
 
         Map<String, Taxonomy> byMfn = cache.findByMfns(pending.stream().map(PendingCategorization::getMfn).toList());
-        Collections.shuffle(pending);
+        LocalDateTime staleBefore = LocalDateTime.now().minus(properties.retryExhaustedAfter());
 
-        int submitted = 0;
+        List<PendingCategorization> candidates = new ArrayList<>();
         int resolvedFromMapping = 0;
         int alreadyCategorized = 0;
+        int awaitingFeed = 0;
         int givenUp = 0;
+        int evicted = 0;
+
         for (PendingCategorization entry : pending) {
             Taxonomy taxonomy = byMfn.get(entry.getMfn());
-            if (taxonomy == null || Taxonomy.hasCategory(taxonomy)) {
+            if (taxonomy == null) {
+                awaitingFeed++;
+                continue;
+            }
+            if (Taxonomy.hasCategory(taxonomy)) {
                 enrichment.forget(entry.getMfn());
                 alreadyCategorized++;
                 continue;
@@ -61,28 +75,51 @@ class TaxonomyCategoryMatchScheduler {
                 continue;
             }
             if (exhausted(entry)) {
-                givenUp++;
+                if (addedBefore(entry, staleBefore)) {
+                    enrichment.forget(entry.getMfn());
+                    evicted++;
+                } else {
+                    givenUp++;
+                }
                 continue;
             }
+            candidates.add(entry);
+        }
+
+        enrichment.pendingCountIs(candidates.size() + awaitingFeed);
+        candidates.sort(LEAST_TRIED_FIRST);
+
+        int submitted = 0;
+        for (PendingCategorization entry : candidates) {
             if (submitted >= properties.maxSubmissionsPerRun()) {
+                break;
+            }
+            int attemptsBeforeClaim = entry.attemptCount();
+            if (!pendingRepository.claimAttempt(entry.getMfn(), attemptsBeforeClaim)) {
                 continue;
             }
+            Taxonomy taxonomy = byMfn.get(entry.getMfn());
             try {
                 pimCatalog.submitCategoryMatch(new CategoryMatchRequest(
                         null, taxonomy.ean(), taxonomy.mfn(), taxonomy.brand(), taxonomy.name(), taxonomy.rawCategory()));
                 submitted++;
-                pendingRepository.recordAttempt(entry.getMfn());
             } catch (IllegalStateException e) {
+                pendingRepository.releaseAttempt(entry.getMfn(), attemptsBeforeClaim);
                 log.warn("Category match sweep aborted: {}", e.getMessage());
                 return;
             }
         }
-        log.info("Category match sweep: pending={} submitted={} resolvedFromMapping={} alreadyCategorized={} givenUp={}",
-                pending.size(), submitted, resolvedFromMapping, alreadyCategorized, givenUp);
+        log.info("Category match sweep: pending={} submitted={} resolvedFromMapping={} alreadyCategorized={}"
+                        + " awaitingFeed={} givenUp={} evicted={}",
+                pending.size(), submitted, resolvedFromMapping, alreadyCategorized, awaitingFeed, givenUp, evicted);
     }
 
     private boolean exhausted(PendingCategorization entry) {
         return properties.maxAttempts() > 0 && entry.attemptCount() >= properties.maxAttempts();
+    }
+
+    private static boolean addedBefore(PendingCategorization entry, LocalDateTime moment) {
+        return entry.getAddedAt() == null || entry.getAddedAt().isBefore(moment);
     }
 
     private boolean resolveFromMapping(PendingCategorization entry, Taxonomy taxonomy) {

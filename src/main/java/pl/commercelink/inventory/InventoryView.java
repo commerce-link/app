@@ -44,7 +44,7 @@ public class InventoryView {
 
     public MatchedInventory findByInventoryKey(InventoryKey lookupKey) {
         MatchedInventory matched = assemble(lookupKey);
-        if (matched.getTaxonomy() == Taxonomy.EMPTY) {
+        if (!Taxonomy.hasCategory(matched.getTaxonomy())) {
             matched.adoptTaxonomy(taxonomyCache.findBest(matched.getInventoryKey().getProductCodes()));
         }
         return matched;

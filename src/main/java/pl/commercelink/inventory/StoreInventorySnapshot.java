@@ -42,18 +42,23 @@ public record StoreInventorySnapshot(LocalDateTime builtAt, List<Entry> entries)
             String name,
             String category,
             String categoryId,
-            int dataAccuracyScore
+            int dataAccuracyScore,
+            Integer netWeightInGrams,
+            Integer grossWeightInGrams,
+            String rawCategory
     ) {
         static ProductData from(Taxonomy taxonomy) {
             if (taxonomy == null || taxonomy == Taxonomy.EMPTY) {
                 return null;
             }
             return new ProductData(taxonomy.ean(), taxonomy.mfn(), taxonomy.brand(), taxonomy.name(),
-                    taxonomy.category(), taxonomy.categoryId(), taxonomy.dataAccuracyScore());
+                    taxonomy.category(), taxonomy.categoryId(), taxonomy.dataAccuracyScore(),
+                    taxonomy.netWeightInGrams(), taxonomy.grossWeightInGrams(), taxonomy.rawCategory());
         }
 
         Taxonomy toTaxonomy() {
-            return new Taxonomy(ean, mfn, brand, name, category, dataAccuracyScore, null, null, null, categoryId);
+            return new Taxonomy(ean, mfn, brand, name, category, dataAccuracyScore,
+                    netWeightInGrams, grossWeightInGrams, rawCategory, categoryId);
         }
     }
 
