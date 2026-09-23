@@ -7,6 +7,7 @@ import java.time.LocalDateTime;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ReceiptConfigurationTest {
 
@@ -58,5 +59,16 @@ class ReceiptConfigurationTest {
     @Test
     void storeNeverReturnsNullConfiguration() {
         assertThat(new Store().getReceiptConfiguration()).isNotNull();
+    }
+
+    @Test
+    void defaultSourceTypesCannotBeModified() {
+        ReceiptConfiguration configuration = new ReceiptConfiguration();
+
+        assertThatThrownBy(() -> configuration.sourceTypes().add(OrderSourceType.PointOfSale))
+                .isInstanceOf(UnsupportedOperationException.class);
+        assertThatThrownBy(() -> ReceiptConfiguration.DEFAULT_SOURCES.add(OrderSourceType.PointOfSale))
+                .isInstanceOf(UnsupportedOperationException.class);
+        assertThat(ReceiptConfiguration.DEFAULT_SOURCES).doesNotContain(OrderSourceType.PointOfSale);
     }
 }

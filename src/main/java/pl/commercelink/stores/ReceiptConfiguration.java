@@ -8,6 +8,7 @@ import pl.commercelink.orders.OrderSourceType;
 import pl.commercelink.starter.dynamodb.DynamoDbLocalDateTimeConverter;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
@@ -22,7 +23,7 @@ import java.util.stream.Collectors;
 public class ReceiptConfiguration {
 
     public static final Set<OrderSourceType> DEFAULT_SOURCES =
-            EnumSet.complementOf(EnumSet.of(OrderSourceType.PointOfSale));
+            Collections.unmodifiableSet(EnumSet.complementOf(EnumSet.of(OrderSourceType.PointOfSale)));
 
     @DynamoDBAttribute(attributeName = "enabled")
     private boolean enabled;
@@ -68,6 +69,7 @@ public class ReceiptConfiguration {
         enabled = false;
     }
 
+    /** Always unmodifiable: callers only read it, and the default must never drift from a caller's mutation. */
     @DynamoDBIgnore
     public Set<OrderSourceType> sourceTypes() {
         if (sources == null) {
@@ -81,7 +83,7 @@ public class ReceiptConfiguration {
                 // a source removed from the enum is simply no longer covered
             }
         }
-        return types;
+        return Collections.unmodifiableSet(types);
     }
 
     public void setSourceTypes(Set<OrderSourceType> types) {
