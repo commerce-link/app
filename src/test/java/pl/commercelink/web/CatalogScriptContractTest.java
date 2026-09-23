@@ -183,20 +183,28 @@ class CatalogScriptContractTest {
     }
 
     /**
-     * The help-text margin reset was written for the catalog's own disclosure bodies, but the selector also matches
-     * `.cl-steps-note` (E-mail template) and `.cl-param-hint` (Reporting, courier account), stripping their margins
-     * on screens outside the catalog. Narrowed with `:not()` so those two classes keep their own rules (D-M1).
+     * The help-text margin reset was written for the catalog's own disclosure bodies, but a plain descendant
+     * selector also matches `.cl-steps-note` (E-mail template) and `.cl-param-hint` (Reporting, courier account),
+     * stripping their margins, and (fix round 1) `.cl-repeat-add p.cl-help` inside a disclosure body, which beats
+     * the more specific `.cl-repeat-add .cl-help` rule (`:2848`) by specificity and forces the wrong line-height —
+     * on the E-mail template's attachments disclosure (`store-email-template.html:101`, outside the catalog) and,
+     * the same bug, on the catalog's own product page custom-filters disclosure (`product.html:235`). Every catalog
+     * use of `.cl-disclosure-body p.cl-help` that IS meant to carry this rule (`product.html:163`,
+     * `category-pricing.html:165`) sits inside a `.cl-form-grid`, so scoping the selector to `.cl-form-grid` keeps
+     * that look while excluding the steps-note/param-hint paragraphs (never inside a form-grid) and every
+     * `.cl-repeat-add` help text (inside `.cl-repeat`, not `.cl-form-grid`) catalog-wide, D-M1.
      */
     @Test
-    void disclosureBodyHelpTextRuleDoesNotReachStepsNoteOrParamHint() throws Exception {
+    void disclosureBodyHelpTextRuleOnlyReachesFormGridDescendantsInTheCatalog() throws Exception {
         // given
         String css = read("src/main/resources/static/css/commercelink.css");
 
         // then
         assertThat(css)
-                .as("the disclosure-body help rule is narrowed away from the steps-note and param-hint classes")
-                .contains(".cl-page .cl-disclosure-body p.cl-help:not(.cl-steps-note):not(.cl-param-hint) {")
-                .doesNotContain(".cl-page .cl-disclosure-body p.cl-help {");
+                .as("the disclosure-body help rule is scoped to form-grid descendants, not any p.cl-help in the disclosure body")
+                .contains(".cl-page .cl-disclosure-body .cl-form-grid p.cl-help:not(.cl-steps-note):not(.cl-param-hint) {")
+                .doesNotContain(".cl-page .cl-disclosure-body p.cl-help {")
+                .doesNotContain(".cl-page .cl-disclosure-body p.cl-help:not(.cl-steps-note):not(.cl-param-hint) {");
     }
 
     /**
