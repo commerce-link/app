@@ -1,6 +1,7 @@
 package pl.commercelink.receipts;
 
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
+import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapperConfig;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBQueryExpression;
 import com.amazonaws.services.dynamodbv2.model.AttributeValue;
 import com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException;
@@ -16,13 +17,17 @@ import java.util.Optional;
 @Component
 class DynamoDbReceiptAttemptStore extends DynamoDbRepository<ReceiptAttempt> implements ReceiptAttemptStore {
 
+    private static final DynamoDBMapperConfig CONSISTENT = DynamoDBMapperConfig.builder()
+            .withConsistentReads(DynamoDBMapperConfig.ConsistentReads.CONSISTENT)
+            .build();
+
     DynamoDbReceiptAttemptStore(AmazonDynamoDB amazonDynamoDB) {
         super(amazonDynamoDB);
     }
 
     @Override
     public Optional<ReceiptAttempt> find(String storeId, String receiptKey) {
-        return Optional.ofNullable(dynamoDBMapper.load(ReceiptAttempt.class, storeId, receiptKey));
+        return Optional.ofNullable(dynamoDBMapper.load(ReceiptAttempt.class, storeId, receiptKey, CONSISTENT));
     }
 
     @Override

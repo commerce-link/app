@@ -12,6 +12,7 @@ public interface ReceiptAttemptStore {
 
     int MAX_UPDATE_ATTEMPTS = 10;
 
+    /** Strongly consistent — updates and leases decide on it. */
     Optional<ReceiptAttempt> find(String storeId, String receiptKey);
 
     /** Attempts of one order by attempt number. */
@@ -26,7 +27,10 @@ public interface ReceiptAttemptStore {
     /** Attempts due at {@code now}, soonest first. */
     List<ReceiptAttempt> findDue(Instant now, int limit);
 
-    /** Whether the store has attempts that still need the provider (ISSUING or PENDING). */
+    /**
+     * Whether the store has attempts that still need the provider (ISSUING or PENDING) — "live" here, unlike
+     * {@link ReceiptAttemptState#isLive()}, excludes FISCALISED: a fiscalised attempt no longer needs the provider.
+     */
     boolean hasLiveAttempts(String storeId);
 
     /**
