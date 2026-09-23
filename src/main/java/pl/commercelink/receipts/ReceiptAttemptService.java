@@ -45,6 +45,7 @@ public class ReceiptAttemptService {
     private final ReceiptWorkPublisher publisher;
     private final OptimisticLockingExecutor optimisticLockingExecutor;
     private final OrderLifecycle orderLifecycle;
+    private final ReceiptAlerts alerts;
     private final Clock clock;
 
     @Autowired
@@ -53,9 +54,10 @@ public class ReceiptAttemptService {
                                  ReceiptProviderFactory providerFactory, ReceiptRequestConverter converter,
                                  ReceiptEligibility eligibility, ReceiptWorkPublisher publisher,
                                  OptimisticLockingExecutor optimisticLockingExecutor,
-                                 @org.springframework.context.annotation.Lazy OrderLifecycle orderLifecycle) {
+                                 @org.springframework.context.annotation.Lazy OrderLifecycle orderLifecycle,
+                                 ReceiptAlerts alerts) {
         this(attempts, storesRepository, ordersRepository, orderItemsRepository, providerFactory, converter,
-                eligibility, publisher, optimisticLockingExecutor, orderLifecycle, Clock.systemDefaultZone());
+                eligibility, publisher, optimisticLockingExecutor, orderLifecycle, alerts, Clock.systemDefaultZone());
     }
 
     ReceiptAttemptService(ReceiptAttemptStore attempts, StoresRepository storesRepository,
@@ -63,7 +65,7 @@ public class ReceiptAttemptService {
                           ReceiptProviderFactory providerFactory, ReceiptRequestConverter converter,
                           ReceiptEligibility eligibility, ReceiptWorkPublisher publisher,
                           OptimisticLockingExecutor optimisticLockingExecutor, OrderLifecycle orderLifecycle,
-                          Clock clock) {
+                          ReceiptAlerts alerts, Clock clock) {
         this.attempts = attempts;
         this.storesRepository = storesRepository;
         this.ordersRepository = ordersRepository;
@@ -74,6 +76,7 @@ public class ReceiptAttemptService {
         this.publisher = publisher;
         this.optimisticLockingExecutor = optimisticLockingExecutor;
         this.orderLifecycle = orderLifecycle;
+        this.alerts = alerts;
         this.clock = clock;
     }
 
@@ -102,8 +105,13 @@ public class ReceiptAttemptService {
             throw new ReceiptActionException("receipts.action.reissue.noProvider");
         }
         int next = existing.stream().mapToInt(ReceiptAttempt::getAttemptNo).max().orElse(0) + 1;
-        return create(store, order, next, actor)
+        ReceiptAttempt created = create(store, order, next, actor)
                 .orElseThrow(() -> new ReceiptActionException("receipts.action.reissue.concurrent"));
+        // Every attempt in `existing` is dead (checked above) and is being superseded by `created`: its bell
+        // alert, if any, no longer needs the operator's attention. The attempt's own `attention` field is left
+        // untouched, so the order page still shows why it needed correcting.
+        existing.forEach(alerts::resolve);
+        return created;
     }
 
     public void checkNow(String storeId, String receiptKey) {

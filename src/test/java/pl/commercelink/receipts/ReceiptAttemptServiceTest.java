@@ -37,6 +37,7 @@ class ReceiptAttemptServiceTest {
     private final MutableClock clock = MutableClock.at("2026-09-23T13:00:00Z");
     private final FakeReceiptProvider provider = new FakeReceiptProvider();
     private final OptimisticLockingExecutor locking = mock(OptimisticLockingExecutor.class);
+    private final ReceiptAlerts alerts = mock(ReceiptAlerts.class);
     private ReceiptAttemptService service;
     private Store store;
     private Order order;
@@ -55,7 +56,8 @@ class ReceiptAttemptServiceTest {
         when(factory.get(any(Store.class), anyString())).thenReturn(provider);
         doAnswer(ReceiptAttemptServiceTest::modifyAndSave).when(locking).modifyAndSave(any(), any(), any());
         service = new ReceiptAttemptService(attempts, stores, orders, orderItems, factory,
-                new ReceiptRequestConverter(), new ReceiptEligibility(factory), publisher, locking, lifecycle, clock);
+                new ReceiptRequestConverter(), new ReceiptEligibility(factory), publisher, locking, lifecycle,
+                alerts, clock);
     }
 
     // Mirrors the real OptimisticLockingExecutor: load, modify, save — used both as the default stub and, in one
@@ -139,6 +141,39 @@ class ReceiptAttemptServiceTest {
         assertThat(second.getReceiptKey()).isEqualTo(ORDER_ID + ":R2");
         assertThat(second.getAttemptNo()).isEqualTo(2);
         assertThat(second.getCreatedBy()).isEqualTo("operator");
+    }
+
+    @Test
+    void reissueResolvesTheBellAlertOfEveryEarlierDeadAttempt() {
+        service.startAutomatic(store, order);
+        attempts.update(STORE_ID, ORDER_ID + ":R1", a -> {
+            a.setState(ReceiptAttemptState.FAILED);
+            return true;
+        });
+
+        service.reissue(STORE_ID, ORDER_ID, "operator");
+
+        verify(alerts).resolve(argThat(a -> a.getReceiptKey().equals(ORDER_ID + ":R1")));
+    }
+
+    @Test
+    void reissueResolvesEveryEarlierDeadAttemptNotJustTheLatest() {
+        service.startAutomatic(store, order);
+        attempts.update(STORE_ID, ORDER_ID + ":R1", a -> {
+            a.setState(ReceiptAttemptState.FAILED);
+            return true;
+        });
+        service.reissue(STORE_ID, ORDER_ID, "operator");
+        attempts.update(STORE_ID, ORDER_ID + ":R2", a -> {
+            a.setState(ReceiptAttemptState.BLOCKED);
+            return true;
+        });
+        clearInvocations(alerts);
+
+        service.reissue(STORE_ID, ORDER_ID, "operator");
+
+        verify(alerts).resolve(argThat(a -> a.getReceiptKey().equals(ORDER_ID + ":R1")));
+        verify(alerts).resolve(argThat(a -> a.getReceiptKey().equals(ORDER_ID + ":R2")));
     }
 
     @Test

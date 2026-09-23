@@ -42,6 +42,15 @@ public class ReceiptAlerts {
         return true;
     }
 
+    /**
+     * Resolves this attempt's bell notification, e.g. because a later attempt of the same order fiscalised and the
+     * old FAILED/BLOCKED alert no longer needs the operator's attention. The attempt's stored {@code attention} is
+     * left as-is: the order page still shows why that dead attempt needed correcting.
+     */
+    public void resolve(ReceiptAttempt attempt) {
+        notifications.resolve(attempt.getStoreId(), StoreNotificationType.RECEIPT_ATTENTION, attempt.getReceiptKey());
+    }
+
     public String message(ReceiptAttempt attempt, ReceiptAttention attention) {
         String blocked = attempt.getBlockedReason() == null ? "" : messageSource.getMessage(
                 "receipts.blocked." + attempt.getBlockedReason(), null, attempt.getBlockedReason(), OPERATOR_LOCALE);
