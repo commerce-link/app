@@ -22,12 +22,12 @@ import static org.mockito.Mockito.when;
 class MatchedInventoryTest {
 
     @Mock
-    private TaxonomyCache taxonomyCache;
+    private TaxonomyCache taxonomyCatalog;
     @Mock
     private SupplierRegistry supplierRegistry;
 
     private MatchedInventory inventoryWith(InventoryItem... items) {
-        return new MatchedInventory(InventoryKey.fromMfn("M1"), List.of(items), taxonomyCache, supplierRegistry);
+        return new MatchedInventory(InventoryKey.fromMfn("M1"), List.of(items), supplierRegistry);
     }
 
     private InventoryItem warehouseItem(double netPrice, boolean inStock) {

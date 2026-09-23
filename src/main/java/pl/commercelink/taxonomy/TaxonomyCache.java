@@ -7,6 +7,8 @@ import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.InventoryKey;
 
 import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
@@ -150,6 +152,21 @@ public class TaxonomyCache {
 
     public Taxonomy findByMfn(String mfn) {
         return taxonomyByMfn.get(mfn);
+    }
+
+    public Map<String, Taxonomy> findByMfns(Collection<String> mfns) {
+        Map<String, Taxonomy> found = new LinkedHashMap<>();
+        for (String mfn : mfns) {
+            Taxonomy taxonomy = taxonomyByMfn.get(mfn);
+            if (taxonomy != null) {
+                found.put(mfn, taxonomy);
+            }
+        }
+        return found;
+    }
+
+    public Taxonomy findBest(Collection<String> productCodes) {
+        return Taxonomy.bestOf(productCodes, findByMfns(productCodes));
     }
 
     public String getFileName() {

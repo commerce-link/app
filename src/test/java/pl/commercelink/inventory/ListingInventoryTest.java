@@ -15,12 +15,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ListingInventoryTest {
 
     @Mock
-    private TaxonomyCache taxonomyCache;
+    private TaxonomyCache taxonomyCatalog;
     @Mock
     private SupplierRegistry supplierRegistry;
 
     private MatchedInventory group(InventoryKey key) {
-        return new MatchedInventory(key, taxonomyCache, supplierRegistry);
+        return new MatchedInventory(key, supplierRegistry);
     }
 
     @Test

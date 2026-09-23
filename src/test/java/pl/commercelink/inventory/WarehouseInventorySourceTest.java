@@ -24,7 +24,7 @@ class WarehouseInventorySourceTest {
     private static final String STORE_ID = "store-1";
 
     @Mock
-    private TaxonomyCache taxonomyCache;
+    private TaxonomyCache taxonomyCatalog;
     @Mock
     private SupplierRegistry supplierRegistry;
     @Mock
@@ -35,7 +35,7 @@ class WarehouseInventorySourceTest {
     }
 
     private MatchedInventory accumulator(InventoryKey lookupKey) {
-        return new MatchedInventory(lookupKey.copy(), taxonomyCache, supplierRegistry);
+        return new MatchedInventory(lookupKey.copy(), supplierRegistry);
     }
 
     @Test

@@ -40,7 +40,7 @@ class InventoryStoreStatisticsTest {
     @Mock
     private InventoryAutoDiscovery autoDiscovery;
     @Mock
-    private TaxonomyCache taxonomyCache;
+    private TaxonomyCache taxonomyCatalog;
     @Mock
     private SupplierRegistry supplierRegistry;
     @Mock
@@ -60,7 +60,7 @@ class InventoryStoreStatisticsTest {
         when(storeInventoryProvider.ownInventory(store))
                 .thenReturn(new StoreInventory(InventoryIndex.of(List.of()), LocalDateTime.of(2026, 9, 14, 10, 0)));
         MatchedInventory group = new MatchedInventory(new InventoryKey("5900000000001", "A"),
-                List.of(new InventoryItem("5900000000001", "A", 100.0, "PLN", 5, 1, "Elko")), taxonomyCache, supplierRegistry);
+                List.of(new InventoryItem("5900000000001", "A", 100.0, "PLN", 5, 1, "Elko")), supplierRegistry);
         when(globalInventory.index()).thenReturn(InventoryIndex.of(List.of(group)));
         when(globalInventory.version()).thenReturn(globalVersion);
     }

@@ -65,7 +65,7 @@ class InventorySearchTest {
     @Mock
     private PimCatalog pimCatalog;
     @Mock
-    private TaxonomyCache taxonomyCache;
+    private TaxonomyCache taxonomyCatalog;
     @Mock
     private Warehouse warehouse;
 
@@ -82,7 +82,7 @@ class InventorySearchTest {
     @BeforeEach
     void setUp() {
         // the label map is real: resolving a connection's label is part of what a search returns
-        search = new InventorySearch(inventory, storesRepository, pimCatalog, taxonomyCache, warehouse,
+        search = new InventorySearch(inventory, storesRepository, pimCatalog, taxonomyCatalog, warehouse,
                 new SupplierLabels(storesRepository), supplierRegistry);
         // shipping is free and instant unless a test says otherwise, so a case about prices stays about prices
         when(supplierRegistry.exists(anyString())).thenReturn(true);
@@ -111,11 +111,11 @@ class InventorySearchTest {
     }
 
     private MatchedInventory empty() {
-        return new MatchedInventory(new InventoryKey(), taxonomyCache, supplierRegistry);
+        return new MatchedInventory(new InventoryKey(), supplierRegistry);
     }
 
     private MatchedInventory offers(InventoryItem... items) {
-        return new MatchedInventory(new InventoryKey(EAN, MFN), List.of(items), taxonomyCache, supplierRegistry);
+        return new MatchedInventory(new InventoryKey(EAN, MFN), List.of(items), supplierRegistry);
     }
 
     private InventoryItem offer(String supplier, double netPrice, int qty) {
@@ -375,7 +375,7 @@ class InventorySearchTest {
     @Test
     void productKnownFromTaxonomyWithoutOffersIsReportedAsKnown() {
         // given
-        when(taxonomyCache.findByMfn(anyString())).thenReturn(new Taxonomy(EAN, MFN, "Logitech", "MX Keys S", "Keyboards", 1, null, null, null, "1"));
+        when(taxonomyCatalog.findByMfn(anyString())).thenReturn(new Taxonomy(EAN, MFN, "Logitech", "MX Keys S", "Keyboards", 1, null, null, null, "1"));
 
         // when
         InventorySearchResult result = search.search(STORE_ID, MFN);

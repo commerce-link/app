@@ -34,7 +34,7 @@ public class Inventory {
     private final Warehouse warehouse;
     private final StoresRepository storesRepository;
     private final InventoryAutoDiscovery autoDiscovery;
-    private final TaxonomyCache taxonomyCache;
+    private final TaxonomyCache taxonomyCatalog;
     private final SupplierRegistry supplierRegistry;
     private final StoreInventoryProvider storeInventoryProvider;
     private final GlobalMatchedInventory globalInventory;
@@ -83,13 +83,13 @@ public class Inventory {
 
     public InventoryView withGlobalData() {
         InventoryIndex globalIndex = globalInventory.index();
-        return new InventoryView(globalIndex, InventoryIndex.of(List.of()), taxonomyCache, supplierRegistry,
+        return new InventoryView(globalIndex, InventoryIndex.of(List.of()), taxonomyCatalog, supplierRegistry,
                 GroupInventorySource.global(globalIndex, supplier -> true));
     }
 
     public InventoryView withWarehouseDataOnly(String storeId) {
         InventoryIndex globalIndex = InventoryIndex.of(List.of());
-        return new InventoryView(globalIndex, InventoryIndex.of(List.of()), taxonomyCache, supplierRegistry,
+        return new InventoryView(globalIndex, InventoryIndex.of(List.of()), taxonomyCatalog, supplierRegistry,
                 new WarehouseInventorySource(storeId, warehouse.stockQueryService(storeId)));
     }
 
@@ -131,7 +131,7 @@ public class Inventory {
                                InventorySource global, InventorySource own, InventorySource... additionalSources) {
         InventorySource[] sources = Stream.concat(Stream.of(global, own), Arrays.stream(additionalSources))
                 .toArray(InventorySource[]::new);
-        return new InventoryView(globalIndex, ownIndex, taxonomyCache, supplierRegistry, sources);
+        return new InventoryView(globalIndex, ownIndex, taxonomyCatalog, supplierRegistry, sources);
     }
 
     private Predicate<String> scopedSupplier(Store store, ConnectionMode mode, SupplierScope scope) {

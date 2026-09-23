@@ -30,7 +30,7 @@ class InventoryStoreRoutingTest {
     @Mock
     private InventoryAutoDiscovery autoDiscovery;
     @Mock
-    private TaxonomyCache taxonomyCache;
+    private TaxonomyCache taxonomyCatalog;
     @Mock
     private SupplierRegistry supplierRegistry;
     @Mock

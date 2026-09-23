@@ -1,6 +1,7 @@
 package pl.commercelink.inventory;
 
 import org.junit.jupiter.api.Test;
+import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
 
 import java.util.List;
@@ -26,7 +27,7 @@ class GlobalMatchedInventoryTest {
     }
 
     private MatchedInventory keyed(String ean, String mfn) {
-        return new MatchedInventory(new InventoryKey(ean, mfn), null, null);
+        return new MatchedInventory(new InventoryKey(ean, mfn), (SupplierRegistry) null);
     }
 
     @Test
