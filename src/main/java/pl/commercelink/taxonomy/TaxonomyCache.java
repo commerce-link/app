@@ -91,7 +91,7 @@ public class TaxonomyCache {
         return updated[0];
     }
 
-    private static Taxonomy mergeOf(Taxonomy current, Taxonomy incoming) {
+    static Taxonomy mergeOf(Taxonomy current, Taxonomy incoming) {
         if (current == null) return incoming;
 
         Taxonomy winner = bestByCategoryThenScore(current, incoming);
@@ -163,6 +163,19 @@ public class TaxonomyCache {
             }
         }
         return found;
+    }
+
+    public TaxonomyMerge startMerge(Collection<String> mfns) {
+        return new TaxonomyMerge(findByMfns(mfns));
+    }
+
+    public void commit(TaxonomyMerge merge) {
+        for (Taxonomy merged : merge.changed()) {
+            taxonomyByMfn.compute(merged.mfn(), (mfn, current) -> {
+                pendingCount.addAndGet(pendingDelta(current, merged));
+                return merged;
+            });
+        }
     }
 
     public Taxonomy findBest(Collection<String> productCodes) {

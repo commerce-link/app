@@ -47,7 +47,7 @@ class TaxonomyCategoryEnrichmentTest {
         Taxonomy taxonomy = taxonomy("MFN-1", "CPU", 10);
 
         // when / then
-        assertEquals(taxonomy, enrichment.enrich(taxonomy));
+        assertEquals(taxonomy, enrichment.enrich(taxonomy, cache.findByMfn(taxonomy.mfn())));
     }
 
     @Test
@@ -57,7 +57,7 @@ class TaxonomyCategoryEnrichmentTest {
         Taxonomy incoming = new Taxonomy("1234567890123", "MFN-1", "OtherBrand", "OtherName", null, 10, 555, null);
 
         // when
-        Taxonomy result = enrichment.enrich(incoming);
+        Taxonomy result = enrichment.enrich(incoming, cache.findByMfn(incoming.mfn()));
 
         // then
         assertEquals("CPU", result.category());
@@ -74,7 +74,7 @@ class TaxonomyCategoryEnrichmentTest {
         Taxonomy incoming = taxonomy("MFN-1", null, 10);
 
         // when / then
-        assertNull(enrichment.enrich(incoming).category());
+        assertNull(enrichment.enrich(incoming, cache.findByMfn(incoming.mfn())).category());
     }
 
     @Test

@@ -26,18 +26,15 @@ public class TaxonomyCategoryEnrichment {
         this.attempts = attempts;
     }
 
-    public Taxonomy enrich(Taxonomy taxonomy) {
-        if (TaxonomyCache.hasCategory(taxonomy) || taxonomy.mfn() == null || taxonomy.mfn().isEmpty()) {
-            return taxonomy;
-        }
-        Taxonomy cached = taxonomyCache.findByMfn(taxonomy.mfn());
-        if (cached == null || !TaxonomyCache.hasCategory(cached)) {
+    public Taxonomy enrich(Taxonomy taxonomy, Taxonomy stored) {
+        if (TaxonomyCache.hasCategory(taxonomy) || taxonomy.mfn() == null || taxonomy.mfn().isEmpty()
+                || !TaxonomyCache.hasCategory(stored)) {
             return taxonomy;
         }
         return new Taxonomy(taxonomy.ean(), taxonomy.mfn(), taxonomy.brand(), taxonomy.name(),
-                cached.category(), taxonomy.dataAccuracyScore(),
+                stored.category(), taxonomy.dataAccuracyScore(),
                 taxonomy.netWeightInGrams(), taxonomy.grossWeightInGrams(),
-                taxonomy.rawCategory(), cached.categoryId());
+                taxonomy.rawCategory(), stored.categoryId());
     }
 
     public boolean isPendingEligible(Taxonomy taxonomy) {
