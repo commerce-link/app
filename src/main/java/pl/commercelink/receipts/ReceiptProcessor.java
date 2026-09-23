@@ -75,7 +75,7 @@ public class ReceiptProcessor {
         try {
             ReceiptAttempt attempt = leased.get();
             switch (attempt.getState()) {
-                case ISSUING -> issue(attempt);
+                case ISSUING -> issue(attempt, owner);
                 case PENDING -> poll(attempt);
                 case FISCALISED -> {
                     if (attempt.getDocumentUrl() == null && attempt.getLinkGaveUpAt() == null) {
@@ -98,22 +98,25 @@ public class ReceiptProcessor {
         }
     }
 
+    /**
+     * Ownership after {@code update} is decided by the persisted {@code leaseOwner}, never by a flag set inside
+     * the predicate: {@code update} retries the predicate on a version conflict, and a flag set on an earlier,
+     * losing try would otherwise survive into the retry that correctly saw the lease taken and wrote nothing.
+     */
     private Optional<ReceiptAttempt> acquire(String storeId, String receiptKey, String owner) {
         Instant now = clock.instant();
-        boolean[] acquired = new boolean[1];
         Optional<ReceiptAttempt> attempt = attempts.update(storeId, receiptKey, a -> {
             if (a.isLeasedAt(now)) {
                 return false;
             }
             a.setLeaseOwner(owner);
             a.setLeaseUntil(now.plus(LEASE));
-            acquired[0] = true;
             return true;
         });
-        return acquired[0] ? attempt : Optional.empty();
+        return attempt.filter(a -> owner.equals(a.getLeaseOwner()));
     }
 
-    private void issue(ReceiptAttempt attempt) {
+    private void issue(ReceiptAttempt attempt, String owner) {
         String storeId = attempt.getStoreId();
         String key = attempt.getReceiptKey();
         if (attempt.getIssueCalls() == 0 && !stillQualifies(attempt)) {
@@ -133,10 +136,26 @@ public class ReceiptProcessor {
             recordError(attempt, e, false);   // nothing was sent
             return;
         }
-        attempts.update(storeId, key, a -> {
+        // Defence in depth: acquire() proved ownership at the start of process(), but a lot can happen between
+        // then and here (a slow store/order lookup letting the lease expire under us, a sweep taking it over).
+        // Re-check right before the call that actually reaches the provider; never call it without the lease.
+        // Whether the guard held is read back from the persisted attempt update() hands back, never from a flag
+        // set inside the predicate — update() retries that predicate on a version conflict, and a flag set on an
+        // earlier, aborted try would otherwise survive into a retry that correctly found the lease gone.
+        Instant guardNow = clock.instant();
+        Optional<ReceiptAttempt> afterGuard = attempts.update(storeId, key, a -> {
+            if (!owner.equals(a.getLeaseOwner()) || !a.isLeasedAt(guardNow) || a.getState() != ReceiptAttemptState.ISSUING) {
+                return false;
+            }
             a.setIssueCalls(a.getIssueCalls() + 1);   // recorded before the call: the count survives a crash
             return true;
         });
+        boolean stillOurs = afterGuard.isPresent() && owner.equals(afterGuard.get().getLeaseOwner())
+                && afterGuard.get().isLeasedAt(guardNow) && afterGuard.get().getState() == ReceiptAttemptState.ISSUING;
+        if (!stillOurs) {
+            log.warn("Receipt attempt {} lost its lease before issue; not calling the provider", key);
+            return;
+        }
         try {
             Receipt receipt = provider.issue(request);
             Instant now = clock.instant();

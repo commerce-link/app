@@ -2,6 +2,7 @@ package pl.commercelink.receipts;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.OrdersRepository;
@@ -117,6 +118,41 @@ class ReceiptProcessorTest {
     }
 
     @Test
+    void aConcurrentLeaseWinnerIsNeverOverriddenByALoserOfTheSameCasRetry() {
+        // A version-conflict retry inside acquire()'s update() must not hand this attempt to us just because
+        // an earlier try of the predicate happened to acquire it: "other" really won the race.
+        attempts.interleaveOnce(a -> {
+            a.setLeaseOwner("other");
+            a.setLeaseUntil(clock.instant().plus(ReceiptProcessor.LEASE));
+        });
+
+        processor.process(STORE_ID, KEY);
+
+        assertThat(provider.issueCalls.get()).isZero();
+        assertThat(stored().getLeaseOwner()).isEqualTo("other");
+    }
+
+    @Test
+    void aLeaseLostJustBeforeIssueAbortsWithoutCallingTheProvider() {
+        // The lease can be lost between acquire() succeeding and the issueCalls++ write that guards the actual
+        // provider call (e.g. a slow order lookup letting the lease expire under us). Arm the steal as a side
+        // effect of the order lookup stillQualifies() makes, right before that guarding write.
+        when(orders.findById(STORE_ID, ORDER_ID)).thenAnswer(i -> {
+            attempts.interleaveOnce(a -> {
+                a.setLeaseOwner("stealer");
+                a.setLeaseUntil(clock.instant().plus(ReceiptProcessor.LEASE));
+            });
+            return order;
+        });
+
+        processor.process(STORE_ID, KEY);
+
+        assertThat(provider.issueCalls.get()).isZero();
+        assertThat(stored().getLeaseOwner()).isEqualTo("stealer");
+    }
+
+    @Test
+    @Timeout(10)
     void redeliveryDuringIssueDoesNotCallIssueAgain() throws Exception {
         provider.issueGate = new CountDownLatch(1);
         Thread first = new Thread(() -> processor.process(STORE_ID, KEY));
