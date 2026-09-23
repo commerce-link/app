@@ -155,9 +155,14 @@ public class ReceiptProcessor {
         ReceiptRequest request;
         try {
             provider = provider(attempt);
+            if (provider == null) {
+                // The adapter is not on the classpath (or the descriptor is otherwise gone): this is a load
+                // failure exactly like a thrown exception below, never a reason to call issue() with a null target.
+                throw new IllegalStateException("Receipt provider " + attempt.getProvider() + " is not available");
+            }
             request = ReceiptSnapshotJson.read(attempt.getRequestSnapshot()).toRequest(key);
         } catch (RuntimeException e) {
-            recordError(attempt, e, false);   // nothing was sent
+            recordPreSendFailure(attempt, e);   // nothing was sent; issueCalls is never touched here
             return;
         }
         // Defence in depth: acquire() proved ownership at the start of process(), but a lot can happen between
@@ -172,6 +177,7 @@ public class ReceiptProcessor {
                 return false;
             }
             a.setIssueCalls(a.getIssueCalls() + 1);   // recorded before the call: the count survives a crash
+            a.setLeaseUntil(guardNow.plus(LEASE));    // renew: the call itself can take a while, close to the lease
             return true;
         });
         boolean stillOurs = afterGuard.isPresent() && owner.equals(afterGuard.get().getLeaseOwner())
@@ -203,7 +209,10 @@ public class ReceiptProcessor {
             });
         } catch (ReceiptRejectedException e) {
             attempts.update(storeId, key, a -> {
-                if (a.getState() != ReceiptAttemptState.ISSUING && a.getState() != ReceiptAttemptState.PENDING) {
+                // Only an attempt still ISSUING is ours to fail: if it is already PENDING, something else (a push
+                // webhook) established a newer, real outcome while this call was in flight, and a stale rejection
+                // from this call must never overwrite it.
+                if (a.getState() != ReceiptAttemptState.ISSUING) {
                     return false;
                 }
                 a.setState(ReceiptAttemptState.FAILED);
@@ -246,6 +255,20 @@ public class ReceiptProcessor {
         });
     }
 
+    /**
+     * A failure preparing the call (provider load, request snapshot) before issue() is ever reached: issueCalls
+     * stays 0, so {@link #reschedule} would otherwise retry it every minute forever; {@code preSendFailures} gives
+     * it its own growing backoff instead.
+     */
+    private void recordPreSendFailure(ReceiptAttempt attempt, RuntimeException e) {
+        attempts.update(attempt.getStoreId(), attempt.getReceiptKey(), a -> {
+            a.setLastError(e.getClass().getSimpleName() + ": " + e.getMessage());
+            a.setLastErrorAt(clock.instant());
+            a.setPreSendFailures(a.getPreSendFailures() + 1);
+            return true;
+        });
+    }
+
     /** find() only describes the situation for the operator; it never changes the attempt's state. */
     private String diagnose(ReceiptAttempt attempt) {
         try {
@@ -271,14 +294,32 @@ public class ReceiptProcessor {
             a.setLeaseOwner(null);
             a.setLeaseUntil(null);
             reschedule(a, now, effectsFailed);
-            alerts.sync(a, ReceiptAttentionEvaluator.evaluate(a, now));
+            syncAlert(a, now);
             return true;
         });
     }
 
+    /**
+     * A notification-store failure here must never cost the lease release or the schedule write above: both are
+     * already staged on {@code a} in this same predicate run, so swallowing the exception still lets {@code update}
+     * save them. Nothing set by this method is read back outside the predicate, so there is no R3 risk in retrying.
+     */
+    private void syncAlert(ReceiptAttempt a, Instant now) {
+        try {
+            alerts.sync(a, ReceiptAttentionEvaluator.evaluate(a, now));
+        } catch (RuntimeException e) {
+            log.error("Receipt attempt {} attention sync failed; lease release and schedule are saved regardless",
+                    a.getReceiptKey(), e);
+        }
+    }
+
     private void reschedule(ReceiptAttempt a, Instant now, boolean effectsFailed) {
         switch (a.getState()) {
-            case ISSUING -> a.schedule(ReceiptSchedule.nextIssue(Math.max(a.getIssueCalls(), 1), now));
+            case ISSUING -> a.schedule(a.getIssueCalls() == 0
+                    // Nothing has been sent yet: growing backoff on preSendFailures instead of retrying every
+                    // minute forever (issueCalls stays 0 the whole time this branch applies).
+                    ? ReceiptSchedule.nextIssue(Math.max(a.getPreSendFailures(), 1), now)
+                    : ReceiptSchedule.nextIssue(a.getIssueCalls(), now));
             case PENDING -> a.schedule(ReceiptSchedule.nextPending(a, now));
             case FISCALISED -> {
                 if (effectsFailed || ReceiptEffects.pending(a)) {

@@ -49,6 +49,9 @@ public class ReceiptAttempt {
     private String providerReceiptId;
     @DynamoDBAttribute(attributeName = "issueCalls")
     private int issueCalls;
+    /** Failures preparing the call (provider load, request snapshot) before {@code issueCalls} is ever incremented. */
+    @DynamoDBAttribute(attributeName = "preSendFailures")
+    private int preSendFailures;
     @DynamoDBAttribute(attributeName = "pollCount")
     private int pollCount;
     @DynamoDBAttribute(attributeName = "lastError")

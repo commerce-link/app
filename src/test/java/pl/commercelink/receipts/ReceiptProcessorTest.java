@@ -340,6 +340,93 @@ class ReceiptProcessorTest {
     }
 
     @Test
+    void aMissingProviderAtIssueTimeRecordsAnErrorWithoutCallingIssueOrIncrementingIssueCalls() {
+        // The adapter is not on the classpath: providerFactory.get() returns null instead of throwing. Before the
+        // fix this null slipped past the preparation try/catch and only blew up as an NPE on provider.issue(),
+        // after issueCalls had already been bumped by the guard right before that call.
+        when(factory.get(any(Store.class), eq(FakeReceiptProviderDescriptor.NAME))).thenReturn(null);
+
+        processor.process(STORE_ID, KEY);
+
+        assertThat(provider.issueCalls.get()).isZero();
+        assertThat(stored().getState()).isEqualTo(ReceiptAttemptState.ISSUING);
+        assertThat(stored().getIssueCalls()).isZero();
+        assertThat(stored().getLastError()).isNotBlank();
+        assertThat(stored().getLastErrorAt()).isNotNull();
+    }
+
+    @Test
+    void preSendFailuresBackOffGrowsInsteadOfStayingAtOneMinuteForever() {
+        when(factory.get(any(Store.class), eq(FakeReceiptProviderDescriptor.NAME))).thenReturn(null);
+
+        processor.process(STORE_ID, KEY);
+        assertThat(stored().getNextCheckAt()).isEqualTo(clock.instant().plus(Duration.ofMinutes(1)));
+
+        clock.advance(Duration.ofMinutes(1));
+        processor.process(STORE_ID, KEY);
+        assertThat(stored().getNextCheckAt()).isEqualTo(clock.instant().plus(Duration.ofMinutes(2)));
+
+        clock.advance(Duration.ofMinutes(2));
+        processor.process(STORE_ID, KEY);
+        assertThat(stored().getNextCheckAt()).isEqualTo(clock.instant().plus(Duration.ofMinutes(5)));
+
+        assertThat(stored().getIssueCalls()).isZero();
+    }
+
+    @Test
+    @Timeout(10)
+    void theLeaseIsRenewedAtThePreIssueGuardNotJustAtAcquisition() throws Exception {
+        // Advance the clock inside the order lookup stillQualifies() makes, between acquire() (which sets the
+        // first lease) and the guard right before issue() (which must renew it): if the guard did not renew the
+        // lease, it would still carry acquire()'s earlier deadline.
+        when(orders.findById(STORE_ID, ORDER_ID)).thenAnswer(i -> {
+            clock.advance(Duration.ofMinutes(5));
+            return order;
+        });
+        provider.issueGate = new CountDownLatch(1);
+
+        Thread worker = new Thread(() -> processor.process(STORE_ID, KEY));
+        worker.start();
+        assertThat(provider.issueEntered.await(5, TimeUnit.SECONDS)).isTrue();
+
+        Instant guardNow = clock.instant();
+        assertThat(stored().getLeaseUntil()).isEqualTo(guardNow.plus(ReceiptProcessor.LEASE));
+
+        provider.issueGate.countDown();
+        worker.join(5000);
+    }
+
+    @Test
+    void aRejectionDuringIssueNeverOverwritesAnAttemptAlreadyMovedToPendingByAConcurrentPush() {
+        // A push webhook can land while our own issue() call is in flight and establish a newer, real outcome
+        // (PENDING) before our call comes back with a rejection. That stale rejection must never turn a PENDING
+        // attempt into FAILED — only an attempt still ISSUING is ours to fail.
+        provider.answerIssue(r -> {
+            attempts.interleaveOnce(a -> a.setState(ReceiptAttemptState.PENDING));
+            throw new ReceiptRejectedException("fiscal_error", "stawka VAT");
+        });
+
+        processor.process(STORE_ID, KEY);
+
+        assertThat(stored().getState()).isEqualTo(ReceiptAttemptState.PENDING);
+    }
+
+    @Test
+    void alertSyncFailureNeverBlocksTheLeaseReleaseOrTheScheduleWrite() {
+        // doThrow(...).when(mock)... (rather than when(mock...).thenThrow(...)) avoids re-running the default
+        // answer stubbed in setUp() as a side effect of registering this override.
+        doThrow(new RuntimeException("notification service down")).when(alerts).sync(any(), any());
+        provider.answerIssue(r -> { throw new ReceiptRejectedException("fiscal_error", "stawka VAT"); });
+
+        processor.process(STORE_ID, KEY);
+
+        assertThat(stored().getState()).isEqualTo(ReceiptAttemptState.FAILED);
+        assertThat(stored().getLeaseOwner()).isNull();
+        assertThat(stored().getLeaseUntil()).isNull();
+        assertThat(stored().isScheduled()).isFalse();
+    }
+
+    @Test
     void blockedAttemptsOnlyRaiseTheirAlert() {
         attempts.update(STORE_ID, KEY, a -> {
             a.setState(ReceiptAttemptState.BLOCKED);
