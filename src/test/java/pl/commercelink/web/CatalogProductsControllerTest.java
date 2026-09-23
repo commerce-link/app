@@ -999,8 +999,9 @@ class CatalogProductsControllerTest {
         assertThat(form.isEnabled()).isTrue();
     }
 
+    /** Only a changed identifier is asked about; one leading to another PIM entry is refused at the EAN. */
     @Test
-    void savingAProductThatWouldMatchAnotherPimEntryIsRejected() throws Exception {
+    void savingAChangedIdentifierThatWouldMatchAnotherPimEntryIsRejected() throws Exception {
         // given
         gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
         Product existing = new Product(gpu.getCategoryId(), "pim-1", "4719331361600", "m", "b", "l", "n", "Default");
@@ -1017,6 +1018,34 @@ class CatalogProductsControllerTest {
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(model().attribute("errors", hasEntry("ean", "product.error.pim.changed")));
         verify(productRepository, never()).save(any(Product.class));
+    }
+
+    /**
+     * OD-1: the product holds an entry matched through a sibling EAN, so its own codes lead elsewhere in the PIM. A
+     * save that leaves the codes as they are (here: a new price) is not a change of identity and goes through.
+     */
+    @Test
+    void savingPriceOfAProductWithASiblingPimEntryPasses() throws Exception {
+        // given
+        gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
+        Product existing = new Product(gpu.getCategoryId(), "pim-1", "4719331361600", "M", "b", "l", "n", "Default");
+        existing.setProductId("p1");
+        when(access.requireProduct(gpu, "p1")).thenReturn(existing);
+        PimEntry other = mock(PimEntry.class);
+        lenient().when(other.pimId()).thenReturn("pim-2");
+        lenient().when(pimCatalog.findByGtinOrMpn(any(), any())).thenReturn(Optional.of(other));
+
+        // when
+        mvc.perform(post(categoryPath() + "/products/p1")
+                        .param("name", "n").param("ean", "4719331361600").param("manufacturerCode", "M")
+                        .param("availabilityType", "BasedOnSupply").param("pricingGroup", "Default")
+                        .param("suggestedRetailPrice", "5199"))
+                .andExpect(redirectedUrl(categoryPath() + "?status=active"));
+
+        // then
+        verify(productRepository).save(existing);
+        assertThat(existing.getSuggestedRetailPrice()).isEqualTo(5199);
+        assertThat(existing.getPimId()).isEqualTo("pim-1");
     }
 
     /** The page of a saved product states the id; a product being created has none yet. */
@@ -1062,9 +1091,6 @@ class CatalogProductsControllerTest {
         Product existing = new Product(gpu.getCategoryId(), "pim-1", "4719331361600", "m", "b", "l", "Old", "Default");
         existing.setProductId("p1");
         when(access.requireProduct(gpu, "p1")).thenReturn(existing);
-        PimEntry same = mock(PimEntry.class);
-        when(same.pimId()).thenReturn("pim-1");
-        when(pimCatalog.findByGtinOrMpn("4719331361600", "m")).thenReturn(Optional.of(same));
 
         // when / then
         mvc.perform(post(categoryPath() + "/products/p1")
@@ -1085,9 +1111,6 @@ class CatalogProductsControllerTest {
         Product existing = new Product(gpu.getCategoryId(), "pim-1", "4719331361600", "m", "b", "l", "Old", "Default");
         existing.setProductId("p1");
         when(access.requireProduct(gpu, "p1")).thenReturn(existing);
-        PimEntry same = mock(PimEntry.class);
-        when(same.pimId()).thenReturn("pim-1");
-        when(pimCatalog.findByGtinOrMpn("4719331361600", "m")).thenReturn(Optional.of(same));
 
         // when / then
         mvc.perform(post(categoryPath() + "/products/p1").param("status", "disabled")
@@ -1108,9 +1131,6 @@ class CatalogProductsControllerTest {
         Product existing = new Product(gpu.getCategoryId(), "pim-1", "4719331361600", "m", "b", "l", "Old", "Default");
         existing.setProductId("p1");
         when(access.requireProduct(gpu, "p1")).thenReturn(existing);
-        PimEntry same = mock(PimEntry.class);
-        when(same.pimId()).thenReturn("pim-1");
-        when(pimCatalog.findByGtinOrMpn("4719331361600", "m")).thenReturn(Optional.of(same));
 
         // when / then
         mvc.perform(post(categoryPath() + "/products/p1").param("status", "all").param("feature", "stock")
@@ -1156,9 +1176,6 @@ class CatalogProductsControllerTest {
         existing.setProductPage("<p>Old description</p>");
         existing.setVersion(7L);
         when(access.requireProduct(gpu, "p1")).thenReturn(existing);
-        PimEntry same = mock(PimEntry.class);
-        when(same.pimId()).thenReturn("pim-1");
-        when(pimCatalog.findByGtinOrMpn("4719331361600", "m")).thenReturn(Optional.of(same));
 
         // when
         mvc.perform(post(categoryPath() + "/products/p1")
@@ -1343,7 +1360,7 @@ class CatalogProductsControllerTest {
                         .param("pricingGroup", "Default").param("customAttributesFilters[0].name", "Socket"))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(model().attribute("errors",
-                        hasEntry("customAttributeFilter-0-name", "product.error.filter.incomplete")))
+                        hasEntry("customAttributeFilter-0-value", "product.error.filter.incomplete")))
                 .andExpect(model().attribute("openClient", true))
                 .andExpect(model().attribute("openStock", false));
         verify(productRepository, never()).save(any(Product.class));

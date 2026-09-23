@@ -340,10 +340,14 @@
                      data-cl-repeat-label=#{product.page.row.remove('@N@')}"></button>
 </th:block>
 
-<!--/* One custom filter: a PIM category, the attribute it compares, the value and the comparison. */-->
+<!--/* One custom filter: a PIM category, the attribute it compares, the value and the comparison. An unfinished one
+       carries its error at the first field left to fill (ProductForm), so each field is marked by its own key. */-->
 <th:block th:fragment="filterFields(index, number, filter)"
           th:with="prefix='customAttributesFilters[' + ${index} + '].', ids='customAttributeFilter-' + ${index} + '-',
-                   error=${errors.get('customAttributeFilter-' + index + '-name')}">
+                   nameError=${errors.get('customAttributeFilter-' + index + '-name')},
+                   valueError=${errors.get('customAttributeFilter-' + index + '-value')},
+                   operatorError=${errors.get('customAttributeFilter-' + index + '-operator')},
+                   error=${nameError ?: (valueError ?: operatorError)}">
     <legend class="cl-fieldset-title">
         <span th:text="#{product.compatibility.filter}"></span>
         <span data-cl-repeat-number th:text="${number}"></span>
@@ -359,21 +363,24 @@
             <div class="cl-field">
                 <label class="cl-label" th:for="${ids + 'name'}" th:text="#{catalog.metadata.name}"></label>
                 <input class="cl-input" type="text" autocomplete="off" th:id="${ids + 'name'}" th:name="${prefix + 'name'}"
-                       th:value="${filter?.name}" th:classappend="${error != null} ? 'is-invalid'"
-                       th:attr="aria-invalid=${error != null} ? 'true' : null"></div>
+                       th:value="${filter?.name}" th:classappend="${nameError != null} ? 'is-invalid'"
+                       th:attr="aria-invalid=${nameError != null} ? 'true' : null"></div>
         </div>
         <div class="cl-span-3">
             <div class="cl-field">
                 <label class="cl-label" th:for="${ids + 'value'}" th:text="#{catalog.metadata.value}"></label>
                 <input class="cl-input" type="text" autocomplete="off" th:id="${ids + 'value'}" th:name="${prefix + 'value'}"
-                       th:value="${filter?.value}"></div>
+                       th:value="${filter?.value}" th:classappend="${valueError != null} ? 'is-invalid'"
+                       th:attr="aria-invalid=${valueError != null} ? 'true' : null"></div>
         </div>
         <div class="cl-span-3">
             <div class="cl-field">
                 <label class="cl-label" th:for="${ids + 'operator'}" th:text="#{catalog.filter.operator}"></label>
                 <!--/* A select, not a free field: only these three comparisons are understood, and a filter carrying
                        anything else is dropped without a word when the product is saved. */-->
-                <select class="cl-select" th:id="${ids + 'operator'}" th:name="${prefix + 'operator'}">
+                <select class="cl-select" th:id="${ids + 'operator'}" th:name="${prefix + 'operator'}"
+                        th:classappend="${operatorError != null} ? 'is-invalid'"
+                        th:attr="aria-invalid=${operatorError != null} ? 'true' : null">
                     <option value="">&#8212;</option>
                     <option th:each="operator : ${T(pl.commercelink.products.ProductCustomAttributeFilter.Operator).values()}"
                             th:value="${operator.operator}" th:text="${operator.operator}"

@@ -146,7 +146,7 @@ class ProductFormTest {
     }
 
     @Test
-    void incompleteRepeatedRowsAreKeyedByTheIdOfTheirFirstField() {
+    void incompleteRepeatedRowsAreKeyedByTheIdOfTheFieldToFill() {
         // given
         ProductForm form = valid();
         ProductCustomAttribute attribute = new ProductCustomAttribute();
@@ -162,7 +162,8 @@ class ProductFormTest {
 
         // then
         assertThat(errors).containsEntry("customAttribute-0-name", "product.error.attribute.incomplete")
-                .containsEntry("customAttributeFilter-0-name", "product.error.filter.incomplete")
+                // The filter has a name and lacks its value: the error sits at the first field that is missing.
+                .containsEntry("customAttributeFilter-0-value", "product.error.filter.incomplete")
                 .containsEntry("metadata-0-key", "product.error.metadata.incomplete");
     }
 
@@ -254,5 +255,76 @@ class ProductFormTest {
         assertThat(form.hasClientData()).isFalse();
         assertThat(product.getMarketplaces()).isEmpty();
         assertThat(product.getQuickFilters()).isEmpty();
+    }
+
+    private static Product saved(String pimId, String ean, String manufacturerCode) {
+        Product product = new Product("cat", pimId, ean, manufacturerCode, "Gigabyte", "RTX 5080", "Gigabyte RTX 5080",
+                "Ultra Premium");
+        product.setMarketplaces(new java.util.LinkedList<>(List.of("allegro")));
+        return product;
+    }
+
+    /**
+     * OD-1: a product can hold a PIM entry its own two codes do not lead to (the entry matched a sibling EAN of the
+     * inventory key, or the PIM changed its GTINs since). Its identity is only at stake when the codes change, so the
+     * PIM is asked then and only then -- a price change must not be refused because of it.
+     */
+    @Test
+    void thePimIsAskedOnlyWhenAnIdentifierChanges() {
+        // given
+        ProductForm unchanged = ProductForm.from(saved("pim-1", "4719331361600", "GV-N5080"));
+        unchanged.setSuggestedRetailPrice("5 199");
+        // the same codes as saved, as they come back typed with spaces and in lower case
+        ProductForm retyped = ProductForm.from(saved("pim-1", "4719331361600", "GV-N5080"));
+        retyped.setEan(" 4719331361600 ");
+        retyped.setManufacturerCode("gv-n5080");
+        ProductForm changed = ProductForm.from(saved("pim-1", "4719331361600", "GV-N5080"));
+        changed.setEan("4719331361601");
+
+        // when / then
+        assertThat(unchanged.validate(LABELS, GROUPS, MARKETPLACES, check -> Optional.of("pim-2"))).isEmpty();
+        assertThat(retyped.validate(LABELS, GROUPS, MARKETPLACES, check -> Optional.of("pim-2"))).isEmpty();
+        assertThat(changed.validate(LABELS, GROUPS, MARKETPLACES, check -> Optional.of("pim-2")))
+                .containsEntry("ean", "product.error.pim.changed");
+    }
+
+    /**
+     * RF-4 (variant A): the 8--14 digit rule applies to an EAN being entered; a product saved before the rule existed
+     * keeps its EAN through a save that does not touch it. An EAN or a code is still required from every product.
+     */
+    @Test
+    void aLegacyEanIsCheckedOnlyOnceItIsChanged() {
+        // given
+        ProductForm unchanged = ProductForm.from(saved(null, "590 123", null));
+        unchanged.setName("Renamed");
+        ProductForm changed = ProductForm.from(saved(null, "590 123", null));
+        changed.setEan("590 124");
+        ProductForm cleared = ProductForm.from(saved(null, "590 123", null));
+        cleared.setEan("");
+
+        // when / then
+        assertThat(unchanged.validate(LABELS, GROUPS, MARKETPLACES, check -> Optional.empty())).isEmpty();
+        assertThat(changed.validate(LABELS, GROUPS, MARKETPLACES, check -> Optional.empty()))
+                .containsEntry("ean", "product.error.ean.invalid");
+        assertThat(cleared.validate(LABELS, GROUPS, MARKETPLACES, check -> Optional.empty()))
+                .containsEntry("ean", "product.error.identifier.required");
+    }
+
+    /** RF-29: a filter complete but for its comparison ("—") is an error of the operator, where the summary links. */
+    @Test
+    void aFilterWithoutItsOperatorIsAnErrorOfTheOperator() {
+        // given
+        ProductForm form = valid();
+        ProductCustomAttributeFilter filter = new ProductCustomAttributeFilter();
+        filter.setCategory("Płyty główne");
+        filter.setName("Socket");
+        filter.setValue("AM5");
+        filter.setOperator("");
+        form.getCustomAttributesFilters().add(filter);
+
+        // when / then
+        assertThat(form.validate(LABELS, GROUPS, MARKETPLACES, check -> Optional.of("pim-1")))
+                .containsOnlyKeys("customAttributeFilter-0-operator")
+                .containsEntry("customAttributeFilter-0-operator", "product.error.filter.incomplete");
     }
 }

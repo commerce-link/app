@@ -299,4 +299,21 @@ class ProductTemplateTest {
         assertThat(rendered(true, form -> form.setLabel("RTX 4060")))
                 .contains("<option value=\"RTX 4060\" selected>RTX 4060 (outside the list)</option>");
     }
+
+    /** RF-29: the error of an unfinished filter is shown and marked at the field its key names, here the operator. */
+    @Test
+    void anUnfinishedFilterIsMarkedAtTheFieldItsErrorNames() {
+        // when
+        String html = rendered(true, Map.of(ProductForm.fieldId(ProductForm.FILTER, 0, "operator"),
+                "product.error.filter.incomplete"));
+
+        // then
+        int select = html.indexOf("id=\"customAttributeFilter-0-operator\"");
+        String operator = html.substring(html.lastIndexOf("<select", select), html.indexOf(">", select));
+        assertThat(operator).contains("is-invalid").contains("aria-invalid=\"true\"");
+        int name = html.indexOf("id=\"customAttributeFilter-0-name\"");
+        String nameField = html.substring(html.lastIndexOf("<input", name), html.indexOf(">", name));
+        assertThat(nameField).doesNotContain("is-invalid");
+        assertThat(occurrences(html, "cl-field-error")).isEqualTo(1);
+    }
 }

@@ -20,6 +20,9 @@ import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import static pl.commercelink.taxonomy.UnifiedProductIdentifiers.unifyEan;
+import static pl.commercelink.taxonomy.UnifiedProductIdentifiers.unifyMfn;
+
 /**
  * One catalog product. Numbers arrive as text; identity (EAN, manufacturer code) may change only while it still
  * resolves to the same PIM entry, because the price list and the offer are keyed by PIM id.
@@ -62,9 +65,11 @@ public class ProductForm {
     private List<ProductCustomAttribute> customAttributes = new ArrayList<>();
     private List<ProductCustomAttributeFilter> customAttributesFilters = new ArrayList<>();
     private List<Metadata> metadata = new ArrayList<>();
-    /** Set by the controller from the saved product (never trusted from the request). */
+    /** Set by the controller from the saved product (never trusted from the request); null for a new product. */
     private String existingPimId;
     private String existingLabel;
+    private String existingEan;
+    private String existingManufacturerCode;
 
     /**
      * The lists are read without a null check everywhere below, and a request can hand a list property an empty value,
@@ -123,9 +128,19 @@ public class ProductForm {
         form.customAttributes = new ArrayList<>(product.getCustomAttributes());
         form.customAttributesFilters = new ArrayList<>(product.getCustomAttributesFilters());
         form.metadata = new ArrayList<>(product.getMetadata());
-        form.existingPimId = product.getPimId();
-        form.existingLabel = product.getLabel();
+        form.rememberSaved(product);
         return form;
+    }
+
+    /**
+     * What the saved product holds, which the submitted values are compared with: a value kept as it was saved is not
+     * held to the rules a new value must meet. Null (a product being created) forgets all of it.
+     */
+    public void rememberSaved(Product saved) {
+        existingPimId = saved == null ? null : saved.getPimId();
+        existingLabel = saved == null ? null : saved.getLabel();
+        existingEan = saved == null ? null : saved.getEan();
+        existingManufacturerCode = saved == null ? null : saved.getManufacturerCode();
     }
 
     /** The id of a field of the row at {@code index}; an error is keyed by it, so the summary links to the field. */
@@ -142,13 +157,28 @@ public class ProductForm {
      * and answers with the same messages.
      */
     static String identifierError(String ean, String manufacturerCode) {
+        return identifierError(ean, manufacturerCode, true);
+    }
+
+    /** @param checkEanFormat false for an EAN kept as it was saved, which may predate the 8--14 digit rule (RF-4) */
+    private static String identifierError(String ean, String manufacturerCode, boolean checkEanFormat) {
         if (StringUtils.isBlank(ean) && StringUtils.isBlank(manufacturerCode)) {
             return IDENTIFIER_REQUIRED;
         }
-        if (StringUtils.isNotBlank(ean) && !ean.trim().matches("\\d{8,14}")) {
+        if (checkEanFormat && StringUtils.isNotBlank(ean) && !ean.trim().matches("\\d{8,14}")) {
             return "product.error.ean.invalid";
         }
         return null;
+    }
+
+    /** Whether the EAN differs from the saved one, compared the way the product stores it (trimmed, unified). */
+    private boolean eanChanged() {
+        return !Objects.equals(unifyEan(StringUtils.trimToNull(ean)), unifyEan(StringUtils.trimToNull(existingEan)));
+    }
+
+    private boolean manufacturerCodeChanged() {
+        return !Objects.equals(unifyMfn(StringUtils.trimToNull(manufacturerCode)),
+                unifyMfn(StringUtils.trimToNull(existingManufacturerCode)));
     }
 
     /**
@@ -161,10 +191,13 @@ public class ProductForm {
                                         List<String> storeMarketplaces, Function<PimCheck, Optional<String>> pimIdFor) {
         Map<String, String> errors = new LinkedHashMap<>();
         FormRules.requireText(errors, "name", name, "product.error.name.required");
-        String identifierError = identifierError(ean, manufacturerCode);
+        String identifierError = identifierError(ean, manufacturerCode, eanChanged());
         if (identifierError != null) {
             errors.put("ean", identifierError);
-        } else if (StringUtils.isNotBlank(existingPimId)) {
+        } else if (StringUtils.isNotBlank(existingPimId) && (eanChanged() || manufacturerCodeChanged())) {
+            // Asked only when an identifier changes: the saved entry may have been matched through a sibling EAN of
+            // the inventory key, which the product's own codes do not lead to, and that is no reason to refuse a save
+            // that leaves the identity as it is (OD-1).
             Optional<String> resolved = pimIdFor.apply(
                     new PimCheck(StringUtils.trimToNull(ean), StringUtils.trimToNull(manufacturerCode)));
             if (!Objects.equals(existingPimId, resolved.orElse(null))) {
@@ -205,7 +238,7 @@ public class ProductForm {
         for (int index = 0; index < customAttributesFilters.size(); index++) {
             ProductCustomAttributeFilter filter = customAttributesFilters.get(index);
             if (!isEmpty(filter) && !filter.isComplete()) {
-                errors.put(fieldId(FILTER, index, "name"), "product.error.filter.incomplete");
+                errors.put(fieldId(FILTER, index, missingField(filter)), "product.error.filter.incomplete");
             }
         }
         for (int index = 0; index < metadata.size(); index++) {
@@ -302,6 +335,24 @@ public class ProductForm {
 
     private static boolean isEmpty(ProductCustomAttribute attribute) {
         return StringUtils.isBlank(attribute.getName()) && StringUtils.isBlank(attribute.getValue());
+    }
+
+    /**
+     * The field of an unfinished filter the summary should lead to: the first one left to fill, in the order of the
+     * page (RF-29). The PIM category is a picker without a field id of its own, so a filter lacking only that one
+     * points at its name, next to it.
+     */
+    private static String missingField(ProductCustomAttributeFilter filter) {
+        if (StringUtils.isBlank(filter.getName())) {
+            return "name";
+        }
+        if (StringUtils.isBlank(filter.getValue())) {
+            return "value";
+        }
+        if (!ProductCustomAttributeFilter.Operator.isKnown(filter.getOperator())) {
+            return "operator";
+        }
+        return "name";
     }
 
     private static boolean isEmpty(ProductCustomAttributeFilter filter) {

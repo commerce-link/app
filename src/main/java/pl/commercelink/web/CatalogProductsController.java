@@ -356,8 +356,7 @@ public class CatalogProductsController {
         Product prefilled = new ProductRecommendation(category, matched, entry).toProduct();
         ProductForm form = ProductForm.from(prefilled);
         // Nothing is saved yet, so there is no identity to protect: the PIM entry is resolved again when it is.
-        form.setExistingPimId(null);
-        form.setExistingLabel(null);
+        form.rememberSaved(null);
         return renderProduct(catalog, category, store, null, form, prefilled.getPimId(), Map.of(), null,
                 currentFilter, model, locale);
     }
@@ -381,8 +380,7 @@ public class CatalogProductsController {
         boolean async = SettingsPaths.isAsync(requestedWith);
         // "label" is the product's own field in this form, so the label of the list travels as "filterLabel".
         CategoryFilter currentFilter = CategoryFilter.of(status, feature, filterLabel, q);
-        form.setExistingPimId(null);
-        form.setExistingLabel(null);
+        form.rememberSaved(null);
         Map<String, String> errors = form.validate(category.getGroupingOrder(), pricingGroups(category),
                 marketplaceNames(store), this::pimIdFor);
         if (!errors.isEmpty()) {
@@ -444,8 +442,7 @@ public class CatalogProductsController {
         CategoryFilter currentFilter = CategoryFilter.of(status, feature, filterLabel, q);
         // Identity and brand belong to the saved product, not to the request: a forged PIM id would let the offer of
         // this product claim another entry.
-        form.setExistingPimId(product.getPimId());
-        form.setExistingLabel(product.getLabel());
+        form.rememberSaved(product);
         Map<String, String> errors = form.validate(category.getGroupingOrder(), pricingGroups(category),
                 marketplaceNames(store), this::pimIdFor);
         if (!errors.isEmpty()) {
