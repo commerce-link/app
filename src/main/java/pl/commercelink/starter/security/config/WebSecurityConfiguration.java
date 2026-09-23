@@ -8,7 +8,9 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestRedirectFilter;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.csrf.CsrfFilter;
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
+import org.springframework.security.web.util.matcher.AndRequestMatcher;
 import pl.commercelink.starter.security.filter.CustomTokenRefreshFilter;
 import pl.commercelink.starter.security.handler.CustomAuthenticationSuccessHandler;
 import pl.commercelink.starter.security.handler.CustomLogoutSuccessHandler;
@@ -25,10 +27,13 @@ public class WebSecurityConfiguration {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http, CustomOAuth2UserService customOAuth2UserService, CustomAuthenticationSuccessHandler successHandler, CustomLogoutSuccessHandler logoutSuccessHandler, CustomTokenRefreshFilter tokenRefreshFilter) throws Exception {
         http
-                // CSRF protection only for the session-based admin panel; the /Store, /Global and customer
-                // API paths are token/gateway-authenticated and stay exempt.
-                .csrf(csrf -> csrf.requireCsrfProtectionMatcher(
-                        PathPatternRequestMatcher.withDefaults().matcher("/dashboard/**")))
+                // CSRF protection only for unsafe methods on the session-based admin panel; the /Store,
+                // /Global and customer API paths are token/gateway-authenticated and stay exempt. The
+                // AndRequestMatcher keeps DEFAULT_CSRF_MATCHER's safe-method exclusion (GET/HEAD/OPTIONS/
+                // TRACE), so dashboard reads are never CSRF-gated — only state-changing requests are.
+                .csrf(csrf -> csrf.requireCsrfProtectionMatcher(new AndRequestMatcher(
+                        CsrfFilter.DEFAULT_CSRF_MATCHER,
+                        PathPatternRequestMatcher.withDefaults().matcher("/dashboard/**"))))
                 .authorizeHttpRequests(auth -> {
                     auth.requestMatchers(
                             "/",

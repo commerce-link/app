@@ -1447,6 +1447,7 @@
                 const form = document.createElement('form');
                 form.method = 'POST';
                 form.action = `/dashboard/orders/${orderId}/cancelShipment`;
+                window.clCsrf.appendTo(form);
                 document.body.appendChild(form);
                 form.submit();
             }
