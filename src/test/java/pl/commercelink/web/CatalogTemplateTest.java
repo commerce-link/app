@@ -108,7 +108,7 @@ class CatalogTemplateTest {
         String html = rendered();
 
         // then
-        assertThat(html).contains("The products are kept \u2014 another category uses the same PIM categories.")
+        assertThat(html).contains("The products of this category will not be deleted, but will disappear from the panel and the price list.")
                 .contains("This removes 245 products of this category.")
                 .contains("The list of this category is worked out from the inventory");
     }
