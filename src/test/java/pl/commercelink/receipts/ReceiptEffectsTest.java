@@ -1,7 +1,9 @@
 package pl.commercelink.receipts;
 
+import com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import pl.commercelink.documents.Document;
 import pl.commercelink.documents.DocumentType;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderLifecycleEventPublisher;
@@ -13,6 +15,7 @@ import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.starter.email.EmailClient;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -127,6 +130,43 @@ class ReceiptEffectsTest {
         assertThat(attempt.getEmailClaimedAt()).isNotNull();
         assertThat(attempt.getEmailSentAt()).isNull();
         assertThat(attempt.getLastError()).contains("e-mail");
+    }
+
+    @Test
+    void aStaleReadThatConflictsOnSaveIsRetriedWithoutDuplicatingTheDocument() {
+        fiscalised("https://paragony.pl/r/1");
+        // Simulates an eventually-consistent read right after an earlier, already-persisted attach: the stale
+        // order has no Receipt document yet, so saving it (with a stale version) would conflict.
+        Order staleOrder = b2cOrder(100);
+        Order freshOrder = b2cOrder(100);
+        freshOrder.addDocument(new Document(KEY, KEY, "https://paragony.pl/r/1", DocumentType.Receipt, LocalDate.now()));
+        when(orders.findById(STORE_ID, ORDER_ID)).thenReturn(staleOrder, freshOrder);
+        doThrow(new ConditionalCheckFailedException("stale version"))
+                .when(attemptService).saveThroughLifecycle(staleOrder);
+
+        OptimisticLockingExecutor retryingLocking = mock(OptimisticLockingExecutor.class);
+        doAnswer(i -> {
+            Supplier<Order> loader = (Supplier<Order>) i.getArgument(0);
+            Consumer<Order> mutator = (Consumer<Order>) i.getArgument(1);
+            Consumer<Order> saver = (Consumer<Order>) i.getArgument(2);
+            Order entity = loader.get();
+            mutator.accept(entity);
+            try {
+                saver.accept(entity);
+            } catch (ConditionalCheckFailedException e) {
+                entity = loader.get();
+                mutator.accept(entity);
+                saver.accept(entity);
+            }
+            return entity;
+        }).when(retryingLocking).modifyAndSave(any(), any(), any());
+        ReceiptEffects retryingEffects = new ReceiptEffects(attempts, orders, retryingLocking, attemptService,
+                lifecycleEvents, emailClient, orderEvents, clock);
+
+        retryingEffects.apply(STORE_ID, KEY);
+
+        assertThat(freshOrder.getDocuments()).filteredOn(d -> d.getType() == DocumentType.Receipt).hasSize(1);
+        verify(attemptService).saveThroughLifecycle(freshOrder);
     }
 
     @Test

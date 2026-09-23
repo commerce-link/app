@@ -107,6 +107,16 @@ public class ReceiptEffects {
         }
     }
 
+    /**
+     * A stale read here (e.g. an eventually-consistent {@code findById} right after an earlier attach already
+     * persisted the document) is not a risk of a duplicate: {@code Order} carries
+     * {@code @DynamoDBVersionAttribute}, so saving an entity built from an older version conflicts with
+     * {@link com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException} — nothing on the save path
+     * (plain {@code ordersRepository.save} for a cancelled order, {@code OrderLifecycle.update} otherwise) catches
+     * or clobbers that — and {@link OptimisticLockingExecutor#modifyAndSave} retries the whole load-mutate-save on
+     * a fresh read. That retry lands on an order that already has the document the conflicting write persisted, so
+     * the dedup check below finds it and does not add a second one.
+     */
     private Order attachDocument(ReceiptAttempt attempt) {
         String key = attempt.getReceiptKey();
         LocalDate issuedAt = attempt.getFiscalisedAt() != null
