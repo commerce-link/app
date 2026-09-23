@@ -346,6 +346,7 @@
     </div>
 
     <form id="orderItemsForm" method="post" th:object="${orderItemsForm}" th:attr="data-order-id=${order.orderId}">
+        <input type="hidden" name="_csrf" th:value="${_csrf.token}"/>
         <input type="hidden" name="targetOrderId" id="targetOrderIdInput"/>
         <h2 class="subtitle" th:text="#{order.items}"></h2>
         <div class="box mb-5">
