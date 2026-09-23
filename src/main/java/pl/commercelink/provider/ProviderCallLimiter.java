@@ -76,6 +76,12 @@ public class ProviderCallLimiter {
         throw (E) e;
     }
 
+    /** Test-only: available concurrency permits for a provider's bucket, to check none leaked after rejection. */
+    int availablePermits(String providerName) {
+        Bucket bucket = buckets.get(providerName);
+        return bucket == null ? -1 : bucket.availablePermits();
+    }
+
     private static final class Bucket {
 
         private final Semaphore concurrent;
@@ -88,10 +94,12 @@ public class ProviderCallLimiter {
         }
 
         void acquire(String providerName, long deadline) {
+            boolean acquired = false;
             try {
                 if (!concurrent.tryAcquire(Math.max(0, deadline - System.nanoTime()), TimeUnit.NANOSECONDS)) {
                     throw new ProviderCallRejectedException(providerName);
                 }
+                acquired = true;
                 while (true) {
                     long wait = reserveStart();
                     if (wait == 0) {
@@ -99,14 +107,27 @@ public class ProviderCallLimiter {
                     }
                     if (System.nanoTime() + wait > deadline) {
                         concurrent.release();
+                        acquired = false;
                         throw new ProviderCallRejectedException(providerName);
                     }
                     TimeUnit.NANOSECONDS.sleep(wait);
                 }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
+                // The concurrency permit was granted (acquired == true) before the wait for the per-minute budget
+                // was interrupted: release it here, or it leaks forever and starves every future call to this
+                // provider. An interrupt during the tryAcquire call above never grants a permit, so nothing to
+                // release in that case.
+                if (acquired) {
+                    concurrent.release();
+                }
                 throw new ProviderCallRejectedException(providerName);
             }
+        }
+
+        /** Test-only: permits currently free to acquire, to check none leaked after a rejected/interrupted call. */
+        int availablePermits() {
+            return concurrent.availablePermits();
         }
 
         /** Records a call start and returns 0, or returns how long to wait until the window has room. */

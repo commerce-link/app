@@ -9,6 +9,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -76,6 +77,31 @@ class ProviderCallLimiterTest {
 
         assertThatThrownBy(() -> limiter.call("fakturownia", () -> "3"))
                 .isInstanceOf(ProviderCallRejectedException.class);
+    }
+
+    @Test
+    void releasesTheConcurrencyPermitWhenInterruptedWaitingForTheMinuteBudget() throws Exception {
+        ProviderCallLimiter limiter = limiter(1, 1, Duration.ofMinutes(2));
+        limiter.call("fakturownia", () -> "first");
+        assertThat(limiter.availablePermits("fakturownia")).isEqualTo(1);
+
+        AtomicReference<Throwable> thrown = new AtomicReference<>();
+        Thread waiter = new Thread(() -> {
+            try {
+                limiter.call("fakturownia", () -> "second");
+            } catch (Throwable e) {
+                thrown.set(e);
+            }
+        });
+        waiter.start();
+        // The minute budget is already spent, so the waiter acquires the (free) concurrency permit and then blocks
+        // in the per-minute wait; this gives it time to reach that point before it gets interrupted.
+        sleep(200);
+        waiter.interrupt();
+        waiter.join(5000);
+
+        assertThat(thrown.get()).isInstanceOf(ProviderCallRejectedException.class);
+        assertThat(limiter.availablePermits("fakturownia")).isEqualTo(1);
     }
 
     @Test
