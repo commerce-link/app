@@ -57,6 +57,15 @@
                         </div>
                     </div>
 
+                    <div class="field">
+                        <label class="label" for="counterpartyShortcut" th:text="#{deliveries.counterpartyShortcut}"></label>
+                        <div class="control">
+                            <input class="input" type="text" name="counterpartyShortcut" id="counterpartyShortcut"
+                                   aria-describedby="counterpartyShortcutHelp" th:value="${searchParams.counterpartyShortcut}">
+                        </div>
+                        <p class="help" id="counterpartyShortcutHelp" th:text="#{deliveries.counterpartyShortcut.help}"></p>
+                    </div>
+
                     <div class="field is-grouped">
                         <div class="control is-expanded">
                             <label class="label" th:text="#{orders.ordered.at.start}"></label>
@@ -121,7 +130,7 @@
                         <tr th:each="delivery : ${deliveries}"
                             th:with="detailPath=${isSuperAdmin} ? '/dashboard/store/' + ${delivery.storeId} : '/dashboard'">
                             <td th:if="${isSuperAdmin}" th:text="${delivery.storeId}"></td>
-                            <td th:text="${supplierLabels.of(delivery.storeId, delivery.provider)}"></td>
+                            <td th:replace="~{fragments/delivery-supplier :: cell(${supplierLabels.of(delivery.storeId, delivery.provider)}, ${delivery.counterpartyShortcut})}"></td>
                             <td>
                                 <span class="tag is-info is-light mb-0" th:if="${delivery.dropship}" th:text="#{deliveries.dropship.badge}"></span>
                                 <span class="tag is-primary is-light mb-0" th:unless="${delivery.dropship}" th:text="#{deliveries.type.warehouse}"></span>

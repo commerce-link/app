@@ -167,6 +167,12 @@ public class  DeliveriesRepository extends DynamoDbRepository<Delivery> {
             appendFilter(filterExpression, "provider = :provider");
         }
 
+        // contains() keeps the match inside the DynamoDB filter, so pagination stays correct; it is case-sensitive.
+        if (isNotBlank(filter.getCounterpartyShortcut())) {
+            eav.put(":counterpartyShortcut", new AttributeValue().withS(filter.getCounterpartyShortcut()));
+            appendFilter(filterExpression, "contains(counterpartyShortcut, :counterpartyShortcut)");
+        }
+
         if (filter.getOrderedAtStart() != null && filter.getOrderedAtEnd() != null) {
             eav.put(":orderedAtStart", new AttributeValue().withS(filter.getOrderedAtStart().toString()));
             eav.put(":orderedAtEnd", new AttributeValue().withS(filter.getOrderedAtEnd().toString()));
