@@ -34,4 +34,16 @@ class FormNumbersTest {
         assertThat(FormNumbers.formatInt(1193)).isEqualTo("1 193");
         assertThat(FormNumbers.formatInt(58)).isEqualTo("58");
     }
+
+    /** RF-2: a multiplier or a markup is shown as saved, so a save that does not touch the field keeps the price. */
+    @Test
+    void decimalFieldsKeepTwoDecimalsAtLeastAndNeverCutTheRest() {
+        // when / then
+        assertThat(FormNumbers.formatDecimalField(1.1)).isEqualTo("1,10");
+        assertThat(FormNumbers.formatDecimalField(1)).isEqualTo("1,00");
+        assertThat(FormNumbers.formatDecimalField(1.125)).isEqualTo("1,125");
+        assertThat(FormNumbers.formatDecimalField(1.075)).isEqualTo("1,075");
+        assertThat(FormNumbers.formatDecimalField(0.123456)).isEqualTo("0,123456");
+        assertThat(FormNumbers.decimal(FormNumbers.formatDecimalField(1.125))).contains(1.125);
+    }
 }

@@ -51,9 +51,12 @@ public final class FormNumbers {
         return new DecimalFormat("#,##0", POLISH).format(value);
     }
 
-    /** Multipliers are shown with two decimals ("1,10"), integers as they are ("49"). */
+    /**
+     * Multipliers and markups: at least two decimals ("1,10") and every further one the value has ("1,125"). A field is
+     * posted back as shown, so a digit cut off here would change the price on a save that never touched the field.
+     */
     public static String formatDecimalField(double value) {
-        return new DecimalFormat("0.00", POLISH).format(value);
+        return new DecimalFormat("0.00####", POLISH).format(value);
     }
 
     private static String clean(String value) {

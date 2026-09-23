@@ -101,4 +101,19 @@ class MarketplaceDefinitionFormTest {
         assertThat(form.isEnabled()).isTrue();
         assertThat(form.isExportSelectedProducts()).isFalse();
     }
+
+    /** RF-2: saving the page without touching the markup keeps a markup of three decimals as it was. */
+    @Test
+    void aMarkupOfThreeDecimalsSurvivesASaveThatDoesNotTouchIt() {
+        // given
+        MarketplaceDefinitionForm form = MarketplaceDefinitionForm.from(new MarketplaceDefinition("Empik", 1.075, 3, 1, 2, 0, 0));
+
+        // when
+        MarketplaceDefinition saved = form.toDefinition("Empik");
+
+        // then
+        assertThat(form.getMarkup()).isEqualTo("1,075");
+        assertThat(form.validate()).isEmpty();
+        assertThat(saved.getMarkup()).isEqualTo(1.075);
+    }
 }
