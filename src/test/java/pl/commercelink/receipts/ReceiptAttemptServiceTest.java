@@ -111,6 +111,34 @@ class ReceiptAttemptServiceTest {
     }
 
     @Test
+    void aMissingAdapterBlocksTheAttemptAsProviderUnavailable() {
+        // The adapter is not on the classpath: providerFactory.get() returns null (no descriptor) rather than
+        // throwing. Before the fix this null reached ReceiptRequestConverter.convert() and NPE'd there.
+        when(factory.get(any(Store.class), anyString())).thenReturn(null);
+
+        ReceiptAttempt attempt = service.startAutomatic(store, order).orElseThrow();
+
+        assertThat(attempt.getState()).isEqualTo(ReceiptAttemptState.BLOCKED);
+        assertThat(attempt.getBlockedReason()).isEqualTo(ReceiptBlockReason.PROVIDER_UNAVAILABLE.name());
+    }
+
+    @Test
+    void reissueIsRefusedWhenTheAdapterIsMissingEvenThoughAProviderNameIsConfigured() {
+        service.startAutomatic(store, order);
+        attempts.update(STORE_ID, ORDER_ID + ":R1", a -> {
+            a.setState(ReceiptAttemptState.FAILED);
+            return true;
+        });
+        store.setConfigurationValue(IntegrationType.RECEIPT_PROVIDER, "uninstalled-adapter");
+        // factory.getDescriptor("uninstalled-adapter") is unstubbed, so the mock returns null: the adapter is gone.
+
+        assertThatThrownBy(() -> service.reissue(STORE_ID, ORDER_ID, "operator"))
+                .isInstanceOf(ReceiptActionException.class)
+                .extracting(e -> ((ReceiptActionException) e).getMessageKey())
+                .isEqualTo("receipts.action.reissue.noProvider");
+    }
+
+    @Test
     void reissueIsRefusedWhenTheOrderHasNoAttemptsYet() {
         assertThatThrownBy(() -> service.reissue(STORE_ID, ORDER_ID, "operator"))
                 .isInstanceOf(ReceiptActionException.class)
@@ -243,6 +271,29 @@ class ReceiptAttemptServiceTest {
         assertThatThrownBy(() -> service.closeManually(STORE_ID, ORDER_ID + ":R1", "1", null, "operator"))
                 .extracting(e -> ((ReceiptActionException) e).getMessageKey())
                 .isEqualTo("receipts.action.close.busy");
+    }
+
+    @Test
+    void closeManuallyRejectsALinkThatDoesNotLookLikeAUrl() {
+        service.startAutomatic(store, order);
+
+        assertThatThrownBy(() -> service.closeManually(STORE_ID, ORDER_ID + ":R1", "1", "javascript:alert(1)", "operator"))
+                .isInstanceOf(ReceiptActionException.class)
+                .extracting(e -> ((ReceiptActionException) e).getMessageKey())
+                .isEqualTo("receipts.action.close.invalidLink");
+        assertThat(attempts.find(STORE_ID, ORDER_ID + ":R1").orElseThrow().getState())
+                .isEqualTo(ReceiptAttemptState.ISSUING);
+        verifyNoInteractions(locking);
+    }
+
+    @Test
+    void closeManuallyAcceptsAnUppercaseHttpsLinkAndABlankOne() {
+        service.startAutomatic(store, order);
+
+        service.closeManually(STORE_ID, ORDER_ID + ":R1", "1", "HTTPS://Paragony.pl/x", "operator");
+
+        assertThat(attempts.find(STORE_ID, ORDER_ID + ":R1").orElseThrow().getState())
+                .isEqualTo(ReceiptAttemptState.CLOSED_MANUALLY);
     }
 
     @Test

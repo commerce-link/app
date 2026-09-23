@@ -132,6 +132,22 @@ class OrderReceiptsControllerTest {
     }
 
     @Test
+    void closeWithAnInvalidLinkShowsTheReason() {
+        String receiptKey = ORDER_ID + ":R1";
+        org.mockito.Mockito.doThrow(new ReceiptActionException("receipts.action.close.invalidLink"))
+                .when(attemptService).closeManually(STORE_ID, receiptKey, "PAR/1", "javascript:x", "Jan Kowalski");
+        when(messageSource.getMessage("receipts.action.close.invalidLink", null, LOCALE))
+                .thenReturn("Link do e-paragonu musi zaczynać się od http:// lub https://.");
+
+        String view = controller.close(ORDER_ID, receiptKey, "PAR/1", "javascript:x", LOCALE, redirectAttributes);
+
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+        assertThat(redirectAttributes.getFlashAttributes().get("errorMessage"))
+                .isEqualTo("Link do e-paragonu musi zaczynać się od http:// lub https://.");
+        assertThat(redirectAttributes.getFlashAttributes()).doesNotContainKey("successMessage");
+    }
+
+    @Test
     void keysOfAnotherOrderAreRefused() {
         String otherOrdersKey = "other-order:R1";
         when(messageSource.getMessage("receipts.action.notFound", null, LOCALE)).thenReturn("Nie znaleziono paragonu.");

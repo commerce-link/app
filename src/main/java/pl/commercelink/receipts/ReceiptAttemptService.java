@@ -101,7 +101,10 @@ public class ReceiptAttemptService {
         if (store == null || order == null || !eligibility.orderQualifies(order)) {
             throw new ReceiptActionException("receipts.action.reissue.notEligible");
         }
-        if (store.getConfigurationValue(IntegrationType.RECEIPT_PROVIDER) == null) {
+        String providerName = store.getConfigurationValue(IntegrationType.RECEIPT_PROVIDER);
+        if (providerName == null || providerFactory.getDescriptor(providerName) == null) {
+            // No provider chosen, or the chosen one's adapter is gone (uninstalled): either way there is nothing
+            // to issue with, and going on would fail deep inside convert() instead of with a clean refusal here.
             throw new ReceiptActionException("receipts.action.reissue.noProvider");
         }
         int next = existing.stream().mapToInt(ReceiptAttempt::getAttemptNo).max().orElse(0) + 1;
@@ -140,6 +143,9 @@ public class ReceiptAttemptService {
     public void closeManually(String storeId, String receiptKey, String number, String link, String actor) {
         if (StringUtils.isBlank(number)) {
             throw new ReceiptActionException("receipts.action.close.numberRequired");
+        }
+        if (!isValidLink(link)) {
+            throw new ReceiptActionException("receipts.action.close.invalidLink");
         }
         String receiptNumber = number.strip();
         Instant now = clock.instant();
@@ -240,11 +246,26 @@ public class ReceiptAttemptService {
             log.warn("Receipt provider {} of store {} unavailable", providerName, store.getStoreId(), e);
             return new ReceiptConversion.Blocked(ReceiptBlockReason.PROVIDER_UNAVAILABLE, e.getMessage());
         }
+        if (provider == null) {
+            // No descriptor for this name (adapter not on the classpath): providerFactory.get() returns null
+            // rather than throwing, so this is checked separately from the catch above.
+            log.warn("Receipt provider {} of store {} has no descriptor (adapter missing)", providerName, store.getStoreId());
+            return new ReceiptConversion.Blocked(ReceiptBlockReason.PROVIDER_UNAVAILABLE, null);
+        }
         return converter.convert(order, orderItemsRepository.findByOrderId(order.getOrderId()), key, provider,
                 LocalDateTime.now(clock));
     }
 
     private static String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value.strip();
+    }
+
+    /** Blank (no link yet) or an http(s) URL: never a scheme an operator could paste in to run script in a browser. */
+    private static boolean isValidLink(String link) {
+        if (StringUtils.isBlank(link)) {
+            return true;
+        }
+        String trimmed = link.strip();
+        return StringUtils.startsWithIgnoreCase(trimmed, "http://") || StringUtils.startsWithIgnoreCase(trimmed, "https://");
     }
 }
