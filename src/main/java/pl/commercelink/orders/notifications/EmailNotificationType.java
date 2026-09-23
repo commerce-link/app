@@ -11,6 +11,7 @@ public enum EmailNotificationType {
     ORDER_SHIPPING("OrderShippingTemplate", Arrays.asList("orderId", "orderStatusLink", "isReceipt", "isInvoice", "trackingUrls")),
     ORDER_PICKUP("OrderPickupTemplate", Arrays.asList("orderId", "orderStatusLink", "estimatedCollectionDate")),
     ORDER_INVOICE("OrderInvoiceTemplate", Arrays.asList("orderId", "invoiceNumber")),
+    ORDER_RECEIPT("OrderReceiptTemplate", Arrays.asList("orderId", "receiptUrl")),
     ORDER_REVIEW("OrderReviewTemplate", Arrays.asList("orderId", "orderStatusLink")),
     ORDER_ASSEMBLY_DATE_CHANGED("OrderAssemblyDateChangedTemplate", Arrays.asList("orderId", "orderStatusLink", "oldAssemblyDate", "newAssemblyDate")),
     ORDER_INVOICE_PROFORMA("OrderInvoiceProformaTemplate", Arrays.asList("invoiceNumber")),
