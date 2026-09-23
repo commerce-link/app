@@ -1,0 +1,71 @@
+package pl.commercelink.receipts;
+
+import org.junit.jupiter.api.Test;
+
+import java.time.Duration;
+import java.time.Instant;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+class ReceiptAttentionEvaluatorTest {
+
+    private static ReceiptAttempt attempt(ReceiptAttemptState state, Instant createdAt) {
+        ReceiptAttempt attempt = new ReceiptAttempt();
+        attempt.setState(state);
+        attempt.setCreatedAt(createdAt);
+        return attempt;
+    }
+
+    @Test
+    void unknownOutcomeAlertsAfterSixIssueCalls() {
+        Instant now = Instant.parse("2026-09-10T12:00:00Z");
+        ReceiptAttempt attempt = attempt(ReceiptAttemptState.ISSUING, now);
+        attempt.setIssueCalls(5);
+        assertThat(ReceiptAttentionEvaluator.evaluate(attempt, now)).isNull();
+        attempt.setIssueCalls(6);
+        assertThat(ReceiptAttentionEvaluator.evaluate(attempt, now)).isEqualTo(ReceiptAttention.ISSUING_UNKNOWN);
+    }
+
+    @Test
+    void invalidRequestAfterSendingAlertsAtOnce() {
+        Instant now = Instant.parse("2026-09-10T12:00:00Z");
+        ReceiptAttempt attempt = attempt(ReceiptAttemptState.ISSUING, now);
+        attempt.setIssueCalls(2);
+        attempt.setInvalidAfterSend(true);
+
+        assertThat(ReceiptAttentionEvaluator.evaluate(attempt, now)).isEqualTo(ReceiptAttention.INVALID_AFTER_SEND);
+    }
+
+    @Test
+    void pendingAlertsAfterTwoDays() {
+        Instant now = Instant.parse("2026-09-10T12:00:00Z");
+        assertThat(ReceiptAttentionEvaluator.evaluate(attempt(ReceiptAttemptState.PENDING, now.minus(Duration.ofHours(47))), now)).isNull();
+        assertThat(ReceiptAttentionEvaluator.evaluate(attempt(ReceiptAttemptState.PENDING, now.minus(Duration.ofHours(49))), now))
+                .isEqualTo(ReceiptAttention.PENDING_LONG);
+    }
+
+    @Test
+    void pendingNearTheEndOfTheMonthInWarsawAlertsEarly() {
+        Instant now = Instant.parse("2026-09-28T23:30:00Z");   // 29 September, 01:30 in Warsaw
+
+        assertThat(ReceiptAttentionEvaluator.evaluate(attempt(ReceiptAttemptState.PENDING, now.minus(Duration.ofHours(2))), now))
+                .isEqualTo(ReceiptAttention.PENDING_MONTH_END);
+        assertThat(ReceiptAttentionEvaluator.evaluate(attempt(ReceiptAttemptState.PENDING, now.minus(Duration.ofMinutes(10))), now))
+                .isNull();
+    }
+
+    @Test
+    void terminalProblemsAlert() {
+        Instant now = Instant.parse("2026-09-10T12:00:00Z");
+        ReceiptAttempt noLink = attempt(ReceiptAttemptState.FISCALISED, now);
+        noLink.setLinkGaveUpAt(now);
+        ReceiptAttempt noMail = attempt(ReceiptAttemptState.FISCALISED, now);
+        noMail.setEmailClaimedAt(now);
+
+        assertThat(ReceiptAttentionEvaluator.evaluate(attempt(ReceiptAttemptState.FAILED, now), now)).isEqualTo(ReceiptAttention.FAILED);
+        assertThat(ReceiptAttentionEvaluator.evaluate(attempt(ReceiptAttemptState.BLOCKED, now), now)).isEqualTo(ReceiptAttention.BLOCKED);
+        assertThat(ReceiptAttentionEvaluator.evaluate(noLink, now)).isEqualTo(ReceiptAttention.LINK_MISSING);
+        assertThat(ReceiptAttentionEvaluator.evaluate(noMail, now)).isEqualTo(ReceiptAttention.EMAIL_NOT_SENT);
+        assertThat(ReceiptAttentionEvaluator.evaluate(attempt(ReceiptAttemptState.CLOSED_MANUALLY, now), now)).isNull();
+    }
+}
