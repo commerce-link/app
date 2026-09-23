@@ -142,10 +142,13 @@ public class CategoryDefinitions {
         return new DeletionPreview(kept, kept ? 0 : products.findAll(category.getCategoryId()).size());
     }
 
-    /** The same preview for a caller that has the products of the category in hand: the decision, without a second read. */
-    public DeletionPreview deletionPreview(ProductCatalog catalog, CategoryDefinition category, List<Product> categoryProducts) {
+    /**
+     * The same preview for a caller that has counted the products of the category (the catalog page, from their
+     * labels): the decision, without reading the products.
+     */
+    public DeletionPreview deletionPreview(ProductCatalog catalog, CategoryDefinition category, int productsCount) {
         boolean kept = productsSurviveRemoval(catalog, category);
-        return new DeletionPreview(kept, kept ? 0 : categoryProducts.size());
+        return new DeletionPreview(kept, kept ? 0 : productsCount);
     }
 
     /**

@@ -333,6 +333,35 @@ class CategoryDefinitionsTest {
         owned.forEach(product -> verify(products).deleteWhateverItsVersion(product));
     }
 
+    /**
+     * D-I7: the catalog page previews every category's removal from a count (its products' labels, not the products);
+     * the confirmation page behind the link reads the products. Both must say the same, kept or deleted.
+     */
+    @Test
+    void aPreviewFromTheCountSaysWhatThePreviewFromTheListSays() {
+        // given
+        gpu.setDeletionProtection(false);
+        gpu.setPimCategoryIds(List.of("pim-gpu"));
+        CategoryDefinition twin = new CategoryDefinition().withName("GPU 2").withGeneratedId();
+        twin.setPimCategoryIds(List.of("pim-twin"));
+        catalog.getCategories().add(twin);
+        when(products.findAll(gpu.getCategoryId())).thenReturn(List.of(
+                new Product(gpu.getCategoryId(), "p1", "1", "m", "b", "l", "n", "Default"),
+                new Product(gpu.getCategoryId(), "p2", "2", "m", "b", "l", "n", "Default")));
+
+        // when: deleted
+        CategoryDefinitions.DeletionPreview fromList = definitions.deletionPreview(catalog, gpu);
+        CategoryDefinitions.DeletionPreview fromCount = definitions.deletionPreview(catalog, gpu, 2);
+        // when: kept, once the twin shares the PIM category
+        twin.setPimCategoryIds(List.of("pim-gpu"));
+        CategoryDefinitions.DeletionPreview keptFromList = definitions.deletionPreview(catalog, gpu);
+        CategoryDefinitions.DeletionPreview keptFromCount = definitions.deletionPreview(catalog, gpu, 2);
+
+        // then
+        assertThat(fromCount).isEqualTo(fromList).isEqualTo(new CategoryDefinitions.DeletionPreview(false, 2));
+        assertThat(keptFromCount).isEqualTo(keptFromList).isEqualTo(new CategoryDefinitions.DeletionPreview(true, 0));
+    }
+
     @Test
     void protectedCategoryCannotBeRemoved() {
         // when / then

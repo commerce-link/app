@@ -293,9 +293,8 @@ class CatalogsControllerTest {
         catalog.getCategories().addAll(List.of(cpu, gpu));
         when(access.requireCatalog(STORE_ID, "c1")).thenReturn(catalog);
         when(pimCategoryOptions.namesOf(any())).thenReturn(List.of());
-        when(productRepository.findAll(gpu.getCategoryId()))
-                .thenReturn(List.of(new Product(gpu.getCategoryId(), "p", "1", "m", "b", "l", "n", "Default")));
-        when(productRepository.findAll(cpu.getCategoryId())).thenReturn(List.of());
+        when(productRepository.labelsOf(gpu.getCategoryId())).thenReturn(List.of("l"));
+        when(productRepository.labelsOf(cpu.getCategoryId())).thenReturn(List.of());
 
         // when
         var result = mvc.perform(get("/dashboard/catalogs/c1")).andExpect(status().isOk())
@@ -323,10 +322,9 @@ class CatalogsControllerTest {
         catalog.getCategories().addAll(List.of(gpu, gaming, cpu));
         when(access.requireCatalog(STORE_ID, "c1")).thenReturn(catalog);
         when(pimCategoryOptions.namesOf(any())).thenReturn(List.of());
-        when(productRepository.findAll(gpu.getCategoryId())).thenReturn(List.of());
-        when(productRepository.findAll(gaming.getCategoryId())).thenReturn(List.of());
-        when(productRepository.findAll(cpu.getCategoryId()))
-                .thenReturn(List.of(new Product(cpu.getCategoryId(), "p", "1", "m", "b", "l", "n", "Default")));
+        when(productRepository.labelsOf(gpu.getCategoryId())).thenReturn(List.of());
+        when(productRepository.labelsOf(gaming.getCategoryId())).thenReturn(List.of());
+        when(productRepository.labelsOf(cpu.getCategoryId())).thenReturn(List.of("l"));
 
         // when
         var result = mvc.perform(get("/dashboard/catalogs/c1")).andExpect(status().isOk()).andReturn();
@@ -362,6 +360,38 @@ class CatalogsControllerTest {
         // then
         assertThat(result.getModelAndView().getModel().get("productsTotal")).isEqualTo(0);
         verify(productRepository, never()).findAll(anyString());
+        verify(productRepository, never()).labelsOf(anyString());
+    }
+
+    /**
+     * D-I7: the page needs a count and the labels of each manual category, never the products themselves (production:
+     * 23 queries and 1 193 full items on every visit). The labels answer the count, the products off the label list
+     * and the deletion preview.
+     */
+    @Test
+    void theCatalogPageReadsTheLabelsOfTheProductsNotTheProducts() throws Exception {
+        // given
+        ProductCatalog catalog = new ProductCatalog(STORE_ID, "Parts");
+        CategoryDefinition gpu = managed("GPU", "pim-gpu");
+        gpu.setGroupingOrder(List.of("RTX 5060"));
+        catalog.getCategories().add(gpu);
+        when(access.requireCatalog(STORE_ID, "c1")).thenReturn(catalog);
+        when(pimCategoryOptions.namesOf(any())).thenReturn(List.of());
+        when(productRepository.labelsOf(gpu.getCategoryId())).thenReturn(List.of("RTX 5060", "RTX 4060", "RTX 4060"));
+
+        // when
+        var result = mvc.perform(get("/dashboard/catalogs/c1")).andExpect(status().isOk()).andReturn();
+
+        // then
+        @SuppressWarnings("unchecked")
+        List<CategoryRow> rows = (List<CategoryRow>) result.getModelAndView().getModel().get("categories");
+        assertThat(rows.get(0).productsCount()).isEqualTo(3);
+        assertThat(rows.get(0).productsOutsideLabels()).isEqualTo(2);
+        assertThat(rows.get(0).productsToDelete()).isEqualTo(3);
+        assertThat(result.getModelAndView().getModel().get("productsTotal")).isEqualTo(3);
+        verify(productRepository).labelsOf(gpu.getCategoryId());
+        verify(productRepository, never()).findAll(anyString());
+        verify(productRepository, never()).findAll(any(ProductCatalog.class));
     }
 
     @Test

@@ -5,18 +5,14 @@ import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.CategoryDefinitionType;
 import pl.commercelink.products.CategoryDefinitions;
 import pl.commercelink.products.MarketplaceDefinition;
-import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductCatalog;
 
+import java.util.Arrays;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class CategoryRowTest {
-
-    private static Product product(String label) {
-        return new Product("cat", "pim", "590", "MFN", "Brand", label, "Name", "Default");
-    }
 
     @Test
     void countsProductsAndLabelsOutsideTheListForAManualCategory() {
@@ -30,7 +26,7 @@ class CategoryRowTest {
 
         // when
         CategoryRow row = CategoryRow.of(catalog, gpu, List.of("Graphics cards"),
-                List.of(product("RTX 5060"), product("RTX 5070"), product("RTX 4060")), name -> name.toUpperCase(),
+                List.of("RTX 5060", "RTX 5070", "RTX 4060"), name -> name.toUpperCase(),
                 new CategoryDefinitions.DeletionPreview(false, 3));
 
         // then
@@ -43,6 +39,22 @@ class CategoryRowTest {
         assertThat(row.marketplaceNames()).containsExactly("ALLEGRO");
         assertThat(row.deletable()).isFalse();
         assertThat(row.href()).isEqualTo("/dashboard/catalogs/" + catalog.getCatalogId() + "/category/" + gpu.getCategoryId());
+    }
+
+    /** One label per product: two products under one unlisted label are two, and a product without one is outside too. */
+    @Test
+    void countsEveryProductWhoseLabelIsOffTheList() {
+        // given
+        CategoryDefinition gpu = new CategoryDefinition().withName("GPU").withGeneratedId();
+        gpu.setGroupingOrder(List.of("RTX 5060"));
+
+        // when
+        CategoryRow row = CategoryRow.of(new ProductCatalog("store", "Parts"), gpu, List.of(),
+                Arrays.asList("RTX 5060", "RTX 4060", "RTX 4060", null), n -> n, new CategoryDefinitions.DeletionPreview(false, 4));
+
+        // then
+        assertThat(row.productsCount()).isEqualTo(4);
+        assertThat(row.productsOutsideLabels()).isEqualTo(3);
     }
 
     @Test

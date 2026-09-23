@@ -20,7 +20,6 @@ import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.CategoryDefinitionType;
 import pl.commercelink.products.CategoryDefinitions;
 import pl.commercelink.products.PimCategoryOptions;
-import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogDetailsService;
 import pl.commercelink.products.ProductCatalogRepository;
@@ -88,11 +87,12 @@ public class CatalogsController {
                 .sorted(Comparator.comparingInt(CategoryDefinition::getSequenceNumber))
                 .map(category -> {
                     // An automatic category has no rows in the products table: its list is computed from the inventory.
-                    List<Product> products = category.hasType(CategoryDefinitionType.Dynamic)
-                            ? List.of() : productRepository.findAll(category.getCategoryId());
-                    // The same products answer the count and the deletion preview, so the row costs one read.
+                    // A manual one is read for its products' labels only (not the products): they answer the count, the
+                    // products off the label list and the deletion preview, so the row costs one projected query.
+                    List<String> labels = category.hasType(CategoryDefinitionType.Dynamic)
+                            ? List.of() : productRepository.labelsOf(category.getCategoryId());
                     return CategoryRow.of(catalog, category, pimCategoryOptions.namesOf(category.getPimCategoryIds()),
-                            products, marketplaces::displayName, definitions.deletionPreview(catalog, category, products));
+                            labels, marketplaces::displayName, definitions.deletionPreview(catalog, category, labels.size()));
                 })
                 .toList();
         model.addAttribute("catalog", catalog);
