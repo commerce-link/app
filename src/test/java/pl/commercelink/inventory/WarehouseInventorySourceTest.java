@@ -6,7 +6,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
-import pl.commercelink.taxonomy.TaxonomyCache;
+import pl.commercelink.taxonomy.TaxonomyCatalog;
 import pl.commercelink.warehouse.api.StockQueryService;
 import pl.commercelink.warehouse.api.WarehouseItemView;
 
@@ -24,7 +24,7 @@ class WarehouseInventorySourceTest {
     private static final String STORE_ID = "store-1";
 
     @Mock
-    private TaxonomyCache taxonomyCache;
+    private TaxonomyCatalog taxonomyCatalog;
     @Mock
     private SupplierRegistry supplierRegistry;
     @Mock
@@ -35,7 +35,7 @@ class WarehouseInventorySourceTest {
     }
 
     private MatchedInventory accumulator(InventoryKey lookupKey) {
-        return new MatchedInventory(lookupKey.copy(), taxonomyCache, supplierRegistry);
+        return new MatchedInventory(lookupKey.copy(), supplierRegistry);
     }
 
     @Test

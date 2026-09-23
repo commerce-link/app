@@ -22,7 +22,7 @@ import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoreSupplierConnection;
 import pl.commercelink.stores.StoresRepository;
-import pl.commercelink.taxonomy.TaxonomyCache;
+import pl.commercelink.taxonomy.TaxonomyCatalog;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -64,7 +64,7 @@ class StoreInventoryProviderTest {
     @Mock
     private ExchangeRates exchangeRates;
     @Mock
-    private TaxonomyCache taxonomyCache;
+    private TaxonomyCatalog taxonomyCatalog;
 
     @InjectMocks
     private StoreInventoryProvider provider;
@@ -234,7 +234,7 @@ class StoreInventoryProviderTest {
         Store store = mock(Store.class);
         when(store.getStoreId()).thenReturn("store-1");
         when(store.hasOwnOrManualSupplierConnections()).thenReturn(true);
-        MatchedInventory matched = new MatchedInventory(new InventoryKey("E1", "M1"), List.of(), taxonomyCache, supplierRegistry);
+        MatchedInventory matched = new MatchedInventory(new InventoryKey("E1", "M1"), List.of(), supplierRegistry);
         when(cache.get("store-1")).thenReturn(Optional.of(new StoreInventory(InventoryIndex.of(List.of(matched)), LocalDateTime.now())));
 
         // when
@@ -264,7 +264,7 @@ class StoreInventoryProviderTest {
                 .thenReturn(List.of(ownItem));
         when(autoDiscovery.run(anyList())).thenAnswer(inv -> {
             List<InventoryItem> items = inv.getArgument(0);
-            return List.of(new MatchedInventory(new InventoryKey("111", "AAA"), items, taxonomyCache, supplierRegistry));
+            return List.of(new MatchedInventory(new InventoryKey("111", "AAA"), items, supplierRegistry));
         });
 
         // when
