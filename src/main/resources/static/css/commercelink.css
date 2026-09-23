@@ -3898,16 +3898,18 @@ a.cl-link-button:hover {
 }
 
 /* --- Catalog: touch targets below 1024 px --- */
-/* A sort button is the name of its column, 19 px of text: below 1024 px it is 44 px tall and wide, the negative margin
-   keeps the header row at its height. The picker trigger grows from 40 to 44 px like the fields around it. */
+/* A sort button of a product table is the name of its column, 19 px of text: below 1024 px it is 44 px tall and wide,
+   the negative margin keeps the header row at its height. Scoped to the product tables: the offers of the inventory
+   turn their sort buttons into 44 px chips of their own below 720 px, which a negative margin would pull together.
+   The picker trigger grows from 40 to 44 px like the fields around it. */
 @media screen and (max-width: 1023px) {
-    .cl-page .cl-table-sort {
+    .cl-page .cl-table.is-products .cl-table-sort {
         min-height: 44px;
         min-width: 44px;
         margin: -12px 0;
     }
 
-    .cl-page .cl-table th.is-numeric .cl-table-sort {
+    .cl-page .cl-table.is-products th.is-numeric .cl-table-sort {
         justify-content: flex-end;
     }
 
