@@ -1,44 +1,46 @@
 package pl.commercelink.taxonomy;
 
-import org.apache.commons.lang3.tuple.Pair;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.pim.api.CategoryMatchedEvent;
 import pl.commercelink.taxonomy.mapping.CategoryMappingCache;
 
-import java.util.ArrayList;
+import java.time.LocalDateTime;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class TaxonomyCategoryEnrichmentTest {
 
-    private TaxonomyCache cache;
-    private TaxonomyCategoryEnrichment enrichment;
+    private static final int PENDING_CAP = 2;
 
     @Mock
-    private TaxonomyRepository taxonomyRepository;
+    private TaxonomyCache catalog;
+
+    @Mock
+    private PendingCategorizationRepository pendingRepository;
 
     @Mock
     private CategoryMappingCache mappingCache;
 
+    private TaxonomyCategoryEnrichment enrichment;
+
     @BeforeEach
     void setUp() {
-        Mockito.when(taxonomyRepository.loadNewest()).thenReturn(Pair.of("N/A", new ArrayList<>()));
-        cache = new TaxonomyCache(taxonomyRepository);
-        cache.onStartUp();
-        enrichment = new TaxonomyCategoryEnrichment(cache,
-                new TaxonomyCategoryMatchProperties(100, 2), mappingCache, new CategoryMatchAttempts());
+        enrichment = new TaxonomyCategoryEnrichment(catalog, pendingRepository,
+                new TaxonomyCategoryMatchProperties(PENDING_CAP, 10), mappingCache);
     }
 
     @Test
@@ -47,17 +49,17 @@ class TaxonomyCategoryEnrichmentTest {
         Taxonomy taxonomy = taxonomy("MFN-1", "CPU", 10);
 
         // when / then
-        assertEquals(taxonomy, enrichment.enrich(taxonomy, cache.findByMfn(taxonomy.mfn())));
+        assertEquals(taxonomy, enrichment.enrich(taxonomy, taxonomy("MFN-1", "GPU", 1)));
     }
 
     @Test
-    void enrichAdoptsCategoryFromCacheKeepingOwnScoreAndWeights() {
+    void enrichAdoptsCategoryFromTheCatalogKeepingOwnScoreAndWeights() {
         // given
-        cache.add(new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", "CPU", 3, null, null, null, "301"));
+        Taxonomy stored = new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", "CPU", 3, null, null, null, "301");
         Taxonomy incoming = new Taxonomy("1234567890123", "MFN-1", "OtherBrand", "OtherName", null, 10, 555, null);
 
         // when
-        Taxonomy result = enrichment.enrich(incoming, cache.findByMfn(incoming.mfn()));
+        Taxonomy result = enrichment.enrich(incoming, stored);
 
         // then
         assertEquals("CPU", result.category());
@@ -68,22 +70,22 @@ class TaxonomyCategoryEnrichmentTest {
     }
 
     @Test
-    void enrichLeavesTaxonomyPendingWhenCacheHasNoCategorizedEntry() {
+    void enrichLeavesTaxonomyPendingWhenTheCatalogHasNoCategorizedEntry() {
         // given
-        cache.add(taxonomy("MFN-1", null, 3));
         Taxonomy incoming = taxonomy("MFN-1", null, 10);
 
         // when / then
-        assertNull(enrichment.enrich(incoming, cache.findByMfn(incoming.mfn())).category());
+        assertNull(enrichment.enrich(incoming, taxonomy("MFN-1", null, 3)).category());
+        assertNull(enrichment.enrich(incoming, null).category());
     }
 
     @Test
     void pendingEligibleForEverySupplier() {
         // given
-        Taxonomy taxonomy = taxonomy("MFN-1", null, 10);
+        when(pendingRepository.count()).thenReturn(0);
 
         // when / then
-        assertTrue(enrichment.isPendingEligible(taxonomy));
+        assertTrue(enrichment.isPendingEligible(taxonomy("MFN-1", null, 10)));
     }
 
     @Test
@@ -97,9 +99,8 @@ class TaxonomyCategoryEnrichmentTest {
 
     @Test
     void pendingNotEligibleAboveCap() {
-        // given (cap = 2)
-        enrichment.addPending(taxonomy("MFN-1", null, 10), "Acme");
-        enrichment.addPending(taxonomy("MFN-2", null, 10), "Acme");
+        // given
+        when(pendingRepository.count()).thenReturn(PENDING_CAP);
 
         // when / then
         assertFalse(enrichment.isPendingEligible(taxonomy("MFN-3", null, 10)));
@@ -107,85 +108,83 @@ class TaxonomyCategoryEnrichmentTest {
 
     @Test
     void addPendingCountsEachMfnOnce() {
+        // given
+        when(pendingRepository.count()).thenReturn(0);
+        when(pendingRepository.add(eq("MFN-1"), eq("Acme"), any(LocalDateTime.class))).thenReturn(true, false);
+
         // when
         enrichment.addPending(taxonomy("MFN-1", null, 10), "Acme");
         enrichment.addPending(taxonomy("MFN-1", null, 5), "Acme");
 
         // then
         assertEquals(1, enrichment.pendingCount());
-        assertEquals(1, cache.size());
     }
 
     @Test
-    void addPendingRecordsSupplierForMfn() {
+    void addPendingIgnoresTaxonomiesWithoutAProductCode() {
         // when
-        enrichment.addPending(taxonomy("MFN-1", null, 10), "Acme");
-        enrichment.addPending(taxonomy("MFN-2", null, 10), null);
+        enrichment.addPending(taxonomy("  ", null, 10), "Acme");
 
         // then
-        assertEquals("Acme", enrichment.supplierOf("MFN-1"));
-        assertNull(enrichment.supplierOf("MFN-2"));
+        verify(pendingRepository, never()).add(anyString(), anyString(), any());
     }
 
     @Test
-    void applyMatchUpdatesCacheAndDecrementsCounter() {
+    void applyMatchSetsTheCategoryAndClearsThePendingRow() {
         // given
-        enrichment.addPending(taxonomy("MFN-1", null, 10), "Acme");
+        when(catalog.updateCategory("MFN-1", "CPU", "301")).thenReturn(true);
 
         // when
         enrichment.applyMatch(new CategoryMatchedEvent("1234567890123", "MFN-1", "CPU", "301", 0.9, "mock"));
 
         // then
-        assertEquals("CPU", cache.findByMfn("MFN-1").category());
-        assertEquals("301", cache.findByMfn("MFN-1").categoryId());
-        assertEquals(0, enrichment.pendingCount());
+        verify(catalog).updateCategory("MFN-1", "CPU", "301");
+        verify(pendingRepository).remove("MFN-1");
     }
 
     @Test
     void applyMatchAcceptsArbitraryCategoryName() {
         // given
-        enrichment.addPending(taxonomy("MFN-1", null, 10), "Acme");
+        when(catalog.updateCategory("MFN-1", "Dowolna Kategoria", "999")).thenReturn(true);
 
         // when
         enrichment.applyMatch(new CategoryMatchedEvent("e", "MFN-1", "Dowolna Kategoria", "999", null, "mock"));
 
         // then
-        assertEquals("Dowolna Kategoria", cache.findByMfn("MFN-1").category());
-        assertEquals("999", cache.findByMfn("MFN-1").categoryId());
+        verify(pendingRepository).remove("MFN-1");
     }
 
     @Test
-    void pendingCountDropsWhenAnotherSupplierDeliversCategorizedEntry() {
-        // given
-        enrichment.addPending(taxonomy("MFN-1", null, 10), "Acme");
-        assertEquals(1, enrichment.pendingCount());
-
-        // when
-        cache.add(taxonomy("MFN-1", "CPU", 5));
-
-        // then
-        assertEquals(0, enrichment.pendingCount());
-    }
-
-    @Test
-    void applyMatchIgnoresBlankCategoryMissingEntryAndNull() {
-        // given
-        enrichment.addPending(taxonomy("MFN-1", null, 10), "Acme");
-
+    void applyMatchIgnoresBlankCategoryAndNullEvent() {
         // when
         enrichment.applyMatch(new CategoryMatchedEvent("e", "MFN-1", "", null, null, "mock"));
-        enrichment.applyMatch(new CategoryMatchedEvent("e", "MFN-GONE", "CPU", "301", null, "mock"));
+        enrichment.applyMatch(new CategoryMatchedEvent("e", null, "CPU", "301", null, "mock"));
         enrichment.applyMatch(null);
 
         // then
-        assertNull(cache.findByMfn("MFN-1").category());
-        assertEquals(1, enrichment.pendingCount());
+        verify(catalog, never()).updateCategory(anyString(), anyString(), anyString());
+        verify(pendingRepository, never()).remove(anyString());
+    }
+
+    @Test
+    void applyMatchLeavesThePendingRowWhenTheConditionalWriteIsRefused() {
+        // given
+        when(catalog.updateCategory("MFN-1", "CPU", "301")).thenReturn(false);
+
+        // when
+        enrichment.applyMatch(new CategoryMatchedEvent("e", "MFN-1", "CPU", "301", null, "mock"));
+
+        // then
+        verify(pendingRepository, never()).remove(anyString());
+        verify(mappingCache, never()).recordSample(any(), any(), any(), any());
     }
 
     @Test
     void applyMatchLearnsMappingSampleFromConfidentAnswer() {
         // given
-        enrichment.addPending(pendingWithRawCategory("MFN-1", "Karty graficzne"), "Acme");
+        pendingRowFor("MFN-1", "Acme");
+        when(catalog.updateCategory("MFN-1", "GPU", "301")).thenReturn(true);
+        when(catalog.findByMfn("MFN-1")).thenReturn(pendingWithRawCategory("MFN-1", "Karty graficzne"));
 
         // when
         enrichment.applyMatch(new CategoryMatchedEvent("e", "MFN-1", "GPU", "301", 0.95, "gemini"));
@@ -197,7 +196,9 @@ class TaxonomyCategoryEnrichmentTest {
     @Test
     void applyMatchLearnsFromPimIndexAnswerWithoutConfidence() {
         // given
-        enrichment.addPending(pendingWithRawCategory("MFN-1", "Karty graficzne"), "Acme");
+        pendingRowFor("MFN-1", "Acme");
+        when(catalog.updateCategory("MFN-1", "GPU", "301")).thenReturn(true);
+        when(catalog.findByMfn("MFN-1")).thenReturn(pendingWithRawCategory("MFN-1", "Karty graficzne"));
 
         // when
         enrichment.applyMatch(new CategoryMatchedEvent("e", "MFN-1", "GPU", "301", null, "pim-index"));
@@ -209,27 +210,52 @@ class TaxonomyCategoryEnrichmentTest {
     @Test
     void applyMatchSkipsLearningBelowConfidenceThreshold() {
         // given
-        enrichment.addPending(pendingWithRawCategory("MFN-1", "Karty graficzne"), "Acme");
+        pendingRowFor("MFN-1", "Acme");
+        when(catalog.updateCategory("MFN-1", "GPU", "301")).thenReturn(true);
 
         // when
         enrichment.applyMatch(new CategoryMatchedEvent("e", "MFN-1", "GPU", "301", 0.85, "gemini"));
 
         // then
         verify(mappingCache, never()).recordSample(any(), any(), any(), any());
-        assertEquals("GPU", cache.findByMfn("MFN-1").category());
+        verify(pendingRepository).remove("MFN-1");
     }
 
     @Test
-    void applyMatchSkipsLearningWithoutSupplierRawCategoryOrCategoryId() {
+    void applyMatchSkipsLearningWithoutSupplier() {
         // given
-        enrichment.addPending(pendingWithRawCategory("MFN-NO-SUPPLIER", "Karty graficzne"), null);
-        enrichment.addPending(taxonomy("MFN-NO-RAW", null, 10), "Acme");
-        enrichment.addPending(pendingWithRawCategory("MFN-NO-CAT-ID", "Karty graficzne"), "Acme");
+        pendingRowFor("MFN-1", null);
+        when(catalog.updateCategory("MFN-1", "GPU", "301")).thenReturn(true);
 
         // when
-        enrichment.applyMatch(new CategoryMatchedEvent("e", "MFN-NO-SUPPLIER", "GPU", "301", 0.95, "gemini"));
-        enrichment.applyMatch(new CategoryMatchedEvent("e", "MFN-NO-RAW", "GPU", "301", 0.95, "gemini"));
-        enrichment.applyMatch(new CategoryMatchedEvent("e", "MFN-NO-CAT-ID", "GPU", null, 0.95, "gemini"));
+        enrichment.applyMatch(new CategoryMatchedEvent("e", "MFN-1", "GPU", "301", 0.95, "gemini"));
+
+        // then
+        verify(mappingCache, never()).recordSample(any(), any(), any(), any());
+    }
+
+    @Test
+    void applyMatchSkipsLearningWithoutRawCategory() {
+        // given
+        pendingRowFor("MFN-1", "Acme");
+        when(catalog.updateCategory("MFN-1", "GPU", "301")).thenReturn(true);
+        when(catalog.findByMfn("MFN-1")).thenReturn(taxonomy("MFN-1", "GPU", 10));
+
+        // when
+        enrichment.applyMatch(new CategoryMatchedEvent("e", "MFN-1", "GPU", "301", 0.95, "gemini"));
+
+        // then
+        verify(mappingCache, never()).recordSample(any(), any(), any(), any());
+    }
+
+    @Test
+    void applyMatchSkipsLearningWithoutCategoryId() {
+        // given
+        pendingRowFor("MFN-1", "Acme");
+        when(catalog.updateCategory("MFN-1", "GPU", null)).thenReturn(true);
+
+        // when
+        enrichment.applyMatch(new CategoryMatchedEvent("e", "MFN-1", "GPU", null, 0.95, "gemini"));
 
         // then
         verify(mappingCache, never()).recordSample(any(), any(), any(), any());
@@ -238,7 +264,9 @@ class TaxonomyCategoryEnrichmentTest {
     @Test
     void applyMatchLearnsOnlyOnceForDuplicateEvent() {
         // given
-        enrichment.addPending(pendingWithRawCategory("MFN-1", "Karty graficzne"), "Acme");
+        pendingRowFor("MFN-1", "Acme");
+        when(catalog.updateCategory("MFN-1", "GPU", "301")).thenReturn(true, false);
+        when(catalog.findByMfn("MFN-1")).thenReturn(pendingWithRawCategory("MFN-1", "Karty graficzne"));
         CategoryMatchedEvent event = new CategoryMatchedEvent("e", "MFN-1", "GPU", "301", 0.95, "gemini");
 
         // when
@@ -247,6 +275,13 @@ class TaxonomyCategoryEnrichmentTest {
 
         // then
         verify(mappingCache).recordSample("Acme", "Karty graficzne", "301", "GPU");
+    }
+
+    private void pendingRowFor(String mfn, String supplier) {
+        PendingCategorization pending = new PendingCategorization();
+        pending.setMfn(mfn);
+        pending.setSupplier(supplier);
+        when(pendingRepository.find(mfn)).thenReturn(pending);
     }
 
     private static Taxonomy taxonomy(String mfn, String category, int score) {

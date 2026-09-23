@@ -1,34 +1,38 @@
 package pl.commercelink.taxonomy;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import pl.commercelink.pim.api.CategoryMatchedEvent;
 import pl.commercelink.taxonomy.mapping.CategoryMappingCache;
 
-import java.util.concurrent.ConcurrentHashMap;
+import java.time.LocalDateTime;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 @Component
+@Slf4j
 public class TaxonomyCategoryEnrichment {
 
-    private final TaxonomyCache taxonomyCache;
+    private static final int UNKNOWN = -1;
+
+    private final TaxonomyCache catalog;
+    private final PendingCategorizationRepository pendingRepository;
     private final TaxonomyCategoryMatchProperties properties;
     private final CategoryMappingCache mappingCache;
-    private final CategoryMatchAttempts attempts;
-    private final ConcurrentHashMap<String, String> supplierByMfn = new ConcurrentHashMap<>();
+    private final AtomicInteger pendingSize = new AtomicInteger(UNKNOWN);
 
-    TaxonomyCategoryEnrichment(TaxonomyCache taxonomyCache, TaxonomyCategoryMatchProperties properties,
-                               CategoryMappingCache mappingCache, CategoryMatchAttempts attempts) {
-        this.taxonomyCache = taxonomyCache;
+    TaxonomyCategoryEnrichment(TaxonomyCache catalog, PendingCategorizationRepository pendingRepository,
+                               TaxonomyCategoryMatchProperties properties, CategoryMappingCache mappingCache) {
+        this.catalog = catalog;
+        this.pendingRepository = pendingRepository;
         this.properties = properties;
         this.mappingCache = mappingCache;
-        this.attempts = attempts;
     }
 
     public Taxonomy enrich(Taxonomy taxonomy, Taxonomy stored) {
-        if (TaxonomyCache.hasCategory(taxonomy) || taxonomy.mfn() == null || taxonomy.mfn().isEmpty()
-                || !TaxonomyCache.hasCategory(stored)) {
+        if (Taxonomy.hasCategory(taxonomy) || isBlank(taxonomy.mfn()) || !Taxonomy.hasCategory(stored)) {
             return taxonomy;
         }
         return new Taxonomy(taxonomy.ean(), taxonomy.mfn(), taxonomy.brand(), taxonomy.name(),
@@ -38,7 +42,7 @@ public class TaxonomyCategoryEnrichment {
     }
 
     public boolean isPendingEligible(Taxonomy taxonomy) {
-        return hasIdentificationData(taxonomy) && taxonomyCache.pendingCount() < properties.pendingCap();
+        return hasIdentificationData(taxonomy) && pendingCount() < properties.pendingCap();
     }
 
     public boolean hasIdentificationData(Taxonomy taxonomy) {
@@ -47,38 +51,47 @@ public class TaxonomyCategoryEnrichment {
     }
 
     public void addPending(Taxonomy taxonomy, String supplier) {
-        if (isNotBlank(supplier) && isNotBlank(taxonomy.mfn())) {
-            supplierByMfn.put(taxonomy.mfn(), supplier);
+        if (isBlank(taxonomy.mfn())) {
+            return;
         }
-        taxonomyCache.add(taxonomy);
-    }
-
-    public String supplierOf(String mfn) {
-        return supplierByMfn.get(mfn);
+        if (pendingRepository.add(taxonomy.mfn(), supplier, LocalDateTime.now())) {
+            adjustPendingSize(1);
+        }
     }
 
     public void applyMatch(CategoryMatchedEvent event) {
-        if (event == null || event.mfn() == null
-                || event.category() == null || event.category().isBlank()) {
+        if (event == null || event.mfn() == null || isBlank(event.category())) {
             return;
         }
-        if (taxonomyCache.updateCategory(event.mfn(), event.category(), event.categoryId())) {
-            attempts.clear(event.mfn());
-            System.out.println("Category match applied: mfn=" + event.mfn()
-                    + " category=" + event.category() + " source=" + event.source());
-            learnMapping(event);
+        PendingCategorization pending = pendingRepository.find(event.mfn());
+        if (!catalog.updateCategory(event.mfn(), event.category(), event.categoryId())) {
+            return;
         }
+        forget(event.mfn());
+        log.info("Category match applied: mfn={} category={} source={}",
+                event.mfn(), event.category(), event.source());
+        learnMapping(event, pending);
     }
 
-    private void learnMapping(CategoryMatchedEvent event) {
-        String supplier = supplierByMfn.remove(event.mfn());
-        if (supplier == null || isBlank(event.categoryId())) {
+    void forget(String mfn) {
+        pendingRepository.remove(mfn);
+        adjustPendingSize(-1);
+    }
+
+    private void adjustPendingSize(int delta) {
+        pendingCount();
+        pendingSize.updateAndGet(size -> Math.max(0, size + delta));
+    }
+
+    private void learnMapping(CategoryMatchedEvent event, PendingCategorization pending) {
+        String supplier = pending == null ? null : pending.getSupplier();
+        if (isBlank(supplier) || isBlank(event.categoryId())) {
             return;
         }
         if (event.confidence() != null && event.confidence() < properties.mapping().minConfidence()) {
             return;
         }
-        Taxonomy taxonomy = taxonomyCache.findByMfn(event.mfn());
+        Taxonomy taxonomy = catalog.findByMfn(event.mfn());
         if (taxonomy == null || isBlank(taxonomy.rawCategory())) {
             return;
         }
@@ -86,6 +99,15 @@ public class TaxonomyCategoryEnrichment {
     }
 
     public int pendingCount() {
-        return taxonomyCache.pendingCount();
+        int known = pendingSize.get();
+        if (known != UNKNOWN) {
+            return known;
+        }
+        pendingSize.compareAndSet(UNKNOWN, pendingRepository.count());
+        return pendingSize.get();
+    }
+
+    void pendingCountIs(int exact) {
+        pendingSize.set(exact);
     }
 }
