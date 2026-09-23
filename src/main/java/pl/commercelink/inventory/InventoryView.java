@@ -3,7 +3,7 @@ package pl.commercelink.inventory;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.products.Product;
 import pl.commercelink.taxonomy.Taxonomy;
-import pl.commercelink.taxonomy.TaxonomyCache;
+import pl.commercelink.taxonomy.TaxonomyCatalog;
 
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -17,15 +17,15 @@ public class InventoryView {
 
     private final InventoryIndex globalIndex;
     private final InventoryIndex ownIndex;
-    private final TaxonomyCache taxonomyCache;
+    private final TaxonomyCatalog taxonomyCatalog;
     private final SupplierRegistry supplierRegistry;
     private final List<InventorySource> sources;
 
     InventoryView(InventoryIndex globalIndex, InventoryIndex ownIndex,
-                  TaxonomyCache taxonomyCache, SupplierRegistry supplierRegistry, InventorySource... sources) {
+                  TaxonomyCatalog taxonomyCatalog, SupplierRegistry supplierRegistry, InventorySource... sources) {
         this.globalIndex = globalIndex;
         this.ownIndex = ownIndex;
-        this.taxonomyCache = taxonomyCache;
+        this.taxonomyCatalog = taxonomyCatalog;
         this.supplierRegistry = supplierRegistry;
         this.sources = List.of(sources);
     }
@@ -45,7 +45,7 @@ public class InventoryView {
     public MatchedInventory findByInventoryKey(InventoryKey lookupKey) {
         MatchedInventory matched = assemble(lookupKey);
         if (matched.getTaxonomy() == Taxonomy.EMPTY) {
-            matched.adoptTaxonomy(taxonomyCache.findBest(matched.getInventoryKey().getProductCodes()));
+            matched.adoptTaxonomy(taxonomyCatalog.findBest(matched.getInventoryKey().getProductCodes()));
         }
         return matched;
     }

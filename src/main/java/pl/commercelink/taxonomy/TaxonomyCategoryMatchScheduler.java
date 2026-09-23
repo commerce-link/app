@@ -17,17 +17,17 @@ import java.util.Map;
 class TaxonomyCategoryMatchScheduler {
 
     private final PendingCategorizationRepository pendingRepository;
-    private final TaxonomyCache cache;
+    private final TaxonomyCatalog catalog;
     private final PimCatalog pimCatalog;
     private final TaxonomyCategoryMatchProperties properties;
     private final TaxonomyCategoryEnrichment enrichment;
     private final CategoryMappingCache mappingCache;
 
-    TaxonomyCategoryMatchScheduler(PendingCategorizationRepository pendingRepository, TaxonomyCache cache,
+    TaxonomyCategoryMatchScheduler(PendingCategorizationRepository pendingRepository, TaxonomyCatalog catalog,
                                    PimCatalog pimCatalog, TaxonomyCategoryMatchProperties properties,
                                    TaxonomyCategoryEnrichment enrichment, CategoryMappingCache mappingCache) {
         this.pendingRepository = pendingRepository;
-        this.cache = cache;
+        this.catalog = catalog;
         this.pimCatalog = pimCatalog;
         this.properties = properties;
         this.enrichment = enrichment;
@@ -42,7 +42,7 @@ class TaxonomyCategoryMatchScheduler {
             return;
         }
 
-        Map<String, Taxonomy> byMfn = cache.findByMfns(pending.stream().map(PendingCategorization::getMfn).toList());
+        Map<String, Taxonomy> byMfn = catalog.findByMfns(pending.stream().map(PendingCategorization::getMfn).toList());
         Collections.shuffle(pending);
 
         int submitted = 0;
@@ -94,7 +94,7 @@ class TaxonomyCategoryMatchScheduler {
             return false;
         }
         boolean resolved = mappingCache.findActive(supplier, taxonomy.rawCategory())
-                .map(mapping -> cache.updateCategory(taxonomy.mfn(), mapping.categoryName(), mapping.categoryId()))
+                .map(mapping -> catalog.updateCategory(taxonomy.mfn(), mapping.categoryName(), mapping.categoryId()))
                 .orElse(false);
         if (resolved) {
             enrichment.forget(taxonomy.mfn());

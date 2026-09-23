@@ -1,5 +1,6 @@
 package pl.commercelink.taxonomy;
 
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.tuple.Pair;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -18,6 +19,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
+@Slf4j
 public class TaxonomyRepository {
 
     @Autowired
@@ -52,16 +54,25 @@ public class TaxonomyRepository {
                             parsed.rawCategory(), parsed.categoryId());
                     taxonomies.add(unified);
                 } catch (Exception e) {
-                    System.err.println("Failed to load taxonomy row: " + e.getMessage());
+                    log.warn("Failed to load taxonomy row: {}", e.getMessage());
                 }
             });
             return Pair.of(fileName, taxonomies);
 
         } catch (Exception e) {
-            System.err.println("Failed to load taxonomies: " + e.getMessage());
+            log.error("Failed to load taxonomies", e);
         }
 
         return  Pair.of("N/A", new ArrayList<>());
+    }
+
+    public String newestFileName() {
+        try {
+            return fileStorage.findNewestFileNameByLastModified(bucketName, "taxonomy/").orElse("N/A");
+        } catch (Exception e) {
+            log.error("Failed to read newest taxonomy file name", e);
+            return "N/A";
+        }
     }
 
     public void save(Collection<Taxonomy> taxonomies) {

@@ -41,7 +41,7 @@ class TaxonomyCategoryMatchSchedulerTest {
     private PendingCategorizationRepository pendingRepository;
 
     @Mock
-    private TaxonomyCache cache;
+    private TaxonomyCatalog catalog;
 
     @Mock
     private PimCatalog pimCatalog;
@@ -68,13 +68,13 @@ class TaxonomyCategoryMatchSchedulerTest {
             return null;
         }).when(pendingRepository).remove(anyString());
 
-        lenient().when(cache.findByMfns(any())).thenAnswer(invocation -> {
+        lenient().when(catalog.findByMfns(any())).thenAnswer(invocation -> {
             Collection<String> wanted = invocation.getArgument(0);
             Map<String, Taxonomy> found = new HashMap<>();
             wanted.stream().filter(catalogRows::containsKey).forEach(mfn -> found.put(mfn, catalogRows.get(mfn)));
             return found;
         });
-        lenient().when(cache.updateCategory(anyString(), anyString(), anyString())).thenAnswer(invocation -> {
+        lenient().when(catalog.updateCategory(anyString(), anyString(), anyString())).thenAnswer(invocation -> {
             String mfn = invocation.getArgument(0);
             Taxonomy stored = catalogRows.get(mfn);
             if (!Taxonomy.hasCategory(stored)) {
@@ -168,7 +168,7 @@ class TaxonomyCategoryMatchSchedulerTest {
 
         // then
         verify(pimCatalog, never()).submitCategoryMatch(any());
-        verify(cache, never()).findByMfns(any());
+        verify(catalog, never()).findByMfns(any());
     }
 
     @Test
@@ -307,8 +307,8 @@ class TaxonomyCategoryMatchSchedulerTest {
     }
 
     private TaxonomyCategoryMatchScheduler scheduler(TaxonomyCategoryMatchProperties properties) {
-        return new TaxonomyCategoryMatchScheduler(pendingRepository, cache, pimCatalog, properties,
-                new TaxonomyCategoryEnrichment(cache, pendingRepository, properties, mappingCache), mappingCache);
+        return new TaxonomyCategoryMatchScheduler(pendingRepository, catalog, pimCatalog, properties,
+                new TaxonomyCategoryEnrichment(catalog, pendingRepository, properties, mappingCache), mappingCache);
     }
 
     private static TaxonomyCategoryMatchProperties properties(int maxSubmissionsPerRun) {

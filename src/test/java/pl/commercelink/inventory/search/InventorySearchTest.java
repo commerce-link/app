@@ -29,7 +29,7 @@ import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoreSupplierConnection;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.taxonomy.Taxonomy;
-import pl.commercelink.taxonomy.TaxonomyCache;
+import pl.commercelink.taxonomy.TaxonomyCatalog;
 import pl.commercelink.warehouse.api.ItemCondition;
 import pl.commercelink.warehouse.api.StockQueryService;
 import pl.commercelink.warehouse.api.Warehouse;
@@ -65,7 +65,7 @@ class InventorySearchTest {
     @Mock
     private PimCatalog pimCatalog;
     @Mock
-    private TaxonomyCache taxonomyCache;
+    private TaxonomyCatalog taxonomyCatalog;
     @Mock
     private Warehouse warehouse;
 
@@ -82,7 +82,7 @@ class InventorySearchTest {
     @BeforeEach
     void setUp() {
         // the label map is real: resolving a connection's label is part of what a search returns
-        search = new InventorySearch(inventory, storesRepository, pimCatalog, taxonomyCache, warehouse,
+        search = new InventorySearch(inventory, storesRepository, pimCatalog, taxonomyCatalog, warehouse,
                 new SupplierLabels(storesRepository), supplierRegistry);
         // shipping is free and instant unless a test says otherwise, so a case about prices stays about prices
         when(supplierRegistry.exists(anyString())).thenReturn(true);
@@ -375,7 +375,7 @@ class InventorySearchTest {
     @Test
     void productKnownFromTaxonomyWithoutOffersIsReportedAsKnown() {
         // given
-        when(taxonomyCache.findByMfn(anyString())).thenReturn(new Taxonomy(EAN, MFN, "Logitech", "MX Keys S", "Keyboards", 1, null, null, null, "1"));
+        when(taxonomyCatalog.findByMfn(anyString())).thenReturn(new Taxonomy(EAN, MFN, "Logitech", "MX Keys S", "Keyboards", 1, null, null, null, "1"));
 
         // when
         InventorySearchResult result = search.search(STORE_ID, MFN);

@@ -18,7 +18,7 @@ import pl.commercelink.products.ProductRecommendationEngine;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
-import pl.commercelink.taxonomy.TaxonomyCache;
+import pl.commercelink.taxonomy.TaxonomyCatalog;
 import pl.commercelink.warehouse.api.StockQueryService;
 import pl.commercelink.warehouse.api.Warehouse;
 import pl.commercelink.warehouse.api.WarehouseItemView;
@@ -53,7 +53,7 @@ class InventoryViewStoreListingsTest {
     @Mock
     private InventoryAutoDiscovery autoDiscovery;
     @Mock
-    private TaxonomyCache taxonomyCache;
+    private TaxonomyCatalog taxonomyCatalog;
     @Mock
     private SupplierRegistry supplierRegistry;
     @Mock
@@ -433,7 +433,7 @@ class InventoryViewStoreListingsTest {
         inventory.withEnabledSuppliersOnly(STORE_ID).findAllByProductCategoryIds(List.of("989", "170"));
 
         // then
-        org.mockito.Mockito.verifyNoInteractions(taxonomyCache);
+        org.mockito.Mockito.verifyNoInteractions(taxonomyCatalog);
     }
 
     @Test
@@ -456,7 +456,7 @@ class InventoryViewStoreListingsTest {
         InventoryIndex mergingIndex = InventoryIndex.of(List.of(groupB));
 
         InventoryView view = new InventoryView(globalIndex, InventoryIndex.of(List.of()),
-                taxonomyCache, supplierRegistry,
+                taxonomyCatalog, supplierRegistry,
                 GroupInventorySource.global(globalIndex, supplier -> true),
                 GroupInventorySource.global(mergingIndex, supplier -> true));
 
