@@ -27,7 +27,7 @@
                         <legend class="cl-fieldset-title" th:text="#{catalog.category.basics.section.category}"></legend>
                         <div class="cl-form-grid">
                             <div class="cl-span-4" th:insert="~{fragments/settings-form :: textField('name', 'catalog.category.name', *{name}, 'text', 'off', true, ${errors['name']}, null)}"></div>
-                            <div class="cl-span-2" th:insert="~{fragments/settings-form :: textField('sequenceNumber', 'catalog.category.sequence', *{sequenceNumber}, 'text', 'off', false, ${errors['sequenceNumber']}, #{catalog.category.sequence.help})}"></div>
+                            <div class="cl-span-2" th:insert="~{fragments/settings-form :: textField('sequenceNumber', 'catalog.category.sequence', *{sequenceNumber}, 'text', 'off', false, ${errors['sequenceNumber']}, ${existing} ? #{catalog.category.sequence.help.edit} : #{catalog.category.sequence.help})}"></div>
                             <div class="cl-span-6">
                                 <div class="cl-field">
                                     <span class="cl-label" id="pimCategoryIds-label" th:text="#{catalog.category.pim}"></span>

@@ -346,4 +346,40 @@ class ProductTemplateTest {
         assertThat(html).contains("<input type=\"hidden\" name=\"marketplaces\" value=\"Morele\">")
                 .doesNotContain("<input type=\"hidden\" name=\"marketplaces\" value=\"allegro\">");
     }
+
+    /**
+     * D-I9 / RF-31: every list of the client section is a group under its own heading and a sentence on what it holds,
+     * like the quick filters; before, the attributes, the custom filters and the metadata were only an "Add" button.
+     */
+    @Test
+    void theThreeClientListsCarryAHeadingAndAHelp() {
+        // when
+        String html = rendered(true);
+
+        // then
+        for (String title : List.of("Attributes", "Custom filters", "Metadata")) {
+            String legend = "<legend class=\"cl-fieldset-title\">" + title + "</legend>";
+            assertThat(html).contains(legend);
+            String after = html.substring(html.indexOf(legend) + legend.length()).stripLeading();
+            assertThat(after).startsWith("<p class=\"cl-help\">");
+        }
+        assertThat(html.indexOf(">Attributes</legend>")).isLessThan(html.indexOf("id=\"customAttribute-0-name\""));
+        assertThat(html.indexOf(">Custom filters</legend>")).isLessThan(html.indexOf("id=\"customAttributeFilter-0-name\""));
+        assertThat(html.indexOf(">Custom filters</legend>")).isGreaterThan(html.indexOf("id=\"customAttribute-0-name\""));
+        assertThat(html).doesNotContain("??");
+    }
+
+    /** D-M30: the suppliers of the maximum price show an example of what goes in, as the mock-up does. */
+    @Test
+    void theSuppliersOfTheMaximumPriceShowAnExample() {
+        // when
+        String html = rendered(true);
+
+        // then
+        int field = html.indexOf("id=\"maxRetailPriceSuppliers\"");
+        String input = html.substring(html.lastIndexOf("<input", field), html.indexOf(">", field));
+        assertThat(input).contains("placeholder=\"e.g. Acme, Elko\"").contains("name=\"maxRetailPriceSuppliers\"")
+                .contains("aria-describedby=\"maxRetailPriceSuppliers-help\"");
+        assertThat(html).contains("<label class=\"cl-label\" for=\"maxRetailPriceSuppliers\">");
+    }
 }

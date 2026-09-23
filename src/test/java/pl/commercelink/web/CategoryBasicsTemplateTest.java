@@ -71,13 +71,17 @@ class CategoryBasicsTemplateTest {
     }
 
     private static String renderedFor(CategoryDefinition gpu) {
+        return renderedFor(gpu, true);
+    }
+
+    private static String renderedFor(CategoryDefinition gpu, boolean existing) {
         CategoryBasicsForm form = CategoryBasicsForm.from(gpu);
         form.setLabels(List.of("RTX 5060"));
         Context context = new Context();
         context.setVariables(Map.of(
                 "form", form,
                 "errors", Map.of(),
-                "existing", true,
+                "existing", existing,
                 "category", gpu,
                 "categoryOptions", List.of(),
                 "categoryAncestors", List.of(),
@@ -141,5 +145,20 @@ class CategoryBasicsTemplateTest {
         assertThat(html).contains("value=\"RTX 5060\"").contains("name=\"labels[0]\"");
         assertThat(occurrences(html, "type=\"radio\"")).isEqualTo(2);
         assertThat(html).contains("value=\"Managed\"").contains("value=\"Dynamic\"").contains("Manual").contains("Automatic");
+    }
+
+    /**
+     * RF-31: an empty position puts a new category at the end, while on a saved one it keeps the position it has;
+     * the help says which of the two the field does.
+     */
+    @Test
+    void thePositionHelpSaysWhatAnEmptyFieldDoesOnThisForm() {
+        // when
+        String edited = renderedFor(new CategoryDefinition().withName("GPU").withGeneratedId(), true);
+        String created = renderedFor(new CategoryDefinition().withName("GPU").withGeneratedId(), false);
+
+        // then
+        assertThat(edited).contains("Empty = the position stays as it is.").doesNotContain("Empty = at the end.");
+        assertThat(created).contains("Empty = at the end.").doesNotContain("Empty = the position stays as it is.");
     }
 }

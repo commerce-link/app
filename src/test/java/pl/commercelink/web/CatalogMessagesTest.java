@@ -100,4 +100,14 @@ class CatalogMessagesTest {
             throw new IllegalStateException(e);
         }
     }
+
+    /** D-M30: the example under the suppliers of the maximum price, as the accepted mock-up words it. */
+    @Test
+    void theSuppliersExampleIsTheMockUpsInBothLanguages() throws Exception {
+        // when / then
+        assertThat(catalogMessages("messages_pl.properties").get("product.page.mrpSuppliers.placeholder"))
+                .isEqualTo("np. Acme, Elko");
+        assertThat(catalogMessages("messages_en.properties").get("product.page.mrpSuppliers.placeholder"))
+                .isEqualTo("e.g. Acme, Elko");
+    }
 }

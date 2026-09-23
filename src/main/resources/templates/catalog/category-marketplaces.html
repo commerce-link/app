@@ -37,7 +37,7 @@
                                th:with="d=${row.definition().get()}">
                                 <span th:text="#{catalog.category.marketplace.row.markup(${#numbers.formatDecimal(d.markup, 1, 2, 'COMMA')})}"></span>
                                 <th:block th:if="${d.minWarehouseQty > 0}"><span> · </span><span th:text="#{catalog.category.marketplace.row.warehouse(${d.minWarehouseQty})}"></span></th:block>
-                                <th:block th:if="${d.minQtyPerDistributor > 0}"><span> · </span><span th:text="#{catalog.category.marketplace.row.distributors(${d.minDistributorsQty}, ${d.minQtyPerDistributor}, ${d.minNumOfDistributors}, ${d.minNumOfLocalDistributors})}"></span></th:block>
+                                <th:block th:if="${d.minQtyPerDistributor > 0}"><span> · </span><span th:text="${d.minDistributorsQty > 0} ? #{catalog.category.marketplace.row.distributors(${d.minDistributorsQty}, ${d.minQtyPerDistributor}, ${d.minNumOfDistributors}, ${d.minNumOfLocalDistributors})} : #{catalog.category.marketplace.row.distributors.noTotal(${d.minQtyPerDistributor}, ${d.minNumOfDistributors}, ${d.minNumOfLocalDistributors})}"></span></th:block>
                                 <span> · </span>
                                 <span th:text="${d.exportSelectedProducts} ? #{catalog.category.marketplace.row.selected(${row.approvedProducts()})} : #{catalog.category.marketplace.row.all}"></span>
                             </p>

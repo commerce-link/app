@@ -116,8 +116,20 @@
                                  th:insert="~{fragments/settings-form :: textField('maxRetailPrice', 'product.page.mrp', *{maxRetailPrice}, 'text', 'off', false, ${errors['maxRetailPrice']}, #{product.page.mrp.help})}"></div>
                             <div class="cl-span-2" data-cl-variant-when="availability=BasedOnSupply"
                                  th:insert="~{fragments/settings-form :: textField('estimatedDeliveryDays', 'product.page.deliveryDays', *{estimatedDeliveryDays}, 'text', 'off', false, ${errors['estimatedDeliveryDays']}, #{product.page.deliveryDays.help})}"></div>
-                            <div class="cl-span-3" data-cl-variant-when="availability=BasedOnSupply"
-                                 th:insert="~{fragments/settings-form :: textField('maxRetailPriceSuppliers', 'product.page.mrpSuppliers', *{maxRetailPriceSuppliers}, 'text', 'off', false, null, #{product.page.mrpSuppliers.help})}"></div>
+                            <!--/* The markup of settings-form :: textField, written out for the example the mock-up shows
+                                   in the empty field; the shared fragment takes no placeholder. */-->
+                            <div class="cl-span-3" data-cl-variant-when="availability=BasedOnSupply">
+                                <div class="cl-field">
+                                    <label class="cl-label" for="maxRetailPriceSuppliers">
+                                        <span th:text="#{product.page.mrpSuppliers}"></span>
+                                        <span class="cl-optional" th:text="#{form.optional}"></span>
+                                    </label>
+                                    <input class="cl-input" id="maxRetailPriceSuppliers" name="maxRetailPriceSuppliers" type="text"
+                                           autocomplete="off" aria-describedby="maxRetailPriceSuppliers-help"
+                                           th:value="*{maxRetailPriceSuppliers}" th:placeholder="#{product.page.mrpSuppliers.placeholder}">
+                                    <p class="cl-help" id="maxRetailPriceSuppliers-help" th:text="#{product.page.mrpSuppliers.help}"></p>
+                                </div>
+                            </div>
                             <div class="cl-span-3">
                                 <div class="cl-field">
                                     <label class="cl-label" for="pricingGroup" th:text="#{product.pricing.group}"></label>
@@ -215,6 +227,11 @@
                                     </div>
                                 </div>
                             </fieldset>
+                            <!--/* Each list of this section is a group of its own, headed and explained like the quick
+                                   filters above (D-I9); the rows inside are fieldsets numbered by the script. */-->
+                            <fieldset class="cl-fieldset">
+                            <legend class="cl-fieldset-title" th:text="#{product.page.attributes.title}"></legend>
+                            <p class="cl-help" th:text="#{product.page.attributes.help}"></p>
                             <div class="cl-repeat" data-cl-repeat="customAttributes" data-cl-repeat-id="customAttribute"
                                  data-cl-repeat-min="0">
                                 <th:block th:each="attribute, stat : *{customAttributes}">
@@ -238,6 +255,10 @@
                                           th:attr="data-template=#{product.page.row.removed('@N@')}"></span>
                                 </div>
                             </div>
+                            </fieldset>
+                            <fieldset class="cl-fieldset">
+                            <legend class="cl-fieldset-title" th:text="#{product.compatibility.filter}"></legend>
+                            <p class="cl-help" th:text="#{product.page.filter.help}"></p>
                             <div class="cl-repeat" data-cl-repeat="customAttributesFilters"
                                  data-cl-repeat-id="customAttributeFilter" data-cl-repeat-min="0">
                                 <th:block th:each="filter, stat : *{customAttributesFilters}">
@@ -257,11 +278,14 @@
                                         <i class="fas fa-plus" aria-hidden="true"></i>
                                         <span th:text="#{product.page.filter.add}"></span>
                                     </button>
-                                    <p class="cl-help" th:text="#{product.page.filter.help}"></p>
                                     <span class="cl-visually-hidden" role="status" data-cl-repeat-status
                                           th:attr="data-template=#{product.page.row.removed('@N@')}"></span>
                                 </div>
                             </div>
+                            </fieldset>
+                            <fieldset class="cl-fieldset">
+                            <legend class="cl-fieldset-title" th:text="#{product.metadata}"></legend>
+                            <p class="cl-help" th:text="#{product.page.metadata.help}"></p>
                             <div class="cl-repeat" data-cl-repeat="metadata" data-cl-repeat-id="metadata" data-cl-repeat-min="0">
                                 <th:block th:each="entry, stat : *{metadata}">
                                     <fieldset class="cl-fieldset" data-cl-repeat-item
@@ -284,6 +308,7 @@
                                           th:attr="data-template=#{product.page.row.removed('@N@')}"></span>
                                 </div>
                             </div>
+                            </fieldset>
                         </div>
                     </details>
                     <div class="cl-card-footer">

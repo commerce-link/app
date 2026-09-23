@@ -182,4 +182,17 @@ class CategoryMarketplacesTemplateTest {
         assertThat(html).contains("href=\"#conditions\"").contains("id=\"conditions\"")
                 .contains("Give a condition: a warehouse quantity or a distributor threshold");
     }
+
+    /** RF-31: a threshold of 0 in total means no total at all; "0 pcs. in total" read as if nothing were in stock. */
+    @Test
+    void aZeroTotalFromDistributorsIsLeftOutOfTheConditions() {
+        // given
+        MarketplaceDefinitionRow allegro = row("Allegro", definition("Allegro", 1.1, 0, 2, 1, 0, 0), 0, true);
+
+        // when
+        String html = renderedList(List.of(allegro), List.of());
+
+        // then
+        assertThat(html).contains("From distributors: 2 at each of at least 1 (0 local)").doesNotContain("in total");
+    }
 }
