@@ -21,7 +21,8 @@ public class ClientPreferredShippingDateService {
         if (!isEditable(order, store)) {
             throw new ClientPreferredShippingDateException(Reason.NOT_EDITABLE);
         }
-        if (requested != null && !order.isWithinPreferredShippingWindow(requested)) {
+        if (requested != null
+                && !order.isWithinPreferredShippingWindow(requested, store.preferredShippingDaysFor(order.getShipmentType()))) {
             throw new ClientPreferredShippingDateException(Reason.INVALID_DATE);
         }
 

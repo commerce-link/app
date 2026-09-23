@@ -14,11 +14,13 @@ import pl.commercelink.stores.BankAccount;
 import pl.commercelink.stores.Store;
 import pl.commercelink.taxonomy.CategoryLocalizer;
 
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 /**
  * Everything the public order status page shows, resolved once in the controller so the template carries
@@ -60,6 +62,7 @@ public class ClientOrderView {
     private final boolean preferredShippingEditable;
     private final boolean preferredShippingOffered;
     private final LocalDate preferredShippingWindowEnd;
+    private final List<DayOfWeek> preferredShippingDays;
 
     private ClientOrderView(Order order, List<OrderItem> orderItems, Store store, CategoryLocalizer categoryLocalizer,
                             boolean shippingAddressEditable, boolean preferredShippingEditable) {
@@ -108,6 +111,11 @@ public class ClientOrderView {
         this.preferredShippingEditable = preferredShippingEditable;
         this.preferredShippingOffered = store.isClientPreferredShippingDateEnabled();
         this.preferredShippingWindowEnd = order.getPreferredShippingWindowEnd();
+        this.preferredShippingDays = store.preferredShippingDaysFor(order.getShipmentType()).stream().sorted().toList();
+    }
+
+    public String getPreferredShippingDayNumbers() {
+        return preferredShippingDays.stream().map(day -> String.valueOf(day.getValue())).collect(Collectors.joining(","));
     }
 
     public static ClientOrderView from(Order order, List<OrderItem> orderItems, Store store, CategoryLocalizer categoryLocalizer) {

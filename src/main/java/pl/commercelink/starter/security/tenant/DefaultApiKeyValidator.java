@@ -2,6 +2,7 @@ package pl.commercelink.starter.security.tenant;
 
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
+import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 
 @Component
@@ -19,9 +20,12 @@ public class DefaultApiKeyValidator implements ApiKeyValidator {
             return false;
         }
 
-        String last6Chars = StringUtils.substring(apiKey, -6);
-        String storeId = storesRepository.findByApiKey(last6Chars);
+        Store store = storesRepository.findById(storeIdFromPath);
+        if (store == null) {
+            return false;
+        }
 
-        return StringUtils.equals(storeId, storeIdFromPath);
+        String last6Chars = StringUtils.substring(apiKey, -6);
+        return StringUtils.equals(store.getApiKey(), last6Chars);
     }
 }
