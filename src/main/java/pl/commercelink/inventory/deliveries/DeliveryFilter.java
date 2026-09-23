@@ -1,11 +1,15 @@
 package pl.commercelink.inventory.deliveries;
 
+import org.apache.commons.lang3.StringUtils;
+
 import java.time.LocalDate;
 
 public class DeliveryFilter {
     private final String deliveryId;
     private final String externalDeliveryId;
     private final String provider;
+    // Fragment of the counterparty shortcut learned from an invoice sync (Delivery.counterpartyShortcut).
+    private final String counterpartyShortcut;
     private final LocalDate orderedAtStart;
     private final LocalDate orderedAtEnd;
     private final boolean waitingForCollection;
@@ -14,10 +18,11 @@ public class DeliveryFilter {
     private final boolean awaitingApproval;
     private final boolean globalOnly;
 
-    public DeliveryFilter(String deliveryId, String externalDeliveryId, String provider, LocalDate orderedAtStart, LocalDate orderedAtEnd, boolean waitingForCollection, boolean withoutInvoice, boolean withoutSync, boolean awaitingApproval, boolean globalOnly) {
+    public DeliveryFilter(String deliveryId, String externalDeliveryId, String provider, String counterpartyShortcut, LocalDate orderedAtStart, LocalDate orderedAtEnd, boolean waitingForCollection, boolean withoutInvoice, boolean withoutSync, boolean awaitingApproval, boolean globalOnly) {
         this.deliveryId = deliveryId;
         this.externalDeliveryId = externalDeliveryId;
         this.provider = provider;
+        this.counterpartyShortcut = StringUtils.trimToNull(counterpartyShortcut);
         this.orderedAtStart = orderedAtStart;
         this.orderedAtEnd = orderedAtEnd;
         this.waitingForCollection = waitingForCollection;
@@ -37,6 +42,10 @@ public class DeliveryFilter {
 
     public String getProvider() {
         return provider;
+    }
+
+    public String getCounterpartyShortcut() {
+        return counterpartyShortcut;
     }
 
     public LocalDate getOrderedAtStart() {

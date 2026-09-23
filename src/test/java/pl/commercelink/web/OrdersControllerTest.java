@@ -26,7 +26,16 @@ import pl.commercelink.starter.secrets.SecretsManager;
 import org.mockito.Spy;
 import pl.commercelink.orders.BillingDetails;
 import pl.commercelink.orders.FulfilmentStatus;
+import pl.commercelink.inventory.Inventory;
+import pl.commercelink.inventory.InventoryKey;
+import pl.commercelink.inventory.InventoryView;
+import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.orders.Order;
+import pl.commercelink.orders.OrderItemDraft;
+import pl.commercelink.pricelist.AvailabilityAndPrice;
+import pl.commercelink.pricelist.PricelistFinder;
+import pl.commercelink.web.dtos.AddItemsForm;
+import org.springframework.web.server.ResponseStatusException;
 import pl.commercelink.orders.OrderLifecycle;
 import pl.commercelink.orders.OrderLifecycleEventPublisher;
 import pl.commercelink.orders.OrderLifecycleEventType;
@@ -60,9 +69,11 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
@@ -112,6 +123,12 @@ class OrdersControllerTest {
     private StoreCategories storeCategories;
     @Mock
     private SupplierLabels supplierLabels;
+    @Mock
+    private PricelistFinder pricelistFinder;
+    @Mock
+    private Inventory inventory;
+    @Mock
+    private InventoryView inventoryView;
 
     // Real resolver over the test classpath registry (`Stub` is a registered supplier type).
     @Spy
@@ -137,6 +154,61 @@ class OrdersControllerTest {
     @AfterEach
     void tearDown() {
         securityStub.close();
+    }
+
+    @Test
+    @DisplayName("addOrderItems resolves pricelist and inventory entries in the posted sequence and hands them to the manager as one batch")
+    void addOrderItemsResolvesEntriesAndAddsThemAsOneBatch() {
+        // given
+        Order order = orderBase();
+        Store store = new Store();
+        store.setStoreId(STORE_ID);
+        AvailabilityAndPrice laptop = new AvailabilityAndPrice(
+                "pim-1", "EAN-1", "MFN-1", "Brand", "Label", "Laptop",
+                "Laptops", 200L, 10L, 5, 0L, false);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(pricelistFinder.findByPimId(STORE_ID, "cat-1", "pim-1")).thenReturn(Optional.of(laptop));
+        when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(inventoryView);
+        when(inventoryView.findByInventoryKey(any())).thenReturn(MatchedInventory.empty(new InventoryKey("EAN-X", "MFN-X")));
+        AddItemsForm form = new AddItemsForm();
+        form.setItems(List.of(
+                AddItemsForm.Entry.fromPricelist("cat-1", "pim-1", 2),
+                AddItemsForm.Entry.fromInventory("EAN-X", "MFN-X", 1)));
+
+        // when
+        String view = ordersController.addOrderItems(ORDER_ID, form);
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<OrderItemDraft>> drafts = ArgumentCaptor.forClass(List.class);
+        verify(ordersManager).addOrderItems(eq(store), eq(order), drafts.capture());
+        assertThat(drafts.getValue()).extracting(OrderItemDraft::sku).containsExactly("MFN-1", "MFN-X");
+        assertThat(drafts.getValue()).extracting(OrderItemDraft::qty).containsExactly(2, 1);
+    }
+
+    @Test
+    @DisplayName("addOrderItems rejects the whole batch when one pricelist entry is unknown")
+    void addOrderItemsRejectsWholeBatchWhenPricelistEntryUnknown() {
+        // given
+        AvailabilityAndPrice laptop = new AvailabilityAndPrice(
+                "pim-1", "EAN-1", "MFN-1", "Brand", "Label", "Laptop",
+                "Laptops", 200L, 10L, 5, 0L, false);
+        when(storesRepository.findById(STORE_ID)).thenReturn(new Store());
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(orderBase());
+        when(pricelistFinder.findByPimId(STORE_ID, "cat-1", "pim-1")).thenReturn(Optional.of(laptop));
+        when(pricelistFinder.findByPimId(STORE_ID, "cat-1", "pim-missing")).thenReturn(Optional.empty());
+        when(inventory.withEnabledSuppliersOnly(STORE_ID)).thenReturn(inventoryView);
+        AddItemsForm form = new AddItemsForm();
+        form.setItems(List.of(
+                AddItemsForm.Entry.fromPricelist("cat-1", "pim-1", 1),
+                AddItemsForm.Entry.fromPricelist("cat-1", "pim-missing", 1)));
+
+        // when / then
+        assertThatThrownBy(() -> ordersController.addOrderItems(ORDER_ID, form))
+                .isInstanceOf(ResponseStatusException.class);
+        verify(ordersManager, never()).addOrderItems(any(), any(), any());
     }
 
     @Test

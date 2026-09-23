@@ -151,6 +151,7 @@ public class DeliveriesController {
             @RequestParam(required = false) String externalDeliveryId,
             @RequestParam(required = false) String provider,
             @RequestParam(required = false) String providerCustom,
+            @RequestParam(required = false) String counterpartyShortcut,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate orderedAtStart,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate orderedAtEnd,
             @RequestParam(required = false, defaultValue = "false") boolean showArchived,
@@ -160,7 +161,7 @@ public class DeliveriesController {
             @RequestParam(required = false, defaultValue = "1") int page,
             Model model) {
         provider = providerFilter(provider, providerCustom);
-        DeliveryFilter deliveryFilter = new DeliveryFilter(deliveryId, externalDeliveryId, provider,
+        DeliveryFilter deliveryFilter = new DeliveryFilter(deliveryId, externalDeliveryId, provider, counterpartyShortcut,
                 orderedAtStart, orderedAtEnd, !showArchived, showWithoutInvoice, showWithoutSync,
                 showAwaitingApproval, isSuperAdmin());
 
@@ -175,6 +176,7 @@ public class DeliveriesController {
         searchParams.put("deliveryId", deliveryId);
         searchParams.put("externalDeliveryId", externalDeliveryId);
         searchParams.put("provider", provider);
+        searchParams.put("counterpartyShortcut", counterpartyShortcut);
         searchParams.put("orderedAtStart", orderedAtStart);
         searchParams.put("orderedAtEnd", orderedAtEnd);
         searchParams.put("showArchived", showArchived);
