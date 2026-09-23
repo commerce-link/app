@@ -15,9 +15,7 @@ class ReceiptSweepScheduler {
 
     private final ReceiptSweep sweep;
 
-    // Spring @Scheduled expects milliseconds, not ISO-8601 durations.
-    // Property value is in milliseconds; defaults to 60000 ms (1 minute).
-    @Scheduled(fixedDelayString = "${receipts.sweep.fixed-delay:60000}", initialDelayString = "30000")
+    @Scheduled(fixedDelayString = "${receipts.sweep.fixed-delay:PT1M}", initialDelayString = "PT30S")
     void trigger() {
         sweep.sweep();
     }

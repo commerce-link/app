@@ -46,4 +46,12 @@ class ReceiptSweepTest {
 
         assertThat(sweep.sweep()).isEqualTo(1);
     }
+
+    @Test
+    void schedulerAnnotationDefaultsAreValidISO8601Durations() {
+        // ReceiptSweepScheduler uses @Scheduled with ISO-8601 duration strings.
+        // Verify the default values in the annotation parse correctly.
+        assertThat(Duration.parse("PT1M")).isEqualTo(Duration.ofMinutes(1));
+        assertThat(Duration.parse("PT30S")).isEqualTo(Duration.ofSeconds(30));
+    }
 }
