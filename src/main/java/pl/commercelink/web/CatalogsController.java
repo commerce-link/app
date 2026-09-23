@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.inventory.supplier.ErrorMessage;
 import pl.commercelink.products.CategoryDefinition;
@@ -114,13 +115,20 @@ public class CatalogsController {
                                 Model model, Locale locale, RedirectAttributes redirectAttributes,
                                 HttpServletRequest request, HttpServletResponse response) {
         boolean async = SettingsPaths.isAsync(requestedWith);
+        String storeId = CustomSecurityContext.getStoreId();
+        String catalogId = newCatalogId(form);
+        // The same form sent again: the catalog it names is there already, so the second POST opens it.
+        ProductCatalog existing = catalogRepository.findById(storeId, catalogId);
+        if (existing != null) {
+            return saved(CatalogPaths.catalog(catalogId),
+                    messageSource.getMessage("catalog.created", new Object[]{existing.getName()}, locale), async, model,
+                    redirectAttributes, request, response, SETTINGS_FRAGMENT,
+                    () -> renderSettings(null, form, Map.of(), model, locale));
+        }
         Map<String, String> errors = form.validate(detailsService.minIntervalMinutes());
         if (!errors.isEmpty()) {
             return rejected(renderSettings(null, form, errors, model, locale), SETTINGS_FRAGMENT, async, response);
         }
-        String storeId = CustomSecurityContext.getStoreId();
-        // The id is generated here rather than by the service: the page the operator lands on next needs it.
-        String catalogId = UniqueIdentifierGenerator.generate();
         ProductCatalogDetailsService.UpdateResult result =
                 detailsService.save(storeId, catalogId, form.toCatalog(storeId, catalogId));
         if (result.hasErrors()) {
@@ -129,6 +137,23 @@ public class CatalogsController {
         String message = messageSource.getMessage("catalog.created", new Object[]{form.getName().trim()}, locale);
         return saved(CatalogPaths.catalog(catalogId), message, async, model, redirectAttributes, request, response,
                 SETTINGS_FRAGMENT, () -> renderSettings(null, form, Map.of(), model, locale));
+    }
+
+    /**
+     * The id the form was given when it was shown. Only the generator's shape is taken from the request (anything
+     * else never was on the page: 400), and only within the operator's own store -- every record and schedule of a
+     * catalog is keyed by the store and the id together, so the same id in another store is a different catalog. A
+     * form posted without one (a page opened before the id travelled with it) gets a fresh id, as it used to.
+     */
+    private static String newCatalogId(CatalogSettingsForm form) {
+        String posted = form.getNewCatalogId();
+        if (posted == null || posted.isBlank()) {
+            return UniqueIdentifierGenerator.generate();
+        }
+        if (!UniqueIdentifierGenerator.isWellFormed(posted)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
+        }
+        return posted;
     }
 
     @GetMapping("/dashboard/catalogs/{catalogId}/settings")

@@ -6,6 +6,7 @@ import org.apache.commons.lang3.StringUtils;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.scheduling.InvalidScheduleException;
 import pl.commercelink.scheduling.PollingSchedule;
+import pl.commercelink.starter.util.UniqueIdentifierGenerator;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -21,11 +22,18 @@ public class CatalogSettingsForm {
     private String pricelistSchedule;
     /** False by default: an unticked checkbox sends nothing, so anything else could never be switched off. */
     private boolean deletionProtection;
+    /**
+     * The id a new catalog will get, given when the form is shown and posted back in a hidden field: the same form
+     * sent twice names the same catalog, which the second POST finds instead of creating another (RF-5). Unused for
+     * an existing catalog, whose id is in the address.
+     */
+    private String newCatalogId;
 
     /** A catalog starts protected, the way ProductCatalog does; the operator unticks the box to be able to delete it. */
     public static CatalogSettingsForm forNewCatalog() {
         CatalogSettingsForm form = new CatalogSettingsForm();
         form.deletionProtection = true;
+        form.newCatalogId = UniqueIdentifierGenerator.generate();
         return form;
     }
 

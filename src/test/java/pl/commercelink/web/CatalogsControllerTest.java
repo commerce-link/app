@@ -381,4 +381,71 @@ class CatalogsControllerTest {
         // when / then
         mvc.perform(get("/dashboard/catalogs/nope")).andExpect(status().isNotFound());
     }
+
+    @Test
+    void theNewCatalogFormCarriesTheIdTheCatalogWillGet() throws Exception {
+        // given
+        when(detailsService.minIntervalMinutes()).thenReturn(5);
+
+        // when
+        var result = mvc.perform(get("/dashboard/catalogs/new")).andExpect(status().isOk()).andReturn();
+
+        // then
+        CatalogSettingsForm form = (CatalogSettingsForm) result.getModelAndView().getModel().get("form");
+        assertThat(form.getNewCatalogId()).matches("[a-z0-9]{10}");
+    }
+
+    /**
+     * RF-5: the id is given when the form is shown, so the form sent twice (Back, a double click without JavaScript)
+     * creates one catalog with one schedule; the second POST finds it and opens it. Runs the real details service
+     * over a repository that remembers what it saved.
+     */
+    @Test
+    void twoPostsOfOneNewCatalogFormCreateOneCatalogAndOneSchedule() throws Exception {
+        // given
+        java.util.Map<String, ProductCatalog> stored = new java.util.HashMap<>();
+        when(catalogRepository.findById(eq(STORE_ID), anyString())).thenAnswer(call -> stored.get(call.<String>getArgument(1)));
+        org.mockito.Mockito.doAnswer(call -> stored.put(call.<ProductCatalog>getArgument(0).getCatalogId(), call.getArgument(0)))
+                .when(catalogRepository).save(any(ProductCatalog.class));
+        pl.commercelink.pricelist.PricelistEventScheduler scheduler = mock(pl.commercelink.pricelist.PricelistEventScheduler.class);
+        ProductCatalogDetailsService realDetails = new ProductCatalogDetailsService(catalogRepository, productRepository, scheduler, 5);
+        MockMvc withRealDetails = MockMvcBuilders.standaloneSetup(new CatalogsController(catalogRepository, messageSource,
+                realDetails, access, productRepository, pimCategoryOptions, marketplaces,
+                new CategoryDefinitions(catalogRepository, productRepository, mock(OptimisticLockingExecutor.class)))).build();
+        when(messageSource.getMessage(eq("catalog.created"), any(), any(Locale.class))).thenReturn("Created");
+        var create = post("/dashboard/catalogs/new").param("name", "Parts").param("newCatalogId", "k3y0000001");
+
+        // when
+        withRealDetails.perform(create).andExpect(redirectedUrl("/dashboard/catalogs/k3y0000001"));
+        withRealDetails.perform(create)
+                .andExpect(redirectedUrl("/dashboard/catalogs/k3y0000001"))
+                .andExpect(flash().attribute("settingsSavedMessage", "Created"));
+
+        // then
+        assertThat(stored).containsOnlyKeys("k3y0000001");
+        verify(catalogRepository).save(any(ProductCatalog.class));
+        verify(scheduler).schedule(eq(STORE_ID), eq("k3y0000001"), any());
+    }
+
+    /** Only the generator's format is taken from the request: an id of another shape was never on the page. */
+    @Test
+    void aNewCatalogIdOfAnotherShapeIsRefused() throws Exception {
+        // when / then
+        mvc.perform(post("/dashboard/catalogs/new").param("name", "Parts").param("newCatalogId", "cat-local-01"))
+                .andExpect(status().isBadRequest());
+        verify(detailsService, never()).save(any(), any(), any());
+    }
+
+    /** The second POST lost the race inside the service: the catalog is the first one's, and it is opened. */
+    @Test
+    void aNewCatalogCreatedMeanwhileByTheSameFormIsOpened() throws Exception {
+        // given
+        when(detailsService.minIntervalMinutes()).thenReturn(5);
+        when(detailsService.save(eq(STORE_ID), eq("k3y0000002"), any()))
+                .thenReturn(new ProductCatalogDetailsService.UpdateResult(List.of(), true));
+
+        // when / then
+        mvc.perform(post("/dashboard/catalogs/new").param("name", "Parts").param("newCatalogId", "k3y0000002"))
+                .andExpect(redirectedUrl("/dashboard/catalogs/k3y0000002"));
+    }
 }

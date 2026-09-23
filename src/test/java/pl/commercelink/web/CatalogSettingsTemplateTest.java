@@ -116,4 +116,31 @@ class CatalogSettingsTemplateTest {
         assertThat(html).contains("data-default-text=\"Default — once a day, at a random hour at night\"");
         assertThat(html).contains("data-units=\"minutes,hours,days\"");
     }
+
+    /** RF-5: a new catalog's id travels with the form, so the same form sent twice names the same catalog. */
+    @Test
+    void theNewCatalogFormPostsTheIdItWasGiven() {
+        // given
+        CatalogSettingsForm form = CatalogSettingsForm.forNewCatalog();
+        form.setNewCatalogId("k3y0000001");
+        Context context = new Context();
+        context.setVariables(Map.of("form", form, "errors", Map.of(), "existing", false,
+                "formAction", "/dashboard/catalogs/new", "backHref", "/dashboard/catalogs", "backLabel", "Catalogs",
+                "pageTitle", "New catalog", "scheduleMinIntervalMinutes", 5));
+        context.setVariable("deleteHref", null);
+        context.setVariable("catalogId", null);
+        context.setVariable("redirectTo", null);
+
+        // when
+        String html = EnglishFragmentTemplateEngine.create().process("catalog/catalog-settings", context);
+
+        // then
+        assertThat(html).contains("<input type=\"hidden\" name=\"newCatalogId\" value=\"k3y0000001\"");
+    }
+
+    @Test
+    void anExistingCatalogPostsNoNewId() {
+        // when / then
+        assertThat(rendered()).doesNotContain("newCatalogId");
+    }
 }

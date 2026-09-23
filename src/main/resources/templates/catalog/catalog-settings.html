@@ -32,6 +32,8 @@
                   method="post" novalidate data-cl-async data-cl-schedule-auto
                   th:attr="data-cl-redirect=${redirectTo}, data-error-message=#{form.save.failed}">
                 <div th:replace="~{fragments/settings-form :: errorSummary('catalog-settings-errors', ${errors}, null)}"></div>
+                <!--/* The id the new catalog gets, given with the page: the form sent twice names one catalog (RF-5). */-->
+                <input th:unless="${existing}" type="hidden" name="newCatalogId" th:value="*{newCatalogId}"/>
                 <div class="cl-card">
                     <fieldset class="cl-fieldset">
                         <legend class="cl-fieldset-title" th:text="#{catalog.settings.section.catalog}"></legend>
