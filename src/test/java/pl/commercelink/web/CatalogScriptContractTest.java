@@ -181,4 +181,40 @@ class CatalogScriptContractTest {
         assertThat(repeat).contains("cl:repeat-added");
         assertThat(variant).contains("cl:repeat-added");
     }
+
+    /**
+     * The help-text margin reset was written for the catalog's own disclosure bodies, but the selector also matches
+     * `.cl-steps-note` (E-mail template) and `.cl-param-hint` (Reporting, courier account), stripping their margins
+     * on screens outside the catalog. Narrowed with `:not()` so those two classes keep their own rules (D-M1).
+     */
+    @Test
+    void disclosureBodyHelpTextRuleDoesNotReachStepsNoteOrParamHint() throws Exception {
+        // given
+        String css = read("src/main/resources/static/css/commercelink.css");
+
+        // then
+        assertThat(css)
+                .as("the disclosure-body help rule is narrowed away from the steps-note and param-hint classes")
+                .contains(".cl-page .cl-disclosure-body p.cl-help:not(.cl-steps-note):not(.cl-param-hint) {")
+                .doesNotContain(".cl-page .cl-disclosure-body p.cl-help {");
+    }
+
+    /**
+     * The filters-card padding on `.cl-card > .cl-repeat` was meant for the catalog's category filters form, but the
+     * bare selector also reaches the shipping/parcel template's repeat list, indenting its parcels by 20 px and
+     * shifting "Usuń paczkę". Scoped to `#category-filters-form` so only the catalog filters page is affected (D-M1).
+     */
+    @Test
+    void cardRepeatPaddingRuleIsScopedToTheCatalogFiltersForm() throws Exception {
+        // given
+        String css = read("src/main/resources/static/css/commercelink.css");
+
+        // then
+        assertThat(css)
+                .as("the filters-card repeat padding rule is scoped to the catalog filters form")
+                .contains("#category-filters-form .cl-card > .cl-repeat {")
+                .contains("#category-filters-form .cl-card > .cl-repeat > .cl-fieldset {")
+                .doesNotContain(".cl-page .cl-card > .cl-repeat {")
+                .doesNotContain(".cl-page .cl-card > .cl-repeat > .cl-fieldset {");
+    }
 }

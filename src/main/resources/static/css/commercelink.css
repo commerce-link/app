@@ -1742,7 +1742,7 @@ a.cl-link-button:hover {
 /* A note that belongs to the whole group rather than one field (the default account, an edit that reaches open offers). */
 .cl-page .cl-fieldset > .cl-help,
 .cl-page .cl-form-grid > .cl-help,
-.cl-page .cl-disclosure-body p.cl-help {
+.cl-page .cl-disclosure-body p.cl-help:not(.cl-steps-note):not(.cl-param-hint) {
     margin: 0;
     font-size: 13px;
     line-height: 1.4;
@@ -3735,12 +3735,13 @@ a.cl-link-button:hover {
     height: 36px;
 }
 
-/* filters card: repeat groups sit under the card head like fieldsets */
-.cl-page .cl-card > .cl-repeat {
+/* filters card: repeat groups sit under the card head like fieldsets (scoped to the catalog filters form so it does
+   not indent the shipping/parcel template's own repeat list, D-M1) */
+#category-filters-form .cl-card > .cl-repeat {
     padding: 0 20px;
 }
 
-.cl-page .cl-card > .cl-repeat > .cl-fieldset {
+#category-filters-form .cl-card > .cl-repeat > .cl-fieldset {
     padding-left: 0;
     padding-right: 0;
 }
