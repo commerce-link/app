@@ -46,6 +46,11 @@ awslocal sqs create-queue --queue-name order-receipt-dlq.fifo \
 awslocal sqs create-queue --queue-name order-receipt-queue.fifo \
   --attributes '{"FifoQueue":"true","ContentBasedDeduplication":"false","VisibilityTimeout":"600","RedrivePolicy":"{\"deadLetterTargetArn\":\"arn:aws:sqs:eu-central-1:000000000000:order-receipt-dlq.fifo\",\"maxReceiveCount\":\"3\"}"}'
 
+## E-receipts sweep queue: EventBridge scheduler on prod sends one message per minute
+awslocal sqs create-queue --queue-name receipt-sweep-queue-dlq
+awslocal sqs create-queue --queue-name receipt-sweep-queue \
+  --attributes '{"VisibilityTimeout":"120","RedrivePolicy":"{\"deadLetterTargetArn\":\"arn:aws:sqs:eu-central-1:000000000000:receipt-sweep-queue-dlq\",\"maxReceiveCount\":\"1\"}"}'
+
 ## SQS Queues - PIM-specific queues (manual SqsMessageListenerContainer, no auto-create)
 awslocal sqs create-queue --queue-name pim-entry-added-queue
 awslocal sqs create-queue --queue-name pim-entry-deleted-queue
