@@ -1478,4 +1478,46 @@ class CatalogProductsControllerTest {
                 .andExpect(view().name("catalog/product"))
                 .andExpect(model().attribute("errors", hasEntry("product-form", "product.conflict")));
     }
+
+    /**
+     * RF-6: a parallel POST of the same review saved this row first -- the conditional put of the row's id fails --
+     * so the row is skipped like a product the category already has, not answered with a 500.
+     */
+    @Test
+    void saveSkipsARowAParallelSaveOfTheSameReviewStoredFirst() throws Exception {
+        // given
+        gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
+        doThrow(new ConditionalCheckFailedException("exists")).when(productRepository).save(any(Product.class));
+
+        // when / then
+        mvc.perform(post(categoryPath() + "/products/add/save")
+                        .param("reviewId", "0b7a52d4-8a51-4a53-9f4d-2f7d2c0b8c11")
+                        .param("products[0].name", "X").param("products[0].ean", "5901234567890")
+                        .param("products[0].manufacturerCode", "m").param("products[0].pricingGroup", "Default"))
+                .andExpect(redirectedUrl(categoryPath()))
+                .andExpect(flash().attribute("catalogWarning", "catalog.products.added.none"));
+    }
+
+    @Test
+    void saveGivesTheRowsOfOneReviewTheIdsTheReviewDetermines() throws Exception {
+        // given
+        gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
+        ProductsBulkAddForm review = new ProductsBulkAddForm();
+        review.setReviewId("0b7a52d4-8a51-4a53-9f4d-2f7d2c0b8c11");
+        ProductsBulkAddForm.Row row = new ProductsBulkAddForm.Row();
+        row.setEan("5901234567890");
+        row.setManufacturerCode("m");
+        review.getProducts().add(row);
+
+        // when
+        mvc.perform(post(categoryPath() + "/products/add/save")
+                .param("reviewId", "0b7a52d4-8a51-4a53-9f4d-2f7d2c0b8c11")
+                .param("products[0].name", "X").param("products[0].ean", "5901234567890")
+                .param("products[0].manufacturerCode", "m").param("products[0].pricingGroup", "Default"));
+
+        // then
+        ArgumentCaptor<Product> saved = ArgumentCaptor.forClass(Product.class);
+        verify(productRepository).save(saved.capture());
+        assertThat(saved.getValue().getProductId()).isEqualTo(review.toProduct(0, gpu.getCategoryId()).getProductId());
+    }
 }

@@ -146,4 +146,65 @@ class ProductsBulkAddFormTest {
         assertThat(row("5901234567892", null).toProduct("cat").getAvailabilityType())
                 .isEqualTo(ProductAvailabilityType.BasedOnSupply);
     }
+
+    /** RF-6: the review is given an id of its own when it is shown, posted back with the rows. */
+    @Test
+    void everyReviewIsGivenAnIdOfItsOwn() {
+        // when
+        ProductsBulkAddForm first = ProductsBulkAddForm.of(List.of(product("A", "RTX 5070", "Default")));
+        ProductsBulkAddForm second = ProductsBulkAddForm.of(List.of(product("A", "RTX 5070", "Default")));
+
+        // then
+        assertThat(first.getReviewId()).isNotBlank().isNotEqualTo(second.getReviewId());
+        assertThat(java.util.UUID.fromString(first.getReviewId()).toString()).isEqualTo(first.getReviewId());
+    }
+
+    /**
+     * RF-6: the same review posted twice saves every row under the same id both times, so the second write of a row
+     * is a conditional put that finds the first one; another review, row or identifier gives another id.
+     */
+    @Test
+    void theSameRowOfTheSameReviewIsSavedUnderTheSameId() {
+        // given
+        ProductsBulkAddForm review = ProductsBulkAddForm.of(List.of(product("A", "RTX 5070", "Default"),
+                withIdentifiers("5901234567890", "M-2")));
+        ProductsBulkAddForm sentAgain = new ProductsBulkAddForm();
+        sentAgain.setReviewId(review.getReviewId());
+        sentAgain.setProducts(review.getProducts());
+        ProductsBulkAddForm another = ProductsBulkAddForm.of(review.getProducts().stream().map(row -> row.toProduct("cat")).toList());
+
+        // when
+        String first = review.toProduct(0, "cat").getProductId();
+
+        // then
+        assertThat(sentAgain.toProduct(0, "cat").getProductId()).isEqualTo(first);
+        assertThat(review.toProduct(1, "cat").getProductId()).isNotEqualTo(first);
+        assertThat(another.toProduct(0, "cat").getProductId()).isNotEqualTo(first);
+        assertThat(review.toProduct(0, "other-cat").getProductId()).isNotEqualTo(first);
+    }
+
+    /** A row whose EAN was corrected before the review was sent again is another product, not the one saved first. */
+    @Test
+    void aRowWithOtherIdentifiersIsSavedUnderAnotherId() {
+        // given
+        ProductsBulkAddForm review = ProductsBulkAddForm.of(List.of(withIdentifiers("5901234567890", "M-1")));
+        String first = review.toProduct(0, "cat").getProductId();
+
+        // when
+        review.getProducts().get(0).setEan("5901234567906");
+
+        // then
+        assertThat(review.toProduct(0, "cat").getProductId()).isNotEqualTo(first);
+    }
+
+    /** A review posted without an id of the generator's shape (an old page, a forged value) saves as before: fresh ids. */
+    @Test
+    void aReviewWithoutAWellFormedIdGivesEveryRowAFreshId() {
+        // given
+        ProductsBulkAddForm review = ProductsBulkAddForm.of(List.of(product("A", "RTX 5070", "Default")));
+        review.setReviewId("not-a-uuid");
+
+        // when / then
+        assertThat(review.toProduct(0, "cat").getProductId()).isNotEqualTo(review.toProduct(0, "cat").getProductId());
+    }
 }

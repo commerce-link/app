@@ -305,10 +305,10 @@ public class CatalogProductsController {
                 .toList());
         InventoryView enabled = inventory.withEnabledSuppliersOnly(storeId());
         int added = 0;
-        for (ProductsBulkAddForm.Row row : form.getProducts()) {
+        for (int index = 0; index < form.getProducts().size(); index++) {
             // The category and the id are the application's to give, and so is the PIM entry: a pim id taken from the
             // form would bind the product to an arbitrary entry of the catalog.
-            Product product = row.toProduct(category.getCategoryId());
+            Product product = form.toProduct(index, category.getCategoryId());
             InventoryKey key = InventoryKey.fromProduct(product);
             if (alreadyInCategory.stream().anyMatch(key::matches)) {
                 continue;
@@ -317,7 +317,13 @@ public class CatalogProductsController {
                 product.setPimId(entry.pimId());
                 product.setBrand(brandMapper.unifyBrand(entry.brand()));
             });
-            productRepository.save(product);
+            try {
+                productRepository.save(product);
+            } catch (ConditionalCheckFailedException e) {
+                // The same review, saved by a parallel request that read the category at the same moment, wrote this
+                // row first under the same id: the category has it, exactly as if the read above had found it.
+                continue;
+            }
             alreadyInCategory.add(key);
             added++;
         }

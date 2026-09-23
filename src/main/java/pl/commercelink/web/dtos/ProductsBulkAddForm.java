@@ -5,10 +5,13 @@ import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
 import pl.commercelink.products.Product;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.UUID;
 import java.util.function.BiFunction;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -74,11 +77,46 @@ public class ProductsBulkAddForm {
     private static final Pattern ROW_FIELD = Pattern.compile("product-(\\d+)-.+");
 
     private List<Row> products = new ArrayList<>();
+    /**
+     * Given when the review is shown and posted back in a hidden field (RF-6). Every row is saved under an id derived
+     * from it, so the same review sent twice -- two tabs, a double click, Back and send -- writes each row under the
+     * same id both times, and the second write, a conditional put (a new product carries no version), finds the first.
+     */
+    private String reviewId;
 
     public static ProductsBulkAddForm of(List<Product> products) {
         ProductsBulkAddForm form = new ProductsBulkAddForm();
         form.setProducts(products.stream().map(Row::new).collect(Collectors.toCollection(ArrayList::new)));
+        form.setReviewId(UUID.randomUUID().toString());
         return form;
+    }
+
+    /**
+     * The product row {@code index} creates, under the id this review gives it: derived from the review, the category,
+     * the row and the identifiers the row is saved with, so a row corrected before the review was sent again is
+     * another product. A review without an id of the generator's shape (a page opened before the id travelled with
+     * it, a forged value) saves under fresh ids as it always did; any id only ever creates -- the save never
+     * overwrites an existing product -- so a chosen one can at most make its own row look saved already.
+     */
+    public Product toProduct(int index, String categoryId) {
+        Product product = products.get(index).toProduct(categoryId);
+        if (hasWellFormedReviewId()) {
+            String seed = String.join("\n", categoryId, reviewId, String.valueOf(index),
+                    Objects.toString(product.getEan(), ""), Objects.toString(product.getManufacturerCode(), ""));
+            product.setProductId(UUID.nameUUIDFromBytes(seed.getBytes(StandardCharsets.UTF_8)).toString());
+        }
+        return product;
+    }
+
+    private boolean hasWellFormedReviewId() {
+        if (reviewId == null) {
+            return false;
+        }
+        try {
+            return UUID.fromString(reviewId).toString().equals(reviewId);
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
     }
 
     /** The id of a field of the row at {@code index}; an error is keyed by it, so the summary links to the field. */

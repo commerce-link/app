@@ -295,4 +295,14 @@ class ProductsAddTemplateTest {
         context.setVariable("category", gpu);
         return context;
     }
+
+    /** RF-6: the review posts back the id it was shown with, so the same review sent twice saves each row once. */
+    @Test
+    void theReviewPostsItsOwnId() {
+        // when
+        String html = renderedReview(Map.of());
+
+        // then
+        assertThat(html).containsPattern("<input type=\"hidden\" name=\"reviewId\" value=\"[0-9a-f-]{36}\"");
+    }
 }
