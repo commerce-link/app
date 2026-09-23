@@ -55,8 +55,9 @@
             });
             // The variant attributes carry the same prefix-<index>- name, so the fields of a group keep following
             // their own choice after a renumbering (two groups sharing a name would follow the first select).
-            ['id', 'for', 'aria-describedby', 'aria-labelledby', 'data-cl-variant-select', 'data-cl-variant-group',
-                'data-cl-variant-when'].forEach(function (attribute) {
+            // aria-controls ties the search of a category picker to its list, whose id carries the row index too.
+            ['id', 'for', 'aria-describedby', 'aria-labelledby', 'aria-controls', 'data-cl-variant-select',
+                'data-cl-variant-group', 'data-cl-variant-when'].forEach(function (attribute) {
                 item.querySelectorAll('[' + attribute + ']').forEach(function (element) {
                     element.setAttribute(attribute, element.getAttribute(attribute)
                         .replace(new RegExp(escaped(idPrefix) + '-\\d+-', 'g'), idPrefix + '-' + index + '-'));

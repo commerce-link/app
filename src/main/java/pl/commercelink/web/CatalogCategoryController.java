@@ -507,7 +507,7 @@ public class CatalogCategoryController {
         model.addAttribute("categoryOptions", options);
         model.addAttribute("categoryAncestors",
                 pimCategoryOptions.ancestorsOf(options.stream().map(PimCategoryOptions.CategoryOption::id).toList()));
-        model.addAttribute("selectedCategoryOptions", pimCategoryOptions.optionsOf(form.getPimCategoryIds()));
+        model.addAttribute("selectedCategoryOptions", pimCategoryOptions.selectedOf(form.getPimCategoryIds()));
         model.addAttribute("types", Arrays.stream(CategoryDefinitionType.values())
                 .map(type -> Map.of("value", type.name(), "labelKey", CategoryTypeLabels.labelKey(type),
                         "descKey", CategoryTypeLabels.descriptionKey(type)))

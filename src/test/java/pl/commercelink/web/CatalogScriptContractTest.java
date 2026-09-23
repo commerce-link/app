@@ -225,4 +225,20 @@ class CatalogScriptContractTest {
                 .doesNotContain(".cl-page .cl-card > .cl-repeat {")
                 .doesNotContain(".cl-page .cl-card > .cl-repeat > .cl-fieldset {");
     }
+
+    /** min(34rem, 90vw) was wider than the field column on a phone: the open menu scrolled the page sideways (D-I3). */
+    @Test
+    void theOpenPickerMenuFitsThePhoneScreen() throws Exception {
+        // given
+        String css = read("src/main/resources/static/css/commercelink.css");
+
+        // then
+        assertThat(css).contains("""
+                @media screen and (max-width: 719px) {
+                    .cl-page .cl-picker-menu {
+                        min-width: 100%;
+                        max-width: calc(100vw - 32px);
+                    }
+                }""");
+    }
 }

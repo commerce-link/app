@@ -108,7 +108,7 @@ class CatalogCategoryControllerTest {
         lenient().when(storesRepository.findById(STORE_ID)).thenReturn(store);
         lenient().when(store.getEnabledCategories()).thenReturn(List.of());
         lenient().when(pimCategoryOptions.leafOptionsUnder(any(), any())).thenReturn(List.of());
-        lenient().when(pimCategoryOptions.optionsOf(any())).thenReturn(List.of());
+        lenient().when(pimCategoryOptions.selectedOf(any())).thenReturn(List.of());
         lenient().when(pimCategoryOptions.ancestorsOf(any())).thenReturn(List.of());
         lenient().when(productRepository.findAll(any(String.class))).thenReturn(List.of());
         lenient().when(messageSource.getMessage(any(String.class), any(), any(Locale.class))).thenAnswer(call -> call.getArgument(0));

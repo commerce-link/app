@@ -37,17 +37,21 @@ class CategoryPickerFragmentTest {
     private static final String PICKER = "<div th:replace=\"~{fragments/category-picker :: picker(%s)}\"></div>";
 
     private String render(String fieldName, String selected, boolean disabled, boolean required) {
-        String arguments = "'%s', %s, %s, %s".formatted(
+        String arguments = "'%s', %s, %s, %s, 'category-label'".formatted(
                 fieldName, selected == null ? "null" : "'" + selected + "'", disabled, required);
         return templateEngine().process(PICKER.formatted(arguments), new Context());
     }
 
-    private String renderMulti(List<PimCategoryOptions.CategoryOption> selected, boolean required) {
+    private String renderMulti(List<PimCategoryOptions.SelectedCategory> selected, boolean required) {
         Context context = new Context();
         context.setVariable("selected", selected);
         return templateEngine().process(
                 "<div th:replace=\"~{fragments/category-picker :: multiPicker('pimCategoryIds', ${selected}, "
-                        + required + ")}\"></div>", context);
+                        + required + ", 'pimCategoryIds-label')}\"></div>", context);
+    }
+
+    private static PimCategoryOptions.SelectedCategory chosen(String id, String name) {
+        return new PimCategoryOptions.SelectedCategory(id, name, null);
     }
 
     private TemplateEngine templateEngine() {
@@ -246,7 +250,8 @@ class CategoryPickerFragmentTest {
         context.setVariable("filters", List.of(new ProductFilter("Procesory"), new ProductFilter("Kołdry")));
         String rows = "<table><tr th:each=\"filter, iterStat : ${filters}\"><td>"
                 + "<div th:replace=\"~{fragments/category-picker :: picker("
-                + "'customAttributesFilters[' + ${iterStat.index} + '].category', ${filter.category}, false, false)}\"></div>"
+                + "'customAttributesFilters[' + ${iterStat.index} + '].category', ${filter.category}, false, false, "
+                + "'customAttributeFilter-' + ${iterStat.index} + '-category-label')}\"></div>"
                 + "</td></tr></table>";
 
         // when
@@ -267,7 +272,7 @@ class CategoryPickerFragmentTest {
         context.setVariable("categoryDefinition", new ProductFilter("CPU"));
         context.setVariable("edit", true);
         String form = "<form th:object=\"${categoryDefinition}\">"
-                + "<div th:replace=\"~{fragments/category-picker :: picker('category', *{category}, ${edit}, true)}\"></div>"
+                + "<div th:replace=\"~{fragments/category-picker :: picker('category', *{category}, ${edit}, true, 'category-label')}\"></div>"
                 + "</form>";
 
         // when
@@ -317,8 +322,8 @@ class CategoryPickerFragmentTest {
     void oneHiddenInputIsRenderedPerSavedCategoryId() {
         // when
         String html = renderMulti(List.of(
-                new PimCategoryOptions.CategoryOption("194", "Klawiatury", null),
-                new PimCategoryOptions.CategoryOption("195", "Myszki", null)), false);
+                chosen("194", "Klawiatury"),
+                chosen("195", "Myszki")), false);
 
         // then
         assertThat(html).contains("name=\"pimCategoryIds\" value=\"194\"");
@@ -329,8 +334,8 @@ class CategoryPickerFragmentTest {
     void savedSelectionRendersACountingTriggerAndNamesOnlyInChips() {
         // when
         String html = renderMulti(List.of(
-                new PimCategoryOptions.CategoryOption("194", "Klawiatury", null),
-                new PimCategoryOptions.CategoryOption("195", "Myszki", null)), false);
+                chosen("194", "Klawiatury"),
+                chosen("195", "Myszki")), false);
 
         // then
         assertThat(html).contains("data-picker-trigger");
@@ -399,8 +404,8 @@ class CategoryPickerFragmentTest {
     void selectedCategoriesAreRenderedAsRemovableChips() {
         // when
         String html = renderMulti(List.of(
-                new PimCategoryOptions.CategoryOption("194", "Klawiatury", null),
-                new PimCategoryOptions.CategoryOption("195", "Myszki", null)), false);
+                chosen("194", "Klawiatury"),
+                chosen("195", "Myszki")), false);
 
         // then
         assertThat(html).contains("data-picker-chips");
@@ -408,8 +413,13 @@ class CategoryPickerFragmentTest {
         assertThat(html).contains("data-chip-remove=\"195\"");
     }
 
+    /**
+     * A checkbox inside a listbox option is a control inside a control: axe reports it as nested-interactive and as a
+     * form field without a label, and a screen reader hears it twice. The option says it is chosen through
+     * aria-selected, and the tick is a mark drawn by CSS.
+     */
     @Test
-    void multiPickerScriptRendersOptionCheckboxesAndDrivesChips() {
+    void multiPickerScriptMarksChosenOptionsWithoutACheckboxAndDrivesChips() {
         // given
         Context context = new Context();
         context.setVariable("options", List.of(new PimCategoryOptions.CategoryOption("194", "Klawiatury", null)));
@@ -420,14 +430,15 @@ class CategoryPickerFragmentTest {
                 "<div th:replace=\"~{fragments/category-picker :: multiPickerScript(${options}, ${ancestors})}\"></div>", context);
 
         // then
-        assertThat(html).contains("picker-option-checkbox");
+        assertThat(html).contains("cl-picker-option-mark").contains("'aria-selected'");
+        assertThat(html).doesNotContain("checkbox").doesNotContain("'picker-option-");
         assertThat(html).contains("[data-picker-chips]");
     }
 
     @Test
     void multiPickerRendersNoSelectOptions() {
         // when
-        String html = renderMulti(List.of(new PimCategoryOptions.CategoryOption("194", "Klawiatury", null)), true);
+        String html = renderMulti(List.of(chosen("194", "Klawiatury")), true);
 
         // then
         assertThat(html).doesNotContain("<option");
@@ -474,7 +485,7 @@ class CategoryPickerFragmentTest {
     void pickersAreRenderedInTheNewDesignWithoutBulmaWidgetsOrInlineStyles() {
         // when
         String single = render("category", "Procesory", false, true);
-        String multi = renderMulti(List.of(new PimCategoryOptions.CategoryOption("194", "Klawiatury", null)), false);
+        String multi = renderMulti(List.of(chosen("194", "Klawiatury")), false);
 
         // then
         assertThat(single).contains("class=\"cl-picker\"").contains("cl-picker-trigger").contains("cl-picker-menu");
@@ -553,5 +564,159 @@ class CategoryPickerFragmentTest {
         assertThat(html).contains("names.length > maxLevels");
         assertThat(html).contains("haystack: normalize(option.name + ' ' + path)");
         assertThat(html).contains("cl-chip-tag-path");
+    }
+
+    // --- accessibility of the open picker (combobox with a listbox popup) ---------------------------------------
+
+    private static String listboxOf(String html) {
+        java.util.regex.Matcher listbox = java.util.regex.Pattern
+                .compile("<div[^>]*role=\"listbox\"[^>]*>(.*?)</div>", java.util.regex.Pattern.DOTALL).matcher(html);
+        assertThat(listbox.find()).as("a listbox is rendered").isTrue();
+        return listbox.group();
+    }
+
+    /**
+     * A listbox may own options only: the search field and the count paragraph inside it were reported by axe as
+     * aria-required-children (critical), and the listbox had no name. The search is the combobox that controls it.
+     */
+    @Test
+    void theListboxHoldsNothingButOptionsAndIsNamedByTheFieldLabel() {
+        // when
+        String single = render("category", "Procesory", false, true);
+        String multi = renderMulti(List.of(chosen("194", "Klawiatury")), false);
+
+        // then
+        for (String html : List.of(single, multi)) {
+            String listbox = listboxOf(html);
+            assertThat(listbox).doesNotContain("<input").doesNotContain("<p");
+            assertThat(listbox).containsPattern("<div[^>]*></div>");
+        }
+        assertThat(listboxOf(single)).contains("id=\"category-label-listbox\"").contains("aria-labelledby=\"category-label\"")
+                .doesNotContain("aria-multiselectable");
+        assertThat(listboxOf(multi)).contains("id=\"pimCategoryIds-label-listbox\"")
+                .contains("aria-labelledby=\"pimCategoryIds-label\"").contains("aria-multiselectable=\"true\"");
+        assertThat(single).containsPattern("<input[^>]*role=\"combobox\"[^>]*>")
+                .contains("aria-controls=\"category-label-listbox\"").contains("aria-autocomplete=\"list\"");
+        assertThat(multi).containsPattern("<input[^>]*role=\"combobox\"[^>]*>")
+                .contains("aria-controls=\"pimCategoryIds-label-listbox\"");
+    }
+
+    /** The trigger is named by the field label and by what it shows: "Kategorie PIM, Wybrano: 1", not "Wybrano: 1". */
+    @Test
+    void theTriggerIsNamedByTheFieldLabelAndItsCurrentValue() {
+        // when
+        String single = render("category", "Procesory", false, true);
+        String multi = renderMulti(List.of(chosen("194", "Klawiatury")), false);
+
+        // then
+        assertThat(single).contains("aria-labelledby=\"category-label category-label-value\"")
+                .contains("id=\"category-label-value\"");
+        assertThat(multi).contains("aria-labelledby=\"pimCategoryIds-label pimCategoryIds-label-value\"")
+                .contains("id=\"pimCategoryIds-label-value\"");
+    }
+
+    /** A locked field keeps its name for a screen reader, too. */
+    @Test
+    void aLockedPickerIsStillNamedByTheFieldLabel() {
+        // when
+        String html = render("category", "CPU", true, true);
+
+        // then
+        assertThat(html).containsPattern("<input[^>]*disabled[^>]*aria-labelledby=\"category-label\"[^>]*>");
+    }
+
+    /** In a repeated filter row the ids carry the row index, so repeat-fields.js renumbers them with the row. */
+    @Test
+    void theIdsOfAPickerInARepeatedRowCarryTheRowIndex() {
+        // given
+        Context context = new Context();
+        context.setVariable("filters", List.of(new ProductFilter("Procesory"), new ProductFilter("Kołdry")));
+        String rows = "<div th:each=\"filter, iterStat : ${filters}\">"
+                + "<div th:replace=\"~{fragments/category-picker :: picker("
+                + "'customAttributesFilters[' + ${iterStat.index} + '].category', ${filter.category}, false, false, "
+                + "'customAttributeFilter-' + ${iterStat.index} + '-category-label')}\"></div></div>";
+
+        // when
+        String html = templateEngine().process(rows, context);
+
+        // then
+        assertThat(html).contains("aria-labelledby=\"customAttributeFilter-1-category-label customAttributeFilter-1-category-label-value\"")
+                .contains("id=\"customAttributeFilter-1-category-label-listbox\"")
+                .contains("aria-controls=\"customAttributeFilter-1-category-label-listbox\"");
+    }
+
+    /** Without JavaScript the chips are all there is, so a server-rendered chip carries its path like a scripted one. */
+    @Test
+    void aServerRenderedChipShowsThePathOfItsCategory() {
+        // when
+        String html = renderMulti(List.of(
+                new PimCategoryOptions.SelectedCategory("194", "Klawiatury", "Komputery \u203a Urządzenia wejścia"),
+                chosen("195", "Myszki")), false);
+
+        // then
+        assertThat(html).contains("<span class=\"cl-chip-tag-path\">Komputery \u203a Urządzenia wejścia</span>");
+        assertThat(occurrences(html, "cl-chip-tag-path")).isEqualTo(1);
+    }
+
+    /** The CSS puts "›" after a chip path, so the path itself is joined with the same sign, not with " > ". */
+    @Test
+    void breadcrumbsAreJoinedWithTheSameSeparatorTheChipAppends() {
+        // given
+        Context context = new Context();
+        context.setVariable("options", List.of(new PimCategoryOptions.CategoryOption("1", "Stoły", null)));
+        context.setVariable("ancestors", List.of());
+
+        // when
+        String html = templateEngine().process(
+                "<div th:replace=\"~{fragments/category-picker :: multiPickerScript(${options}, ${ancestors})}\"></div>", context);
+
+        // then
+        assertThat(html).contains("separator = ' \\u203a '").doesNotContain("' > '");
+    }
+
+    /**
+     * The popup closes when the focus leaves the picker (Tab from the search used to leave it open), Escape works from
+     * anywhere inside it, and the active option is announced through aria-activedescendant. The outside-click
+     * listener stays the one shared per script block.
+     */
+    @Test
+    void bothPickerScriptsFollowTheComboboxPattern() {
+        // given
+        Context context = new Context();
+        context.setVariable("categories", List.of(new PimCategoryOptions.CategoryOption("1", "Stoly", null)));
+        context.setVariable("ancestors", List.of());
+
+        // when
+        String single = templateEngine().process(
+                "<div th:replace=\"~{fragments/category-picker :: pickerScript(${categories}, ${ancestors})}\"></div>", context);
+        String multi = templateEngine().process(
+                "<div th:replace=\"~{fragments/category-picker :: multiPickerScript(${categories}, ${ancestors})}\"></div>", context);
+
+        // then
+        for (String html : List.of(single, multi)) {
+            assertThat(html).contains("addEventListener('focusout'").contains("'aria-activedescendant'")
+                    .contains("'aria-selected'").contains("search.setAttribute('aria-expanded'");
+            assertThat(occurrences(html, "document.addEventListener('click'")).isEqualTo(1);
+            assertThat(occurrences(html, "document.addEventListener('focusout'")).isZero();
+        }
+    }
+
+    /** Removing a chip destroys the focused button: the focus goes to the trigger and a status line says what went. */
+    @Test
+    void removingAChipKeepsTheFocusOnTheTriggerAndAnnouncesTheRemoval() {
+        // given
+        Context context = new Context();
+        context.setVariable("options", List.of(new PimCategoryOptions.CategoryOption("1", "Stoly", null)));
+        context.setVariable("ancestors", List.of());
+
+        // when
+        String multi = renderMulti(List.of(chosen("194", "Klawiatury")), false);
+        String script = templateEngine().process(
+                "<div th:replace=\"~{fragments/category-picker :: multiPickerScript(${options}, ${ancestors})}\"></div>", context);
+
+        // then
+        assertThat(multi).containsPattern("<span[^>]*role=\"status\"[^>]*data-picker-status[^>]*>");
+        // the message is inlined as a JavaScript string, with the Polish letters escaped
+        assertThat(script).contains("removed: \"Usuni\\u0119to: {0}\"").contains("trigger.focus()");
     }
 }

@@ -33,7 +33,7 @@
                                     <span class="cl-label" id="pimCategoryIds-label" th:text="#{catalog.category.pim}"></span>
                                     <div th:replace="~{fragments/category-picker :: emptyHint(${categoryOptions})}"></div>
                                     <!--/* The picker posts one hidden input per chosen category, so a save always carries the whole list. */-->
-                                    <div th:replace="~{fragments/category-picker :: multiPicker('pimCategoryIds', ${selectedCategoryOptions}, false)}"></div>
+                                    <div th:replace="~{fragments/category-picker :: multiPicker('pimCategoryIds', ${selectedCategoryOptions}, false, 'pimCategoryIds-label')}"></div>
                                     <p class="cl-help" th:text="#{catalog.category.pim.help}"></p>
                                 </div>
                             </div>

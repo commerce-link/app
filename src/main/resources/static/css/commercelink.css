@@ -3625,6 +3625,14 @@ a.cl-link-button:hover {
     display: none;
 }
 
+/* On a phone min(34rem, 90vw) was wider than the field column and the open menu scrolled the page sideways. */
+@media screen and (max-width: 719px) {
+    .cl-page .cl-picker-menu {
+        min-width: 100%;
+        max-width: calc(100vw - 32px);
+    }
+}
+
 .cl-page .cl-picker-search {
     width: calc(100% - 2 * var(--cl-gap-related));
     margin: 0 var(--cl-gap-related);
@@ -3659,12 +3667,34 @@ a.cl-link-button:hover {
     font-weight: 600;
 }
 
-.cl-page .cl-picker-option .picker-option-checkbox {
-    pointer-events: none;
-    margin-top: 3px;
+/* The tick of a multi picker option is drawn: a checkbox inside an option would be a control inside a control. */
+.cl-page .cl-picker-option-mark {
+    flex: none;
+    display: inline-grid;
+    place-items: center;
+    width: 16px;
+    height: 16px;
+    margin-top: 2px;
+    border: 1px solid var(--cl-ink-3);
+    border-radius: calc(var(--cl-radius) / 2);
+    background: var(--cl-surface);
 }
 
-.cl-page .cl-picker-option .picker-option-text {
+.cl-page .cl-picker-option.is-selected .cl-picker-option-mark {
+    border-color: var(--cl-accent);
+    background: var(--cl-accent);
+}
+
+.cl-page .cl-picker-option.is-selected .cl-picker-option-mark::after {
+    content: "";
+    width: 8px;
+    height: 4px;
+    border: solid var(--cl-surface);
+    border-width: 0 0 2px 2px;
+    transform: translateY(-1px) rotate(-45deg);
+}
+
+.cl-page .cl-picker-option-text {
     flex: 1;
     min-width: 0;
 }
@@ -3684,8 +3714,13 @@ a.cl-link-button:hover {
 }
 
 .cl-page .cl-picker-empty {
+    margin: 0;
     padding: 6px 16px;
     color: var(--cl-ink-3);
+}
+
+.cl-page .cl-picker-empty[hidden] {
+    display: none;
 }
 
 .cl-page .cl-picker-menu .cl-picker-count {
