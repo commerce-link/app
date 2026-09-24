@@ -122,7 +122,9 @@ class StoreReportTemplateTest {
 
         // then
         assertThat(html).doesNotContain("name=\"googleAdsToken\"").doesNotContain("store.storeId").doesNotContain("readonly");
-        assertThat(Pattern.compile("<(input|select|textarea)[^>]*\\sname=\"").matcher(html).results().count()).isEqualTo(1);
+        // Only the toggle is a real form field; the shared confirm-dialog's hidden _csrf field is
+        // infrastructure and excluded from the count.
+        assertThat(Pattern.compile("<(input|select|textarea)[^>]*\\sname=\"(?!_csrf\")").matcher(html).results().count()).isEqualTo(1);
     }
 
     @Test
