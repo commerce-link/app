@@ -1559,6 +1559,20 @@ body.cl-drawer-open .cl-sidebar {
     color: var(--cl-bad);
 }
 
+/* The delete action of a page header: an outlined button like the other header buttons, in the colour of the
+   destructive action. The filled .cl-button.is-danger stays for the confirmation itself. */
+.cl-button.is-danger-outline {
+    border-color: var(--cl-line);
+    background: var(--cl-surface);
+    color: var(--cl-bad);
+}
+
+.cl-button.is-danger-outline:hover {
+    border-color: var(--cl-bad);
+    background: var(--cl-bad-soft);
+    color: var(--cl-bad-ink);
+}
+
 a.cl-link-button {
     text-decoration: none;
 }
@@ -2975,6 +2989,11 @@ a.cl-link-button:hover {
     vertical-align: middle;
 }
 
+/* ... except the pill that opens the line (the type of a category): it starts where the title does. */
+.cl-page .cl-page-lead .cl-status.is-leading {
+    margin-left: 0;
+}
+
 /* Controls above a data table: the filter on the left, the search on the right; stacked on a phone. */
 .cl-page .cl-table-toolbar {
     display: flex;
@@ -4000,6 +4019,37 @@ a.cl-link-button:hover {
 .cl-page .cl-table .cl-table-actions {
     text-align: right;
     white-space: nowrap;
+}
+
+/* A row action keeps its 44 px target but reads on the row's first line: the target was centred on the cell and put
+   the link 12 px below the name next to it. The negative margin gives the target back to the cell's padding. */
+@media screen and (min-width: 720px) {
+    .cl-page .cl-table td.cl-table-actions .cl-link-button {
+        margin-block: -12px;
+    }
+}
+
+/* A toolbar that opens its card (only a visually hidden title before it) gets the card's top padding: its controls sat
+   on the card's top border. A toolbar under a card head keeps the head's spacing. */
+.cl-page .cl-card > .cl-visually-hidden:first-child + .cl-table-toolbar,
+.cl-page .cl-card > .cl-visually-hidden:first-child + [data-cl-table-filter] > .cl-table-toolbar:first-child {
+    padding-top: 14px;
+}
+
+/* The review ("Uzupełnij dane") in table mode: the name, subcategory and group fields start on the line of the EAN field
+   of the product cell -- below its brand line and the EAN label, 60 px from the top of the row -- instead of being
+   centred on the row, which put them between the EAN and the code. Card mode (< 720 px) stacks the cells anyway. */
+@media screen and (min-width: 720px) {
+    .cl-page .cl-table.is-editable.is-compact td {
+        vertical-align: top;
+        padding-top: 60px;
+    }
+}
+
+/* A form page (its form 760 px wide): the header is as wide as the form, so its action stands at the form's edge
+   instead of at the edge of the page body. */
+.cl-page .cl-page-body.is-form > .cl-page-header {
+    max-width: 760px;
 }
 
 /* --- Catalog: Warning help text (labels outside the list) --- */

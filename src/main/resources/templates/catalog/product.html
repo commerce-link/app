@@ -5,7 +5,7 @@
 <body>
 <div layout:fragment="content">
     <section class="cl-page">
-        <div class="cl-page-body">
+        <div class="cl-page-body is-form">
             <!--/* The lead and the delete link are defined inside the replaced element: the header pulls them in as its
                    slots, and the body of a th:replace host is dropped, so they are never rendered twice. */-->
             <div th:replace="~{fragments/settings-header :: subpageWithActions(${backHref}, ${category.name}, ${pageTitle},
@@ -15,11 +15,12 @@
                         class="cl-status is-warn" th:text="${part.text()}"></span><th:block th:unless="${part.warn()}"
                         th:text="${part.text()}"></th:block></th:block></th:block>
                 <th:block th:fragment="deleteAction">
-                    <a th:if="${deleteHref != null}" class="cl-link-button is-danger" th:href="@{${deleteHref}}"
-                       data-cl-confirm th:text="#{product.delete}"
+                    <a th:if="${deleteHref != null}" class="cl-button is-danger-outline" th:href="@{${deleteHref}}"
+                       data-cl-confirm
                        th:attr="data-cl-confirm-title=#{product.delete.title(${pageTitle})},
                                 data-cl-confirm-message=#{product.delete.message},
-                                data-cl-confirm-action=#{product.delete}"></a>
+                                data-cl-confirm-action=#{product.delete}"><i class="fas fa-trash-alt" aria-hidden="true"></i><span
+                            th:text="#{product.delete}"></span></a>
                 </th:block>
             </div>
 
