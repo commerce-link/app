@@ -68,8 +68,6 @@
                         <div class="cl-form-grid">
                             <div class="cl-span-6">
                                 <div th:replace="~{fragments/settings-form :: check('deletionProtection', 'catalog.protect', *{deletionProtection}, 'catalog.protect.desc', null)}"></div>
-                                <!--/* Only worth saying once the catalog exists and the protection is what stands between it and the delete link. */-->
-                                <p th:if="${existing and form.deletionProtection}" class="cl-help" th:text="#{catalog.protect.hint}"></p>
                             </div>
                         </div>
                     </fieldset>
