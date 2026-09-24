@@ -48,7 +48,13 @@ public class ProviderCallLimiter {
         }
         return (T) Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[]{type}, (proxy, method, args) -> {
             if (method.getDeclaringClass() == Object.class || method.isDefault()) {
-                return method.invoke(target, args);
+                try {
+                    return method.invoke(target, args);
+                } catch (InvocationTargetException e) {
+                    throw sneaky(e.getCause());
+                } catch (IllegalAccessException e) {
+                    throw new IllegalStateException(e);
+                }
             }
             return call(providerName, () -> {
                 try {

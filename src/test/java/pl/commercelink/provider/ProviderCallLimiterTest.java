@@ -29,6 +29,10 @@ class ProviderCallLimiterTest {
         default int maxLineNameLength() {
             return 40;
         }
+
+        default int brokenDefault() {
+            throw new IllegalStateException("boom");
+        }
     }
 
     private static ProviderCallLimiter limiter(int maxConcurrent, int perMinute, Duration timeout) {
@@ -145,6 +149,14 @@ class ProviderCallLimiterTest {
 
         release.countDown();
         holder.join(5000);
+    }
+
+    @Test
+    void aDefaultMethodThatThrowsSurfacesTheOriginalException() {
+        DefaultsApi wrapped = limiter(1, 1000, Duration.ofSeconds(5))
+                .wrap(DefaultsApi.class, "fakturownia", (DefaultsApi) () -> "unused");
+
+        assertThatThrownBy(wrapped::brokenDefault).isInstanceOf(IllegalStateException.class).hasMessage("boom");
     }
 
     @Test
