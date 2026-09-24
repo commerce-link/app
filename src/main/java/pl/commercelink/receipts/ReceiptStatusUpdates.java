@@ -46,20 +46,14 @@ public class ReceiptStatusUpdates {
                 return;
             }
             Instant now = clock.instant();
-            // update() re-runs this predicate after a version conflict (someone else wrote the attempt meanwhile);
-            // changed[0] must reflect only the run that actually gets saved, so it is reset on every run and set
-            // only on the run that returns true — never carried over from an earlier, discarded run.
-            boolean[] changed = new boolean[1];
-            attempts.update(storeId, key, a -> {
-                changed[0] = false;
+            boolean changed = attempts.updateWritten(storeId, key, a -> {
                 if (!ReceiptStatusMerger.merge(a, receipt, ReceiptStatusMerger.Source.PUSH, now)) {
                     return false;
                 }
                 a.schedule(now);
-                changed[0] = true;
                 return true;
-            });
-            if (changed[0]) {
+            }).isPresent();
+            if (changed) {
                 publisher.publishNow(storeId, key);
             }
         } catch (RuntimeException e) {

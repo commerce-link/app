@@ -150,15 +150,12 @@ public class ReceiptAttemptService {
         }
         String receiptNumber = number.strip();
         Instant now = clock.instant();
-        ReceiptAttempt[] closed = new ReceiptAttempt[1];
-        attempts.update(storeId, receiptKey, a -> {
-            closed[0] = null;   // reset on every run: a value from an earlier, conflicting run must never survive (R3)
+        ReceiptAttempt attempt = attempts.update(storeId, receiptKey, a -> {
             if (a.getState() == ReceiptAttemptState.CLOSED_MANUALLY) {
                 if (!Objects.equals(a.getReceiptNumber(), receiptNumber)) {
                     throw new ReceiptActionException("receipts.action.close.notHung");
                 }
-                closed[0] = a;   // already closed with this number: an earlier call's order step failed, retry only that
-                return false;
+                return false;   // already closed with this number: an earlier call's order step failed, retry only that
             }
             if (a.getState() != ReceiptAttemptState.ISSUING && a.getState() != ReceiptAttemptState.PENDING) {
                 throw new ReceiptActionException("receipts.action.close.notHung");
@@ -172,10 +169,8 @@ public class ReceiptAttemptService {
             a.setLastError("Closed manually by " + actor);
             a.setLastErrorAt(now);
             a.unschedule();
-            closed[0] = a;
             return true;
         }).orElseThrow(() -> new ReceiptActionException("receipts.action.notFound"));
-        ReceiptAttempt attempt = closed[0];
         Document document = new Document(receiptKey, receiptNumber, blankToNull(link), DocumentType.Receipt,
                 LocalDate.now(clock));
         optimisticLockingExecutor.modifyAndSave(

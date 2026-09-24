@@ -145,55 +145,47 @@ public class ReceiptEffects {
     }
 
     private void notifyMarketplace(String storeId, String receiptKey, Order order) {
-        // The flag is reset at the start of every predicate run, not just set on a win: update() retries this
-        // predicate on a version conflict, and a value written by an earlier, losing try (that also happened to
-        // see the claim as free) must not survive into a retry that correctly finds the claim already taken.
-        // update() only ever saves the LAST run's outcome, so resetting first makes the flag exactly answer
-        // "did the run that actually got saved claim it".
-        boolean[] claimed = new boolean[1];
-        attempts.update(storeId, receiptKey, a -> {
-            claimed[0] = false;
+        boolean claimed = attempts.updateWritten(storeId, receiptKey, a -> {
             if (a.getMarketplaceNotifiedAt() != null) {
                 return false;
             }
             a.setMarketplaceNotifiedAt(clock.instant());
-            claimed[0] = true;
             return true;
-        });
-        if (claimed[0] && order != null) {
+        }).isPresent();
+        if (claimed && order != null) {
             lifecycleEventPublisher.publish(order, OrderLifecycleEventType.InvoiceCreated);
         }
+    }
+
+    /**
+     * The store not sending this e-mail type, or the buyer never giving an address, is not a failure: there is
+     * nothing to retry and nothing for the operator to fix, unlike a real send error. Depends only on the request
+     * snapshot, which the claim never changes, so it answers the same for the claimed attempt as inside the claim.
+     */
+    private static boolean skipsEmail(Store store, ReceiptAttempt attempt) {
+        return ReceiptSnapshotJson.read(attempt.getRequestSnapshot()).buyerEmail() == null
+                || store == null || !store.supportsNotification(EmailNotificationType.ORDER_RECEIPT);
     }
 
     private void sendEmail(String storeId, String receiptKey) {
         // Loaded once, outside the claim predicate: a store lookup is not part of the attempt's own state and must
         // not be repeated on every predicate retry.
         Store store = storesRepository.findById(storeId);
-        // Same reset-per-run rule as notifyMarketplace's claim, for the same reason.
-        ReceiptAttempt[] claimed = new ReceiptAttempt[1];
-        boolean[] skipped = new boolean[1];
-        attempts.update(storeId, receiptKey, a -> {
-            claimed[0] = null;
-            skipped[0] = false;
+        Optional<ReceiptAttempt> claimed = attempts.updateWritten(storeId, receiptKey, a -> {
             if (a.getEmailClaimedAt() != null || a.getDocumentUrl() == null) {
                 return false;
             }
             Instant now = clock.instant();
             a.setEmailClaimedAt(now);
-            String buyerEmail = ReceiptSnapshotJson.read(a.getRequestSnapshot()).buyerEmail();
-            // The store not sending this e-mail type, or the buyer never giving an address, is not a failure: there
-            // is nothing to retry and nothing for the operator to fix, unlike a real send error below.
-            if (buyerEmail == null || store == null || !store.supportsNotification(EmailNotificationType.ORDER_RECEIPT)) {
+            if (skipsEmail(store, a)) {
                 a.setEmailSkippedAt(now);
-                skipped[0] = true;
             }
-            claimed[0] = a;
             return true;
         });
-        ReceiptAttempt attempt = claimed[0];
-        if (attempt == null || skipped[0]) {
+        if (claimed.isEmpty() || skipsEmail(store, claimed.get())) {
             return;
         }
+        ReceiptAttempt attempt = claimed.get();
         String email = ReceiptSnapshotJson.read(attempt.getRequestSnapshot()).buyerEmail();
         Order order = ordersRepository.findById(storeId, attempt.getOrderId());
         boolean sent;

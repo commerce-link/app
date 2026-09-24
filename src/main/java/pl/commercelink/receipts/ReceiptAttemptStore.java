@@ -40,22 +40,43 @@ public interface ReceiptAttemptStore {
      * modified the attempt; an unmodified attempt is not written. Empty when the attempt does not exist.
      */
     default Optional<ReceiptAttempt> update(String storeId, String receiptKey, Predicate<ReceiptAttempt> change) {
+        return Optional.ofNullable(apply(this, storeId, receiptKey, change)).map(AppliedChange::attempt);
+    }
+
+    /**
+     * Like {@link #update}, but present only when this call saved {@code change}'s modification: a predicate that
+     * returned false on the final pass, or a missing attempt, gives empty. Retries on a version conflict re-run
+     * {@code change} from a fresh read, so nothing the predicate did on an earlier, lost pass leaks into the result.
+     */
+    default Optional<ReceiptAttempt> updateWritten(String storeId, String receiptKey, Predicate<ReceiptAttempt> change) {
+        return Optional.ofNullable(apply(this, storeId, receiptKey, change))
+                .filter(AppliedChange::written)
+                .map(AppliedChange::attempt);
+    }
+
+    /** The load-change-save loop behind both updates; null when the attempt does not exist. */
+    private static AppliedChange apply(ReceiptAttemptStore store, String storeId, String receiptKey,
+                                       Predicate<ReceiptAttempt> change) {
         for (int i = 0; i < MAX_UPDATE_ATTEMPTS; i++) {
-            Optional<ReceiptAttempt> loaded = find(storeId, receiptKey);
+            Optional<ReceiptAttempt> loaded = store.find(storeId, receiptKey);
             if (loaded.isEmpty()) {
-                return Optional.empty();
+                return null;
             }
             ReceiptAttempt attempt = loaded.get();
             if (!change.test(attempt)) {
-                return Optional.of(attempt);
+                return new AppliedChange(attempt, false);
             }
             try {
-                save(attempt);
-                return Optional.of(attempt);
+                store.save(attempt);
+                return new AppliedChange(attempt, true);
             } catch (ConditionalCheckFailedException e) {
                 // someone wrote the attempt meanwhile: re-read and apply again
             }
         }
         throw new IllegalStateException("Receipt attempt " + receiptKey + " kept changing; update given up");
     }
+}
+
+/** The attempt an update ended with, and whether that update saved it. */
+record AppliedChange(ReceiptAttempt attempt, boolean written) {
 }

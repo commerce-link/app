@@ -109,14 +109,9 @@ public class ReceiptProcessor {
         return attempts.find(storeId, receiptKey).filter(a -> owner.equals(a.getLeaseOwner())).isPresent();
     }
 
-    /**
-     * Ownership after {@code update} is decided by the persisted {@code leaseOwner}, never by a flag set inside
-     * the predicate: {@code update} retries the predicate on a version conflict, and a flag set on an earlier,
-     * losing try would otherwise survive into the retry that correctly saw the lease taken and wrote nothing.
-     */
     private Optional<ReceiptAttempt> acquire(String storeId, String receiptKey, String owner) {
         Instant now = clock.instant();
-        Optional<ReceiptAttempt> attempt = attempts.update(storeId, receiptKey, a -> {
+        return attempts.updateWritten(storeId, receiptKey, a -> {
             if (a.isLeasedAt(now)) {
                 return false;
             }
@@ -124,7 +119,6 @@ public class ReceiptProcessor {
             a.setLeaseUntil(now.plus(LEASE));
             return true;
         });
-        return attempt.filter(a -> owner.equals(a.getLeaseOwner()));
     }
 
     private void issue(ReceiptAttempt attempt, String owner) {
@@ -134,10 +128,9 @@ public class ReceiptProcessor {
             // stillQualifies() is exactly the slow window (an order lookup) in which the lease can be lost to
             // another owner who has since bumped issueCalls and may be inside provider.issue right now — blocking
             // unconditionally here would kill that attempt and its eventual result would be dropped by the merger
-            // (BLOCKED ignores everything), losing a real sale. Guard and read back the outcome exactly as the
-            // issueCalls guard below does: from the persisted attempt, never from a flag set inside the predicate.
+            // (BLOCKED ignores everything), losing a real sale. Block only while the lease is still ours.
             Instant blockNow = clock.instant();
-            Optional<ReceiptAttempt> blocked = attempts.update(storeId, key, a -> {
+            boolean blockedByUs = attempts.updateWritten(storeId, key, a -> {
                 if (!owner.equals(a.getLeaseOwner()) || !a.isLeasedAt(blockNow)
                         || a.getState() != ReceiptAttemptState.ISSUING || a.getIssueCalls() != 0) {
                     return false;
@@ -145,9 +138,7 @@ public class ReceiptProcessor {
                 a.setState(ReceiptAttemptState.BLOCKED);
                 a.setBlockedReason(ReceiptBlockReason.NOT_ELIGIBLE.name());
                 return true;
-            });
-            boolean blockedByUs = blocked.isPresent() && owner.equals(blocked.get().getLeaseOwner())
-                    && blocked.get().getState() == ReceiptAttemptState.BLOCKED;
+            }).isPresent();
             if (!blockedByUs) {
                 log.warn("Receipt attempt {} lost its lease before it could be blocked as not eligible; leaving it untouched", key);
             }
@@ -170,20 +161,15 @@ public class ReceiptProcessor {
         // Defence in depth: acquire() proved ownership at the start of process(), but a lot can happen between
         // then and here (a slow store/order lookup letting the lease expire under us, a sweep taking it over).
         // Re-check right before the call that actually reaches the provider; never call it without the lease.
-        // Whether the guard held is read back from the persisted attempt update() hands back, never from a flag
-        // set inside the predicate — update() retries that predicate on a version conflict, and a flag set on an
-        // earlier, aborted try would otherwise survive into a retry that correctly found the lease gone.
         Instant guardNow = clock.instant();
-        Optional<ReceiptAttempt> afterGuard = attempts.update(storeId, key, a -> {
+        boolean stillOurs = attempts.updateWritten(storeId, key, a -> {
             if (!owner.equals(a.getLeaseOwner()) || !a.isLeasedAt(guardNow) || a.getState() != ReceiptAttemptState.ISSUING) {
                 return false;
             }
             a.setIssueCalls(a.getIssueCalls() + 1);   // recorded before the call: the count survives a crash
             a.setLeaseUntil(guardNow.plus(LEASE));    // renew: the call itself can take a while, close to the lease
             return true;
-        });
-        boolean stillOurs = afterGuard.isPresent() && owner.equals(afterGuard.get().getLeaseOwner())
-                && afterGuard.get().isLeasedAt(guardNow) && afterGuard.get().getState() == ReceiptAttemptState.ISSUING;
+        }).isPresent();
         if (!stillOurs) {
             log.warn("Receipt attempt {} lost its lease before issue; not calling the provider", key);
             return;
