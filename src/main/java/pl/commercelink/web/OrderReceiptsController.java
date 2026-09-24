@@ -22,9 +22,8 @@ import java.util.Locale;
 
 /**
  * Operator actions on an order's e-receipt attempts. Each refusal names its reason; nothing here calls a provider.
- * "Wystaw ponownie" is confirmed first: the order page has no {@code .cl-page} ancestor for the on-page dialog script
- * to size a submit button against a form (there is no button variant of {@code confirm-dialog.js}, only the
- * {@code a[data-cl-confirm]} link one used across the settings screens), so it links here for a plain confirmation
+ * "Wystaw ponownie" is confirmed first: there is no button variant of {@code confirm-dialog.js}, only the
+ * {@code a[data-cl-confirm]} link one used across the settings screens, so it links here for a plain confirmation
  * page and is enhanced into the same dialog with JavaScript, exactly like every other confirmed link in the app.
  */
 @Controller

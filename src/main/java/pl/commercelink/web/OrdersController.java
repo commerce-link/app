@@ -362,16 +362,16 @@ public class OrdersController extends BaseController {
 
     @GetMapping("/dashboard/orders/{orderId}")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String getOrderDetails(@PathVariable("orderId") String orderId, Model model) {
+    public String getOrderDetails(@PathVariable("orderId") String orderId, Model model, Locale locale) {
         Order existingOrder = ordersRepository.findById(getStoreId(), orderId);
-        return showOrderDetails(existingOrder, model);
+        return showOrderDetails(existingOrder, model, locale);
     }
 
     @GetMapping("/dashboard/store/{storeId}/orders/{orderId}")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public String getOrderDetailsForSuperAdmin(@PathVariable("storeId") String storeId, @PathVariable("orderId") String orderId, Model model) {
+    public String getOrderDetailsForSuperAdmin(@PathVariable("storeId") String storeId, @PathVariable("orderId") String orderId, Model model, Locale locale) {
         Order existingOrder = ordersRepository.findById(storeId, orderId);
-        return showOrderDetails(existingOrder, model);
+        return showOrderDetails(existingOrder, model, locale);
     }
 
     @PostMapping("/dashboard/orders/{orderId}/add-items")
@@ -397,8 +397,8 @@ public class OrdersController extends BaseController {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
     }
 
-    private String showOrderDetails(Order order, Model model) {
-        return showOrderDetails(order, orderItemsRepository.findByOrderId(order.getOrderId()), model);
+    private String showOrderDetails(Order order, Model model, Locale locale) {
+        return showOrderDetails(order, orderItemsRepository.findByOrderId(order.getOrderId()), model, locale);
     }
 
     private String resolveTaxonomyName(String mfn) {
@@ -406,7 +406,7 @@ public class OrdersController extends BaseController {
         return taxonomy != null && taxonomy.name() != null ? taxonomy.name() : "";
     }
 
-    private String showOrderDetails(Order order, List<OrderItem> orderItems, Model model) {
+    private String showOrderDetails(Order order, List<OrderItem> orderItems, Model model, Locale locale) {
         List<ProductCatalog> catalogs = productCatalogRepository.findAll(order.getStoreId());
 
         Store store = storesRepository.findById(order.getStoreId());
@@ -445,7 +445,7 @@ public class OrdersController extends BaseController {
                 .collect(Collectors.toList()));
         model.addAttribute("orderReviewStatuses", OrderReviewStatus.values());
         model.addAttribute("receiptTypes", manualDocumentTypes);
-        model.addAttribute("receiptView", receiptAttemptService.orderView(order, receiptAlerts));
+        model.addAttribute("receiptView", receiptAttemptService.orderView(order, receiptAlerts, locale));
         model.addAttribute("paymentSources", PaymentSource.values());
         model.addAttribute("pendingPayment", order.getPayments().stream()
                 .filter(Payment::isUnsettled)

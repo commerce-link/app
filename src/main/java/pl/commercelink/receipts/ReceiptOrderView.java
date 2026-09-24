@@ -2,6 +2,7 @@ package pl.commercelink.receipts;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 
 /** The e-receipt section of the order screen: every attempt, newest first, and whether a new one may be issued. */
 public record ReceiptOrderView(List<Row> rows, boolean canReissue) {
@@ -16,14 +17,18 @@ public record ReceiptOrderView(List<Row> rows, boolean canReissue) {
     }
 
     public static ReceiptOrderView of(List<ReceiptAttempt> attempts, boolean orderQualifies, ReceiptAlerts alerts,
-                                      Instant now) {
+                                      Instant now, Locale locale) {
+        int maxAttemptNo = attempts.stream().mapToInt(ReceiptAttempt::getAttemptNo).max().orElse(0);
         List<Row> rows = attempts.stream()
                 .sorted((a, b) -> Integer.compare(b.getAttemptNo(), a.getAttemptNo()))
                 .map(a -> {
                     ReceiptAttention attention = ReceiptAttentionEvaluator.evaluate(a, now);
+                    // A dead attempt superseded by a newer one no longer needs the operator's attention: only the
+                    // newest attempt of the order still shows a problem.
+                    boolean superseded = a.getState().isDead() && a.getAttemptNo() < maxAttemptNo;
+                    String problem = attention == null || superseded ? null : alerts.message(a, attention, locale);
                     return new Row(a.getReceiptKey(), a.getState(), "receipts.state." + a.getState().name(),
-                            tone(a.getState()), a.getDocumentUrl(),
-                            attention == null ? null : alerts.message(a, attention), a.getEmailSentAt(),
+                            tone(a.getState()), a.getDocumentUrl(), problem, a.getEmailSentAt(),
                             a.getEmailSkippedAt(),
                             a.isScheduled() && !a.isLeasedAt(now),
                             (a.getState() == ReceiptAttemptState.ISSUING || a.getState() == ReceiptAttemptState.PENDING)

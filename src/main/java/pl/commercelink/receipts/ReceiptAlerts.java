@@ -51,9 +51,15 @@ public class ReceiptAlerts {
         notifications.resolve(attempt.getStoreId(), StoreNotificationType.RECEIPT_ATTENTION, attempt.getReceiptKey());
     }
 
+    /** Bell notifications always read in the fixed operator locale, whatever the caller's own request locale is. */
     public String message(ReceiptAttempt attempt, ReceiptAttention attention) {
+        return message(attempt, attention, OPERATOR_LOCALE);
+    }
+
+    /** Same message, in the given locale: the order page shows it to the operator viewing it in their own language. */
+    public String message(ReceiptAttempt attempt, ReceiptAttention attention, Locale locale) {
         String blocked = attempt.getBlockedReason() == null ? "" : messageSource.getMessage(
-                "receipts.blocked." + attempt.getBlockedReason(), null, attempt.getBlockedReason(), OPERATOR_LOCALE);
+                "receipts.blocked." + attempt.getBlockedReason(), null, attempt.getBlockedReason(), locale);
         Object[] args = {
                 attempt.getOrderId(),
                 attempt.getReceiptKey(),
@@ -62,6 +68,6 @@ public class ReceiptAlerts {
                 blocked + (attempt.getBlockedDetail() == null ? "" : " (" + attempt.getBlockedDetail() + ")"),
                 attempt.getIssueCalls()
         };
-        return messageSource.getMessage(attention.messageKey(), args, attention.name(), OPERATOR_LOCALE);
+        return messageSource.getMessage(attention.messageKey(), args, attention.name(), locale);
     }
 }

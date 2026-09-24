@@ -22,6 +22,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -230,10 +231,13 @@ public class ReceiptAttemptService {
         return attemptsOf(storeId, orderId).stream().anyMatch(a -> a.getState().isLive());
     }
 
-    /** The order screen's e-receipt section: every attempt of the order and whether the operator may issue a new one. */
-    public ReceiptOrderView orderView(Order order, ReceiptAlerts alerts) {
+    /**
+     * The order screen's e-receipt section: every attempt of the order and whether the operator may issue a new one.
+     * {@code locale} is the viewer's own request locale, not the fixed operator locale bell notifications use.
+     */
+    public ReceiptOrderView orderView(Order order, ReceiptAlerts alerts, Locale locale) {
         return ReceiptOrderView.of(attemptsOf(order.getStoreId(), order.getOrderId()),
-                eligibility.orderQualifies(order), alerts, clock.instant());
+                eligibility.orderQualifies(order), alerts, clock.instant(), locale);
     }
 
     void saveThroughLifecycle(Order order) {

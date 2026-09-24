@@ -25,6 +25,9 @@ import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.dtos.ReceiptSettingsForm;
 
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -129,6 +132,28 @@ class StoreReceiptsSettingsControllerTest {
         assertThat(store.getReceiptConfiguration().getEnabledAt()).isNotNull();
         assertThat(store.getReceiptConfiguration().covers(OrderSourceType.WebStore)).isTrue();
         assertThat(view).isEqualTo("redirect:/dashboard/store/receipts");
+    }
+
+    @Test
+    void sourcesFieldsetHasAnIdSoTheErrorSummaryLinkCanFocusIt() throws Exception {
+        // The controller test never renders Thymeleaf (no view resolution), so the "no sources selected" error
+        // summary link (fragments/settings-form :: errorSummary builds an href of '#' + errors.key, i.e. "#sources")
+        // is checked against the template markup itself: it must have a matching id to land on.
+        String html = template("store-receipts");
+
+        assertThat(html).contains("id=\"sources\"");
+    }
+
+    @Test
+    void enabledCheckboxIsDescribedByItsErrorWhenOneIsShown() throws Exception {
+        String html = template("store-receipts");
+
+        // the checkbox's aria-describedby grows to include enabled-error once receiptsErrors['enabled'] is set
+        assertThat(html).contains("'enabled-description enabled-error'");
+    }
+
+    private static String template(String name) throws Exception {
+        return Files.readString(Path.of("src/main/resources/templates/" + name + ".html"), StandardCharsets.UTF_8);
     }
 
     private Store store(String storeId) {

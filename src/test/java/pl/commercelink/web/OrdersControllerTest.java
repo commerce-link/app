@@ -788,7 +788,7 @@ class OrdersControllerTest {
         ExtendedModelMap model = new ExtendedModelMap();
 
         // when
-        ordersController.getOrderDetails(ORDER_ID, model);
+        ordersController.getOrderDetails(ORDER_ID, model, Locale.ENGLISH);
 
         // then
         @SuppressWarnings("unchecked")
@@ -1286,7 +1286,7 @@ class OrdersControllerTest {
         ExtendedModelMap model = new ExtendedModelMap();
 
         // when
-        ordersController.getOrderDetails(ORDER_ID, model);
+        ordersController.getOrderDetails(ORDER_ID, model, Locale.ENGLISH);
 
         // then
         assertThat(model.getAttribute("hasAvailableItemActions")).isEqualTo(true);
