@@ -5,14 +5,14 @@
 <body>
 <div layout:fragment="content">
     <section class="cl-page">
-        <div class="cl-page-body">
+        <div class="cl-page-body is-form">
             <!--/* The delete link is defined inside the replaced element: the header pulls it in as its actions slot,
                    and the body of a th:replace host is dropped, so it is never rendered twice. */-->
             <div th:replace="~{fragments/settings-header :: subpageWithActions(${backHref}, ${backLabel}, ${pageTitle}, ${lead}, ~{::deleteAction})}">
                 <th:block th:fragment="deleteAction">
                     <!--/* A plain link to the confirmation page, not a dialog: the page says what the deletion takes with it. */-->
-                    <a th:if="${deleteHref != null}" class="cl-link-button is-danger" th:href="@{${deleteHref}}"
-                       th:text="#{catalog.category.delete}"></a>
+                    <a th:if="${deleteHref != null}" class="cl-button is-danger-outline" th:href="@{${deleteHref}}"><i
+                            class="fas fa-trash-alt" aria-hidden="true"></i><span th:text="#{catalog.category.delete}"></span></a>
                 </th:block>
             </div>
             <!--/* Under the page title, one placement across the catalog screens: plain, selectable text, because

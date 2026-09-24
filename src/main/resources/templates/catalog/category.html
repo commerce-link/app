@@ -11,7 +11,7 @@
             <div th:replace="~{fragments/settings-header :: subpageWithActions(${backHref}, ${catalog.name}, ${category.name},
                     ~{::categoryLead}, ~{::categoryActions})}">
                 <th:block th:fragment="categoryLead">
-                    <span class="cl-status" th:classappend="${typeTone}" th:text="#{${typeLabelKey}}"></span>
+                    <span class="cl-status is-leading" th:classappend="${typeTone}" th:text="#{${typeLabelKey}}"></span>
                     <span th:text="' ' + (${#strings.isEmpty(pimNames)} ? #{catalog.category.row.pim.none} : #{catalog.category.row.pim(${pimNames})})"></span>
                     <th:block th:if="${!category.groupingOrder.isEmpty()}"><span> · </span><span th:text="#{catalog.category.row.labels(${category.groupingOrder.size()})}"></span></th:block>
                     <!--/* An automatic category is defined by its PIM categories and its recommendation filters. */-->

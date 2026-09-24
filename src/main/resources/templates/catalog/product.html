@@ -5,7 +5,7 @@
 <body>
 <div layout:fragment="content">
     <section class="cl-page">
-        <div class="cl-page-body">
+        <div class="cl-page-body is-form">
             <!--/* The lead and the delete link are defined inside the replaced element: the header pulls them in as its
                    slots, and the body of a th:replace host is dropped, so they are never rendered twice. */-->
             <div th:replace="~{fragments/settings-header :: subpageWithActions(${backHref}, ${category.name}, ${pageTitle},
@@ -15,11 +15,12 @@
                         class="cl-status is-warn" th:text="${part.text()}"></span><th:block th:unless="${part.warn()}"
                         th:text="${part.text()}"></th:block></th:block></th:block>
                 <th:block th:fragment="deleteAction">
-                    <a th:if="${deleteHref != null}" class="cl-link-button is-danger" th:href="@{${deleteHref}}"
-                       data-cl-confirm th:text="#{product.delete}"
+                    <a th:if="${deleteHref != null}" class="cl-button is-danger-outline" th:href="@{${deleteHref}}"
+                       data-cl-confirm
                        th:attr="data-cl-confirm-title=#{product.delete.title(${pageTitle})},
                                 data-cl-confirm-message=#{product.delete.message},
-                                data-cl-confirm-action=#{product.delete}"></a>
+                                data-cl-confirm-action=#{product.delete}"><i class="fas fa-trash-alt" aria-hidden="true"></i><span
+                            th:text="#{product.delete}"></span></a>
                 </th:block>
             </div>
 
@@ -49,8 +50,29 @@
                         <legend class="cl-fieldset-title" th:text="#{product.page.section.product}"></legend>
                         <div class="cl-form-grid">
                             <div class="cl-span-6" th:insert="~{fragments/settings-form :: textField('name', 'product.name', *{name}, 'text', 'off', true, ${errors['name']}, null)}"></div>
-                            <div class="cl-span-2" th:insert="~{fragments/settings-form :: textField('ean', 'product.ean', *{ean}, 'text', 'off', false, ${errors['ean']}, null)}"></div>
-                            <div class="cl-span-2" th:insert="~{fragments/settings-form :: textField('manufacturerCode', 'product.manufacturer.code', *{manufacturerCode}, 'text', 'off', false, null, null)}"></div>
+                            <th:block th:unless="${form.identifiersLocked()}">
+                                <div class="cl-span-2" th:insert="~{fragments/settings-form :: textField('ean', 'product.ean', *{ean}, 'text', 'off', true, ${errors['ean']}, null)}"></div>
+                                <div class="cl-span-2" th:insert="~{fragments/settings-form :: textField('manufacturerCode', 'product.manufacturer.code', *{manufacturerCode}, 'text', 'off', true, ${errors['manufacturerCode']}, null)}"></div>
+                            </th:block>
+                            <!--/* A product the PIM knows keeps its codes: display only, like the brand below, so nothing is
+                                   posted for them and the save keeps the saved values. */-->
+                            <th:block th:if="${form.identifiersLocked()}">
+                                <div class="cl-span-2">
+                                    <div class="cl-field">
+                                        <label class="cl-label" for="eanDisplay" th:text="#{product.ean}"></label>
+                                        <input class="cl-input" type="text" id="eanDisplay" readonly
+                                               aria-describedby="identifiers-locked" th:value="*{ean}">
+                                    </div>
+                                </div>
+                                <div class="cl-span-2">
+                                    <div class="cl-field">
+                                        <label class="cl-label" for="manufacturerCodeDisplay" th:text="#{product.manufacturer.code}"></label>
+                                        <input class="cl-input" type="text" id="manufacturerCodeDisplay" readonly
+                                               aria-describedby="identifiers-locked" th:value="*{manufacturerCode}">
+                                        <p class="cl-help" id="identifiers-locked" th:text="#{product.identifiers.locked}"></p>
+                                    </div>
+                                </div>
+                            </th:block>
                             <div class="cl-span-2">
                                 <div class="cl-field" th:if="${!labels.isEmpty()}">
                                     <label class="cl-label" for="label" th:text="#{product.label}"></label>

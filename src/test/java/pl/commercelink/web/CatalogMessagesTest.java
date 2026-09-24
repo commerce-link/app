@@ -6,6 +6,7 @@ import java.io.Reader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
@@ -167,5 +168,66 @@ class CatalogMessagesTest {
                 .isEqualTo("np. Acme, Elko");
         assertThat(catalogMessages("messages_en.properties").get("product.page.mrpSuppliers.placeholder"))
                 .isEqualTo("e.g. Acme, Elko");
+    }
+
+    /** The client's wording: the operator knows the purchase suggestions, not the name of the view that lists them. */
+    @Test
+    void restockCheckboxSaysWhereTheProductsShowUp() throws Exception {
+        // when
+        String pl = catalogMessages("messages_pl.properties").get("catalog.category.restock.desc");
+        String en = catalogMessages("messages_en.properties").get("catalog.category.restock.desc");
+
+        // then
+        assertThat(pl).isEqualTo("Produkty z ustawionym oczekiwanym stanem magazynowym pojawią się jako sugestie zakupu "
+                + "w momencie tworzenia dostaw lub bezpośrednio w magazynie.");
+        assertThat(en).doesNotContain("Restock the warehouse");
+    }
+
+    /**
+     * The client's term: a category's labels are its subcategories, the groups its products are assigned to. No text of
+     * the catalog screens calls them labels any more (shipping labels and label printers live under other prefixes).
+     */
+    @Test
+    void theCatalogCallsLabelsSubcategories() throws Exception {
+        // when
+        Map<String, String> pl = catalogMessages("messages_pl.properties");
+        Map<String, String> en = catalogMessages("messages_en.properties");
+
+        // then
+        assertThat(pl).allSatisfy((key, text) -> assertThat(text).as(key).doesNotContainPattern("(?i)etykie|etykiec"));
+        assertThat(en).allSatisfy((key, text) -> assertThat(text).as(key).doesNotContainPattern("(?i)\\blabels?\\b"));
+        assertThat(pl.get("catalog.category.labels")).isEqualTo("Podkategorie");
+        assertThat(en.get("catalog.category.labels")).isEqualTo("Subcategories");
+    }
+
+    /** The client's term: a product without a PIM entry is waiting for its data, as the legacy "Queued" view said. */
+    @Test
+    void aProductWithoutAPimEntryIsPending() throws Exception {
+        // when
+        Map<String, String> pl = catalogMessages("messages_pl.properties");
+        Map<String, String> en = catalogMessages("messages_en.properties");
+
+        // then
+        assertThat(pl.get("catalog.products.status.nopim")).isEqualTo("Oczekujące");
+        assertThat(pl.get("catalog.products.pill.nopim")).isEqualTo("Oczekujący");
+        assertThat(en.get("catalog.products.status.nopim")).isEqualTo("Pending");
+        assertThat(en.get("catalog.products.pill.nopim")).isEqualTo("Pending");
+        assertThat(pl).allSatisfy((key, text) -> assertThat(text).as(key).doesNotContain("Bez PIM"));
+        assertThat(en.get("catalog.products.note.dynamic")).doesNotContain("\"No PIM\"").contains("\"Pending\"");
+    }
+
+    /**
+     * A tile of the category settings shows two lines of its description and cuts the rest; 56 characters is what the
+     * narrowest tile holds (390 px, and the three-column grid at 768 and 1440 px). "podkategorie" made the Basics one
+     * longer than that, and the Marketplaces one was cut on a phone already.
+     */
+    @Test
+    void theDescriptionOfEveryCategorySettingsTileFitsItsTwoLines() throws Exception {
+        for (String file : List.of("messages_pl.properties", "messages_en.properties")) {
+            Map<String, String> messages = catalogMessages(file);
+            for (String tile : List.of("basics", "pricing", "marketplaces", "filters")) {
+                assertThat(messages.get("catalog.category." + tile + ".tile")).as(file + " " + tile).hasSizeLessThanOrEqualTo(56);
+            }
+        }
     }
 }
