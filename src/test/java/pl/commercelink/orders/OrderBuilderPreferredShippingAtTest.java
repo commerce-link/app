@@ -7,7 +7,7 @@ import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class OrderBuilderEstimatedShippingAtTest {
+class OrderBuilderPreferredShippingAtTest {
 
     private static Order.Builder builder() {
         Order original = new Order("store-1");
@@ -17,18 +17,20 @@ class OrderBuilderEstimatedShippingAtTest {
     }
 
     @Test
-    @DisplayName("withEstimatedShippingAt sets the date coming from the marketplace")
+    @DisplayName("withPreferredShippingAt sets the date coming from the marketplace as the preferred one")
     void setsTheDateFromMarketplace() {
-        Order order = builder().withEstimatedShippingAt(LocalDate.of(2026, 9, 3)).build();
+        Order order = builder().withPreferredShippingAt(LocalDate.of(2026, 9, 3)).build();
 
-        assertThat(order.getEstimatedShippingAt()).isEqualTo(LocalDate.of(2026, 9, 3));
+        assertThat(order.getPreferredShippingAt()).isEqualTo(LocalDate.of(2026, 9, 3));
+        assertThat(order.getEstimatedShippingAt()).isNull();
     }
 
     @Test
-    @DisplayName("withEstimatedShippingAt leaves the order untouched when the marketplace gives no date")
+    @DisplayName("withPreferredShippingAt leaves the order untouched when the marketplace gives no date")
     void leavesOrderUntouchedForMissingDate() {
-        Order order = builder().withEstimatedShippingAt(null).build();
+        Order order = builder().withPreferredShippingAt(null).build();
 
+        assertThat(order.getPreferredShippingAt()).isNull();
         assertThat(order.getEstimatedShippingAt()).isNull();
     }
 }
