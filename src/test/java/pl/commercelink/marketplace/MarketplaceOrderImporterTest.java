@@ -13,6 +13,7 @@ import pl.commercelink.marketplace.api.MarketplaceCustomer;
 import pl.commercelink.marketplace.api.MarketplaceOrder;
 import pl.commercelink.marketplace.api.MarketplaceProduct;
 import pl.commercelink.orders.BillingDetails;
+import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrdersManager;
 import pl.commercelink.orders.ShippingDetails;
@@ -24,6 +25,7 @@ import pl.commercelink.stores.IntegrationType;
 import pl.commercelink.stores.Store;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -185,6 +187,24 @@ class MarketplaceOrderImporterTest {
         // then: the key must survive byte-for-byte, because Allegro sends it back raw on returns
         OrderItem productItem = capturedOrderItems().stream().filter(i -> !i.isService()).findFirst().orElseThrow();
         assertEquals("k7m2xq9pz4", productItem.getExternalItemId());
+    }
+
+    @Test
+    void storesTheMarketplaceShippingDateAsThePreferredOne() {
+        when(pimCatalog.findByMpn(anyString())).thenReturn(Optional.empty());
+        Store store = new Store();
+        store.setFulfilmentConfiguration(new FulfilmentConfiguration());
+        MarketplaceOrder base = orderWithProduct("SKU-1");
+        MarketplaceOrder marketplaceOrder = new MarketplaceOrder(base.externalOrderId(), base.customer(), base.products(),
+                new MarketplaceOrder.Shipping(new BigDecimal("9.99"), "InPost", null, LocalDate.of(2026, 9, 10)),
+                base.paymentType(), base.paymentTransactionId());
+
+        importer.importOrder(store, "Allegro", marketplaceOrder);
+
+        ArgumentCaptor<Order> orderCaptor = ArgumentCaptor.forClass(Order.class);
+        verify(ordersManager).saveWithFulfilment(orderCaptor.capture(), any());
+        assertEquals(LocalDate.of(2026, 9, 10), orderCaptor.getValue().getPreferredShippingAt());
+        assertNull(orderCaptor.getValue().getEstimatedShippingAt());
     }
 
     private static MarketplaceOrder orderWithProduct(String manufacturerCode) {

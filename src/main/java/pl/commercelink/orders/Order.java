@@ -883,9 +883,9 @@ public class Order {
             return this;
         }
 
-        public Builder withEstimatedShippingAt(LocalDate estimatedShippingAt) {
-            if (estimatedShippingAt != null) {
-                order.setEstimatedShippingAt(estimatedShippingAt);
+        public Builder withPreferredShippingAt(LocalDate preferredShippingAt) {
+            if (preferredShippingAt != null) {
+                order.setPreferredShippingAt(preferredShippingAt);
             }
             return this;
         }
