@@ -5,16 +5,16 @@
 <body>
 <div layout:fragment="content">
     <section class="cl-page">
-        <div class="cl-page-body">
+        <div class="cl-page-body is-form">
             <!--/* The delete link is defined inside the replaced element: the header pulls it in as its actions slot,
                    and the body of a th:replace host is dropped, so it is never rendered twice. */-->
             <div th:replace="~{fragments/settings-header :: subpageWithActions(${backHref}, ${backLabel}, ${pageTitle}, #{catalog.settings.lead}, ~{::deleteAction})}">
                 <th:block th:fragment="deleteAction">
-                    <a th:if="${deleteHref != null}" class="cl-link-button is-danger" th:href="@{${deleteHref}}" data-cl-confirm
-                       th:text="#{catalog.delete}"
+                    <a th:if="${deleteHref != null}" class="cl-button is-danger-outline" th:href="@{${deleteHref}}" data-cl-confirm
                        th:attr="data-cl-confirm-title=#{catalog.delete.title(${form.name})},
                                 data-cl-confirm-message=#{catalog.delete.message(${categoriesCount}, ${productsCount})},
-                                data-cl-confirm-action=#{catalog.delete}"></a>
+                                data-cl-confirm-action=#{catalog.delete}"><i class="fas fa-trash-alt" aria-hidden="true"></i><span
+                            th:text="#{catalog.delete}"></span></a>
                 </th:block>
             </div>
             <!--/* Under the page title, one placement across the catalog screens: plain, selectable text, because
@@ -68,8 +68,6 @@
                         <div class="cl-form-grid">
                             <div class="cl-span-6">
                                 <div th:replace="~{fragments/settings-form :: check('deletionProtection', 'catalog.protect', *{deletionProtection}, 'catalog.protect.desc', null)}"></div>
-                                <!--/* Only worth saying once the catalog exists and the protection is what stands between it and the delete link. */-->
-                                <p th:if="${existing and form.deletionProtection}" class="cl-help" th:text="#{catalog.protect.hint}"></p>
                             </div>
                         </div>
                     </fieldset>

@@ -151,7 +151,7 @@ class CategoryPageTemplateTest {
         assertThat(html).contains("data-cl-select-table");
         assertThat(html.indexOf("cl-page-actions")).isLessThan(html.indexOf("/products/add"));
         assertThat(html).contains("Manual").doesNotContain("??");
-        assertThat(html).contains("MSI RTX 5070").contains("Outside the list").contains("No PIM")
+        assertThat(html).contains("MSI RTX 5070").contains("Outside the list").contains("Pending")
                 .contains("value=\"p1\"").contains("action=\"/dashboard/catalogs/c1/category/k1/products/bulk\"");
     }
 
@@ -225,7 +225,7 @@ class CategoryPageTemplateTest {
         // then
         assertThat(html).contains("<span class=\"cl-segment-count\">1</span>")
                 .contains("Listed on marketplaces (1)").contains("With a maximum price (0)")
-                .contains("RTX 5070 (1)").contains("RTX 5060 (1)").contains("Label: all (2)");
+                .contains("RTX 5070 (1)").contains("RTX 5060 (1)").contains("Subcategory: all (2)");
     }
 
     /**
@@ -294,15 +294,15 @@ class CategoryPageTemplateTest {
                 .contains("<span>All</span><span class=\"cl-segment-sep\">: </span><span class=\"cl-segment-count\">2</span>");
     }
 
-    /** The column is the label of the category's list, as in the mock-up; "product label" is the product page's field. */
+    /** The column is the subcategory of the category's list; "product subcategory" is the product page's field. */
     @Test
-    void theLabelColumnIsCalledLabel() {
+    void theSubcategoryColumnIsCalledSubcategory() {
         // when
         String html = rendered(false);
 
         // then
-        assertThat(html).contains("data-sort-key=\"label\">Label</button>").contains("data-label=\"Label\"")
-                .doesNotContain("Product label");
+        assertThat(html).contains("data-sort-key=\"label\">Subcategory</button>").contains("data-label=\"Subcategory\"")
+                .doesNotContain("Product subcategory");
     }
 
     /** An automatic category is defined by its recommendation filters: the lead says how many it has. */

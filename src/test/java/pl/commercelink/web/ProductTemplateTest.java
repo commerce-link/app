@@ -247,18 +247,61 @@ class ProductTemplateTest {
                 .contains("EAN 1 is no longer in the inventory").doesNotContain("??");
     }
 
+    /** The form of a product still waiting for its PIM entry: saved without one, its codes stay editable. */
+    private static void pending(ProductForm form) {
+        form.rememberSaved(new Product("k1", null, "4719331361600", "GV-N5080", null, "RTX 5080", "Gigabyte RTX 5080",
+                "Default"));
+    }
+
+    /** The label of a field, from its opening tag to its end, to see what it says next to the name of the field. */
+    private static String labelOf(String html, String field) {
+        int start = html.indexOf("for=\"" + field + "\"");
+        return html.substring(start, html.indexOf("</label>", start));
+    }
+
+    /** A product the PIM knows shows its codes read-only and posts none of them; the page says why. */
+    @Test
+    void aProductKnownToThePimShowsItsCodesReadOnlyAndPostsNone() {
+        // when
+        String html = rendered(true);
+
+        // then
+        assertThat(html).contains("id=\"eanDisplay\" readonly").contains("id=\"manufacturerCodeDisplay\" readonly")
+                .contains("value=\"4719331361600\"").contains("value=\"GV-N5080\"")
+                .contains("The product has a PIM entry, so its EAN and manufacturer code cannot be changed.");
+        assertThat(html).doesNotContain("name=\"ean\"").doesNotContain("name=\"manufacturerCode\"");
+    }
+
+    /** Both codes are required: a pending product and a new one post them, neither field is marked optional. */
+    @Test
+    void aPendingOrANewProductHasBothCodesRequired() {
+        // when
+        String pendingPage = rendered(true, ProductTemplateTest::pending);
+        String newPage = rendered(false, form -> form.rememberSaved(null));
+
+        // then
+        assertThat(List.of(pendingPage, newPage)).allSatisfy(html -> {
+            assertThat(html).contains("name=\"ean\"").contains("name=\"manufacturerCode\"")
+                    .doesNotContain("eanDisplay").doesNotContain("The product has a PIM entry");
+            assertThat(labelOf(html, "ean")).doesNotContain("cl-optional");
+            assertThat(labelOf(html, "manufacturerCode")).doesNotContain("cl-optional");
+            assertThat(occurrences(html, " required")).isGreaterThanOrEqualTo(3);
+        });
+    }
+
     /** The error summary links to "#" + the key of the error, so every key the form can produce must be an id here. */
     @Test
     void everyErrorKeyNamesAnElementOfThePage() {
         // given
-        List<String> fields = List.of("name", "ean", "label", "availabilityType", "suggestedRetailPrice",
+        List<String> fields = List.of("name", "ean", "manufacturerCode", "label", "availabilityType", "suggestedRetailPrice",
                 "maxRetailPrice", "estimatedDeliveryDays", "pricingGroup", "stockExpectedQty", "restockPricePromo",
                 "restockPriceStandard", "marketplaces");
         Map<String, String> errors = new LinkedHashMap<>();
         fields.forEach(field -> errors.put(field, "product.error.amount.invalid"));
 
-        // when
-        String html = rendered(true, errors);
+        // when -- a pending product: only its codes are editable, so only there can they carry an error
+        String html = rendered(true, errors, List.of(new CatalogProductsController.LeadPart("EAN 4719331361600", false)),
+                ProductTemplateTest::pending);
 
         // then
         assertThat(fields).allSatisfy(field -> assertThat(html).contains("id=\"" + field + "\""));

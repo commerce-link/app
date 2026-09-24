@@ -529,4 +529,51 @@ class CatalogScriptContractTest {
         // then
         assertThat(separator).contains("font-size: 0").doesNotContain("position").doesNotContain("display");
     }
+
+    /**
+     * Client review 2026-09-24: on a form page the delete action stood at the edge of the wide page body, far right of
+     * the 760 px form, as loose red text; the header of such a page is as wide as its form and the action is an
+     * outlined button like the other header buttons. The controls of a toolbar that opens its card sat on the card's
+     * top border, and the "Dodaj i edytuj" link of a row sat 12 px below the row's first line (its 44 px target was
+     * centred on the cell); both line up now.
+     */
+    @Test
+    void headerActionsTableToolbarsAndRowActionsLineUpWithWhatTheyBelongTo() throws Exception {
+        // given
+        String css = read("src/main/resources/static/css/commercelink.css");
+
+        // when / then
+        assertThat(rule(css, ".cl-page .cl-page-body.is-form > .cl-page-header")).contains("max-width: 760px;");
+        assertThat(rule(css, ".cl-button.is-danger-outline")).contains("color: var(--cl-bad);")
+                .contains("background: var(--cl-surface);");
+        assertThat(rule(css, ".cl-page .cl-card > .cl-visually-hidden:first-child + .cl-table-toolbar,\n"
+                + ".cl-page .cl-card > .cl-visually-hidden:first-child + [data-cl-table-filter] > .cl-table-toolbar:first-child"))
+                .contains("padding-top: 14px;");
+        assertThat(rule(css, ".cl-page .cl-table td.cl-table-actions .cl-link-button")).contains("margin-block: -12px;");
+        // a read-only field of a catalog form (the codes of a product the PIM knows, its brand) looks read-only
+        assertThat(rule(css, ".cl-page .cl-form .cl-input[readonly]")).contains("background: var(--cl-surface-2);")
+                .contains("color: var(--cl-ink-2);");
+        // a pill that opens the line under a page title starts where the title does
+        assertThat(rule(css, ".cl-page .cl-page-lead .cl-status.is-leading")).contains("margin-left: 0;");
+        assertThat(read("src/main/resources/templates/catalog/category.html"))
+                .contains("<span class=\"cl-status is-leading\"");
+        // the review's fields start on the line of the EAN field, not centred between the EAN and the code
+        assertThat(rule(css, ".cl-page .cl-table.is-editable.is-compact td")).contains("vertical-align: top;")
+                .contains("padding-top: 60px;");
+    }
+
+    /** The narrow catalog forms mark their page body, and their delete action is the outlined danger button. */
+    @Test
+    void theNarrowCatalogFormsMarkTheirBodyAndOutlineTheirDeleteAction() throws Exception {
+        for (String name : List.of("product", "catalog-settings", "category-basics", "category-marketplace")) {
+            String page = read("src/main/resources/templates/catalog/" + name + ".html");
+            assertThat(page).as(name).contains("class=\"cl-page-body is-form\"");
+        }
+        for (String name : List.of("product", "catalog-settings", "category-basics")) {
+            String page = read("src/main/resources/templates/catalog/" + name + ".html");
+            String header = page.substring(0, page.indexOf("</th:block>", page.indexOf("th:fragment=\"deleteAction\"")));
+            assertThat(header).as(name).contains("class=\"cl-button is-danger-outline\"").contains("fa-trash-alt")
+                    .doesNotContain("cl-link-button is-danger");
+        }
+    }
 }
