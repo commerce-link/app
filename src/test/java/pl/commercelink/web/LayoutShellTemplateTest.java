@@ -37,6 +37,19 @@ class LayoutShellTemplateTest {
         assertThat(html).doesNotContain("scrollbar-width: none");
     }
 
+    /**
+     * Without it a screen reader reads a Polish page with an English voice, and `document.documentElement.lang`
+     * (the collation of the sortable tables) falls back to a guess.
+     */
+    @Test
+    void namesTheLanguageOfThePage() throws Exception {
+        // when
+        String html = layout();
+
+        // then
+        assertThat(html).contains("<html th:lang=\"${#locale.language}\"");
+    }
+
     @Test
     void keepsExactlyOneContentFragmentSoEveryPageStillDecoratesIt() throws Exception {
         // when

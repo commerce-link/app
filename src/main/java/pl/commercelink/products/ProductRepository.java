@@ -1,10 +1,12 @@
 package pl.commercelink.products;
 
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
+import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapperConfig;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBQueryExpression;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBScanExpression;
 import com.amazonaws.services.dynamodbv2.model.AttributeValue;
 import com.amazonaws.services.dynamodbv2.model.QueryRequest;
+import com.amazonaws.services.dynamodbv2.model.QueryResult;
 import com.amazonaws.services.dynamodbv2.model.ScanRequest;
 import com.amazonaws.services.dynamodbv2.model.ScanResult;
 import org.apache.commons.lang3.StringUtils;
@@ -24,6 +26,19 @@ public class ProductRepository extends DynamoDbRepository<Product> {
 
     public ProductRepository(AmazonDynamoDB amazonDynamoDB) {
         super(amazonDynamoDB);
+    }
+
+    /**
+     * Deletes the product whatever version it has now. A plain delete of a versioned item is conditional on the
+     * version it was read with, so a save landing between the read and the delete fails it with
+     * ConditionalCheckFailedException. The deletions of the catalog screens (the bulk action, the product page, a
+     * removed category) delete what the operator chose regardless of an edit made meanwhile; an item already gone is
+     * no error.
+     */
+    public void deleteWhateverItsVersion(Product product) {
+        dynamoDBMapper.delete(product, DynamoDBMapperConfig.builder()
+                .withSaveBehavior(DynamoDBMapperConfig.SaveBehavior.CLOBBER)
+                .build());
     }
 
     public Product findByProductId(String categoryId, String productId) {
@@ -55,6 +70,39 @@ public class ProductRepository extends DynamoDbRepository<Product> {
                 .withExpressionAttributeValues(eav);
 
         return query(queryRequest, Product.class);
+    }
+
+    /**
+     * The label of every product of the category, one entry per product (null for a product without one): what the
+     * catalog page needs to count the products and the ones whose label is off the category's list, without reading
+     * the products. Only the label is projected, and every page of the query is followed.
+     */
+    public List<String> labelsOf(String categoryId) {
+        return labelsOf(categoryId, null);
+    }
+
+    /** As {@link #labelsOf(String)}, at most pageSize items a query page (null: DynamoDB's 1 MB page). */
+    List<String> labelsOf(String categoryId, Integer pageSize) {
+        Map<String, AttributeValue> eav = new HashMap<>();
+        eav.put(":categoryId", new AttributeValue().withS(categoryId));
+        List<String> labels = new ArrayList<>();
+        Map<String, AttributeValue> lastEvaluatedKey = null;
+        do {
+            QueryRequest queryRequest = new QueryRequest()
+                    .withTableName(TABLE)
+                    .withKeyConditionExpression("categoryId = :categoryId")
+                    .withExpressionAttributeValues(eav)
+                    .withProjectionExpression("label")
+                    .withLimit(pageSize)
+                    .withExclusiveStartKey(lastEvaluatedKey);
+            QueryResult queryResult = amazonDynamoDB.query(queryRequest);
+            for (Map<String, AttributeValue> item : queryResult.getItems()) {
+                AttributeValue label = item.get("label");
+                labels.add(label == null ? null : label.getS());
+            }
+            lastEvaluatedKey = queryResult.getLastEvaluatedKey();
+        } while (lastEvaluatedKey != null && !lastEvaluatedKey.isEmpty());
+        return labels;
     }
 
     public List<Product> findAll(ProductCatalog catalog) {

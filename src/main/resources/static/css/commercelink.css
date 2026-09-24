@@ -629,6 +629,14 @@ body.cl-drawer-open .cl-sidebar {
     color: var(--cl-ink-2);
 }
 
+/* A link in the line under a title ("Dziś pasuje: 8 produktów", "Edytuj") looks like a link in a row description: the
+   Bulma link colour without an underline was 1.33:1 against the text around it (WCAG 1.4.1). */
+.cl-page .cl-page-lead a {
+    color: var(--cl-accent-ink);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
 .cl-page .cl-back {
     display: inline-flex;
     align-items: center;
@@ -1352,6 +1360,12 @@ body.cl-drawer-open .cl-sidebar {
     color: var(--cl-ink-2);
 }
 
+.cl-page .cl-card .cl-card-desc a {
+    color: var(--cl-accent-ink);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
 .cl-page .cl-card .cl-card-body {
     margin: 0;
     padding: 16px 20px;
@@ -1735,7 +1749,8 @@ a.cl-link-button:hover {
 
 /* A note that belongs to the whole group rather than one field (the default account, an edit that reaches open offers). */
 .cl-page .cl-fieldset > .cl-help,
-.cl-page .cl-form-grid > .cl-help {
+.cl-page .cl-form-grid > .cl-help,
+.cl-page .cl-disclosure-body .cl-form-grid p.cl-help:not(.cl-steps-note):not(.cl-param-hint) {
     margin: 0;
     font-size: 13px;
     line-height: 1.4;
@@ -2972,12 +2987,13 @@ a.cl-link-button:hover {
 
 .cl-page .cl-table-search {
     width: 280px;
-    height: 36px;
 }
 
+/* --cl-ink-2: the segmented control sits on --cl-surface-2, where --cl-ink-3 is 4.47:1, below AA; the pressed segment
+   inherits its own colour. Shared with the export run, which had the same shortfall. */
 .cl-segment-count {
     margin-left: 4px;
-    color: var(--cl-ink-3);
+    color: var(--cl-ink-2);
     font-variant-numeric: tabular-nums;
 }
 
@@ -3063,7 +3079,6 @@ a.cl-link-button:hover {
 
     .cl-page .cl-table-search {
         width: 100%;
-        height: 44px;
     }
 
     .cl-page .cl-table thead {
@@ -3109,6 +3124,9 @@ a.cl-link-button:hover {
         font-size: 12.5px;
         font-weight: 400;
         color: var(--cl-ink-2);
+        /* A column name longer than its 84 px ("Najniższa cena brutto") wraps instead of running under the value:
+           the cell of a number keeps white-space: nowrap for the number itself. */
+        white-space: normal;
     }
 
     .cl-page .cl-table td.is-empty {
@@ -3247,6 +3265,16 @@ a.cl-link-button:hover {
     outline-offset: 2px;
 }
 
+/* In a product table the marker of a numeric column hangs on the right as well: on the left it met the marker of the
+   column before it ("Marka ↕ ↕ Najniższa", D-M29). Outside the button either way, so the name of the column stays
+   aligned with its values and the marker adds nothing to the width of the table. */
+.cl-page .cl-table.is-products th.is-numeric .cl-table-sort::after {
+    left: 100%;
+    right: auto;
+    margin-left: 4px;
+    margin-right: 0;
+}
+
 /* Placeholder for a value still being fetched. Sized by the caller, so one block serves a label,
    a figure or an inline value. */
 .cl-skeleton {
@@ -3310,5 +3338,805 @@ a.cl-link-button:hover {
     /* a still ring reads as a frozen page, so the indicator keeps moving in the one way that is safe */
     .cl-spinner {
         animation: cl-spin-pulse 1.2s ease-in-out infinite;
+    }
+}
+
+/* --- Catalog: Selection bar (actions on the checked rows of a cl-table) --- */
+.cl-page .cl-selection-bar {
+    position: sticky;
+    top: calc(var(--cl-topbar-height) + 8px);
+    z-index: 5;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--cl-gap-related);
+    margin: 0 20px 12px;
+    padding: 10px 14px;
+    border: 1px solid var(--cl-accent);
+    border-radius: var(--cl-radius);
+    background: var(--cl-accent-soft);
+    box-shadow: var(--cl-shadow-card);
+}
+
+.cl-page .cl-selection-bar[hidden] {
+    display: none;
+}
+
+.cl-page .cl-selection-count {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--cl-accent-ink);
+    font-variant-numeric: tabular-nums;
+    margin-right: 6px;
+}
+
+.cl-page .cl-selection-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--cl-gap-related);
+}
+
+.cl-page .cl-selection-bar .cl-button:not(.is-danger) {
+    background: var(--cl-surface);
+}
+
+.cl-page .cl-selection-clear {
+    margin-left: auto;
+}
+
+/* the primary action keeps its accent fill */
+.cl-page .cl-selection-bar .cl-button.is-primary {
+    background: var(--cl-accent);
+    color: var(--cl-surface);
+    border-color: var(--cl-accent);
+}
+
+.cl-page .cl-selection-bar .cl-button.is-primary:hover {
+    background: var(--cl-accent-ink);
+}
+
+/* --- Catalog: Selectable rows --- */
+.cl-page .cl-table .cl-table-check {
+    width: 44px;
+    padding-right: 4px;
+}
+
+.cl-page .cl-table .cl-check-input {
+    width: 18px;
+    height: 18px;
+    margin: 0;
+    accent-color: var(--cl-accent);
+    cursor: pointer;
+}
+
+/* The label around a row checkbox is its touch target: 44 px (36 px from 1024 px) centred on the 18 px box. The negative
+   margin keeps the row and the header as tall as the box alone would make them; position: relative keeps the part of
+   the target that reaches over the next cell above that cell. */
+.cl-page .cl-table .cl-check-target {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    margin: -13px;
+    cursor: pointer;
+}
+
+.cl-page .cl-table .cl-check-input:disabled {
+    cursor: not-allowed;
+    opacity: .45;
+}
+
+.cl-page .cl-table .cl-check-input:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
+}
+
+.cl-page .cl-table tr.is-selected > * {
+    background: var(--cl-accent-soft);
+}
+
+/* --cl-ink-3 is 4.04:1 on --cl-accent-soft, below AA for 12.5 px; the codes of a selected row use the darker grey. */
+.cl-page .cl-table tr.is-selected .cl-table-sub {
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-table tr.is-muted > * {
+    color: var(--cl-ink-3);
+}
+
+/* A quiet underline, not none: the codes under the name are text of the same cell, and telling the link from them
+   by colour alone is below the 3:1 that would allow it (WCAG 1.4.1). It turns into the accent one on hover. */
+.cl-page .cl-table .cl-table-key a {
+    color: var(--cl-ink);
+    text-decoration: underline;
+    text-decoration-color: var(--cl-ink-3);
+    text-underline-offset: 3px;
+}
+
+.cl-page .cl-table .cl-table-key a:hover {
+    color: var(--cl-accent-ink);
+    text-decoration: underline;
+}
+
+.cl-page .cl-table.is-products .cl-table-key {
+    white-space: normal;
+}
+
+.cl-page .cl-table .cl-table-note {
+    display: block;
+    max-width: 34ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-style: italic;
+}
+
+.cl-page .cl-table .cl-table-sub .cl-status {
+    margin-top: 4px;
+    font-size: 12px;
+    padding: 1px 8px;
+}
+
+.cl-page .cl-table td .cl-status + .cl-status {
+    margin-left: 4px;
+}
+
+/* --- Catalog: Segment with zero matches --- */
+/* The count next to the name already says there is nothing to show; tinting the name as well took it to 4.47:1 on
+   the segmented background, below the 4.5:1 this size needs, and no darker grey token stands between the two. */
+
+/* --- Catalog: Toolbar in two rows (status segments across the top, category and search below) --- */
+.cl-page .cl-table-toolbar.is-stacked {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    row-gap: 10px;
+}
+
+.cl-page .cl-table-toolbar.is-stacked .cl-toolbar-filters,
+.cl-page .cl-table-toolbar.is-stacked .cl-toolbar-row {
+    grid-column: 1 / -1;
+}
+
+.cl-page .cl-table-toolbar .cl-toolbar-row {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--cl-gap-related);
+}
+
+.cl-page .cl-table-toolbar.is-stacked .cl-segmented {
+    display: flex;
+    flex-wrap: wrap;
+}
+
+.cl-page .cl-table-toolbar.is-stacked .cl-segment {
+    flex: 1 1 auto;
+    text-align: center;
+    white-space: nowrap;
+}
+
+/* The ": " between a segment's label and its count, so the button is named "Aktywne: 2", not "Aktywne2". Inline text of
+   no size rather than .cl-visually-hidden: an absolutely positioned span leaves the flow, and Chromium then pads it
+   with spaces in the accessible name ("Aktywne : 2"). */
+.cl-page .cl-segment .cl-segment-sep {
+    font-size: 0;
+}
+
+/* A segment with nothing to show (DS "Filtr wielowymiarowy": dimmed, but still a button). The grey is --cl-ink-2 let
+   15% towards the control's own --cl-surface-2: 4.9:1 there, above AA -- --cl-ink-3 would be 4.47:1. The weight drops
+   too, so the dimming does not rest on the colour alone; hover brings the ink back like on any segment. */
+.cl-page .cl-segment[data-count="0"]:not([aria-pressed="true"]) {
+    color: color-mix(in srgb, var(--cl-ink-2) 85%, var(--cl-surface-2));
+    font-weight: 400;
+}
+
+.cl-page .cl-segment[data-count="0"]:not([aria-pressed="true"]) .cl-segment-count {
+    color: inherit;
+}
+
+.cl-page .cl-segment[data-count="0"]:not([aria-pressed="true"]):hover {
+    color: var(--cl-ink);
+}
+
+.cl-page .cl-table-toolbar .cl-toolbar-filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--cl-gap-related);
+}
+
+.cl-page .cl-table-toolbar .cl-select.is-compact {
+    min-width: 180px;
+}
+
+/* toolbar with a single row (no segments) */
+.cl-page .cl-table-toolbar .cl-toolbar-row:only-child {
+    width: 100%;
+}
+
+/* --- Catalog: Tree picker (PIM categories): trigger looks like a select, chosen entries as removable chips below --- */
+.cl-page .cl-picker {
+    display: grid;
+    gap: var(--cl-gap-related);
+}
+
+.cl-page .cl-picker-trigger {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    min-height: 40px;
+    padding: 0 12px;
+    font: inherit;
+    font-size: 15px;
+    color: var(--cl-ink);
+    background: var(--cl-surface);
+    border: 1px solid var(--cl-line);
+    border-radius: var(--cl-radius);
+    cursor: pointer;
+    text-align: left;
+}
+
+.cl-page .cl-picker-trigger:hover {
+    border-color: var(--cl-ink-3);
+}
+
+.cl-page .cl-picker-trigger:focus-visible {
+    outline: none;
+    border-color: var(--cl-accent);
+    box-shadow: 0 0 0 3px var(--cl-accent-soft);
+}
+
+.cl-page .cl-chip-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--cl-gap-related);
+}
+
+.cl-page .cl-chip-list:empty {
+    display: none;
+}
+
+.cl-page .cl-chip-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 100%;
+    margin: 0;
+    padding: 4px 6px 4px 10px;
+    font-size: 13px;
+    color: var(--cl-ink);
+    background: var(--cl-accent-soft);
+    border-radius: var(--cl-radius);
+}
+
+/* --cl-ink-2: the chip is tinted --cl-accent-soft, where --cl-ink-3 is 4.04:1, below AA for 12 px. */
+.cl-page .cl-chip-tag-path {
+    color: var(--cl-ink-2);
+    font-size: 12px;
+}
+
+.cl-page .cl-chip-tag-path::after {
+    content: " ›";
+}
+
+.cl-page .cl-chip-tag-remove {
+    display: inline-grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    margin: -2px 0;
+    border: 0;
+    border-radius: calc(var(--cl-radius) - 2px);
+    background: transparent;
+    color: var(--cl-ink-2);
+    font: inherit;
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.cl-page .cl-chip-tag-remove:hover {
+    background: var(--cl-surface);
+    color: var(--cl-bad);
+}
+
+/* The focus ring of a link button, instead of the browser's default one. */
+.cl-page .cl-chip-tag-remove:focus-visible,
+.cl-page .cl-list-title a:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+/* The hidden inputs of the multi picker travel in a span, which would otherwise take a grid row of its own. */
+.cl-page .cl-picker > [data-picker-values] {
+    display: none;
+}
+
+/* The menu floats over the form, so a whole breadcrumb stays readable even in a narrow form column. */
+.cl-page .cl-picker-field {
+    position: relative;
+}
+
+.cl-page .cl-picker-trigger > [data-picker-label] {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cl-page .cl-picker-trigger.is-invalid {
+    border-color: var(--cl-bad);
+}
+
+.cl-page .cl-picker-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    z-index: var(--cl-z-pop);
+    width: 100%;
+    min-width: min(34rem, 90vw);
+    padding: var(--cl-gap-related) 0;
+    background: var(--cl-surface);
+    border: 1px solid var(--cl-line);
+    border-radius: var(--cl-radius);
+    box-shadow: var(--cl-shadow);
+}
+
+.cl-page .cl-picker-menu[hidden] {
+    display: none;
+}
+
+/* On a phone min(34rem, 90vw) was wider than the field column and the open menu scrolled the page sideways. */
+@media screen and (max-width: 719px) {
+    .cl-page .cl-picker-menu {
+        min-width: 100%;
+        max-width: calc(100vw - 32px);
+    }
+}
+
+.cl-page .cl-picker-search {
+    width: calc(100% - 2 * var(--cl-gap-related));
+    margin: 0 var(--cl-gap-related);
+}
+
+.cl-page .cl-picker-list {
+    max-height: 20rem;
+    overflow-y: auto;
+    margin-top: var(--cl-gap-related);
+    border-top: 1px solid var(--cl-line);
+    border-bottom: 1px solid var(--cl-line);
+}
+
+/* Two-line row: muted ancestor path on top, leaf name below. Both clipped so the row height stays put. */
+.cl-page .cl-picker-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 6px 16px;
+    line-height: 1.3;
+    color: var(--cl-ink);
+    cursor: pointer;
+    white-space: normal;
+}
+
+.cl-page .cl-picker-option:hover,
+.cl-page .cl-picker-option.is-active {
+    background: var(--cl-accent-soft);
+}
+
+.cl-page .cl-picker-option.is-selected {
+    font-weight: 600;
+}
+
+/* The tick of a multi picker option is drawn: a checkbox inside an option would be a control inside a control. */
+.cl-page .cl-picker-option-mark {
+    flex: none;
+    display: inline-grid;
+    place-items: center;
+    width: 16px;
+    height: 16px;
+    margin-top: 2px;
+    border: 1px solid var(--cl-ink-3);
+    border-radius: calc(var(--cl-radius) / 2);
+    background: var(--cl-surface);
+}
+
+.cl-page .cl-picker-option.is-selected .cl-picker-option-mark {
+    border-color: var(--cl-accent);
+    background: var(--cl-accent);
+}
+
+.cl-page .cl-picker-option.is-selected .cl-picker-option-mark::after {
+    content: "";
+    width: 8px;
+    height: 4px;
+    border: solid var(--cl-surface);
+    border-width: 0 0 2px 2px;
+    transform: translateY(-1px) rotate(-45deg);
+}
+
+.cl-page .cl-picker-option-text {
+    flex: 1;
+    min-width: 0;
+}
+
+.cl-page .cl-picker-path,
+.cl-page .cl-picker-name {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cl-page .cl-picker-path {
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--cl-ink-3);
+}
+
+/* On the tinted row under the mouse or the arrows --cl-ink-3 is 4.04:1, below AA for 12 px. */
+.cl-page .cl-picker-option:is(:hover, .is-active) .cl-picker-path {
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-picker-empty {
+    margin: 0;
+    padding: 6px 16px;
+    color: var(--cl-ink-3);
+}
+
+.cl-page .cl-picker-empty[hidden] {
+    display: none;
+}
+
+.cl-page .cl-picker-menu .cl-picker-count {
+    margin: var(--cl-gap-attached) 16px 0;
+    font-size: 13px;
+    color: var(--cl-ink-2);
+}
+
+/* --- Catalog: One-field repeat rows (labels list): numbered lines instead of a fieldset per entry --- */
+.cl-page .cl-repeat-lines {
+    display: grid;
+    gap: var(--cl-gap-related);
+}
+
+.cl-page .cl-repeat-line {
+    display: grid;
+    grid-template-columns: 28px 1fr auto;
+    align-items: center;
+    gap: var(--cl-gap-related);
+}
+
+.cl-page .cl-repeat-line-no {
+    color: var(--cl-ink-3);
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+
+.cl-page .cl-repeat-lines .cl-repeat-remove {
+    position: static;
+}
+
+/* an unknown metadata pair of a recommendation filter: the pill, the key, the value and the remove of the row */
+.cl-page .cl-repeat-line.is-unknown {
+    grid-template-columns: auto 1fr 1fr auto;
+}
+
+.cl-page .cl-repeat-line.is-unknown .cl-field-error {
+    grid-column: 1 / -1;
+}
+
+.cl-page .cl-repeat-lines .cl-repeat-add {
+    margin-top: 4px;
+}
+
+/* filters card: repeat groups sit under the card head like fieldsets (scoped to the catalog filters form so it does
+   not indent the shipping/parcel template's own repeat list, D-M1) */
+#category-filters-form .cl-card > .cl-repeat {
+    padding: 0 20px;
+}
+
+#category-filters-form .cl-card > .cl-repeat > .cl-fieldset {
+    padding-left: 0;
+    padding-right: 0;
+}
+
+/* --- Catalog: Editable compact table (bulk review) --- */
+.cl-page .cl-table.is-editable td {
+    padding: 6px 8px;
+    vertical-align: middle;
+}
+
+.cl-page .cl-table.is-editable .cl-input,
+.cl-page .cl-table.is-editable .cl-select {
+    font-size: 14px;
+    width: 100%;
+}
+
+/* The product cell of the bulk review holds the brand and then the two identifier fields, each under its label, one
+   under the other. It wraps, unlike the key column of a read-only table: kept on one line, the fields stood side by
+   side and the second one ran under the next column, out of reach of the mouse (D-I2). */
+.cl-page .cl-table.is-editable tbody th {
+    vertical-align: middle;
+    white-space: normal;
+}
+
+/* A floor for the product column of the table; in card mode (< 720 px) the cell is the width of the card, which on a
+   320 px screen is narrower than the floor. */
+@media screen and (min-width: 720px) {
+    .cl-page .cl-table.is-editable tbody th {
+        min-width: 12rem;
+    }
+}
+
+.cl-page .cl-table.is-editable tbody th .cl-label {
+    display: block;
+    margin-top: var(--cl-gap-related);
+    margin-bottom: var(--cl-gap-attached);
+    font-size: 12.5px;
+}
+
+.cl-page .cl-table.is-editable tbody th .cl-input {
+    display: block;
+}
+
+/* the product cell is a row header (600); its field errors read like those of the other cells */
+.cl-page .cl-table.is-editable .cl-field-error {
+    margin-top: var(--cl-gap-attached);
+    font-weight: 400;
+}
+
+.cl-page .cl-table.is-compact thead th,
+.cl-page .cl-table.is-compact td,
+.cl-page .cl-table.is-compact tbody th {
+    padding: 8px 10px;
+}
+
+/* --- Catalog: compact controls from 1024 px --- */
+/* 36 px is the size of the dense catalog controls on a desktop; below 1024 px they keep the 44 px of every field and
+   control of the frame (design system §1.4), which a finger needs (D-I5, D-M22). */
+@media screen and (min-width: 1024px) {
+    .cl-page .cl-table-search {
+        height: 36px;
+    }
+
+    .cl-page .cl-table.is-editable .cl-input,
+    .cl-page .cl-table.is-editable .cl-select {
+        height: 36px;
+    }
+
+    .cl-page .cl-repeat-lines .cl-input {
+        height: 36px;
+    }
+
+    .cl-page .cl-table .cl-check-target {
+        width: 36px;
+        height: 36px;
+        margin: -9px;
+    }
+}
+
+/* --- Catalog: touch targets below 1024 px --- */
+/* A sort button of a product table is the name of its column, 19 px of text: below 1024 px it is 44 px tall and wide,
+   the negative margin keeps the header row at its height. Scoped to the product tables: the offers of the inventory
+   turn their sort buttons into 44 px chips of their own below 720 px, which a negative margin would pull together.
+   The picker trigger grows from 40 to 44 px like the fields around it. */
+@media screen and (max-width: 1023px) {
+    .cl-page .cl-table.is-products .cl-table-sort {
+        min-height: 44px;
+        min-width: 44px;
+        margin: -12px 0;
+    }
+
+    .cl-page .cl-table.is-products th.is-numeric .cl-table-sort {
+        justify-content: flex-end;
+    }
+
+    .cl-page .cl-picker-trigger {
+        min-height: 44px;
+    }
+}
+
+/* --- Catalog: Pills inside table cells wrap; empty marker --- */
+.cl-page .cl-table .cl-table-pills {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+/* A floor for the name and the codes that the other columns always leave room for: 300 px from 1216 px was wider than
+   the room left beside the sidebar up to about 1300 px, and the page scrolled sideways (D-I8). Above the floor the
+   column takes whatever the table has left. Below 720 px the cell is a block of the card and needs no floor. */
+@media screen and (min-width: 720px) {
+    .cl-page .cl-table.is-products .cl-table-key {
+        min-width: 11rem;
+    }
+}
+
+/* An EAN is read and compared digit by digit: it wraps before or after, never inside (D-M52). */
+.cl-page .cl-table .cl-table-code {
+    white-space: nowrap;
+}
+
+/* 720-1023 px: no sidebar, but seven columns and a narrow window. The column of marketplaces gives way (the filter
+   "Wystawiane na marketplace" and the product page still tell it; in card mode below 720 px it is back) and the column
+   names and the row action ("Dodaj i edytuj") wrap, so the name and the EAN of a product keep a readable column instead
+   of one word per line (D-M52). */
+@media screen and (min-width: 720px) and (max-width: 1023px) {
+    .cl-page .cl-table.is-products .is-secondary-column {
+        display: none;
+    }
+
+    .cl-page .cl-table.is-products thead th,
+    .cl-page .cl-table.is-products .cl-table-actions {
+        white-space: normal;
+    }
+
+    /* a wrapped column name lines up with its values, not in the middle of the button */
+    .cl-page .cl-table.is-products .cl-table-sort {
+        text-align: inherit;
+    }
+}
+
+.cl-page .cl-table .cl-table-empty {
+    color: var(--cl-ink-3);
+}
+
+.cl-page .cl-table .cl-table-key .cl-status {
+    margin-left: 8px;
+    vertical-align: middle;
+}
+
+.cl-page .cl-table .cl-table-actions {
+    text-align: right;
+    white-space: nowrap;
+}
+
+/* --- Catalog: Warning help text (labels outside the list) --- */
+.cl-page .cl-help.is-warn,
+.cl-page .cl-list-desc .is-warn {
+    color: var(--cl-warn);
+}
+
+/* --- Catalog: Choice group used without a visible legend inside a fieldset: no extra top gap --- */
+.cl-page .cl-fieldset .cl-choice-group + .cl-alert {
+    margin-top: var(--cl-gap-fields);
+}
+
+/* --- Catalog: Section labels inside a form grid (marketplace thresholds) --- */
+.cl-page .cl-form-grid > .cl-span-6 > .cl-label {
+    margin-top: 4px;
+}
+
+/* --- Catalog: phone layout for the selection bar, selectable rows and the stacked toolbar --- */
+@media screen and (max-width: 719px) {
+    .cl-page .cl-selection-bar {
+        margin: 0 16px 12px;
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .cl-page .cl-selection-actions .cl-button {
+        flex: 1 1 100%;
+        justify-content: center;
+    }
+
+    .cl-page .cl-selection-clear {
+        margin-left: 0;
+    }
+
+    .cl-page .cl-table .cl-table-check {
+        width: auto;
+    }
+
+    .cl-page .cl-table .cl-table-note {
+        max-width: none;
+        white-space: normal;
+    }
+
+    .cl-page .cl-table-toolbar.is-stacked {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .cl-page .cl-table-toolbar.is-stacked .cl-table-search,
+    .cl-page .cl-table-toolbar.is-stacked .cl-select.is-compact {
+        width: 100%;
+    }
+
+    .cl-page .cl-repeat-line {
+        grid-template-columns: 24px 1fr;
+    }
+
+    .cl-page .cl-repeat-line .cl-repeat-remove {
+        grid-column: 2;
+        justify-self: start;
+    }
+
+    .cl-page .cl-repeat-line.is-unknown {
+        grid-template-columns: 1fr;
+    }
+
+    .cl-page .cl-repeat-line.is-unknown .cl-repeat-remove {
+        grid-column: 1;
+    }
+
+    .cl-page .cl-table.is-editable td {
+        padding: 4px 0;
+    }
+
+    /* card mode: the product cell spans the card (brand, then each identifier under its label) instead of squeezing
+       both fields into the value column beside the column name */
+    .cl-page .cl-table.is-editable tbody th.cl-table-key {
+        display: block;
+        padding: 0 0 4px;
+    }
+
+    .cl-page .cl-table.is-editable tbody th.cl-table-key::before {
+        display: none;
+    }
+
+    .cl-page .cl-table.is-editable td > .cl-field-error {
+        grid-column: 2;
+    }
+}
+
+/* card mode (< 720 px): the product cell spans the whole card, codes under the name instead of a narrow label column */
+@media screen and (max-width: 719px) {
+    .cl-page .cl-table.is-products tbody th.cl-table-key,
+    .cl-page .cl-table[data-cl-select-table] tbody th.cl-table-key {
+        display: block;
+        padding: 8px 12px 4px 44px;
+    }
+
+    .cl-page .cl-table.is-products tbody th.cl-table-key::before,
+    .cl-page .cl-table[data-cl-select-table] tbody th.cl-table-key::before {
+        display: none;
+    }
+
+    .cl-page .cl-table tbody th.cl-table-key .cl-table-sub {
+        display: block;
+        margin-top: 2px;
+        word-break: normal;
+        overflow-wrap: anywhere;
+    }
+
+    .cl-page .cl-table tbody th.cl-table-key .cl-status {
+        margin-left: 0;
+    }
+
+    .cl-page .cl-table[data-cl-select-table] tbody tr {
+        position: relative;
+    }
+
+    /* the 44 px target of the checkbox sits in the top-left corner of the card, inside it, the box level with the name */
+    .cl-page .cl-table[data-cl-select-table] tbody td.cl-table-check {
+        position: absolute;
+        top: 3px;
+        left: 0;
+        width: auto;
+        padding: 0;
+        display: block;
+    }
+
+    .cl-page .cl-table[data-cl-select-table] tbody .cl-check-target {
+        margin: 0;
+    }
+
+    .cl-page .cl-table[data-cl-select-table] tbody td.cl-table-check::before {
+        display: none;
+    }
+
+    .cl-page .cl-table tbody td.cl-table-actions {
+        text-align: left;
     }
 }

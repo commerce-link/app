@@ -19,6 +19,37 @@
     </div>
 </div>
 
+<!--/* Error summary of a form whose message keys may carry arguments (e.g. the rows of a price group that disagree).
+       Same markup as errorSummary; arguments maps a field id to the arguments of its message, absent when none. */-->
+<div th:fragment="errorSummaryWithArguments(id, errors, arguments)" th:if="${!errors.isEmpty()}" th:id="${id}"
+     class="cl-alert is-bad" tabindex="-1" data-cl-error-summary>
+    <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
+    <div>
+        <p class="cl-alert-title" th:text="#{form.errors.title}"></p>
+        <ul class="cl-alert-list">
+            <li th:each="error : ${errors}">
+                <a th:href="'#' + ${error.key}" th:text="${#messages.msgWithParams(error.value, arguments[error.key])}"></a>
+            </li>
+        </ul>
+    </div>
+</div>
+
+<!--/* Error summary of a form whose messages are already translated (a message whose text carries a number the key
+       cannot hold, e.g. the line of a broken brand line). Same markup as errorSummary; errors maps a field id to the
+       text of its error. */-->
+<div th:fragment="errorSummaryText(id, errors)" th:if="${!errors.isEmpty()}" th:id="${id}" class="cl-alert is-bad"
+     tabindex="-1" data-cl-error-summary>
+    <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
+    <div>
+        <p class="cl-alert-title" th:text="#{form.errors.title}"></p>
+        <ul class="cl-alert-list">
+            <li th:each="error : ${errors}">
+                <a th:href="'#' + ${error.key}" th:text="${error.value}"></a>
+            </li>
+        </ul>
+    </div>
+</div>
+
 <!--/* Labelled input with an optional help text (already resolved, or null) read out with the field. Not named "input":
        a fragment name is also an element selector and would pull in every input of this file. */-->
 <div th:fragment="textField(name, labelKey, value, type, autocomplete, required, errorKey, help)" class="cl-field">
@@ -103,6 +134,12 @@
 <div th:fragment="savedAlert" th:if="${settingsSavedMessage != null}" class="cl-alert is-ok" role="status" data-cl-saved-alert>
     <i class="fas fa-check-circle cl-alert-icon" aria-hidden="true"></i>
     <p class="cl-alert-title" th:text="${settingsSavedMessage}"></p>
+</div>
+
+<!--/* What a save could not refuse but the operator should know (flash catalogWarning), under the saved message. */-->
+<div th:fragment="warnAlert" th:if="${catalogWarning != null}" class="cl-alert is-warn" role="status">
+    <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+    <p class="cl-alert-text" th:text="${catalogWarning}"></p>
 </div>
 
 </body>

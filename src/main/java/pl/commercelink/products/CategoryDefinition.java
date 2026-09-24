@@ -225,13 +225,14 @@ public class CategoryDefinition implements DeletionProtection {
         return priceDefinitions;
     }
 
+    /**
+     * Keeps the groups in the order they are matched in: the higher price threshold first. Groups with the same threshold
+     * keep the order they come in (the sort is stable) — the order of the pricing form, or the stored one on a read.
+     */
     public void setPriceDefinitions(List<PriceDefinition> priceDefinitions) {
         this.priceDefinitions = priceDefinitions.stream()
-                .sorted(
-                        Comparator
-                                .comparing(PriceDefinition::getPriceMatch).reversed()
-                                .thenComparing(PriceDefinition::getPricingGroup)
-                ).collect(Collectors.toList());
+                .sorted(Comparator.comparing(PriceDefinition::getPriceMatch).reversed())
+                .collect(Collectors.toList());
     }
 
     public List<InventoryDefinition> getInventoryDefinitions() {

@@ -349,7 +349,7 @@ class PimCategoryOptionsTest {
     }
 
     @Test
-    void optionsOfKeepTheGivenOrderAndFallBackToTheIdForUnknownCategories() {
+    void selectedOfKeepsTheGivenOrderAndFallsBackToTheIdForUnknownCategories() {
         // given
         when(pimCatalog.allCategories()).thenReturn(List.of(
                 new PimCategory("1", null, "Dom", "pl"),
@@ -357,12 +357,33 @@ class PimCategoryOptionsTest {
         ));
 
         // when
-        List<PimCategoryOptions.CategoryOption> options = pimCategoryOptions().optionsOf(List.of("2", "nieznane-id"));
+        List<PimCategoryOptions.SelectedCategory> selected = pimCategoryOptions().selectedOf(List.of("2", "nieznane-id"));
 
         // then
-        assertThat(options).containsExactly(
-                new PimCategoryOptions.CategoryOption("2", "Stoły", "1"),
-                new PimCategoryOptions.CategoryOption("nieznane-id", "nieznane-id", null));
+        assertThat(selected).containsExactly(
+                new PimCategoryOptions.SelectedCategory("2", "Stoły", "Dom"),
+                new PimCategoryOptions.SelectedCategory("nieznane-id", "nieznane-id", null));
+    }
+
+    /** The chip rendered by the server shows the same path as the one the script draws: every ancestor, joined by "›". */
+    @Test
+    void selectedOfCarriesTheWholePathJoinedWithTheChipSeparator() {
+        // given
+        when(pimCatalog.allCategories()).thenReturn(List.of(
+                new PimCategory("1", null, "Komputery", "pl"),
+                new PimCategory("2", "1", "Peryferia", "pl"),
+                new PimCategory("3", "2", "Urządzenia wejścia", "pl"),
+                new PimCategory("4", "3", "Klawiatury", "pl"),
+                new PimCategory("5", null, "Dom", "pl")
+        ));
+
+        // when
+        List<PimCategoryOptions.SelectedCategory> selected = pimCategoryOptions().selectedOf(List.of("4", "5"));
+
+        // then
+        assertThat(selected).containsExactly(
+                new PimCategoryOptions.SelectedCategory("4", "Klawiatury", "Komputery \u203a Peryferia \u203a Urządzenia wejścia"),
+                new PimCategoryOptions.SelectedCategory("5", "Dom", null));
     }
 
     @Test
