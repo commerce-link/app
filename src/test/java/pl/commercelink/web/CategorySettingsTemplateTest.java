@@ -50,6 +50,15 @@ class CategorySettingsTemplateTest {
         assertThat(html).contains("Saved").doesNotContain("cl-alert is-warn");
     }
 
+    @Test
+    void theHubHasNoLeadUnderItsTitle() {
+        // when
+        String html = rendered(null);
+
+        // then
+        assertThat(html).doesNotContain("cl-page-lead").doesNotContain("Four short forms");
+    }
+
     /** The category is created from the Basics page, so its own page carries the same warning after the redirect. */
     @Test
     void theCategoryPageCarriesTheSameWarningFragment() throws Exception {
