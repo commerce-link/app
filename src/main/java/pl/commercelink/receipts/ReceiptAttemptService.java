@@ -198,7 +198,9 @@ public class ReceiptAttemptService {
             throw new ReceiptActionException("receipts.action.notFound");
         }
         Instant now = clock.instant();
-        ReceiptAttempt attempt = attempts.update(storeId, receiptKey, a -> {
+        // updateWritten, not update: a declined resend (nothing to resend) must not go on to resolve the bell and
+        // wake the attempt — for an ISSUING attempt that would silently drop its ISSUING_UNKNOWN alert for good.
+        ReceiptAttempt attempt = attempts.updateWritten(storeId, receiptKey, a -> {
                     if (a.isLeasedAt(now)) {
                         throw new ReceiptActionException("receipts.action.resendEmail.busy");
                     }
@@ -206,13 +208,15 @@ public class ReceiptAttemptService {
                         return false;
                     }
                     a.setEmailClaimedAt(null);
+                    // The bell is resolved below; forgetting the stored reason too lets ReceiptAlerts.sync raise
+                    // EMAIL_NOT_SENT afresh if the resent mail fails again (an unchanged reason publishes nothing).
+                    a.setAttention(null);
                     a.schedule(now);
                     return true;
                 })
-                .orElseThrow(() -> new ReceiptActionException("receipts.action.notFound"));
-        if (attempt.getEmailClaimedAt() != null) {
-            throw new ReceiptActionException("receipts.action.resendEmail.notEligible");
-        }
+                .orElseThrow(() -> attempts.find(storeId, receiptKey).isPresent()
+                        ? new ReceiptActionException("receipts.action.resendEmail.notEligible")
+                        : new ReceiptActionException("receipts.action.notFound"));
         log.info("Receipt attempt {} e-mail resend requested by {}", receiptKey, by);
         alerts.resolve(attempt);
         publisher.publishNow(storeId, receiptKey);

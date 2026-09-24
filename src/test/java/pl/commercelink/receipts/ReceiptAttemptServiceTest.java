@@ -2,6 +2,8 @@ package pl.commercelink.receipts;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.support.StaticMessageSource;
+import pl.commercelink.notifications.StoreNotificationService;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrderLifecycle;
@@ -9,6 +11,8 @@ import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.stores.IntegrationType;
 import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoreNotification;
+import pl.commercelink.stores.StoreNotificationType;
 import pl.commercelink.stores.StoresRepository;
 
 import java.time.Duration;
@@ -389,6 +393,64 @@ class ReceiptAttemptServiceTest {
         assertThat(attempt.isScheduled()).isTrue();
         verify(alerts).resolve(argThat(a -> a.getReceiptKey().equals(key)));
         verify(publisher).publishNow(STORE_ID, key);
+    }
+
+    @Test
+    void aResentMailThatFailsAgainRaisesTheBellAgain() {
+        // The bell is resolved by the resend; if the stored attention stayed EMAIL_NOT_SENT, the next sync would
+        // see "no change" and the operator would never hear that the resent mail failed too.
+        StoreNotificationService notifications = mock(StoreNotificationService.class);
+        StaticMessageSource messages = new StaticMessageSource();
+        ReceiptAlerts realAlerts = new ReceiptAlerts(notifications, messages);
+        service = new ReceiptAttemptService(attempts, stores, orders, orderItems, factory,
+                new ReceiptRequestConverter(), new ReceiptEligibility(factory), publisher, locking, lifecycle,
+                realAlerts, clock);
+        String key = ORDER_ID + ":R1";
+        service.startAutomatic(store, order);
+        attempts.update(STORE_ID, key, a -> {
+            a.setState(ReceiptAttemptState.FISCALISED);
+            a.setDocumentUrl("https://paragony.pl/x");
+            a.setEmailClaimedAt(clock.instant());
+            a.setAttention(ReceiptAttention.EMAIL_NOT_SENT.name());
+            a.unschedule();
+            return true;
+        });
+
+        service.resendEmail(STORE_ID, ORDER_ID, key, "operator");
+        // ReceiptEffects claims the e-mail again and the send fails again: claimed, never sent.
+        attempts.update(STORE_ID, key, a -> {
+            a.setEmailClaimedAt(clock.instant());
+            return true;
+        });
+        ReceiptAttempt failedAgain = attempts.find(STORE_ID, key).orElseThrow();
+
+        assertThat(realAlerts.sync(failedAgain, ReceiptAttentionEvaluator.evaluate(failedAgain, clock.instant())))
+                .isTrue();
+        verify(notifications).publish(eq(STORE_ID), argThat((StoreNotification n) ->
+                n.getType() == StoreNotificationType.RECEIPT_ATTENTION && key.equals(n.getObject())));
+        assertThat(failedAgain.getAttention()).isEqualTo(ReceiptAttention.EMAIL_NOT_SENT.name());
+    }
+
+    @Test
+    void resendEmailOfAnAttemptWithNoFailedMailIsRefusedAndLeavesItsAlertAlone() {
+        // An ISSUING attempt has no e-mail claim at all; before, the declined update still "succeeded" and went on
+        // to resolve the attempt's bell (e.g. ISSUING_UNKNOWN) for good.
+        String key = ORDER_ID + ":R1";
+        service.startAutomatic(store, order);
+        attempts.update(STORE_ID, key, a -> {
+            a.setAttention(ReceiptAttention.ISSUING_UNKNOWN.name());
+            return true;
+        });
+        clearInvocations(publisher);
+
+        assertThatThrownBy(() -> service.resendEmail(STORE_ID, ORDER_ID, key, "operator"))
+                .isInstanceOf(ReceiptActionException.class)
+                .extracting(e -> ((ReceiptActionException) e).getMessageKey())
+                .isEqualTo("receipts.action.resendEmail.notEligible");
+        verifyNoInteractions(alerts);
+        verify(publisher, never()).publishNow(any(), any());
+        assertThat(attempts.find(STORE_ID, key).orElseThrow().getAttention())
+                .isEqualTo(ReceiptAttention.ISSUING_UNKNOWN.name());
     }
 
     @Test
