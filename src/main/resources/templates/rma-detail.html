@@ -140,7 +140,7 @@
                             <div class="select">
                                 <select th:field="*{status}" th:disabled="${isClosed}">
                                     <option th:each="status : ${rmaStatusTypes}" th:value="${status}" th:text="${enumI18n.localize(status)}"
-                                            th:disabled="${rma.status.name() == 'Processing' and status.name() == 'ItemsReceived'}">>
+                                            th:disabled="${rma.status.name() == 'Processing' and status.name() == 'ItemsReceived'}">
                                     </option>
                                 </select>
                             </div>
