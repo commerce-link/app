@@ -403,7 +403,7 @@ public class CatalogProductsController {
         CategoryFilter currentFilter = CategoryFilter.of(status, feature, filterLabel, q);
         form.rememberSaved(null);
         Map<String, String> errors = form.validate(category.getGroupingOrder(), pricingGroups(category),
-                marketplaceNames(store), this::pimIdFor);
+                marketplaceNames(store));
         if (!errors.isEmpty()) {
             return rejected(renderProduct(catalog, category, store, null, form, null, errors, null, currentFilter,
                     model, locale), PRODUCT_FRAGMENT, async, response);
@@ -472,12 +472,40 @@ public class CatalogProductsController {
         // this product claim another entry.
         form.rememberSaved(product);
         Map<String, String> errors = form.validate(category.getGroupingOrder(), pricingGroups(category),
-                marketplaceNames(store), this::pimIdFor);
+                marketplaceNames(store));
         if (!errors.isEmpty()) {
             return rejected(renderProduct(catalog, category, store, product, form, product.getPimId(), errors, null,
                     currentFilter, model, locale), PRODUCT_FRAGMENT, async, response);
         }
+        // A pending product is looked up in the PIM on every save, the way an added one is: the codes may have been
+        // corrected just now, or the PIM may have created the entry since. A product the PIM knows keeps its entry.
+        // Asked with the codes as they will be saved, before anything of the form reaches the product.
+        InventoryKey key = new InventoryKey(StringUtils.trimToNull(form.getEan()), StringUtils.trimToNull(form.getManufacturerCode()));
+        Optional<PimEntry> joined = Optional.empty();
+        if (!form.identifiersLocked()) {
+            Product asSaved = new Product();
+            asSaved.setEan(StringUtils.trimToNull(form.getEan()));
+            asSaved.setManufacturerCode(StringUtils.trimToNull(form.getManufacturerCode()));
+            joined = pimEntryOf(inventory.withEnabledSuppliersOnly(storeId()), key, asSaved);
+        }
+        if (form.identifiersChanged() || joined.isPresent()) {
+            // Corrected codes, or the entry they lead to, must not be another product's of the category: the category
+            // would list it twice and the price list would price it twice.
+            String joinedPimId = joined.map(PimEntry::pimId).orElse(null);
+            boolean taken = productRepository.findAll(category.getCategoryId()).stream()
+                    .filter(other -> !other.getProductId().equals(product.getProductId()))
+                    .anyMatch(other -> key.matches(InventoryKey.fromProduct(other))
+                            || (joinedPimId != null && joinedPimId.equals(other.getPimId())));
+            if (taken) {
+                return rejected(renderProduct(catalog, category, store, product, form, product.getPimId(),
+                        Map.of("ean", DUPLICATE), null, currentFilter, model, locale), PRODUCT_FRAGMENT, async, response);
+            }
+        }
         form.applyTo(product);
+        joined.ifPresent(entry -> {
+            product.setPimId(entry.pimId());
+            product.setBrand(brandMapper.unifyBrand(entry.brand()));
+        });
         try {
             productRepository.save(product);
         } catch (ConditionalCheckFailedException e) {
@@ -489,7 +517,8 @@ public class CatalogProductsController {
             return async ? PRODUCT_FRAGMENT : view;
         }
         return saved(CatalogPaths.category(catalogId, categoryId) + currentFilter.query(),
-                messageSource.getMessage("product.saved", new Object[]{product.getName()}, locale), async, model,
+                messageSource.getMessage(joined.isPresent() ? "product.saved.pimAttached" : "product.saved",
+                        new Object[]{product.getName()}, locale), async, model,
                 redirectAttributes, request, response, PRODUCT_FRAGMENT,
                 () -> renderProduct(catalog, category, store, product, form, product.getPimId(), Map.of(), null,
                         currentFilter, model, locale));
@@ -554,11 +583,6 @@ public class CatalogProductsController {
             }
         }
         return pimCatalog.findByGtinOrMpn(product.getEan(), product.getManufacturerCode());
-    }
-
-    /** The PIM entry the submitted identifiers point at, which the saved product's own entry is compared with. */
-    private Optional<String> pimIdFor(ProductForm.PimCheck check) {
-        return pimCatalog.findByGtinOrMpn(check.ean(), check.mfn()).map(PimEntry::pimId);
     }
 
     private static List<String> marketplaceNames(Store store) {

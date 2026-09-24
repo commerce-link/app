@@ -37,25 +37,29 @@ class ProductsBulkAddFormTest {
     }
 
     /**
-     * The identifiers are editable here, so they are checked here, by the rules the product page uses: a product is
-     * known by its EAN or by its manufacturer code, and an EAN that is given is 8--14 digits.
+     * The identifiers are editable here, so they are checked here, by the rules the product page uses: a product needs
+     * both its EAN (8--14 digits) and its manufacturer code, each missing one an error of its own field.
      */
     @Test
-    void aRowNeedsAnIdentifierAndAnEanOfEightToFourteenDigits() {
+    void aRowNeedsAnEanOfEightToFourteenDigitsAndAManufacturerCode() {
         // given
         ProductsBulkAddForm form = ProductsBulkAddForm.of(List.of(
-                withIdentifiers(null, null), withIdentifiers("12345", null), withIdentifiers(null, "MFN-1")));
+                withIdentifiers(null, null), withIdentifiers("12345", "MFN-1"), withIdentifiers(null, "MFN-1"),
+                withIdentifiers("5901234567890", " "), withIdentifiers("5901234567890", "MFN-1")));
 
         // when
         Map<String, String> errors = form.validate(List.of(), List.of("Default"));
 
         // then
-        assertThat(errors).containsEntry("product-0-ean", "product.error.identifier.required")
-                // Either field would fix a row with no identifier at all, so both are marked and both are linkable.
-                .containsEntry("product-0-manufacturerCode", "product.error.identifier.required")
+        assertThat(errors).containsEntry("product-0-ean", "product.error.ean.required")
+                .containsEntry("product-0-manufacturerCode", "product.error.mfn.required")
                 .containsEntry("product-1-ean", "product.error.ean.invalid")
                 .doesNotContainKey("product-1-manufacturerCode")
-                .doesNotContainKey("product-2-ean");
+                .containsEntry("product-2-ean", "product.error.ean.required")
+                .doesNotContainKey("product-2-manufacturerCode")
+                .containsEntry("product-3-manufacturerCode", "product.error.mfn.required")
+                .doesNotContainKey("product-3-ean")
+                .doesNotContainKey("product-4-ean").doesNotContainKey("product-4-manufacturerCode");
     }
 
     /** The key of an error is the id of the field it belongs to, so the summary can link to it. */
@@ -84,7 +88,7 @@ class ProductsBulkAddFormTest {
         // given
         Map<String, String> texts = new LinkedHashMap<>();
         texts.put("product-1-name", PolishMessages.text("product.error.name.required"));
-        texts.put("product-11-ean", PolishMessages.text("product.error.identifier.required"));
+        texts.put("product-11-ean", PolishMessages.text("product.error.ean.required"));
         texts.put("products", PolishMessages.text("catalog.products.review.none"));
 
         // when
@@ -94,7 +98,7 @@ class ProductsBulkAddFormTest {
         // then
         assertThat(summary).containsExactly(
                 Map.entry("product-1-name", "Produkt 2: Podaj nazwę produktu."),
-                Map.entry("product-11-ean", "Produkt 12: Podaj EAN albo kod producenta."),
+                Map.entry("product-11-ean", "Produkt 12: Podaj EAN."),
                 Map.entry("products", "Nie zaznaczono produktów."));
     }
 
@@ -129,9 +133,9 @@ class ProductsBulkAddFormTest {
     @Test
     void anUnknownAvailabilityIsAnErrorOfItsFieldAndAKnownOneIsApplied() {
         // given
-        ProductsBulkAddForm.Row forged = row("5901234567890", null);
+        ProductsBulkAddForm.Row forged = row("5901234567890", "MFN-1");
         forged.setAvailabilityType("Forged");
-        ProductsBulkAddForm.Row fixed = row("5901234567891", null);
+        ProductsBulkAddForm.Row fixed = row("5901234567891", "MFN-2");
         fixed.setAvailabilityType("AlwaysAvailable");
         ProductsBulkAddForm form = new ProductsBulkAddForm();
         form.setProducts(new ArrayList<>(List.of(forged, fixed)));

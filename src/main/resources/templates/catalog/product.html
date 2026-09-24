@@ -49,8 +49,29 @@
                         <legend class="cl-fieldset-title" th:text="#{product.page.section.product}"></legend>
                         <div class="cl-form-grid">
                             <div class="cl-span-6" th:insert="~{fragments/settings-form :: textField('name', 'product.name', *{name}, 'text', 'off', true, ${errors['name']}, null)}"></div>
-                            <div class="cl-span-2" th:insert="~{fragments/settings-form :: textField('ean', 'product.ean', *{ean}, 'text', 'off', false, ${errors['ean']}, null)}"></div>
-                            <div class="cl-span-2" th:insert="~{fragments/settings-form :: textField('manufacturerCode', 'product.manufacturer.code', *{manufacturerCode}, 'text', 'off', false, null, null)}"></div>
+                            <th:block th:unless="${form.identifiersLocked()}">
+                                <div class="cl-span-2" th:insert="~{fragments/settings-form :: textField('ean', 'product.ean', *{ean}, 'text', 'off', true, ${errors['ean']}, null)}"></div>
+                                <div class="cl-span-2" th:insert="~{fragments/settings-form :: textField('manufacturerCode', 'product.manufacturer.code', *{manufacturerCode}, 'text', 'off', true, ${errors['manufacturerCode']}, null)}"></div>
+                            </th:block>
+                            <!--/* A product the PIM knows keeps its codes: display only, like the brand below, so nothing is
+                                   posted for them and the save keeps the saved values. */-->
+                            <th:block th:if="${form.identifiersLocked()}">
+                                <div class="cl-span-2">
+                                    <div class="cl-field">
+                                        <label class="cl-label" for="eanDisplay" th:text="#{product.ean}"></label>
+                                        <input class="cl-input" type="text" id="eanDisplay" readonly
+                                               aria-describedby="identifiers-locked" th:value="*{ean}">
+                                    </div>
+                                </div>
+                                <div class="cl-span-2">
+                                    <div class="cl-field">
+                                        <label class="cl-label" for="manufacturerCodeDisplay" th:text="#{product.manufacturer.code}"></label>
+                                        <input class="cl-input" type="text" id="manufacturerCodeDisplay" readonly
+                                               aria-describedby="identifiers-locked" th:value="*{manufacturerCode}">
+                                        <p class="cl-help" id="identifiers-locked" th:text="#{product.identifiers.locked}"></p>
+                                    </div>
+                                </div>
+                            </th:block>
                             <div class="cl-span-2">
                                 <div class="cl-field" th:if="${!labels.isEmpty()}">
                                     <label class="cl-label" for="label" th:text="#{product.label}"></label>

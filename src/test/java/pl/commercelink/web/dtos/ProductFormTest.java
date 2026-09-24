@@ -11,7 +11,6 @@ import pl.commercelink.starter.dynamodb.Metadata;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -53,7 +52,7 @@ class ProductFormTest {
         Product product = new Product("cat", "pim-1", "4719331361600", "GV-N5080", "Gigabyte", "old", "old", "Default");
 
         // when
-        Map<String, String> errors = form.validate(LABELS, GROUPS, MARKETPLACES, check -> Optional.of("pim-1"));
+        Map<String, String> errors = form.validate(LABELS, GROUPS, MARKETPLACES);
         form.applyTo(product);
 
         // then
@@ -68,20 +67,26 @@ class ProductFormTest {
         assertThat(product.getAvailabilityType()).isEqualTo(ProductAvailabilityType.BasedOnSupply);
     }
 
+    /** The client's rule: a product is known by both its EAN and its manufacturer code, each at its own field. */
     @Test
-    void nameAndAnIdentifierAreRequired() {
+    void theNameTheEanAndTheManufacturerCodeAreAllRequired() {
         // given
         ProductForm form = valid();
         form.setName(" ");
         form.setEan("");
         form.setManufacturerCode("");
+        ProductForm withoutCode = valid();
+        withoutCode.setManufacturerCode(" ");
 
         // when
-        Map<String, String> errors = form.validate(LABELS, GROUPS, MARKETPLACES, check -> Optional.empty());
+        Map<String, String> errors = form.validate(LABELS, GROUPS, MARKETPLACES);
 
         // then
         assertThat(errors).containsEntry("name", "product.error.name.required")
-                .containsEntry("ean", "product.error.identifier.required");
+                .containsEntry("ean", "product.error.ean.required")
+                .containsEntry("manufacturerCode", "product.error.mfn.required");
+        assertThat(withoutCode.validate(LABELS, GROUPS, MARKETPLACES))
+                .containsOnlyKeys("manufacturerCode");
     }
 
     @Test
@@ -91,7 +96,7 @@ class ProductFormTest {
         form.setEan("12ab");
 
         // when / then
-        assertThat(form.validate(LABELS, GROUPS, MARKETPLACES, check -> Optional.empty()))
+        assertThat(form.validate(LABELS, GROUPS, MARKETPLACES))
                 .containsEntry("ean", "product.error.ean.invalid");
     }
 
@@ -103,20 +108,57 @@ class ProductFormTest {
         form.setSuggestedRetailPrice("0");
 
         // when / then
-        assertThat(form.validate(LABELS, GROUPS, MARKETPLACES, check -> Optional.empty()))
+        assertThat(form.validate(LABELS, GROUPS, MARKETPLACES))
                 .containsEntry("suggestedRetailPrice", "product.error.srp.requiredForFixed");
     }
 
+    /**
+     * A product the PIM knows keeps the EAN and the code it was saved with: whatever the request carries for them (the
+     * page shows them read-only and posts nothing) is replaced by the saved values before anything is checked.
+     */
     @Test
-    void changingTheIdentifierToAnotherPimEntryIsAnError() {
+    void aProductKnownToThePimKeepsItsSavedIdentifiers() {
         // given
         ProductForm form = valid();
-        form.rememberSaved(new Product("cat", "pim-1", null, null, null, null, null, null));
+        form.setEan("4719331361699");
+        form.setManufacturerCode("FORGED");
+        Product product = saved("pim-1", "4719331361600", "GV-N5080");
 
-        // when / then
-        assertThat(form.validate(LABELS, GROUPS, MARKETPLACES, check -> Optional.of("pim-2")))
-                .containsEntry("ean", "product.error.pim.changed");
-        assertThat(form.validate(LABELS, GROUPS, MARKETPLACES, check -> Optional.of("pim-1"))).isEmpty();
+        // when
+        form.rememberSaved(product);
+        Map<String, String> errors = form.validate(LABELS, GROUPS, MARKETPLACES);
+        form.applyTo(product);
+
+        // then
+        assertThat(errors).isEmpty();
+        assertThat(form.identifiersLocked()).isTrue();
+        assertThat(form.getEan()).isEqualTo("4719331361600");
+        assertThat(form.getManufacturerCode()).isEqualTo("GV-N5080");
+        assertThat(product.getEan()).isEqualTo("4719331361600");
+        assertThat(product.getManufacturerCode()).isEqualTo("GV-N5080");
+    }
+
+    /** A pending product (no PIM entry yet) may have its codes corrected; the save then looks the PIM up by them. */
+    @Test
+    void aPendingProductMayCorrectItsIdentifiers() {
+        // given
+        ProductForm form = valid();
+        form.setEan("4719331361601");
+        form.setManufacturerCode("gv-n5080-oc");
+        Product product = saved(null, "4719331361600", "GV-N5080");
+
+        // when
+        form.rememberSaved(product);
+        Map<String, String> errors = form.validate(LABELS, GROUPS, MARKETPLACES);
+        form.applyTo(product);
+
+        // then
+        assertThat(errors).isEmpty();
+        assertThat(form.identifiersLocked()).isFalse();
+        assertThat(form.identifiersChanged()).isTrue();
+        assertThat(product.getEan()).isEqualTo("4719331361601");
+        // stored the way every product stores its code: upper case
+        assertThat(product.getManufacturerCode()).isEqualTo("GV-N5080-OC");
     }
 
     @Test
@@ -126,10 +168,10 @@ class ProductFormTest {
         form.setLabel("RTX 4060");
 
         // when / then
-        assertThat(form.validate(LABELS, GROUPS, MARKETPLACES, check -> Optional.of("pim-1")))
+        assertThat(form.validate(LABELS, GROUPS, MARKETPLACES))
                 .containsEntry("label", "product.error.label.notInList");
         form.rememberSaved(new Product("cat", null, null, null, null, "RTX 4060", null, null));
-        assertThat(form.validate(LABELS, GROUPS, MARKETPLACES, check -> Optional.of("pim-1"))).isEmpty();
+        assertThat(form.validate(LABELS, GROUPS, MARKETPLACES)).isEmpty();
     }
 
     @Test
@@ -140,7 +182,7 @@ class ProductFormTest {
         form.setPricingGroup("Nope");
 
         // when
-        Map<String, String> errors = form.validate(LABELS, GROUPS, MARKETPLACES, check -> Optional.of("pim-1"));
+        Map<String, String> errors = form.validate(LABELS, GROUPS, MARKETPLACES);
 
         // then
         assertThat(errors).containsEntry("marketplaces", "product.error.marketplace.unknown")
@@ -160,7 +202,7 @@ class ProductFormTest {
         form.getMetadata().add(new Metadata("gtin", null));
 
         // when
-        Map<String, String> errors = form.validate(LABELS, GROUPS, MARKETPLACES, check -> Optional.of("pim-1"));
+        Map<String, String> errors = form.validate(LABELS, GROUPS, MARKETPLACES);
 
         // then
         assertThat(errors).containsEntry("customAttribute-0-name", "product.error.attribute.incomplete")
@@ -179,7 +221,7 @@ class ProductFormTest {
         Product product = new Product("cat", "pim-1", "4719331361600", "GV-N5080", "Gigabyte", "old", "old", "Default");
 
         // when
-        Map<String, String> errors = form.validate(LABELS, GROUPS, MARKETPLACES, check -> Optional.of("pim-1"));
+        Map<String, String> errors = form.validate(LABELS, GROUPS, MARKETPLACES);
         form.applyTo(product);
 
         // then
@@ -249,7 +291,7 @@ class ProductFormTest {
         Product product = new Product("cat", "pim-1", "4719331361600", "GV-N5080", "Gigabyte", "old", "old", "Default");
 
         // when
-        Map<String, String> errors = form.validate(LABELS, GROUPS, MARKETPLACES, check -> Optional.of("pim-1"));
+        Map<String, String> errors = form.validate(LABELS, GROUPS, MARKETPLACES);
         form.applyTo(product);
 
         // then
@@ -267,49 +309,25 @@ class ProductFormTest {
     }
 
     /**
-     * OD-1: a product can hold a PIM entry its own two codes do not lead to (the entry matched a sibling EAN of the
-     * inventory key, or the PIM changed its GTINs since). Its identity is only at stake when the codes change, so the
-     * PIM is asked then and only then -- a price change must not be refused because of it.
-     */
-    @Test
-    void thePimIsAskedOnlyWhenAnIdentifierChanges() {
-        // given
-        ProductForm unchanged = ProductForm.from(saved("pim-1", "4719331361600", "GV-N5080"));
-        unchanged.setSuggestedRetailPrice("5 199");
-        // the same codes as saved, as they come back typed with spaces and in lower case
-        ProductForm retyped = ProductForm.from(saved("pim-1", "4719331361600", "GV-N5080"));
-        retyped.setEan(" 4719331361600 ");
-        retyped.setManufacturerCode("gv-n5080");
-        ProductForm changed = ProductForm.from(saved("pim-1", "4719331361600", "GV-N5080"));
-        changed.setEan("4719331361601");
-
-        // when / then
-        assertThat(unchanged.validate(LABELS, GROUPS, MARKETPLACES, check -> Optional.of("pim-2"))).isEmpty();
-        assertThat(retyped.validate(LABELS, GROUPS, MARKETPLACES, check -> Optional.of("pim-2"))).isEmpty();
-        assertThat(changed.validate(LABELS, GROUPS, MARKETPLACES, check -> Optional.of("pim-2")))
-                .containsEntry("ean", "product.error.pim.changed");
-    }
-
-    /**
      * RF-4 (variant A): the 8--14 digit rule applies to an EAN being entered; a product saved before the rule existed
-     * keeps its EAN through a save that does not touch it. An EAN or a code is still required from every product.
+     * keeps its EAN through a save that does not touch it. Both the EAN and the code are still required from every product.
      */
     @Test
     void aLegacyEanIsCheckedOnlyOnceItIsChanged() {
         // given
-        ProductForm unchanged = ProductForm.from(saved(null, "590 123", null));
+        ProductForm unchanged = ProductForm.from(saved(null, "590 123", "LEGACY-1"));
         unchanged.setName("Renamed");
-        ProductForm changed = ProductForm.from(saved(null, "590 123", null));
+        ProductForm changed = ProductForm.from(saved(null, "590 123", "LEGACY-1"));
         changed.setEan("590 124");
-        ProductForm cleared = ProductForm.from(saved(null, "590 123", null));
+        ProductForm cleared = ProductForm.from(saved(null, "590 123", "LEGACY-1"));
         cleared.setEan("");
 
         // when / then
-        assertThat(unchanged.validate(LABELS, GROUPS, MARKETPLACES, check -> Optional.empty())).isEmpty();
-        assertThat(changed.validate(LABELS, GROUPS, MARKETPLACES, check -> Optional.empty()))
+        assertThat(unchanged.validate(LABELS, GROUPS, MARKETPLACES)).isEmpty();
+        assertThat(changed.validate(LABELS, GROUPS, MARKETPLACES))
                 .containsEntry("ean", "product.error.ean.invalid");
-        assertThat(cleared.validate(LABELS, GROUPS, MARKETPLACES, check -> Optional.empty()))
-                .containsEntry("ean", "product.error.identifier.required");
+        assertThat(cleared.validate(LABELS, GROUPS, MARKETPLACES))
+                .containsEntry("ean", "product.error.ean.required");
     }
 
     /** RF-29: a filter complete but for its comparison ("—") is an error of the operator, where the summary links. */
@@ -325,7 +343,7 @@ class ProductFormTest {
         form.getCustomAttributesFilters().add(filter);
 
         // when / then
-        assertThat(form.validate(LABELS, GROUPS, MARKETPLACES, check -> Optional.of("pim-1")))
+        assertThat(form.validate(LABELS, GROUPS, MARKETPLACES))
                 .containsOnlyKeys("customAttributeFilter-0-operator")
                 .containsEntry("customAttributeFilter-0-operator", "product.error.filter.incomplete");
     }
@@ -349,11 +367,11 @@ class ProductFormTest {
         created.setPricingGroup("Ultra");
 
         // when / then
-        assertThat(kept.validate(LABELS, GROUPS, MARKETPLACES, check -> Optional.of("pim-1"))).isEmpty();
-        assertThat(keptLowerCase.validate(LABELS, GROUPS, MARKETPLACES, check -> Optional.of("pim-1"))).isEmpty();
-        assertThat(changed.validate(LABELS, GROUPS, MARKETPLACES, check -> Optional.of("pim-1")))
+        assertThat(kept.validate(LABELS, GROUPS, MARKETPLACES)).isEmpty();
+        assertThat(keptLowerCase.validate(LABELS, GROUPS, MARKETPLACES)).isEmpty();
+        assertThat(changed.validate(LABELS, GROUPS, MARKETPLACES))
                 .containsEntry("pricingGroup", "product.error.group.unknown");
-        assertThat(created.validate(LABELS, GROUPS, MARKETPLACES, check -> Optional.of("pim-1")))
+        assertThat(created.validate(LABELS, GROUPS, MARKETPLACES))
                 .containsEntry("pricingGroup", "product.error.group.unknown");
     }
 
@@ -402,8 +420,8 @@ class ProductFormTest {
         added.setMarketplaces(List.of("allegro", "Morele", "Wish"));
 
         // when / then
-        assertThat(kept.validate(LABELS, GROUPS, MARKETPLACES, check -> Optional.of("pim-1"))).isEmpty();
-        assertThat(added.validate(LABELS, GROUPS, MARKETPLACES, check -> Optional.of("pim-1")))
+        assertThat(kept.validate(LABELS, GROUPS, MARKETPLACES)).isEmpty();
+        assertThat(added.validate(LABELS, GROUPS, MARKETPLACES))
                 .containsEntry("marketplaces", "product.error.marketplace.unknown");
     }
 }
