@@ -9,7 +9,10 @@ import pl.commercelink.receipts.api.ReceiptProviderDescriptor;
 import pl.commercelink.stores.IntegrationType;
 import pl.commercelink.stores.Store;
 
-/** Receipt providers of a store; every call goes through the shared provider call limiter. */
+/**
+ * Receipt providers of a store. The provider's network methods (its non-{@code default} SPI methods) go through the
+ * shared provider call limiter; {@code default} methods are local helpers and pass straight through without a permit.
+ */
 @Service
 public class ReceiptProviderFactory extends ProviderFactory<ReceiptProviderDescriptor, ReceiptProvider> {
 
