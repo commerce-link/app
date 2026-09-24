@@ -4046,6 +4046,14 @@ a.cl-link-button:hover {
     }
 }
 
+/* A read-only field of a catalog form -- the EAN and code of a product the PIM knows, its brand, the name of the Default
+   pricing group -- looked like one to type in: the tinted ground and the darker grey (--cl-ink-2 on a tint, §2) say it
+   is shown, not edited. Only catalog forms have read-only inputs. */
+.cl-page .cl-form .cl-input[readonly] {
+    background: var(--cl-surface-2);
+    color: var(--cl-ink-2);
+}
+
 /* A form page (its form 760 px wide): the header is as wide as the form, so its action stands at the form's edge
    instead of at the edge of the page body. */
 .cl-page .cl-page-body.is-form > .cl-page-header {

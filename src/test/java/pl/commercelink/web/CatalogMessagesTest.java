@@ -6,6 +6,7 @@ import java.io.Reader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
@@ -213,5 +214,20 @@ class CatalogMessagesTest {
         assertThat(en.get("catalog.products.pill.nopim")).isEqualTo("Pending");
         assertThat(pl).allSatisfy((key, text) -> assertThat(text).as(key).doesNotContain("Bez PIM"));
         assertThat(en.get("catalog.products.note.dynamic")).doesNotContain("\"No PIM\"").contains("\"Pending\"");
+    }
+
+    /**
+     * A tile of the category settings shows two lines of its description and cuts the rest; 56 characters is what the
+     * narrowest tile holds (390 px, and the three-column grid at 768 and 1440 px). "podkategorie" made the Basics one
+     * longer than that, and the Marketplaces one was cut on a phone already.
+     */
+    @Test
+    void theDescriptionOfEveryCategorySettingsTileFitsItsTwoLines() throws Exception {
+        for (String file : List.of("messages_pl.properties", "messages_en.properties")) {
+            Map<String, String> messages = catalogMessages(file);
+            for (String tile : List.of("basics", "pricing", "marketplaces", "filters")) {
+                assertThat(messages.get("catalog.category." + tile + ".tile")).as(file + " " + tile).hasSizeLessThanOrEqualTo(56);
+            }
+        }
     }
 }
