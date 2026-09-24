@@ -1,8 +1,11 @@
 package pl.commercelink.receipts;
 
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
+import com.amazonaws.services.dynamodbv2.model.AttributeValue;
 import com.amazonaws.services.dynamodbv2.model.GetItemRequest;
 import com.amazonaws.services.dynamodbv2.model.GetItemResult;
+import com.amazonaws.services.dynamodbv2.model.QueryRequest;
+import com.amazonaws.services.dynamodbv2.model.QueryResult;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -29,5 +32,21 @@ class DynamoDbReceiptAttemptStoreTest {
         assertThat(request.getValue().isConsistentRead()).isTrue();
         assertThat(request.getValue().getTableName()).isEqualTo(ReceiptAttempt.TABLE_NAME);
         assertThat(request.getValue().getKey()).containsKeys("storeId", "receiptKey");
+    }
+
+    /** A FISCALISED attempt still needing its link (no document, no give-up) counts as live: the customer still
+     *  waits for the e-mail, and switching the provider away would strand the poll. */
+    @Test
+    void hasLiveAttemptsFiltersForStatesStillNeedingTheProvider() {
+        when(dynamoDB.query(any())).thenReturn(new QueryResult());
+
+        store.hasLiveAttempts("s1");
+
+        ArgumentCaptor<QueryRequest> request = ArgumentCaptor.forClass(QueryRequest.class);
+        verify(dynamoDB).query(request.capture());
+        assertThat(request.getValue().getFilterExpression()).contains("attribute_not_exists(documentUrl)");
+        assertThat(request.getValue().getExpressionAttributeValues().values())
+                .extracting(AttributeValue::getS)
+                .contains(ReceiptAttemptState.FISCALISED.name());
     }
 }

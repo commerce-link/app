@@ -18,6 +18,9 @@ import org.springframework.ui.ExtendedModelMap;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 import pl.commercelink.provider.api.ProviderField;
 import pl.commercelink.receipts.FakeReceiptProviderDescriptor;
+import pl.commercelink.receipts.InMemoryReceiptAttemptStore;
+import pl.commercelink.receipts.ReceiptAttempt;
+import pl.commercelink.receipts.ReceiptAttemptState;
 import pl.commercelink.receipts.ReceiptAttemptStore;
 import pl.commercelink.receipts.ReceiptProviderFactory;
 import pl.commercelink.receipts.api.ReceiptProviderDescriptor;
@@ -33,9 +36,11 @@ import java.util.Locale;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -187,6 +192,53 @@ class StoreReceiptSystemControllerTest {
         assertThat(store.getConfigurationValue(IntegrationType.RECEIPT_PROVIDER)).isEqualTo(SYSTEM);
         assertThat(view).isEqualTo("store-receipt-system :: systemForm");
         assertThat(response.getStatus()).isEqualTo(422);
+    }
+
+    /** A fiscalised receipt still waiting for its link (no document, no give-up) is still polled through the
+     *  provider: disconnecting now would strand it, so the customer would never get the e-mail. */
+    @Test
+    void disconnectIsRefusedWhileAFiscalisedReceiptStillWaitsForItsLink() {
+        // given
+        InMemoryReceiptAttemptStore realAttempts = new InMemoryReceiptAttemptStore();
+        ReceiptAttempt attempt = new ReceiptAttempt();
+        attempt.setStoreId("store-1");
+        attempt.setReceiptKey("o1:R1");
+        attempt.setOrderId("o1");
+        attempt.setState(ReceiptAttemptState.FISCALISED);
+        realAttempts.create(attempt);
+        StoreReceiptSystemController controllerWithRealAttempts = new StoreReceiptSystemController(storesRepository,
+                new ReceiptSystems(receiptProviderFactory, realAttempts, API_DOMAIN), messageSource);
+        Store store = configuredStore();
+        RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
+        authenticateAs("store-1", "ADMIN");
+
+        // when
+        String view = controllerWithRealAttempts.disconnect(PL, redirectAttributes);
+
+        // then
+        verify(receiptProviderFactory, never()).deleteConfiguration(any(), anyString());
+        assertThat(store.getConfigurationValue(IntegrationType.RECEIPT_PROVIDER)).isEqualTo(SYSTEM);
+        assertThat(view).isEqualTo("redirect:/dashboard/store/receipts");
+        assertThat(redirectAttributes.getFlashAttributes().get("settingsErrorMessage"))
+                .isEqualTo("store.receipts.system.disconnect.live");
+    }
+
+    /** {@code save} can also fail with an unrelated {@code IllegalStateException} (e.g. from the provider factory);
+     *  only {@link ReceiptSystemBusyException} means "live receipts", so anything else must propagate instead of
+     *  being reported as the switch-blocked error. */
+    @Test
+    void aDifferentIllegalStateExceptionFromSavingIsNotReportedAsLiveReceipts() {
+        // given
+        store("store-1");
+        doThrow(new IllegalStateException("storage unavailable"))
+                .when(receiptProviderFactory).saveConfiguration(any(), anyString(), anyMap());
+
+        // when / then
+        assertThatThrownBy(() -> controller.saveSystem(system(Map.of(SYSTEM + ".token", "secret")), null,
+                new ExtendedModelMap(), PL, new RedirectAttributesModelMap(), new MockHttpServletRequest(),
+                new MockHttpServletResponse()))
+                .isExactlyInstanceOf(IllegalStateException.class)
+                .isNotInstanceOf(ReceiptSystemBusyException.class);
     }
 
     private Store configuredStore() {

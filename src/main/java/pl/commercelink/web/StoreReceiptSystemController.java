@@ -128,7 +128,7 @@ public class StoreReceiptSystemController {
         // Validated above, so the adapter settings are complete.
         try {
             receiptSystems.save(store, form.getProviderName(), form.toConfiguration(fields));
-        } catch (IllegalStateException e) {
+        } catch (ReceiptSystemBusyException e) {
             // Switching away from a provider that still has live attempts would strand them without their secret.
             Map<String, String> switchErrors = Map.of("providerName", "store.receipts.system.switch.live");
             String view = render(store, form, switchErrors, model, locale);

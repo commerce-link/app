@@ -112,14 +112,14 @@ class ReceiptSystems {
      * A system the store does not use yet starts from a clean secret (saving merges into an existing one, which would
      * bring back keys of an earlier connection), and the previous system's secret goes once the new one is saved.
      *
-     * @throws IllegalStateException when switching away from a provider that still has live attempts: they need its
-     *         secret until they are resolved, and deleting it here would strand them
+     * @throws ReceiptSystemBusyException when switching away from a provider that still has live attempts: they need
+     *         its secret until they are resolved, and deleting it here would strand them
      */
     void save(Store store, String providerName, Map<String, String> configuration) {
         String previous = current(store);
         boolean switching = !providerName.equals(previous);
         if (switching && previous != null && hasLiveAttempts(store)) {
-            throw new IllegalStateException("live attempts");
+            throw new ReceiptSystemBusyException("Cannot switch away from " + previous + ": live attempts still need it");
         }
         if (switching) {
             receiptProviderFactory.deleteConfiguration(store, providerName);

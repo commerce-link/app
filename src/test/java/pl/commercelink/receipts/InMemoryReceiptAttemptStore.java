@@ -97,7 +97,6 @@ public class InMemoryReceiptAttemptStore implements ReceiptAttemptStore {
 
     @Override
     public boolean hasLiveAttempts(String storeId) {
-        return items.values().stream().anyMatch(a -> a.getStoreId().equals(storeId)
-                && (a.getState() == ReceiptAttemptState.ISSUING || a.getState() == ReceiptAttemptState.PENDING));
+        return items.values().stream().anyMatch(a -> a.getStoreId().equals(storeId) && a.needsProvider());
     }
 }

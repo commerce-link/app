@@ -28,8 +28,10 @@ public interface ReceiptAttemptStore {
     List<ReceiptAttempt> findDue(Instant now, int limit);
 
     /**
-     * Whether the store has attempts that still need the provider (ISSUING or PENDING) — "live" here, unlike
-     * {@link ReceiptAttemptState#isLive()}, excludes FISCALISED: a fiscalised attempt no longer needs the provider.
+     * Whether the store has attempts that still {@link ReceiptAttempt#needsProvider() need the provider}: ISSUING,
+     * PENDING, or FISCALISED but still waiting for its link. "Live" here, unlike {@link ReceiptAttemptState#isLive()},
+     * excludes a FISCALISED attempt whose link already arrived or was given up on — that one no longer needs the
+     * provider, so switching or disconnecting the receipt system is safe for it.
      */
     boolean hasLiveAttempts(String storeId);
 

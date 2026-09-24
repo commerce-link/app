@@ -137,4 +137,13 @@ public class ReceiptAttempt {
     public boolean isLeasedAt(Instant now) {
         return leaseUntil != null && leaseUntil.isAfter(now);
     }
+
+    /** Whether this attempt still needs the provider: ISSUING and PENDING always do, and a FISCALISED attempt does
+     *  too until its link is fetched ({@code documentUrl}) or the fetch is given up on ({@code linkGaveUpAt}) — until
+     *  then it is still polled and the customer still waits for the e-mail. */
+    @DynamoDBIgnore
+    public boolean needsProvider() {
+        return state == ReceiptAttemptState.ISSUING || state == ReceiptAttemptState.PENDING
+                || (state == ReceiptAttemptState.FISCALISED && documentUrl == null && linkGaveUpAt == null);
+    }
 }

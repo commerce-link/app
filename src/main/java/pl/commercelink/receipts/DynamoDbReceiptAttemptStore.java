@@ -77,12 +77,14 @@ class DynamoDbReceiptAttemptStore extends DynamoDbRepository<ReceiptAttempt> imp
     public boolean hasLiveAttempts(String storeId) {
         DynamoDBQueryExpression<ReceiptAttempt> query = new DynamoDBQueryExpression<ReceiptAttempt>()
                 .withKeyConditionExpression("storeId = :s")
-                .withFilterExpression("#st IN (:issuing, :pending)")
+                .withFilterExpression("#st IN (:issuing, :pending) "
+                        + "OR (#st = :fiscalised AND attribute_not_exists(documentUrl) AND attribute_not_exists(linkGaveUpAt))")
                 .withExpressionAttributeNames(Map.of("#st", "state"))
                 .withExpressionAttributeValues(Map.of(
                         ":s", new AttributeValue(storeId),
                         ":issuing", new AttributeValue(ReceiptAttemptState.ISSUING.name()),
-                        ":pending", new AttributeValue(ReceiptAttemptState.PENDING.name())));
+                        ":pending", new AttributeValue(ReceiptAttemptState.PENDING.name()),
+                        ":fiscalised", new AttributeValue(ReceiptAttemptState.FISCALISED.name())));
         return !dynamoDBMapper.query(ReceiptAttempt.class, query).isEmpty();
     }
 }
