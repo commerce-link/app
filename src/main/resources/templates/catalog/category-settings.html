@@ -6,7 +6,7 @@
 <div layout:fragment="content">
     <section class="cl-page">
         <div class="cl-page-body">
-            <div th:replace="~{fragments/settings-header :: subpageWithActions(${backHref}, ${category.name}, #{catalog.category.settings.title}, #{catalog.category.settings.lead}, null)}"></div>
+            <div th:replace="~{fragments/settings-header :: subpageWithActions(${backHref}, ${category.name}, #{catalog.category.settings.title}, null, null)}"></div>
 
             <div th:replace="~{fragments/settings-form :: savedAlert}"></div>
             <div th:replace="~{fragments/settings-form :: warnAlert}"></div>

@@ -149,16 +149,10 @@ public class ProductsBulkAddForm {
             if (StringUtils.isBlank(row.getName())) {
                 errors.put(fieldId(index, "name"), "product.error.name.required");
             }
-            // The review edits the identifiers, so it checks them by the same rules as the product page. A row with
-            // neither of them is a mistake of both fields -- either one fixes it -- so both are marked and the error
-            // summary links to whichever the operator wants to fill in.
-            String identifierError = ProductForm.identifierError(row.getEan(), row.getManufacturerCode());
-            if (identifierError != null) {
-                errors.put(fieldId(index, "ean"), identifierError);
-            }
-            if (ProductForm.IDENTIFIER_REQUIRED.equals(identifierError)) {
-                errors.put(fieldId(index, "manufacturerCode"), identifierError);
-            }
+            // The review edits the identifiers, so it checks them by the same rules as the product page: both are
+            // required, each missing one an error of its own field that the summary links to.
+            ProductForm.validateIdentifiers(errors, fieldId(index, "ean"), fieldId(index, "manufacturerCode"),
+                    row.getEan(), row.getManufacturerCode());
             if (!categoryLabels.isEmpty() && !categoryLabels.contains(row.getLabel())) {
                 errors.put(fieldId(index, "label"), "product.error.label.notInList");
             }

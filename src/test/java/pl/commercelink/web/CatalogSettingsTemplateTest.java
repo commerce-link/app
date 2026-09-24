@@ -29,7 +29,13 @@ class CatalogSettingsTemplateTest {
     void deleteIsOfferedOnlyForAnUnprotectedExistingCatalog() throws Exception {
         // when / then
         assertThat(page()).contains("th:if=\"${deleteHref != null}\"").contains("data-cl-confirm").contains("fragments/confirm-dialog :: dialog")
-                .contains("#{catalog.protect.hint}").doesNotContain("confirmDelete(");
+                .doesNotContain("confirmDelete(");
+    }
+
+    @Test
+    void saysNothingBelowTheProtectionAboutHowToDelete() throws Exception {
+        // when / then
+        assertThat(page()).doesNotContain("catalog.protect.hint");
     }
 
     @Test

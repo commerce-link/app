@@ -18,23 +18,19 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static pl.commercelink.taxonomy.UnifiedProductIdentifiers.unifyEan;
 import static pl.commercelink.taxonomy.UnifiedProductIdentifiers.unifyMfn;
 
 /**
- * One catalog product. Numbers arrive as text; identity (EAN, manufacturer code) may change only while it still
- * resolves to the same PIM entry, because the price list and the offer are keyed by PIM id.
+ * One catalog product. Numbers arrive as text. A product is known by both its EAN and its manufacturer code; once it
+ * has a PIM entry the two are fixed, because the price list and the offer are keyed by PIM id -- only a pending product
+ * (no entry yet) may have them corrected, and its save then looks the PIM up by them.
  */
 @Getter
 @Setter
 public class ProductForm {
-
-    /** The identifiers as they would be saved, asked of the PIM catalog to see whether the entry behind them changed. */
-    public record PimCheck(String ean, String mfn) {
-    }
 
     /** Repeat ids of the lists at the bottom of the page; also the first part of every field id and error key there. */
     public static final String ATTRIBUTE = "customAttribute";
@@ -151,6 +147,11 @@ public class ProductForm {
      */
     public void rememberSaved(Product saved) {
         existingPimId = saved == null ? null : saved.getPimId();
+        if (identifiersLocked()) {
+            // Shown read-only and posted by nobody: whatever the request carried for them is not the product's.
+            ean = saved.getEan();
+            manufacturerCode = saved.getManufacturerCode();
+        }
         existingLabel = saved == null ? null : saved.getLabel();
         existingEan = saved == null ? null : saved.getEan();
         existingManufacturerCode = saved == null ? null : saved.getManufacturerCode();
@@ -172,27 +173,36 @@ public class ProductForm {
         return repeatId + "-" + index + "-" + field;
     }
 
-    /** Neither identifier was given; either one of the two fields would fix it, so both may carry the message. */
-    static final String IDENTIFIER_REQUIRED = "product.error.identifier.required";
+    /** Whether the product has a PIM entry, which fixes its EAN and manufacturer code: the page shows them read-only. */
+    public boolean identifiersLocked() {
+        return StringUtils.isNotBlank(existingPimId);
+    }
+
+    /** Whether the EAN or the manufacturer code differs from the saved one (always, for a product being created). */
+    public boolean identifiersChanged() {
+        return eanChanged() || manufacturerCodeChanged();
+    }
 
     /**
-     * What is wrong with the identifiers of a product, or null when nothing is: a product is known by its EAN or by
-     * its manufacturer code, and an EAN that is given is 8--14 digits. The bulk-add review edits the same two fields
-     * and answers with the same messages.
+     * Puts what is wrong with the identifiers of a product at their fields: both the EAN (8--14 digits) and the
+     * manufacturer code are required. The bulk-add review edits the same two fields and answers with the same messages.
      */
-    static String identifierError(String ean, String manufacturerCode) {
-        return identifierError(ean, manufacturerCode, true);
+    static void validateIdentifiers(Map<String, String> errors, String eanField, String manufacturerCodeField,
+                                    String ean, String manufacturerCode) {
+        validateIdentifiers(errors, eanField, manufacturerCodeField, ean, manufacturerCode, true);
     }
 
     /** @param checkEanFormat false for an EAN kept as it was saved, which may predate the 8--14 digit rule (RF-4) */
-    private static String identifierError(String ean, String manufacturerCode, boolean checkEanFormat) {
-        if (StringUtils.isBlank(ean) && StringUtils.isBlank(manufacturerCode)) {
-            return IDENTIFIER_REQUIRED;
+    private static void validateIdentifiers(Map<String, String> errors, String eanField, String manufacturerCodeField,
+                                            String ean, String manufacturerCode, boolean checkEanFormat) {
+        if (StringUtils.isBlank(ean)) {
+            errors.put(eanField, "product.error.ean.required");
+        } else if (checkEanFormat && !ean.trim().matches("\\d{8,14}")) {
+            errors.put(eanField, "product.error.ean.invalid");
         }
-        if (checkEanFormat && StringUtils.isNotBlank(ean) && !ean.trim().matches("\\d{8,14}")) {
-            return "product.error.ean.invalid";
+        if (StringUtils.isBlank(manufacturerCode)) {
+            errors.put(manufacturerCodeField, "product.error.mfn.required");
         }
-        return null;
     }
 
     /** Whether the EAN differs from the saved one, compared the way the product stores it (trimmed, unified). */
@@ -209,24 +219,15 @@ public class ProductForm {
      * @param categoryLabels   the labels the category offers, or empty when it groups by nothing and any label passes
      * @param pricingGroups    the pricing groups of the category; the product must land in one of them
      * @param storeMarketplaces the marketplaces the store is connected to; only those may approve the product
-     * @param pimIdFor         the PIM entry the submitted identifiers resolve to, asked only for a saved product
      */
     public Map<String, String> validate(List<String> categoryLabels, List<String> pricingGroups,
-                                        List<String> storeMarketplaces, Function<PimCheck, Optional<String>> pimIdFor) {
+                                        List<String> storeMarketplaces) {
         Map<String, String> errors = new LinkedHashMap<>();
         FormRules.requireText(errors, "name", name, "product.error.name.required");
-        String identifierError = identifierError(ean, manufacturerCode, eanChanged());
-        if (identifierError != null) {
-            errors.put("ean", identifierError);
-        } else if (StringUtils.isNotBlank(existingPimId) && (eanChanged() || manufacturerCodeChanged())) {
-            // Asked only when an identifier changes: the saved entry may have been matched through a sibling EAN of
-            // the inventory key, which the product's own codes do not lead to, and that is no reason to refuse a save
-            // that leaves the identity as it is (OD-1).
-            Optional<String> resolved = pimIdFor.apply(
-                    new PimCheck(StringUtils.trimToNull(ean), StringUtils.trimToNull(manufacturerCode)));
-            if (!Objects.equals(existingPimId, resolved.orElse(null))) {
-                errors.put("ean", "product.error.pim.changed");
-            }
+        // A product the PIM knows keeps the codes it was saved with (rememberSaved put them back), so there is nothing
+        // of the operator's to check in them.
+        if (!identifiersLocked()) {
+            validateIdentifiers(errors, "ean", "manufacturerCode", ean, manufacturerCode, eanChanged());
         }
         // A label the category no longer offers stays allowed while it is the one the product was saved with: the page
         // says so with an option of its own instead of moving the product to another label behind the operator's back.
@@ -280,8 +281,10 @@ public class ProductForm {
 
     public void applyTo(Product product) {
         product.setName(name.trim());
-        product.setEan(StringUtils.trimToNull(ean));
-        product.setManufacturerCode(StringUtils.trimToNull(manufacturerCode));
+        if (!identifiersLocked()) {
+            product.setEan(StringUtils.trimToNull(ean));
+            product.setManufacturerCode(StringUtils.trimToNull(manufacturerCode));
+        }
         product.setLabel(StringUtils.trimToNull(label));
         product.setEnabled(enabled);
         product.setService(service);

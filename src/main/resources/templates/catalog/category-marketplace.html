@@ -5,7 +5,7 @@
 <body>
 <div layout:fragment="content">
     <section class="cl-page">
-        <div class="cl-page-body">
+        <div class="cl-page-body is-form">
             <div th:replace="~{fragments/settings-header :: subpageWithActions(${backHref}, ${backLabel}, ${marketplaceName}, ${lead}, null)}"></div>
 
             <form th:fragment="marketplaceForm" id="marketplace-definition-form" class="cl-form" th:action="@{${formAction}}"
