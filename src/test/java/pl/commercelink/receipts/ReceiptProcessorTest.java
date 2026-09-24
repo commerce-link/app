@@ -173,6 +173,47 @@ class ReceiptProcessorTest {
     }
 
     @Test
+    void effectsAreSkippedWhenTheLeaseExpiredButWasNotRetaken() {
+        // Still our owner id, but the lease lapsed during the poll: an operator's resend may already have run on
+        // the unleased attempt, so an effects pass now could send the e-mail a second time.
+        fiscalisedAwaitingItsLink();
+        provider.answerFetch(id -> {
+            clock.advance(ReceiptProcessor.LEASE.plusSeconds(1));
+            return Receipt.fiscalised(null, id, new FiscalData(null, null, clock.instant()), "https://x/1");
+        });
+
+        processor.process(STORE_ID, KEY);
+
+        verify(effects, never()).apply(STORE_ID, KEY);
+    }
+
+    @Test
+    void theLeaseIsRenewedBeforeEffectsRun() {
+        fiscalisedAwaitingItsLink();
+        provider.answerFetch(id -> {
+            clock.advance(Duration.ofMinutes(14));   // most of the lease used up by a slow poll
+            return Receipt.fiscalised(null, id, new FiscalData(null, null, clock.instant()), "https://x/1");
+        });
+        Instant[] leaseDuringEffects = new Instant[1];
+        doAnswer(i -> {
+            leaseDuringEffects[0] = stored().getLeaseUntil();
+            return null;
+        }).when(effects).apply(STORE_ID, KEY);
+
+        processor.process(STORE_ID, KEY);
+
+        assertThat(leaseDuringEffects[0]).isEqualTo(clock.instant().plus(ReceiptProcessor.LEASE));
+    }
+
+    private void fiscalisedAwaitingItsLink() {
+        attempts.update(STORE_ID, KEY, a -> {
+            a.setState(ReceiptAttemptState.FISCALISED);
+            a.setProviderReceiptId("p1");
+            return true;
+        });
+    }
+
+    @Test
     void aNotEligibleOrderDoesNotBlockAnAttemptWhoseLeaseWasStolenAndIsAlreadyBeingIssued() {
         // stillQualifies() (called to decide NOT_ELIGIBLE) is the same slow window as the issueCalls guard's:
         // if the lease is stolen and the new owner is already inside issue() by the time we get back, blocking

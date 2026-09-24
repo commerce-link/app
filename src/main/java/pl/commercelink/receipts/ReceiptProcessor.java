@@ -89,8 +89,9 @@ public class ReceiptProcessor {
             }
             // issue()/poll() may have lost the lease mid-flight (stolen, or simply expired); re-read from the
             // store rather than trust anything decided earlier in this call — effects must never run for an
-            // attempt this call no longer owns.
-            if (holdsLease(storeId, receiptKey, owner)) {
+            // attempt this call no longer owns, nor under a lease that has already expired (an operator's resend
+            // is allowed on an unleased attempt and would race the e-mail step).
+            if (renewLease(storeId, receiptKey, owner)) {
                 try {
                     effects.apply(storeId, receiptKey);
                 } catch (RuntimeException e) {
@@ -105,8 +106,19 @@ public class ReceiptProcessor {
         }
     }
 
-    private boolean holdsLease(String storeId, String receiptKey, String owner) {
-        return attempts.find(storeId, receiptKey).filter(a -> owner.equals(a.getLeaseOwner())).isPresent();
+    /**
+     * Whether this call still holds a live lease, renewing it for the effects pass that follows: the issue or poll
+     * before it may have taken most of the lease, and effects must finish under a lease no resend can slip past.
+     */
+    private boolean renewLease(String storeId, String receiptKey, String owner) {
+        Instant now = clock.instant();
+        return attempts.updateWritten(storeId, receiptKey, a -> {
+            if (!owner.equals(a.getLeaseOwner()) || !a.isLeasedAt(now)) {
+                return false;
+            }
+            a.setLeaseUntil(now.plus(LEASE));
+            return true;
+        }).isPresent();
     }
 
     private Optional<ReceiptAttempt> acquire(String storeId, String receiptKey, String owner) {
