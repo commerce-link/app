@@ -86,12 +86,15 @@
 
 <!--/* A setting that switches a feature on when the form is saved. The label says what happens; the description says
        the effect. revealId (or null) names the container of fields that only matter while the box is ticked;
-       static/js/reveal.js hides it while unticked, without JavaScript it stays visible. */-->
-<div th:fragment="check(name, labelKey, checked, descriptionKey, revealId)" class="cl-check-field">
+       static/js/reveal.js hides it while unticked, without JavaScript it stays visible. errorId (or null) is the id of
+       the field error the page renders for this box, so the checkbox is described by it as well as the description. */-->
+<div th:fragment="check(name, labelKey, checked, descriptionKey, revealId, errorId)" class="cl-check-field">
     <label class="cl-check">
         <input type="checkbox" th:id="${name}" th:name="${name}" value="true" th:checked="${checked}"
                th:attr="data-cl-reveal=${revealId}, aria-controls=${revealId},
-                        aria-describedby=${descriptionKey != null ? name + '-description' : null}"/>
+                        aria-describedby=${descriptionKey != null
+                                ? name + '-description' + (errorId != null ? ' ' + errorId : '')
+                                : errorId}"/>
         <span th:text="#{${labelKey}}"></span>
     </label>
     <p th:if="${descriptionKey != null}" class="cl-check-description" th:id="${name} + '-description'"

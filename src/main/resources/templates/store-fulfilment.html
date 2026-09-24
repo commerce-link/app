@@ -60,15 +60,15 @@
                                     <span th:text="#{${errors['defaultFulfilmentType']}}"></span>
                                 </p>
                             </fieldset>
-                            <div th:replace="~{fragments/settings-form :: check('automatedFulfilment', 'store.enable.automated.fulfilment', *{automatedFulfilment}, 'store.fulfilment.automated.description', null)}"></div>
+                            <div th:replace="~{fragments/settings-form :: check('automatedFulfilment', 'store.enable.automated.fulfilment', *{automatedFulfilment}, 'store.fulfilment.automated.description', null, null)}"></div>
                         </fieldset>
 
                         <fieldset class="cl-fieldset" id="client-order-page">
                             <legend class="cl-fieldset-title" th:text="#{store.fulfilment.orderPage.title}"></legend>
-                            <div th:replace="~{fragments/settings-form :: check('clientOrderPageEnabled', 'store.fulfilment.orderPage.enable', *{clientOrderPageEnabled}, 'store.fulfilment.orderPage.description', 'fulfilment-address-change')}"></div>
+                            <div th:replace="~{fragments/settings-form :: check('clientOrderPageEnabled', 'store.fulfilment.orderPage.enable', *{clientOrderPageEnabled}, 'store.fulfilment.orderPage.description', 'fulfilment-address-change', null)}"></div>
                             <div id="fulfilment-address-change" class="cl-reveal">
-                                <div th:replace="~{fragments/settings-form :: check('clientShippingAddressChangeEnabled', 'store.fulfilment.addressChange.enable', *{clientShippingAddressChangeEnabled}, 'store.fulfilment.addressChange.description', null)}"></div>
-                                <div th:replace="~{fragments/settings-form :: check('clientPreferredShippingDateEnabled', 'store.fulfilment.preferredDate.enable', *{clientPreferredShippingDateEnabled}, 'store.fulfilment.preferredDate.description', 'fulfilment-preferred-days')}"></div>
+                                <div th:replace="~{fragments/settings-form :: check('clientShippingAddressChangeEnabled', 'store.fulfilment.addressChange.enable', *{clientShippingAddressChangeEnabled}, 'store.fulfilment.addressChange.description', null, null)}"></div>
+                                <div th:replace="~{fragments/settings-form :: check('clientPreferredShippingDateEnabled', 'store.fulfilment.preferredDate.enable', *{clientPreferredShippingDateEnabled}, 'store.fulfilment.preferredDate.description', 'fulfilment-preferred-days', null)}"></div>
                                 <div id="fulfilment-preferred-days" class="cl-reveal">
                                     <fieldset class="cl-choice-group" id="preferredShippingDays" tabindex="-1"
                                               th:attr="aria-label=#{store.fulfilment.preferredDays.title},

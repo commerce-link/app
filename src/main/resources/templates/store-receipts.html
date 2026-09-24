@@ -49,16 +49,7 @@
                     <div class="cl-card">
                         <fieldset class="cl-fieldset">
                             <legend class="cl-fieldset-title" th:text="#{store.receipts.automatic.title}"></legend>
-                            <!--/* Not fragments/settings-form :: check: that fragment has no error parameter, and the
-                                   error paragraph below needs the checkbox to point at it with aria-describedby. */-->
-                            <div class="cl-check-field">
-                                <label class="cl-check">
-                                    <input type="checkbox" id="enabled" name="enabled" value="true" th:checked="*{enabled}"
-                                           th:attr="aria-describedby=${receiptsErrors['enabled'] != null ? 'enabled-description enabled-error' : 'enabled-description'}"/>
-                                    <span th:text="#{store.receipts.enabled.label}"></span>
-                                </label>
-                                <p class="cl-check-description" id="enabled-description" th:text="#{store.receipts.enabled.description}"></p>
-                            </div>
+                            <div th:replace="~{fragments/settings-form :: check('enabled', 'store.receipts.enabled.label', *{enabled}, 'store.receipts.enabled.description', null, ${receiptsErrors['enabled'] != null ? 'enabled-error' : null})}"></div>
                             <p th:if="${receiptsErrors['enabled'] != null}" class="cl-field-error" id="enabled-error">
                                 <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
                                 <span th:text="#{${receiptsErrors['enabled']}}"></span>

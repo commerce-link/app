@@ -27,7 +27,7 @@
                                 </p>
                             </div>
                         </div>
-                        <div th:replace="~{fragments/settings-form :: check('enabled', 'store.emailTemplate.enabled', *{enabled}, 'store.emailTemplate.enabled.description', null)}"></div>
+                        <div th:replace="~{fragments/settings-form :: check('enabled', 'store.emailTemplate.enabled', *{enabled}, 'store.emailTemplate.enabled.description', null, null)}"></div>
                         <p class="cl-help" th:switch="${source.name()}">
                             <th:block th:case="'OWN'">
                                 <span th:text="#{store.emailTemplate.source.own}"></span>

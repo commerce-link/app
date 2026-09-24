@@ -148,8 +148,10 @@ class StoreReceiptsSettingsControllerTest {
     void enabledCheckboxIsDescribedByItsErrorWhenOneIsShown() throws Exception {
         String html = template("store-receipts");
 
-        // the checkbox's aria-describedby grows to include enabled-error once receiptsErrors['enabled'] is set
-        assertThat(html).contains("'enabled-description enabled-error'");
+        // the shared check fragment gets enabled-error as its errorId once receiptsErrors['enabled'] is set
+        // (SettingsFormCheckFragmentTest pins what the fragment renders from it)
+        assertThat(html).contains("receiptsErrors['enabled'] != null ? 'enabled-error' : null");
+        assertThat(html).contains("id=\"enabled-error\"");
     }
 
     private static String template(String name) throws Exception {

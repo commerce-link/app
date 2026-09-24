@@ -50,7 +50,7 @@
             <th:block th:if="${withDefault and !firstAddress}">
                 <p th:if="${alreadyDefault}" class="cl-help" th:text="#{store.shipping.address.isDefault}"></p>
                 <th:block th:unless="${alreadyDefault}">
-                    <div th:replace="~{fragments/settings-form :: check('makeDefault', 'store.shipping.address.makeDefault', ${form.makeDefault}, 'store.shipping.address.makeDefault.description', null)}"></div>
+                    <div th:replace="~{fragments/settings-form :: check('makeDefault', 'store.shipping.address.makeDefault', ${form.makeDefault}, 'store.shipping.address.makeDefault.description', null, null)}"></div>
                 </th:block>
             </th:block>
         </div>
