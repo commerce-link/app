@@ -368,4 +368,93 @@ class ReceiptAttemptServiceTest {
 
         verify(publisher).publishNow(STORE_ID, ORDER_ID + ":R1");
     }
+
+    @Test
+    void resendEmailClearsTheClaimResolvesTheAlertAndWakesTheAttempt() {
+        String key = ORDER_ID + ":R1";
+        service.startAutomatic(store, order);
+        attempts.update(STORE_ID, key, a -> {
+            a.setState(ReceiptAttemptState.FISCALISED);
+            a.setDocumentUrl("https://paragony.pl/x");
+            a.setEmailClaimedAt(clock.instant());
+            a.unschedule();
+            return true;
+        });
+        clearInvocations(publisher);
+
+        service.resendEmail(STORE_ID, ORDER_ID, key, "operator");
+
+        ReceiptAttempt attempt = attempts.find(STORE_ID, key).orElseThrow();
+        assertThat(attempt.getEmailClaimedAt()).isNull();
+        assertThat(attempt.isScheduled()).isTrue();
+        verify(alerts).resolve(argThat(a -> a.getReceiptKey().equals(key)));
+        verify(publisher).publishNow(STORE_ID, key);
+    }
+
+    @Test
+    void resendEmailIsRefusedOnceTheMailWasActuallySent() {
+        String key = ORDER_ID + ":R1";
+        service.startAutomatic(store, order);
+        attempts.update(STORE_ID, key, a -> {
+            a.setState(ReceiptAttemptState.FISCALISED);
+            a.setDocumentUrl("https://paragony.pl/x");
+            a.setEmailClaimedAt(clock.instant());
+            a.setEmailSentAt(clock.instant());
+            a.unschedule();
+            return true;
+        });
+
+        assertThatThrownBy(() -> service.resendEmail(STORE_ID, ORDER_ID, key, "operator"))
+                .isInstanceOf(ReceiptActionException.class)
+                .extracting(e -> ((ReceiptActionException) e).getMessageKey())
+                .isEqualTo("receipts.action.resendEmail.notEligible");
+        verifyNoInteractions(alerts);
+        verify(publisher, never()).publishNow(any(), any());
+    }
+
+    @Test
+    void resendEmailIsRefusedWhenTheMailWasSkippedByTheStore() {
+        String key = ORDER_ID + ":R1";
+        service.startAutomatic(store, order);
+        attempts.update(STORE_ID, key, a -> {
+            a.setState(ReceiptAttemptState.FISCALISED);
+            a.setDocumentUrl("https://paragony.pl/x");
+            a.setEmailClaimedAt(clock.instant());
+            a.setEmailSkippedAt(clock.instant());
+            a.unschedule();
+            return true;
+        });
+
+        assertThatThrownBy(() -> service.resendEmail(STORE_ID, ORDER_ID, key, "operator"))
+                .isInstanceOf(ReceiptActionException.class)
+                .extracting(e -> ((ReceiptActionException) e).getMessageKey())
+                .isEqualTo("receipts.action.resendEmail.notEligible");
+    }
+
+    @Test
+    void resendEmailIsRefusedForAnotherOrdersKey() {
+        String key = ORDER_ID + ":R1";
+        service.startAutomatic(store, order);
+        attempts.update(STORE_ID, key, a -> {
+            a.setState(ReceiptAttemptState.FISCALISED);
+            a.setDocumentUrl("https://paragony.pl/x");
+            a.setEmailClaimedAt(clock.instant());
+            a.unschedule();
+            return true;
+        });
+
+        assertThatThrownBy(() -> service.resendEmail(STORE_ID, "some-other-order", key, "operator"))
+                .isInstanceOf(ReceiptActionException.class)
+                .extracting(e -> ((ReceiptActionException) e).getMessageKey())
+                .isEqualTo("receipts.action.notFound");
+        verifyNoInteractions(alerts);
+    }
+
+    @Test
+    void resendEmailIsRefusedWhenTheAttemptDoesNotExist() {
+        assertThatThrownBy(() -> service.resendEmail(STORE_ID, ORDER_ID, ORDER_ID + ":R1", "operator"))
+                .isInstanceOf(ReceiptActionException.class)
+                .extracting(e -> ((ReceiptActionException) e).getMessageKey())
+                .isEqualTo("receipts.action.notFound");
+    }
 }

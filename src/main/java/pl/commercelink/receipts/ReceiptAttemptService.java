@@ -183,6 +183,35 @@ public class ReceiptAttemptService {
                 this::saveThroughLifecycle);
     }
 
+    /**
+     * The operator retries a real e-mail failure — the send was attempted and failed, unlike an attempt whose
+     * {@code emailSkippedAt} shows the store simply does not send this e-mail type or the buyer has no address,
+     * which need no operator action. Clears the claim so a fresh {@link ReceiptEffects#apply} tries the send again,
+     * resolves the now-obsolete bell alert, and wakes the attempt on the work queue the same way {@code checkNow}
+     * does — a FISCALISED attempt whose e-mail step just finished is otherwise not scheduled on its own, so only
+     * clearing the claim would leave it waiting for the next sweep.
+     */
+    public void resendEmail(String storeId, String orderId, String receiptKey, String by) {
+        if (!receiptKey.startsWith(ReceiptAttemptKeys.orderPrefix(orderId))) {
+            throw new ReceiptActionException("receipts.action.notFound");
+        }
+        ReceiptAttempt attempt = attempts.update(storeId, receiptKey, a -> {
+                    if (!a.emailFailed()) {
+                        return false;
+                    }
+                    a.setEmailClaimedAt(null);
+                    a.schedule(clock.instant());
+                    return true;
+                })
+                .orElseThrow(() -> new ReceiptActionException("receipts.action.notFound"));
+        if (attempt.getEmailClaimedAt() != null) {
+            throw new ReceiptActionException("receipts.action.resendEmail.notEligible");
+        }
+        log.info("Receipt attempt {} e-mail resend requested by {}", receiptKey, by);
+        alerts.resolve(attempt);
+        publisher.publishNow(storeId, receiptKey);
+    }
+
     public List<ReceiptAttempt> attemptsOf(String storeId, String orderId) {
         return attempts.findByOrder(storeId, orderId);
     }

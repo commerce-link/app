@@ -108,6 +108,48 @@ class OrderReceiptsControllerTest {
     }
 
     @Test
+    void resendEmailPassesTheKey() {
+        String receiptKey = ORDER_ID + ":R1";
+        when(messageSource.getMessage("receipts.flash.emailResent", null, LOCALE))
+                .thenReturn("The e-receipt e-mail will be sent again.");
+
+        String view = controller.resendEmail(ORDER_ID, receiptKey, LOCALE, redirectAttributes);
+
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+        assertThat(redirectAttributes.getFlashAttributes().get("successMessage"))
+                .isEqualTo("The e-receipt e-mail will be sent again.");
+        verify(attemptService).resendEmail(STORE_ID, ORDER_ID, receiptKey, "Jan Kowalski");
+    }
+
+    @Test
+    void resendEmailWithAnotherOrdersKeyIsRefused() {
+        String otherOrdersKey = "other-order:R1";
+        when(messageSource.getMessage("receipts.action.notFound", null, LOCALE)).thenReturn("Nie znaleziono paragonu.");
+
+        String view = controller.resendEmail(ORDER_ID, otherOrdersKey, LOCALE, redirectAttributes);
+
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+        assertThat(redirectAttributes.getFlashAttributes().get("errorMessage")).isEqualTo("Nie znaleziono paragonu.");
+        verifyNoInteractions(attemptService);
+    }
+
+    @Test
+    void refusedResendEmailShowsTheReason() {
+        String receiptKey = ORDER_ID + ":R1";
+        org.mockito.Mockito.doThrow(new ReceiptActionException("receipts.action.resendEmail.notEligible"))
+                .when(attemptService).resendEmail(STORE_ID, ORDER_ID, receiptKey, "Jan Kowalski");
+        when(messageSource.getMessage("receipts.action.resendEmail.notEligible", null, LOCALE))
+                .thenReturn("This e-mail is not waiting to be resent.");
+
+        String view = controller.resendEmail(ORDER_ID, receiptKey, LOCALE, redirectAttributes);
+
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+        assertThat(redirectAttributes.getFlashAttributes().get("errorMessage"))
+                .isEqualTo("This e-mail is not waiting to be resent.");
+        assertThat(redirectAttributes.getFlashAttributes()).doesNotContainKey("successMessage");
+    }
+
+    @Test
     void closeNeedsANumber() {
         String receiptKey = ORDER_ID + ":R1";
         when(messageSource.getMessage("receipts.action.close.numberRequired", null, LOCALE)).thenReturn("Podaj numer paragonu.");

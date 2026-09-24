@@ -94,4 +94,14 @@ class ReceiptAttentionEvaluatorTest {
         assertThat(ReceiptAttentionEvaluator.evaluate(noMail, now)).isEqualTo(ReceiptAttention.EMAIL_NOT_SENT);
         assertThat(ReceiptAttentionEvaluator.evaluate(attempt(ReceiptAttemptState.CLOSED_MANUALLY, now), now)).isNull();
     }
+
+    @Test
+    void aSkippedEmailNeverAlertsEvenThoughItWasClaimed() {
+        Instant now = Instant.parse("2026-09-10T12:00:00Z");
+        ReceiptAttempt skipped = attempt(ReceiptAttemptState.FISCALISED, now);
+        skipped.setEmailClaimedAt(now);
+        skipped.setEmailSkippedAt(now);
+
+        assertThat(ReceiptAttentionEvaluator.evaluate(skipped, now)).isNull();
+    }
 }

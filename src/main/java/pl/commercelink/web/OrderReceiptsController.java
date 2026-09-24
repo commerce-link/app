@@ -65,6 +65,16 @@ public class OrderReceiptsController {
         });
     }
 
+    @PostMapping("/dashboard/orders/{orderId}/receipts/resend-email")
+    @PreAuthorize("!hasRole('SUPER_ADMIN')")
+    public String resendEmail(@PathVariable String orderId, @RequestParam String receiptKey, Locale locale,
+                              RedirectAttributes redirectAttributes) {
+        return run(orderId, locale, redirectAttributes, "receipts.flash.emailResent", () -> {
+            requireOwnKey(orderId, receiptKey);
+            attemptService.resendEmail(CustomSecurityContext.getStoreId(), orderId, receiptKey, actor());
+        });
+    }
+
     @PostMapping("/dashboard/orders/{orderId}/receipts/close")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String close(@PathVariable String orderId, @RequestParam String receiptKey,

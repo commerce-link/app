@@ -15,6 +15,9 @@ import pl.commercelink.orders.event.OrderEventsRepository;
 import pl.commercelink.orders.notifications.EmailNotificationType;
 import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.starter.email.EmailClient;
+import pl.commercelink.stores.ClientNotificationsConfiguration;
+import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoresRepository;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -42,9 +45,11 @@ class ReceiptEffectsTest {
     private final OrderLifecycleEventPublisher lifecycleEvents = mock(OrderLifecycleEventPublisher.class);
     private final EmailClient emailClient = mock(EmailClient.class);
     private final OrderEventsRepository orderEvents = mock(OrderEventsRepository.class);
+    private final StoresRepository stores = mock(StoresRepository.class);
     private final MutableClock clock = MutableClock.at("2026-09-23T13:00:00Z");
     private ReceiptEffects effects;
     private Order order;
+    private Store store;
 
     @BeforeEach
     void setUp() {
@@ -58,8 +63,14 @@ class ReceiptEffectsTest {
             return entity;
         }).when(locking).modifyAndSave(any(), any(), any());
         when(emailClient.send(eq(STORE_ID), eq(EmailNotificationType.ORDER_RECEIPT), any())).thenReturn(true);
+        store = new Store();
+        store.setStoreId(STORE_ID);
+        ClientNotificationsConfiguration notifications = new ClientNotificationsConfiguration();
+        notifications.enableNotification(EmailNotificationType.ORDER_RECEIPT, "OrderReceiptTemplate");
+        store.setClientNotificationsConfiguration(notifications);
+        when(stores.findById(STORE_ID)).thenReturn(store);
         effects = new ReceiptEffects(attempts, orders, locking, attemptService, lifecycleEvents, emailClient,
-                orderEvents, clock);
+                orderEvents, stores, clock);
     }
 
     private void fiscalised(String url) {
@@ -158,7 +169,47 @@ class ReceiptEffectsTest {
         ReceiptAttempt attempt = attempts.find(STORE_ID, KEY).orElseThrow();
         assertThat(attempt.getEmailClaimedAt()).isNotNull();
         assertThat(attempt.getEmailSentAt()).isNull();
+        assertThat(attempt.getEmailSkippedAt()).isNull();
         assertThat(attempt.getLastError()).contains("e-mail");
+        assertThat(ReceiptAttentionEvaluator.evaluate(attempt, clock.instant())).isEqualTo(ReceiptAttention.EMAIL_NOT_SENT);
+    }
+
+    @Test
+    void aStoreThatDoesNotSendTheReceiptEmailTypeSkipsItQuietly() {
+        store.setClientNotificationsConfiguration(new ClientNotificationsConfiguration());   // ORDER_RECEIPT off
+        fiscalised("https://paragony.pl/r/1");
+
+        effects.apply(STORE_ID, KEY);
+
+        verifyNoInteractions(emailClient);
+        ReceiptAttempt attempt = attempts.find(STORE_ID, KEY).orElseThrow();
+        assertThat(attempt.getEmailClaimedAt()).isNotNull();
+        assertThat(attempt.getEmailSkippedAt()).isNotNull();
+        assertThat(attempt.getEmailSentAt()).isNull();
+        assertThat(ReceiptAttentionEvaluator.evaluate(attempt, clock.instant())).isNull();
+        assertThat(ReceiptEffects.pending(attempt)).isFalse();
+    }
+
+    @Test
+    void aBuyerWithNoEmailSkipsTheEmailQuietly() {
+        ReceiptAttempt attempt = new ReceiptAttempt();
+        attempt.setStoreId(STORE_ID);
+        attempt.setReceiptKey(KEY);
+        attempt.setOrderId(ORDER_ID);
+        attempt.setState(ReceiptAttemptState.FISCALISED);
+        attempt.setFiscalisedAt(Instant.parse("2026-09-23T12:00:00Z"));
+        attempt.setDocumentUrl("https://paragony.pl/r/1");
+        attempt.setRequestSnapshot(ReceiptSnapshotJson.write(new ReceiptRequestSnapshot(ORDER_ID, DELIVERED_AT,
+                null, List.of(), List.of())));
+        attempts.create(attempt);
+
+        effects.apply(STORE_ID, KEY);
+
+        verifyNoInteractions(emailClient);
+        ReceiptAttempt saved = attempts.find(STORE_ID, KEY).orElseThrow();
+        assertThat(saved.getEmailClaimedAt()).isNotNull();
+        assertThat(saved.getEmailSkippedAt()).isNotNull();
+        assertThat(ReceiptAttentionEvaluator.evaluate(saved, clock.instant())).isNull();
     }
 
     @Test
@@ -190,7 +241,7 @@ class ReceiptEffectsTest {
             return entity;
         }).when(retryingLocking).modifyAndSave(any(), any(), any());
         ReceiptEffects retryingEffects = new ReceiptEffects(attempts, orders, retryingLocking, attemptService,
-                lifecycleEvents, emailClient, orderEvents, clock);
+                lifecycleEvents, emailClient, orderEvents, stores, clock);
 
         retryingEffects.apply(STORE_ID, KEY);
 

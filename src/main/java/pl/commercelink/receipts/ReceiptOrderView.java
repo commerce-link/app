@@ -7,7 +7,8 @@ import java.util.List;
 public record ReceiptOrderView(List<Row> rows, boolean canReissue) {
 
     public record Row(String key, ReceiptAttemptState state, String statusKey, String statusTone, String documentUrl,
-                      String problem, Instant emailSentAt, boolean canCheck, boolean canClose) {
+                      String problem, Instant emailSentAt, Instant emailSkippedAt, boolean canCheck, boolean canClose,
+                      boolean canResendEmail) {
     }
 
     public boolean isEmpty() {
@@ -23,9 +24,11 @@ public record ReceiptOrderView(List<Row> rows, boolean canReissue) {
                     return new Row(a.getReceiptKey(), a.getState(), "receipts.state." + a.getState().name(),
                             tone(a.getState()), a.getDocumentUrl(),
                             attention == null ? null : alerts.message(a, attention), a.getEmailSentAt(),
+                            a.getEmailSkippedAt(),
                             a.isScheduled() && !a.isLeasedAt(now),
                             (a.getState() == ReceiptAttemptState.ISSUING || a.getState() == ReceiptAttemptState.PENDING)
-                                    && !a.isLeasedAt(now));
+                                    && !a.isLeasedAt(now),
+                            a.emailFailed());
                 })
                 .toList();
         boolean allDead = attempts.stream().allMatch(a -> a.getState().isDead());

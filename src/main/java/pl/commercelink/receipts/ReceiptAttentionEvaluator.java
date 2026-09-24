@@ -23,7 +23,7 @@ public final class ReceiptAttentionEvaluator {
                     : providerUnavailable(attempt, now) ? ReceiptAttention.PROVIDER_UNAVAILABLE
                     : attempt.getIssueCalls() >= ISSUE_CALLS_BEFORE_ALERT ? ReceiptAttention.ISSUING_UNKNOWN : null;
             case PENDING -> pending(attempt, now);
-            case FISCALISED -> attempt.getEmailClaimedAt() != null && attempt.getEmailSentAt() == null
+            case FISCALISED -> attempt.emailFailed()
                     ? ReceiptAttention.EMAIL_NOT_SENT
                     : attempt.getLinkGaveUpAt() != null ? ReceiptAttention.LINK_MISSING : null;
             case FAILED -> ReceiptAttention.FAILED;

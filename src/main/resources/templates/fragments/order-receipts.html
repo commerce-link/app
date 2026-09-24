@@ -31,6 +31,7 @@
                     <p class="cl-list-desc" th:if="${row.documentUrl() != null}">
                         <a th:href="${row.documentUrl()}" target="_blank" rel="noopener" th:text="#{receipts.document.open}"></a>
                         <span th:if="${row.emailSentAt() != null}" th:text="' · ' + #{receipts.email.sent}"></span>
+                        <span th:if="${row.emailSkippedAt() != null}" th:text="' · ' + #{receipts.email.skipped}"></span>
                     </p>
                     <p class="cl-list-desc is-warn" th:if="${row.problem() != null}" th:text="${row.problem()}"></p>
                 </div>
@@ -40,6 +41,12 @@
                         <input type="hidden" name="receiptKey" th:value="${row.key()}"/>
                         <button type="submit" class="cl-link-button" th:text="#{receipts.action.check}"
                                 th:attr="aria-label=#{receipts.action.check} + ': ' + ${row.key()}"></button>
+                    </form>
+                    <form th:if="${row.canResendEmail()}" method="post"
+                          th:action="@{/dashboard/orders/{id}/receipts/resend-email(id=${orderId})}">
+                        <input type="hidden" name="receiptKey" th:value="${row.key()}"/>
+                        <button type="submit" class="cl-link-button" th:text="#{receipts.action.resendEmail}"
+                                th:attr="aria-label=#{receipts.action.resendEmail} + ': ' + ${row.key()}"></button>
                     </form>
                     <!--/* details/summary, not .cl-disclosure: that class is styled as a full-width collapsible
                            section at the bottom of a card, which does not fit a compact list-row action. Plain

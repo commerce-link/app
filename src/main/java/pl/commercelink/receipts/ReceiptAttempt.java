@@ -96,6 +96,11 @@ public class ReceiptAttempt {
     @DynamoDBAttribute(attributeName = "emailSentAt")
     @DynamoDBTypeConverted(converter = ReceiptInstantConverter.class)
     private Instant emailSentAt;
+    /** Set instead of {@code emailSentAt} when the claim resolved without ever calling the provider: the store does
+     *  not send this e-mail type, or the buyer has no address. Not a failure — nothing for the operator to do. */
+    @DynamoDBAttribute(attributeName = "emailSkippedAt")
+    @DynamoDBTypeConverted(converter = ReceiptInstantConverter.class)
+    private Instant emailSkippedAt;
     @DynamoDBAttribute(attributeName = "attention")
     private String attention;
     @DynamoDBAttribute(attributeName = "leaseOwner")
@@ -145,5 +150,13 @@ public class ReceiptAttempt {
     public boolean needsProvider() {
         return state == ReceiptAttemptState.ISSUING || state == ReceiptAttemptState.PENDING
                 || (state == ReceiptAttemptState.FISCALISED && documentUrl == null && linkGaveUpAt == null);
+    }
+
+    /** The e-mail was claimed and really failed to send (not skipped, not delivered): the one case the operator can
+     *  retry with "resend e-mail". */
+    @DynamoDBIgnore
+    public boolean emailFailed() {
+        return state == ReceiptAttemptState.FISCALISED && emailClaimedAt != null && emailSentAt == null
+                && emailSkippedAt == null;
     }
 }

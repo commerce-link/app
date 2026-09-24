@@ -16,6 +16,8 @@ import pl.commercelink.orders.event.OrderEventsRepository;
 import pl.commercelink.orders.notifications.EmailNotificationType;
 import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.starter.email.EmailClient;
+import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoresRepository;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -43,21 +45,22 @@ public class ReceiptEffects {
     private final OrderLifecycleEventPublisher lifecycleEventPublisher;
     private final EmailClient emailClient;
     private final OrderEventsRepository orderEventsRepository;
+    private final StoresRepository storesRepository;
     private final Clock clock;
 
     @Autowired
     public ReceiptEffects(ReceiptAttemptStore attempts, OrdersRepository ordersRepository,
                           OptimisticLockingExecutor optimisticLockingExecutor, ReceiptAttemptService attemptService,
                           OrderLifecycleEventPublisher lifecycleEventPublisher, EmailClient emailClient,
-                          OrderEventsRepository orderEventsRepository) {
+                          OrderEventsRepository orderEventsRepository, StoresRepository storesRepository) {
         this(attempts, ordersRepository, optimisticLockingExecutor, attemptService, lifecycleEventPublisher,
-                emailClient, orderEventsRepository, Clock.systemUTC());
+                emailClient, orderEventsRepository, storesRepository, Clock.systemUTC());
     }
 
     ReceiptEffects(ReceiptAttemptStore attempts, OrdersRepository ordersRepository,
                    OptimisticLockingExecutor optimisticLockingExecutor, ReceiptAttemptService attemptService,
                    OrderLifecycleEventPublisher lifecycleEventPublisher, EmailClient emailClient,
-                   OrderEventsRepository orderEventsRepository, Clock clock) {
+                   OrderEventsRepository orderEventsRepository, StoresRepository storesRepository, Clock clock) {
         this.attempts = attempts;
         this.ordersRepository = ordersRepository;
         this.optimisticLockingExecutor = optimisticLockingExecutor;
@@ -65,6 +68,7 @@ public class ReceiptEffects {
         this.lifecycleEventPublisher = lifecycleEventPublisher;
         this.emailClient = emailClient;
         this.orderEventsRepository = orderEventsRepository;
+        this.storesRepository = storesRepository;
         this.clock = clock;
     }
 
@@ -162,19 +166,32 @@ public class ReceiptEffects {
     }
 
     private void sendEmail(String storeId, String receiptKey) {
+        // Loaded once, outside the claim predicate: a store lookup is not part of the attempt's own state and must
+        // not be repeated on every predicate retry.
+        Store store = storesRepository.findById(storeId);
         // Same reset-per-run rule as notifyMarketplace's claim, for the same reason.
         ReceiptAttempt[] claimed = new ReceiptAttempt[1];
+        boolean[] skipped = new boolean[1];
         attempts.update(storeId, receiptKey, a -> {
             claimed[0] = null;
+            skipped[0] = false;
             if (a.getEmailClaimedAt() != null || a.getDocumentUrl() == null) {
                 return false;
             }
-            a.setEmailClaimedAt(clock.instant());
+            Instant now = clock.instant();
+            a.setEmailClaimedAt(now);
+            String buyerEmail = ReceiptSnapshotJson.read(a.getRequestSnapshot()).buyerEmail();
+            // The store not sending this e-mail type, or the buyer never giving an address, is not a failure: there
+            // is nothing to retry and nothing for the operator to fix, unlike a real send error below.
+            if (buyerEmail == null || store == null || !store.supportsNotification(EmailNotificationType.ORDER_RECEIPT)) {
+                a.setEmailSkippedAt(now);
+                skipped[0] = true;
+            }
             claimed[0] = a;
             return true;
         });
         ReceiptAttempt attempt = claimed[0];
-        if (attempt == null) {
+        if (attempt == null || skipped[0]) {
             return;
         }
         String email = ReceiptSnapshotJson.read(attempt.getRequestSnapshot()).buyerEmail();
