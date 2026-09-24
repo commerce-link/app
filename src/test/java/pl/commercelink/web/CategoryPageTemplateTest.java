@@ -151,7 +151,7 @@ class CategoryPageTemplateTest {
         assertThat(html).contains("data-cl-select-table");
         assertThat(html.indexOf("cl-page-actions")).isLessThan(html.indexOf("/products/add"));
         assertThat(html).contains("Manual").doesNotContain("??");
-        assertThat(html).contains("MSI RTX 5070").contains("Outside the list").contains("No PIM")
+        assertThat(html).contains("MSI RTX 5070").contains("Outside the list").contains("Pending")
                 .contains("value=\"p1\"").contains("action=\"/dashboard/catalogs/c1/category/k1/products/bulk\"");
     }
 

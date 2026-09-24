@@ -198,4 +198,20 @@ class CatalogMessagesTest {
         assertThat(pl.get("catalog.category.labels")).isEqualTo("Podkategorie");
         assertThat(en.get("catalog.category.labels")).isEqualTo("Subcategories");
     }
+
+    /** The client's term: a product without a PIM entry is waiting for its data, as the legacy "Queued" view said. */
+    @Test
+    void aProductWithoutAPimEntryIsPending() throws Exception {
+        // when
+        Map<String, String> pl = catalogMessages("messages_pl.properties");
+        Map<String, String> en = catalogMessages("messages_en.properties");
+
+        // then
+        assertThat(pl.get("catalog.products.status.nopim")).isEqualTo("Oczekujące");
+        assertThat(pl.get("catalog.products.pill.nopim")).isEqualTo("Oczekujący");
+        assertThat(en.get("catalog.products.status.nopim")).isEqualTo("Pending");
+        assertThat(en.get("catalog.products.pill.nopim")).isEqualTo("Pending");
+        assertThat(pl).allSatisfy((key, text) -> assertThat(text).as(key).doesNotContain("Bez PIM"));
+        assertThat(en.get("catalog.products.note.dynamic")).doesNotContain("\"No PIM\"").contains("\"Pending\"");
+    }
 }
