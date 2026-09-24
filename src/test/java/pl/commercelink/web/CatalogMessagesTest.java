@@ -168,4 +168,17 @@ class CatalogMessagesTest {
         assertThat(catalogMessages("messages_en.properties").get("product.page.mrpSuppliers.placeholder"))
                 .isEqualTo("e.g. Acme, Elko");
     }
+
+    /** The client's wording: the operator knows the purchase suggestions, not the name of the view that lists them. */
+    @Test
+    void restockCheckboxSaysWhereTheProductsShowUp() throws Exception {
+        // when
+        String pl = catalogMessages("messages_pl.properties").get("catalog.category.restock.desc");
+        String en = catalogMessages("messages_en.properties").get("catalog.category.restock.desc");
+
+        // then
+        assertThat(pl).isEqualTo("Produkty z ustawionym oczekiwanym stanem magazynowym pojawią się jako sugestie zakupu "
+                + "w momencie tworzenia dostaw lub bezpośrednio w magazynie.");
+        assertThat(en).doesNotContain("Restock the warehouse");
+    }
 }
