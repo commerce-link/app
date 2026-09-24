@@ -26,6 +26,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
@@ -62,7 +63,7 @@ class TaxonomyCategoryMatchSchedulerTest {
         lenient().when(pendingRepository.count()).thenAnswer(invocation -> pendingRows.size());
         lenient().when(pendingRepository.find(anyString()))
                 .thenAnswer(invocation -> rowOf(invocation.getArgument(0)));
-        lenient().when(pendingRepository.claimAttempt(anyString(), anyInt())).thenAnswer(invocation -> {
+        lenient().when(pendingRepository.claimAttempt(anyString(), anyInt(), any())).thenAnswer(invocation -> {
             PendingCategorization row = rowOf(invocation.getArgument(0));
             if (row == null || row.attemptCount() != (int) invocation.getArgument(1)) {
                 return false;
@@ -350,7 +351,7 @@ class TaxonomyCategoryMatchSchedulerTest {
     void rowAlreadyClaimedByAnotherInstanceIsNotSubmitted() {
         // given
         givenPending("MFN-TAKEN", null, null);
-        doReturn(false).when(pendingRepository).claimAttempt("MFN-TAKEN", 0);
+        doReturn(false).when(pendingRepository).claimAttempt(eq("MFN-TAKEN"), eq(0), any());
 
         // when
         scheduler(properties(NO_LIMIT)).sweep();
@@ -397,8 +398,68 @@ class TaxonomyCategoryMatchSchedulerTest {
 
     private static TaxonomyCategoryMatchProperties properties(int pendingCap, int maxSubmissionsPerRun,
                                                               int maxAttempts, Duration retryExhaustedAfter) {
+        return properties(pendingCap, maxSubmissionsPerRun, maxAttempts, retryExhaustedAfter, Duration.ZERO);
+    }
+
+    private static TaxonomyCategoryMatchProperties properties(int pendingCap, int maxSubmissionsPerRun,
+                                                              int maxAttempts, Duration retryExhaustedAfter,
+                                                              Duration retryAfter) {
         return new TaxonomyCategoryMatchProperties(pendingCap, maxSubmissionsPerRun,
-                new TaxonomyCategoryMatchProperties.Mapping(5, 0.9, 0.9, 20), maxAttempts, retryExhaustedAfter);
+                new TaxonomyCategoryMatchProperties.Mapping(5, 0.9, 0.9, 20), maxAttempts, retryExhaustedAfter,
+                retryAfter);
+    }
+
+    @Test
+    void rowWaitingForItsProductToComeBackIsKeptUntilItGoesStale() {
+        // given
+        givenPending("MFN-GONE", null, null);
+        catalogRows.remove("MFN-GONE");
+
+        // when
+        scheduler(properties(NO_LIMIT)).sweep();
+
+        // then
+        verify(pendingRepository, never()).remove("MFN-GONE");
+    }
+
+    @Test
+    void rowWaitingForItsProductLongerThanTheRetryWindowIsEvicted() {
+        // given
+        givenPending("MFN-GONE", null, null);
+        catalogRows.remove("MFN-GONE");
+        rowOf("MFN-GONE").setAddedAt(LocalDateTime.now().minusDays(30));
+
+        // when
+        scheduler(properties(NO_LIMIT, 10, 4, Duration.ofDays(7))).sweep();
+
+        // then
+        verify(pendingRepository).remove("MFN-GONE");
+    }
+
+    @Test
+    void rowAttemptedWithinTheCooldownIsNotSubmittedAgain() {
+        // given
+        givenPending("MFN-FRESH", null, null);
+        rowOf("MFN-FRESH").setLastAttemptAt(LocalDateTime.now().minusMinutes(5));
+
+        // when
+        scheduler(properties(NO_LIMIT, 10, 4, Duration.ofDays(7), Duration.ofHours(1))).sweep();
+
+        // then
+        verify(pimCatalog, never()).submitCategoryMatch(any());
+    }
+
+    @Test
+    void rowAttemptedBeforeTheCooldownExpiredIsSubmittedAgain() {
+        // given
+        givenPending("MFN-COOLED", null, null);
+        rowOf("MFN-COOLED").setLastAttemptAt(LocalDateTime.now().minusHours(2));
+
+        // when
+        scheduler(properties(NO_LIMIT, 10, 4, Duration.ofDays(7), Duration.ofHours(1))).sweep();
+
+        // then
+        verify(pimCatalog).submitCategoryMatch(any());
     }
 
     private void givenPending(String mfn, String supplier, String rawCategory) {

@@ -22,6 +22,7 @@ public class PendingCategorization {
     public static final String SUPPLIER = "supplier";
     public static final String ATTEMPTS = "attempts";
     public static final String ADDED_AT = "addedAt";
+    public static final String LAST_ATTEMPT_AT = "lastAttemptAt";
 
     @DynamoDBHashKey(attributeName = MFN)
     private String mfn;
@@ -35,6 +36,10 @@ public class PendingCategorization {
     @DynamoDBAttribute(attributeName = ADDED_AT)
     @DynamoDBTypeConverted(converter = DynamoDbLocalDateTimeConverter.class)
     private LocalDateTime addedAt;
+
+    @DynamoDBAttribute(attributeName = LAST_ATTEMPT_AT)
+    @DynamoDBTypeConverted(converter = DynamoDbLocalDateTimeConverter.class)
+    private LocalDateTime lastAttemptAt;
 
     public int attemptCount() {
         return attempts == null ? 0 : attempts;

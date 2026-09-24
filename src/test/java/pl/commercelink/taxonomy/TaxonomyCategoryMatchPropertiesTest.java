@@ -11,22 +11,23 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class TaxonomyCategoryMatchPropertiesTest {
 
     private static final Mapping MAPPING = new Mapping(5, 0.9, 0.9, 20);
-    private static final Duration RETRY_AFTER = Duration.ofDays(7);
+    private static final Duration RETRY_EXHAUSTED_AFTER = Duration.ofDays(7);
+    private static final Duration RETRY_AFTER = Duration.ofHours(1);
 
     @Test
     void rejectsMaxSubmissionsPerRunBelowOne() {
         // when / then
         assertThrows(IllegalArgumentException.class,
-                () -> new TaxonomyCategoryMatchProperties(1000, 0, MAPPING, 4, RETRY_AFTER));
+                () -> new TaxonomyCategoryMatchProperties(1000, 0, MAPPING, 4, RETRY_EXHAUSTED_AFTER, RETRY_AFTER));
         assertThrows(IllegalArgumentException.class,
-                () -> new TaxonomyCategoryMatchProperties(1000, -5, MAPPING, 4, RETRY_AFTER));
+                () -> new TaxonomyCategoryMatchProperties(1000, -5, MAPPING, 4, RETRY_EXHAUSTED_AFTER, RETRY_AFTER));
     }
 
     @Test
     void acceptsASingleSubmissionPerRun() {
         // when
         TaxonomyCategoryMatchProperties properties =
-                new TaxonomyCategoryMatchProperties(1000, 1, MAPPING, 4, RETRY_AFTER);
+                new TaxonomyCategoryMatchProperties(1000, 1, MAPPING, 4, RETRY_EXHAUSTED_AFTER, RETRY_AFTER);
 
         // then
         assertEquals(1, properties.maxSubmissionsPerRun());
@@ -45,14 +46,14 @@ class TaxonomyCategoryMatchPropertiesTest {
     void rejectsNegativeMaxAttempts() {
         // when / then
         assertThrows(IllegalArgumentException.class,
-                () -> new TaxonomyCategoryMatchProperties(1000, 10, MAPPING, -1, RETRY_AFTER));
+                () -> new TaxonomyCategoryMatchProperties(1000, 10, MAPPING, -1, RETRY_EXHAUSTED_AFTER, RETRY_AFTER));
     }
 
     @Test
     void acceptsZeroMaxAttemptsAsDisabled() {
         // when
         TaxonomyCategoryMatchProperties properties =
-                new TaxonomyCategoryMatchProperties(1000, 10, MAPPING, 0, RETRY_AFTER);
+                new TaxonomyCategoryMatchProperties(1000, 10, MAPPING, 0, RETRY_EXHAUSTED_AFTER, RETRY_AFTER);
 
         // then
         assertEquals(0, properties.maxAttempts());
@@ -62,8 +63,8 @@ class TaxonomyCategoryMatchPropertiesTest {
     void rejectsANonPositiveRetryWindow() {
         // when / then
         assertThrows(IllegalArgumentException.class,
-                () -> new TaxonomyCategoryMatchProperties(1000, 10, MAPPING, 4, Duration.ZERO));
+                () -> new TaxonomyCategoryMatchProperties(1000, 10, MAPPING, 4, Duration.ZERO, RETRY_AFTER));
         assertThrows(IllegalArgumentException.class,
-                () -> new TaxonomyCategoryMatchProperties(1000, 10, MAPPING, 4, Duration.ofDays(-1)));
+                () -> new TaxonomyCategoryMatchProperties(1000, 10, MAPPING, 4, Duration.ofDays(-1), RETRY_AFTER));
     }
 }

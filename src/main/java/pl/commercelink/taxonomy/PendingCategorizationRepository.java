@@ -58,32 +58,43 @@ public class PendingCategorizationRepository extends DynamoDbRepository<PendingC
         }
     }
 
-    public boolean claimAttempt(String mfn, int expectedAttempts) {
-        return setAttempts(mfn, expectedAttempts + 1, expectedAttempts);
+    public boolean claimAttempt(String mfn, int expectedAttempts, LocalDateTime attemptedAt) {
+        return setAttempts(mfn, expectedAttempts + 1, expectedAttempts, attemptedAt);
     }
 
     public void releaseAttempt(String mfn, int expectedAttempts) {
-        setAttempts(mfn, expectedAttempts, expectedAttempts + 1);
+        setAttempts(mfn, expectedAttempts, expectedAttempts + 1, null);
     }
 
-    private boolean setAttempts(String mfn, int next, int expected) {
+    private boolean setAttempts(String mfn, int next, int expected, LocalDateTime attemptedAt) {
         try {
             amazonDynamoDB.updateItem(new UpdateItemRequest()
                     .withTableName(PendingCategorization.TABLE_NAME)
                     .withKey(Map.of(PendingCategorization.MFN, new AttributeValue(mfn)))
-                    .withUpdateExpression("SET #attempts = :next")
+                    .withUpdateExpression(attemptedAt == null
+                            ? "SET #attempts = :next REMOVE #lastAttemptAt"
+                            : "SET #attempts = :next, #lastAttemptAt = :attemptedAt")
                     .withConditionExpression(
                             "attribute_exists(#mfn) AND (attribute_not_exists(#attempts) OR #attempts = :expected)")
                     .withExpressionAttributeNames(Map.of(
                             "#mfn", PendingCategorization.MFN,
-                            "#attempts", PendingCategorization.ATTEMPTS))
-                    .withExpressionAttributeValues(Map.of(
-                            ":next", new AttributeValue().withN(String.valueOf(next)),
-                            ":expected", new AttributeValue().withN(String.valueOf(expected)))));
+                            "#attempts", PendingCategorization.ATTEMPTS,
+                            "#lastAttemptAt", PendingCategorization.LAST_ATTEMPT_AT))
+                    .withExpressionAttributeValues(attemptValues(next, expected, attemptedAt)));
             return true;
         } catch (ConditionalCheckFailedException e) {
             return false;
         }
+    }
+
+    private static Map<String, AttributeValue> attemptValues(int next, int expected, LocalDateTime attemptedAt) {
+        Map<String, AttributeValue> values = new LinkedHashMap<>();
+        values.put(":next", new AttributeValue().withN(String.valueOf(next)));
+        values.put(":expected", new AttributeValue().withN(String.valueOf(expected)));
+        if (attemptedAt != null) {
+            values.put(":attemptedAt", new AttributeValue(attemptedAt.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)));
+        }
+        return values;
     }
 
     public boolean remove(String mfn) {

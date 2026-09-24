@@ -12,7 +12,8 @@ public record TaxonomyCategoryMatchProperties(
         @DefaultValue("10") int maxSubmissionsPerRun,
         @DefaultValue Mapping mapping,
         @DefaultValue("4") int maxAttempts,
-        @DefaultValue("7d") Duration retryExhaustedAfter) {
+        @DefaultValue("7d") Duration retryExhaustedAfter,
+        @DefaultValue("1h") Duration retryAfter) {
 
     @ConstructorBinding
     public TaxonomyCategoryMatchProperties {
@@ -26,6 +27,10 @@ public record TaxonomyCategoryMatchProperties(
         if (retryExhaustedAfter == null || retryExhaustedAfter.isNegative() || retryExhaustedAfter.isZero()) {
             throw new IllegalArgumentException(
                     "taxonomy.category-match.retry-exhausted-after must be positive, got: " + retryExhaustedAfter);
+        }
+        if (retryAfter == null || retryAfter.isNegative()) {
+            throw new IllegalArgumentException(
+                    "taxonomy.category-match.retry-after must not be negative, got: " + retryAfter);
         }
     }
 
