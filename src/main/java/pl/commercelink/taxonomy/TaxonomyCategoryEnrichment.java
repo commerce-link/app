@@ -42,7 +42,19 @@ public class TaxonomyCategoryEnrichment {
     }
 
     public boolean isPendingEligible(Taxonomy taxonomy) {
-        return hasIdentificationData(taxonomy) && pendingCount() < properties.pendingCap();
+        if (!hasIdentificationData(taxonomy)) {
+            return false;
+        }
+        return pendingCount() < properties.pendingCap() || alreadyPending(taxonomy.mfn());
+    }
+
+    private boolean alreadyPending(String mfn) {
+        try {
+            return pendingRepository.find(mfn) != null;
+        } catch (RuntimeException e) {
+            log.warn("Could not check the categorization queue for mfn={}: {}", mfn, e.getMessage());
+            return false;
+        }
     }
 
     public boolean hasIdentificationData(Taxonomy taxonomy) {
@@ -54,8 +66,13 @@ public class TaxonomyCategoryEnrichment {
         if (isBlank(taxonomy.mfn())) {
             return;
         }
-        if (pendingRepository.add(taxonomy.mfn(), supplier, LocalDateTime.now())) {
-            adjustPendingSize(1);
+        try {
+            if (pendingRepository.add(taxonomy.mfn(), supplier, LocalDateTime.now())) {
+                adjustPendingSize(1);
+            }
+        } catch (RuntimeException e) {
+            log.warn("Could not queue mfn={} for categorization, the next import will retry: {}",
+                    taxonomy.mfn(), e.getMessage());
         }
     }
 

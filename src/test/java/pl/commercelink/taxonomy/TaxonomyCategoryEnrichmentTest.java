@@ -1,5 +1,6 @@
 package pl.commercelink.taxonomy;
 
+import com.amazonaws.services.dynamodbv2.model.AmazonDynamoDBException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -11,6 +12,7 @@ import pl.commercelink.taxonomy.mapping.CategoryMappingCache;
 import java.time.Duration;
 import java.time.LocalDateTime;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -280,9 +282,49 @@ class TaxonomyCategoryEnrichmentTest {
         verify(mappingCache).recordSample("Acme", "Karty graficzne", "301", "GPU");
     }
 
+    @Test
+    void productAlreadyQueuedStaysEligibleEvenWhenTheCapIsFull() {
+        // given
+        TaxonomyCategoryEnrichment enrichment = new TaxonomyCategoryEnrichment(catalog, pendingRepository,
+                properties(0), mappingCache);
+        when(pendingRepository.count()).thenReturn(0);
+        when(pendingRepository.find("MFN-1")).thenReturn(new PendingCategorization());
+
+        // when / then
+        assertTrue(enrichment.isPendingEligible(identifiable("MFN-1")));
+    }
+
+    @Test
+    void productNotYetQueuedIsRefusedWhenTheCapIsFull() {
+        // given
+        TaxonomyCategoryEnrichment enrichment = new TaxonomyCategoryEnrichment(catalog, pendingRepository,
+                properties(0), mappingCache);
+        when(pendingRepository.count()).thenReturn(0);
+        when(pendingRepository.find("MFN-1")).thenReturn(null);
+
+        // when / then
+        assertFalse(enrichment.isPendingEligible(identifiable("MFN-1")));
+    }
+
+    @Test
+    void queueingFailureDoesNotBreakTheImport() {
+        // given
+        TaxonomyCategoryEnrichment enrichment = new TaxonomyCategoryEnrichment(catalog, pendingRepository,
+                properties(1000), mappingCache);
+        when(pendingRepository.add(eq("MFN-1"), any(), any()))
+                .thenThrow(new AmazonDynamoDBException("throttled"));
+
+        // when / then
+        assertDoesNotThrow(() -> enrichment.addPending(identifiable("MFN-1"), "Elko"));
+    }
+
+    private static Taxonomy identifiable(String mfn) {
+        return new Taxonomy("1234567890123", mfn, "Brand", "Name", null, 5, null, null, null);
+    }
+
     private static TaxonomyCategoryMatchProperties properties(int pendingCap) {
         return new TaxonomyCategoryMatchProperties(pendingCap, 10,
-                new TaxonomyCategoryMatchProperties.Mapping(5, 0.9, 0.9, 20), 4, Duration.ofDays(7));
+                new TaxonomyCategoryMatchProperties.Mapping(5, 0.9, 0.9, 20), 4, Duration.ofDays(7), Duration.ofHours(1));
     }
 
     private void pendingRowFor(String mfn, String supplier) {

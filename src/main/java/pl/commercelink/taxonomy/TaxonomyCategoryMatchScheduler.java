@@ -50,7 +50,9 @@ class TaxonomyCategoryMatchScheduler {
         }
 
         Map<String, Taxonomy> byMfn = catalog.findByMfns(pending.stream().map(PendingCategorization::getMfn).toList());
-        LocalDateTime staleBefore = LocalDateTime.now().minus(properties.retryExhaustedAfter());
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime staleBefore = now.minus(properties.retryExhaustedAfter());
+        LocalDateTime cooledDownBefore = now.minus(properties.retryAfter());
 
         List<PendingCategorization> candidates = new ArrayList<>();
         int resolvedFromMapping = 0;
@@ -58,11 +60,17 @@ class TaxonomyCategoryMatchScheduler {
         int awaitingFeed = 0;
         int givenUp = 0;
         int evicted = 0;
+        int coolingDown = 0;
 
         for (PendingCategorization entry : pending) {
             Taxonomy taxonomy = byMfn.get(entry.getMfn());
             if (taxonomy == null) {
-                awaitingFeed++;
+                if (addedBefore(entry, staleBefore)) {
+                    enrichment.forget(entry.getMfn());
+                    evicted++;
+                } else {
+                    awaitingFeed++;
+                }
                 continue;
             }
             if (Taxonomy.hasCategory(taxonomy)) {
@@ -83,10 +91,14 @@ class TaxonomyCategoryMatchScheduler {
                 }
                 continue;
             }
+            if (attemptedAfter(entry, cooledDownBefore)) {
+                coolingDown++;
+                continue;
+            }
             candidates.add(entry);
         }
 
-        enrichment.pendingCountIs(candidates.size() + awaitingFeed);
+        enrichment.pendingCountIs(candidates.size() + awaitingFeed + coolingDown);
         candidates.sort(LEAST_TRIED_FIRST);
 
         int submitted = 0;
@@ -95,7 +107,7 @@ class TaxonomyCategoryMatchScheduler {
                 break;
             }
             int attemptsBeforeClaim = entry.attemptCount();
-            if (!pendingRepository.claimAttempt(entry.getMfn(), attemptsBeforeClaim)) {
+            if (!pendingRepository.claimAttempt(entry.getMfn(), attemptsBeforeClaim, now)) {
                 continue;
             }
             Taxonomy taxonomy = byMfn.get(entry.getMfn());
@@ -110,8 +122,9 @@ class TaxonomyCategoryMatchScheduler {
             }
         }
         log.info("Category match sweep: pending={} submitted={} resolvedFromMapping={} alreadyCategorized={}"
-                        + " awaitingFeed={} givenUp={} evicted={}",
-                pending.size(), submitted, resolvedFromMapping, alreadyCategorized, awaitingFeed, givenUp, evicted);
+                        + " awaitingFeed={} coolingDown={} givenUp={} evicted={}",
+                pending.size(), submitted, resolvedFromMapping, alreadyCategorized, awaitingFeed, coolingDown,
+                givenUp, evicted);
     }
 
     private boolean exhausted(PendingCategorization entry) {
@@ -120,6 +133,10 @@ class TaxonomyCategoryMatchScheduler {
 
     private static boolean addedBefore(PendingCategorization entry, LocalDateTime moment) {
         return entry.getAddedAt() == null || entry.getAddedAt().isBefore(moment);
+    }
+
+    private static boolean attemptedAfter(PendingCategorization entry, LocalDateTime moment) {
+        return entry.getLastAttemptAt() != null && entry.getLastAttemptAt().isAfter(moment);
     }
 
     private boolean resolveFromMapping(PendingCategorization entry, Taxonomy taxonomy) {

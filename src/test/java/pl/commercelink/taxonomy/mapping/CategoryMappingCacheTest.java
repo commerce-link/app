@@ -53,7 +53,7 @@ class CategoryMappingCacheTest {
 
     private static TaxonomyCategoryMatchProperties matchProperties() {
         return new TaxonomyCategoryMatchProperties(1000, 10,
-                new TaxonomyCategoryMatchProperties.Mapping(5, 0.9, 0.9, 20), 4, Duration.ofDays(7));
+                new TaxonomyCategoryMatchProperties.Mapping(5, 0.9, 0.9, 20), 4, Duration.ofDays(7), Duration.ofHours(1));
     }
 
     private static List<PimCategory> categoryTree() {
