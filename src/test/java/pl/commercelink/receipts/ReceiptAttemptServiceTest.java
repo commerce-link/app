@@ -392,6 +392,31 @@ class ReceiptAttemptServiceTest {
     }
 
     @Test
+    void resendEmailIsRefusedWhileTheProcessorHoldsTheLeaseEvenThoughTheAttemptLooksFailed() {
+        // The window ReceiptEffects.sendEmail's claim opens before the outcome is written: emailFailed() is true
+        // (claimed, not yet sent) even though nothing has actually failed. Clearing the claim here would race the
+        // in-flight send and could get the mail sent twice, so the lease must refuse this regardless of emailFailed().
+        String key = ORDER_ID + ":R1";
+        service.startAutomatic(store, order);
+        attempts.update(STORE_ID, key, a -> {
+            a.setState(ReceiptAttemptState.FISCALISED);
+            a.setDocumentUrl("https://paragony.pl/x");
+            a.setEmailClaimedAt(clock.instant());
+            a.setLeaseUntil(clock.instant().plus(Duration.ofMinutes(10)));
+            return true;
+        });
+
+        assertThatThrownBy(() -> service.resendEmail(STORE_ID, ORDER_ID, key, "operator"))
+                .isInstanceOf(ReceiptActionException.class)
+                .extracting(e -> ((ReceiptActionException) e).getMessageKey())
+                .isEqualTo("receipts.action.resendEmail.busy");
+        ReceiptAttempt attempt = attempts.find(STORE_ID, key).orElseThrow();
+        assertThat(attempt.getEmailClaimedAt()).isNotNull();
+        verifyNoInteractions(alerts);
+        verify(publisher, never()).publishNow(any(), any());
+    }
+
+    @Test
     void resendEmailIsRefusedOnceTheMailWasActuallySent() {
         String key = ORDER_ID + ":R1";
         service.startAutomatic(store, order);

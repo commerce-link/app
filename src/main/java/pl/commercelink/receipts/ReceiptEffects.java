@@ -208,7 +208,16 @@ public class ReceiptEffects {
         boolean delivered = sent;
         attempts.update(storeId, receiptKey, a -> {
             if (delivered) {
-                a.setEmailSentAt(now);
+                // Belt and braces against a resendEmail that raced this in-flight send and cleared the claim (the
+                // lease guard in ReceiptAttemptService.resendEmail is meant to prevent that, but this write must
+                // never regress an already-recorded send, and must re-claim if the claim was cleared under it):
+                // pending() only stops seeing this attempt as needing the e-mail step once both are set again.
+                if (a.getEmailSentAt() == null) {
+                    a.setEmailSentAt(now);
+                }
+                if (a.getEmailClaimedAt() == null) {
+                    a.setEmailClaimedAt(now);
+                }
             } else {
                 a.setLastError("E-receipt e-mail not sent (e-mail type off, no template or no address)");
                 a.setLastErrorAt(now);

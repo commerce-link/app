@@ -190,17 +190,27 @@ public class ReceiptAttemptService {
      * resolves the now-obsolete bell alert, and wakes the attempt on the work queue the same way {@code checkNow}
      * does — a FISCALISED attempt whose e-mail step just finished is otherwise not scheduled on its own, so only
      * clearing the claim would leave it waiting for the next sweep.
+     * <p>Refused while the processor's lease is held (mirrors {@link #closeManually}): while
+     * {@link ReceiptEffects#apply} is claiming and sending the e-mail, the attempt already satisfies
+     * {@link ReceiptAttempt#emailFailed()} (claimed, not yet sent) even though nothing has failed yet — clearing the
+     * claim then would race the in-flight send and could get the e-mail sent twice. The lease check must run before
+     * the {@code emailFailed()} check for exactly that reason: during the race window {@code emailFailed()} alone
+     * would say "eligible".
      */
     public void resendEmail(String storeId, String orderId, String receiptKey, String by) {
         if (!receiptKey.startsWith(ReceiptAttemptKeys.orderPrefix(orderId))) {
             throw new ReceiptActionException("receipts.action.notFound");
         }
+        Instant now = clock.instant();
         ReceiptAttempt attempt = attempts.update(storeId, receiptKey, a -> {
+                    if (a.isLeasedAt(now)) {
+                        throw new ReceiptActionException("receipts.action.resendEmail.busy");
+                    }
                     if (!a.emailFailed()) {
                         return false;
                     }
                     a.setEmailClaimedAt(null);
-                    a.schedule(clock.instant());
+                    a.schedule(now);
                     return true;
                 })
                 .orElseThrow(() -> new ReceiptActionException("receipts.action.notFound"));

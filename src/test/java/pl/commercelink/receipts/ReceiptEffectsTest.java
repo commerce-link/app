@@ -286,6 +286,32 @@ class ReceiptEffectsTest {
     }
 
     @Test
+    void anOutcomeWriteThatFindsTheClaimClearedByAConcurrentResendReclaimsInsteadOfLeavingTheAttemptUnclaimed() {
+        // The lease guard in ReceiptAttemptService.resendEmail is meant to make this impossible, but the outcome
+        // write is a second, independent line of defence: it must never leave a sent e-mail's claim cleared, or a
+        // later apply() (e.g. the resend's own queued work) would see emailClaimedAt == null and send it again.
+        fiscalised("https://paragony.pl/r/1");
+        when(emailClient.send(eq(STORE_ID), eq(EmailNotificationType.ORDER_RECEIPT), any())).thenAnswer(invocation -> {
+            attempts.update(STORE_ID, KEY, a -> {
+                a.setEmailClaimedAt(null);   // simulates a resendEmail racing the in-flight send
+                return true;
+            });
+            return true;
+        });
+
+        effects.apply(STORE_ID, KEY);
+
+        ReceiptAttempt attempt = attempts.find(STORE_ID, KEY).orElseThrow();
+        assertThat(attempt.getEmailSentAt()).isNotNull();
+        assertThat(attempt.getEmailClaimedAt()).isNotNull();
+        assertThat(ReceiptEffects.pending(attempt)).isFalse();
+
+        effects.apply(STORE_ID, KEY);   // the requeued work from the (hypothetical) racing resend re-enters apply()
+
+        verify(emailClient, times(1)).send(eq(STORE_ID), eq(EmailNotificationType.ORDER_RECEIPT), any());
+    }
+
+    @Test
     void attemptsThatAreNotFiscalisedHaveNoEffects() {
         fiscalised("u");
         attempts.update(STORE_ID, KEY, a -> {

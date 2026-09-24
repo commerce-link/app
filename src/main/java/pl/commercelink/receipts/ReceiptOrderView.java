@@ -28,7 +28,7 @@ public record ReceiptOrderView(List<Row> rows, boolean canReissue) {
                             a.isScheduled() && !a.isLeasedAt(now),
                             (a.getState() == ReceiptAttemptState.ISSUING || a.getState() == ReceiptAttemptState.PENDING)
                                     && !a.isLeasedAt(now),
-                            a.emailFailed());
+                            a.emailFailed() && !a.isLeasedAt(now));
                 })
                 .toList();
         boolean allDead = attempts.stream().allMatch(a -> a.getState().isDead());
