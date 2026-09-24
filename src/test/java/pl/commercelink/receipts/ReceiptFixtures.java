@@ -22,7 +22,7 @@ public final class ReceiptFixtures {
     private ReceiptFixtures() {
     }
 
-    /** A delivered consumer order paid by an online gateway (payment amount 0, like the gateway webhook creates). */
+    /** A delivered consumer order fully paid through an online gateway. */
     public static Order b2cOrder(double totalPrice) {
         Order order = new Order(STORE_ID);
         order.setOrderId(ORDER_ID);
@@ -37,8 +37,26 @@ public final class ReceiptFixtures {
         Shipment shipment = new Shipment();
         shipment.setDeliveredAt(DELIVERED_AT);
         order.getShipments().add(shipment);
-        order.getPayments().add(new Payment("ref", "Przelewy24", PaymentSource.OnlinePayment, 0, 1.2));
+        order.getPayments().add(new Payment("ref", "Przelewy24", PaymentSource.OnlinePayment, totalPrice, 1.2));
         return order;
+    }
+
+    /** A {@link #b2cOrder} with the given payments instead of the default full online-gateway one. */
+    public static Order order(double totalPrice, Payment... payments) {
+        Order order = b2cOrder(totalPrice);
+        order.getPayments().clear();
+        order.getPayments().addAll(List.of(payments));
+        return order;
+    }
+
+    /** A delivered consumer order with no payment yet, as it exists before the gateway settles it. */
+    public static Order deliveredOrder(double totalPrice) {
+        return order(totalPrice);
+    }
+
+    /** An incoming payment of the given form and amount, unnamed (0 marks it unsettled). */
+    public static Payment payment(PaymentSource source, double amount) {
+        return new Payment(null, null, source, amount, 0);
     }
 
     public static OrderItem item(String name, int qty, double price, double tax) {

@@ -5,6 +5,7 @@ import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderSource;
 import pl.commercelink.orders.OrderSourceType;
 import pl.commercelink.orders.OrderStatus;
+import pl.commercelink.orders.PaymentSource;
 import pl.commercelink.stores.IntegrationType;
 import pl.commercelink.stores.Store;
 
@@ -73,6 +74,27 @@ class ReceiptEligibilityTest {
                 pl.commercelink.documents.DocumentType.InvoicePersonal));
 
         assertThat(eligibility.automaticCandidate(store(), order)).isFalse();
+    }
+
+    @Test
+    void orderWithZeroPaymentDoesNotQualify() {
+        assertThat(eligibility.orderQualifies(order(100.0, payment(PaymentSource.BankTransfer, 0.0)))).isFalse();
+    }
+
+    @Test
+    void partiallyPaidOrderDoesNotQualify() {
+        assertThat(eligibility.orderQualifies(order(100.0, payment(PaymentSource.BankTransfer, 60.0)))).isFalse();
+    }
+
+    @Test
+    void floatingPointFullPaymentQualifies() {
+        assertThat(eligibility.orderQualifies(
+                order(0.3, payment(PaymentSource.Card, 0.1), payment(PaymentSource.Card, 0.2)))).isTrue();
+    }
+
+    @Test
+    void overpaidOrderQualifies() {
+        assertThat(eligibility.orderQualifies(order(100.0, payment(PaymentSource.Card, 100.5)))).isTrue();
     }
 
     @Test

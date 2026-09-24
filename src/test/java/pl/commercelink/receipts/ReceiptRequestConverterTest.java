@@ -101,9 +101,10 @@ class ReceiptRequestConverterTest {
     }
 
     @Test
-    void mixedPaymentFormsWithoutAmountsBlock() {
-        Order order = b2cOrder(100.00);
-        order.getPayments().add(new Payment(PaymentSource.CashOnDelivery));
+    void mixedPaymentFormsThatDoNotAddUpToTheTotalBlock() {
+        // Two settled forms whose amounts fall short of the total: unlike a zero-amount placeholder, this is not
+        // something the converter can safely ignore, so it blocks rather than guessing.
+        Order order = order(100.00, payment(PaymentSource.BankTransfer, 60.00), payment(PaymentSource.Card, 10.00));
 
         assertThat(blocked(order, items(item("Mysz", 1, 100.00, 1.23))).reason())
                 .isEqualTo(ReceiptBlockReason.MIXED_PAYMENTS);
@@ -136,12 +137,8 @@ class ReceiptRequestConverterTest {
 
     @Test
     void cashOnDeliveryIsCashAndDirectDebitIsTransfer() {
-        Order cod = b2cOrder(100.00);
-        cod.getPayments().clear();
-        cod.getPayments().add(new Payment(PaymentSource.CashOnDelivery));
-        Order debit = b2cOrder(100.00);
-        debit.getPayments().clear();
-        debit.getPayments().add(new Payment(PaymentSource.DirectDebit));
+        Order cod = order(100.00, payment(PaymentSource.CashOnDelivery, 100.00));
+        Order debit = order(100.00, payment(PaymentSource.DirectDebit, 100.00));
 
         assertThat(converted(cod, items(item("Mysz", 1, 100.00, 1.23))).payments().get(0).form()).isEqualTo(PaymentForm.CASH);
         assertThat(converted(debit, items(item("Mysz", 1, 100.00, 1.23))).payments().get(0).form()).isEqualTo(PaymentForm.TRANSFER);
@@ -181,6 +178,15 @@ class ReceiptRequestConverterTest {
         assertThat(((ReceiptConversion.Blocked) converter.convert(b2cOrder(100.00),
                 items(item("Mysz", 1, 100.00, 1.23)), KEY, paperOnly, NOW)).reason())
                 .isEqualTo(ReceiptBlockReason.MEDIUM_UNSUPPORTED);
+    }
+
+    @Test
+    void zeroPlaceholderPaymentOfAnotherFormIsIgnored() {
+        // Card 100.00 settled + an unsettled 0.00 BankTransfer placeholder -> one CARD payment of the whole total
+        Order order = order(100.00, payment(PaymentSource.Card, 100.00), payment(PaymentSource.BankTransfer, 0.00));
+
+        assertThat(converted(order, items(item("Mysz", 1, 100.00, 1.23))).payments())
+                .containsExactly(new ReceiptRequestSnapshot.Pay(PaymentForm.CARD, 10000, null));
     }
 
     @Test

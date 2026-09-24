@@ -85,9 +85,4 @@ public class FakeReceiptProvider implements ReceiptProvider {
     public boolean requiresBuyerEmail() {
         return requiresEmail;
     }
-
-    @Override
-    public boolean pushesStatusUpdates() {
-        return true;
-    }
 }

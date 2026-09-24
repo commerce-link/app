@@ -85,6 +85,7 @@ public class ReceiptRequestConverter {
         }
         List<Payment> incoming = order.getPayments().stream()
                 .filter(p -> p.getDirection() != PaymentDirection.Outgoing)
+                .filter(p -> !p.isUnsettled())
                 .toList();
         if (incoming.isEmpty()) {
             return new ReceiptConversion.Blocked(ReceiptBlockReason.NO_PAYMENT, null);

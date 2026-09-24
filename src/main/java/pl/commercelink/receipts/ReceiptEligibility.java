@@ -35,7 +35,13 @@ public class ReceiptEligibility {
                 && !order.isB2B()
                 && !order.isInvoiced()
                 && !order.isRMAReplacementOrder()
-                && order.getTotalPrice() > 0;
+                && order.getTotalPrice() > 0
+                && isPaid(order);
+    }
+
+    /** Fiscalising declares the payment; an order that is not fully paid would print a payment that never happened. */
+    private static boolean isPaid(Order order) {
+        return order.getUnpaidAmount() <= 0.005;
     }
 
     public boolean automaticCandidate(Store store, Order order) {
