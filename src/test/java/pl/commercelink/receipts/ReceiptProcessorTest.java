@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Timeout;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.OrdersRepository;
+import pl.commercelink.provider.ProviderCallRejectedException;
 import pl.commercelink.receipts.api.FiscalData;
 import pl.commercelink.receipts.api.Receipt;
 import pl.commercelink.receipts.api.ReceiptException;
@@ -268,6 +269,17 @@ class ReceiptProcessorTest {
         processor.process(STORE_ID, KEY);
         assertThat(stored().getState()).isEqualTo(ReceiptAttemptState.ISSUING);
         assertThat(stored().getIssueCalls()).isEqualTo(2);
+    }
+
+    @Test
+    void limiterRejectionDoesNotCountAsAnIssueCall() {
+        provider.answerIssue(r -> { throw new ProviderCallRejectedException("busy"); });
+
+        processor.process(STORE_ID, KEY);
+
+        assertThat(stored().getIssueCalls()).isZero();
+        assertThat(stored().getPreSendFailures()).isEqualTo(1);
+        assertThat(stored().getState()).isEqualTo(ReceiptAttemptState.ISSUING);
     }
 
     @Test

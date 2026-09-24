@@ -5,6 +5,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrdersRepository;
+import pl.commercelink.provider.ProviderCallRejectedException;
 import pl.commercelink.receipts.api.Receipt;
 import pl.commercelink.receipts.api.ReceiptOutcomeUnknownException;
 import pl.commercelink.receipts.api.ReceiptProvider;
@@ -222,6 +223,19 @@ public class ReceiptProcessor {
             });
         } catch (ReceiptOutcomeUnknownException e) {
             recordError(attempt, e, true);
+        } catch (ProviderCallRejectedException e) {
+            // The limiter never made the call: undo the issueCalls bump from the guard above (nothing was sent)
+            // and count it as a pre-send failure instead, exactly like a failure before the call was ever attempted.
+            attempts.update(storeId, key, a -> {
+                if (!owner.equals(a.getLeaseOwner()) || a.getState() != ReceiptAttemptState.ISSUING) {
+                    return false;
+                }
+                a.setIssueCalls(a.getIssueCalls() - 1);
+                a.setPreSendFailures(a.getPreSendFailures() + 1);
+                a.setLastError(e.getMessage());
+                a.setLastErrorAt(clock.instant());
+                return true;
+            });
         } catch (RuntimeException e) {
             recordError(attempt, e, false);
         }

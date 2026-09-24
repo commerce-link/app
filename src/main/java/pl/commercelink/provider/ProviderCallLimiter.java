@@ -33,25 +33,21 @@ public class ProviderCallLimiter {
     }
 
     public static ProviderCallLimiter unlimited() {
-        return new ProviderCallLimiter(new ProviderCallLimitProperties(Duration.ZERO, Duration.ZERO, Map.of()));
-    }
-
-    public <T> T wrap(Class<T> type, String providerName, T target) {
-        return wrap(type, providerName, target, acquireTimeout);
+        return new ProviderCallLimiter(new ProviderCallLimitProperties(Duration.ZERO, Map.of()));
     }
 
     /**
-     * Same as {@link #wrap(Class, String, Object)}, but waiting for a permit at most {@code acquireTimeout} instead
-     * of this instance's default — for a caller whose own deadline (e.g. an SQS message's visibility timeout) is
-     * shorter than the shared default wait.
+     * Wraps every abstract method in a permit; {@code Object} methods ({@code toString}, ...) and interface
+     * {@code default} methods pass straight through, without a permit. Default methods of a provider SPI are
+     * metadata answered locally (e.g. {@code maxLineNameLength()}); only abstract methods reach the provider.
      */
     @SuppressWarnings("unchecked")
-    public <T> T wrap(Class<T> type, String providerName, T target, Duration acquireTimeout) {
+    public <T> T wrap(Class<T> type, String providerName, T target) {
         if (target == null || !buckets.containsKey(providerName)) {
             return target;
         }
         return (T) Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[]{type}, (proxy, method, args) -> {
-            if (method.getDeclaringClass() == Object.class) {
+            if (method.getDeclaringClass() == Object.class || method.isDefault()) {
                 return method.invoke(target, args);
             }
             return call(providerName, () -> {
@@ -62,16 +58,11 @@ public class ProviderCallLimiter {
                 } catch (IllegalAccessException e) {
                     throw new IllegalStateException(e);
                 }
-            }, acquireTimeout);
+            });
         });
     }
 
     public <R> R call(String providerName, Supplier<R> call) {
-        return call(providerName, call, acquireTimeout);
-    }
-
-    /** Same as {@link #call(String, Supplier)}, but waiting for a permit at most {@code acquireTimeout}. */
-    public <R> R call(String providerName, Supplier<R> call, Duration acquireTimeout) {
         Bucket bucket = buckets.get(providerName);
         if (bucket == null) {
             return call.get();

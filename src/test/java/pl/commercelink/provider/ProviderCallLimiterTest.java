@@ -14,6 +14,7 @@ import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 class ProviderCallLimiterTest {
 
@@ -21,8 +22,17 @@ class ProviderCallLimiterTest {
         String hello();
     }
 
+    /** A provider SPI shape: one abstract method that reaches the provider, one default metadata getter that must not. */
+    interface DefaultsApi {
+        String issue();
+
+        default int maxLineNameLength() {
+            return 40;
+        }
+    }
+
     private static ProviderCallLimiter limiter(int maxConcurrent, int perMinute, Duration timeout) {
-        return new ProviderCallLimiter(new ProviderCallLimitProperties(timeout, timeout,
+        return new ProviderCallLimiter(new ProviderCallLimitProperties(timeout,
                 Map.of("fakturownia", new ProviderCallLimitProperties.Limit(maxConcurrent, perMinute))));
     }
 
@@ -113,26 +123,26 @@ class ProviderCallLimiterTest {
     }
 
     @Test
-    void wrapWithACustomAcquireTimeoutNeverWaitsLongerThanItEvenWhenTheDefaultIsMuchLonger() throws Exception {
-        // The shared default wait is long (2 minutes, as receipts use); a queue-driven caller whose own visibility
-        // timeout is much shorter (invoicing: 20 s) must never be held past its own timeout regardless.
-        ProviderCallLimiter limiter = limiter(1, 1000, Duration.ofMinutes(2));
+    void defaultMethodsDoNotTakeAPermit() throws Exception {
+        // One permit total, held by a call blocked on another thread: a default method must still answer instantly.
+        ProviderCallLimiter limiter = limiter(1, 1000, Duration.ofSeconds(5));
         CountDownLatch inside = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
-        Thread holder = new Thread(() -> limiter.call("fakturownia", () -> {
-            inside.countDown();
-            await(release);
-            return null;
-        }));
+        DefaultsApi target = new DefaultsApi() {
+            @Override
+            public String issue() {
+                inside.countDown();
+                await(release);
+                return "ok";
+            }
+        };
+        DefaultsApi wrapped = limiter.wrap(DefaultsApi.class, "fakturownia", target);
+        Thread holder = new Thread(wrapped::issue);
         holder.start();
         inside.await();
 
-        Api api = limiter.wrap(Api.class, "fakturownia", () -> "hi", Duration.ofMillis(100));
-        long start = System.nanoTime();
-        assertThatThrownBy(api::hello).isInstanceOf(ProviderCallRejectedException.class);
-        long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
+        assertTimeoutPreemptively(Duration.ofSeconds(1), () -> assertThat(wrapped.maxLineNameLength()).isEqualTo(40));
 
-        assertThat(elapsedMs).isLessThan(5000);   // nowhere near the default 2-minute wait
         release.countDown();
         holder.join(5000);
     }
