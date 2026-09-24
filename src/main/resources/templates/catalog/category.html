@@ -1,0 +1,232 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+<div layout:fragment="content">
+    <section class="cl-page">
+        <div class="cl-page-body is-wide">
+            <!--/* The lead and the actions are defined inside the replaced element: the header pulls them in as its
+                   slots, and the body of a th:replace host is dropped, so they are never rendered twice. */-->
+            <div th:replace="~{fragments/settings-header :: subpageWithActions(${backHref}, ${catalog.name}, ${category.name},
+                    ~{::categoryLead}, ~{::categoryActions})}">
+                <th:block th:fragment="categoryLead">
+                    <span class="cl-status is-leading" th:classappend="${typeTone}" th:text="#{${typeLabelKey}}"></span>
+                    <span th:text="' ' + (${#strings.isEmpty(pimNames)} ? #{catalog.category.row.pim.none} : #{catalog.category.row.pim(${pimNames})})"></span>
+                    <th:block th:if="${!category.groupingOrder.isEmpty()}"><span> · </span><span th:text="#{catalog.category.row.labels(${category.groupingOrder.size()})}"></span></th:block>
+                    <!--/* An automatic category is defined by its PIM categories and its recommendation filters. */-->
+                    <th:block th:if="${page.dynamic()}"><span> · </span><span th:text="#{catalog.category.row.filters(${category.inventoryDefinitions.size()})}"></span></th:block>
+                    <span> · </span>
+                    <span th:text="${categoryMarketplaceNames.isEmpty()} ? #{catalog.category.row.marketplaces.none} : #{catalog.category.row.marketplaces(${#strings.listJoin(categoryMarketplaceNames, ', ')})}"></span>
+                </th:block>
+                <th:block th:fragment="categoryActions">
+                    <a class="cl-button" th:href="@{${settingsHref}}">
+                        <span class="icon is-small" aria-hidden="true"><i class="fas fa-cog"></i></span>
+                        <span th:text="#{catalog.category.settings.title}"></span>
+                    </a>
+                    <a th:unless="${page.dynamic()}" class="cl-button is-primary" th:href="@{${addHref}}">
+                        <span class="icon is-small" aria-hidden="true"><i class="fas fa-plus"></i></span>
+                        <span th:text="#{catalog.products.add}"></span>
+                    </a>
+                </th:block>
+            </div>
+
+            <div th:replace="~{fragments/settings-form :: savedAlert}"></div>
+            <div th:replace="~{fragments/settings-form :: warnAlert}"></div>
+            <div th:if="${categoryNotice}" class="cl-alert is-info" role="status">
+                <i class="fas fa-info-circle cl-alert-icon" aria-hidden="true"></i>
+                <p class="cl-alert-text" th:text="${categoryNotice}"></p>
+            </div>
+            <!--/* Outcome of a refused bulk action, in the page body; the layout banner is Bulma markup. */-->
+            <div th:if="${catalogError}" class="cl-alert is-bad" role="status">
+                <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
+                <p class="cl-alert-text" th:text="${catalogError}"></p>
+            </div>
+            <div th:if="${page.dynamic() and !page.hasMapping()}" class="cl-alert is-warn">
+                <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+                <p class="cl-alert-text">
+                    <span th:text="#{catalog.products.dynamic.noPim}"></span>
+                    <a th:href="@{${basicsHref}}" th:text="#{catalog.products.dynamic.noPim.action}"></a>
+                </p>
+            </div>
+
+            <!--/* The card is the filter container: the toolbar, the rows it filters and the selection bar that acts on
+                   them all live inside it. "feature" is the one group whose row attribute holds several values. */-->
+            <section class="cl-card" aria-labelledby="products-title" data-cl-table-filter data-cl-filter-multi="feature"
+                     th:attr="data-cl-filter-default=${filterDefault}">
+                <h2 class="cl-visually-hidden" id="products-title" th:text="#{catalog.products.title}"></h2>
+
+                <div class="cl-table-toolbar is-stacked" th:unless="${page.rows().isEmpty()}">
+                    <div class="cl-toolbar-filters" data-cl-filter-controls hidden>
+                        <div class="cl-segmented" role="group" th:attr="aria-label=#{catalog.products.status}">
+                            <button type="button" class="cl-segment" th:each="s : ${statuses}" data-cl-filter-group="status"
+                                    aria-pressed="false" th:attr="data-cl-filter=${s.filter()}, data-count=${page.statusCounts().get(s)}">
+                                <span th:text="#{${s.labelKey()}}"></span><span class="cl-segment-sep">: </span><span class="cl-segment-count" th:text="${page.statusCounts().get(s)}"></span>
+                            </button>
+                            <button type="button" class="cl-segment" data-cl-filter-group="status" data-cl-filter="all"
+                                    aria-pressed="false" th:attr="data-count=${page.total()}">
+                                <span th:text="#{catalog.products.status.all}"></span><span class="cl-segment-sep">: </span><span class="cl-segment-count" th:text="${page.total()}"></span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="cl-toolbar-row" data-cl-filter-controls hidden>
+                        <th:block th:if="${page.hasLabels()}">
+                            <label class="cl-visually-hidden" for="label-filter" th:text="#{catalog.products.label}"></label>
+                            <select class="cl-select is-compact" id="label-filter" data-cl-filter-group="label" data-cl-filter-select>
+                                <option value="all" th:attr="data-count=${page.total()}, data-label=#{catalog.products.label.all}"
+                                        th:text="#{catalog.products.label.all} + ' (' + ${page.total()} + ')'"></option>
+                                <option th:each="o : ${page.labelOptions()}" th:value="${o.value()}"
+                                        th:attr="data-count=${o.count()}, data-label=${o.value()}"
+                                        th:text="${o.value()} + ' (' + ${o.count()} + ')'"></option>
+                            </select>
+                        </th:block>
+                        <th:block th:unless="${page.dynamic()}">
+                            <label class="cl-visually-hidden" for="feature-filter" th:text="#{catalog.products.feature}"></label>
+                            <select class="cl-select is-compact" id="feature-filter" data-cl-filter-group="feature" data-cl-filter-select>
+                                <option value="all" th:attr="data-count=${page.total()}, data-label=#{catalog.products.feature.all}"
+                                        th:text="#{catalog.products.feature.all} + ' (' + ${page.total()} + ')'"></option>
+                                <option th:each="f : ${features}" th:value="${f}"
+                                        th:attr="data-count=${page.featureCounts().get(f)}, data-label=#{'catalog.products.feature.' + ${f}}"
+                                        th:text="#{'catalog.products.feature.' + ${f}} + ' (' + ${page.featureCounts().get(f)} + ')'"></option>
+                            </select>
+                        </th:block>
+                        <!--/* The placeholder fits a 280 px field; the name says what the search looks through. The value
+                               lives in the address as "q", so a product saved or a bulk action comes back to it. */-->
+                        <input class="cl-input cl-table-search" type="search" autocomplete="off" data-cl-table-search="q"
+                               th:placeholder="#{catalog.products.search.placeholder}" th:attr="aria-label=#{catalog.products.search}">
+                    </div>
+                </div>
+
+                <!--/* The count is announced from a region that is always in the page: one that appears in the same
+                       frame as its text is often skipped by a screen reader. The bar keeps the visible count. */-->
+                <p th:unless="${page.dynamic()}" class="cl-visually-hidden" role="status" data-cl-selection-status></p>
+                <div th:unless="${page.dynamic()}" class="cl-selection-bar" hidden data-cl-selection-bar>
+                    <span class="cl-selection-count" data-cl-selection-count
+                          th:attr="data-template=#{catalog.products.selected('{n}')}"></span>
+                    <div class="cl-selection-actions">
+                        <button type="button" class="cl-button" data-cl-select-action="enable">
+                            <span class="icon is-small" aria-hidden="true"><i class="fas fa-check"></i></span>
+                            <span th:text="#{catalog.products.bulk.enable}"></span>
+                        </button>
+                        <button type="button" class="cl-button" data-cl-select-action="disable">
+                            <span class="icon is-small" aria-hidden="true"><i class="fas fa-ban"></i></span>
+                            <span th:text="#{catalog.products.bulk.disable}"></span>
+                        </button>
+                        <button type="button" class="cl-button is-danger" data-cl-select-action="delete"
+                                th:attr="data-cl-select-confirm-title=#{catalog.products.bulk.delete.title('{n}')},
+                                         data-cl-select-confirm-message=#{catalog.products.bulk.delete.message},
+                                         data-cl-select-confirm-action=#{catalog.products.bulk.delete}">
+                            <span class="icon is-small" aria-hidden="true"><i class="fas fa-trash-alt"></i></span>
+                            <span th:text="#{catalog.products.bulk.delete}"></span>
+                        </button>
+                        <button type="button" class="cl-link-button cl-selection-clear" data-cl-select-clear
+                                th:text="#{catalog.products.clear}"></button>
+                    </div>
+                </div>
+
+                <!--/* Only a manual category is selectable; the attribute needs a value, as Thymeleaf drops an empty one. */-->
+                <table class="cl-table is-products" th:unless="${page.rows().isEmpty()}"
+                       th:attr="data-cl-select-table=${page.dynamic()} ? null : 'true'">
+                    <thead>
+                    <tr>
+                        <th th:unless="${page.dynamic()}" scope="col" class="cl-table-check">
+                            <label class="cl-check-target">
+                                <input type="checkbox" class="cl-check-input" data-cl-select-all hidden
+                                       th:attr="aria-label=#{catalog.products.selectAll}">
+                            </label>
+                        </th>
+                        <th scope="col" aria-sort="none">
+                            <button type="button" class="cl-table-sort" data-sort-key="name" th:text="#{catalog.products.column.product}"></button>
+                        </th>
+                        <th scope="col" aria-sort="none">
+                            <button type="button" class="cl-table-sort" data-sort-key="brand" th:text="#{product.brand}"></button>
+                        </th>
+                        <th scope="col" aria-sort="none">
+                            <button type="button" class="cl-table-sort" data-sort-key="label" th:text="#{catalog.products.label}"></button>
+                        </th>
+                        <th th:unless="${page.dynamic()}" scope="col" aria-sort="none">
+                            <button type="button" class="cl-table-sort" data-sort-key="group" th:text="#{product.pricing.group}"></button>
+                        </th>
+                        <th th:unless="${page.dynamic()}" scope="col" class="is-secondary-column" th:text="#{catalog.products.column.marketplaces}"></th>
+                        <th th:if="${page.dynamic()}" scope="col" class="is-numeric" aria-sort="none">
+                            <button type="button" class="cl-table-sort" data-sort-key="price" th:text="#{catalog.products.column.price}"></button>
+                        </th>
+                        <th scope="col" th:text="#{catalog.products.column.status}"></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="row : ${page.rows()}"
+                        th:attr="data-cl-filter-status=${row.status().filter()}, data-cl-filter-label=${row.label()},
+                                 data-cl-filter-feature=${row.featuresAttribute()}, data-cl-search=${row.searchText()},
+                                 data-sort-name=${row.name()}, data-sort-label=${row.label()}, data-sort-price=${row.lowestGrossPrice()}">
+                        <td th:unless="${page.dynamic()}" class="cl-table-check">
+                            <label class="cl-check-target">
+                                <input type="checkbox" class="cl-check-input" data-cl-select-row hidden th:value="${row.id()}"
+                                       th:attr="aria-label=#{catalog.products.select(${row.name()})}">
+                            </label>
+                        </td>
+                        <th scope="row" class="cl-table-key" th:attr="data-label=#{catalog.products.column.product}">
+                            <!--/* The link carries the filter of the list; table-filter.js keeps it in step with the address. */-->
+                            <a th:if="${row.href() != null}" th:href="@{${row.href() + (filterQuery ?: '')}}" data-cl-filter-carry
+                               th:text="${row.name()}"></a>
+                            <span th:if="${row.href() == null}" th:text="${row.name()}"></span>
+                            <span class="cl-table-sub">
+                                <!--/* A product can be known by its manufacturer code alone: each code states itself, and the separator belongs to the one before it. */-->
+                                <span th:if="${row.ean() != null}" class="cl-table-code" th:text="'EAN ' + ${row.ean()}"></span><span th:if="${row.mfn() != null}"><th:block th:text="${row.ean() != null} ? ' · ' : ''"></th:block><span class="cl-table-code" th:text="${row.mfn()}"></span></span><span th:if="${row.pimId() != null}" th:text="(${row.ean() != null or row.mfn() != null} ? ' · ' : '') + 'PIM ' + ${row.pimId()}"></span>
+                            </span>
+                        </th>
+                        <td th:attr="data-label=#{product.brand}" th:text="${row.brand()}"></td>
+                        <td th:attr="data-label=#{catalog.products.label}">
+                            <span th:text="${row.label()}"></span>
+                            <span th:if="${row.labelOutside()}" class="cl-status is-warn" th:text="#{catalog.products.label.outside}"></span>
+                        </td>
+                        <td th:unless="${page.dynamic()}" th:attr="data-label=#{product.pricing.group}" th:text="${row.pricingGroup()}"></td>
+                        <td th:unless="${page.dynamic()}" class="is-secondary-column" th:attr="data-label=#{catalog.products.column.marketplaces}">
+                            <span class="cl-table-pills" th:unless="${row.marketplaceNames().isEmpty()}">
+                                <span class="cl-status is-neutral" th:each="m : ${row.marketplaceNames()}" th:text="${m}"></span>
+                            </span>
+                            <span class="cl-table-empty" th:if="${row.marketplaceNames().isEmpty()}">—</span>
+                        </td>
+                        <td th:if="${page.dynamic()}" class="is-numeric" th:attr="data-label=#{catalog.products.column.price}"
+                            th:text="#{general.currency.amount(${row.lowestGrossPrice()})}"></td>
+                        <td th:attr="data-label=#{catalog.products.column.status}">
+                            <span class="cl-status" th:classappend="${row.status().tone()}" th:text="#{${row.status().pillKey()}}"></span>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+                <p class="cl-list-empty" data-cl-filter-empty hidden th:unless="${page.rows().isEmpty()}">
+                    <span th:text="#{catalog.products.filter.empty}"></span>
+                    <button type="button" class="cl-link-button" data-cl-filter-clear th:text="#{catalog.products.filter.clear}"></button>
+                </p>
+
+                <p class="cl-list-empty" th:if="${page.rows().isEmpty() and !page.dynamic()}">
+                    <span th:text="#{catalog.products.empty}"></span>
+                    <a class="cl-button is-primary" th:href="@{${addHref}}" th:text="#{catalog.products.add}"></a>
+                    <a class="cl-link-button" th:href="@{${newProductHref + (filterQuery ?: '')}}" data-cl-filter-carry
+                       th:text="#{catalog.products.addManually}"></a>
+                </p>
+                <p class="cl-list-empty" th:if="${page.rows().isEmpty() and page.dynamic() and page.hasMapping()}"
+                   th:text="#{catalog.products.empty.dynamic}"></p>
+                <p class="cl-card-desc cl-card-note" th:unless="${page.dynamic() or page.rows().isEmpty()}">
+                    <span th:text="#{catalog.products.note.manual}"></span>
+                    <a th:href="@{${newProductHref + (filterQuery ?: '')}}" data-cl-filter-carry th:text="#{catalog.products.addManually}"></a>
+                </p>
+                <p class="cl-card-desc cl-card-note" th:if="${page.dynamic()}" th:text="#{catalog.products.note.dynamic}"></p>
+
+                <!--/* The bulk form carries nothing of its own: table-select.js adds the action, the checked ids and the
+                       page's address (the filter as the operator left it, which the redirect comes back to) before it
+                       submits. A status rendered here would be the one the page was opened with. */-->
+                <form th:unless="${page.dynamic()}" data-cl-select-form method="post" th:action="@{${bulkAction}}" hidden></form>
+            </section>
+            <noscript><p class="cl-help" th:text="#{catalog.products.noscript}"></p></noscript>
+            <dialog th:replace="~{fragments/confirm-dialog :: dialog}"></dialog>
+        </div>
+    </section>
+    <script th:src="@{/js/table-filter.js}" defer></script>
+    <script th:src="@{/js/table-sort.js}" defer></script>
+    <script th:src="@{/js/table-select.js}" defer></script>
+    <script th:src="@{/js/confirm-dialog.js}" defer></script>
+</div>
+</body>
+</html>

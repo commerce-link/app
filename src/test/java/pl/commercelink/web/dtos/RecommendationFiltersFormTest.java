@@ -1,0 +1,237 @@
+package pl.commercelink.web.dtos;
+
+import org.junit.jupiter.api.Test;
+import pl.commercelink.products.CategoryDefinition;
+import pl.commercelink.products.InventoryDefinition;
+import pl.commercelink.products.filters.InventoryFilterType;
+import pl.commercelink.starter.dynamodb.Metadata;
+
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+class RecommendationFiltersFormTest {
+
+    private static RecommendationFiltersForm.FilterForm filter(String type) {
+        RecommendationFiltersForm.FilterForm form = new RecommendationFiltersForm.FilterForm();
+        form.setType(type);
+        return form;
+    }
+
+    /** A row is removed by clearing it; a value left without a key is a mistake, not a removal. */
+    @Test
+    void anUnknownRowWithAValueButNoKeyIsRefusedAtItsOwnField() {
+        // given
+        RecommendationFiltersForm form = new RecommendationFiltersForm();
+        RecommendationFiltersForm.FilterForm brands = filter("BRAND_NAME");
+        brands.setValues("MSI");
+        RecommendationFiltersForm.MetadataForm nameless = new RecommendationFiltersForm.MetadataForm();
+        nameless.setValue("x");
+        RecommendationFiltersForm.MetadataForm emptied = new RecommendationFiltersForm.MetadataForm();
+        brands.getUnknown().addAll(List.of(nameless, emptied));
+        form.getFilters().add(brands);
+
+        // when
+        Map<String, String> errors = form.validate();
+
+        // then
+        assertThat(errors).containsExactly(Map.entry("filter-0-unknown-0-key", "catalog.filter.unknown.key.required"));
+    }
+
+    /**
+     * The typed fields of a filter own their metadata keys; an unknown row renamed onto one of them would be written
+     * twice and, on the next load, overwrite the typed field without a word.
+     */
+    @Test
+    void anUnknownRowMayNotTakeOverTheKeyOfATypedField() {
+        // given
+        RecommendationFiltersForm form = new RecommendationFiltersForm();
+        RecommendationFiltersForm.FilterForm brands = filter("BRAND_NAME");
+        brands.setValues("MSI");
+        brands.getUnknown().add(pair("brands", "ASUS"));
+        RecommendationFiltersForm.FilterForm prices = filter("PRICE_RANGE");
+        prices.setMinPrice("900");
+        prices.getUnknown().add(pair(" MaxPrice ", "1"));
+        RecommendationFiltersForm.FilterForm lines = filter("PRODUCT_LINE_BY_BRAND");
+        lines.setBrandLines("Gigabyte: Windforce");
+        lines.getUnknown().add(pair("gigabyte", "Gaming OC"));
+        form.getFilters().addAll(List.of(brands, prices, lines));
+
+        // when
+        Map<String, String> errors = form.validate();
+
+        // then
+        assertThat(errors).containsOnly(
+                Map.entry("filter-0-unknown-0-key", "catalog.filter.unknown.key.taken"),
+                Map.entry("filter-1-unknown-0-key", "catalog.filter.unknown.key.taken"),
+                Map.entry("filter-2-unknown-0-key", "catalog.filter.unknown.key.taken"));
+    }
+
+    @Test
+    void anUnknownRowWithAKeyOfItsOwnIsAccepted() {
+        // given
+        RecommendationFiltersForm form = new RecommendationFiltersForm();
+        RecommendationFiltersForm.FilterForm brands = filter("BRAND_NAME");
+        brands.setValues("MSI");
+        brands.getUnknown().add(pair("Legacy", "x"));
+        form.getFilters().add(brands);
+
+        // when / then
+        assertThat(form.validate()).isEmpty();
+    }
+
+    /** A broken brand-lines field has no brands to compare against; its own error already stops the save. */
+    @Test
+    void anUnknownRowIsNotCheckedAgainstBrandLinesThatDoNotParse() {
+        // given
+        RecommendationFiltersForm form = new RecommendationFiltersForm();
+        RecommendationFiltersForm.FilterForm lines = filter("PRODUCT_LINE_BY_BRAND");
+        lines.setBrandLines("Gigabyte Windforce");
+        lines.getUnknown().add(pair("Legacy", "x"));
+        form.getFilters().add(lines);
+
+        // when
+        Map<String, String> errors = form.validate();
+
+        // then
+        assertThat(errors).containsOnlyKeys("filter-0-brandLines");
+    }
+
+    private static RecommendationFiltersForm.MetadataForm pair(String key, String value) {
+        RecommendationFiltersForm.MetadataForm row = new RecommendationFiltersForm.MetadataForm();
+        row.setKey(key);
+        row.setValue(value);
+        return row;
+    }
+
+    @Test
+    void emptyListIsValidAndMeansNoFilters() {
+        // given
+        RecommendationFiltersForm form = new RecommendationFiltersForm();
+
+        // when / then
+        assertThat(form.validate()).isEmpty();
+        assertThat(form.toDefinitions()).isEmpty();
+    }
+
+    @Test
+    void listFilterNeedsValues() {
+        // given
+        RecommendationFiltersForm form = new RecommendationFiltersForm();
+        form.getFilters().add(filter("PRODUCT_TITLE_CONTAINS"));
+
+        // when / then
+        assertThat(form.validate()).containsEntry("filter-0-values", "catalog.filter.values.required");
+    }
+
+    @Test
+    void priceRangeNeedsAtLeastOneBoundAndMaxAboveMin() {
+        // given
+        RecommendationFiltersForm form = new RecommendationFiltersForm();
+        RecommendationFiltersForm.FilterForm empty = filter("PRICE_RANGE");
+        RecommendationFiltersForm.FilterForm inverted = filter("PRICE_RANGE");
+        inverted.setMinPrice("900");
+        inverted.setMaxPrice("100");
+        form.getFilters().addAll(List.of(empty, inverted));
+
+        // when
+        Map<String, String> errors = form.validate();
+
+        // then
+        assertThat(errors).containsEntry("filter-0-minPrice", "catalog.filter.price.required")
+                .containsEntry("filter-1-maxPrice", "catalog.filter.price.order");
+    }
+
+    @Test
+    void aPriceThatIsNotAWholeAmountIsNamedAtItsOwnField() {
+        // given
+        RecommendationFiltersForm form = new RecommendationFiltersForm();
+        RecommendationFiltersForm.FilterForm price = filter("PRICE_RANGE");
+        price.setMinPrice("tanio");
+        form.getFilters().add(price);
+
+        // when / then
+        assertThat(form.validate()).containsExactly(Map.entry("filter-0-minPrice", "catalog.filter.price.invalid"));
+    }
+
+    @Test
+    void brandLinesErrorNamesTheLine() {
+        // given
+        RecommendationFiltersForm form = new RecommendationFiltersForm();
+        RecommendationFiltersForm.FilterForm byBrand = filter("PRODUCT_LINE_BY_BRAND_NOT_CONTAIN");
+        byBrand.setBrandLines("Gigabyte: Eagle\nbroken line");
+        form.getFilters().add(byBrand);
+
+        // when / then
+        assertThat(form.validate()).containsEntry("filter-0-brandLines", "catalog.filter.brandLines.line:2");
+    }
+
+    @Test
+    void byBrandFilterNeedsAtLeastOneBrand() {
+        // given
+        RecommendationFiltersForm form = new RecommendationFiltersForm();
+        form.getFilters().add(filter("PRODUCT_LINE_BY_BRAND"));
+
+        // when / then
+        assertThat(form.validate()).containsEntry("filter-0-brandLines", "catalog.filter.brandLines.required");
+    }
+
+    @Test
+    void unknownTypeIsAnError() {
+        // given
+        RecommendationFiltersForm form = new RecommendationFiltersForm();
+        form.getFilters().add(filter("NOPE"));
+
+        // when / then
+        assertThat(form.validate()).containsEntry("filter-0-type", "catalog.filter.type.invalid");
+    }
+
+    @Test
+    void fromAndToDefinitionsRoundTrip() {
+        // given
+        CategoryDefinition category = new CategoryDefinition().withName("GPU").withGeneratedId();
+        category.getInventoryDefinitions().add(new InventoryDefinition(InventoryFilterType.BRAND_NAME, List.of(new Metadata("Brands", "MSI"))));
+        category.getInventoryDefinitions().add(new InventoryDefinition(InventoryFilterType.PRICE_RANGE, List.of(new Metadata("MinPrice", "900"))));
+
+        // when
+        RecommendationFiltersForm form = RecommendationFiltersForm.from(category);
+        List<InventoryDefinition> back = form.toDefinitions();
+
+        // then
+        assertThat(form.getFilters()).hasSize(2);
+        assertThat(back).hasSize(2);
+        assertThat(back.get(0).getType()).isEqualTo(InventoryFilterType.BRAND_NAME);
+        assertThat(back.get(1).getMetadata()).extracting(Metadata::getKey).containsExactly("MinPrice", "MaxPrice");
+        assertThat(back).allMatch(InventoryDefinition::isComplete);
+    }
+
+    /** The id of a field is also the key of its error, so the error summary can link to the field. */
+    @Test
+    void theFieldIdCarriesTheIndexAndTheFieldName() {
+        // when / then
+        assertThat(RecommendationFiltersForm.fieldId(2, "brandLines")).isEqualTo("filter-2-brandLines");
+    }
+
+    /**
+     * "Podaj co najmniej jedną wartość." can stand for several filters at once, so the error summary names the filter
+     * by the number its legend shows; an error of an unknown metadata row belongs to the filter that carries it.
+     */
+    @Test
+    void theErrorSummaryNamesTheFilterOfEveryErrorByTheNumberOfItsLegend() {
+        // given
+        Map<String, String> texts = new LinkedHashMap<>();
+        texts.put("filter-3-values", PolishMessages.text("catalog.filter.values.required"));
+        texts.put("filter-0-unknown-1-key", PolishMessages.text("catalog.filter.unknown.key.required"));
+
+        // when
+        Map<String, String> summary = RecommendationFiltersForm.summary(texts,
+                (number, text) -> PolishMessages.text(RecommendationFiltersForm.SUMMARY_LINE, number, text));
+
+        // then
+        assertThat(summary).containsExactly(
+                Map.entry("filter-3-values", "Filtr 4: Podaj co najmniej jedną wartość."),
+                Map.entry("filter-0-unknown-1-key", "Filtr 1: Podaj nazwę pola albo usuń wiersz."));
+    }
+}

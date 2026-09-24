@@ -1,0 +1,141 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+<div layout:fragment="content">
+    <section class="cl-page">
+        <div class="cl-page-body is-form">
+            <!--/* The delete link is defined inside the replaced element: the header pulls it in as its actions slot,
+                   and the body of a th:replace host is dropped, so it is never rendered twice. */-->
+            <div th:replace="~{fragments/settings-header :: subpageWithActions(${backHref}, ${backLabel}, ${pageTitle}, ${lead}, ~{::deleteAction})}">
+                <th:block th:fragment="deleteAction">
+                    <!--/* A plain link to the confirmation page, not a dialog: the page says what the deletion takes with it. */-->
+                    <a th:if="${deleteHref != null}" class="cl-button is-danger-outline" th:href="@{${deleteHref}}"><i
+                            class="fas fa-trash-alt" aria-hidden="true"></i><span th:text="#{catalog.category.delete}"></span></a>
+                </th:block>
+            </div>
+            <!--/* Under the page title, one placement across the catalog screens: plain, selectable text, because
+                   support asks for this id over the phone and a form field would invite posting it back. */-->
+            <p th:if="${existing}" class="cl-help" th:text="#{catalog.category.id(${category.categoryId})}"></p>
+
+            <form th:fragment="basicsForm" id="category-basics-form" class="cl-form" th:action="@{${formAction}}" th:object="${form}"
+                  method="post" novalidate data-cl-async th:attr="data-cl-redirect=${redirectTo}, data-error-message=#{form.save.failed}">
+                <div th:replace="~{fragments/settings-form :: errorSummary('category-basics-errors', ${errors}, null)}"></div>
+                <div class="cl-card">
+                    <fieldset class="cl-fieldset">
+                        <legend class="cl-fieldset-title" th:text="#{catalog.category.basics.section.category}"></legend>
+                        <div class="cl-form-grid">
+                            <div class="cl-span-4" th:insert="~{fragments/settings-form :: textField('name', 'catalog.category.name', *{name}, 'text', 'off', true, ${errors['name']}, null)}"></div>
+                            <div class="cl-span-2" th:insert="~{fragments/settings-form :: textField('sequenceNumber', 'catalog.category.sequence', *{sequenceNumber}, 'text', 'off', false, ${errors['sequenceNumber']}, ${existing} ? #{catalog.category.sequence.help.edit} : #{catalog.category.sequence.help})}"></div>
+                            <div class="cl-span-6">
+                                <div class="cl-field">
+                                    <span class="cl-label" id="pimCategoryIds-label" th:text="#{catalog.category.pim}"></span>
+                                    <div th:replace="~{fragments/category-picker :: emptyHint(${categoryOptions})}"></div>
+                                    <!--/* The picker posts one hidden input per chosen category, so a save always carries the whole list. */-->
+                                    <div th:replace="~{fragments/category-picker :: multiPicker('pimCategoryIds', ${selectedCategoryOptions}, false, 'pimCategoryIds-label')}"></div>
+                                    <p class="cl-help" th:text="#{catalog.category.pim.help}"></p>
+                                </div>
+                            </div>
+                        </div>
+                    </fieldset>
+                    <fieldset class="cl-fieldset">
+                        <legend class="cl-fieldset-title" th:text="#{catalog.category.type.section}"></legend>
+                        <div class="cl-form-grid">
+                            <div class="cl-span-6">
+                                <fieldset class="cl-choice-group is-row" th:attr="aria-label=#{catalog.category.type.section}">
+                                    <label class="cl-choice" th:each="t : ${types}">
+                                        <input type="radio" name="type" th:value="${t.value}" th:checked="${form.type == t.value}"
+                                               data-cl-variant-select="categoryType">
+                                        <span class="cl-choice-text">
+                                            <span class="cl-choice-title" th:text="#{${t.labelKey}}"></span>
+                                            <span class="cl-choice-description" th:text="#{${t.descKey}}"></span>
+                                        </span>
+                                    </label>
+                                </fieldset>
+                                <p th:if="${errors['type'] != null}" class="cl-field-error" th:text="#{${errors['type']}}"></p>
+                                <!--/* Shown only while "Automatyczna" is chosen: the products it would remove are still there. */-->
+                                <div th:if="${existing and category.type.name() == 'Managed' and managedProductsCount > 0}"
+                                     class="cl-alert is-warn" data-cl-variant-when="categoryType=Dynamic">
+                                    <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+                                    <p class="cl-alert-text" th:text="#{catalog.category.type.dynamic.warning(${managedProductsCount})}"></p>
+                                </div>
+                            </div>
+                        </div>
+                    </fieldset>
+                    <fieldset class="cl-fieldset">
+                        <legend class="cl-fieldset-title" th:text="#{catalog.category.offer.section}"></legend>
+                        <div class="cl-form-grid">
+                            <div class="cl-span-2" th:insert="~{fragments/settings-form :: textField('maxQty', 'catalog.category.maxQty', *{maxQty}, 'text', 'off', true, ${errors['maxQty']}, #{catalog.category.maxQty.help})}"></div>
+                            <div class="cl-span-6">
+                                <div th:replace="~{fragments/settings-form :: check('requiredDuringOrder', 'catalog.category.required', *{requiredDuringOrder}, 'catalog.category.required.desc', null)}"></div>
+                                <div th:replace="~{fragments/settings-form :: check('includedInDeliverySuggestions', 'catalog.category.restock', *{includedInDeliverySuggestions}, 'catalog.category.restock.desc', null)}"></div>
+                                <div th:replace="~{fragments/settings-form :: check('deletionProtection', 'catalog.category.protect', *{deletionProtection}, 'catalog.category.protect.desc', null)}"></div>
+                            </div>
+                        </div>
+                    </fieldset>
+                    <fieldset class="cl-fieldset">
+                        <legend class="cl-fieldset-title" th:text="#{catalog.category.labels}"></legend>
+                        <p class="cl-help" th:text="#{catalog.category.labels.help}"></p>
+                        <div class="cl-repeat cl-repeat-lines" data-cl-repeat="labels" data-cl-repeat-id="label"
+                             data-cl-repeat-min="0" id="labels" tabindex="-1">
+                            <!--/* th:insert runs before th:each on one element, so the loop sits on its own block. */-->
+                            <th:block th:each="label, stat : *{labels}">
+                                <div class="cl-repeat-line" data-cl-repeat-item
+                                     th:insert="~{catalog/category-basics :: labelLine(${stat.index}, ${stat.count}, ${label})}"></div>
+                            </th:block>
+                            <template data-cl-repeat-template>
+                                <div class="cl-repeat-line" data-cl-repeat-item
+                                     th:insert="~{catalog/category-basics :: labelLine('@INDEX@', '@NUMBER@', '')}"></div>
+                            </template>
+                            <noscript>
+                                <div class="cl-repeat-line"
+                                     th:insert="~{catalog/category-basics :: labelLine(${form.labels.size()}, ${form.labels.size() + 1}, '')}"></div>
+                            </noscript>
+                            <div class="cl-repeat-add">
+                                <button type="button" class="cl-button" data-cl-repeat-add hidden>
+                                    <i class="fas fa-plus" aria-hidden="true"></i>
+                                    <span th:text="#{catalog.category.labels.add}"></span>
+                                </button>
+                                <span class="cl-visually-hidden" role="status" data-cl-repeat-status
+                                      th:attr="data-template=#{catalog.category.labels.removed('@N@')}"></span>
+                            </div>
+                        </div>
+                        <p th:if="${errors['labels'] != null}" class="cl-field-error" id="labels-error">
+                            <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                            <span th:text="#{${errors['labels']}}"></span>
+                        </p>
+                        <p th:if="${labelsOutsideCount > 0}" class="cl-help is-warn"
+                           th:text="#{catalog.category.labels.outside.hint(${labelsOutsideCount})}"></p>
+                    </fieldset>
+                    <div class="cl-card-footer">
+                        <button class="cl-button is-primary" type="submit"
+                                th:text="${existing} ? #{catalog.category.basics.save} : #{catalog.category.create}"></button>
+                        <a class="cl-button" th:href="@{${backHref}}" th:text="#{general.cancel}"></a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </section>
+    <script th:if="${!errors.isEmpty()}">
+        document.getElementById('category-basics-errors').focus();
+    </script>
+    <div th:replace="~{fragments/category-picker :: multiPickerScript(${categoryOptions}, ${categoryAncestors})}"></div>
+    <script th:src="@{/js/async-form.js}" defer></script>
+    <script th:src="@{/js/repeat-fields.js}" defer></script>
+    <script th:src="@{/js/variant-fields.js}" defer></script>
+</div>
+
+<!--/* One label: its index in the posted list, the number shown to people, and its value (empty for a blank one).
+       The remove button is renumbered by repeat-fields.js; the input keeps the number it was rendered with. */-->
+<th:block th:fragment="labelLine(index, number, value)">
+    <span class="cl-repeat-line-no" aria-hidden="true"><span data-cl-repeat-number th:text="${number}"></span>.</span>
+    <input class="cl-input" type="text" autocomplete="off" th:name="'labels[' + ${index} + ']'" th:id="'label-' + ${index} + '-value'"
+           th:value="${value}" th:attr="aria-label=#{catalog.category.label.n(${number})}">
+    <button type="button" class="cl-link-button is-danger cl-repeat-remove" data-cl-repeat-remove hidden
+            th:text="#{settings.list.delete}"
+            th:attr="aria-label=#{catalog.category.labels.remove(${number})},
+                     data-cl-repeat-label=#{catalog.category.labels.remove('@N@')}"></button>
+</th:block>
+</body>
+</html>

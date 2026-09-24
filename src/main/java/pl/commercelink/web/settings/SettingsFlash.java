@@ -6,6 +6,8 @@ import org.springframework.web.servlet.FlashMap;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.web.servlet.support.RequestContextUtils;
 
+import java.util.Map;
+
 /**
  * Outcome of an action shown on the settings page it returns to, inside the page body (fragments/settings-form ::
  * savedAlert) rather than in the full-width banner of the layout.
@@ -32,8 +34,17 @@ public final class SettingsFlash {
     /** The same for a page that shows its own flash attribute (an error, a notice) instead of the saved message. */
     public static void forNextPage(HttpServletRequest request, HttpServletResponse response, String path, String attribute,
                                    String message) {
+        forNextPage(request, response, path, Map.of(attribute, message));
+    }
+
+    /**
+     * Several attributes for the same next page. Saved in one go on purpose: saving the output flash map twice stores
+     * the same map twice, and only one of the copies is taken by the page that follows.
+     */
+    public static void forNextPage(HttpServletRequest request, HttpServletResponse response, String path,
+                                   Map<String, String> attributes) {
         FlashMap flashMap = RequestContextUtils.getOutputFlashMap(request);
-        flashMap.put(attribute, message);
+        flashMap.putAll(attributes);
         RequestContextUtils.saveOutputFlashMap(path, request, response);
     }
 }
