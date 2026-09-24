@@ -108,7 +108,7 @@ class CategoryPricingTemplateTest {
         // then
         assertThat(html).contains("the first group from the top");
         // N2: the legend reuses the same lossless field value as the input, so it reads without a grouping space.
-        assertThat(html).contains("label RTX 5070 \u00b7 price from 2500,00 PLN");
+        assertThat(html).contains("subcategory RTX 5070 \u00b7 price from 2500,00 PLN");
         // the Default pill and the summary of the one matched group, both in the legends
         assertThat(occurrences(html, "cl-status is-neutral")).isEqualTo(1);
         assertThat(occurrences(html, "cl-status is-info")).isEqualTo(1);
@@ -140,7 +140,7 @@ class CategoryPricingTemplateTest {
         String html = renderedWithAPriceOnlyGroup();
 
         // then
-        assertThat(html).contains("price threshold without a label");
+        assertThat(html).contains("price threshold without a subcategory");
         assertThat(occurrences(html, "cl-status is-warn")).isEqualTo(1);
         assertThat(occurrences(html, "cl-status is-neutral")).isEqualTo(0);
         assertThat(html).doesNotContain("??");

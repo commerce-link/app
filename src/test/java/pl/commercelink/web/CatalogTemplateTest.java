@@ -122,7 +122,7 @@ class CatalogTemplateTest {
         assertThat(occurrences(html, "/dashboard/catalogs/c1/category/k1/delete")).isEqualTo(1);
         assertThat(html).doesNotContain("/dashboard/catalogs/c1/category/k2/delete");
         assertThat(html).contains("Automatic").contains("Products from the inventory")
-                .contains("Products with a label outside the list: 1")
+                .contains("Products with a subcategory outside the list: 1")
                 .contains("Marketplaces: Allegro, Empik");
     }
 }

@@ -181,4 +181,21 @@ class CatalogMessagesTest {
                 + "w momencie tworzenia dostaw lub bezpośrednio w magazynie.");
         assertThat(en).doesNotContain("Restock the warehouse");
     }
+
+    /**
+     * The client's term: a category's labels are its subcategories, the groups its products are assigned to. No text of
+     * the catalog screens calls them labels any more (shipping labels and label printers live under other prefixes).
+     */
+    @Test
+    void theCatalogCallsLabelsSubcategories() throws Exception {
+        // when
+        Map<String, String> pl = catalogMessages("messages_pl.properties");
+        Map<String, String> en = catalogMessages("messages_en.properties");
+
+        // then
+        assertThat(pl).allSatisfy((key, text) -> assertThat(text).as(key).doesNotContainPattern("(?i)etykie|etykiec"));
+        assertThat(en).allSatisfy((key, text) -> assertThat(text).as(key).doesNotContainPattern("(?i)\\blabels?\\b"));
+        assertThat(pl.get("catalog.category.labels")).isEqualTo("Podkategorie");
+        assertThat(en.get("catalog.category.labels")).isEqualTo("Subcategories");
+    }
 }
