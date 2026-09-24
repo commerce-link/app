@@ -35,6 +35,7 @@ public class ReceiptProcessor {
 
     static final Duration LEASE = Duration.ofMinutes(15);
     private static final Duration EFFECTS_RETRY = Duration.ofMinutes(5);
+    private static final Duration EFFECTS_RETRY_CAP = Duration.ofHours(6);
 
     private final ReceiptAttemptStore attempts;
     private final StoresRepository storesRepository;
@@ -336,9 +337,15 @@ public class ReceiptProcessor {
                     : ReceiptSchedule.nextIssue(a.getIssueCalls(), now));
             case PENDING -> a.schedule(ReceiptSchedule.nextPending(a, now));
             case FISCALISED -> {
-                if (effectsFailed || ReceiptEffects.pending(a)) {
+                if (effectsFailed) {
+                    // Growing backoff instead of retrying a broken effects run (e.g. the order was deleted) every
+                    // 5 minutes forever with nobody told; nextEffectsRetry alerts the operator once it repeats.
+                    a.setEffectsFailures(a.getEffectsFailures() + 1);
+                    a.schedule(nextEffectsRetry(a.getEffectsFailures(), now));
+                } else if (ReceiptEffects.pending(a)) {
                     a.schedule(now.plus(EFFECTS_RETRY));
                 } else if (a.getDocumentUrl() == null && a.getLinkGaveUpAt() == null) {
+                    a.setEffectsFailures(0);
                     Instant next = ReceiptSchedule.nextLink(a, now);
                     if (next == null) {
                         a.setLinkGaveUpAt(now);
@@ -347,11 +354,23 @@ public class ReceiptProcessor {
                         a.schedule(next);
                     }
                 } else {
+                    a.setEffectsFailures(0);
                     a.unschedule();
                 }
             }
             default -> a.unschedule();
         }
+    }
+
+    /** After the {@code effectsFailures}-th consecutive failed effects run: 5 min x 2^(effectsFailures-1), capped
+     *  at 6 h. */
+    private static Instant nextEffectsRetry(int effectsFailures, Instant now) {
+        int exponent = Math.min(effectsFailures - 1, 32);   // guards the shift; the cap below applies long before this
+        Duration delay = EFFECTS_RETRY.multipliedBy(1L << exponent);
+        if (delay.compareTo(EFFECTS_RETRY_CAP) > 0) {
+            delay = EFFECTS_RETRY_CAP;
+        }
+        return now.plus(delay);
     }
 
     private boolean stillQualifies(ReceiptAttempt attempt) {

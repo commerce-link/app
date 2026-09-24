@@ -54,6 +54,11 @@ public class ReceiptAttempt {
     private int preSendFailures;
     @DynamoDBAttribute(attributeName = "pollCount")
     private int pollCount;
+    /** Consecutive failed effects runs (attaching the document, notifying marketplaces, sending the e-mail) since
+     *  the last one that had nothing left pending; drives the effects retry backoff and the operator alert. Reset
+     *  to 0 once a run leaves nothing pending. */
+    @DynamoDBAttribute(attributeName = "effectsFailures")
+    private int effectsFailures;
     @DynamoDBAttribute(attributeName = "lastError")
     private String lastError;
     @DynamoDBAttribute(attributeName = "lastErrorAt")

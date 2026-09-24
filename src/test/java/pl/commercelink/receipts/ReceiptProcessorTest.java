@@ -341,6 +341,64 @@ class ReceiptProcessorTest {
     }
 
     @Test
+    void repeatedEffectsFailuresBackOffExponentiallyThenAlertTheOperator() {
+        provider.answerIssue(r -> Receipt.fiscalised(KEY, "p1", new FiscalData(null, null, clock.instant()), "https://x/1"));
+        doThrow(new RuntimeException("boom")).when(effects).apply(STORE_ID, KEY);
+
+        processor.process(STORE_ID, KEY);
+        assertThat(stored().getState()).isEqualTo(ReceiptAttemptState.FISCALISED);
+        assertThat(stored().getEffectsFailures()).isEqualTo(1);
+        assertThat(stored().getNextCheckAt()).isEqualTo(clock.instant().plus(Duration.ofMinutes(5)));
+        assertThat(stored().getAttention()).isNull();
+
+        clock.advance(Duration.ofMinutes(5));
+        processor.process(STORE_ID, KEY);
+        assertThat(stored().getEffectsFailures()).isEqualTo(2);
+        assertThat(stored().getNextCheckAt()).isEqualTo(clock.instant().plus(Duration.ofMinutes(10)));
+        assertThat(stored().getAttention()).isNull();
+
+        clock.advance(Duration.ofMinutes(10));
+        processor.process(STORE_ID, KEY);
+        assertThat(stored().getEffectsFailures()).isEqualTo(3);
+        assertThat(stored().getNextCheckAt()).isEqualTo(clock.instant().plus(Duration.ofMinutes(20)));
+        assertThat(stored().getAttention()).isEqualTo(ReceiptAttention.EFFECTS_FAILED.name());
+
+        // a later run that leaves nothing pending resets the counter and clears the alert
+        doAnswer(i -> {
+            attempts.update(STORE_ID, KEY, a -> {
+                Instant now = clock.instant();
+                a.setDocumentAttachedAt(now);
+                a.setDocumentLinkedAt(now);
+                a.setMarketplaceNotifiedAt(now);
+                a.setEmailClaimedAt(now);
+                a.setEmailSentAt(now);
+                return true;
+            });
+            return null;
+        }).when(effects).apply(STORE_ID, KEY);
+        clock.advance(Duration.ofMinutes(20));
+        processor.process(STORE_ID, KEY);
+
+        assertThat(stored().getEffectsFailures()).isZero();
+        assertThat(stored().isScheduled()).isFalse();
+        assertThat(stored().getAttention()).isNull();
+    }
+
+    @Test
+    void effectsBackoffCapsAtSixHours() {
+        provider.answerIssue(r -> Receipt.fiscalised(KEY, "p1", new FiscalData(null, null, clock.instant()), "https://x/1"));
+        doThrow(new RuntimeException("boom")).when(effects).apply(STORE_ID, KEY);
+
+        processor.process(STORE_ID, KEY);
+        for (int i = 0; i < 10; i++) {
+            clock.advance(Duration.between(clock.instant(), stored().getNextCheckAt()));
+            processor.process(STORE_ID, KEY);
+        }
+
+        assertThat(stored().getNextCheckAt()).isEqualTo(clock.instant().plus(Duration.ofHours(6)));
+    }
+
+    @Test
     void aFailureReportedLaterEndsAPendingAttempt() {
         processor.process(STORE_ID, KEY);
         provider.answerFetch(id -> Receipt.failed(null, id, new ReceiptFailure("fiscal_error", "VAT")));

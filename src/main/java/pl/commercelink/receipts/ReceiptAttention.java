@@ -10,7 +10,8 @@ public enum ReceiptAttention {
     FAILED,
     BLOCKED,
     LINK_MISSING,
-    EMAIL_NOT_SENT;
+    EMAIL_NOT_SENT,
+    EFFECTS_FAILED;
 
     public String messageKey() {
         return "receipts.attention." + name();

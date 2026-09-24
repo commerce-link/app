@@ -96,6 +96,22 @@ class ReceiptAttentionEvaluatorTest {
     }
 
     @Test
+    void effectsFailuresAlertAfterThreeAndTakePrecedenceOverEmailAndLink() {
+        Instant now = Instant.parse("2026-09-10T12:00:00Z");
+        ReceiptAttempt attempt = attempt(ReceiptAttemptState.FISCALISED, now);
+        attempt.setEffectsFailures(2);
+        assertThat(ReceiptAttentionEvaluator.evaluate(attempt, now)).isNull();
+
+        attempt.setEffectsFailures(3);
+        assertThat(ReceiptAttentionEvaluator.evaluate(attempt, now)).isEqualTo(ReceiptAttention.EFFECTS_FAILED);
+
+        // takes precedence over both EMAIL_NOT_SENT and LINK_MISSING
+        attempt.setEmailClaimedAt(now);
+        attempt.setLinkGaveUpAt(now);
+        assertThat(ReceiptAttentionEvaluator.evaluate(attempt, now)).isEqualTo(ReceiptAttention.EFFECTS_FAILED);
+    }
+
+    @Test
     void aSkippedEmailNeverAlertsEvenThoughItWasClaimed() {
         Instant now = Instant.parse("2026-09-10T12:00:00Z");
         ReceiptAttempt skipped = attempt(ReceiptAttemptState.FISCALISED, now);
