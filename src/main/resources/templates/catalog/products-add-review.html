@@ -1,0 +1,126 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+<div layout:fragment="content">
+    <section class="cl-page">
+        <div class="cl-page-body">
+            <div th:replace="~{fragments/settings-header :: subpageWithActions(${backHref}, #{catalog.products.add.title},
+                    #{catalog.products.review.title(${form.products.size()})}, #{catalog.products.review.lead}, null)}"></div>
+
+            <div th:replace="~{fragments/settings-form :: errorSummaryText('review-errors', ${errorSummary})}"></div>
+            <div th:unless="${skipped.isEmpty()}" class="cl-alert is-warn">
+                <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+                <p class="cl-alert-text"
+                   th:text="#{catalog.products.review.skipped(${skipped.size()}, ${#strings.listJoin(skipped, ', ')})}"></p>
+            </div>
+            <div th:unless="${skippedExisting.isEmpty()}" class="cl-alert is-warn">
+                <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+                <p class="cl-alert-text"
+                   th:text="#{catalog.products.review.skipped.existing(${skippedExisting.size()}, ${#strings.listJoin(skippedExisting, ', ')})}"></p>
+            </div>
+
+            <!--/* No th:field: the id of every field is the key of its error, so the summary links straight to it.
+                   The category is not posted at all -- the products are saved into the category of the address. */-->
+            <form class="cl-form is-wide" id="bulk-add-form" method="post" th:action="@{${saveAction}}" novalidate>
+                <!--/* The same review sent twice saves each row under the same id, so the category gets it once (RF-6). */-->
+                <input type="hidden" name="reviewId" th:value="${form.reviewId}"/>
+                <div class="cl-card">
+                    <table class="cl-table is-compact is-editable" id="products" tabindex="-1">
+                        <thead>
+                        <tr>
+                            <th scope="col" th:text="#{catalog.products.column.product}"></th>
+                            <th scope="col" th:text="#{product.name}"></th>
+                            <th scope="col" th:text="#{product.label}"></th>
+                            <th scope="col" th:text="#{product.pricing.group}"></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="product, status : ${form.products}"
+                            th:with="prefix=${'products[' + status.index + '].'},
+                                     nameId=${T(pl.commercelink.web.dtos.ProductsBulkAddForm).fieldId(status.index, 'name')},
+                                     eanId=${T(pl.commercelink.web.dtos.ProductsBulkAddForm).fieldId(status.index, 'ean')},
+                                     mfnId=${T(pl.commercelink.web.dtos.ProductsBulkAddForm).fieldId(status.index, 'manufacturerCode')},
+                                     labelId=${T(pl.commercelink.web.dtos.ProductsBulkAddForm).fieldId(status.index, 'label')},
+                                     groupId=${T(pl.commercelink.web.dtos.ProductsBulkAddForm).fieldId(status.index, 'pricingGroup')}">
+                            <th scope="row" class="cl-table-key" th:attr="data-label=#{catalog.products.column.product}"
+                                th:with="eanError=${errors.get(eanId)}, mfnError=${errors.get(mfnId)}">
+                                <!--/* The PIM entry is not posted back: it is resolved again when the row is saved, from
+                                       the identifiers as they are corrected here. */-->
+                                <input type="hidden" th:name="${prefix + 'brand'}" th:value="${product.brand}">
+                                <!--/* The id is the key of its error, which only a forged value can raise. */-->
+                                <input type="hidden" th:name="${prefix + 'availabilityType'}" th:value="${product.availabilityType}"
+                                       th:id="${T(pl.commercelink.web.dtos.ProductsBulkAddForm).fieldId(status.index, 'availabilityType')}">
+                                <span th:text="${product.brand}"></span>
+                                <!--/* Each identifier under its own visible label: a placeholder is gone once the field
+                                       holds a value, and the two codes look alike. */-->
+                                <label class="cl-label" th:for="${eanId}" th:text="#{product.ean}"></label>
+                                <input class="cl-input" type="text" inputmode="numeric" autocomplete="off"
+                                       th:id="${eanId}" th:name="${prefix + 'ean'}" th:value="${product.ean}"
+                                       th:classappend="${eanError != null} ? 'is-invalid'"
+                                       th:attr="aria-label=#{catalog.products.review.ean.n(${status.count})},
+                                                aria-invalid=${eanError != null} ? 'true' : null,
+                                                aria-describedby=${eanError != null} ? ${eanId + '-error'} : null">
+                                <p th:if="${eanError != null}" class="cl-field-error" th:id="${eanId + '-error'}" th:text="${eanError}"></p>
+                                <label class="cl-label" th:for="${mfnId}" th:text="#{product.manufacturer.code}"></label>
+                                <input class="cl-input" type="text" autocomplete="off"
+                                       th:id="${mfnId}" th:name="${prefix + 'manufacturerCode'}" th:value="${product.manufacturerCode}"
+                                       th:classappend="${mfnError != null} ? 'is-invalid'"
+                                       th:attr="aria-label=#{catalog.products.review.mfn.n(${status.count})},
+                                                aria-invalid=${mfnError != null} ? 'true' : null,
+                                                aria-describedby=${mfnError != null} ? ${mfnId + '-error'} : null">
+                                <p th:if="${mfnError != null}" class="cl-field-error" th:id="${mfnId + '-error'}" th:text="${mfnError}"></p>
+                            </th>
+                            <td th:attr="data-label=#{product.name}" th:with="error=${errors.get(nameId)}">
+                                <input class="cl-input" type="text" th:id="${nameId}" th:name="${prefix + 'name'}"
+                                       th:value="${product.name}" th:classappend="${error != null} ? 'is-invalid'"
+                                       th:attr="aria-label=#{catalog.products.review.name.n(${status.count})},
+                                                aria-invalid=${error != null} ? 'true' : null,
+                                                aria-describedby=${error != null} ? ${nameId + '-error'} : null">
+                                <p th:if="${error != null}" class="cl-field-error" th:id="${nameId + '-error'}" th:text="${error}"></p>
+                            </td>
+                            <td th:attr="data-label=#{product.label}" th:with="error=${errors.get(labelId)}">
+                                <select th:unless="${labels.isEmpty()}" class="cl-select" th:id="${labelId}" th:name="${prefix + 'label'}"
+                                        th:classappend="${error != null} ? 'is-invalid'"
+                                        th:attr="aria-label=#{catalog.products.review.label.n(${status.count})},
+                                                 aria-invalid=${error != null} ? 'true' : null,
+                                                 aria-describedby=${error != null} ? ${labelId + '-error'} : null">
+                                    <option value="">—</option>
+                                    <option th:each="label : ${labels}" th:value="${label}" th:text="${label}"
+                                            th:selected="${label == product.label}"></option>
+                                </select>
+                                <input th:if="${labels.isEmpty()}" class="cl-input" type="text" th:id="${labelId}"
+                                       th:name="${prefix + 'label'}" th:value="${product.label}"
+                                       th:attr="aria-label=#{catalog.products.review.label.n(${status.count})}">
+                                <p th:if="${error != null}" class="cl-field-error" th:id="${labelId + '-error'}" th:text="${error}"></p>
+                            </td>
+                            <td th:attr="data-label=#{product.pricing.group}" th:with="error=${errors.get(groupId)}">
+                                <select class="cl-select" th:id="${groupId}" th:name="${prefix + 'pricingGroup'}"
+                                        th:classappend="${error != null} ? 'is-invalid'"
+                                        th:attr="aria-label=#{catalog.products.review.group.n(${status.count})},
+                                                 aria-invalid=${error != null} ? 'true' : null,
+                                                 aria-describedby=${error != null} ? ${groupId + '-error'} : null">
+                                    <option th:each="group : ${pricingGroups}" th:value="${group}" th:text="${group}"
+                                            th:selected="${group == product.pricingGroup}"></option>
+                                </select>
+                                <p th:if="${error != null}" class="cl-field-error" th:id="${groupId + '-error'}" th:text="${error}"></p>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                    <div class="cl-card-footer">
+                        <button class="cl-button is-primary" type="submit" th:disabled="${form.products.isEmpty()}"
+                                th:text="#{catalog.products.review.save(${form.products.size()})}"></button>
+                        <a class="cl-button" th:href="@{${backHref}}" th:text="#{general.cancel}"></a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </section>
+    <script th:unless="${errors.isEmpty()}">
+        document.getElementById('review-errors').focus();
+    </script>
+</div>
+</body>
+</html>

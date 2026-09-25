@@ -78,5 +78,6 @@
         }
     });
     document.addEventListener('cl:form-replaced', syncAll);
+    document.addEventListener('cl:repeat-added', syncAll);
     syncAll();
 })();

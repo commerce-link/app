@@ -78,11 +78,13 @@ class SupplierLabelTemplatesTest {
     }
 
     @Test
-    void theRecommendationTableShowsLabelsForItsAlternativeSuppliers() throws Exception {
-        // when / then -- alternativeSuppliers carries connection identities, not display names
-        assertThat(template("catalogDetails_categoryDefinition_productRecommendations.html"))
-                .contains("supplierLabels.of(provider)")
-                .doesNotContain("th:text=\"${provider}\"");
+    void theProposalsTableShowsLabelsForItsAlternativeSuppliers() throws Exception {
+        // when / then -- alternativeSuppliers carries connection identities; RecommendationRow maps them through the
+        // label function in the controller, so the proposals table only joins the names it was handed
+        assertThat(template("catalog/products-add.html"))
+                .contains("${#strings.listJoin(row.suppliers(), ', ')}")
+                .doesNotContain("alternativeSuppliers")
+                .doesNotContain("${row.provider");
     }
 
     /**

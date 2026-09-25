@@ -5,245 +5,230 @@
 <span th:fragment="categoryName(value)"
       th:text="${value}"></span>
 
-<div th:fragment="emptyHint(categories)" th:if="${#lists.isEmpty(categories)}"
-     class="notification is-warning is-light">
-    <span th:text="#{catalog.category.noneEnabled}"></span>
-    <a th:href="@{/dashboard/store/categories}" th:text="#{catalog.category.noneEnabled.action}"></a>
+<div th:fragment="emptyHint(categories)" th:if="${#lists.isEmpty(categories)}" class="cl-alert is-warn">
+    <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+    <p class="cl-alert-text">
+        <span th:text="#{catalog.category.noneEnabled}"></span>
+        <a th:href="@{/dashboard/store/categories}" th:text="#{catalog.category.noneEnabled.action}"></a>
+    </p>
 </div>
 
-<div th:fragment="picker(fieldName, selected, disabled, required)" class="category-picker">
+<!--/* A select-like trigger opening a popup with a search field and the list of categories. The search is a combobox
+       that owns the listbox, and the listbox holds options only. labelledBy is the id of the field label: the trigger
+       is named by it and by the value it shows, and the ids of the popup derive from it, so a picker in a repeated row
+       carries the row index and repeat-fields.js renumbers it with the row. */-->
+<div th:fragment="picker(fieldName, selected, disabled, required, labelledBy)" class="cl-picker">
     <input type="hidden" th:name="${fieldName}" th:value="${selected}" data-picker-value>
 
-    <div th:if="${disabled}" class="control">
-        <input class="input" type="text" disabled th:value="${selected}">
-    </div>
+    <input th:if="${disabled}" class="cl-input" type="text" disabled th:value="${selected}"
+           th:attr="aria-labelledby=${labelledBy}">
 
-    <div th:unless="${disabled}" class="dropdown is-fullwidth" data-category-picker
+    <div th:unless="${disabled}" class="cl-picker-field" data-category-picker
          th:attr="data-picker-required=${required} ? 'true' : null">
-        <div class="dropdown-trigger">
-            <button type="button" class="button is-fullwidth" data-picker-trigger aria-haspopup="listbox">
-                <span data-picker-label th:text="${#strings.isEmpty(selected)} ? #{catalog.category.unset} : ${selected}"></span>
-                <span class="icon is-small">
-                    <i class="fas fa-angle-down"></i>
-                </span>
-            </button>
-        </div>
-        <div class="dropdown-menu" role="listbox">
-            <div class="dropdown-content">
-                <div class="dropdown-item">
-                    <div class="control has-icons-left">
-                        <input class="input" type="search" autocomplete="off" data-picker-search
-                               th:placeholder="#{catalog.category.filter}">
-                        <span class="icon is-small is-left">
-                            <i class="fas fa-search"></i>
-                        </span>
-                    </div>
-                </div>
-                <div data-picker-list></div>
-                <div class="dropdown-item">
-                    <p class="help" data-picker-count></p>
-                </div>
-            </div>
+        <button type="button" class="cl-picker-trigger" data-picker-trigger
+                aria-haspopup="listbox" aria-expanded="false"
+                th:attr="aria-labelledby=${labelledBy + ' ' + labelledBy + '-value'}">
+            <span data-picker-label th:id="${labelledBy + '-value'}"
+                  th:text="${#strings.isEmpty(selected)} ? #{catalog.category.unset} : ${selected}"></span>
+            <span class="icon is-small" aria-hidden="true">
+                <i class="fas fa-angle-down"></i>
+            </span>
+        </button>
+        <div class="cl-picker-menu" hidden>
+            <input class="cl-input cl-picker-search" type="search" autocomplete="off" data-picker-search
+                   role="combobox" aria-autocomplete="list" aria-expanded="false"
+                   th:attr="aria-controls=${labelledBy + '-listbox'}, aria-labelledby=${labelledBy}"
+                   th:placeholder="#{catalog.category.filter}">
+            <!--/* tabindex -1: the browser would make the scrolling list a Tab stop of its own, keeping the focus inside
+                   the picker when Tab should leave it; the arrows in the search move through the options instead. */-->
+            <div class="cl-picker-list" role="listbox" tabindex="-1" data-picker-list
+                 th:id="${labelledBy + '-listbox'}" th:attr="aria-labelledby=${labelledBy}"></div>
+            <p class="cl-picker-empty" data-picker-empty hidden th:text="#{catalog.category.empty}"></p>
+            <p class="cl-help cl-picker-count" role="status" data-picker-count></p>
         </div>
     </div>
 </div>
 
-<div th:fragment="multiPicker(fieldName, selectedOptions, required)" class="category-picker">
+<!--/* The multi picker: the same popup, a listbox of many, and the chosen categories as removable chips below. */-->
+<div th:fragment="multiPicker(fieldName, selectedOptions, required, labelledBy)" class="cl-picker">
     <span data-picker-values>
         <input type="hidden" th:each="option : ${selectedOptions}"
                th:name="${fieldName}" th:value="${option.id}" th:attr="data-name=${option.name}">
     </span>
 
-    <div class="dropdown is-fullwidth" data-category-multi-picker
+    <div class="cl-picker-field" data-category-multi-picker
          th:attr="data-picker-required=${required} ? 'true' : null, data-picker-field=${fieldName}">
-        <div class="dropdown-trigger">
-            <button type="button" class="button is-fullwidth" data-picker-trigger aria-haspopup="listbox">
-                <span data-picker-label
-                      th:text="${#lists.isEmpty(selectedOptions)} ? #{catalog.category.unset} : #{catalog.category.selectedCount(${#lists.size(selectedOptions)})}"></span>
-                <span class="icon is-small"><i class="fas fa-angle-down"></i></span>
-            </button>
-        </div>
-        <div class="dropdown-menu" role="listbox">
-            <div class="dropdown-content">
-                <div class="dropdown-item">
-                    <div class="control has-icons-left">
-                        <input class="input" type="search" autocomplete="off" data-picker-search
-                               th:placeholder="#{catalog.category.filter}">
-                        <span class="icon is-small is-left"><i class="fas fa-search"></i></span>
-                    </div>
-                </div>
-                <div data-picker-list></div>
-                <div class="dropdown-item"><p class="help" data-picker-count></p></div>
-            </div>
+        <button type="button" class="cl-picker-trigger" data-picker-trigger
+                aria-haspopup="listbox" aria-expanded="false"
+                th:attr="aria-labelledby=${labelledBy + ' ' + labelledBy + '-value'}">
+            <span data-picker-label th:id="${labelledBy + '-value'}"
+                  th:text="${#lists.isEmpty(selectedOptions)} ? #{catalog.category.unset} : #{catalog.category.selectedCount(${#lists.size(selectedOptions)})}"></span>
+            <span class="icon is-small" aria-hidden="true"><i class="fas fa-angle-down"></i></span>
+        </button>
+        <div class="cl-picker-menu" hidden>
+            <input class="cl-input cl-picker-search" type="search" autocomplete="off" data-picker-search
+                   role="combobox" aria-autocomplete="list" aria-expanded="false"
+                   th:attr="aria-controls=${labelledBy + '-listbox'}, aria-labelledby=${labelledBy}"
+                   th:placeholder="#{catalog.category.filter}">
+            <div class="cl-picker-list" role="listbox" aria-multiselectable="true" tabindex="-1" data-picker-list
+                 th:id="${labelledBy + '-listbox'}" th:attr="aria-labelledby=${labelledBy}"></div>
+            <p class="cl-picker-empty" data-picker-empty hidden th:text="#{catalog.category.empty}"></p>
+            <p class="cl-help cl-picker-count" role="status" data-picker-count></p>
         </div>
     </div>
 
-    <div class="field is-grouped is-grouped-multiline" data-picker-chips>
-        <div class="control" th:each="option : ${selectedOptions}">
-            <span class="tags has-addons">
-                <span class="tag is-link is-light" th:text="${option.name}"></span>
-                <a class="tag is-delete" th:attr="data-chip-remove=${option.id}"></a>
-            </span>
-        </div>
-    </div>
+    <!--/* Without JavaScript the chips are all there is, so each carries its path like the ones the script draws. */-->
+    <ul class="cl-chip-list" data-picker-chips>
+        <li class="cl-chip-tag" th:each="option : ${selectedOptions}">
+            <span th:if="${option.path != null}" class="cl-chip-tag-path" th:text="${option.path}"></span>
+            <span th:text="${option.name}"></span>
+            <button type="button" class="cl-chip-tag-remove"
+                    th:attr="data-chip-remove=${option.id}, aria-label=#{catalog.category.pim.remove(${option.name})}">&times;</button>
+        </li>
+    </ul>
+    <span class="cl-visually-hidden" role="status" data-picker-status></span>
 </div>
 
 <th:block th:fragment="pickerHelpers">
-    <style>
-        .category-picker .dropdown-trigger .button {
-            justify-content: space-between;
-            font-weight: 400;
-        }
-
-        /* Fill the field like the inputs next to it, so a whole breadcrumb fits on one line. */
-        .category-picker .dropdown,
-        .category-picker .dropdown-trigger {
-            display: block;
-            width: 100%;
-        }
-
-        /* The menu floats, so in narrow form columns it may still overflow the trigger to stay readable. */
-        .category-picker .dropdown-menu {
-            width: 100%;
-            min-width: min(34rem, 90vw);
-        }
-
-        .category-picker [data-picker-list] {
-            max-height: 20rem;
-            overflow-y: auto;
-            border-top: 1px solid #dbdbdb;
-            border-bottom: 1px solid #dbdbdb;
-        }
-
-        .category-picker .dropdown-item.is-active {
-            background-color: #eef3ff;
-            color: #363636;
-        }
-
-        .category-picker .dropdown-item {
-            white-space: normal;
-            padding-right: 1rem;
-        }
-
-        .category-picker .dropdown-item.is-selected {
-            font-weight: 600;
-        }
-
-        .category-picker .picker-option-checkbox {
-            pointer-events: none;
-            margin-right: 0.5rem;
-            vertical-align: baseline;
-        }
-
-        /* Two-line row: muted ancestor path on top, leaf name below. Both clipped so the row height stays put. */
-        .category-picker .dropdown-item[role="option"] {
-            display: flex;
-            align-items: flex-start;
-            line-height: 1.3;
-            padding-top: 0.375rem;
-            padding-bottom: 0.375rem;
-        }
-
-        .category-picker .picker-option-text {
-            flex: 1;
-            min-width: 0;
-        }
-
-        .category-picker .category-path,
-        .category-picker .category-name {
-            display: block;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-
-        .category-picker .category-path {
-            font-size: 0.75rem;
-            font-weight: 400;
-            color: #7a7a7a;
-        }
-
-        .category-picker .dropdown-item.is-selected .category-path {
-            font-weight: 400;
-        }
-
-        /* A chip carries the whole path, so it wraps onto another line instead of clipping it. */
-        .category-picker [data-picker-chips] .tag.is-link {
-            height: auto;
-            white-space: normal;
-            text-align: left;
-            padding-top: 0.25rem;
-            padding-bottom: 0.25rem;
-        }
-
-        .category-picker .chip-path {
-            color: #6b7280;
-            font-size: 0.75rem;
-            margin-right: 0.35rem;
-        }
-
-        .category-picker [data-picker-label] {
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-
-        .category-picker [data-picker-chips] {
-            margin-top: 0.5rem;
-            margin-bottom: 0;
-        }
-
-        .category-picker [data-picker-chips]:empty {
-            display: none;
-        }
-
-
-        .category-picker .help {
-            margin-top: 0;
-        }
-    </style>
     <script>
-        window.pickerHelpers = {
-            format: (template, ...values) =>
-                    values.reduce((text, value, index) => text.replace('{' + index + '}', value), template),
-            normalize: text => text.toLowerCase()
-                    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-                    .replace(/\u0142/g, 'l'),
-            // Only branch nodes travel with the page; a leaf's breadcrumb is walked from its parentId chain here.
-            breadcrumbs: (ancestors, separator = ' > ', maxLevels = 3) => {
-                const branchById = new Map(ancestors.map(branch => [branch.id, branch]));
-                const namesOf = option => {
-                    const names = [];
-                    const visited = new Set();
-                    let parentId = option.parentId;
-                    while (parentId && branchById.has(parentId) && !visited.has(parentId)) {
-                        visited.add(parentId);
-                        const parent = branchById.get(parentId);
-                        names.unshift(parent.name);
-                        parentId = parent.parentId;
-                    }
-                    return names;
-                };
-                return option => {
-                    const names = namesOf(option);
-                    // Deeper than three levels collapses the middle: "Elektronika > … > Akcesoria telefoniczne".
-                    const shortened = names.length > maxLevels
-                            ? [names[0], '\u2026', names[names.length - 1]]
-                            : names;
-                    return {path: names.join(separator), shortPath: shortened.join(separator)};
-                };
-            },
-            pathElement: option => {
-                if (!option.path) {
-                    return document.createDocumentFragment();
+        (function () {
+            const closeMenu = picker => {
+                const menu = picker.querySelector('.cl-picker-menu');
+                const trigger = picker.querySelector('[data-picker-trigger]');
+                const search = picker.querySelector('[data-picker-search]');
+                // Hiding the menu with the focus in it would drop the focus onto <body>; it goes back to the trigger.
+                const focusInside = !!menu && menu.contains(document.activeElement);
+                if (menu) {
+                    menu.hidden = true;
                 }
-                const path = document.createElement('span');
-                path.className = 'category-path';
-                path.title = option.path;
-                path.textContent = option.shortPath;
-                return path;
-            }
-        };
+                if (trigger) {
+                    trigger.setAttribute('aria-expanded', 'false');
+                }
+                if (search) {
+                    search.setAttribute('aria-expanded', 'false');
+                    search.removeAttribute('aria-activedescendant');
+                }
+                if (focusInside && trigger) {
+                    trigger.focus();
+                }
+            };
+
+            window.pickerHelpers = {
+                format: (template, ...values) =>
+                        values.reduce((text, value, index) => text.replace('{' + index + '}', value), template),
+                normalize: text => text.toLowerCase()
+                        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+                        .replace(/\u0142/g, 'l'),
+                // Only branch nodes travel with the page; a leaf's breadcrumb is walked from its parentId chain here.
+                breadcrumbs: (ancestors, separator = ' \u203a ', maxLevels = 3) => {
+                    const branchById = new Map(ancestors.map(branch => [branch.id, branch]));
+                    const namesOf = option => {
+                        const names = [];
+                        const visited = new Set();
+                        let parentId = option.parentId;
+                        while (parentId && branchById.has(parentId) && !visited.has(parentId)) {
+                            visited.add(parentId);
+                            const parent = branchById.get(parentId);
+                            names.unshift(parent.name);
+                            parentId = parent.parentId;
+                        }
+                        return names;
+                    };
+                    return option => {
+                        const names = namesOf(option);
+                        // Deeper than three levels collapses the middle: "Elektronika › … › Akcesoria telefoniczne".
+                        const shortened = names.length > maxLevels
+                                ? [names[0], '\u2026', names[names.length - 1]]
+                                : names;
+                        return {path: names.join(separator), shortPath: shortened.join(separator)};
+                    };
+                },
+                pathElement: option => {
+                    if (!option.path) {
+                        return document.createDocumentFragment();
+                    }
+                    const path = document.createElement('span');
+                    path.className = 'cl-picker-path';
+                    path.title = option.path;
+                    path.textContent = option.shortPath;
+                    return path;
+                },
+                // The menu is a plain popover: hidden carries the state, aria-expanded reports it.
+                menuOf: picker => picker.querySelector('.cl-picker-menu'),
+                closeMenu: closeMenu,
+                // The option the arrows reached: highlighted, scrolled into view and announced through the combobox.
+                showActive: (search, list, active) => {
+                    let activeId = null;
+                    Array.from(list.querySelectorAll('[role="option"]')).forEach((item, index) => {
+                        item.classList.toggle('is-active', index === active);
+                        if (index === active) {
+                            activeId = item.id;
+                            item.scrollIntoView({block: 'nearest'});
+                        }
+                    });
+                    if (activeId) {
+                        search.setAttribute('aria-activedescendant', activeId);
+                    } else {
+                        search.removeAttribute('aria-activedescendant');
+                    }
+                },
+                // The popup closes when the focus leaves the field (Tab out of the search) and on Escape from anywhere
+                // inside the picker, chips included; the focus then returns to the trigger. A press inside the menu
+                // keeps the focus in the search, so choosing an option with the mouse does not count as leaving.
+                closeOnLeave: (picker, isOpen, close) => {
+                    const trigger = picker.querySelector('[data-picker-trigger]');
+                    const search = picker.querySelector('[data-picker-search]');
+                    const menu = picker.querySelector('.cl-picker-menu');
+                    picker.addEventListener('focusout', event => {
+                        if (isOpen() && !picker.contains(event.relatedTarget)) {
+                            close();
+                        }
+                    });
+                    menu.addEventListener('mousedown', event => {
+                        if (event.target !== search) {
+                            event.preventDefault();
+                        }
+                    });
+                    // A browser that does not focus a pressed button (Safari) would close the menu on the press and
+                    // open it again on the click.
+                    trigger.addEventListener('mousedown', event => {
+                        if (isOpen()) {
+                            event.preventDefault();
+                        }
+                    });
+                    (picker.closest('.cl-picker') || picker).addEventListener('keydown', event => {
+                        if (event.key === 'Escape' && isOpen()) {
+                            event.preventDefault();
+                            close();
+                            trigger.focus();
+                        }
+                    });
+                },
+                // Pickers arrive with the page, inside a repeat row added by JavaScript and inside a form
+                // replaced after an async save, so every entry point initialises the ones it can reach.
+                initialiseOn: (selector, setUp) => {
+                    const initialise = scope => {
+                        if (scope.matches && scope.matches(selector)) {
+                            setUp(scope);
+                        }
+                        scope.querySelectorAll(selector).forEach(setUp);
+                    };
+                    ['cl:repeat-added', 'cl:form-replaced'].forEach(eventName =>
+                            document.addEventListener(eventName, event =>
+                                    initialise(event.target instanceof Element ? event.target : document)));
+                    // Exactly one outside-click listener per script block, reading the pickers that are in the
+                    // document when the click happens. One registered per picker would stay bound after an async
+                    // save replaced the form, holding the detached fields alive and adding a listener per save.
+                    document.addEventListener('click', event =>
+                            document.querySelectorAll(selector + '[data-picker-ready]').forEach(picker => {
+                                if (!picker.contains(event.target)) {
+                                    closeMenu(picker);
+                                }
+                            }));
+                    initialise(document);
+                }
+            };
+        })();
     </script>
 </th:block>
 
@@ -256,20 +241,28 @@
             const categories = /*[[${categories}]]*/ [];
             const categoryAncestors = /*[[${categoryAncestors}]]*/ [];
             const messages = {
-                empty: /*[[#{catalog.category.empty}]]*/ '',
                 count: /*[[#{catalog.category.count}]]*/ '',
                 unset: /*[[#{catalog.category.unset}]]*/ ''
             };
-            const {format, normalize, breadcrumbs, pathElement: optionPath} = window.pickerHelpers;
+            const {format, normalize, breadcrumbs, pathElement: optionPath, menuOf, closeMenu, initialiseOn} = window.pickerHelpers;
+            const {showActive, closeOnLeave} = window.pickerHelpers;
             const breadcrumbOf = breadcrumbs(categoryAncestors);
 
             const setUp = picker => {
+                // A repeat row or a replaced form may hand us a picker that is already wired.
+                if (picker.dataset.pickerReady) {
+                    return;
+                }
+                picker.dataset.pickerReady = 'true';
+
                 const field = picker.parentElement.querySelector('[data-picker-value]');
                 const trigger = picker.querySelector('[data-picker-trigger]');
                 const label = picker.querySelector('[data-picker-label]');
                 const search = picker.querySelector('[data-picker-search]');
                 const list = picker.querySelector('[data-picker-list]');
                 const counter = picker.querySelector('[data-picker-count]');
+                const empty = picker.querySelector('[data-picker-empty]');
+                const menu = menuOf(picker);
 
                 const options = categories.map(category => {
                     const {path, shortPath} = breadcrumbOf(category);
@@ -294,22 +287,23 @@
 
                 const select = option => {
                     field.value = option.value;
-                    trigger.classList.remove('is-danger');
+                    trigger.classList.remove('is-invalid');
                     showSelection();
                     close();
                 };
 
                 const appendChunk = () => {
                     matches.slice(shown.length, shown.length + CHUNK).forEach(option => {
-                        const item = document.createElement('a');
-                        item.className = 'dropdown-item';
-                        item.href = '#';
+                        const item = document.createElement('div');
+                        item.className = 'cl-picker-option';
+                        item.id = list.id + '-option-' + shown.length;
                         item.setAttribute('role', 'option');
+                        item.setAttribute('aria-selected', String(option.value === field.value));
                         const text = document.createElement('span');
-                        text.className = 'picker-option-text';
+                        text.className = 'cl-picker-option-text';
                         text.appendChild(optionPath(option));
                         const name = document.createElement('span');
-                        name.className = 'category-name';
+                        name.className = 'cl-picker-name';
                         name.textContent = option.label;
                         text.appendChild(name);
                         item.appendChild(text);
@@ -331,13 +325,9 @@
                     active = -1;
                     list.innerHTML = '';
                     list.scrollTop = 0;
-
-                    if (!matches.length) {
-                        const empty = document.createElement('div');
-                        empty.className = 'dropdown-item has-text-grey';
-                        empty.textContent = messages.empty;
-                        list.appendChild(empty);
-                    }
+                    search.removeAttribute('aria-activedescendant');
+                    // The listbox holds options only; "nothing matches" is a line below it.
+                    empty.hidden = matches.length > 0;
 
                     appendChunk();
                     counter.textContent = format(messages.count, matches.length, options.length);
@@ -349,14 +339,7 @@
                     }
                 });
 
-                const highlightActive = () => {
-                    Array.from(list.querySelectorAll('.dropdown-item[role="option"]')).forEach((item, index) => {
-                        item.classList.toggle('is-active', index === active);
-                        if (index === active) {
-                            item.scrollIntoView({block: 'nearest'});
-                        }
-                    });
-                };
+                const highlightActive = () => showActive(search, list, active);
 
                 const move = step => {
                     if (!shown.length) {
@@ -369,16 +352,20 @@
                     highlightActive();
                 };
 
+                const isOpen = () => !menu.hidden;
+
                 const open = () => {
-                    picker.classList.add('is-active');
+                    menu.hidden = false;
+                    trigger.setAttribute('aria-expanded', 'true');
+                    search.setAttribute('aria-expanded', 'true');
                     search.value = '';
                     render();
                     search.focus();
                 };
 
-                const close = () => picker.classList.remove('is-active');
+                const close = () => closeMenu(picker);
 
-                trigger.addEventListener('click', () => picker.classList.contains('is-active') ? close() : open());
+                trigger.addEventListener('click', () => isOpen() ? close() : open());
                 search.addEventListener('input', render);
 
                 search.addEventListener('keydown', event => {
@@ -395,32 +382,25 @@
                         } else if (shown.length === 1) {
                             select(shown[0]);
                         }
-                    } else if (event.key === 'Escape') {
-                        close();
-                        trigger.focus();
                     }
                 });
-
-                document.addEventListener('click', event => {
-                    if (!picker.contains(event.target)) {
-                        close();
-                    }
-                });
+                closeOnLeave(picker, isOpen, close);
 
                 if (field.form && picker.dataset.pickerRequired) {
                     field.form.addEventListener('submit', event => {
                         if (!field.value) {
                             event.preventDefault();
-                            trigger.classList.add('is-danger');
+                            trigger.classList.add('is-invalid');
                             open();
                         }
                     });
                 }
 
                 showSelection();
+                close();
             };
 
-            document.querySelectorAll('[data-category-picker]').forEach(setUp);
+            initialiseOn('[data-category-picker]', setUp);
         })();
     </script>
 </th:block>
@@ -434,16 +414,24 @@
             const options = /*[[${categoryOptions}]]*/ [];
             const categoryAncestors = /*[[${categoryAncestors}]]*/ [];
             const messages = {
-                empty: /*[[#{catalog.category.empty}]]*/ '',
                 count: /*[[#{catalog.category.count}]]*/ '',
                 unset: /*[[#{catalog.category.unset}]]*/ '',
-                selectedCount: /*[[#{catalog.category.selectedCount}]]*/ ''
+                selectedCount: /*[[#{catalog.category.selectedCount}]]*/ '',
+                remove: /*[[#{catalog.category.pim.remove}]]*/ '',
+                removed: /*[[#{catalog.category.pim.removed}]]*/ ''
             };
-            const {format, normalize, breadcrumbs, pathElement: optionPath} = window.pickerHelpers;
+            const {format, normalize, breadcrumbs, pathElement: optionPath, menuOf, closeMenu, initialiseOn} = window.pickerHelpers;
+            const {showActive, closeOnLeave} = window.pickerHelpers;
             const breadcrumbOf = breadcrumbs(categoryAncestors);
 
             const setUp = picker => {
-                const root = picker.closest('.category-picker');
+                // A repeat row or a replaced form may hand us a picker that is already wired.
+                if (picker.dataset.pickerReady) {
+                    return;
+                }
+                picker.dataset.pickerReady = 'true';
+
+                const root = picker.closest('.cl-picker');
                 const values = root.querySelector('[data-picker-values]');
                 const fieldName = picker.dataset.pickerField;
                 const selected = new Map();
@@ -466,7 +454,10 @@
                 const search = picker.querySelector('[data-picker-search]');
                 const list = picker.querySelector('[data-picker-list]');
                 const counter = picker.querySelector('[data-picker-count]');
+                const empty = picker.querySelector('[data-picker-empty]');
                 const chips = root.querySelector('[data-picker-chips]');
+                const status = root.querySelector('[data-picker-status]');
+                const menu = menuOf(picker);
 
                 const entries = options.map(option => {
                     const {path, shortPath} = breadcrumbOf(option);
@@ -491,13 +482,10 @@
                 };
 
                 const renderSelectionState = () => {
-                    Array.from(list.querySelectorAll('.dropdown-item[role="option"]')).forEach(item => {
+                    Array.from(list.querySelectorAll('.cl-picker-option[role="option"]')).forEach(item => {
                         const isSelected = selected.has(item.dataset.value);
                         item.classList.toggle('is-selected', isSelected);
-                        const checkbox = item.querySelector('.picker-option-checkbox');
-                        if (checkbox) {
-                            checkbox.checked = isSelected;
-                        }
+                        item.setAttribute('aria-selected', String(isSelected));
                     });
                 };
 
@@ -507,34 +495,36 @@
                     }
                     chips.innerHTML = '';
                     selected.forEach((name, id) => {
-                        const control = document.createElement('div');
-                        control.className = 'control';
-                        const tags = document.createElement('span');
-                        tags.className = 'tags has-addons';
-                        const tag = document.createElement('span');
-                        tag.className = 'tag is-link is-light';
+                        const chip = document.createElement('li');
+                        chip.className = 'cl-chip-tag';
                         const entry = entriesByValue.get(id);
                         if (entry && entry.path) {
                             const path = document.createElement('span');
-                            path.className = 'chip-path';
-                            path.textContent = entry.path + ' \u203a';
-                            tag.appendChild(path);
+                            path.className = 'cl-chip-tag-path';
+                            path.textContent = entry.path;
+                            chip.appendChild(path);
                         }
                         const chipName = document.createElement('span');
-                        chipName.className = 'chip-name';
                         chipName.textContent = name;
-                        tag.appendChild(chipName);
-                        const remove = document.createElement('a');
-                        remove.className = 'tag is-delete';
-                        remove.href = '#';
+                        chip.appendChild(chipName);
+                        const remove = document.createElement('button');
+                        remove.type = 'button';
+                        remove.className = 'cl-chip-tag-remove';
+                        remove.textContent = '\u00d7';
+                        remove.setAttribute('aria-label', format(messages.remove, name));
                         remove.dataset.chipRemove = id;
                         remove.addEventListener('click', event => {
                             event.preventDefault();
                             toggle({value: id, label: name});
+                            // The pressed button went with its chip: the focus stays in the field, and the status
+                            // line says what was removed.
+                            trigger.focus();
+                            if (status) {
+                                status.textContent = format(messages.removed, name);
+                            }
                         });
-                        tags.append(tag, remove);
-                        control.appendChild(tags);
-                        chips.appendChild(control);
+                        chip.appendChild(remove);
+                        chips.appendChild(chip);
                     });
                 };
 
@@ -544,7 +534,7 @@
                     } else {
                         selected.set(option.value, option.label);
                     }
-                    trigger.classList.remove('is-danger');
+                    trigger.classList.remove('is-invalid');
                     syncHiddenInputs();
                     showSelection();
                     renderSelectionState();
@@ -553,25 +543,25 @@
 
                 const appendChunk = () => {
                     matches.slice(shown.length, shown.length + CHUNK).forEach(option => {
-                        const item = document.createElement('a');
-                        item.className = 'dropdown-item';
-                        item.href = '#';
+                        const item = document.createElement('div');
+                        item.className = 'cl-picker-option';
+                        item.id = list.id + '-option-' + shown.length;
                         item.setAttribute('role', 'option');
+                        item.setAttribute('aria-selected', String(selected.has(option.value)));
                         item.dataset.value = option.value;
                         item.classList.toggle('is-selected', selected.has(option.value));
-                        const checkbox = document.createElement('input');
-                        checkbox.type = 'checkbox';
-                        checkbox.className = 'picker-option-checkbox';
-                        checkbox.tabIndex = -1;
-                        checkbox.checked = selected.has(option.value);
+                        // The tick is drawn by CSS: a control inside an option would be a control inside a control.
+                        const mark = document.createElement('span');
+                        mark.className = 'cl-picker-option-mark';
+                        mark.setAttribute('aria-hidden', 'true');
                         const text = document.createElement('span');
-                        text.className = 'picker-option-text';
+                        text.className = 'cl-picker-option-text';
                         text.appendChild(optionPath(option));
                         const name = document.createElement('span');
-                        name.className = 'category-name';
+                        name.className = 'cl-picker-name';
                         name.textContent = option.label;
                         text.appendChild(name);
-                        item.append(checkbox, text);
+                        item.append(mark, text);
                         item.addEventListener('click', event => {
                             event.preventDefault();
                             toggle(option);
@@ -590,13 +580,9 @@
                     active = -1;
                     list.innerHTML = '';
                     list.scrollTop = 0;
-
-                    if (!matches.length) {
-                        const empty = document.createElement('div');
-                        empty.className = 'dropdown-item has-text-grey';
-                        empty.textContent = messages.empty;
-                        list.appendChild(empty);
-                    }
+                    search.removeAttribute('aria-activedescendant');
+                    // The listbox holds options only; "nothing matches" is a line below it.
+                    empty.hidden = matches.length > 0;
 
                     appendChunk();
                     counter.textContent = format(messages.count, matches.length, entries.length);
@@ -608,14 +594,7 @@
                     }
                 });
 
-                const highlightActive = () => {
-                    Array.from(list.querySelectorAll('.dropdown-item[role="option"]')).forEach((item, index) => {
-                        item.classList.toggle('is-active', index === active);
-                        if (index === active) {
-                            item.scrollIntoView({block: 'nearest'});
-                        }
-                    });
-                };
+                const highlightActive = () => showActive(search, list, active);
 
                 const move = step => {
                     if (!shown.length) {
@@ -628,16 +607,20 @@
                     highlightActive();
                 };
 
+                const isOpen = () => !menu.hidden;
+
                 const open = () => {
-                    picker.classList.add('is-active');
+                    menu.hidden = false;
+                    trigger.setAttribute('aria-expanded', 'true');
+                    search.setAttribute('aria-expanded', 'true');
                     search.value = '';
                     render();
                     search.focus();
                 };
 
-                const close = () => picker.classList.remove('is-active');
+                const close = () => closeMenu(picker);
 
-                trigger.addEventListener('click', () => picker.classList.contains('is-active') ? close() : open());
+                trigger.addEventListener('click', () => isOpen() ? close() : open());
                 search.addEventListener('input', render);
 
                 search.addEventListener('keydown', event => {
@@ -654,24 +637,16 @@
                         } else if (shown.length === 1) {
                             toggle(shown[0]);
                         }
-                    } else if (event.key === 'Escape') {
-                        close();
-                        trigger.focus();
                     }
                 });
-
-                document.addEventListener('click', event => {
-                    if (!picker.contains(event.target)) {
-                        close();
-                    }
-                });
+                closeOnLeave(picker, isOpen, close);
 
                 const form = picker.closest('form');
                 if (form && picker.dataset.pickerRequired) {
                     form.addEventListener('submit', event => {
                         if (selected.size === 0) {
                             event.preventDefault();
-                            trigger.classList.add('is-danger');
+                            trigger.classList.add('is-invalid');
                             open();
                         }
                     });
@@ -679,9 +654,10 @@
 
                 showSelection();
                 renderChips();
+                close();
             };
 
-            document.querySelectorAll('[data-category-multi-picker]').forEach(setUp);
+            initialiseOn('[data-category-multi-picker]', setUp);
         })();
     </script>
 </th:block>

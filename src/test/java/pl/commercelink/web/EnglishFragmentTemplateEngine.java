@@ -1,7 +1,9 @@
 package pl.commercelink.web;
 
 import org.thymeleaf.TemplateEngine;
+import org.thymeleaf.context.IExpressionContext;
 import org.thymeleaf.context.ITemplateContext;
+import org.thymeleaf.linkbuilder.StandardLinkBuilder;
 import org.thymeleaf.messageresolver.IMessageResolver;
 import org.thymeleaf.spring6.dialect.SpringStandardDialect;
 import org.thymeleaf.templatemode.TemplateMode;
@@ -10,6 +12,7 @@ import org.thymeleaf.templateresolver.StringTemplateResolver;
 
 import java.text.MessageFormat;
 import java.util.Locale;
+import java.util.Map;
 import java.util.ResourceBundle;
 import java.util.Set;
 
@@ -42,7 +45,21 @@ final class EnglishFragmentTemplateEngine {
         templateEngine.addTemplateResolver(stringResolver);
         templateEngine.addTemplateResolver(classpathResolver);
         templateEngine.setMessageResolver(new EnglishMessages());
+        templateEngine.setLinkBuilder(new ContextRootLinkBuilder());
         return templateEngine;
+    }
+
+    /**
+     * {@code @{/...}} links are context-relative and normally need an {@code IWebContext} to supply the
+     * servlet context path; the plain {@link org.thymeleaf.context.Context} used by these tests has none.
+     * Fragments here are rendered as if the app were mounted at the server root, matching local/dev.
+     */
+    private static class ContextRootLinkBuilder extends StandardLinkBuilder {
+
+        @Override
+        protected String computeContextPath(IExpressionContext context, String base, Map<String, Object> parameters) {
+            return "";
+        }
     }
 
     private static class EnglishMessages implements IMessageResolver {

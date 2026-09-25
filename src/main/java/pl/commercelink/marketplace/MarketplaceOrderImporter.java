@@ -88,7 +88,7 @@ public class MarketplaceOrderImporter {
                 .withExternalSupplierId(marketplaceOrder.externalSupplierId())
                 .withPayment(payment)
                 .withDeliveryCarrier(toCarrierName(store, marketplaceName, marketplaceOrder.shipping().carrier()))
-                .withEstimatedShippingAt(marketplaceOrder.shipping().estimatedShippingAt());
+                .withPreferredShippingAt(marketplaceOrder.shipping().estimatedShippingAt());
 
         String collectionPointCode = toCollectionPointCode(marketplaceOrder.shipping().pickupPoint());
         if (collectionPointCode != null) {

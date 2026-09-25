@@ -1,0 +1,463 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+<div layout:fragment="content">
+    <section class="cl-page">
+        <div class="cl-page-body is-form">
+            <!--/* The lead and the delete link are defined inside the replaced element: the header pulls them in as its
+                   slots, and the body of a th:replace host is dropped, so they are never rendered twice. */-->
+            <div th:replace="~{fragments/settings-header :: subpageWithActions(${backHref}, ${category.name}, ${pageTitle},
+                    ~{::productLead}, ~{::deleteAction})}">
+                <th:block th:fragment="productLead"><th:block th:each="part, stat : ${leadParts}"><th:block
+                        th:unless="${stat.first}" th:text="' · '"></th:block><span th:if="${part.warn()}"
+                        class="cl-status is-warn" th:text="${part.text()}"></span><th:block th:unless="${part.warn()}"
+                        th:text="${part.text()}"></th:block></th:block></th:block>
+                <th:block th:fragment="deleteAction">
+                    <a th:if="${deleteHref != null}" class="cl-button is-danger-outline" th:href="@{${deleteHref}}"
+                       data-cl-confirm
+                       th:attr="data-cl-confirm-title=#{product.delete.title(${pageTitle})},
+                                data-cl-confirm-message=#{product.delete.message},
+                                data-cl-confirm-action=#{product.delete}"><i class="fas fa-trash-alt" aria-hidden="true"></i><span
+                            th:text="#{product.delete}"></span></a>
+                </th:block>
+            </div>
+
+            <!--/* Support conversations quote the id; otherwise it is only in the address. */-->
+            <p th:if="${productId != null}" class="cl-help" th:text="#{product.page.id(${productId})}"></p>
+
+            <div th:if="${prefillNotice != null}" class="cl-alert is-warn" role="status">
+                <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+                <p class="cl-alert-text" th:text="${prefillNotice}"></p>
+            </div>
+
+            <form th:fragment="productForm" id="product-form" class="cl-form" th:action="@{${formAction}}" th:object="${form}"
+                  method="post" novalidate data-cl-async
+                  th:attr="data-cl-redirect=${redirectTo}, data-error-message=#{form.save.failed}">
+                <div th:replace="~{fragments/settings-form :: errorSummary('product-errors', ${errors}, null)}"></div>
+                <!--/* Identity the operator does not type: taken from PIM or from the inventory the product came from. */-->
+                <input type="hidden" name="brand" th:value="*{brand}">
+                <!--/* The filter the category page was showing when this page was reached, so a save or an add returns
+                       to the same list instead of always landing on "active". The list's label travels as "filterLabel":
+                       "label" is the product's own field in this form. */-->
+                <input type="hidden" name="status" th:value="${filter?.status()}">
+                <input th:if="${filter?.feature() != null}" type="hidden" name="feature" th:value="${filter.feature()}">
+                <input th:if="${filter?.label() != null}" type="hidden" name="filterLabel" th:value="${filter.label()}">
+                <input th:if="${filter?.search() != null}" type="hidden" name="q" th:value="${filter.search()}">
+                <div class="cl-card">
+                    <fieldset class="cl-fieldset">
+                        <legend class="cl-fieldset-title" th:text="#{product.page.section.product}"></legend>
+                        <div class="cl-form-grid">
+                            <div class="cl-span-6" th:insert="~{fragments/settings-form :: textField('name', 'product.name', *{name}, 'text', 'off', true, ${errors['name']}, null)}"></div>
+                            <th:block th:unless="${form.identifiersLocked()}">
+                                <div class="cl-span-2" th:insert="~{fragments/settings-form :: textField('ean', 'product.ean', *{ean}, 'text', 'off', true, ${errors['ean']}, null)}"></div>
+                                <div class="cl-span-2" th:insert="~{fragments/settings-form :: textField('manufacturerCode', 'product.manufacturer.code', *{manufacturerCode}, 'text', 'off', true, ${errors['manufacturerCode']}, null)}"></div>
+                            </th:block>
+                            <!--/* A product the PIM knows keeps its codes: display only, like the brand below, so nothing is
+                                   posted for them and the save keeps the saved values. */-->
+                            <th:block th:if="${form.identifiersLocked()}">
+                                <div class="cl-span-2">
+                                    <div class="cl-field">
+                                        <label class="cl-label" for="eanDisplay" th:text="#{product.ean}"></label>
+                                        <input class="cl-input" type="text" id="eanDisplay" readonly
+                                               aria-describedby="identifiers-locked" th:value="*{ean}">
+                                    </div>
+                                </div>
+                                <div class="cl-span-2">
+                                    <div class="cl-field">
+                                        <label class="cl-label" for="manufacturerCodeDisplay" th:text="#{product.manufacturer.code}"></label>
+                                        <input class="cl-input" type="text" id="manufacturerCodeDisplay" readonly
+                                               aria-describedby="identifiers-locked" th:value="*{manufacturerCode}">
+                                        <p class="cl-help" id="identifiers-locked" th:text="#{product.identifiers.locked}"></p>
+                                    </div>
+                                </div>
+                            </th:block>
+                            <div class="cl-span-2">
+                                <div class="cl-field" th:if="${!labels.isEmpty()}">
+                                    <label class="cl-label" for="label" th:text="#{product.label}"></label>
+                                    <select class="cl-select" id="label" name="label"
+                                            th:classappend="${errors['label'] != null} ? 'is-invalid'"
+                                            th:attr="aria-invalid=${errors['label'] != null} ? 'true' : null">
+                                        <option value="">&#8212;</option>
+                                        <option th:each="option : ${labels}" th:value="${option}" th:text="${option}"
+                                                th:selected="${option == form.label}"></option>
+                                        <!--/* The label the product was saved with stays choosable although the category
+                                               no longer offers it: nothing moves to another label by itself. A new
+                                               product has no saved label to keep, so a prefilled one outside the list
+                                               leaves the select on "—" instead of offering a value the save refuses. */-->
+                                        <option th:if="${existing and form.label != null and !labels.contains(form.label)}"
+                                                th:value="${form.label}" th:text="#{product.label.outside(${form.label})}" selected></option>
+                                    </select>
+                                    <p th:if="${errors['label'] != null}" class="cl-field-error">
+                                        <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                                        <span th:text="#{${errors['label']}}"></span>
+                                    </p>
+                                </div>
+                                <div th:if="${labels.isEmpty()}" th:insert="~{fragments/settings-form :: textField('label', 'product.label', *{label}, 'text', 'off', false, ${errors['label']}, null)}"></div>
+                            </div>
+                            <!--/* Display only: the value the operator sees is carried to the server by the hidden
+                                   "brand" input above, so this field has no name of its own. */-->
+                            <div class="cl-span-3">
+                                <div class="cl-field">
+                                    <label class="cl-label" for="brandDisplay" th:text="#{product.brand}"></label>
+                                    <input class="cl-input" type="text" id="brandDisplay" readonly
+                                           th:value="${#strings.isEmpty(form.brand)} ? '—' : ${form.brand}">
+                                </div>
+                            </div>
+                            <div class="cl-span-6">
+                                <div th:replace="~{fragments/settings-form :: check('enabled', 'product.page.enabled', *{enabled}, 'product.page.enabled.desc', null)}"></div>
+                                <div th:replace="~{fragments/settings-form :: check('service', 'product.page.service', *{service}, 'product.page.service.desc', null)}"></div>
+                            </div>
+                        </div>
+                    </fieldset>
+                    <fieldset class="cl-fieldset">
+                        <legend class="cl-fieldset-title" th:text="#{product.page.section.pricing}"></legend>
+                        <div class="cl-form-grid">
+                            <div class="cl-span-6">
+                                <fieldset class="cl-choice-group is-row" id="availabilityType" tabindex="-1">
+                                    <legend class="cl-label"><span th:text="#{product.page.availability}"></span></legend>
+                                    <label class="cl-choice" th:each="type : ${availabilityTypes}">
+                                        <input type="radio" name="availabilityType" th:value="${type}"
+                                               th:checked="${type == form.availabilityType}" data-cl-variant-select="availability">
+                                        <span class="cl-choice-text">
+                                            <span class="cl-choice-title" th:text="#{'product.page.availability.' + ${type}}"></span>
+                                            <span class="cl-choice-description" th:text="#{'product.page.availability.' + ${type} + '.desc'}"></span>
+                                        </span>
+                                    </label>
+                                </fieldset>
+                                <p th:if="${errors['availabilityType'] != null}" class="cl-field-error">
+                                    <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                                    <span th:text="#{${errors['availabilityType']}}"></span>
+                                </p>
+                            </div>
+                            <div class="cl-span-2" th:insert="~{fragments/settings-form :: textField('suggestedRetailPrice', 'product.page.srp', *{suggestedRetailPrice}, 'text', 'off', false, ${errors['suggestedRetailPrice']}, #{product.page.srp.help})}"></div>
+                            <!--/* Only a price computed from supplier offers can be capped or given a delivery time; a
+                                   fixed price is the one above. Hidden, not disabled: the saved values still come back. */-->
+                            <div class="cl-span-2" data-cl-variant-when="availability=BasedOnSupply"
+                                 th:insert="~{fragments/settings-form :: textField('maxRetailPrice', 'product.page.mrp', *{maxRetailPrice}, 'text', 'off', false, ${errors['maxRetailPrice']}, #{product.page.mrp.help})}"></div>
+                            <div class="cl-span-2" data-cl-variant-when="availability=BasedOnSupply"
+                                 th:insert="~{fragments/settings-form :: textField('estimatedDeliveryDays', 'product.page.deliveryDays', *{estimatedDeliveryDays}, 'text', 'off', false, ${errors['estimatedDeliveryDays']}, #{product.page.deliveryDays.help})}"></div>
+                            <!--/* The markup of settings-form :: textField, written out for the example the mock-up shows
+                                   in the empty field; the shared fragment takes no placeholder. */-->
+                            <div class="cl-span-3" data-cl-variant-when="availability=BasedOnSupply">
+                                <div class="cl-field">
+                                    <label class="cl-label" for="maxRetailPriceSuppliers">
+                                        <span th:text="#{product.page.mrpSuppliers}"></span>
+                                        <span class="cl-optional" th:text="#{form.optional}"></span>
+                                    </label>
+                                    <input class="cl-input" id="maxRetailPriceSuppliers" name="maxRetailPriceSuppliers" type="text"
+                                           autocomplete="off" aria-describedby="maxRetailPriceSuppliers-help"
+                                           th:value="*{maxRetailPriceSuppliers}" th:placeholder="#{product.page.mrpSuppliers.placeholder}">
+                                    <p class="cl-help" id="maxRetailPriceSuppliers-help" th:text="#{product.page.mrpSuppliers.help}"></p>
+                                </div>
+                            </div>
+                            <div class="cl-span-3">
+                                <div class="cl-field">
+                                    <label class="cl-label" for="pricingGroup" th:text="#{product.pricing.group}"></label>
+                                    <select class="cl-select" id="pricingGroup" name="pricingGroup"
+                                            th:classappend="${errors['pricingGroup'] != null} ? 'is-invalid'"
+                                            th:attr="aria-invalid=${errors['pricingGroup'] != null} ? 'true' : null">
+                                        <!--/* Matched regardless of case, as the price list matches it; the value goes back
+                                               as saved, so a save that leaves the field alone changes nothing. */-->
+                                        <option th:each="group : ${pricingGroups}"
+                                                th:with="chosen=${form.pricingGroup != null and #strings.equalsIgnoreCase(group, form.pricingGroup)}"
+                                                th:value="${chosen} ? ${form.pricingGroup} : ${group}" th:text="${group}"
+                                                th:selected="${chosen}"></option>
+                                        <!--/* The group the product is priced by stays choosable although the category no
+                                               longer lists it: the select must not fall back to another group, and so to
+                                               another price, by itself. A new product has no saved group to keep. */-->
+                                        <option th:if="${existing and form.pricingGroup != null and !form.pricingGroupListedIn(pricingGroups)}"
+                                                th:value="${form.pricingGroup}" th:text="#{product.pricing.group.outside(${form.pricingGroup})}" selected></option>
+                                    </select>
+                                    <p class="cl-help" th:text="#{product.page.group.help}"></p>
+                                    <p th:if="${errors['pricingGroup'] != null}" class="cl-field-error">
+                                        <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                                        <span th:text="#{${errors['pricingGroup']}}"></span>
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </fieldset>
+                    <!--/* Rarely used, so folded away unless something is set or wrong in it. */-->
+                    <details class="cl-disclosure cl-card-extras" id="product-extras-stock" th:open="${openStock}">
+                        <summary th:text="#{product.page.section.stock}"></summary>
+                        <div class="cl-disclosure-body">
+                            <div class="cl-form-grid">
+                                <div class="cl-span-2" th:insert="~{fragments/settings-form :: textField('stockExpectedQty', 'product.page.stockExpected', *{stockExpectedQty}, 'text', 'off', false, ${errors['stockExpectedQty']}, #{product.page.stockExpected.help})}"></div>
+                                <div class="cl-span-2" th:insert="~{fragments/settings-form :: textField('restockPricePromo', 'product.page.restockPromo', *{restockPricePromo}, 'text', 'off', false, ${errors['restockPricePromo']}, #{product.page.restockPromo.help})}"></div>
+                                <div class="cl-span-2" th:insert="~{fragments/settings-form :: textField('restockPriceStandard', 'product.page.restockStandard', *{restockPriceStandard}, 'text', 'off', false, ${errors['restockPriceStandard']}, #{product.page.restockStandard.help})}"></div>
+                                <div class="cl-span-6">
+                                    <div class="cl-field" id="marketplaces" tabindex="-1">
+                                        <span class="cl-label" th:text="#{product.page.marketplaces}"></span>
+                                        <!--/* An approval for a marketplace the store is no longer connected to has no box
+                                               here; it travels hidden, so a save does not drop it without a word. */-->
+                                        <input th:each="kept : ${form.marketplaces}"
+                                               th:unless="${storeMarketplaces.![get('name')].contains(kept)}"
+                                               type="hidden" name="marketplaces" th:value="${kept}">
+                                        <ul class="cl-check-columns" th:unless="${storeMarketplaces.isEmpty()}">
+                                            <li th:each="marketplace : ${storeMarketplaces}">
+                                                <label class="cl-check">
+                                                    <input type="checkbox" name="marketplaces" th:value="${marketplace.name}"
+                                                           th:checked="${form.marketplaces.contains(marketplace.name)}">
+                                                    <span class="cl-check-text" th:text="${marketplace.displayName}"></span>
+                                                </label>
+                                            </li>
+                                        </ul>
+                                        <p class="cl-help" th:if="${storeMarketplaces.isEmpty()}" th:text="#{catalog.category.marketplaces.none}"></p>
+                                        <p class="cl-help" th:unless="${storeMarketplaces.isEmpty()}" th:text="#{product.page.marketplaces.help}"></p>
+                                        <p th:if="${errors['marketplaces'] != null}" class="cl-field-error">
+                                            <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                                            <span th:text="#{${errors['marketplaces']}}"></span>
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </details>
+                    <details class="cl-disclosure cl-card-extras" id="product-extras-client" th:open="${openClient}">
+                        <summary th:text="#{product.page.section.client}"></summary>
+                        <div class="cl-disclosure-body">
+                            <div class="cl-form-grid">
+                                <p class="cl-help" th:text="#{product.page.section.client.help}"></p>
+                                <div class="cl-span-6" th:insert="~{fragments/settings-form :: textField('recommendation', 'product.recommendation', *{recommendation}, 'text', 'off', false, null, #{product.page.recommendation.help})}"></div>
+                            </div>
+                            <fieldset class="cl-fieldset">
+                                <legend class="cl-fieldset-title" th:text="#{product.quick.filters}"></legend>
+                                <div class="cl-repeat cl-repeat-lines" data-cl-repeat="quickFilters"
+                                     data-cl-repeat-id="quickFilter" data-cl-repeat-min="0">
+                                    <!--/* th:insert runs before th:each on one element, so the loop sits on its own block. */-->
+                                    <th:block th:each="value, stat : *{quickFilters}">
+                                        <div class="cl-repeat-line" data-cl-repeat-item
+                                             th:insert="~{catalog/product :: quickFilterLine(${stat.index}, ${stat.count}, ${value})}"></div>
+                                    </th:block>
+                                    <template data-cl-repeat-template>
+                                        <div class="cl-repeat-line" data-cl-repeat-item
+                                             th:insert="~{catalog/product :: quickFilterLine('@INDEX@', '@NUMBER@', '')}"></div>
+                                    </template>
+                                    <noscript>
+                                        <div class="cl-repeat-line"
+                                             th:insert="~{catalog/product :: quickFilterLine(${form.quickFilters.size()}, ${form.quickFilters.size() + 1}, '')}"></div>
+                                    </noscript>
+                                    <div class="cl-repeat-add">
+                                        <button type="button" class="cl-button" data-cl-repeat-add hidden>
+                                            <i class="fas fa-plus" aria-hidden="true"></i>
+                                            <span th:text="#{product.page.quickFilter.add}"></span>
+                                        </button>
+                                        <span class="cl-visually-hidden" role="status" data-cl-repeat-status
+                                              th:attr="data-template=#{product.page.row.removed('@N@')}"></span>
+                                    </div>
+                                </div>
+                            </fieldset>
+                            <!--/* Each list of this section is a group of its own, headed and explained like the quick
+                                   filters above (D-I9); the rows inside are fieldsets numbered by the script. */-->
+                            <fieldset class="cl-fieldset">
+                                <legend class="cl-fieldset-title" th:text="#{product.page.attributes.title}"></legend>
+                                <p class="cl-help" th:text="#{product.page.attributes.help}"></p>
+                                <div class="cl-repeat" data-cl-repeat="customAttributes" data-cl-repeat-id="customAttribute"
+                                     data-cl-repeat-min="0">
+                                    <th:block th:each="attribute, stat : *{customAttributes}">
+                                        <fieldset class="cl-fieldset" data-cl-repeat-item
+                                                  th:insert="~{catalog/product :: pairFields('customAttributes', 'customAttribute', #{product.compatibility.tags}, 'name', #{catalog.metadata.name}, 'value', #{catalog.metadata.value}, ${stat.index}, ${stat.count}, ${attribute?.name}, ${attribute?.value})}"></fieldset>
+                                    </th:block>
+                                    <template data-cl-repeat-template>
+                                        <fieldset class="cl-fieldset" data-cl-repeat-item
+                                                  th:insert="~{catalog/product :: pairFields('customAttributes', 'customAttribute', #{product.compatibility.tags}, 'name', #{catalog.metadata.name}, 'value', #{catalog.metadata.value}, '@INDEX@', '@NUMBER@', null, null)}"></fieldset>
+                                    </template>
+                                    <noscript>
+                                        <fieldset class="cl-fieldset"
+                                                  th:insert="~{catalog/product :: pairFields('customAttributes', 'customAttribute', #{product.compatibility.tags}, 'name', #{catalog.metadata.name}, 'value', #{catalog.metadata.value}, ${form.customAttributes.size()}, ${form.customAttributes.size() + 1}, null, null)}"></fieldset>
+                                    </noscript>
+                                    <div class="cl-repeat-add">
+                                        <button type="button" class="cl-button" data-cl-repeat-add hidden>
+                                            <i class="fas fa-plus" aria-hidden="true"></i>
+                                            <span th:text="#{product.page.attribute.add}"></span>
+                                        </button>
+                                        <span class="cl-visually-hidden" role="status" data-cl-repeat-status
+                                              th:attr="data-template=#{product.page.row.removed('@N@')}"></span>
+                                    </div>
+                                </div>
+                            </fieldset>
+                            <fieldset class="cl-fieldset">
+                                <legend class="cl-fieldset-title" th:text="#{product.compatibility.filter}"></legend>
+                                <p class="cl-help" th:text="#{product.page.filter.help}"></p>
+                                <div class="cl-repeat" data-cl-repeat="customAttributesFilters"
+                                     data-cl-repeat-id="customAttributeFilter" data-cl-repeat-min="0">
+                                    <th:block th:each="filter, stat : *{customAttributesFilters}">
+                                        <fieldset class="cl-fieldset" data-cl-repeat-item
+                                                  th:insert="~{catalog/product :: filterFields(${stat.index}, ${stat.count}, ${filter})}"></fieldset>
+                                    </th:block>
+                                    <template data-cl-repeat-template>
+                                        <fieldset class="cl-fieldset" data-cl-repeat-item
+                                                  th:insert="~{catalog/product :: filterFields('@INDEX@', '@NUMBER@', null)}"></fieldset>
+                                    </template>
+                                    <noscript>
+                                        <fieldset class="cl-fieldset"
+                                                  th:insert="~{catalog/product :: filterFields(${form.customAttributesFilters.size()}, ${form.customAttributesFilters.size() + 1}, null)}"></fieldset>
+                                    </noscript>
+                                    <div class="cl-repeat-add">
+                                        <button type="button" class="cl-button" data-cl-repeat-add hidden>
+                                            <i class="fas fa-plus" aria-hidden="true"></i>
+                                            <span th:text="#{product.page.filter.add}"></span>
+                                        </button>
+                                        <span class="cl-visually-hidden" role="status" data-cl-repeat-status
+                                              th:attr="data-template=#{product.page.row.removed('@N@')}"></span>
+                                    </div>
+                                </div>
+                            </fieldset>
+                            <fieldset class="cl-fieldset">
+                                <legend class="cl-fieldset-title" th:text="#{product.metadata}"></legend>
+                                <p class="cl-help" th:text="#{product.page.metadata.help}"></p>
+                                <div class="cl-repeat" data-cl-repeat="metadata" data-cl-repeat-id="metadata" data-cl-repeat-min="0">
+                                    <th:block th:each="entry, stat : *{metadata}">
+                                        <fieldset class="cl-fieldset" data-cl-repeat-item
+                                                  th:insert="~{catalog/product :: pairFields('metadata', 'metadata', #{product.metadata}, 'key', #{catalog.metadata.key}, 'value', #{catalog.metadata.value}, ${stat.index}, ${stat.count}, ${entry?.key}, ${entry?.value})}"></fieldset>
+                                    </th:block>
+                                    <template data-cl-repeat-template>
+                                        <fieldset class="cl-fieldset" data-cl-repeat-item
+                                                  th:insert="~{catalog/product :: pairFields('metadata', 'metadata', #{product.metadata}, 'key', #{catalog.metadata.key}, 'value', #{catalog.metadata.value}, '@INDEX@', '@NUMBER@', null, null)}"></fieldset>
+                                    </template>
+                                    <noscript>
+                                        <fieldset class="cl-fieldset"
+                                                  th:insert="~{catalog/product :: pairFields('metadata', 'metadata', #{product.metadata}, 'key', #{catalog.metadata.key}, 'value', #{catalog.metadata.value}, ${form.metadata.size()}, ${form.metadata.size() + 1}, null, null)}"></fieldset>
+                                    </noscript>
+                                    <div class="cl-repeat-add">
+                                        <button type="button" class="cl-button" data-cl-repeat-add hidden>
+                                            <i class="fas fa-plus" aria-hidden="true"></i>
+                                            <span th:text="#{product.page.metadata.add}"></span>
+                                        </button>
+                                        <span class="cl-visually-hidden" role="status" data-cl-repeat-status
+                                              th:attr="data-template=#{product.page.row.removed('@N@')}"></span>
+                                    </div>
+                                </div>
+                            </fieldset>
+                        </div>
+                    </details>
+                    <div class="cl-card-footer">
+                        <button class="cl-button is-primary" type="submit"
+                                th:text="${existing} ? #{product.save} : #{product.add}"></button>
+                        <a class="cl-button" th:href="@{${backHref}}" th:text="#{general.cancel}"></a>
+                    </div>
+                </div>
+            </form>
+
+            <dialog th:replace="~{fragments/confirm-dialog :: dialog}"></dialog>
+        </div>
+    </section>
+    <script th:if="${!errors.isEmpty()}">
+        document.getElementById('product-errors').focus();
+    </script>
+    <div th:replace="~{fragments/category-picker :: pickerScript(${productCategories}, ${categoryAncestors})}"></div>
+    <script th:src="@{/js/async-form.js}" defer></script>
+    <script th:src="@{/js/repeat-fields.js}" defer></script>
+    <script th:src="@{/js/variant-fields.js}" defer></script>
+    <script th:src="@{/js/confirm-dialog.js}" defer></script>
+</div>
+
+<!--/* One quick filter: its index in the posted list, the number shown to people, and its value (empty for a blank one). */-->
+<th:block th:fragment="quickFilterLine(index, number, value)">
+    <span class="cl-repeat-line-no" aria-hidden="true"><span data-cl-repeat-number th:text="${number}"></span>.</span>
+    <input class="cl-input" type="text" autocomplete="off" th:name="'quickFilters[' + ${index} + ']'"
+           th:id="'quickFilter-' + ${index} + '-value'" th:value="${value}"
+           th:attr="aria-label=#{product.page.quickFilter.n(${number})}">
+    <button type="button" class="cl-link-button is-danger cl-repeat-remove" data-cl-repeat-remove hidden
+            th:text="#{settings.list.delete}"
+            th:attr="aria-label=#{product.page.row.remove(${number})},
+                     data-cl-repeat-label=#{product.page.row.remove('@N@')}"></button>
+</th:block>
+
+<!--/* One name/value row (a custom attribute, a metadata entry). The error of an unfinished row is keyed by the id of
+       its first field, so the summary links straight to it. */-->
+<th:block th:fragment="pairFields(prefix, repeatId, title, keyProp, keyLabel, valueProp, valueLabel, index, number, key, value)"
+          th:with="keyId=${repeatId + '-' + index + '-' + keyProp}, valueId=${repeatId + '-' + index + '-' + valueProp},
+                   error=${errors.get(repeatId + '-' + index + '-' + keyProp)}">
+    <legend class="cl-fieldset-title">
+        <span th:text="${title}"></span>
+        <span data-cl-repeat-number th:text="${number}"></span>
+    </legend>
+    <div class="cl-form-grid">
+        <div class="cl-span-3">
+            <div class="cl-field">
+                <label class="cl-label" th:for="${keyId}" th:text="${keyLabel}"></label>
+                <input class="cl-input" type="text" autocomplete="off" th:id="${keyId}"
+                       th:name="${prefix} + '[' + ${index} + '].' + ${keyProp}" th:value="${key}"
+                       th:classappend="${error != null} ? 'is-invalid'"
+                       th:attr="aria-invalid=${error != null} ? 'true' : null"></div>
+        </div>
+        <div class="cl-span-3">
+            <div class="cl-field">
+                <label class="cl-label" th:for="${valueId}" th:text="${valueLabel}"></label>
+                <input class="cl-input" type="text" autocomplete="off" th:id="${valueId}"
+                       th:name="${prefix} + '[' + ${index} + '].' + ${valueProp}" th:value="${value}"></div>
+        </div>
+        <p th:if="${error != null}" class="cl-field-error">
+            <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+            <span th:text="#{${error}}"></span>
+        </p>
+    </div>
+    <button type="button" class="cl-link-button is-danger cl-repeat-remove" data-cl-repeat-remove hidden
+            th:text="#{settings.list.delete}"
+            th:attr="aria-label=#{product.page.row.remove(${number})},
+                     data-cl-repeat-label=#{product.page.row.remove('@N@')}"></button>
+</th:block>
+
+<!--/* One custom filter: a PIM category, the attribute it compares, the value and the comparison. An unfinished one
+       carries its error at the first field left to fill (ProductForm), so each field is marked by its own key. */-->
+<th:block th:fragment="filterFields(index, number, filter)"
+          th:with="prefix='customAttributesFilters[' + ${index} + '].', ids='customAttributeFilter-' + ${index} + '-',
+                   nameError=${errors.get('customAttributeFilter-' + index + '-name')},
+                   valueError=${errors.get('customAttributeFilter-' + index + '-value')},
+                   operatorError=${errors.get('customAttributeFilter-' + index + '-operator')},
+                   error=${nameError ?: (valueError ?: operatorError)}">
+    <legend class="cl-fieldset-title">
+        <span th:text="#{product.compatibility.filter}"></span>
+        <span data-cl-repeat-number th:text="${number}"></span>
+    </legend>
+    <div class="cl-form-grid">
+        <div class="cl-span-3">
+            <div class="cl-field">
+                <span class="cl-label" th:id="${ids + 'category-label'}" th:text="#{product.category}"></span>
+                <div th:replace="~{fragments/category-picker :: picker(${prefix + 'category'}, ${filter?.category}, false, false, ${ids + 'category-label'})}"></div>
+            </div>
+        </div>
+        <div class="cl-span-3">
+            <div class="cl-field">
+                <label class="cl-label" th:for="${ids + 'name'}" th:text="#{catalog.metadata.name}"></label>
+                <input class="cl-input" type="text" autocomplete="off" th:id="${ids + 'name'}" th:name="${prefix + 'name'}"
+                       th:value="${filter?.name}" th:classappend="${nameError != null} ? 'is-invalid'"
+                       th:attr="aria-invalid=${nameError != null} ? 'true' : null"></div>
+        </div>
+        <div class="cl-span-3">
+            <div class="cl-field">
+                <label class="cl-label" th:for="${ids + 'value'}" th:text="#{catalog.metadata.value}"></label>
+                <input class="cl-input" type="text" autocomplete="off" th:id="${ids + 'value'}" th:name="${prefix + 'value'}"
+                       th:value="${filter?.value}" th:classappend="${valueError != null} ? 'is-invalid'"
+                       th:attr="aria-invalid=${valueError != null} ? 'true' : null"></div>
+        </div>
+        <div class="cl-span-3">
+            <div class="cl-field">
+                <label class="cl-label" th:for="${ids + 'operator'}" th:text="#{catalog.filter.operator}"></label>
+                <!--/* A select, not a free field: only these three comparisons are understood, and a filter carrying
+                       anything else is dropped without a word when the product is saved. */-->
+                <select class="cl-select" th:id="${ids + 'operator'}" th:name="${prefix + 'operator'}"
+                        th:classappend="${operatorError != null} ? 'is-invalid'"
+                        th:attr="aria-invalid=${operatorError != null} ? 'true' : null">
+                    <option value="">&#8212;</option>
+                    <option th:each="operator : ${T(pl.commercelink.products.ProductCustomAttributeFilter.Operator).values()}"
+                            th:value="${operator.operator}" th:text="${operator.operator}"
+                            th:selected="${filter != null and operator.operator == filter.operator}"></option>
+                </select>
+            </div>
+        </div>
+        <p th:if="${error != null}" class="cl-field-error">
+            <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+            <span th:text="#{${error}}"></span>
+        </p>
+    </div>
+    <button type="button" class="cl-link-button is-danger cl-repeat-remove" data-cl-repeat-remove hidden
+            th:text="#{settings.list.delete}"
+            th:attr="aria-label=#{product.page.row.remove(${number})},
+                     data-cl-repeat-label=#{product.page.row.remove('@N@')}"></button>
+</th:block>
+</body>
+</html>

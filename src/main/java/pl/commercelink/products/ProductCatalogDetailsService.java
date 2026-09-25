@@ -1,5 +1,6 @@
 package pl.commercelink.products;
 
+import com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -66,7 +67,18 @@ public class ProductCatalogDetailsService {
             catalog.setName(submitted.getName());
             catalog.setDeletionProtection(submitted.isDeletionProtection());
             catalog.setPricelistSchedule(schedule);
-            productCatalogRepository.save(catalog);
+            try {
+                productCatalogRepository.save(catalog);
+            } catch (ConditionalCheckFailedException e) {
+                if (!created) {
+                    throw e;
+                }
+                // A new catalog is saved with no version, which the mapper writes only when no item has the key yet:
+                // another request with the same form created it first. That catalog and its schedule (one name per
+                // catalog id) are the ones to keep, so nothing is restored.
+                log.info("Catalog {} of store {} was created by a parallel request", catalogId, storeId);
+                return UpdateResult.createdByAnotherRequest();
+            }
         } catch (RuntimeException e) {
             log.error("Saving catalog {} of store {} failed, restoring the previous schedule", catalogId, storeId, e);
             compensate(compensations);
@@ -106,7 +118,15 @@ public class ProductCatalogDetailsService {
         }
     }
 
-    public record UpdateResult(List<ErrorMessage> errors) {
+    /**
+     * @param createdMeanwhile the catalog did not exist when the save read it, and another request created it before
+     *                         this one could: the same form sent twice. Not an error -- the catalog is there.
+     */
+    public record UpdateResult(List<ErrorMessage> errors, boolean createdMeanwhile) {
+
+        public UpdateResult(List<ErrorMessage> errors) {
+            this(errors, false);
+        }
 
         static UpdateResult errors(List<ErrorMessage> errors) {
             return new UpdateResult(errors);
@@ -114,6 +134,10 @@ public class ProductCatalogDetailsService {
 
         static UpdateResult ok() {
             return new UpdateResult(List.of());
+        }
+
+        static UpdateResult createdByAnotherRequest() {
+            return new UpdateResult(List.of(), true);
         }
 
         public boolean hasErrors() {

@@ -1,0 +1,57 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+<div layout:fragment="content">
+    <section class="cl-page">
+        <div class="cl-page-body">
+            <header class="cl-page-header">
+                <div class="cl-page-header-row">
+                    <div class="cl-page-header-row">
+                        <h1 class="cl-page-title" th:text="#{catalog.title}"></h1>
+                        <button th:replace="~{fragments/screen-intro :: toggle}"></button>
+                    </div>
+                </div>
+                <p class="cl-page-lead" th:text="#{catalog.page.lead}"></p>
+            </header>
+            <div th:replace="~{fragments/screen-intro :: panel('catalogs', 'fas fa-book')}"></div>
+            <div th:replace="~{fragments/settings-form :: savedAlert}"></div>
+
+            <section class="cl-card" aria-labelledby="catalogs-title">
+                <div class="cl-card-head">
+                    <h2 class="cl-card-title" id="catalogs-title" th:text="#{catalog.list.title}"></h2>
+                    <a class="cl-button" th:href="@{/dashboard/catalogs/new}">
+                        <span class="icon is-small" aria-hidden="true"><i class="fas fa-plus"></i></span>
+                        <span th:text="#{catalog.add}"></span>
+                    </a>
+                </div>
+                <ul class="cl-list" th:if="${!catalogs.isEmpty()}">
+                    <!--/* A catalog saved without a name by the old form (RF-24) still gets link text to click and a name to
+                           be read out with, as the other settings lists do. */-->
+                    <li class="cl-list-item" th:each="catalog : ${catalogs}"
+                        th:with="name=${#strings.isEmpty(catalog.name())} ? #{settings.list.untitled} : ${catalog.name()}">
+                        <div>
+                            <div class="cl-list-title">
+                                <a th:href="@{${catalog.href()}}" th:text="${name}"></a>
+                                <span th:if="${catalog.protectedFromDeletion()}" class="cl-status is-neutral" th:text="#{catalog.protected}"></span>
+                            </div>
+                            <p class="cl-list-desc"
+                               th:text="#{catalog.list.desc(${catalog.categories()}, ${catalog.managed()}, ${catalog.dynamic()}, ${catalog.scheduleText()})}"></p>
+                        </div>
+                        <div class="cl-list-actions">
+                            <a class="cl-link-button" th:href="@{${catalog.settingsHref()}}" th:text="#{catalog.settings}"
+                               th:attr="aria-label=#{catalog.settings.for(${name})}"></a>
+                        </div>
+                    </li>
+                </ul>
+                <p class="cl-list-empty" th:if="${catalogs.isEmpty()}">
+                    <span th:text="#{catalog.list.empty}"></span>
+                    <a class="cl-button is-primary" th:href="@{/dashboard/catalogs/new}" th:text="#{catalog.add}"></a>
+                </p>
+            </section>
+        </div>
+    </section>
+</div>
+</body>
+</html>
