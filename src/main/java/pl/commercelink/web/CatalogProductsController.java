@@ -36,7 +36,6 @@ import pl.commercelink.products.PriceDefinition;
 import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductAvailabilityType;
 import pl.commercelink.products.ProductCatalog;
-import pl.commercelink.products.ProductCustomAttributeFilter;
 import pl.commercelink.products.ProductRecommendation;
 import pl.commercelink.products.ProductRecommendationEngine;
 import pl.commercelink.products.ProductRepository;
@@ -602,9 +601,6 @@ public class CatalogProductsController {
         boolean edit = existing != null;
         String catalogId = catalog.getCatalogId();
         String categoryId = category.getCategoryId();
-        List<PimCategoryOptions.CategoryOption> productCategories = pimCategoryOptions.namedOptions(
-                store.getEnabledCategories(),
-                form.getCustomAttributesFilters().stream().map(ProductCustomAttributeFilter::getCategory).toList());
         model.addAttribute("form", form);
         model.addAttribute("errors", errors);
         model.addAttribute("existing", edit);
@@ -619,9 +615,6 @@ public class CatalogProductsController {
                 .map(integration -> Map.of("name", integration.getName(),
                         "displayName", marketplaces.displayName(integration.getName())))
                 .toList());
-        model.addAttribute("productCategories", productCategories);
-        model.addAttribute("categoryAncestors", pimCategoryOptions.ancestorsOfNames(
-                productCategories.stream().map(PimCategoryOptions.CategoryOption::name).toList()));
         model.addAttribute("formAction", edit
                 ? CatalogPaths.product(catalogId, categoryId, existing.getProductId())
                 : CatalogPaths.newProduct(catalogId, categoryId));
