@@ -68,9 +68,9 @@
                         <div class="cl-form-grid">
                             <div class="cl-span-2" th:insert="~{fragments/settings-form :: textField('maxQty', 'catalog.category.maxQty', *{maxQty}, 'text', 'off', true, ${errors['maxQty']}, #{catalog.category.maxQty.help})}"></div>
                             <div class="cl-span-6">
-                                <div th:replace="~{fragments/settings-form :: check('requiredDuringOrder', 'catalog.category.required', *{requiredDuringOrder}, 'catalog.category.required.desc', null)}"></div>
-                                <div th:replace="~{fragments/settings-form :: check('includedInDeliverySuggestions', 'catalog.category.restock', *{includedInDeliverySuggestions}, 'catalog.category.restock.desc', null)}"></div>
-                                <div th:replace="~{fragments/settings-form :: check('deletionProtection', 'catalog.category.protect', *{deletionProtection}, 'catalog.category.protect.desc', null)}"></div>
+                                <div th:replace="~{fragments/settings-form :: check('requiredDuringOrder', 'catalog.category.required', *{requiredDuringOrder}, 'catalog.category.required.desc', null, null)}"></div>
+                                <div th:replace="~{fragments/settings-form :: check('includedInDeliverySuggestions', 'catalog.category.restock', *{includedInDeliverySuggestions}, 'catalog.category.restock.desc', null, null)}"></div>
+                                <div th:replace="~{fragments/settings-form :: check('deletionProtection', 'catalog.category.protect', *{deletionProtection}, 'catalog.category.protect.desc', null, null)}"></div>
                             </div>
                         </div>
                     </fieldset>
