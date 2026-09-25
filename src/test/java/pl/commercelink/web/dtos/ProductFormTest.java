@@ -206,8 +206,8 @@ class ProductFormTest {
 
         // then
         assertThat(errors).containsEntry("customAttribute-0-name", "product.error.attribute.incomplete")
-                // The filter has a name and lacks its value: the error sits at the first field that is missing.
-                .containsEntry("customAttributeFilter-0-value", "product.error.filter.incomplete")
+                // The filter has a name and lacks its category and value: the error sits at the first field missing.
+                .containsEntry("customAttributeFilter-0-category", "product.error.filter.incomplete")
                 .containsEntry("metadata-0-key", "product.error.metadata.incomplete");
     }
 
@@ -328,6 +328,42 @@ class ProductFormTest {
                 .containsEntry("ean", "product.error.ean.invalid");
         assertThat(cleared.validate(LABELS, GROUPS, MARKETPLACES))
                 .containsEntry("ean", "product.error.ean.required");
+    }
+
+    @Test
+    void aFilterWithoutItsCategoryIsAnErrorOfTheCategory() {
+        // given
+        ProductForm form = valid();
+        ProductCustomAttributeFilter filter = new ProductCustomAttributeFilter();
+        filter.setName("Length");
+        filter.setValue("315");
+        filter.setOperator("<=");
+        form.getCustomAttributesFilters().add(filter);
+
+        // when / then
+        assertThat(form.validate(LABELS, GROUPS, MARKETPLACES))
+                .containsOnlyKeys("customAttributeFilter-0-category")
+                .containsEntry("customAttributeFilter-0-category", "product.error.filter.incomplete");
+    }
+
+    @Test
+    void aFilterKeepsAnyCategoryTextTrimmed() {
+        // given
+        ProductForm form = valid();
+        ProductCustomAttributeFilter filter = new ProductCustomAttributeFilter();
+        filter.setCategory(" GPU ");
+        filter.setName("Length");
+        filter.setValue("315");
+        filter.setOperator("<=");
+        form.getCustomAttributesFilters().add(filter);
+        Product product = new Product("cat", "pim-1", "4719331361600", "GV-N5080", "Gigabyte", "old", "old", "Default");
+
+        // when
+        form.applyTo(product);
+
+        // then
+        assertThat(product.getCustomAttributesFilters()).singleElement()
+                .extracting(ProductCustomAttributeFilter::getCategory).isEqualTo("GPU");
     }
 
     /** RF-29: a filter complete but for its comparison ("—") is an error of the operator, where the summary links. */

@@ -347,7 +347,6 @@
     <script th:if="${!errors.isEmpty()}">
         document.getElementById('product-errors').focus();
     </script>
-    <div th:replace="~{fragments/category-picker :: pickerScript(${productCategories}, ${categoryAncestors})}"></div>
     <script th:src="@{/js/async-form.js}" defer></script>
     <script th:src="@{/js/repeat-fields.js}" defer></script>
     <script th:src="@{/js/variant-fields.js}" defer></script>
@@ -401,24 +400,28 @@
                      data-cl-repeat-label=#{product.page.row.remove('@N@')}"></button>
 </th:block>
 
-<!--/* One custom filter: a PIM category, the attribute it compares, the value and the comparison. An unfinished one
+<!--/* One custom filter: its category, the attribute it compares, the value and the comparison. An unfinished one
        carries its error at the first field left to fill (ProductForm), so each field is marked by its own key. */-->
 <th:block th:fragment="filterFields(index, number, filter)"
           th:with="prefix='customAttributesFilters[' + ${index} + '].', ids='customAttributeFilter-' + ${index} + '-',
+                   categoryError=${errors.get('customAttributeFilter-' + index + '-category')},
                    nameError=${errors.get('customAttributeFilter-' + index + '-name')},
                    valueError=${errors.get('customAttributeFilter-' + index + '-value')},
                    operatorError=${errors.get('customAttributeFilter-' + index + '-operator')},
-                   error=${nameError ?: (valueError ?: operatorError)}">
+                   error=${categoryError ?: (nameError ?: (valueError ?: operatorError))}">
     <legend class="cl-fieldset-title">
         <span th:text="#{product.compatibility.filter}"></span>
         <span data-cl-repeat-number th:text="${number}"></span>
     </legend>
     <div class="cl-form-grid">
         <div class="cl-span-3">
+            <!--/* Free text, not the PIM category picker: the category groups filters and attributes internally
+                   ("GPU", "Cooler") and is not the category of any product. */-->
             <div class="cl-field">
-                <span class="cl-label" th:id="${ids + 'category-label'}" th:text="#{product.category}"></span>
-                <div th:replace="~{fragments/category-picker :: picker(${prefix + 'category'}, ${filter?.category}, false, false, ${ids + 'category-label'})}"></div>
-            </div>
+                <label class="cl-label" th:for="${ids + 'category'}" th:text="#{product.page.filter.category}"></label>
+                <input class="cl-input" type="text" autocomplete="off" th:id="${ids + 'category'}" th:name="${prefix + 'category'}"
+                       th:value="${filter?.category}" th:classappend="${categoryError != null} ? 'is-invalid'"
+                       th:attr="aria-invalid=${categoryError != null} ? 'true' : null"></div>
         </div>
         <div class="cl-span-3">
             <div class="cl-field">
