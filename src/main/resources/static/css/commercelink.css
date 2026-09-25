@@ -4309,21 +4309,6 @@ a.cl-link-button:hover {
 
 /* Status tabs: one underlined row at the top of the card — open statuses on the left, history on the right. Counts
    are small and grey so the labels carry the row; a tab with nothing behind it is quieter but still clickable. */
-.cl-page .cl-tabs-row {
-    display: flex;
-    align-items: stretch;
-    flex-wrap: wrap;
-    gap: 0 12px;
-    padding: 0 20px;
-    border-bottom: 1px solid var(--cl-line);
-}
-
-.cl-page .cl-tabs {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0 2px;
-}
-
 .cl-page .cl-tab {
     display: inline-flex;
     align-items: center;
@@ -4375,22 +4360,7 @@ a.cl-link-button:hover {
     font-weight: 400;
 }
 
-/* History tabs sit at the right end of the row behind a thin divider; when the open statuses need the whole width
-   the pair wraps under them, divider included. */
-.cl-page .cl-tabs.is-history {
-    margin-left: auto;
-}
-
-.cl-page .cl-tabs.is-history::before {
-    content: "";
-    width: 1px;
-    height: 20px;
-    align-self: center;
-    margin-right: 10px;
-    background: var(--cl-line);
-}
-
-/* Controls under the tabs: the custom-filter menu on the left, search on the right. */
+/* Controls that open the table card: the Status and custom-filter menus on the left, search on the right. */
 .cl-page .cl-list-controls {
     display: flex;
     align-items: center;
@@ -4398,6 +4368,13 @@ a.cl-link-button:hover {
     flex-wrap: wrap;
     gap: var(--cl-gap-related);
     padding: 14px 20px 0;
+}
+
+.cl-page .cl-list-filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
 }
 
 /* Custom-filter menu: a native <details> (works without JavaScript), styled as a button that opens a popover with
@@ -4426,6 +4403,21 @@ a.cl-link-button:hover {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+/* "Status:" before the chosen value, so the button reads as a labelled field. */
+.cl-page .cl-menu-summary-key {
+    font-weight: 500;
+    color: var(--cl-ink-3);
+}
+
+.cl-page .cl-menu-summary-key::after {
+    content: ":";
+}
+
+.cl-page .cl-menu-summary.is-active .cl-menu-summary-key {
+    color: inherit;
+    opacity: .75;
 }
 
 .cl-page .cl-menu-summary.is-active {
@@ -4465,6 +4457,22 @@ a.cl-link-button:hover {
 
 .cl-page .cl-menu-list li {
     margin: 0;
+}
+
+/* The saved filters scroll; the footer (save this view…, manage…) stays pinned under them. */
+.cl-page .cl-menu-scroll {
+    max-height: min(48vh, 360px);
+    margin: 0;
+    padding: 0;
+    overflow-y: auto;
+    list-style: none;
+}
+
+.cl-page .cl-menu-footer {
+    margin: 6px -6px -6px;
+    padding: 6px;
+    border-top: 1px solid var(--cl-line);
+    list-style: none;
 }
 
 .cl-page .cl-menu-item {
@@ -4518,6 +4526,80 @@ a.cl-link-button:hover {
     padding: 8px 10px;
     font-size: 13px;
     color: var(--cl-ink-2);
+}
+
+/* Status menu: a GET form of checkboxes in two groups (open, history) with counts, in the same popover as the list. */
+.cl-page .cl-menu-panel {
+    position: absolute;
+    z-index: var(--cl-z-pop);
+    top: calc(100% + 6px);
+    left: 0;
+    min-width: 260px;
+    margin: 0;
+    padding: 4px 6px 8px;
+    background: var(--cl-surface);
+    border: 1px solid var(--cl-line);
+    border-radius: var(--cl-radius);
+    box-shadow: var(--cl-shadow);
+}
+
+.cl-page .cl-menu-group {
+    padding: 4px 0;
+}
+
+.cl-page .cl-menu-group + .cl-menu-group {
+    border-top: 1px solid var(--cl-line);
+}
+
+.cl-page .cl-menu-group-title {
+    display: block;
+    padding: 6px 10px 2px;
+}
+
+.cl-page .cl-menu-check {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 34px;
+    padding: 0 10px;
+    border-radius: 6px;
+    color: var(--cl-ink);
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.cl-page .cl-menu-check:hover {
+    background: var(--cl-surface-2);
+}
+
+.cl-page .cl-menu-check input {
+    flex: none;
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    accent-color: var(--cl-accent);
+}
+
+.cl-page .cl-menu-check input:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
+}
+
+.cl-page .cl-menu-check .cl-menu-item-text {
+    flex: 1 1 auto;
+}
+
+.cl-page .cl-menu-check.is-empty {
+    color: var(--cl-ink-3);
+}
+
+.cl-page .cl-menu-actions {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-top: 4px;
+    padding: 10px 10px 2px;
+    border-top: 1px solid var(--cl-line);
 }
 
 /* Search: the icon sits in the field, a clear "×" appears once something is searched (it is a link, so it works
@@ -4824,6 +4906,10 @@ a.cl-link-button:hover {
         min-height: 44px;
     }
 
+    .cl-page .cl-menu-check {
+        min-height: 44px;
+    }
+
     .cl-page .cl-menu-item {
         min-height: 44px;
     }
@@ -4915,23 +5001,6 @@ a.cl-link-button:hover {
         font-size: 12px;
     }
 
-    /* Tabs scroll sideways in one row; the history pair follows the open statuses in the same row. */
-    .cl-page .cl-tabs-row {
-        flex-wrap: nowrap;
-        overflow-x: auto;
-        scrollbar-width: none;
-        -webkit-overflow-scrolling: touch;
-        padding: 0 16px;
-    }
-
-    .cl-page .cl-tabs-row::-webkit-scrollbar {
-        display: none;
-    }
-
-    .cl-page .cl-tabs {
-        flex-wrap: nowrap;
-    }
-
     .cl-page .cl-list-controls {
         flex-direction: column;
         align-items: stretch;
@@ -4939,15 +5008,22 @@ a.cl-link-button:hover {
     }
 
     .cl-page .cl-menu-summary {
+        box-sizing: border-box;
         max-width: none;
         width: 100%;
         justify-content: flex-start;
     }
 
-    .cl-page .cl-menu-list {
+    .cl-page .cl-menu-list,
+    .cl-page .cl-menu-panel {
         left: 0;
         right: 0;
         max-width: none;
+    }
+
+    .cl-page .cl-list-filters,
+    .cl-page .cl-list-filters .cl-menu {
+        width: 100%;
     }
 
     .cl-page .cl-search-form,

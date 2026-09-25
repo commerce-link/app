@@ -32,7 +32,7 @@ class OrderListQueryTest {
     @Test
     void unknownValuesFallBackToDefaultsAndPageIsClampedToOne() {
         OrderListQuery query = OrderListQuery.parse(params("status", "Bogus", "focus", "x", "sort", "y", "dir", "z", "page", "abc"));
-        assertThat(query.status()).isNull();
+        assertThat(query.statuses()).isEmpty();
         assertThat(query.focus()).isNull();
         assertThat(query.sort()).isNull();
         assertThat(query.page()).isEqualTo(1);
@@ -43,7 +43,7 @@ class OrderListQueryTest {
     @Test
     void historyDefaultsToNewestFirst() {
         OrderListQuery query = OrderListQuery.parse(params("status", "completed"));
-        assertThat(query.status()).isEqualTo(OrderStatus.Completed);
+        assertThat(query.statuses()).containsExactly(OrderStatus.Completed);
         assertThat(query.isHistory()).isTrue();
         assertThat(query.effectiveSort()).isEqualTo(OrderListQuery.Sort.ORDERED);
         assertThat(query.effectiveDir()).isEqualTo(OrderListQuery.Direction.DESC);
@@ -103,10 +103,28 @@ class OrderListQueryTest {
     @Test
     void legacyStatusesAndShowAllRedirect() {
         assertThat(OrderListQuery.legacyRedirect(params("statuses", "Blocked", "statuses", "New")))
-                .contains("/dashboard/orders?status=Blocked");
+                .contains("/dashboard/orders?status=New&status=Blocked");
         assertThat(OrderListQuery.legacyRedirect(params("showAll", "true"))).contains("/dashboard/orders");
         assertThat(OrderListQuery.legacyRedirect(params("showAll", "true", "filterId", "f1"))).contains("/dashboard/orders?filterId=f1");
         assertThat(OrderListQuery.legacyRedirect(params("statuses", "Bogus"))).contains("/dashboard/orders");
         assertThat(OrderListQuery.legacyRedirect(params("status", "New"))).isEmpty();
+    }
+
+    @Test
+    void severalStatusesAreTickedTogetherAndKeptInEnumOrder() {
+        OrderListQuery query = OrderListQuery.parse(params("status", "Blocked", "status", "New", "status", "new", "status", "Bogus"));
+        assertThat(query.statuses()).containsExactly(OrderStatus.New, OrderStatus.Blocked);
+        assertThat(query.href()).isEqualTo("/dashboard/orders?status=New&status=Blocked");
+        assertThat(query.single()).isEmpty();
+        assertThat(query.isOpen()).isFalse();
+        assertThat(query.isHistory()).isFalse();
+        assertThat(OrderListQuery.parse(params("status", "Completed,Cancelled")).statuses())
+                .containsExactly(OrderStatus.Cancelled, OrderStatus.Completed);
+        assertThat(OrderListQuery.parse(params("status", "Completed", "status", "Cancelled")).isHistory()).isTrue();
+        // an open status next to a history one is an ordinary list: due first, focus applies
+        assertThat(OrderListQuery.parse(params("status", "Completed", "status", "New")).isHistory()).isFalse();
+        assertThat(query.toggleStatus(OrderStatus.Blocked).statuses()).containsExactly(OrderStatus.New);
+        assertThat(query.toggleStatus(OrderStatus.Assembly).statuses()).containsExactly(OrderStatus.New, OrderStatus.Blocked, OrderStatus.Assembly);
+        assertThat(query.withStatus(OrderStatus.Completed).single()).contains(OrderStatus.Completed);
     }
 }

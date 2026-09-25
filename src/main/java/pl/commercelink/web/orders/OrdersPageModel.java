@@ -11,8 +11,9 @@ import java.util.Optional;
 public record OrdersPageModel(
         OrderListQuery query,
         List<Tile> tiles,
-        List<Segment> openSegments,
-        List<Segment> historySegments,
+        List<StatusOption> openStatuses,
+        List<StatusOption> historyStatuses,
+        String statusSummary,
         List<FilterOption> filterOptions,
         Optional<OrderFilter> activeFilter,
         boolean activeFilterStarred,
@@ -28,7 +29,8 @@ public record OrdersPageModel(
                        boolean pressed, boolean enabled, String tone) {
     }
 
-    public record Segment(String status, String label, long count, String href, boolean current) {
+    /** One row of the Status menu: the status, its count within the custom filter and the search, and whether it is ticked. */
+    public record StatusOption(String status, String label, long count, boolean selected) {
     }
 
     public record FilterOption(String id, String label, boolean shared, boolean starred, boolean selected) {

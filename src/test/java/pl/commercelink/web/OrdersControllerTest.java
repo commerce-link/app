@@ -1238,7 +1238,7 @@ class OrdersControllerTest {
         }
 
         private pl.commercelink.web.orders.OrdersPageModel emptyPage(pl.commercelink.web.orders.OrderListQuery query) {
-            return new pl.commercelink.web.orders.OrdersPageModel(query, List.of(), List.of(), List.of(), List.of(),
+            return new pl.commercelink.web.orders.OrdersPageModel(query, List.of(), List.of(), List.of(), "", List.of(),
                     Optional.empty(), false, List.of(), "", java.util.Map.of(), List.of(),
                     pl.commercelink.web.orders.Pagination.of(1, 0, 50, n -> "/x"), null, List.of());
         }
@@ -1260,7 +1260,7 @@ class OrdersControllerTest {
             String view = ordersController.orders(params("status", "New"), Locale.forLanguageTag("pl"), model);
             assertThat(view).isEqualTo("orders/list");
             var page = (pl.commercelink.web.orders.OrdersPageModel) model.get("page");
-            assertThat(page.query().status()).isEqualTo(OrderStatus.New);
+            assertThat(page.query().statuses()).containsExactly(OrderStatus.New);
             assertThat(model.get("filters")).isNotNull();
             assertThat(model.get("canManageStoreFilters")).isEqualTo(false);
         }

@@ -225,7 +225,7 @@ public class OrdersController extends BaseController {
                 return safeReturnTo(form.getReturnTo());
             }
             OrderListQuery target = parseReturnTo(safeReturnTo(form.getReturnTo())).withFilterId(created.getId());
-            return target.withStatus(statusOf(created).orElse(target.status())).href();
+            return statusOf(created).map(target::withStatus).orElse(target).href();
         });
     }
 

@@ -19,7 +19,7 @@ import pl.commercelink.web.orders.OrdersPageModel.Chip;
 import pl.commercelink.web.orders.OrdersPageModel.Condition;
 import pl.commercelink.web.orders.OrdersPageModel.EmptyState;
 import pl.commercelink.web.orders.OrdersPageModel.FilterOption;
-import pl.commercelink.web.orders.OrdersPageModel.Segment;
+import pl.commercelink.web.orders.OrdersPageModel.StatusOption;
 import pl.commercelink.web.orders.OrdersPageModel.SortHeader;
 import pl.commercelink.web.orders.OrdersPageModel.Tile;
 import pl.commercelink.web.orders.Pagination;
@@ -39,7 +39,7 @@ import java.util.stream.Stream;
 
 /**
  * Builds the orders list page from one query of the store's orders (spec §8.2): tiles from all open orders,
- * segment counts within the custom filter and the search, rows within status and focus, then sort and page.
+ * status counts within the custom filter and the search, rows within the ticked statuses and focus, then sort and page.
  */
 @Service
 public class OrderListService {
@@ -70,7 +70,7 @@ public class OrderListService {
                 .filter(order -> OrderSearch.matches(order, query.q()))
                 .toList();
         List<Order> inStatus = filtered.stream()
-                .filter(order -> query.isOpen() ? OrderAttention.isOpen(order) : order.getStatus() == query.status())
+                .filter(order -> query.isOpen() ? OrderAttention.isOpen(order) : query.statuses().contains(order.getStatus()))
                 .filter(order -> query.focus() == null || query.isHistory() || query.focus().matches(order, today))
                 .sorted(comparator(query.effectiveSort(), query.effectiveDir()))
                 .toList();
@@ -84,8 +84,9 @@ public class OrderListService {
         return new OrdersPageModel(
                 query,
                 tiles(open, query, today, locale),
-                openSegments(filtered, query, locale),
-                historySegments(filtered, query, locale),
+                statusOptions(filtered, OPEN, query, locale),
+                statusOptions(filtered, HISTORY, query, locale),
+                statusSummary(query, locale),
                 filterOptions(filters, query),
                 activeFilter,
                 starred,
@@ -156,24 +157,22 @@ public class OrderListService {
         return tiles;
     }
 
-    private List<Segment> openSegments(List<Order> filtered, OrderListQuery query, Locale locale) {
-        List<Segment> segments = new ArrayList<>();
-        long openCount = filtered.stream().filter(OrderAttention::isOpen).count();
-        segments.add(new Segment("open", text("orders.list.segment.open", locale), openCount, query.withStatus(null).href(), query.isOpen()));
-        for (OrderStatus status : OPEN) {
-            segments.add(segment(filtered, status, query, locale));
+    private List<StatusOption> statusOptions(List<Order> filtered, List<OrderStatus> statuses, OrderListQuery query, Locale locale) {
+        return statuses.stream().map(status -> new StatusOption(status.name(), text("OrderStatus." + status.name(), locale),
+                filtered.stream().filter(o -> o.getStatus() == status).count(), query.statuses().contains(status))).toList();
+    }
+
+    /** What the Status button says: "Otwarte", the one ticked status, or "3 wybrane". */
+    private String statusSummary(OrderListQuery query, Locale locale) {
+        if (query.isOpen()) {
+            return text("orders.list.segment.open", locale);
         }
-        return segments;
+        return query.single().map(s -> text("OrderStatus." + s.name(), locale))
+                .orElseGet(() -> text("orders.list.status.selected", locale, query.statuses().size()));
     }
 
-    private List<Segment> historySegments(List<Order> filtered, OrderListQuery query, Locale locale) {
-        return HISTORY.stream().map(status -> segment(filtered, status, query, locale)).toList();
-    }
-
-    private Segment segment(List<Order> filtered, OrderStatus status, OrderListQuery query, Locale locale) {
-        long count = filtered.stream().filter(o -> o.getStatus() == status).count();
-        return new Segment(status.name(), text("OrderStatus." + status.name(), locale), count,
-                query.withStatus(status).href(), query.status() == status);
+    private String statusLabels(OrderListQuery query, Locale locale) {
+        return String.join(", ", query.statuses().stream().map(s -> text("OrderStatus." + s.name(), locale)).toList());
     }
 
     private List<FilterOption> filterOptions(ListOrderFiltersView filters, OrderListQuery query) {
@@ -191,6 +190,10 @@ public class OrderListService {
 
     private List<Chip> chips(OrderListQuery query, Optional<OrderFilter> activeFilter, boolean starred, int count, Locale locale) {
         List<Chip> chips = new ArrayList<>();
+        if (!query.isOpen()) {
+            String label = text("orders.list.chip.status", locale, statusLabels(query, locale));
+            chips.add(new Chip(label, query.withStatus(null).href(), text("orders.list.chip.clearLabel", locale, label)));
+        }
         activeFilter.ifPresent(f -> {
             String label = text("orders.list.chip.filter", locale, f.getLabel() + (starred ? " ★" : ""));
             chips.add(new Chip(label, query.withFilterId("").href(), text("orders.list.chip.clearLabel", locale, label)));
@@ -242,8 +245,9 @@ public class OrderListService {
                     text("orders.list.empty.filter.clear", locale), query.withFilterId("").href());
         }
         if (!query.isOpen()) {
-            return new EmptyState(text("orders.list.empty.status", locale, text("OrderStatus." + query.status().name(), locale)),
-                    text("orders.list.empty.showOpen", locale), query.withStatus(null).href());
+            String message = query.single().map(s -> text("orders.list.empty.status", locale, text("OrderStatus." + s.name(), locale)))
+                    .orElseGet(() -> text("orders.list.empty.statuses", locale));
+            return new EmptyState(message, text("orders.list.empty.showOpen", locale), query.withStatus(null).href());
         }
         if (storeEmpty) {
             return new EmptyState(text("orders.list.empty.store", locale), null, null);
@@ -253,13 +257,14 @@ public class OrderListService {
                 text("orders.list.empty.open.history", locale), query.withStatus(OrderStatus.Completed).href());
     }
 
-    /** What "Save this view" would store: the segment's status (if any) plus the active filter's other conditions. */
+    /**
+     * What "Save this view" would store: the ticked status plus the active filter's other conditions. A saved filter
+     * holds one status, so with several ticked the status is left out rather than silently reduced to the first.
+     */
     private List<Condition> saveViewConditions(OrderListQuery query, Optional<OrderFilter> activeFilter, Locale locale) {
         List<Condition> conditions = new ArrayList<>();
-        if (!query.isOpen()) {
-            conditions.add(new Condition(OrderFilterField.Status.name(), query.status().name(),
-                    text("orders.filters.field.status", locale) + ": " + text("OrderStatus." + query.status().name(), locale)));
-        }
+        query.single().ifPresent(status -> conditions.add(new Condition(OrderFilterField.Status.name(), status.name(),
+                text("orders.filters.field.status", locale) + ": " + text("OrderStatus." + status.name(), locale))));
         activeFilter.ifPresent(f -> f.getConditions().stream()
                 .filter(c -> c.getField() != OrderFilterField.Status)
                 .forEach(c -> conditions.add(new Condition(c.getField().name(), c.getValue(), conditionLabel(c, locale)))));

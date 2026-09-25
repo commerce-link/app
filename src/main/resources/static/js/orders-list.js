@@ -1,8 +1,10 @@
-// Progressive enhancement of the orders list: a click on a tab, attention figure, chip, menu item, sort header or
-// page link, and a submit of the search form, fetch /dashboard/orders/list with the same query and swap the results
-// block in place. The address bar follows (pushState), Back re-fetches, and focus lands on the count line so a
-// screen reader hears the new number. Emptying the search field refreshes the list too, and the filter menu (a
-// native <details>) closes on a click outside or Escape. Anything unexpected falls back to a plain navigation.
+// Progressive enhancement of the orders list: a click on a chip, menu item, sort header or page link, a submit of
+// the search form, and a tick in the Status menu fetch /dashboard/orders/list with the same query and swap the
+// results block in place. The address bar follows (pushState), Back re-fetches, and focus lands on the count line so
+// a screen reader hears the new number. A tick keeps the Status menu open on the fresh block (with focus on the same
+// box) so several statuses can be picked in a row; its "Zastosuj" button is hidden because every tick applies at
+// once. Emptying the search field refreshes the list too, and an open menu (a native <details>) closes on a click
+// outside or Escape. Anything unexpected falls back to a plain navigation.
 (function () {
     'use strict';
 
@@ -15,6 +17,18 @@
         var url = new URL(href, window.location.href);
         url.pathname = '/dashboard/orders/list';
         return url;
+    }
+
+    // A menu to reopen after the swap, set by a tick in an auto-submitting menu form: { menu, value }.
+    var reopen = null;
+
+    function hideAutosubmitButtons() {
+        root.querySelectorAll('[data-cl-autosubmit-hide]').forEach(function (button) {
+            button.hidden = true;
+            // an actions row left with nothing visible would be an empty strip under the last checkbox
+            var row = button.parentElement;
+            if (row && !Array.prototype.some.call(row.children, function (c) { return !c.hidden; })) { row.hidden = true; }
+        });
     }
 
     function load(href, push, focusSearch) {
@@ -34,7 +48,16 @@
                 if (!fresh) { throw new Error('no results block'); }
                 root.replaceWith(fresh);
                 root = fresh;
+                hideAutosubmitButtons();
                 if (push) { history.pushState({ ordersList: true }, '', target.pathname + target.search); }
+                if (reopen) {
+                    var menu = root.querySelector('details[data-cl-menu="' + reopen.menu + '"]');
+                    var box = menu && menu.querySelector('input[value="' + reopen.value + '"]');
+                    reopen = null;
+                    if (menu) { menu.setAttribute('open', ''); }
+                    if (box) { box.focus({ preventScroll: true }); }
+                    return;
+                }
                 if (focusSearch) {
                     var field = root.querySelector('.cl-table-search');
                     if (field) { field.focus(); field.setSelectionRange(field.value.length, field.value.length); }
@@ -87,6 +110,16 @@
         submitSearch(form, false);
     });
 
+    // A tick in the Status menu applies at once; the menu stays open on the fresh block for the next tick.
+    document.addEventListener('change', function (event) {
+        var box = event.target;
+        var form = box.form;
+        if (!form || !form.hasAttribute('data-cl-autosubmit') || !root.contains(form)) { return; }
+        var menu = form.closest('details[data-cl-menu]');
+        reopen = menu ? { menu: menu.getAttribute('data-cl-menu'), value: box.value } : null;
+        submitSearch(form, false);
+    });
+
     // Emptying the search field (Backspace, the field's own clear) shows the unsearched list again without a click.
     document.addEventListener('input', function (event) {
         var field = event.target;
@@ -101,5 +134,6 @@
         load(window.location.pathname + window.location.search, false);
     });
 
+    hideAutosubmitButtons();
     history.replaceState({ ordersList: true }, '', window.location.pathname + window.location.search);
 })();

@@ -137,7 +137,7 @@ class OrderListServiceTest {
     }
 
     @Test
-    void tilesCountTheWholeStoreWhileSegmentsCountWithinTheFilter() {
+    void tilesCountTheWholeStoreWhileStatusCountsStayWithinTheFilter() {
         add("a", OrderStatus.New, TODAY.minusDays(1), 100, 0, "Allegro");
         add("b", OrderStatus.New, TODAY, 100, 100, null);
         add("c", OrderStatus.Blocked, null, 50, 50, "Allegro");
@@ -151,10 +151,10 @@ class OrderListServiceTest {
         assertThat(model.tiles().get(3).hint()).isEqualTo("z brakującą wpłatą");
         assertThat(model.tiles().get(3).valueOf()).isEqualTo("100,00 PLN");
         assertThat(model.tiles().get(2).hint()).isEqualTo("Nowe 2 · Zablokowane 1");
-        assertThat(model.openSegments().get(0).count()).isEqualTo(2);   // all open within Allegro
-        assertThat(segment(model, "Nowe").count()).isEqualTo(1);
-        assertThat(segment(model, "Zablokowane").count()).isEqualTo(1);
-        assertThat(model.historySegments()).extracting(s -> s.count()).containsExactly(1L, 0L);
+        assertThat(option(model, "Nowe").count()).isEqualTo(1);
+        assertThat(option(model, "Zablokowane").count()).isEqualTo(1);
+        assertThat(model.historyStatuses()).extracting(s -> s.count()).containsExactly(1L, 0L);
+        assertThat(model.statusSummary()).isEqualTo("Otwarte");
         assertThat(model.rows()).hasSize(2);
         assertThat(model.chips()).extracting(c -> c.label()).containsExactly("Filtr: Allegro ★");
         assertThat(model.activeFilterStarred()).isTrue();
@@ -171,12 +171,13 @@ class OrderListServiceTest {
         assertThat(model.tiles().get(0).pressed()).isTrue();
         assertThat(model.tiles().get(0).href()).isEqualTo("/dashboard/orders?status=New");
         assertThat(model.tiles().get(1).href()).isEqualTo("/dashboard/orders?status=New&focus=today");
-        assertThat(model.chips()).extracting(c -> c.label()).containsExactly("Po terminie: 1");
-        assertThat(model.chips().get(0).clearHref()).isEqualTo("/dashboard/orders?status=New");
+        assertThat(model.chips()).extracting(c -> c.label()).containsExactly("Status: Nowe", "Po terminie: 1");
+        assertThat(model.chips().get(0).clearHref()).isEqualTo("/dashboard/orders?focus=overdue");
+        assertThat(model.chips().get(1).clearHref()).isEqualTo("/dashboard/orders?status=New");
 
         OrdersPageModel history = page(query("status", "Completed", "focus", "overdue"));
         assertThat(history.tiles()).allSatisfy(t -> assertThat(t.enabled()).isFalse());
-        assertThat(history.chips()).isEmpty();
+        assertThat(history.chips()).extracting(c -> c.label()).containsExactly("Status: Zakończone");   // focus is ignored in history
     }
 
     @Test
@@ -190,7 +191,7 @@ class OrderListServiceTest {
 
         assertThat(model.rows()).extracting(r -> r.href()).containsExactly("/dashboard/orders/open-1");
         assertThat(model.resultsLine()).isEqualTo("Wyniki dla „nowak”: 1 · w historii: 2");
-        assertThat(model.historySegments()).extracting(s -> s.count()).containsExactly(1L, 1L);
+        assertThat(model.historyStatuses()).extracting(s -> s.count()).containsExactly(1L, 1L);
         assertThat(model.chips()).extracting(c -> c.label()).containsExactly("Szukasz: „nowak”");
     }
 
@@ -266,7 +267,28 @@ class OrderListServiceTest {
         assertThat(narrowed.saveViewConditions().get(0).value()).isEqualTo("New");
     }
 
-    private static OrdersPageModel.Segment segment(OrdersPageModel model, String label) {
-        return model.openSegments().stream().filter(s -> s.label().equals(label)).findFirst().orElseThrow();
+    @Test
+    void severalTickedStatusesShowTogetherWithOneChipAndNoSavedStatus() {
+        add("n", OrderStatus.New, TODAY.plusDays(2), 10, 10, null);
+        add("b", OrderStatus.Blocked, TODAY.plusDays(1), 10, 10, null);
+        add("a", OrderStatus.Assembly, TODAY, 10, 10, null);
+        add("c", OrderStatus.Completed, null, 10, 10, null);
+
+        OrdersPageModel model = page(query("status", "New", "status", "Blocked"));
+
+        assertThat(model.rows()).extracting(r -> r.href()).containsExactly("/dashboard/orders/b", "/dashboard/orders/n");
+        assertThat(model.statusSummary()).isEqualTo("2 wybrane");
+        assertThat(option(model, "Nowe").selected()).isTrue();
+        assertThat(option(model, "W kompletacji").selected()).isFalse();
+        assertThat(model.chips()).extracting(c -> c.label()).containsExactly("Status: Nowe, Zablokowane");
+        assertThat(model.chips().get(0).clearHref()).isEqualTo("/dashboard/orders");
+        assertThat(model.saveViewConditions()).isEmpty();   // a saved filter holds one status
+        assertThat(page(query("status", "New")).statusSummary()).isEqualTo("Nowe");
+        assertThat(page(query("status", "New")).saveViewConditions()).extracting(c -> c.value()).containsExactly("New");
+        assertThat(page(query("status", "Shipping", "status", "Delivered")).emptyState().text()).isEqualTo("Brak zamówień w wybranych statusach.");
+    }
+
+    private static OrdersPageModel.StatusOption option(OrdersPageModel model, String label) {
+        return model.openStatuses().stream().filter(s -> s.label().equals(label)).findFirst().orElseThrow();
     }
 }
