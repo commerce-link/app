@@ -41,6 +41,25 @@ public class OrdersRepository extends DynamoDbRepository<Order> {
         return dynamoDBMapper.scan(Order.class, scanExpression);
     }
 
+    /**
+     * Every order of a store, newest first, from the StoreIdOrderedAtIndex partition of the store. One query
+     * replaces the table scan the orders list used to make; the list filters and pages in memory (spec §8.3, D7).
+     */
+    public List<Order> findByStore(String storeId) {
+        Map<String, AttributeValue> eav = new HashMap<>();
+        eav.put(":storeId", new AttributeValue().withS(storeId));
+
+        DynamoDBQueryExpression<Order> queryExpression = new DynamoDBQueryExpression<Order>()
+                .withIndexName("StoreIdOrderedAtIndex")
+                .withConsistentRead(false)
+                .withKeyConditionExpression("storeId = :storeId")
+                .withExpressionAttributeValues(eav)
+                .withScanIndexForward(false);
+
+        // PaginatedQueryList loads lazily; copying it walks every page before the caller sorts and filters.
+        return new ArrayList<>(dynamoDBMapper.query(Order.class, queryExpression));
+    }
+
     public Order findByStoreIdAndExternalOrderId(String storeId, String externalOrderId) {
         Map<String, AttributeValue> eav = new HashMap<>();
         eav.put(":storeId", new AttributeValue().withS(storeId));
