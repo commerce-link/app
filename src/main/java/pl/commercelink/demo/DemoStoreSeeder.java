@@ -4,6 +4,7 @@ import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapper;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapperConfig;
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import pl.commercelink.documents.Document;
@@ -73,6 +74,7 @@ import pl.commercelink.warehouse.builtin.WarehouseDocument;
 import pl.commercelink.warehouse.builtin.WarehouseDocumentItem;
 import pl.commercelink.warehouse.builtin.WarehouseDocumentSequence;
 import pl.commercelink.warehouse.builtin.WarehouseItem;
+import pl.commercelink.web.DevReceiptPreviewController;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -156,7 +158,9 @@ public class DemoStoreSeeder implements StoreSeeder {
     /** The dev invoicing adapter, present only under the `dev` Maven profile. */
     static final String DEV_INVOICING = "invoicing-dev";
     /** The dev receipts adapter, present only under the `dev` Maven profile. */
-    static final String DEV_RECEIPTS = "receipts-dev";
+    public static final String DEV_RECEIPTS = "receipts-dev";
+    /** The receipts-dev setting its e-receipt links start with; the provider's receipt id is appended. */
+    static final String DEV_RECEIPTS_DOCUMENT_URL_BASE = "documentUrlBase";
     /**
      * Id prefix the invoicing-dev adapter uses for synthesised supplier invoices. Mirrored here so
      * a seeded invoice document matches what the adapter returns: InvoiceLinkingService then
@@ -201,11 +205,15 @@ public class DemoStoreSeeder implements StoreSeeder {
     @Value("${s3.bucket.stores}")
     String storesBucket;
 
+    @Value("${app.domain}")
+    String appDomain;
+
     @Override
     public void seed(Store store) {
         applyStoreConfiguration(store, store.getStoreId(), store.getName(), store.getDemo());
         enableDevInvoicing(store, invoicingProviderFactory);
         enableDevReceipts(store, receiptProviderFactory, LocalDateTime.now());
+        pointDevReceiptLinksAtPreview(store, receiptProviderFactory, appDomain);
         applyDemoWarehouseId(store);
         applyDemoCompanyDetails(store);
         applyDemoInvoicingConfiguration(store);
@@ -226,6 +234,7 @@ public class DemoStoreSeeder implements StoreSeeder {
         connectDemoMarketplaces(store);
         enableDevInvoicing(store, invoicingProviderFactory);
         enableDevReceipts(store, receiptProviderFactory, LocalDateTime.now());
+        pointDevReceiptLinksAtPreview(store, receiptProviderFactory, appDomain);
         mapper.save(store);
         List<CatalogSeedRow> rows = loadFilteredRows();
         seedStoreData(storeId, rows, true);
@@ -309,6 +318,30 @@ public class DemoStoreSeeder implements StoreSeeder {
         if (firstTime) {
             store.enableOrderReceiptEmailNotification();
         }
+    }
+
+    /**
+     * Points the receipts-dev e-receipt links at the app's own preview page ({@link DevReceiptPreviewController}), so
+     * the link on the order and in the customer e-mail opens something instead of the simulator's dead default host.
+     * Runs on every seed, so a store that got receipts-dev before the preview existed is fixed too; a base already
+     * set (by hand in the settings) is kept, and the rest of the configuration (webhook secret, scenario override) is
+     * saved back unchanged. Only for a store actually using receipts-dev, and only when the adapter is present.
+     */
+    static void pointDevReceiptLinksAtPreview(Store store, ReceiptProviderFactory receiptProviderFactory, String appDomain) {
+        if (receiptProviderFactory.getDescriptor(DEV_RECEIPTS) == null) {
+            return;
+        }
+        if (!DEV_RECEIPTS.equals(store.getConfigurationValue(IntegrationType.RECEIPT_PROVIDER))) {
+            return;
+        }
+        Map<String, String> current = receiptProviderFactory.loadConfiguration(store, DEV_RECEIPTS);
+        if (StringUtils.isNotBlank(current.get(DEV_RECEIPTS_DOCUMENT_URL_BASE))) {
+            return;
+        }
+        Map<String, String> updated = new HashMap<>(current);
+        updated.put(DEV_RECEIPTS_DOCUMENT_URL_BASE,
+                StringUtils.removeEnd(appDomain, "/") + DevReceiptPreviewController.PATH_PREFIX);
+        receiptProviderFactory.saveConfiguration(store, DEV_RECEIPTS, updated);
     }
 
     /**

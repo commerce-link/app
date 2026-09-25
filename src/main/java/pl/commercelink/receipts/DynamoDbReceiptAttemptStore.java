@@ -43,6 +43,17 @@ class DynamoDbReceiptAttemptStore extends DynamoDbRepository<ReceiptAttempt> imp
                 .toList();
     }
 
+    @Override
+    public Optional<ReceiptAttempt> findByProviderReceiptId(String storeId, String providerReceiptId) {
+        DynamoDBQueryExpression<ReceiptAttempt> query = new DynamoDBQueryExpression<ReceiptAttempt>()
+                .withKeyConditionExpression("storeId = :s")
+                .withFilterExpression("providerReceiptId = :p")
+                .withExpressionAttributeValues(Map.of(
+                        ":s", new AttributeValue(storeId),
+                        ":p", new AttributeValue(providerReceiptId)));
+        return dynamoDBMapper.query(ReceiptAttempt.class, query).stream().findFirst();
+    }
+
     /** A new attempt has no version, so the mapper saves it only if no item with the key exists. */
     @Override
     public boolean create(ReceiptAttempt attempt) {

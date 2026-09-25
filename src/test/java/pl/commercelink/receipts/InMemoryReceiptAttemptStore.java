@@ -56,6 +56,14 @@ public class InMemoryReceiptAttemptStore implements ReceiptAttemptStore {
     }
 
     @Override
+    public Optional<ReceiptAttempt> findByProviderReceiptId(String storeId, String providerReceiptId) {
+        return items.values().stream()
+                .filter(a -> a.getStoreId().equals(storeId) && providerReceiptId.equals(a.getProviderReceiptId()))
+                .findFirst()
+                .map(InMemoryReceiptAttemptStore::copy);
+    }
+
+    @Override
     public synchronized boolean create(ReceiptAttempt attempt) {
         String id = id(attempt.getStoreId(), attempt.getReceiptKey());
         if (items.containsKey(id)) {

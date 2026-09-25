@@ -51,7 +51,10 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class DemoStoreSeederTest {
@@ -1224,6 +1227,98 @@ class DemoStoreSeederTest {
 
         // then
         assertFalse(store.getClientNotificationsConfiguration().supports(EmailNotificationType.ORDER_RECEIPT));
+    }
+
+    /** The receipts-dev link must open the app's preview page, and the store's other simulator settings survive. */
+    @Test
+    void pointsDevReceiptLinksAtThePreviewPageAndKeepsTheOtherSettings() {
+        // given
+        Store store = devReceiptsStore();
+        ReceiptProviderFactory factory = devReceiptsFactory();
+        when(factory.loadConfiguration(store, "receipts-dev"))
+                .thenReturn(Map.of("webhookSecret", "s3cret", "scenarioOverride", "PENDING"));
+
+        // when
+        DemoStoreSeeder.pointDevReceiptLinksAtPreview(store, factory, "http://localhost:8080/");
+
+        // then
+        verify(factory).saveConfiguration(store, "receipts-dev", Map.of(
+                "webhookSecret", "s3cret",
+                "scenarioOverride", "PENDING",
+                "documentUrlBase", "http://localhost:8080/dashboard/dev-receipts/"));
+    }
+
+    /** The seed re-runs at every local start: a base the store already has (set by hand) is never replaced. */
+    @Test
+    void keepsADevReceiptsLinkBaseAlreadySet() {
+        // given
+        Store store = devReceiptsStore();
+        ReceiptProviderFactory factory = devReceiptsFactory();
+        when(factory.loadConfiguration(store, "receipts-dev"))
+                .thenReturn(Map.of("documentUrlBase", "https://preview.example/r/"));
+
+        // when
+        DemoStoreSeeder.pointDevReceiptLinksAtPreview(store, factory, "http://localhost:8080");
+
+        // then
+        verify(factory, never()).saveConfiguration(any(), any(), any());
+    }
+
+    @Test
+    void fillsABlankDevReceiptsLinkBase() {
+        // given
+        Store store = devReceiptsStore();
+        ReceiptProviderFactory factory = devReceiptsFactory();
+        when(factory.loadConfiguration(store, "receipts-dev")).thenReturn(Map.of("documentUrlBase", " "));
+
+        // when
+        DemoStoreSeeder.pointDevReceiptLinksAtPreview(store, factory, "https://demo.example");
+
+        // then
+        verify(factory).saveConfiguration(store, "receipts-dev",
+                Map.of("documentUrlBase", "https://demo.example/dashboard/dev-receipts/"));
+    }
+
+    @Test
+    void leavesTheLinkBaseAloneForAStoreOnAnotherReceiptSystem() {
+        // given
+        Store store = devReceiptsStore();
+        store.setConfigurationValue(IntegrationType.RECEIPT_PROVIDER, "fakturownia");
+        ReceiptProviderFactory factory = devReceiptsFactory();
+
+        // when
+        DemoStoreSeeder.pointDevReceiptLinksAtPreview(store, factory, "http://localhost:8080");
+
+        // then
+        verify(factory, never()).loadConfiguration(any(), any());
+        verify(factory, never()).saveConfiguration(any(), any(), any());
+    }
+
+    @Test
+    void leavesTheLinkBaseAloneWithoutTheDevReceiptsAdapter() {
+        // given
+        Store store = devReceiptsStore();
+        ReceiptProviderFactory factory = mock(ReceiptProviderFactory.class);
+        when(factory.getDescriptor("receipts-dev")).thenReturn(null);
+
+        // when
+        DemoStoreSeeder.pointDevReceiptLinksAtPreview(store, factory, "http://localhost:8080");
+
+        // then
+        verify(factory, never()).saveConfiguration(any(), any(), any());
+    }
+
+    private static Store devReceiptsStore() {
+        Store store = new Store();
+        store.setStoreId("store-1");
+        store.setConfigurationValue(IntegrationType.RECEIPT_PROVIDER, "receipts-dev");
+        return store;
+    }
+
+    private static ReceiptProviderFactory devReceiptsFactory() {
+        ReceiptProviderFactory factory = mock(ReceiptProviderFactory.class);
+        when(factory.getDescriptor("receipts-dev")).thenReturn(mock(ReceiptProviderDescriptor.class));
+        return factory;
     }
 
     @Test

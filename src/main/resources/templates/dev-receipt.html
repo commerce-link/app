@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="#{devReceipts.title}"></title>
+    <link rel="stylesheet" th:href="@{/css/commercelink.css}">
+</head>
+<body class="cl-receipt-page">
+<main class="cl-receipt" th:object="${receipt}">
+    <p class="cl-receipt-banner" role="note" th:text="#{devReceipts.banner}"></p>
+
+    <header class="cl-receipt-head">
+        <h1 th:text="*{storeName}"></h1>
+        <p class="cl-receipt-kind" th:text="#{devReceipts.kind}"></p>
+    </header>
+
+    <dl class="cl-receipt-meta">
+        <dt th:text="#{devReceipts.saleDate}"></dt>
+        <dd th:text="*{saleDate}"></dd>
+        <dt th:text="#{devReceipts.orderId}"></dt>
+        <dd th:text="*{orderId}"></dd>
+        <dt th:text="#{devReceipts.receiptKey}"></dt>
+        <dd th:text="*{receiptKey}"></dd>
+        <dt th:text="#{devReceipts.providerReceiptId}"></dt>
+        <dd th:text="*{providerReceiptId}"></dd>
+        <th:block th:if="*{receiptNumber != null}">
+            <dt th:text="#{devReceipts.receiptNumber}"></dt>
+            <dd th:text="*{receiptNumber}"></dd>
+        </th:block>
+        <dt th:text="#{devReceipts.state}"></dt>
+        <dd th:text="*{state} != null ? #{${'receipts.state.' + receipt.state}} : ''"></dd>
+    </dl>
+
+    <table class="cl-receipt-table">
+        <thead>
+        <tr>
+            <th scope="col" th:text="#{devReceipts.line.name}"></th>
+            <th scope="col" th:text="#{devReceipts.line.quantity}"></th>
+            <th scope="col" th:text="#{devReceipts.line.unitPrice}"></th>
+            <th scope="col" th:text="#{devReceipts.line.vat}"></th>
+            <th scope="col" th:text="#{devReceipts.line.total}"></th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="line : *{lines}" data-cl-receipt-line>
+            <td th:text="${line.name}"></td>
+            <td th:text="${line.quantity}"></td>
+            <td th:text="${line.unitPrice}"></td>
+            <td th:text="#{${'devReceipts.vat.' + line.vatRate}}"></td>
+            <td th:text="${line.total}"></td>
+        </tr>
+        </tbody>
+    </table>
+
+    <p class="cl-receipt-total">
+        <span th:text="#{devReceipts.total}"></span>
+        <span th:text="*{total}" data-cl-receipt-total></span>
+    </p>
+
+    <h2 th:text="#{devReceipts.vatSummary}"></h2>
+    <dl class="cl-receipt-meta">
+        <th:block th:each="vat : *{vatSummary}">
+            <dt th:text="#{${'devReceipts.vat.' + vat.vatRate}}"></dt>
+            <dd th:text="${vat.gross}"></dd>
+        </th:block>
+    </dl>
+
+    <h2 th:text="#{devReceipts.payments}"></h2>
+    <dl class="cl-receipt-meta">
+        <th:block th:each="payment : *{payments}">
+            <dt><span th:text="#{${'devReceipts.payment.' + payment.form}}"></span><th:block
+                    th:unless="${#strings.isEmpty(payment.label)}" th:text="' (' + ${payment.label} + ')'"></th:block></dt>
+            <dd th:text="${payment.amount}"></dd>
+        </th:block>
+    </dl>
+
+    <dl class="cl-receipt-meta" th:if="*{buyerEmail != null}">
+        <dt th:text="#{devReceipts.buyerEmail}"></dt>
+        <dd th:text="*{buyerEmail}"></dd>
+    </dl>
+
+    <a class="cl-receipt-back" th:href="@{/dashboard/orders/{id}(id=*{orderId})}" th:text="#{devReceipts.backToOrder}"></a>
+</main>
+</body>
+</html>

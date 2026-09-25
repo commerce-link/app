@@ -18,6 +18,12 @@ public interface ReceiptAttemptStore {
     /** Attempts of one order by attempt number. */
     List<ReceiptAttempt> findByOrder(String storeId, String orderId);
 
+    /**
+     * The store's attempt the provider knows under {@code providerReceiptId}. Reads the whole store partition with a
+     * filter, so it serves only the dev e-receipt preview, never a production path.
+     */
+    Optional<ReceiptAttempt> findByProviderReceiptId(String storeId, String providerReceiptId);
+
     /** Creates the attempt; false when the key already exists (nothing written). */
     boolean create(ReceiptAttempt attempt);
 

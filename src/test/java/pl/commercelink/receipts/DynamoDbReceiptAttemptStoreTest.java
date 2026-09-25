@@ -9,6 +9,10 @@ import com.amazonaws.services.dynamodbv2.model.QueryResult;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -48,5 +52,38 @@ class DynamoDbReceiptAttemptStoreTest {
         assertThat(request.getValue().getExpressionAttributeValues().values())
                 .extracting(AttributeValue::getS)
                 .contains(ReceiptAttemptState.FISCALISED.name());
+    }
+
+    /** The dev preview looks a receipt up by the provider's id: one store partition, the id as a filter. */
+    @Test
+    void findByProviderReceiptIdQueriesTheStorePartitionWithAFilter() {
+        // given
+        when(dynamoDB.query(any())).thenReturn(new QueryResult().withItems(List.of(Map.of(
+                "storeId", new AttributeValue("s1"),
+                "receiptKey", new AttributeValue("o1:R1"),
+                "providerReceiptId", new AttributeValue("dev-rcpt-1")))));
+
+        // when
+        Optional<ReceiptAttempt> found = store.findByProviderReceiptId("s1", "dev-rcpt-1");
+
+        // then
+        ArgumentCaptor<QueryRequest> request = ArgumentCaptor.forClass(QueryRequest.class);
+        verify(dynamoDB).query(request.capture());
+        assertThat(request.getValue().getTableName()).isEqualTo(ReceiptAttempt.TABLE_NAME);
+        assertThat(request.getValue().getKeyConditionExpression()).isEqualTo("storeId = :s");
+        assertThat(request.getValue().getFilterExpression()).isEqualTo("providerReceiptId = :p");
+        assertThat(request.getValue().getExpressionAttributeValues())
+                .containsEntry(":s", new AttributeValue("s1"))
+                .containsEntry(":p", new AttributeValue("dev-rcpt-1"));
+        assertThat(found).map(ReceiptAttempt::getReceiptKey).contains("o1:R1");
+    }
+
+    @Test
+    void findByProviderReceiptIdIsEmptyWhenNothingMatches() {
+        // given
+        when(dynamoDB.query(any())).thenReturn(new QueryResult());
+
+        // when / then
+        assertThat(store.findByProviderReceiptId("s1", "dev-rcpt-x")).isEmpty();
     }
 }
