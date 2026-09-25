@@ -70,8 +70,8 @@ class OrderRowMapperTest {
         assertThat(row.dueTone()).isEqualTo("is-bad");
         assertThat(row.statusLabel()).isEqualTo("Zablokowane");
         assertThat(row.statusTone()).isEqualTo("is-bad");
-        assertThat(row.totalText()).isEqualTo("1 249,00 PLN");
-        assertThat(row.unpaidText()).isEqualTo("do zapłaty 1 249,00 PLN");
+        assertThat(row.totalText()).isEqualTo("1 249,00 PLN");
+        assertThat(row.unpaidText()).isEqualTo("do zapłaty 1 249,00 PLN");
     }
 
     @Test

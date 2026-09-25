@@ -30,7 +30,7 @@ public class OrderRowMapper {
         this.messages = messages;
         this.locale = locale;
         DecimalFormatSymbols symbols = new DecimalFormatSymbols(locale);
-        symbols.setGroupingSeparator(' ');
+        symbols.setGroupingSeparator(' ');
         symbols.setDecimalSeparator(',');
         this.amount = new DecimalFormat("#,##0.00", symbols);
     }
