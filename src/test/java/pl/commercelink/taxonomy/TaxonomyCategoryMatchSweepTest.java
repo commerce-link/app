@@ -1,5 +1,9 @@
 package pl.commercelink.taxonomy;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import org.apache.commons.lang3.tuple.Pair;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -8,13 +12,12 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.LoggerFactory;
 import pl.commercelink.pim.api.CategoryMatchRequest;
 import pl.commercelink.pim.api.CategoryMatchedEvent;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.taxonomy.mapping.CategoryMappingCache;
 
-import java.io.ByteArrayOutputStream;
-import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -32,7 +35,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class TaxonomyCategoryMatchSchedulerTest {
+class TaxonomyCategoryMatchSweepTest {
 
     private TaxonomyCache cache;
 
@@ -54,8 +57,8 @@ class TaxonomyCategoryMatchSchedulerTest {
         cache.onStartUp();
     }
 
-    private TaxonomyCategoryMatchScheduler scheduler(TaxonomyCategoryMatchProperties properties) {
-        return new TaxonomyCategoryMatchScheduler(cache, pimCatalog, properties,
+    private TaxonomyCategoryMatchSweep sweep(TaxonomyCategoryMatchProperties properties) {
+        return new TaxonomyCategoryMatchSweep(cache, pimCatalog, properties,
                 new TaxonomyCategoryEnrichment(cache, properties, mappingCache, attempts), mappingCache, attempts);
     }
 
@@ -75,11 +78,11 @@ class TaxonomyCategoryMatchSchedulerTest {
         List<String> pendingMfns = IntStream.range(0, 20).mapToObj(i -> "MFN-P-" + i).toList();
         pendingMfns.forEach(mfn -> cache.add(pending(mfn)));
         cache.add(new Taxonomy("1234567890123", "MFN-CAT", "Brand", "Name", "CPU", 5, null, null));
-        TaxonomyCategoryMatchScheduler scheduler = scheduler(new TaxonomyCategoryMatchProperties(4, 300000));
+        TaxonomyCategoryMatchSweep sweep = sweep(new TaxonomyCategoryMatchProperties(4, 300000));
 
         // when
         for (int i = 0; i < 4; i++) {
-            scheduler.sweep();
+            sweep.sweep();
         }
 
         // then
@@ -95,10 +98,10 @@ class TaxonomyCategoryMatchSchedulerTest {
     void requestCarriesIdentifiersFromCacheRow() {
         // given
         cache.add(new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", null, 5, null, null));
-        TaxonomyCategoryMatchScheduler scheduler = scheduler(new TaxonomyCategoryMatchProperties(1, 300000));
+        TaxonomyCategoryMatchSweep sweep = sweep(new TaxonomyCategoryMatchProperties(1, 300000));
 
         // when
-        scheduler.sweep();
+        sweep.sweep();
 
         // then
         ArgumentCaptor<CategoryMatchRequest> captor = ArgumentCaptor.forClass(CategoryMatchRequest.class);
@@ -116,10 +119,10 @@ class TaxonomyCategoryMatchSchedulerTest {
     void sweepPassesRawCategoryIntoRequest() {
         // given
         cache.add(new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", null, 5, null, null, "Karty graficzne"));
-        TaxonomyCategoryMatchScheduler scheduler = scheduler(new TaxonomyCategoryMatchProperties(1, 300000));
+        TaxonomyCategoryMatchSweep sweep = sweep(new TaxonomyCategoryMatchProperties(1, 300000));
 
         // when
-        scheduler.sweep();
+        sweep.sweep();
 
         // then
         ArgumentCaptor<CategoryMatchRequest> captor = ArgumentCaptor.forClass(CategoryMatchRequest.class);
@@ -132,10 +135,14 @@ class TaxonomyCategoryMatchSchedulerTest {
         // given
         cache.add(pending("MFN-1"));
         doThrow(new IllegalStateException("no sqs")).when(pimCatalog).submitCategoryMatch(any());
-        TaxonomyCategoryMatchScheduler scheduler = scheduler(new TaxonomyCategoryMatchProperties(1, 300000));
+        TaxonomyCategoryMatchSweep sweep = sweep(new TaxonomyCategoryMatchProperties(1, 300000));
 
-        // when / then
-        scheduler.sweep();
+        // when
+        List<ILoggingEvent> events = captureLog(sweep::sweep);
+
+        // then
+        assertThat(events).extracting(ILoggingEvent::getLevel).containsExactly(Level.WARN);
+        assertThat(events.getFirst().getFormattedMessage()).contains("no sqs");
     }
 
     @Test
@@ -147,11 +154,11 @@ class TaxonomyCategoryMatchSchedulerTest {
         enrichment.addPending(new Taxonomy("1234567890123", mfn, "Brand", "Name", null, 5, null, null, "Karty graficzne"), "Acme");
         when(mappingCache.findActive("Acme", "Karty graficzne"))
                 .thenReturn(Optional.of(new CategoryMappingCache.ActiveMapping("301", "GPU")));
-        TaxonomyCategoryMatchScheduler scheduler = new TaxonomyCategoryMatchScheduler(
+        TaxonomyCategoryMatchSweep sweep = new TaxonomyCategoryMatchSweep(
                 cache, pimCatalog, properties, enrichment, mappingCache, attempts);
 
         // when
-        scheduler.sweep();
+        sweep.sweep();
 
         // then
         assertThat(cache.findByMfn(mfn).category()).isEqualTo("GPU");
@@ -167,11 +174,11 @@ class TaxonomyCategoryMatchSchedulerTest {
         TaxonomyCategoryEnrichment enrichment = enrichmentFor(properties);
         enrichment.addPending(new Taxonomy("1234567890123", mfn, "Brand", "Name", null, 5, null, null, "Karty graficzne"), "Acme");
         when(mappingCache.findActive("Acme", "Karty graficzne")).thenReturn(Optional.empty());
-        TaxonomyCategoryMatchScheduler scheduler = new TaxonomyCategoryMatchScheduler(
+        TaxonomyCategoryMatchSweep sweep = new TaxonomyCategoryMatchSweep(
                 cache, pimCatalog, properties, enrichment, mappingCache, attempts);
 
         // when
-        scheduler.sweep();
+        sweep.sweep();
 
         // then
         verify(pimCatalog).submitCategoryMatch(any());
@@ -185,11 +192,11 @@ class TaxonomyCategoryMatchSchedulerTest {
         TaxonomyCategoryMatchProperties properties = new TaxonomyCategoryMatchProperties(1, 300000);
         TaxonomyCategoryEnrichment enrichment = enrichmentFor(properties);
         enrichment.addPending(new Taxonomy("1234567890123", mfn, "Brand", "Name", null, 5, null, null, "Karty graficzne"), "Acme");
-        TaxonomyCategoryMatchScheduler scheduler = new TaxonomyCategoryMatchScheduler(
+        TaxonomyCategoryMatchSweep sweep = new TaxonomyCategoryMatchSweep(
                 cache, pimCatalog, properties, enrichment, mappingCache, attempts);
 
         // when
-        scheduler.sweep();
+        sweep.sweep();
 
         // then
         verify(mappingCache, never()).findActive(any(), any());
@@ -202,11 +209,11 @@ class TaxonomyCategoryMatchSchedulerTest {
         String mfn = mfnWhere(residue -> residue != 0);
         TaxonomyCategoryMatchProperties properties = new TaxonomyCategoryMatchProperties(1, 300000);
         cache.add(new Taxonomy("1234567890123", mfn, "Brand", "Name", null, 5, null, null, "Karty graficzne"));
-        TaxonomyCategoryMatchScheduler scheduler = new TaxonomyCategoryMatchScheduler(
+        TaxonomyCategoryMatchSweep sweep = new TaxonomyCategoryMatchSweep(
                 cache, pimCatalog, properties, enrichmentFor(properties), mappingCache, attempts);
 
         // when
-        scheduler.sweep();
+        sweep.sweep();
 
         // then
         verify(mappingCache, never()).findActive(any(), any());
@@ -217,11 +224,11 @@ class TaxonomyCategoryMatchSchedulerTest {
     void givesUpAfterMaxAttemptsSubmissions() {
         // given
         cache.add(pending("MFN-1"));
-        TaxonomyCategoryMatchScheduler scheduler = scheduler(new TaxonomyCategoryMatchProperties(1, 300000));
+        TaxonomyCategoryMatchSweep sweep = sweep(new TaxonomyCategoryMatchProperties(1, 300000));
 
         // when
         for (int i = 0; i < 6; i++) {
-            scheduler.sweep();
+            sweep.sweep();
         }
 
         // then
@@ -232,12 +239,12 @@ class TaxonomyCategoryMatchSchedulerTest {
     void zeroMaxAttemptsKeepsSubmittingForever() {
         // given
         cache.add(pending("MFN-1"));
-        TaxonomyCategoryMatchScheduler scheduler = scheduler(new TaxonomyCategoryMatchProperties(
+        TaxonomyCategoryMatchSweep sweep = sweep(new TaxonomyCategoryMatchProperties(
                 1, 300000, new TaxonomyCategoryMatchProperties.Mapping(5, 0.9, 0.9, 20), 0));
 
         // when
         for (int i = 0; i < 10; i++) {
-            scheduler.sweep();
+            sweep.sweep();
         }
 
         // then
@@ -249,18 +256,18 @@ class TaxonomyCategoryMatchSchedulerTest {
         // given
         TaxonomyCategoryMatchProperties properties = new TaxonomyCategoryMatchProperties(1, 300000);
         TaxonomyCategoryEnrichment enrichment = enrichmentFor(properties);
-        TaxonomyCategoryMatchScheduler scheduler = new TaxonomyCategoryMatchScheduler(
+        TaxonomyCategoryMatchSweep sweep = new TaxonomyCategoryMatchSweep(
                 cache, pimCatalog, properties, enrichment, mappingCache, attempts);
         cache.add(pending("MFN-1"));
-        scheduler.sweep();
-        scheduler.sweep();
+        sweep.sweep();
+        sweep.sweep();
 
         // when
         enrichment.applyMatch(new CategoryMatchedEvent("1234567890123", "MFN-1", "CPU", "301", 0.95, "gemini"));
         Mockito.when(taxonomyRepository.loadNewest()).thenReturn(Pair.of("N/A", new ArrayList<>(List.of(pending("MFN-1")))));
         cache.onStartUp();
         for (int i = 0; i < 6; i++) {
-            scheduler.sweep();
+            sweep.sweep();
         }
 
         // then
@@ -272,11 +279,11 @@ class TaxonomyCategoryMatchSchedulerTest {
         // given
         cache.add(pending("MFN-1"));
         doThrow(new IllegalStateException("no sqs")).doNothing().when(pimCatalog).submitCategoryMatch(any());
-        TaxonomyCategoryMatchScheduler scheduler = scheduler(new TaxonomyCategoryMatchProperties(1, 300000));
+        TaxonomyCategoryMatchSweep sweep = sweep(new TaxonomyCategoryMatchProperties(1, 300000));
 
         // when
         for (int i = 0; i < 6; i++) {
-            scheduler.sweep();
+            sweep.sweep();
         }
 
         // then
@@ -287,29 +294,35 @@ class TaxonomyCategoryMatchSchedulerTest {
     void sweepLogReportsGivenUpCount() {
         // given
         cache.add(pending("MFN-1"));
-        TaxonomyCategoryMatchScheduler scheduler = scheduler(new TaxonomyCategoryMatchProperties(1, 300000));
+        TaxonomyCategoryMatchSweep sweep = sweep(new TaxonomyCategoryMatchProperties(1, 300000));
         for (int i = 0; i < 4; i++) {
-            scheduler.sweep();
+            sweep.sweep();
         }
 
         // when
-        String log = captureLog(scheduler::sweep);
+        List<ILoggingEvent> events = captureLog(sweep::sweep);
 
         // then
-        assertThat(log).contains("givenUp=1");
-        assertThat(log).contains("submitted=0");
+        assertThat(events).singleElement().satisfies(event -> {
+            assertThat(event.getLevel()).isEqualTo(Level.INFO);
+            assertThat(event.getFormattedMessage()).contains("givenUp=1").contains("submitted=0");
+        });
     }
 
-    private static String captureLog(Runnable action) {
-        PrintStream originalOut = System.out;
-        ByteArrayOutputStream captured = new ByteArrayOutputStream();
-        System.setOut(new PrintStream(captured));
+    private static List<ILoggingEvent> captureLog(Runnable action) {
+        Logger logger = (Logger) LoggerFactory.getLogger(TaxonomyCategoryMatchSweep.class);
+        Level previousLevel = logger.getLevel();
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        logger.setLevel(Level.INFO);
         try {
             action.run();
         } finally {
-            System.setOut(originalOut);
+            logger.detachAppender(appender);
+            logger.setLevel(previousLevel);
         }
-        return captured.toString();
+        return appender.list;
     }
 
     private static Taxonomy pending(String mfn) {
