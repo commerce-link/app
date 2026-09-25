@@ -51,8 +51,9 @@
                     <!--/* details/summary, not .cl-disclosure: that class is styled as a full-width collapsible
                            section at the bottom of a card, which does not fit a compact list-row action. Plain
                            semantic HTML keeps it keyboard-operable and working without JavaScript; .cl-link-button on
-                           the summary only matches its look to "Sprawdź teraz" next to it. */-->
-                    <details th:if="${row.canClose()}">
+                           the summary only matches its look to "Sprawdź teraz" next to it. .cl-row-form moves the open
+                           form under the record, full width, instead of letting it squeeze the record column. */-->
+                    <details class="cl-row-form" th:if="${row.canClose()}">
                         <summary class="cl-link-button" th:text="#{receipts.action.close}"
                                  th:attr="aria-label=#{receipts.action.close} + ': ' + ${row.key()}"></summary>
                         <form method="post" class="cl-form" th:action="@{/dashboard/orders/{id}/receipts/close(id=${orderId})}">

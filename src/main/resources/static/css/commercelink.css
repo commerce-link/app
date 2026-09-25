@@ -1455,6 +1455,34 @@ body.cl-drawer-open .cl-sidebar {
     margin: 0;
 }
 
+/* A row action that opens its form in place (details.cl-row-form, e.g. "Zamknij ręcznie"). Open, the form would widen
+   the auto actions column and squeeze the record column to one character, so the row turns into one column and the
+   form takes the full width under the record. */
+.cl-page .cl-list .cl-list-item:has(.cl-row-form[open]) {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.cl-page .cl-list .cl-list-item:has(.cl-row-form[open]) .cl-list-actions {
+    justify-content: flex-start;
+}
+
+.cl-page .cl-list-actions .cl-row-form[open] {
+    flex-basis: 100%;
+}
+
+.cl-page .cl-row-form > .cl-form {
+    max-width: 480px;
+    margin-top: 8px;
+}
+
+/* The same ::details-content box-sizing break as in .cl-disclosure-body below. */
+.cl-page .cl-row-form,
+.cl-page .cl-row-form *,
+.cl-page .cl-row-form *::before,
+.cl-page .cl-row-form *::after {
+    box-sizing: border-box;
+}
+
 .cl-page .cl-card .cl-list-group {
     margin: 0;
     padding: 14px 20px 6px;
