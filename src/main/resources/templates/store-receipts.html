@@ -42,7 +42,10 @@
                                 : (${!status.installed()} ? #{store.receipts.system.missing.text} : #{store.receipts.system.incomplete.text}))"></p>
                 </section>
 
-                <form th:fragment="receiptsForm" id="receipts-form" class="cl-form is-wide"
+                <!--/* Without a configured system the checkbox can never be turned on (the server still rejects it),
+                       so the form itself is hidden until the status card above says "configured": the status card's
+                       own action ("Wybierz system" / "Uzupełnij" / "Zmień") is the only thing to click. */-->
+                <form th:if="${systemStatus.configured()}" th:fragment="receiptsForm" id="receipts-form" class="cl-form is-wide"
                       th:action="@{${receiptsAction}}" th:object="${receiptsForm}" method="post" novalidate data-cl-async
                       th:attr="data-success-message=${savedMessage}, data-error-message=#{form.save.failed}">
                     <div th:replace="~{fragments/settings-form :: errorSummary('receipts-errors', ${receiptsErrors}, null)}"></div>

@@ -23,6 +23,7 @@ import pl.commercelink.stores.IntegrationType;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.dtos.ReceiptSettingsForm;
+import pl.commercelink.web.settings.IntegrationStatus;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -87,6 +88,24 @@ class StoreReceiptsSettingsControllerTest {
         assertThat(view).isEqualTo("store-receipts");
         ReceiptSettingsForm form = (ReceiptSettingsForm) model.getAttribute("receiptsForm");
         assertThat(form.isEnabled()).isFalse();
+        // the template renders the form only for a configured system: without one, the page must still say so
+        assertThat(((IntegrationStatus) model.getAttribute("systemStatus")).configured()).isFalse();
+    }
+
+    @Test
+    void theModelSaysTheSystemIsConfiguredOnceItIs() {
+        // given
+        Store store = store("store-1");
+        store.setConfigurationValue(IntegrationType.RECEIPT_PROVIDER, SYSTEM);
+        when(receiptProviderFactory.loadConfigurationForUI(store)).thenReturn(Map.of("token", ""));
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        String view = controller.receipts(model);
+
+        // then: the template shows the receipts form only in this state
+        assertThat(view).isEqualTo("store-receipts");
+        assertThat(((IntegrationStatus) model.getAttribute("systemStatus")).configured()).isTrue();
     }
 
     @Test

@@ -131,8 +131,15 @@ class ReceiptSystems {
         }
     }
 
+    /**
+     * Also switches automatic receipts off: {@code enabledAt} stays at its old value while the configuration stays
+     * enabled, so a later reconnect (which only moves {@code enabledAt} while receipts are off) would otherwise
+     * fiscalise, on their next save, every order delivered since that old moment, including during the disconnection.
+     * Reconnecting must switch e-receipts on again, which sets a fresh {@code enabledAt} and avoids that.
+     */
     void disconnect(Store store, String providerName) {
         receiptProviderFactory.deleteConfiguration(store, providerName);
         store.removeIntegration(IntegrationType.RECEIPT_PROVIDER);
+        store.getReceiptConfiguration().disable();
     }
 }
