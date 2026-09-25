@@ -27,8 +27,9 @@ class OrdersListTemplateTest {
     @Test
     void tilesSegmentsToolbarChipsTableAndPagingAreWiredToTheModel() throws Exception {
         String html = page();
-        assertThat(html).contains("class=\"cl-attention\"").contains("cl-attention-item").contains("aria-current=${tile.pressed()} ? 'true' : null")
-                .contains("tile.kind().name() != 'Decide'")
+        assertThat(html).contains("cl-stat-grid is-orders").contains("cl-stat-head").contains("cl-stat-icon").contains("tile.kind().icon()")
+                .contains("cl-stat-value").contains("cl-stat-sum").contains("cl-stat-hint").contains("'is-zero'")
+                .contains("tile.kind().name() != 'Decide'").doesNotContain("cl-attention")
                 .contains("cl-tabs-row").contains("cl-tabs is-history").contains("class=\"cl-tab\"").contains("cl-tab-count")
                 .contains("cl-list-controls").contains("details class=\"cl-menu\" data-cl-menu").contains("cl-menu-item")
                 .contains("q.withFilterId(o.id()).href()").contains("q.withFilterId('').href()")

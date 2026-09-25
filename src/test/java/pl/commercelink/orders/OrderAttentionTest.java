@@ -58,5 +58,22 @@ class OrderAttentionTest {
         assertThat(OrderAttention.parse("nope")).isEmpty();
         assertThat(OrderAttention.parse(null)).isEmpty();
         assertThat(OrderAttention.Today.param()).isEqualTo("today");
+        assertThat(OrderAttention.Overdue.icon()).isEqualTo("fa-clock");
+        assertThat(OrderAttention.Overdue.iconTone()).isEqualTo("is-bad");
+    }
+
+    @Test
+    void newTodayIsPlacedTodayAndNotCancelled() {
+        Order placedToday = order(OrderStatus.New, null, null, 10, 10);
+        placedToday.setOrderedAt(TODAY.atTime(9, 30));
+        assertThat(OrderAttention.NewToday.matches(placedToday, TODAY)).isTrue();
+        placedToday.setStatus(OrderStatus.Cancelled);
+        assertThat(OrderAttention.NewToday.matches(placedToday, TODAY)).isFalse();
+        Order yesterday = order(OrderStatus.New, null, null, 10, 10);
+        yesterday.setOrderedAt(TODAY.minusDays(1).atTime(23, 59));
+        assertThat(OrderAttention.NewToday.matches(yesterday, TODAY)).isFalse();
+        Order undated = order(OrderStatus.New, null, null, 10, 10);
+        undated.setOrderedAt(null);
+        assertThat(OrderAttention.NewToday.matches(undated, TODAY)).isFalse();
     }
 }

@@ -32,24 +32,20 @@
 
         <div data-cl-orders-results th:fragment="results" th:with="q=${page.query()}">
 
-            <!--/* Attention strip: three figures of the whole store, each a link that narrows the list (spec §4).
-                   "Do decyzji" is left out — it repeats the Nowe and Zablokowane tabs a few centimetres below. */-->
-            <nav class="cl-attention" th:attr="aria-label=#{orders.list.attention.label}">
-                <th:block th:each="tile : ${page.tiles()}" th:if="${tile.kind().name() != 'Decide'}">
-                    <a th:if="${tile.enabled()}" class="cl-attention-item" th:classappend="${tile.tone()}" th:href="@{${tile.href()}}"
-                       th:attr="aria-current=${tile.pressed()} ? 'true' : null" data-cl-orders-nav>
-                        <strong class="cl-attention-count" th:text="${tile.count()}"></strong>
-                        <span class="cl-attention-label" th:text="${tile.label()}"></span>
-                        <span th:if="${tile.valueOf() != null}" class="cl-attention-sub" th:text="${tile.valueOf()}"></span>
-                        <span th:if="${tile.pressed()}" class="cl-visually-hidden" th:text="#{orders.list.attention.pressed}"></span>
-                    </a>
-                    <span th:unless="${tile.enabled()}" class="cl-attention-item is-disabled">
-                        <strong class="cl-attention-count" th:text="${tile.count()}"></strong>
-                        <span class="cl-attention-label" th:text="${tile.label()}"></span>
-                        <span th:if="${tile.valueOf() != null}" class="cl-attention-sub" th:text="${tile.valueOf()}"></span>
+            <!--/* Four read-only figures of the whole store (design system "Kafelek liczbowy"): Po terminie, Na dziś,
+                   Nieopłacone, Nowe dziś. "Do decyzji" is left out — it repeats the Nowe and Zablokowane tabs below.
+                   Label + tone-tinted icon, the count, then one sub-line: the sum for money figures, the hint otherwise. */-->
+            <ul class="cl-stat-grid is-orders" th:attr="aria-label=#{orders.list.attention.label}">
+                <li class="cl-stat" th:each="tile : ${page.tiles()}" th:if="${tile.kind().name() != 'Decide'}">
+                    <span class="cl-stat-head">
+                        <span class="cl-eyebrow" th:text="${tile.label()}"></span>
+                        <span class="cl-stat-icon" th:classappend="${tile.kind().iconTone()}" aria-hidden="true"><i class="fas" th:classappend="${tile.kind().icon()}"></i></span>
                     </span>
-                </th:block>
-            </nav>
+                    <span class="cl-stat-value" th:classappend="${tile.count() == 0 ? 'is-zero' : tile.tone()}" th:text="${tile.count()}"></span>
+                    <span class="cl-stat-sum" th:if="${tile.valueOf() != null}" th:text="${tile.valueOf()}"></span>
+                    <span class="cl-stat-hint" th:unless="${tile.valueOf() != null}" th:text="${tile.hint()}"></span>
+                </li>
+            </ul>
 
             <section class="cl-card" aria-labelledby="orders-table-title">
                 <h2 class="cl-visually-hidden" id="orders-table-title" th:text="#{orders.list.table.title}"></h2>

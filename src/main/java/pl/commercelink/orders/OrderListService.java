@@ -130,6 +130,7 @@ public class OrderListService {
         long newCount = open.stream().filter(o -> o.getStatus() == OrderStatus.New).count();
         long blockedCount = open.stream().filter(o -> o.getStatus() == OrderStatus.Blocked).count();
         double unpaidSum = open.stream().filter(o -> OrderAttention.Unpaid.matches(o, today)).mapToDouble(Order::getUnpaidAmount).sum();
+        double newTodaySum = open.stream().filter(o -> OrderAttention.NewToday.matches(o, today)).mapToDouble(Order::getTotalPrice).sum();
         List<Tile> tiles = new ArrayList<>();
         for (OrderAttention kind : OrderAttention.values()) {
             long count = open.stream().filter(o -> kind.matches(o, today)).count();
@@ -145,7 +146,11 @@ public class OrderListService {
                 default -> "";
             };
             tiles.add(new Tile(kind, text(key, locale), count,
-                    kind == OrderAttention.Unpaid ? text("general.currency.amount", locale, money(unpaidSum, locale)) : null,
+                    switch (kind) {
+                        case Unpaid -> text("general.currency.amount", locale, money(unpaidSum, locale));
+                        case NewToday -> text("general.currency.amount", locale, money(newTodaySum, locale));
+                        default -> null;
+                    },
                     hint, enabled ? query.withFocus(pressed ? null : kind).href() : null, pressed, enabled, tone));
         }
         return tiles;
