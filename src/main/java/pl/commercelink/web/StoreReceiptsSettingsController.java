@@ -14,7 +14,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
-import pl.commercelink.orders.OrderSourceType;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
@@ -116,7 +115,6 @@ public class StoreReceiptsSettingsController {
         model.addAttribute("receiptsForm", receipts);
         model.addAttribute("receiptsErrors", receiptsErrors);
         model.addAttribute("receiptsAction", SettingsPaths.store(storeId, "/receipts"));
-        model.addAttribute("sourceTypes", OrderSourceType.values());
     }
 
     private Store requireStore(String storeId) {

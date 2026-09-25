@@ -51,20 +51,33 @@ class ReceiptEligibilityTest {
     }
 
     @Test
-    void undeliveredZeroValueRmaAndUncoveredSourcesDoNotQualify() {
+    void undeliveredZeroValueAndRmaDoNotQualify() {
         Order shipping = b2cOrder(100);
         shipping.setStatus(OrderStatus.Shipping);
         Order free = b2cOrder(0);
         Order rma = b2cOrder(100);
         rma.setSource(new OrderSource("RMA", OrderSourceType.Other));
-        Order pos = b2cOrder(100);
-        pos.setSource(new OrderSource("kasa", OrderSourceType.PointOfSale));
 
         Store store = store();
         assertThat(eligibility.automaticCandidate(store, shipping)).isFalse();
         assertThat(eligibility.automaticCandidate(store, free)).isFalse();
         assertThat(eligibility.automaticCandidate(store, rma)).isFalse();
-        assertThat(eligibility.automaticCandidate(store, pos)).isFalse();
+    }
+
+    @Test
+    void pointOfSaleOrdersQualifyLikeAnyOtherSource() {
+        Order pos = b2cOrder(100);
+        pos.setSource(new OrderSource("kasa", OrderSourceType.PointOfSale));
+
+        assertThat(eligibility.automaticCandidate(store(), pos)).isTrue();
+    }
+
+    @Test
+    void ordersWithoutASourceStillQualify() {
+        Order order = b2cOrder(100);
+        order.setSource(null);
+
+        assertThat(eligibility.automaticCandidate(store(), order)).isTrue();
     }
 
     @Test

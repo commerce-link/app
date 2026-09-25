@@ -15,7 +15,6 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.ui.ExtendedModelMap;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
-import pl.commercelink.orders.OrderSourceType;
 import pl.commercelink.receipts.FakeReceiptProviderDescriptor;
 import pl.commercelink.receipts.ReceiptAttemptStore;
 import pl.commercelink.receipts.ReceiptProviderFactory;
@@ -88,12 +87,6 @@ class StoreReceiptsSettingsControllerTest {
         assertThat(view).isEqualTo("store-receipts");
         ReceiptSettingsForm form = (ReceiptSettingsForm) model.getAttribute("receiptsForm");
         assertThat(form.isEnabled()).isFalse();
-        assertThat(form.getSources()).containsExactlyInAnyOrderElementsOf(
-                java.util.Arrays.stream(OrderSourceType.values())
-                        .filter(type -> type != OrderSourceType.PointOfSale)
-                        .map(Enum::name)
-                        .toList());
-        assertThat(model.getAttribute("sourceTypes")).isEqualTo(OrderSourceType.values());
     }
 
     @Test
@@ -104,7 +97,7 @@ class StoreReceiptsSettingsControllerTest {
         MockHttpServletResponse response = new MockHttpServletResponse();
 
         // when
-        String view = controller.saveReceipts(receipts(true, "WebStore"), "fetch", model, PL,
+        String view = controller.saveReceipts(receipts(true), "fetch", model, PL,
                 new RedirectAttributesModelMap(), response);
 
         // then
@@ -116,32 +109,21 @@ class StoreReceiptsSettingsControllerTest {
     }
 
     @Test
-    void enablingWithASourceAndAConfiguredSystemIsSaved() {
+    void enablingWithAConfiguredSystemIsSaved() {
         // given
         Store store = store("store-1");
         store.setConfigurationValue(IntegrationType.RECEIPT_PROVIDER, SYSTEM);
         when(receiptProviderFactory.loadConfigurationForUI(store)).thenReturn(Map.of("token", ""));
 
         // when
-        String view = controller.saveReceipts(receipts(true, "WebStore"), null, new ExtendedModelMap(), PL,
+        String view = controller.saveReceipts(receipts(true), null, new ExtendedModelMap(), PL,
                 new RedirectAttributesModelMap(), new MockHttpServletResponse());
 
         // then
         verify(storesRepository).save(store);
         assertThat(store.getReceiptConfiguration().isEnabled()).isTrue();
         assertThat(store.getReceiptConfiguration().getEnabledAt()).isNotNull();
-        assertThat(store.getReceiptConfiguration().covers(OrderSourceType.WebStore)).isTrue();
         assertThat(view).isEqualTo("redirect:/dashboard/store/receipts");
-    }
-
-    @Test
-    void sourcesFieldsetHasAnIdSoTheErrorSummaryLinkCanFocusIt() throws Exception {
-        // The controller test never renders Thymeleaf (no view resolution), so the "no sources selected" error
-        // summary link (fragments/settings-form :: errorSummary builds an href of '#' + errors.key, i.e. "#sources")
-        // is checked against the template markup itself: it must have a matching id to land on.
-        String html = template("store-receipts");
-
-        assertThat(html).contains("id=\"sources\"");
     }
 
     @Test
@@ -165,10 +147,9 @@ class StoreReceiptsSettingsControllerTest {
         return store;
     }
 
-    private static ReceiptSettingsForm receipts(boolean enabled, String... sources) {
+    private static ReceiptSettingsForm receipts(boolean enabled) {
         ReceiptSettingsForm form = new ReceiptSettingsForm();
         form.setEnabled(enabled);
-        form.setSources(List.of(sources));
         return form;
     }
 

@@ -49,7 +49,6 @@ public class ReceiptEligibility {
         return order.getStatus() == OrderStatus.Delivered
                 && storeReady(store)
                 && orderQualifies(order)
-                && order.getSource() != null && configuration.covers(order.getSource().getType())
                 && deliveredSinceEnabled(order, configuration.getEnabledAt());
     }
 
