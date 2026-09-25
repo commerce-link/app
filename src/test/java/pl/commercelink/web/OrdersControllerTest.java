@@ -1371,6 +1371,66 @@ class OrdersControllerTest {
         }
 
         @Test
+        void rejectedUpdateKeepsTheSubmittedFieldsAndTheEditedFilterId() {
+            var form = new pl.commercelink.web.dtos.OrderFilterForm();
+            form.setLabel("Do wysłania jutro");
+            form.setStatus("New");
+            form.setReturnTo("/dashboard/orders");
+            org.mockito.Mockito.doThrow(new pl.commercelink.orders.filters.exceptions.OrderFilterInvalidException("orders.filters.error.no.label"))
+                    .when(orderFilters).update(any(), any(), anyBoolean(), any(), any());
+            when(messageSource.getMessage(eq("orders.filters.error.no.label"), any(), any(Locale.class))).thenReturn("Filtr musi mieć nazwę.");
+
+            ExtendedModelMap model = new ExtendedModelMap();
+            var response = new org.springframework.mock.web.MockHttpServletResponse();
+            String fragment = ordersController.updateOrderFilter("f1", form, "fetch", new RedirectAttributesModelMap(), model, Locale.forLanguageTag("pl"), response);
+
+            assertThat(fragment).isEqualTo("orders/filters :: dialogBody");
+            assertThat(response.getStatus()).isEqualTo(422);
+            var filterForm = (pl.commercelink.web.dtos.OrderFilterForm) model.get("filterForm");
+            assertThat(filterForm.getLabel()).isEqualTo("Do wysłania jutro");
+            assertThat(filterForm.getStatus()).isEqualTo("New");
+            assertThat(model.get("filterId")).isEqualTo("f1");
+        }
+
+        @Test
+        void successfulFetchReturnsTheDialogBodyWithTheRedirectAddress() {
+            var created = pl.commercelink.orders.filters.model.OrderFilter.of("Nowy", List.of(
+                    pl.commercelink.orders.filters.model.OrderFilterCondition.of(pl.commercelink.orders.filters.OrderFilterField.Status, "New")));
+            when(orderFilters.create(eq(ACTOR), eq(false), eq("Nowy"), any(), eq(false))).thenReturn(created);
+            var form = new pl.commercelink.web.dtos.OrderFilterForm();
+            form.setLabel("Nowy");
+            form.setReturnTo("/dashboard/orders?q=x");
+
+            ExtendedModelMap model = new ExtendedModelMap();
+            var response = new org.springframework.mock.web.MockHttpServletResponse();
+            String fragment = ordersController.createOrderFilter(form, "fetch", new RedirectAttributesModelMap(), model, Locale.forLanguageTag("pl"), response);
+
+            assertThat(fragment).isEqualTo("orders/filters :: dialogBody");
+            assertThat(model.get("redirectTo")).isEqualTo("/dashboard/orders?q=x");
+            assertThat(response.getStatus()).isEqualTo(200);
+        }
+
+        @Test
+        void rejectedSaveViewDialogRerendersTheSaveViewBodyWithThePage() {
+            var form = new pl.commercelink.web.dtos.OrderFilterForm();
+            form.setLabel("");
+            form.setDialog("save-view");
+            form.setReturnTo("/dashboard/orders");
+            when(orderFilters.create(any(), anyBoolean(), any(), any(), anyBoolean()))
+                    .thenThrow(new pl.commercelink.orders.filters.exceptions.OrderFilterInvalidException("orders.filters.error.no.label"));
+            when(messageSource.getMessage(eq("orders.filters.error.no.label"), any(), any(Locale.class))).thenReturn("Filtr musi mieć nazwę.");
+
+            ExtendedModelMap model = new ExtendedModelMap();
+            var response = new org.springframework.mock.web.MockHttpServletResponse();
+            String fragment = ordersController.createOrderFilter(form, "fetch", new RedirectAttributesModelMap(), model, Locale.forLanguageTag("pl"), response);
+
+            assertThat(fragment).isEqualTo("orders/filters :: saveViewBody");
+            assertThat(response.getStatus()).isEqualTo(422);
+            assertThat(model.get("page")).isNotNull();
+            assertThat(((pl.commercelink.web.dtos.OrderFilterForm) model.get("filterForm")).getLabel()).isEqualTo("");
+        }
+
+        @Test
         void malformedReturnToFallsBackToTheBareList() {
             String view = ordersController.deleteOrderFilter("f1", "/dashboard/orders?x=%", null,
                     new RedirectAttributesModelMap(), new ExtendedModelMap(), Locale.forLanguageTag("pl"),

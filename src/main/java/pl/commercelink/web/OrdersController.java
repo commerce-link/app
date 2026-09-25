@@ -218,7 +218,7 @@ public class OrdersController extends BaseController {
                                     @RequestHeader(value = "X-Requested-With", required = false) String requestedWith,
                                     RedirectAttributes redirectAttributes, Model model, Locale locale,
                                     HttpServletResponse response) {
-        return filterAction(requestedWith, form.getReturnTo(), redirectAttributes, model, locale, response, () -> {
+        return filterAction(requestedWith, form.getReturnTo(), redirectAttributes, model, locale, response, form, null, () -> {
             OrderFilter created = orderFilters.create(actor(), form.isSharedWithStore(), form.getLabel(),
                     form.toConditions(), form.isMakeDefault());
             if (!form.isMakeDefault()) {
@@ -235,7 +235,7 @@ public class OrdersController extends BaseController {
                                     @RequestHeader(value = "X-Requested-With", required = false) String requestedWith,
                                     RedirectAttributes redirectAttributes, Model model, Locale locale,
                                     HttpServletResponse response) {
-        return filterAction(requestedWith, form.getReturnTo(), redirectAttributes, model, locale, response, () -> {
+        return filterAction(requestedWith, form.getReturnTo(), redirectAttributes, model, locale, response, form, filterId, () -> {
             orderFilters.update(actor(), filterId, form.isSharedWithStore(), form.getLabel(), form.toConditions());
             return safeReturnTo(form.getReturnTo());
         });
@@ -321,6 +321,18 @@ public class OrdersController extends BaseController {
      */
     private String filterAction(String requestedWith, String returnTo, RedirectAttributes redirectAttributes, Model model,
                                 Locale locale, HttpServletResponse response, Supplier<String> action) {
+        return filterAction(requestedWith, returnTo, redirectAttributes, model, locale, response, null, null, action);
+    }
+
+    /**
+     * Same as above, but for the create/update endpoints: on a 422 the submitted {@code form} (and, for an update,
+     * the {@code filterId} being edited) go into the model so the re-rendered dialog keeps what the user typed
+     * (spec §6/§7, "422 loses the user's input" fix). A form whose hidden {@code dialog} field is "save-view"
+     * re-renders {@code saveViewBody} instead of {@code dialogBody}, since that's the form the user was looking at.
+     */
+    private String filterAction(String requestedWith, String returnTo, RedirectAttributes redirectAttributes, Model model,
+                                Locale locale, HttpServletResponse response, OrderFilterForm form, String filterId,
+                                Supplier<String> action) {
         String rejection = null;
         String target = safeReturnTo(returnTo);
         try {
@@ -335,6 +347,16 @@ public class OrdersController extends BaseController {
             if (rejection != null) {
                 model.addAttribute("filterError", rejection);
                 response.setStatus(422);
+                if (form != null) {
+                    model.addAttribute("filterForm", form);
+                    if (filterId != null) {
+                        model.addAttribute("filterId", filterId);
+                    }
+                    if ("save-view".equals(form.getDialog())) {
+                        model.addAttribute("page", orderListService.page(actor(), parseReturnTo(target), LocalDate.now(), locale));
+                        return "orders/filters :: saveViewBody";
+                    }
+                }
             } else {
                 model.addAttribute("redirectTo", target);
             }

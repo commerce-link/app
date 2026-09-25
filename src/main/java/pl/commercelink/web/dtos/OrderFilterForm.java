@@ -18,6 +18,7 @@ public class OrderFilterForm {
     private String shippingPostalCode;
     private boolean makeDefault;
     private String returnTo;
+    private String dialog;
 
     public List<OrderFilterCondition> toConditions() {
         List<OrderFilterCondition> conditions = new LinkedList<>();
@@ -114,5 +115,13 @@ public class OrderFilterForm {
 
     public void setReturnTo(String returnTo) {
         this.returnTo = returnTo;
+    }
+
+    public String getDialog() {
+        return dialog;
+    }
+
+    public void setDialog(String dialog) {
+        this.dialog = dialog;
     }
 }

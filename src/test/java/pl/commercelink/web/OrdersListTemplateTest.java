@@ -74,4 +74,13 @@ class OrdersListTemplateTest {
                 .doesNotContain("style=").doesNotContain("onclick=").doesNotContain("class=\"button");
         assertThat(page()).contains("orders/filters :: filtersDialog").contains("orders/filters :: saveViewDialog");
     }
+
+    @Test
+    void rejectedFilterFormsKeepWhatTheUserSubmitted() throws Exception {
+        String html = filters();
+        assertThat(html).contains("th:value=\"${filterForm?.label}\"")
+                .contains("th:value=\"${filterId}\"")
+                .contains("name=\"dialog\" value=\"save-view\"")
+                .contains("th:selected=\"${filterForm != null and #strings.equalsIgnoreCase(filterForm.status, status.name())}\"");
+    }
 }
