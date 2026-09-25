@@ -15,7 +15,7 @@
                     <button th:replace="~{fragments/screen-intro :: toggle}"></button>
                     <form method="post" th:action="@{/dashboard/orders/new/pos}" class="cl-page-action-form">
                         <button type="submit" class="cl-button is-primary">
-                            <span class="icon is-small" aria-hidden="true"><i class="fas fa-cash-register"></i></span>
+                            <span class="icon is-small" aria-hidden="true"><i class="fas fa-plus"></i></span>
                             <span th:text="#{orders.new.pos.button}"></span>
                         </button>
                     </form>
@@ -32,92 +32,106 @@
 
         <div data-cl-orders-results th:fragment="results" th:with="q=${page.query()}">
 
-            <ul class="cl-stat-grid cl-stat-grid-attention" th:attr="aria-label=#{orders.list.attention.scope}">
-                <li th:each="tile : ${page.tiles()}">
-                    <a th:if="${tile.enabled()}" class="cl-stat is-link" th:classappend="${tile.tone()}" th:href="@{${tile.href()}}"
+            <!--/* Attention strip: three figures of the whole store, each a link that narrows the list (spec §4).
+                   "Do decyzji" is left out — it repeats the Nowe and Zablokowane tabs a few centimetres below. */-->
+            <nav class="cl-attention" th:attr="aria-label=#{orders.list.attention.label}">
+                <th:block th:each="tile : ${page.tiles()}" th:if="${tile.kind().name() != 'Decide'}">
+                    <a th:if="${tile.enabled()}" class="cl-attention-item" th:classappend="${tile.tone()}" th:href="@{${tile.href()}}"
                        th:attr="aria-current=${tile.pressed()} ? 'true' : null" data-cl-orders-nav>
-                        <span class="cl-eyebrow" th:text="${tile.label()}"></span>
-                        <span class="cl-stat-value"><th:block th:text="${tile.count()}"></th:block><small th:if="${tile.valueOf() != null}" class="cl-stat-value-of"><span class="cl-stat-value-sep" aria-hidden="true"> · </span><th:block th:text="${tile.valueOf()}"></th:block></small></span>
-                        <span class="cl-stat-hint" th:text="${tile.hint()}"></span>
+                        <strong class="cl-attention-count" th:text="${tile.count()}"></strong>
+                        <span class="cl-attention-label" th:text="${tile.label()}"></span>
+                        <span th:if="${tile.valueOf() != null}" class="cl-attention-sub" th:text="${tile.valueOf()}"></span>
                         <span th:if="${tile.pressed()}" class="cl-visually-hidden" th:text="#{orders.list.attention.pressed}"></span>
                     </a>
-                    <span th:unless="${tile.enabled()}" class="cl-stat is-link is-disabled">
-                        <span class="cl-eyebrow" th:text="${tile.label()}"></span>
-                        <span class="cl-stat-value"><th:block th:text="${tile.count()}"></th:block><small th:if="${tile.valueOf() != null}" class="cl-stat-value-of"><span class="cl-stat-value-sep" aria-hidden="true"> · </span><th:block th:text="${tile.valueOf()}"></th:block></small></span>
-                        <span class="cl-stat-hint" th:text="${tile.hint()}"></span>
+                    <span th:unless="${tile.enabled()}" class="cl-attention-item is-disabled">
+                        <strong class="cl-attention-count" th:text="${tile.count()}"></strong>
+                        <span class="cl-attention-label" th:text="${tile.label()}"></span>
+                        <span th:if="${tile.valueOf() != null}" class="cl-attention-sub" th:text="${tile.valueOf()}"></span>
                     </span>
-                </li>
-            </ul>
-            <p class="cl-help cl-stat-scope" th:text="#{orders.list.attention.scope}"></p>
+                </th:block>
+            </nav>
 
             <section class="cl-card" aria-labelledby="orders-table-title">
                 <h2 class="cl-visually-hidden" id="orders-table-title" th:text="#{orders.list.table.title}"></h2>
 
-                <div class="cl-table-toolbar is-stacked is-orders">
-                    <div class="cl-toolbar-filters cl-segmented-scroll">
-                        <nav class="cl-segmented" th:attr="aria-label=#{orders.list.segments.open}">
-                            <a th:each="seg : ${page.openSegments()}" class="cl-segment" th:href="@{${seg.href()}}"
-                               th:attr="aria-current=${seg.current()} ? 'page' : null, data-count=${seg.count()}" data-cl-orders-nav>
-                                <span th:text="${seg.label()}"></span><span class="cl-segment-sep">: </span><span class="cl-segment-count" th:text="${seg.count()}"></span>
-                            </a>
-                        </nav>
-                        <span class="cl-segmented-divider" aria-hidden="true"></span>
-                        <nav class="cl-segmented" th:attr="aria-label=#{orders.list.segments.history}">
-                            <a th:each="seg : ${page.historySegments()}" class="cl-segment" th:href="@{${seg.href()}}"
-                               th:attr="aria-current=${seg.current()} ? 'page' : null, data-count=${seg.count()}" data-cl-orders-nav>
-                                <span th:text="${seg.label()}"></span><span class="cl-segment-sep">: </span><span class="cl-segment-count" th:text="${seg.count()}"></span>
-                            </a>
-                        </nav>
-                    </div>
+                <!--/* Status tabs: one underlined row, open statuses left, history right (spec §5). */-->
+                <div class="cl-tabs-row">
+                    <nav class="cl-tabs" th:attr="aria-label=#{orders.list.segments.open}">
+                        <a th:each="seg : ${page.openSegments()}" class="cl-tab" th:href="@{${seg.href()}}"
+                           th:attr="aria-current=${seg.current()} ? 'page' : null, data-count=${seg.count()}" data-cl-orders-nav>
+                            <span th:text="${seg.label()}"></span><span class="cl-tab-sep">: </span><span class="cl-tab-count" th:text="${seg.count()}"></span>
+                        </a>
+                    </nav>
+                    <nav class="cl-tabs is-history" th:attr="aria-label=#{orders.list.segments.history}">
+                        <a th:each="seg : ${page.historySegments()}" class="cl-tab" th:href="@{${seg.href()}}"
+                           th:attr="aria-current=${seg.current()} ? 'page' : null, data-count=${seg.count()}" data-cl-orders-nav>
+                            <span th:text="${seg.label()}"></span><span class="cl-tab-sep">: </span><span class="cl-tab-count" th:text="${seg.count()}"></span>
+                        </a>
+                    </nav>
+                </div>
 
-                    <div class="cl-toolbar-row">
-                        <form method="get" th:action="@{/dashboard/orders}" class="cl-filter-form" data-cl-orders-form>
-                            <input type="hidden" name="status" th:if="${q.status() != null}" th:value="${q.status().name()}"/>
-                            <input type="hidden" name="q" th:if="${q.q() != null}" th:value="${q.q()}"/>
-                            <input type="hidden" name="sort" th:if="${q.sort() != null}" th:value="${q.sort().param()}"/>
-                            <input type="hidden" name="dir" th:if="${q.dir() != null}" th:value="${q.dir().param()}"/>
-                            <label class="cl-visually-hidden" for="orders-filter" th:text="#{orders.list.filter.label}"></label>
-                            <select class="cl-select is-compact" id="orders-filter" name="filterId" data-filter-auto-submit>
-                                <option value="" th:text="#{orders.list.filter.none}" th:selected="${page.activeFilter().isEmpty()}"></option>
-                                <optgroup th:if="${!filters.sharedWithStore().isEmpty()}" th:attr="label=#{orders.list.filter.shared}">
-                                    <option th:each="o : ${page.filterOptions()}" th:if="${o.shared()}" th:value="${o.id()}" th:text="${o.label()}" th:selected="${o.selected()}"></option>
-                                </optgroup>
-                                <optgroup th:if="${!filters.own().isEmpty()}" th:attr="label=#{orders.list.filter.own}">
-                                    <option th:each="o : ${page.filterOptions()}" th:unless="${o.shared()}" th:value="${o.id()}" th:text="${o.label()}" th:selected="${o.selected()}"></option>
-                                </optgroup>
-                            </select>
-                            <noscript><button type="submit" class="cl-button" th:text="#{orders.list.filter.apply}"></button></noscript>
-                        </form>
-                        <a class="cl-button" th:href="@{/dashboard/orders/filters/new(returnTo=${returnTo})}" data-cl-dialog-open="save-view-dialog"
-                           th:if="${page.canSaveView()}" th:text="#{orders.list.saveView}"></a>
-                        <span class="cl-button is-disabled" th:unless="${page.canSaveView()}"
-                              th:attr="title=#{orders.list.saveView.disabled}"><span th:text="#{orders.list.saveView}"></span><span class="cl-visually-hidden" th:text="#{orders.list.saveView.disabled}"></span></span>
-                        <a class="cl-button" th:href="@{/dashboard/orders/filters(returnTo=${returnTo})}" data-cl-dialog-open="filters-dialog"
-                           th:text="#{orders.list.manageFilters}"></a>
-                        <form method="get" th:action="@{/dashboard/orders}" class="cl-search-form" role="search" data-cl-orders-form>
-                            <input type="hidden" name="filterId" th:if="${q.filterId() != null}" th:value="${q.filterId()}"/>
-                            <input type="hidden" name="sort" th:if="${q.sort() != null}" th:value="${q.sort().param()}"/>
-                            <input type="hidden" name="dir" th:if="${q.dir() != null}" th:value="${q.dir().param()}"/>
-                            <label class="cl-visually-hidden" for="orders-search" th:text="#{orders.list.search.label}"></label>
+                <!--/* Controls: the custom-filter menu on the left, search on the right. The menu is a native
+                       <details>, so it opens without JavaScript; orders-list.js only closes it on outside click. */-->
+                <div class="cl-list-controls">
+                    <details class="cl-menu" data-cl-menu th:with="active=${page.activeFilter()}">
+                        <summary class="cl-button cl-menu-summary" th:classappend="${active.isPresent()} ? 'is-active' : ''">
+                            <span class="icon is-small" aria-hidden="true"><i class="fas fa-filter"></i></span>
+                            <span class="cl-menu-summary-text" th:text="${active.isPresent()} ? ${active.get().label} : #{orders.list.filter.menu}"></span>
+                            <span class="cl-menu-caret" aria-hidden="true"></span>
+                        </summary>
+                        <ul class="cl-menu-list">
+                            <li th:if="${page.filterOptions().isEmpty()}" class="cl-menu-empty" th:text="#{orders.list.filter.empty}"></li>
+                            <li th:each="o : ${page.filterOptions()}">
+                                <a class="cl-menu-item" th:href="@{${q.withFilterId(o.id()).href()}}"
+                                   th:attr="aria-current=${o.selected()} ? 'true' : null" data-cl-orders-nav>
+                                    <span class="cl-menu-item-text" th:text="${o.label()}"></span>
+                                    <span class="cl-menu-item-meta" th:text="${o.shared()} ? #{orders.filters.scope.store} : #{orders.filters.scope.private}"></span>
+                                </a>
+                            </li>
+                            <li th:if="${active.isPresent()}">
+                                <a class="cl-menu-item" th:href="@{${q.withFilterId('').href()}}" th:text="#{orders.list.filter.off}" data-cl-orders-nav></a>
+                            </li>
+                            <li class="cl-menu-sep" role="separator"></li>
+                            <li th:if="${page.canSaveView()}">
+                                <a class="cl-menu-item" th:href="@{/dashboard/orders/filters/new(returnTo=${returnTo})}"
+                                   data-cl-dialog-open="save-view-dialog" th:text="#{orders.list.saveView}"></a>
+                            </li>
+                            <li>
+                                <a class="cl-menu-item" th:href="@{/dashboard/orders/filters(returnTo=${returnTo})}"
+                                   data-cl-dialog-open="filters-dialog" th:text="#{orders.list.manageFilters}"></a>
+                            </li>
+                        </ul>
+                    </details>
+
+                    <form method="get" th:action="@{/dashboard/orders}" class="cl-search-form" role="search" data-cl-orders-form>
+                        <input type="hidden" name="filterId" th:if="${q.filterId() != null}" th:value="${q.filterId()}"/>
+                        <input type="hidden" name="sort" th:if="${q.sort() != null}" th:value="${q.sort().param()}"/>
+                        <input type="hidden" name="dir" th:if="${q.dir() != null}" th:value="${q.dir().param()}"/>
+                        <label class="cl-visually-hidden" for="orders-search" th:text="#{orders.list.search.label}"></label>
+                        <div class="cl-search-field">
+                            <span class="cl-search-icon icon is-small" aria-hidden="true"><i class="fas fa-search"></i></span>
                             <input class="cl-input cl-table-search" type="search" id="orders-search" name="q" autocomplete="off"
-                                   th:value="${q.q()}" th:attr="placeholder=#{orders.list.search.placeholder}"/>
-                            <button type="submit" class="cl-button cl-search-button" th:attr="aria-label=#{orders.list.search.button}">
-                                <span class="icon is-small" aria-hidden="true"><i class="fas fa-search"></i></span>
-                                <span class="cl-search-button-text" th:text="#{orders.list.search.button}"></span>
-                            </button>
-                        </form>
-                    </div>
+                                   th:value="${q.q()}" th:attr="placeholder=#{orders.list.search.placeholder}, data-cl-search-had=${q.q() != null}"/>
+                            <a th:if="${q.q() != null}" class="cl-search-clear" th:href="@{${q.withQ(null).href()}}"
+                               th:attr="aria-label=#{orders.list.search.clear}" data-cl-orders-nav>
+                                <span aria-hidden="true">×</span>
+                            </a>
+                        </div>
+                        <button type="submit" class="cl-visually-hidden" th:text="#{orders.list.search.button}"></button>
+                    </form>
+                </div>
 
+                <!--/* What narrows the list right now, and how many orders that leaves. */-->
+                <div class="cl-list-meta" th:classappend="${page.chips().isEmpty()} ? 'is-count-only' : ''">
                     <div class="cl-filter-chips" th:if="${!page.chips().isEmpty()}">
                         <span class="cl-filter-chip" th:each="chip : ${page.chips()}">
                             <span th:text="${chip.label()}"></span>
                             <a class="cl-filter-chip-clear" th:href="@{${chip.clearHref()}}" th:attr="aria-label=${chip.clearLabel()}"
-                               th:text="#{orders.list.chip.clear}" data-cl-orders-nav></a>
+                               data-cl-orders-nav><span aria-hidden="true">×</span></a>
                         </span>
                     </div>
+                    <p class="cl-table-results" role="status" th:text="${page.resultsLine()}"></p>
                 </div>
-
-                <p class="cl-table-results" role="status" th:text="${page.resultsLine()}"></p>
 
                 <th:block th:unless="${page.rows().isEmpty()}"
                           th:with="numberSort=${T(pl.commercelink.web.orders.OrderListQuery.Sort).NUMBER},
@@ -126,22 +140,22 @@
                                    orderedSort=${T(pl.commercelink.web.orders.OrderListQuery.Sort).ORDERED}">
                 <nav class="cl-table-sortbar" th:attr="aria-label=#{orders.list.sort.label}">
                     <span class="cl-eyebrow" th:text="#{orders.list.sort.label}"></span>
-                    <a class="cl-segment" th:with="h=${page.sortHeaders().get(dueSort)}" th:href="@{${h.href()}}"
+                    <a class="cl-tab" th:with="h=${page.sortHeaders().get(dueSort)}" th:href="@{${h.href()}}"
                        th:attr="aria-current=${h.ariaSort() != 'none'} ? 'page' : null" data-cl-orders-nav>
                         <span th:text="#{orders.list.sort.due}"></span>
                         <span th:if="${h.ariaSort() != 'none'}" aria-hidden="true" th:text="${h.ariaSort() == 'ascending'} ? '▲' : '▼'"></span>
                     </a>
-                    <a class="cl-segment" th:with="h=${page.sortHeaders().get(amountSort)}" th:href="@{${h.href()}}"
+                    <a class="cl-tab" th:with="h=${page.sortHeaders().get(amountSort)}" th:href="@{${h.href()}}"
                        th:attr="aria-current=${h.ariaSort() != 'none'} ? 'page' : null" data-cl-orders-nav>
                         <span th:text="#{orders.list.sort.amount}"></span>
                         <span th:if="${h.ariaSort() != 'none'}" aria-hidden="true" th:text="${h.ariaSort() == 'ascending'} ? '▲' : '▼'"></span>
                     </a>
-                    <a class="cl-segment" th:with="h=${page.sortHeaders().get(numberSort)}" th:href="@{${h.href()}}"
+                    <a class="cl-tab" th:with="h=${page.sortHeaders().get(numberSort)}" th:href="@{${h.href()}}"
                        th:attr="aria-current=${h.ariaSort() != 'none'} ? 'page' : null" data-cl-orders-nav>
                         <span th:text="#{orders.list.sort.number}"></span>
                         <span th:if="${h.ariaSort() != 'none'}" aria-hidden="true" th:text="${h.ariaSort() == 'ascending'} ? '▲' : '▼'"></span>
                     </a>
-                    <a class="cl-segment" th:if="${q.isHistory()}" th:with="h=${page.sortHeaders().get(orderedSort)}" th:href="@{${h.href()}}"
+                    <a class="cl-tab" th:if="${q.isHistory()}" th:with="h=${page.sortHeaders().get(orderedSort)}" th:href="@{${h.href()}}"
                        th:attr="aria-current=${h.ariaSort() != 'none'} ? 'page' : null" data-cl-orders-nav>
                         <span th:text="#{orders.list.sort.ordered}"></span>
                         <span th:if="${h.ariaSort() != 'none'}" aria-hidden="true" th:text="${h.ariaSort() == 'ascending'} ? '▲' : '▼'"></span>
@@ -174,15 +188,15 @@
                             <span class="cl-table-sub cl-cards-hide" th:if="${row.email() != null}" th:text="${row.email()}"></span>
                         </td>
                         <td class="cl-cell-due" th:attr="data-label=#{orders.list.column.due}">
-                            <span th:text="${row.dueText()}"></span>
-                            <span th:if="${row.dueNote() != null}" class="cl-due-note" th:classappend="${row.dueTone()}" th:text="${row.dueNote()}"></span>
+                            <span class="cl-cell-date" th:text="${row.dueText()}"></span>
+                            <span th:if="${row.dueNote() != null}" class="cl-table-sub cl-due-note" th:classappend="${row.dueTone()}" th:text="${row.dueNote()}"></span>
                         </td>
                         <td th:attr="data-label=#{orders.list.column.status}">
                             <span class="cl-status" th:classappend="${row.statusTone()}" th:text="${row.statusLabel()}"></span>
                         </td>
                         <td class="is-numeric" th:attr="data-label=#{orders.list.column.amount}">
-                            <span th:text="${row.totalText()}"></span>
-                            <span class="cl-table-sub is-warn" th:if="${row.unpaidText() != null}" th:text="${row.unpaidText()}"></span>
+                            <span class="cl-cell-amount" th:text="${row.totalText()}"></span>
+                            <span class="cl-table-sub cl-unpaid" th:if="${row.unpaidText() != null}" th:text="${row.unpaidText()}"></span>
                         </td>
                     </tr>
                     </tbody>

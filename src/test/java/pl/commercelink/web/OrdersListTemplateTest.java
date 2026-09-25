@@ -27,10 +27,14 @@ class OrdersListTemplateTest {
     @Test
     void tilesSegmentsToolbarChipsTableAndPagingAreWiredToTheModel() throws Exception {
         String html = page();
-        assertThat(html).contains("cl-stat-grid").contains("cl-stat is-link").contains("aria-current=${tile.pressed()} ? 'true' : null")
-                .contains("cl-segmented-divider").contains("aria-current").contains("cl-segment-count")
-                .contains("cl-table-toolbar is-stacked").contains("cl-search-form").contains("name=\"q\"")
-                .contains("cl-filter-chips").contains("cl-table-results").contains("role=\"status\"")
+        assertThat(html).contains("class=\"cl-attention\"").contains("cl-attention-item").contains("aria-current=${tile.pressed()} ? 'true' : null")
+                .contains("tile.kind().name() != 'Decide'")
+                .contains("cl-tabs-row").contains("cl-tabs is-history").contains("class=\"cl-tab\"").contains("cl-tab-count")
+                .contains("cl-list-controls").contains("details class=\"cl-menu\" data-cl-menu").contains("cl-menu-item")
+                .contains("q.withFilterId(o.id()).href()").contains("q.withFilterId('').href()")
+                .contains("data-cl-dialog-open=\"save-view-dialog\"").contains("data-cl-dialog-open=\"filters-dialog\"")
+                .contains("cl-search-form").contains("name=\"q\"").contains("cl-search-clear").contains("q.withQ(null).href()")
+                .contains("cl-list-meta").contains("cl-filter-chips").contains("cl-table-results").contains("role=\"status\"")
                 .contains("cl-table is-orders").contains("cl-table-sort").contains("aria-sort")
                 .contains("cl-table-sortbar").contains("orders.list.sort.label")
                 .contains("orders.list.sort.due").contains("orders.list.sort.amount").contains("orders.list.sort.number")
@@ -45,7 +49,8 @@ class OrdersListTemplateTest {
         String html = page();
         assertThat(html).doesNotContain("style=").doesNotContain("onclick=").doesNotContain("class=\"button")
                 .doesNotContain("class=\"box\"").doesNotContain("notification is-").doesNotContain("dropdown")
-                .doesNotContain("modal").doesNotContain("is-primary is-selected").doesNotContain("table is-striped");
+                .doesNotContain("modal").doesNotContain("is-primary is-selected").doesNotContain("table is-striped")
+                .doesNotContain("fa-cash-register").doesNotContain("<select");
         // every visible text goes through a message key: no Polish/English words as tag text
         Matcher text = Pattern.compile(">\\s*[A-Za-zĄ-ż][^<{#]{3,}<").matcher(html.replaceAll("<!--.*?-->", ""));
         assertThat(text.find()).as("literal text found: " + (text.hitEnd() ? "" : text.group())).isFalse();

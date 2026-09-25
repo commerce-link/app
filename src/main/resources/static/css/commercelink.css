@@ -4210,115 +4210,372 @@ a.cl-link-button:hover {
     }
 }
 
-/* --- Orders list (spec docs/active/orders-list-redesign): attention tiles, segments as links, chips, the orders
-   table with a whole-row link and its phone card, search form, pagination, star button --- */
+/* --- Orders list (spec docs/active/orders-list-redesign; layout revised 2026-09-25 after the UX review): attention
+   strip, status tabs, custom-filter menu, search field, chips + count line, the orders table with a whole-row link
+   and its phone card, phone sort bar, pagination, star button, dialog with a form --- */
 
-/* A stat tile that narrows the list under it (D9). It is a link, not navigation: pressed = aria-pressed + border. */
-.cl-page .cl-stat.is-link {
+/* Attention strip: three whole-store figures in one flat row above the card. Each is a link that narrows the list;
+   the narrowed one is underlined with the accent (D9: the tile does not navigate, it filters what is below). */
+.cl-page .cl-attention {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 28px;
+    margin: 2px 0 18px;
+}
+
+.cl-page .cl-attention-item {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 6px 2px;
+    border-bottom: 2px solid transparent;
+    color: var(--cl-ink-2);
     text-decoration: none;
-    color: inherit;
-    transition: border-color .15s ease, box-shadow .15s ease;
 }
 
-.cl-page .cl-stat.is-link:hover {
-    border-color: var(--cl-accent);
-    box-shadow: var(--cl-shadow-card), var(--cl-shadow);
+.cl-page a.cl-attention-item:hover {
+    color: var(--cl-ink);
+    border-bottom-color: var(--cl-line);
 }
 
-.cl-page .cl-stat.is-link:focus-visible {
+.cl-page a.cl-attention-item:focus-visible {
     outline: 2px solid var(--cl-accent);
     outline-offset: 2px;
+    border-radius: 4px;
 }
 
-.cl-page .cl-stat.is-link[aria-current="true"] {
-    background: var(--cl-accent-soft);
-    border-color: var(--cl-accent);
+.cl-page .cl-attention-item[aria-current="true"] {
+    color: var(--cl-ink);
+    border-bottom-color: var(--cl-accent);
 }
 
-.cl-page .cl-stat.is-link[aria-current="true"] .cl-eyebrow,
-.cl-page .cl-stat.is-link[aria-current="true"] .cl-stat-hint {
-    color: var(--cl-ink-2);
+.cl-page .cl-attention-count {
+    font-size: 22px;
+    font-weight: 650;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    color: var(--cl-ink);
 }
 
-.cl-page .cl-stat.is-link.is-disabled {
-    color: var(--cl-ink-3);
-    box-shadow: none;
-}
-
-.cl-page .cl-stat.is-bad .cl-stat-value {
+.cl-page .cl-attention-item.is-bad .cl-attention-count {
     color: var(--cl-bad);
 }
 
-.cl-page .cl-stat.is-warn .cl-stat-value {
+.cl-page .cl-attention-item.is-warn .cl-attention-count {
     color: var(--cl-warn);
 }
 
-.cl-page .cl-stat-grid-attention {
-    margin: 0 0 6px;
-    padding: 0;
-    list-style: none;
+.cl-page .cl-attention-label {
+    font-size: 14px;
+    font-weight: 500;
 }
 
-.cl-page .cl-stat-scope {
-    margin: 0 0 16px;
+.cl-page .cl-attention-sub {
+    font-size: 12.5px;
+    color: var(--cl-ink-3);
+    font-variant-numeric: tabular-nums;
 }
 
-/* Segments as links (a GET filter, spec §5): same look as button.cl-segment[aria-pressed]. */
-.cl-page a.cl-segment {
+.cl-page .cl-attention-item.is-disabled,
+.cl-page .cl-attention-item.is-disabled .cl-attention-count {
+    color: var(--cl-ink-3);
+}
+
+/* Status tabs: one underlined row at the top of the card — open statuses on the left, history on the right. Counts
+   are small and grey so the labels carry the row; a tab with nothing behind it is quieter but still clickable. */
+.cl-page .cl-tabs-row {
+    display: flex;
+    align-items: stretch;
+    flex-wrap: wrap;
+    gap: 0 12px;
+    padding: 0 20px;
+    border-bottom: 1px solid var(--cl-line);
+}
+
+.cl-page .cl-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 2px;
+}
+
+.cl-page .cl-tab {
     display: inline-flex;
     align-items: center;
-    justify-content: center;
+    gap: 5px;
+    min-height: 44px;
+    padding: 0 8px;
+    margin-bottom: -1px;
+    border-bottom: 2px solid transparent;
+    color: var(--cl-ink-2);
+    font-size: 13.5px;
+    font-weight: 500;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.cl-page .cl-tab:hover {
+    color: var(--cl-ink);
+}
+
+.cl-page .cl-tab:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: -2px;
+    border-radius: 4px;
+}
+
+.cl-page .cl-tab[aria-current="page"] {
+    color: var(--cl-ink);
+    font-weight: 600;
+    border-bottom-color: var(--cl-accent);
+}
+
+.cl-page .cl-tab-sep {
+    font-size: 0;
+}
+
+.cl-page .cl-tab-count {
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--cl-ink-3);
+    font-variant-numeric: tabular-nums;
+}
+
+.cl-page .cl-tab[aria-current="page"] .cl-tab-count {
+    color: var(--cl-accent-ink);
+}
+
+.cl-page .cl-tab[data-count="0"]:not([aria-current="page"]) {
+    color: var(--cl-ink-3);
+    font-weight: 400;
+}
+
+/* History tabs sit at the right end of the row behind a thin divider; when the open statuses need the whole width
+   the pair wraps under them, divider included. */
+.cl-page .cl-tabs.is-history {
+    margin-left: auto;
+}
+
+.cl-page .cl-tabs.is-history::before {
+    content: "";
+    width: 1px;
+    height: 20px;
+    align-self: center;
+    margin-right: 10px;
+    background: var(--cl-line);
+}
+
+/* Controls under the tabs: the custom-filter menu on the left, search on the right. */
+.cl-page .cl-list-controls {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--cl-gap-related);
+    padding: 14px 20px 0;
+}
+
+/* Custom-filter menu: a native <details> (works without JavaScript), styled as a button that opens a popover with
+   the saved filters, "switch off", "save this view…" and "manage…". */
+.cl-page .cl-menu {
+    position: relative;
+}
+
+.cl-page .cl-menu > summary {
+    list-style: none;
+    cursor: pointer;
+}
+
+.cl-page .cl-menu > summary::-webkit-details-marker {
+    display: none;
+}
+
+.cl-page .cl-menu-summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 320px;
+}
+
+.cl-page .cl-menu-summary-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cl-page .cl-menu-summary.is-active {
+    border-color: var(--cl-accent);
+    background: var(--cl-accent-soft);
+    color: var(--cl-accent-ink);
+}
+
+.cl-page .cl-menu-caret {
+    width: 0;
+    height: 0;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 5px solid currentColor;
+    opacity: .7;
+}
+
+.cl-page .cl-menu[open] .cl-menu-caret {
+    transform: rotate(180deg);
+}
+
+.cl-page .cl-menu-list {
+    position: absolute;
+    z-index: var(--cl-z-pop);
+    top: calc(100% + 6px);
+    left: 0;
+    min-width: 280px;
+    max-width: 360px;
+    margin: 0;
+    padding: 6px;
+    list-style: none;
+    background: var(--cl-surface);
+    border: 1px solid var(--cl-line);
+    border-radius: var(--cl-radius);
+    box-shadow: var(--cl-shadow);
+}
+
+.cl-page .cl-menu-list li {
+    margin: 0;
+}
+
+.cl-page .cl-menu-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 36px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    color: var(--cl-ink);
+    font-size: 14px;
     text-decoration: none;
 }
 
-.cl-page a.cl-segment[aria-current="page"] {
-    background: var(--cl-surface);
+.cl-page .cl-menu-item:hover,
+.cl-page .cl-menu-item:focus-visible {
+    background: var(--cl-surface-2);
+    outline: none;
+}
+
+.cl-page .cl-menu-item[aria-current="true"] {
+    background: var(--cl-accent-soft);
     color: var(--cl-accent-ink);
-    box-shadow: 0 1px 2px rgba(14, 23, 33, .12), inset 0 0 0 1px var(--cl-accent);
     font-weight: 600;
 }
 
-.cl-page a.cl-segment[aria-current="page"] .cl-segment-count {
-    color: inherit;
+.cl-page .cl-menu-item-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-.cl-page .cl-segmented-divider {
-    width: 1px;
-    height: 24px;
-    background: var(--cl-line);
-    margin: 0 4px;
+.cl-page .cl-menu-item-meta {
     flex: 0 0 auto;
+    font-size: 12px;
+    color: var(--cl-ink-3);
 }
 
-.cl-page .cl-table-toolbar.is-stacked .cl-toolbar-filters nav.cl-segmented {
-    flex: 0 1 auto;
+.cl-page .cl-menu-item[aria-current="true"] .cl-menu-item-meta {
+    color: var(--cl-ink-2);
 }
 
-/* Orders: the open-status segments (seven labels, longer than the catalog's) keep their own width instead of
-   stretching evenly across the row. At 1280 px `flex: 1 1 auto` split the leftover space over whichever segments
-   wrapped to a second line, so a lone last segment (e.g. "W dostawie: 5") ended up alone and stretched full width.
-   Scoped to the orders toolbar (`is-orders`) and to 720 px and up so the phone horizontal-scroll bar (below), which
-   needs the segments to keep their content width without shrinking, is untouched (Task 14). */
-@media screen and (min-width: 720px) {
-    .cl-page .cl-table-toolbar.is-stacked.is-orders .cl-toolbar-filters .cl-segment {
-        flex: 0 1 auto;
-    }
+.cl-page .cl-menu-sep {
+    height: 1px;
+    margin: 6px 4px;
+    background: var(--cl-line);
 }
 
-/* Active narrowings under the toolbar, each with its own "Clear" (spec §5, row 3). */
+.cl-page .cl-menu-empty {
+    padding: 8px 10px;
+    font-size: 13px;
+    color: var(--cl-ink-2);
+}
+
+/* Search: the icon sits in the field, a clear "×" appears once something is searched (it is a link, so it works
+   without JavaScript; with it, orders-list.js also refreshes the list when the field is emptied). */
+.cl-page .cl-search-form {
+    display: flex;
+    align-items: center;
+    margin-left: auto;
+}
+
+.cl-page .cl-search-field {
+    position: relative;
+    width: 300px;
+}
+
+.cl-page .cl-search-icon {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--cl-ink-3);
+    pointer-events: none;
+}
+
+.cl-page .cl-search-field .cl-table-search {
+    width: 100%;
+    padding-left: 34px;
+    padding-right: 34px;
+}
+
+.cl-page .cl-search-field .cl-table-search::-webkit-search-cancel-button {
+    display: none;
+}
+
+.cl-page .cl-search-clear {
+    position: absolute;
+    right: 5px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    color: var(--cl-ink-2);
+    font-size: 18px;
+    line-height: 1;
+    text-decoration: none;
+}
+
+.cl-page .cl-search-clear:hover {
+    background: var(--cl-surface-2);
+    color: var(--cl-ink);
+}
+
+/* Active narrowings (chips with their own "×") and the count of what is left, on one line. */
+.cl-page .cl-list-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    padding: 10px 20px 12px;
+}
+
+.cl-page .cl-list-meta.is-count-only {
+    justify-content: flex-end;
+    padding-top: 6px;
+    padding-bottom: 8px;
+}
+
 .cl-page .cl-filter-chips {
-    grid-column: 1 / -1;
     display: flex;
     flex-wrap: wrap;
-    gap: var(--cl-gap-related);
+    gap: 8px;
 }
 
 .cl-page .cl-filter-chip {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
+    gap: 4px;
     min-height: 28px;
-    padding: 2px 10px;
+    padding: 2px 4px 2px 10px;
     border-radius: 12px;
     background: var(--cl-accent-soft);
     color: var(--cl-accent-ink);
@@ -4327,35 +4584,27 @@ a.cl-link-button:hover {
 }
 
 .cl-page .cl-filter-chip-clear {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
     color: var(--cl-accent-ink);
-    font-weight: 500;
-    text-decoration: underline;
-    text-underline-offset: 2px;
+    font-size: 16px;
+    line-height: 1;
+    text-decoration: none;
+}
+
+.cl-page .cl-filter-chip-clear:hover {
+    background: rgba(27, 77, 177, .15);
 }
 
 .cl-page .cl-table-results {
     margin: 0;
-    padding: 0 20px 10px;
-    font-size: 13px;
-    color: var(--cl-ink-2);
-}
-
-/* Search as a GET form: the field and its button share one row. */
-.cl-page .cl-search-form {
-    display: flex;
-    gap: var(--cl-gap-related);
-    align-items: center;
-    margin-left: auto;
-}
-
-.cl-page .cl-filter-form {
-    display: flex;
-    gap: var(--cl-gap-related);
-    align-items: center;
-}
-
-.cl-page .cl-filter-form .cl-select.is-compact {
-    min-width: 200px;
+    font-size: 12.5px;
+    color: var(--cl-ink-3);
+    font-variant-numeric: tabular-nums;
 }
 
 .cl-page .cl-page-action-form {
@@ -4382,9 +4631,15 @@ a.cl-link-button:hover {
     background: var(--cl-surface-2);
 }
 
+/* Muted text on the tinted hover row: --cl-ink-3 is 4.47:1 on --cl-surface-2 (design system §7, D-C2). */
+.cl-page .cl-table.is-orders tbody tr:hover .cl-table-sub:not(.cl-due-note):not(.cl-unpaid) {
+    color: var(--cl-ink-2);
+}
+
 .cl-page .cl-table.is-orders .cl-row-link {
     color: var(--cl-accent-ink);
     text-decoration: none;
+    font-variant-numeric: tabular-nums;
 }
 
 .cl-page .cl-table.is-orders .cl-row-link::after {
@@ -4403,14 +4658,15 @@ a.cl-link-button:hover {
     outline-offset: 2px;
 }
 
-.cl-page .cl-table.is-orders .cl-due-note {
-    font-weight: 600;
+.cl-page .cl-table.is-orders .cl-cell-date {
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
 }
 
-/* The " · " that joins the due note to the date above it, from 720 px up (D10 card mode below 720 px puts the note
-   on its own full-width line and drops it — see the phone block, Task 14 round 1). */
-.cl-page .cl-table.is-orders .cl-due-note::before {
-    content: " · ";
+/* "dziś" / "po terminie: N dni" as the second line of the date cell, in its tone. */
+.cl-page .cl-table.is-orders .cl-due-note {
+    font-weight: 600;
+    white-space: nowrap;
 }
 
 .cl-page .cl-table.is-orders .cl-due-note.is-bad {
@@ -4421,8 +4677,9 @@ a.cl-link-button:hover {
     color: var(--cl-warn);
 }
 
-.cl-page .cl-table .cl-table-sub.is-warn {
+.cl-page .cl-table.is-orders .cl-unpaid {
     color: var(--cl-warn);
+    font-weight: 500;
 }
 
 /* Pagination under a server-paged table. */
@@ -4437,13 +4694,7 @@ a.cl-link-button:hover {
     color: var(--cl-ink-2);
 }
 
-.cl-page .cl-pagination .cl-button.is-disabled {
-    color: var(--cl-ink-3);
-    pointer-events: none;
-}
-
-/* Any other cl-button rendered as a disabled <span> (e.g. the orders toolbar's "Zapisz widok…" when there is
-   nothing to save) — same treatment as the pagination one above, generic so any screen can reuse it. */
+/* A cl-button rendered as a disabled <span> (previous/next at the ends of the pages). */
 .cl-page .cl-button.is-disabled {
     color: var(--cl-ink-3);
     pointer-events: none;
@@ -4492,7 +4743,7 @@ a.cl-link-button:hover {
 
 /* Dialog with a form (filters): wider than the confirmation, scrolling body. */
 .cl-page .cl-dialog.is-form {
-    width: min(560px, calc(100vw - 32px));
+    width: min(600px, calc(100vw - 32px));
 }
 
 .cl-page .cl-dialog.is-form .cl-dialog-body {
@@ -4505,16 +4756,40 @@ a.cl-link-button:hover {
     margin: 0;
 }
 
+/* A saved filter in the management list: star | name + conditions as small pills | Edit · Delete. */
+.cl-page .cl-list .cl-list-item.is-filter {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 12px;
+    padding: 10px 0;
+}
+
+.cl-page .cl-list-item.is-filter .cl-list-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.cl-page .cl-filter-conditions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 6px;
+}
+
+.cl-page .cl-filter-conditions .cl-status {
+    font-weight: 500;
+}
+
+.cl-page .cl-list-item.is-filter .cl-list-actions {
+    display: flex;
+    gap: 12px;
+    white-space: nowrap;
+}
+
 @media screen and (max-width: 1023px) {
-    .cl-page .cl-stat-grid-attention {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    .cl-page .cl-stat.is-link {
-        min-height: 44px;
-    }
-
-    .cl-page a.cl-segment {
+    .cl-page .cl-attention-item {
         min-height: 44px;
     }
 
@@ -4527,15 +4802,22 @@ a.cl-link-button:hover {
         min-height: 44px;
     }
 
-    /* Orders: the chip's "Wyczyść" link is 19 px of underlined text — below 1024 px it gets a 44 px tap area of its
-       own without inflating the chip's own height (Task 14). `.cl-filter-chip-clear` exists only on the orders
-       list, so this needs no extra scoping. */
-    .cl-page .cl-filter-chip-clear {
-        display: inline-flex;
-        align-items: center;
+    .cl-page .cl-menu-item {
         min-height: 44px;
-        margin: -8px -2px;
-        padding: 0 2px;
+    }
+
+    /* 44 px tap targets for the two "×" without inflating the chip or the field: the box grows, the margins take
+       the growth back. */
+    .cl-page .cl-filter-chip-clear {
+        width: 44px;
+        height: 44px;
+        margin: -8px -6px -8px -4px;
+    }
+
+    .cl-page .cl-search-clear {
+        width: 44px;
+        height: 44px;
+        right: 0;
     }
 }
 
@@ -4546,76 +4828,57 @@ a.cl-link-button:hover {
         justify-content: center;
     }
 
-    /* Task 14 round 1: the open-status nav, the divider and the history nav used to share one scrolling row; once
-       the open-status nav wrapped onto two lines above 390-719 px widths, the divider was stranded alone on its
-       own row with the history nav pushed below it anyway. Below 720 px each nav is its own full-width,
-       independently-scrolling row instead (the fade says there is more), and the divider — redundant once the two
-       navs are already on separate rows — is hidden. */
-    .cl-page .cl-segmented-scroll {
-        display: flex;
-        flex-direction: column;
-        align-items: stretch;
-        gap: 8px;
+    .cl-page .cl-attention {
+        gap: 0 20px;
     }
 
-    .cl-page .cl-segmented-scroll .cl-segmented {
-        position: relative;
+    /* Tabs scroll sideways in one row; the history pair follows the open statuses in the same row. */
+    .cl-page .cl-tabs-row {
         flex-wrap: nowrap;
         overflow-x: auto;
         scrollbar-width: none;
         -webkit-overflow-scrolling: touch;
-        margin: 0 -16px;
         padding: 0 16px;
     }
 
-    .cl-page .cl-segmented-scroll .cl-segmented::-webkit-scrollbar {
+    .cl-page .cl-tabs-row::-webkit-scrollbar {
         display: none;
     }
 
-    .cl-page .cl-segmented-divider {
-        display: none;
-    }
-
-    .cl-page .cl-table-toolbar.is-stacked .cl-toolbar-filters nav.cl-segmented {
-        flex: 0 0 auto;
+    .cl-page .cl-tabs {
         flex-wrap: nowrap;
     }
 
-    .cl-page .cl-table-toolbar.is-stacked .cl-toolbar-filters .cl-segment {
-        flex: 0 0 auto;
+    .cl-page .cl-list-controls {
+        flex-direction: column;
+        align-items: stretch;
+        padding: 12px 16px 0;
     }
 
-    .cl-page .cl-filter-form,
+    .cl-page .cl-menu-summary {
+        max-width: none;
+        width: 100%;
+        justify-content: flex-start;
+    }
+
+    .cl-page .cl-menu-list {
+        left: 0;
+        right: 0;
+        max-width: none;
+    }
+
     .cl-page .cl-search-form,
-    .cl-page .cl-filter-form .cl-select.is-compact,
-    .cl-page .cl-search-form .cl-table-search {
+    .cl-page .cl-search-field {
         width: 100%;
     }
 
-    .cl-page .cl-search-form .cl-search-button-text {
-        display: none;
-    }
-
-    /* Task 14 round 1: "37 · 72 762,00 PLN" (Nieopłacone tile) wrapped across three lines in the narrower 2×2 tile
-       below 720 px. The value moves to its own line under the count instead, and the " · " that joins them inline
-       from 1024 px up (kept in `.cl-stat-value-sep`) is redundant once the line break already separates them. */
-    .cl-page .cl-stat-grid-attention .cl-stat-value-of {
-        display: block;
-        font-size: 12.5px;
-        margin-top: 2px;
-    }
-
-    .cl-page .cl-stat-grid-attention .cl-stat-value-sep {
-        display: none;
-    }
-
-    .cl-page .cl-table-results {
+    .cl-page .cl-list-meta {
         padding-left: 16px;
         padding-right: 16px;
     }
 
-    /* Card A (D10): number + status / context / date + amount. The shared card mode already hides thead and
-       stacks rows; here the cells drop their labels and fall into a two-column grid. */
+    /* Card A (D10): number + status / context / date + amount / due note + unpaid. The shared card mode already
+       hides thead and stacks rows; here the cells drop their labels and fall into a two-column grid. */
     .cl-page .cl-table.is-orders tr {
         display: grid;
         grid-template-columns: minmax(0, 1fr) auto;
@@ -4657,31 +4920,23 @@ a.cl-link-button:hover {
         display: none;
     }
 
-    .cl-page .cl-table.is-orders .cl-cell-due > span:first-child {
+    .cl-page .cl-table.is-orders .cl-cell-date {
         grid-column: 1;
     }
 
-    .cl-page .cl-table.is-orders .is-numeric > span:first-child {
+    .cl-page .cl-table.is-orders .cl-cell-amount {
         grid-column: 2;
         justify-self: end;
         text-align: right;
     }
 
-    .cl-page .cl-table.is-orders .cl-table-sub.is-warn {
-        grid-column: 2;
-        justify-self: end;
-    }
-
-    /* Task 14 round 1: "po terminie: 2 dni" wrapped to three lines squeezed into the narrow date column (grid-column
-       1 of a minmax(0,1fr)/auto row). Its own full-width line below the date/amount line instead, and the " · "
-       that joins it to the date above (kept from 720 px up, see the base rule) drops here — the line break already
-       separates them. */
     .cl-page .cl-table.is-orders .cl-due-note {
         grid-column: 1 / -1;
     }
 
-    .cl-page .cl-table.is-orders .cl-due-note::before {
-        content: none;
+    .cl-page .cl-table.is-orders .cl-unpaid {
+        grid-column: 1 / -1;
+        justify-self: end;
     }
 
     .cl-page .cl-pagination {
@@ -4689,21 +4944,28 @@ a.cl-link-button:hover {
         padding-right: 16px;
     }
 
-    /* Phone sort bar (spec §6): only reachable place to sort once thead is hidden below 720 px. Same look as
-       a.cl-segment[aria-current="page"] for the active one, 44 px tap targets, horizontal scroll if it overflows
-       a narrow phone. */
+    /* Phone sort bar (spec §6): the only reachable place to sort once thead is hidden below 720 px. */
     .cl-page .cl-table-sortbar {
         display: flex;
-        gap: 8px;
+        gap: 4px;
         align-items: center;
-        padding: 10px 16px;
+        padding: 0 16px;
         border-bottom: 1px solid var(--cl-line);
         overflow-x: auto;
+        scrollbar-width: none;
     }
 
-    .cl-page .cl-table-sortbar .cl-segment {
-        min-height: 44px;
-        display: inline-flex;
-        align-items: center;
+    .cl-page .cl-table-sortbar .cl-eyebrow {
+        margin-right: 6px;
+    }
+
+    /* The management list stacks on a phone: star + name, then conditions, then the actions. */
+    .cl-page .cl-list .cl-list-item.is-filter {
+        grid-template-columns: auto minmax(0, 1fr);
+    }
+
+    .cl-page .cl-list-item.is-filter .cl-list-actions {
+        grid-column: 2;
+        justify-content: flex-start;
     }
 }

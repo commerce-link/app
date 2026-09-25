@@ -23,21 +23,21 @@
     <div data-cl-filters-list>
         <ul class="cl-list" th:unless="${filters.sharedWithStore().isEmpty() and filters.own().isEmpty()}">
             <th:block th:each="group : ${ {filters.sharedWithStore(), filters.own()} }" th:with="shared=${groupStat.first}">
-                <li class="cl-list-item" th:each="filter : ${group}">
+                <li class="cl-list-item is-filter" th:each="filter : ${group}" th:with="starred=${filters.isDefault(filter.id)}">
                     <form method="post" class="cl-star-form" data-cl-filters-form
-                          th:action="${filters.isDefault(filter.id)} ? @{/dashboard/orders/filters/default/clear} : @{/dashboard/orders/filters/{id}/default(id=${filter.id})}">
+                          th:action="${starred} ? @{/dashboard/orders/filters/default/clear} : @{/dashboard/orders/filters/{id}/default(id=${filter.id})}">
                         <input type="hidden" name="returnTo" th:value="${returnTo}"/>
-                        <button type="submit" class="cl-star" th:attr="aria-pressed=${filters.isDefault(filter.id)},
-                                aria-label=${filters.isDefault(filter.id)} ? #{orders.filters.default.clear(${filter.label})} : #{orders.filters.default.set(${filter.label})}">
-                            <span class="icon is-small" aria-hidden="true"><i th:class="${filters.isDefault(filter.id)} ? 'fas fa-star' : 'far fa-star'"></i></span>
+                        <button type="submit" class="cl-star" th:attr="aria-pressed=${starred},
+                                aria-label=${starred} ? #{orders.filters.default.clear(${filter.label})} : #{orders.filters.default.set(${filter.label})}">
+                            <span class="icon is-small" aria-hidden="true"><i th:class="${starred} ? 'fas fa-star' : 'far fa-star'"></i></span>
                         </button>
                     </form>
                     <div>
-                        <span class="cl-list-title" th:text="${filter.label}"></span>
-                        <p class="cl-list-desc">
-                            <th:block th:each="c, s : ${filter.conditions}"><span th:text="${#messages.msg('orders.filters.field.' + T(pl.commercelink.web.orders.FilterConditionLabels).fieldKey(c.field))} + ': ' + ${T(pl.commercelink.web.orders.FilterConditionLabels).value(c, #messages)}"></span><span th:unless="${s.last}"> · </span></th:block>
-                            · <span th:text="${shared} ? #{orders.filters.scope.store} : #{orders.filters.scope.private}"></span>
-                        </p>
+                        <span class="cl-list-title"><span th:text="${filter.label}"></span><span th:if="${starred}" class="cl-status is-info" th:text="#{orders.filters.default.badge}"></span></span>
+                        <div class="cl-filter-conditions">
+                            <span class="cl-status is-neutral" th:each="c : ${filter.conditions}" th:text="${#messages.msg('orders.filters.field.' + T(pl.commercelink.web.orders.FilterConditionLabels).fieldKey(c.field))} + ': ' + ${T(pl.commercelink.web.orders.FilterConditionLabels).value(c, #messages)}"></span>
+                            <span class="cl-status is-neutral" th:text="${shared} ? #{orders.filters.scope.store} : #{orders.filters.scope.private}"></span>
+                        </div>
                     </div>
                     <div class="cl-list-actions" th:if="${!shared or canManageStoreFilters}">
                         <button type="button" class="cl-link-button" data-cl-filter-edit
@@ -62,7 +62,7 @@
             </th:block>
         </ul>
         <p class="cl-list-empty" th:if="${filters.sharedWithStore().isEmpty() and filters.own().isEmpty()}" th:text="#{orders.filters.empty}"></p>
-        <p class="cl-help" th:text="#{orders.filters.default.help}"></p>
+        <p class="cl-help cl-filters-help" th:text="#{orders.filters.default.help}"></p>
         <div class="cl-dialog-actions">
             <button type="button" class="cl-button is-primary" data-cl-filter-new th:text="#{orders.filters.new}"></button>
             <a class="cl-button" th:href="@{${returnTo}}" data-cl-dialog-close th:text="#{orders.filters.close}"></a>

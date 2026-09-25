@@ -96,7 +96,7 @@ class OrderListServiceTest {
 
         assertThat(model.rows()).extracting(r -> r.href()).containsExactly(
                 "/dashboard/orders/late", "/dashboard/orders/today", "/dashboard/orders/soon", "/dashboard/orders/none");
-        assertThat(model.resultsLine()).isEqualTo("Wyniki: 4");
+        assertThat(model.resultsLine()).isEqualTo("Zamówienia: 4");
         assertThat(page(query("sort", "due", "dir", "desc")).rows()).extracting(r -> r.href()).containsExactly(
                 "/dashboard/orders/soon", "/dashboard/orders/today", "/dashboard/orders/late", "/dashboard/orders/none");
     }
@@ -206,7 +206,7 @@ class OrderListServiceTest {
         assertThat(page(query("sort", "amount", "dir", "desc")).rows()).extracting(r -> r.href()).containsExactly("/dashboard/orders/b", "/dashboard/orders/c", "/dashboard/orders/a");
         assertThat(page(query("sort", "number")).rows()).extracting(r -> r.href()).containsExactly("/dashboard/orders/a", "/dashboard/orders/b", "/dashboard/orders/c");
         assertThat(page(query("status", "Completed")).rows()).extracting(r -> r.href()).containsExactly("/dashboard/orders/h2", "/dashboard/orders/h1");
-        assertThat(page(query("status", "Completed")).resultsLine()).isEqualTo("Wyniki: 2 · najnowsze pierwsze");
+        assertThat(page(query("status", "Completed")).resultsLine()).isEqualTo("Zamówienia: 2 · najnowsze pierwsze");
         assertThat(page(query("sort", "amount")).sortHeaders().get(OrderListQuery.Sort.AMOUNT).ariaSort()).isEqualTo("ascending");
         assertThat(page(query("sort", "amount")).sortHeaders().get(OrderListQuery.Sort.AMOUNT).href()).isEqualTo("/dashboard/orders?sort=amount&dir=desc");
         assertThat(page(query()).sortHeaders().get(OrderListQuery.Sort.DUE).ariaSort()).isEqualTo("ascending");
