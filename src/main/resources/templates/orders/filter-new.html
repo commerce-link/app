@@ -1,0 +1,17 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+<div layout:fragment="content">
+    <section class="cl-page">
+        <div class="cl-page-body is-form">
+            <div th:replace="~{fragments/settings-header :: subpage(${returnTo}, #{orders.filters.page.back}, #{orders.filters.saveView.title})}"></div>
+            <section class="cl-card">
+                <div th:replace="~{orders/filters :: saveViewBody}"></div>
+            </section>
+        </div>
+    </section>
+</div>
+</body>
+</html>

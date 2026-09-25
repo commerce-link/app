@@ -123,7 +123,7 @@ class OrderListServiceTest {
         OrdersPageModel model = page(query("status", "New", "filterId", filter.getId()));
 
         assertThat(model.saveViewConditions()).extracting(c -> c.label()).containsExactly(
-                "Status zamówienia: Nowe",
+                "Otwieraj na statusie: Nowe",
                 "Sposób dostawy: Kurier",
                 "Marketplace: Allegro",
                 "Kod pocztowy zaczyna się od: 30-");

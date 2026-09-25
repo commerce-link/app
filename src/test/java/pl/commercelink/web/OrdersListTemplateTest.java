@@ -57,4 +57,21 @@ class OrdersListTemplateTest {
     private static int countOf(String html, String needle) {
         return html.split(Pattern.quote(needle), -1).length - 1;
     }
+
+    private static String filters() throws Exception {
+        return Files.readString(Path.of("src/main/resources/templates/orders/filters.html"), StandardCharsets.UTF_8);
+    }
+
+    @Test
+    void filterDialogsCarryTheStarTheReturnAddressAndWorkAsPages() throws Exception {
+        String html = filters();
+        assertThat(html).contains("th:fragment=\"filtersDialog\"").contains("th:fragment=\"saveViewDialog\"")
+                .contains("th:fragment=\"dialogBody\"").contains("id=\"filters-dialog\"").contains("id=\"save-view-dialog\"")
+                .contains("cl-dialog is-form").contains("data-cl-dialog-body").contains("data-cl-dialog-close")
+                .contains("class=\"cl-star\"").contains("aria-pressed").contains("/default").contains("default/clear")
+                .contains("name=\"returnTo\"").contains("name=\"makeDefault\"").contains("data-cl-confirm")
+                .contains("orders.filters.field.status.help").contains("th:if=\"${canManageStoreFilters}\"")
+                .doesNotContain("style=").doesNotContain("onclick=").doesNotContain("class=\"button");
+        assertThat(page()).contains("orders/filters :: filtersDialog").contains("orders/filters :: saveViewDialog");
+    }
 }

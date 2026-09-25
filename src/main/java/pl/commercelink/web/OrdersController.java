@@ -66,11 +66,13 @@ import pl.commercelink.web.dtos.OrderItemsForm;
 import pl.commercelink.web.dtos.SplitGroupForm;
 import pl.commercelink.web.dtos.SplitGroupPreviewDto;
 import pl.commercelink.web.orders.OrderListQuery;
+import pl.commercelink.web.settings.ConfirmAction;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URLDecoder;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
@@ -222,8 +224,7 @@ public class OrdersController extends BaseController {
             if (!form.isMakeDefault()) {
                 return safeReturnTo(form.getReturnTo());
             }
-            OrderListQuery target = OrderListQuery.parse(queryOf(safeReturnTo(form.getReturnTo())))
-                    .withFilterId(created.getId());
+            OrderListQuery target = parseReturnTo(safeReturnTo(form.getReturnTo())).withFilterId(created.getId());
             return target.withStatus(statusOf(created).orElse(target.status())).href();
         });
     }
@@ -248,9 +249,28 @@ public class OrdersController extends BaseController {
                                     HttpServletResponse response) {
         return filterAction(requestedWith, returnTo, redirectAttributes, model, locale, response, () -> {
             orderFilters.delete(actor(), filterId);
-            OrderListQuery back = OrderListQuery.parse(queryOf(safeReturnTo(returnTo)));
+            OrderListQuery back = parseReturnTo(safeReturnTo(returnTo));
             return filterId.equals(back.filterId()) ? back.withFilterId(null).href() : back.href();
         });
+    }
+
+    /** The no-JS confirmation page for the delete link (data-cl-confirm opens the shared dialog with JavaScript). */
+    @GetMapping("/dashboard/orders/filters/delete")
+    @PreAuthorize("!hasRole('SUPER_ADMIN')")
+    public String confirmDeleteOrderFilter(@RequestParam String filterId, @RequestParam(required = false) String returnTo,
+                                           Locale locale, Model model) {
+        OrderFilter filter = orderFilters.list(actor()).byId(filterId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        String back = safeReturnTo(returnTo);
+        String actionPath = "/dashboard/orders/filters/delete?filterId=" + URLEncoder.encode(filter.getId(), StandardCharsets.UTF_8)
+                + "&returnTo=" + URLEncoder.encode(back, StandardCharsets.UTF_8);
+        model.addAttribute("confirm", new ConfirmAction(
+                messageSource.getMessage("orders.filters.delete.title", new Object[]{filter.getLabel()}, locale),
+                messageSource.getMessage("orders.filters.delete.message", null, locale),
+                messageSource.getMessage("orders.filters.delete.action", null, locale),
+                actionPath, back));
+        model.addAttribute("backLabel", messageSource.getMessage("orders.filters.page.back", null, locale));
+        return "settings-confirm";
     }
 
     @PostMapping("/dashboard/orders/filters/{filterId}/default")
@@ -291,7 +311,7 @@ public class OrdersController extends BaseController {
     public String newOrderFilterPage(@RequestParam(required = false) String returnTo, Locale locale, Model model) {
         String back = safeReturnTo(returnTo);
         addFilterFormAttributes(model, back, locale);
-        model.addAttribute("page", orderListService.page(actor(), OrderListQuery.parse(queryOf(back)), LocalDate.now(), locale));
+        model.addAttribute("page", orderListService.page(actor(), parseReturnTo(back), LocalDate.now(), locale));
         return "orders/filter-new";
     }
 
@@ -351,6 +371,16 @@ public class OrdersController extends BaseController {
                 .collect(LinkedMultiValueMap::new,
                         (map, e) -> e.getValue().forEach(v -> map.add(e.getKey(), v == null ? "" : URLDecoder.decode(v, StandardCharsets.UTF_8))),
                         LinkedMultiValueMap::addAll);
+    }
+
+    /** A malformed address (an unbalanced "%" from a truncated returnTo) falls back to the bare list rather than
+     * throwing out of a filter action. */
+    private static OrderListQuery parseReturnTo(String href) {
+        try {
+            return OrderListQuery.parse(queryOf(href));
+        } catch (IllegalArgumentException e) {
+            return OrderListQuery.parse(queryOf(OrderListQuery.PATH));
+        }
     }
 
     private FilterActor actor() {

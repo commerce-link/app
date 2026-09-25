@@ -1369,5 +1369,39 @@ class OrdersControllerTest {
             assertThat(model.get("filterError")).isEqualTo("Filtr musi mieć nazwę.");
             assertThat(response.getStatus()).isEqualTo(422);
         }
+
+        @Test
+        void malformedReturnToFallsBackToTheBareList() {
+            String view = ordersController.deleteOrderFilter("f1", "/dashboard/orders?x=%", null,
+                    new RedirectAttributesModelMap(), new ExtendedModelMap(), Locale.forLanguageTag("pl"),
+                    new org.springframework.mock.web.MockHttpServletResponse());
+            assertThat(view).isEqualTo("redirect:/dashboard/orders");
+            verify(orderFilters).delete(ACTOR, "f1");
+        }
+
+        @Test
+        void deleteConfirmationPageShowsTheFilterLabelAndPostsBackToDelete() {
+            var filter = pl.commercelink.orders.filters.model.OrderFilter.of("Do wysłania", List.of(
+                    pl.commercelink.orders.filters.model.OrderFilterCondition.of(pl.commercelink.orders.filters.OrderFilterField.Status, "New")));
+            when(orderFilters.list(ACTOR)).thenReturn(new pl.commercelink.orders.filters.services.ListOrderFiltersView(List.of(), List.of(filter)));
+            when(messageSource.getMessage(eq("orders.filters.delete.title"), any(), any(Locale.class))).thenReturn("Usunąć filtr „Do wysłania”?");
+            when(messageSource.getMessage(eq("orders.filters.delete.message"), any(), any(Locale.class))).thenReturn("...");
+            when(messageSource.getMessage(eq("orders.filters.delete.action"), any(), any(Locale.class))).thenReturn("Usuń filtr");
+            when(messageSource.getMessage(eq("orders.filters.page.back"), any(), any(Locale.class))).thenReturn("‹ Zamówienia");
+
+            ExtendedModelMap model = new ExtendedModelMap();
+            String view = ordersController.confirmDeleteOrderFilter(filter.getId(), "/dashboard/orders", Locale.forLanguageTag("pl"), model);
+
+            assertThat(view).isEqualTo("settings-confirm");
+            var confirm = (pl.commercelink.web.settings.ConfirmAction) model.get("confirm");
+            assertThat(confirm.actionPath()).contains(filter.getId());
+        }
+
+        @Test
+        void deleteConfirmationPageIs404ForAnUnknownFilter() {
+            assertThatThrownBy(() -> ordersController.confirmDeleteOrderFilter("unknown", "/dashboard/orders",
+                    Locale.forLanguageTag("pl"), new ExtendedModelMap()))
+                    .isInstanceOf(ResponseStatusException.class);
+        }
     }
 }

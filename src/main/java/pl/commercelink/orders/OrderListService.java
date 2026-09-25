@@ -8,6 +8,7 @@ import pl.commercelink.orders.filters.model.OrderFilter;
 import pl.commercelink.orders.filters.model.OrderFilterCondition;
 import pl.commercelink.orders.filters.services.ListOrderFiltersView;
 import pl.commercelink.orders.filters.services.OrderFiltersService;
+import pl.commercelink.web.orders.FilterConditionLabels;
 import pl.commercelink.web.orders.OrderListQuery;
 import pl.commercelink.web.orders.OrderListQuery.Direction;
 import pl.commercelink.web.orders.OrderListQuery.Sort;
@@ -261,33 +262,9 @@ public class OrderListService {
     }
 
     private String conditionLabel(OrderFilterCondition c, Locale locale) {
-        String field = switch (c.getField()) {
-            case ShipmentType -> text("orders.filters.field.shipment.type", locale);
-            case PaymentSource -> text("orders.filters.field.payment.source", locale);
-            case ShippingDue -> text("orders.filters.field.shipping.due", locale);
-            case SourceName -> text("orders.filters.field.marketplace", locale);
-            case ShippingPostalCode -> text("orders.filters.field.postal.code", locale);
-            case Status -> text("orders.filters.field.status", locale);
-        };
-        String value = switch (c.getField()) {
-            case ShipmentType -> enumLabel(ShipmentType.class, c.getValue(), "ShipmentType.", locale);
-            case PaymentSource -> enumLabel(PaymentSource.class, c.getValue(), "PaymentSource.", locale);
-            case ShippingDue -> enumLabel(pl.commercelink.orders.filters.ShippingDue.class, c.getValue(), "ShippingDue.", locale);
-            case Status -> enumLabel(OrderStatus.class, c.getValue(), "OrderStatus.", locale);
-            default -> c.getValue();
-        };
+        String field = text("orders.filters.field." + FilterConditionLabels.fieldKey(c.getField()), locale);
+        String value = FilterConditionLabels.value(c, key -> text(key, locale));
         return field + ": " + value;
-    }
-
-    /** Stored condition values are trimmed raw strings that may differ in case from the enum name (OrderFilterField
-     * normalizes to upper case for matching); resolve the enum case-insensitively before building the label key,
-     * falling back to the raw value when nothing matches. */
-    private <E extends Enum<E>> String enumLabel(Class<E> type, String rawValue, String keyPrefix, Locale locale) {
-        return java.util.Arrays.stream(type.getEnumConstants())
-                .filter(v -> v.name().equalsIgnoreCase(rawValue))
-                .findFirst()
-                .map(v -> text(keyPrefix + v.name(), locale))
-                .orElse(rawValue);
     }
 
     private String text(String key, Locale locale, Object... args) {

@@ -2,12 +2,15 @@ package pl.commercelink.orders.filters.model;
 
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBAttribute;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBDocument;
+import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBIgnore;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.filters.exceptions.OrderFilterInvalidException;
 
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -90,5 +93,15 @@ public class OrderFilter {
 
     public void setConditions(List<OrderFilterCondition> conditions) {
         this.conditions = conditions;
+    }
+
+    /** The filter's conditions as field.name() -> value, for the "Edytuj" button to prefill the form (spec §7.4). */
+    @DynamoDBIgnore
+    public Map<String, String> getConditionsByField() {
+        Map<String, String> byField = new LinkedHashMap<>();
+        conditions.stream()
+                .filter(condition -> Objects.nonNull(condition.getField()))
+                .forEach(condition -> byField.put(condition.getField().name(), condition.getValue()));
+        return byField;
     }
 }
