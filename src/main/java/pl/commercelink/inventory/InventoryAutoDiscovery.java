@@ -6,7 +6,7 @@ import pl.commercelink.inventory.supplier.api.InventoryItem;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
 import pl.commercelink.taxonomy.Taxonomy;
-import pl.commercelink.taxonomy.TaxonomyCache;
+import pl.commercelink.taxonomy.TaxonomyCatalog;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -15,12 +15,12 @@ import java.util.stream.Collectors;
 class InventoryAutoDiscovery {
 
     private PimCatalog pimCatalog;
-    private TaxonomyCache taxonomyCache;
+    private TaxonomyCatalog taxonomyCatalog;
     private SupplierRegistry supplierRegistry;
 
-    public InventoryAutoDiscovery(PimCatalog pimCatalog, TaxonomyCache taxonomyCache, SupplierRegistry supplierRegistry) {
+    public InventoryAutoDiscovery(PimCatalog pimCatalog, TaxonomyCatalog taxonomyCatalog, SupplierRegistry supplierRegistry) {
         this.pimCatalog = pimCatalog;
-        this.taxonomyCache = taxonomyCache;
+        this.taxonomyCatalog = taxonomyCatalog;
         this.supplierRegistry = supplierRegistry;
     }
 
@@ -93,7 +93,7 @@ class InventoryAutoDiscovery {
         Set<String> productCodes = groups.stream()
                 .flatMap(group -> group.getMfnCodes().stream())
                 .collect(Collectors.toSet());
-        Map<String, Taxonomy> byMfn = taxonomyCache.findByMfns(productCodes);
+        Map<String, Taxonomy> byMfn = taxonomyCatalog.findByMfns(productCodes);
         groups.forEach(group -> group.adoptTaxonomy(Taxonomy.bestOf(group.getMfnCodes(), byMfn)));
     }
 

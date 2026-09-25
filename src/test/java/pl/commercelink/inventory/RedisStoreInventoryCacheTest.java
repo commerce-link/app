@@ -13,7 +13,7 @@ import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.http.converter.json.Jackson2ObjectMapperBuilder;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
-import pl.commercelink.taxonomy.TaxonomyCache;
+import pl.commercelink.taxonomy.TaxonomyCatalog;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -36,7 +36,7 @@ class RedisStoreInventoryCacheTest {
 
     @Mock private StringRedisTemplate redisTemplate;
     @Mock private ValueOperations<String, String> valueOps;
-    @Mock private TaxonomyCache taxonomyCache;
+    @Mock private TaxonomyCatalog taxonomyCatalog;
     @Mock private SupplierRegistry supplierRegistry;
 
     private final ObjectMapper objectMapper = Jackson2ObjectMapperBuilder.json().build();

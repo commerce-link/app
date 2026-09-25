@@ -10,7 +10,7 @@ import pl.commercelink.inventory.supplier.api.InventoryItem;
 import pl.commercelink.inventory.supplier.api.ParsedRow;
 import pl.commercelink.inventory.supplier.api.SupplierProduct;
 import pl.commercelink.taxonomy.Taxonomy;
-import pl.commercelink.taxonomy.TaxonomyCache;
+import pl.commercelink.taxonomy.TaxonomyCatalog;
 import pl.commercelink.taxonomy.TaxonomyCategoryEnrichment;
 import pl.commercelink.taxonomy.TaxonomyMerge;
 
@@ -31,7 +31,7 @@ class FeedRowProcessorTest {
     @Mock
     private DataCorrection dataCorrection;
     @Mock
-    private TaxonomyCache taxonomyCache;
+    private TaxonomyCatalog taxonomyCatalog;
     @Mock
     private TaxonomyCategoryEnrichment enrichment;
     @Mock
@@ -69,7 +69,7 @@ class FeedRowProcessorTest {
         // then
         assertThat(result).containsExactly(sellableItem);
         verify(merge).apply(categorizedTaxonomy);
-        verify(taxonomyCache).commit(merge);
+        verify(taxonomyCatalog).commit(merge);
         verify(stats).markImported();
         verify(stats, never()).markImportedCategorized();
         verify(stats, never()).markInvalid();
@@ -220,8 +220,8 @@ class FeedRowProcessorTest {
 
         // then
         assertThat(result).isEmpty();
-        verify(taxonomyCache, never()).openMerge(any());
-        verify(taxonomyCache, never()).commit(any());
+        verify(taxonomyCatalog, never()).openMerge(any());
+        verify(taxonomyCatalog, never()).commit(any());
         verify(enrichment, never()).addPending(any(), any());
         verify(stats).markInvalid();
         verify(stats, never()).markImported();
@@ -265,8 +265,8 @@ class FeedRowProcessorTest {
 
         // then
         assertThat(result).containsExactly(sellableItem, secondItem);
-        verify(taxonomyCache, times(1)).openMerge(List.of("MFN-1", "MFN-2"));
-        verify(taxonomyCache, times(1)).commit(merge);
+        verify(taxonomyCatalog, times(1)).openMerge(List.of("MFN-1", "MFN-2"));
+        verify(taxonomyCatalog, times(1)).commit(merge);
     }
 
     @Test
@@ -276,7 +276,7 @@ class FeedRowProcessorTest {
 
         // then
         assertThat(result).isEmpty();
-        verify(taxonomyCache, never()).openMerge(any());
+        verify(taxonomyCatalog, never()).openMerge(any());
     }
 
     private ParsedRow row() {
@@ -284,7 +284,7 @@ class FeedRowProcessorTest {
     }
 
     private void givenMerge() {
-        when(taxonomyCache.openMerge(any())).thenReturn(merge);
+        when(taxonomyCatalog.openMerge(any())).thenReturn(merge);
     }
 
     private void givenPendingRow() {

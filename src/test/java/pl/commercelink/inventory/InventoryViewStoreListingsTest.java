@@ -18,7 +18,7 @@ import pl.commercelink.products.ProductRecommendationEngine;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
-import pl.commercelink.taxonomy.TaxonomyCache;
+import pl.commercelink.taxonomy.TaxonomyCatalog;
 import pl.commercelink.warehouse.api.StockQueryService;
 import pl.commercelink.warehouse.api.Warehouse;
 import pl.commercelink.warehouse.api.WarehouseItemView;
@@ -53,7 +53,7 @@ class InventoryViewStoreListingsTest {
     @Mock
     private InventoryAutoDiscovery autoDiscovery;
     @Mock
-    private TaxonomyCache taxonomyCache;
+    private TaxonomyCatalog taxonomyCatalog;
     @Mock
     private SupplierRegistry supplierRegistry;
     @Mock
@@ -425,13 +425,13 @@ class InventoryViewStoreListingsTest {
     }
 
     @Test
-    void singleLookupAsksTheCacheWhenTheIndexedGroupHasNoCategoryYet() {
+    void singleLookupAsksTheCatalogWhenTheIndexedGroupHasNoCategoryYet() {
         // given
         Taxonomy uncategorized = new Taxonomy(EAN, MFN, "Intel", "i7", null, 5, null, null);
         Taxonomy justCategorized = new Taxonomy(EAN, MFN, "Intel", "i7", "Procesory", 5, null, null, null, "989");
         stubGlobalIndex(List.of(categorized(new MatchedInventory(new InventoryKey(EAN, MFN),
                 List.of(item("AB Group", 1399.0)), supplierRegistry), uncategorized)));
-        when(taxonomyCache.findBest(any())).thenReturn(justCategorized);
+        when(taxonomyCatalog.findBest(any())).thenReturn(justCategorized);
 
         // when
         MatchedInventory matched = inventory.withGlobalData().findByProductCode(MFN);
@@ -450,7 +450,7 @@ class InventoryViewStoreListingsTest {
         inventory.withEnabledSuppliersOnly(STORE_ID).findAllByProductCategoryIds(List.of("989", "170"));
 
         // then
-        org.mockito.Mockito.verifyNoInteractions(taxonomyCache);
+        org.mockito.Mockito.verifyNoInteractions(taxonomyCatalog);
     }
 
     @Test
@@ -473,7 +473,7 @@ class InventoryViewStoreListingsTest {
         InventoryIndex mergingIndex = InventoryIndex.of(List.of(groupB));
 
         InventoryView view = new InventoryView(globalIndex, InventoryIndex.of(List.of()),
-                taxonomyCache, supplierRegistry,
+                taxonomyCatalog, supplierRegistry,
                 GroupInventorySource.global(globalIndex, supplier -> true),
                 GroupInventorySource.global(mergingIndex, supplier -> true));
 

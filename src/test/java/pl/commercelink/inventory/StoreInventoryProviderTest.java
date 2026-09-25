@@ -22,7 +22,7 @@ import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoreSupplierConnection;
 import pl.commercelink.stores.StoresRepository;
-import pl.commercelink.taxonomy.TaxonomyCache;
+import pl.commercelink.taxonomy.TaxonomyCatalog;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -64,7 +64,7 @@ class StoreInventoryProviderTest {
     @Mock
     private ExchangeRates exchangeRates;
     @Mock
-    private TaxonomyCache taxonomyCache;
+    private TaxonomyCatalog taxonomyCatalog;
 
     @InjectMocks
     private StoreInventoryProvider provider;

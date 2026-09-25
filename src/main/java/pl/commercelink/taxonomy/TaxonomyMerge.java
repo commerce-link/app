@@ -24,7 +24,11 @@ public class TaxonomyMerge {
         if (candidate == null || isBlank(candidate.mfn())) {
             return;
         }
-        merged.put(candidate.mfn(), TaxonomyCache.mergeOf(latest(candidate.mfn()), candidate));
+        merged.put(candidate.mfn(), TaxonomyCatalog.mergeOf(latest(candidate.mfn()), candidate));
+    }
+
+    Taxonomy stored(String mfn) {
+        return stored.get(mfn);
     }
 
     List<Taxonomy> changed() {

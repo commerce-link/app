@@ -6,7 +6,7 @@ import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
 import pl.commercelink.inventory.supplier.api.ParsedRow;
 import pl.commercelink.taxonomy.Taxonomy;
-import pl.commercelink.taxonomy.TaxonomyCache;
+import pl.commercelink.taxonomy.TaxonomyCatalog;
 import pl.commercelink.taxonomy.TaxonomyCategoryEnrichment;
 import pl.commercelink.taxonomy.TaxonomyMerge;
 
@@ -18,7 +18,7 @@ import java.util.List;
 class FeedRowProcessor {
 
     private final DataCorrection dataCorrection;
-    private final TaxonomyCache taxonomyCache;
+    private final TaxonomyCatalog taxonomyCatalog;
     private final TaxonomyCategoryEnrichment enrichment;
 
     List<InventoryItem> process(List<ParsedRow> rows, int taxonomyPenalty, FeedParseStats stats) {
@@ -27,7 +27,7 @@ class FeedRowProcessor {
             return List.of();
         }
 
-        TaxonomyMerge merge = taxonomyCache.openMerge(candidates.stream().map(c -> c.product().mfn()).toList());
+        TaxonomyMerge merge = taxonomyCatalog.openMerge(candidates.stream().map(c -> c.product().mfn()).toList());
         List<InventoryItem> accepted = new ArrayList<>();
         for (Candidate candidate : candidates) {
             Taxonomy record = StoreFeedTaxonomy.deprioritized(
@@ -50,7 +50,7 @@ class FeedRowProcessor {
                 stats.markIncomplete();
             }
         }
-        taxonomyCache.commit(merge);
+        taxonomyCatalog.commit(merge);
         return accepted;
     }
 

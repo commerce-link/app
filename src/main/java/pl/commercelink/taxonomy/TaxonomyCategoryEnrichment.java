@@ -17,15 +17,15 @@ public class TaxonomyCategoryEnrichment {
 
     private static final int UNKNOWN = -1;
 
-    private final TaxonomyCache cache;
+    private final TaxonomyCatalog catalog;
     private final PendingCategorizationRepository pendingRepository;
     private final TaxonomyCategoryMatchProperties properties;
     private final CategoryMappingCache mappingCache;
     private final AtomicInteger pendingSize = new AtomicInteger(UNKNOWN);
 
-    TaxonomyCategoryEnrichment(TaxonomyCache cache, PendingCategorizationRepository pendingRepository,
+    TaxonomyCategoryEnrichment(TaxonomyCatalog catalog, PendingCategorizationRepository pendingRepository,
                                TaxonomyCategoryMatchProperties properties, CategoryMappingCache mappingCache) {
-        this.cache = cache;
+        this.catalog = catalog;
         this.pendingRepository = pendingRepository;
         this.properties = properties;
         this.mappingCache = mappingCache;
@@ -81,7 +81,7 @@ public class TaxonomyCategoryEnrichment {
             return;
         }
         PendingCategorization pending = pendingRepository.find(event.mfn());
-        if (!cache.updateCategory(event.mfn(), event.category(), event.categoryId())) {
+        if (!catalog.updateCategory(event.mfn(), event.category(), event.categoryId())) {
             return;
         }
         if (pending != null) {
@@ -111,7 +111,7 @@ public class TaxonomyCategoryEnrichment {
         if (event.confidence() != null && event.confidence() < properties.mapping().minConfidence()) {
             return;
         }
-        Taxonomy taxonomy = cache.findByMfn(event.mfn());
+        Taxonomy taxonomy = catalog.findByMfn(event.mfn());
         if (taxonomy == null || isBlank(taxonomy.rawCategory())) {
             return;
         }

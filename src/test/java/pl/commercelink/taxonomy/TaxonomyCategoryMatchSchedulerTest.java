@@ -45,7 +45,7 @@ class TaxonomyCategoryMatchSchedulerTest {
     private PendingCategorizationRepository pendingRepository;
 
     @Mock
-    private TaxonomyCache cache;
+    private TaxonomyCatalog catalog;
 
     @Mock
     private PimCatalog pimCatalog;
@@ -81,13 +81,13 @@ class TaxonomyCategoryMatchSchedulerTest {
         lenient().when(pendingRepository.remove(anyString())).thenAnswer(invocation ->
                 pendingRows.removeIf(row -> row.getMfn().equals(invocation.getArgument(0))));
 
-        lenient().when(cache.findByMfns(any())).thenAnswer(invocation -> {
+        lenient().when(catalog.findByMfns(any())).thenAnswer(invocation -> {
             Collection<String> wanted = invocation.getArgument(0);
             Map<String, Taxonomy> found = new HashMap<>();
             wanted.stream().filter(catalogRows::containsKey).forEach(mfn -> found.put(mfn, catalogRows.get(mfn)));
             return found;
         });
-        lenient().when(cache.updateCategory(anyString(), anyString(), anyString())).thenAnswer(invocation -> {
+        lenient().when(catalog.updateCategory(anyString(), anyString(), anyString())).thenAnswer(invocation -> {
             String mfn = invocation.getArgument(0);
             Taxonomy stored = catalogRows.get(mfn);
             if (!Taxonomy.hasCategory(stored)) {
@@ -181,7 +181,7 @@ class TaxonomyCategoryMatchSchedulerTest {
 
         // then
         verify(pimCatalog, never()).submitCategoryMatch(any());
-        verify(cache, never()).findByMfns(any());
+        verify(catalog, never()).findByMfns(any());
     }
 
     @Test
@@ -387,8 +387,8 @@ class TaxonomyCategoryMatchSchedulerTest {
     }
 
     private TaxonomyCategoryMatchScheduler scheduler(TaxonomyCategoryMatchProperties properties) {
-        enrichment = new TaxonomyCategoryEnrichment(cache, pendingRepository, properties, mappingCache);
-        return new TaxonomyCategoryMatchScheduler(pendingRepository, cache, pimCatalog, properties,
+        enrichment = new TaxonomyCategoryEnrichment(catalog, pendingRepository, properties, mappingCache);
+        return new TaxonomyCategoryMatchScheduler(pendingRepository, catalog, pimCatalog, properties,
                 enrichment, mappingCache);
     }
 
