@@ -4198,3 +4198,406 @@ a.cl-link-button:hover {
         text-align: left;
     }
 }
+
+/* --- Orders list (spec docs/active/orders-list-redesign): attention tiles, segments as links, chips, the orders
+   table with a whole-row link and its phone card, search form, pagination, star button --- */
+
+/* A stat tile that narrows the list under it (D9). It is a link, not navigation: pressed = aria-pressed + border. */
+.cl-page .cl-stat.is-link {
+    text-decoration: none;
+    color: inherit;
+    transition: border-color .15s ease, box-shadow .15s ease;
+}
+
+.cl-page .cl-stat.is-link:hover {
+    border-color: var(--cl-accent);
+    box-shadow: var(--cl-shadow-card), var(--cl-shadow);
+}
+
+.cl-page .cl-stat.is-link:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
+}
+
+.cl-page .cl-stat.is-link[aria-pressed="true"] {
+    background: var(--cl-accent-soft);
+    border-color: var(--cl-accent);
+}
+
+.cl-page .cl-stat.is-link[aria-pressed="true"] .cl-eyebrow,
+.cl-page .cl-stat.is-link[aria-pressed="true"] .cl-stat-hint {
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-stat.is-link[aria-disabled="true"] {
+    color: var(--cl-ink-3);
+    box-shadow: none;
+}
+
+.cl-page .cl-stat.is-bad .cl-stat-value {
+    color: var(--cl-bad);
+}
+
+.cl-page .cl-stat.is-warn .cl-stat-value {
+    color: var(--cl-warn);
+}
+
+.cl-page .cl-stat-grid-attention {
+    margin: 0 0 6px;
+    padding: 0;
+    list-style: none;
+}
+
+.cl-page .cl-stat-scope {
+    margin: 0 0 16px;
+}
+
+/* Segments as links (a GET filter, spec §5): same look as button.cl-segment[aria-pressed]. */
+.cl-page a.cl-segment {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+}
+
+.cl-page a.cl-segment[aria-current="page"] {
+    background: var(--cl-surface);
+    color: var(--cl-accent-ink);
+    box-shadow: 0 1px 2px rgba(14, 23, 33, .12), inset 0 0 0 1px var(--cl-accent);
+    font-weight: 600;
+}
+
+.cl-page a.cl-segment[aria-current="page"] .cl-segment-count {
+    color: inherit;
+}
+
+.cl-page .cl-segmented-divider {
+    width: 1px;
+    height: 24px;
+    background: var(--cl-line);
+    margin: 0 4px;
+    flex: 0 0 auto;
+}
+
+.cl-page .cl-table-toolbar.is-stacked .cl-toolbar-filters nav.cl-segmented {
+    flex: 0 1 auto;
+}
+
+/* Active narrowings under the toolbar, each with its own "Clear" (spec §5, row 3). */
+.cl-page .cl-filter-chips {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--cl-gap-related);
+}
+
+.cl-page .cl-filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 28px;
+    padding: 2px 10px;
+    border-radius: 12px;
+    background: var(--cl-accent-soft);
+    color: var(--cl-accent-ink);
+    font-size: 12.5px;
+    font-weight: 600;
+}
+
+.cl-page .cl-filter-chip-clear {
+    color: var(--cl-accent-ink);
+    font-weight: 500;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.cl-page .cl-table-results {
+    margin: 0;
+    padding: 0 20px 10px;
+    font-size: 13px;
+    color: var(--cl-ink-2);
+}
+
+/* Search as a GET form: the field and its button share one row. */
+.cl-page .cl-search-form {
+    display: flex;
+    gap: var(--cl-gap-related);
+    align-items: center;
+    margin-left: auto;
+}
+
+.cl-page .cl-filter-form {
+    display: flex;
+    gap: var(--cl-gap-related);
+    align-items: center;
+}
+
+.cl-page .cl-filter-form .cl-select.is-compact {
+    min-width: 200px;
+}
+
+.cl-page .cl-page-action-form {
+    display: inline;
+}
+
+/* Sort links look like the sort buttons of table-sort.js (same class, so the marker rules apply). */
+.cl-page a.cl-table-sort {
+    text-decoration: none;
+}
+
+/* The orders row: the number's link covers the whole row, so the row has no other links. */
+.cl-page .cl-table.is-orders tbody tr {
+    position: relative;
+}
+
+.cl-page .cl-table.is-orders tbody tr:hover {
+    background: var(--cl-surface-2);
+}
+
+.cl-page .cl-table.is-orders .cl-row-link {
+    color: var(--cl-accent-ink);
+    text-decoration: none;
+}
+
+.cl-page .cl-table.is-orders .cl-row-link::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+}
+
+.cl-page .cl-table.is-orders tbody tr:has(.cl-row-link:focus-visible) {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: -2px;
+}
+
+.cl-page .cl-table.is-orders .cl-row-link:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
+}
+
+.cl-page .cl-table.is-orders .cl-due-note {
+    font-weight: 600;
+}
+
+.cl-page .cl-table.is-orders .cl-due-note.is-bad {
+    color: var(--cl-bad);
+}
+
+.cl-page .cl-table.is-orders .cl-due-note.is-warn {
+    color: var(--cl-warn);
+}
+
+.cl-page .cl-table .cl-table-sub.is-warn {
+    color: var(--cl-warn);
+}
+
+/* Pagination under a server-paged table. */
+.cl-page .cl-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 12px 20px 16px;
+    border-top: 1px solid var(--cl-line);
+    font-size: 13px;
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-pagination .cl-button[aria-disabled="true"] {
+    color: var(--cl-ink-3);
+    pointer-events: none;
+}
+
+.cl-page .cl-pagination-page {
+    font-variant-numeric: tabular-nums;
+}
+
+.cl-page .cl-list-empty .cl-link-button {
+    margin-left: 6px;
+}
+
+.cl-page .cl-list-empty-action {
+    margin-top: 12px;
+}
+
+/* Star: one filter per user opens the list (spec §7.3). */
+.cl-page .cl-star {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: 0;
+    border-radius: var(--cl-radius);
+    background: transparent;
+    color: var(--cl-ink-3);
+    font-size: 18px;
+    cursor: pointer;
+}
+
+.cl-page .cl-star[aria-pressed="true"] {
+    color: var(--cl-accent);
+}
+
+.cl-page .cl-star:hover {
+    background: var(--cl-surface-2);
+    color: var(--cl-accent-ink);
+}
+
+.cl-page .cl-star:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
+}
+
+/* Dialog with a form (filters): wider than the confirmation, scrolling body. */
+.cl-page .cl-dialog.is-form {
+    width: min(560px, calc(100vw - 32px));
+}
+
+.cl-page .cl-dialog.is-form .cl-dialog-body {
+    max-height: min(70vh, 640px);
+    overflow: auto;
+    padding: 4px 20px 16px;
+}
+
+.cl-page .cl-dialog.is-form .cl-list {
+    margin: 0;
+}
+
+@media screen and (max-width: 1023px) {
+    .cl-page .cl-stat-grid-attention {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .cl-page .cl-stat.is-link {
+        min-height: 44px;
+    }
+
+    .cl-page a.cl-segment {
+        min-height: 44px;
+    }
+
+    .cl-page .cl-star {
+        width: 44px;
+        height: 44px;
+    }
+
+    .cl-page .cl-pagination .cl-button {
+        min-height: 44px;
+    }
+}
+
+@media screen and (max-width: 719px) {
+    .cl-page .cl-page-actions .cl-page-action-form,
+    .cl-page .cl-page-actions .cl-page-action-form .cl-button {
+        width: 100%;
+        justify-content: center;
+    }
+
+    /* Segments scroll sideways in one row; the fade says there is more. */
+    .cl-page .cl-segmented-scroll {
+        position: relative;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
+        margin: 0 -16px;
+        padding: 0 16px;
+    }
+
+    .cl-page .cl-segmented-scroll::-webkit-scrollbar {
+        display: none;
+    }
+
+    .cl-page .cl-table-toolbar.is-stacked .cl-toolbar-filters nav.cl-segmented {
+        flex: 0 0 auto;
+        flex-wrap: nowrap;
+    }
+
+    .cl-page .cl-table-toolbar.is-stacked .cl-toolbar-filters .cl-segment {
+        flex: 0 0 auto;
+    }
+
+    .cl-page .cl-filter-form,
+    .cl-page .cl-search-form,
+    .cl-page .cl-filter-form .cl-select.is-compact,
+    .cl-page .cl-search-form .cl-table-search {
+        width: 100%;
+    }
+
+    .cl-page .cl-search-form .cl-search-button-text {
+        display: none;
+    }
+
+    .cl-page .cl-table-results {
+        padding-left: 16px;
+        padding-right: 16px;
+    }
+
+    /* Card A (D10): number + status / context / date + amount. The shared card mode already hides thead and
+       stacks rows; here the cells drop their labels and fall into a two-column grid. */
+    .cl-page .cl-table.is-orders tr {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        column-gap: 10px;
+        row-gap: 2px;
+        padding: 10px 16px;
+    }
+
+    .cl-page .cl-table.is-orders tbody th,
+    .cl-page .cl-table.is-orders td {
+        display: contents;
+    }
+
+    .cl-page .cl-table.is-orders :is(tbody th, td)::before {
+        content: none;
+    }
+
+    .cl-page .cl-table.is-orders .cl-row-link {
+        grid-column: 1;
+        grid-row: 1;
+        font-weight: 600;
+    }
+
+    .cl-page .cl-table.is-orders .cl-status {
+        grid-column: 2;
+        grid-row: 1;
+        justify-self: end;
+    }
+
+    .cl-page .cl-table.is-orders .cl-table-key .cl-table-sub,
+    .cl-page .cl-table.is-orders .cl-cell-client {
+        grid-column: 1 / -1;
+        grid-row: auto;
+        font-size: 12.5px;
+        color: var(--cl-ink-3);
+    }
+
+    .cl-page .cl-table.is-orders .cl-cards-hide {
+        display: none;
+    }
+
+    .cl-page .cl-table.is-orders .cl-cell-due > span:first-child {
+        grid-column: 1;
+    }
+
+    .cl-page .cl-table.is-orders .is-numeric > span:first-child {
+        grid-column: 2;
+        justify-self: end;
+        text-align: right;
+    }
+
+    .cl-page .cl-table.is-orders .cl-table-sub.is-warn {
+        grid-column: 2;
+        justify-self: end;
+    }
+
+    .cl-page .cl-table.is-orders .cl-due-note {
+        grid-column: 1;
+    }
+
+    .cl-page .cl-pagination {
+        padding-left: 16px;
+        padding-right: 16px;
+    }
+}

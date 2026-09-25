@@ -1,0 +1,192 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+
+<div layout:fragment="content">
+<section class="cl-page">
+    <div class="cl-page-body is-wide">
+
+        <header class="cl-page-header">
+            <div class="cl-page-header-row">
+                <h1 class="cl-page-title" th:text="#{orders.list.title}"></h1>
+                <div class="cl-page-actions">
+                    <button th:replace="~{fragments/screen-intro :: toggle}"></button>
+                    <form method="post" th:action="@{/dashboard/orders/new/pos}" class="cl-page-action-form">
+                        <button type="submit" class="cl-button is-primary">
+                            <span class="icon is-small" aria-hidden="true"><i class="fas fa-cash-register"></i></span>
+                            <span th:text="#{orders.new.pos.button}"></span>
+                        </button>
+                    </form>
+                </div>
+            </div>
+            <p class="cl-page-lead" th:text="#{orders.list.lead}"></p>
+        </header>
+
+        <div th:replace="~{fragments/screen-intro :: panel('orders', 'fas fa-shopping-cart')}"></div>
+
+        <div th:if="${filterError}" class="cl-alert is-bad" role="status">
+            <p class="cl-alert-text" th:text="${filterError}"></p>
+        </div>
+
+        <div data-cl-orders-results th:fragment="results" th:with="q=${page.query()}">
+
+            <ul class="cl-stat-grid cl-stat-grid-attention" th:attr="aria-label=#{orders.list.attention.scope}">
+                <li th:each="tile : ${page.tiles()}">
+                    <a th:if="${tile.enabled()}" class="cl-stat is-link" th:classappend="${tile.tone()}" th:href="@{${tile.href()}}"
+                       th:attr="aria-pressed=${tile.pressed()}" data-cl-orders-nav>
+                        <span class="cl-eyebrow" th:text="${tile.label()}"></span>
+                        <span class="cl-stat-value"><th:block th:text="${tile.count()}"></th:block><small th:if="${tile.valueOf() != null}" class="cl-stat-value-of" th:text="' · ' + ${tile.valueOf()}"></small></span>
+                        <span class="cl-stat-hint" th:text="${tile.hint()}"></span>
+                        <span th:if="${tile.pressed()}" class="cl-visually-hidden" th:text="#{orders.list.attention.pressed}"></span>
+                    </a>
+                    <span th:unless="${tile.enabled()}" class="cl-stat is-link" aria-disabled="true">
+                        <span class="cl-eyebrow" th:text="${tile.label()}"></span>
+                        <span class="cl-stat-value" th:text="${tile.count()}"></span>
+                        <span class="cl-stat-hint" th:text="${tile.hint()}"></span>
+                    </span>
+                </li>
+            </ul>
+            <p class="cl-help cl-stat-scope" th:text="#{orders.list.attention.scope}"></p>
+
+            <section class="cl-card" aria-labelledby="orders-table-title">
+                <h2 class="cl-visually-hidden" id="orders-table-title" th:text="#{orders.list.table.title}"></h2>
+
+                <div class="cl-table-toolbar is-stacked">
+                    <div class="cl-toolbar-filters cl-segmented-scroll">
+                        <nav class="cl-segmented" th:attr="aria-label=#{orders.list.segments.open}">
+                            <a th:each="seg : ${page.openSegments()}" class="cl-segment" th:href="@{${seg.href()}}"
+                               th:attr="aria-current=${seg.current()} ? 'page' : null, data-count=${seg.count()}" data-cl-orders-nav>
+                                <span th:text="${seg.label()}"></span><span class="cl-segment-sep">: </span><span class="cl-segment-count" th:text="${seg.count()}"></span>
+                            </a>
+                        </nav>
+                        <span class="cl-segmented-divider" aria-hidden="true"></span>
+                        <nav class="cl-segmented" th:attr="aria-label=#{orders.list.segments.history}">
+                            <a th:each="seg : ${page.historySegments()}" class="cl-segment" th:href="@{${seg.href()}}"
+                               th:attr="aria-current=${seg.current()} ? 'page' : null, data-count=${seg.count()}" data-cl-orders-nav>
+                                <span th:text="${seg.label()}"></span><span class="cl-segment-sep">: </span><span class="cl-segment-count" th:text="${seg.count()}"></span>
+                            </a>
+                        </nav>
+                    </div>
+
+                    <div class="cl-toolbar-row">
+                        <form method="get" th:action="@{/dashboard/orders}" class="cl-filter-form" data-cl-orders-form>
+                            <input type="hidden" name="status" th:if="${q.status() != null}" th:value="${q.status().name()}"/>
+                            <input type="hidden" name="q" th:if="${q.q() != null}" th:value="${q.q()}"/>
+                            <input type="hidden" name="sort" th:if="${q.sort() != null}" th:value="${q.sort().param()}"/>
+                            <input type="hidden" name="dir" th:if="${q.dir() != null}" th:value="${q.dir().param()}"/>
+                            <label class="cl-visually-hidden" for="orders-filter" th:text="#{orders.list.filter.label}"></label>
+                            <select class="cl-select is-compact" id="orders-filter" name="filterId" data-filter-auto-submit>
+                                <option value="" th:text="#{orders.list.filter.none}" th:selected="${page.activeFilter().isEmpty()}"></option>
+                                <optgroup th:if="${!filters.sharedWithStore().isEmpty()}" th:attr="label=#{orders.list.filter.shared}">
+                                    <option th:each="o : ${page.filterOptions()}" th:if="${o.shared()}" th:value="${o.id()}" th:text="${o.label()}" th:selected="${o.selected()}"></option>
+                                </optgroup>
+                                <optgroup th:if="${!filters.own().isEmpty()}" th:attr="label=#{orders.list.filter.own}">
+                                    <option th:each="o : ${page.filterOptions()}" th:unless="${o.shared()}" th:value="${o.id()}" th:text="${o.label()}" th:selected="${o.selected()}"></option>
+                                </optgroup>
+                            </select>
+                            <noscript><button type="submit" class="cl-button" th:text="#{orders.list.filter.apply}"></button></noscript>
+                        </form>
+                        <a class="cl-button" th:href="@{/dashboard/orders/filters/new(returnTo=${returnTo})}" data-cl-dialog-open="save-view-dialog"
+                           th:if="${page.canSaveView()}" th:text="#{orders.list.saveView}"></a>
+                        <span class="cl-button" aria-disabled="true" th:unless="${page.canSaveView()}"
+                              th:attr="title=#{orders.list.saveView.disabled}" th:text="#{orders.list.saveView}"></span>
+                        <a class="cl-button" th:href="@{/dashboard/orders/filters(returnTo=${returnTo})}" data-cl-dialog-open="filters-dialog"
+                           th:text="#{orders.list.manageFilters}"></a>
+                        <form method="get" th:action="@{/dashboard/orders}" class="cl-search-form" role="search" data-cl-orders-form>
+                            <input type="hidden" name="filterId" th:if="${q.filterId() != null}" th:value="${q.filterId()}"/>
+                            <input type="hidden" name="sort" th:if="${q.sort() != null}" th:value="${q.sort().param()}"/>
+                            <input type="hidden" name="dir" th:if="${q.dir() != null}" th:value="${q.dir().param()}"/>
+                            <label class="cl-visually-hidden" for="orders-search" th:text="#{orders.list.search.label}"></label>
+                            <input class="cl-input cl-table-search" type="search" id="orders-search" name="q" autocomplete="off"
+                                   th:value="${q.q()}" th:attr="placeholder=#{orders.list.search.placeholder}"/>
+                            <button type="submit" class="cl-button cl-search-button" th:attr="aria-label=#{orders.list.search.button}">
+                                <span class="icon is-small" aria-hidden="true"><i class="fas fa-search"></i></span>
+                                <span class="cl-search-button-text" th:text="#{orders.list.search.button}"></span>
+                            </button>
+                        </form>
+                    </div>
+
+                    <div class="cl-filter-chips" th:if="${!page.chips().isEmpty()}">
+                        <span class="cl-filter-chip" th:each="chip : ${page.chips()}">
+                            <span th:text="${chip.label()}"></span>
+                            <a class="cl-filter-chip-clear" th:href="@{${chip.clearHref()}}" th:attr="aria-label=${chip.clearLabel()}"
+                               th:text="#{orders.list.chip.clear}" data-cl-orders-nav></a>
+                        </span>
+                    </div>
+                </div>
+
+                <p class="cl-table-results" role="status" th:text="${page.resultsLine()}"></p>
+
+                <table class="cl-table is-orders" th:unless="${page.rows().isEmpty()}"
+                       th:with="numberSort=${T(pl.commercelink.web.orders.OrderListQuery.Sort).NUMBER},
+                                dueSort=${T(pl.commercelink.web.orders.OrderListQuery.Sort).DUE},
+                                amountSort=${T(pl.commercelink.web.orders.OrderListQuery.Sort).AMOUNT}">
+                    <thead>
+                    <tr>
+                        <th scope="col" th:attr="aria-sort=${page.sortHeaders().get(numberSort).ariaSort()}">
+                            <a class="cl-table-sort" th:href="@{${page.sortHeaders().get(numberSort).href()}}" th:text="#{orders.list.column.order}" data-cl-orders-nav></a>
+                        </th>
+                        <th scope="col" th:text="#{orders.list.column.client}"></th>
+                        <th scope="col" th:attr="aria-sort=${page.sortHeaders().get(dueSort).ariaSort()}">
+                            <a class="cl-table-sort" th:href="@{${page.sortHeaders().get(dueSort).href()}}" th:text="#{orders.list.column.due}" data-cl-orders-nav></a>
+                        </th>
+                        <th scope="col" th:text="#{orders.list.column.status}"></th>
+                        <th scope="col" class="is-numeric" th:attr="aria-sort=${page.sortHeaders().get(amountSort).ariaSort()}">
+                            <a class="cl-table-sort" th:href="@{${page.sortHeaders().get(amountSort).href()}}" th:text="#{orders.list.column.amount}" data-cl-orders-nav></a>
+                        </th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="row : ${page.rows()}">
+                        <th scope="row" class="cl-table-key" th:attr="data-label=#{orders.list.column.order}">
+                            <a class="cl-row-link" th:href="@{${row.href()}}" th:text="${row.number()}"></a>
+                            <span class="cl-table-sub"><span th:text="${row.sourceText()}"></span><th:block th:if="${row.externalId() != null}"> · <span class="cl-table-code" th:text="${row.externalId()}"></span></th:block></span>
+                        </th>
+                        <td th:attr="data-label=#{orders.list.column.client}">
+                            <span class="cl-cell-client"><span th:text="${row.clientName()}"></span><th:block th:if="${row.clientCity() != null}"> · <span th:text="${row.clientCity()}"></span></th:block></span>
+                            <span class="cl-table-sub cl-cards-hide" th:if="${row.email() != null}" th:text="${row.email()}"></span>
+                        </td>
+                        <td class="cl-cell-due" th:attr="data-label=#{orders.list.column.due}">
+                            <span th:text="${row.dueText()}"></span>
+                            <span th:if="${row.dueNote() != null}" class="cl-due-note" th:classappend="${row.dueTone()}" th:text="' · ' + ${row.dueNote()}"></span>
+                        </td>
+                        <td th:attr="data-label=#{orders.list.column.status}">
+                            <span class="cl-status" th:classappend="${row.statusTone()}" th:text="${row.statusLabel()}"></span>
+                        </td>
+                        <td class="is-numeric" th:attr="data-label=#{orders.list.column.amount}">
+                            <span th:text="${row.totalText()}"></span>
+                            <span class="cl-table-sub is-warn" th:if="${row.unpaidText() != null}" th:text="${row.unpaidText()}"></span>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+
+                <p class="cl-list-empty" th:if="${page.emptyState() != null}" th:with="es=${page.emptyState()},esHref=${page.emptyState() != null ? page.emptyState().actionHref() : null}">
+                    <span th:text="${es.text()}"></span>
+                    <a th:if="${esHref != null}" class="cl-link-button" th:href="@{${esHref}}"
+                       th:text="${es.actionLabel()}" data-cl-orders-nav></a>
+                    <form th:unless="${esHref != null}" method="post" th:action="@{/dashboard/orders/new/pos}" class="cl-list-empty-action">
+                        <button type="submit" class="cl-button is-primary" th:text="#{orders.new.pos.button}"></button>
+                    </form>
+                </p>
+
+                <div th:replace="~{fragments/pagination :: pages(${page.pagination()})}"></div>
+            </section>
+        </div>
+
+        <!--/* <div th:replace="~{orders/filters :: filtersDialog}"></div> */-->
+        <!--/* <div th:replace="~{orders/filters :: saveViewDialog}"></div> */-->
+        <div th:replace="~{fragments/confirm-dialog :: dialog}"></div>
+    </div>
+</section>
+
+<script th:src="@{/js/dialog.js}" defer></script>
+<script th:src="@{/js/confirm-dialog.js}" defer></script>
+<script th:src="@{/js/filters-dialog.js}" defer></script>
+<script th:src="@{/js/orders-list.js}" defer></script>
+</div>
+
+</body>
+</html>
