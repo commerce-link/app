@@ -42,22 +42,22 @@ public class OrdersRepository extends DynamoDbRepository<Order> {
     }
 
     /**
-     * Every order of a store, newest first, from the StoreIdOrderedAtIndex partition of the store. One query
-     * replaces the table scan the orders list used to make; the list filters and pages in memory (spec §8.3, D7).
+     * Every order of a store, newest first. A query on the table's own partition key (storeId) returns whole items;
+     * StoreIdOrderedAtIndex would not — its projection carries only the id, status, e-mail and fulfilment type, which
+     * is enough for the fulfilment queue but not for the orders list (spec §8.3, D7).
      */
     public List<Order> findByStore(String storeId) {
         Map<String, AttributeValue> eav = new HashMap<>();
         eav.put(":storeId", new AttributeValue().withS(storeId));
 
         DynamoDBQueryExpression<Order> queryExpression = new DynamoDBQueryExpression<Order>()
-                .withIndexName("StoreIdOrderedAtIndex")
-                .withConsistentRead(false)
                 .withKeyConditionExpression("storeId = :storeId")
-                .withExpressionAttributeValues(eav)
-                .withScanIndexForward(false);
+                .withExpressionAttributeValues(eav);
 
-        // PaginatedQueryList loads lazily; copying it walks every page before the caller sorts and filters.
-        return new ArrayList<>(dynamoDBMapper.query(Order.class, queryExpression));
+        // PaginatedQueryList loads lazily; copying it walks every page before the list sorts and filters.
+        List<Order> orders = new ArrayList<>(dynamoDBMapper.query(Order.class, queryExpression));
+        orders.sort(Comparator.comparing(Order::getOrderedAt, Comparator.nullsLast(Comparator.reverseOrder())));
+        return orders;
     }
 
     public Order findByStoreIdAndExternalOrderId(String storeId, String externalOrderId) {
