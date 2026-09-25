@@ -97,6 +97,43 @@ class OrderListServiceTest {
         assertThat(model.rows()).extracting(r -> r.href()).containsExactly(
                 "/dashboard/orders/late", "/dashboard/orders/today", "/dashboard/orders/soon", "/dashboard/orders/none");
         assertThat(model.resultsLine()).isEqualTo("Wyniki: 4");
+        assertThat(page(query("sort", "due", "dir", "desc")).rows()).extracting(r -> r.href()).containsExactly(
+                "/dashboard/orders/soon", "/dashboard/orders/today", "/dashboard/orders/late", "/dashboard/orders/none");
+    }
+
+    @Test
+    void emptyStateOffersHistoryWhenStoreHasOnlyClosedOrders() {
+        add("done", OrderStatus.Completed, TODAY.minusDays(1), 10, 10, null);
+
+        OrdersPageModel model = page(query());
+
+        assertThat(model.emptyState().text()).isEqualTo("Brak otwartych zamówień.");
+        assertThat(model.emptyState().actionLabel()).isEqualTo("Zobacz zakończone");
+        assertThat(model.emptyState().actionHref()).isEqualTo("/dashboard/orders?status=Completed");
+    }
+
+    @Test
+    void saveViewConditionsCarryHumanLabels() {
+        OrderFilter filter = OrderFilter.of("Custom", List.of(
+                OrderFilterCondition.of(OrderFilterField.ShipmentType, "courier"),
+                OrderFilterCondition.of(OrderFilterField.SourceName, "Allegro"),
+                OrderFilterCondition.of(OrderFilterField.ShippingPostalCode, "30-")));
+        when(orderFilters.list(ACTOR)).thenReturn(new ListOrderFiltersView(List.of(), List.of(filter)));
+
+        OrdersPageModel model = page(query("status", "New", "filterId", filter.getId()));
+
+        assertThat(model.saveViewConditions()).extracting(c -> c.label()).containsExactly(
+                "Status zamówienia: Nowe",
+                "Sposób dostawy: Kurier",
+                "Marketplace: Allegro",
+                "Kod pocztowy zaczyna się od: 30-");
+
+        OrderFilter unknownValue = OrderFilter.of("Unknown", List.of(OrderFilterCondition.of(OrderFilterField.PaymentSource, "zzz")));
+        when(orderFilters.list(ACTOR)).thenReturn(new ListOrderFiltersView(List.of(), List.of(unknownValue)));
+
+        OrdersPageModel fallbackModel = page(query("filterId", unknownValue.getId()));
+
+        assertThat(fallbackModel.saveViewConditions()).extracting(c -> c.label()).containsExactly("Płatność: zzz");
     }
 
     @Test

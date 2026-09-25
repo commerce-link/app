@@ -239,7 +239,12 @@ public class OrderListService {
             return new EmptyState(text("orders.list.empty.status", locale, text("OrderStatus." + query.status().name(), locale)),
                     text("orders.list.empty.showOpen", locale), query.withStatus(null).href());
         }
-        return new EmptyState(text("orders.list.empty.store", locale), null, null);
+        if (storeEmpty) {
+            return new EmptyState(text("orders.list.empty.store", locale), null, null);
+        }
+        // The store has orders, just none open right now — offer the history instead of claiming there are none.
+        return new EmptyState(text("orders.list.empty.open", locale),
+                text("orders.list.empty.open.history", locale), query.withStatus(OrderStatus.Completed).href());
     }
 
     /** What "Save this view" would store: the segment's status (if any) plus the active filter's other conditions. */
