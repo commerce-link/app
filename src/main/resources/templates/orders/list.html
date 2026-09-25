@@ -11,8 +11,8 @@
         <header class="cl-page-header">
             <div class="cl-page-header-row">
                 <h1 class="cl-page-title" th:text="#{orders.list.title}"></h1>
+                <button th:replace="~{fragments/screen-intro :: toggle}"></button>
                 <div class="cl-page-actions">
-                    <button th:replace="~{fragments/screen-intro :: toggle}"></button>
                     <form method="post" th:action="@{/dashboard/orders/new/pos}" class="cl-page-action-form">
                         <button type="submit" class="cl-button is-primary">
                             <span class="icon is-small" aria-hidden="true"><i class="fas fa-plus"></i></span>

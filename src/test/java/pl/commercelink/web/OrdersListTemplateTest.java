@@ -22,6 +22,8 @@ class OrdersListTemplateTest {
         assertThat(html).contains("layout:decorate=\"~{layout}\"").contains("class=\"cl-page\"").contains("cl-page-body is-wide");
         assertThat(countOf(html, "<h1")).isEqualTo(1);
         assertThat(html).contains("fragments/screen-intro :: toggle").contains("fragments/screen-intro :: panel('orders'");
+        // the guide toggle follows the title, as on Asortyment and the settings pages, not the header actions
+        assertThat(html.indexOf("fragments/screen-intro :: toggle")).isBetween(html.indexOf("cl-page-title"), html.indexOf("cl-page-actions"));
     }
 
     @Test
