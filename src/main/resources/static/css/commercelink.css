@@ -1496,6 +1496,12 @@ body.cl-drawer-open .cl-sidebar {
     box-shadow: inset 0 0 0 1px var(--cl-line);
 }
 
+/* Error tone of the status pill (Zablokowane on the orders list, FAILED/BLOCKED attempts elsewhere): first use on main. */
+.cl-status.is-bad {
+    background: var(--cl-bad-soft);
+    color: var(--cl-bad);
+}
+
 .cl-page .cl-alert.is-warn {
     border-color: var(--cl-warn-soft);
     border-left-color: var(--cl-warn);
