@@ -3949,15 +3949,20 @@ a.cl-link-button:hover {
 /* A sort button of a product table is the name of its column, 19 px of text: below 1024 px it is 44 px tall and wide,
    the negative margin keeps the header row at its height. Scoped to the product tables: the offers of the inventory
    turn their sort buttons into 44 px chips of their own below 720 px, which a negative margin would pull together.
-   The picker trigger grows from 40 to 44 px like the fields around it. */
+   The picker trigger grows from 40 to 44 px like the fields around it.
+   Orders (Task 14): the same fix, scoped to `.is-orders` — its header is visible at 720-1023 px with the same 19 px
+   sort links; below 720 px the whole `thead` is visually hidden (see the `max-width: 719px` block above), so the
+   44 px box only ever affects layout in the range it needs to. */
 @media screen and (max-width: 1023px) {
-    .cl-page .cl-table.is-products .cl-table-sort {
+    .cl-page .cl-table.is-products .cl-table-sort,
+    .cl-page .cl-table.is-orders .cl-table-sort {
         min-height: 44px;
         min-width: 44px;
         margin: -12px 0;
     }
 
-    .cl-page .cl-table.is-products th.is-numeric .cl-table-sort {
+    .cl-page .cl-table.is-products th.is-numeric .cl-table-sort,
+    .cl-page .cl-table.is-orders th.is-numeric .cl-table-sort {
         justify-content: flex-end;
     }
 
@@ -4219,13 +4224,13 @@ a.cl-link-button:hover {
     outline-offset: 2px;
 }
 
-.cl-page .cl-stat.is-link[aria-pressed="true"] {
+.cl-page .cl-stat.is-link[aria-current="true"] {
     background: var(--cl-accent-soft);
     border-color: var(--cl-accent);
 }
 
-.cl-page .cl-stat.is-link[aria-pressed="true"] .cl-eyebrow,
-.cl-page .cl-stat.is-link[aria-pressed="true"] .cl-stat-hint {
+.cl-page .cl-stat.is-link[aria-current="true"] .cl-eyebrow,
+.cl-page .cl-stat.is-link[aria-current="true"] .cl-stat-hint {
     color: var(--cl-ink-2);
 }
 
@@ -4281,6 +4286,17 @@ a.cl-link-button:hover {
 
 .cl-page .cl-table-toolbar.is-stacked .cl-toolbar-filters nav.cl-segmented {
     flex: 0 1 auto;
+}
+
+/* Orders: the open-status segments (seven labels, longer than the catalog's) keep their own width instead of
+   stretching evenly across the row. At 1280 px `flex: 1 1 auto` split the leftover space over whichever segments
+   wrapped to a second line, so a lone last segment (e.g. "W dostawie: 5") ended up alone and stretched full width.
+   Scoped to the orders toolbar (`is-orders`) and to 720 px and up so the phone horizontal-scroll bar (below), which
+   needs the segments to keep their content width without shrinking, is untouched (Task 14). */
+@media screen and (min-width: 720px) {
+    .cl-page .cl-table-toolbar.is-stacked.is-orders .cl-toolbar-filters .cl-segment {
+        flex: 0 1 auto;
+    }
 }
 
 /* Active narrowings under the toolbar, each with its own "Clear" (spec §5, row 3). */
@@ -4484,6 +4500,17 @@ a.cl-link-button:hover {
 
     .cl-page .cl-pagination .cl-button {
         min-height: 44px;
+    }
+
+    /* Orders: the chip's "Wyczyść" link is 19 px of underlined text — below 1024 px it gets a 44 px tap area of its
+       own without inflating the chip's own height (Task 14). `.cl-filter-chip-clear` exists only on the orders
+       list, so this needs no extra scoping. */
+    .cl-page .cl-filter-chip-clear {
+        display: inline-flex;
+        align-items: center;
+        min-height: 44px;
+        margin: -8px -2px;
+        padding: 0 2px;
     }
 }
 

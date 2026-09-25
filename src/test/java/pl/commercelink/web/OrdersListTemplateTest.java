@@ -27,7 +27,7 @@ class OrdersListTemplateTest {
     @Test
     void tilesSegmentsToolbarChipsTableAndPagingAreWiredToTheModel() throws Exception {
         String html = page();
-        assertThat(html).contains("cl-stat-grid").contains("cl-stat is-link").contains("th:attr=\"aria-pressed=${tile.pressed()}")
+        assertThat(html).contains("cl-stat-grid").contains("cl-stat is-link").contains("aria-current=${tile.pressed()} ? 'true' : null")
                 .contains("cl-segmented-divider").contains("aria-current").contains("cl-segment-count")
                 .contains("cl-table-toolbar is-stacked").contains("cl-search-form").contains("name=\"q\"")
                 .contains("cl-filter-chips").contains("cl-table-results").contains("role=\"status\"")

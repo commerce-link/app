@@ -35,7 +35,7 @@
             <ul class="cl-stat-grid cl-stat-grid-attention" th:attr="aria-label=#{orders.list.attention.scope}">
                 <li th:each="tile : ${page.tiles()}">
                     <a th:if="${tile.enabled()}" class="cl-stat is-link" th:classappend="${tile.tone()}" th:href="@{${tile.href()}}"
-                       th:attr="aria-pressed=${tile.pressed()}" data-cl-orders-nav>
+                       th:attr="aria-current=${tile.pressed()} ? 'true' : null" data-cl-orders-nav>
                         <span class="cl-eyebrow" th:text="${tile.label()}"></span>
                         <span class="cl-stat-value"><th:block th:text="${tile.count()}"></th:block><small th:if="${tile.valueOf() != null}" class="cl-stat-value-of" th:text="' · ' + ${tile.valueOf()}"></small></span>
                         <span class="cl-stat-hint" th:text="${tile.hint()}"></span>
@@ -53,7 +53,7 @@
             <section class="cl-card" aria-labelledby="orders-table-title">
                 <h2 class="cl-visually-hidden" id="orders-table-title" th:text="#{orders.list.table.title}"></h2>
 
-                <div class="cl-table-toolbar is-stacked">
+                <div class="cl-table-toolbar is-stacked is-orders">
                     <div class="cl-toolbar-filters cl-segmented-scroll">
                         <nav class="cl-segmented" th:attr="aria-label=#{orders.list.segments.open}">
                             <a th:each="seg : ${page.openSegments()}" class="cl-segment" th:href="@{${seg.href()}}"
