@@ -163,14 +163,14 @@
                     </tbody>
                 </table>
 
-                <p class="cl-list-empty" th:if="${page.emptyState() != null}" th:with="es=${page.emptyState()},esHref=${page.emptyState() != null ? page.emptyState().actionHref() : null}">
+                <div class="cl-list-empty" th:if="${page.emptyState() != null}" th:with="es=${page.emptyState()}">
                     <span th:text="${es.text()}"></span>
-                    <a th:if="${esHref != null}" class="cl-link-button" th:href="@{${esHref}}"
+                    <a th:if="${es.actionHref() != null}" class="cl-link-button" th:href="@{${es.actionHref()}}"
                        th:text="${es.actionLabel()}" data-cl-orders-nav></a>
-                    <form th:unless="${esHref != null}" method="post" th:action="@{/dashboard/orders/new/pos}" class="cl-list-empty-action">
+                    <form th:if="${es.actionHref() == null}" method="post" th:action="@{/dashboard/orders/new/pos}" class="cl-list-empty-action">
                         <button type="submit" class="cl-button is-primary" th:text="#{orders.new.pos.button}"></button>
                     </form>
-                </p>
+                </div>
 
                 <div th:replace="~{fragments/pagination :: pages(${page.pagination()})}"></div>
             </section>
