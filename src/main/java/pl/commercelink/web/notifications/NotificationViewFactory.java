@@ -4,6 +4,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 import org.springframework.web.util.UriUtils;
 import pl.commercelink.notifications.StoreNotificationRecord;
+import pl.commercelink.receipts.ReceiptAttemptKeys;
 import pl.commercelink.starter.security.UserRole;
 import pl.commercelink.stores.StoreNotificationSeverity;
 import pl.commercelink.stores.StoreNotificationType;
@@ -34,6 +35,12 @@ public class NotificationViewFactory {
             // the RMA screen resolves the store from the logged-in admin, so only the store admin gets the link
             actionHref = "/dashboard/rma/" + UriUtils.encodePathSegment(record.getObject(), StandardCharsets.UTF_8);
             actionKey = "store.notification.action.viewReturn";
+        } else if (type == StoreNotificationType.RECEIPT_ATTENTION && role == UserRole.ADMIN
+                && StringUtils.isNotBlank(record.getObject())) {
+            // the order screen resolves the store from the logged-in admin, so only the store admin gets the link
+            actionHref = "/dashboard/orders/" + UriUtils.encodePathSegment(
+                    ReceiptAttemptKeys.orderPartOf(record.getObject()), StandardCharsets.UTF_8);
+            actionKey = "store.notification.action.viewOrder";
         }
         return new NotificationView(record.getNotificationId(), titleKey, record.getMessage(), record.getCreatedAt(),
                 record.isUnread(), record.getSeverity() == StoreNotificationSeverity.WARNING, actionHref, actionKey,

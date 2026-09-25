@@ -97,7 +97,7 @@
                         <legend class="cl-fieldset-title" th:text="#{store.payments.gateway.defaultSection}"></legend>
                         <p th:if="${alreadyDefault}" class="cl-help" th:text="#{store.payments.gateway.isDefault}"></p>
                         <th:block th:unless="${alreadyDefault}">
-                            <div th:replace="~{fragments/settings-form :: check('makeDefault', 'store.payments.gateway.makeDefault', ${makeDefault}, 'store.payments.gateway.makeDefault.description', null)}"></div>
+                            <div th:replace="~{fragments/settings-form :: check('makeDefault', 'store.payments.gateway.makeDefault', ${makeDefault}, 'store.payments.gateway.makeDefault.description', null, null)}"></div>
                         </th:block>
                     </fieldset>
 

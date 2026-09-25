@@ -18,7 +18,7 @@
                     <div class="cl-card">
                         <fieldset class="cl-fieldset">
                             <legend class="cl-fieldset-title" th:text="#{store.warehouse.documents.title}"></legend>
-                            <div th:replace="~{fragments/settings-form :: check('documentsEnabled', 'store.warehouse.documents.enable', *{documentsEnabled}, 'store.warehouse.documents.enable.description', 'warehouse-documents-ids')}"></div>
+                            <div th:replace="~{fragments/settings-form :: check('documentsEnabled', 'store.warehouse.documents.enable', *{documentsEnabled}, 'store.warehouse.documents.enable.description', 'warehouse-documents-ids', null)}"></div>
                             <div id="warehouse-documents-ids" class="cl-reveal">
                                 <div th:unless="${invoicingConnected}" class="cl-alert is-warn">
                                     <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>

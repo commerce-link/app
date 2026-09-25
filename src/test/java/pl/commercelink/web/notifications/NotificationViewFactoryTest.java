@@ -91,6 +91,25 @@ class NotificationViewFactoryTest {
     }
 
     @Test
+    void linksAReceiptAttentionAlertToItsOrderForTheStoreAdminOnly() {
+        // given
+        String orderId = "8f14e45f-ceea-467e-bd6f-1a5e0b8e5c2a";
+        StoreNotificationRecord attention = record(StoreNotificationSeverity.WARNING,
+                StoreNotificationType.RECEIPT_ATTENTION, orderId + ":R2", "Receipt needs attention");
+
+        // when
+        NotificationView admin = factory.toView(attention, UserRole.ADMIN);
+        NotificationView superAdmin = factory.toView(attention, UserRole.SUPER_ADMIN);
+
+        // then
+        assertThat(admin.actionHref()).isEqualTo("/dashboard/orders/" + orderId);
+        assertThat(admin.actionKey()).isEqualTo("store.notification.action.viewOrder");
+        // the order screen is scoped to the store of the logged-in admin, so the super admin would land elsewhere
+        assertThat(superAdmin.actionHref()).isNull();
+        assertThat(superAdmin.actionKey()).isNull();
+    }
+
+    @Test
     void showsOtherNotificationsWithoutAnActionAndInfoSeverityAsInfo() {
         // given
         List<StoreNotificationRecord> records = List.of(

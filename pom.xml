@@ -98,6 +98,11 @@
         </dependency>
         <dependency>
             <groupId>pl.commercelink</groupId>
+            <artifactId>receipts-api</artifactId>
+            <version>0.1.0</version>
+        </dependency>
+        <dependency>
+            <groupId>pl.commercelink</groupId>
             <artifactId>payments-api</artifactId>
             <version>0.2.1</version>
         </dependency>
@@ -348,6 +353,11 @@
                 <dependency>
                     <groupId>pl.commercelink</groupId>
                     <artifactId>invoicing-dev</artifactId>
+                    <version>0.1.0</version>
+                </dependency>
+                <dependency>
+                    <groupId>pl.commercelink</groupId>
+                    <artifactId>receipts-dev</artifactId>
                     <version>0.1.0</version>
                 </dependency>
             </dependencies>

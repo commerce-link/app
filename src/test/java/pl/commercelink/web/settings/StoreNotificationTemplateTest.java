@@ -86,7 +86,7 @@ class StoreNotificationTemplateTest {
         String html = SettingsTemplateRenderer.render("store-notification", page(store, NotificationSenderForm.from(store), Map.of()));
 
         // then
-        assertThat(html).contains("Wysyłane: 1 z 19.");
+        assertThat(html).contains("Wysyłane: 1 z 20.");
         assertThat(html).contains("href=\"/dashboard/store/email-templates\"");
         assertThat(html).doesNotContain("Zamówienie wysłane").doesNotContain("class=\"cl-list\"")
                 .doesNotContain("/dashboard/store/email-templates/ORDER_SHIPPING");

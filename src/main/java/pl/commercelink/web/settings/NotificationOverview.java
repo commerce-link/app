@@ -25,7 +25,7 @@ public record NotificationOverview(int sentCount, int totalCount, int brokenCoun
             new GroupDefinition("email.notification.group.orders", List.of(ORDER_CONFIRMATION, ORDER_ASSEMBLY,
                     ORDER_ASSEMBLY_DATE_CHANGED, ORDER_ASSEMBLED, ORDER_REALIZATION, ORDER_SHIPPING, ORDER_PICKUP,
                     ORDER_SHIPPING_ADDRESS_CHANGED, ORDER_REVIEW)),
-            new GroupDefinition("email.notification.group.invoices", List.of(ORDER_INVOICE, ORDER_INVOICE_PROFORMA)),
+            new GroupDefinition("email.notification.group.invoices", List.of(ORDER_INVOICE, ORDER_RECEIPT, ORDER_INVOICE_PROFORMA)),
             new GroupDefinition("email.notification.group.returns", List.of(RMA_CARRIER_ARRANGEMENT,
                     RMA_CARRIER_CONFIRMATION, RMA_ITEMS_RECEIVED, RMA_PROCESSING_STARTED, RMA_ITEMS_ACCEPTED,
                     RMA_REJECTED, RMA_ITEMS_SEND_TO_CLIENT)),
