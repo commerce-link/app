@@ -1,5 +1,6 @@
 package pl.commercelink.inventory.supplier;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -11,15 +12,16 @@ import pl.commercelink.inventory.supplier.api.SupplierProduct;
 import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.taxonomy.TaxonomyCache;
 import pl.commercelink.taxonomy.TaxonomyCategoryEnrichment;
+import pl.commercelink.taxonomy.TaxonomyMerge;
 
-import java.util.Optional;
+import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -32,6 +34,8 @@ class FeedRowProcessorTest {
     private TaxonomyCache taxonomyCache;
     @Mock
     private TaxonomyCategoryEnrichment enrichment;
+    @Mock
+    private TaxonomyMerge merge;
     @InjectMocks
     private FeedRowProcessor processor;
 
@@ -44,44 +48,48 @@ class FeedRowProcessorTest {
     private final Taxonomy categorizedTaxonomy =
             new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", "CPU", 5, null, null);
 
+    private FeedParseStats stats;
+
+    @BeforeEach
+    void setUp() {
+        stats = mock(FeedParseStats.class);
+    }
+
     @Test
-    void processableRowGoesToCacheAndInventory() {
+    void processableRowGoesToTheCatalogAndInventory() {
         // given
-        ParsedRow parsed = new ParsedRow(sellableItem, feedProduct);
+        givenMerge();
         when(dataCorrection.run(sellableItem)).thenReturn(sellableItem);
         when(dataCorrection.run(feedProduct)).thenReturn(categorizedTaxonomy);
-        when(enrichment.enrich(categorizedTaxonomy)).thenReturn(categorizedTaxonomy);
-        FeedParseStats stats = mock(FeedParseStats.class);
+        when(enrichment.enrich(categorizedTaxonomy, null)).thenReturn(categorizedTaxonomy);
 
         // when
-        Optional<InventoryItem> result = processor.process(parsed, 0, stats);
+        List<InventoryItem> result = processor.process(List.of(row()), 0, stats);
 
         // then
-        assertEquals(Optional.of(sellableItem), result);
-        verify(taxonomyCache).add(categorizedTaxonomy);
+        assertThat(result).containsExactly(sellableItem);
+        verify(merge).apply(categorizedTaxonomy);
+        verify(taxonomyCache).commit(merge);
         verify(stats).markImported();
         verify(stats, never()).markImportedCategorized();
         verify(stats, never()).markInvalid();
     }
 
     @Test
-    void pendingEligibleRowGoesOnlyToPendingNotToInventory() {
+    void pendingEligibleRowGoesToTheCatalogAndToThePendingTableButNotToInventory() {
         // given
-        ParsedRow parsed = new ParsedRow(sellableItem, feedProduct);
-        when(dataCorrection.run(sellableItem)).thenReturn(sellableItem);
-        when(dataCorrection.run(feedProduct)).thenReturn(pendingTaxonomy);
-        when(enrichment.enrich(pendingTaxonomy)).thenReturn(pendingTaxonomy);
+        givenMerge();
+        givenPendingRow();
         when(enrichment.isPendingEligible(pendingTaxonomy)).thenReturn(true);
-        FeedParseStats stats = mock(FeedParseStats.class);
         when(stats.supplierName()).thenReturn("Acme");
 
         // when
-        Optional<InventoryItem> result = processor.process(parsed, 0, stats);
+        List<InventoryItem> result = processor.process(List.of(row()), 0, stats);
 
         // then
-        assertTrue(result.isEmpty());
+        assertThat(result).isEmpty();
         verify(enrichment).addPending(pendingTaxonomy, "Acme");
-        verify(taxonomyCache, never()).add(any());
+        verify(merge).apply(pendingTaxonomy);
         verify(stats).markCategorizationScheduled();
         verify(stats, never()).markCategorizationPostponed();
         verify(stats, never()).markIncomplete();
@@ -90,17 +98,14 @@ class FeedRowProcessorTest {
 
     @Test
     void pendingEligibleRowScopesTheMappingToTheSupplierTypeForAnOwnConnection() {
-        // given -- category mappings are learned per adapter type, not per connection instance
-        ParsedRow parsed = new ParsedRow(sellableItem, feedProduct);
-        when(dataCorrection.run(sellableItem)).thenReturn(sellableItem);
-        when(dataCorrection.run(feedProduct)).thenReturn(pendingTaxonomy);
-        when(enrichment.enrich(pendingTaxonomy)).thenReturn(pendingTaxonomy);
+        // given
+        givenMerge();
+        givenPendingRow();
         when(enrichment.isPendingEligible(pendingTaxonomy)).thenReturn(true);
-        FeedParseStats stats = mock(FeedParseStats.class);
         when(stats.supplierName()).thenReturn("Kosatec-k7f3a9c2");
 
         // when
-        processor.process(parsed, 0, stats);
+        processor.process(List.of(row()), 0, stats);
 
         // then
         verify(enrichment).addPending(pendingTaxonomy, "Kosatec");
@@ -108,17 +113,14 @@ class FeedRowProcessorTest {
 
     @Test
     void pendingEligibleRowScopesTheMappingToTheFullIdentityForAManualConnection() {
-        // given -- manual feeds are distinct per connection, so each keeps its own mappings
-        ParsedRow parsed = new ParsedRow(sellableItem, feedProduct);
-        when(dataCorrection.run(sellableItem)).thenReturn(sellableItem);
-        when(dataCorrection.run(feedProduct)).thenReturn(pendingTaxonomy);
-        when(enrichment.enrich(pendingTaxonomy)).thenReturn(pendingTaxonomy);
+        // given
+        givenMerge();
+        givenPendingRow();
         when(enrichment.isPendingEligible(pendingTaxonomy)).thenReturn(true);
-        FeedParseStats stats = mock(FeedParseStats.class);
         when(stats.supplierName()).thenReturn("manual-k7f3a9c2");
 
         // when
-        processor.process(parsed, 0, stats);
+        processor.process(List.of(row()), 0, stats);
 
         // then
         verify(enrichment).addPending(pendingTaxonomy, "manual-k7f3a9c2");
@@ -127,21 +129,18 @@ class FeedRowProcessorTest {
     @Test
     void pendingIneligibleRowWithCompleteDataIsDeferredToNextFeed() {
         // given
-        ParsedRow parsed = new ParsedRow(sellableItem, feedProduct);
-        when(dataCorrection.run(sellableItem)).thenReturn(sellableItem);
-        when(dataCorrection.run(feedProduct)).thenReturn(pendingTaxonomy);
-        when(enrichment.enrich(pendingTaxonomy)).thenReturn(pendingTaxonomy);
+        givenMerge();
+        givenPendingRow();
         when(enrichment.isPendingEligible(pendingTaxonomy)).thenReturn(false);
         when(enrichment.hasIdentificationData(pendingTaxonomy)).thenReturn(true);
-        FeedParseStats stats = mock(FeedParseStats.class);
 
         // when
-        Optional<InventoryItem> result = processor.process(parsed, 0, stats);
+        List<InventoryItem> result = processor.process(List.of(row()), 0, stats);
 
         // then
-        assertTrue(result.isEmpty());
+        assertThat(result).isEmpty();
         verify(enrichment, never()).addPending(any(), any());
-        verify(taxonomyCache, never()).add(any());
+        verify(merge, never()).apply(any());
         verify(stats).markCategorizationPostponed();
         verify(stats, never()).markIncomplete();
         verify(stats, never()).markCategorizationScheduled();
@@ -150,41 +149,39 @@ class FeedRowProcessorTest {
     @Test
     void pendingIneligibleRowWithMissingDataIsDropped() {
         // given
-        ParsedRow parsed = new ParsedRow(sellableItem, feedProduct);
-        when(dataCorrection.run(sellableItem)).thenReturn(sellableItem);
-        when(dataCorrection.run(feedProduct)).thenReturn(pendingTaxonomy);
-        when(enrichment.enrich(pendingTaxonomy)).thenReturn(pendingTaxonomy);
+        givenMerge();
+        givenPendingRow();
         when(enrichment.isPendingEligible(pendingTaxonomy)).thenReturn(false);
         when(enrichment.hasIdentificationData(pendingTaxonomy)).thenReturn(false);
-        FeedParseStats stats = mock(FeedParseStats.class);
 
         // when
-        Optional<InventoryItem> result = processor.process(parsed, 0, stats);
+        List<InventoryItem> result = processor.process(List.of(row()), 0, stats);
 
         // then
-        assertTrue(result.isEmpty());
+        assertThat(result).isEmpty();
         verify(enrichment, never()).addPending(any(), any());
-        verify(taxonomyCache, never()).add(any());
+        verify(merge, never()).apply(any());
         verify(stats).markIncomplete();
         verify(stats, never()).markCategorizationPostponed();
         verify(stats, never()).markCategorizationScheduled();
     }
 
     @Test
-    void adoptedCategoryFromCachePutsItemIntoInventory() {
+    void categoryAdoptedFromTheCatalogPutsItemIntoInventory() {
         // given
-        ParsedRow parsed = new ParsedRow(sellableItem, feedProduct);
+        givenMerge();
+        Taxonomy stored = new Taxonomy("1234567890123", "MFN-1", "Brand", "Name", "CPU", 3, null, null);
+        when(merge.latest("MFN-1")).thenReturn(stored);
         when(dataCorrection.run(sellableItem)).thenReturn(sellableItem);
         when(dataCorrection.run(feedProduct)).thenReturn(pendingTaxonomy);
-        when(enrichment.enrich(pendingTaxonomy)).thenReturn(categorizedTaxonomy);
-        FeedParseStats stats = mock(FeedParseStats.class);
+        when(enrichment.enrich(pendingTaxonomy, stored)).thenReturn(categorizedTaxonomy);
 
         // when
-        Optional<InventoryItem> result = processor.process(parsed, 0, stats);
+        List<InventoryItem> result = processor.process(List.of(row()), 0, stats);
 
         // then
-        assertEquals(Optional.of(sellableItem), result);
-        verify(taxonomyCache).add(categorizedTaxonomy);
+        assertThat(result).containsExactly(sellableItem);
+        verify(merge).apply(categorizedTaxonomy);
         verify(stats).markImportedCategorized();
         verify(stats).markImported();
     }
@@ -192,59 +189,107 @@ class FeedRowProcessorTest {
     @Test
     void adoptedCategoryOnIncompleteRowIsNotCountedAsImportedCategorized() {
         // given
+        givenMerge();
         Taxonomy noBrand = new Taxonomy("1234567890123", "MFN-1", null, "Name", null, 5, null, null);
         Taxonomy enrichedNoBrand = new Taxonomy("1234567890123", "MFN-1", null, "Name", "CPU", 5, null, null);
-        ParsedRow parsed = new ParsedRow(sellableItem, feedProduct);
         when(dataCorrection.run(sellableItem)).thenReturn(sellableItem);
         when(dataCorrection.run(feedProduct)).thenReturn(noBrand);
-        when(enrichment.enrich(noBrand)).thenReturn(enrichedNoBrand);
+        when(enrichment.enrich(noBrand, null)).thenReturn(enrichedNoBrand);
         when(enrichment.isPendingEligible(enrichedNoBrand)).thenReturn(false);
         when(enrichment.hasIdentificationData(enrichedNoBrand)).thenReturn(false);
-        FeedParseStats stats = mock(FeedParseStats.class);
 
         // when
-        Optional<InventoryItem> result = processor.process(parsed, 0, stats);
+        List<InventoryItem> result = processor.process(List.of(row()), 0, stats);
 
         // then
-        assertTrue(result.isEmpty());
+        assertThat(result).isEmpty();
         verify(stats).markIncomplete();
         verify(stats, never()).markImportedCategorized();
         verify(stats, never()).markImported();
     }
 
     @Test
-    void notSellableItemIsDroppedWithoutTouchingCache() {
+    void notSellableItemIsDroppedWithoutTouchingTheCatalog() {
         // given
         InventoryItem noQty = new InventoryItem("1234567890123", "MFN-1", 10.0, "PLN", 0, 1, "Acme", true);
-        ParsedRow parsed = new ParsedRow(noQty, feedProduct);
         when(dataCorrection.run(noQty)).thenReturn(noQty);
         when(dataCorrection.run(feedProduct)).thenReturn(categorizedTaxonomy);
-        FeedParseStats stats = mock(FeedParseStats.class);
 
         // when
-        Optional<InventoryItem> result = processor.process(parsed, 0, stats);
+        List<InventoryItem> result = processor.process(List.of(new ParsedRow(noQty, feedProduct)), 0, stats);
 
         // then
-        assertTrue(result.isEmpty());
-        verify(taxonomyCache, never()).add(any());
+        assertThat(result).isEmpty();
+        verify(taxonomyCache, never()).openMerge(any());
+        verify(taxonomyCache, never()).commit(any());
         verify(enrichment, never()).addPending(any(), any());
         verify(stats).markInvalid();
         verify(stats, never()).markImported();
     }
 
     @Test
-    void taxonomyPenaltyIsAppliedBeforeCacheAdd() {
+    void taxonomyPenaltyIsAppliedBeforeTheRecordIsStaged() {
         // given
-        ParsedRow parsed = new ParsedRow(sellableItem, feedProduct);
+        givenMerge();
         when(dataCorrection.run(sellableItem)).thenReturn(sellableItem);
         when(dataCorrection.run(feedProduct)).thenReturn(categorizedTaxonomy);
-        when(enrichment.enrich(categorizedTaxonomy)).thenReturn(categorizedTaxonomy);
-        FeedParseStats stats = mock(FeedParseStats.class);
+        when(enrichment.enrich(categorizedTaxonomy, null)).thenReturn(categorizedTaxonomy);
 
         // when
-        processor.process(parsed, 1000, stats);
+        processor.process(List.of(row()), 1000, stats);
 
         // then
-        verify(taxonomyCache).add(eq(StoreFeedTaxonomy.deprioritized(categorizedTaxonomy, 1000)));
+        verify(merge).apply(eq(StoreFeedTaxonomy.deprioritized(categorizedTaxonomy, 1000)));
+    }
+
+    @Test
+    void wholeChunkIsReadAndWrittenInOneRoundTrip() {
+        // given
+        givenMerge();
+        InventoryItem secondItem =
+                new InventoryItem("1234567890124", "MFN-2", 12.0, "PLN", 5, 1, "Acme", true);
+        SupplierProduct secondProduct =
+                new SupplierProduct("1234567890124", "MFN-2", "Brand", "Name2", 5, null, null);
+        Taxonomy secondTaxonomy =
+                new Taxonomy("1234567890124", "MFN-2", "Brand", "Name2", "GPU", 5, null, null);
+        when(dataCorrection.run(sellableItem)).thenReturn(sellableItem);
+        when(dataCorrection.run(feedProduct)).thenReturn(categorizedTaxonomy);
+        when(dataCorrection.run(secondItem)).thenReturn(secondItem);
+        when(dataCorrection.run(secondProduct)).thenReturn(secondTaxonomy);
+        when(enrichment.enrich(categorizedTaxonomy, null)).thenReturn(categorizedTaxonomy);
+        when(enrichment.enrich(secondTaxonomy, null)).thenReturn(secondTaxonomy);
+
+        // when
+        List<InventoryItem> result = processor.process(
+                List.of(row(), new ParsedRow(secondItem, secondProduct)), 0, stats);
+
+        // then
+        assertThat(result).containsExactly(sellableItem, secondItem);
+        verify(taxonomyCache, times(1)).openMerge(List.of("MFN-1", "MFN-2"));
+        verify(taxonomyCache, times(1)).commit(merge);
+    }
+
+    @Test
+    void emptyChunkTouchesNothing() {
+        // when
+        List<InventoryItem> result = processor.process(List.of(), 0, stats);
+
+        // then
+        assertThat(result).isEmpty();
+        verify(taxonomyCache, never()).openMerge(any());
+    }
+
+    private ParsedRow row() {
+        return new ParsedRow(sellableItem, feedProduct);
+    }
+
+    private void givenMerge() {
+        when(taxonomyCache.openMerge(any())).thenReturn(merge);
+    }
+
+    private void givenPendingRow() {
+        when(dataCorrection.run(sellableItem)).thenReturn(sellableItem);
+        when(dataCorrection.run(feedProduct)).thenReturn(pendingTaxonomy);
+        when(enrichment.enrich(pendingTaxonomy, null)).thenReturn(pendingTaxonomy);
     }
 }

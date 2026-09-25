@@ -25,11 +25,11 @@ class GroupInventorySourceTest {
     }
 
     private MatchedInventory group(InventoryKey key, InventoryItem... items) {
-        return new MatchedInventory(key, List.of(items), taxonomyCache, supplierRegistry);
+        return new MatchedInventory(key, List.of(items), supplierRegistry);
     }
 
     private MatchedInventory accumulator(InventoryKey lookupKey) {
-        return new MatchedInventory(lookupKey.copy(), taxonomyCache, supplierRegistry);
+        return new MatchedInventory(lookupKey.copy(), supplierRegistry);
     }
 
     @Test

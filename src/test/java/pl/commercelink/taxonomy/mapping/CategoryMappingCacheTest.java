@@ -11,6 +11,7 @@ import pl.commercelink.pim.api.PimCategory;
 import pl.commercelink.taxonomy.TaxonomyCategoryMatchProperties;
 
 import java.util.HashMap;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -47,7 +48,12 @@ class CategoryMappingCacheTest {
             return null;
         }).when(repository).save(any(CategoryMapping.class));
         lenient().when(pimCatalog.allCategories()).thenReturn(categoryTree());
-        mappingCache = new CategoryMappingCache(repository, new TaxonomyCategoryMatchProperties(100, 300000), pimCatalog);
+        mappingCache = new CategoryMappingCache(repository, matchProperties(), pimCatalog);
+    }
+
+    private static TaxonomyCategoryMatchProperties matchProperties() {
+        return new TaxonomyCategoryMatchProperties(1000, 10,
+                new TaxonomyCategoryMatchProperties.Mapping(5, 0.9, 0.9, 20), 4, Duration.ofDays(7), Duration.ofHours(1));
     }
 
     private static List<PimCategory> categoryTree() {

@@ -2,27 +2,28 @@ package pl.commercelink.taxonomy;
 
 import com.nimbusds.oauth2.sdk.util.StringUtils;
 import jakarta.annotation.PostConstruct;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.tuple.Pair;
 import org.springframework.stereotype.Component;
-import pl.commercelink.inventory.InventoryKey;
 
 import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
 @Component
+@Slf4j
 public class TaxonomyCache {
 
     private final TaxonomyRepository taxonomyRepository;
 
     private String fileName = "N/A";
     private ConcurrentHashMap<String, Taxonomy> taxonomyByMfn = new ConcurrentHashMap<>();
-    private final AtomicInteger pendingCount = new AtomicInteger();
     private final ConcurrentHashMap<String, String> stringPool = new ConcurrentHashMap<>();
 
     public TaxonomyCache(TaxonomyRepository taxonomyRepository) {
@@ -38,35 +39,12 @@ public class TaxonomyCache {
             Taxonomy interned = internLowCardinalityFields(cachedTaxonomy);
             taxonomyByMfn.put(interned.mfn(), interned);
         });
-        pendingCount.set((int) taxonomyByMfn.values().stream().filter(taxonomy -> !hasCategory(taxonomy)).count());
 
-        System.out.println("Loaded " + taxonomyByMfn.size() + " taxonomies by mfn into cache from file: " + fileName);
-    }
-
-    public void add(Taxonomy taxonomy) {
-        if (StringUtils.isBlank(taxonomy.mfn())) return;
-        Taxonomy candidate = internLowCardinalityFields(taxonomy);
-        taxonomyByMfn.compute(candidate.mfn(), (mfn, current) -> {
-            Taxonomy merged = mergeOf(current, candidate);
-            pendingCount.addAndGet(pendingDelta(current, merged));
-            return merged;
-        });
-    }
-
-    private static int pendingDelta(Taxonomy current, Taxonomy merged) {
-        int before = current != null && !hasCategory(current) ? 1 : 0;
-        int after = hasCategory(merged) ? 0 : 1;
-        return after - before;
-    }
-
-    public int pendingCount() {
-        return pendingCount.get();
+        log.info("Loaded {} taxonomies by mfn into cache from file: {}", taxonomyByMfn.size(), fileName);
     }
 
     public static boolean hasCategory(Taxonomy taxonomy) {
-        return taxonomy != null
-                && taxonomy.category() != null
-                && !taxonomy.category().isBlank();
+        return Taxonomy.hasCategory(taxonomy);
     }
 
     public boolean updateCategory(String mfn, String category, String categoryId) {
@@ -80,7 +58,6 @@ public class TaxonomyCache {
                 return current;
             }
             updated[0] = true;
-            pendingCount.decrementAndGet();
             return new Taxonomy(current.ean(), current.mfn(), current.brand(), current.name(),
                     pooled(category), current.dataAccuracyScore(),
                     current.netWeightInGrams(), current.grossWeightInGrams(),
@@ -89,7 +66,7 @@ public class TaxonomyCache {
         return updated[0];
     }
 
-    private static Taxonomy mergeOf(Taxonomy current, Taxonomy incoming) {
+    static Taxonomy mergeOf(Taxonomy current, Taxonomy incoming) {
         if (current == null) return incoming;
 
         Taxonomy winner = bestByCategoryThenScore(current, incoming);
@@ -128,28 +105,34 @@ public class TaxonomyCache {
                             t.category(), t.dataAccuracyScore(), net, gross, t.rawCategory(), t.categoryId());
     }
 
-    public Taxonomy find(InventoryKey inventoryKey) {
-        Taxonomy taxonomy = Taxonomy.EMPTY;
+    public Taxonomy findByMfn(String mfn) {
+        return StringUtils.isBlank(mfn) ? null : taxonomyByMfn.get(mfn);
+    }
 
-        for (String productCode : inventoryKey.getProductCodes()) {
-            Taxonomy t = taxonomyByMfn.get(productCode);
-            if (t != null && preferredOver(t, taxonomy)) {
-                taxonomy = t;
+    public Map<String, Taxonomy> findByMfns(Collection<String> mfns) {
+        Map<String, Taxonomy> found = new LinkedHashMap<>();
+        for (String mfn : mfns) {
+            Taxonomy taxonomy = findByMfn(mfn);
+            if (taxonomy != null) {
+                found.put(mfn, taxonomy);
             }
         }
-
-        return taxonomy;
+        return found;
     }
 
-    private static boolean preferredOver(Taxonomy candidate, Taxonomy current) {
-        if (hasCategory(candidate) != hasCategory(current)) {
-            return hasCategory(candidate);
+    public TaxonomyMerge openMerge(Collection<String> mfns) {
+        return new TaxonomyMerge(findByMfns(mfns));
+    }
+
+    public void commit(TaxonomyMerge merge) {
+        for (Taxonomy merged : merge.changed()) {
+            Taxonomy candidate = internLowCardinalityFields(merged);
+            taxonomyByMfn.merge(candidate.mfn(), candidate, (current, incoming) -> mergeOf(current, incoming));
         }
-        return candidate.dataAccuracyScore() < current.dataAccuracyScore();
     }
 
-    public Taxonomy findByMfn(String mfn) {
-        return taxonomyByMfn.get(mfn);
+    public Taxonomy findBest(Collection<String> productCodes) {
+        return Taxonomy.bestOf(productCodes, findByMfns(productCodes));
     }
 
     public String getFileName() {

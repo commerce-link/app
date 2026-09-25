@@ -66,13 +66,13 @@ class RedisStoreInventoryCacheIntegrationTest {
     }
 
     private RedisStoreInventoryCache cache() {
-        return new RedisStoreInventoryCache(redisTemplate, objectMapper, taxonomyCache, supplierRegistry);
+        return new RedisStoreInventoryCache(redisTemplate, objectMapper, supplierRegistry);
     }
 
     private StoreInventory sampleInventory() {
         InventoryItem item = new InventoryItem("5900000000002", "MFN-1", 10.0, "PLN", 5, 1, "Acme", true, true, false);
         MatchedInventory matched = new MatchedInventory(new InventoryKey("5900000000002", "MFN-1"),
-                List.of(item), taxonomyCache, supplierRegistry);
+                List.of(item), supplierRegistry);
         return new StoreInventory(InventoryIndex.of(List.of(matched)), LocalDateTime.of(2026, 6, 17, 10, 0));
     }
 
@@ -85,7 +85,7 @@ class RedisStoreInventoryCacheIntegrationTest {
                     new InventoryItem(ean, mfn, 10.0 + i, "PLN", 5, 1, "Acme", true, true, false),
                     new InventoryItem(ean, mfn, 11.0 + i, "PLN", 3, 2, "Beta", true, false, true),
                     new InventoryItem(ean, mfn, 12.0 + i, "PLN", 7, 1, "Gamma", true, true, false));
-            matched.add(new MatchedInventory(new InventoryKey(ean, mfn), items, taxonomyCache, supplierRegistry));
+            matched.add(new MatchedInventory(new InventoryKey(ean, mfn), items, supplierRegistry));
         }
         return new StoreInventory(InventoryIndex.of(matched), LocalDateTime.of(2026, 6, 17, 10, 0));
     }
@@ -114,7 +114,7 @@ class RedisStoreInventoryCacheIntegrationTest {
         cache.put("s1", sampleInventory(), Duration.ofMinutes(60));
 
         // then
-        Long ttl = redisTemplate.getExpire("store-inventory:s1");
+        Long ttl = redisTemplate.getExpire("store-inventory:v2:s1");
         assertTrue(ttl != null && ttl > 0 && ttl <= 3600);
     }
 
@@ -143,7 +143,7 @@ class RedisStoreInventoryCacheIntegrationTest {
         // then
         assertTrue(result.isPresent());
         assertEquals(entries, result.get().items().size());
-        int storedBytes = redisTemplate.opsForValue().get("store-inventory:big")
+        int storedBytes = redisTemplate.opsForValue().get("store-inventory:v2:big")
                 .getBytes(StandardCharsets.UTF_8).length;
         assertTrue(storedBytes < rawJsonBytes);
         assertTrue(storedBytes < 64 * 1024 * 1024);

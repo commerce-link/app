@@ -20,7 +20,7 @@ class ListingInventoryTest {
     private SupplierRegistry supplierRegistry;
 
     private MatchedInventory group(InventoryKey key) {
-        return new MatchedInventory(key, taxonomyCache, supplierRegistry);
+        return new MatchedInventory(key, supplierRegistry);
     }
 
     @Test

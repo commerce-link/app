@@ -4,25 +4,34 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.ConstructorBinding;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 
+import java.time.Duration;
+
 @ConfigurationProperties(prefix = "taxonomy.category-match")
 public record TaxonomyCategoryMatchProperties(
-        @DefaultValue("100") int buckets,
-        @DefaultValue("300000") int pendingCap,
+        @DefaultValue("1000") int pendingCap,
+        @DefaultValue("10") int maxSubmissionsPerRun,
         @DefaultValue Mapping mapping,
-        @DefaultValue("4") int maxAttempts) {
+        @DefaultValue("4") int maxAttempts,
+        @DefaultValue("7d") Duration retryExhaustedAfter,
+        @DefaultValue("1h") Duration retryAfter) {
 
     @ConstructorBinding
     public TaxonomyCategoryMatchProperties {
-        if (buckets < 1) {
-            throw new IllegalArgumentException("taxonomy.category-match.buckets must be at least 1, got: " + buckets);
+        if (maxSubmissionsPerRun < 1) {
+            throw new IllegalArgumentException(
+                    "taxonomy.category-match.max-submissions-per-run must be at least 1, got: " + maxSubmissionsPerRun);
         }
         if (maxAttempts < 0) {
             throw new IllegalArgumentException("taxonomy.category-match.max-attempts must not be negative, got: " + maxAttempts);
         }
-    }
-
-    public TaxonomyCategoryMatchProperties(int buckets, int pendingCap) {
-        this(buckets, pendingCap, new Mapping(5, 0.9, 0.9, 20), 4);
+        if (retryExhaustedAfter == null || retryExhaustedAfter.isNegative() || retryExhaustedAfter.isZero()) {
+            throw new IllegalArgumentException(
+                    "taxonomy.category-match.retry-exhausted-after must be positive, got: " + retryExhaustedAfter);
+        }
+        if (retryAfter == null || retryAfter.isNegative()) {
+            throw new IllegalArgumentException(
+                    "taxonomy.category-match.retry-after must not be negative, got: " + retryAfter);
+        }
     }
 
     public record Mapping(
