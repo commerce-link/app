@@ -148,8 +148,8 @@ class OrderListServiceTest {
         OrdersPageModel model = page(query("filterId", allegro.getId()));
 
         assertThat(model.tiles()).extracting(t -> t.count()).containsExactly(1L, 1L, 3L, 1L, 0L); // overdue, today, decide, unpaid, new today (open only)
-        assertThat(model.tiles().get(3).hint()).isEqualTo("z brakującą wpłatą");
-        assertThat(model.tiles().get(3).valueOf()).isEqualTo("100,00 PLN");
+        assertThat(model.tiles().get(3).hint()).isEqualTo("brakująca wpłata: 100,00 PLN");
+        assertThat(model.tiles().get(3).valueOf()).isNull();
         assertThat(model.tiles().get(2).hint()).isEqualTo("Nowe 2 · Zablokowane 1");
         assertThat(option(model, "Nowe").count()).isEqualTo(1);
         assertThat(option(model, "Zablokowane").count()).isEqualTo(1);

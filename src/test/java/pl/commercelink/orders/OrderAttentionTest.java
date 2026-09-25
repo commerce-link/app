@@ -58,8 +58,6 @@ class OrderAttentionTest {
         assertThat(OrderAttention.parse("nope")).isEmpty();
         assertThat(OrderAttention.parse(null)).isEmpty();
         assertThat(OrderAttention.Today.param()).isEqualTo("today");
-        assertThat(OrderAttention.Overdue.icon()).isEqualTo("fa-clock");
-        assertThat(OrderAttention.Overdue.iconTone()).isEqualTo("is-bad");
     }
 
     @Test

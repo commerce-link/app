@@ -139,6 +139,8 @@ public class OrderListService {
             String key = "orders.list.attention." + kind.param();
             String hint = switch (kind) {
                 case Decide -> text("orders.list.attention.decide.hint", locale, newCount, blockedCount);
+                case Unpaid -> text(key + ".hint", locale, text("general.currency.amount", locale, money(unpaidSum, locale)));
+                case NewToday -> text(key + ".hint", locale, text("general.currency.amount", locale, money(newTodaySum, locale)));
                 default -> text(key + ".hint", locale);
             };
             String tone = switch (kind) {
@@ -146,13 +148,7 @@ public class OrderListService {
                 case Today -> count > 0 ? "is-warn" : "";
                 default -> "";
             };
-            tiles.add(new Tile(kind, text(key, locale), count,
-                    switch (kind) {
-                        case Unpaid -> text("general.currency.amount", locale, money(unpaidSum, locale));
-                        case NewToday -> text("general.currency.amount", locale, money(newTodaySum, locale));
-                        default -> null;
-                    },
-                    hint, enabled ? query.withFocus(pressed ? null : kind).href() : null, pressed, enabled, tone));
+            tiles.add(new Tile(kind, text(key, locale), count, null, hint, enabled ? query.withFocus(pressed ? null : kind).href() : null, pressed, enabled, tone));
         }
         return tiles;
     }

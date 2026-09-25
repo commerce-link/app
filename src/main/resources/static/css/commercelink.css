@@ -4214,97 +4214,24 @@ a.cl-link-button:hover {
    strip, status tabs, custom-filter menu, search field, chips + count line, the orders table with a whole-row link
    and its phone card, phone sort bar, pagination, star button, dialog with a form --- */
 
-/* Stat cards of the orders list: four read-only figures of the whole store in the design system's cl-stat tile
-   (Po terminie, Na dziś, Nieopłacone, Nowe dziś). Label + tone-tinted icon square on top, the count, then one
-   sub-line: the sum for money figures, the hint otherwise. Not links — the tabs and filter below narrow the list. */
+/* Stat tiles of the orders list: the design system's cl-stat, unchanged. Only the tone of the number is added
+   (the same use as the Magazyn "Wymaga uwagi" tile) and Bulma's li + li spacing is cancelled. */
 .cl-page .cl-stat-grid.is-orders {
-    gap: 16px;
     margin: 4px 0 20px;
     padding: 0;
     list-style: none;
 }
 
-/* Bulma spaces every li after the first (li + li), which staggered the cards by 4 px each. */
 .cl-page .cl-stat-grid.is-orders .cl-stat {
-    gap: 0;
     margin: 0;
-    padding: 16px 18px;
 }
 
-.cl-page .cl-stat-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    min-height: 32px;
-    margin-bottom: 8px;
-}
-
-.cl-page .cl-stat-icon {
-    display: inline-flex;
-    flex: none;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    border-radius: 8px;
-    font-size: 14px;
-    color: var(--cl-ink-2);
-    background: var(--cl-surface-2);
-}
-
-.cl-page .cl-stat-icon.is-bad {
-    color: var(--cl-bad);
-    background: var(--cl-bad-soft);
-}
-
-.cl-page .cl-stat-icon.is-warn {
-    color: var(--cl-warn);
-    background: var(--cl-warn-soft);
-}
-
-.cl-page .cl-stat-icon.is-info {
-    color: var(--cl-info);
-    background: var(--cl-info-soft);
-}
-
-.cl-page .cl-stat-icon.is-accent {
-    color: var(--cl-accent);
-    background: var(--cl-accent-soft);
-}
-
-.cl-page .cl-stat-grid.is-orders .cl-stat-value {
-    font-size: 30px;
-    line-height: 1.1;
-    letter-spacing: -.01em;
-}
-
-.cl-page .cl-stat-grid.is-orders .cl-stat-value.is-bad {
+.cl-page .cl-stat-value.is-bad {
     color: var(--cl-bad);
 }
 
-.cl-page .cl-stat-grid.is-orders .cl-stat-value.is-warn {
+.cl-page .cl-stat-value.is-warn {
     color: var(--cl-warn);
-}
-
-/* A zero is good news (nothing overdue) and must not shout. */
-.cl-page .cl-stat-grid.is-orders .cl-stat-value.is-zero {
-    color: var(--cl-ink-3);
-}
-
-.cl-page .cl-stat-sum {
-    display: block;
-    margin-top: 4px;
-    font-size: 13.5px;
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
-    color: var(--cl-ink-2);
-}
-
-.cl-page .cl-stat-grid.is-orders .cl-stat-hint {
-    margin-top: 4px;
-    font-size: 13px;
-    color: var(--cl-ink-2);
 }
 
 /* Status tabs: one underlined row at the top of the card — open statuses on the left, history on the right. Counts
@@ -4947,59 +4874,6 @@ a.cl-link-button:hover {
         justify-content: center;
     }
 
-    .cl-page .cl-stat-grid.is-orders {
-        gap: 10px;
-        margin-bottom: 16px;
-    }
-
-    /* Narrow card: the label alone on top (it wrapped beside the icon), then icon + count on one line, then the
-       sub-line. The head becomes display: contents so its two children take grid cells of the card. */
-    .cl-page .cl-stat-grid.is-orders .cl-stat {
-        display: grid;
-        grid-template-columns: auto minmax(0, 1fr);
-        align-items: center;
-        column-gap: 8px;
-        padding: 12px 14px;
-    }
-
-    .cl-page .cl-stat-head {
-        display: contents;
-    }
-
-    .cl-page .cl-stat-grid.is-orders .cl-eyebrow {
-        grid-column: 1 / -1;
-        margin-bottom: 6px;
-        overflow: hidden;
-        white-space: nowrap;
-        text-overflow: ellipsis;
-    }
-
-    .cl-page .cl-stat-icon {
-        grid-row: 2;
-        grid-column: 1;
-        width: 28px;
-        height: 28px;
-        font-size: 12px;
-    }
-
-    .cl-page .cl-stat-grid.is-orders .cl-stat-value {
-        grid-row: 2;
-        grid-column: 2;
-        font-size: 24px;
-    }
-
-    .cl-page .cl-stat-sum,
-    .cl-page .cl-stat-grid.is-orders .cl-stat-hint {
-        grid-column: 1 / -1;
-    }
-
-    .cl-page .cl-stat-sum {
-        font-size: 12.5px;
-    }
-
-    .cl-page .cl-stat-grid.is-orders .cl-stat-hint {
-        font-size: 12px;
-    }
 
     .cl-page .cl-list-controls {
         flex-direction: column;

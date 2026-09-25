@@ -9,33 +9,33 @@ import java.util.Optional;
  * and the ?focus= narrowing of the list use the same definition.
  */
 public enum OrderAttention {
-    Overdue("overdue", "fa-clock", "is-bad") {
+    Overdue("overdue") {
         @Override
         public boolean matches(Order order, LocalDate today) {
             LocalDate due = order.getShippingDueAt();
             return due != null && due.isBefore(today) && isBeforeShipping(order);
         }
     },
-    Today("today", "fa-calendar-alt", "is-warn") {
+    Today("today") {
         @Override
         public boolean matches(Order order, LocalDate today) {
             return today.equals(order.getShippingDueAt()) && isBeforeShipping(order);
         }
     },
-    Decide("decide", "fa-question-circle", "is-info") {
+    Decide("decide") {
         @Override
         public boolean matches(Order order, LocalDate today) {
             return order.hasOneOfStatuses(OrderStatus.New, OrderStatus.Blocked);
         }
     },
-    Unpaid("unpaid", "fa-credit-card", "is-info") {
+    Unpaid("unpaid") {
         @Override
         public boolean matches(Order order, LocalDate today) {
             return isOpen(order) && order.getUnpaidAmount() > 0;
         }
     },
     /** Placed today — the day's intake, a pulse figure rather than a queue. */
-    NewToday("newToday", "fa-inbox", "is-accent") {
+    NewToday("newToday") {
         @Override
         public boolean matches(Order order, LocalDate today) {
             return order.getOrderedAt() != null && today.equals(order.getOrderedAt().toLocalDate())
@@ -44,27 +44,13 @@ public enum OrderAttention {
     };
 
     private final String param;
-    private final String icon;
-    private final String iconTone;
 
-    OrderAttention(String param, String icon, String iconTone) {
+    OrderAttention(String param) {
         this.param = param;
-        this.icon = icon;
-        this.iconTone = iconTone;
     }
 
     public String param() {
         return param;
-    }
-
-    /** FontAwesome 5.0.7 solid glyph of the stat card (the bundled version has no {@code fa-calendar-day}). */
-    public String icon() {
-        return icon;
-    }
-
-    /** Tone of the card's icon square ({@code is-bad}, {@code is-warn}, {@code is-info}, {@code is-accent}); constant, unlike the count's tone. */
-    public String iconTone() {
-        return iconTone;
     }
 
     public abstract boolean matches(Order order, LocalDate today);

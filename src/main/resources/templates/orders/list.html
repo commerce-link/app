@@ -32,18 +32,14 @@
 
         <div data-cl-orders-results th:fragment="results" th:with="q=${page.query()}">
 
-            <!--/* Four read-only figures of the whole store (design system "Kafelek liczbowy"): Po terminie, Na dziś,
-                   Nieopłacone, Nowe dziś. "Do decyzji" is left out — it repeats the Nowe and Zablokowane tabs below.
-                   Label + tone-tinted icon, the count, then one sub-line: the sum for money figures, the hint otherwise. */-->
+            <!--/* Four read-only figures of the whole store in the design system's cl-stat tile, exactly as Asortyment uses
+                   it: label, number, hint. "Do decyzji" is left out — it repeats the Nowe and Zablokowane rows of the
+                   Status menu. The money figures carry their sum in the hint. */-->
             <ul class="cl-stat-grid is-orders" th:attr="aria-label=#{orders.list.attention.label}">
                 <li class="cl-stat" th:each="tile : ${page.tiles()}" th:if="${tile.kind().name() != 'Decide'}">
-                    <span class="cl-stat-head">
-                        <span class="cl-eyebrow" th:text="${tile.label()}"></span>
-                        <span class="cl-stat-icon" th:classappend="${tile.kind().iconTone()}" aria-hidden="true"><i class="fas" th:classappend="${tile.kind().icon()}"></i></span>
-                    </span>
-                    <span class="cl-stat-value" th:classappend="${tile.count() == 0 ? 'is-zero' : tile.tone()}" th:text="${tile.count()}"></span>
-                    <span class="cl-stat-sum" th:if="${tile.valueOf() != null}" th:text="${tile.valueOf()}"></span>
-                    <span class="cl-stat-hint" th:unless="${tile.valueOf() != null}" th:text="${tile.hint()}"></span>
+                    <span class="cl-eyebrow" th:text="${tile.label()}"></span>
+                    <span class="cl-stat-value" th:classappend="${tile.tone()}" th:text="${tile.count()}"></span>
+                    <span class="cl-stat-hint" th:text="${tile.hint()}"></span>
                 </li>
             </ul>
 
