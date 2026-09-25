@@ -16,7 +16,7 @@ import pl.commercelink.products.StoreCategories;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.taxonomy.Categories;
-import pl.commercelink.taxonomy.TaxonomyCache;
+import pl.commercelink.taxonomy.TaxonomyCatalog;
 import pl.commercelink.taxonomy.UnifiedProductIdentifiers;
 import pl.commercelink.warehouse.api.ItemCondition;
 import pl.commercelink.warehouse.api.Warehouse;
@@ -39,7 +39,7 @@ class WarehouseItemController {
     private Warehouse warehouse;
 
     @Autowired
-    private TaxonomyCache taxonomyCache;
+    private TaxonomyCatalog taxonomyCatalog;
 
     @Autowired
     private MessageSource messageSource;
@@ -122,7 +122,7 @@ class WarehouseItemController {
         }
         supplier = resolution.identity();
         String mfn = UnifiedProductIdentifiers.unifyMfn(manufacturerCode);
-        Taxonomy taxonomy = taxonomyCache.findByMfn(mfn);
+        Taxonomy taxonomy = taxonomyCatalog.findByMfn(mfn);
 
         String name = taxonomy != null ? taxonomy.name() : null;
         String ean = taxonomy != null ? taxonomy.ean() : null;

@@ -10,7 +10,6 @@ import org.mockito.quality.Strictness;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
 import pl.commercelink.taxonomy.Taxonomy;
-import pl.commercelink.taxonomy.TaxonomyRepository;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.products.CategoryDefinition;
@@ -19,7 +18,7 @@ import pl.commercelink.products.ProductRecommendationEngine;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
-import pl.commercelink.taxonomy.TaxonomyCache;
+import pl.commercelink.taxonomy.TaxonomyCatalog;
 import pl.commercelink.warehouse.api.StockQueryService;
 import pl.commercelink.warehouse.api.Warehouse;
 import pl.commercelink.warehouse.api.WarehouseItemView;
@@ -44,6 +43,8 @@ class InventoryViewStoreListingsTest {
     private static final String STORE_ID = "store-1";
     private static final String EAN = "5901234567890";
     private static final String MFN = "MFN-1";
+    private static final Taxonomy PROCESORY = new Taxonomy(EAN, MFN, "Intel", "i7", "Procesory", 1, null, null, null, "989");
+    private static final Taxonomy CPU = new Taxonomy(EAN, MFN, "Intel", "i7", "CPU", 1, null, null, null, "989");
 
     @Mock
     private Warehouse warehouse;
@@ -52,7 +53,7 @@ class InventoryViewStoreListingsTest {
     @Mock
     private InventoryAutoDiscovery autoDiscovery;
     @Mock
-    private TaxonomyCache taxonomyCache;
+    private TaxonomyCatalog taxonomyCatalog;
     @Mock
     private SupplierRegistry supplierRegistry;
     @Mock
@@ -87,17 +88,32 @@ class InventoryViewStoreListingsTest {
     }
 
     private MatchedInventory globalGroupWithPimId() {
+        return globalGroupWithPimId(PROCESORY);
+    }
+
+    private MatchedInventory globalGroupWithPimId(Taxonomy taxonomy) {
         InventoryKey key = new InventoryKey("PIM-1");
         key.addEan(EAN);
         key.addManufacturerCode(MFN);
-        return new MatchedInventory(key, List.of(
+        return categorized(new MatchedInventory(key, List.of(
                 item("AB Group", 1399.0),
                 item("Action", 1450.0),
-                item("Elko", 1300.0)), taxonomyCache, supplierRegistry);
+                item("Elko", 1300.0)), supplierRegistry), taxonomy);
     }
 
     private MatchedInventory ownActionGroup() {
-        return new MatchedInventory(new InventoryKey(EAN, MFN), List.of(item("Action", 1380.0)), taxonomyCache, supplierRegistry);
+        return ownActionGroup(PROCESORY);
+    }
+
+    private MatchedInventory ownActionGroup(Taxonomy taxonomy) {
+        return categorized(
+                new MatchedInventory(new InventoryKey(EAN, MFN), List.of(item("Action", 1380.0)), supplierRegistry),
+                taxonomy);
+    }
+
+    private static MatchedInventory categorized(MatchedInventory group, Taxonomy taxonomy) {
+        group.adoptTaxonomy(taxonomy);
+        return group;
     }
 
     private void storeWithGlobalAbGroupAndOwnAction() {
@@ -107,7 +123,6 @@ class InventoryViewStoreListingsTest {
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(storeInventoryProvider.ownIndex(store)).thenReturn(InventoryIndex.of(List.of(ownActionGroup())));
         stubGlobalIndex(List.of(globalGroupWithPimId()));
-        when(taxonomyCache.find(any())).thenReturn(new Taxonomy(EAN, MFN, "Intel", "i7", "Procesory", 1, null, null, null, "989"));
     }
 
     private void stubGlobalIndex(Collection<MatchedInventory> groups) {
@@ -160,9 +175,8 @@ class InventoryViewStoreListingsTest {
         when(store.hasOwnSupplierConnections()).thenReturn(true);
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(storeInventoryProvider.ownIndex(store)).thenReturn(InventoryIndex.of(List.of(ownActionGroup())));
-        stubGlobalIndex(List.of(new MatchedInventory(new InventoryKey(EAN, MFN),
-                List.of(item("Elko", 1300.0), item("Action", 1450.0)), taxonomyCache, supplierRegistry)));
-        when(taxonomyCache.find(any())).thenReturn(new Taxonomy(EAN, MFN, "Intel", "i7", "CPU", 1, null, null, null, "989"));
+        stubGlobalIndex(List.of(categorized(new MatchedInventory(new InventoryKey(EAN, MFN),
+                List.of(item("Elko", 1300.0), item("Action", 1450.0)), supplierRegistry), CPU)));
         when(productRepository.findAll("cat-1")).thenReturn(List.of());
         when(pimCatalog.findByPimIdOrGtinsOrMpns(any(), any(), any())).thenReturn(Optional.empty());
 
@@ -184,9 +198,8 @@ class InventoryViewStoreListingsTest {
         when(store.getGlobalSupplierNames()).thenReturn(List.of());
         when(store.hasOwnSupplierConnections()).thenReturn(true);
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
-        when(storeInventoryProvider.ownIndex(store)).thenReturn(InventoryIndex.of(List.of(ownActionGroup())));
+        when(storeInventoryProvider.ownIndex(store)).thenReturn(InventoryIndex.of(List.of(ownActionGroup(CPU))));
         stubGlobalIndex(List.of());
-        when(taxonomyCache.find(any())).thenReturn(new Taxonomy(EAN, MFN, "Intel", "i7", "CPU", 1, null, null, null, "989"));
         when(productRepository.findAll("cat-1")).thenReturn(List.of());
         when(pimCatalog.findByPimIdOrGtinsOrMpns(any(), any(), any())).thenReturn(Optional.empty());
 
@@ -209,14 +222,13 @@ class InventoryViewStoreListingsTest {
         InventoryKey ownKey = new InventoryKey("PIM-1");
         MatchedInventory ownGroup = new MatchedInventory(ownKey,
                 List.of(new InventoryItem("5907777777777", "MFN-OWN", 1380.0, "PLN", 5, 1, "Action", true, true, false)),
-                taxonomyCache, supplierRegistry);
+                supplierRegistry);
         when(storeInventoryProvider.ownIndex(store)).thenReturn(InventoryIndex.of(List.of(ownGroup)));
         InventoryKey globalKey = new InventoryKey("PIM-1");
         globalKey.addEan(EAN);
         globalKey.addManufacturerCode(MFN);
-        stubGlobalIndex(List.of(new MatchedInventory(globalKey,
-                List.of(item("AB Group", 1399.0)), taxonomyCache, supplierRegistry)));
-        when(taxonomyCache.find(any())).thenReturn(new Taxonomy(EAN, MFN, "Intel", "i7", "Procesory", 1, null, null, null, "989"));
+        stubGlobalIndex(List.of(categorized(new MatchedInventory(globalKey,
+                List.of(item("AB Group", 1399.0)), supplierRegistry), PROCESORY)));
 
         // when
         Collection<MatchedInventory> result =
@@ -236,7 +248,6 @@ class InventoryViewStoreListingsTest {
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(storeInventoryProvider.ownIndex(store)).thenReturn(InventoryIndex.of(List.of(ownActionGroup())));
         stubGlobalIndex(List.of());
-        when(taxonomyCache.find(any())).thenReturn(new Taxonomy(EAN, MFN, "Intel", "i7", "Procesory", 1, null, null, null, "989"));
         StockQueryService stockQueryService = org.mockito.Mockito.mock(StockQueryService.class);
         when(warehouse.stockQueryService(STORE_ID)).thenReturn(stockQueryService);
         when(stockQueryService.searchAvailableByMfns(any(), any())).thenReturn(List.of());
@@ -255,11 +266,11 @@ class InventoryViewStoreListingsTest {
         // given
         MatchedInventory smaller = new MatchedInventory(new InventoryKey("5900000000001", MFN),
                 List.of(new InventoryItem("5900000000001", MFN, 100.0, "PLN", 5, 1, "SupplierX", true, true, false)),
-                taxonomyCache, supplierRegistry);
+                supplierRegistry);
         MatchedInventory bigger = new MatchedInventory(new InventoryKey("5900000000002", MFN),
                 List.of(new InventoryItem("5900000000002", MFN, 90.0, "PLN", 5, 1, "SupplierY", true, true, false),
                         new InventoryItem("5900000000002", MFN, 95.0, "PLN", 5, 1, "SupplierZ", true, true, false)),
-                taxonomyCache, supplierRegistry);
+                supplierRegistry);
         stubGlobalIndex(List.of(smaller, bigger));
 
         // when
@@ -278,7 +289,7 @@ class InventoryViewStoreListingsTest {
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(storeInventoryProvider.ownIndex(store)).thenReturn(InventoryIndex.of(List.of(ownActionGroup())));
         stubGlobalIndex(List.of(new MatchedInventory(new InventoryKey(EAN, MFN),
-                List.of(item("AB Group", 1399.0), item("Action", 1450.0)), taxonomyCache, supplierRegistry)));
+                List.of(item("AB Group", 1399.0), item("Action", 1450.0)), supplierRegistry)));
 
         // when
         MatchedInventory matched = inventory.withEnabledSuppliersOnly(STORE_ID).findByProductCode(MFN);
@@ -301,7 +312,7 @@ class InventoryViewStoreListingsTest {
         globalKey.addEan(EAN);
         globalKey.addManufacturerCode(MFN);
         stubGlobalIndex(List.of(new MatchedInventory(globalKey,
-                List.of(item("AB Group", 1399.0)), taxonomyCache, supplierRegistry)));
+                List.of(item("AB Group", 1399.0)), supplierRegistry)));
 
         // when
         MatchedInventory matched = inventory.withEnabledSuppliersOnly(STORE_ID).findByEan(EAN);
@@ -320,7 +331,7 @@ class InventoryViewStoreListingsTest {
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(storeInventoryProvider.ownIndex(store)).thenReturn(InventoryIndex.of(List.of()));
         stubGlobalIndex(List.of(new MatchedInventory(new InventoryKey(EAN, MFN),
-                List.of(item("AB Group", 1399.0)), taxonomyCache, supplierRegistry)));
+                List.of(item("AB Group", 1399.0)), supplierRegistry)));
         StockQueryService stockQueryService = org.mockito.Mockito.mock(StockQueryService.class);
         when(warehouse.stockQueryService(STORE_ID)).thenReturn(stockQueryService);
         WarehouseItemView view = org.mockito.Mockito.mock(WarehouseItemView.class);
@@ -342,9 +353,8 @@ class InventoryViewStoreListingsTest {
         when(store.hasOwnSupplierConnections()).thenReturn(false);
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(storeInventoryProvider.ownIndex(store)).thenReturn(InventoryIndex.of(List.of()));
-        stubGlobalIndex(List.of(new MatchedInventory(new InventoryKey(EAN, MFN),
-                List.of(item("AB Group", 1399.0)), taxonomyCache, supplierRegistry)));
-        when(taxonomyCache.find(any())).thenReturn(new Taxonomy(EAN, MFN, "Intel", "i7", "Procesory", 1, null, null, null, "989"));
+        stubGlobalIndex(List.of(categorized(new MatchedInventory(new InventoryKey(EAN, MFN),
+                List.of(item("AB Group", 1399.0)), supplierRegistry), PROCESORY)));
         StockQueryService stockQueryService = org.mockito.Mockito.mock(StockQueryService.class);
         when(warehouse.stockQueryService(STORE_ID)).thenReturn(stockQueryService);
         WarehouseItemView view = org.mockito.Mockito.mock(WarehouseItemView.class);
@@ -403,9 +413,8 @@ class InventoryViewStoreListingsTest {
         when(store.hasOwnSupplierConnections()).thenReturn(false);
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(storeInventoryProvider.ownIndex(store)).thenReturn(InventoryIndex.of(List.of()));
-        stubGlobalIndex(List.of(globalGroupWithPimId()));
-        when(taxonomyCache.find(any())).thenReturn(
-                new Taxonomy(EAN, MFN, "Intel", "i7", "Procesory", 1, null, null, null, null));
+        stubGlobalIndex(List.of(globalGroupWithPimId(
+                new Taxonomy(EAN, MFN, "Intel", "i7", "Procesory", 1, null, null, null, null))));
 
         // when
         Map<String, Collection<MatchedInventory>> result =
@@ -416,22 +425,32 @@ class InventoryViewStoreListingsTest {
     }
 
     @Test
-    void taxonomyLookupCountIsIndependentOfSelectionSize() {
+    void singleLookupAsksTheCatalogWhenTheIndexedGroupHasNoCategoryYet() {
+        // given
+        Taxonomy uncategorized = new Taxonomy(EAN, MFN, "Intel", "i7", null, 5, null, null);
+        Taxonomy justCategorized = new Taxonomy(EAN, MFN, "Intel", "i7", "Procesory", 5, null, null, null, "989");
+        stubGlobalIndex(List.of(categorized(new MatchedInventory(new InventoryKey(EAN, MFN),
+                List.of(item("AB Group", 1399.0)), supplierRegistry), uncategorized)));
+        when(taxonomyCatalog.findBest(any())).thenReturn(justCategorized);
+
+        // when
+        MatchedInventory matched = inventory.withGlobalData().findByProductCode(MFN);
+
+        // then
+        assertThat(matched.getTaxonomy().category()).isEqualTo("Procesory");
+        assertThat(matched.getTaxonomy().categoryId()).isEqualTo("989");
+    }
+
+    @Test
+    void listingByCategoryNeverReadsTheCatalog() {
         // given
         storeWithGlobalAbGroupAndOwnAction();
 
         // when
-        inventory.withEnabledSuppliersOnly(STORE_ID).findAllByProductCategoryIds(List.of("989"));
-        Collection<org.mockito.invocation.Invocation> afterSingle =
-                org.mockito.Mockito.mockingDetails(taxonomyCache).getInvocations();
-        long singleRunFinds = afterSingle.stream().filter(i -> i.getMethod().getName().equals("find")).count();
-        org.mockito.Mockito.clearInvocations(taxonomyCache);
         inventory.withEnabledSuppliersOnly(STORE_ID).findAllByProductCategoryIds(List.of("989", "170"));
-        long doubleRunFinds = org.mockito.Mockito.mockingDetails(taxonomyCache).getInvocations().stream()
-                .filter(i -> i.getMethod().getName().equals("find")).count();
 
         // then
-        assertThat(doubleRunFinds).isEqualTo(singleRunFinds);
+        org.mockito.Mockito.verifyNoInteractions(taxonomyCatalog);
     }
 
     @Test
@@ -439,25 +458,22 @@ class InventoryViewStoreListingsTest {
         // given — pre-merge lookup key carries only MFN-A (categoryId "194", worse score);
         // a second InventorySource merges in MFN-B during assemble() (categoryId "195", better/lower score) —
         // grouping must use the pre-merge taxonomy, landing the product in "194" and never in "195"
-        TaxonomyRepository taxonomyRepository = org.mockito.Mockito.mock(TaxonomyRepository.class);
-        TaxonomyCache realCache = new TaxonomyCache(taxonomyRepository);
-        realCache.add(new Taxonomy(EAN, "MFN-A", "Logitech", "K120", "Klawiatury", 2, null, null, null, "194"));
-        realCache.add(new Taxonomy(EAN, "MFN-B", "Logitech", "K120", "Myszki", 1, null, null, null, "195"));
-
         InventoryKey keyA = new InventoryKey(EAN, "MFN-A");
-        MatchedInventory groupA = new MatchedInventory(keyA,
+        MatchedInventory groupA = categorized(new MatchedInventory(keyA,
                 List.of(new InventoryItem(EAN, "MFN-A", 100.0, "PLN", 5, 1, "AB Group", true, true, false)),
-                realCache, supplierRegistry);
+                supplierRegistry),
+                new Taxonomy(EAN, "MFN-A", "Logitech", "K120", "Klawiatury", 2, null, null, null, "194"));
         InventoryIndex globalIndex = InventoryIndex.of(List.of(groupA));
 
         InventoryKey keyB = new InventoryKey(EAN, "MFN-B");
-        MatchedInventory groupB = new MatchedInventory(keyB,
+        MatchedInventory groupB = categorized(new MatchedInventory(keyB,
                 List.of(new InventoryItem(EAN, "MFN-B", 90.0, "PLN", 5, 1, "AB Group", true, true, false)),
-                realCache, supplierRegistry);
+                supplierRegistry),
+                new Taxonomy(EAN, "MFN-B", "Logitech", "K120", "Myszki", 1, null, null, null, "195"));
         InventoryIndex mergingIndex = InventoryIndex.of(List.of(groupB));
 
         InventoryView view = new InventoryView(globalIndex, InventoryIndex.of(List.of()),
-                realCache, supplierRegistry,
+                taxonomyCatalog, supplierRegistry,
                 GroupInventorySource.global(globalIndex, supplier -> true),
                 GroupInventorySource.global(mergingIndex, supplier -> true));
 

@@ -132,7 +132,7 @@ class StoreScopedFeedLoaderTest {
 
         // then
         ArgumentCaptor<Integer> captor = ArgumentCaptor.forClass(Integer.class);
-        verify(feedRowProcessor).process(any(ParsedRow.class), captor.capture(), any(FeedParseStats.class));
+        verify(feedRowProcessor).process(anyList(), captor.capture(), any(FeedParseStats.class));
         assertEquals(1000, captor.getValue());
     }
 
@@ -173,7 +173,7 @@ class StoreScopedFeedLoaderTest {
 
         // then
         ArgumentCaptor<Integer> captor = ArgumentCaptor.forClass(Integer.class);
-        verify(feedRowProcessor).process(any(ParsedRow.class), captor.capture(), any(FeedParseStats.class));
+        verify(feedRowProcessor).process(anyList(), captor.capture(), any(FeedParseStats.class));
         assertEquals(1000, captor.getValue());
     }
 
@@ -194,7 +194,7 @@ class StoreScopedFeedLoaderTest {
 
         // then
         ArgumentCaptor<Integer> captor = ArgumentCaptor.forClass(Integer.class);
-        verify(feedRowProcessor).process(any(ParsedRow.class), captor.capture(), any(FeedParseStats.class));
+        verify(feedRowProcessor).process(anyList(), captor.capture(), any(FeedParseStats.class));
         assertEquals(0, captor.getValue());
     }
 
@@ -209,7 +209,7 @@ class StoreScopedFeedLoaderTest {
 
         // then
         ArgumentCaptor<Integer> captor = ArgumentCaptor.forClass(Integer.class);
-        verify(feedRowProcessor).process(any(ParsedRow.class), captor.capture(), any(FeedParseStats.class));
+        verify(feedRowProcessor).process(anyList(), captor.capture(), any(FeedParseStats.class));
         assertEquals(0, captor.getValue());
     }
 }

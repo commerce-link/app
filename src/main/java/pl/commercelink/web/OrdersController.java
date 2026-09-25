@@ -36,7 +36,7 @@ import pl.commercelink.orders.fulfilment.ExternalSupplierBinding;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.orders.imports.BasketOrderImporter;
 import pl.commercelink.orders.pos.PosOrderCreator;
-import pl.commercelink.taxonomy.TaxonomyCache;
+import pl.commercelink.taxonomy.TaxonomyCatalog;
 import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.pricelist.PricelistFinder;
@@ -141,7 +141,7 @@ public class OrdersController extends BaseController {
     private GoodsOutEventPublisher goodsOutEventPublisher;
 
     @Autowired
-    private TaxonomyCache taxonomyCache;
+    private TaxonomyCatalog taxonomyCatalog;
 
     @Autowired
     private OrderLifecycleEventPublisher orderLifecycleEventPublisher;
@@ -394,7 +394,7 @@ public class OrdersController extends BaseController {
     }
 
     private String resolveTaxonomyName(String mfn) {
-        Taxonomy taxonomy = taxonomyCache.findByMfn(mfn);
+        Taxonomy taxonomy = taxonomyCatalog.findByMfn(mfn);
         return taxonomy != null && taxonomy.name() != null ? taxonomy.name() : "";
     }
 
@@ -714,7 +714,7 @@ public class OrdersController extends BaseController {
         orderItem.setCost(cost);
         orderItem.setDeliveryId(supplier);
 
-        Taxonomy taxonomy = taxonomyCache.findByMfn(orderItem.getManufacturerCode());
+        Taxonomy taxonomy = taxonomyCatalog.findByMfn(orderItem.getManufacturerCode());
         String resolvedEan = taxonomy != null ? taxonomy.ean() : null;
 
         if (Strings.isBlank(resolvedEan)) {

@@ -170,7 +170,7 @@ class DeliveryTest {
     }
 
     @Test
-    void orderOutcomeIsNotUnknownForAFailedDeliveryWithAnErrorMessage() {
+    void orderOutcomeIsNotUnlatestAFailedDeliveryWithAnErrorMessage() {
         // given
         Delivery delivery = new Delivery("store-1", null, "Acme");
         delivery.setOrderStatus(DeliveryOrderStatus.FAILED);

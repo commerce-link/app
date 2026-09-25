@@ -5,7 +5,8 @@ import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
-import pl.commercelink.taxonomy.TaxonomyCache;
+import pl.commercelink.taxonomy.Taxonomy;
+import pl.commercelink.taxonomy.TaxonomyCatalog;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -14,12 +15,12 @@ import java.util.stream.Collectors;
 class InventoryAutoDiscovery {
 
     private PimCatalog pimCatalog;
-    private TaxonomyCache taxonomyCache;
+    private TaxonomyCatalog taxonomyCatalog;
     private SupplierRegistry supplierRegistry;
 
-    public InventoryAutoDiscovery(PimCatalog pimCatalog, TaxonomyCache taxonomyCache, SupplierRegistry supplierRegistry) {
+    public InventoryAutoDiscovery(PimCatalog pimCatalog, TaxonomyCatalog taxonomyCatalog, SupplierRegistry supplierRegistry) {
         this.pimCatalog = pimCatalog;
-        this.taxonomyCache = taxonomyCache;
+        this.taxonomyCatalog = taxonomyCatalog;
         this.supplierRegistry = supplierRegistry;
     }
 
@@ -44,7 +45,7 @@ class InventoryAutoDiscovery {
             matchingItems.addAll(findItemsByKeysModifyingCollection(inventoryKey.getProductEans(), mappedByEan));
             matchingItems.addAll(findItemsByKeysModifyingCollection(inventoryKey.getProductCodes(), mappedByProductCode));
 
-            MatchedInventory matchedInventory = new MatchedInventory(inventoryKey, matchingItems, taxonomyCache, supplierRegistry);
+            MatchedInventory matchedInventory = new MatchedInventory(inventoryKey, matchingItems, supplierRegistry);
 
             for (String ean : matchedInventory.getEans()) {
                 keyToMatchedInventory.put(ean, matchedInventory);
@@ -75,7 +76,7 @@ class InventoryAutoDiscovery {
                 inv.addAlternativeInventoryItems(matchingItems);
             } else {
                 InventoryKey ik = new InventoryKey(eans, productCodes);
-                MatchedInventory mi = new MatchedInventory(ik, matchingItems, taxonomyCache, supplierRegistry);
+                MatchedInventory mi = new MatchedInventory(ik, matchingItems, supplierRegistry);
 
                 for (String ean : eans) {
                     keyToMatchedInventory.put(ean, mi);
@@ -83,7 +84,17 @@ class InventoryAutoDiscovery {
             }
         }
 
-        return processMatchedInventoryCandidates(keyToMatchedInventory.values());
+        Collection<MatchedInventory> groups = processMatchedInventoryCandidates(keyToMatchedInventory.values());
+        attachTaxonomies(groups);
+        return groups;
+    }
+
+    private void attachTaxonomies(Collection<MatchedInventory> groups) {
+        Set<String> productCodes = groups.stream()
+                .flatMap(group -> group.getMfnCodes().stream())
+                .collect(Collectors.toSet());
+        Map<String, Taxonomy> byMfn = taxonomyCatalog.findByMfns(productCodes);
+        groups.forEach(group -> group.adoptTaxonomy(Taxonomy.bestOf(group.getMfnCodes(), byMfn)));
     }
 
     private static Collection<InventoryItem> findItemsByKeysModifyingCollection(Collection<String> keys, Map<String, List<InventoryItem>> col) {
@@ -210,7 +221,7 @@ class InventoryAutoDiscovery {
         Set<String> eans = approvedItems.stream().map(InventoryItem::ean).collect(Collectors.toSet());
         Set<String> productCodes = approvedItems.stream().map(InventoryItem::mfn).collect(Collectors.toSet());
 
-        return new MatchedInventory(new InventoryKey(eans, productCodes), approvedItems, taxonomyCache, supplierRegistry);
+        return new MatchedInventory(new InventoryKey(eans, productCodes), approvedItems, supplierRegistry);
     }
 
     private boolean isUniformGroupOfItems(List<InventoryItem> inventoryItems) {

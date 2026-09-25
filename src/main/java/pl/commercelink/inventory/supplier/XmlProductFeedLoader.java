@@ -6,7 +6,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import pl.commercelink.inventory.supplier.api.InventoryItem;
 import pl.commercelink.inventory.InventoryRepository;
-import pl.commercelink.inventory.supplier.api.ParsedRow;
 import pl.commercelink.inventory.supplier.api.SupplierInfo;
 import pl.commercelink.inventory.supplier.api.XmlItem;
 
@@ -78,17 +77,13 @@ public class XmlProductFeedLoader {
         JAXBContext jaxbContext = JAXBContext.newInstance(itemClass);
         Unmarshaller unmarshaller = jaxbContext.createUnmarshaller();
 
-        List<InventoryItem> res = new LinkedList<>();
-        FeedParseStats stats = new FeedParseStats(supplierInfo.name());
+        FeedRowBatcher batcher = new FeedRowBatcher(feedRowProcessor, taxonomyPenalty, new FeedParseStats(supplierInfo.name()));
 
         try {
             while (xsr.hasNext()) {
                 if (xsr.isStartElement() && xsr.getLocalName().equals(itemElementName)) {
                     V xmlItem = unmarshaller.unmarshal(xsr, itemClass).getValue();
-
-                    ParsedRow parsed = xmlItem.toParsedRow(supplierInfo);
-                    feedRowProcessor.process(parsed, taxonomyPenalty, stats)
-                            .ifPresent(res::add);
+                    batcher.accept(xmlItem.toParsedRow(supplierInfo));
                 } else {
                     xsr.next();
                 }
@@ -97,8 +92,7 @@ public class XmlProductFeedLoader {
             xsr.close();
         }
 
-        stats.log();
-        return dataCleanup.run(res);
+        return dataCleanup.run(batcher.finish());
     }
 
 }

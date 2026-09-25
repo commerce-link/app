@@ -11,14 +11,17 @@ class ListingInventory {
     private final InventoryIndex globalIndex;
     private final InventoryIndex ownIndex;
 
-    Stream<InventoryKey> keys() {
-        Stream<InventoryKey> globalKeys = globalIndex.all().stream().map(MatchedInventory::getInventoryKey);
+    Stream<MatchedInventory> groups() {
+        Stream<MatchedInventory> globalGroups = globalIndex.all().stream();
         if (ownIndex.all().isEmpty()) {
-            return globalKeys;
+            return globalGroups;
         }
-        Stream<InventoryKey> ownOnlyKeys = ownIndex.all().stream()
-                .map(MatchedInventory::getInventoryKey)
-                .filter(key -> !globalIndex.contains(key));
-        return Stream.concat(globalKeys, ownOnlyKeys);
+        Stream<MatchedInventory> ownOnlyGroups = ownIndex.all().stream()
+                .filter(group -> !globalIndex.contains(group.getInventoryKey()));
+        return Stream.concat(globalGroups, ownOnlyGroups);
+    }
+
+    Stream<InventoryKey> keys() {
+        return groups().map(MatchedInventory::getInventoryKey);
     }
 }
