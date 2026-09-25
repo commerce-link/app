@@ -69,8 +69,10 @@
     <h2 th:text="#{devReceipts.payments}"></h2>
     <dl class="cl-receipt-meta">
         <th:block th:each="payment : *{payments}">
-            <dt><span th:text="#{${'devReceipts.payment.' + payment.form}}"></span><th:block
-                    th:unless="${#strings.isEmpty(payment.label)}" th:text="' (' + ${payment.label} + ')'"></th:block></dt>
+            <dt th:with="formName=#{${'devReceipts.payment.' + payment.form}}, label=${#strings.trim(payment.label)}"><span
+                    th:text="${formName}"></span><th:block
+                    th:unless="${#strings.isEmpty(label) or #strings.equalsIgnoreCase(label, #strings.trim(formName))}"
+                    th:text="' (' + ${label} + ')'"></th:block></dt>
             <dd th:text="${payment.amount}"></dd>
         </th:block>
     </dl>

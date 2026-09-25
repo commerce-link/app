@@ -121,6 +121,34 @@ class DevReceiptPreviewControllerTest {
         assertThat(html.split("data-cl-receipt-line", -1)).hasSize(4);
     }
 
+    /** A label that only repeats the displayed form name ("Przelew (Przelew)") is not shown again. */
+    @Test
+    void doesNotRepeatThePaymentFormAsItsLabel() {
+        // when
+        String html = renderedWithPaymentLabel(" bank TRANSFER ");
+
+        // then
+        assertThat(html).contains("<dt><span>Bank transfer</span></dt>");
+    }
+
+    @Test
+    void showsAPaymentLabelThatDiffersFromTheForm() {
+        // when
+        String html = renderedWithPaymentLabel("Przelew24");
+
+        // then
+        assertThat(html).contains("<dt><span>Bank transfer</span> (Przelew24)</dt>");
+    }
+
+    @Test
+    void omitsABlankPaymentLabel() {
+        // when
+        String html = renderedWithPaymentLabel("  ");
+
+        // then
+        assertThat(html).contains("<dt><span>Bank transfer</span></dt>");
+    }
+
     @Test
     void polishPageCarriesTheSimulationBanner() throws Exception {
         // when / then
@@ -133,6 +161,22 @@ class DevReceiptPreviewControllerTest {
         // when / then
         assertThat(devReceiptKeys("messages_pl.properties")).isEqualTo(devReceiptKeys("messages_en.properties"))
                 .contains("devReceipts.vat.EXEMPT", "devReceipts.payment.OTHER");
+    }
+
+    /** The rendered page of a one-line receipt paid by transfer with the given payment label. */
+    private String renderedWithPaymentLabel(String label) {
+        ReceiptAttempt attempt = attempt(STORE_ID, "order-2:R1", "dev-rcpt-2");
+        attempt.setRequestSnapshot(ReceiptSnapshotJson.write(new ReceiptRequestSnapshot("order-2",
+                LocalDateTime.of(2026, 9, 24, 14, 5), null,
+                List.of(new ReceiptRequestSnapshot.Line(LineKind.GOODS, "Kabel", BigDecimal.ONE, 2000,
+                        VatRate.VAT_23, null, null)),
+                List.of(new ReceiptRequestSnapshot.Pay(PaymentForm.TRANSFER, 2000, label)))));
+        attemptStore.create(attempt);
+        ExtendedModelMap model = new ExtendedModelMap();
+        String view = controller.preview("dev-rcpt-2", model);
+        Context context = new Context();
+        context.setVariables(model);
+        return EnglishFragmentTemplateEngine.create().process(view, context);
     }
 
     private static ReceiptAttempt attempt(String storeId, String receiptKey, String providerReceiptId) {
