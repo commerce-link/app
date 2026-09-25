@@ -4395,6 +4395,12 @@ a.cl-link-button:hover {
     font-weight: 600;
 }
 
+/* The " · " that joins the due note to the date above it, from 720 px up (D10 card mode below 720 px puts the note
+   on its own full-width line and drops it — see the phone block, Task 14 round 1). */
+.cl-page .cl-table.is-orders .cl-due-note::before {
+    content: " · ";
+}
+
 .cl-page .cl-table.is-orders .cl-due-note.is-bad {
     color: var(--cl-bad);
 }
@@ -4521,8 +4527,19 @@ a.cl-link-button:hover {
         justify-content: center;
     }
 
-    /* Segments scroll sideways in one row; the fade says there is more. */
+    /* Task 14 round 1: the open-status nav, the divider and the history nav used to share one scrolling row; once
+       the open-status nav wrapped onto two lines above 390-719 px widths, the divider was stranded alone on its
+       own row with the history nav pushed below it anyway. Below 720 px each nav is its own full-width,
+       independently-scrolling row instead (the fade says there is more), and the divider — redundant once the two
+       navs are already on separate rows — is hidden. */
     .cl-page .cl-segmented-scroll {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+    }
+
+    .cl-page .cl-segmented-scroll .cl-segmented {
         position: relative;
         flex-wrap: nowrap;
         overflow-x: auto;
@@ -4532,7 +4549,11 @@ a.cl-link-button:hover {
         padding: 0 16px;
     }
 
-    .cl-page .cl-segmented-scroll::-webkit-scrollbar {
+    .cl-page .cl-segmented-scroll .cl-segmented::-webkit-scrollbar {
+        display: none;
+    }
+
+    .cl-page .cl-segmented-divider {
         display: none;
     }
 
@@ -4553,6 +4574,19 @@ a.cl-link-button:hover {
     }
 
     .cl-page .cl-search-form .cl-search-button-text {
+        display: none;
+    }
+
+    /* Task 14 round 1: "37 · 72 762,00 PLN" (Nieopłacone tile) wrapped across three lines in the narrower 2×2 tile
+       below 720 px. The value moves to its own line under the count instead, and the " · " that joins them inline
+       from 1024 px up (kept in `.cl-stat-value-sep`) is redundant once the line break already separates them. */
+    .cl-page .cl-stat-grid-attention .cl-stat-value-of {
+        display: block;
+        font-size: 12.5px;
+        margin-top: 2px;
+    }
+
+    .cl-page .cl-stat-grid-attention .cl-stat-value-sep {
         display: none;
     }
 
@@ -4619,8 +4653,16 @@ a.cl-link-button:hover {
         justify-self: end;
     }
 
+    /* Task 14 round 1: "po terminie: 2 dni" wrapped to three lines squeezed into the narrow date column (grid-column
+       1 of a minmax(0,1fr)/auto row). Its own full-width line below the date/amount line instead, and the " · "
+       that joins it to the date above (kept from 720 px up, see the base rule) drops here — the line break already
+       separates them. */
     .cl-page .cl-table.is-orders .cl-due-note {
-        grid-column: 1;
+        grid-column: 1 / -1;
+    }
+
+    .cl-page .cl-table.is-orders .cl-due-note::before {
+        content: none;
     }
 
     .cl-page .cl-pagination {
