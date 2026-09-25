@@ -47,18 +47,33 @@ class StoreReceiptsTemplateTest {
         assertThat(html).contains("id=\"receipts-form\"").contains("type=\"checkbox\"").contains("id=\"enabled\"");
     }
 
+    /** A stale form (enabled=true) submitted after the system was disconnected in another tab still reaches
+     *  saveReceipts with the noSystem error, but re-renders with systemStatus.configured()==false: the error
+     *  summary lives inside the now-hidden form, so the focus script must not run getElementById().focus() on it
+     *  (it would return null and throw). */
+    @Test
+    void theFocusScriptIsAbsentWhenTheFormIsHiddenEvenWithErrors() {
+        String html = render(new IntegrationStatus(null, null, false, false), Map.of("enabled", "store.receipts.enabled.noSystem"));
+
+        assertThat(html).doesNotContain("id=\"receipts-form\"").doesNotContain("receipts-errors').focus()");
+    }
+
     private static String render(IntegrationStatus systemStatus) {
-        Context context = context(systemStatus);
+        return render(systemStatus, Map.of());
+    }
+
+    private static String render(IntegrationStatus systemStatus, Map<String, String> receiptsErrors) {
+        Context context = context(systemStatus, receiptsErrors);
         return EnglishFragmentTemplateEngine.create().process("store-receipts", context);
     }
 
     private static String renderFragment(IntegrationStatus systemStatus) {
-        Context context = context(systemStatus);
+        Context context = context(systemStatus, Map.of());
         TemplateSpec spec = new TemplateSpec("store-receipts", Set.of("receiptsForm"), (String) null, null);
         return EnglishFragmentTemplateEngine.create().process(spec, context);
     }
 
-    private static Context context(IntegrationStatus systemStatus) {
+    private static Context context(IntegrationStatus systemStatus, Map<String, String> receiptsErrors) {
         ReceiptSettingsForm form = new ReceiptSettingsForm();
         form.setEnabled(false);
         Context context = new Context();
@@ -66,7 +81,7 @@ class StoreReceiptsTemplateTest {
         context.setVariable("systemHref", "/dashboard/store/receipts/system");
         context.setVariable("disconnectHref", "/dashboard/store/receipts/system/disconnect");
         context.setVariable("receiptsForm", form);
-        context.setVariable("receiptsErrors", Map.of());
+        context.setVariable("receiptsErrors", receiptsErrors);
         context.setVariable("receiptsAction", "/dashboard/store/receipts");
         context.setVariable("savedMessage", null);
         return context;

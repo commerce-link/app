@@ -68,7 +68,10 @@
             <dialog th:replace="~{fragments/confirm-dialog :: dialog}"></dialog>
         </div>
     </section>
-    <script th:if="${!receiptsErrors.isEmpty()}">
+    <!--/* The error summary only exists inside the hidden form's markup, so without a configured system there is
+           nothing to focus (a stale enabled=true submitted after a disconnect in another tab still reaches here
+           with the noSystem error and an unconfigured status). */-->
+    <script th:if="${!receiptsErrors.isEmpty() and systemStatus.configured()}">
         document.getElementById('receipts-errors').focus();
     </script>
     <script th:src="@{/js/async-form.js}" defer></script>
