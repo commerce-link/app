@@ -784,7 +784,7 @@ class OrdersControllerTest {
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
         when(storesRepository.findById(STORE_ID)).thenReturn(new Store());
         when(dropshipItemLookup.itemIdsInDropshipDeliveries(eq(STORE_ID), any())).thenReturn(Set.of());
-        when(receiptAttemptService.hasLiveAttempt(STORE_ID, ORDER_ID)).thenReturn(true);
+        when(receiptAttemptService.blocksManualReceipt(STORE_ID, ORDER_ID)).thenReturn(true);
         ExtendedModelMap model = new ExtendedModelMap();
 
         // when
@@ -828,7 +828,7 @@ class OrdersControllerTest {
     @DisplayName("addReceipt refuses to add a manual Receipt document while an e-receipt attempt is live")
     void addReceiptRefusesAManualReceiptWhileAnAttemptIsLive() {
         // given
-        when(receiptAttemptService.hasLiveAttempt(STORE_ID, ORDER_ID)).thenReturn(true);
+        when(receiptAttemptService.blocksManualReceipt(STORE_ID, ORDER_ID)).thenReturn(true);
         when(messageSource.getMessage(eq("receipts.document.add.live"), any(), eq(Locale.ENGLISH)))
                 .thenReturn("An automatic receipt is already being issued");
         pl.commercelink.documents.Document document = new pl.commercelink.documents.Document(

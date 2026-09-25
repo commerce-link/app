@@ -414,9 +414,9 @@ public class OrdersController extends BaseController {
         List<DocumentType> manualDocumentTypes = order.isB2B()
                 ? Arrays.asList(DocumentType.InvoiceVat, DocumentType.InvoiceAdvance, DocumentType.InvoiceFinal)
                 : Arrays.asList(DocumentType.Receipt, DocumentType.InvoicePersonal);
-        boolean liveReceipt = receiptAttemptService.hasLiveAttempt(order.getStoreId(), order.getOrderId());
+        boolean liveReceipt = receiptAttemptService.blocksManualReceipt(order.getStoreId(), order.getOrderId());
         if (liveReceipt) {
-            // the automatic e-receipt is issuing or already fiscalised: manual "add Receipt" would double-fiscalise
+            // the automatic e-receipt is issuing, fiscalised or closed manually: manual "add Receipt" would double it
             manualDocumentTypes = manualDocumentTypes.stream().filter(t -> t != DocumentType.Receipt).toList();
         }
 
@@ -1079,7 +1079,7 @@ public class OrdersController extends BaseController {
     public String addReceipt(@PathVariable String orderId, @ModelAttribute Document document, Locale locale,
                              RedirectAttributes redirectAttributes) {
         if (document.getType() == DocumentType.Receipt
-                && receiptAttemptService.hasLiveAttempt(getStoreId(), orderId)) {
+                && receiptAttemptService.blocksManualReceipt(getStoreId(), orderId)) {
             redirectAttributes.addFlashAttribute("errorMessage",
                     messageSource.getMessage("receipts.document.add.live", null, locale));
             return "redirect:/dashboard/orders/" + orderId;

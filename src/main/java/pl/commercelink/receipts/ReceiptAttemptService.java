@@ -226,8 +226,13 @@ public class ReceiptAttemptService {
         return attempts.findByOrder(storeId, orderId);
     }
 
-    public boolean hasLiveAttempt(String storeId, String orderId) {
-        return attemptsOf(storeId, orderId).stream().anyMatch(a -> a.getState().isLive());
+    /**
+     * Whether an attempt already owns the order's receipt, so a manual "add Receipt" would give it a second one: the
+     * attempt is issuing or fiscalised, or an operator closed it with the document they resolved at the provider.
+     */
+    public boolean blocksManualReceipt(String storeId, String orderId) {
+        return attemptsOf(storeId, orderId).stream()
+                .anyMatch(a -> a.getState().isLive() || a.getState() == ReceiptAttemptState.CLOSED_MANUALLY);
     }
 
     /**

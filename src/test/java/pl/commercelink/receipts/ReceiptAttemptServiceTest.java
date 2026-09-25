@@ -249,6 +249,21 @@ class ReceiptAttemptServiceTest {
     }
 
     @Test
+    void manualReceiptIsBlockedWhileAnAttemptOwnsTheReceiptIncludingAfterAManualClose() {
+        assertThat(service.blocksManualReceipt(STORE_ID, ORDER_ID)).isFalse();
+        service.startAutomatic(store, order);
+
+        for (ReceiptAttemptState state : ReceiptAttemptState.values()) {
+            attempts.update(STORE_ID, ORDER_ID + ":R1", a -> {
+                a.setState(state);
+                return true;
+            });
+            assertThat(service.blocksManualReceipt(STORE_ID, ORDER_ID)).as(state.name())
+                    .isEqualTo(!state.isDead());
+        }
+    }
+
+    @Test
     void closeManuallyAttachesTheOperatorsDocumentAndStopsPolling() {
         service.startAutomatic(store, order);
 
