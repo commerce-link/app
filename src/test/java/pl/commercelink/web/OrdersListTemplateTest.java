@@ -32,6 +32,9 @@ class OrdersListTemplateTest {
                 .contains("cl-table-toolbar is-stacked").contains("cl-search-form").contains("name=\"q\"")
                 .contains("cl-filter-chips").contains("cl-table-results").contains("role=\"status\"")
                 .contains("cl-table is-orders").contains("cl-table-sort").contains("aria-sort")
+                .contains("cl-table-sortbar").contains("orders.list.sort.label")
+                .contains("orders.list.sort.due").contains("orders.list.sort.amount").contains("orders.list.sort.number")
+                .contains("orders.list.sort.ordered")
                 .contains("fragments/pagination :: pages(${page.pagination()})")
                 .contains("data-cl-orders-results").contains("data-cl-orders-nav")
                 .contains("cl-list-empty").contains("orders.new.pos.button");

@@ -3554,16 +3554,16 @@ a.cl-link-button:hover {
 /* A segment with nothing to show (DS "Filtr wielowymiarowy": dimmed, but still a button). The grey is --cl-ink-2 let
    15% towards the control's own --cl-surface-2: 4.9:1 there, above AA -- --cl-ink-3 would be 4.47:1. The weight drops
    too, so the dimming does not rest on the colour alone; hover brings the ink back like on any segment. */
-.cl-page .cl-segment[data-count="0"]:not([aria-pressed="true"]) {
+.cl-page .cl-segment[data-count="0"]:not([aria-pressed="true"]):not([aria-current="page"]) {
     color: color-mix(in srgb, var(--cl-ink-2) 85%, var(--cl-surface-2));
     font-weight: 400;
 }
 
-.cl-page .cl-segment[data-count="0"]:not([aria-pressed="true"]) .cl-segment-count {
+.cl-page .cl-segment[data-count="0"]:not([aria-pressed="true"]):not([aria-current="page"]) .cl-segment-count {
     color: inherit;
 }
 
-.cl-page .cl-segment[data-count="0"]:not([aria-pressed="true"]):hover {
+.cl-page .cl-segment[data-count="0"]:not([aria-pressed="true"]):not([aria-current="page"]):hover {
     color: var(--cl-ink);
 }
 
@@ -4240,7 +4240,7 @@ a.cl-link-button:hover {
     color: var(--cl-ink-2);
 }
 
-.cl-page .cl-stat.is-link[aria-disabled="true"] {
+.cl-page .cl-stat.is-link.is-disabled {
     color: var(--cl-ink-3);
     box-shadow: none;
 }
@@ -4367,6 +4367,12 @@ a.cl-link-button:hover {
     text-decoration: none;
 }
 
+/* Phone sort bar (spec §6): below 720 px the shared card mode hides thead, so this is the only way to reach
+   sorting on a phone. Hidden by default; shown inside the max-width: 719px block below. */
+.cl-page .cl-table-sortbar {
+    display: none;
+}
+
 /* The orders row: the number's link covers the whole row, so the row has no other links. */
 .cl-page .cl-table.is-orders tbody tr {
     position: relative;
@@ -4431,7 +4437,14 @@ a.cl-link-button:hover {
     color: var(--cl-ink-2);
 }
 
-.cl-page .cl-pagination .cl-button[aria-disabled="true"] {
+.cl-page .cl-pagination .cl-button.is-disabled {
+    color: var(--cl-ink-3);
+    pointer-events: none;
+}
+
+/* Any other cl-button rendered as a disabled <span> (e.g. the orders toolbar's "Zapisz widok…" when there is
+   nothing to save) — same treatment as the pagination one above, generic so any screen can reuse it. */
+.cl-page .cl-button.is-disabled {
     color: var(--cl-ink-3);
     pointer-events: none;
 }
@@ -4674,5 +4687,23 @@ a.cl-link-button:hover {
     .cl-page .cl-pagination {
         padding-left: 16px;
         padding-right: 16px;
+    }
+
+    /* Phone sort bar (spec §6): only reachable place to sort once thead is hidden below 720 px. Same look as
+       a.cl-segment[aria-current="page"] for the active one, 44 px tap targets, horizontal scroll if it overflows
+       a narrow phone. */
+    .cl-page .cl-table-sortbar {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        padding: 10px 16px;
+        border-bottom: 1px solid var(--cl-line);
+        overflow-x: auto;
+    }
+
+    .cl-page .cl-table-sortbar .cl-segment {
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
     }
 }

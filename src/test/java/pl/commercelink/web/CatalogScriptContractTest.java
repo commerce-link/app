@@ -510,7 +510,7 @@ class CatalogScriptContractTest {
         String css = read("src/main/resources/static/css/commercelink.css");
 
         // when
-        String dimmed = rule(css, ".cl-page .cl-segment[data-count=\"0\"]:not([aria-pressed=\"true\"])");
+        String dimmed = rule(css, ".cl-page .cl-segment[data-count=\"0\"]:not([aria-pressed=\"true\"]):not([aria-current=\"page\"])");
 
         // then
         assertThat(dimmed).isNotBlank().doesNotContain("--cl-ink-3").doesNotContain("opacity")

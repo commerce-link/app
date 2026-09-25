@@ -41,9 +41,9 @@
                         <span class="cl-stat-hint" th:text="${tile.hint()}"></span>
                         <span th:if="${tile.pressed()}" class="cl-visually-hidden" th:text="#{orders.list.attention.pressed}"></span>
                     </a>
-                    <span th:unless="${tile.enabled()}" class="cl-stat is-link" aria-disabled="true">
+                    <span th:unless="${tile.enabled()}" class="cl-stat is-link is-disabled">
                         <span class="cl-eyebrow" th:text="${tile.label()}"></span>
-                        <span class="cl-stat-value" th:text="${tile.count()}"></span>
+                        <span class="cl-stat-value"><th:block th:text="${tile.count()}"></th:block><small th:if="${tile.valueOf() != null}" class="cl-stat-value-of"><span class="cl-stat-value-sep" aria-hidden="true"> · </span><th:block th:text="${tile.valueOf()}"></th:block></small></span>
                         <span class="cl-stat-hint" th:text="${tile.hint()}"></span>
                     </span>
                 </li>
@@ -90,8 +90,8 @@
                         </form>
                         <a class="cl-button" th:href="@{/dashboard/orders/filters/new(returnTo=${returnTo})}" data-cl-dialog-open="save-view-dialog"
                            th:if="${page.canSaveView()}" th:text="#{orders.list.saveView}"></a>
-                        <span class="cl-button" aria-disabled="true" th:unless="${page.canSaveView()}"
-                              th:attr="title=#{orders.list.saveView.disabled}" th:text="#{orders.list.saveView}"></span>
+                        <span class="cl-button is-disabled" th:unless="${page.canSaveView()}"
+                              th:attr="title=#{orders.list.saveView.disabled}"><span th:text="#{orders.list.saveView}"></span><span class="cl-visually-hidden" th:text="#{orders.list.saveView.disabled}"></span></span>
                         <a class="cl-button" th:href="@{/dashboard/orders/filters(returnTo=${returnTo})}" data-cl-dialog-open="filters-dialog"
                            th:text="#{orders.list.manageFilters}"></a>
                         <form method="get" th:action="@{/dashboard/orders}" class="cl-search-form" role="search" data-cl-orders-form>
@@ -119,10 +119,35 @@
 
                 <p class="cl-table-results" role="status" th:text="${page.resultsLine()}"></p>
 
-                <table class="cl-table is-orders" th:unless="${page.rows().isEmpty()}"
-                       th:with="numberSort=${T(pl.commercelink.web.orders.OrderListQuery.Sort).NUMBER},
-                                dueSort=${T(pl.commercelink.web.orders.OrderListQuery.Sort).DUE},
-                                amountSort=${T(pl.commercelink.web.orders.OrderListQuery.Sort).AMOUNT}">
+                <th:block th:unless="${page.rows().isEmpty()}"
+                          th:with="numberSort=${T(pl.commercelink.web.orders.OrderListQuery.Sort).NUMBER},
+                                   dueSort=${T(pl.commercelink.web.orders.OrderListQuery.Sort).DUE},
+                                   amountSort=${T(pl.commercelink.web.orders.OrderListQuery.Sort).AMOUNT},
+                                   orderedSort=${T(pl.commercelink.web.orders.OrderListQuery.Sort).ORDERED}">
+                <nav class="cl-table-sortbar" th:attr="aria-label=#{orders.list.sort.label}">
+                    <span class="cl-eyebrow" th:text="#{orders.list.sort.label}"></span>
+                    <a class="cl-segment" th:with="h=${page.sortHeaders().get(dueSort)}" th:href="@{${h.href()}}"
+                       th:attr="aria-current=${h.ariaSort() != 'none'} ? 'page' : null" data-cl-orders-nav>
+                        <span th:text="#{orders.list.sort.due}"></span>
+                        <span th:if="${h.ariaSort() != 'none'}" aria-hidden="true" th:text="${h.ariaSort() == 'ascending'} ? '▲' : '▼'"></span>
+                    </a>
+                    <a class="cl-segment" th:with="h=${page.sortHeaders().get(amountSort)}" th:href="@{${h.href()}}"
+                       th:attr="aria-current=${h.ariaSort() != 'none'} ? 'page' : null" data-cl-orders-nav>
+                        <span th:text="#{orders.list.sort.amount}"></span>
+                        <span th:if="${h.ariaSort() != 'none'}" aria-hidden="true" th:text="${h.ariaSort() == 'ascending'} ? '▲' : '▼'"></span>
+                    </a>
+                    <a class="cl-segment" th:with="h=${page.sortHeaders().get(numberSort)}" th:href="@{${h.href()}}"
+                       th:attr="aria-current=${h.ariaSort() != 'none'} ? 'page' : null" data-cl-orders-nav>
+                        <span th:text="#{orders.list.sort.number}"></span>
+                        <span th:if="${h.ariaSort() != 'none'}" aria-hidden="true" th:text="${h.ariaSort() == 'ascending'} ? '▲' : '▼'"></span>
+                    </a>
+                    <a class="cl-segment" th:if="${q.isHistory()}" th:with="h=${page.sortHeaders().get(orderedSort)}" th:href="@{${h.href()}}"
+                       th:attr="aria-current=${h.ariaSort() != 'none'} ? 'page' : null" data-cl-orders-nav>
+                        <span th:text="#{orders.list.sort.ordered}"></span>
+                        <span th:if="${h.ariaSort() != 'none'}" aria-hidden="true" th:text="${h.ariaSort() == 'ascending'} ? '▲' : '▼'"></span>
+                    </a>
+                </nav>
+                <table class="cl-table is-orders">
                     <thead>
                     <tr>
                         <th scope="col" th:attr="aria-sort=${page.sortHeaders().get(numberSort).ariaSort()}">
@@ -162,6 +187,7 @@
                     </tr>
                     </tbody>
                 </table>
+                </th:block>
 
                 <div class="cl-list-empty" th:if="${page.emptyState() != null}" th:with="es=${page.emptyState()}">
                     <span th:text="${es.text()}"></span>
