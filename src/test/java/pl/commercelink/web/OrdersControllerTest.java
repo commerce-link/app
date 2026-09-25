@@ -3,6 +3,7 @@ package pl.commercelink.web;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -129,6 +130,10 @@ class OrdersControllerTest {
     private Inventory inventory;
     @Mock
     private InventoryView inventoryView;
+    @Mock
+    private pl.commercelink.orders.OrderListService orderListService;
+    @Mock
+    private pl.commercelink.orders.filters.services.OrderFiltersService orderFilters;
 
     // Real resolver over the test classpath registry (`Stub` is a registered supplier type).
     @Spy
@@ -1214,5 +1219,90 @@ class OrdersControllerTest {
 
         // then
         assertThat(model.getAttribute("hasAvailableItemActions")).isEqualTo(true);
+    }
+
+    @Nested
+    @DisplayName("orders list page")
+    class ListPage {
+
+        private static final pl.commercelink.orders.filters.FilterActor ACTOR =
+                new pl.commercelink.orders.filters.FilterActor(STORE_ID, "user-1", false);
+
+        private org.springframework.util.MultiValueMap<String, String> params(String... keyValues) {
+            var map = new org.springframework.util.LinkedMultiValueMap<String, String>();
+            for (int i = 0; i < keyValues.length; i += 2) {
+                map.add(keyValues[i], keyValues[i + 1]);
+            }
+            return map;
+        }
+
+        private pl.commercelink.web.orders.OrdersPageModel emptyPage(pl.commercelink.web.orders.OrderListQuery query) {
+            return new pl.commercelink.web.orders.OrdersPageModel(query, List.of(), List.of(), List.of(), List.of(),
+                    Optional.empty(), false, List.of(), "", java.util.Map.of(), List.of(),
+                    pl.commercelink.web.orders.Pagination.of(1, 0, 50, n -> "/x"), null, List.of());
+        }
+
+        @BeforeEach
+        void user() {
+            var user = mock(pl.commercelink.starter.security.model.CustomUser.class);
+            when(user.getAttributes()).thenReturn(java.util.Map.of("sub", "user-1"));
+            securityStub.when(CustomSecurityContext::getLoggedInUser).thenReturn(Optional.of(user));
+            securityStub.when(() -> CustomSecurityContext.hasRole("ADMIN")).thenReturn(false);
+            when(storesRepository.findById(STORE_ID)).thenReturn(new Store());
+            when(orderFilters.list(ACTOR)).thenReturn(new pl.commercelink.orders.filters.services.ListOrderFiltersView(List.of(), List.of()));
+            when(orderListService.page(eq(ACTOR), any(), any(), any())).thenAnswer(inv -> emptyPage(inv.getArgument(1)));
+        }
+
+        @Test
+        void rendersTheListWithThePageModel() {
+            ExtendedModelMap model = new ExtendedModelMap();
+            String view = ordersController.orders(params("status", "New"), Locale.forLanguageTag("pl"), model);
+            assertThat(view).isEqualTo("orders/list");
+            var page = (pl.commercelink.web.orders.OrdersPageModel) model.get("page");
+            assertThat(page.query().status()).isEqualTo(OrderStatus.New);
+            assertThat(model.get("filters")).isNotNull();
+            assertThat(model.get("canManageStoreFilters")).isEqualTo(false);
+        }
+
+        @Test
+        void entryWithoutParametersOpensOnTheStarredFilterAndItsStatus() {
+            var starred = pl.commercelink.orders.filters.model.OrderFilter.of("Do wysłania", List.of(
+                    pl.commercelink.orders.filters.model.OrderFilterCondition.of(pl.commercelink.orders.filters.OrderFilterField.Status, "Assembled")));
+            when(orderFilters.list(ACTOR)).thenReturn(new pl.commercelink.orders.filters.services.ListOrderFiltersView(List.of(), List.of(starred), Optional.of(starred)));
+
+            String view = ordersController.orders(params(), Locale.forLanguageTag("pl"), new ExtendedModelMap());
+
+            assertThat(view).isEqualTo("redirect:/dashboard/orders?status=Assembled&filterId=" + starred.getId());
+        }
+
+        @Test
+        void explicitEmptyFilterIdAndAnyOtherParameterSkipTheStarRedirect() {
+            var starred = pl.commercelink.orders.filters.model.OrderFilter.of("X", List.of(
+                    pl.commercelink.orders.filters.model.OrderFilterCondition.of(pl.commercelink.orders.filters.OrderFilterField.ShipmentType, "Courier")));
+            when(orderFilters.list(ACTOR)).thenReturn(new pl.commercelink.orders.filters.services.ListOrderFiltersView(List.of(), List.of(starred), Optional.of(starred)));
+
+            assertThat(ordersController.orders(params("filterId", ""), Locale.forLanguageTag("pl"), new ExtendedModelMap())).isEqualTo("orders/list");
+            assertThat(ordersController.orders(params("status", "New"), Locale.forLanguageTag("pl"), new ExtendedModelMap())).isEqualTo("orders/list");
+            assertThat(ordersController.orders(params("q", "x"), Locale.forLanguageTag("pl"), new ExtendedModelMap())).isEqualTo("orders/list");
+            // a starred filter without a status condition redirects to the filter alone
+            assertThat(ordersController.orders(params(), Locale.forLanguageTag("pl"), new ExtendedModelMap()))
+                    .isEqualTo("redirect:/dashboard/orders?filterId=" + starred.getId());
+        }
+
+        @Test
+        void legacyParametersRedirect() {
+            assertThat(ordersController.orders(params("statuses", "Blocked", "showAll", "false"), Locale.forLanguageTag("pl"), new ExtendedModelMap()))
+                    .isEqualTo("redirect:/dashboard/orders?status=Blocked");
+            assertThat(ordersController.orders(params("showAll", "true"), Locale.forLanguageTag("pl"), new ExtendedModelMap()))
+                    .isEqualTo("redirect:/dashboard/orders");
+        }
+
+        @Test
+        void fragmentEndpointRendersOnlyTheResults() {
+            ExtendedModelMap model = new ExtendedModelMap();
+            String view = ordersController.ordersList(params("focus", "overdue"), Locale.forLanguageTag("pl"), model);
+            assertThat(view).isEqualTo("orders/list :: results");
+            assertThat(((pl.commercelink.web.orders.OrdersPageModel) model.get("page")).query().focus()).isEqualTo(pl.commercelink.orders.OrderAttention.Overdue);
+        }
     }
 }

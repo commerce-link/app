@@ -28,6 +28,7 @@ import pl.commercelink.orders.filters.model.OrderFilter;
 import pl.commercelink.orders.filters.exceptions.OrderFilterException;
 
 import pl.commercelink.orders.filters.FilterActor;
+import pl.commercelink.orders.filters.OrderFilterField;
 import pl.commercelink.orders.filters.services.OrderFiltersService;
 
 import pl.commercelink.orders.filters.ShippingDue;
@@ -60,11 +61,11 @@ import pl.commercelink.web.dtos.AddPaymentForm;
 import pl.commercelink.web.dtos.RoutedSupplierView;
 import pl.commercelink.web.dtos.ClientDataDto;
 import pl.commercelink.web.dtos.OrderFilterForm;
-import pl.commercelink.web.dtos.OrderStatusSelection;
-import pl.commercelink.web.dtos.SavedOrderFilterView;
 import pl.commercelink.web.dtos.OrderItemsForm;
 import pl.commercelink.web.dtos.SplitGroupForm;
 import pl.commercelink.web.dtos.SplitGroupPreviewDto;
+import pl.commercelink.web.orders.OrderListQuery;
+import org.springframework.util.MultiValueMap;
 
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
@@ -74,7 +75,6 @@ import pl.commercelink.inventory.supplier.SupplierLabelMap;
 import pl.commercelink.inventory.supplier.SupplierLabels;
 
 import java.util.*;
-import java.util.stream.Stream;
 import java.util.stream.Collectors;
 
 @Controller
@@ -155,56 +155,58 @@ public class OrdersController extends BaseController {
     @Autowired
     private OrderFiltersService orderFilters;
 
+    @Autowired
+    private OrderListService orderListService;
+
+    private static final Set<String> LIST_PARAMS = Set.of("status", "filterId", "focus", "q", "sort", "dir", "page");
+
     @GetMapping("/dashboard/orders")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String orders(@RequestParam(required = false) List<String> statuses,
-                        @RequestParam(required = false, defaultValue = "false") boolean showAll,
-                        @RequestParam(required = false) String filterId,
-                        Model model) {
-        OpenOrdersSelection selection = selectOpenOrders(statuses, showAll, filterId);
-        ListOrderFiltersView savedFilters = selection.savedFilters();
-        OrderFilter selectedFilter = selection.selectedFilter();
-        List<Order> allOpenOrders = selection.allOpenOrders();
-        LocalDate today = selection.today();
-        List<Order> openOrders = selection.openOrders();
-        OrderStatusSelection statusSelection = selection.statusSelection();
-        List<Order> filteredOrders = selection.filteredOrders();
-
-        addSectionsAttributes(model, filteredOrders);
-
-        model.addAttribute("liveOrders", filteredOrders);
-        model.addAttribute("itemCountsByStatus",
-                allOpenOrders.stream().collect(Collectors.groupingBy(Order::getStatus, Collectors.counting())));
-        model.addAttribute("statuses", Arrays.stream(OrderStatus.values())
-                .filter(status -> status != OrderStatus.Completed && status != OrderStatus.Cancelled)
-                .toList());
-        model.addAttribute("selectedStatuses", statusSelection.selected());
-        model.addAttribute("savedFilters", Stream.concat(
-                        savedFilters.sharedWithStore().stream()
-                                .map(f -> SavedOrderFilterView.of(f, true, countMatching(allOpenOrders, f, today))),
-                        savedFilters.own().stream()
-                                .map(f -> SavedOrderFilterView.of(f, false, countMatching(allOpenOrders, f, today))))
-                .toList());
-        model.addAttribute("selectedFilterId", selectedFilter == null ? null : selectedFilter.getId());
-        model.addAttribute("selectedFilterLabel", selectedFilter == null ? null : selectedFilter.getLabel());
-        model.addAttribute("selectedStatusEnums", statusSelection.statuses());
-        model.addAttribute("openOrdersTotal", allOpenOrders.size());
-        model.addAttribute("canManageStoreFilters", isAdmin());
-        model.addAttribute("shipmentTypes", ShipmentType.values());
-        model.addAttribute("paymentSources", PaymentSource.values());
-        model.addAttribute("shippingDueOptions", ShippingDue.values());
-        model.addAttribute("marketplaces", connectedMarketplaceNames());
-        return "orders";
+    public String orders(@RequestParam MultiValueMap<String, String> params, Locale locale, Model model) {
+        Optional<String> legacy = OrderListQuery.legacyRedirect(params);
+        if (legacy.isPresent()) {
+            return "redirect:" + legacy.get();
+        }
+        OrderListQuery query = OrderListQuery.parse(params);
+        ListOrderFiltersView filters = orderFilters.list(actor());
+        // A bare entry (the menu link) opens on the user's starred filter; any list parameter — including an
+        // empty filterId= from "Wyczyść filtr" — means the user already chose a view (spec §2). Parameters the
+        // list does not own (lang=) do not count.
+        boolean bareEntry = params.keySet().stream().noneMatch(LIST_PARAMS::contains);
+        if (bareEntry && filters.defaultFilter().isPresent()) {
+            OrderFilter starred = filters.defaultFilter().get();
+            OrderListQuery target = query.withFilterId(starred.getId()).withStatus(statusOf(starred).orElse(null));
+            return "redirect:" + target.href();
+        }
+        addListAttributes(model, query, filters, locale);
+        return "orders/list";
     }
 
     @GetMapping("/dashboard/orders/list")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String ordersList(@RequestParam(required = false) List<String> statuses,
-                             @RequestParam(required = false, defaultValue = "false") boolean showAll,
-                             @RequestParam(required = false) String filterId,
-                             Model model) {
-        addSectionsAttributes(model, selectOpenOrders(statuses, showAll, filterId).filteredOrders());
-        return "fragments/openOrdersSections :: sections";
+    public String ordersList(@RequestParam MultiValueMap<String, String> params, Locale locale, Model model) {
+        addListAttributes(model, OrderListQuery.parse(params), orderFilters.list(actor()), locale);
+        return "orders/list :: results";
+    }
+
+    private void addListAttributes(Model model, OrderListQuery query, ListOrderFiltersView filters, Locale locale) {
+        model.addAttribute("page", orderListService.page(actor(), query, LocalDate.now(), locale));
+        model.addAttribute("filters", filters);
+        model.addAttribute("canManageStoreFilters", isAdmin());
+        model.addAttribute("statuses", Arrays.stream(OrderStatus.values()).toList());
+        model.addAttribute("shipmentTypes", ShipmentType.values());
+        model.addAttribute("paymentSources", PaymentSource.values());
+        model.addAttribute("shippingDueOptions", ShippingDue.values());
+        model.addAttribute("marketplaces", connectedMarketplaceNames());
+        model.addAttribute("returnTo", query.returnTo());
+    }
+
+    private static Optional<OrderStatus> statusOf(OrderFilter filter) {
+        return filter.getConditions().stream()
+                .filter(c -> c.getField() == OrderFilterField.Status)
+                .map(c -> c.getField().normalize(c.getValue()))
+                .flatMap(value -> Arrays.stream(OrderStatus.values()).filter(s -> s.name().equalsIgnoreCase(value)))
+                .findFirst();
     }
 
     @PostMapping("/dashboard/orders/filters")
@@ -251,40 +253,6 @@ public class OrdersController extends BaseController {
 
     private FilterActor actor() {
         return new FilterActor(getStoreId(), getUserId(), isAdmin());
-    }
-
-    private record OpenOrdersSelection(ListOrderFiltersView savedFilters, OrderFilter selectedFilter,
-                                       List<Order> allOpenOrders, List<Order> openOrders,
-                                       OrderStatusSelection statusSelection, List<Order> filteredOrders,
-                                       LocalDate today) {
-    }
-
-    private OpenOrdersSelection selectOpenOrders(List<String> statuses, boolean showAll, String filterId) {
-        ListOrderFiltersView savedFilters = orderFilters.list(actor());
-        OrderFilter selectedFilter = savedFilters.byId(filterId).orElse(null);
-
-        List<Order> allOpenOrders = ordersRepository.findOpenOrders(getStoreId());
-        LocalDate today = LocalDate.now();
-        List<Order> openOrders = matching(allOpenOrders, selectedFilter, today);
-
-        OrderStatusSelection statusSelection =
-                OrderStatusSelection.resolve(openOrders, statuses, showAll || selectedFilter != null);
-
-        return new OpenOrdersSelection(savedFilters, selectedFilter, allOpenOrders, openOrders,
-                statusSelection, statusSelection.narrow(openOrders), today);
-    }
-
-    private void addSectionsAttributes(Model model, List<Order> filteredOrders) {
-        Arrays.stream(OrderStatus.values()).forEach(s -> model.addAttribute(s.name() + "Status", s));
-        model.addAttribute("ordersByStatus", filteredOrders.stream().collect(Collectors.groupingBy(Order::getStatus)));
-    }
-
-    private List<Order> matching(List<Order> orders, OrderFilter filter, LocalDate today) {
-        return filter == null ? orders : orders.stream().filter(order -> filter.matches(order, today)).toList();
-    }
-
-    private long countMatching(List<Order> orders, OrderFilter filter, LocalDate today) {
-        return orders.stream().filter(order -> filter.matches(order, today)).count();
     }
 
     private List<String> connectedMarketplaceNames() {
