@@ -59,16 +59,22 @@ class OrdersListMessagesTest {
 
     @Test
     void enumSourceTypesAllHaveLabels() throws Exception {
-        Properties plMessages = load("messages_pl.properties");
-        for (pl.commercelink.orders.OrderSourceType type : pl.commercelink.orders.OrderSourceType.values()) {
-            assertThat(plMessages.containsKey("order.source.type." + type.name())).as(type.name()).isTrue();
+        for (String file : new String[] {"messages_pl.properties", "messages_en.properties"}) {
+            Properties messages = load(file);
+            for (pl.commercelink.orders.OrderSourceType type : pl.commercelink.orders.OrderSourceType.values()) {
+                assertThat(messages.containsKey("order.source.type." + type.name())).as(file + ": " + type.name()).isTrue();
+            }
         }
     }
 
     @Test
     void oldListKeysAreGone() throws Exception {
-        Properties pl = load("messages_pl.properties");
-        assertThat(pl.stringPropertyNames()).noneMatch(k -> k.startsWith("orders.filters.view.") || k.startsWith("orders.filters.mode."))
-                .doesNotContain("orders.status.filter.clear", "orders.filters.manage", "orders.filters.back");
+        for (String file : new String[] {"messages_pl.properties", "messages_en.properties"}) {
+            Properties messages = load(file);
+            assertThat(messages.stringPropertyNames()).as(file)
+                    .noneMatch(k -> k.startsWith("orders.filters.view.") || k.startsWith("orders.filters.mode."))
+                    .doesNotContain("orders.status.filter.clear", "orders.filters.manage", "orders.filters.back",
+                            "orders.status.filter.title", "orders.status.filter.apply");
+        }
     }
 }
