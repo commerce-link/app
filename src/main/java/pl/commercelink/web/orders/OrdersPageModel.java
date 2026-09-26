@@ -1,6 +1,5 @@
 package pl.commercelink.web.orders;
 
-import pl.commercelink.orders.OrderAttention;
 import pl.commercelink.orders.filters.model.OrderFilter;
 
 import java.util.List;
@@ -20,18 +19,18 @@ public record OrdersPageModel(
         Map<OrderListQuery.Sort, SortHeader> sortHeaders,
         List<OrderRow> rows,
         Pagination pagination,
-        EmptyState emptyState,
-        List<Condition> saveViewConditions) {
+        EmptyState emptyState) {
 
-    public record Tile(OrderAttention kind, String label, long count, String valueOf, String hint, String href,
-                       boolean pressed, boolean enabled) {
+    /** A read-only figure above the list: label, number, one short hint (the Asortyment cl-stat, spec §17). */
+    public record Tile(String label, long count, String hint) {
     }
 
     /** One row of the Status menu: the status, its count within the custom filter and the search, and whether it is ticked. */
     public record StatusOption(String status, String label, long count, boolean selected) {
     }
 
-    public record FilterOption(String id, String label, boolean shared, boolean selected) {
+    /** A saved filter in the Filter menu; href also ticks the filter's own Status condition, if it has one. */
+    public record FilterOption(String id, String label, boolean shared, boolean selected, String href) {
     }
 
     public record Chip(String label, String clearHref, String clearLabel) {
@@ -41,13 +40,5 @@ public record OrdersPageModel(
     }
 
     public record EmptyState(String text, String actionLabel, String actionHref) {
-    }
-
-    /** A condition of the "save this view" dialog: the filter field name and the raw value it will be saved with. */
-    public record Condition(String field, String value, String label) {
-    }
-
-    public boolean canSaveView() {
-        return !saveViewConditions.isEmpty();
     }
 }

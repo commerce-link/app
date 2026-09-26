@@ -1,12 +1,10 @@
 package pl.commercelink.orders;
 
 import java.time.LocalDate;
-import java.util.Arrays;
-import java.util.Optional;
 
 /**
- * The four "needs attention" figures of the orders list (spec §4). Each is a predicate over an order, so the tiles
- * and the ?focus= narrowing of the list use the same definition.
+ * The read-only figures above the orders list (spec §15, §17): Po terminie, Na dziś, Nieopłacone, Nowe dziś. Each is a
+ * predicate over an order, counted over all open orders of the store; the tiles are in declaration order.
  */
 public enum OrderAttention {
     Overdue("overdue") {
@@ -20,12 +18,6 @@ public enum OrderAttention {
         @Override
         public boolean matches(Order order, LocalDate today) {
             return today.equals(order.getShippingDueAt()) && isBeforeShipping(order);
-        }
-    },
-    Decide("decide") {
-        @Override
-        public boolean matches(Order order, LocalDate today) {
-            return order.hasOneOfStatuses(OrderStatus.New, OrderStatus.Blocked);
         }
     },
     Unpaid("unpaid") {
@@ -54,10 +46,6 @@ public enum OrderAttention {
     }
 
     public abstract boolean matches(Order order, LocalDate today);
-
-    public static Optional<OrderAttention> parse(String value) {
-        return Arrays.stream(values()).filter(kind -> kind.param.equalsIgnoreCase(value == null ? "" : value.trim())).findFirst();
-    }
 
     /** Not Completed and not Cancelled — the same definition as OrdersRepository.findAllActiveOrders. */
     public static boolean isOpen(Order order) {

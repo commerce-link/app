@@ -131,27 +131,27 @@ class OrderListServiceTest {
     }
 
     @Test
-    void saveViewConditionsCarryHumanLabels() {
-        OrderFilter filter = OrderFilter.of("Custom", List.of(
-                OrderFilterCondition.of(OrderFilterField.ShipmentType, "courier"),
-                OrderFilterCondition.of(OrderFilterField.SourceName, "Allegro"),
-                OrderFilterCondition.of(OrderFilterField.ShippingPostalCode, "30-")));
-        when(orderFilters.list(ACTOR)).thenReturn(new ListOrderFiltersView(List.of(), List.of(filter)));
+    void choosingAFilterFromTheMenuTicksItsOwnStatus() {
+        add("a", OrderStatus.Assembled, null, 10, 10, "Allegro");
+        add("b", OrderStatus.New, null, 10, 10, "Allegro");
+        OrderFilter assembled = OrderFilter.of("Skompletowane z Allegro", List.of(
+                OrderFilterCondition.of(OrderFilterField.Status, "Assembled"),
+                OrderFilterCondition.of(OrderFilterField.SourceName, "Allegro")));
+        OrderFilter allegro = OrderFilter.of("Allegro", List.of(OrderFilterCondition.of(OrderFilterField.SourceName, "Allegro")));
+        // saved before the list dropped history: a closed status cannot be ticked, so the link leaves the status alone
+        OrderFilter closed = OrderFilter.of("Zakończone", List.of(OrderFilterCondition.of(OrderFilterField.Status, "Completed")));
+        when(orderFilters.list(ACTOR)).thenReturn(new ListOrderFiltersView(List.of(), List.of(assembled, allegro, closed)));
 
-        OrdersPageModel model = page(query("status", "New", "filterId", filter.getId()));
+        OrdersPageModel model = page(query("q", "a"));
 
-        assertThat(model.saveViewConditions()).extracting(c -> c.label()).containsExactly(
-                "Otwieraj na statusie: Nowe",
-                "Sposób dostawy: Kurier",
-                "Marketplace: Allegro",
-                "Kod pocztowy zaczyna się od: 30-");
+        assertThat(model.filterOptions()).extracting(o -> o.href()).containsExactly(
+                "/dashboard/orders?status=Assembled&filterId=" + assembled.getId() + "&q=a",
+                "/dashboard/orders?filterId=" + allegro.getId() + "&q=a",
+                "/dashboard/orders?filterId=" + closed.getId() + "&q=a");
 
-        OrderFilter unknownValue = OrderFilter.of("Unknown", List.of(OrderFilterCondition.of(OrderFilterField.PaymentSource, "zzz")));
-        when(orderFilters.list(ACTOR)).thenReturn(new ListOrderFiltersView(List.of(), List.of(unknownValue)));
-
-        OrdersPageModel fallbackModel = page(query("filterId", unknownValue.getId()));
-
-        assertThat(fallbackModel.saveViewConditions()).extracting(c -> c.label()).containsExactly("Płatność: zzz");
+        OrdersPageModel chosen = page(query("status", "Assembled", "filterId", assembled.getId()));
+        assertThat(chosen.rows()).extracting(r -> r.href()).containsExactly("/dashboard/orders/a");
+        assertThat(chosen.statusSummary()).isEqualTo("Skompletowane");
     }
 
     @Test
@@ -165,10 +165,9 @@ class OrderListServiceTest {
 
         OrdersPageModel model = page(query("filterId", allegro.getId()));
 
-        assertThat(model.tiles()).extracting(t -> t.count()).containsExactly(1L, 1L, 3L, 1L, 0L); // overdue, today, decide, unpaid, new today (open only)
-        assertThat(model.tiles().get(3).hint()).isEqualTo("czeka na wpłatę");
-        assertThat(model.tiles().get(3).valueOf()).isNull();
-        assertThat(model.tiles().get(2).hint()).isEqualTo("Nowe 2 · Zablokowane 1");
+        assertThat(model.tiles()).extracting(t -> t.count()).containsExactly(1L, 1L, 1L, 0L); // overdue, today, unpaid, new today (open only)
+        assertThat(model.tiles()).extracting(t -> t.label()).containsExactly("Po terminie", "Na dziś", "Nieopłacone", "Nowe dziś");
+        assertThat(model.tiles().get(2).hint()).isEqualTo("czeka na wpłatę");
         assertThat(option(model, "Nowe").count()).isEqualTo(1);
         assertThat(option(model, "Zablokowane").count()).isEqualTo(1);
         assertThat(model.statusSummary()).isEqualTo("Otwarte");
@@ -178,20 +177,17 @@ class OrderListServiceTest {
     }
 
     @Test
-    void focusNarrowsWithinStatusAndFilterAndIsDisabledInHistory() {
+    void anOldFocusBookmarkOpensTheUnnarrowedList() {
         add("a", OrderStatus.New, TODAY.minusDays(1), 100, 100, null);
-        add("b", OrderStatus.Assembly, TODAY.minusDays(1), 100, 100, null);
-        add("c", OrderStatus.New, TODAY, 100, 100, null);
+        add("b", OrderStatus.Blocked, null, 100, 100, null);
 
-        OrdersPageModel model = page(query("focus", "overdue", "status", "New"));
-        assertThat(model.rows()).extracting(r -> r.href()).containsExactly("/dashboard/orders/a");
-        assertThat(model.tiles().get(0).pressed()).isTrue();
-        assertThat(model.tiles().get(0).href()).isEqualTo("/dashboard/orders?status=New");
-        assertThat(model.tiles().get(1).href()).isEqualTo("/dashboard/orders?status=New&focus=today");
-        assertThat(model.chips()).extracting(c -> c.label()).containsExactly("Status: Nowe", "Po terminie: 1");
-        assertThat(model.chips().get(0).clearHref()).isEqualTo("/dashboard/orders?focus=overdue");
-        assertThat(model.chips().get(1).clearHref()).isEqualTo("/dashboard/orders?status=New");
-
+        // ?focus= came from the clickable tiles, which are read-only now; no value may break the page (newToday used to)
+        for (String focus : List.of("overdue", "today", "decide", "unpaid", "newToday")) {
+            OrdersPageModel model = page(query("focus", focus, "status", "Blocked"));
+            assertThat(model.rows()).extracting(r -> r.href()).containsExactly("/dashboard/orders/b");
+            assertThat(model.chips()).extracting(c -> c.label()).containsExactly("Status: Zablokowane");
+            assertThat(model.chips().get(0).clearHref()).isEqualTo("/dashboard/orders");
+        }
     }
 
     @Test
@@ -260,8 +256,6 @@ class OrderListServiceTest {
         assertThat(page(query()).emptyState().text()).isEqualTo("Brak otwartych zamówień. Nowe pojawią się tu ze sklepu, marketplace’ów i sprzedaży POS.");
         assertThat(page(query()).emptyState().actionHref()).isNull();
         add("a", OrderStatus.New, TODAY.plusDays(1), 10, 10, null);
-        assertThat(page(query("focus", "overdue")).emptyState().text()).isEqualTo("Nic po terminie.");
-        assertThat(page(query("focus", "overdue")).emptyState().actionHref()).isEqualTo("/dashboard/orders");
         assertThat(page(query("q", "zzz")).emptyState().text()).startsWith("Brak wyników dla „zzz”");
         assertThat(page(query("q", "zzz")).emptyState().actionHref()).isEqualTo("/dashboard/orders");
         assertThat(page(query("status", "Blocked")).emptyState().text()).isEqualTo("Brak zamówień w statusie „Zablokowane”.");
@@ -286,15 +280,10 @@ class OrderListServiceTest {
         assertThat(model.activeFilter()).isEmpty();
         assertThat(model.filterOptions()).extracting(o -> o.label()).containsExactly("Sklepowy", "Mój");
         assertThat(model.filterOptions()).extracting(o -> o.shared()).containsExactly(true, false);
-        assertThat(model.saveViewConditions()).isEmpty();
-        // the segment's status replaces the filter's own Status condition; the filter's other conditions are kept
-        OrdersPageModel narrowed = page(query("status", "New", "filterId", shared.getId()));
-        assertThat(narrowed.saveViewConditions()).extracting(c -> c.field()).containsExactly("Status");
-        assertThat(narrowed.saveViewConditions().get(0).value()).isEqualTo("New");
     }
 
     @Test
-    void severalTickedStatusesShowTogetherWithOneChipAndNoSavedStatus() {
+    void severalTickedStatusesShowTogetherWithOneChipEach() {
         add("n", OrderStatus.New, TODAY.plusDays(2), 10, 10, null);
         add("b", OrderStatus.Blocked, TODAY.plusDays(1), 10, 10, null);
         add("a", OrderStatus.Assembly, TODAY, 10, 10, null);
@@ -311,9 +300,7 @@ class OrderListServiceTest {
         assertThat(model.chips()).extracting(c -> c.clearHref())
                 .containsExactly("/dashboard/orders?status=Blocked", "/dashboard/orders?status=New");
         assertThat(page(query("status", "New")).chips().get(0).clearHref()).isEqualTo("/dashboard/orders");
-        assertThat(model.saveViewConditions()).isEmpty();   // a saved filter holds one status
         assertThat(page(query("status", "New")).statusSummary()).isEqualTo("Nowe");
-        assertThat(page(query("status", "New")).saveViewConditions()).extracting(c -> c.value()).containsExactly("New");
         assertThat(page(query("status", "Shipping", "status", "Delivered")).emptyState().text()).isEqualTo("Brak zamówień w wybranych statusach.");
     }
 

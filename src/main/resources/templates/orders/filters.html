@@ -4,9 +4,6 @@
       layout:decorate="~{layout}">
 <body>
 
-<!--/* The answer to a successful fetch from the "save this view" dialog: where the list goes next. */-->
-<div th:fragment="redirect" th:attr="data-cl-redirect=${redirectTo}"></div>
-
 <!--/* The fields of a filter on the new/edit subpage (orders/filter-edit.html). */-->
 <div th:fragment="filterFormFields" class="cl-form-grid">
     <div class="cl-field cl-span-6">
@@ -63,43 +60,6 @@
         <p class="cl-check-description" th:text="#{orders.filters.share.help}"></p>
     </div>
 </div>
-
-<!--/* "Save the current view": conditions as pills, pre-filled hidden fields, star checkbox. */-->
-<dialog th:fragment="saveViewDialog" class="cl-dialog is-form" id="save-view-dialog" aria-labelledby="save-view-title">
-    <h2 class="cl-dialog-title" id="save-view-title" th:text="#{orders.filters.saveView.title}"></h2>
-    <div class="cl-dialog-body" data-cl-dialog-body>
-        <div th:replace="~{orders/filters :: saveViewBody}"></div>
-    </div>
-</dialog>
-
-<form th:fragment="saveViewBody" method="post" th:action="@{/dashboard/orders/filters}" class="cl-form" novalidate data-cl-filters-form
-      th:attr="data-cl-redirect=${redirectTo}">
-    <div th:if="${filterError}" class="cl-alert is-bad" role="status" data-cl-error-summary tabindex="-1">
-        <p class="cl-alert-text" th:text="${filterError}"></p>
-    </div>
-    <input type="hidden" name="returnTo" th:value="${returnTo}"/>
-    <input type="hidden" name="dialog" value="save-view"/>
-    <input type="hidden" th:each="c : ${page.saveViewConditions()}" th:name="${T(pl.commercelink.web.orders.FilterConditionLabels).formField(c.field())}" th:value="${c.value()}"/>
-    <div class="cl-form-grid">
-        <div class="cl-field cl-span-6">
-            <label class="cl-label" for="save-view-label" th:text="#{orders.filters.name}"></label>
-            <input class="cl-input" type="text" id="save-view-label" name="label" th:value="${filterForm?.label}" required autofocus/>
-        </div>
-        <div class="cl-span-6">
-            <span class="cl-eyebrow" th:text="#{orders.filters.saveView.conditions}"></span>
-            <span class="cl-table-pills"><span class="cl-status is-neutral" th:each="c : ${page.saveViewConditions()}" th:text="${c.label()}"></span></span>
-            <p class="cl-help" th:text="#{orders.filters.saveView.help}"></p>
-        </div>
-        <div class="cl-check-field cl-span-6" th:if="${canManageStoreFilters}">
-            <label class="cl-check"><input type="checkbox" name="sharedWithStore" value="true" th:checked="${filterForm != null and filterForm.sharedWithStore}"/> <span th:text="#{orders.filters.share}"></span></label>
-            <p class="cl-check-description" th:text="#{orders.filters.share.help}"></p>
-        </div>
-    </div>
-    <div class="cl-dialog-actions">
-        <button type="submit" class="cl-button is-primary" th:text="#{orders.filters.save}"></button>
-        <a class="cl-button" th:href="@{${returnTo}}" data-cl-dialog-close th:text="#{orders.filters.cancel}"></a>
-    </div>
-</form>
 
 <!--/* Filter management page (design system: a list of records in a card, "Nowy filtr" in the card head, editing on a
        subpage, deleting through the confirm dialog or its page). The delete link returns to this page ($returnTo);

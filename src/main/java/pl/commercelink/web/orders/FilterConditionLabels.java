@@ -33,19 +33,6 @@ public final class FilterConditionLabels {
         };
     }
 
-    public static String formField(String fieldName) {
-        OrderFilterField field = OrderFilterField.parse(fieldName)
-                .orElseThrow(() -> new IllegalArgumentException("Unknown order filter field: " + fieldName));
-        return switch (field) {
-            case Status -> "status";
-            case ShipmentType -> "shipmentType";
-            case PaymentSource -> "paymentSource";
-            case ShippingDue -> "shippingDue";
-            case SourceName -> "sourceName";
-            case ShippingPostalCode -> "shippingPostalCode";
-        };
-    }
-
     /** The display value of a condition, for a Thymeleaf template holding an org.thymeleaf.expression.Messages. */
     public static String value(OrderFilterCondition condition, Messages messages) {
         return value(condition, messages::msg);

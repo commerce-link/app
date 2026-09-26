@@ -190,43 +190,23 @@ public class OrdersController extends BaseController {
         model.addAttribute("page", orderListService.page(actor(), query, LocalDate.now(), locale));
     }
 
-    private static Optional<OrderStatus> statusOf(OrderFilter filter) {
-        return filter.getConditions().stream()
-                .filter(c -> c.getField() == OrderFilterField.Status)
-                .map(c -> c.getField().normalize(c.getValue()))
-                .flatMap(value -> Arrays.stream(OrderStatus.values()).filter(s -> s.name().equalsIgnoreCase(value)))
-                .findFirst();
-    }
-
-    private static final String FETCH = "fetch";
     static final String FILTERS_PATH = "/dashboard/orders/filters";
-    /** The hidden "dialog" field of the filter subpage's form: a rejection re-renders that page. */
-    private static final String PAGE_FORM = "page";
 
     @PostMapping("/dashboard/orders/filters")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String createOrderFilter(OrderFilterForm form,
-                                    @RequestHeader(value = "X-Requested-With", required = false) String requestedWith,
-                                    RedirectAttributes redirectAttributes, Model model, Locale locale,
+    public String createOrderFilter(OrderFilterForm form, RedirectAttributes redirectAttributes, Model model, Locale locale,
                                     HttpServletResponse response) {
-        return filterAction(requestedWith, form.getReturnTo(), redirectAttributes, model, locale, response, form, null, () -> {
-            OrderFilter created = orderFilters.create(actor(), form.isSharedWithStore(), form.getLabel(), form.toConditions());
-            if (PAGE_FORM.equals(form.getDialog())) {
-                return safeReturnTo(form.getReturnTo());
-            }
-            // "save this view": the list opens on the filter just saved
-            OrderListQuery target = parseReturnTo(listOf(safeReturnTo(form.getReturnTo()))).withFilterId(created.getId());
-            return statusOf(created).map(target::withStatus).orElse(target).href();
+        return filterAction(form.getReturnTo(), redirectAttributes, model, locale, response, form, null, () -> {
+            orderFilters.create(actor(), form.isSharedWithStore(), form.getLabel(), form.toConditions());
+            return safeReturnTo(form.getReturnTo());
         });
     }
 
     @PostMapping("/dashboard/orders/filters/update")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String updateOrderFilter(@RequestParam String filterId, OrderFilterForm form,
-                                    @RequestHeader(value = "X-Requested-With", required = false) String requestedWith,
-                                    RedirectAttributes redirectAttributes, Model model, Locale locale,
-                                    HttpServletResponse response) {
-        return filterAction(requestedWith, form.getReturnTo(), redirectAttributes, model, locale, response, form, filterId, () -> {
+    public String updateOrderFilter(@RequestParam String filterId, OrderFilterForm form, RedirectAttributes redirectAttributes,
+                                    Model model, Locale locale, HttpServletResponse response) {
+        return filterAction(form.getReturnTo(), redirectAttributes, model, locale, response, form, filterId, () -> {
             orderFilters.update(actor(), filterId, form.isSharedWithStore(), form.getLabel(), form.toConditions());
             return safeReturnTo(form.getReturnTo());
         });
@@ -235,10 +215,9 @@ public class OrdersController extends BaseController {
     @PostMapping("/dashboard/orders/filters/delete")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String deleteOrderFilter(@RequestParam String filterId, @RequestParam(required = false) String returnTo,
-                                    @RequestHeader(value = "X-Requested-With", required = false) String requestedWith,
                                     RedirectAttributes redirectAttributes, Model model, Locale locale,
                                     HttpServletResponse response) {
-        return filterAction(requestedWith, returnTo, redirectAttributes, model, locale, response, () -> {
+        return filterAction(returnTo, redirectAttributes, model, locale, response, null, null, () -> {
             orderFilters.delete(actor(), filterId);
             String target = safeReturnTo(returnTo);
             OrderListQuery list = parseReturnTo(listOf(target));
@@ -330,75 +309,36 @@ public class OrdersController extends BaseController {
         return form;
     }
 
-    /** "Save this view" as a page, for browsers without JavaScript. */
-    @GetMapping("/dashboard/orders/filters/new")
-    @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String newOrderFilterPage(@RequestParam(required = false) String returnTo, Locale locale, Model model) {
-        String back = safeReturnTo(returnTo);
-        addFilterFormAttributes(model, back, locale);
-        model.addAttribute("page", orderListService.page(actor(), parseReturnTo(back), LocalDate.now(), locale));
-        return "orders/filter-new";
-    }
-
     /**
-     * Runs a filter change and answers the way the caller can use: a fetch gets the dialog body (200, or 422 with the
-     * rejection), a plain form gets a redirect with the rejection as a flash for the list page.
+     * Runs a filter change and redirects to where the user came from. A rejected create or update ({@code form} given)
+     * re-renders the filter subpage with a 422, the rejection and what the user typed; a rejected delete goes back as a
+     * flash for the page it returns to.
      */
-    private String filterAction(String requestedWith, String returnTo, RedirectAttributes redirectAttributes, Model model,
-                                Locale locale, HttpServletResponse response, Supplier<String> action) {
-        return filterAction(requestedWith, returnTo, redirectAttributes, model, locale, response, null, null, action);
-    }
-
-    /**
-     * Same as above, but for the create/update endpoints: on a rejection the submitted {@code form} (and, for an
-     * update, the {@code filterId} being edited) go back into what the user was looking at, so nothing typed is lost —
-     * the filter subpage (hidden {@code dialog=page}, a 422 page) or the "save this view" dialog (fetch, a 422 body).
-     */
-    private String filterAction(String requestedWith, String returnTo, RedirectAttributes redirectAttributes, Model model,
-                                Locale locale, HttpServletResponse response, OrderFilterForm form, String filterId,
-                                Supplier<String> action) {
-        String rejection = null;
-        String target = safeReturnTo(returnTo);
+    private String filterAction(String returnTo, RedirectAttributes redirectAttributes, Model model, Locale locale,
+                                HttpServletResponse response, OrderFilterForm form, String filterId, Supplier<String> action) {
+        String rejection;
         try {
-            target = action.get();
+            return "redirect:" + action.get();
         } catch (OrderFilterException rejected) {
             rejection = messageSource.getMessage(rejected.getMessageKey(), rejected.getMessageArguments(), locale);
         } catch (OptimisticLockingExhaustedException e) {
             rejection = messageSource.getMessage("orders.filters.error.conflict", null, locale);
         }
-        if (rejection != null && form != null && PAGE_FORM.equals(form.getDialog())) {
-            // the filter subpage: show the rejection above the form and keep what the user typed
+        if (form != null) {
             addFilterEditAttributes(model, listOf(safeReturnTo(returnTo)), filterId, form, locale);
             model.addAttribute("filterError", rejection);
             response.setStatus(422);
             return "orders/filter-edit";
         }
-        if (FETCH.equals(requestedWith)) {
-            addFilterFormAttributes(model, target, locale);
-            if (rejection != null) {
-                model.addAttribute("filterError", rejection);
-                response.setStatus(422);
-                if (form != null) {
-                    // the only form still posted with fetch is the "save this view" dialog
-                    model.addAttribute("filterForm", form);
-                    model.addAttribute("page", orderListService.page(actor(), parseReturnTo(target), LocalDate.now(), locale));
-                    return "orders/filters :: saveViewBody";
-                }
-            } else {
-                model.addAttribute("redirectTo", target);
-            }
-            return "orders/filters :: redirect";
-        }
-        if (rejection != null) {
-            redirectAttributes.addFlashAttribute("filterError", rejection);
-        }
-        return "redirect:" + target;
+        redirectAttributes.addFlashAttribute("filterError", rejection);
+        return "redirect:" + safeReturnTo(returnTo);
     }
 
     private void addFilterFormAttributes(Model model, String returnTo, Locale locale) {
         model.addAttribute("filters", orderFilters.list(actor()));
         model.addAttribute("canManageStoreFilters", isAdmin());
-        model.addAttribute("statuses", Arrays.stream(OrderStatus.values()).toList());
+        // the list shows only open orders, so a filter can only name an open status
+        model.addAttribute("statuses", OrderListService.OPEN);
         model.addAttribute("shipmentTypes", ShipmentType.values());
         model.addAttribute("paymentSources", PaymentSource.values());
         model.addAttribute("shippingDueOptions", ShippingDue.values());

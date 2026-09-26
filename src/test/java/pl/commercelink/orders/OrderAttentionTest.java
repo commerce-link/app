@@ -40,12 +40,6 @@ class OrderAttentionTest {
     }
 
     @Test
-    void decideIsNewOrBlocked() {
-        assertThat(OrderAttention.Decide.matches(order(OrderStatus.Blocked, null, null, 10, 10), TODAY)).isTrue();
-        assertThat(OrderAttention.Decide.matches(order(OrderStatus.Assembly, null, null, 10, 10), TODAY)).isFalse();
-    }
-
-    @Test
     void unpaidIsOpenWithMissingPayment() {
         assertThat(OrderAttention.Unpaid.matches(order(OrderStatus.Delivered, null, null, 100, 40), TODAY)).isTrue();
         assertThat(OrderAttention.Unpaid.matches(order(OrderStatus.Completed, null, null, 100, 40), TODAY)).isFalse();
@@ -53,11 +47,11 @@ class OrderAttentionTest {
     }
 
     @Test
-    void parseIsCaseInsensitiveAndRejectsUnknown() {
-        assertThat(OrderAttention.parse("OVERDUE")).contains(OrderAttention.Overdue);
-        assertThat(OrderAttention.parse("nope")).isEmpty();
-        assertThat(OrderAttention.parse(null)).isEmpty();
-        assertThat(OrderAttention.Today.param()).isEqualTo("today");
+    void theTilesAreTheFourFiguresInOrder() {
+        // "Do decyzji" is gone: it repeated the Nowe and Zablokowane rows of the Status menu
+        assertThat(OrderAttention.values()).containsExactly(OrderAttention.Overdue, OrderAttention.Today,
+                OrderAttention.Unpaid, OrderAttention.NewToday);
+        assertThat(OrderAttention.NewToday.param()).isEqualTo("newToday");
     }
 
     @Test

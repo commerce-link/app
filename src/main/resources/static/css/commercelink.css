@@ -3554,16 +3554,16 @@ a.cl-link-button:hover {
 /* A segment with nothing to show (DS "Filtr wielowymiarowy": dimmed, but still a button). The grey is --cl-ink-2 let
    15% towards the control's own --cl-surface-2: 4.9:1 there, above AA -- --cl-ink-3 would be 4.47:1. The weight drops
    too, so the dimming does not rest on the colour alone; hover brings the ink back like on any segment. */
-.cl-page .cl-segment[data-count="0"]:not([aria-pressed="true"]):not([aria-current="page"]) {
+.cl-page .cl-segment[data-count="0"]:not([aria-pressed="true"]) {
     color: color-mix(in srgb, var(--cl-ink-2) 85%, var(--cl-surface-2));
     font-weight: 400;
 }
 
-.cl-page .cl-segment[data-count="0"]:not([aria-pressed="true"]):not([aria-current="page"]) .cl-segment-count {
+.cl-page .cl-segment[data-count="0"]:not([aria-pressed="true"]) .cl-segment-count {
     color: inherit;
 }
 
-.cl-page .cl-segment[data-count="0"]:not([aria-pressed="true"]):not([aria-current="page"]):hover {
+.cl-page .cl-segment[data-count="0"]:not([aria-pressed="true"]):hover {
     color: var(--cl-ink);
 }
 
@@ -4007,6 +4007,17 @@ a.cl-link-button:hover {
         display: none;
     }
 
+    /* The orders table at 720-1023 px: five columns in a card of 600-900 px. Tighter cell sides and a due note that may
+       break ("po terminie:" / "2 dni") keep the columns' minimum widths inside the card (design system §1.4). */
+    .cl-page .cl-table.is-orders :is(thead th, tbody th, td) {
+        padding-left: 8px;
+        padding-right: 8px;
+    }
+
+    .cl-page .cl-table.is-orders .cl-due-note {
+        white-space: normal;
+    }
+
     .cl-page .cl-table.is-products thead th,
     .cl-page .cl-table.is-products .cl-table-actions {
         white-space: normal;
@@ -4210,12 +4221,12 @@ a.cl-link-button:hover {
     }
 }
 
-/* --- Orders list (spec docs/active/orders-list-redesign; layout revised 2026-09-25 after the UX review): attention
-   strip, status tabs, custom-filter menu, search field, chips + count line, the orders table with a whole-row link
-   and its phone card, phone sort bar, pagination, star button, dialog with a form --- */
+/* --- Orders list (spec docs/active/orders-list-redesign): read-only stat tiles, the Status and custom-filter menus,
+   search field, chips + count line, the orders table with a whole-row link and document marks, its phone card and
+   phone sort bar, pagination --- */
 
-/* Stat tiles of the orders list: the design system's cl-stat, unchanged. Only the tone of the number is added
-   (the same use as the Magazyn "Wymaga uwagi" tile) and Bulma's li + li spacing is cancelled. */
+/* Stat tiles of the orders list: the design system's cl-stat, unchanged; only the spacing under the header and
+   Bulma's li + li margin are set here. */
 .cl-page .cl-stat-grid.is-orders {
     margin: 4px 0 20px;
     padding: 0;
@@ -4226,12 +4237,12 @@ a.cl-link-button:hover {
     margin: 0;
 }
 
-/* Status tabs: one underlined row at the top of the card — open statuses on the left, history on the right. Counts
-   are small and grey so the labels carry the row; a tab with nothing behind it is quieter but still clickable. */
+/* Links of the phone sort bar (.cl-table-sortbar, below 720 px): an underlined tab row, the current sort in ink with
+   an accent underline. The class outlived the status tabs it was made for (design system §5 "Zakładki statusów"). */
 .cl-page .cl-tab {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
+    gap: 4px;
     min-height: 44px;
     padding: 0 8px;
     margin-bottom: -1px;
@@ -4257,26 +4268,6 @@ a.cl-link-button:hover {
     color: var(--cl-ink);
     font-weight: 600;
     border-bottom-color: var(--cl-accent);
-}
-
-.cl-page .cl-tab-sep {
-    font-size: 0;
-}
-
-.cl-page .cl-tab-count {
-    font-size: 12.5px;
-    font-weight: 500;
-    color: var(--cl-ink-3);
-    font-variant-numeric: tabular-nums;
-}
-
-.cl-page .cl-tab[aria-current="page"] .cl-tab-count {
-    color: var(--cl-accent-ink);
-}
-
-.cl-page .cl-tab[data-count="0"]:not([aria-current="page"]) {
-    color: var(--cl-ink-3);
-    font-weight: 400;
 }
 
 /* Filter menu in a table toolbar (Status, custom filter): a native <details>, so it opens without JavaScript. The
@@ -4430,15 +4421,9 @@ a.cl-link-button:hover {
     color: var(--cl-ink-2);
 }
 
-/* Status menu: a GET form of checkboxes in two groups (open, history) with counts. */
+/* Status menu: a GET form of checkboxes (the open statuses) with counts. */
 .cl-page .cl-filter-menu-panel {
     min-width: 260px;
-}
-
-.cl-page .cl-filter-menu-group + .cl-filter-menu-group {
-    margin-top: var(--cl-gap-related);
-    padding-top: var(--cl-gap-related);
-    border-top: 1px solid var(--cl-line);
 }
 
 .cl-page .cl-filter-menu-group-title {
@@ -4607,7 +4592,7 @@ a.cl-link-button:hover {
 }
 
 .cl-page .cl-filter-chip-clear:hover {
-    background: rgba(27, 77, 177, .15);
+    background: color-mix(in srgb, var(--cl-accent) 15%, transparent);
 }
 
 .cl-page .cl-table-results {
@@ -4641,9 +4626,35 @@ a.cl-link-button:hover {
     background: var(--cl-surface-2);
 }
 
-/* Muted text on the tinted hover row: --cl-ink-3 is 4.47:1 on --cl-surface-2 (design system §7, D-C2). */
-.cl-page .cl-table.is-orders tbody tr:hover .cl-table-sub:not(.cl-due-note):not(.cl-unpaid) {
+/* Muted text on the tinted hover row: --cl-ink-3 is 4.47:1 on --cl-surface-2 (design system §7, D-C2). The phone card
+   mutes the client line too (.cl-cell-client), and a tap leaves the row in :hover. */
+.cl-page .cl-table.is-orders tbody tr:hover :is(.cl-table-sub:not(.cl-due-note):not(.cl-unpaid), .cl-cell-client) {
     color: var(--cl-ink-2);
+}
+
+/* The row never makes the card wider than the page (design system §1.4). An Allegro order number is a 36-character
+   checkout-form id: it ends in an ellipsis (the whole number is in title), and the order cell may wrap (an order id
+   that is not a UUID is shown whole, and the source line can break under the number). The e-mail ends in an ellipsis within whatever width its column gets — width 0 keeps it out of the
+   column's minimum, min-width fills the cell. The table only wraps these when the card is too narrow for every column
+   at full width (1024 px beside the rail, 1216 px beside the open sidebar, 720-1023 px). */
+.cl-page .cl-table.is-orders .cl-table-key {
+    white-space: normal;
+}
+
+.cl-page .cl-table.is-orders .cl-table-code {
+    display: inline-block;
+    max-width: 14ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: bottom;
+}
+
+.cl-page .cl-table.is-orders .cl-cell-email {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    width: 0;
+    min-width: 100%;
 }
 
 .cl-page .cl-table.is-orders .cl-row-link {
@@ -4768,17 +4779,6 @@ a.cl-link-button:hover {
     margin-top: 12px;
 }
 
-/* Dialog with a form (filters): wider than the confirmation, scrolling body. */
-.cl-page .cl-dialog.is-form {
-    width: min(600px, calc(100vw - 32px));
-}
-
-.cl-page .cl-dialog.is-form .cl-dialog-body {
-    max-height: min(70vh, 640px);
-    overflow: auto;
-    padding: 4px 20px 16px;
-}
-
 /* A saved filter's conditions as small pills under its name, in an ordinary .cl-list-item (name | Edytuj · Usuń). */
 .cl-page .cl-filter-conditions {
     display: flex;
@@ -4794,6 +4794,11 @@ a.cl-link-button:hover {
 @media screen and (max-width: 1023px) {
     .cl-page .cl-pagination .cl-button {
         min-height: 44px;
+    }
+
+    /* "do zapłaty 1 249,00 PLN" may break under the amount when the card is narrow (no page scroll, §1.4). */
+    .cl-page .cl-table.is-orders .cl-unpaid {
+        white-space: normal;
     }
 
     .cl-page .cl-filter-menu-check {
@@ -4895,8 +4900,10 @@ a.cl-link-button:hover {
         padding-right: 16px;
     }
 
-    /* Card A (D10): number + status / context / date + amount / due note + unpaid. The shared card mode already
-       hides thead and stacks rows; here the cells drop their labels and fall into a two-column grid. */
+    /* Card A (D10): number + status / source / client / date + amount / due note + unpaid / what is left to do. The
+       shared card mode already hides thead and stacks rows; here the cells drop their labels (display: contents) and
+       their parts fall into a two-column grid in the order set below, so the date and the amount share a line and
+       the due note and the unpaid amount share the next one. */
     .cl-page .cl-table.is-orders tr {
         display: grid;
         grid-template-columns: minmax(0, 1fr) auto;
@@ -4934,27 +4941,42 @@ a.cl-link-button:hover {
         color: var(--cl-ink-3);
     }
 
+    .cl-page .cl-table.is-orders .cl-table-key .cl-table-sub {
+        order: 1;
+    }
+
+    .cl-page .cl-table.is-orders .cl-cell-client {
+        order: 2;
+    }
+
     .cl-page .cl-table.is-orders .cl-cards-hide {
         display: none;
     }
 
     .cl-page .cl-table.is-orders .cl-cell-date {
         grid-column: 1;
+        order: 3;
     }
 
     .cl-page .cl-table.is-orders .cl-cell-amount {
         grid-column: 2;
         justify-self: end;
         text-align: right;
+        order: 4;
     }
 
     .cl-page .cl-table.is-orders .cl-due-note {
-        grid-column: 1 / -1;
+        grid-column: 1;
+        margin-top: 0;
+        order: 5;
     }
 
     .cl-page .cl-table.is-orders .cl-unpaid {
-        grid-column: 1 / -1;
+        grid-column: 2;
         justify-self: end;
+        text-align: right;
+        margin-top: 0;
+        order: 6;
     }
 
     /* The phone card shows only what still holds the order open, as its last line, and nothing when all is done. */
@@ -4964,7 +4986,7 @@ a.cl-link-button:hover {
 
     .cl-page .cl-table.is-orders .cl-doc-marks.has-todo {
         display: flex;
-        order: 1;   /* after the amount lines: the date and the amount keep sharing their line */
+        order: 7;   /* the last line of the card */
         gap: 4px;
         grid-column: 1 / -1;
         margin: 2px 0 0;

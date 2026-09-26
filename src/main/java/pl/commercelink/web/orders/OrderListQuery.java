@@ -1,7 +1,6 @@
 package pl.commercelink.web.orders;
 
 import org.springframework.util.MultiValueMap;
-import pl.commercelink.orders.OrderAttention;
 import pl.commercelink.orders.OrderStatus;
 
 import java.net.URLEncoder;
@@ -17,10 +16,11 @@ import java.util.Set;
 /**
  * The state of the orders list, read from and written back to the address (spec §2). Every link on the page is
  * built here, so changing one parameter never loses the others. statuses is empty for "all open" and otherwise the
- * statuses ticked in the Status menu (?status=New&status=Blocked, in enum order); filterId == "" (an
- * older "clear the filter" link) means no filter, like null.
+ * statuses ticked in the Status menu (?status=New&status=Blocked, in enum order); an empty filterId (an
+ * older "clear the filter" link) is read as no filter. Parameters the list no longer has (focus from the
+ * clickable tiles, sort=ordered from the history) are ignored, so old bookmarks still open the list.
  */
-public record OrderListQuery(List<OrderStatus> statuses, String filterId, OrderAttention focus, String q,
+public record OrderListQuery(List<OrderStatus> statuses, String filterId, String q,
                              Sort sort, Direction dir, int page) {
 
     public static final String PATH = "/dashboard/orders";
@@ -36,7 +36,7 @@ public record OrderListQuery(List<OrderStatus> statuses, String filterId, OrderA
     }
 
     public enum Sort {
-        DUE("due"), AMOUNT("amount"), NUMBER("number"), STATUS("status"), ORDERED("ordered");
+        DUE("due"), AMOUNT("amount"), NUMBER("number"), STATUS("status");
 
         private final String param;
 
@@ -73,8 +73,7 @@ public record OrderListQuery(List<OrderStatus> statuses, String filterId, OrderA
         String rawFilter = params.getFirst("filterId");
         return new OrderListQuery(
                 parseStatuses(params.get("status")),
-                rawFilter == null ? null : rawFilter.trim(),
-                OrderAttention.parse(params.getFirst("focus")).orElse(null),
+                rawFilter == null || rawFilter.isBlank() ? null : rawFilter.trim(),
                 normalizeQ(params.getFirst("q")),
                 Sort.parse(params.getFirst("sort")).orElse(null),
                 Direction.parse(params.getFirst("dir")).orElse(null),
@@ -90,7 +89,7 @@ public record OrderListQuery(List<OrderStatus> statuses, String filterId, OrderA
         }
         String filterId = params.getFirst("filterId");
         OrderListQuery target = new OrderListQuery(parseStatuses(statuses), filterId == null || filterId.isBlank() ? null : filterId.trim(),
-                null, null, null, null, 1);
+                null, null, null, 1);
         return Optional.of(target.href());
     }
 
@@ -138,13 +137,9 @@ public record OrderListQuery(List<OrderStatus> statuses, String filterId, OrderA
         return statuses.isEmpty();
     }
 
-    /** The one ticked status, if exactly one is — what a saved filter can hold. */
+    /** The one ticked status, if exactly one is. */
     public Optional<OrderStatus> single() {
         return statuses.size() == 1 ? Optional.of(statuses.get(0)) : Optional.empty();
-    }
-
-    public boolean hasExplicitNoFilter() {
-        return filterId != null && filterId.isEmpty();
     }
 
     public boolean hasFilter() {
@@ -156,10 +151,7 @@ public record OrderListQuery(List<OrderStatus> statuses, String filterId, OrderA
     }
 
     public Direction effectiveDir() {
-        if (dir != null) {
-            return dir;
-        }
-        return sort == Sort.ORDERED ? Direction.DESC : Direction.ASC;
+        return dir != null ? dir : Direction.ASC;
     }
 
     /** Exactly this one status, or all open when null. */
@@ -168,7 +160,7 @@ public record OrderListQuery(List<OrderStatus> statuses, String filterId, OrderA
     }
 
     public OrderListQuery withStatuses(Collection<OrderStatus> newStatuses) {
-        return new OrderListQuery(List.copyOf(newStatuses), filterId, focus, q, sort, dir, 1);
+        return new OrderListQuery(List.copyOf(newStatuses), filterId, q, sort, dir, 1);
     }
 
     public OrderListQuery toggleStatus(OrderStatus status) {
@@ -180,25 +172,20 @@ public record OrderListQuery(List<OrderStatus> statuses, String filterId, OrderA
     }
 
     public OrderListQuery withFilterId(String newFilterId) {
-        return new OrderListQuery(statuses, newFilterId, focus, q, sort, dir, 1);
-    }
-
-    public OrderListQuery withFocus(OrderAttention newFocus) {
-        return new OrderListQuery(statuses, filterId, newFocus, q, sort, dir, 1);
+        return new OrderListQuery(statuses, newFilterId, q, sort, dir, 1);
     }
 
     public OrderListQuery withQ(String newQ) {
-        return new OrderListQuery(statuses, filterId, focus, normalizeQ(newQ), sort, dir, 1);
+        return new OrderListQuery(statuses, filterId, normalizeQ(newQ), sort, dir, 1);
     }
 
     public OrderListQuery toggleSort(Sort column) {
-        Direction next = effectiveSort() == column ? effectiveDir().flipped()
-                : (column == Sort.ORDERED ? Direction.DESC : Direction.ASC);
-        return new OrderListQuery(statuses, filterId, focus, q, column, next, 1);
+        Direction next = effectiveSort() == column ? effectiveDir().flipped() : Direction.ASC;
+        return new OrderListQuery(statuses, filterId, q, column, next, 1);
     }
 
     public OrderListQuery withPage(int newPage) {
-        return new OrderListQuery(statuses, filterId, focus, q, sort, dir, Math.max(1, newPage));
+        return new OrderListQuery(statuses, filterId, q, sort, dir, Math.max(1, newPage));
     }
 
     public String href() {
@@ -208,9 +195,6 @@ public record OrderListQuery(List<OrderStatus> statuses, String filterId, OrderA
         }
         if (filterId != null) {
             parts.add("filterId=" + encode(filterId));
-        }
-        if (focus != null) {
-            parts.add("focus=" + focus.param());
         }
         if (q != null) {
             parts.add("q=" + encode(q));
@@ -227,7 +211,7 @@ public record OrderListQuery(List<OrderStatus> statuses, String filterId, OrderA
         return parts.isEmpty() ? PATH : PATH + "?" + String.join("&", parts);
     }
 
-    /** Where a dialog form returns to; a runaway address falls back to the bare list (spec §8.1). */
+    /** Where the filter pages return to; a runaway address falls back to the bare list (spec §8.1). */
     public String returnTo() {
         String href = href();
         return href.length() > MAX_RETURN_TO ? PATH : href;

@@ -57,6 +57,18 @@ class OrdersListMessagesTest {
         assertThat(used.stream().filter(k -> !en.containsKey(k)).toList()).as("missing in EN").isEmpty();
     }
 
+    /** The tile keys are built from OrderAttention.param(), so the scan above cannot see them. */
+    @Test
+    void everyTileHasALabelAndAHint() throws Exception {
+        for (String file : new String[] {"messages_pl.properties", "messages_en.properties"}) {
+            Properties messages = load(file);
+            for (pl.commercelink.orders.OrderAttention kind : pl.commercelink.orders.OrderAttention.values()) {
+                String key = "orders.list.attention." + kind.param();
+                assertThat(messages.containsKey(key) && messages.containsKey(key + ".hint")).as(file + ": " + key).isTrue();
+            }
+        }
+    }
+
     @Test
     void enumSourceTypesAllHaveLabels() throws Exception {
         for (String file : new String[] {"messages_pl.properties", "messages_en.properties"}) {
@@ -74,7 +86,10 @@ class OrdersListMessagesTest {
             assertThat(messages.stringPropertyNames()).as(file)
                     .noneMatch(k -> k.startsWith("orders.filters.view.") || k.startsWith("orders.filters.mode."))
                     .doesNotContain("orders.status.filter.clear", "orders.filters.manage", "orders.filters.back",
-                            "orders.status.filter.title", "orders.status.filter.apply");
+                            "orders.status.filter.title", "orders.status.filter.apply")
+                    // "save this view", the focus tiles and "Do decyzji" are gone with their keys
+                    .noneMatch(k -> k.startsWith("orders.filters.saveView") || k.startsWith("orders.list.saveView")
+                            || k.startsWith("orders.list.attention.decide") || k.equals("orders.list.chip.focus"));
         }
     }
 }

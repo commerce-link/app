@@ -10,7 +10,6 @@ import pl.commercelink.orders.filters.services.ListOrderFiltersView;
 import pl.commercelink.orders.filters.services.OrderFiltersService;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
-import pl.commercelink.web.orders.FilterConditionLabels;
 import pl.commercelink.web.orders.OrderListQuery;
 import pl.commercelink.web.orders.OrderListQuery.Direction;
 import pl.commercelink.web.orders.OrderListQuery.Sort;
@@ -18,7 +17,6 @@ import pl.commercelink.web.orders.OrderRow;
 import pl.commercelink.web.orders.OrderRowMapper;
 import pl.commercelink.web.orders.OrdersPageModel;
 import pl.commercelink.web.orders.OrdersPageModel.Chip;
-import pl.commercelink.web.orders.OrdersPageModel.Condition;
 import pl.commercelink.web.orders.OrdersPageModel.EmptyState;
 import pl.commercelink.web.orders.OrdersPageModel.FilterOption;
 import pl.commercelink.web.orders.OrdersPageModel.StatusOption;
@@ -27,8 +25,8 @@ import pl.commercelink.web.orders.OrdersPageModel.Tile;
 import pl.commercelink.web.orders.Pagination;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.List;
@@ -38,13 +36,13 @@ import java.util.Optional;
 import java.util.stream.Stream;
 
 /**
- * Builds the orders list page from one query of the store's orders (spec §8.2): tiles from all open orders,
- * status counts within the custom filter and the search, rows within the ticked statuses and focus, then sort and page.
+ * Builds the orders list page from one query of the store's open orders (spec §8.2, §23): tiles from all open orders,
+ * status counts within the custom filter and the search, rows within the ticked statuses, then sort and page.
  */
 @Service
 public class OrderListService {
 
-    static final List<OrderStatus> OPEN = List.of(OrderStatus.New, OrderStatus.Blocked, OrderStatus.Assembly,
+    public static final List<OrderStatus> OPEN = List.of(OrderStatus.New, OrderStatus.Blocked, OrderStatus.Assembly,
             OrderStatus.Assembled, OrderStatus.Realization, OrderStatus.Shipping, OrderStatus.Delivered);
 
     private final OrdersRepository ordersRepository;
@@ -73,7 +71,6 @@ public class OrderListService {
                 .toList();
         List<Order> inStatus = filtered.stream()
                 .filter(order -> query.isOpen() || query.statuses().contains(order.getStatus()))
-                .filter(order -> query.focus() == null || query.focus().matches(order, today))
                 .sorted(comparator(query.effectiveSort(), query.effectiveDir()))
                 .toList();
 
@@ -85,21 +82,23 @@ public class OrderListService {
 
         return new OrdersPageModel(
                 query,
-                tiles(open, query, today, locale),
+                tiles(open, today, locale),
                 statusOptions(filtered, OPEN, query, locale),
                 statusSummary(query, locale),
                 filterOptions(filters, query),
                 activeFilter,
-                chips(query, activeFilter, inStatus.size(), locale),
+                chips(query, activeFilter, locale),
                 text("orders.list.results", locale, inStatus.size()),
                 sortHeaders(query),
                 rows,
                 pagination,
-                rows.isEmpty() ? emptyState(query, activeFilter, locale) : null,
-                saveViewConditions(query, activeFilter, locale));
+                rows.isEmpty() ? emptyState(query, activeFilter, locale) : null);
     }
 
-    /** A custom filter's Status condition only chooses the segment on entry (spec §7.5); the list applies the rest. */
+    /**
+     * A custom filter's Status condition ticks the Status menu when the filter is chosen ({@link #filterStatus}); from
+     * then on the menu decides the status, and the list applies the filter's other conditions (spec §7.5, D3).
+     */
     static boolean matchesIgnoringStatus(OrderFilter filter, Order order, LocalDate today) {
         List<OrderFilterCondition> others = filter.getConditions().stream()
                 .filter(c -> c.getField() != OrderFilterField.Status).toList();
@@ -112,7 +111,6 @@ public class OrderListService {
                     .thenComparing(Order::getOrderedAt, Comparator.nullsLast(Comparator.naturalOrder()));
             case AMOUNT -> Comparator.comparingDouble(Order::getTotalPrice);
             case NUMBER -> Comparator.comparing(Order::getOrderId, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER));
-            case ORDERED -> Comparator.comparing(Order::getOrderedAt, Comparator.nullsLast(Comparator.<LocalDateTime>naturalOrder()));
             case STATUS -> byStatus(Comparator.naturalOrder());
         };
         if (dir == Direction.ASC) {
@@ -131,21 +129,11 @@ public class OrderListService {
         return base.reversed();
     }
 
-    private List<Tile> tiles(List<Order> open, OrderListQuery query, LocalDate today, Locale locale) {
-        long newCount = open.stream().filter(o -> o.getStatus() == OrderStatus.New).count();
-        long blockedCount = open.stream().filter(o -> o.getStatus() == OrderStatus.Blocked).count();
-        List<Tile> tiles = new ArrayList<>();
-        for (OrderAttention kind : OrderAttention.values()) {
-            long count = open.stream().filter(o -> kind.matches(o, today)).count();
-            boolean pressed = query.focus() == kind;
+    private List<Tile> tiles(List<Order> open, LocalDate today, Locale locale) {
+        return Arrays.stream(OrderAttention.values()).map(kind -> {
             String key = "orders.list.attention." + kind.param();
-            String hint = switch (kind) {
-                case Decide -> text("orders.list.attention.decide.hint", locale, newCount, blockedCount);
-                default -> text(key + ".hint", locale);
-            };
-            tiles.add(new Tile(kind, text(key, locale), count, null, hint, query.withFocus(pressed ? null : kind).href(), pressed, true));
-        }
-        return tiles;
+            return new Tile(text(key, locale), open.stream().filter(o -> kind.matches(o, today)).count(), text(key + ".hint", locale));
+        }).toList();
     }
 
     private List<StatusOption> statusOptions(List<Order> filtered, List<OrderStatus> statuses, OrderListQuery query, Locale locale) {
@@ -170,11 +158,21 @@ public class OrderListService {
     }
 
     private static FilterOption option(OrderFilter filter, boolean shared, OrderListQuery query) {
-        return new FilterOption(filter.getId(), filter.getLabel(), shared,
-                filter.getId().equals(query.filterId()));
+        OrderListQuery chosen = query.withFilterId(filter.getId());
+        String href = filterStatus(filter).map(chosen::withStatus).orElse(chosen).href();
+        return new FilterOption(filter.getId(), filter.getLabel(), shared, filter.getId().equals(query.filterId()), href);
     }
 
-    private List<Chip> chips(OrderListQuery query, Optional<OrderFilter> activeFilter, int count, Locale locale) {
+    /** The open status a filter's Status condition names; a closed one (saved before the list dropped history) is ignored. */
+    public static Optional<OrderStatus> filterStatus(OrderFilter filter) {
+        return filter.getConditions().stream()
+                .filter(c -> c.getField() == OrderFilterField.Status)
+                .map(c -> c.getField().normalize(c.getValue()))
+                .flatMap(value -> OPEN.stream().filter(s -> s.name().equalsIgnoreCase(value)))
+                .findFirst();
+    }
+
+    private List<Chip> chips(OrderListQuery query, Optional<OrderFilter> activeFilter, Locale locale) {
         List<Chip> chips = new ArrayList<>();
         // one chip per ticked status, so its "×" drops just that status; dropping the last one returns to all open
         for (OrderStatus status : query.statuses()) {
@@ -185,10 +183,6 @@ public class OrderListService {
             String label = text("orders.list.chip.filter", locale, f.getLabel());
             chips.add(new Chip(label, query.withFilterId(null).href(), text("orders.list.chip.clearLabel", locale, label)));
         });
-        if (query.focus() != null) {
-            String label = text("orders.list.chip.focus", locale, text("orders.list.attention." + query.focus().param(), locale), count);
-            chips.add(new Chip(label, query.withFocus(null).href(), text("orders.list.chip.clearLabel", locale, label)));
-        }
         if (query.q() != null) {
             String label = text("orders.list.chip.search", locale, query.q());
             chips.add(new Chip(label, query.withQ(null).href(), text("orders.list.chip.clearLabel", locale, label)));
@@ -218,10 +212,6 @@ public class OrderListService {
             return new EmptyState(text("orders.list.empty.search", locale, query.q()),
                     text("orders.list.empty.search.clear", locale), query.withQ(null).href());
         }
-        if (query.focus() != null) {
-            return new EmptyState(text("orders.list.empty." + query.focus().param(), locale),
-                    text("orders.list.empty.showOpen", locale), query.withFocus(null).withStatus(null).href());
-        }
         if (activeFilter.isPresent()) {
             return new EmptyState(text("orders.list.empty.filter", locale),
                     text("orders.list.empty.filter.clear", locale), query.withFilterId(null).href());
@@ -233,26 +223,6 @@ public class OrderListService {
         }
         // only open orders are read, so "none open" is all the list can say (a new store and a quiet day look the same)
         return new EmptyState(text("orders.list.empty.open", locale), null, null);
-    }
-
-    /**
-     * What "Save this view" would store: the ticked status plus the active filter's other conditions. A saved filter
-     * holds one status, so with several ticked the status is left out rather than silently reduced to the first.
-     */
-    private List<Condition> saveViewConditions(OrderListQuery query, Optional<OrderFilter> activeFilter, Locale locale) {
-        List<Condition> conditions = new ArrayList<>();
-        query.single().ifPresent(status -> conditions.add(new Condition(OrderFilterField.Status.name(), status.name(),
-                text("orders.filters.field.status", locale) + ": " + text("OrderStatus." + status.name(), locale))));
-        activeFilter.ifPresent(f -> f.getConditions().stream()
-                .filter(c -> c.getField() != OrderFilterField.Status)
-                .forEach(c -> conditions.add(new Condition(c.getField().name(), c.getValue(), conditionLabel(c, locale)))));
-        return conditions;
-    }
-
-    private String conditionLabel(OrderFilterCondition c, Locale locale) {
-        String field = text("orders.filters.field." + FilterConditionLabels.fieldKey(c.getField()), locale);
-        String value = FilterConditionLabels.value(c, key -> text(key, locale));
-        return field + ": " + value;
     }
 
     private String text(String key, Locale locale, Object... args) {

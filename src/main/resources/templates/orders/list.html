@@ -33,10 +33,9 @@
         <div data-cl-orders-results th:fragment="results" th:with="q=${page.query()}">
 
             <!--/* Four read-only figures of the whole store in the design system's cl-stat tile, exactly as Asortyment uses
-                   it: label, number, hint. "Do decyzji" is left out — it repeats the Nowe and Zablokowane rows of the
-                   Status menu. The money figures carry their sum in the hint. */-->
+                   it: label, number, short hint. */-->
             <ul class="cl-stat-grid is-orders" th:attr="aria-label=#{orders.list.attention.label}">
-                <li class="cl-stat" th:each="tile : ${page.tiles()}" th:if="${tile.kind().name() != 'Decide'}">
+                <li class="cl-stat" th:each="tile : ${page.tiles()}">
                     <span class="cl-eyebrow" th:text="${tile.label()}"></span>
                     <span class="cl-stat-value" th:text="${tile.count()}"></span>
                     <span class="cl-stat-hint" th:text="${tile.hint()}"></span>
@@ -46,9 +45,8 @@
             <section class="cl-card" aria-labelledby="orders-table-title">
                 <h2 class="cl-visually-hidden" id="orders-table-title" th:text="#{orders.list.table.title}"></h2>
 
-                <!--/* Status tabs: one underlined row, open statuses left, history right (spec §5). */-->
                 <!--/* The table toolbar (design system "Tabela danych"): two filter menus on the left — Status (checkboxes
-                       with counts, both groups) and the custom filter — and search on the right. The menus look like the
+                       with counts of the open statuses) and the custom filter — and search on the right. The menus look like the
                        toolbar's compact select ("Podkategoria: wszystkie ⌄" on a catalog category) and open a popover. Both menus are native <details>, so they open without
                        JavaScript; the Status menu is a GET form (its "Zastosuj" button is hidden once orders-list.js
                        applies each tick at once). */-->
@@ -61,7 +59,6 @@
                             </summary>
                             <form method="get" th:action="@{/dashboard/orders}" class="cl-filter-menu-panel" data-cl-orders-form data-cl-autosubmit>
                                 <input type="hidden" name="filterId" th:if="${q.filterId() != null}" th:value="${q.filterId()}"/>
-                                <input type="hidden" name="focus" th:if="${q.focus() != null}" th:value="${q.focus().param()}"/>
                                 <input type="hidden" name="q" th:if="${q.q() != null}" th:value="${q.q()}"/>
                                 <input type="hidden" name="sort" th:if="${q.sort() != null}" th:value="${q.sort().param()}"/>
                                 <input type="hidden" name="dir" th:if="${q.dir() != null}" th:value="${q.dir().param()}"/>
@@ -86,13 +83,13 @@
                                 <span class="cl-filter-menu-key" th:text="#{orders.list.filter.menu}"></span>
                                 <span class="cl-filter-menu-value" th:text="${active.isPresent()} ? ${active.get().label} : #{orders.list.filter.none}"></span>
                             </summary>
-                            <!--/* The saved filters scroll inside the popover; "save this view…" and "manage…" stay pinned
-                                   underneath, so a long list never hides them. */-->
+                            <!--/* The saved filters scroll inside the popover; "manage…" stays pinned underneath, so a long
+                                   list never hides it. Choosing a filter also ticks its own Status condition. */-->
                             <div class="cl-filter-menu-list">
                                 <ul class="cl-filter-menu-scroll">
                                     <li th:if="${page.filterOptions().isEmpty()}" class="cl-filter-menu-empty" th:text="#{orders.list.filter.empty}"></li>
                                     <li th:each="o : ${page.filterOptions()}">
-                                        <a class="cl-filter-menu-item" th:href="@{${q.withFilterId(o.id()).href()}}"
+                                        <a class="cl-filter-menu-item" th:href="@{${o.href()}}"
                                            th:attr="aria-current=${o.selected()} ? 'true' : null" data-cl-orders-nav>
                                             <span class="cl-filter-menu-text" th:text="${o.label()}"></span>
                                             <span class="cl-filter-menu-meta" th:text="${o.shared()} ? #{orders.filters.scope.store} : #{orders.filters.scope.private}"></span>
@@ -103,10 +100,6 @@
                                     </li>
                                 </ul>
                                 <ul class="cl-filter-menu-footer">
-                                    <li th:if="${page.canSaveView()}">
-                                        <a class="cl-filter-menu-item" th:href="@{/dashboard/orders/filters/new(returnTo=${returnTo})}"
-                                           data-cl-dialog-open="save-view-dialog" th:text="#{orders.list.saveView}"></a>
-                                    </li>
                                     <li>
                                         <a class="cl-filter-menu-item" th:href="@{/dashboard/orders/filters(returnTo=${returnTo})}"
                                            th:text="#{orders.list.manageFilters}"></a>
@@ -205,11 +198,11 @@
                     <tr th:each="row : ${page.rows()}">
                         <th scope="row" class="cl-table-key" th:attr="data-label=#{orders.list.column.order}">
                             <a class="cl-row-link" th:href="@{${row.href()}}" th:text="${row.number()}"></a>
-                            <span class="cl-table-sub"><span th:text="${row.sourceText()}"></span><th:block th:if="${row.externalId() != null}"> · <span class="cl-table-code" th:text="${row.externalId()}"></span></th:block></span>
+                            <span class="cl-table-sub"><span th:text="${row.sourceText()}"></span><th:block th:if="${row.externalId() != null}"> · <span class="cl-table-code" th:text="${row.externalId()}" th:title="${row.externalId()}"></span></th:block></span>
                         </th>
                         <td th:attr="data-label=#{orders.list.column.client}">
                             <span class="cl-cell-client"><span th:text="${row.clientName()}"></span><th:block th:if="${row.clientCity() != null}"> · <span th:text="${row.clientCity()}"></span></th:block></span>
-                            <span class="cl-table-sub cl-cards-hide" th:if="${row.email() != null}" th:text="${row.email()}"></span>
+                            <span class="cl-table-sub cl-cell-email cl-cards-hide" th:if="${row.email() != null}" th:text="${row.email()}" th:title="${row.email()}"></span>
                         </td>
                         <td class="cl-cell-due" th:attr="data-label=#{orders.list.column.due}">
                             <span class="cl-cell-date" th:text="${row.dueText()}"></span>
@@ -249,15 +242,9 @@
                 <div th:replace="~{fragments/pagination :: pages(${page.pagination()})}"></div>
             </section>
         </div>
-
-        <div th:replace="~{orders/filters :: saveViewDialog}"></div>
-        <div th:replace="~{fragments/confirm-dialog :: dialog}"></div>
     </div>
 </section>
 
-<script th:src="@{/js/dialog.js}" defer></script>
-<script th:src="@{/js/confirm-dialog.js}" defer></script>
-<script th:src="@{/js/filters-dialog.js}" defer></script>
 <script th:src="@{/js/orders-list.js}" defer></script>
 </div>
 

@@ -31,9 +31,10 @@ class OrderListQueryTest {
 
     @Test
     void unknownValuesFallBackToDefaultsAndPageIsClampedToOne() {
-        OrderListQuery query = OrderListQuery.parse(params("status", "Bogus", "focus", "x", "sort", "y", "dir", "z", "page", "abc"));
+        // focus (the clickable tiles) and sort=ordered (the history) are gone: old bookmarks open the plain list
+        OrderListQuery query = OrderListQuery.parse(params("status", "Bogus", "focus", "overdue", "sort", "ordered", "dir", "z", "page", "abc"));
         assertThat(query.statuses()).isEmpty();
-        assertThat(query.focus()).isNull();
+        assertThat(query.href()).isEqualTo("/dashboard/orders");
         assertThat(query.sort()).isNull();
         assertThat(query.page()).isEqualTo(1);
         assertThat(OrderListQuery.parse(params("page", "0")).page()).isEqualTo(1);
@@ -51,24 +52,22 @@ class OrderListQueryTest {
     }
 
     @Test
-    void emptyFilterIdIsAnExplicitNoFilter() {
+    void emptyFilterIdMeansNoFilter() {
+        // the start filter's "filterId=" marker is gone; an old link with it opens the clean list
         OrderListQuery query = OrderListQuery.parse(params("filterId", ""));
-        assertThat(query.hasExplicitNoFilter()).isTrue();
         assertThat(query.hasFilter()).isFalse();
-        assertThat(query.href()).isEqualTo("/dashboard/orders?filterId=");
-        assertThat(OrderListQuery.parse(params()).hasExplicitNoFilter()).isFalse();
+        assertThat(query.href()).isEqualTo("/dashboard/orders");
     }
 
     @Test
     void hrefKeepsEveryParameterAndResetsPageOnChange() {
-        OrderListQuery query = OrderListQuery.parse(params("status", "New", "filterId", "f1", "focus", "overdue",
+        OrderListQuery query = OrderListQuery.parse(params("status", "New", "filterId", "f1",
                 "q", "kowalski", "sort", "amount", "dir", "desc", "page", "3"));
-        assertThat(query.href()).isEqualTo("/dashboard/orders?status=New&filterId=f1&focus=overdue&q=kowalski&sort=amount&dir=desc&page=3");
-        assertThat(query.withStatus(OrderStatus.Blocked).href()).startsWith("/dashboard/orders?status=Blocked&filterId=f1&focus=overdue&q=kowalski&sort=amount&dir=desc").doesNotContain("page=");
+        assertThat(query.href()).isEqualTo("/dashboard/orders?status=New&filterId=f1&q=kowalski&sort=amount&dir=desc&page=3");
+        assertThat(query.withStatus(OrderStatus.Blocked).href()).startsWith("/dashboard/orders?status=Blocked&filterId=f1&q=kowalski&sort=amount&dir=desc").doesNotContain("page=");
         assertThat(query.withStatus(null).href()).doesNotContain("status=");
-        assertThat(query.withFocus(null).href()).doesNotContain("focus=");
         assertThat(query.withQ(null).href()).doesNotContain("q=");
-        assertThat(query.withFilterId("").href()).contains("filterId=&");
+        assertThat(query.withFilterId(null).href()).doesNotContain("filterId=");
         assertThat(query.withPage(2).href()).endsWith("page=2");
     }
 
