@@ -1,0 +1,270 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<th:block th:fragment="dialogs" th:with="items=${page.items()}, suppliers=${page.items().suppliers()}">
+
+    <dialog class="cl-dialog is-form is-wide" id="assign-sku-dialog" aria-labelledby="assign-sku-title">
+        <form method="post" th:action="@{/dashboard/orders/{o}/assign-sku(o=${page.orderId()})}" data-cl-assign-sku>
+            <h2 class="cl-dialog-title" id="assign-sku-title" th:text="#{order.item.menu.assign.sku}"></h2>
+            <div class="cl-dialog-body">
+                <input type="hidden" name="itemId" data-cl-item-id>
+                <input type="hidden" name="sku" data-cl-sku-value>
+                <dl class="cl-kv" th:replace="~{orders/details/item-dialogs :: context}"></dl>
+                <div class="cl-field">
+                    <span class="cl-label" th:text="#{order.item.assign.sku.selected}"></span>
+                    <ul class="cl-chip-list" data-cl-sku-chips
+                        th:attr="data-foreign=#{order.item.assign.sku.foreign}, data-remove=#{order.item.assign.sku.remove}"></ul>
+                    <p class="cl-help" data-cl-sku-empty th:text="#{order.item.assign.sku.empty}"></p>
+                    <p class="cl-help"><span th:text="#{order.item.assign.sku.result}"></span> <code class="cl-code" data-cl-sku-preview>—</code></p>
+                </div>
+                <div class="cl-form-grid">
+                    <div class="cl-span-2 cl-field">
+                        <label class="cl-label" for="assign-sku-catalog" th:text="#{order.item.assign.sku.catalog}"></label>
+                        <select class="cl-select" id="assign-sku-catalog" data-cl-sku-catalog th:attr="data-url=@{/dashboard/pricelist}">
+                            <option value="" th:text="#{orders.select.catalog}"></option>
+                            <option th:each="catalog : ${items.catalogs()}" th:value="${catalog.catalogId}" th:text="${catalog.name}"></option>
+                        </select>
+                    </div>
+                    <div class="cl-span-2 cl-field">
+                        <label class="cl-label" for="assign-sku-category" th:text="#{order.item.category}"></label>
+                        <select class="cl-select" id="assign-sku-category" data-cl-sku-category th:attr="data-placeholder=#{offers.select.category}"></select>
+                    </div>
+                    <div class="cl-span-2 cl-field">
+                        <label class="cl-label" for="assign-sku-label" th:text="#{order.item.assign.sku.label}"></label>
+                        <select class="cl-select" id="assign-sku-label" data-cl-sku-label th:attr="data-placeholder=#{order.item.assign.sku.all.labels}"></select>
+                    </div>
+                    <div class="cl-span-4 cl-field">
+                        <label class="cl-label" for="assign-sku-search" th:text="#{general.search}"></label>
+                        <input class="cl-input" id="assign-sku-search" type="search" data-cl-sku-search
+                               th:placeholder="#{order.item.assign.sku.search.placeholder}">
+                    </div>
+                    <div class="cl-span-2 cl-field">
+                        <label class="cl-label" for="assign-sku-manual" th:text="#{order.item.assign.sku.manual.placeholder}"></label>
+                        <div class="cl-input-row">
+                            <input class="cl-input" id="assign-sku-manual" type="text" data-cl-sku-manual autocomplete="off">
+                            <button type="button" class="cl-button" data-cl-sku-add th:text="#{general.add}"></button>
+                        </div>
+                    </div>
+                </div>
+                <table class="cl-table is-compact">
+                    <caption class="cl-visually-hidden" th:text="#{order.item.assign.sku.table}"></caption>
+                    <thead><tr>
+                        <th scope="col" class="cl-table-check"><span class="cl-visually-hidden" th:text="#{order.item.assign.sku.pick}"></span></th>
+                        <th scope="col" th:text="#{order.item.name}"></th>
+                        <th scope="col" th:text="#{order.item.assign.sku.label}"></th>
+                        <th scope="col" th:text="#{order.item.sku}"></th>
+                        <th scope="col" class="is-numeric" th:text="#{order.item.price}"></th>
+                        <th scope="col" class="is-numeric" th:text="#{order.item.assign.sku.availability}"></th>
+                    </tr></thead>
+                    <tbody data-cl-sku-rows></tbody>
+                </table>
+                <p class="cl-list-empty" data-cl-sku-none hidden th:text="#{order.item.assign.sku.no.results}"></p>
+            </div>
+            <div class="cl-dialog-actions">
+                <button type="submit" class="cl-button is-primary" data-cl-sku-submit th:text="#{general.save}"></button>
+                <button type="button" class="cl-button" data-cl-dialog-close th:text="#{general.cancel}"></button>
+                <span class="cl-help" data-cl-sku-hint th:text="#{order.item.assign.sku.empty.hint}"></span>
+            </div>
+        </form>
+    </dialog>
+
+    <dialog class="cl-dialog is-form" id="assign-supplier-dialog" aria-labelledby="assign-supplier-title">
+        <form th:replace="~{orders/details/item-dialogs :: supplierForm}"></form>
+    </dialog>
+
+    <dialog class="cl-dialog is-form is-wide" id="assign-warehouse-dialog" aria-labelledby="assign-warehouse-title">
+        <form method="post" th:action="@{/dashboard/orders/{o}/assign-warehouse(o=${page.orderId()})}" data-cl-assign-warehouse
+              th:attr="data-url=@{/dashboard/warehouse/items/available}">
+            <h2 class="cl-dialog-title" id="assign-warehouse-title" th:text="#{order.item.menu.assign.warehouse}"></h2>
+            <div class="cl-dialog-body">
+                <input type="hidden" name="itemId" data-cl-item-id>
+                <input type="hidden" name="warehouseItemId" data-cl-warehouse-item>
+                <dl class="cl-kv" th:replace="~{orders/details/item-dialogs :: context}"></dl>
+                <div class="cl-field">
+                    <label class="cl-label" for="assign-warehouse-search" th:text="#{general.search}"></label>
+                    <input class="cl-input" id="assign-warehouse-search" type="search" data-cl-warehouse-search
+                           th:placeholder="#{order.item.assign.sku.search.placeholder}">
+                </div>
+                <table class="cl-table is-compact"
+                       th:attr="data-status-ordered=#{FulfilmentStatus.Ordered}, data-status-delivered=#{FulfilmentStatus.Delivered},
+                                data-condition-openbox=#{ItemCondition.OpenBox}, data-condition-damaged=#{ItemCondition.Damaged}">
+                    <caption class="cl-visually-hidden" th:text="#{order.item.menu.assign.warehouse}"></caption>
+                    <thead><tr>
+                        <th scope="col" class="cl-table-check"><span class="cl-visually-hidden" th:text="#{order.item.assign.sku.pick}"></span></th>
+                        <th scope="col" th:text="#{order.item.name}"></th>
+                        <th scope="col" th:text="#{order.item.sku}"></th>
+                        <th scope="col" th:text="#{order.item.serial.no}"></th>
+                        <th scope="col" class="is-numeric" th:text="#{order.item.quantity}"></th>
+                        <th scope="col" th:text="#{order.item.status}"></th>
+                    </tr></thead>
+                    <tbody data-cl-warehouse-rows></tbody>
+                </table>
+                <p class="cl-list-empty" data-cl-warehouse-none hidden th:text="#{order.item.assign.warehouse.no.results}"></p>
+            </div>
+            <div class="cl-dialog-actions">
+                <button type="submit" class="cl-button is-primary" data-cl-warehouse-submit disabled th:text="#{general.save}"></button>
+                <button type="button" class="cl-button" data-cl-dialog-close th:text="#{general.cancel}"></button>
+                <span class="cl-help" data-cl-warehouse-hint th:text="#{order.item.assign.warehouse.empty.hint}"></span>
+            </div>
+        </form>
+    </dialog>
+
+    <dialog class="cl-dialog is-form is-wide" id="split-group-dialog" aria-labelledby="split-group-title">
+        <form method="post" th:action="@{/dashboard/orders/{o}/split-group(o=${page.orderId()})}" data-cl-split-group>
+            <h2 class="cl-dialog-title" id="split-group-title" th:text="#{order.item.menu.split.group}"></h2>
+            <div class="cl-dialog-body">
+                <input type="hidden" name="itemId" data-cl-item-id>
+                <dl class="cl-kv" th:replace="~{orders/details/item-dialogs :: context}"></dl>
+                <table class="cl-table is-compact is-editable">
+                    <caption class="cl-visually-hidden" th:text="#{order.item.split.group.components}"></caption>
+                    <thead><tr>
+                        <th scope="col" th:text="#{order.item.quantity}"></th>
+                        <th scope="col" th:text="#{order.item.sku}"></th>
+                        <th scope="col" th:text="#{order.item.name}"></th>
+                        <th scope="col" th:text="#{order.item.unit.price}"></th>
+                        <th scope="col" class="is-numeric" th:text="#{general.value}"></th>
+                        <th scope="col"><span class="cl-visually-hidden" th:text="#{order.items.column.actions}"></span></th>
+                    </tr></thead>
+                    <tbody data-cl-split-rows
+                           th:attr="data-qty-hint=#{order.item.split.group.qty.hint}, data-qty-warning=#{order.item.split.group.qty.warning},
+                                    data-remove=#{order.item.split.group.remove}, data-remove-label=#{order.item.split.group.remove.label}"></tbody>
+                </table>
+                <p class="cl-card-actions">
+                    <button type="button" class="cl-link-button" data-cl-split-add th:text="#{order.item.split.group.add}"></button>
+                    <button type="button" class="cl-link-button" data-cl-split-distribute th:text="#{order.item.split.group.distribute}"></button>
+                </p>
+                <div class="cl-alert is-ok" data-cl-split-bar role="status">
+                    <p class="cl-alert-text">
+                        <span th:text="#{general.value}"></span> <strong data-cl-split-total></strong> ·
+                        <span th:text="#{order.item.split.group.allocated}"></span> <strong data-cl-split-allocated></strong> ·
+                        <span th:text="#{order.item.split.group.difference}"></span> <strong data-cl-split-difference></strong>
+                    </p>
+                </div>
+                <p class="cl-help" th:text="#{order.item.split.group.help}"></p>
+            </div>
+            <div class="cl-dialog-actions">
+                <button type="submit" class="cl-button is-primary" data-cl-split-submit th:text="#{order.item.split.group.submit}"></button>
+                <button type="button" class="cl-button" data-cl-dialog-close th:text="#{general.cancel}"></button>
+            </div>
+        </form>
+        <script th:inline="javascript">
+            window.CL_SPLIT_PREVIEWS = /*[[${items.splitPreviews()}]]*/ {};
+        </script>
+    </dialog>
+
+    <dialog th:if="${items.canAddSerials()}" class="cl-dialog is-form is-wide" id="serials-dialog" aria-labelledby="serials-title">
+        <form method="post" th:action="@{/dashboard/orders/{o}/updateSerialNumbers(o=${page.orderId()})}" data-cl-serials>
+            <h2 class="cl-dialog-title" id="serials-title" th:text="#{order.update.serial.no}"></h2>
+            <div class="cl-dialog-body">
+                <table class="cl-table is-compact is-editable">
+                    <caption class="cl-visually-hidden" th:text="#{order.update.serial.no}"></caption>
+                    <thead><tr>
+                        <th scope="col" th:text="#{order.item.name}"></th>
+                        <th scope="col" th:text="#{general.manufacturer.code}"></th>
+                        <th scope="col" class="is-numeric" th:text="#{order.item.quantity}"></th>
+                        <th scope="col" th:text="#{order.item.serial.no}"></th>
+                    </tr></thead>
+                    <tbody>
+                    <tr th:each="item, i : ${items.serialItems()}">
+                        <th scope="row" class="cl-table-key" th:text="${item.name}"></th>
+                        <td th:text="${item.mfn}"></td>
+                        <td class="is-numeric" th:text="${item.qty}"></td>
+                        <td>
+                            <input class="cl-input" type="text" th:name="|orderItems[${i.index}].serialNo|" th:value="${item.serialNo}"
+                                   th:attr="aria-label=#{order.items.serial.for(${item.name})}">
+                            <input type="hidden" th:name="|orderItems[${i.index}].itemId|" th:value="${item.itemId}">
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="cl-dialog-actions">
+                <button type="submit" class="cl-button is-primary" th:text="#{general.save}"></button>
+                <button type="button" class="cl-button" data-cl-dialog-close th:text="#{general.cancel}"></button>
+            </div>
+        </form>
+    </dialog>
+
+    <!--/* No form of its own: the field and the button belong to form#order-items-form (the checked rows). */-->
+    <dialog class="cl-dialog is-form" id="move-dialog" aria-labelledby="move-title"
+            th:attr="data-url=@{/dashboard/orders/{o}/move-target(o=${page.orderId()})}, data-not-found=#{order.move.not.found},
+                     data-effect=#{order.move.effect}, data-items=#{order.move.preview.items}, data-client=#{order.move.preview.client},
+                     data-amount=#{order.move.preview.amount}, data-title=#{order.page.title}">
+        <h2 class="cl-dialog-title" id="move-title" th:text="#{order.bulk.move.confirm.title}"></h2>
+        <div class="cl-dialog-body">
+            <div class="cl-field">
+                <label class="cl-label" for="move-target" th:text="#{order.move.target}"></label>
+                <!--/* Starts disabled so it is not a successful control of #order-items-form until the script that
+                       can open this dialog runs; items.html's <noscript> fallback is the only targetOrderId field a
+                       browser without JavaScript ever submits, so exactly one reaches the server either way. */-->
+                <input class="cl-input" id="move-target" name="targetOrderId" type="text" form="order-items-form" autocomplete="off"
+                       aria-describedby="move-target-help" data-cl-move-target disabled>
+                <p class="cl-help" id="move-target-help" th:text="#{order.move.help}"></p>
+            </div>
+            <div data-cl-move-preview aria-live="polite"></div>
+        </div>
+        <div class="cl-dialog-actions">
+            <button type="submit" class="cl-button is-primary" form="order-items-form" data-cl-move-submit disabled
+                    th:formaction="@{/dashboard/orders/{o}/moveItemsToOrder(o=${page.orderId()})}"
+                    th:text="#{order.bulk.move.confirm.action}"></button>
+            <button type="button" class="cl-button" data-cl-dialog-close th:text="#{general.cancel}"></button>
+        </div>
+    </dialog>
+</th:block>
+
+<!--/* The item a dialog works on, filled by the script from the menu entry's data attributes. */-->
+<dl th:fragment="context" class="cl-kv" data-cl-item-context>
+    <div><dt th:text="#{order.item.assign.sku.item}"></dt><dd data-field="name"></dd></div>
+    <div><dt th:text="#{order.item.category}"></dt><dd data-field="category"></dd></div>
+    <div><dt th:text="#{order.item.quantity}"></dt><dd class="is-numeric" data-field="qty"></dd></div>
+    <div><dt th:text="#{order.item.unit.price}"></dt><dd class="is-numeric" data-field="price"></dd></div>
+    <div><dt th:text="#{general.value}"></dt><dd class="is-numeric" data-field="total"></dd></div>
+</dl>
+
+<!--/* Saved without reloading: 422 comes back with supplierError, 200 with supplierRedirect (async-form.js follows it). */-->
+<form th:fragment="supplierForm" id="assign-supplier-form" method="post" data-cl-async data-cl-assign-supplier
+      th:action="@{/dashboard/orders/{o}/assign-supplier(o=${orderId})}"
+      th:attr="data-cl-redirect=${supplierRedirect}, data-error-message=#{form.save.failed}">
+    <h2 class="cl-dialog-title" id="assign-supplier-title" th:text="#{order.item.menu.assign.supplier}"></h2>
+    <div class="cl-dialog-body">
+        <div th:if="${supplierError != null}" class="cl-alert is-bad" tabindex="-1" data-cl-error-summary>
+            <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
+            <p class="cl-alert-title" th:text="${supplierError}"></p>
+        </div>
+        <input type="hidden" name="itemId" data-cl-item-id th:value="${supplierForm?.itemId}">
+        <div class="cl-form-grid">
+            <div class="cl-span-6 cl-field">
+                <label class="cl-label" for="assign-supplier-mfn" th:text="#{general.manufacturer.code}"></label>
+                <input class="cl-input" id="assign-supplier-mfn" name="manufacturerCode" type="text" required autocomplete="off"
+                       th:value="${supplierForm?.manufacturerCode}" th:placeholder="#{inventory.product.code.placeholder}">
+                <ul class="cl-chip-list" data-cl-mfn-options></ul>
+            </div>
+            <div class="cl-span-6 cl-field">
+                <label class="cl-label" for="assign-supplier-cost" th:text="#{order.item.price.purchase}"></label>
+                <div class="cl-input-row">
+                    <input class="cl-input" id="assign-supplier-cost" name="cost" type="text" inputmode="decimal" required
+                           th:value="${supplierForm?.cost}" aria-describedby="assign-supplier-cost-hint">
+                    <div class="cl-segmented" role="group" data-cl-cost-type th:attr="aria-label=#{order.item.price.type}">
+                        <button type="button" class="cl-segment" data-value="net"
+                                th:attr="aria-pressed=${supplierForm == null or !supplierForm.gross}" th:text="#{order.item.price.type.net}"></button>
+                        <button type="button" class="cl-segment" data-value="gross"
+                                th:attr="aria-pressed=${supplierForm != null and supplierForm.gross}" th:text="#{order.item.price.type.gross}"></button>
+                    </div>
+                </div>
+                <input type="hidden" name="priceType" th:value="${supplierForm != null} ? ${supplierForm.priceType} : 'net'">
+                <p class="cl-help" id="assign-supplier-cost-hint" data-cl-cost-hint
+                   th:attr="data-template-net=#{order.item.price.net.hint}, data-template-gross=#{order.item.price.gross.hint}"></p>
+            </div>
+            <!--/* th:insert (not th:replace) keeps this div's cl-span-6 grid-column class; th:replace would
+                   discard the host tag and drop the span. */-->
+            <div class="cl-span-6" th:insert="~{fragments/supplier-choice :: clField('assign-supplier-choice', ${suppliers},
+                    ${supplierForm?.supplier}, ${supplierForm?.customSupplier})}"></div>
+        </div>
+    </div>
+    <div class="cl-dialog-actions">
+        <button type="submit" class="cl-button is-primary" th:text="#{general.save}"></button>
+        <button type="button" class="cl-button" data-cl-dialog-close th:text="#{general.cancel}"></button>
+    </div>
+</form>
+</body>
+</html>

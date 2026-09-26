@@ -5844,11 +5844,13 @@ a.cl-link-button:hover {
 
 .cl-page .cl-card.is-collapsible .cl-collapse-body:not([hidden]) {
     border-top: 1px solid var(--cl-line);
+}
 
 @media (prefers-reduced-motion: reduce) {
     .cl-page .cl-copy-inline .cl-copy-icon {
         transition: none;
     }
+}
 
 /* --- Orders redesign: helpers that replace the mockups' inline styles --- */
 

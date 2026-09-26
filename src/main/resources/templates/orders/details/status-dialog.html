@@ -1,0 +1,41 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<dialog th:fragment="dialog" class="cl-dialog is-form" id="status-dialog" aria-labelledby="status-dialog-title">
+    <th:block th:replace="~{orders/details/status-dialog :: dialogForm}"></th:block>
+</dialog>
+
+<form th:fragment="dialogForm" th:replace="~{orders/details/status-dialog :: statusForm(true)}"></form>
+<form th:fragment="pageForm" th:replace="~{orders/details/status-dialog :: statusForm(false)}"></form>
+
+<!--/* The status choice (decision 4): the manual statuses with the sentence of their effect, the current one marked. */-->
+<form th:fragment="statusForm(inDialog)" method="post" th:action="@{/dashboard/orders/{o}/status(o=${orderId})}"
+      th:with="options=${statusOptions}">
+    <h2 th:if="${inDialog}" class="cl-dialog-title" id="status-dialog-title" th:text="#{order.status.dialog.title(${shortId})}"></h2>
+    <div th:class="${inDialog} ? 'cl-dialog-body' : 'cl-card-inset'">
+        <p th:if="${options.emailNote() or options.marketplaceName() != null}" class="cl-dialog-effect">
+            <span th:if="${options.emailNote()}" th:text="#{order.status.dialog.email}"></span>
+            <span th:if="${options.marketplaceName() != null}" th:text="#{order.status.dialog.marketplace(${options.marketplaceName()})}"></span>
+        </p>
+        <fieldset class="cl-choice-group">
+            <legend class="cl-visually-hidden" th:text="#{order.status.dialog.legend}"></legend>
+            <label class="cl-choice" th:each="option : ${options.options()}">
+                <input type="radio" name="status" th:value="${option.status().name()}" th:checked="${option.current()}"
+                       th:disabled="${option.disabled()}">
+                <span class="cl-choice-text">
+                    <span class="cl-choice-title"
+                          th:text="${option.current()} ? #{order.status.dialog.current(${#messages.msg(option.labelKey())})} : #{${option.labelKey()}}"></span>
+                    <span class="cl-choice-description"
+                          th:text="${option.disabled()} ? #{${option.reasonKey()}} : #{${option.effectKey()}}"></span>
+                </span>
+            </label>
+        </fieldset>
+    </div>
+    <div th:class="${inDialog} ? 'cl-dialog-actions' : 'cl-card-footer'">
+        <button type="submit" class="cl-button is-primary" th:text="#{order.page.status.change}"></button>
+        <button th:if="${inDialog}" type="button" class="cl-button" data-cl-dialog-close th:text="#{general.cancel}"></button>
+        <a th:unless="${inDialog}" class="cl-button" th:href="@{/dashboard/orders/{o}(o=${orderId})}" th:text="#{general.cancel}"></a>
+    </div>
+</form>
+</body>
+</html>

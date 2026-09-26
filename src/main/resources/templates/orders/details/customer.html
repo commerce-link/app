@@ -1,0 +1,42 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--/* Billing and shipping address blocks. The shipping condition sits on a th:block wrapper around the
+       th:replace, because th:unless and th:replace on the same element discard the condition. */-->
+<section th:fragment="card" class="cl-card" aria-labelledby="customer-title" data-order="3" th:with="c=${page.customer()}">
+    <div class="cl-card-head"><h2 class="cl-card-title" id="customer-title" th:text="#{order.card.customer}"></h2></div>
+    <div class="cl-address">
+        <div class="cl-address-head">
+            <span th:text="#{order.customer.billing}"></span>
+            <a th:if="${c.billingEditHref() != null}" class="cl-link-button" th:href="@{${c.billingEditHref()}}"
+               th:attr="aria-label=#{order.customer.billing.edit}" th:text="#{general.edit}"></a>
+        </div>
+        <th:block th:replace="~{orders/details/customer :: address(${c.billing()})}"></th:block>
+        <p th:if="${c.billingLockedKey() != null}" class="cl-help" th:text="#{${c.billingLockedKey()}}"></p>
+    </div>
+    <div class="cl-address">
+        <div class="cl-address-head">
+            <span th:text="${c.shipmentTypeKey() != null} ? #{order.customer.shipping(${#messages.msg(c.shipmentTypeKey())})} : #{order.customer.shipping.plain}"></span>
+            <a th:if="${c.shippingEditHref() != null}" class="cl-link-button" th:href="@{${c.shippingEditHref()}}"
+               th:attr="aria-label=#{order.customer.shipping.edit}" th:text="#{general.edit}"></a>
+        </div>
+        <span th:if="${c.shippingSameAsBilling()}" th:text="#{order.customer.shipping.same}"></span>
+        <th:block th:unless="${c.shippingSameAsBilling()}">
+            <th:block th:replace="~{orders/details/customer :: address(${c.shipping()})}"></th:block>
+        </th:block>
+        <th:block th:if="${c.pickupPoint() != null}"><br><span th:text="#{order.customer.pickup.point(${c.pickupPoint()})}"></span></th:block>
+        <p th:if="${c.shippingLockedKey() != null}" class="cl-help" th:text="#{${c.shippingLockedKey()}}"></p>
+    </div>
+</section>
+
+<th:block th:fragment="address(block)">
+    <th:block th:if="${block.name() != null}"><strong th:text="${block.name()}"></strong><br></th:block>
+    <th:block th:if="${block.company() != null}"><span th:text="${block.company()}"></span><br></th:block>
+    <th:block th:if="${block.taxId() != null}"><span th:text="#{order.customer.tax.id(${block.taxId()})}"></span><br></th:block>
+    <th:block th:if="${block.street() != null}"><span th:text="${block.street()}"></span><br></th:block>
+    <th:block th:if="${block.cityLine() != null}"><span th:text="${block.country() != null} ? ${block.cityLine() + ', ' + block.country()} : ${block.cityLine()}"></span><br></th:block>
+    <th:block th:if="${block.email() != null}"><a th:href="'mailto:' + ${block.email()}" th:text="${block.email()}"></a><br></th:block>
+    <a th:if="${block.phone() != null}" th:href="'tel:' + ${block.phone()}" th:text="${block.phone()}"></a>
+</th:block>
+</body>
+</html>

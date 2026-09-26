@@ -111,16 +111,6 @@ class DropshipTemplateTest {
     }
 
     @Test
-    void orderDetailsNoLongerCarriesTheDropshipAction() throws Exception {
-        // when
-        String html = read("orderDetails.html");
-
-        // then
-        assertThat(html).doesNotContain("order.action.dropship");
-        assertThat(html).doesNotContain("dropshipProvider");
-    }
-
-    @Test
     void deliveryScreensCarryTheDropshipBadge() throws Exception {
         // when / then
         assertThat(read("deliveryDetails.html")).contains("deliveries.dropship.badge");
@@ -309,59 +299,6 @@ class DropshipTemplateTest {
     }
 
     @Test
-    void orderDetailsResolvesTheDeliveryLinkWithTheOrder() throws Exception {
-        // when
-        String html = read("orderDetails.html");
-
-        // then
-        assertThat(html).contains("@{${@deliveryRedirectResolver.resolveFor(order, item)}}");
-    }
-
-    @Test
-    void orderDetailsGreysOutWarehouseMovesWhenItemsSitInADropshipDelivery() throws Exception {
-        // when
-        String html = read("orderDetails.html");
-        String pl = Files.readString(Path.of("src/main/resources/messages_pl.properties"), StandardCharsets.UTF_8);
-        String en = Files.readString(Path.of("src/main/resources/messages_en.properties"), StandardCharsets.UTF_8);
-
-        // then
-        assertThat(html).contains("value=\"moveSelectedItemsToTheWarehouse\" th:disabled=\"${hasDropshipItems}\"");
-        assertThat(html).contains("value=\"moveSelectedItemsToTheWarehouseForRMA\" th:disabled=\"${hasDropshipItems}\"");
-        assertThat(html).contains("order.items.action.move.warehouse.dropship");
-        assertThat(pl).contains("order.items.action.move.warehouse.dropship=");
-        assertThat(pl).contains("order.items.action.move.warehouse.dropship.error=");
-        assertThat(en).contains("order.items.action.move.warehouse.dropship=");
-        assertThat(en).contains("order.items.action.move.warehouse.dropship.error=");
-        assertThat(html).contains("value=\"moveSelectedItemsToAllocation\" th:disabled=\"${hasDropshipItems}\"");
-        assertThat(html).contains("value=\"removeSelectedItemsFromOrder\" th:disabled=\"${hasDropshipItems}\"");
-        assertThat(html).contains("order.items.action.dropship.locked");
-        assertThat(pl).contains("order.items.action.dropship.locked=");
-        assertThat(en).contains("order.items.action.dropship.locked=");
-    }
-
-    @Test
-    void orderDetailsDisablesTheActionControlWhenNoItemActionIsAvailable() throws Exception {
-        // when
-        String html = read("orderDetails.html");
-
-        // then
-        assertThat(html).contains(
-                "<select id=\"action-select\" th:disabled=\"${isCompletedOrder or hasWarehouseDocument or !hasAvailableItemActions}\">");
-        assertThat(html).contains(
-                "th:disabled=\"${isCompletedOrder or hasWarehouseDocument or !hasAvailableItemActions}\" onclick=\"executeOrderItemsAction(this)\"");
-    }
-
-    @Test
-    void orderDetailsDisablesAddingItemsWhenItemsSitInADropshipDelivery() throws Exception {
-        // when
-        String html = read("orderDetails.html");
-
-        // then
-        assertThat(html).contains(
-                "th:disabled=\"${isCompletedOrder or hasWarehouseDocument or isInvoiced or hasDropshipItems}\" th:title=\"${hasDropshipItems} ? #{order.items.action.dropship.locked} : ''\" onclick=\"toggleOrderItemModal(true)\"");
-    }
-
-    @Test
     void deliveryDetailsHideTheOrderedQuantityPencilForDropshipDeliveries() throws Exception {
         // when
         String html = read("deliveryDetails.html");
@@ -467,18 +404,6 @@ class DropshipTemplateTest {
         int refreshStart = script.indexOf("function refreshSubmitState()");
         int refreshEnd = script.indexOf("}", refreshStart);
         assertThat(script.substring(refreshStart, refreshEnd)).contains("orderOptionsComplete()");
-    }
-
-    @Test
-    void orderDetailsHidesTheGoodsIssueActionForOrdersWithoutWarehouseItems() throws Exception {
-        // when
-        String html = read("orderDetails.html");
-
-        // then
-        // th:if on the goods-issue form: only rendered when there are warehouse items to issue
-        assertThat(html).contains("${hasWarehouseDocumentsEnabled and hasWarehouseItems and !hasWarehouseDocument}");
-        // th:disabled on the dropdown trigger: the same clause, negated, inside the compound condition
-        assertThat(html).contains("!(hasWarehouseDocumentsEnabled and hasWarehouseItems and !hasWarehouseDocument))}");
     }
 
     @Test

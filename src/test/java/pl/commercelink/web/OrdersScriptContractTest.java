@@ -234,4 +234,23 @@ class OrdersScriptContractTest {
         String aside = rule(css, ".cl-page .cl-layout-aside");
         assertThat(aside).contains("320px").doesNotContain("340px");
     }
+
+    @Test
+    void everyCssBlockIsClosedSoNoLaterRuleEndsUpInsideAMediaQuery() throws Exception {
+        // given: two missing braces once swallowed every later rule (the closing strip, the side layout) into a
+        // prefers-reduced-motion block, so the browser ignored them on ordinary screens
+        String css = css().replaceAll("(?s)/\\*.*?\\*/", "");
+
+        // when
+        int depth = 0;
+        int minimum = 0;
+        for (char c : css.toCharArray()) {
+            depth += c == '{' ? 1 : c == '}' ? -1 : 0;
+            minimum = Math.min(minimum, depth);
+        }
+
+        // then
+        assertThat(depth).isZero();
+        assertThat(minimum).isZero();
+    }
 }

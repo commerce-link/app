@@ -55,3 +55,17 @@
         }
     }, true);
 })();
+
+document.addEventListener('cl:form-replaced', (e) => {
+  const form = e.target;
+  if (!(form instanceof HTMLFormElement) || form.dataset.clDialogCloseOnSuccess !== 'true') return;
+  if (form.querySelector('[data-cl-error-summary]')) return;
+  const dialog = form.closest('dialog');
+  if (dialog && dialog.open) {
+    dialog.close();
+    // the read-only card shows the saved values only after a reload; the toast already said "Zapisano"
+    const card = document.getElementById('settings-body');
+    if (card) card.setAttribute('aria-busy', 'true');
+    window.location.reload();
+  }
+});

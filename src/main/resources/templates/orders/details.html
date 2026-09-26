@@ -1,0 +1,73 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+<div layout:fragment="content">
+    <section class="cl-page">
+        <div class="cl-page-body is-wide">
+            <div th:replace="~{orders/details/header :: header}"></div>
+            <div th:if="${page.superAdmin()}" class="cl-alert is-info" role="status">
+                <i class="fas fa-info-circle cl-alert-icon" aria-hidden="true"></i>
+                <p class="cl-alert-text" th:text="#{order.page.readonly(${page.storeName()})}"></p>
+            </div>
+            <div th:replace="~{orders/parts :: notice}"></div>
+            <section th:replace="~{orders/details/closing :: strip}"></section>
+
+            <div class="cl-layout-aside">
+                <div class="cl-layout-main">
+                    <section th:replace="~{orders/details/items :: card}"></section>
+                    <section th:replace="~{orders/details/shipments :: card}"></section>
+                    <section th:replace="~{orders/details/documents :: card}"></section>
+                    <section th:replace="~{orders/details/payments :: card}"></section>
+                </div>
+                <div class="cl-layout-side">
+                    <section th:replace="~{orders/details/customer :: card}"></section>
+                    <section th:replace="~{orders/details/settings :: card}"></section>
+                    <section th:replace="~{orders/details/finances :: card}"></section>
+                    <section th:replace="~{orders/details/history :: card}"></section>
+                </div>
+            </div>
+
+            <th:block th:unless="${page.superAdmin()}">
+                <dialog th:replace="~{fragments/confirm-dialog :: dialog}"></dialog>
+                <th:block th:unless="${page.readOnly()}">
+                    <th:block th:with="statusOptions=${page.statusOptions()}, orderId=${page.orderId()}, shortId=${page.shortId()}">
+                        <dialog th:replace="~{orders/details/status-dialog :: dialog}"></dialog>
+                        <dialog th:replace="~{orders/details/settings :: dialog}"></dialog>
+                    </th:block>
+                    <th:block th:replace="~{orders/details/item-dialogs :: dialogs}"></th:block>
+                    <th:block th:with="catalogs=${page.items().catalogs()}">
+                        <div th:replace="~{fragments/item-add-modal :: itemAddModal(${page.orderId()}, '/dashboard/orders')}"></div>
+                    </th:block>
+                    <dialog th:replace="~{orders/details/shipments :: dialog}"></dialog>
+                    <th:block th:if="${page.documents().canAdd()}"><dialog th:replace="~{orders/details/documents :: documentDialog}"></dialog></th:block>
+                    <th:block th:if="${!page.documents().issuable().isEmpty()}"><dialog th:replace="~{orders/details/documents :: issueDialog}"></dialog></th:block>
+                    <dialog th:replace="~{orders/details/history :: reviewDialog}"></dialog>
+                    <div th:replace="~{fragments/add-payment-modal :: addPaymentModal(
+                            formAction=@{/dashboard/orders/{o}/addPayment(o=${page.orderId()})},
+                            expectedAmount=${page.payments().expected()},
+                            pendingPayment=${page.payments().pending()},
+                            paymentSources=${page.payments().sources()},
+                            loadMoneyJs=false)}"></div>
+                    <th:block th:if="${page.payments().canEdit()}"><dialog th:replace="~{orders/details/payments :: editDialog}"></dialog></th:block>
+                </th:block>
+            </th:block>
+        </div>
+    </section>
+    <script th:src="@{/js/menu.js}" defer></script>
+    <script th:src="@{/js/dialog.js}" defer></script>
+    <script th:src="@{/js/collapse.js}" defer></script>
+    <script th:src="@{/js/copy-field.js}" defer></script>
+    <script th:src="@{/js/confirm-dialog.js}" defer></script>
+    <script th:src="@{/js/async-form.js}" defer></script>
+    <script th:src="@{/js/table-select.js}" defer></script>
+    <script th:src="@{/js/order-items.js}" defer></script>
+    <script th:src="@{/js/supplier-choice.js}" defer></script>
+    <script th:src="@{/js/order-item-dialogs.js}" defer></script>
+    <script th:src="@{/js/order-shipments.js}" defer></script>
+    <script th:src="@{/js/order-documents.js}" defer></script>
+    <script th:src="@{/js/order-payments.js}" defer></script>
+</div>
+</body>
+</html>

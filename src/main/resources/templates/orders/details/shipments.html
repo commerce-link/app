@@ -1,0 +1,145 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--/* Shipment rows, courier cancellation and the shipments dialog trigger. */-->
+<section th:fragment="card" class="cl-card" id="przesylki" aria-labelledby="shipments-title" data-order="4"
+         th:with="shipments=${page.shipments()}">
+    <div class="cl-card-head">
+        <h2 class="cl-card-title" id="shipments-title" th:text="#{order.card.shipments}"></h2>
+        <div class="cl-card-actions" th:unless="${page.readOnly()}">
+            <a th:if="${shipments.canCancelCourier()}" class="cl-link-button is-danger" data-cl-confirm
+               th:href="@{/dashboard/orders/{o}/cancelShipment(o=${page.orderId()})}"
+               th:attr="data-cl-confirm-title=#{order.shipments.cancel.confirm.title},
+                        data-cl-confirm-message=#{order.shipments.cancel.confirm.message},
+                        data-cl-confirm-action=#{order.shipments.cancel.confirm.action}"
+               th:text="#{order.shipments.cancel}"></a>
+            <button type="button" class="cl-button" data-cl-dialog-open="shipments-dialog" th:disabled="${!shipments.canEdit()}"
+                    th:text="#{order.shipments.edit}"></button>
+        </div>
+    </div>
+    <ul class="cl-list" th:if="${!shipments.rows().isEmpty()}">
+        <li class="cl-list-item" th:each="s : ${shipments.rows()}">
+            <div>
+                <p class="cl-list-title">
+                    <span th:text="#{${s.typeKey()}}"></span>
+                    <span th:if="${s.carrier() != null}" th:text="' · ' + ${s.carrier()}"></span>
+                    <span th:if="${s.trackingKey() != null}" class="cl-status is-info" th:text="#{${s.trackingKey()}}"></span>
+                </p>
+                <p class="cl-list-desc">
+                    <th:block th:if="${s.trackingNo() != null}">
+                        <span th:text="#{order.shipments.tracking}"></span>
+                        <a th:if="${s.trackingUrl() != null}" th:href="${s.trackingUrl()}" target="_blank" rel="noopener"
+                           th:text="${s.trackingNo()}"></a>
+                        <span th:unless="${s.trackingUrl() != null}" th:text="${s.trackingNo()}"></span>
+                        <span> · </span>
+                    </th:block>
+                    <th:block th:if="${s.pickupPoint() != null}"><span th:text="#{order.shipments.pickup(${s.pickupPoint()})}"></span><span> · </span></th:block>
+                    <span th:if="${s.shippedAt() != null}" th:text="#{order.shipments.shipped(${s.shippedAt()})}"></span>
+                    <span th:if="${s.deliveredAt() != null}" th:text="' · ' + #{order.shipments.delivered(${s.deliveredAt()})}"></span>
+                    <span th:if="${s.shippedAt() != null and s.deliveredAt() == null}" th:text="' · ' + #{order.shipments.in.transit}"></span>
+                    <span th:if="${s.shippedAt() == null}" th:text="#{order.shipments.waiting}"></span>
+                </p>
+            </div>
+        </li>
+    </ul>
+    <p th:if="${shipments.rows().isEmpty()}" class="cl-list-empty" th:text="#{order.shipments.empty}"></p>
+</section>
+
+<dialog th:fragment="dialog" class="cl-dialog is-form is-wide" id="shipments-dialog" aria-labelledby="shipments-dialog-title"
+        th:with="shipments=${page.shipments()}">
+    <form method="post" th:action="@{/dashboard/orders/{o}/updateShipments(o=${page.orderId()})}" data-cl-shipments-form>
+        <h2 class="cl-dialog-title" id="shipments-dialog-title" th:text="#{order.card.shipments}"></h2>
+        <div class="cl-dialog-body">
+            <table class="cl-table is-compact is-editable">
+                <caption class="cl-visually-hidden" th:text="#{order.card.shipments}"></caption>
+                <thead><tr>
+                    <th scope="col" th:text="#{order.shipment.type}"></th>
+                    <th scope="col" th:text="#{order.shipment.carrier}"></th>
+                    <th scope="col" th:text="#{order.shipment.tracking.no}"></th>
+                    <th scope="col" th:text="#{order.collection.point}"></th>
+                    <th scope="col" th:text="#{order.shipment.tracking.url}"></th>
+                    <th scope="col" th:text="#{order.shipments.dialog.shipped}"></th>
+                    <th scope="col" th:text="#{order.shipments.dialog.delivered}"></th>
+                    <th scope="col"><span class="cl-visually-hidden" th:text="#{order.items.column.actions}"></span></th>
+                </tr></thead>
+                <tbody data-cl-shipment-rows>
+                <tr th:each="s, i : ${shipments.editable()}" th:with="known=${s.carrier == null or shipments.carriers().contains(s.carrier)}">
+                    <td th:attr="data-label=#{order.shipment.type}">
+                        <select class="cl-select" th:name="|shipments[${i.index}].type|" th:attr="aria-label=#{order.shipments.dialog.type(${i.count})}">
+                            <option th:each="type : ${shipments.types()}" th:value="${type.value().name()}" th:selected="${type.value() == s.type}"
+                                    th:text="#{${type.labelKey()}}"></option>
+                        </select>
+                    </td>
+                    <td th:attr="data-label=#{order.shipment.carrier}">
+                        <select th:if="${!shipments.carriers().isEmpty()}" class="cl-select" data-cl-carrier-select hidden
+                                th:attr="aria-label=#{order.shipments.dialog.carrier(${i.count})}">
+                            <option value=""></option>
+                            <option th:each="carrier : ${shipments.carriers()}" th:value="${carrier}" th:selected="${carrier == s.carrier}" th:text="${carrier}"></option>
+                            <option value="__other__" th:selected="${!known}" th:text="#{order.shipments.dialog.carrier.other}"></option>
+                        </select>
+                        <input class="cl-input" type="text" data-cl-carrier-input th:name="|shipments[${i.index}].carrier|" th:value="${s.carrier}"
+                               th:attr="aria-label=#{order.shipments.dialog.carrier.name(${i.count})}">
+                    </td>
+                    <td th:attr="data-label=#{order.shipment.tracking.no}">
+                        <input class="cl-input" type="text" th:name="|shipments[${i.index}].trackingNo|" th:value="${s.trackingNo}"
+                               th:attr="aria-label=#{order.shipments.dialog.tracking(${i.count})}">
+                    </td>
+                    <td th:attr="data-label=#{order.collection.point}">
+                        <input class="cl-input" type="text" th:name="|shipments[${i.index}].collectionPointCode|" th:value="${s.collectionPointCode}"
+                               th:attr="aria-label=#{order.shipments.dialog.point(${i.count})}">
+                    </td>
+                    <td th:attr="data-label=#{order.shipment.tracking.url}">
+                        <input class="cl-input" type="url" th:name="|shipments[${i.index}].trackingUrl|" th:value="${s.trackingUrl}"
+                               th:attr="aria-label=#{order.shipments.dialog.url(${i.count})}">
+                    </td>
+                    <td th:attr="data-label=#{order.shipments.dialog.shipped}">
+                        <input class="cl-input" type="datetime-local" th:name="|shipments[${i.index}].shippedAt|"
+                               th:value="${s.shippedAt != null} ? ${#temporals.format(s.shippedAt, 'yyyy-MM-dd''T''HH:mm')} : ''"
+                               th:attr="aria-label=#{order.shipments.dialog.shipped.row(${i.count})}">
+                    </td>
+                    <td th:attr="data-label=#{order.shipments.dialog.delivered}">
+                        <input class="cl-input" type="datetime-local" th:name="|shipments[${i.index}].deliveredAt|"
+                               th:value="${s.deliveredAt != null} ? ${#temporals.format(s.deliveredAt, 'yyyy-MM-dd''T''HH:mm')} : ''"
+                               th:attr="aria-label=#{order.shipments.dialog.delivered.row(${i.count})}">
+                    </td>
+                    <td class="cl-table-actions">
+                        <button type="button" class="cl-link-button is-danger" data-cl-shipment-remove th:text="#{general.delete}"></button>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+            <template data-cl-shipment-template>
+                <tr>
+                    <td><select class="cl-select" name="shipments[0].type">
+                        <option th:each="type : ${shipments.types()}" th:value="${type.value().name()}" th:text="#{${type.labelKey()}}"></option>
+                    </select></td>
+                    <td>
+                        <select th:if="${!shipments.carriers().isEmpty()}" class="cl-select" data-cl-carrier-select>
+                            <option value=""></option>
+                            <option th:each="carrier : ${shipments.carriers()}" th:value="${carrier}" th:text="${carrier}"></option>
+                            <option value="__other__" th:text="#{order.shipments.dialog.carrier.other}"></option>
+                        </select>
+                        <input class="cl-input" type="text" data-cl-carrier-input name="shipments[0].carrier">
+                    </td>
+                    <td><input class="cl-input" type="text" name="shipments[0].trackingNo"></td>
+                    <td><input class="cl-input" type="text" name="shipments[0].collectionPointCode"></td>
+                    <td><input class="cl-input" type="url" name="shipments[0].trackingUrl"></td>
+                    <td><input class="cl-input" type="datetime-local" name="shipments[0].shippedAt"></td>
+                    <td><input class="cl-input" type="datetime-local" name="shipments[0].deliveredAt"></td>
+                    <td class="cl-table-actions"><button type="button" class="cl-link-button is-danger" data-cl-shipment-remove th:text="#{general.delete}"></button></td>
+                </tr>
+            </template>
+            <p><button type="button" class="cl-link-button" data-cl-shipment-add>
+                <span class="icon is-small" aria-hidden="true"><i class="fas fa-plus"></i></span>
+                <span th:text="#{order.shipments.dialog.add}"></span>
+            </button></p>
+            <p class="cl-dialog-effect" th:text="#{order.shipments.dialog.effect}"></p>
+        </div>
+        <div class="cl-dialog-actions">
+            <button type="submit" class="cl-button is-primary" th:text="#{order.shipments.dialog.save}"></button>
+            <button type="button" class="cl-button" data-cl-dialog-close th:text="#{general.cancel}"></button>
+        </div>
+    </form>
+</dialog>
+</body>
+</html>

@@ -1,0 +1,117 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--/* Document rows, issuing and unpinning. Issuable types and the next type come as Option/key from the model. */-->
+<section th:fragment="card" class="cl-card" id="dokumenty" aria-labelledby="documents-title" data-order="5"
+         th:with="documents=${page.documents()}">
+    <div class="cl-card-head">
+        <h2 class="cl-card-title" id="documents-title" th:text="#{order.card.documents}"></h2>
+        <div class="cl-card-actions" th:unless="${page.readOnly()}">
+            <button th:if="${documents.canAdd()}" type="button" class="cl-button" data-cl-dialog-open="document-dialog"
+                    th:text="#{order.documents.add}"></button>
+            <div class="cl-menu" th:if="${documents.canIssue()}">
+                <button type="button" class="cl-button" aria-expanded="false" aria-controls="issue-menu" aria-haspopup="true">
+                    <span th:text="#{order.documents.issue}"></span>
+                    <span class="icon is-small" aria-hidden="true"><i class="fas fa-chevron-down"></i></span>
+                </button>
+                <ul class="cl-menu-list" id="issue-menu" hidden>
+                    <li th:if="${documents.goodsIssue()}">
+                        <a class="cl-menu-item" data-cl-confirm data-cl-confirm-tone="primary"
+                           th:href="@{/dashboard/orders/{o}/goods-out(o=${page.orderId()})}"
+                           th:attr="data-cl-confirm-title=#{order.documents.goods.issue.confirm.title},
+                                    data-cl-confirm-message=#{order.documents.goods.issue.confirm.message},
+                                    data-cl-confirm-action=#{order.documents.goods.issue.confirm.action}"
+                           th:text="#{order.documents.goods.issue}"></a>
+                    </li>
+                    <li th:each="type : ${documents.issuable()}">
+                        <button type="button" class="cl-menu-item" data-cl-dialog-open="issue-dialog"
+                                th:attr="data-document-type=${type.value().name()}, data-label=#{${type.labelKey()}}"
+                                th:text="#{${type.labelKey()}}"></button>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    <ul class="cl-list" th:if="${!documents.rows().isEmpty()}">
+        <li class="cl-list-item" th:each="d : ${documents.rows()}">
+            <div>
+                <p class="cl-list-title">
+                    <span th:text="#{${d.typeKey()}}"></span>
+                    <a th:if="${d.href() != null}" th:href="@{${d.href()}}" th:attr="target=${d.external()} ? '_blank' : null,
+                       rel=${d.external()} ? 'noopener' : null" th:text="${d.number()}"></a>
+                    <span th:unless="${d.href() != null}" th:text="${d.number()}"></span>
+                    <span th:if="${d.external()}" class="icon is-small" aria-hidden="true"><i class="fas fa-external-link-alt"></i></span>
+                </p>
+                <p class="cl-list-desc" th:if="${d.issuedAt() != null}" th:text="#{order.documents.issued(${d.issuedAt()})}"></p>
+            </div>
+            <div class="cl-list-actions" th:if="${d.removable()}">
+                <a class="cl-link-button is-danger" data-cl-confirm th:href="@{${d.removeHref()}}"
+                   th:attr="data-cl-confirm-title=#{order.documents.unpin.confirm.title(${d.number()})},
+                            data-cl-confirm-message=#{order.documents.unpin.confirm.message},
+                            data-cl-confirm-action=#{order.documents.unpin.confirm.action}"
+                   th:text="#{order.documents.unpin}"></a>
+            </div>
+        </li>
+    </ul>
+    <p th:if="${documents.rows().isEmpty()}" class="cl-list-empty"
+       th:text="${documents.nextTypeKey() != null} ? #{order.documents.empty.next(${#messages.msg(documents.nextTypeKey())})} : #{order.documents.empty}"></p>
+</section>
+
+<!--/* "Add document" (manual receipt/invoice) and "Issue" (invoicing-system document, with an explicit send choice). */-->
+<dialog th:fragment="documentDialog" class="cl-dialog is-form" id="document-dialog" aria-labelledby="document-dialog-title"
+        th:with="documents=${page.documents()}">
+    <form method="post" th:action="@{/dashboard/orders/{o}/addReceipt(o=${page.orderId()})}">
+        <h2 class="cl-dialog-title" id="document-dialog-title" th:text="#{order.documents.add}"></h2>
+        <div class="cl-dialog-body">
+            <div class="cl-form-grid">
+                <div class="cl-span-3 cl-field">
+                    <label class="cl-label" for="document-type" th:text="#{order.document.type}"></label>
+                    <select class="cl-select" id="document-type" name="type" required>
+                        <option th:each="type : ${documents.manualTypes()}" th:value="${type.value().name()}" th:selected="${type.value() == documents.nextType()}" th:text="#{${type.labelKey()}}"></option>
+                    </select>
+                </div>
+                <div class="cl-span-3 cl-field">
+                    <label class="cl-label" for="document-issued" th:text="#{order.document.issuedAt}"></label>
+                    <input class="cl-input" type="date" id="document-issued" name="issuedAt" required th:value="${documents.today()}">
+                </div>
+                <div class="cl-span-6 cl-field">
+                    <label class="cl-label" for="document-number" th:text="#{order.documents.number}"></label>
+                    <input class="cl-input" type="text" id="document-number" name="number" required autocomplete="off">
+                </div>
+                <div class="cl-span-6 cl-field">
+                    <label class="cl-label" for="document-link" th:text="#{order.documents.link}"></label>
+                    <input class="cl-input" type="url" id="document-link" name="link" inputmode="url" autocomplete="off"
+                           aria-describedby="document-link-help">
+                    <p class="cl-help" id="document-link-help" th:text="#{order.documents.link.help}"></p>
+                </div>
+            </div>
+        </div>
+        <div class="cl-dialog-actions">
+            <button type="submit" class="cl-button is-primary" th:text="#{order.documents.add.save}"></button>
+            <button type="button" class="cl-button" data-cl-dialog-close th:text="#{general.cancel}"></button>
+        </div>
+    </form>
+</dialog>
+
+<dialog th:fragment="issueDialog" class="cl-dialog is-form" id="issue-dialog" aria-labelledby="issue-dialog-title">
+    <form method="post" th:action="@{/dashboard/orders/{o}/invoicing(o=${page.orderId()})}">
+        <input type="hidden" name="documentType" value="">
+        <h2 class="cl-dialog-title" id="issue-dialog-title">
+            <span th:text="#{order.documents.issue.title}"></span> <span data-cl-issue-type></span>
+        </h2>
+        <div class="cl-dialog-body">
+            <p class="cl-dialog-effect" th:text="#{order.documents.issue.effect}"></p>
+            <label class="cl-check">
+                <input type="checkbox" name="send" value="true">
+                <span th:text="#{order.action.send.invoice.email}"></span>
+            </label>
+            <p class="cl-help" th:text="#{order.documents.issue.send.help}"></p>
+        </div>
+        <div class="cl-dialog-actions">
+            <button type="submit" class="cl-button is-primary" th:text="#{order.documents.issue.confirm}"></button>
+            <button type="button" class="cl-button" data-cl-dialog-close th:text="#{general.cancel}"></button>
+        </div>
+    </form>
+</dialog>
+</body>
+</html>

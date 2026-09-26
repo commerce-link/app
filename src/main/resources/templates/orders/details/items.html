@@ -1,0 +1,203 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<section th:fragment="card" class="cl-card" id="pozycje" aria-labelledby="items-title" data-order="2"
+         th:with="items=${page.items()}, menus=${!page.readOnly()}">
+    <div class="cl-card-head">
+        <h2 class="cl-card-title" id="items-title" th:text="#{order.card.items(${items.count()})}"></h2>
+        <div class="cl-card-actions" th:if="${menus}">
+            <button th:if="${items.canAddSerials()}" type="button" class="cl-link-button" data-cl-dialog-open="serials-dialog"
+                    th:text="#{order.items.serials.add}"></button>
+            <button type="button" class="cl-button" data-cl-dialog-open="item-add-dialog" th:disabled="${!items.canAddItems()}"
+                    th:attr="aria-describedby=${items.addItemsReasonKey() != null} ? 'add-items-reason' : null">
+                <span class="icon is-small" aria-hidden="true"><i class="fas fa-plus"></i></span>
+                <span th:text="#{order.items.add}"></span>
+            </button>
+        </div>
+        <p th:if="${items.addItemsReasonKey() != null}" class="cl-help" id="add-items-reason"
+           th:text="#{order.items.add.reason(${#messages.msg(items.addItemsReasonKey())})}"></p>
+    </div>
+
+    <!--/* read-only (closed order, super admin): the same block without method and action, so it never posts */-->
+    <form id="order-items-form" class="cl-card-section"
+          th:attr="method=${page.readOnly()} ? null : 'post',
+                   action=${page.readOnly()} ? null : @{/dashboard/orders/{id}/moveSelectedItemsToAllocation(id=${page.orderId()})}">
+        <th:block th:if="${items.selectable()}">
+            <p class="cl-visually-hidden" role="status" data-cl-selection-status></p>
+            <div class="cl-selection-bar" data-cl-selection-bar hidden>
+                <span class="cl-selection-count" data-cl-selection-count th:attr="data-template=#{order.bulk.selected}"></span>
+                <div class="cl-selection-actions" th:attr="data-cl-scope-template=#{order.bulk.scope}">
+                    <th:block th:each="bulk : ${items.bulkActions()}">
+                        <button th:if="${bulk.action().name() != 'MOVE'}" type="button" class="cl-button"
+                                th:classappend="${bulk.action().danger()} ? 'is-danger' : ''" th:disabled="${!bulk.available()}"
+                                th:attr="data-cl-bulk-action=@{${bulk.href()}}, data-cl-bulk-scope=${bulk.action().scope()},
+                                         data-label=#{${bulk.action().labelKey()}},
+                                         data-cl-bulk-confirm-title=#{${bulk.action().confirmTitleKey()}},
+                                         data-cl-bulk-confirm-message=#{${bulk.action().confirmMessageKey()}},
+                                         data-cl-bulk-confirm-action=#{${bulk.action().confirmActionKey()}},
+                                         title=${bulk.reasonKey() != null} ? #{${bulk.reasonKey()}} : null"
+                                th:text="#{${bulk.action().labelKey()}}"></button>
+                        <button th:if="${bulk.action().name() == 'MOVE'}" type="button" class="cl-button"
+                                data-cl-dialog-open="move-dialog" th:disabled="${!bulk.available()}"
+                                th:attr="data-cl-bulk-scope=${bulk.action().scope()}, data-label=#{${bulk.action().labelKey()}},
+                                         title=${bulk.reasonKey() != null} ? #{${bulk.reasonKey()}} : null"
+                                th:text="#{${bulk.action().labelKey()}}"></button>
+                        <span th:if="${bulk.reasonKey() != null}" class="cl-visually-hidden" th:text="#{${bulk.reasonKey()}}"></span>
+                    </th:block>
+                </div>
+                <button type="button" class="cl-link-button cl-selection-clear" data-cl-select-clear th:text="#{order.bulk.clear}"></button>
+            </div>
+        </th:block>
+
+        <table th:if="${items.count() > 0}" class="cl-table is-compact is-wrap"
+               th:attr="data-cl-select-table=${items.selectable()} ? 'true' : null">
+            <caption class="cl-visually-hidden" th:text="#{order.items.caption}"></caption>
+            <colgroup>
+                <col th:if="${items.selectable()}" class="cl-col-check">
+                <col>
+                <col class="cl-col-price">
+                <col class="cl-col-state">
+                <col th:if="${menus}" class="cl-col-menu">
+            </colgroup>
+            <thead>
+            <tr>
+                <th th:if="${items.selectable()}" scope="col" class="cl-table-check">
+                    <label class="cl-check-target"><input class="cl-check-input" type="checkbox" data-cl-select-all
+                                                          th:attr="aria-label=#{order.items.select.all}"></label>
+                </th>
+                <th scope="col" th:text="#{order.items.column.product}"></th>
+                <th scope="col" class="is-numeric" th:text="#{order.items.column.price}"></th>
+                <th scope="col" th:text="#{order.items.column.fulfilment}"></th>
+                <th th:if="${menus}" scope="col" class="cl-table-actions"><span class="cl-visually-hidden" th:text="#{order.items.column.actions}"></span></th>
+            </tr>
+            </thead>
+            <tbody>
+            <th:block th:each="row : ${items.products()}"><tr th:replace="~{orders/details/items :: row(${row})}"></tr></th:block>
+            <tr th:if="${!items.services().isEmpty()}" class="cl-table-group">
+                <th scope="rowgroup" th:colspan="${(items.selectable() ? 1 : 0) + 3 + (menus ? 1 : 0)}"
+                    th:text="#{order.items.group.services}"></th>
+            </tr>
+            <th:block th:each="row : ${items.services()}"><tr th:replace="~{orders/details/items :: row(${row})}"></tr></th:block>
+            </tbody>
+        </table>
+        <p th:if="${items.count() == 0}" class="cl-list-empty" th:text="#{order.items.empty}"></p>
+        <noscript th:if="${items.bulkAvailable()}">
+            <div class="cl-selection-actions">
+                <th:block th:each="bulk : ${items.bulkActions()}">
+                    <button th:if="${bulk.available() and bulk.action().name() != 'MOVE'}" type="submit" class="cl-button"
+                            th:formaction="@{${bulk.href()}}" th:text="#{${bulk.action().labelKey()}}"></button>
+                    <th:block th:if="${bulk.available() and bulk.action().name() == 'MOVE'}">
+                        <label class="cl-visually-hidden" for="move-target-fallback" th:text="#{order.move.target}"></label>
+                        <input class="cl-input is-code" id="move-target-fallback" name="targetOrderId" type="text"
+                               th:placeholder="#{order.move.target}">
+                        <button type="submit" class="cl-button" th:formaction="@{${bulk.href()}}"
+                                th:text="#{${bulk.action().labelKey()}}"></button>
+                    </th:block>
+                </th:block>
+            </div>
+        </noscript>
+    </form>
+    <form th:unless="${page.readOnly()}" id="consolidate-form" method="post"
+          th:action="@{/dashboard/orders/{o}/toggle-consolidation(o=${page.orderId()})}"></form>
+</section>
+
+<tr th:fragment="row(row)" th:with="menus=${!page.readOnly()}"
+    th:attr="data-ready-for-allocation=${row.readyForAllocation()}, data-allocated-product=${row.allocatedProduct()},
+             data-delivered-product=${row.deliveredProduct()}, data-movable=${row.movable()}, data-removable=${row.removable()}">
+    <td th:if="${page.items().selectable()}" class="cl-table-check">
+        <label class="cl-check-target"><input class="cl-check-input" type="checkbox" value="true" data-cl-select-row
+                                              th:name="|orderItems[${row.index()}].selected|"
+                                              th:attr="aria-label=#{order.items.select(${row.name()})}"></label>
+        <input type="hidden" th:name="|orderItems[${row.index()}].itemId|" th:value="${row.itemId()}">
+    </td>
+    <th scope="row" class="cl-table-key" th:attr="data-label=#{order.items.column.product}">
+        <span th:text="${row.name()}"></span>
+        <span class="cl-table-sub">
+            <span th:if="${row.category() != null}" th:text="${row.category()}"></span>
+            <th:block th:if="${row.mfn() != null}">
+                <span th:if="${row.category() != null}"> · </span>
+                <button type="button" class="cl-copy-inline" th:attr="data-cl-copy=${row.mfn()}, aria-label=#{order.items.copy.mfn(${row.mfn()})}">
+                    <span th:text="${row.mfn()}"></span><span class="cl-copy-icon"><span class="icon is-small" aria-hidden="true"><i class="far fa-copy"></i></span></span>
+                </button>
+            </th:block>
+            <th:block th:if="${row.sku() != null and row.sku() != row.mfn()}">
+                <span> · SKU </span>
+                <button type="button" class="cl-copy-inline"
+                        th:attr="data-cl-copy=${row.sku()}, title=${row.sku()}, aria-label=#{order.items.copy.sku(${row.sku()})}">
+                    <span th:text="${#strings.abbreviate(row.sku(), 28)}"></span><span class="cl-copy-icon"><span class="icon is-small" aria-hidden="true"><i class="far fa-copy"></i></span></span>
+                </button>
+            </th:block>
+            <th:block th:if="${row.serialNo() != null}">
+                <span> · SN </span>
+                <a th:if="${row.serialHref() != null}" class="cl-table-link" th:href="@{${row.serialHref()}}" th:text="${row.serialNo()}"></a>
+                <span th:unless="${row.serialHref() != null}" th:text="${row.serialNo()}"></span>
+                <!--/* D-09: the SN itself is easy to read but tedious to type into a search box — offer a copy button too */-->
+                <button type="button" class="cl-copy-inline" th:attr="data-cl-copy=${row.serialNo()}, aria-label=#{order.items.copy.sn(${row.serialNo()})}">
+                    <span class="cl-copy-icon"><span class="icon is-small" aria-hidden="true"><i class="far fa-copy"></i></span></span>
+                </button>
+            </th:block>
+        </span>
+        <span th:if="${row.conditionKey() != null or row.consolidated() or row.service()}" class="cl-table-pills">
+            <span th:if="${row.conditionKey() != null}" class="cl-status" th:classappend="${row.conditionTone()}" th:text="#{${row.conditionKey()}}"></span>
+            <span th:if="${row.consolidated()}" class="cl-status is-neutral" th:text="#{order.items.pill.consolidated}"></span>
+            <span th:if="${row.service()}" class="cl-status is-neutral" th:text="#{order.items.pill.service}"></span>
+        </span>
+        <span th:if="${row.comment() != null}" class="cl-table-sub" th:text="${row.comment()}"></span>
+    </th>
+    <td class="is-numeric" th:attr="data-label=#{order.items.column.price}">
+        <span th:text="#{order.items.qty.price(${row.qty()}, ${row.unitPrice()})}"></span>
+        <span th:if="${row.unitCost() != null}" class="cl-table-sub" th:text="#{order.items.cost(${row.unitCost()})}"></span>
+    </td>
+    <td th:attr="data-label=#{order.items.column.fulfilment}">
+        <span class="cl-status" th:classappend="${row.statusTone()}" th:text="#{${row.statusKey()}}"></span>
+        <span th:if="${row.deliveryLabel() != null}" class="cl-table-sub">
+            <a th:if="${row.deliveryHref() != null}" class="cl-table-link" th:href="@{${row.deliveryHref()}}" th:text="${row.deliveryLabel()}"></a>
+            <span th:unless="${row.deliveryHref() != null}" th:text="${row.deliveryLabel()}"></span>
+        </span>
+    </td>
+    <td th:if="${menus}" class="cl-table-actions">
+        <div class="cl-menu" th:if="${!row.actions().isEmpty()}">
+            <button type="button" class="cl-button is-icon" aria-expanded="false" aria-haspopup="true"
+                    th:attr="aria-controls=|item-menu-${row.index()}|, aria-label=#{order.items.menu(${row.name()})}">
+                <span class="icon is-small" aria-hidden="true"><i class="fas fa-ellipsis-h"></i></span>
+            </button>
+            <ul class="cl-menu-list" th:id="|item-menu-${row.index()}|" hidden>
+                <th:block th:each="state : ${row.actions()}">
+                    <li th:if="${state.action().name() == 'EDIT'}" class="cl-menu-sep" role="separator"></li>
+                    <li th:if="${!state.available()}">
+                        <button type="button" class="cl-menu-item" aria-disabled="true">
+                            <span th:text="#{${state.labelKey()}}"></span>
+                            <span class="cl-menu-reason"
+                                  th:text="${state.reasonArg() != null} ? #{${state.reasonKey()}(${state.reasonArg()})} : #{${state.reasonKey()}}"></span>
+                        </button>
+                    </li>
+                    <li th:if="${state.available() and state.action().dialogId() != null}">
+                        <button type="button" class="cl-menu-item"
+                                th:attr="data-cl-dialog-open=${state.action().dialogId()}, data-item-id=${row.itemId()},
+                                         data-name=${row.name()}, data-sku=${row.sku()}, data-category=${row.category()},
+                                         data-qty=${row.qty()}, data-price=${row.price()}, data-tax=${row.tax()}"
+                                th:text="#{${state.labelKey()}}"></button>
+                    </li>
+                    <li th:if="${state.available() and state.action().name() == 'CLEAR_SUPPLIER'}">
+                        <a class="cl-menu-item" data-cl-confirm
+                           th:href="@{/dashboard/orders/{o}/clear-supplier(o=${page.orderId()}, itemId=${row.itemId()})}"
+                           th:attr="data-cl-confirm-title=#{order.item.clear.confirm.title(${row.name()})},
+                                    data-cl-confirm-message=#{order.item.clear.confirm.message},
+                                    data-cl-confirm-action=#{order.item.clear.confirm.action}"
+                           th:text="#{${state.labelKey()}}"></a>
+                    </li>
+                    <li th:if="${state.available() and state.action().name() == 'CONSOLIDATE'}">
+                        <!--/* forms cannot nest: the button submits the separate form#consolidate-form, its value is the itemId */-->
+                        <button type="submit" class="cl-menu-item" form="consolidate-form" name="itemId"
+                                th:value="${row.itemId()}" th:text="#{${state.labelKey()}}"></button>
+                    </li>
+                    <li th:if="${state.action().name() == 'EDIT'}">
+                        <a class="cl-menu-item" th:href="@{${row.editHref()}}" th:text="#{${state.labelKey()}}"></a>
+                    </li>
+                </th:block>
+            </ul>
+        </div>
+    </td>
+</tr>
+</body>
+</html>

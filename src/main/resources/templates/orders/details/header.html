@@ -1,0 +1,107 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--/* Record header (spec §5.2.1): back to the list as left, h1 with the number, the status and its action, the meta
+       lines and the actions. The slots are defined inside the replaced element, so they are never rendered twice. */-->
+<div th:fragment="header"
+     th:replace="~{fragments/settings-header :: record(${page.backHref()}, #{orders.list.title},
+             #{order.page.title(${page.shortId()})}, ~{::orderStatus}, ~{::orderMeta}, ~{::orderActions})}">
+    <th:block th:fragment="orderStatus">
+        <button type="button" class="cl-copy-inline is-pinned"
+                th:attr="data-cl-copy=${page.orderId()}, aria-label=#{order.page.copy.id}, title=${page.orderId()}">
+            <span class="cl-copy-icon"><span class="icon is-small" aria-hidden="true"><i class="far fa-copy"></i></span></span>
+        </button>
+        <span class="cl-status" th:classappend="${page.header().statusTone()}" th:text="#{${page.header().statusKey()}}"></span>
+        <a th:if="${page.header().canChangeStatus()}" class="cl-link-button"
+           th:href="@{/dashboard/orders/{id}/status(id=${page.orderId()})}" data-cl-dialog-open="status-dialog"
+           th:text="#{order.page.status.change}"></a>
+        <span th:if="${page.header().completedAutomatically()}" class="cl-help" th:text="#{order.page.status.completed.note}"></span>
+    </th:block>
+
+    <th:block th:fragment="orderMeta" th:with="h=${page.header()},
+            typeLabel=${h.sourceTypeKey() != null} ? ${#messages.msg(h.sourceTypeKey())} : null">
+        <p class="cl-record-meta">
+            <span th:if="${h.clientName() != null}"><strong th:text="${h.clientName()}"></strong></span>
+            <span th:if="${h.sourceName() != null or typeLabel != null}"
+                  th:text="${h.sourceName() == null} ? ${typeLabel}
+                          : (${typeLabel == null or typeLabel == h.sourceName()} ? ${h.sourceName()} : #{order.page.meta.source(${h.sourceName()}, ${typeLabel})})"></span>
+            <span th:text="${h.orderedAt()}"></span>
+            <span><strong th:text="#{general.currency.amount(${h.total()})}"></strong></span>
+            <span th:if="${h.fulfilmentTypeKey() != null}" th:text="#{${h.fulfilmentTypeKey()}}"></span>
+        </p>
+        <p class="cl-record-meta is-secondary"
+           th:if="${h.externalOrderId() != null or h.routedSupplier() != null or h.splitFromHref() != null or h.clientOrderUrl() != null}">
+            <span th:if="${h.externalOrderId() != null}" th:text="#{order.page.meta.external(${h.externalOrderId()})}"></span>
+            <span th:if="${h.routedSupplier() != null and h.routedSupplier().isMatched()}">
+                <span th:text="#{order.page.meta.routed(${h.routedSupplier().supplierName()})}"></span>
+                <span th:if="${!h.routedSupplier().enabled() or !h.routedSupplier().includeInFulfilment()}"
+                      class="cl-status is-warn" th:text="#{order.page.meta.routed.unavailable}"></span>
+            </span>
+            <span th:if="${h.routedSupplier() != null and !h.routedSupplier().isMatched()}" class="cl-status is-bad"
+                  th:text="#{order.page.meta.routed.unknown(${h.routedSupplier().externalSupplierId()})}"></span>
+            <span th:if="${h.splitFromHref() != null}">
+                <span th:text="#{order.page.meta.split.from}"></span>
+                <a th:href="@{${h.splitFromHref()}}" th:text="${h.splitFromShortId()}"></a>
+            </span>
+            <span th:if="${h.clientOrderUrl() != null}">
+                <span th:text="#{order.page.meta.client.link}"></span>
+                <button type="button" class="cl-copy-inline is-pinned"
+                        th:attr="data-cl-copy=${h.clientOrderUrl()}, aria-label=#{order.page.copy.client.link}">
+                    <span class="cl-copy-icon"><span class="icon is-small" aria-hidden="true"><i class="fas fa-link"></i></span></span>
+                </button>
+            </span>
+        </p>
+    </th:block>
+
+    <th:block th:fragment="orderActions" th:with="h=${page.header()}">
+        <a th:if="${h.primaryAction() != null}" class="cl-button is-primary" th:href="@{${h.primaryAction().href()}}">
+            <span class="icon is-small" aria-hidden="true"><i class="fas" th:classappend="${h.primaryAction().icon()}"></i></span>
+            <span th:text="#{${h.primaryAction().labelKey()}}"></span>
+        </a>
+        <div class="cl-menu">
+            <button type="button" class="cl-button" aria-expanded="false" aria-controls="order-more-menu" aria-haspopup="true">
+                <span th:text="#{order.page.more}"></span>
+                <span class="icon is-small" aria-hidden="true"><i class="fas fa-chevron-down"></i></span>
+            </button>
+            <ul class="cl-menu-list" id="order-more-menu" hidden>
+                <li><a class="cl-menu-item" th:href="@{${h.cardHref()}}" th:text="#{order.page.print.card}"></a></li>
+                <li><a class="cl-menu-item" th:href="@{${h.collectionHref()}}" th:text="#{order.page.print.collection}"></a></li>
+                <li th:if="${h.itemHistoryHref() != null}">
+                    <a class="cl-menu-item" th:href="@{${h.itemHistoryHref()}}" th:text="#{item.history}"></a>
+                </li>
+                <!--/* a closed order keeps an available cancel (a completed order can still be cancelled after a full
+                       return), but not the greyed-out placeholders: there is nothing left to explain */-->
+                <th:block th:unless="${page.superAdmin()}">
+                    <li th:if="${h.canCancel() or h.canDelete() or !page.closed()}" class="cl-menu-sep" role="separator"></li>
+                    <li th:if="${h.canCancel() or !page.closed()}">
+                        <a th:if="${h.canCancel()}" class="cl-menu-item is-danger"
+                           th:href="@{/dashboard/orders/{id}/cancel(id=${page.orderId()})}" data-cl-confirm
+                           th:attr="data-cl-confirm-title=#{order.page.cancel.confirm.title(${page.shortId()})},
+                                    data-cl-confirm-message=#{order.page.cancel.confirm.message},
+                                    data-cl-confirm-action=#{order.page.cancel.confirm.action}"
+                           th:text="#{order.page.cancel}"></a>
+                        <button th:unless="${h.canCancel()}" type="button" class="cl-menu-item is-danger" aria-disabled="true">
+                            <span th:text="#{order.page.cancel}"></span>
+                            <span class="cl-menu-reason" th:text="#{order.page.cancel.unavailable}"></span>
+                        </button>
+                    </li>
+                    <li th:if="${h.canDelete() or !page.closed()}">
+                        <a th:if="${h.canDelete()}" class="cl-menu-item is-danger"
+                           th:href="@{/dashboard/orders/{id}/delete(id=${page.orderId()})}" data-cl-confirm
+                           th:attr="data-cl-confirm-title=#{order.page.delete.confirm.title(${page.shortId()})},
+                                    data-cl-confirm-message=${h.marketplaceName() != null and h.deleteMessageKey() == 'order.page.delete.confirm.marketplace'}
+                                        ? #{order.page.delete.confirm.marketplace(${h.marketplaceName()})} : #{order.page.delete.confirm.message},
+                                    data-cl-confirm-action=#{order.page.delete.confirm.action}"
+                           th:text="#{order.page.delete}"></a>
+                        <button th:unless="${h.canDelete()}" type="button" class="cl-menu-item is-danger" aria-disabled="true">
+                            <span th:text="#{order.page.delete}"></span>
+                            <span class="cl-menu-reason" th:text="#{order.page.delete.unavailable}"></span>
+                        </button>
+                    </li>
+                </th:block>
+            </ul>
+        </div>
+    </th:block>
+</div>
+</body>
+</html>
