@@ -190,7 +190,11 @@ class OrderListServiceTest {
         OrdersPageModel model = page(query("q", "nowak"));
 
         assertThat(model.rows()).extracting(r -> r.href()).containsExactly("/dashboard/orders/open-1");
-        assertThat(model.resultsLine()).isEqualTo("Wyniki dla „nowak”: 1 · w historii: 2");
+        assertThat(model.resultsLine()).isEqualTo("Zamówienia: 1");
+        assertThat(model.chips().get(0).linkLabel()).isEqualTo("+2 w historii ›");
+        assertThat(model.chips().get(0).linkHref()).isEqualTo("/dashboard/orders?status=Cancelled&status=Completed&q=nowak");
+        // inside the history there is nothing left to point at
+        assertThat(page(query("q", "nowak", "status", "Completed")).chips().get(1).linkHref()).isNull();
         assertThat(model.historyStatuses()).extracting(s -> s.count()).containsExactly(1L, 1L);
         assertThat(model.chips()).extracting(c -> c.label()).containsExactly("Szukasz: „nowak”");
     }
@@ -207,7 +211,7 @@ class OrderListServiceTest {
         assertThat(page(query("sort", "amount", "dir", "desc")).rows()).extracting(r -> r.href()).containsExactly("/dashboard/orders/b", "/dashboard/orders/c", "/dashboard/orders/a");
         assertThat(page(query("sort", "number")).rows()).extracting(r -> r.href()).containsExactly("/dashboard/orders/a", "/dashboard/orders/b", "/dashboard/orders/c");
         assertThat(page(query("status", "Completed")).rows()).extracting(r -> r.href()).containsExactly("/dashboard/orders/h2", "/dashboard/orders/h1");
-        assertThat(page(query("status", "Completed")).resultsLine()).isEqualTo("Zamówienia: 2 · najnowsze pierwsze");
+        assertThat(page(query("status", "Completed")).resultsLine()).isEqualTo("Zamówienia: 2");
         assertThat(page(query("sort", "amount")).sortHeaders().get(OrderListQuery.Sort.AMOUNT).ariaSort()).isEqualTo("ascending");
         assertThat(page(query("sort", "amount")).sortHeaders().get(OrderListQuery.Sort.AMOUNT).href()).isEqualTo("/dashboard/orders?sort=amount&dir=desc");
         assertThat(page(query()).sortHeaders().get(OrderListQuery.Sort.DUE).ariaSort()).isEqualTo("ascending");

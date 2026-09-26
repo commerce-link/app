@@ -2,7 +2,7 @@ package pl.commercelink.web.orders;
 
 import java.util.function.IntFunction;
 
-/** "‹ Previous · Page 2 of 4 · Next ›" under a list; the hrefs already carry the rest of the list's query. */
+/** "‹ Previous · 51–100 of 180 · Next ›" under a list; the hrefs already carry the rest of the list's query. */
 public record Pagination(int page, int totalPages, String previousHref, String nextHref, int pageSize, int totalItems) {
 
     public static Pagination of(int requestedPage, int totalItems, int pageSize, IntFunction<String> href) {

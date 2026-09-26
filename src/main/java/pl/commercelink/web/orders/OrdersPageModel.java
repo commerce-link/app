@@ -36,7 +36,12 @@ public record OrdersPageModel(
     public record FilterOption(String id, String label, boolean shared, boolean starred, boolean selected) {
     }
 
-    public record Chip(String label, String clearHref, String clearLabel) {
+    /** An active narrowing with its "×" link; linkHref/linkLabel add an optional link inside it (search → history). */
+    public record Chip(String label, String clearHref, String clearLabel, String linkHref, String linkLabel) {
+
+        public Chip(String label, String clearHref, String clearLabel) {
+            this(label, clearHref, clearLabel, null, null);
+        }
     }
 
     public record SortHeader(String href, String ariaSort) {

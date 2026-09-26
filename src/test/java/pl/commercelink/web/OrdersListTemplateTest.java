@@ -42,6 +42,7 @@ class OrdersListTemplateTest {
                 .contains("data-cl-dialog-open=\"save-view-dialog\"").contains("data-cl-dialog-open=\"filters-dialog\"")
                 .contains("cl-search-form").contains("name=\"q\"").contains("cl-search-clear").contains("q.withQ(null).href()")
                 .contains("cl-list-meta").contains("cl-filter-chips").contains("cl-table-results").contains("role=\"status\"")
+                .contains("'cl-visually-hidden'").contains("cl-filter-chip-link").contains("chip.linkHref()")
                 .contains("cl-table is-orders").contains("cl-table-sort").contains("aria-sort")
                 .contains("cl-table-sortbar").contains("orders.list.sort.label")
                 .contains("orders.list.sort.due").contains("orders.list.sort.amount").contains("orders.list.sort.number")

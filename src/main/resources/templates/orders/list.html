@@ -144,16 +144,21 @@
                     </form>
                 </div>
 
-                <!--/* What narrows the list right now, and how many orders that leaves. */-->
+                <!--/* What narrows the list right now, and how many orders that leaves. With nothing narrowed the row is
+                       not drawn: the count repeats the Status menu, so it stays only for screen readers (the status
+                       region orders-list.js focuses after each swap). */-->
                 <div class="cl-list-meta" th:classappend="${page.chips().isEmpty()} ? 'is-count-only' : ''">
                     <div class="cl-filter-chips" th:if="${!page.chips().isEmpty()}">
                         <span class="cl-filter-chip" th:each="chip : ${page.chips()}">
                             <span th:text="${chip.label()}"></span>
+                            <a th:if="${chip.linkHref() != null}" class="cl-filter-chip-link" th:href="@{${chip.linkHref()}}"
+                               th:text="${chip.linkLabel()}" data-cl-orders-nav></a>
                             <a class="cl-filter-chip-clear" th:href="@{${chip.clearHref()}}" th:attr="aria-label=${chip.clearLabel()}"
                                data-cl-orders-nav><span aria-hidden="true">×</span></a>
                         </span>
                     </div>
-                    <p class="cl-table-results" role="status" th:text="${page.resultsLine()}"></p>
+                    <p class="cl-table-results" role="status" th:classappend="${page.chips().isEmpty()} ? 'cl-visually-hidden' : ''"
+                       th:text="${page.resultsLine()}"></p>
                 </div>
 
                 <th:block th:unless="${page.rows().isEmpty()}"

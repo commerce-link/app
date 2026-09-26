@@ -35,7 +35,7 @@
        th:text="'‹ ' + #{general.pagination.previous}" data-cl-orders-nav></a>
     <span th:unless="${pagination.previousHref() != null}" class="cl-button is-disabled"
           th:text="'‹ ' + #{general.pagination.previous}"></span>
-    <span class="cl-pagination-page" th:text="#{general.pagination.page(${pagination.page()}, ${pagination.totalPages()})}"></span>
+    <span class="cl-pagination-page" th:text="#{general.pagination.range(${pagination.fromIndex() + 1}, ${pagination.toIndex()}, ${pagination.totalItems()})}"></span>
     <a th:if="${pagination.nextHref() != null}" class="cl-button" th:href="@{${pagination.nextHref()}}"
        th:text="#{general.pagination.next} + ' ›'" data-cl-orders-nav></a>
     <span th:unless="${pagination.nextHref() != null}" class="cl-button is-disabled"

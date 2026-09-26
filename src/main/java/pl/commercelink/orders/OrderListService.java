@@ -90,8 +90,8 @@ public class OrderListService {
                 filterOptions(filters, query),
                 activeFilter,
                 starred,
-                chips(query, activeFilter, starred, inStatus.size(), locale),
-                resultsLine(query, inStatus.size(), historyHits, locale),
+                chips(query, activeFilter, starred, inStatus.size(), historyHits, locale),
+                text("orders.list.results", locale, inStatus.size()),
                 sortHeaders(query),
                 rows,
                 pagination,
@@ -184,7 +184,8 @@ public class OrderListService {
                 filter.getId().equals(query.filterId()));
     }
 
-    private List<Chip> chips(OrderListQuery query, Optional<OrderFilter> activeFilter, boolean starred, int count, Locale locale) {
+    private List<Chip> chips(OrderListQuery query, Optional<OrderFilter> activeFilter, boolean starred, int count, long historyHits,
+                             Locale locale) {
         List<Chip> chips = new ArrayList<>();
         if (!query.isOpen()) {
             String label = text("orders.list.chip.status", locale, statusLabels(query, locale));
@@ -200,21 +201,13 @@ public class OrderListService {
         }
         if (query.q() != null) {
             String label = text("orders.list.chip.search", locale, query.q());
-            chips.add(new Chip(label, query.withQ(null).href(), text("orders.list.chip.clearLabel", locale, label)));
+            // the open list hides matches that are already closed; say how many and link straight to them
+            boolean offerHistory = query.isOpen() && historyHits > 0;
+            chips.add(new Chip(label, query.withQ(null).href(), text("orders.list.chip.clearLabel", locale, label),
+                    offerHistory ? query.withStatuses(HISTORY).href() : null,
+                    offerHistory ? text("orders.list.chip.history", locale, historyHits) : null));
         }
         return chips;
-    }
-
-    private String resultsLine(OrderListQuery query, int count, long historyHits, Locale locale) {
-        String line = query.q() == null ? text("orders.list.results", locale, count)
-                : text("orders.list.results.search", locale, query.q(), count);
-        if (query.q() != null && !query.isHistory()) {
-            line += " · " + text("orders.list.results.history", locale, historyHits);
-        }
-        if (query.isHistory() && query.sort() == null) {
-            line += " · " + text("orders.list.results.newestFirst", locale);
-        }
-        return line;
     }
 
     private static Map<Sort, SortHeader> sortHeaders(OrderListQuery query) {
