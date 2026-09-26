@@ -47,41 +47,41 @@
                 <h2 class="cl-visually-hidden" id="orders-table-title" th:text="#{orders.list.table.title}"></h2>
 
                 <!--/* Status tabs: one underlined row, open statuses left, history right (spec §5). */-->
-                <!--/* Controls: two independent menus on the left — Status (checkboxes with counts, both groups) and the
-                       custom filter — and search on the right. Both menus are native <details>, so they open without
+                <!--/* The table toolbar (design system "Tabela danych"): two filter menus on the left — Status (checkboxes
+                       with counts, both groups) and the custom filter — and search on the right. The menus look like the
+                       toolbar's compact select ("Podkategoria: wszystkie ⌄" on a catalog category) and open a popover. Both menus are native <details>, so they open without
                        JavaScript; the Status menu is a GET form (its "Zastosuj" button is hidden once orders-list.js
                        applies each tick at once). */-->
-                <div class="cl-list-controls">
-                    <div class="cl-list-filters">
-                        <details class="cl-menu is-status" data-cl-menu="status">
-                            <summary class="cl-button cl-menu-summary" th:classappend="${!q.isOpen()} ? 'is-active' : ''">
-                                <span class="cl-menu-summary-key" th:text="#{orders.list.status.menu}"></span>
-                                <span class="cl-menu-summary-text" th:text="${page.statusSummary()}"></span>
-                                <span class="cl-menu-caret" aria-hidden="true"></span>
+                <div class="cl-table-toolbar">
+                    <div class="cl-toolbar-filters">
+                        <details class="cl-filter-menu is-status" data-cl-filter-menu="status">
+                            <summary class="cl-filter-menu-trigger">
+                                <span class="cl-filter-menu-key" th:text="#{orders.list.status.menu}"></span>
+                                <span class="cl-filter-menu-value" th:text="${page.statusSummary()}"></span>
                             </summary>
-                            <form method="get" th:action="@{/dashboard/orders}" class="cl-menu-panel" data-cl-orders-form data-cl-autosubmit>
+                            <form method="get" th:action="@{/dashboard/orders}" class="cl-filter-menu-panel" data-cl-orders-form data-cl-autosubmit>
                                 <input type="hidden" name="filterId" th:if="${q.filterId() != null}" th:value="${q.filterId()}"/>
                                 <input type="hidden" name="focus" th:if="${q.focus() != null}" th:value="${q.focus().param()}"/>
                                 <input type="hidden" name="q" th:if="${q.q() != null}" th:value="${q.q()}"/>
                                 <input type="hidden" name="sort" th:if="${q.sort() != null}" th:value="${q.sort().param()}"/>
                                 <input type="hidden" name="dir" th:if="${q.dir() != null}" th:value="${q.dir().param()}"/>
-                                <div class="cl-menu-group" role="group" th:attr="aria-label=#{orders.list.segments.open}">
-                                    <span class="cl-eyebrow cl-menu-group-title" aria-hidden="true" th:text="#{orders.list.segments.open}"></span>
-                                    <label class="cl-menu-check" th:each="o : ${page.openStatuses()}" th:classappend="${o.count() == 0} ? 'is-empty' : ''">
+                                <div class="cl-filter-menu-group" role="group" th:attr="aria-label=#{orders.list.segments.open}">
+                                    <span class="cl-eyebrow cl-filter-menu-group-title" aria-hidden="true" th:text="#{orders.list.segments.open}"></span>
+                                    <label class="cl-filter-menu-check" th:each="o : ${page.openStatuses()}" th:classappend="${o.count() == 0} ? 'is-empty' : ''">
                                         <input type="checkbox" name="status" th:value="${o.status()}" th:checked="${o.selected()}"/>
-                                        <span class="cl-menu-item-text" th:text="${o.label()}"></span>
-                                        <span class="cl-menu-item-meta" th:text="${o.count()}"></span>
+                                        <span class="cl-filter-menu-text" th:text="${o.label()}"></span>
+                                        <span class="cl-filter-menu-meta" th:text="${o.count()}"></span>
                                     </label>
                                 </div>
-                                <div class="cl-menu-group" role="group" th:attr="aria-label=#{orders.list.segments.history}">
-                                    <span class="cl-eyebrow cl-menu-group-title" aria-hidden="true" th:text="#{orders.list.segments.history}"></span>
-                                    <label class="cl-menu-check" th:each="o : ${page.historyStatuses()}" th:classappend="${o.count() == 0} ? 'is-empty' : ''">
+                                <div class="cl-filter-menu-group" role="group" th:attr="aria-label=#{orders.list.segments.history}">
+                                    <span class="cl-eyebrow cl-filter-menu-group-title" aria-hidden="true" th:text="#{orders.list.segments.history}"></span>
+                                    <label class="cl-filter-menu-check" th:each="o : ${page.historyStatuses()}" th:classappend="${o.count() == 0} ? 'is-empty' : ''">
                                         <input type="checkbox" name="status" th:value="${o.status()}" th:checked="${o.selected()}"/>
-                                        <span class="cl-menu-item-text" th:text="${o.label()}"></span>
-                                        <span class="cl-menu-item-meta" th:text="${o.count()}"></span>
+                                        <span class="cl-filter-menu-text" th:text="${o.label()}"></span>
+                                        <span class="cl-filter-menu-meta" th:text="${o.count()}"></span>
                                     </label>
                                 </div>
-                                <div class="cl-menu-actions">
+                                <div class="cl-filter-menu-actions">
                                     <button type="submit" class="cl-button is-primary" data-cl-autosubmit-hide th:text="#{orders.list.status.apply}"></button>
                                     <a th:if="${!q.isOpen()}" class="cl-link-button" th:href="@{${q.withStatus(null).href()}}"
                                        th:text="#{orders.list.status.reset}" data-cl-orders-nav></a>
@@ -89,35 +89,34 @@
                             </form>
                         </details>
 
-                        <details class="cl-menu" data-cl-menu="filter" th:with="active=${page.activeFilter()}">
-                            <summary class="cl-button cl-menu-summary" th:classappend="${active.isPresent()} ? 'is-active' : ''">
-                                <span class="icon is-small" aria-hidden="true"><i class="fas fa-filter"></i></span>
-                                <span class="cl-menu-summary-text" th:text="${active.isPresent()} ? ${active.get().label} : #{orders.list.filter.menu}"></span>
-                                <span class="cl-menu-caret" aria-hidden="true"></span>
+                        <details class="cl-filter-menu" data-cl-filter-menu="filter" th:with="active=${page.activeFilter()}">
+                            <summary class="cl-filter-menu-trigger">
+                                <span class="cl-filter-menu-key" th:text="#{orders.list.filter.menu}"></span>
+                                <span class="cl-filter-menu-value" th:text="${active.isPresent()} ? ${active.get().label} : #{orders.list.filter.none}"></span>
                             </summary>
                             <!--/* The saved filters scroll inside the popover; "save this view…" and "manage…" stay pinned
                                    underneath, so a long list never hides them. */-->
-                            <div class="cl-menu-list">
-                                <ul class="cl-menu-scroll">
-                                    <li th:if="${page.filterOptions().isEmpty()}" class="cl-menu-empty" th:text="#{orders.list.filter.empty}"></li>
+                            <div class="cl-filter-menu-list">
+                                <ul class="cl-filter-menu-scroll">
+                                    <li th:if="${page.filterOptions().isEmpty()}" class="cl-filter-menu-empty" th:text="#{orders.list.filter.empty}"></li>
                                     <li th:each="o : ${page.filterOptions()}">
-                                        <a class="cl-menu-item" th:href="@{${q.withFilterId(o.id()).href()}}"
+                                        <a class="cl-filter-menu-item" th:href="@{${q.withFilterId(o.id()).href()}}"
                                            th:attr="aria-current=${o.selected()} ? 'true' : null" data-cl-orders-nav>
-                                            <span class="cl-menu-item-text" th:text="${o.label()}"></span>
-                                            <span class="cl-menu-item-meta" th:text="${o.shared()} ? #{orders.filters.scope.store} : #{orders.filters.scope.private}"></span>
+                                            <span class="cl-filter-menu-text" th:text="${o.label()}"></span>
+                                            <span class="cl-filter-menu-meta" th:text="${o.shared()} ? #{orders.filters.scope.store} : #{orders.filters.scope.private}"></span>
                                         </a>
                                     </li>
                                     <li th:if="${active.isPresent()}">
-                                        <a class="cl-menu-item" th:href="@{${q.withFilterId('').href()}}" th:text="#{orders.list.filter.off}" data-cl-orders-nav></a>
+                                        <a class="cl-filter-menu-item" th:href="@{${q.withFilterId('').href()}}" th:text="#{orders.list.filter.off}" data-cl-orders-nav></a>
                                     </li>
                                 </ul>
-                                <ul class="cl-menu-footer">
+                                <ul class="cl-filter-menu-footer">
                                     <li th:if="${page.canSaveView()}">
-                                        <a class="cl-menu-item" th:href="@{/dashboard/orders/filters/new(returnTo=${returnTo})}"
+                                        <a class="cl-filter-menu-item" th:href="@{/dashboard/orders/filters/new(returnTo=${returnTo})}"
                                            data-cl-dialog-open="save-view-dialog" th:text="#{orders.list.saveView}"></a>
                                     </li>
                                     <li>
-                                        <a class="cl-menu-item" th:href="@{/dashboard/orders/filters(returnTo=${returnTo})}"
+                                        <a class="cl-filter-menu-item" th:href="@{/dashboard/orders/filters(returnTo=${returnTo})}"
                                            data-cl-dialog-open="filters-dialog" th:text="#{orders.list.manageFilters}"></a>
                                     </li>
                                 </ul>

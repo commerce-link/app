@@ -51,7 +51,7 @@
                 hideAutosubmitButtons();
                 if (push) { history.pushState({ ordersList: true }, '', target.pathname + target.search); }
                 if (reopen) {
-                    var menu = root.querySelector('details[data-cl-menu="' + reopen.menu + '"]');
+                    var menu = root.querySelector('details[data-cl-filter-menu="' + reopen.menu + '"]');
                     var box = menu && menu.querySelector('input[value="' + reopen.value + '"]');
                     reopen = null;
                     if (menu) { menu.setAttribute('open', ''); }
@@ -87,7 +87,7 @@
             return;
         }
         // The filter menu is a <details>: close it when the click lands anywhere else.
-        var openMenu = root.querySelector('details[data-cl-menu][open]');
+        var openMenu = root.querySelector('details[data-cl-filter-menu][open]');
         if (openMenu && !openMenu.contains(event.target)) {
             openMenu.removeAttribute('open');
         }
@@ -95,7 +95,7 @@
 
     document.addEventListener('keydown', function (event) {
         if (event.key !== 'Escape') { return; }
-        var openMenu = root.querySelector('details[data-cl-menu][open]');
+        var openMenu = root.querySelector('details[data-cl-filter-menu][open]');
         if (openMenu) {
             openMenu.removeAttribute('open');
             var summary = openMenu.querySelector('summary');
@@ -115,8 +115,8 @@
         var box = event.target;
         var form = box.form;
         if (!form || !form.hasAttribute('data-cl-autosubmit') || !root.contains(form)) { return; }
-        var menu = form.closest('details[data-cl-menu]');
-        reopen = menu ? { menu: menu.getAttribute('data-cl-menu'), value: box.value } : null;
+        var menu = form.closest('details[data-cl-filter-menu]');
+        reopen = menu ? { menu: menu.getAttribute('data-cl-filter-menu'), value: box.value } : null;
         submitSearch(form, false);
     });
 

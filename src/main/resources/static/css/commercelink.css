@@ -4287,94 +4287,83 @@ a.cl-link-button:hover {
     font-weight: 400;
 }
 
-/* Controls that open the table card: the Status and custom-filter menus on the left, search on the right. */
-.cl-page .cl-list-controls {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: var(--cl-gap-related);
-    padding: 14px 20px 0;
-}
-
-.cl-page .cl-list-filters {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 8px;
-}
-
-/* Custom-filter menu: a native <details> (works without JavaScript), styled as a button that opens a popover with
-   the saved filters, "switch off", "save this view…" and "manage…". */
-.cl-page .cl-menu {
+/* Filter menu in a table toolbar (Status, custom filter): a native <details>, so it opens without JavaScript. The
+   trigger is the toolbar's compact select ("Podkategoria: wszystkie ⌄" on a catalog category) — 36 px, 14 px regular,
+   the same chevron — so the two kinds of filter cannot be told apart until one opens. The popover follows the
+   category picker's (4 px below, --cl-shadow, rows 6 × 16 px). Named cl-filter-menu, not cl-menu: that name belongs to
+   the action menu (button + menu.js) of the order details. */
+.cl-page .cl-filter-menu {
     position: relative;
 }
 
-.cl-page .cl-menu > summary {
+/* Border-box throughout (min-height 34 grew to 46 on the content box), and no Bulma .content list margins
+   (".content ul:not(:last-child)" put 16 px under the saved filters). */
+.cl-page .cl-filter-menu,
+.cl-page .cl-filter-menu * {
+    box-sizing: border-box;
+}
+
+.cl-page .cl-filter-menu ul,
+.cl-page .cl-filter-menu li {
+    margin: 0;
+}
+
+.cl-page .cl-filter-menu > summary {
     list-style: none;
     cursor: pointer;
 }
 
-.cl-page .cl-menu > summary::-webkit-details-marker {
+.cl-page .cl-filter-menu > summary::-webkit-details-marker {
     display: none;
 }
 
-.cl-page .cl-menu-summary {
-    display: inline-flex;
+.cl-page .cl-filter-menu-trigger {
+    box-sizing: border-box;
+    display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 4px;
     max-width: 320px;
-}
-
-.cl-page .cl-menu-summary-text {
-    overflow: hidden;
-    text-overflow: ellipsis;
+    min-width: 88px;
+    height: 36px;
+    padding: 0 36px 0 12px;
+    border: 1px solid var(--cl-line);
+    border-radius: var(--cl-radius);
+    background-color: var(--cl-surface);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%2363748d' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    color: var(--cl-ink);
+    font-size: 14px;
     white-space: nowrap;
+    transition: border-color .15s ease, box-shadow .15s ease;
 }
 
-/* "Status:" before the chosen value, so the button reads as a labelled field. */
-.cl-page .cl-menu-summary-key {
-    font-weight: 500;
-    color: var(--cl-ink-3);
+.cl-page .cl-filter-menu-trigger:focus-visible,
+.cl-page .cl-filter-menu[open] > .cl-filter-menu-trigger {
+    outline: none;
+    border-color: var(--cl-accent);
+    box-shadow: 0 0 0 3px var(--cl-accent-soft);
 }
 
-.cl-page .cl-menu-summary-key::after {
+.cl-page .cl-filter-menu-key::after {
     content: ":";
 }
 
-.cl-page .cl-menu-summary.is-active .cl-menu-summary-key {
-    color: inherit;
-    opacity: .75;
+.cl-page .cl-filter-menu-value {
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-.cl-page .cl-menu-summary.is-active {
-    border-color: var(--cl-accent);
-    background: var(--cl-accent-soft);
-    color: var(--cl-accent-ink);
-}
-
-.cl-page .cl-menu-caret {
-    width: 0;
-    height: 0;
-    border-left: 4px solid transparent;
-    border-right: 4px solid transparent;
-    border-top: 5px solid currentColor;
-    opacity: .7;
-}
-
-.cl-page .cl-menu[open] .cl-menu-caret {
-    transform: rotate(180deg);
-}
-
-.cl-page .cl-menu-list {
+.cl-page .cl-filter-menu-list,
+.cl-page .cl-filter-menu-panel {
     position: absolute;
     z-index: var(--cl-z-pop);
-    top: calc(100% + 6px);
+    top: calc(100% + 4px);
     left: 0;
     min-width: 280px;
     max-width: 360px;
     margin: 0;
-    padding: 6px;
+    padding: var(--cl-gap-related) 0;
     list-style: none;
     background: var(--cl-surface);
     border: 1px solid var(--cl-line);
@@ -4382,12 +4371,12 @@ a.cl-link-button:hover {
     box-shadow: var(--cl-shadow);
 }
 
-.cl-page .cl-menu-list li {
+.cl-page .cl-filter-menu-list li {
     margin: 0;
 }
 
 /* The saved filters scroll; the footer (save this view…, manage…) stays pinned under them. */
-.cl-page .cl-menu-scroll {
+.cl-page .cl-filter-menu-scroll {
     max-height: min(48vh, 360px);
     margin: 0;
     padding: 0;
@@ -4395,111 +4384,92 @@ a.cl-link-button:hover {
     list-style: none;
 }
 
-.cl-page .cl-menu-footer {
-    margin: 6px -6px -6px;
-    padding: 6px;
+.cl-page .cl-filter-menu .cl-filter-menu-footer {
+    margin: var(--cl-gap-related) 0 calc(-1 * var(--cl-gap-related));
+    padding: var(--cl-gap-related) 0;
     border-top: 1px solid var(--cl-line);
     list-style: none;
 }
 
-.cl-page .cl-menu-item {
+.cl-page .cl-filter-menu-item {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    min-height: 36px;
-    padding: 6px 10px;
-    border-radius: 6px;
+    min-height: 32px;
+    padding: 6px 16px;
     color: var(--cl-ink);
     font-size: 14px;
     text-decoration: none;
 }
 
-.cl-page .cl-menu-item:hover,
-.cl-page .cl-menu-item:focus-visible {
+.cl-page .cl-filter-menu-item:hover,
+.cl-page .cl-filter-menu-item:focus-visible {
     background: var(--cl-surface-2);
     outline: none;
 }
 
-.cl-page .cl-menu-item[aria-current="true"] {
+.cl-page .cl-filter-menu-item[aria-current="true"] {
     background: var(--cl-accent-soft);
     color: var(--cl-accent-ink);
     font-weight: 600;
 }
 
-.cl-page .cl-menu-item-text {
+.cl-page .cl-filter-menu-text {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.cl-page .cl-menu-item-meta {
+.cl-page .cl-filter-menu-meta {
     flex: 0 0 auto;
     font-size: 12px;
     color: var(--cl-ink-3);
+    font-variant-numeric: tabular-nums;
 }
 
-.cl-page .cl-menu-item[aria-current="true"] .cl-menu-item-meta {
+.cl-page .cl-filter-menu-item[aria-current="true"] .cl-filter-menu-meta {
     color: var(--cl-ink-2);
 }
 
-.cl-page .cl-menu-sep {
-    height: 1px;
-    margin: 6px 4px;
-    background: var(--cl-line);
-}
-
-.cl-page .cl-menu-empty {
-    padding: 8px 10px;
+.cl-page .cl-filter-menu-empty {
+    padding: 6px 16px;
     font-size: 13px;
     color: var(--cl-ink-2);
 }
 
-/* Status menu: a GET form of checkboxes in two groups (open, history) with counts, in the same popover as the list. */
-.cl-page .cl-menu-panel {
-    position: absolute;
-    z-index: var(--cl-z-pop);
-    top: calc(100% + 6px);
-    left: 0;
+/* Status menu: a GET form of checkboxes in two groups (open, history) with counts. */
+.cl-page .cl-filter-menu-panel {
     min-width: 260px;
-    margin: 0;
-    padding: 4px 6px 8px;
-    background: var(--cl-surface);
-    border: 1px solid var(--cl-line);
-    border-radius: var(--cl-radius);
-    box-shadow: var(--cl-shadow);
 }
 
-.cl-page .cl-menu-group {
-    padding: 4px 0;
-}
-
-.cl-page .cl-menu-group + .cl-menu-group {
+.cl-page .cl-filter-menu-group + .cl-filter-menu-group {
+    margin-top: var(--cl-gap-related);
+    padding-top: var(--cl-gap-related);
     border-top: 1px solid var(--cl-line);
 }
 
-.cl-page .cl-menu-group-title {
+.cl-page .cl-filter-menu-group-title {
     display: block;
-    padding: 6px 10px 2px;
+    padding: 4px 16px 2px;
 }
 
-.cl-page .cl-menu-check {
+.cl-page .cl-filter-menu-check {
     display: flex;
     align-items: center;
     gap: 10px;
-    min-height: 34px;
-    padding: 0 10px;
-    border-radius: 6px;
+    min-height: 32px;
+    padding: 6px 16px;
     color: var(--cl-ink);
     font-size: 14px;
     cursor: pointer;
 }
 
-.cl-page .cl-menu-check:hover {
+.cl-page .cl-filter-menu-check:hover {
     background: var(--cl-surface-2);
 }
 
-.cl-page .cl-menu-check input {
+.cl-page .cl-filter-menu-check input {
     flex: none;
     width: 16px;
     height: 16px;
@@ -4507,25 +4477,25 @@ a.cl-link-button:hover {
     accent-color: var(--cl-accent);
 }
 
-.cl-page .cl-menu-check input:focus-visible {
+.cl-page .cl-filter-menu-check input:focus-visible {
     outline: 2px solid var(--cl-accent);
     outline-offset: 2px;
 }
 
-.cl-page .cl-menu-check .cl-menu-item-text {
+.cl-page .cl-filter-menu-check .cl-filter-menu-text {
     flex: 1 1 auto;
 }
 
-.cl-page .cl-menu-check.is-empty {
+.cl-page .cl-filter-menu-check.is-empty {
     color: var(--cl-ink-3);
 }
 
-.cl-page .cl-menu-actions {
+.cl-page .cl-filter-menu-actions {
     display: flex;
     align-items: center;
     gap: 14px;
-    margin-top: 4px;
-    padding: 10px 10px 2px;
+    margin-top: var(--cl-gap-related);
+    padding: var(--cl-gap-related) 16px 0;
     border-top: 1px solid var(--cl-line);
 }
 
@@ -4590,12 +4560,12 @@ a.cl-link-button:hover {
     justify-content: space-between;
     flex-wrap: wrap;
     gap: 8px 12px;
-    padding: 10px 20px 12px;
+    padding: 0 20px 12px;
 }
 
 /* Nothing narrows the list: the row holds only the hidden status region and takes no height. */
 .cl-page .cl-list-meta.is-count-only {
-    padding: 0 0 14px;
+    padding: 0;
 }
 
 .cl-page .cl-filter-chips {
@@ -4845,11 +4815,15 @@ a.cl-link-button:hover {
         min-height: 44px;
     }
 
-    .cl-page .cl-menu-check {
+    .cl-page .cl-filter-menu-check {
         min-height: 44px;
     }
 
-    .cl-page .cl-menu-item {
+    .cl-page .cl-filter-menu-trigger {
+        height: 44px;
+    }
+
+    .cl-page .cl-filter-menu-item {
         min-height: 44px;
     }
 
@@ -4887,29 +4861,22 @@ a.cl-link-button:hover {
     }
 
 
-    .cl-page .cl-list-controls {
-        flex-direction: column;
-        align-items: stretch;
-        padding: 12px 16px 0;
-    }
-
-    .cl-page .cl-menu-summary {
-        box-sizing: border-box;
-        max-width: none;
+    .cl-page .cl-toolbar-filters,
+    .cl-page .cl-toolbar-filters .cl-filter-menu,
+    .cl-page .cl-filter-menu-trigger {
         width: 100%;
-        justify-content: flex-start;
+        max-width: none;
     }
 
-    .cl-page .cl-menu-list,
-    .cl-page .cl-menu-panel {
+    .cl-page .cl-filter-menu-trigger {
+        font-size: 16px;
+    }
+
+    .cl-page .cl-filter-menu-list,
+    .cl-page .cl-filter-menu-panel {
         left: 0;
         right: 0;
         max-width: none;
-    }
-
-    .cl-page .cl-list-filters,
-    .cl-page .cl-list-filters .cl-menu {
-        width: 100%;
     }
 
     .cl-page .cl-search-form,
