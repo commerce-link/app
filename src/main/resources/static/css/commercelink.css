@@ -4650,7 +4650,8 @@ a.cl-link-button:hover {
 }
 
 /* Muted text on the tinted hover row: --cl-ink-3 is 4.47:1 on --cl-surface-2 (design system §7, D-C2). */
-.cl-page .cl-table.is-orders tbody tr:hover .cl-table-sub:not(.cl-due-note):not(.cl-unpaid) {
+.cl-page .cl-table.is-orders tbody tr:hover .cl-table-sub:not(.cl-due-note):not(.cl-unpaid),
+.cl-page .cl-table.is-orders tbody tr:hover .cl-doc-mark:not(.is-todo) {
     color: var(--cl-ink-2);
 }
 
@@ -4698,6 +4699,73 @@ a.cl-link-button:hover {
 .cl-page .cl-table.is-orders .cl-unpaid {
     color: var(--cl-warn);
     font-weight: 500;
+}
+
+/* Document marks under a status pill (WZ · FV/PAR · review star): what still holds the record open. Three fixed slots,
+   so the marks line up from row to row even when one does not apply. Done recedes (grey, check), to-do is the only
+   filled one (warn), later is outlined, waiting is dashed with a clock — shape, not only colour (principle 3). */
+.cl-page .cl-doc-marks {
+    display: grid;
+    grid-template-columns: 38px 46px 32px;
+    align-items: center;
+    margin: 4px 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.cl-page .cl-doc-mark {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    justify-self: start;
+    height: 18px;
+    margin: 0;
+    padding: 0 5px;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    color: var(--cl-ink-3);
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: .02em;
+    white-space: nowrap;
+}
+
+.cl-page .cl-doc-mark.is-wz {
+    grid-column: 1;
+}
+
+.cl-page .cl-doc-mark.is-invoice {
+    grid-column: 2;
+}
+
+.cl-page .cl-doc-mark.is-review {
+    grid-column: 3;
+}
+
+.cl-page .cl-doc-mark .cl-doc-mark-icon,
+.cl-page .cl-doc-mark svg {
+    width: 9px;
+    height: 9px;
+    font-size: 9px;
+}
+
+.cl-page .cl-doc-mark.is-done {
+    padding-left: 0;
+}
+
+.cl-page .cl-doc-mark.is-todo {
+    color: var(--cl-warn);
+    background: var(--cl-warn-soft);
+}
+
+.cl-page .cl-doc-mark.is-later {
+    border-color: var(--cl-line);
+}
+
+.cl-page .cl-doc-mark.is-waiting {
+    border-color: var(--cl-ink-3);
+    border-style: dashed;
 }
 
 /* Pagination under a server-paged table. */
@@ -4917,6 +4985,23 @@ a.cl-link-button:hover {
     .cl-page .cl-table.is-orders .cl-unpaid {
         grid-column: 1 / -1;
         justify-self: end;
+    }
+
+    /* The phone card shows only what still holds the order open, as its last line, and nothing when all is done. */
+    .cl-page .cl-table.is-orders .cl-doc-marks {
+        display: none;
+    }
+
+    .cl-page .cl-table.is-orders .cl-doc-marks.has-todo {
+        display: flex;
+        order: 1;   /* after the amount lines: the date and the amount keep sharing their line */
+        gap: 4px;
+        grid-column: 1 / -1;
+        margin: 2px 0 0;
+    }
+
+    .cl-page .cl-table.is-orders .cl-doc-mark:not(.is-todo) {
+        display: none;
     }
 
     .cl-page .cl-pagination {

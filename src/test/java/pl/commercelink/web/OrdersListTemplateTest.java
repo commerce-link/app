@@ -53,6 +53,19 @@ class OrdersListTemplateTest {
                 .contains("cl-list-empty").contains("orders.new.pos.button");
     }
 
+    /** WZ · FV/PAR · review under the status pill (spec §25): a labelled list, state as a class, text for screen readers. */
+    @Test
+    void documentMarksSitUnderTheStatusPill() throws Exception {
+        String html = page();
+        int status = html.indexOf("th:text=\"${row.statusLabel()}\"");
+        int marks = html.indexOf("<ul class=\"cl-doc-marks\"");
+        assertThat(marks).isGreaterThan(status).isLessThan(html.indexOf("th:text=\"${row.totalText()}\""));
+        assertThat(html).contains("aria-label=#{orders.list.marks.label}").contains("th:unless=\"${row.marks().isEmpty()}\"")
+                .contains("${row.hasTodo()} ? 'has-todo'").contains("${mark.state() + ' is-' + mark.kind()}")
+                .contains("<span class=\"cl-visually-hidden\" th:text=\"${mark.label()}\"></span>")
+                .contains("fas fa-check cl-doc-mark-icon").contains("fas fa-clock cl-doc-mark-icon").contains("fas fa-star cl-doc-mark-icon");
+    }
+
     @Test
     void noBulmaWidgetsNoInlineStylesNoHardcodedText() throws Exception {
         String html = page();

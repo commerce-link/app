@@ -1,19 +1,27 @@
 package pl.commercelink.web.orders;
 
 import org.springframework.context.MessageSource;
+import pl.commercelink.documents.Document;
+import pl.commercelink.documents.DocumentType;
 import pl.commercelink.orders.BillingDetails;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderAttention;
+import pl.commercelink.orders.OrderReviewStatus;
 import pl.commercelink.orders.OrderSourceType;
 import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.ShippingDetails;
+import pl.commercelink.orders.fulfilment.FulfilmentType;
+import pl.commercelink.web.orders.OrderRow.DocMark;
 
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.stream.Stream;
 
 /** Turns an order into the texts of its list row (spec §6). One instance per request, bound to the request locale. */
@@ -25,10 +33,13 @@ public class OrderRowMapper {
     private final MessageSource messages;
     private final Locale locale;
     private final DecimalFormat amount;
+    private final boolean warehouseDocuments;
 
-    public OrderRowMapper(MessageSource messages, Locale locale) {
+    /** warehouseDocuments: the store issues warehouse documents (Store.hasDocumentsGenerationEnabled), so a WZ is expected. */
+    public OrderRowMapper(MessageSource messages, Locale locale, boolean warehouseDocuments) {
         this.messages = messages;
         this.locale = locale;
+        this.warehouseDocuments = warehouseDocuments;
         DecimalFormatSymbols symbols = new DecimalFormatSymbols(locale);
         symbols.setGroupingSeparator(' ');
         symbols.setDecimalSeparator(',');
@@ -70,7 +81,64 @@ public class OrderRowMapper {
                 order.getStatus() == null ? "" : text("OrderStatus." + order.getStatus().name()),
                 statusTone(order.getStatus()),
                 money(order.getTotalPrice()),
-                unpaid > 0 ? text("orders.list.unpaid", money(unpaid)) : null);
+                unpaid > 0 ? text("orders.list.unpaid", money(unpaid)) : null,
+                marks(order));
+    }
+
+    /**
+     * The WZ, the closing document and the review, in that order (spec §25). A missing one blocks the order from closing
+     * (Order.isSettled) only once it is Delivered, so only then is it is-todo; before that it is is-later. The WZ is
+     * expected when the store issues warehouse documents and the order is fulfilled from the warehouse — the list does
+     * not read the order's items, so a mixed order with dropshipped lines counts as a warehouse one (OrderLifecycle
+     * decides from the items). An order that needs no such document or review shows no marker for it.
+     */
+    List<DocMark> marks(Order order) {
+        String missing = order.getStatus() == OrderStatus.Delivered ? "is-todo" : "is-later";
+        List<DocMark> marks = new ArrayList<>();
+
+        Optional<Document> goodsIssue = order.getDocumentByType(DocumentType.GoodsIssue);
+        if (goodsIssue.isPresent()) {
+            marks.add(mark("wz", "WZ", "is-done", text("orders.list.mark.done", "WZ", number(goodsIssue.get()))));
+        } else if (warehouseDocuments && order.getFulfilmentType() != FulfilmentType.DirectToConsumer) {
+            marks.add(mark("wz", "WZ", missing, text("orders.list.mark." + missing.substring(3), "WZ")));
+        }
+
+        Optional<Document> closing = order.getClosingDocument();
+        if (closing.isPresent()) {
+            DocumentType type = closing.get().getType();
+            marks.add(mark("invoice", code(type), "is-done", text("orders.list.mark.done", documentName(type), number(closing.get()))));
+        } else if (!order.isInvoiced()) {
+            DocumentType type = order.getReceiptType();
+            marks.add(mark("invoice", code(type), missing, text("orders.list.mark." + missing.substring(3), documentName(type))));
+        }
+
+        OrderReviewStatus review = order.getReview() == null ? null : order.getReview().getStatus();
+        String reviewName = text("orders.list.mark.review");
+        if (review == OrderReviewStatus.ToBeCollected) {
+            marks.add(mark("review", "", missing, text("orders.list.mark.review." + missing.substring(3), reviewName)));
+        } else if (review == OrderReviewStatus.InProgress) {
+            marks.add(mark("review", "", "is-waiting", text("orders.list.mark.review.waiting", reviewName)));
+        } else if (review != null && review != OrderReviewStatus.NotApplicable) {
+            marks.add(mark("review", "", "is-done", text("orders.list.mark.review.done", reviewName, text("OrderReviewStatus." + review.name()))));
+        }
+        return List.copyOf(marks);
+    }
+
+    private static DocMark mark(String kind, String code, String state, String label) {
+        return new DocMark(kind, code, state, label);
+    }
+
+    /** "PAR" for a receipt, "FV" for every invoice (VAT, final, personal): the code the store's staff already use. */
+    private String code(DocumentType type) {
+        return text(type == DocumentType.Receipt ? "orders.list.mark.receipt" : "orders.list.mark.invoice");
+    }
+
+    private String documentName(DocumentType type) {
+        return text("DocumentType." + type.name());
+    }
+
+    private static String number(Document document) {
+        return document.getNumber() == null ? "" : document.getNumber();
     }
 
     /** Spec D11. */

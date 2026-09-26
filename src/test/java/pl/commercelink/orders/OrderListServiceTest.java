@@ -14,6 +14,9 @@ import pl.commercelink.orders.filters.model.OrderFilter;
 import pl.commercelink.orders.filters.model.OrderFilterCondition;
 import pl.commercelink.orders.filters.services.ListOrderFiltersView;
 import pl.commercelink.orders.filters.services.OrderFiltersService;
+import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoresRepository;
+import pl.commercelink.stores.WarehouseConfiguration;
 import pl.commercelink.web.orders.OrderListQuery;
 import pl.commercelink.web.orders.OrdersPageModel;
 
@@ -43,6 +46,8 @@ class OrderListServiceTest {
     private OrdersRepository ordersRepository;
     @Mock
     private OrderFiltersService orderFilters;
+    @Mock
+    private StoresRepository storesRepository;
 
     private OrderListService service;
     private final List<Order> orders = new ArrayList<>();
@@ -52,7 +57,7 @@ class OrderListServiceTest {
         ResourceBundleMessageSource messages = new ResourceBundleMessageSource();
         messages.setBasename("messages");
         messages.setDefaultEncoding("UTF-8");
-        service = new OrderListService(ordersRepository, orderFilters, messages);
+        service = new OrderListService(ordersRepository, orderFilters, messages, storesRepository);
         // the repository reads only the asked-for statuses (StoreIdStatusIndex); the stub filters the same way, so any
         // Completed or Cancelled order below is not seen by the list, as in the database
         when(ordersRepository.findByStoreAndStatuses(eq("store-1"), any())).thenAnswer(inv -> {
@@ -297,5 +302,20 @@ class OrderListServiceTest {
 
     private static OrdersPageModel.StatusOption option(OrdersPageModel model, String label) {
         return model.openStatuses().stream().filter(s -> s.label().equals(label)).findFirst().orElseThrow();
+    }
+
+    /** The WZ marker depends on the store's warehouse documents setting, read once per page (spec §25). */
+    @Test
+    void rowsExpectAWzOnlyInAStoreThatIssuesWarehouseDocuments() {
+        add("a", OrderStatus.Delivered, TODAY, 100, 100, null);
+
+        assertThat(page(query()).rows().get(0).marks()).extracting(m -> m.kind()).doesNotContain("wz");
+
+        WarehouseConfiguration warehouse = new WarehouseConfiguration();
+        warehouse.setDocumentsGenerationEnabled(true);
+        Store store = new Store();
+        store.setWarehouseConfiguration(warehouse);
+        when(storesRepository.findById("store-1")).thenReturn(store);
+        assertThat(page(query()).rows().get(0).marks()).extracting(m -> m.kind() + ":" + m.state()).contains("wz:is-todo");
     }
 }

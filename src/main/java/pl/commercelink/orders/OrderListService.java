@@ -8,6 +8,8 @@ import pl.commercelink.orders.filters.model.OrderFilter;
 import pl.commercelink.orders.filters.model.OrderFilterCondition;
 import pl.commercelink.orders.filters.services.ListOrderFiltersView;
 import pl.commercelink.orders.filters.services.OrderFiltersService;
+import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.orders.FilterConditionLabels;
 import pl.commercelink.web.orders.OrderListQuery;
 import pl.commercelink.web.orders.OrderListQuery.Direction;
@@ -48,11 +50,14 @@ public class OrderListService {
     private final OrdersRepository ordersRepository;
     private final OrderFiltersService orderFilters;
     private final MessageSource messages;
+    private final StoresRepository storesRepository;
 
-    public OrderListService(OrdersRepository ordersRepository, OrderFiltersService orderFilters, MessageSource messages) {
+    public OrderListService(OrdersRepository ordersRepository, OrderFiltersService orderFilters, MessageSource messages,
+                            StoresRepository storesRepository) {
         this.ordersRepository = ordersRepository;
         this.orderFilters = orderFilters;
         this.messages = messages;
+        this.storesRepository = storesRepository;
     }
 
     public OrdersPageModel page(FilterActor actor, OrderListQuery query, LocalDate today, Locale locale) {
@@ -73,7 +78,8 @@ public class OrderListService {
                 .toList();
 
         Pagination pagination = Pagination.of(query.page(), inStatus.size(), OrderListQuery.PAGE_SIZE, n -> query.withPage(n).href());
-        OrderRowMapper mapper = new OrderRowMapper(messages, locale);
+        Store store = storesRepository.findById(actor.storeId());
+        OrderRowMapper mapper = new OrderRowMapper(messages, locale, store != null && store.hasDocumentsGenerationEnabled());
         List<OrderRow> rows = inStatus.subList(pagination.fromIndex(), pagination.toIndex()).stream()
                 .map(order -> mapper.map(order, today)).toList();
 
