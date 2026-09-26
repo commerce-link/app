@@ -213,6 +213,7 @@
                                 th:attr="aria-label=#{orders.list.marks.label}">
                                 <li th:each="mark : ${row.marks()}" class="cl-doc-mark" th:classappend="${mark.state()}">
                                     <i th:if="${mark.state() == 'is-done'}" class="fas fa-check cl-doc-mark-icon" aria-hidden="true"></i>
+                                    <i th:if="${mark.state() == 'is-todo'}" class="fas fa-times cl-doc-mark-icon" aria-hidden="true"></i>
                                     <i th:if="${mark.kind() == 'review'}" class="fas fa-star cl-doc-mark-icon" aria-hidden="true"></i>
                                     <span th:unless="${mark.kind() == 'review'}" aria-hidden="true" th:text="${mark.code()}"></span>
                                     <span class="cl-visually-hidden" th:text="${mark.label()}"></span>

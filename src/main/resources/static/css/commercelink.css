@@ -4650,8 +4650,7 @@ a.cl-link-button:hover {
 }
 
 /* Muted text on the tinted hover row: --cl-ink-3 is 4.47:1 on --cl-surface-2 (design system §7, D-C2). */
-.cl-page .cl-table.is-orders tbody tr:hover .cl-table-sub:not(.cl-due-note):not(.cl-unpaid),
-.cl-page .cl-table.is-orders tbody tr:hover .cl-doc-mark:not(.is-todo) {
+.cl-page .cl-table.is-orders tbody tr:hover .cl-table-sub:not(.cl-due-note):not(.cl-unpaid) {
     color: var(--cl-ink-2);
 }
 
@@ -4701,9 +4700,9 @@ a.cl-link-button:hover {
     font-weight: 500;
 }
 
-/* Document marks under a status pill (WZ · FV/PAR · review star): a check for what exists, the one filled warn mark
-   for what holds a delivered record open — shape as well as colour (principle 3). Nothing else is shown, so the marks
-   start at the left edge whichever of them apply. */
+/* Document marks under a status pill (WZ · FV/PAR · review star): a green check for what exists, a filled warn mark
+   with a cross for what holds a delivered record open — shape as well as colour (principle 3). Nothing else is shown,
+   so the marks start at the left edge whichever of them apply. */
 .cl-page .cl-doc-marks {
     display: flex;
     flex-wrap: wrap;
@@ -4739,6 +4738,7 @@ a.cl-link-button:hover {
 
 .cl-page .cl-doc-mark.is-done {
     padding: 0;
+    color: var(--cl-ok);
 }
 
 .cl-page .cl-doc-mark.is-todo {

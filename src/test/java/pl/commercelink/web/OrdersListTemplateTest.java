@@ -63,7 +63,7 @@ class OrdersListTemplateTest {
         assertThat(html).contains("aria-label=#{orders.list.marks.label}").contains("th:unless=\"${row.marks().isEmpty()}\"")
                 .contains("${row.hasTodo()} ? 'has-todo'").contains("th:classappend=\"${mark.state()}\"")
                 .contains("<span class=\"cl-visually-hidden\" th:text=\"${mark.label()}\"></span>")
-                .contains("fas fa-check cl-doc-mark-icon").contains("fas fa-star cl-doc-mark-icon").doesNotContain("fa-clock");
+                .contains("fas fa-check cl-doc-mark-icon").contains("fas fa-times cl-doc-mark-icon").contains("fas fa-star cl-doc-mark-icon").doesNotContain("fa-clock");
     }
 
     @Test
