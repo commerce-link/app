@@ -145,9 +145,11 @@ public class OrderPageModelFactory {
                 order.getSource() == null ? null : order.getSource().getName());
     }
 
-    // The same condition as DeliveryRedirectResolver's dropship link: waiting for its supplier, not yet in a delivery.
+    // What DropshipEligibility accepts: an item in Allocation with its supplier, not yet claimed by a delivery. A New
+    // item is not enough — the dropship page would send the operator back ("assign a supplier first"), so the row
+    // menu's "Przypisz dostawcę" is the next step there, not this button.
     private static boolean awaitsDropship(OrderItem item) {
-        return item.isProduct() && item.hasOneOfTheStatuses(FulfilmentStatus.New, FulfilmentStatus.Allocation)
+        return item.isProduct() && item.hasOneOfTheStatuses(FulfilmentStatus.Allocation)
                 && !item.isClaimed() && item.getDeliveryId() != null
                 && !SupplierRegistry.WAREHOUSE.equalsIgnoreCase(item.getDeliveryId());
     }
@@ -234,7 +236,9 @@ public class OrderPageModelFactory {
                         OrderFormats.dateTime(s.getShippedAt()), OrderFormats.dateTime(s.getDeliveredAt()),
                         order.hasTrackedShipments() ? OrderLabels.tracking(s.getTrackingSubscriptionStatus()) : null))
                 .toList();
-        boolean cancellable = order.firstShipmentWithShippingData().map(s -> s.getExternalId() != null).orElse(false);
+        // the courier order can be cancelled only while its labelled parcel is still on the way
+        boolean cancellable = order.firstShipmentWithShippingData()
+                .map(s -> s.getExternalId() != null && s.getDeliveredAt() == null).orElse(false);
         // an order can genuinely have zero shipments (not yet allocated); the dialog needs one blank row to edit,
         // not an empty table that posts nothing on Save (P25 forbids only an extra blank row next to existing ones)
         List<Shipment> editable = order.getShipments().isEmpty() ? List.of(new Shipment()) : order.getShipments();

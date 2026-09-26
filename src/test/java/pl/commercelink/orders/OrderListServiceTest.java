@@ -117,6 +117,17 @@ class OrderListServiceTest {
     }
 
     @Test
+    void aRowLinksToTheDetailsWithTheListItCameFrom() {
+        add("new-1", OrderStatus.New, TODAY, 10, 10, null);
+
+        // a narrowed list travels to the details page, so its "‹ Zamówienia" returns to it (D11)
+        assertThat(page(query("status", "New")).rows().get(0).href())
+                .isEqualTo("/dashboard/orders/new-1?returnTo=%2Fdashboard%2Forders%3Fstatus%3DNew");
+        // the default list adds nothing: the details page falls back to the bare list anyway
+        assertThat(page(query()).rows().get(0).href()).isEqualTo("/dashboard/orders/new-1");
+    }
+
+    @Test
     void closedOrdersAreNotPartOfTheListAndOnlyOpenOnesAreAskedFor() {
         add("done", OrderStatus.Completed, TODAY.minusDays(1), 10, 10, null);
         add("gone", OrderStatus.Cancelled, TODAY.minusDays(1), 10, 10, null);

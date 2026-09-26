@@ -441,7 +441,7 @@ class OrderDetailsTemplateTest {
         assertThat(html).contains("class=\"cl-card is-status cl-closing\"").contains("class=\"cl-doc-marks is-inline\"")
                 .contains("fa-times").contains("aria-label=\"Warunki zamknięcia zamówienia\"");
         assertThat(html).contains("Do zamknięcia brakuje:").contains("href=\"#platnosci\"")
-                .contains("data-cl-dialog-open=\"review-dialog\"").contains("brakuje:")
+                .contains("data-cl-dialog-open=\"review-dialog\"").contains("Do zrobienia:").doesNotContain("brakuje:</span>")
                 .contains("Faktura już wystawiona");
     }
 

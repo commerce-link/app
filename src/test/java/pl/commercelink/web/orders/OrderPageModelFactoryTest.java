@@ -247,6 +247,47 @@ class OrderPageModelFactoryTest {
     }
 
     @Test
+    void aNewItemOfADropshipOrderDoesNotOfferTheSupplierOrderYet() {
+        // given: the dropship page accepts only items in Allocation; a New one needs its supplier assigned first
+        Order dropship = order(OrderStatus.New);
+        dropship.setFulfilmentType(FulfilmentType.DirectToConsumer);
+        OrderItem fresh = item(FulfilmentStatus.New);
+        fresh.setDeliveryId("Acme");
+        OrderItem allocated = item(FulfilmentStatus.Allocation);
+        allocated.setDeliveryId("Acme");
+        OrderPageModelFactory.Viewer admin = new OrderPageModelFactory.Viewer(false, true, null);
+
+        // when
+        OrderPageModel withNew = factory.build(dropship, List.of(fresh), admin, PL);
+        OrderPageModel withAllocated = factory.build(dropship, List.of(allocated), admin, PL);
+
+        // then
+        assertThat(withNew.header().primaryAction()).isNull();
+        assertThat(withAllocated.header().primaryAction().labelKey()).isEqualTo("order.page.action.dropship");
+    }
+
+    @Test
+    void theCourierOrderCannotBeCancelledOnceItsParcelIsDelivered() {
+        // given
+        Order order = order(OrderStatus.Delivered);
+        Shipment sent = order.getShipments().get(0);
+        sent.setCarrier("InPost");
+        sent.setTrackingNo("T-1");
+        sent.setShippedAt(LocalDateTime.now().minusDays(2));
+        sent.setExternalId("PKG-1");
+        OrderPageModelFactory.Viewer admin = new OrderPageModelFactory.Viewer(false, true, null);
+
+        // when
+        OrderPageModel onTheWay = factory.build(order, List.of(item(FulfilmentStatus.Delivered)), admin, PL);
+        sent.setDeliveredAt(LocalDateTime.now().minusDays(1));
+        OrderPageModel delivered = factory.build(order, List.of(item(FulfilmentStatus.Delivered)), admin, PL);
+
+        // then
+        assertThat(onTheWay.shipments().canCancelCourier()).isTrue();
+        assertThat(delivered.shipments().canCancelCourier()).isFalse();
+    }
+
+    @Test
     void dropshipItemsLockTheWarehouseMovesAndTheCourierCancellationNeedsAPackageId() {
         // given
         Order order = order(OrderStatus.Realization);
