@@ -4618,19 +4618,6 @@ a.cl-link-button:hover {
     background: rgba(27, 77, 177, .15);
 }
 
-/* "+2 w historii ›" inside the search chip: closed matches the open list leaves out. */
-.cl-page .cl-filter-chip-link {
-    font-weight: 600;
-    color: var(--cl-accent);
-    text-decoration: underline;
-    text-underline-offset: 2px;
-    white-space: nowrap;
-}
-
-.cl-page .cl-filter-chip-link:hover {
-    color: var(--cl-accent-ink);
-}
-
 .cl-page .cl-table-results {
     margin: 0;
     font-size: 12.5px;

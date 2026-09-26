@@ -46,7 +46,6 @@ public class OrderListService {
 
     static final List<OrderStatus> OPEN = List.of(OrderStatus.New, OrderStatus.Blocked, OrderStatus.Assembly,
             OrderStatus.Assembled, OrderStatus.Realization, OrderStatus.Shipping, OrderStatus.Delivered);
-    static final List<OrderStatus> HISTORY = List.of(OrderStatus.Completed, OrderStatus.Cancelled);
 
     private final OrdersRepository ordersRepository;
     private final OrderFiltersService orderFilters;
@@ -59,18 +58,19 @@ public class OrderListService {
     }
 
     public OrdersPageModel page(FilterActor actor, OrderListQuery query, LocalDate today, Locale locale) {
-        List<Order> all = ordersRepository.findByStore(actor.storeId());
+        // Only open orders are read (StoreIdStatusIndex): Completed and Cancelled are not part of this list, so a store's
+        // growing history costs nothing here.
+        List<Order> open = ordersRepository.findByStoreAndStatuses(actor.storeId(), OPEN);
         ListOrderFiltersView filters = orderFilters.list(actor);
         Optional<OrderFilter> activeFilter = query.hasFilter() ? filters.byId(query.filterId()) : Optional.empty();
 
-        List<Order> open = all.stream().filter(OrderAttention::isOpen).toList();
-        List<Order> filtered = all.stream()
+        List<Order> filtered = open.stream()
                 .filter(order -> activeFilter.map(f -> matchesIgnoringStatus(f, order, today)).orElse(true))
                 .filter(order -> OrderSearch.matches(order, query.q()))
                 .toList();
         List<Order> inStatus = filtered.stream()
-                .filter(order -> query.isOpen() ? OrderAttention.isOpen(order) : query.statuses().contains(order.getStatus()))
-                .filter(order -> query.focus() == null || query.isHistory() || query.focus().matches(order, today))
+                .filter(order -> query.isOpen() || query.statuses().contains(order.getStatus()))
+                .filter(order -> query.focus() == null || query.focus().matches(order, today))
                 .sorted(comparator(query.effectiveSort(), query.effectiveDir()))
                 .toList();
 
@@ -79,21 +79,19 @@ public class OrderListService {
         List<OrderRow> rows = inStatus.subList(pagination.fromIndex(), pagination.toIndex()).stream()
                 .map(order -> mapper.map(order, today)).toList();
 
-        long historyHits = query.q() == null ? 0 : filtered.stream().filter(o -> !OrderAttention.isOpen(o)).count();
         return new OrdersPageModel(
                 query,
                 tiles(open, query, today, locale),
                 statusOptions(filtered, OPEN, query, locale),
-                statusOptions(filtered, HISTORY, query, locale),
                 statusSummary(query, locale),
                 filterOptions(filters, query),
                 activeFilter,
-                chips(query, activeFilter, inStatus.size(), historyHits, locale),
+                chips(query, activeFilter, inStatus.size(), locale),
                 text("orders.list.results", locale, inStatus.size()),
                 sortHeaders(query),
                 rows,
                 pagination,
-                rows.isEmpty() ? emptyState(query, activeFilter, all.isEmpty(), locale) : null,
+                rows.isEmpty() ? emptyState(query, activeFilter, locale) : null,
                 saveViewConditions(query, activeFilter, locale));
     }
 
@@ -125,7 +123,6 @@ public class OrderListService {
     }
 
     private List<Tile> tiles(List<Order> open, OrderListQuery query, LocalDate today, Locale locale) {
-        boolean enabled = !query.isHistory();
         long newCount = open.stream().filter(o -> o.getStatus() == OrderStatus.New).count();
         long blockedCount = open.stream().filter(o -> o.getStatus() == OrderStatus.Blocked).count();
         double unpaidSum = open.stream().filter(o -> OrderAttention.Unpaid.matches(o, today)).mapToDouble(Order::getUnpaidAmount).sum();
@@ -146,7 +143,7 @@ public class OrderListService {
                 case Today -> count > 0 ? "is-warn" : "";
                 default -> "";
             };
-            tiles.add(new Tile(kind, text(key, locale), count, null, hint, enabled ? query.withFocus(pressed ? null : kind).href() : null, pressed, enabled, tone));
+            tiles.add(new Tile(kind, text(key, locale), count, null, hint, query.withFocus(pressed ? null : kind).href(), pressed, true, tone));
         }
         return tiles;
     }
@@ -177,8 +174,7 @@ public class OrderListService {
                 filter.getId().equals(query.filterId()));
     }
 
-    private List<Chip> chips(OrderListQuery query, Optional<OrderFilter> activeFilter, int count, long historyHits,
-                             Locale locale) {
+    private List<Chip> chips(OrderListQuery query, Optional<OrderFilter> activeFilter, int count, Locale locale) {
         List<Chip> chips = new ArrayList<>();
         // one chip per ticked status, so its "×" drops just that status; dropping the last one returns to all open
         for (OrderStatus status : query.statuses()) {
@@ -189,17 +185,13 @@ public class OrderListService {
             String label = text("orders.list.chip.filter", locale, f.getLabel());
             chips.add(new Chip(label, query.withFilterId(null).href(), text("orders.list.chip.clearLabel", locale, label)));
         });
-        if (query.focus() != null && !query.isHistory()) {
+        if (query.focus() != null) {
             String label = text("orders.list.chip.focus", locale, text("orders.list.attention." + query.focus().param(), locale), count);
             chips.add(new Chip(label, query.withFocus(null).href(), text("orders.list.chip.clearLabel", locale, label)));
         }
         if (query.q() != null) {
             String label = text("orders.list.chip.search", locale, query.q());
-            // the open list hides matches that are already closed; say how many and link straight to them
-            boolean offerHistory = query.isOpen() && historyHits > 0;
-            chips.add(new Chip(label, query.withQ(null).href(), text("orders.list.chip.clearLabel", locale, label),
-                    offerHistory ? query.withStatuses(HISTORY).href() : null,
-                    offerHistory ? text("orders.list.chip.history", locale, historyHits) : null));
+            chips.add(new Chip(label, query.withQ(null).href(), text("orders.list.chip.clearLabel", locale, label)));
         }
         return chips;
     }
@@ -214,12 +206,12 @@ public class OrderListService {
         return headers;
     }
 
-    private EmptyState emptyState(OrderListQuery query, Optional<OrderFilter> activeFilter, boolean storeEmpty, Locale locale) {
+    private EmptyState emptyState(OrderListQuery query, Optional<OrderFilter> activeFilter, Locale locale) {
         if (query.q() != null) {
             return new EmptyState(text("orders.list.empty.search", locale, query.q()),
                     text("orders.list.empty.search.clear", locale), query.withQ(null).href());
         }
-        if (query.focus() != null && !query.isHistory()) {
+        if (query.focus() != null) {
             return new EmptyState(text("orders.list.empty." + query.focus().param(), locale),
                     text("orders.list.empty.showOpen", locale), query.withFocus(null).withStatus(null).href());
         }
@@ -232,12 +224,8 @@ public class OrderListService {
                     .orElseGet(() -> text("orders.list.empty.statuses", locale));
             return new EmptyState(message, text("orders.list.empty.showOpen", locale), query.withStatus(null).href());
         }
-        if (storeEmpty) {
-            return new EmptyState(text("orders.list.empty.store", locale), null, null);
-        }
-        // The store has orders, just none open right now — offer the history instead of claiming there are none.
-        return new EmptyState(text("orders.list.empty.open", locale),
-                text("orders.list.empty.open.history", locale), query.withStatus(OrderStatus.Completed).href());
+        // only open orders are read, so "none open" is all the list can say (a new store and a quiet day look the same)
+        return new EmptyState(text("orders.list.empty.open", locale), null, null);
     }
 
     /**

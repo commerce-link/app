@@ -73,14 +73,6 @@
                                         <span class="cl-filter-menu-meta" th:text="${o.count()}"></span>
                                     </label>
                                 </div>
-                                <div class="cl-filter-menu-group" role="group" th:attr="aria-label=#{orders.list.segments.history}">
-                                    <span class="cl-eyebrow cl-filter-menu-group-title" aria-hidden="true" th:text="#{orders.list.segments.history}"></span>
-                                    <label class="cl-filter-menu-check" th:each="o : ${page.historyStatuses()}" th:classappend="${o.count() == 0} ? 'is-empty' : ''">
-                                        <input type="checkbox" name="status" th:value="${o.status()}" th:checked="${o.selected()}"/>
-                                        <span class="cl-filter-menu-text" th:text="${o.label()}"></span>
-                                        <span class="cl-filter-menu-meta" th:text="${o.count()}"></span>
-                                    </label>
-                                </div>
                                 <div class="cl-filter-menu-actions">
                                     <button type="submit" class="cl-button is-primary" data-cl-autosubmit-hide th:text="#{orders.list.status.apply}"></button>
                                     <a th:if="${!q.isOpen()}" class="cl-link-button" th:href="@{${q.withStatus(null).href()}}"
@@ -155,8 +147,6 @@
                     <div class="cl-filter-chips" th:if="${!page.chips().isEmpty()}">
                         <span class="cl-filter-chip" th:each="chip : ${page.chips()}">
                             <span th:text="${chip.label()}"></span>
-                            <a th:if="${chip.linkHref() != null}" class="cl-filter-chip-link" th:href="@{${chip.linkHref()}}"
-                               th:text="${chip.linkLabel()}" data-cl-orders-nav></a>
                             <a class="cl-filter-chip-clear" th:href="@{${chip.clearHref()}}" th:attr="aria-label=${chip.clearLabel()}"
                                data-cl-orders-nav><span aria-hidden="true">×</span></a>
                         </span>
@@ -168,8 +158,7 @@
                 <th:block th:unless="${page.rows().isEmpty()}"
                           th:with="numberSort=${T(pl.commercelink.web.orders.OrderListQuery.Sort).NUMBER},
                                    dueSort=${T(pl.commercelink.web.orders.OrderListQuery.Sort).DUE},
-                                   amountSort=${T(pl.commercelink.web.orders.OrderListQuery.Sort).AMOUNT},
-                                   orderedSort=${T(pl.commercelink.web.orders.OrderListQuery.Sort).ORDERED}">
+                                   amountSort=${T(pl.commercelink.web.orders.OrderListQuery.Sort).AMOUNT}">
                 <nav class="cl-table-sortbar" th:attr="aria-label=#{orders.list.sort.label}">
                     <span class="cl-eyebrow" th:text="#{orders.list.sort.label}"></span>
                     <a class="cl-tab" th:with="h=${page.sortHeaders().get(dueSort)}" th:href="@{${h.href()}}"
@@ -185,11 +174,6 @@
                     <a class="cl-tab" th:with="h=${page.sortHeaders().get(numberSort)}" th:href="@{${h.href()}}"
                        th:attr="aria-current=${h.ariaSort() != 'none'} ? 'page' : null" data-cl-orders-nav>
                         <span th:text="#{orders.list.sort.number}"></span>
-                        <span th:if="${h.ariaSort() != 'none'}" aria-hidden="true" th:text="${h.ariaSort() == 'ascending'} ? '▲' : '▼'"></span>
-                    </a>
-                    <a class="cl-tab" th:if="${q.isHistory()}" th:with="h=${page.sortHeaders().get(orderedSort)}" th:href="@{${h.href()}}"
-                       th:attr="aria-current=${h.ariaSort() != 'none'} ? 'page' : null" data-cl-orders-nav>
-                        <span th:text="#{orders.list.sort.ordered}"></span>
                         <span th:if="${h.ariaSort() != 'none'}" aria-hidden="true" th:text="${h.ariaSort() == 'ascending'} ? '▲' : '▼'"></span>
                     </a>
                 </nav>

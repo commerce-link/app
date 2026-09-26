@@ -27,6 +27,10 @@ import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.verify;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.any;
 
 @ExtendWith(MockitoExtension.class)
 class OrderListServiceTest {
@@ -49,7 +53,12 @@ class OrderListServiceTest {
         messages.setBasename("messages");
         messages.setDefaultEncoding("UTF-8");
         service = new OrderListService(ordersRepository, orderFilters, messages);
-        when(ordersRepository.findByStore("store-1")).thenReturn(orders);
+        // the repository reads only the asked-for statuses (StoreIdStatusIndex); the stub filters the same way, so any
+        // Completed or Cancelled order below is not seen by the list, as in the database
+        when(ordersRepository.findByStoreAndStatuses(eq("store-1"), any())).thenAnswer(inv -> {
+            java.util.Collection<OrderStatus> wanted = inv.getArgument(1);
+            return orders.stream().filter(o -> wanted.contains(o.getStatus())).collect(java.util.stream.Collectors.toList());
+        });
         when(orderFilters.list(ACTOR)).thenReturn(new ListOrderFiltersView(List.of(), List.of()));
     }
 
@@ -102,14 +111,18 @@ class OrderListServiceTest {
     }
 
     @Test
-    void emptyStateOffersHistoryWhenStoreHasOnlyClosedOrders() {
+    void closedOrdersAreNotPartOfTheListAndOnlyOpenOnesAreAskedFor() {
         add("done", OrderStatus.Completed, TODAY.minusDays(1), 10, 10, null);
+        add("gone", OrderStatus.Cancelled, TODAY.minusDays(1), 10, 10, null);
 
         OrdersPageModel model = page(query());
 
-        assertThat(model.emptyState().text()).isEqualTo("Brak otwartych zamówień.");
-        assertThat(model.emptyState().actionLabel()).isEqualTo("Zobacz zakończone");
-        assertThat(model.emptyState().actionHref()).isEqualTo("/dashboard/orders?status=Completed");
+        assertThat(model.rows()).isEmpty();
+        assertThat(model.emptyState().text()).isEqualTo("Brak otwartych zamówień. Nowe pojawią się tu ze sklepu, marketplace’ów i sprzedaży POS.");
+        assertThat(model.emptyState().actionHref()).isNull();
+        verify(ordersRepository, atLeastOnce()).findByStoreAndStatuses("store-1", OrderListService.OPEN);
+        // an old bookmark to the history lands on the open list
+        assertThat(page(query("status", "Completed")).query().isOpen()).isTrue();
     }
 
     @Test
@@ -153,7 +166,6 @@ class OrderListServiceTest {
         assertThat(model.tiles().get(2).hint()).isEqualTo("Nowe 2 · Zablokowane 1");
         assertThat(option(model, "Nowe").count()).isEqualTo(1);
         assertThat(option(model, "Zablokowane").count()).isEqualTo(1);
-        assertThat(model.historyStatuses()).extracting(s -> s.count()).containsExactly(1L, 0L);
         assertThat(model.statusSummary()).isEqualTo("Otwarte");
         assertThat(model.rows()).hasSize(2);
         assertThat(model.chips()).extracting(c -> c.label()).containsExactly("Filtr: Allegro");
@@ -175,13 +187,10 @@ class OrderListServiceTest {
         assertThat(model.chips().get(0).clearHref()).isEqualTo("/dashboard/orders?focus=overdue");
         assertThat(model.chips().get(1).clearHref()).isEqualTo("/dashboard/orders?status=New");
 
-        OrdersPageModel history = page(query("status", "Completed", "focus", "overdue"));
-        assertThat(history.tiles()).allSatisfy(t -> assertThat(t.enabled()).isFalse());
-        assertThat(history.chips()).extracting(c -> c.label()).containsExactly("Status: Zakończone");   // focus is ignored in history
     }
 
     @Test
-    void searchReachesHistoryAndCountsIt() {
+    void searchLooksInOpenOrdersOnly() {
         add("open-1", OrderStatus.New, null, 10, 10, null).getShippingDetails().setSurname("Nowak");
         add("open-2", OrderStatus.New, null, 10, 10, null);
         add("old-1", OrderStatus.Completed, null, 10, 10, null).getShippingDetails().setSurname("Nowak");
@@ -191,27 +200,18 @@ class OrderListServiceTest {
 
         assertThat(model.rows()).extracting(r -> r.href()).containsExactly("/dashboard/orders/open-1");
         assertThat(model.resultsLine()).isEqualTo("Zamówienia: 1");
-        assertThat(model.chips().get(0).linkLabel()).isEqualTo("+2 w historii ›");
-        assertThat(model.chips().get(0).linkHref()).isEqualTo("/dashboard/orders?status=Cancelled&status=Completed&q=nowak");
-        // inside the history there is nothing left to point at
-        assertThat(page(query("q", "nowak", "status", "Completed")).chips().get(1).linkHref()).isNull();
-        assertThat(model.historyStatuses()).extracting(s -> s.count()).containsExactly(1L, 1L);
         assertThat(model.chips()).extracting(c -> c.label()).containsExactly("Szukasz: „nowak”");
     }
 
     @Test
-    void sortsByAmountNumberAndOrderedAndHistoryIsNewestFirst() {
+    void sortsByAmountAndNumber() {
         add("b", OrderStatus.New, null, 300, 300, null);
         add("a", OrderStatus.New, null, 100, 100, null);
         add("c", OrderStatus.New, null, 200, 200, null);
-        add("h1", OrderStatus.Completed, null, 1, 1, null);
-        add("h2", OrderStatus.Completed, null, 1, 1, null);
 
         assertThat(page(query("sort", "amount")).rows()).extracting(r -> r.href()).containsExactly("/dashboard/orders/a", "/dashboard/orders/c", "/dashboard/orders/b");
         assertThat(page(query("sort", "amount", "dir", "desc")).rows()).extracting(r -> r.href()).containsExactly("/dashboard/orders/b", "/dashboard/orders/c", "/dashboard/orders/a");
         assertThat(page(query("sort", "number")).rows()).extracting(r -> r.href()).containsExactly("/dashboard/orders/a", "/dashboard/orders/b", "/dashboard/orders/c");
-        assertThat(page(query("status", "Completed")).rows()).extracting(r -> r.href()).containsExactly("/dashboard/orders/h2", "/dashboard/orders/h1");
-        assertThat(page(query("status", "Completed")).resultsLine()).isEqualTo("Zamówienia: 2");
         assertThat(page(query("sort", "amount")).sortHeaders().get(OrderListQuery.Sort.AMOUNT).ariaSort()).isEqualTo("ascending");
         assertThat(page(query("sort", "amount")).sortHeaders().get(OrderListQuery.Sort.AMOUNT).href()).isEqualTo("/dashboard/orders?sort=amount&dir=desc");
         assertThat(page(query()).sortHeaders().get(OrderListQuery.Sort.DUE).ariaSort()).isEqualTo("ascending");
@@ -235,7 +235,7 @@ class OrderListServiceTest {
 
     @Test
     void emptyStatesPickTheRightMessageAndAction() {
-        assertThat(page(query()).emptyState().text()).isEqualTo("Nie masz jeszcze zamówień. Pojawią się tu ze sklepu, marketplace’ów i sprzedaży POS.");
+        assertThat(page(query()).emptyState().text()).isEqualTo("Brak otwartych zamówień. Nowe pojawią się tu ze sklepu, marketplace’ów i sprzedaży POS.");
         assertThat(page(query()).emptyState().actionHref()).isNull();
         add("a", OrderStatus.New, TODAY.plusDays(1), 10, 10, null);
         assertThat(page(query("focus", "overdue")).emptyState().text()).isEqualTo("Nic po terminie.");

@@ -1238,7 +1238,7 @@ class OrdersControllerTest {
         }
 
         private pl.commercelink.web.orders.OrdersPageModel emptyPage(pl.commercelink.web.orders.OrderListQuery query) {
-            return new pl.commercelink.web.orders.OrdersPageModel(query, List.of(), List.of(), List.of(), "", List.of(),
+            return new pl.commercelink.web.orders.OrdersPageModel(query, List.of(), List.of(), "", List.of(),
                     Optional.empty(), List.of(), "", java.util.Map.of(), List.of(),
                     pl.commercelink.web.orders.Pagination.of(1, 0, 50, n -> "/x"), null, List.of());
         }

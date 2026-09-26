@@ -28,6 +28,7 @@ public record OrderListQuery(List<OrderStatus> statuses, String filterId, OrderA
     public static final int MAX_Q = 100;
     static final int MAX_RETURN_TO = 300;
 
+    /** Completed and Cancelled orders are not part of the list: such a status in the address is ignored. */
     private static final Set<OrderStatus> HISTORY = EnumSet.of(OrderStatus.Completed, OrderStatus.Cancelled);
 
     public OrderListQuery {
@@ -102,7 +103,7 @@ public record OrderListQuery(List<OrderStatus> statuses, String filterId, OrderA
                 .filter(v -> v != null)
                 .flatMap(v -> Arrays.stream(v.split(",")))
                 .map(OrderListQuery::parseStatus)
-                .filter(s -> s != null)
+                .filter(s -> s != null && !HISTORY.contains(s))
                 .toList();
     }
 
@@ -137,11 +138,6 @@ public record OrderListQuery(List<OrderStatus> statuses, String filterId, OrderA
         return statuses.isEmpty();
     }
 
-    /** Only history statuses ticked (Zakończone, Anulowane): newest first, no "needs attention" narrowing. */
-    public boolean isHistory() {
-        return !statuses.isEmpty() && HISTORY.containsAll(statuses);
-    }
-
     /** The one ticked status, if exactly one is — what a saved filter can hold. */
     public Optional<OrderStatus> single() {
         return statuses.size() == 1 ? Optional.of(statuses.get(0)) : Optional.empty();
@@ -156,14 +152,14 @@ public record OrderListQuery(List<OrderStatus> statuses, String filterId, OrderA
     }
 
     public Sort effectiveSort() {
-        return sort != null ? sort : (isHistory() ? Sort.ORDERED : Sort.DUE);
+        return sort != null ? sort : Sort.DUE;
     }
 
     public Direction effectiveDir() {
         if (dir != null) {
             return dir;
         }
-        return sort == null && isHistory() ? Direction.DESC : (sort == Sort.ORDERED ? Direction.DESC : Direction.ASC);
+        return sort == Sort.ORDERED ? Direction.DESC : Direction.ASC;
     }
 
     /** Exactly this one status, or all open when null. */

@@ -43,11 +43,11 @@ class OrdersListTemplateTest {
                 .contains("data-cl-dialog-open=\"save-view-dialog\"").contains("@{/dashboard/orders/filters(returnTo=${returnTo})}")
                 .contains("cl-search-form").contains("name=\"q\"").contains("cl-search-clear").contains("cl-button is-primary cl-search-submit").contains("q.withQ(null).href()")
                 .contains("cl-list-meta").contains("cl-filter-chips").contains("cl-table-results").contains("role=\"status\"")
-                .contains("'cl-visually-hidden'").contains("cl-filter-chip-link").contains("chip.linkHref()")
+                .contains("'cl-visually-hidden'").doesNotContain("cl-filter-chip-link").doesNotContain("historyStatuses")
                 .contains("cl-table is-orders").contains("cl-table-sort").contains("aria-sort")
                 .contains("cl-table-sortbar").contains("orders.list.sort.label")
                 .contains("orders.list.sort.due").contains("orders.list.sort.amount").contains("orders.list.sort.number")
-                .contains("orders.list.sort.ordered")
+                .doesNotContain("orders.list.sort.ordered")   // "date placed" only sorted the history, which is gone
                 .contains("fragments/pagination :: pages(${page.pagination()})")
                 .contains("data-cl-orders-results").contains("data-cl-orders-nav")
                 .contains("cl-list-empty").contains("orders.new.pos.button");

@@ -12,7 +12,6 @@ public record OrdersPageModel(
         OrderListQuery query,
         List<Tile> tiles,
         List<StatusOption> openStatuses,
-        List<StatusOption> historyStatuses,
         String statusSummary,
         List<FilterOption> filterOptions,
         Optional<OrderFilter> activeFilter,
@@ -35,12 +34,7 @@ public record OrdersPageModel(
     public record FilterOption(String id, String label, boolean shared, boolean selected) {
     }
 
-    /** An active narrowing with its "×" link; linkHref/linkLabel add an optional link inside it (search → history). */
-    public record Chip(String label, String clearHref, String clearLabel, String linkHref, String linkLabel) {
-
-        public Chip(String label, String clearHref, String clearLabel) {
-            this(label, clearHref, clearLabel, null, null);
-        }
+    public record Chip(String label, String clearHref, String clearLabel) {
     }
 
     public record SortHeader(String href, String ariaSort) {

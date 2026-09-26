@@ -41,12 +41,13 @@ class OrderListQueryTest {
     }
 
     @Test
-    void historyDefaultsToNewestFirst() {
+    void closedStatusesInTheAddressAreIgnored() {
+        // Completed and Cancelled are not part of the list: old bookmarks open the open list, due first
         OrderListQuery query = OrderListQuery.parse(params("status", "completed"));
-        assertThat(query.statuses()).containsExactly(OrderStatus.Completed);
-        assertThat(query.isHistory()).isTrue();
-        assertThat(query.effectiveSort()).isEqualTo(OrderListQuery.Sort.ORDERED);
-        assertThat(query.effectiveDir()).isEqualTo(OrderListQuery.Direction.DESC);
+        assertThat(query.statuses()).isEmpty();
+        assertThat(query.isOpen()).isTrue();
+        assertThat(query.effectiveSort()).isEqualTo(OrderListQuery.Sort.DUE);
+        assertThat(OrderListQuery.parse(params("status", "Completed", "status", "New")).statuses()).containsExactly(OrderStatus.New);
     }
 
     @Test
@@ -117,14 +118,9 @@ class OrderListQueryTest {
         assertThat(query.href()).isEqualTo("/dashboard/orders?status=New&status=Blocked");
         assertThat(query.single()).isEmpty();
         assertThat(query.isOpen()).isFalse();
-        assertThat(query.isHistory()).isFalse();
-        assertThat(OrderListQuery.parse(params("status", "Completed,Cancelled")).statuses())
-                .containsExactly(OrderStatus.Cancelled, OrderStatus.Completed);
-        assertThat(OrderListQuery.parse(params("status", "Completed", "status", "Cancelled")).isHistory()).isTrue();
-        // an open status next to a history one is an ordinary list: due first, focus applies
-        assertThat(OrderListQuery.parse(params("status", "Completed", "status", "New")).isHistory()).isFalse();
+        assertThat(OrderListQuery.parse(params("status", "New,Blocked")).statuses()).containsExactly(OrderStatus.New, OrderStatus.Blocked);
         assertThat(query.toggleStatus(OrderStatus.Blocked).statuses()).containsExactly(OrderStatus.New);
         assertThat(query.toggleStatus(OrderStatus.Assembly).statuses()).containsExactly(OrderStatus.New, OrderStatus.Blocked, OrderStatus.Assembly);
-        assertThat(query.withStatus(OrderStatus.Completed).single()).contains(OrderStatus.Completed);
+        assertThat(query.withStatus(OrderStatus.Assembled).single()).contains(OrderStatus.Assembled);
     }
 }
