@@ -5,6 +5,7 @@ import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBQueryExpression;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBScanExpression;
 import com.amazonaws.services.dynamodbv2.model.AttributeValue;
 import com.amazonaws.services.dynamodbv2.model.QueryRequest;
+import com.amazonaws.services.dynamodbv2.model.AmazonDynamoDBException;
 import com.amazonaws.services.dynamodbv2.model.QueryResult;
 import org.springframework.stereotype.Component;
 import pl.commercelink.starter.dynamodb.QueryPageResult;
@@ -21,6 +22,9 @@ import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 @Component
 public class OrdersRepository extends DynamoDbRepository<Order> {
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(OrdersRepository.class);
+    static final String STORE_STATUS_INDEX = "StoreIdStatusIndex";
 
     public OrdersRepository(AmazonDynamoDB amazonDynamoDB) {
         super(amazonDynamoDB);
@@ -39,6 +43,87 @@ public class OrdersRepository extends DynamoDbRepository<Order> {
                 .withExpressionAttributeValues(eav);
 
         return dynamoDBMapper.scan(Order.class, scanExpression);
+    }
+
+    /**
+     * Every order of a store, newest first. A query on the table's own partition key (storeId) returns whole items;
+     * StoreIdOrderedAtIndex would not — its projection carries only the id, status, e-mail and fulfilment type, which
+     * is enough for the fulfilment queue but not for the orders list (spec §8.3, D7).
+     */
+    public List<Order> findByStore(String storeId) {
+        Map<String, AttributeValue> eav = new HashMap<>();
+        eav.put(":storeId", new AttributeValue().withS(storeId));
+
+        DynamoDBQueryExpression<Order> queryExpression = new DynamoDBQueryExpression<Order>()
+                .withKeyConditionExpression("storeId = :storeId")
+                .withExpressionAttributeValues(eav);
+
+        // PaginatedQueryList loads lazily; copying it walks every page before the list sorts and filters.
+        List<Order> orders = new ArrayList<>(dynamoDBMapper.query(Order.class, queryExpression));
+        orders.sort(Comparator.comparing(Order::getOrderedAt, Comparator.nullsLast(Comparator.reverseOrder())));
+        return orders;
+    }
+
+    /**
+     * The store's orders in the given statuses, read through StoreIdStatusIndex: one query per status (every page
+     * followed) for the keys, then a batch load of the orders themselves — so a store's growing history of Completed
+     * and Cancelled orders is never read when only open ones are asked for. The index is eventually consistent, so an
+     * order whose status changed a moment ago is dropped when its loaded status is no longer asked for. Until the index
+     * exists and is active (it is built in the background after V016 runs) the store's partition is read instead.
+     */
+    public List<Order> findByStoreAndStatuses(String storeId, Collection<OrderStatus> statuses) {
+        Set<OrderStatus> wanted = statuses.isEmpty() ? EnumSet.noneOf(OrderStatus.class) : EnumSet.copyOf(statuses);
+        List<Order> keys = new ArrayList<>();
+        try {
+            for (OrderStatus status : wanted) {
+                Map<String, AttributeValue> startKey = null;
+                do {
+                    QueryResult page = amazonDynamoDB.query(new QueryRequest()
+                            .withTableName("Orders")
+                            .withIndexName(STORE_STATUS_INDEX)
+                            .withKeyConditionExpression("storeId = :storeId AND #status = :status")
+                            .withExpressionAttributeNames(Map.of("#status", "status"))
+                            .withExpressionAttributeValues(Map.of(
+                                    ":storeId", new AttributeValue().withS(storeId),
+                                    ":status", new AttributeValue().withS(status.name())))
+                            .withExclusiveStartKey(startKey));
+                    page.getItems().forEach(item -> keys.add(orderKey(storeId, item.get("orderId").getS())));
+                    startKey = page.getLastEvaluatedKey();
+                } while (startKey != null && !startKey.isEmpty());
+            }
+        } catch (AmazonDynamoDBException e) {
+            if (!indexUnavailable(e)) {
+                throw e;
+            }
+            log.warn("{} is not available yet ({}); reading the store's partition for the orders list", STORE_STATUS_INDEX, e.getErrorMessage());
+            return findByStore(storeId).stream().filter(order -> wanted.contains(order.getStatus())).toList();
+        }
+        if (keys.isEmpty()) {
+            return new ArrayList<>();
+        }
+        List<Order> orders = dynamoDBMapper.batchLoad(keys).values().stream()
+                .flatMap(List::stream)
+                .map(Order.class::cast)
+                .filter(order -> wanted.contains(order.getStatus()))
+                .sorted(Comparator.comparing(Order::getOrderedAt, Comparator.nullsLast(Comparator.reverseOrder())))
+                .collect(Collectors.toCollection(ArrayList::new));
+        return orders;
+    }
+
+    /**
+     * A missing index ("The table does not have the specified index: StoreIdStatusIndex") or one still being built after
+     * V016 ("Cannot read from backfilling global secondary index: StoreIdStatusIndex") answers with an error naming it;
+     * every other error is a real failure and is not hidden behind the fallback.
+     */
+    private static boolean indexUnavailable(AmazonDynamoDBException e) {
+        return e.getErrorMessage() != null && e.getErrorMessage().contains(STORE_STATUS_INDEX);
+    }
+
+    private static Order orderKey(String storeId, String orderId) {
+        Order key = new Order();
+        key.setStoreId(storeId);
+        key.setOrderId(orderId);
+        return key;
     }
 
     public Order findByStoreIdAndExternalOrderId(String storeId, String externalOrderId) {
@@ -121,12 +206,6 @@ public class OrdersRepository extends DynamoDbRepository<Order> {
                 .withExpressionAttributeNames(expressionAttributeNames);
 
         return dynamoDBMapper.scan(Order.class, scanExpression);
-    }
-
-    public List<Order> findOpenOrders(String storeId) {
-        return findAllActiveOrders(storeId).stream()
-                .sorted(Comparator.comparing(Order::getEstimatedShippingAt, Comparator.nullsLast(Comparator.naturalOrder())))
-                .toList();
     }
 
     public List<OrderIndexEntry> findAllWarehouseFulfilmentOrder(String storeId) {

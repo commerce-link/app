@@ -1496,6 +1496,12 @@ body.cl-drawer-open .cl-sidebar {
     box-shadow: inset 0 0 0 1px var(--cl-line);
 }
 
+/* Error tone of the status pill (Zablokowane on the orders list, FAILED/BLOCKED attempts elsewhere): first use on main. */
+.cl-status.is-bad {
+    background: var(--cl-bad-soft);
+    color: var(--cl-bad);
+}
+
 .cl-page .cl-alert.is-warn {
     border-color: var(--cl-warn-soft);
     border-left-color: var(--cl-warn);
@@ -3949,15 +3955,20 @@ a.cl-link-button:hover {
 /* A sort button of a product table is the name of its column, 19 px of text: below 1024 px it is 44 px tall and wide,
    the negative margin keeps the header row at its height. Scoped to the product tables: the offers of the inventory
    turn their sort buttons into 44 px chips of their own below 720 px, which a negative margin would pull together.
-   The picker trigger grows from 40 to 44 px like the fields around it. */
+   The picker trigger grows from 40 to 44 px like the fields around it.
+   Orders (Task 14): the same fix, scoped to `.is-orders` — its header is visible at 720-1023 px with the same 19 px
+   sort links; below 720 px the whole `thead` is visually hidden (see the `max-width: 719px` block above), so the
+   44 px box only ever affects layout in the range it needs to. */
 @media screen and (max-width: 1023px) {
-    .cl-page .cl-table.is-products .cl-table-sort {
+    .cl-page .cl-table.is-products .cl-table-sort,
+    .cl-page .cl-table.is-orders .cl-table-sort {
         min-height: 44px;
         min-width: 44px;
         margin: -12px 0;
     }
 
-    .cl-page .cl-table.is-products th.is-numeric .cl-table-sort {
+    .cl-page .cl-table.is-products th.is-numeric .cl-table-sort,
+    .cl-page .cl-table.is-orders th.is-numeric .cl-table-sort {
         justify-content: flex-end;
     }
 
@@ -3994,6 +4005,17 @@ a.cl-link-button:hover {
 @media screen and (min-width: 720px) and (max-width: 1023px) {
     .cl-page .cl-table.is-products .is-secondary-column {
         display: none;
+    }
+
+    /* The orders table at 720-1023 px: five columns in a card of 600-900 px. Tighter cell sides and a due note that may
+       break ("po terminie:" / "2 dni") keep the columns' minimum widths inside the card (design system §1.4). */
+    .cl-page .cl-table.is-orders :is(thead th, tbody th, td) {
+        padding-left: 8px;
+        padding-right: 8px;
+    }
+
+    .cl-page .cl-table.is-orders .cl-due-note {
+        white-space: normal;
     }
 
     .cl-page .cl-table.is-products thead th,
@@ -4197,4 +4219,801 @@ a.cl-link-button:hover {
     .cl-page .cl-table tbody td.cl-table-actions {
         text-align: left;
     }
+}
+
+/* --- Orders list (spec docs/active/orders-list-redesign): read-only stat tiles, the Status and custom-filter menus,
+   search field, chips + count line, the orders table with a whole-row link and document marks, its phone card and
+   phone sort bar, pagination --- */
+
+/* Stat tiles of the orders list: the design system's cl-stat, unchanged; only the spacing under the header and
+   Bulma's li + li margin are set here. */
+.cl-page .cl-stat-grid.is-orders {
+    margin: 4px 0 20px;
+    padding: 0;
+    list-style: none;
+}
+
+.cl-page .cl-stat-grid.is-orders .cl-stat {
+    margin: 0;
+}
+
+/* Links of the phone sort bar (.cl-table-sortbar, below 720 px): an underlined tab row, the current sort in ink with
+   an accent underline. The class outlived the status tabs it was made for (design system §5 "Zakładki statusów"). */
+.cl-page .cl-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 44px;
+    padding: 0 8px;
+    margin-bottom: -1px;
+    border-bottom: 2px solid transparent;
+    color: var(--cl-ink-2);
+    font-size: 13.5px;
+    font-weight: 500;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.cl-page .cl-tab:hover {
+    color: var(--cl-ink);
+}
+
+.cl-page .cl-tab:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: -2px;
+    border-radius: 4px;
+}
+
+.cl-page .cl-tab[aria-current="page"] {
+    color: var(--cl-ink);
+    font-weight: 600;
+    border-bottom-color: var(--cl-accent);
+}
+
+/* Filter menu in a table toolbar (Status, custom filter): a native <details>, so it opens without JavaScript. The
+   trigger is the toolbar's compact select ("Podkategoria: wszystkie ⌄" on a catalog category) — 36 px, 14 px regular,
+   the same chevron — so the two kinds of filter cannot be told apart until one opens. The popover follows the
+   category picker's (4 px below, --cl-shadow, rows 6 × 16 px). Named cl-filter-menu, not cl-menu: that name belongs to
+   the action menu (button + menu.js) of the order details. */
+.cl-page .cl-filter-menu {
+    position: relative;
+}
+
+/* Border-box throughout (min-height 34 grew to 46 on the content box), and no Bulma .content list margins
+   (".content ul:not(:last-child)" put 16 px under the saved filters). */
+.cl-page .cl-filter-menu,
+.cl-page .cl-filter-menu * {
+    box-sizing: border-box;
+}
+
+.cl-page .cl-filter-menu ul,
+.cl-page .cl-filter-menu li {
+    margin: 0;
+}
+
+.cl-page .cl-filter-menu > summary {
+    list-style: none;
+    cursor: pointer;
+}
+
+.cl-page .cl-filter-menu > summary::-webkit-details-marker {
+    display: none;
+}
+
+.cl-page .cl-filter-menu-trigger {
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    max-width: 320px;
+    min-width: 88px;
+    height: 36px;
+    padding: 0 36px 0 12px;
+    border: 1px solid var(--cl-line);
+    border-radius: var(--cl-radius);
+    background-color: var(--cl-surface);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%2363748d' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    color: var(--cl-ink);
+    font-size: 14px;
+    white-space: nowrap;
+    transition: border-color .15s ease, box-shadow .15s ease;
+}
+
+.cl-page .cl-filter-menu-trigger:focus-visible,
+.cl-page .cl-filter-menu[open] > .cl-filter-menu-trigger {
+    outline: none;
+    border-color: var(--cl-accent);
+    box-shadow: 0 0 0 3px var(--cl-accent-soft);
+}
+
+.cl-page .cl-filter-menu-key::after {
+    content: ":";
+}
+
+.cl-page .cl-filter-menu-value {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.cl-page .cl-filter-menu-list,
+.cl-page .cl-filter-menu-panel {
+    position: absolute;
+    z-index: var(--cl-z-pop);
+    top: calc(100% + 4px);
+    left: 0;
+    min-width: 280px;
+    max-width: 360px;
+    margin: 0;
+    padding: var(--cl-gap-related) 0;
+    list-style: none;
+    background: var(--cl-surface);
+    border: 1px solid var(--cl-line);
+    border-radius: var(--cl-radius);
+    box-shadow: var(--cl-shadow);
+}
+
+.cl-page .cl-filter-menu-list li {
+    margin: 0;
+}
+
+/* The saved filters scroll; the footer (save this view…, manage…) stays pinned under them. */
+.cl-page .cl-filter-menu-scroll {
+    max-height: min(48vh, 360px);
+    margin: 0;
+    padding: 0;
+    overflow-y: auto;
+    list-style: none;
+}
+
+.cl-page .cl-filter-menu .cl-filter-menu-footer {
+    margin: var(--cl-gap-related) 0 calc(-1 * var(--cl-gap-related));
+    padding: var(--cl-gap-related) 0;
+    border-top: 1px solid var(--cl-line);
+    list-style: none;
+}
+
+.cl-page .cl-filter-menu-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 32px;
+    padding: 6px 16px;
+    color: var(--cl-ink);
+    font-size: 14px;
+    text-decoration: none;
+}
+
+.cl-page .cl-filter-menu-item:hover,
+.cl-page .cl-filter-menu-item:focus-visible {
+    background: var(--cl-surface-2);
+    outline: none;
+}
+
+.cl-page .cl-filter-menu-item[aria-current="true"] {
+    background: var(--cl-accent-soft);
+    color: var(--cl-accent-ink);
+    font-weight: 600;
+}
+
+.cl-page .cl-filter-menu-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cl-page .cl-filter-menu-meta {
+    flex: 0 0 auto;
+    font-size: 12px;
+    color: var(--cl-ink-3);
+    font-variant-numeric: tabular-nums;
+}
+
+.cl-page .cl-filter-menu-item[aria-current="true"] .cl-filter-menu-meta {
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-filter-menu-empty {
+    padding: 6px 16px;
+    font-size: 13px;
+    color: var(--cl-ink-2);
+}
+
+/* Status menu: a GET form of checkboxes (the open statuses) with counts. */
+.cl-page .cl-filter-menu-panel {
+    min-width: 260px;
+}
+
+.cl-page .cl-filter-menu-group-title {
+    display: block;
+    padding: 4px 16px 2px;
+}
+
+.cl-page .cl-filter-menu-check {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 32px;
+    padding: 6px 16px;
+    color: var(--cl-ink);
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.cl-page .cl-filter-menu-check:hover {
+    background: var(--cl-surface-2);
+}
+
+.cl-page .cl-filter-menu-check input {
+    flex: none;
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    accent-color: var(--cl-accent);
+}
+
+.cl-page .cl-filter-menu-check input:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
+}
+
+.cl-page .cl-filter-menu-check .cl-filter-menu-text {
+    flex: 1 1 auto;
+}
+
+.cl-page .cl-filter-menu-check.is-empty {
+    color: var(--cl-ink-3);
+}
+
+.cl-page .cl-filter-menu-actions {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-top: var(--cl-gap-related);
+    padding: var(--cl-gap-related) 16px 0;
+    border-top: 1px solid var(--cl-line);
+}
+
+/* Search: the icon sits in the field, a clear "×" appears once something is searched (it is a link, so it works
+   without JavaScript; with it, orders-list.js also refreshes the list when the field is emptied). */
+.cl-page .cl-search-form {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+}
+
+/* The submit takes the field's height, as on Asortyment; the magnifier inside it shows only on phones. */
+.cl-page .cl-search-submit {
+    height: 36px;
+}
+
+.cl-page .cl-search-submit-icon {
+    display: none;
+}
+
+.cl-page .cl-search-field {
+    position: relative;
+    width: 300px;
+}
+
+.cl-page .cl-search-icon {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--cl-ink-3);
+    pointer-events: none;
+}
+
+.cl-page .cl-search-field .cl-table-search {
+    width: 100%;
+    padding-left: 36px;
+    padding-right: 40px;
+}
+
+.cl-page .cl-search-field .cl-table-search::-webkit-search-cancel-button {
+    display: none;
+}
+
+/* Same as Asortyment's clear button (32 px, 6 px radius, fa-times), but a link, so it works without JavaScript. */
+.cl-page .cl-search-clear {
+    position: absolute;
+    right: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    color: var(--cl-ink-3);
+    text-decoration: none;
+}
+
+.cl-page .cl-search-clear:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
+}
+
+.cl-page .cl-search-clear:hover {
+    background: var(--cl-surface-2);
+    color: var(--cl-ink);
+}
+
+/* Active narrowings (chips with their own "×") and the count of what is left, on one line. */
+.cl-page .cl-list-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    padding: 0 20px 12px;
+}
+
+/* Nothing narrows the list: the row holds only the hidden status region and takes no height. */
+.cl-page .cl-list-meta.is-count-only {
+    padding: 0;
+}
+
+.cl-page .cl-filter-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.cl-page .cl-filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 28px;
+    padding: 2px 4px 2px 10px;
+    border-radius: 12px;
+    background: var(--cl-accent-soft);
+    color: var(--cl-accent-ink);
+    font-size: 12.5px;
+    font-weight: 600;
+}
+
+.cl-page .cl-filter-chip-clear {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    color: var(--cl-accent-ink);
+    font-size: 16px;
+    line-height: 1;
+    text-decoration: none;
+}
+
+.cl-page .cl-filter-chip-clear:hover {
+    background: color-mix(in srgb, var(--cl-accent) 15%, transparent);
+}
+
+.cl-page .cl-table-results {
+    margin: 0;
+    font-size: 12.5px;
+    color: var(--cl-ink-3);
+    font-variant-numeric: tabular-nums;
+}
+
+.cl-page .cl-page-action-form {
+    display: inline;
+}
+
+/* Sort links look like the sort buttons of table-sort.js (same class, so the marker rules apply). */
+.cl-page a.cl-table-sort {
+    text-decoration: none;
+}
+
+/* Phone sort bar (spec §6): below 720 px the shared card mode hides thead, so this is the only way to reach
+   sorting on a phone. Hidden by default; shown inside the max-width: 719px block below. */
+.cl-page .cl-table-sortbar {
+    display: none;
+}
+
+/* The orders row: the number's link covers the whole row, so the row has no other links. */
+.cl-page .cl-table.is-orders tbody tr {
+    position: relative;
+}
+
+.cl-page .cl-table.is-orders tbody tr:hover {
+    background: var(--cl-surface-2);
+}
+
+/* Muted text on the tinted hover row: --cl-ink-3 is 4.47:1 on --cl-surface-2 (design system §7, D-C2). The phone card
+   mutes the client line too (.cl-cell-client), and a tap leaves the row in :hover. */
+.cl-page .cl-table.is-orders tbody tr:hover :is(.cl-table-sub:not(.cl-due-note):not(.cl-unpaid), .cl-cell-client) {
+    color: var(--cl-ink-2);
+}
+
+/* The row never makes the card wider than the page (design system §1.4). An Allegro order number is a 36-character
+   checkout-form id: it ends in an ellipsis (the whole number is in title), and the order cell may wrap (an order id
+   that is not a UUID is shown whole, and the source line can break under the number). The e-mail ends in an ellipsis within whatever width its column gets — width 0 keeps it out of the
+   column's minimum, min-width fills the cell. The table only wraps these when the card is too narrow for every column
+   at full width (1024 px beside the rail, 1216 px beside the open sidebar, 720-1023 px). */
+.cl-page .cl-table.is-orders .cl-table-key {
+    white-space: normal;
+}
+
+.cl-page .cl-table.is-orders .cl-table-code {
+    display: inline-block;
+    max-width: 14ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: bottom;
+}
+
+.cl-page .cl-table.is-orders .cl-cell-email {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    width: 0;
+    min-width: 100%;
+}
+
+.cl-page .cl-table.is-orders .cl-row-link {
+    color: var(--cl-accent-ink);
+    text-decoration: none;
+    font-variant-numeric: tabular-nums;
+}
+
+.cl-page .cl-table.is-orders .cl-row-link::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+}
+
+.cl-page .cl-table.is-orders tbody tr:has(.cl-row-link:focus-visible) {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: -2px;
+}
+
+.cl-page .cl-table.is-orders .cl-row-link:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
+}
+
+.cl-page .cl-table.is-orders .cl-cell-date {
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+/* "dziś" / "po terminie: N dni" as the second line of the date cell, in its tone. */
+.cl-page .cl-table.is-orders .cl-due-note {
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.cl-page .cl-table.is-orders .cl-due-note.is-bad {
+    color: var(--cl-bad);
+}
+
+.cl-page .cl-table.is-orders .cl-due-note.is-warn {
+    color: var(--cl-warn);
+}
+
+.cl-page .cl-table.is-orders .cl-unpaid {
+    color: var(--cl-warn);
+    font-weight: 500;
+}
+
+/* Document marks under a status pill (WZ · FV/PAR · review star): a green check for what exists, a filled warn mark
+   with a cross for what holds a delivered record open — shape as well as colour (principle 3). Nothing else is shown,
+   so the marks start at the left edge whichever of them apply. */
+.cl-page .cl-doc-marks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+    align-items: center;
+    margin: 4px 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.cl-page .cl-doc-mark {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    height: 18px;
+    margin: 0;
+    padding: 0 5px;
+    border-radius: 4px;
+    color: var(--cl-ink-3);
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: .02em;
+    white-space: nowrap;
+}
+
+.cl-page .cl-doc-mark .cl-doc-mark-icon,
+.cl-page .cl-doc-mark svg {
+    width: 9px;
+    height: 9px;
+    font-size: 9px;
+}
+
+.cl-page .cl-doc-mark.is-done {
+    padding: 0;
+    color: var(--cl-ok);
+}
+
+.cl-page .cl-doc-mark.is-todo {
+    color: var(--cl-warn);
+    background: var(--cl-warn-soft);
+}
+
+/* Pagination under a server-paged table. */
+.cl-page .cl-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 12px 20px 16px;
+    border-top: 1px solid var(--cl-line);
+    font-size: 13px;
+    color: var(--cl-ink-2);
+}
+
+/* A cl-button rendered as a disabled <span> (previous/next at the ends of the pages). */
+.cl-page .cl-button.is-disabled {
+    color: var(--cl-ink-3);
+    pointer-events: none;
+}
+
+.cl-page .cl-pagination-page {
+    font-variant-numeric: tabular-nums;
+}
+
+.cl-page .cl-list-empty .cl-link-button {
+    margin-left: 6px;
+}
+
+.cl-page .cl-list-empty-action {
+    margin-top: 12px;
+}
+
+/* A saved filter's conditions as small pills under its name, in an ordinary .cl-list-item (name | Edytuj · Usuń). */
+.cl-page .cl-filter-conditions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 6px;
+}
+
+.cl-page .cl-filter-conditions .cl-status {
+    font-weight: 500;
+}
+
+@media screen and (max-width: 1023px) {
+    .cl-page .cl-pagination .cl-button {
+        min-height: 44px;
+    }
+
+    /* "do zapłaty 1 249,00 PLN" may break under the amount when the card is narrow (no page scroll, §1.4). */
+    .cl-page .cl-table.is-orders .cl-unpaid {
+        white-space: normal;
+    }
+
+    .cl-page .cl-filter-menu-check {
+        min-height: 44px;
+    }
+
+    .cl-page .cl-filter-menu-trigger {
+        height: 44px;
+    }
+
+    .cl-page .cl-filter-menu-item {
+        min-height: 44px;
+    }
+
+    /* 44 px tap targets for the two "×" without inflating the chip or the field: the box grows, the margins take
+       the growth back. */
+    .cl-page .cl-filter-chip-clear {
+        width: 44px;
+        height: 44px;
+        margin: -8px -6px -8px -4px;
+    }
+
+    .cl-page .cl-search-clear {
+        width: 44px;
+        height: 44px;
+        right: 0;
+    }
+
+    .cl-page .cl-search-submit {
+        height: 44px;
+    }
+}
+
+@media screen and (max-width: 719px) {
+    /* Frame: 16 px content gutter on phones (design system §8, 2026-09-24). Bulma's .section (24 px) plus
+       .container.is-fluid (32 px) left 56 px on each side — a third of a 360 px screen. */
+    .cl-content > .section {
+        padding: 24px 16px 32px;
+    }
+
+    .cl-content .container.is-fluid {
+        padding-left: 0;
+        padding-right: 0;
+    }
+
+    .cl-page .cl-page-actions .cl-page-action-form,
+    .cl-page .cl-page-actions .cl-page-action-form .cl-button {
+        width: 100%;
+        justify-content: center;
+    }
+
+
+    .cl-page .cl-toolbar-filters,
+    .cl-page .cl-toolbar-filters .cl-filter-menu,
+    .cl-page .cl-filter-menu-trigger {
+        width: 100%;
+        max-width: none;
+    }
+
+    .cl-page .cl-filter-menu-trigger {
+        font-size: 16px;
+    }
+
+    .cl-page .cl-filter-menu-list,
+    .cl-page .cl-filter-menu-panel {
+        left: 0;
+        right: 0;
+        max-width: none;
+    }
+
+    .cl-page .cl-search-form {
+        width: 100%;
+    }
+
+    .cl-page .cl-search-field {
+        flex: 1 1 auto;
+        width: auto;
+        min-width: 0;
+    }
+
+    /* Phone: the submit shrinks to the magnifier (its name stays in aria-label). */
+    .cl-page .cl-search-submit {
+        flex: none;
+        width: 44px;
+        padding: 0;
+        justify-content: center;
+    }
+
+    .cl-page .cl-search-submit-icon {
+        display: inline-flex;
+    }
+
+    .cl-page .cl-search-submit-text {
+        display: none;
+    }
+
+    .cl-page .cl-list-meta {
+        padding-left: 16px;
+        padding-right: 16px;
+    }
+
+    /* Card A (D10): number + status / source / client / date + amount / due note + unpaid / what is left to do. The
+       shared card mode already hides thead and stacks rows; here the cells drop their labels (display: contents) and
+       their parts fall into a two-column grid in the order set below, so the date and the amount share a line and
+       the due note and the unpaid amount share the next one. */
+    .cl-page .cl-table.is-orders tr {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        column-gap: 10px;
+        row-gap: 2px;
+        padding: 10px 16px;
+    }
+
+    .cl-page .cl-table.is-orders tbody th,
+    .cl-page .cl-table.is-orders td {
+        display: contents;
+    }
+
+    .cl-page .cl-table.is-orders :is(tbody th, td)::before {
+        content: none;
+    }
+
+    .cl-page .cl-table.is-orders .cl-row-link {
+        grid-column: 1;
+        grid-row: 1;
+        font-weight: 600;
+    }
+
+    .cl-page .cl-table.is-orders .cl-status {
+        grid-column: 2;
+        grid-row: 1;
+        justify-self: end;
+    }
+
+    .cl-page .cl-table.is-orders .cl-table-key .cl-table-sub,
+    .cl-page .cl-table.is-orders .cl-cell-client {
+        grid-column: 1 / -1;
+        grid-row: auto;
+        font-size: 12.5px;
+        color: var(--cl-ink-3);
+    }
+
+    .cl-page .cl-table.is-orders .cl-table-key .cl-table-sub {
+        order: 1;
+    }
+
+    .cl-page .cl-table.is-orders .cl-cell-client {
+        order: 2;
+    }
+
+    .cl-page .cl-table.is-orders .cl-cards-hide {
+        display: none;
+    }
+
+    .cl-page .cl-table.is-orders .cl-cell-date {
+        grid-column: 1;
+        order: 3;
+    }
+
+    .cl-page .cl-table.is-orders .cl-cell-amount {
+        grid-column: 2;
+        justify-self: end;
+        text-align: right;
+        order: 4;
+    }
+
+    .cl-page .cl-table.is-orders .cl-due-note {
+        grid-column: 1;
+        margin-top: 0;
+        order: 5;
+    }
+
+    .cl-page .cl-table.is-orders .cl-unpaid {
+        grid-column: 2;
+        justify-self: end;
+        text-align: right;
+        margin-top: 0;
+        order: 6;
+    }
+
+    /* The phone card shows only what still holds the order open, as its last line, and nothing when all is done. */
+    .cl-page .cl-table.is-orders .cl-doc-marks {
+        display: none;
+    }
+
+    .cl-page .cl-table.is-orders .cl-doc-marks.has-todo {
+        display: flex;
+        order: 7;   /* the last line of the card */
+        gap: 4px;
+        grid-column: 1 / -1;
+        margin: 2px 0 0;
+    }
+
+    .cl-page .cl-table.is-orders .cl-doc-mark:not(.is-todo) {
+        display: none;
+    }
+
+    .cl-page .cl-pagination {
+        padding-left: 16px;
+        padding-right: 16px;
+    }
+
+    /* Phone sort bar (spec §6): the only reachable place to sort once thead is hidden below 720 px. */
+    .cl-page .cl-table-sortbar {
+        display: flex;
+        gap: 4px;
+        align-items: center;
+        padding: 0 16px;
+        border-bottom: 1px solid var(--cl-line);
+        overflow-x: auto;
+        scrollbar-width: none;
+    }
+
+    .cl-page .cl-table-sortbar .cl-eyebrow {
+        margin-right: 6px;
+    }
+
 }

@@ -15,9 +15,9 @@
     display: none !important;
 }
 
-/* .cl-page-body gives the 1200px width, .cl-page the bottom padding; this page only adds its top inset. */
+/* .cl-page-body gives the 1200px width and .cl-page the bottom padding. No top inset of its own: the title starts where
+   it does on every other dashboard page (Zamówienia, Ustawienia sklepu, Katalog produktów). */
 .cl-inv-page {
-    padding-block: 24px 40px;
     color: var(--cl-ink);
 }
 
@@ -694,10 +694,6 @@
 }
 
 @media screen and (max-width: 719px) {
-    .cl-inv-page {
-        padding-block: 16px 32px;
-    }
-
     .cl-inv-issues {
         display: none;
     }

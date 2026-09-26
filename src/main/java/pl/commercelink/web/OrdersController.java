@@ -1,5 +1,6 @@
 package pl.commercelink.web;
 
+import jakarta.servlet.http.HttpServletResponse;
 import org.apache.commons.lang3.StringUtils;
 import pl.commercelink.orders.ShipmentCarrierOptions;
 import org.apache.logging.log4j.util.Strings;
@@ -28,6 +29,7 @@ import pl.commercelink.orders.filters.model.OrderFilter;
 import pl.commercelink.orders.filters.exceptions.OrderFilterException;
 
 import pl.commercelink.orders.filters.FilterActor;
+import pl.commercelink.orders.filters.OrderFilterField;
 import pl.commercelink.orders.filters.services.OrderFiltersService;
 
 import pl.commercelink.orders.filters.ShippingDue;
@@ -60,12 +62,18 @@ import pl.commercelink.web.dtos.AddPaymentForm;
 import pl.commercelink.web.dtos.RoutedSupplierView;
 import pl.commercelink.web.dtos.ClientDataDto;
 import pl.commercelink.web.dtos.OrderFilterForm;
-import pl.commercelink.web.dtos.OrderStatusSelection;
-import pl.commercelink.web.dtos.SavedOrderFilterView;
 import pl.commercelink.web.dtos.OrderItemsForm;
 import pl.commercelink.web.dtos.SplitGroupForm;
 import pl.commercelink.web.dtos.SplitGroupPreviewDto;
+import pl.commercelink.web.orders.OrderListQuery;
+import pl.commercelink.web.settings.ConfirmAction;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.util.UriComponentsBuilder;
 
+import java.net.URLDecoder;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import pl.commercelink.inventory.deliveries.DropshipItemLookup;
@@ -74,7 +82,7 @@ import pl.commercelink.inventory.supplier.SupplierLabelMap;
 import pl.commercelink.inventory.supplier.SupplierLabels;
 
 import java.util.*;
-import java.util.stream.Stream;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 @Controller
@@ -155,136 +163,242 @@ public class OrdersController extends BaseController {
     @Autowired
     private OrderFiltersService orderFilters;
 
+    @Autowired
+    private OrderListService orderListService;
+
     @GetMapping("/dashboard/orders")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String orders(@RequestParam(required = false) List<String> statuses,
-                        @RequestParam(required = false, defaultValue = "false") boolean showAll,
-                        @RequestParam(required = false) String filterId,
-                        Model model) {
-        OpenOrdersSelection selection = selectOpenOrders(statuses, showAll, filterId);
-        ListOrderFiltersView savedFilters = selection.savedFilters();
-        OrderFilter selectedFilter = selection.selectedFilter();
-        List<Order> allOpenOrders = selection.allOpenOrders();
-        LocalDate today = selection.today();
-        List<Order> openOrders = selection.openOrders();
-        OrderStatusSelection statusSelection = selection.statusSelection();
-        List<Order> filteredOrders = selection.filteredOrders();
-
-        addSectionsAttributes(model, filteredOrders);
-
-        model.addAttribute("liveOrders", filteredOrders);
-        model.addAttribute("itemCountsByStatus",
-                allOpenOrders.stream().collect(Collectors.groupingBy(Order::getStatus, Collectors.counting())));
-        model.addAttribute("statuses", Arrays.stream(OrderStatus.values())
-                .filter(status -> status != OrderStatus.Completed && status != OrderStatus.Cancelled)
-                .toList());
-        model.addAttribute("selectedStatuses", statusSelection.selected());
-        model.addAttribute("savedFilters", Stream.concat(
-                        savedFilters.sharedWithStore().stream()
-                                .map(f -> SavedOrderFilterView.of(f, true, countMatching(allOpenOrders, f, today))),
-                        savedFilters.own().stream()
-                                .map(f -> SavedOrderFilterView.of(f, false, countMatching(allOpenOrders, f, today))))
-                .toList());
-        model.addAttribute("selectedFilterId", selectedFilter == null ? null : selectedFilter.getId());
-        model.addAttribute("selectedFilterLabel", selectedFilter == null ? null : selectedFilter.getLabel());
-        model.addAttribute("selectedStatusEnums", statusSelection.statuses());
-        model.addAttribute("openOrdersTotal", allOpenOrders.size());
-        model.addAttribute("canManageStoreFilters", isAdmin());
-        model.addAttribute("shipmentTypes", ShipmentType.values());
-        model.addAttribute("paymentSources", PaymentSource.values());
-        model.addAttribute("shippingDueOptions", ShippingDue.values());
-        model.addAttribute("marketplaces", connectedMarketplaceNames());
-        return "orders";
+    public String orders(@RequestParam MultiValueMap<String, String> params, Locale locale, Model model) {
+        Optional<String> legacy = OrderListQuery.legacyRedirect(params);
+        if (legacy.isPresent()) {
+            return "redirect:" + legacy.get();
+        }
+        OrderListQuery query = OrderListQuery.parse(params);
+        addListAttributes(model, query, locale);
+        return "orders/list";
     }
 
     @GetMapping("/dashboard/orders/list")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String ordersList(@RequestParam(required = false) List<String> statuses,
-                             @RequestParam(required = false, defaultValue = "false") boolean showAll,
-                             @RequestParam(required = false) String filterId,
-                             Model model) {
-        addSectionsAttributes(model, selectOpenOrders(statuses, showAll, filterId).filteredOrders());
-        return "fragments/openOrdersSections :: sections";
+    public String ordersList(@RequestParam MultiValueMap<String, String> params, Locale locale, Model model) {
+        addListAttributes(model, OrderListQuery.parse(params), locale);
+        return "orders/list :: results";
     }
+
+    private void addListAttributes(Model model, OrderListQuery query, Locale locale) {
+        addFilterFormAttributes(model, query.returnTo(), locale);
+        model.addAttribute("page", orderListService.page(actor(), query, LocalDate.now(), locale));
+    }
+
+    static final String FILTERS_PATH = "/dashboard/orders/filters";
 
     @PostMapping("/dashboard/orders/filters")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String createOrderFilter(OrderFilterForm form, @RequestParam(required = false) String activeFilterId,
-                                    RedirectAttributes redirectAttributes) {
-        orderFilters.create(actor(), form.isSharedWithStore(), form.getLabel(), form.toConditions());
-        return backToFilters(activeFilterId, redirectAttributes);
+    public String createOrderFilter(OrderFilterForm form, RedirectAttributes redirectAttributes, Model model, Locale locale,
+                                    HttpServletResponse response) {
+        return filterAction(form.getReturnTo(), redirectAttributes, model, locale, response, form, null, () -> {
+            orderFilters.create(actor(), form.isSharedWithStore(), form.getLabel(), form.toConditions());
+            return safeReturnTo(form.getReturnTo());
+        });
     }
 
     @PostMapping("/dashboard/orders/filters/update")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String updateOrderFilter(@RequestParam String filterId, OrderFilterForm form,
-                                    @RequestParam(required = false) String activeFilterId,
-                                    RedirectAttributes redirectAttributes) {
-        orderFilters.update(actor(), filterId, form.isSharedWithStore(), form.getLabel(), form.toConditions());
-        return backToFilters(activeFilterId, redirectAttributes);
+    public String updateOrderFilter(@RequestParam String filterId, OrderFilterForm form, RedirectAttributes redirectAttributes,
+                                    Model model, Locale locale, HttpServletResponse response) {
+        return filterAction(form.getReturnTo(), redirectAttributes, model, locale, response, form, filterId, () -> {
+            orderFilters.update(actor(), filterId, form.isSharedWithStore(), form.getLabel(), form.toConditions());
+            return safeReturnTo(form.getReturnTo());
+        });
     }
 
     @PostMapping("/dashboard/orders/filters/delete")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String deleteOrderFilter(@RequestParam String filterId,
-                                    @RequestParam(required = false) String activeFilterId,
-                                    RedirectAttributes redirectAttributes) {
-        orderFilters.delete(actor(), filterId);
-        return backToFilters(filterId.equals(activeFilterId) ? null : activeFilterId, redirectAttributes);
+    public String deleteOrderFilter(@RequestParam String filterId, @RequestParam(required = false) String returnTo,
+                                    RedirectAttributes redirectAttributes, Model model, Locale locale,
+                                    HttpServletResponse response) {
+        return filterAction(returnTo, redirectAttributes, model, locale, response, null, null, () -> {
+            orderFilters.delete(actor(), filterId);
+            String target = safeReturnTo(returnTo);
+            OrderListQuery list = parseReturnTo(listOf(target));
+            String listBack = filterId.equals(list.filterId()) ? list.withFilterId(null).href() : list.href();
+            return target.startsWith(FILTERS_PATH) ? filtersPage(listBack) : listBack;
+        });
     }
 
-    @ExceptionHandler({OrderFilterException.class, OptimisticLockingExhaustedException.class})
-    public String orderFilterRejected(Exception e, Locale locale, RedirectAttributes redirectAttributes) {
-        redirectAttributes.addFlashAttribute("error", e instanceof OrderFilterException rejected
-                ? messageSource.getMessage(rejected.getMessageKey(), rejected.getMessageArguments(), locale)
-                : messageSource.getMessage("orders.filters.error.conflict", null, locale));
-        return backToFilters(null, redirectAttributes);
+    /** The no-JS confirmation page for the delete link (data-cl-confirm opens the shared dialog with JavaScript). */
+    @GetMapping("/dashboard/orders/filters/delete")
+    @PreAuthorize("!hasRole('SUPER_ADMIN')")
+    public String confirmDeleteOrderFilter(@RequestParam String filterId, @RequestParam(required = false) String returnTo,
+                                           Locale locale, Model model) {
+        OrderFilter filter = orderFilters.list(actor()).byId(filterId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        String back = safeReturnTo(returnTo);
+        String actionPath = "/dashboard/orders/filters/delete?filterId=" + URLEncoder.encode(filter.getId(), StandardCharsets.UTF_8)
+                + "&returnTo=" + URLEncoder.encode(back, StandardCharsets.UTF_8);
+        model.addAttribute("confirm", new ConfirmAction(
+                messageSource.getMessage("orders.filters.delete.title", new Object[]{filter.getLabel()}, locale),
+                messageSource.getMessage("orders.filters.delete.message", null, locale),
+                messageSource.getMessage("orders.filters.delete.action", null, locale),
+                actionPath, back));
+        // the way back names where "Anuluj" goes: the management page, or the list for an older link
+        model.addAttribute("backLabel", messageSource.getMessage(back.startsWith(FILTERS_PATH) ? "orders.filters.edit.back"
+                : "orders.filters.page.back", null, locale));
+        return "settings-confirm";
     }
 
-    private String backToFilters(String activeFilterId, RedirectAttributes redirectAttributes) {
-        if (activeFilterId != null && !activeFilterId.isBlank()) {
-            redirectAttributes.addAttribute("filterId", activeFilterId);
+    /**
+     * Filter management as its own page (design system: a list of records in a card, editing on a subpage). {@code returnTo}
+     * is the list address the user came from; "‹ Zamówienia" goes back to it, and every form on this page and its subpages
+     * returns here, to {@link #filtersPage(String)}.
+     */
+    @GetMapping(FILTERS_PATH)
+    @PreAuthorize("!hasRole('SUPER_ADMIN')")
+    public String orderFiltersPage(@RequestParam(required = false) String returnTo, Locale locale, Model model) {
+        String list = safeListReturnTo(returnTo);
+        addFilterFormAttributes(model, filtersPage(list), locale);
+        model.addAttribute("listHref", list);
+        return "orders/filters";
+    }
+
+    /** "Nowy filtr" from the management page: the empty form as a subpage. */
+    @GetMapping(FILTERS_PATH + "/add")
+    @PreAuthorize("!hasRole('SUPER_ADMIN')")
+    public String addOrderFilterPage(@RequestParam(required = false) String returnTo, Locale locale, Model model) {
+        addFilterEditAttributes(model, safeListReturnTo(returnTo), null, new OrderFilterForm(), locale);
+        return "orders/filter-edit";
+    }
+
+    /** "Edytuj" from the management page: the filter's form as a subpage; a filter the user cannot see is a 404. */
+    @GetMapping(FILTERS_PATH + "/{filterId}/edit")
+    @PreAuthorize("!hasRole('SUPER_ADMIN')")
+    public String editOrderFilterPage(@PathVariable String filterId, @RequestParam(required = false) String returnTo,
+                                      Locale locale, Model model) {
+        ListOrderFiltersView filters = orderFilters.list(actor());
+        OrderFilter filter = filters.byId(filterId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        boolean shared = filters.sharedWithStore().stream().anyMatch(f -> f.getId().equals(filterId));
+        if (shared && !isAdmin()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
-        redirectAttributes.addFlashAttribute("openFilters", true);
-        return "redirect:/dashboard/orders";
+        addFilterEditAttributes(model, safeListReturnTo(returnTo), filterId, formOf(filter, shared), locale);
+        return "orders/filter-edit";
+    }
+
+    private void addFilterEditAttributes(Model model, String list, String filterId, OrderFilterForm form, Locale locale) {
+        addFilterFormAttributes(model, filtersPage(list), locale);
+        model.addAttribute("listHref", list);
+        model.addAttribute("filterId", filterId);
+        model.addAttribute("filterForm", form);
+        model.addAttribute("formAction", filterId == null ? FILTERS_PATH : FILTERS_PATH + "/update");
+        model.addAttribute("pageTitle", filterId == null
+                ? messageSource.getMessage("orders.filters.new", null, locale)
+                : messageSource.getMessage("orders.filters.edit.title", new Object[]{form.getLabel()}, locale));
+    }
+
+    private static OrderFilterForm formOf(OrderFilter filter, boolean shared) {
+        Map<String, String> byField = filter.getConditionsByField();
+        OrderFilterForm form = new OrderFilterForm();
+        form.setLabel(filter.getLabel());
+        form.setSharedWithStore(shared);
+        form.setStatus(byField.get(OrderFilterField.Status.name()));
+        form.setShipmentType(byField.get(OrderFilterField.ShipmentType.name()));
+        form.setPaymentSource(byField.get(OrderFilterField.PaymentSource.name()));
+        form.setShippingDue(byField.get(OrderFilterField.ShippingDue.name()));
+        form.setSourceName(byField.get(OrderFilterField.SourceName.name()));
+        form.setShippingPostalCode(byField.get(OrderFilterField.ShippingPostalCode.name()));
+        return form;
+    }
+
+    /**
+     * Runs a filter change and redirects to where the user came from. A rejected create or update ({@code form} given)
+     * re-renders the filter subpage with a 422, the rejection and what the user typed; a rejected delete goes back as a
+     * flash for the page it returns to.
+     */
+    private String filterAction(String returnTo, RedirectAttributes redirectAttributes, Model model, Locale locale,
+                                HttpServletResponse response, OrderFilterForm form, String filterId, Supplier<String> action) {
+        String rejection;
+        try {
+            return "redirect:" + action.get();
+        } catch (OrderFilterException rejected) {
+            rejection = messageSource.getMessage(rejected.getMessageKey(), rejected.getMessageArguments(), locale);
+        } catch (OptimisticLockingExhaustedException e) {
+            rejection = messageSource.getMessage("orders.filters.error.conflict", null, locale);
+        }
+        if (form != null) {
+            addFilterEditAttributes(model, listOf(safeReturnTo(returnTo)), filterId, form, locale);
+            model.addAttribute("filterError", rejection);
+            response.setStatus(422);
+            return "orders/filter-edit";
+        }
+        redirectAttributes.addFlashAttribute("filterError", rejection);
+        return "redirect:" + safeReturnTo(returnTo);
+    }
+
+    private void addFilterFormAttributes(Model model, String returnTo, Locale locale) {
+        model.addAttribute("filters", orderFilters.list(actor()));
+        model.addAttribute("canManageStoreFilters", isAdmin());
+        // the list shows only open orders, so a filter can only name an open status
+        model.addAttribute("statuses", OrderListService.OPEN);
+        model.addAttribute("shipmentTypes", ShipmentType.values());
+        model.addAttribute("paymentSources", PaymentSource.values());
+        model.addAttribute("shippingDueOptions", ShippingDue.values());
+        model.addAttribute("marketplaces", connectedMarketplaceNames());
+        model.addAttribute("returnTo", returnTo);
+    }
+
+    /**
+     * Only the list's own address, or the filter management page carrying one, may be returned to (spec §7.2);
+     * anything else falls back to the bare list.
+     */
+    static String safeReturnTo(String returnTo) {
+        if (returnTo != null && (returnTo.equals(FILTERS_PATH) || returnTo.startsWith(FILTERS_PATH + "?"))) {
+            return filtersPage(listOf(returnTo));
+        }
+        return safeListReturnTo(returnTo);
+    }
+
+    /** The list address only: the management page's own back link and returnTo parameter. */
+    static String safeListReturnTo(String returnTo) {
+        if (returnTo == null || returnTo.length() > 300) {
+            return OrderListQuery.PATH;
+        }
+        boolean ownPath = returnTo.equals(OrderListQuery.PATH) || returnTo.startsWith(OrderListQuery.PATH + "?");
+        return ownPath && !returnTo.contains("//") ? returnTo : OrderListQuery.PATH;
+    }
+
+    /** The management page that returns to the given list address. */
+    static String filtersPage(String listReturnTo) {
+        return FILTERS_PATH + "?returnTo=" + URLEncoder.encode(safeListReturnTo(listReturnTo), StandardCharsets.UTF_8);
+    }
+
+    /** The list address a return address leads back to: itself, or the management page's returnTo. */
+    static String listOf(String returnTo) {
+        if (returnTo != null && (returnTo.equals(FILTERS_PATH) || returnTo.startsWith(FILTERS_PATH + "?"))) {
+            List<String> inner = queryOf(returnTo).get("returnTo");
+            return safeListReturnTo(inner == null || inner.isEmpty() ? null : inner.get(0));
+        }
+        return safeListReturnTo(returnTo);
+    }
+
+    private static MultiValueMap<String, String> queryOf(String href) {
+        return UriComponentsBuilder.fromUriString(href).build().getQueryParams().entrySet().stream()
+                .collect(LinkedMultiValueMap::new,
+                        (map, e) -> e.getValue().forEach(v -> map.add(e.getKey(), v == null ? "" : URLDecoder.decode(v, StandardCharsets.UTF_8))),
+                        LinkedMultiValueMap::addAll);
+    }
+
+    /** A malformed address (an unbalanced "%" from a truncated returnTo) falls back to the bare list rather than
+     * throwing out of a filter action. */
+    private static OrderListQuery parseReturnTo(String href) {
+        try {
+            return OrderListQuery.parse(queryOf(href));
+        } catch (IllegalArgumentException e) {
+            return OrderListQuery.parse(queryOf(OrderListQuery.PATH));
+        }
     }
 
     private FilterActor actor() {
         return new FilterActor(getStoreId(), getUserId(), isAdmin());
-    }
-
-    private record OpenOrdersSelection(ListOrderFiltersView savedFilters, OrderFilter selectedFilter,
-                                       List<Order> allOpenOrders, List<Order> openOrders,
-                                       OrderStatusSelection statusSelection, List<Order> filteredOrders,
-                                       LocalDate today) {
-    }
-
-    private OpenOrdersSelection selectOpenOrders(List<String> statuses, boolean showAll, String filterId) {
-        ListOrderFiltersView savedFilters = orderFilters.list(actor());
-        OrderFilter selectedFilter = savedFilters.byId(filterId).orElse(null);
-
-        List<Order> allOpenOrders = ordersRepository.findOpenOrders(getStoreId());
-        LocalDate today = LocalDate.now();
-        List<Order> openOrders = matching(allOpenOrders, selectedFilter, today);
-
-        OrderStatusSelection statusSelection =
-                OrderStatusSelection.resolve(openOrders, statuses, showAll || selectedFilter != null);
-
-        return new OpenOrdersSelection(savedFilters, selectedFilter, allOpenOrders, openOrders,
-                statusSelection, statusSelection.narrow(openOrders), today);
-    }
-
-    private void addSectionsAttributes(Model model, List<Order> filteredOrders) {
-        Arrays.stream(OrderStatus.values()).forEach(s -> model.addAttribute(s.name() + "Status", s));
-        model.addAttribute("ordersByStatus", filteredOrders.stream().collect(Collectors.groupingBy(Order::getStatus)));
-    }
-
-    private List<Order> matching(List<Order> orders, OrderFilter filter, LocalDate today) {
-        return filter == null ? orders : orders.stream().filter(order -> filter.matches(order, today)).toList();
-    }
-
-    private long countMatching(List<Order> orders, OrderFilter filter, LocalDate today) {
-        return orders.stream().filter(order -> filter.matches(order, today)).count();
     }
 
     private List<String> connectedMarketplaceNames() {

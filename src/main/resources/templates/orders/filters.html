@@ -1,0 +1,116 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+
+<!--/* The fields of a filter on the new/edit subpage (orders/filter-edit.html). */-->
+<div th:fragment="filterFormFields" class="cl-form-grid">
+    <div class="cl-field cl-span-6">
+        <label class="cl-label" for="filter-label" th:text="#{orders.filters.name}"></label>
+        <input class="cl-input" type="text" id="filter-label" name="label" th:value="${filterForm?.label}" required/>
+    </div>
+    <div class="cl-field cl-span-3">
+        <label class="cl-label" for="filter-status" th:text="#{orders.filters.field.status}"></label>
+        <select class="cl-select" id="filter-status" name="status" aria-describedby="filter-conditions-help">
+            <option value="" th:text="#{orders.filters.any}"></option>
+            <option th:each="status : ${statuses}" th:value="${status.name()}" th:text="#{${'OrderStatus.' + status.name()}}"
+                    th:selected="${filterForm != null and #strings.equalsIgnoreCase(filterForm.status, status.name())}"></option>
+        </select>
+    </div>
+    <div class="cl-field cl-span-3">
+        <label class="cl-label" for="filter-shipping-due" th:text="#{orders.filters.field.shipping.due}"></label>
+        <select class="cl-select" id="filter-shipping-due" name="shippingDue">
+            <option value="" th:text="#{orders.filters.any}"></option>
+            <option th:each="due : ${shippingDueOptions}" th:value="${due.name()}" th:text="#{${'ShippingDue.' + due.name()}}"
+                    th:selected="${filterForm != null and #strings.equalsIgnoreCase(filterForm.shippingDue, due.name())}"></option>
+        </select>
+    </div>
+    <div class="cl-field cl-span-3">
+        <label class="cl-label" for="filter-shipment-type" th:text="#{orders.filters.field.shipment.type}"></label>
+        <select class="cl-select" id="filter-shipment-type" name="shipmentType">
+            <option value="" th:text="#{orders.filters.any}"></option>
+            <option th:each="type : ${shipmentTypes}" th:value="${type.name()}" th:text="#{${'ShipmentType.' + type.name()}}"
+                    th:selected="${filterForm != null and #strings.equalsIgnoreCase(filterForm.shipmentType, type.name())}"></option>
+        </select>
+    </div>
+    <div class="cl-field cl-span-3">
+        <label class="cl-label" for="filter-payment-source" th:text="#{orders.filters.field.payment.source}"></label>
+        <select class="cl-select" id="filter-payment-source" name="paymentSource">
+            <option value="" th:text="#{orders.filters.any}"></option>
+            <option th:each="source : ${paymentSources}" th:value="${source.name()}" th:text="#{${'PaymentSource.' + source.name()}}"
+                    th:selected="${filterForm != null and #strings.equalsIgnoreCase(filterForm.paymentSource, source.name())}"></option>
+        </select>
+    </div>
+    <div class="cl-field cl-span-3">
+        <label class="cl-label" for="filter-source-name" th:text="#{orders.filters.field.marketplace}"></label>
+        <select class="cl-select" id="filter-source-name" name="sourceName" th:unless="${marketplaces.isEmpty()}">
+            <option value="" th:text="#{orders.filters.any}"></option>
+            <option th:each="m : ${marketplaces}" th:value="${m}" th:text="${m}"
+                    th:selected="${filterForm != null and #strings.equalsIgnoreCase(filterForm.sourceName, m)}"></option>
+        </select>
+        <p class="cl-help" th:if="${marketplaces.isEmpty()}" th:text="#{orders.filters.marketplaces.empty}"></p>
+    </div>
+    <div class="cl-field cl-span-3">
+        <label class="cl-label" for="filter-postal-code" th:text="#{orders.filters.field.postal.code}"></label>
+        <input class="cl-input" type="text" id="filter-postal-code" name="shippingPostalCode" th:value="${filterForm?.shippingPostalCode}" inputmode="numeric" data-cl-postal-code/>
+    </div>
+    <div class="cl-check-field cl-span-6" th:if="${canManageStoreFilters}">
+        <label class="cl-check"><input type="checkbox" name="sharedWithStore" value="true" th:checked="${filterForm != null and filterForm.sharedWithStore}"/> <span th:text="#{orders.filters.share}"></span></label>
+        <p class="cl-check-description" th:text="#{orders.filters.share.help}"></p>
+    </div>
+</div>
+
+<!--/* Filter management page (design system: a list of records in a card, "Nowy filtr" in the card head, editing on a
+       subpage, deleting through the confirm dialog or its page). The delete link returns to this page ($returnTo);
+       "‹ Zamówienia" goes back to the list view the user came from ($listHref). */-->
+<div layout:fragment="content">
+    <section class="cl-page">
+        <div class="cl-page-body">
+            <div th:replace="~{fragments/settings-header :: subpage(${listHref}, #{orders.filters.page.back}, #{orders.filters.page.title})}"></div>
+            <div th:if="${filterError}" class="cl-alert is-bad" role="status">
+                <p class="cl-alert-text" th:text="${filterError}"></p>
+            </div>
+            <section class="cl-card" aria-labelledby="filters-title">
+                <div class="cl-card-head">
+                    <h2 class="cl-card-title" id="filters-title" th:text="#{orders.filters.list.title}"></h2>
+                    <a class="cl-button" th:href="@{/dashboard/orders/filters/add(returnTo=${listHref})}">
+                        <i class="fas fa-plus" aria-hidden="true"></i>
+                        <span th:text="#{orders.filters.new}"></span>
+                    </a>
+                </div>
+                <p class="cl-card-desc" th:text="#{orders.filters.list.desc}"></p>
+                <ul class="cl-list" th:unless="${filters.sharedWithStore().isEmpty() and filters.own().isEmpty()}">
+                    <th:block th:each="group : ${ {filters.sharedWithStore(), filters.own()} }" th:with="shared=${groupStat.first}">
+                        <li class="cl-list-item" th:each="filter : ${group}">
+                            <div>
+                                <span class="cl-list-title" th:text="${filter.label}"></span>
+                                <div class="cl-filter-conditions">
+                                    <span class="cl-status is-neutral" th:each="c : ${filter.conditions}" th:text="${#messages.msg('orders.filters.field.' + T(pl.commercelink.web.orders.FilterConditionLabels).fieldKey(c.field))} + ': ' + ${T(pl.commercelink.web.orders.FilterConditionLabels).value(c, #messages)}"></span>
+                                    <span class="cl-status is-neutral" th:text="${shared} ? #{orders.filters.scope.store} : #{orders.filters.scope.private}"></span>
+                                </div>
+                            </div>
+                            <div class="cl-list-actions" th:if="${!shared or canManageStoreFilters}">
+                                <a class="cl-link-button" th:href="@{/dashboard/orders/filters/{id}/edit(id=${filter.id},returnTo=${listHref})}"
+                                   th:attr="aria-label=#{orders.filters.edit.label(${filter.label})}" th:text="#{settings.list.edit}"></a>
+                                <a class="cl-link-button is-danger" data-cl-confirm
+                                   th:href="@{/dashboard/orders/filters/delete(filterId=${filter.id},returnTo=${returnTo})}"
+                                   th:attr="aria-label=#{orders.filters.delete.label(${filter.label})},
+                                            data-cl-confirm-title=#{orders.filters.delete.title(${filter.label})},
+                                            data-cl-confirm-message=#{orders.filters.delete.message},
+                                            data-cl-confirm-action=#{orders.filters.delete.action}"
+                                   th:text="#{settings.list.delete}"></a>
+                            </div>
+                        </li>
+                    </th:block>
+                </ul>
+                <p class="cl-list-empty" th:if="${filters.sharedWithStore().isEmpty() and filters.own().isEmpty()}" th:text="#{orders.filters.empty}"></p>
+            </section>
+            <dialog th:replace="~{fragments/confirm-dialog :: dialog}"></dialog>
+        </div>
+    </section>
+    <script th:src="@{/js/confirm-dialog.js}" defer></script>
+</div>
+
+</body>
+</html>

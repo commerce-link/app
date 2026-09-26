@@ -431,7 +431,7 @@ class CatalogScriptContractTest {
                 .contains(".cl-page .cl-table .cl-check-target {").contains(".cl-page .cl-table-search {")
                 .contains(".cl-page .cl-table.is-editable .cl-select {").contains(".cl-page .cl-repeat-lines .cl-input {");
         assertThat(touch).contains("@media screen and (max-width: 1023px) {")
-                .contains(".cl-page .cl-table.is-products .cl-table-sort {").contains("min-height: 44px;").contains("min-width: 44px;")
+                .contains(".cl-page .cl-table.is-products .cl-table-sort,").contains("min-height: 44px;").contains("min-width: 44px;")
                 .contains(".cl-page .cl-picker-trigger {");
         // outside the two blocks nothing of the catalog tables is fixed at 36 px
         String rest = css.replace(desktop, "");

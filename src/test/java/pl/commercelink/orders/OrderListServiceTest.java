@@ -1,0 +1,325 @@
+package pl.commercelink.orders;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.support.ResourceBundleMessageSource;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import pl.commercelink.orders.filters.FilterActor;
+import pl.commercelink.orders.filters.OrderFilterField;
+import pl.commercelink.orders.filters.model.OrderFilter;
+import pl.commercelink.orders.filters.model.OrderFilterCondition;
+import pl.commercelink.orders.filters.services.ListOrderFiltersView;
+import pl.commercelink.orders.filters.services.OrderFiltersService;
+import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoresRepository;
+import pl.commercelink.stores.WarehouseConfiguration;
+import pl.commercelink.web.orders.OrderListQuery;
+import pl.commercelink.web.orders.OrdersPageModel;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import java.util.Optional;
+import java.util.stream.IntStream;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.verify;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.any;
+
+@ExtendWith(MockitoExtension.class)
+class OrderListServiceTest {
+
+    private static final LocalDate TODAY = LocalDate.of(2026, 9, 25);
+    private static final FilterActor ACTOR = new FilterActor("store-1", "u1", false);
+    private static final Locale PL = new Locale("pl");
+
+    @Mock
+    private OrdersRepository ordersRepository;
+    @Mock
+    private OrderFiltersService orderFilters;
+    @Mock
+    private StoresRepository storesRepository;
+
+    private OrderListService service;
+    private final List<Order> orders = new ArrayList<>();
+
+    @BeforeEach
+    void service() {
+        ResourceBundleMessageSource messages = new ResourceBundleMessageSource();
+        messages.setBasename("messages");
+        messages.setDefaultEncoding("UTF-8");
+        service = new OrderListService(ordersRepository, orderFilters, messages, storesRepository);
+        // the repository reads only the asked-for statuses (StoreIdStatusIndex); the stub filters the same way, so any
+        // Completed or Cancelled order below is not seen by the list, as in the database
+        when(ordersRepository.findByStoreAndStatuses(eq("store-1"), any())).thenAnswer(inv -> {
+            java.util.Collection<OrderStatus> wanted = inv.getArgument(1);
+            return orders.stream().filter(o -> wanted.contains(o.getStatus())).collect(java.util.stream.Collectors.toList());
+        });
+        when(orderFilters.list(ACTOR)).thenReturn(new ListOrderFiltersView(List.of(), List.of()));
+    }
+
+    private Order add(String id, OrderStatus status, LocalDate due, double total, double paid, String marketplace) {
+        Order order = new Order("store-1");
+        order.setOrderId(id);
+        order.setStatus(status);
+        order.setOrderedAt(LocalDateTime.of(2026, 9, 20, 12, 0).plusMinutes(orders.size()));
+        order.setEstimatedShippingAt(due);
+        order.setTotalPrice(total);
+        Payment payment = new Payment(PaymentSource.BankTransfer);
+        payment.setAmount(paid);
+        order.setPayments(new ArrayList<>(List.of(payment)));
+        order.setSource(marketplace == null ? new OrderSource(null, OrderSourceType.WebStore) : new OrderSource(marketplace, OrderSourceType.Marketplace));
+        ShippingDetails shipping = new ShippingDetails();
+        shipping.setName("Jan");
+        shipping.setSurname("Kowalski-" + id);
+        order.setShippingDetails(shipping);
+        orders.add(order);
+        return order;
+    }
+
+    private static OrderListQuery query(String... keyValues) {
+        MultiValueMap<String, String> map = new LinkedMultiValueMap<>();
+        for (int i = 0; i < keyValues.length; i += 2) {
+            map.add(keyValues[i], keyValues[i + 1]);
+        }
+        return OrderListQuery.parse(map);
+    }
+
+    private OrdersPageModel page(OrderListQuery query) {
+        return service.page(ACTOR, query, TODAY, PL);
+    }
+
+    @Test
+    void defaultViewIsOpenOrdersDueFirstWithUndatedLast() {
+        add("late", OrderStatus.New, TODAY.minusDays(2), 10, 10, null);
+        add("none", OrderStatus.New, null, 10, 10, null);
+        add("soon", OrderStatus.Assembly, TODAY.plusDays(1), 10, 10, null);
+        add("today", OrderStatus.Blocked, TODAY, 10, 10, null);
+        add("done", OrderStatus.Completed, TODAY.minusDays(9), 10, 10, null);
+
+        OrdersPageModel model = page(query());
+
+        assertThat(model.rows()).extracting(r -> r.href()).containsExactly(
+                "/dashboard/orders/late", "/dashboard/orders/today", "/dashboard/orders/soon", "/dashboard/orders/none");
+        assertThat(model.resultsLine()).isEqualTo("Zamówienia: 4");
+        assertThat(page(query("sort", "due", "dir", "desc")).rows()).extracting(r -> r.href()).containsExactly(
+                "/dashboard/orders/soon", "/dashboard/orders/today", "/dashboard/orders/late", "/dashboard/orders/none");
+    }
+
+    @Test
+    void closedOrdersAreNotPartOfTheListAndOnlyOpenOnesAreAskedFor() {
+        add("done", OrderStatus.Completed, TODAY.minusDays(1), 10, 10, null);
+        add("gone", OrderStatus.Cancelled, TODAY.minusDays(1), 10, 10, null);
+
+        OrdersPageModel model = page(query());
+
+        assertThat(model.rows()).isEmpty();
+        assertThat(model.emptyState().text()).isEqualTo("Brak otwartych zamówień. Nowe pojawią się tu ze sklepu, marketplace’ów i sprzedaży POS.");
+        assertThat(model.emptyState().actionHref()).isNull();
+        verify(ordersRepository, atLeastOnce()).findByStoreAndStatuses("store-1", OrderListService.OPEN);
+        // an old bookmark to the history lands on the open list
+        assertThat(page(query("status", "Completed")).query().isOpen()).isTrue();
+    }
+
+    @Test
+    void choosingAFilterFromTheMenuTicksItsOwnStatus() {
+        add("a", OrderStatus.Assembled, null, 10, 10, "Allegro");
+        add("b", OrderStatus.New, null, 10, 10, "Allegro");
+        OrderFilter assembled = OrderFilter.of("Skompletowane z Allegro", List.of(
+                OrderFilterCondition.of(OrderFilterField.Status, "Assembled"),
+                OrderFilterCondition.of(OrderFilterField.SourceName, "Allegro")));
+        OrderFilter allegro = OrderFilter.of("Allegro", List.of(OrderFilterCondition.of(OrderFilterField.SourceName, "Allegro")));
+        // saved before the list dropped history: a closed status cannot be ticked, so the link leaves the status alone
+        OrderFilter closed = OrderFilter.of("Zakończone", List.of(OrderFilterCondition.of(OrderFilterField.Status, "Completed")));
+        when(orderFilters.list(ACTOR)).thenReturn(new ListOrderFiltersView(List.of(), List.of(assembled, allegro, closed)));
+
+        OrdersPageModel model = page(query("q", "a"));
+
+        assertThat(model.filterOptions()).extracting(o -> o.href()).containsExactly(
+                "/dashboard/orders?status=Assembled&filterId=" + assembled.getId() + "&q=a",
+                "/dashboard/orders?filterId=" + allegro.getId() + "&q=a",
+                "/dashboard/orders?filterId=" + closed.getId() + "&q=a");
+
+        OrdersPageModel chosen = page(query("status", "Assembled", "filterId", assembled.getId()));
+        assertThat(chosen.rows()).extracting(r -> r.href()).containsExactly("/dashboard/orders/a");
+        assertThat(chosen.statusSummary()).isEqualTo("Skompletowane");
+    }
+
+    @Test
+    void tilesCountTheWholeStoreWhileStatusCountsStayWithinTheFilter() {
+        add("a", OrderStatus.New, TODAY.minusDays(1), 100, 0, "Allegro");
+        add("b", OrderStatus.New, TODAY, 100, 100, null);
+        add("c", OrderStatus.Blocked, null, 50, 50, "Allegro");
+        add("d", OrderStatus.Completed, null, 50, 0, "Allegro");
+        OrderFilter allegro = OrderFilter.of("Allegro", List.of(OrderFilterCondition.of(OrderFilterField.SourceName, "Allegro")));
+        when(orderFilters.list(ACTOR)).thenReturn(new ListOrderFiltersView(List.of(allegro), List.of()));
+
+        OrdersPageModel model = page(query("filterId", allegro.getId()));
+
+        assertThat(model.tiles()).extracting(t -> t.count()).containsExactly(1L, 1L, 1L, 0L); // overdue, today, unpaid, new today (open only)
+        assertThat(model.tiles()).extracting(t -> t.label()).containsExactly("Po terminie", "Na dziś", "Nieopłacone", "Nowe dziś");
+        assertThat(model.tiles().get(2).hint()).isEqualTo("czeka na wpłatę");
+        assertThat(option(model, "Nowe").count()).isEqualTo(1);
+        assertThat(option(model, "Zablokowane").count()).isEqualTo(1);
+        assertThat(model.statusSummary()).isEqualTo("Otwarte");
+        assertThat(model.rows()).hasSize(2);
+        assertThat(model.chips()).extracting(c -> c.label()).containsExactly("Filtr: Allegro");
+        assertThat(model.chips().get(0).clearHref()).isEqualTo("/dashboard/orders");
+    }
+
+    @Test
+    void anOldFocusBookmarkOpensTheUnnarrowedList() {
+        add("a", OrderStatus.New, TODAY.minusDays(1), 100, 100, null);
+        add("b", OrderStatus.Blocked, null, 100, 100, null);
+
+        // ?focus= came from the clickable tiles, which are read-only now; no value may break the page (newToday used to)
+        for (String focus : List.of("overdue", "today", "decide", "unpaid", "newToday")) {
+            OrdersPageModel model = page(query("focus", focus, "status", "Blocked"));
+            assertThat(model.rows()).extracting(r -> r.href()).containsExactly("/dashboard/orders/b");
+            assertThat(model.chips()).extracting(c -> c.label()).containsExactly("Status: Zablokowane");
+            assertThat(model.chips().get(0).clearHref()).isEqualTo("/dashboard/orders");
+        }
+    }
+
+    @Test
+    void searchLooksInOpenOrdersOnly() {
+        add("open-1", OrderStatus.New, null, 10, 10, null).getShippingDetails().setSurname("Nowak");
+        add("open-2", OrderStatus.New, null, 10, 10, null);
+        add("old-1", OrderStatus.Completed, null, 10, 10, null).getShippingDetails().setSurname("Nowak");
+        add("old-2", OrderStatus.Cancelled, null, 10, 10, null).getShippingDetails().setSurname("Nowak");
+
+        OrdersPageModel model = page(query("q", "nowak"));
+
+        assertThat(model.rows()).extracting(r -> r.href()).containsExactly("/dashboard/orders/open-1");
+        assertThat(model.resultsLine()).isEqualTo("Zamówienia: 1");
+        assertThat(model.chips()).extracting(c -> c.label()).containsExactly("Szukasz: „nowak”");
+    }
+
+    @Test
+    void sortsByAmountAndNumber() {
+        add("b", OrderStatus.New, null, 300, 300, null);
+        add("a", OrderStatus.New, null, 100, 100, null);
+        add("c", OrderStatus.New, null, 200, 200, null);
+
+        assertThat(page(query("sort", "amount")).rows()).extracting(r -> r.href()).containsExactly("/dashboard/orders/a", "/dashboard/orders/c", "/dashboard/orders/b");
+        assertThat(page(query("sort", "amount", "dir", "desc")).rows()).extracting(r -> r.href()).containsExactly("/dashboard/orders/b", "/dashboard/orders/c", "/dashboard/orders/a");
+        assertThat(page(query("sort", "number")).rows()).extracting(r -> r.href()).containsExactly("/dashboard/orders/a", "/dashboard/orders/b", "/dashboard/orders/c");
+        assertThat(page(query("sort", "amount")).sortHeaders().get(OrderListQuery.Sort.AMOUNT).ariaSort()).isEqualTo("ascending");
+        assertThat(page(query("sort", "amount")).sortHeaders().get(OrderListQuery.Sort.AMOUNT).href()).isEqualTo("/dashboard/orders?sort=amount&dir=desc");
+        assertThat(page(query()).sortHeaders().get(OrderListQuery.Sort.DUE).ariaSort()).isEqualTo("ascending");
+        assertThat(page(query()).sortHeaders().get(OrderListQuery.Sort.NUMBER).ariaSort()).isEqualTo("none");
+    }
+
+    /** Lifecycle order; within one status the most urgent first, in either direction (only the statuses flip). */
+    @Test
+    void sortsByStatusInLifecycleOrderWithTheDueDateInside() {
+        add("delivered", OrderStatus.Delivered, TODAY, 100, 100, null);
+        add("new-later", OrderStatus.New, TODAY.plusDays(3), 100, 100, null);
+        add("blocked", OrderStatus.Blocked, TODAY, 100, 100, null);
+        add("new-undated", OrderStatus.New, null, 100, 100, null);
+        add("new-soon", OrderStatus.New, TODAY.plusDays(1), 100, 100, null);
+
+        assertThat(page(query("sort", "status")).rows()).extracting(r -> r.href().substring(18)).containsExactly(
+                "new-soon", "new-later", "new-undated", "blocked", "delivered");
+        assertThat(page(query("sort", "status", "dir", "desc")).rows()).extracting(r -> r.href().substring(18)).containsExactly(
+                "delivered", "blocked", "new-soon", "new-later", "new-undated");
+        assertThat(page(query("sort", "status")).sortHeaders().get(OrderListQuery.Sort.STATUS).ariaSort()).isEqualTo("ascending");
+        assertThat(page(query()).sortHeaders().get(OrderListQuery.Sort.STATUS).href()).isEqualTo("/dashboard/orders?sort=status&dir=asc");
+    }
+
+    @Test
+    void pagesFiftyRowsAndClampsThePage() {
+        IntStream.range(0, 51).forEach(i -> add(String.format("o%02d", i), OrderStatus.New, null, i, i, null));
+
+        OrdersPageModel first = page(query());
+        assertThat(first.rows()).hasSize(50);
+        assertThat(first.pagination().isNeeded()).isTrue();
+        assertThat(first.pagination().nextHref()).isEqualTo("/dashboard/orders?page=2");
+
+        OrdersPageModel beyond = page(query("page", "9"));
+        assertThat(beyond.rows()).hasSize(1);
+        assertThat(beyond.pagination().page()).isEqualTo(2);
+        assertThat(beyond.pagination().previousHref()).isEqualTo("/dashboard/orders");
+    }
+
+    @Test
+    void emptyStatesPickTheRightMessageAndAction() {
+        assertThat(page(query()).emptyState().text()).isEqualTo("Brak otwartych zamówień. Nowe pojawią się tu ze sklepu, marketplace’ów i sprzedaży POS.");
+        assertThat(page(query()).emptyState().actionHref()).isNull();
+        add("a", OrderStatus.New, TODAY.plusDays(1), 10, 10, null);
+        assertThat(page(query("q", "zzz")).emptyState().text()).startsWith("Brak wyników dla „zzz”");
+        assertThat(page(query("q", "zzz")).emptyState().actionHref()).isEqualTo("/dashboard/orders");
+        assertThat(page(query("status", "Blocked")).emptyState().text()).isEqualTo("Brak zamówień w statusie „Zablokowane”.");
+        OrderFilter f = OrderFilter.of("Kurier", List.of(OrderFilterCondition.of(OrderFilterField.ShipmentType, "PickupPoint")));
+        when(orderFilters.list(ACTOR)).thenReturn(new ListOrderFiltersView(List.of(), List.of(f)));
+        assertThat(page(query("filterId", f.getId())).emptyState().text()).isEqualTo("Ten filtr nie ma dziś zamówień.");
+        assertThat(page(query("filterId", f.getId())).emptyState().actionHref()).isEqualTo("/dashboard/orders");
+        assertThat(page(query()).emptyState()).isNull();
+    }
+
+    @Test
+    void unknownFilterIdIsIgnoredAndFilterOptionsListSharedFirst() {
+        add("a", OrderStatus.New, null, 10, 10, null);
+        OrderFilter own = OrderFilter.of("Mój", List.of(OrderFilterCondition.of(OrderFilterField.Status, "New")));
+        OrderFilter shared = OrderFilter.of("Sklepowy", List.of(OrderFilterCondition.of(OrderFilterField.Status, "Blocked")));
+        when(orderFilters.list(ACTOR)).thenReturn(new ListOrderFiltersView(List.of(shared), List.of(own)));
+
+        OrdersPageModel model = page(query("filterId", "does-not-exist"));
+
+        assertThat(model.rows()).hasSize(1);
+        assertThat(model.chips()).isEmpty();
+        assertThat(model.activeFilter()).isEmpty();
+        assertThat(model.filterOptions()).extracting(o -> o.label()).containsExactly("Sklepowy", "Mój");
+        assertThat(model.filterOptions()).extracting(o -> o.shared()).containsExactly(true, false);
+    }
+
+    @Test
+    void severalTickedStatusesShowTogetherWithOneChipEach() {
+        add("n", OrderStatus.New, TODAY.plusDays(2), 10, 10, null);
+        add("b", OrderStatus.Blocked, TODAY.plusDays(1), 10, 10, null);
+        add("a", OrderStatus.Assembly, TODAY, 10, 10, null);
+        add("c", OrderStatus.Completed, null, 10, 10, null);
+
+        OrdersPageModel model = page(query("status", "New", "status", "Blocked"));
+
+        assertThat(model.rows()).extracting(r -> r.href()).containsExactly("/dashboard/orders/b", "/dashboard/orders/n");
+        assertThat(model.statusSummary()).isEqualTo("2 wybrane");
+        assertThat(option(model, "Nowe").selected()).isTrue();
+        assertThat(option(model, "W kompletacji").selected()).isFalse();
+        // each ticked status is its own chip; its "×" drops only that status
+        assertThat(model.chips()).extracting(c -> c.label()).containsExactly("Status: Nowe", "Status: Zablokowane");
+        assertThat(model.chips()).extracting(c -> c.clearHref())
+                .containsExactly("/dashboard/orders?status=Blocked", "/dashboard/orders?status=New");
+        assertThat(page(query("status", "New")).chips().get(0).clearHref()).isEqualTo("/dashboard/orders");
+        assertThat(page(query("status", "New")).statusSummary()).isEqualTo("Nowe");
+        assertThat(page(query("status", "Shipping", "status", "Delivered")).emptyState().text()).isEqualTo("Brak zamówień w wybranych statusach.");
+    }
+
+    private static OrdersPageModel.StatusOption option(OrdersPageModel model, String label) {
+        return model.openStatuses().stream().filter(s -> s.label().equals(label)).findFirst().orElseThrow();
+    }
+
+    /** The WZ marker depends on the store's warehouse documents setting, read once per page (spec §25). */
+    @Test
+    void rowsExpectAWzOnlyInAStoreThatIssuesWarehouseDocuments() {
+        add("a", OrderStatus.Delivered, TODAY, 100, 100, null);
+
+        assertThat(page(query()).rows().get(0).marks()).extracting(m -> m.kind()).doesNotContain("wz");
+
+        WarehouseConfiguration warehouse = new WarehouseConfiguration();
+        warehouse.setDocumentsGenerationEnabled(true);
+        Store store = new Store();
+        store.setWarehouseConfiguration(warehouse);
+        when(storesRepository.findById("store-1")).thenReturn(store);
+        assertThat(page(query()).rows().get(0).marks()).extracting(m -> m.kind() + ":" + m.state()).contains("wz:is-todo");
+    }
+}

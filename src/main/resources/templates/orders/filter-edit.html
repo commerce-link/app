@@ -1,0 +1,37 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+<!--/* A custom filter's new/edit subpage (design system: record subpage — header with the way back, the form in a card,
+       "Zapisz" and "Anuluj" in the card footer). Posts plainly and returns to the management page ($returnTo); a
+       rejection comes back here with a 422 and the user's input. */-->
+<div layout:fragment="content">
+    <section class="cl-page">
+        <div class="cl-page-body is-form">
+            <div th:replace="~{fragments/settings-header :: subpage(${returnTo}, #{orders.filters.edit.back}, ${pageTitle})}"></div>
+            <form class="cl-form" method="post" th:action="@{${formAction}}" novalidate>
+                <div th:if="${filterError}" class="cl-alert is-bad" role="alert" id="filter-errors" tabindex="-1">
+                    <p class="cl-alert-text" th:text="${filterError}"></p>
+                </div>
+                <input type="hidden" name="filterId" th:if="${filterId != null}" th:value="${filterId}"/>
+                <input type="hidden" name="returnTo" th:value="${returnTo}"/>
+                <div class="cl-card">
+                    <fieldset class="cl-fieldset">
+                        <legend class="cl-fieldset-title" th:text="#{orders.filters.form.legend}"></legend>
+                        <!--/* One note for the whole group (under the status field alone it made that grid row taller than its neighbour). */-->
+                        <p class="cl-help" id="filter-conditions-help" th:text="#{orders.filters.field.status.help}"></p>
+                        <div th:replace="~{orders/filters :: filterFormFields}"></div>
+                    </fieldset>
+                    <div class="cl-card-footer">
+                        <button type="submit" class="cl-button is-primary" th:text="#{orders.filters.save}"></button>
+                        <a class="cl-button" th:href="@{${returnTo}}" th:text="#{orders.filters.cancel}"></a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </section>
+    <script th:src="@{/js/order-filter-form.js}" defer></script>
+</div>
+</body>
+</html>
