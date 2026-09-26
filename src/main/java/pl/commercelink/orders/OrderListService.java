@@ -24,8 +24,6 @@ import pl.commercelink.web.orders.OrdersPageModel.SortHeader;
 import pl.commercelink.web.orders.OrdersPageModel.Tile;
 import pl.commercelink.web.orders.Pagination;
 
-import java.text.DecimalFormat;
-import java.text.DecimalFormatSymbols;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -125,8 +123,6 @@ public class OrderListService {
     private List<Tile> tiles(List<Order> open, OrderListQuery query, LocalDate today, Locale locale) {
         long newCount = open.stream().filter(o -> o.getStatus() == OrderStatus.New).count();
         long blockedCount = open.stream().filter(o -> o.getStatus() == OrderStatus.Blocked).count();
-        double unpaidSum = open.stream().filter(o -> OrderAttention.Unpaid.matches(o, today)).mapToDouble(Order::getUnpaidAmount).sum();
-        double newTodaySum = open.stream().filter(o -> OrderAttention.NewToday.matches(o, today)).mapToDouble(Order::getTotalPrice).sum();
         List<Tile> tiles = new ArrayList<>();
         for (OrderAttention kind : OrderAttention.values()) {
             long count = open.stream().filter(o -> kind.matches(o, today)).count();
@@ -134,8 +130,6 @@ public class OrderListService {
             String key = "orders.list.attention." + kind.param();
             String hint = switch (kind) {
                 case Decide -> text("orders.list.attention.decide.hint", locale, newCount, blockedCount);
-                case Unpaid -> text(key + ".hint", locale, text("general.currency.amount", locale, money(unpaidSum, locale)));
-                case NewToday -> text(key + ".hint", locale, text("general.currency.amount", locale, money(newTodaySum, locale)));
                 default -> text(key + ".hint", locale);
             };
             String tone = switch (kind) {
@@ -250,12 +244,5 @@ public class OrderListService {
 
     private String text(String key, Locale locale, Object... args) {
         return messages.getMessage(key, args, locale);
-    }
-
-    private static String money(double value, Locale locale) {
-        DecimalFormatSymbols symbols = new DecimalFormatSymbols(locale);
-        symbols.setGroupingSeparator(' ');
-        symbols.setDecimalSeparator(',');
-        return new DecimalFormat("#,##0.00", symbols).format(value);
     }
 }
