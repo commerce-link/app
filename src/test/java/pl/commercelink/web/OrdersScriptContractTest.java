@@ -2,7 +2,6 @@ package pl.commercelink.web;
 
 import org.junit.jupiter.api.Test;
 
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -19,6 +18,17 @@ class OrdersScriptContractTest {
 
     static String css() throws Exception {
         return read("src/main/resources/static/css/commercelink.css");
+    }
+
+    /** The declarations of every rule of the style sheet whose selector list is exactly {@code selector}, joined. */
+    private static String rule(String css, String selector) {
+        StringBuilder body = new StringBuilder();
+        java.util.regex.Matcher matcher = java.util.regex.Pattern
+                .compile("(?m)^\\s*" + java.util.regex.Pattern.quote(selector) + " \\{([^}]*)}").matcher(css);
+        while (matcher.find()) {
+            body.append(matcher.group(1));
+        }
+        return body.toString();
     }
 
     @Test
@@ -204,11 +214,24 @@ class OrdersScriptContractTest {
     /**
      * The closing strip (spec §4.2) restyles the list's doc marks inline, as full sentences: both glyph and tone
      * carry the meaning, and the side column never drops below 320 px at its widest breakpoint (spec §4).
+     * <p>
+     * Review fix round 1: the inline mark must not inherit the list's pill chrome (padding, fixed line-height,
+     * {@code white-space: nowrap}) or the list's {@code .is-todo} background — the tone belongs on the icon only,
+     * so the sentence itself can wrap and does not carry a second warn-soft pill behind it. The side-column check
+     * is scoped to the {@code .cl-layout-aside} rule bodies only: the add-items dialog's own, unrelated
+     * {@code .cl-item-add-scroll} height legitimately keeps 340 px (Task 4 review round 1).
      */
     @Test
-    void theClosingStripStylesTheInlineMarksWithBothGlyphAndTone() throws IOException {
-        String css = Files.readString(Path.of("src/main/resources/static/css/commercelink.css"));
-        assertThat(css).contains(".cl-page .cl-closing {").contains(".cl-page .cl-doc-marks.is-inline .is-todo .cl-doc-mark-icon { color: var(--cl-warn); background: var(--cl-warn-soft); }");
-        assertThat(css).contains(".cl-page .cl-layout-aside").doesNotContain("340px");
+    void theClosingStripStylesTheInlineMarksWithBothGlyphAndTone() throws Exception {
+        // given
+        String css = css();
+
+        // then
+        assertThat(css).contains(".cl-page .cl-closing {")
+                .contains(".cl-page .cl-doc-marks.is-inline .is-todo .cl-doc-mark-icon { color: var(--cl-warn); background: var(--cl-warn-soft); }")
+                .contains(".cl-page .cl-doc-marks.is-inline .cl-doc-mark { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; height: auto; background: none; padding: 0; white-space: normal; font-weight: 400; letter-spacing: 0; }");
+
+        String aside = rule(css, ".cl-page .cl-layout-aside");
+        assertThat(aside).contains("320px").doesNotContain("340px");
     }
 }

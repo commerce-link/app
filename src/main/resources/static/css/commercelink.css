@@ -5951,7 +5951,7 @@ a.cl-link-button:hover {
 
 /* --- Add-items dialog (orders and offers) --- */
 .cl-page .cl-item-add-scroll {
-    max-height: 320px;
+    max-height: 340px;
     overflow-y: auto;
     border: 1px solid var(--cl-line);
     border-radius: var(--cl-radius);
@@ -6109,7 +6109,7 @@ a.cl-link-button:hover {
 .cl-page .cl-closing-title.is-warn { color: var(--cl-warn); }
 .cl-page .cl-closing-title.is-ok { color: var(--cl-ok); }
 .cl-page .cl-doc-marks.is-inline { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 0; padding: 0; list-style: none; }
-.cl-page .cl-doc-marks.is-inline .cl-doc-mark { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; height: auto; }
+.cl-page .cl-doc-marks.is-inline .cl-doc-mark { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; height: auto; background: none; padding: 0; white-space: normal; font-weight: 400; letter-spacing: 0; }
 .cl-page .cl-doc-marks.is-inline .cl-doc-mark.is-done { color: var(--cl-ink-2); }
 .cl-page .cl-doc-marks.is-inline .cl-doc-mark.is-todo { color: var(--cl-ink); }
 .cl-page .cl-doc-marks.is-inline .cl-doc-mark-icon { width: 18px; height: 18px; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; }
