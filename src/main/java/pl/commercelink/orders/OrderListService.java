@@ -113,9 +113,14 @@ public class OrderListService {
             case AMOUNT -> Comparator.comparingDouble(Order::getTotalPrice);
             case NUMBER -> Comparator.comparing(Order::getOrderId, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER));
             case ORDERED -> Comparator.comparing(Order::getOrderedAt, Comparator.nullsLast(Comparator.<LocalDateTime>naturalOrder()));
+            case STATUS -> byStatus(Comparator.naturalOrder());
         };
         if (dir == Direction.ASC) {
             return base;
+        }
+        // the lifecycle order flips, the most urgent order stays on top within each status
+        if (sort == Sort.STATUS) {
+            return byStatus(Comparator.reverseOrder());
         }
         // "no date" stays last whichever way the dates run
         if (sort == Sort.DUE) {
@@ -194,6 +199,13 @@ public class OrderListService {
             chips.add(new Chip(label, query.withQ(null).href(), text("orders.list.chip.clearLabel", locale, label)));
         }
         return chips;
+    }
+
+    /** Statuses in lifecycle order (the OrderStatus declaration: New … Delivered), then due first within one status. */
+    private static Comparator<Order> byStatus(Comparator<OrderStatus> statusOrder) {
+        return Comparator.comparing(Order::getStatus, Comparator.nullsLast(statusOrder))
+                .thenComparing(Order::getShippingDueAt, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(Order::getOrderedAt, Comparator.nullsLast(Comparator.naturalOrder()));
     }
 
     private static Map<Sort, SortHeader> sortHeaders(OrderListQuery query) {

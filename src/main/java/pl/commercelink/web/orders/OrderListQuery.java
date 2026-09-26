@@ -36,7 +36,7 @@ public record OrderListQuery(List<OrderStatus> statuses, String filterId, OrderA
     }
 
     public enum Sort {
-        DUE("due"), AMOUNT("amount"), NUMBER("number"), ORDERED("ordered");
+        DUE("due"), AMOUNT("amount"), NUMBER("number"), STATUS("status"), ORDERED("ordered");
 
         private final String param;
 

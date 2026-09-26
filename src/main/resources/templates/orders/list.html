@@ -158,7 +158,8 @@
                 <th:block th:unless="${page.rows().isEmpty()}"
                           th:with="numberSort=${T(pl.commercelink.web.orders.OrderListQuery.Sort).NUMBER},
                                    dueSort=${T(pl.commercelink.web.orders.OrderListQuery.Sort).DUE},
-                                   amountSort=${T(pl.commercelink.web.orders.OrderListQuery.Sort).AMOUNT}">
+                                   amountSort=${T(pl.commercelink.web.orders.OrderListQuery.Sort).AMOUNT},
+                                   statusSort=${T(pl.commercelink.web.orders.OrderListQuery.Sort).STATUS}">
                 <nav class="cl-table-sortbar" th:attr="aria-label=#{orders.list.sort.label}">
                     <span class="cl-eyebrow" th:text="#{orders.list.sort.label}"></span>
                     <a class="cl-tab" th:with="h=${page.sortHeaders().get(dueSort)}" th:href="@{${h.href()}}"
@@ -169,6 +170,11 @@
                     <a class="cl-tab" th:with="h=${page.sortHeaders().get(amountSort)}" th:href="@{${h.href()}}"
                        th:attr="aria-current=${h.ariaSort() != 'none'} ? 'page' : null" data-cl-orders-nav>
                         <span th:text="#{orders.list.sort.amount}"></span>
+                        <span th:if="${h.ariaSort() != 'none'}" aria-hidden="true" th:text="${h.ariaSort() == 'ascending'} ? '▲' : '▼'"></span>
+                    </a>
+                    <a class="cl-tab" th:with="h=${page.sortHeaders().get(statusSort)}" th:href="@{${h.href()}}"
+                       th:attr="aria-current=${h.ariaSort() != 'none'} ? 'page' : null" data-cl-orders-nav>
+                        <span th:text="#{orders.list.sort.status}"></span>
                         <span th:if="${h.ariaSort() != 'none'}" aria-hidden="true" th:text="${h.ariaSort() == 'ascending'} ? '▲' : '▼'"></span>
                     </a>
                     <a class="cl-tab" th:with="h=${page.sortHeaders().get(numberSort)}" th:href="@{${h.href()}}"
@@ -187,7 +193,9 @@
                         <th scope="col" th:attr="aria-sort=${page.sortHeaders().get(dueSort).ariaSort()}">
                             <a class="cl-table-sort" th:href="@{${page.sortHeaders().get(dueSort).href()}}" th:text="#{orders.list.column.due}" data-cl-orders-nav></a>
                         </th>
-                        <th scope="col" th:text="#{orders.list.column.status}"></th>
+                        <th scope="col" th:attr="aria-sort=${page.sortHeaders().get(statusSort).ariaSort()}">
+                            <a class="cl-table-sort" th:href="@{${page.sortHeaders().get(statusSort).href()}}" th:text="#{orders.list.column.status}" data-cl-orders-nav></a>
+                        </th>
                         <th scope="col" class="is-numeric" th:attr="aria-sort=${page.sortHeaders().get(amountSort).ariaSort()}">
                             <a class="cl-table-sort" th:href="@{${page.sortHeaders().get(amountSort).href()}}" th:text="#{orders.list.column.amount}" data-cl-orders-nav></a>
                         </th>

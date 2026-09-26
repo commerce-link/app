@@ -46,7 +46,8 @@ class OrdersListTemplateTest {
                 .contains("'cl-visually-hidden'").doesNotContain("cl-filter-chip-link").doesNotContain("historyStatuses")
                 .contains("cl-table is-orders").contains("cl-table-sort").contains("aria-sort")
                 .contains("cl-table-sortbar").contains("orders.list.sort.label")
-                .contains("orders.list.sort.due").contains("orders.list.sort.amount").contains("orders.list.sort.number")
+                .contains("orders.list.sort.due").contains("orders.list.sort.amount").contains("orders.list.sort.number").contains("orders.list.sort.status")
+                .contains("th:href=\"@{${page.sortHeaders().get(statusSort).href()}}\" th:text=\"#{orders.list.column.status}\"")
                 .doesNotContain("orders.list.sort.ordered")   // "date placed" only sorted the history, which is gone
                 .contains("fragments/pagination :: pages(${page.pagination()})")
                 .contains("data-cl-orders-results").contains("data-cl-orders-nav")

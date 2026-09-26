@@ -223,6 +223,23 @@ class OrderListServiceTest {
         assertThat(page(query()).sortHeaders().get(OrderListQuery.Sort.NUMBER).ariaSort()).isEqualTo("none");
     }
 
+    /** Lifecycle order; within one status the most urgent first, in either direction (only the statuses flip). */
+    @Test
+    void sortsByStatusInLifecycleOrderWithTheDueDateInside() {
+        add("delivered", OrderStatus.Delivered, TODAY, 100, 100, null);
+        add("new-later", OrderStatus.New, TODAY.plusDays(3), 100, 100, null);
+        add("blocked", OrderStatus.Blocked, TODAY, 100, 100, null);
+        add("new-undated", OrderStatus.New, null, 100, 100, null);
+        add("new-soon", OrderStatus.New, TODAY.plusDays(1), 100, 100, null);
+
+        assertThat(page(query("sort", "status")).rows()).extracting(r -> r.href().substring(18)).containsExactly(
+                "new-soon", "new-later", "new-undated", "blocked", "delivered");
+        assertThat(page(query("sort", "status", "dir", "desc")).rows()).extracting(r -> r.href().substring(18)).containsExactly(
+                "delivered", "blocked", "new-soon", "new-later", "new-undated");
+        assertThat(page(query("sort", "status")).sortHeaders().get(OrderListQuery.Sort.STATUS).ariaSort()).isEqualTo("ascending");
+        assertThat(page(query()).sortHeaders().get(OrderListQuery.Sort.STATUS).href()).isEqualTo("/dashboard/orders?sort=status&dir=asc");
+    }
+
     @Test
     void pagesFiftyRowsAndClampsThePage() {
         IntStream.range(0, 51).forEach(i -> add(String.format("o%02d", i), OrderStatus.New, null, i, i, null));
