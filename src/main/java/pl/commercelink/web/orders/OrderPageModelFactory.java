@@ -91,7 +91,7 @@ public class OrderPageModelFactory {
                 closed, readOnly, viewer.superAdmin(), viewer.admin(), store == null ? null : store.getName(),
                 header(order, items, store, viewer, readOnly, links),
                 checklist, checklist == null ? null : checklist.title(messageSource, locale),
-                items(order, items, store, viewer, closed, readOnly, links, hasDropshipItems, hasWarehouseDocument),
+                items(order, items, store, viewer, readOnly, links, hasDropshipItems, hasWarehouseDocument),
                 shipments(order, store, readOnly),
                 documents(order, viewer, closed, readOnly, documentsEnabled && hasWarehouseItems && !hasWarehouseDocument),
                 payments(order, readOnly),
@@ -152,7 +152,7 @@ public class OrderPageModelFactory {
                 && !SupplierRegistry.WAREHOUSE.equalsIgnoreCase(item.getDeliveryId());
     }
 
-    private OrderPageModel.ItemsCard items(Order order, List<OrderItem> items, Store store, Viewer viewer, boolean closed,
+    private OrderPageModel.ItemsCard items(Order order, List<OrderItem> items, Store store, Viewer viewer,
                                            boolean readOnly, OrderLinks links, boolean hasDropshipItems,
                                            boolean hasWarehouseDocument) {
         SupplierLabelMap labels = supplierLabels.forStore(store);
@@ -175,10 +175,7 @@ public class OrderPageModelFactory {
             }
         }
         boolean canSplitOrder = order.canBeSplit() && !items.isEmpty();
-        String addReason = closed ? "order.items.add.locked.closed"
-                : hasWarehouseDocument ? "order.items.add.locked.goods.issue"
-                : order.isInvoiced() ? "order.items.add.locked.invoiced"
-                : hasDropshipItems ? "order.items.action.dropship.locked" : null;
+        String addReason = addItemsLockedKey(order, hasDropshipItems);
         List<OrderPageModel.SerialItemRow> serialItems = items.stream()
                 .filter(i -> i.hasOneOfTheStatuses(FulfilmentStatus.Delivered)).filter(OrderItem::isProduct)
                 .map(i -> serialItemRow(i, labels)).toList();
@@ -311,5 +308,19 @@ public class OrderPageModelFactory {
             return new OrderPageModel.EventRow(at, "order.event.type.action." + name, null, null);
         }
         return new OrderPageModel.EventRow(at, "order.event.type.other", null, name);
+    }
+
+    /** Why items cannot be added (null when they can): the page greys the button with it, the controller refuses with it. */
+    public static String addItemsLockedKey(Order order, boolean hasDropshipItems) {
+        if (order.hasOneOfStatuses(OrderStatus.Completed, OrderStatus.Cancelled)) {
+            return "order.items.add.locked.closed";
+        }
+        if (order.getDocumentByType(DocumentType.GoodsIssue).isPresent()) {
+            return "order.items.add.locked.goods.issue";
+        }
+        if (order.isInvoiced()) {
+            return "order.items.add.locked.invoiced";
+        }
+        return hasDropshipItems ? "order.items.action.dropship.locked" : null;
     }
 }
