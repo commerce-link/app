@@ -503,7 +503,7 @@ public class Order {
     }
 
     public void setBillingDetails(BillingDetails billingDetails) {
-        this.email = billingDetails.getEmail(); // projection
+        this.email = billingDetails != null ? billingDetails.getEmail() : null; // projection
         this.billingDetails = billingDetails;
     }
 
@@ -544,7 +544,8 @@ public class Order {
     }
 
     public void setPayments(List<Payment> payments) {
-        this.payments = payments;
+        // normalize at the boundary: every internal read (getPaidAmount, getPendingPayment, ...) assumes a list, never null
+        this.payments = payments != null ? payments : new LinkedList<>();
     }
 
     public List<Shipment> getShipments() {
