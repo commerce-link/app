@@ -117,7 +117,7 @@
                                     </li>
                                     <li>
                                         <a class="cl-filter-menu-item" th:href="@{/dashboard/orders/filters(returnTo=${returnTo})}"
-                                           data-cl-dialog-open="filters-dialog" th:text="#{orders.list.manageFilters}"></a>
+                                           th:text="#{orders.list.manageFilters}"></a>
                                     </li>
                                 </ul>
                             </div>
@@ -248,7 +248,6 @@
             </section>
         </div>
 
-        <div th:replace="~{orders/filters :: filtersDialog}"></div>
         <div th:replace="~{orders/filters :: saveViewDialog}"></div>
         <div th:replace="~{fragments/confirm-dialog :: dialog}"></div>
     </div>

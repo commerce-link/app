@@ -4,83 +4,10 @@
       layout:decorate="~{layout}">
 <body>
 
-<!--/* The management dialog of the orders list. Without JavaScript the same body renders as the page
-       /dashboard/orders/filters (layout:fragment below). */-->
-<dialog th:fragment="filtersDialog" class="cl-dialog is-form" id="filters-dialog" aria-labelledby="filters-dialog-title">
-    <h2 class="cl-dialog-title" id="filters-dialog-title" th:text="#{orders.filters.title}"></h2>
-    <div class="cl-dialog-body" data-cl-dialog-body>
-        <div th:replace="~{orders/filters :: dialogBody}"></div>
-    </div>
-</dialog>
+<!--/* The answer to a successful fetch from the "save this view" dialog: where the list goes next. */-->
+<div th:fragment="redirect" th:attr="data-cl-redirect=${redirectTo}"></div>
 
-<!--/* List + star + edit/delete, then the new/edit form (hidden until "Nowy filtr" / "Edytuj"). Re-rendered by the
-       controller after every fetch; data-cl-redirect tells the script the list under the dialog changed. */-->
-<div th:fragment="dialogBody" th:attr="data-cl-redirect=${redirectTo}">
-    <div th:if="${filterError}" class="cl-alert is-bad" role="status" data-cl-error-summary tabindex="-1">
-        <p class="cl-alert-text" th:text="${filterError}"></p>
-    </div>
-
-    <div data-cl-filters-list>
-        <ul class="cl-list" th:unless="${filters.sharedWithStore().isEmpty() and filters.own().isEmpty()}">
-            <th:block th:each="group : ${ {filters.sharedWithStore(), filters.own()} }" th:with="shared=${groupStat.first}">
-                <li class="cl-list-item is-filter" th:each="filter : ${group}" th:with="starred=${filters.isDefault(filter.id)}">
-                    <form method="post" class="cl-star-form" data-cl-filters-form
-                          th:action="${starred} ? @{/dashboard/orders/filters/default/clear} : @{/dashboard/orders/filters/{id}/default(id=${filter.id})}">
-                        <input type="hidden" name="returnTo" th:value="${returnTo}"/>
-                        <button type="submit" class="cl-star" th:attr="aria-pressed=${starred},
-                                aria-label=${starred} ? #{orders.filters.default.clear(${filter.label})} : #{orders.filters.default.set(${filter.label})}">
-                            <span class="icon is-small" aria-hidden="true"><i th:class="${starred} ? 'fas fa-star' : 'far fa-star'"></i></span>
-                        </button>
-                    </form>
-                    <div>
-                        <span class="cl-list-title"><span th:text="${filter.label}"></span><span th:if="${starred}" class="cl-status is-info" th:text="#{orders.filters.default.badge}"></span></span>
-                        <div class="cl-filter-conditions">
-                            <span class="cl-status is-neutral" th:each="c : ${filter.conditions}" th:text="${#messages.msg('orders.filters.field.' + T(pl.commercelink.web.orders.FilterConditionLabels).fieldKey(c.field))} + ': ' + ${T(pl.commercelink.web.orders.FilterConditionLabels).value(c, #messages)}"></span>
-                            <span class="cl-status is-neutral" th:text="${shared} ? #{orders.filters.scope.store} : #{orders.filters.scope.private}"></span>
-                        </div>
-                    </div>
-                    <div class="cl-list-actions" th:if="${!shared or canManageStoreFilters}">
-                        <button type="button" class="cl-link-button" data-cl-filter-edit
-                                th:attr="aria-label=#{orders.filters.edit.label(${filter.label})},
-                                         data-filter-id=${filter.id}, data-label=${filter.label}, data-shared=${shared},
-                                         data-status=${filter.conditionsByField.get('Status')},
-                                         data-shipment-type=${filter.conditionsByField.get('ShipmentType')},
-                                         data-payment-source=${filter.conditionsByField.get('PaymentSource')},
-                                         data-source-name=${filter.conditionsByField.get('SourceName')},
-                                         data-shipping-postal-code=${filter.conditionsByField.get('ShippingPostalCode')},
-                                         data-shipping-due=${filter.conditionsByField.get('ShippingDue')}"
-                                th:text="#{settings.list.edit}"></button>
-                        <a class="cl-link-button is-danger" data-cl-confirm
-                           th:href="@{/dashboard/orders/filters/delete(filterId=${filter.id},returnTo=${returnTo})}"
-                           th:attr="aria-label=#{orders.filters.delete.label(${filter.label})},
-                                    data-cl-confirm-title=#{orders.filters.delete.title(${filter.label})},
-                                    data-cl-confirm-message=#{orders.filters.delete.message},
-                                    data-cl-confirm-action=#{orders.filters.delete.action}"
-                           th:text="#{settings.list.delete}"></a>
-                    </div>
-                </li>
-            </th:block>
-        </ul>
-        <p class="cl-list-empty" th:if="${filters.sharedWithStore().isEmpty() and filters.own().isEmpty()}" th:text="#{orders.filters.empty}"></p>
-        <p class="cl-help cl-filters-help" th:text="#{orders.filters.default.help}"></p>
-        <div class="cl-dialog-actions">
-            <button type="button" class="cl-button is-primary" data-cl-filter-new th:text="#{orders.filters.new}"></button>
-            <a class="cl-button" th:href="@{${returnTo}}" data-cl-dialog-close th:text="#{orders.filters.close}"></a>
-        </div>
-    </div>
-
-    <form method="post" th:action="@{/dashboard/orders/filters}" class="cl-form" id="filter-form" novalidate hidden data-cl-filters-form data-cl-filter-form>
-        <input type="hidden" name="filterId" th:value="${filterId}" data-cl-filter-id/>
-        <input type="hidden" name="returnTo" th:value="${returnTo}"/>
-        <div th:replace="~{orders/filters :: filterFormFields}"></div>
-        <div class="cl-dialog-actions">
-            <button type="submit" class="cl-button is-primary" th:text="#{orders.filters.save}"></button>
-            <button type="button" class="cl-button" data-cl-filter-back th:text="#{orders.filters.cancel}"></button>
-        </div>
-    </form>
-</div>
-
-<!--/* The fields of a filter, shared by new/edit and by "save this view" (which pre-fills them from the address). */-->
+<!--/* The fields of a filter on the new/edit subpage (orders/filter-edit.html). */-->
 <div th:fragment="filterFormFields" class="cl-form-grid">
     <div class="cl-field cl-span-6">
         <label class="cl-label" for="filter-label" th:text="#{orders.filters.name}"></label>
@@ -179,19 +106,63 @@
     </div>
 </form>
 
-<!--/* The page for browsers without JavaScript: the dialog body inside a card. */-->
+<!--/* Filter management page (design system: a list of records in a card, "Nowy filtr" in the card head, editing on a
+       subpage, deleting through the confirm dialog or its page). Every form here returns to this page ($returnTo);
+       "‹ Zamówienia" goes back to the list view the user came from ($listHref). */-->
 <div layout:fragment="content">
     <section class="cl-page">
-        <div class="cl-page-body">
-            <div th:replace="~{fragments/settings-header :: subpage(${returnTo}, #{orders.filters.page.back}, #{orders.filters.page.title})}"></div>
-            <section class="cl-card cl-card-dialog-page">
-                <div th:replace="~{orders/filters :: dialogBody}"></div>
+        <div class="cl-page-body is-form">
+            <div th:replace="~{fragments/settings-header :: subpage(${listHref}, #{orders.filters.page.back}, #{orders.filters.page.title})}"></div>
+            <div th:if="${filterError}" class="cl-alert is-bad" role="status">
+                <p class="cl-alert-text" th:text="${filterError}"></p>
+            </div>
+            <section class="cl-card" aria-labelledby="filters-title">
+                <div class="cl-card-head">
+                    <h2 class="cl-card-title" id="filters-title" th:text="#{orders.filters.list.title}"></h2>
+                    <a class="cl-button" th:href="@{/dashboard/orders/filters/add(returnTo=${listHref})}">
+                        <i class="fas fa-plus" aria-hidden="true"></i>
+                        <span th:text="#{orders.filters.new}"></span>
+                    </a>
+                </div>
+                <p class="cl-card-desc" th:text="#{orders.filters.default.help}"></p>
+                <ul class="cl-list" th:unless="${filters.sharedWithStore().isEmpty() and filters.own().isEmpty()}">
+                    <th:block th:each="group : ${ {filters.sharedWithStore(), filters.own()} }" th:with="shared=${groupStat.first}">
+                        <li class="cl-list-item is-filter" th:each="filter : ${group}" th:with="starred=${filters.isDefault(filter.id)}">
+                            <form method="post" class="cl-star-form"
+                                  th:action="${starred} ? @{/dashboard/orders/filters/default/clear} : @{/dashboard/orders/filters/{id}/default(id=${filter.id})}">
+                                <input type="hidden" name="returnTo" th:value="${returnTo}"/>
+                                <button type="submit" class="cl-star" th:attr="aria-pressed=${starred},
+                                        aria-label=${starred} ? #{orders.filters.default.clear(${filter.label})} : #{orders.filters.default.set(${filter.label})}">
+                                    <span class="icon is-small" aria-hidden="true"><i th:class="${starred} ? 'fas fa-star' : 'far fa-star'"></i></span>
+                                </button>
+                            </form>
+                            <div>
+                                <span class="cl-list-title"><span th:text="${filter.label}"></span><span th:if="${starred}" class="cl-status is-info" th:text="#{orders.filters.default.badge}"></span></span>
+                                <div class="cl-filter-conditions">
+                                    <span class="cl-status is-neutral" th:each="c : ${filter.conditions}" th:text="${#messages.msg('orders.filters.field.' + T(pl.commercelink.web.orders.FilterConditionLabels).fieldKey(c.field))} + ': ' + ${T(pl.commercelink.web.orders.FilterConditionLabels).value(c, #messages)}"></span>
+                                    <span class="cl-status is-neutral" th:text="${shared} ? #{orders.filters.scope.store} : #{orders.filters.scope.private}"></span>
+                                </div>
+                            </div>
+                            <div class="cl-list-actions" th:if="${!shared or canManageStoreFilters}">
+                                <a class="cl-link-button" th:href="@{/dashboard/orders/filters/{id}/edit(id=${filter.id},returnTo=${listHref})}"
+                                   th:attr="aria-label=#{orders.filters.edit.label(${filter.label})}" th:text="#{settings.list.edit}"></a>
+                                <a class="cl-link-button is-danger" data-cl-confirm
+                                   th:href="@{/dashboard/orders/filters/delete(filterId=${filter.id},returnTo=${returnTo})}"
+                                   th:attr="aria-label=#{orders.filters.delete.label(${filter.label})},
+                                            data-cl-confirm-title=#{orders.filters.delete.title(${filter.label})},
+                                            data-cl-confirm-message=#{orders.filters.delete.message},
+                                            data-cl-confirm-action=#{orders.filters.delete.action}"
+                                   th:text="#{settings.list.delete}"></a>
+                            </div>
+                        </li>
+                    </th:block>
+                </ul>
+                <p class="cl-list-empty" th:if="${filters.sharedWithStore().isEmpty() and filters.own().isEmpty()}" th:text="#{orders.filters.empty}"></p>
             </section>
-            <div th:replace="~{fragments/confirm-dialog :: dialog}"></div>
+            <dialog th:replace="~{fragments/confirm-dialog :: dialog}"></dialog>
         </div>
     </section>
     <script th:src="@{/js/confirm-dialog.js}" defer></script>
-    <script th:src="@{/js/filters-dialog.js}" defer></script>
 </div>
 
 </body>

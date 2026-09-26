@@ -211,6 +211,9 @@ public class OrdersController extends BaseController {
     }
 
     private static final String FETCH = "fetch";
+    static final String FILTERS_PATH = "/dashboard/orders/filters";
+    /** The hidden "dialog" field of the filter subpage's form: a rejection re-renders that page. */
+    private static final String PAGE_FORM = "page";
 
     @PostMapping("/dashboard/orders/filters")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
@@ -249,8 +252,10 @@ public class OrdersController extends BaseController {
                                     HttpServletResponse response) {
         return filterAction(requestedWith, returnTo, redirectAttributes, model, locale, response, () -> {
             orderFilters.delete(actor(), filterId);
-            OrderListQuery back = parseReturnTo(safeReturnTo(returnTo));
-            return filterId.equals(back.filterId()) ? back.withFilterId(null).href() : back.href();
+            String target = safeReturnTo(returnTo);
+            OrderListQuery list = parseReturnTo(listOf(target));
+            String listBack = filterId.equals(list.filterId()) ? list.withFilterId(null).href() : list.href();
+            return target.startsWith(FILTERS_PATH) ? filtersPage(listBack) : listBack;
         });
     }
 
@@ -269,7 +274,9 @@ public class OrdersController extends BaseController {
                 messageSource.getMessage("orders.filters.delete.message", null, locale),
                 messageSource.getMessage("orders.filters.delete.action", null, locale),
                 actionPath, back));
-        model.addAttribute("backLabel", messageSource.getMessage("orders.filters.page.back", null, locale));
+        // the way back names where "Anuluj" goes: the management page, or the list for an older link
+        model.addAttribute("backLabel", messageSource.getMessage(back.startsWith(FILTERS_PATH) ? "orders.filters.edit.back"
+                : "orders.filters.page.back", null, locale));
         return "settings-confirm";
     }
 
@@ -297,12 +304,66 @@ public class OrdersController extends BaseController {
         });
     }
 
-    /** The management list as a page, for browsers without JavaScript (the dialog renders the same fragment). */
-    @GetMapping("/dashboard/orders/filters")
+    /**
+     * Filter management as its own page (design system: a list of records in a card, editing on a subpage). {@code returnTo}
+     * is the list address the user came from; "‹ Zamówienia" goes back to it, and every form on this page and its subpages
+     * returns here, to {@link #filtersPage(String)}.
+     */
+    @GetMapping(FILTERS_PATH)
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String orderFiltersPage(@RequestParam(required = false) String returnTo, Locale locale, Model model) {
-        addFilterFormAttributes(model, safeReturnTo(returnTo), locale);
+        String list = safeListReturnTo(returnTo);
+        addFilterFormAttributes(model, filtersPage(list), locale);
+        model.addAttribute("listHref", list);
         return "orders/filters";
+    }
+
+    /** "Nowy filtr" from the management page: the empty form as a subpage. */
+    @GetMapping(FILTERS_PATH + "/add")
+    @PreAuthorize("!hasRole('SUPER_ADMIN')")
+    public String addOrderFilterPage(@RequestParam(required = false) String returnTo, Locale locale, Model model) {
+        addFilterEditAttributes(model, safeListReturnTo(returnTo), null, new OrderFilterForm(), locale);
+        return "orders/filter-edit";
+    }
+
+    /** "Edytuj" from the management page: the filter's form as a subpage; a filter the user cannot see is a 404. */
+    @GetMapping(FILTERS_PATH + "/{filterId}/edit")
+    @PreAuthorize("!hasRole('SUPER_ADMIN')")
+    public String editOrderFilterPage(@PathVariable String filterId, @RequestParam(required = false) String returnTo,
+                                      Locale locale, Model model) {
+        ListOrderFiltersView filters = orderFilters.list(actor());
+        OrderFilter filter = filters.byId(filterId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        boolean shared = filters.sharedWithStore().stream().anyMatch(f -> f.getId().equals(filterId));
+        if (shared && !isAdmin()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+        addFilterEditAttributes(model, safeListReturnTo(returnTo), filterId, formOf(filter, shared), locale);
+        return "orders/filter-edit";
+    }
+
+    private void addFilterEditAttributes(Model model, String list, String filterId, OrderFilterForm form, Locale locale) {
+        addFilterFormAttributes(model, filtersPage(list), locale);
+        model.addAttribute("listHref", list);
+        model.addAttribute("filterId", filterId);
+        model.addAttribute("filterForm", form);
+        model.addAttribute("formAction", filterId == null ? FILTERS_PATH : FILTERS_PATH + "/update");
+        model.addAttribute("pageTitle", filterId == null
+                ? messageSource.getMessage("orders.filters.new", null, locale)
+                : messageSource.getMessage("orders.filters.edit.title", new Object[]{form.getLabel()}, locale));
+    }
+
+    private static OrderFilterForm formOf(OrderFilter filter, boolean shared) {
+        Map<String, String> byField = filter.getConditionsByField();
+        OrderFilterForm form = new OrderFilterForm();
+        form.setLabel(filter.getLabel());
+        form.setSharedWithStore(shared);
+        form.setStatus(byField.get(OrderFilterField.Status.name()));
+        form.setShipmentType(byField.get(OrderFilterField.ShipmentType.name()));
+        form.setPaymentSource(byField.get(OrderFilterField.PaymentSource.name()));
+        form.setShippingDue(byField.get(OrderFilterField.ShippingDue.name()));
+        form.setSourceName(byField.get(OrderFilterField.SourceName.name()));
+        form.setShippingPostalCode(byField.get(OrderFilterField.ShippingPostalCode.name()));
+        return form;
     }
 
     /** "Save this view" as a page, for browsers without JavaScript. */
@@ -325,10 +386,9 @@ public class OrdersController extends BaseController {
     }
 
     /**
-     * Same as above, but for the create/update endpoints: on a 422 the submitted {@code form} (and, for an update,
-     * the {@code filterId} being edited) go into the model so the re-rendered dialog keeps what the user typed
-     * (spec §6/§7, "422 loses the user's input" fix). A form whose hidden {@code dialog} field is "save-view"
-     * re-renders {@code saveViewBody} instead of {@code dialogBody}, since that's the form the user was looking at.
+     * Same as above, but for the create/update endpoints: on a rejection the submitted {@code form} (and, for an
+     * update, the {@code filterId} being edited) go back into what the user was looking at, so nothing typed is lost —
+     * the filter subpage (hidden {@code dialog=page}, a 422 page) or the "save this view" dialog (fetch, a 422 body).
      */
     private String filterAction(String requestedWith, String returnTo, RedirectAttributes redirectAttributes, Model model,
                                 Locale locale, HttpServletResponse response, OrderFilterForm form, String filterId,
@@ -342,25 +402,28 @@ public class OrdersController extends BaseController {
         } catch (OptimisticLockingExhaustedException e) {
             rejection = messageSource.getMessage("orders.filters.error.conflict", null, locale);
         }
+        if (rejection != null && form != null && PAGE_FORM.equals(form.getDialog())) {
+            // the filter subpage: show the rejection above the form and keep what the user typed
+            addFilterEditAttributes(model, listOf(safeReturnTo(returnTo)), filterId, form, locale);
+            model.addAttribute("filterError", rejection);
+            response.setStatus(422);
+            return "orders/filter-edit";
+        }
         if (FETCH.equals(requestedWith)) {
             addFilterFormAttributes(model, target, locale);
             if (rejection != null) {
                 model.addAttribute("filterError", rejection);
                 response.setStatus(422);
                 if (form != null) {
+                    // the only form still posted with fetch is the "save this view" dialog
                     model.addAttribute("filterForm", form);
-                    if (filterId != null) {
-                        model.addAttribute("filterId", filterId);
-                    }
-                    if ("save-view".equals(form.getDialog())) {
-                        model.addAttribute("page", orderListService.page(actor(), parseReturnTo(target), LocalDate.now(), locale));
-                        return "orders/filters :: saveViewBody";
-                    }
+                    model.addAttribute("page", orderListService.page(actor(), parseReturnTo(target), LocalDate.now(), locale));
+                    return "orders/filters :: saveViewBody";
                 }
             } else {
                 model.addAttribute("redirectTo", target);
             }
-            return "orders/filters :: dialogBody";
+            return "orders/filters :: redirect";
         }
         if (rejection != null) {
             redirectAttributes.addFlashAttribute("filterError", rejection);
@@ -379,13 +442,38 @@ public class OrdersController extends BaseController {
         model.addAttribute("returnTo", returnTo);
     }
 
-    /** Only the list's own address may be returned to (spec §7.2); anything else falls back to the bare list. */
+    /**
+     * Only the list's own address, or the filter management page carrying one, may be returned to (spec §7.2);
+     * anything else falls back to the bare list.
+     */
     static String safeReturnTo(String returnTo) {
+        if (returnTo != null && (returnTo.equals(FILTERS_PATH) || returnTo.startsWith(FILTERS_PATH + "?"))) {
+            return filtersPage(listOf(returnTo));
+        }
+        return safeListReturnTo(returnTo);
+    }
+
+    /** The list address only: the management page's own back link and returnTo parameter. */
+    static String safeListReturnTo(String returnTo) {
         if (returnTo == null || returnTo.length() > 300) {
             return OrderListQuery.PATH;
         }
         boolean ownPath = returnTo.equals(OrderListQuery.PATH) || returnTo.startsWith(OrderListQuery.PATH + "?");
         return ownPath && !returnTo.contains("//") ? returnTo : OrderListQuery.PATH;
+    }
+
+    /** The management page that returns to the given list address. */
+    static String filtersPage(String listReturnTo) {
+        return FILTERS_PATH + "?returnTo=" + URLEncoder.encode(safeListReturnTo(listReturnTo), StandardCharsets.UTF_8);
+    }
+
+    /** The list address a return address leads back to: itself, or the management page's returnTo. */
+    static String listOf(String returnTo) {
+        if (returnTo != null && (returnTo.equals(FILTERS_PATH) || returnTo.startsWith(FILTERS_PATH + "?"))) {
+            List<String> inner = queryOf(returnTo).get("returnTo");
+            return safeListReturnTo(inner == null || inner.isEmpty() ? null : inner.get(0));
+        }
+        return safeListReturnTo(returnTo);
     }
 
     private static MultiValueMap<String, String> queryOf(String href) {

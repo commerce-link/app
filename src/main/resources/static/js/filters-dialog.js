@@ -1,48 +1,10 @@
-// The filters dialog of the orders list: switches between the list and the form, fills the form for "Edit", posts
-// every form inside the dialog with fetch (X-Requested-With: fetch) and swaps the dialog body with the answer. A 200
-// answer carrying data-cl-redirect means the list under the dialog changed, so the page follows it; a 422 answer
-// shows the rejection inside the dialog. Without JavaScript the same forms post and the page reloads.
+// Custom filters of the orders list. The "save this view" dialog posts its form with fetch (X-Requested-With: fetch)
+// and follows the answer: a 200 carrying data-cl-redirect sends the page to the list with the new filter, a 422
+// swaps the dialog body with the rejection and the user's input. Without JavaScript the same form posts and the page
+// reloads. Managing filters is a page of its own (/dashboard/orders/filters), not a dialog. On the filter's
+// new/edit subpage the postal-code field gets its "00-000" dash as the user types.
 (function () {
     'use strict';
-
-    function bodyOf(form) {
-        return form.closest('[data-cl-dialog-body], .cl-card-dialog-page');
-    }
-
-    function showList(body) {
-        var list = body.querySelector('[data-cl-filters-list]');
-        var form = body.querySelector('[data-cl-filter-form]');
-        if (list) { list.hidden = false; }
-        if (form) { form.hidden = true; }
-    }
-
-    function showForm(body, creating) {
-        var list = body.querySelector('[data-cl-filters-list]');
-        var form = body.querySelector('[data-cl-filter-form]');
-        form.action = creating ? '/dashboard/orders/filters' : '/dashboard/orders/filters/update';
-        list.hidden = true;
-        form.hidden = false;
-        form.querySelector('[name=label]').focus();
-    }
-
-    function selectOption(select, value) {
-        var match = Array.prototype.find.call(select.options, function (o) { return o.value.toUpperCase() === value.toUpperCase(); });
-        if (match) { select.value = match.value; return; }
-        select.add(new Option(value, value, true, true));
-    }
-
-    function fill(form, button) {
-        form.reset();
-        form.querySelector('[data-cl-filter-id]').value = button.getAttribute('data-filter-id');
-        form.elements.label.value = button.getAttribute('data-label');
-        if (form.elements.sharedWithStore) { form.elements.sharedWithStore.checked = button.getAttribute('data-shared') === 'true'; }
-        ['status', 'shipmentType', 'paymentSource', 'sourceName', 'shippingPostalCode', 'shippingDue'].forEach(function (name) {
-            var value = button.dataset[name];
-            var input = form.elements[name];
-            if (!value || !input) { return; }
-            if (input.tagName === 'SELECT') { selectOption(input, value); } else { input.value = value; }
-        });
-    }
 
     function formatPostalCode(input, appendSeparator) {
         var digits = input.value.replace(/\D/g, '').slice(0, 5);
@@ -55,35 +17,13 @@
         }
     });
 
-    document.addEventListener('click', function (event) {
-        var target = event.target;
-        var newButton = target.closest && target.closest('[data-cl-filter-new]');
-        if (newButton) {
-            var body = bodyOf(newButton);
-            body.querySelector('[data-cl-filter-form]').reset();
-            body.querySelector('[data-cl-filter-id]').value = '';
-            showForm(body, true);
-            return;
-        }
-        var back = target.closest && target.closest('[data-cl-filter-back]');
-        if (back) { showList(bodyOf(back)); return; }
-        var edit = target.closest && target.closest('[data-cl-filter-edit]');
-        if (edit) {
-            var editBody = bodyOf(edit);
-            fill(editBody.querySelector('[data-cl-filter-form]'), edit);
-            showForm(editBody, false);
-        }
-    });
-
     document.addEventListener('submit', function (event) {
         var form = event.target.closest && event.target.closest('form[data-cl-filters-form]');
         if (!form || !window.fetch) { return; }
-        var body = bodyOf(form);
+        var body = form.closest('[data-cl-dialog-body]');
         if (!body) { return; }
         event.preventDefault();
-        var submitter = event.submitter;
-        var action = submitter && submitter.getAttribute('formaction') ? submitter.getAttribute('formaction') : form.action;
-        fetch(action, {
+        fetch(form.action, {
             method: 'POST',
             headers: { 'X-Requested-With': 'fetch' },
             body: new URLSearchParams(new FormData(form)),
@@ -108,11 +48,7 @@
             }
             body.replaceChildren(fresh);
             var error = body.querySelector('[data-cl-error-summary]');
-            if (error) {
-                var openForm = body.querySelector('[data-cl-filter-form]');
-                if (openForm && form.hasAttribute('data-cl-filter-form')) { showForm(body, action.indexOf('/update') < 0); }
-                error.focus();
-            }
+            if (error) { error.focus(); }
         }).catch(function () {
             if (typeof showToast === 'function') { showToast(document.body.getAttribute('data-cl-server-error'), 'danger'); }
         });

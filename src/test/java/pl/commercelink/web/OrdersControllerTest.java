@@ -1350,6 +1350,73 @@ class OrdersControllerTest {
         }
 
         @Test
+        void deletingFromTheManagementPageReturnsThereAndDropsTheFilterFromItsListAddress() {
+            String manage = OrdersController.filtersPage("/dashboard/orders?status=New&filterId=f1");
+            String view = ordersController.deleteOrderFilter("f1", manage, null, new RedirectAttributesModelMap(), new ExtendedModelMap(), Locale.forLanguageTag("pl"), new org.springframework.mock.web.MockHttpServletResponse());
+            assertThat(view).isEqualTo("redirect:" + OrdersController.filtersPage("/dashboard/orders?status=New"));
+        }
+
+        @Test
+        void managementPageBacksToTheListAndReturnsItsFormsToItself() {
+            ExtendedModelMap model = new ExtendedModelMap();
+            assertThat(ordersController.orderFiltersPage("/dashboard/orders?q=x", Locale.forLanguageTag("pl"), model)).isEqualTo("orders/filters");
+            assertThat(model.get("listHref")).isEqualTo("/dashboard/orders?q=x");
+            assertThat(model.get("returnTo")).isEqualTo("/dashboard/orders/filters?returnTo=%2Fdashboard%2Forders%3Fq%3Dx");
+            // a foreign address never becomes the way back
+            ExtendedModelMap foreign = new ExtendedModelMap();
+            ordersController.orderFiltersPage("https://evil.example/x", Locale.forLanguageTag("pl"), foreign);
+            assertThat(foreign.get("listHref")).isEqualTo("/dashboard/orders");
+        }
+
+        @Test
+        void returnAddressesAcceptTheListAndTheManagementPageOnly() {
+            String manage = OrdersController.filtersPage("/dashboard/orders?status=New");
+            assertThat(OrdersController.safeReturnTo(manage)).isEqualTo(manage);
+            assertThat(OrdersController.listOf(manage)).isEqualTo("/dashboard/orders?status=New");
+            assertThat(OrdersController.safeReturnTo("/dashboard/orders/filters?returnTo=https%3A%2F%2Fevil.example"))
+                    .isEqualTo(OrdersController.filtersPage("/dashboard/orders"));
+            assertThat(OrdersController.safeReturnTo("/dashboard/orders/filters/f1/edit")).isEqualTo("/dashboard/orders");
+            assertThat(OrdersController.safeReturnTo("/dashboard/store")).isEqualTo("/dashboard/orders");
+        }
+
+        @Test
+        void editSubpageFillsTheFormFromTheFilterAndHidesOtherPeoplesFilters() {
+            var own = pl.commercelink.orders.filters.model.OrderFilter.of("Allegro nowe", List.of(
+                    pl.commercelink.orders.filters.model.OrderFilterCondition.of(pl.commercelink.orders.filters.OrderFilterField.Status, "New"),
+                    pl.commercelink.orders.filters.model.OrderFilterCondition.of(pl.commercelink.orders.filters.OrderFilterField.SourceName, "Allegro")));
+            var shared = pl.commercelink.orders.filters.model.OrderFilter.of("Sklepowy", List.of(
+                    pl.commercelink.orders.filters.model.OrderFilterCondition.of(pl.commercelink.orders.filters.OrderFilterField.Status, "Blocked")));
+            when(orderFilters.list(ACTOR)).thenReturn(new pl.commercelink.orders.filters.services.ListOrderFiltersView(List.of(shared), List.of(own)));
+            when(messageSource.getMessage(eq("orders.filters.edit.title"), any(), any(Locale.class))).thenReturn("Edytuj filtr „Allegro nowe”");
+
+            ExtendedModelMap model = new ExtendedModelMap();
+            assertThat(ordersController.editOrderFilterPage(own.getId(), "/dashboard/orders", Locale.forLanguageTag("pl"), model)).isEqualTo("orders/filter-edit");
+            var form = (pl.commercelink.web.dtos.OrderFilterForm) model.get("filterForm");
+            assertThat(form.getLabel()).isEqualTo("Allegro nowe");
+            assertThat(form.getStatus()).isEqualTo("New");
+            assertThat(form.getSourceName()).isEqualTo("Allegro");
+            assertThat(form.isSharedWithStore()).isFalse();
+            assertThat(model.get("filterId")).isEqualTo(own.getId());
+            assertThat(model.get("formAction")).isEqualTo("/dashboard/orders/filters/update");
+            assertThat(model.get("returnTo")).isEqualTo(OrdersController.filtersPage("/dashboard/orders"));
+
+            // a store filter is read-only for a non-admin, an unknown id is not there at all
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> ordersController.editOrderFilterPage(shared.getId(), null, Locale.forLanguageTag("pl"), new ExtendedModelMap()))
+                    .isInstanceOf(ResponseStatusException.class);
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> ordersController.editOrderFilterPage("nope", null, Locale.forLanguageTag("pl"), new ExtendedModelMap()))
+                    .isInstanceOf(ResponseStatusException.class);
+        }
+
+        @Test
+        void addSubpageIsAnEmptyCreateForm() {
+            ExtendedModelMap model = new ExtendedModelMap();
+            assertThat(ordersController.addOrderFilterPage("/dashboard/orders", Locale.forLanguageTag("pl"), model)).isEqualTo("orders/filter-edit");
+            assertThat(((pl.commercelink.web.dtos.OrderFilterForm) model.get("filterForm")).getLabel()).isNull();
+            assertThat(model.get("filterId")).isNull();
+            assertThat(model.get("formAction")).isEqualTo("/dashboard/orders/filters");
+        }
+
+        @Test
         void rejectedFilterBecomesAFlashOnRedirectAnd422OnFetch() {
             var form = new pl.commercelink.web.dtos.OrderFilterForm();
             form.setLabel("");
@@ -1365,7 +1432,7 @@ class OrdersControllerTest {
             ExtendedModelMap model = new ExtendedModelMap();
             var response = new org.springframework.mock.web.MockHttpServletResponse();
             String fragment = ordersController.createOrderFilter(form, "fetch", redirect, model, Locale.forLanguageTag("pl"), response);
-            assertThat(fragment).isEqualTo("orders/filters :: dialogBody");
+            assertThat(fragment).isEqualTo("orders/filters :: saveViewBody");
             assertThat(model.get("filterError")).isEqualTo("Filtr musi mieć nazwę.");
             assertThat(response.getStatus()).isEqualTo(422);
         }
@@ -1375,17 +1442,22 @@ class OrdersControllerTest {
             var form = new pl.commercelink.web.dtos.OrderFilterForm();
             form.setLabel("Do wysłania jutro");
             form.setStatus("New");
-            form.setReturnTo("/dashboard/orders");
+            form.setDialog("page");
+            form.setReturnTo("/dashboard/orders/filters?returnTo=%2Fdashboard%2Forders%3Fq%3Dx");
             org.mockito.Mockito.doThrow(new pl.commercelink.orders.filters.exceptions.OrderFilterInvalidException("orders.filters.error.no.label"))
                     .when(orderFilters).update(any(), any(), anyBoolean(), any(), any());
             when(messageSource.getMessage(eq("orders.filters.error.no.label"), any(), any(Locale.class))).thenReturn("Filtr musi mieć nazwę.");
 
             ExtendedModelMap model = new ExtendedModelMap();
             var response = new org.springframework.mock.web.MockHttpServletResponse();
-            String fragment = ordersController.updateOrderFilter("f1", form, "fetch", new RedirectAttributesModelMap(), model, Locale.forLanguageTag("pl"), response);
+            // the filter subpage posts plainly: a rejection renders that page again, with a 422
+            String view = ordersController.updateOrderFilter("f1", form, null, new RedirectAttributesModelMap(), model, Locale.forLanguageTag("pl"), response);
 
-            assertThat(fragment).isEqualTo("orders/filters :: dialogBody");
+            assertThat(view).isEqualTo("orders/filter-edit");
             assertThat(response.getStatus()).isEqualTo(422);
+            assertThat(model.get("filterError")).isEqualTo("Filtr musi mieć nazwę.");
+            assertThat(model.get("returnTo")).isEqualTo("/dashboard/orders/filters?returnTo=%2Fdashboard%2Forders%3Fq%3Dx");
+            assertThat(model.get("formAction")).isEqualTo("/dashboard/orders/filters/update");
             var filterForm = (pl.commercelink.web.dtos.OrderFilterForm) model.get("filterForm");
             assertThat(filterForm.getLabel()).isEqualTo("Do wysłania jutro");
             assertThat(filterForm.getStatus()).isEqualTo("New");
@@ -1393,7 +1465,7 @@ class OrdersControllerTest {
         }
 
         @Test
-        void successfulFetchReturnsTheDialogBodyWithTheRedirectAddress() {
+        void successfulFetchAnswersTheRedirectAddress() {
             var created = pl.commercelink.orders.filters.model.OrderFilter.of("Nowy", List.of(
                     pl.commercelink.orders.filters.model.OrderFilterCondition.of(pl.commercelink.orders.filters.OrderFilterField.Status, "New")));
             when(orderFilters.create(eq(ACTOR), eq(false), eq("Nowy"), any(), eq(false))).thenReturn(created);
@@ -1405,7 +1477,7 @@ class OrdersControllerTest {
             var response = new org.springframework.mock.web.MockHttpServletResponse();
             String fragment = ordersController.createOrderFilter(form, "fetch", new RedirectAttributesModelMap(), model, Locale.forLanguageTag("pl"), response);
 
-            assertThat(fragment).isEqualTo("orders/filters :: dialogBody");
+            assertThat(fragment).isEqualTo("orders/filters :: redirect");
             assertThat(model.get("redirectTo")).isEqualTo("/dashboard/orders?q=x");
             assertThat(response.getStatus()).isEqualTo(200);
         }
