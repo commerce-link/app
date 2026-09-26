@@ -2,7 +2,7 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
 <!--/* Read-only card (spec §4.7); the edit happens in the dialog below, or on orders/settings without JS. */-->
-<section th:fragment="card" class="cl-card" aria-labelledby="settings-title" data-cl-collapse>
+<section th:fragment="card" class="cl-card" aria-labelledby="settings-title" data-order="7" data-cl-collapse>
     <div class="cl-card-head">
         <h2 class="cl-card-title" id="settings-title" th:text="#{order.card.settings}"></h2>
         <a th:if="${settings.editable()}" class="cl-link-button" th:href="@{/dashboard/orders/{o}/settings(o=${orderId})}"
@@ -59,7 +59,7 @@
                     <option th:each="type : ${settings.fulfilmentTypes()}" th:value="${type.value().name()}"
                             th:selected="${type.value() == settings.fulfilmentType()}" th:text="#{${type.labelKey()}}"></option>
                 </select>
-                <input th:if="${settings.fulfilmentTypeLocked()}" type="hidden" name="fulfilmentType" th:value="${settings.fulfilmentType().name()}">
+                <input th:if="${settings.fulfilmentTypeLocked() and settings.fulfilmentType() != null}" type="hidden" name="fulfilmentType" th:value="${settings.fulfilmentType().name()}">
                 <p th:if="${settings.fulfilmentTypeLocked()}" class="cl-help" id="fulfilmentType-help" th:text="#{order.fulfilment.type.locked}"></p>
             </div>
             <div class="cl-span-6 cl-check-field">

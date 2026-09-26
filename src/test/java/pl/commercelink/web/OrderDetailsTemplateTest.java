@@ -32,6 +32,8 @@ import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.taxonomy.TaxonomyCache;
 import pl.commercelink.web.orders.OrderPageModel;
 import pl.commercelink.web.orders.OrderPageModelFactory;
+import pl.commercelink.web.orders.OrderLabels;
+import pl.commercelink.web.orders.OrderSettingsView;
 import pl.commercelink.web.settings.SettingsTemplateRenderer;
 
 import java.time.LocalDateTime;
@@ -377,7 +379,8 @@ class OrderDetailsTemplateTest {
         assertThat(html).containsPattern("href=\"/dashboard/orders/3e373abc-1111-2222-3333-444455556666/settings\"[^>]*data-cl-dialog-open=\"settings-dialog\"")
                 .contains("id=\"settings-dialog\"").contains("id=\"order-settings-form\"")
                 .contains("action=\"/dashboard/orders/3e373abc-1111-2222-3333-444455556666/updateOrderInfo\"")
-                .contains("data-cl-dialog-close-on-success=\"true\"").contains("data-cl-async");
+                .contains("data-cl-dialog-close-on-success=\"true\"").contains("data-cl-async")
+                .containsPattern("<section class=\"cl-card\" aria-labelledby=\"settings-title\" data-order=\"7\"");
         assertThat(html.indexOf("id=\"settings-title\"")).isLessThan(html.indexOf("id=\"settings-dialog\""));
     }
 
@@ -743,7 +746,8 @@ class OrderDetailsTemplateTest {
                 .contains("action=\"/dashboard/orders/3e373abc-1111-2222-3333-444455556666/updateOrderInfo\"")
                 .contains("href=\"/dashboard/orders/3e373abc-1111-2222-3333-444455556666\"")
                 .contains("Terminy i ustawienia zamówienia 3e373abc")
-                .doesNotContain("data-cl-dialog-close-on-success").doesNotContain("??");
+                .doesNotContain("data-cl-dialog-close-on-success").doesNotContain("data-cl-dialog-close")
+                .doesNotContain("async-form.js").doesNotContain("??");
     }
 
     @Test
@@ -769,5 +773,37 @@ class OrderDetailsTemplateTest {
         // then
         assertThat(html).contains("action=\"/dashboard/orders/3e373abc-1111-2222-3333-444455556666/status\"")
                 .containsPattern("name=\"status\" value=\"Assembly\" checked").doesNotContain("??");
+    }
+
+    static OrderSettingsView lockedSettings(FulfilmentType type) {
+        return new OrderSettingsView("2026-09-20", "2026-09-22", null, "20.09.2026", "22.09.2026", null,
+                type, type == null ? null : OrderLabels.fulfilmentType(type), true, false, null, null, null, true,
+                OrderLabels.Option.of(FulfilmentType.values(), OrderLabels::fulfilmentType));
+    }
+
+    static String renderDialogForm(OrderSettingsView settings) {
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("settings", settings);
+        variables.put("orderId", "3e373abc-1111-2222-3333-444455556666");
+        variables.put("shortId", "3e373abc");
+        return SettingsTemplateRenderer.render("<div th:replace=\"~{orders/details/settings :: dialogForm}\"></div>", variables);
+    }
+
+    @Test
+    void aLockedFulfilmentTypeWithoutAValueRendersWithoutTheHiddenField() {
+        // when
+        String html = renderDialogForm(lockedSettings(null));
+
+        // then
+        assertThat(html).contains("id=\"fulfilmentType\"").doesNotContainPattern("<input[^>]*type=\"hidden\"[^>]*name=\"fulfilmentType\"");
+    }
+
+    @Test
+    void aLockedFulfilmentTypeIsPostedThroughTheHiddenField() {
+        // when
+        String html = renderDialogForm(lockedSettings(FulfilmentType.WarehouseFulfilment));
+
+        // then
+        assertThat(html).containsPattern("<input[^>]*type=\"hidden\"[^>]*name=\"fulfilmentType\"[^>]*value=\"WarehouseFulfilment\"");
     }
 }
