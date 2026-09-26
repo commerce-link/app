@@ -41,7 +41,7 @@ class OrdersListTemplateTest {
                 .contains("details class=\"cl-filter-menu\" data-cl-filter-menu=\"filter\"").contains("cl-filter-menu-item")
                 .contains("q.withFilterId(o.id()).href()").contains("q.withFilterId('').href()")
                 .contains("data-cl-dialog-open=\"save-view-dialog\"").contains("data-cl-dialog-open=\"filters-dialog\"")
-                .contains("cl-search-form").contains("name=\"q\"").contains("cl-search-clear").contains("q.withQ(null).href()")
+                .contains("cl-search-form").contains("name=\"q\"").contains("cl-search-clear").contains("cl-button is-primary cl-search-submit").contains("q.withQ(null).href()")
                 .contains("cl-list-meta").contains("cl-filter-chips").contains("cl-table-results").contains("role=\"status\"")
                 .contains("'cl-visually-hidden'").contains("cl-filter-chip-link").contains("chip.linkHref()")
                 .contains("cl-table is-orders").contains("cl-table-sort").contains("aria-sort")

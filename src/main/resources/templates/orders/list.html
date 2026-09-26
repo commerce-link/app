@@ -136,10 +136,15 @@
                                    th:value="${q.q()}" th:attr="placeholder=#{orders.list.search.placeholder}, data-cl-search-had=${q.q() != null}"/>
                             <a th:if="${q.q() != null}" class="cl-search-clear" th:href="@{${q.withQ(null).href()}}"
                                th:attr="aria-label=#{orders.list.search.clear}" data-cl-orders-nav>
-                                <span aria-hidden="true">×</span>
+                                <i class="fas fa-times" aria-hidden="true"></i>
                             </a>
                         </div>
-                        <button type="submit" class="cl-visually-hidden" th:text="#{orders.list.search.button}"></button>
+                        <!--/* As on Asortyment: a primary "Szukaj" next to the field (one primary per form — the search is its own
+                               form); below 720 px only the magnifier, named by aria-label (design system "Wyszukiwarka jako formularz"). */-->
+                        <button type="submit" class="cl-button is-primary cl-search-submit" th:attr="aria-label=#{orders.list.search.button}">
+                            <span class="icon is-small cl-search-submit-icon" aria-hidden="true"><i class="fas fa-search"></i></span>
+                            <span class="cl-search-submit-text" th:text="#{orders.list.search.button}"></span>
+                        </button>
                     </form>
                 </div>
 

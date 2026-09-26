@@ -167,10 +167,6 @@ public class OrderListService {
                 .orElseGet(() -> text("orders.list.status.selected", locale, query.statuses().size()));
     }
 
-    private String statusLabels(OrderListQuery query, Locale locale) {
-        return String.join(", ", query.statuses().stream().map(s -> text("OrderStatus." + s.name(), locale)).toList());
-    }
-
     private List<FilterOption> filterOptions(ListOrderFiltersView filters, OrderListQuery query) {
         return Stream.concat(
                         filters.sharedWithStore().stream().map(f -> option(f, true, filters, query)),
@@ -187,9 +183,10 @@ public class OrderListService {
     private List<Chip> chips(OrderListQuery query, Optional<OrderFilter> activeFilter, boolean starred, int count, long historyHits,
                              Locale locale) {
         List<Chip> chips = new ArrayList<>();
-        if (!query.isOpen()) {
-            String label = text("orders.list.chip.status", locale, statusLabels(query, locale));
-            chips.add(new Chip(label, query.withStatus(null).href(), text("orders.list.chip.clearLabel", locale, label)));
+        // one chip per ticked status, so its "×" drops just that status; dropping the last one returns to all open
+        for (OrderStatus status : query.statuses()) {
+            String label = text("orders.list.chip.status", locale, text("OrderStatus." + status.name(), locale));
+            chips.add(new Chip(label, query.toggleStatus(status).href(), text("orders.list.chip.clearLabel", locale, label)));
         }
         activeFilter.ifPresent(f -> {
             String label = text("orders.list.chip.filter", locale, f.getLabel() + (starred ? " ★" : ""));

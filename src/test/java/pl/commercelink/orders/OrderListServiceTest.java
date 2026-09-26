@@ -284,8 +284,11 @@ class OrderListServiceTest {
         assertThat(model.statusSummary()).isEqualTo("2 wybrane");
         assertThat(option(model, "Nowe").selected()).isTrue();
         assertThat(option(model, "W kompletacji").selected()).isFalse();
-        assertThat(model.chips()).extracting(c -> c.label()).containsExactly("Status: Nowe, Zablokowane");
-        assertThat(model.chips().get(0).clearHref()).isEqualTo("/dashboard/orders");
+        // each ticked status is its own chip; its "×" drops only that status
+        assertThat(model.chips()).extracting(c -> c.label()).containsExactly("Status: Nowe", "Status: Zablokowane");
+        assertThat(model.chips()).extracting(c -> c.clearHref())
+                .containsExactly("/dashboard/orders?status=Blocked", "/dashboard/orders?status=New");
+        assertThat(page(query("status", "New")).chips().get(0).clearHref()).isEqualTo("/dashboard/orders");
         assertThat(model.saveViewConditions()).isEmpty();   // a saved filter holds one status
         assertThat(page(query("status", "New")).statusSummary()).isEqualTo("Nowe");
         assertThat(page(query("status", "New")).saveViewConditions()).extracting(c -> c.value()).containsExactly("New");

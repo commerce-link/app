@@ -4504,7 +4504,17 @@ a.cl-link-button:hover {
 .cl-page .cl-search-form {
     display: flex;
     align-items: center;
+    gap: 8px;
     margin-left: auto;
+}
+
+/* The submit takes the field's height, as on Asortyment; the magnifier inside it shows only on phones. */
+.cl-page .cl-search-submit {
+    height: 36px;
+}
+
+.cl-page .cl-search-submit-icon {
+    display: none;
 }
 
 .cl-page .cl-search-field {
@@ -4523,29 +4533,33 @@ a.cl-link-button:hover {
 
 .cl-page .cl-search-field .cl-table-search {
     width: 100%;
-    padding-left: 34px;
-    padding-right: 34px;
+    padding-left: 36px;
+    padding-right: 40px;
 }
 
 .cl-page .cl-search-field .cl-table-search::-webkit-search-cancel-button {
     display: none;
 }
 
+/* Same as Asortyment's clear button (32 px, 6 px radius, fa-times), but a link, so it works without JavaScript. */
 .cl-page .cl-search-clear {
     position: absolute;
-    right: 5px;
+    right: 4px;
     top: 50%;
     transform: translateY(-50%);
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    color: var(--cl-ink-2);
-    font-size: 18px;
-    line-height: 1;
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    color: var(--cl-ink-3);
     text-decoration: none;
+}
+
+.cl-page .cl-search-clear:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
 }
 
 .cl-page .cl-search-clear:hover {
@@ -4840,6 +4854,10 @@ a.cl-link-button:hover {
         height: 44px;
         right: 0;
     }
+
+    .cl-page .cl-search-submit {
+        height: 44px;
+    }
 }
 
 @media screen and (max-width: 719px) {
@@ -4879,9 +4897,30 @@ a.cl-link-button:hover {
         max-width: none;
     }
 
-    .cl-page .cl-search-form,
-    .cl-page .cl-search-field {
+    .cl-page .cl-search-form {
         width: 100%;
+    }
+
+    .cl-page .cl-search-field {
+        flex: 1 1 auto;
+        width: auto;
+        min-width: 0;
+    }
+
+    /* Phone: the submit shrinks to the magnifier (its name stays in aria-label). */
+    .cl-page .cl-search-submit {
+        flex: none;
+        width: 44px;
+        padding: 0;
+        justify-content: center;
+    }
+
+    .cl-page .cl-search-submit-icon {
+        display: inline-flex;
+    }
+
+    .cl-page .cl-search-submit-text {
+        display: none;
     }
 
     .cl-page .cl-list-meta {
