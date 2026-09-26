@@ -236,6 +236,22 @@ class OrdersScriptContractTest {
     }
 
     @Test
+    void theE2eFixesKeepTheDetailsLayoutTight() throws Exception {
+        // given
+        String css = css();
+
+        // then: the review todo reads like the other todos, the dialog form lines up with its title, the strip keeps a
+        // gap to the next card on phones, and card-mode rows do not indent the name by the list's checkbox padding
+        assertThat(rule(css, ".cl-page .cl-doc-marks.is-inline .cl-doc-mark .cl-link-button"))
+                .contains("text-decoration: underline").contains("font-weight: 400").contains("color: inherit");
+        assertThat(rule(css, ".cl-page .cl-dialog-body .cl-card-grid")).contains("padding: 4px 0 0");
+        assertThat(css).contains("@media (max-width: 1023px) { .cl-page .cl-closing { margin-bottom: 16px; } }")
+                .contains(".cl-page .cl-table.is-wrap tbody tr > th.cl-table-key { padding-left: 0; padding-right: 0; }")
+                .contains(".cl-page .cl-table.is-wrap tbody tr:not(.cl-table-group):not(:has(.cl-table-check)) > td.cl-table-actions { grid-column: 2; grid-row: 1; }");
+        assertThat(rule(css, ".cl-page .cl-help.is-note")).contains("font-size: 13px");
+    }
+
+    @Test
     void everyCssBlockIsClosedSoNoLaterRuleEndsUpInsideAMediaQuery() throws Exception {
         // given: two missing braces once swallowed every later rule (the closing strip, the side layout) into a
         // prefers-reduced-motion block, so the browser ignored them on ordinary screens

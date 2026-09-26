@@ -203,6 +203,15 @@ class OrderDetailsTemplateTest {
     }
 
     @Test
+    void menuSeparatorsAreHiddenFromAssistiveTechnologySoTheListHoldsOnlyListItems() {
+        // when
+        String html = page(render(order(OrderStatus.New), ADMIN));
+
+        // then (E2E axe "list": an li with role="separator" is not a list item)
+        assertThat(html).contains("class=\"cl-menu-sep\" aria-hidden=\"true\"").doesNotContain("role=\"separator\"");
+    }
+
+    @Test
     void aUserReceivesNoCostOrProfitInTheHtml() {
         // when (B10)
         String user = page(render(order(OrderStatus.New), USER));

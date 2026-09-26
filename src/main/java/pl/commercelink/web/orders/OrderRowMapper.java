@@ -13,6 +13,8 @@ import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.web.orders.OrderRow.DocMark;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.time.LocalDate;
@@ -47,6 +49,11 @@ public class OrderRowMapper {
     }
 
     public OrderRow map(Order order, LocalDate today) {
+        return map(order, today, null);
+    }
+
+    /** returnTo: the list as the operator sees it, so the details page's "‹ Zamówienia" leads back to it (spec §4.1). */
+    public OrderRow map(Order order, LocalDate today, String returnTo) {
         ShippingDetails shipping = order.getShippingDetails();
         BillingDetails billing = order.getBillingDetails();
         String email = billing == null ? null : billing.getEmail();
@@ -66,7 +73,7 @@ public class OrderRowMapper {
         }
         double unpaid = order.getUnpaidAmount();
         return new OrderRow(
-                OrderListQuery.PATH + "/" + order.getOrderId(),
+                OrderListQuery.PATH + "/" + order.getOrderId() + (returnTo == null || returnTo.equals(OrderListQuery.PATH) ? "" : "?returnTo=" + URLEncoder.encode(returnTo, StandardCharsets.UTF_8)),
                 order.getShortenedOrderId(),
                 sourceText(order),
                 order.getExternalOrderId() == null || order.getExternalOrderId().isBlank() ? null

@@ -12,7 +12,7 @@
                th:attr="aria-label=#{order.customer.billing.edit}" th:text="#{general.edit}"></a>
         </div>
         <th:block th:replace="~{orders/details/customer :: address(${c.billing()})}"></th:block>
-        <p th:if="${c.billingLockedKey() != null}" class="cl-help" th:text="#{${c.billingLockedKey()}}"></p>
+        <p th:if="${c.billingLockedKey() != null}" class="cl-help is-note" th:text="#{${c.billingLockedKey()}}"></p>
     </div>
     <div class="cl-address">
         <div class="cl-address-head">
@@ -25,7 +25,7 @@
             <th:block th:replace="~{orders/details/customer :: address(${c.shipping()})}"></th:block>
         </th:block>
         <th:block th:if="${c.pickupPoint() != null}"><br><span th:text="#{order.customer.pickup.point(${c.pickupPoint()})}"></span></th:block>
-        <p th:if="${c.shippingLockedKey() != null}" class="cl-help" th:text="#{${c.shippingLockedKey()}}"></p>
+        <p th:if="${c.shippingLockedKey() != null}" class="cl-help is-note" th:text="#{${c.shippingLockedKey()}}"></p>
     </div>
 </section>
 

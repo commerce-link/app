@@ -14,7 +14,7 @@
                 <span th:text="#{order.items.add}"></span>
             </button>
         </div>
-        <p th:if="${items.addItemsReasonKey() != null}" class="cl-help" id="add-items-reason"
+        <p th:if="${items.addItemsReasonKey() != null}" class="cl-help is-note" id="add-items-reason"
            th:text="#{order.items.add.reason(${#messages.msg(items.addItemsReasonKey())})}"></p>
     </div>
 
@@ -163,7 +163,7 @@
             </button>
             <ul class="cl-menu-list" th:id="|item-menu-${row.index()}|" hidden>
                 <th:block th:each="state : ${row.actions()}">
-                    <li th:if="${state.action().name() == 'EDIT'}" class="cl-menu-sep" role="separator"></li>
+                    <li th:if="${state.action().name() == 'EDIT'}" class="cl-menu-sep" aria-hidden="true"></li>
                     <li th:if="${!state.available()}">
                         <button type="button" class="cl-menu-item" aria-disabled="true">
                             <span th:text="#{${state.labelKey()}}"></span>

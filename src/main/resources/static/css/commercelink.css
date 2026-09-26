@@ -6120,4 +6120,30 @@ a.cl-link-button:hover {
 .cl-page .cl-doc-marks.is-inline .cl-doc-mark a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
 .cl-page .cl-doc-marks.is-inline .cl-doc-mark a:hover { color: var(--cl-accent-ink); }
 @media (max-width: 1023px) { .cl-page .cl-doc-marks.is-inline .cl-doc-mark a, .cl-page .cl-doc-marks.is-inline .cl-doc-mark button { min-height: 44px; display: inline-flex; align-items: center; } }
+/* the review todo opens a dialog (a button) but reads like the other todos (links): underlined text, no accent */
+.cl-page .cl-doc-marks.is-inline .cl-doc-mark .cl-link-button { color: inherit; font-size: inherit; font-weight: 400; text-decoration: underline; text-underline-offset: 2px; padding: 0; }
+.cl-page .cl-doc-marks.is-inline .cl-doc-mark .cl-link-button:hover { color: var(--cl-accent-ink); }
+@media (max-width: 1023px) { .cl-page .cl-closing { margin-bottom: 16px; } }
+
+/* Order details: short notes beside a title or an address (why items cannot be added, a locked address, "completed
+   automatically") — help-sized, and under a card title they start at its left edge */
+.cl-page .cl-help.is-note { font-size: 13px; line-height: 1.4; color: var(--cl-ink-2); }
+.cl-page .cl-card-head > .cl-help.is-note { text-align: left; }
+
+/* Order details: a card's form grid inside a dialog — the dialog body already pads it, so fields line up with the title */
+.cl-page .cl-dialog-body .cl-card-grid { padding: 4px 0 0; }
+.cl-page .cl-dialog-body .cl-card-extras > summary { padding: 0; }
+.cl-page .cl-dialog-body .cl-card-extras > .cl-disclosure-body > .cl-form-grid { padding: 4px 0 0; }
+
+/* Order details items as cards (< 720 px): the checkbox column fits its 44 px target and the product name starts right
+   after it (the list's padding for an overlaid checkbox does not apply here) */
+@media screen and (max-width: 719px) {
+    .cl-page .cl-table.is-wrap tbody tr:not(.cl-table-group) { grid-template-columns: 44px minmax(0, 1fr) 44px; }
+    .cl-page .cl-table.is-wrap tbody tr:not(.cl-table-group):not(:has(.cl-table-check)) { grid-template-columns: minmax(0, 1fr); }
+    .cl-page .cl-table.is-wrap tbody tr > th.cl-table-key { padding-left: 0; padding-right: 0; }
+    /* a row with a menu but no checkbox (a WZ is issued): the name keeps its line, the menu sits beside it */
+    .cl-page .cl-table.is-wrap tbody tr:not(.cl-table-group):not(:has(.cl-table-check)):has(.cl-table-actions) { grid-template-columns: minmax(0, 1fr) 44px; }
+    .cl-page .cl-table.is-wrap tbody tr:not(.cl-table-group):not(:has(.cl-table-check)):has(.cl-table-actions) > th.cl-table-key { grid-column: 1; }
+    .cl-page .cl-table.is-wrap tbody tr:not(.cl-table-group):not(:has(.cl-table-check)) > td.cl-table-actions { grid-column: 2; grid-row: 1; }
+}
 

@@ -18,6 +18,7 @@ import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.stores.WarehouseConfiguration;
 import pl.commercelink.web.orders.OrderListQuery;
+import pl.commercelink.web.orders.OrderRow;
 import pl.commercelink.web.orders.OrdersPageModel;
 
 import java.time.LocalDate;
@@ -108,10 +109,10 @@ class OrderListServiceTest {
 
         OrdersPageModel model = page(query());
 
-        assertThat(model.rows()).extracting(r -> r.href()).containsExactly(
+        assertThat(model.rows()).extracting(OrderListServiceTest::path).containsExactly(
                 "/dashboard/orders/late", "/dashboard/orders/today", "/dashboard/orders/soon", "/dashboard/orders/none");
         assertThat(model.resultsLine()).isEqualTo("Zamówienia: 4");
-        assertThat(page(query("sort", "due", "dir", "desc")).rows()).extracting(r -> r.href()).containsExactly(
+        assertThat(page(query("sort", "due", "dir", "desc")).rows()).extracting(OrderListServiceTest::path).containsExactly(
                 "/dashboard/orders/soon", "/dashboard/orders/today", "/dashboard/orders/late", "/dashboard/orders/none");
     }
 
@@ -150,7 +151,7 @@ class OrderListServiceTest {
                 "/dashboard/orders?filterId=" + closed.getId() + "&q=a");
 
         OrdersPageModel chosen = page(query("status", "Assembled", "filterId", assembled.getId()));
-        assertThat(chosen.rows()).extracting(r -> r.href()).containsExactly("/dashboard/orders/a");
+        assertThat(chosen.rows()).extracting(OrderListServiceTest::path).containsExactly("/dashboard/orders/a");
         assertThat(chosen.statusSummary()).isEqualTo("Skompletowane");
     }
 
@@ -184,7 +185,7 @@ class OrderListServiceTest {
         // ?focus= came from the clickable tiles, which are read-only now; no value may break the page (newToday used to)
         for (String focus : List.of("overdue", "today", "decide", "unpaid", "newToday")) {
             OrdersPageModel model = page(query("focus", focus, "status", "Blocked"));
-            assertThat(model.rows()).extracting(r -> r.href()).containsExactly("/dashboard/orders/b");
+            assertThat(model.rows()).extracting(OrderListServiceTest::path).containsExactly("/dashboard/orders/b");
             assertThat(model.chips()).extracting(c -> c.label()).containsExactly("Status: Zablokowane");
             assertThat(model.chips().get(0).clearHref()).isEqualTo("/dashboard/orders");
         }
@@ -199,7 +200,7 @@ class OrderListServiceTest {
 
         OrdersPageModel model = page(query("q", "nowak"));
 
-        assertThat(model.rows()).extracting(r -> r.href()).containsExactly("/dashboard/orders/open-1");
+        assertThat(model.rows()).extracting(OrderListServiceTest::path).containsExactly("/dashboard/orders/open-1");
         assertThat(model.resultsLine()).isEqualTo("Zamówienia: 1");
         assertThat(model.chips()).extracting(c -> c.label()).containsExactly("Szukasz: „nowak”");
     }
@@ -210,9 +211,9 @@ class OrderListServiceTest {
         add("a", OrderStatus.New, null, 100, 100, null);
         add("c", OrderStatus.New, null, 200, 200, null);
 
-        assertThat(page(query("sort", "amount")).rows()).extracting(r -> r.href()).containsExactly("/dashboard/orders/a", "/dashboard/orders/c", "/dashboard/orders/b");
-        assertThat(page(query("sort", "amount", "dir", "desc")).rows()).extracting(r -> r.href()).containsExactly("/dashboard/orders/b", "/dashboard/orders/c", "/dashboard/orders/a");
-        assertThat(page(query("sort", "number")).rows()).extracting(r -> r.href()).containsExactly("/dashboard/orders/a", "/dashboard/orders/b", "/dashboard/orders/c");
+        assertThat(page(query("sort", "amount")).rows()).extracting(OrderListServiceTest::path).containsExactly("/dashboard/orders/a", "/dashboard/orders/c", "/dashboard/orders/b");
+        assertThat(page(query("sort", "amount", "dir", "desc")).rows()).extracting(OrderListServiceTest::path).containsExactly("/dashboard/orders/b", "/dashboard/orders/c", "/dashboard/orders/a");
+        assertThat(page(query("sort", "number")).rows()).extracting(OrderListServiceTest::path).containsExactly("/dashboard/orders/a", "/dashboard/orders/b", "/dashboard/orders/c");
         assertThat(page(query("sort", "amount")).sortHeaders().get(OrderListQuery.Sort.AMOUNT).ariaSort()).isEqualTo("ascending");
         assertThat(page(query("sort", "amount")).sortHeaders().get(OrderListQuery.Sort.AMOUNT).href()).isEqualTo("/dashboard/orders?sort=amount&dir=desc");
         assertThat(page(query()).sortHeaders().get(OrderListQuery.Sort.DUE).ariaSort()).isEqualTo("ascending");
@@ -228,9 +229,9 @@ class OrderListServiceTest {
         add("new-undated", OrderStatus.New, null, 100, 100, null);
         add("new-soon", OrderStatus.New, TODAY.plusDays(1), 100, 100, null);
 
-        assertThat(page(query("sort", "status")).rows()).extracting(r -> r.href().substring(18)).containsExactly(
+        assertThat(page(query("sort", "status")).rows()).extracting(r -> path(r).substring(18)).containsExactly(
                 "new-soon", "new-later", "new-undated", "blocked", "delivered");
-        assertThat(page(query("sort", "status", "dir", "desc")).rows()).extracting(r -> r.href().substring(18)).containsExactly(
+        assertThat(page(query("sort", "status", "dir", "desc")).rows()).extracting(r -> path(r).substring(18)).containsExactly(
                 "delivered", "blocked", "new-soon", "new-later", "new-undated");
         assertThat(page(query("sort", "status")).sortHeaders().get(OrderListQuery.Sort.STATUS).ariaSort()).isEqualTo("ascending");
         assertThat(page(query()).sortHeaders().get(OrderListQuery.Sort.STATUS).href()).isEqualTo("/dashboard/orders?sort=status&dir=asc");
@@ -291,7 +292,7 @@ class OrderListServiceTest {
 
         OrdersPageModel model = page(query("status", "New", "status", "Blocked"));
 
-        assertThat(model.rows()).extracting(r -> r.href()).containsExactly("/dashboard/orders/b", "/dashboard/orders/n");
+        assertThat(model.rows()).extracting(OrderListServiceTest::path).containsExactly("/dashboard/orders/b", "/dashboard/orders/n");
         assertThat(model.statusSummary()).isEqualTo("2 wybrane");
         assertThat(option(model, "Nowe").selected()).isTrue();
         assertThat(option(model, "W kompletacji").selected()).isFalse();
@@ -321,5 +322,10 @@ class OrderListServiceTest {
         store.setWarehouseConfiguration(warehouse);
         when(storesRepository.findById("store-1")).thenReturn(store);
         assertThat(page(query()).rows().get(0).marks()).extracting(m -> m.kind() + ":" + m.state()).contains("wz:is-todo");
+    }
+
+    // a row's link carries the list's returnTo (D11); these tests look at which orders are listed, in what order
+    private static String path(OrderRow row) {
+        return row.href().replaceFirst("\\?.*", "");
     }
 }

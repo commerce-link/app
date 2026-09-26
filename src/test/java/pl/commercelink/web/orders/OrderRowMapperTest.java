@@ -68,6 +68,8 @@ class OrderRowMapperTest {
     void marketplaceOrderOverdueAndUnpaid() {
         OrderRow row = mapper.map(order(), TODAY);
         assertThat(row.href()).isEqualTo("/dashboard/orders/ab58c563-9f1e-4d2a-b0c1-000000000000");
+        assertThat(mapper.map(order(), TODAY, "/dashboard/orders?status=New").href())
+                .isEqualTo("/dashboard/orders/ab58c563-9f1e-4d2a-b0c1-000000000000?returnTo=%2Fdashboard%2Forders%3Fstatus%3DNew");
         assertThat(row.number()).isEqualTo(order().getShortenedOrderId());
         assertThat(row.sourceText()).isEqualTo("Allegro");
         assertThat(row.externalId()).isEqualTo("nr 5749922740");

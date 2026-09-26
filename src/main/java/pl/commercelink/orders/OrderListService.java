@@ -78,7 +78,7 @@ public class OrderListService {
         Store store = storesRepository.findById(actor.storeId());
         OrderRowMapper mapper = new OrderRowMapper(messages, locale, store != null && store.hasDocumentsGenerationEnabled());
         List<OrderRow> rows = inStatus.subList(pagination.fromIndex(), pagination.toIndex()).stream()
-                .map(order -> mapper.map(order, today)).toList();
+                .map(order -> mapper.map(order, today, query.returnTo())).toList();
 
         return new OrdersPageModel(
                 query,
