@@ -1,11 +1,13 @@
 package pl.commercelink.web;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.orders.*;
 import pl.commercelink.shipping.AbstractShippingController;
 import pl.commercelink.shipping.ShipmentTrackingSubscriber;
@@ -13,6 +15,7 @@ import pl.commercelink.shipping.ShipmentTrackingSubscriber;
 import java.time.LocalDate;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import pl.commercelink.shipping.DeliveryTarget;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.stores.IntegrationType;
@@ -20,6 +23,7 @@ import pl.commercelink.stores.Store;
 
 @Controller
 @RequestMapping("/dashboard/orders/{orderId}/shipping")
+@PreAuthorize("!hasRole('SUPER_ADMIN')")
 public class OrdersShippingController extends AbstractShippingController {
 
     @Autowired
@@ -35,10 +39,13 @@ public class OrdersShippingController extends AbstractShippingController {
     private ShipmentTrackingSubscriber shipmentTrackingSubscriber;
 
     @GetMapping("")
-    public String initiate(@PathVariable("orderId") String orderId, Model model) {
+    public String initiate(@PathVariable("orderId") String orderId, Model model,
+                           RedirectAttributes redirectAttributes, Locale locale) {
         Order order = ordersRepository.findById(getStoreId(), orderId);
-        if (order.getShipments().stream().allMatch(Shipment::hasShippingData)) {
-            throw new RuntimeException("All shipments have been defined already");
+        if (!order.hasShipmentWithoutShippingData()) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage("shipping.error.all.defined", null, locale));
+            return "redirect:/dashboard/orders/" + orderId;
         }
         ShippingForm form = new ShippingForm(orderId, "orders");
         return renderShippingForm(getStore(), form, Collections.singletonList(order.getShippingDetails()), model);

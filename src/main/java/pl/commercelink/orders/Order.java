@@ -572,9 +572,32 @@ public class Order {
         return shipments.stream().anyMatch(Shipment::hasTrackingSubscription);
     }
 
+    /** A shipment the courier has not been ordered for yet; an order whose every shipment is sent has nothing to book. */
+    @DynamoDBIgnore
+    public boolean hasShipmentWithoutShippingData() {
+        return shipments.stream().anyMatch(shipment -> !shipment.hasShippingData());
+    }
+
     @DynamoDBIgnore
     public boolean hasShippingLabel() {
         return shipments.stream().anyMatch(Shipment::hasLabel);
+    }
+
+    /** The shipment a courier cancellation acts on (ShipmentCancelService): the first one that was handed to a carrier. */
+    @DynamoDBIgnore
+    public Optional<Shipment> firstShipmentWithShippingData() {
+        return shipments.stream().filter(Shipment::hasShippingData).findFirst();
+    }
+
+    /**
+     * The operator's rule for the shipping address (spec B3, D-S12): the customer's own rule without its customer-only
+     * conditions (courier, not marketplace, e-mail for the code), so a pickup point or a marketplace order can still be
+     * corrected before the parcel is labelled. A tracking number typed by hand counts as a label, as for the customer.
+     */
+    @DynamoDBIgnore
+    public boolean canOperatorChangeShippingAddress() {
+        return hasOneOfStatuses(OrderStatus.New, OrderStatus.Blocked, OrderStatus.Assembly, OrderStatus.Assembled,
+                OrderStatus.Realization) && !hasShippingLabel();
     }
 
     @DynamoDBIgnore

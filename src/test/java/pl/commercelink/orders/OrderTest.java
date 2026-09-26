@@ -5,6 +5,8 @@ import org.junit.jupiter.api.Test;
 import pl.commercelink.documents.Document;
 import pl.commercelink.documents.DocumentType;
 
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class OrderTest {
@@ -338,5 +340,49 @@ class OrderTest {
         // then
         assertThat(order.getEstimatedAssemblyAt()).isNull();
         assertThat(order.getEstimatedShippingAt()).isNull();
+    }
+
+    @Test
+    void hasShipmentWithoutShippingDataIsTrueOnlyWhenSomeShipmentLacksLabelData() {
+        // given
+        Order order = new Order("store-1");
+        Shipment withData = new Shipment(ShipmentType.Courier);
+        withData.setCarrier("DPD");
+        withData.setTrackingNo("T-1");
+        withData.setShippedAt(java.time.LocalDateTime.now());
+        Shipment empty = new Shipment(ShipmentType.Courier);
+        // when / then
+        order.setShipments(List.of(withData));
+        assertThat(order.hasShipmentWithoutShippingData()).isFalse();
+        order.setShipments(List.of(withData, empty));
+        assertThat(order.hasShipmentWithoutShippingData()).isTrue();
+        order.setShipments(List.of());
+        assertThat(order.hasShipmentWithoutShippingData()).isFalse();
+    }
+
+    @Test
+    void firstShipmentWithShippingDataSkipsEmptyRows() {
+        // given
+        Order order = new Order("store-1");
+        Shipment empty = new Shipment(ShipmentType.Courier);
+        Shipment withData = new Shipment(ShipmentType.Courier);
+        withData.setCarrier("DPD");
+        withData.setTrackingNo("T-1");
+        withData.setShippedAt(java.time.LocalDateTime.now());
+        order.setShipments(List.of(empty, withData));
+        // then
+        assertThat(order.firstShipmentWithShippingData()).contains(withData);
+    }
+
+    @Test
+    void operatorCannotChangeShippingAddressOnceALabelExists() {
+        // given
+        Order order = new Order("store-1");
+        Shipment labelled = new Shipment(ShipmentType.Courier);
+        labelled.setTrackingNo("T-1");
+        // then
+        assertThat(order.canOperatorChangeShippingAddress()).isTrue();
+        order.setShipments(List.of(labelled));
+        assertThat(order.canOperatorChangeShippingAddress()).isFalse();
     }
 }

@@ -33,9 +33,7 @@ public class ShipmentCancelService {
         Store store = storesRepository.findById(storeId);
         Order order = ordersRepository.findById(storeId, orderId);
 
-        Shipment shipment = order.getShipments().stream()
-                .filter(Shipment::hasShippingData)
-                .findFirst()
+        Shipment shipment = order.firstShipmentWithShippingData()
                 .orElseThrow(() -> new ShippingException("No valid shipment data to cancel"));
 
         if (shipment.getExternalId() == null) {

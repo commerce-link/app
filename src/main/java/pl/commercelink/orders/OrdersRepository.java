@@ -16,6 +16,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.*;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
@@ -124,6 +125,35 @@ public class OrdersRepository extends DynamoDbRepository<Order> {
         key.setStoreId(storeId);
         key.setOrderId(orderId);
         return key;
+    }
+
+    public List<Order> findByShortId(String storeId, String prefix) {
+        Map<String, AttributeValue> eav = new HashMap<>();
+        eav.put(":storeId", new AttributeValue().withS(storeId));
+        eav.put(":prefix", new AttributeValue().withS(prefix));
+        return queryAll(() -> new QueryRequest()
+                .withTableName("Orders")
+                .withKeyConditionExpression("storeId = :storeId AND begins_with(orderId, :prefix)")
+                .withExpressionAttributeValues(eav));
+    }
+
+    // A raw QueryRequest stops at 1 MB and does not page on its own (DynamoDBMapper.scan did), so every page is
+    // followed explicitly; a fresh request per page keeps each call's start key its own.
+    private List<Order> queryAll(Supplier<QueryRequest> request) {
+        List<Order> orders = new ArrayList<>();
+        Map<String, AttributeValue> startKey = null;
+        do {
+            QueryRequest page = request.get();
+            if (startKey != null && !startKey.isEmpty()) {
+                page.withExclusiveStartKey(startKey);
+            }
+            QueryResult result = amazonDynamoDB.query(page);
+            result.getItems().stream()
+                    .map(item -> dynamoDBMapper.marshallIntoObject(Order.class, item))
+                    .forEach(orders::add);
+            startKey = result.getLastEvaluatedKey();
+        } while (startKey != null && !startKey.isEmpty());
+        return orders;
     }
 
     public Order findByStoreIdAndExternalOrderId(String storeId, String externalOrderId) {
