@@ -65,6 +65,7 @@ import pl.commercelink.web.dtos.OrderFilterForm;
 import pl.commercelink.web.dtos.OrderItemsForm;
 import pl.commercelink.web.dtos.SplitGroupForm;
 import pl.commercelink.web.dtos.SplitGroupPreviewDto;
+import pl.commercelink.web.orders.OrderLabels;
 import pl.commercelink.web.orders.OrderListQuery;
 import pl.commercelink.web.settings.ConfirmAction;
 import org.springframework.util.LinkedMultiValueMap;
@@ -546,7 +547,9 @@ public class OrdersController extends BaseController {
                 .collect(Collectors.toList()));
         model.addAttribute("orderReviewStatuses", OrderReviewStatus.values());
         model.addAttribute("receiptTypes", manualDocumentTypes);
-        model.addAttribute("paymentSources", PaymentSource.values());
+        // fragments/payments-section.html reads Option.value()/labelKey() like every other enum choice on the order
+        // pages; orderDetails.html is the only OrdersController-rendered page that embeds that fragment.
+        model.addAttribute("paymentSources", OrderLabels.Option.of(PaymentSource.values(), OrderLabels::paymentSource));
         model.addAttribute("pendingPayment", order.getPayments().stream()
                 .filter(Payment::isUnsettled)
                 .findFirst()

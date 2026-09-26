@@ -23,6 +23,7 @@ import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.documents.Document;
 import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.starter.security.CustomSecurityContext;
+import pl.commercelink.web.orders.OrderLabels;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
@@ -1177,7 +1178,7 @@ public class DeliveriesController {
         model.addAttribute("isSuperAdmin", isSuperAdmin());
         model.addAttribute("isAdmin", isAdmin());
         model.addAttribute("supplierRegistry", supplierRegistry);
-        model.addAttribute("paymentSources", PaymentSource.values());
+        model.addAttribute("paymentSources", OrderLabels.Option.of(PaymentSource.values(), OrderLabels::paymentSource));
         model.addAttribute("pendingPayment", delivery.getPendingPayment());
         if (delivery.isDropship()) {
             var dropshipOrder = resolveDropshipOrder(storeId, delivery);

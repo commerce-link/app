@@ -1,0 +1,57 @@
+// Dialogs with a form (dialog.cl-dialog.is-form). An element with data-cl-dialog-open="id" opens dialog#id with
+// showModal (focus stays inside, Escape closes); before that the dialog receives cl:dialog-open with detail.trigger, so
+// a page script can fill it from the opener's data attributes. [data-cl-dialog-close] and a click on the backdrop close
+// it; the focus goes back to the opener, or to its menu button when the opener sat in an action menu (the menu is
+// closed by then). Without dialog support the opener's href, when it has one, is followed.
+(function () {
+    'use strict';
+
+    var FOCUSABLE = 'input:not([type="hidden"]):not([disabled]), select:not([disabled]), '
+        + 'textarea:not([disabled]), button:not([disabled])';
+    var returnTo = new WeakMap();
+
+    function focusTarget(trigger) {
+        var menu = trigger.closest('.cl-menu');
+        return menu ? menu.querySelector(':scope > button') : trigger;
+    }
+
+    document.addEventListener('click', function (event) {
+        if (!event.target.closest) {
+            return;
+        }
+        var trigger = event.target.closest('[data-cl-dialog-open]');
+        if (trigger) {
+            var dialog = document.getElementById(trigger.getAttribute('data-cl-dialog-open'));
+            if (!dialog || typeof dialog.showModal !== 'function') {
+                return;
+            }
+            event.preventDefault();
+            returnTo.set(dialog, focusTarget(trigger));
+            dialog.dispatchEvent(new CustomEvent('cl:dialog-open', { detail: { trigger: trigger } }));
+            dialog.showModal();
+            var first = dialog.querySelector('[autofocus]') || dialog.querySelector(FOCUSABLE);
+            if (first) {
+                first.focus();
+            }
+            return;
+        }
+        var closer = event.target.closest('[data-cl-dialog-close]');
+        if (closer && closer.closest('dialog')) {
+            event.preventDefault();
+            closer.closest('dialog').close();
+            return;
+        }
+        // a click on the backdrop lands on the dialog element itself; the confirmation dialog handles its own
+        if (event.target instanceof HTMLDialogElement && event.target.classList.contains('is-form')) {
+            event.target.close();
+        }
+    });
+
+    // close does not bubble
+    document.addEventListener('close', function (event) {
+        var target = event.target instanceof HTMLDialogElement ? returnTo.get(event.target) : null;
+        if (target && document.contains(target)) {
+            target.focus();
+        }
+    }, true);
+})();

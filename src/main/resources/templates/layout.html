@@ -16,14 +16,13 @@
             }
         })();
     </script>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma-timeline@3.0.5/dist/css/bulma-timeline.min.css">
     <link rel="stylesheet" th:href="@{/css/commercelink.css}">
     <script defer src="https://use.fontawesome.com/releases/v5.0.7/js/all.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <th:block th:replace="~{fragments/gtm :: tag}"></th:block>
 </head>
-<body th:attr="data-cl-server-error=#{form.save.serverError}">
+<body th:attr="data-cl-server-error=#{form.save.serverError}, data-cl-amount-format=#{general.currency.amount}">
 <th:block th:replace="~{fragments/gtm :: noscript}"></th:block>
 
 <a class="cl-skip" href="#clContent" th:text="#{nav.skip.to.content}"></a>

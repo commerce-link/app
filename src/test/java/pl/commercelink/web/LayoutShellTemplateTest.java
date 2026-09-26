@@ -104,7 +104,7 @@ class LayoutShellTemplateTest {
         String script = Files.readString(Path.of("src/main/resources/static/js/async-form.js"), StandardCharsets.UTF_8);
 
         // then
-        assertThat(layout).contains("<body th:attr=\"data-cl-server-error=#{form.save.serverError}\">");
+        assertThat(layout).contains("<body th:attr=\"data-cl-server-error=#{form.save.serverError}, data-cl-amount-format=#{general.currency.amount}\">");
         assertThat(script).contains("document.body.getAttribute('data-cl-server-error')");
     }
 }

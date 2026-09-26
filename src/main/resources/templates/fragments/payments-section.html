@@ -4,7 +4,7 @@
 
 <!--
   Reusable payments section (read-only table + Add modal + bulk Edit modal).
-  Used by orderDetails and deliveryDetails.
+  Used by deliveryDetails (the order details page includes fragments/add-payment-modal.html directly instead).
 
   Caller passes:
     - payments             : List<Payment> for read-only display + edit table
@@ -12,7 +12,8 @@
     - updatePaymentsAction : URL for bulk edit form (Spring binds input names to controller's @ModelAttribute)
     - expectedAmount       : double, unpaid amount for the modal hint
     - pendingPayment       : Payment or null (pre-fills modal)
-    - paymentSources       : iterable of PaymentSource enum values
+    - paymentSources       : List<OrderLabels.Option<PaymentSource>> (value + labelKey), like every other enum choice
+                             list on the order pages — read value()/labelKey() here too, not the raw enum
     - addDisabled          : boolean — disable Add/Edit buttons (e.g. completed Order)
     - editEnabled          : boolean — show Add/Edit buttons + render modals at all
     - mode                 : 'order' or 'delivery' — picks which checkbox set is shown in Add modal
@@ -75,7 +76,8 @@
             formAction=${addPaymentAction},
             expectedAmount=${expectedAmount},
             pendingPayment=${pendingPayment},
-            paymentSources=${paymentSources})}"></div>
+            paymentSources=${paymentSources},
+            loadMoneyJs=true)}"></div>
 
     <div id="paymentsEditModal" class="modal" th:if="${editEnabled}">
         <div class="modal-background" onclick="togglePaymentsEditModal(false)"></div>
@@ -107,8 +109,9 @@
                                        th:value="${payment.direction}"/>
                                 <div class="select">
                                     <select th:name="'payments[' + ${iterStat.index} + '].source'">
-                                        <option th:each="src : ${paymentSources}" th:value="${src}" th:text="${src}"
-                                                th:selected="${src == payment.source}"></option>
+                                        <option th:each="src : ${paymentSources}" th:value="${src.value().name()}"
+                                                th:selected="${src.value() == payment.source}"
+                                                th:text="#{${src.labelKey()}}"></option>
                                     </select>
                                 </div>
                             </td>

@@ -123,44 +123,52 @@
         form.submit();
     }
 
-    function confirmThen(button, table) {
+    // Shared with order-items.js (Task 11, D-12): opens #cl-confirm-dialog, fills it from the button's title/message/
+    // action attributes (named by the caller, with "{n}" replaced by count) and wires the accept button to onConfirm.
+    // Fails closed: without the dialog the operator never gets asked, and a bulk action is not something to do on a
+    // page whose confirmation markup is missing. Returns whether the dialog was shown.
+    window.CL_confirmBulk = function (button, count, onConfirm, titleAttr, messageAttr, actionAttr) {
         var dialog = document.getElementById('cl-confirm-dialog');
-        var action = button.getAttribute('data-cl-select-action');
         var accept = dialog && dialog.querySelector('[data-cl-confirm-submit]');
-        // Fails closed: without the dialog the operator never gets asked, and a bulk delete is not something to do on
-        // a page whose confirmation markup is missing.
         if (!dialog || !accept || typeof dialog.showModal !== 'function') {
-            return;
+            return false;
         }
-        var count = String(checked(table).length);
         var title = dialog.querySelector('#cl-confirm-title');
         var message = dialog.querySelector('#cl-confirm-message');
         if (title) {
-            title.textContent = (button.getAttribute('data-cl-select-confirm-title') || '').replace('{n}', count);
+            title.textContent = (button.getAttribute(titleAttr) || '').replace('{n}', count);
         }
         if (message) {
-            message.textContent = (button.getAttribute('data-cl-select-confirm-message') || '').replace('{n}', count);
+            message.textContent = (button.getAttribute(messageAttr) || '').replace('{n}', count);
         }
-        accept.textContent = button.getAttribute('data-cl-select-confirm-action') || accept.textContent;
+        accept.textContent = button.getAttribute(actionAttr) || accept.textContent;
         accept.classList.toggle('is-danger', button.classList.contains('is-danger'));
         accept.classList.toggle('is-primary', !button.classList.contains('is-danger'));
-        // The dialog's own form posts to the address of the link that last opened it; this action goes through the
-        // bulk form instead, so the confirm button must not submit that form.
         accept.disabled = false;
-        var onConfirm = function (event) {
+        var handler = function (event) {
             event.preventDefault();
             dialog.close();
-            submit(table, action);
+            onConfirm();
         };
-        accept.addEventListener('click', onConfirm);
+        accept.addEventListener('click', handler);
         dialog.addEventListener('close', function () {
-            accept.removeEventListener('click', onConfirm);
+            accept.removeEventListener('click', handler);
         }, { once: true });
         dialog.showModal();
         var cancel = dialog.querySelector('[data-cl-confirm-cancel]');
         if (cancel) {
             cancel.focus();
         }
+        return true;
+    };
+
+    function confirmThen(button, table) {
+        var action = button.getAttribute('data-cl-select-action');
+        // The dialog's own form posts to the address of the link that last opened it; this action goes through the
+        // bulk form instead, so the confirm button must not submit that form.
+        window.CL_confirmBulk(button, String(checked(table).length), function () {
+            submit(table, action);
+        }, 'data-cl-select-confirm-title', 'data-cl-select-confirm-message', 'data-cl-select-confirm-action');
     }
 
     function init(table) {

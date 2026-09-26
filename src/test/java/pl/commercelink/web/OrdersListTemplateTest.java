@@ -85,7 +85,6 @@ class OrdersListTemplateTest {
     void onlyTheListScriptIsIncluded() throws Exception {
         // no dialog is left on the list: "save this view" is gone and filters are managed on their own page
         assertThat(page()).contains("@{/js/orders-list.js}").doesNotContain("dialog.js").doesNotContain("confirm-dialog");
-        assertThat(Path.of("src/main/resources/static/js/dialog.js")).doesNotExist();
         assertThat(Path.of("src/main/resources/templates/orders/filter-new.html")).doesNotExist();
     }
 
