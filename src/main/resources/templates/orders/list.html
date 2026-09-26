@@ -38,7 +38,7 @@
             <ul class="cl-stat-grid is-orders" th:attr="aria-label=#{orders.list.attention.label}">
                 <li class="cl-stat" th:each="tile : ${page.tiles()}" th:if="${tile.kind().name() != 'Decide'}">
                     <span class="cl-eyebrow" th:text="${tile.label()}"></span>
-                    <span class="cl-stat-value" th:classappend="${tile.tone()}" th:text="${tile.count()}"></span>
+                    <span class="cl-stat-value" th:text="${tile.count()}"></span>
                     <span class="cl-stat-hint" th:text="${tile.hint()}"></span>
                 </li>
             </ul>

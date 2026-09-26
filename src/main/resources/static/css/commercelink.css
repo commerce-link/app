@@ -4226,14 +4226,6 @@ a.cl-link-button:hover {
     margin: 0;
 }
 
-.cl-page .cl-stat-value.is-bad {
-    color: var(--cl-bad);
-}
-
-.cl-page .cl-stat-value.is-warn {
-    color: var(--cl-warn);
-}
-
 /* Status tabs: one underlined row at the top of the card — open statuses on the left, history on the right. Counts
    are small and grey so the labels carry the row; a tab with nothing behind it is quieter but still clickable. */
 .cl-page .cl-tab {

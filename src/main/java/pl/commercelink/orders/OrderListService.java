@@ -143,12 +143,7 @@ public class OrderListService {
                 case Decide -> text("orders.list.attention.decide.hint", locale, newCount, blockedCount);
                 default -> text(key + ".hint", locale);
             };
-            String tone = switch (kind) {
-                case Overdue -> count > 0 ? "is-bad" : "";
-                case Today -> count > 0 ? "is-warn" : "";
-                default -> "";
-            };
-            tiles.add(new Tile(kind, text(key, locale), count, null, hint, query.withFocus(pressed ? null : kind).href(), pressed, true, tone));
+            tiles.add(new Tile(kind, text(key, locale), count, null, hint, query.withFocus(pressed ? null : kind).href(), pressed, true));
         }
         return tiles;
     }

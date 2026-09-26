@@ -30,7 +30,8 @@ class OrdersListTemplateTest {
     void tilesSegmentsToolbarChipsTableAndPagingAreWiredToTheModel() throws Exception {
         String html = page();
         assertThat(html).contains("cl-stat-grid is-orders").contains("cl-stat-value").contains("cl-stat-hint")
-                .doesNotContain("cl-stat-icon").doesNotContain("cl-stat-sum").doesNotContain("cl-stat-value-of")
+                .doesNotContain("cl-stat-icon").doesNotContain("tile.tone()")  // values in ink, as on Asortyment
+                .doesNotContain("cl-stat-sum").doesNotContain("cl-stat-value-of")
                 .contains("tile.kind().name() != 'Decide'").doesNotContain("cl-attention")
                 .doesNotContain("cl-tabs").doesNotContain("cl-tab-count")
                 .contains("class=\"cl-table-toolbar\"").contains("class=\"cl-toolbar-filters\"").doesNotContain("cl-list-controls")

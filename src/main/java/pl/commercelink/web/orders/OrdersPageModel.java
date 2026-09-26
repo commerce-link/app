@@ -24,7 +24,7 @@ public record OrdersPageModel(
         List<Condition> saveViewConditions) {
 
     public record Tile(OrderAttention kind, String label, long count, String valueOf, String hint, String href,
-                       boolean pressed, boolean enabled, String tone) {
+                       boolean pressed, boolean enabled) {
     }
 
     /** One row of the Status menu: the status, its count within the custom filter and the search, and whether it is ticked. */
