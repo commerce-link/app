@@ -61,9 +61,9 @@ class OrdersListTemplateTest {
         int marks = html.indexOf("<ul class=\"cl-doc-marks\"");
         assertThat(marks).isGreaterThan(status).isLessThan(html.indexOf("th:text=\"${row.totalText()}\""));
         assertThat(html).contains("aria-label=#{orders.list.marks.label}").contains("th:unless=\"${row.marks().isEmpty()}\"")
-                .contains("${row.hasTodo()} ? 'has-todo'").contains("${mark.state() + ' is-' + mark.kind()}")
+                .contains("${row.hasTodo()} ? 'has-todo'").contains("th:classappend=\"${mark.state()}\"")
                 .contains("<span class=\"cl-visually-hidden\" th:text=\"${mark.label()}\"></span>")
-                .contains("fas fa-check cl-doc-mark-icon").contains("fas fa-clock cl-doc-mark-icon").contains("fas fa-star cl-doc-mark-icon");
+                .contains("fas fa-check cl-doc-mark-icon").contains("fas fa-star cl-doc-mark-icon").doesNotContain("fa-clock");
     }
 
     @Test

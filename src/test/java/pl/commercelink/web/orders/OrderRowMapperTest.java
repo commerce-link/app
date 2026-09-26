@@ -165,18 +165,17 @@ class OrderRowMapperTest {
         assertThat(row.hasTodo()).isTrue();
     }
 
+    /** Before delivery a gap is not work yet: only what already exists shows, and it starts at the left. */
     @Test
-    void beforeDeliveryAMissingDocumentIsNotYetDue() {
+    void beforeDeliveryOnlyWhatExistsIsShown() {
         Order order = order();
         order.setStatus(OrderStatus.Realization);
         order.setReview(new OrderReview(OrderReviewStatus.ToBeCollected));
-        order.getBillingDetails().setTaxId("5250001009");
+        assertThat(withWarehouseDocuments.map(order, TODAY).marks()).isEmpty();
 
+        order.addDocument(new Document("d1", "FV/7/2026", null, DocumentType.InvoiceVat));
         OrderRow row = withWarehouseDocuments.map(order, TODAY);
-
-        assertThat(row.marks()).extracting(DocMark::code, DocMark::state)
-                .containsExactly(tuple("WZ", "is-later"), tuple("FV", "is-later"), tuple("", "is-later"));
-        assertThat(row.marks().get(1).label()).isEqualTo("Faktura VAT: do wystawienia po dostarczeniu");
+        assertThat(row.marks()).extracting(DocMark::kind, DocMark::code, DocMark::state).containsExactly(tuple("invoice", "FV", "is-done"));
         assertThat(row.hasTodo()).isFalse();
     }
 
@@ -210,9 +209,8 @@ class OrderRowMapperTest {
                 .as("a store without warehouse documents expects no WZ").containsExactly("invoice");
 
         order.setReview(new OrderReview(OrderReviewStatus.InProgress));
-        DocMark review = mapper.map(order, TODAY).marks().get(1);
-        assertThat(review.state()).isEqualTo("is-waiting");
-        assertThat(review.label()).isEqualTo("Opinia: prośba wysłana, czeka na klienta");
+        assertThat(mapper.map(order, TODAY).marks()).extracting(DocMark::kind)
+                .as("a review already requested no longer holds the order open").containsExactly("invoice");
 
         order.setReview(null);
         assertThat(mapper.map(order, TODAY).marks()).extracting(DocMark::kind).containsExactly("invoice");

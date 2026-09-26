@@ -86,39 +86,38 @@ public class OrderRowMapper {
     }
 
     /**
-     * The WZ, the closing document and the review, in that order (spec §25). A missing one blocks the order from closing
-     * (Order.isSettled) only once it is Delivered, so only then is it is-todo; before that it is is-later. The WZ is
-     * expected when the store issues warehouse documents and the order is fulfilled from the warehouse — the list does
-     * not read the order's items, so a mixed order with dropshipped lines counts as a warehouse one (OrderLifecycle
-     * decides from the items). An order that needs no such document or review shows no marker for it.
+     * The WZ, the closing document and the review, in that order (spec §25): a check for what exists, a to-do mark for
+     * what is missing once the order is Delivered — the point where it keeps the order from closing (Order.isSettled).
+     * Anything else shows nothing: a gap before delivery is not work yet, and a review already requested (InProgress)
+     * no longer blocks the close. The WZ is expected when the store issues warehouse documents and the order is
+     * fulfilled from the warehouse — the list does not read the order's items, so a mixed order with dropshipped lines
+     * counts as a warehouse one (OrderLifecycle decides from the items).
      */
     List<DocMark> marks(Order order) {
-        String missing = order.getStatus() == OrderStatus.Delivered ? "is-todo" : "is-later";
+        boolean delivered = order.getStatus() == OrderStatus.Delivered;
         List<DocMark> marks = new ArrayList<>();
 
         Optional<Document> goodsIssue = order.getDocumentByType(DocumentType.GoodsIssue);
         if (goodsIssue.isPresent()) {
             marks.add(mark("wz", "WZ", "is-done", text("orders.list.mark.done", "WZ", number(goodsIssue.get()))));
-        } else if (warehouseDocuments && order.getFulfilmentType() != FulfilmentType.DirectToConsumer) {
-            marks.add(mark("wz", "WZ", missing, text("orders.list.mark." + missing.substring(3), "WZ")));
+        } else if (delivered && warehouseDocuments && order.getFulfilmentType() != FulfilmentType.DirectToConsumer) {
+            marks.add(mark("wz", "WZ", "is-todo", text("orders.list.mark.todo", "WZ")));
         }
 
         Optional<Document> closing = order.getClosingDocument();
         if (closing.isPresent()) {
             DocumentType type = closing.get().getType();
             marks.add(mark("invoice", code(type), "is-done", text("orders.list.mark.done", documentName(type), number(closing.get()))));
-        } else if (!order.isInvoiced()) {
+        } else if (delivered && !order.isInvoiced()) {
             DocumentType type = order.getReceiptType();
-            marks.add(mark("invoice", code(type), missing, text("orders.list.mark." + missing.substring(3), documentName(type))));
+            marks.add(mark("invoice", code(type), "is-todo", text("orders.list.mark.todo", documentName(type))));
         }
 
         OrderReviewStatus review = order.getReview() == null ? null : order.getReview().getStatus();
         String reviewName = text("orders.list.mark.review");
-        if (review == OrderReviewStatus.ToBeCollected) {
-            marks.add(mark("review", "", missing, text("orders.list.mark.review." + missing.substring(3), reviewName)));
-        } else if (review == OrderReviewStatus.InProgress) {
-            marks.add(mark("review", "", "is-waiting", text("orders.list.mark.review.waiting", reviewName)));
-        } else if (review != null && review != OrderReviewStatus.NotApplicable) {
+        if (review == OrderReviewStatus.ToBeCollected && delivered) {
+            marks.add(mark("review", "", "is-todo", text("orders.list.mark.review.todo", reviewName)));
+        } else if (review == OrderReviewStatus.Positive || review == OrderReviewStatus.Negative || review == OrderReviewStatus.NoResponse) {
             marks.add(mark("review", "", "is-done", text("orders.list.mark.review.done", reviewName, text("OrderReviewStatus." + review.name()))));
         }
         return List.copyOf(marks);

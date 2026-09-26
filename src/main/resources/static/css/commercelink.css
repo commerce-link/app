@@ -4701,12 +4701,13 @@ a.cl-link-button:hover {
     font-weight: 500;
 }
 
-/* Document marks under a status pill (WZ · FV/PAR · review star): what still holds the record open. Three fixed slots,
-   so the marks line up from row to row even when one does not apply. Done recedes (grey, check), to-do is the only
-   filled one (warn), later is outlined, waiting is dashed with a clock — shape, not only colour (principle 3). */
+/* Document marks under a status pill (WZ · FV/PAR · review star): a check for what exists, the one filled warn mark
+   for what holds a delivered record open — shape as well as colour (principle 3). Nothing else is shown, so the marks
+   start at the left edge whichever of them apply. */
 .cl-page .cl-doc-marks {
-    display: grid;
-    grid-template-columns: 38px 46px 32px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 8px;
     align-items: center;
     margin: 4px 0 0;
     padding: 0;
@@ -4717,11 +4718,9 @@ a.cl-link-button:hover {
     display: inline-flex;
     align-items: center;
     gap: 3px;
-    justify-self: start;
     height: 18px;
     margin: 0;
     padding: 0 5px;
-    border: 1px solid transparent;
     border-radius: 4px;
     color: var(--cl-ink-3);
     font-size: 11px;
@@ -4729,18 +4728,6 @@ a.cl-link-button:hover {
     line-height: 1;
     letter-spacing: .02em;
     white-space: nowrap;
-}
-
-.cl-page .cl-doc-mark.is-wz {
-    grid-column: 1;
-}
-
-.cl-page .cl-doc-mark.is-invoice {
-    grid-column: 2;
-}
-
-.cl-page .cl-doc-mark.is-review {
-    grid-column: 3;
 }
 
 .cl-page .cl-doc-mark .cl-doc-mark-icon,
@@ -4751,21 +4738,12 @@ a.cl-link-button:hover {
 }
 
 .cl-page .cl-doc-mark.is-done {
-    padding-left: 0;
+    padding: 0;
 }
 
 .cl-page .cl-doc-mark.is-todo {
     color: var(--cl-warn);
     background: var(--cl-warn-soft);
-}
-
-.cl-page .cl-doc-mark.is-later {
-    border-color: var(--cl-line);
-}
-
-.cl-page .cl-doc-mark.is-waiting {
-    border-color: var(--cl-ink-3);
-    border-style: dashed;
 }
 
 /* Pagination under a server-paged table. */
