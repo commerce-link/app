@@ -166,8 +166,6 @@ public class OrdersController extends BaseController {
     @Autowired
     private OrderListService orderListService;
 
-    private static final Set<String> LIST_PARAMS = Set.of("status", "filterId", "focus", "q", "sort", "dir", "page");
-
     @GetMapping("/dashboard/orders")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String orders(@RequestParam MultiValueMap<String, String> params, Locale locale, Model model) {
@@ -176,16 +174,6 @@ public class OrdersController extends BaseController {
             return "redirect:" + legacy.get();
         }
         OrderListQuery query = OrderListQuery.parse(params);
-        ListOrderFiltersView filters = orderFilters.list(actor());
-        // A bare entry (the menu link) opens on the user's starred filter; any list parameter — including an
-        // empty filterId= from "Wyczyść filtr" — means the user already chose a view (spec §2). Parameters the
-        // list does not own (lang=) do not count.
-        boolean bareEntry = params.keySet().stream().noneMatch(LIST_PARAMS::contains);
-        if (bareEntry && filters.defaultFilter().isPresent()) {
-            OrderFilter starred = filters.defaultFilter().get();
-            OrderListQuery target = query.withFilterId(starred.getId()).withStatus(statusOf(starred).orElse(null));
-            return "redirect:" + target.href();
-        }
         addListAttributes(model, query, locale);
         return "orders/list";
     }
@@ -222,12 +210,12 @@ public class OrdersController extends BaseController {
                                     RedirectAttributes redirectAttributes, Model model, Locale locale,
                                     HttpServletResponse response) {
         return filterAction(requestedWith, form.getReturnTo(), redirectAttributes, model, locale, response, form, null, () -> {
-            OrderFilter created = orderFilters.create(actor(), form.isSharedWithStore(), form.getLabel(),
-                    form.toConditions(), form.isMakeDefault());
-            if (!form.isMakeDefault()) {
+            OrderFilter created = orderFilters.create(actor(), form.isSharedWithStore(), form.getLabel(), form.toConditions());
+            if (PAGE_FORM.equals(form.getDialog())) {
                 return safeReturnTo(form.getReturnTo());
             }
-            OrderListQuery target = parseReturnTo(safeReturnTo(form.getReturnTo())).withFilterId(created.getId());
+            // "save this view": the list opens on the filter just saved
+            OrderListQuery target = parseReturnTo(listOf(safeReturnTo(form.getReturnTo()))).withFilterId(created.getId());
             return statusOf(created).map(target::withStatus).orElse(target).href();
         });
     }
@@ -278,30 +266,6 @@ public class OrdersController extends BaseController {
         model.addAttribute("backLabel", messageSource.getMessage(back.startsWith(FILTERS_PATH) ? "orders.filters.edit.back"
                 : "orders.filters.page.back", null, locale));
         return "settings-confirm";
-    }
-
-    @PostMapping("/dashboard/orders/filters/{filterId}/default")
-    @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String setDefaultFilter(@PathVariable String filterId, @RequestParam(required = false) String returnTo,
-                                   @RequestHeader(value = "X-Requested-With", required = false) String requestedWith,
-                                   RedirectAttributes redirectAttributes, Model model, Locale locale,
-                                   HttpServletResponse response) {
-        return filterAction(requestedWith, returnTo, redirectAttributes, model, locale, response, () -> {
-            orderFilters.setDefault(actor(), filterId);
-            return safeReturnTo(returnTo);
-        });
-    }
-
-    @PostMapping("/dashboard/orders/filters/default/clear")
-    @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String clearDefaultFilter(@RequestParam(required = false) String returnTo,
-                                     @RequestHeader(value = "X-Requested-With", required = false) String requestedWith,
-                                     RedirectAttributes redirectAttributes, Model model, Locale locale,
-                                     HttpServletResponse response) {
-        return filterAction(requestedWith, returnTo, redirectAttributes, model, locale, response, () -> {
-            orderFilters.clearDefault(actor());
-            return safeReturnTo(returnTo);
-        });
     }
 
     /**

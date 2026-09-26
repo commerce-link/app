@@ -5,7 +5,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.orders.filters.FilterActor;
@@ -321,89 +320,6 @@ class OrderFiltersServiceTest {
 
             assertThat(storeRow.getFilters()).isEmpty();
             verify(repository).save(storeRow);
-        }
-    }
-
-    @Nested
-    @DisplayName("default (starred) filter")
-    class DefaultFilter {
-
-        @Test
-        void listReportsTheStarredFilterWhenItStillExistsInEitherScope() {
-            OrderFilter shared = filter("Do wysłania");
-            OwnedOrderFilters storeRow = rowOf(OwnedOrderFilters.STORE_FILTER, shared);
-            OwnedOrderFilters userRow = rowOf("u1");
-            userRow.setDefaultFilterId(shared.getId());
-            when(repository.findByOwner(STORE_ID, OwnedOrderFilters.STORE_FILTER)).thenReturn(Optional.of(storeRow));
-            when(repository.findByOwner(STORE_ID, "u1")).thenReturn(Optional.of(userRow));
-
-            ListOrderFiltersView view = service().list(user("u1"));
-
-            assertThat(view.defaultFilter()).contains(shared);
-            assertThat(view.isDefault(shared.getId())).isTrue();
-        }
-
-        @Test
-        void aStarPointingAtADeletedFilterIsSimplyAbsent() {
-            OwnedOrderFilters userRow = rowOf("u1");
-            userRow.setDefaultFilterId("gone");
-            when(repository.findByOwner(STORE_ID, OwnedOrderFilters.STORE_FILTER)).thenReturn(Optional.empty());
-            when(repository.findByOwner(STORE_ID, "u1")).thenReturn(Optional.of(userRow));
-
-            assertThat(service().list(user("u1")).defaultFilter()).isEmpty();
-            verify(repository, never()).save(any());
-        }
-
-        @Test
-        void setDefaultAcceptsOwnAndSharedFiltersAndCreatesTheUsersRowWhenMissing() {
-            OrderFilter shared = filter("Sklepowy");
-            when(repository.findByOwner(STORE_ID, OwnedOrderFilters.STORE_FILTER)).thenReturn(Optional.of(rowOf(OwnedOrderFilters.STORE_FILTER, shared)));
-            when(repository.findByOwner(STORE_ID, "u1")).thenReturn(Optional.empty());
-
-            service().setDefault(user("u1"), shared.getId());
-
-            ArgumentCaptor<OwnedOrderFilters> saved = ArgumentCaptor.forClass(OwnedOrderFilters.class);
-            verify(repository).save(saved.capture());
-            assertThat(saved.getValue().getUserId()).isEqualTo("u1");
-            assertThat(saved.getValue().getDefaultFilterId()).isEqualTo(shared.getId());
-        }
-
-        @Test
-        void setDefaultRejectsAFilterTheUserCannotSee() {
-            OrderFilter someoneElses = filter("Cudzy");
-            when(repository.findByOwner(STORE_ID, OwnedOrderFilters.STORE_FILTER)).thenReturn(Optional.empty());
-            when(repository.findByOwner(STORE_ID, "u1")).thenReturn(Optional.of(rowOf("u1")));
-
-            assertThatThrownBy(() -> service().setDefault(user("u1"), someoneElses.getId()))
-                    .isInstanceOf(OrderFilterInvalidException.class);
-            verify(repository, never()).save(any());
-        }
-
-        @Test
-        void clearDefaultRemovesTheStarAndDeletingOwnStarredFilterClearsItToo() {
-            OrderFilter own = filter("Mój");
-            OwnedOrderFilters userRow = rowOf("u1", own);
-            userRow.setDefaultFilterId(own.getId());
-            when(repository.findByOwner(STORE_ID, OwnedOrderFilters.STORE_FILTER)).thenReturn(Optional.empty());
-            when(repository.findByOwner(STORE_ID, "u1")).thenReturn(Optional.of(userRow));
-
-            service().delete(user("u1"), own.getId());
-            assertThat(userRow.getDefaultFilterId()).isNull();
-
-            userRow.setDefaultFilterId("x");
-            service().clearDefault(user("u1"));
-            assertThat(userRow.getDefaultFilterId()).isNull();
-        }
-
-        @Test
-        void createWithMakeDefaultStarsTheNewFilter() {
-            when(repository.findByOwner(STORE_ID, OwnedOrderFilters.STORE_FILTER)).thenReturn(Optional.empty());
-            OwnedOrderFilters userRow = rowOf("u1");
-            when(repository.findByOwner(STORE_ID, "u1")).thenReturn(Optional.of(userRow));
-
-            OrderFilter created = service().create(user("u1"), false, "Nowy", COURIER, true);
-
-            assertThat(userRow.getDefaultFilterId()).isEqualTo(created.getId());
         }
     }
 }

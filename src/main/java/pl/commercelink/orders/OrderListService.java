@@ -62,7 +62,6 @@ public class OrderListService {
         List<Order> all = ordersRepository.findByStore(actor.storeId());
         ListOrderFiltersView filters = orderFilters.list(actor);
         Optional<OrderFilter> activeFilter = query.hasFilter() ? filters.byId(query.filterId()) : Optional.empty();
-        boolean starred = activeFilter.map(f -> filters.isDefault(f.getId())).orElse(false);
 
         List<Order> open = all.stream().filter(OrderAttention::isOpen).toList();
         List<Order> filtered = all.stream()
@@ -89,8 +88,7 @@ public class OrderListService {
                 statusSummary(query, locale),
                 filterOptions(filters, query),
                 activeFilter,
-                starred,
-                chips(query, activeFilter, starred, inStatus.size(), historyHits, locale),
+                chips(query, activeFilter, inStatus.size(), historyHits, locale),
                 text("orders.list.results", locale, inStatus.size()),
                 sortHeaders(query),
                 rows,
@@ -169,18 +167,17 @@ public class OrderListService {
 
     private List<FilterOption> filterOptions(ListOrderFiltersView filters, OrderListQuery query) {
         return Stream.concat(
-                        filters.sharedWithStore().stream().map(f -> option(f, true, filters, query)),
-                        filters.own().stream().map(f -> option(f, false, filters, query)))
+                        filters.sharedWithStore().stream().map(f -> option(f, true, query)),
+                        filters.own().stream().map(f -> option(f, false, query)))
                 .toList();
     }
 
-    private static FilterOption option(OrderFilter filter, boolean shared, ListOrderFiltersView filters, OrderListQuery query) {
-        boolean starred = filters.isDefault(filter.getId());
-        return new FilterOption(filter.getId(), (starred ? "★ " : "") + filter.getLabel(), shared, starred,
+    private static FilterOption option(OrderFilter filter, boolean shared, OrderListQuery query) {
+        return new FilterOption(filter.getId(), filter.getLabel(), shared,
                 filter.getId().equals(query.filterId()));
     }
 
-    private List<Chip> chips(OrderListQuery query, Optional<OrderFilter> activeFilter, boolean starred, int count, long historyHits,
+    private List<Chip> chips(OrderListQuery query, Optional<OrderFilter> activeFilter, int count, long historyHits,
                              Locale locale) {
         List<Chip> chips = new ArrayList<>();
         // one chip per ticked status, so its "×" drops just that status; dropping the last one returns to all open
@@ -189,8 +186,8 @@ public class OrderListService {
             chips.add(new Chip(label, query.toggleStatus(status).href(), text("orders.list.chip.clearLabel", locale, label)));
         }
         activeFilter.ifPresent(f -> {
-            String label = text("orders.list.chip.filter", locale, f.getLabel() + (starred ? " ★" : ""));
-            chips.add(new Chip(label, query.withFilterId("").href(), text("orders.list.chip.clearLabel", locale, label)));
+            String label = text("orders.list.chip.filter", locale, f.getLabel());
+            chips.add(new Chip(label, query.withFilterId(null).href(), text("orders.list.chip.clearLabel", locale, label)));
         });
         if (query.focus() != null && !query.isHistory()) {
             String label = text("orders.list.chip.focus", locale, text("orders.list.attention." + query.focus().param(), locale), count);
@@ -228,7 +225,7 @@ public class OrderListService {
         }
         if (activeFilter.isPresent()) {
             return new EmptyState(text("orders.list.empty.filter", locale),
-                    text("orders.list.empty.filter.clear", locale), query.withFilterId("").href());
+                    text("orders.list.empty.filter.clear", locale), query.withFilterId(null).href());
         }
         if (!query.isOpen()) {
             String message = query.single().map(s -> text("orders.list.empty.status", locale, text("OrderStatus." + s.name(), locale)))

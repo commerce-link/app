@@ -14,7 +14,6 @@ import pl.commercelink.orders.filters.model.OwnedOrderFilters;
 import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 
 import java.util.List;
-import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -24,27 +23,17 @@ public class OrderFiltersService {
     private final OptimisticLockingExecutor optimisticLockingExecutor;
 
     public ListOrderFiltersView list(FilterActor actor) {
-        List<OrderFilter> shared = filtersOf(actor.storeId(), OwnedOrderFilters.STORE_FILTER);
-        Optional<OwnedOrderFilters> ownRow = orderFiltersRepository.findByOwner(actor.storeId(), actor.userId());
-        List<OrderFilter> own = ownRow.map(OwnedOrderFilters::getFilters).orElseGet(List::of);
-        ListOrderFiltersView view = new ListOrderFiltersView(shared, own);
-        // A star that points at a filter deleted since (an admin removed a shared one) is ignored, not repaired:
-        // the row is the user's, and a read must not write.
-        Optional<OrderFilter> starred = ownRow.map(OwnedOrderFilters::getDefaultFilterId).flatMap(view::byId);
-        return new ListOrderFiltersView(shared, own, starred);
+        return new ListOrderFiltersView(
+                filtersOf(actor.storeId(), OwnedOrderFilters.STORE_FILTER),
+                filtersOf(actor.storeId(), actor.userId()));
     }
 
     public OrderFilter create(FilterActor actor, boolean sharedWithStore, String label,
                               List<OrderFilterCondition> conditions) {
-        return create(actor, sharedWithStore, label, conditions, false);
-    }
-
-    public OrderFilter create(FilterActor actor, boolean sharedWithStore, String label,
-                              List<OrderFilterCondition> conditions, boolean makeDefault) {
         OrderFilter.checkValid(label, conditions);
         checkWritePermissionsAndReturn(actor, sharedWithStore).checkRoomForOneMore();
 
-        OrderFilter created = optimisticLockingExecutor.modifyAndSaveReturning(
+        return optimisticLockingExecutor.modifyAndSaveReturning(
                 () -> checkWritePermissionsAndReturn(actor, sharedWithStore),
                 ownersFilters -> {
                     OrderFilter newFilter = OrderFilter.of(label, conditions);
@@ -52,10 +41,6 @@ public class OrderFiltersService {
                     return newFilter;
                 },
                 orderFiltersRepository::save);
-        if (makeDefault) {
-            setDefault(actor, created.getId());
-        }
-        return created;
     }
 
     public OrderFilter update(FilterActor actor, String filterId, boolean sharedWithStore, String label,
@@ -104,29 +89,6 @@ public class OrderFiltersService {
             throw new OrderFilterConflictException("orders.filters.error.conflict");
         }
         return filterToUpdate;
-    }
-
-    /** Stars a filter the actor can see (own or shared with the store) as the one the orders list opens on. */
-    public void setDefault(FilterActor actor, String filterId) {
-        if (list(actor).byId(filterId).isEmpty()) {
-            throw new OrderFilterInvalidException("orders.filters.error.not.found");
-        }
-        optimisticLockingExecutor.modifyAndSave(
-                () -> ownRow(actor),
-                ownersFilters -> ownersFilters.setDefaultFilterId(filterId),
-                orderFiltersRepository::save);
-    }
-
-    public void clearDefault(FilterActor actor) {
-        optimisticLockingExecutor.modifyAndSave(
-                () -> ownRow(actor),
-                ownersFilters -> ownersFilters.setDefaultFilterId(null),
-                orderFiltersRepository::save);
-    }
-
-    private OwnedOrderFilters ownRow(FilterActor actor) {
-        return orderFiltersRepository.findByOwner(actor.storeId(), actor.userId())
-                .orElseGet(() -> OwnedOrderFilters.emptyFor(actor.storeId(), actor.userId()));
     }
 
     private List<OrderFilter> filtersOf(String storeId, String userId) {

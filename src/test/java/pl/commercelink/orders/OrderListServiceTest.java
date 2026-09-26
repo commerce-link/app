@@ -143,7 +143,7 @@ class OrderListServiceTest {
         add("c", OrderStatus.Blocked, null, 50, 50, "Allegro");
         add("d", OrderStatus.Completed, null, 50, 0, "Allegro");
         OrderFilter allegro = OrderFilter.of("Allegro", List.of(OrderFilterCondition.of(OrderFilterField.SourceName, "Allegro")));
-        when(orderFilters.list(ACTOR)).thenReturn(new ListOrderFiltersView(List.of(allegro), List.of(), Optional.of(allegro)));
+        when(orderFilters.list(ACTOR)).thenReturn(new ListOrderFiltersView(List.of(allegro), List.of()));
 
         OrdersPageModel model = page(query("filterId", allegro.getId()));
 
@@ -156,8 +156,8 @@ class OrderListServiceTest {
         assertThat(model.historyStatuses()).extracting(s -> s.count()).containsExactly(1L, 0L);
         assertThat(model.statusSummary()).isEqualTo("Otwarte");
         assertThat(model.rows()).hasSize(2);
-        assertThat(model.chips()).extracting(c -> c.label()).containsExactly("Filtr: Allegro ★");
-        assertThat(model.activeFilterStarred()).isTrue();
+        assertThat(model.chips()).extracting(c -> c.label()).containsExactly("Filtr: Allegro");
+        assertThat(model.chips().get(0).clearHref()).isEqualTo("/dashboard/orders");
     }
 
     @Test
@@ -246,23 +246,23 @@ class OrderListServiceTest {
         OrderFilter f = OrderFilter.of("Kurier", List.of(OrderFilterCondition.of(OrderFilterField.ShipmentType, "PickupPoint")));
         when(orderFilters.list(ACTOR)).thenReturn(new ListOrderFiltersView(List.of(), List.of(f)));
         assertThat(page(query("filterId", f.getId())).emptyState().text()).isEqualTo("Ten filtr nie ma dziś zamówień.");
-        assertThat(page(query("filterId", f.getId())).emptyState().actionHref()).isEqualTo("/dashboard/orders?filterId=");
+        assertThat(page(query("filterId", f.getId())).emptyState().actionHref()).isEqualTo("/dashboard/orders");
         assertThat(page(query()).emptyState()).isNull();
     }
 
     @Test
-    void unknownFilterIdIsIgnoredAndFilterOptionsCarryTheStar() {
+    void unknownFilterIdIsIgnoredAndFilterOptionsListSharedFirst() {
         add("a", OrderStatus.New, null, 10, 10, null);
         OrderFilter own = OrderFilter.of("Mój", List.of(OrderFilterCondition.of(OrderFilterField.Status, "New")));
         OrderFilter shared = OrderFilter.of("Sklepowy", List.of(OrderFilterCondition.of(OrderFilterField.Status, "Blocked")));
-        when(orderFilters.list(ACTOR)).thenReturn(new ListOrderFiltersView(List.of(shared), List.of(own), Optional.of(own)));
+        when(orderFilters.list(ACTOR)).thenReturn(new ListOrderFiltersView(List.of(shared), List.of(own)));
 
         OrdersPageModel model = page(query("filterId", "does-not-exist"));
 
         assertThat(model.rows()).hasSize(1);
         assertThat(model.chips()).isEmpty();
         assertThat(model.activeFilter()).isEmpty();
-        assertThat(model.filterOptions()).extracting(o -> o.label()).containsExactly("Sklepowy", "★ Mój");
+        assertThat(model.filterOptions()).extracting(o -> o.label()).containsExactly("Sklepowy", "Mój");
         assertThat(model.filterOptions()).extracting(o -> o.shared()).containsExactly(true, false);
         assertThat(model.saveViewConditions()).isEmpty();
         // the segment's status replaces the filter's own Status condition; the filter's other conditions are kept

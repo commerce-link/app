@@ -20,6 +20,8 @@
                 <div class="cl-card">
                     <fieldset class="cl-fieldset">
                         <legend class="cl-fieldset-title" th:text="#{orders.filters.form.legend}"></legend>
+                        <!--/* One note for the whole group (under the status field alone it made that grid row taller than its neighbour). */-->
+                        <p class="cl-help" id="filter-conditions-help" th:text="#{orders.filters.field.status.help}"></p>
                         <div th:replace="~{orders/filters :: filterFormFields}"></div>
                     </fieldset>
                     <div class="cl-card-footer">

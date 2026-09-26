@@ -15,12 +15,11 @@
     </div>
     <div class="cl-field cl-span-3">
         <label class="cl-label" for="filter-status" th:text="#{orders.filters.field.status}"></label>
-        <select class="cl-select" id="filter-status" name="status" aria-describedby="filter-status-help">
+        <select class="cl-select" id="filter-status" name="status" aria-describedby="filter-conditions-help">
             <option value="" th:text="#{orders.filters.any}"></option>
             <option th:each="status : ${statuses}" th:value="${status.name()}" th:text="#{${'OrderStatus.' + status.name()}}"
                     th:selected="${filterForm != null and #strings.equalsIgnoreCase(filterForm.status, status.name())}"></option>
         </select>
-        <p class="cl-help" id="filter-status-help" th:text="#{orders.filters.field.status.help}"></p>
     </div>
     <div class="cl-field cl-span-3">
         <label class="cl-label" for="filter-shipping-due" th:text="#{orders.filters.field.shipping.due}"></label>
@@ -91,10 +90,6 @@
             <span class="cl-table-pills"><span class="cl-status is-neutral" th:each="c : ${page.saveViewConditions()}" th:text="${c.label()}"></span></span>
             <p class="cl-help" th:text="#{orders.filters.saveView.help}"></p>
         </div>
-        <div class="cl-check-field cl-span-6">
-            <label class="cl-check"><input type="checkbox" name="makeDefault" value="true" th:checked="${filterForm == null or filterForm.makeDefault}"/> <span th:text="#{orders.filters.makeDefault}"></span></label>
-            <p class="cl-check-description" th:if="${filters.defaultFilter().isPresent()}" th:text="#{orders.filters.default.replace(${filters.defaultFilter().get().label})}"></p>
-        </div>
         <div class="cl-check-field cl-span-6" th:if="${canManageStoreFilters}">
             <label class="cl-check"><input type="checkbox" name="sharedWithStore" value="true" th:checked="${filterForm != null and filterForm.sharedWithStore}"/> <span th:text="#{orders.filters.share}"></span></label>
             <p class="cl-check-description" th:text="#{orders.filters.share.help}"></p>
@@ -107,11 +102,11 @@
 </form>
 
 <!--/* Filter management page (design system: a list of records in a card, "Nowy filtr" in the card head, editing on a
-       subpage, deleting through the confirm dialog or its page). Every form here returns to this page ($returnTo);
+       subpage, deleting through the confirm dialog or its page). The delete link returns to this page ($returnTo);
        "‹ Zamówienia" goes back to the list view the user came from ($listHref). */-->
 <div layout:fragment="content">
     <section class="cl-page">
-        <div class="cl-page-body is-form">
+        <div class="cl-page-body">
             <div th:replace="~{fragments/settings-header :: subpage(${listHref}, #{orders.filters.page.back}, #{orders.filters.page.title})}"></div>
             <div th:if="${filterError}" class="cl-alert is-bad" role="status">
                 <p class="cl-alert-text" th:text="${filterError}"></p>
@@ -124,20 +119,12 @@
                         <span th:text="#{orders.filters.new}"></span>
                     </a>
                 </div>
-                <p class="cl-card-desc" th:text="#{orders.filters.default.help}"></p>
+                <p class="cl-card-desc" th:text="#{orders.filters.list.desc}"></p>
                 <ul class="cl-list" th:unless="${filters.sharedWithStore().isEmpty() and filters.own().isEmpty()}">
                     <th:block th:each="group : ${ {filters.sharedWithStore(), filters.own()} }" th:with="shared=${groupStat.first}">
-                        <li class="cl-list-item is-filter" th:each="filter : ${group}" th:with="starred=${filters.isDefault(filter.id)}">
-                            <form method="post" class="cl-star-form"
-                                  th:action="${starred} ? @{/dashboard/orders/filters/default/clear} : @{/dashboard/orders/filters/{id}/default(id=${filter.id})}">
-                                <input type="hidden" name="returnTo" th:value="${returnTo}"/>
-                                <button type="submit" class="cl-star" th:attr="aria-pressed=${starred},
-                                        aria-label=${starred} ? #{orders.filters.default.clear(${filter.label})} : #{orders.filters.default.set(${filter.label})}">
-                                    <span class="icon is-small" aria-hidden="true"><i th:class="${starred} ? 'fas fa-star' : 'far fa-star'"></i></span>
-                                </button>
-                            </form>
+                        <li class="cl-list-item" th:each="filter : ${group}">
                             <div>
-                                <span class="cl-list-title"><span th:text="${filter.label}"></span><span th:if="${starred}" class="cl-status is-info" th:text="#{orders.filters.default.badge}"></span></span>
+                                <span class="cl-list-title" th:text="${filter.label}"></span>
                                 <div class="cl-filter-conditions">
                                     <span class="cl-status is-neutral" th:each="c : ${filter.conditions}" th:text="${#messages.msg('orders.filters.field.' + T(pl.commercelink.web.orders.FilterConditionLabels).fieldKey(c.field))} + ': ' + ${T(pl.commercelink.web.orders.FilterConditionLabels).value(c, #messages)}"></span>
                                     <span class="cl-status is-neutral" th:text="${shared} ? #{orders.filters.scope.store} : #{orders.filters.scope.private}"></span>

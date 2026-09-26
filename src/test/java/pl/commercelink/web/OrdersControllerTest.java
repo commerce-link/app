@@ -1239,7 +1239,7 @@ class OrdersControllerTest {
 
         private pl.commercelink.web.orders.OrdersPageModel emptyPage(pl.commercelink.web.orders.OrderListQuery query) {
             return new pl.commercelink.web.orders.OrdersPageModel(query, List.of(), List.of(), List.of(), "", List.of(),
-                    Optional.empty(), false, List.of(), "", java.util.Map.of(), List.of(),
+                    Optional.empty(), List.of(), "", java.util.Map.of(), List.of(),
                     pl.commercelink.web.orders.Pagination.of(1, 0, 50, n -> "/x"), null, List.of());
         }
 
@@ -1266,28 +1266,12 @@ class OrdersControllerTest {
         }
 
         @Test
-        void entryWithoutParametersOpensOnTheStarredFilterAndItsStatus() {
-            var starred = pl.commercelink.orders.filters.model.OrderFilter.of("Do wysłania", List.of(
+        void entryWithoutParametersOpensTheOpenList() {
+            var saved = pl.commercelink.orders.filters.model.OrderFilter.of("Do wysłania", List.of(
                     pl.commercelink.orders.filters.model.OrderFilterCondition.of(pl.commercelink.orders.filters.OrderFilterField.Status, "Assembled")));
-            when(orderFilters.list(ACTOR)).thenReturn(new pl.commercelink.orders.filters.services.ListOrderFiltersView(List.of(), List.of(starred), Optional.of(starred)));
-
-            String view = ordersController.orders(params(), Locale.forLanguageTag("pl"), new ExtendedModelMap());
-
-            assertThat(view).isEqualTo("redirect:/dashboard/orders?status=Assembled&filterId=" + starred.getId());
-        }
-
-        @Test
-        void explicitEmptyFilterIdAndAnyOtherParameterSkipTheStarRedirect() {
-            var starred = pl.commercelink.orders.filters.model.OrderFilter.of("X", List.of(
-                    pl.commercelink.orders.filters.model.OrderFilterCondition.of(pl.commercelink.orders.filters.OrderFilterField.ShipmentType, "Courier")));
-            when(orderFilters.list(ACTOR)).thenReturn(new pl.commercelink.orders.filters.services.ListOrderFiltersView(List.of(), List.of(starred), Optional.of(starred)));
-
-            assertThat(ordersController.orders(params("filterId", ""), Locale.forLanguageTag("pl"), new ExtendedModelMap())).isEqualTo("orders/list");
-            assertThat(ordersController.orders(params("status", "New"), Locale.forLanguageTag("pl"), new ExtendedModelMap())).isEqualTo("orders/list");
-            assertThat(ordersController.orders(params("q", "x"), Locale.forLanguageTag("pl"), new ExtendedModelMap())).isEqualTo("orders/list");
-            // a starred filter without a status condition redirects to the filter alone
-            assertThat(ordersController.orders(params(), Locale.forLanguageTag("pl"), new ExtendedModelMap()))
-                    .isEqualTo("redirect:/dashboard/orders?filterId=" + starred.getId());
+            when(orderFilters.list(ACTOR)).thenReturn(new pl.commercelink.orders.filters.services.ListOrderFiltersView(List.of(), List.of(saved)));
+            // no start filter any more: a saved filter never opens by itself
+            assertThat(ordersController.orders(params(), Locale.forLanguageTag("pl"), new ExtendedModelMap())).isEqualTo("orders/list");
         }
 
         @Test
@@ -1307,39 +1291,34 @@ class OrdersControllerTest {
         }
 
         @Test
-        void starEndpointsReturnToTheGivenAddressAndCallTheService() {
-            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
-            assertThat(ordersController.setDefaultFilter("f1", "/dashboard/orders?status=New", null, redirect, new ExtendedModelMap(), Locale.forLanguageTag("pl"), new org.springframework.mock.web.MockHttpServletResponse()))
-                    .isEqualTo("redirect:/dashboard/orders?status=New");
-            verify(orderFilters).setDefault(ACTOR, "f1");
-            assertThat(ordersController.clearDefaultFilter("/dashboard/orders", null, redirect, new ExtendedModelMap(), Locale.forLanguageTag("pl"), new org.springframework.mock.web.MockHttpServletResponse()))
-                    .isEqualTo("redirect:/dashboard/orders");
-            verify(orderFilters).clearDefault(ACTOR);
-        }
-
-        @Test
         void returnToOutsideTheListIsIgnored() {
             RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
-            assertThat(ordersController.setDefaultFilter("f1", "https://evil.example/x", null, redirect, new ExtendedModelMap(), Locale.forLanguageTag("pl"), new org.springframework.mock.web.MockHttpServletResponse()))
+            assertThat(ordersController.deleteOrderFilter("f1", "https://evil.example/x", null, redirect, new ExtendedModelMap(), Locale.forLanguageTag("pl"), new org.springframework.mock.web.MockHttpServletResponse()))
                     .isEqualTo("redirect:/dashboard/orders");
-            assertThat(ordersController.setDefaultFilter("f1", "/dashboard/store/x", null, redirect, new ExtendedModelMap(), Locale.forLanguageTag("pl"), new org.springframework.mock.web.MockHttpServletResponse()))
+            assertThat(ordersController.deleteOrderFilter("f1", "/dashboard/store/x", null, redirect, new ExtendedModelMap(), Locale.forLanguageTag("pl"), new org.springframework.mock.web.MockHttpServletResponse()))
                     .isEqualTo("redirect:/dashboard/orders");
         }
 
         @Test
-        void createWithMakeDefaultOpensTheNewFilter() {
+        void savingTheViewOpensTheNewFilterAndThePageFormReturnsToThePage() {
             var created = pl.commercelink.orders.filters.model.OrderFilter.of("Nowy", List.of(
                     pl.commercelink.orders.filters.model.OrderFilterCondition.of(pl.commercelink.orders.filters.OrderFilterField.Status, "New")));
-            when(orderFilters.create(eq(ACTOR), eq(false), eq("Nowy"), any(), eq(true))).thenReturn(created);
+            when(orderFilters.create(eq(ACTOR), eq(false), eq("Nowy"), any())).thenReturn(created);
             var form = new pl.commercelink.web.dtos.OrderFilterForm();
             form.setLabel("Nowy");
             form.setStatus("New");
-            form.setMakeDefault(true);
             form.setReturnTo("/dashboard/orders?q=x");
 
             String view = ordersController.createOrderFilter(form, null, new RedirectAttributesModelMap(), new ExtendedModelMap(), Locale.forLanguageTag("pl"), new org.springframework.mock.web.MockHttpServletResponse());
 
             assertThat(view).isEqualTo("redirect:/dashboard/orders?status=New&filterId=" + created.getId() + "&q=x");
+
+            // "Nowy filtr" on the management page returns to that page, not to the list
+            String manage = OrdersController.filtersPage("/dashboard/orders?q=x");
+            form.setDialog("page");
+            form.setReturnTo(manage);
+            assertThat(ordersController.createOrderFilter(form, null, new RedirectAttributesModelMap(), new ExtendedModelMap(), Locale.forLanguageTag("pl"), new org.springframework.mock.web.MockHttpServletResponse()))
+                    .isEqualTo("redirect:" + manage);
         }
 
         @Test
@@ -1421,7 +1400,7 @@ class OrdersControllerTest {
             var form = new pl.commercelink.web.dtos.OrderFilterForm();
             form.setLabel("");
             form.setReturnTo("/dashboard/orders");
-            when(orderFilters.create(any(), anyBoolean(), any(), any(), anyBoolean()))
+            when(orderFilters.create(any(), anyBoolean(), any(), any()))
                     .thenThrow(new pl.commercelink.orders.filters.exceptions.OrderFilterInvalidException("orders.filters.error.no.label"));
             when(messageSource.getMessage(eq("orders.filters.error.no.label"), any(), any(Locale.class))).thenReturn("Filtr musi mieć nazwę.");
 
@@ -1468,7 +1447,7 @@ class OrdersControllerTest {
         void successfulFetchAnswersTheRedirectAddress() {
             var created = pl.commercelink.orders.filters.model.OrderFilter.of("Nowy", List.of(
                     pl.commercelink.orders.filters.model.OrderFilterCondition.of(pl.commercelink.orders.filters.OrderFilterField.Status, "New")));
-            when(orderFilters.create(eq(ACTOR), eq(false), eq("Nowy"), any(), eq(false))).thenReturn(created);
+            when(orderFilters.create(eq(ACTOR), eq(false), eq("Nowy"), any())).thenReturn(created);
             var form = new pl.commercelink.web.dtos.OrderFilterForm();
             form.setLabel("Nowy");
             form.setReturnTo("/dashboard/orders?q=x");
@@ -1478,7 +1457,7 @@ class OrdersControllerTest {
             String fragment = ordersController.createOrderFilter(form, "fetch", new RedirectAttributesModelMap(), model, Locale.forLanguageTag("pl"), response);
 
             assertThat(fragment).isEqualTo("orders/filters :: redirect");
-            assertThat(model.get("redirectTo")).isEqualTo("/dashboard/orders?q=x");
+            assertThat(model.get("redirectTo")).isEqualTo("/dashboard/orders?status=New&filterId=" + created.getId() + "&q=x");
             assertThat(response.getStatus()).isEqualTo(200);
         }
 
@@ -1488,7 +1467,7 @@ class OrdersControllerTest {
             form.setLabel("");
             form.setDialog("save-view");
             form.setReturnTo("/dashboard/orders");
-            when(orderFilters.create(any(), anyBoolean(), any(), any(), anyBoolean()))
+            when(orderFilters.create(any(), anyBoolean(), any(), any()))
                     .thenThrow(new pl.commercelink.orders.filters.exceptions.OrderFilterInvalidException("orders.filters.error.no.label"));
             when(messageSource.getMessage(eq("orders.filters.error.no.label"), any(), any(Locale.class))).thenReturn("Filtr musi mieć nazwę.");
 

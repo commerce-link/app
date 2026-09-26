@@ -28,10 +28,6 @@ public class OwnedOrderFilters {
     @DynamoDBAttribute(attributeName = "filters")
     private List<OrderFilter> filters = new LinkedList<>();
 
-    /** The filter this user opens the orders list on (a filter of their own or one shared with the store); never set on the #store row. */
-    @DynamoDBAttribute(attributeName = "defaultFilterId")
-    private String defaultFilterId;
-
     @DynamoDBVersionAttribute
     private Long version;
 
@@ -69,9 +65,6 @@ public class OwnedOrderFilters {
 
     @DynamoDBIgnore
     public boolean remove(String filterId) {
-        if (filterId != null && filterId.equals(defaultFilterId)) {
-            defaultFilterId = null;
-        }
         return filters.removeIf(filter -> filter.getId().equals(filterId));
     }
 
@@ -97,14 +90,6 @@ public class OwnedOrderFilters {
 
     public void setFilters(List<OrderFilter> filters) {
         this.filters = filters;
-    }
-
-    public String getDefaultFilterId() {
-        return defaultFilterId;
-    }
-
-    public void setDefaultFilterId(String defaultFilterId) {
-        this.defaultFilterId = defaultFilterId;
     }
 
     public Long getVersion() {

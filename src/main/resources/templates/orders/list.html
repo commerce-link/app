@@ -107,7 +107,7 @@
                                         </a>
                                     </li>
                                     <li th:if="${active.isPresent()}">
-                                        <a class="cl-filter-menu-item" th:href="@{${q.withFilterId('').href()}}" th:text="#{orders.list.filter.off}" data-cl-orders-nav></a>
+                                        <a class="cl-filter-menu-item" th:href="@{${q.withFilterId(null).href()}}" th:text="#{orders.list.filter.off}" data-cl-orders-nav></a>
                                     </li>
                                 </ul>
                                 <ul class="cl-filter-menu-footer">

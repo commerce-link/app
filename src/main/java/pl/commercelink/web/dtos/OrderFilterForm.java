@@ -16,7 +16,6 @@ public class OrderFilterForm {
     private String shippingDue;
     private String sourceName;
     private String shippingPostalCode;
-    private boolean makeDefault;
     private String returnTo;
     private String dialog;
 
@@ -99,14 +98,6 @@ public class OrderFilterForm {
 
     public void setShippingPostalCode(String shippingPostalCode) {
         this.shippingPostalCode = shippingPostalCode;
-    }
-
-    public boolean isMakeDefault() {
-        return makeDefault;
-    }
-
-    public void setMakeDefault(boolean makeDefault) {
-        this.makeDefault = makeDefault;
     }
 
     public String getReturnTo() {

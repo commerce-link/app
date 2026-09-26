@@ -4743,35 +4743,6 @@ a.cl-link-button:hover {
     margin-top: 12px;
 }
 
-/* Star: one filter per user opens the list (spec §7.3). */
-.cl-page .cl-star {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 36px;
-    height: 36px;
-    border: 0;
-    border-radius: var(--cl-radius);
-    background: transparent;
-    color: var(--cl-ink-3);
-    font-size: 18px;
-    cursor: pointer;
-}
-
-.cl-page .cl-star[aria-pressed="true"] {
-    color: var(--cl-accent);
-}
-
-.cl-page .cl-star:hover {
-    background: var(--cl-surface-2);
-    color: var(--cl-accent-ink);
-}
-
-.cl-page .cl-star:focus-visible {
-    outline: 2px solid var(--cl-accent);
-    outline-offset: 2px;
-}
-
 /* Dialog with a form (filters): wider than the confirmation, scrolling body. */
 .cl-page .cl-dialog.is-form {
     width: min(600px, calc(100vw - 32px));
@@ -4783,25 +4754,7 @@ a.cl-link-button:hover {
     padding: 4px 20px 16px;
 }
 
-.cl-page .cl-dialog.is-form .cl-list {
-    margin: 0;
-}
-
-/* A saved filter in the management list: star | name + conditions as small pills | Edit · Delete. */
-.cl-page .cl-list .cl-list-item.is-filter {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    align-items: center;
-    column-gap: 12px;
-    padding: 10px 0;
-}
-
-.cl-page .cl-list-item.is-filter .cl-list-title {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-}
-
+/* A saved filter's conditions as small pills under its name, in an ordinary .cl-list-item (name | Edytuj · Usuń). */
 .cl-page .cl-filter-conditions {
     display: flex;
     flex-wrap: wrap;
@@ -4813,18 +4766,7 @@ a.cl-link-button:hover {
     font-weight: 500;
 }
 
-.cl-page .cl-list-item.is-filter .cl-list-actions {
-    display: flex;
-    gap: 12px;
-    white-space: nowrap;
-}
-
 @media screen and (max-width: 1023px) {
-    .cl-page .cl-star {
-        width: 44px;
-        height: 44px;
-    }
-
     .cl-page .cl-pagination .cl-button {
         min-height: 44px;
     }
@@ -5010,13 +4952,4 @@ a.cl-link-button:hover {
         margin-right: 6px;
     }
 
-    /* The management list stacks on a phone: star + name, then conditions, then the actions. */
-    .cl-page .cl-list .cl-list-item.is-filter {
-        grid-template-columns: auto minmax(0, 1fr);
-    }
-
-    .cl-page .cl-list-item.is-filter .cl-list-actions {
-        grid-column: 2;
-        justify-content: flex-start;
-    }
 }

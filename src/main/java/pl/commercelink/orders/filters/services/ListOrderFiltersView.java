@@ -6,11 +6,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
 
-public record ListOrderFiltersView(List<OrderFilter> sharedWithStore, List<OrderFilter> own, Optional<OrderFilter> defaultFilter) {
-
-    public ListOrderFiltersView(List<OrderFilter> sharedWithStore, List<OrderFilter> own) {
-        this(sharedWithStore, own, Optional.empty());
-    }
+public record ListOrderFiltersView(List<OrderFilter> sharedWithStore, List<OrderFilter> own) {
 
     public Optional<OrderFilter> byId(String filterId) {
         return filterId == null || filterId.isBlank()
@@ -18,9 +14,5 @@ public record ListOrderFiltersView(List<OrderFilter> sharedWithStore, List<Order
                 : Stream.concat(sharedWithStore.stream(), own.stream())
                         .filter(filter -> filter.getId().equals(filterId))
                         .findFirst();
-    }
-
-    public boolean isDefault(String filterId) {
-        return defaultFilter.map(f -> f.getId().equals(filterId)).orElse(false);
     }
 }

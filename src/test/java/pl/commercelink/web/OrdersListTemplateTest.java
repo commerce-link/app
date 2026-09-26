@@ -39,7 +39,7 @@ class OrdersListTemplateTest {
                 .contains("name=\"status\"").contains("cl-filter-menu-check").contains("cl-filter-menu-group").contains("page.statusSummary()")
                 .contains("data-cl-autosubmit-hide").contains("q.withStatus(null).href()")
                 .contains("details class=\"cl-filter-menu\" data-cl-filter-menu=\"filter\"").contains("cl-filter-menu-item")
-                .contains("q.withFilterId(o.id()).href()").contains("q.withFilterId('').href()")
+                .contains("q.withFilterId(o.id()).href()").contains("q.withFilterId(null).href()")
                 .contains("data-cl-dialog-open=\"save-view-dialog\"").contains("@{/dashboard/orders/filters(returnTo=${returnTo})}")
                 .contains("cl-search-form").contains("name=\"q\"").contains("cl-search-clear").contains("cl-button is-primary cl-search-submit").contains("q.withQ(null).href()")
                 .contains("cl-list-meta").contains("cl-filter-chips").contains("cl-table-results").contains("role=\"status\"")
@@ -84,20 +84,20 @@ class OrdersListTemplateTest {
         String html = filters();
         // the management page: list in a card, "Nowy filtr" in the card head, edit on a subpage, star and delete here
         assertThat(html).contains("layout:fragment=\"content\"").contains("cl-card-head").contains("/dashboard/orders/filters/add")
-                .contains("/dashboard/orders/filters/{id}/edit").contains("class=\"cl-star\"").contains("aria-pressed")
-                .contains("/default").contains("default/clear").contains("name=\"returnTo\"").contains("data-cl-confirm")
+                .contains("/dashboard/orders/filters/{id}/edit").contains("name=\"returnTo\"").contains("data-cl-confirm")
+                .doesNotContain("cl-star").doesNotContain("/default").doesNotContain("makeDefault").doesNotContain("is-filter")
                 .contains("settings-header :: subpage(${listHref}")
                 .doesNotContain("filtersDialog").doesNotContain("dialogBody").doesNotContain("data-cl-filter-edit")
                 .doesNotContain("style=").doesNotContain("onclick=").doesNotContain("class=\"button");
         // "save this view" stays a dialog; a successful fetch answers the redirect fragment
         assertThat(html).contains("th:fragment=\"saveViewDialog\"").contains("id=\"save-view-dialog\"").contains("cl-dialog is-form")
-                .contains("data-cl-dialog-body").contains("data-cl-dialog-close").contains("name=\"makeDefault\"")
-                .contains("th:fragment=\"redirect\"").contains("orders.filters.field.status.help").contains("th:if=\"${canManageStoreFilters}\"");
+                .contains("data-cl-dialog-body").contains("data-cl-dialog-close")
+                .contains("th:fragment=\"redirect\"").contains("aria-describedby=\"filter-conditions-help\"").contains("th:if=\"${canManageStoreFilters}\"");
         assertThat(page()).contains("orders/filters :: saveViewDialog").doesNotContain("filters-dialog\"")
                 .doesNotContain("orders/filters :: filtersDialog");
         String edit = Files.readString(Path.of("src/main/resources/templates/orders/filter-edit.html"), StandardCharsets.UTF_8);
         assertThat(edit).contains("orders/filters :: filterFormFields").contains("name=\"dialog\" value=\"page\"")
-                .contains("cl-card-footer").contains("th:action=\"@{${formAction}}\"").contains("settings-header :: subpage(${returnTo}");
+                .contains("cl-card-footer").contains("th:action=\"@{${formAction}}\"").contains("id=\"filter-conditions-help\"").contains("settings-header :: subpage(${returnTo}");
     }
 
     @Test

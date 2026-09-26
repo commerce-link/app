@@ -17,8 +17,8 @@ import java.util.Set;
 /**
  * The state of the orders list, read from and written back to the address (spec §2). Every link on the page is
  * built here, so changing one parameter never loses the others. statuses is empty for "all open" and otherwise the
- * statuses ticked in the Status menu (?status=New&status=Blocked, in enum order); filterId == "" means "no filter
- * even though the user has a starred one"; filterId == null means "not said".
+ * statuses ticked in the Status menu (?status=New&status=Blocked, in enum order); filterId == "" (an
+ * older "clear the filter" link) means no filter, like null.
  */
 public record OrderListQuery(List<OrderStatus> statuses, String filterId, OrderAttention focus, String q,
                              Sort sort, Direction dir, int page) {
