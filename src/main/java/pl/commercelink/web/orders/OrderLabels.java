@@ -66,11 +66,12 @@ public final class OrderLabels {
             return null;
         }
         return switch (status) {
-            case Allocation, InExternalService -> WARN;
-            case Ordered, Reserved -> INFO;
+            // spec §4.3
+            case New -> NEUTRAL;
+            case Allocation, Ordered, Reserved -> INFO;
             case Delivered -> OK;
-            case InRMA -> BAD;
-            case New, Returned, Replaced, Destroyed -> NEUTRAL;
+            case InRMA, Returned, Replaced, InExternalService -> WARN;
+            case Destroyed -> BAD;
         };
     }
 

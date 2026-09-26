@@ -16,7 +16,7 @@ import java.util.Locale;
  */
 public record OrderClosingChecklist(List<Item> items) {
 
-    public record Item(boolean done, String text, String anchor, String linkKey, boolean reviewDialog) {
+    public record Item(boolean done, String text, String anchor, boolean reviewDialog) {
     }
 
     public static OrderClosingChecklist of(Order order, boolean goodsIssueRequired, MessageSource messages, Locale locale) {
@@ -24,53 +24,53 @@ public record OrderClosingChecklist(List<Item> items) {
         List<Shipment> shipments = order.getShipments();
         if (shipments.isEmpty()) {
             // allMatch on an empty list is true: the order counts as delivered, the text says why
-            items.add(new Item(true, text(messages, locale, "order.closing.shipments.none"), null, null, false));
+            items.add(new Item(true, text(messages, locale, "order.closing.shipments.none"), null, false));
         } else if (order.isDelivered()) {
-            items.add(new Item(true, text(messages, locale, "order.closing.shipments.done"), null, null, false));
+            items.add(new Item(true, text(messages, locale, "order.closing.shipments.done"), null, false));
         } else {
             long delivered = shipments.stream().filter(s -> s.getDeliveredAt() != null).count();
             items.add(new Item(false, text(messages, locale, "order.closing.shipments.todo", delivered, shipments.size()),
-                    "#przesylki", "order.card.shipments", false));
+                    "#przesylki", false));
         }
 
         double unpaid = order.getUnpaidAmount();
         if (order.isFullyPaid()) {
-            items.add(new Item(true, text(messages, locale, "order.closing.paid.done"), null, null, false));
+            items.add(new Item(true, text(messages, locale, "order.closing.paid.done"), null, false));
         } else if (unpaid < 0) {
             items.add(new Item(false, text(messages, locale, "order.closing.paid.overpaid", Money.format(-unpaid)),
-                    "#platnosci", "order.card.payments", false));
+                    "#platnosci", false));
         } else {
             items.add(new Item(false, text(messages, locale, "order.closing.paid.todo", Money.format(unpaid)),
-                    "#platnosci", "order.card.payments", false));
+                    "#platnosci", false));
         }
 
         if (order.isRMAReplacementOrder()) {
-            items.add(new Item(true, text(messages, locale, "order.closing.invoice.rma"), null, null, false));
+            items.add(new Item(true, text(messages, locale, "order.closing.invoice.rma"), null, false));
         } else if (order.isInvoiced()) {
             Document closing = order.getClosingDocument().orElseThrow();
             items.add(new Item(true, text(messages, locale, "order.closing.invoice.done",
-                    label(messages, locale, closing.getType()), closing.getNumber()), null, null, false));
+                    label(messages, locale, closing.getType()), closing.getNumber()), null, false));
         } else {
             DocumentType next = order.getNextDocumentToIssue().orElse(order.getReceiptType());
             items.add(new Item(false, text(messages, locale, "order.closing.invoice.todo", label(messages, locale, next)),
-                    "#dokumenty", "order.card.documents", false));
+                    "#dokumenty", false));
         }
 
         if (goodsIssueRequired) {
             boolean issued = !order.isAwaitingDocumentsGeneration(true);
             items.add(issued
                     ? new Item(true, text(messages, locale, "order.closing.goods.issue.done",
-                            order.getDocumentByType(DocumentType.GoodsIssue).map(Document::getNumber).orElse("")), null, null, false)
-                    : new Item(false, text(messages, locale, "order.closing.goods.issue.todo"), "#dokumenty", "order.card.documents", false));
+                            order.getDocumentByType(DocumentType.GoodsIssue).map(Document::getNumber).orElse("")), null, false)
+                    : new Item(false, text(messages, locale, "order.closing.goods.issue.todo"), "#dokumenty", false));
         }
 
         if (order.getReview() == null || order.getReview().getStatus() == null) {
-            items.add(new Item(true, text(messages, locale, "order.closing.review.none"), null, null, false));
+            items.add(new Item(true, text(messages, locale, "order.closing.review.none"), null, false));
         } else if (!order.isAwaitingReview()) {
             items.add(new Item(true, text(messages, locale, "order.closing.review.done",
-                    messages.getMessage(OrderLabels.reviewStatus(order.getReview().getStatus()), null, locale)), null, null, false));
+                    messages.getMessage(OrderLabels.reviewStatus(order.getReview().getStatus()), null, locale)), null, false));
         } else {
-            items.add(new Item(false, text(messages, locale, "order.closing.review.todo"), null, "order.closing.review.link", true));
+            items.add(new Item(false, text(messages, locale, "order.closing.review.todo"), null, true));
         }
         return new OrderClosingChecklist(List.copyOf(items));
     }

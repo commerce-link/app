@@ -110,9 +110,13 @@ public class OrderPageModelFactory {
                                          OrderLinks links) {
         boolean canOrderShipment = !order.getStatus().isOneOf(OrderStatus.New, OrderStatus.Blocked, OrderStatus.Assembly);
         OrderPageModel.PrimaryAction primary = null;
-        if (!readOnly && viewer.admin() && order.getFulfilmentType() == FulfilmentType.DirectToConsumer
-                && items.stream().anyMatch(OrderPageModelFactory::awaitsDropship)) {
-            primary = new OrderPageModel.PrimaryAction("order.page.action.dropship", links.details() + "/dropship", "fa-truck");
+        // with items at several suppliers the dropship page without ?provider= sends the operator back to choose one,
+        // so the button names the first waiting supplier, as DeliveryRedirectResolver does for the delivery link
+        OrderItem firstDropship = !readOnly && viewer.admin() && order.getFulfilmentType() == FulfilmentType.DirectToConsumer
+                ? items.stream().filter(OrderPageModelFactory::awaitsDropship).findFirst().orElse(null) : null;
+        if (firstDropship != null) {
+            primary = new OrderPageModel.PrimaryAction("order.page.action.dropship", links.details() + "/dropship?provider="
+                    + URLEncoder.encode(firstDropship.getDeliveryId(), StandardCharsets.UTF_8), "fa-truck");
         } else if (!readOnly && canOrderShipment && order.hasShipmentWithoutShippingData()) {
             primary = new OrderPageModel.PrimaryAction("order.page.action.courier", links.details() + "/shipping", "fa-truck");
         }

@@ -241,9 +241,29 @@ class OrderPageModelFactoryTest {
         OrderPageModel user = factory.build(dropship, List.of(allocated), new OrderPageModelFactory.Viewer(false, false, null), PL);
 
         // then
-        assertThat(admin.header().primaryAction().href()).endsWith("/dropship");
+        assertThat(admin.header().primaryAction().href()).endsWith("/dropship?provider=Acme");
         assertThat(user.header().primaryAction()).isNull();
         assertThat(user.items().products().get(0).deliveryHref()).isNull();
+    }
+
+    @Test
+    void withItemsAtTwoSuppliersTheSupplierOrderNamesTheFirstWaitingOne() {
+        // given: without ?provider= the dropship page redirects back to choose a supplier
+        Order dropship = order(OrderStatus.New);
+        dropship.setFulfilmentType(FulfilmentType.DirectToConsumer);
+        OrderItem fresh = item(FulfilmentStatus.New);
+        fresh.setDeliveryId("Other");
+        OrderItem first = item(FulfilmentStatus.Allocation);
+        first.setDeliveryId("Acme B");
+        OrderItem second = item(FulfilmentStatus.Allocation);
+        second.setDeliveryId("Elko");
+
+        // when
+        OrderPageModel page = factory.build(dropship, List.of(fresh, first, second),
+                new OrderPageModelFactory.Viewer(false, true, null), PL);
+
+        // then
+        assertThat(page.header().primaryAction().href()).endsWith("/dropship?provider=Acme+B");
     }
 
     @Test

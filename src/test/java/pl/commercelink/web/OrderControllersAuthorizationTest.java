@@ -89,6 +89,19 @@ class OrderControllersAuthorizationTest {
     }
 
     @Test
+    void theInvoiceConfirmationPageIsForTheStoreUsersLikeTheIssuingItself() {
+        // when
+        Method page = Arrays.stream(OrdersController.class.getDeclaredMethods())
+                .filter(method -> method.getName().equals("confirmInvoice")).findFirst().orElseThrow();
+
+        // then
+        assertThat(pathOf(page)).isEqualTo("/dashboard/orders/{orderId}/invoicing");
+        assertThat(page.isAnnotationPresent(GetMapping.class)).isTrue();
+        assertThat(page.getAnnotation(PreAuthorize.class).value()).isEqualTo("!hasRole('SUPER_ADMIN')");
+        assertThat(handler("createInvoice").getAnnotation(PreAuthorize.class).value()).isEqualTo("!hasRole('SUPER_ADMIN')");
+    }
+
+    @Test
     void unpinningADocumentIsForTheAdministrator() {
         // when
         Method remove = handler("removeDocument");

@@ -80,17 +80,17 @@ class OrderLabelsTest {
 
     @Test
     void itemStatusTonesFollowTheSpec() {
-        // when / then
+        // when / then: spec §4.3
         assertThat(OrderLabels.tone(FulfilmentStatus.New)).isEqualTo("is-neutral");
-        assertThat(OrderLabels.tone(FulfilmentStatus.Allocation)).isEqualTo("is-warn");
+        assertThat(OrderLabels.tone(FulfilmentStatus.Allocation)).isEqualTo("is-info");
         assertThat(OrderLabels.tone(FulfilmentStatus.Ordered)).isEqualTo("is-info");
         assertThat(OrderLabels.tone(FulfilmentStatus.Reserved)).isEqualTo("is-info");
         assertThat(OrderLabels.tone(FulfilmentStatus.Delivered)).isEqualTo("is-ok");
-        assertThat(OrderLabels.tone(FulfilmentStatus.InRMA)).isEqualTo("is-bad");
+        assertThat(OrderLabels.tone(FulfilmentStatus.InRMA)).isEqualTo("is-warn");
+        assertThat(OrderLabels.tone(FulfilmentStatus.Returned)).isEqualTo("is-warn");
+        assertThat(OrderLabels.tone(FulfilmentStatus.Replaced)).isEqualTo("is-warn");
         assertThat(OrderLabels.tone(FulfilmentStatus.InExternalService)).isEqualTo("is-warn");
-        assertThat(OrderLabels.tone(FulfilmentStatus.Returned)).isEqualTo("is-neutral");
-        assertThat(OrderLabels.tone(FulfilmentStatus.Replaced)).isEqualTo("is-neutral");
-        assertThat(OrderLabels.tone(FulfilmentStatus.Destroyed)).isEqualTo("is-neutral");
+        assertThat(OrderLabels.tone(FulfilmentStatus.Destroyed)).isEqualTo("is-bad");
     }
 
     @Test

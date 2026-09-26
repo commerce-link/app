@@ -156,12 +156,11 @@
         </span>
     </td>
     <td th:if="${menus}" class="cl-table-actions">
-        <div class="cl-menu" th:if="${!row.actions().isEmpty()}">
-            <button type="button" class="cl-button is-icon" aria-expanded="false" aria-haspopup="true"
-                    th:attr="aria-controls=|item-menu-${row.index()}|, aria-label=#{order.items.menu(${row.name()})}">
+        <details class="cl-menu" th:if="${!row.actions().isEmpty()}">
+            <summary class="cl-button is-icon" th:attr="aria-label=#{order.items.menu(${row.name()})}">
                 <span class="icon is-small" aria-hidden="true"><i class="fas fa-ellipsis-h"></i></span>
-            </button>
-            <ul class="cl-menu-list" th:id="|item-menu-${row.index()}|" hidden>
+            </summary>
+            <ul class="cl-menu-list" th:id="|item-menu-${row.index()}|">
                 <th:block th:each="state : ${row.actions()}">
                     <li th:if="${state.action().name() == 'EDIT'}" class="cl-menu-sep" aria-hidden="true"></li>
                     <li th:if="${!state.available()}">
@@ -171,12 +170,13 @@
                                   th:text="${state.reasonArg() != null} ? #{${state.reasonKey()}(${state.reasonArg()})} : #{${state.reasonKey()}}"></span>
                         </button>
                     </li>
+                    <!--/* without JavaScript the dialog cannot open; the link leads to the item's edit page instead */-->
                     <li th:if="${state.available() and state.action().dialogId() != null}">
-                        <button type="button" class="cl-menu-item"
-                                th:attr="data-cl-dialog-open=${state.action().dialogId()}, data-item-id=${row.itemId()},
-                                         data-name=${row.name()}, data-sku=${row.sku()}, data-category=${row.category()},
-                                         data-qty=${row.qty()}, data-price=${row.price()}, data-tax=${row.tax()}"
-                                th:text="#{${state.labelKey()}}"></button>
+                        <a class="cl-menu-item" th:href="@{${row.editHref()}}"
+                           th:attr="data-cl-dialog-open=${state.action().dialogId()}, data-item-id=${row.itemId()},
+                                    data-name=${row.name()}, data-sku=${row.sku()}, data-category=${row.category()},
+                                    data-qty=${row.qty()}, data-price=${row.price()}, data-tax=${row.tax()}"
+                           th:text="#{${state.labelKey()}}"></a>
                     </li>
                     <li th:if="${state.available() and state.action().name() == 'CLEAR_SUPPLIER'}">
                         <a class="cl-menu-item" data-cl-confirm
@@ -196,7 +196,7 @@
                     </li>
                 </th:block>
             </ul>
-        </div>
+        </details>
     </td>
 </tr>
 </body>

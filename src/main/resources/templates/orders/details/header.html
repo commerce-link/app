@@ -58,12 +58,13 @@
             <span class="icon is-small" aria-hidden="true"><i class="fas" th:classappend="${h.primaryAction().icon()}"></i></span>
             <span th:text="#{${h.primaryAction().labelKey()}}"></span>
         </a>
-        <div class="cl-menu">
-            <button type="button" class="cl-button" aria-expanded="false" aria-controls="order-more-menu" aria-haspopup="true">
+        <!--/* a native details: without JavaScript it still opens and every entry below is a link or a form */-->
+        <details class="cl-menu">
+            <summary class="cl-button">
                 <span th:text="#{order.page.more}"></span>
                 <span class="icon is-small" aria-hidden="true"><i class="fas fa-chevron-down"></i></span>
-            </button>
-            <ul class="cl-menu-list" id="order-more-menu" hidden>
+            </summary>
+            <ul class="cl-menu-list" id="order-more-menu">
                 <li><a class="cl-menu-item" th:href="@{${h.cardHref()}}" th:text="#{order.page.print.card}"></a></li>
                 <li><a class="cl-menu-item" th:href="@{${h.collectionHref()}}" th:text="#{order.page.print.collection}"></a></li>
                 <li th:if="${h.itemHistoryHref() != null}">
@@ -100,7 +101,7 @@
                     </li>
                 </th:block>
             </ul>
-        </div>
+        </details>
     </th:block>
 </div>
 </body>

@@ -5150,10 +5150,29 @@ a.cl-link-button:hover {
 }
 
 
-/* Action menu (disclosure pattern, static/js/menu.js) */
+/* Action menu: details.cl-menu > summary.cl-button + ul.cl-menu-list. The browser opens it (also without JavaScript);
+   static/js/menu.js adds Escape, the arrow keys, closing on an outside click and .is-up. The summary drops its marker
+   like .cl-filter-menu > summary and keeps the .cl-button look and focus ring. */
 .cl-page .cl-menu {
     position: relative;
     display: inline-block;
+}
+
+.cl-page .cl-menu > summary {
+    list-style: none;
+    cursor: pointer;
+}
+
+.cl-page .cl-menu > summary::-webkit-details-marker {
+    display: none;
+}
+
+.cl-page .cl-menu > summary::marker {
+    content: "";
+}
+
+.cl-page .cl-menu[open] > summary {
+    border-color: var(--cl-accent);
 }
 
 .cl-page .cl-menu-list {

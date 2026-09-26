@@ -1,7 +1,7 @@
 // Dialogs with a form (dialog.cl-dialog.is-form). An element with data-cl-dialog-open="id" opens dialog#id with
 // showModal (focus stays inside, Escape closes); before that the dialog receives cl:dialog-open with detail.trigger, so
 // a page script can fill it from the opener's data attributes. [data-cl-dialog-close] and a click on the backdrop close
-// it; the focus goes back to the opener, or to its menu button when the opener sat in an action menu (the menu is
+// it; the focus goes back to the opener, or to its menu's summary when the opener sat in an action menu (the menu is
 // closed by then). Without dialog support the opener's href, when it has one, is followed.
 (function () {
     'use strict';
@@ -11,8 +11,8 @@
     var returnTo = new WeakMap();
 
     function focusTarget(trigger) {
-        var menu = trigger.closest('.cl-menu');
-        return menu ? menu.querySelector(':scope > button') : trigger;
+        var menu = trigger.closest('details.cl-menu');
+        return menu ? menu.querySelector(':scope > summary') : trigger;
     }
 
     document.addEventListener('click', function (event) {

@@ -65,6 +65,7 @@ import pl.commercelink.web.dtos.SplitGroupForm;
 import pl.commercelink.starter.util.ConversionUtil;
 import pl.commercelink.web.orders.BulkAction;
 import pl.commercelink.web.orders.BulkActionResult;
+import pl.commercelink.web.orders.CustomerView;
 import pl.commercelink.web.orders.Money;
 import pl.commercelink.web.orders.MoveTargetView;
 import pl.commercelink.web.orders.OrderBackLink;
@@ -719,6 +720,20 @@ public class OrdersController extends BaseController {
         return "orderCard";
     }
 
+    // Without JavaScript the "Wystaw" menu entry leads here instead of opening the issue dialog: the same question with
+    // the same "send to the customer" checkbox, posting to the unchanged invoicing endpoint.
+    @GetMapping("/dashboard/orders/{orderId}/invoicing")
+    @PreAuthorize("!hasRole('SUPER_ADMIN')")
+    public String confirmInvoice(@PathVariable String orderId, @RequestParam DocumentType documentType, Model model,
+                                 Locale locale, RedirectAttributes redirectAttributes) {
+        Order order = requireOrder(ordersRepository, getStoreId(), orderId);
+        if (!order.getIssuableDocumentTypes().contains(documentType)) {
+            redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage("error.message.no.eligible.invoice.to.create", null, locale));
+            return "redirect:/dashboard/orders/" + orderId;
+        }
+        return OrderConfirmPages.renderInvoicing(model, orderId, documentType, orderPageTitle(order, locale));
+    }
+
     @PostMapping("/dashboard/orders/{orderId}/invoicing")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String createInvoice(@PathVariable String orderId, @RequestParam DocumentType documentType, @RequestParam(defaultValue = "false") boolean send, Locale locale, RedirectAttributes redirectAttributes) {
@@ -1217,9 +1232,9 @@ public class OrdersController extends BaseController {
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String updateAddressDetails(@PathVariable String orderId, @RequestParam String type, @ModelAttribute("order") Order updatedOrder, RedirectAttributes redirectAttributes, Locale locale) {
         Order existingOrder = ordersRepository.findById(getStoreId(), orderId);
-        // once a label exists the parcel goes to the address printed on it; the page greys the edit link for the same reason
+        // once a label exists (or the parcel is on its way) the address is fixed; the page greys the edit link with the same reason
         if ("shipping".equals(type) && !existingOrder.canOperatorChangeShippingAddress()) {
-            redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage("error.message.shipping.details.locked", null, locale));
+            redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage(CustomerView.lockedKey(existingOrder, false), null, locale));
             return "redirect:/dashboard/orders/" + orderId;
         }
         if ("billing".equals(type) && updatedOrder.getBillingDetails() != null) {

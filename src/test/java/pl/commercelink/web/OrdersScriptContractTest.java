@@ -75,10 +75,12 @@ class OrdersScriptContractTest {
         String copy = read("src/main/resources/static/js/copy-field.js");
 
         // then
-        assertThat(menu).contains("aria-expanded").contains("aria-controls").contains("Escape").contains("ArrowDown")
-                .contains("aria-disabled").contains("is-up");
+        // the menus are native details (spec §4.10): the script enhances them and never hides the list itself
+        assertThat(menu).contains("details.cl-menu").contains("'toggle'").contains(":scope > summary")
+                .contains("Escape").contains("ArrowDown").contains("aria-disabled").contains("is-up").contains(".open = false")
+                .doesNotContain(".hidden =").doesNotContain("aria-controls");
         assertThat(dialog).contains("data-cl-dialog-open").contains("data-cl-dialog-close").contains("showModal")
-                .contains("cl:dialog-open").contains(".cl-menu");
+                .contains("cl:dialog-open").contains("details.cl-menu").contains(":scope > summary");
         assertThat(collapse).contains("data-cl-collapse").contains("cl-card-toggle").contains("(max-width: 719px)");
         assertThat(copy).contains("cl-copy-inline").contains("data-cl-copy").contains("CL_TOAST_COPIED");
         for (String script : List.of(menu, dialog, collapse, copy)) {

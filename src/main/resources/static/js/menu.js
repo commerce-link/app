@@ -1,64 +1,75 @@
-// Action menu (disclosure pattern, not an ARIA menu): .cl-menu > button[aria-controls][aria-expanded] toggles the
-// ul.cl-menu-list[hidden] it controls. Click, Enter and Space open it; Escape and a click outside close it and hand the
-// focus back to the button; the arrow keys move between the items that can be used. An item marked aria-disabled="true"
-// stays readable (its reason sits in .cl-menu-reason) but does nothing. Near the bottom of the window the list opens
-// upwards (.is-up) instead of changing the overflow of the table around it.
+// Action menu: details.cl-menu > summary + ul.cl-menu-list. The browser opens and closes it (and tells assistive
+// technology whether it is expanded), so without JavaScript every entry is still reachable. This script adds the rest:
+// one menu open at a time, the first usable item focused on opening, Escape and a click outside close it (Escape hands
+// the focus back to the summary), the arrow keys move between the items that can be used. An item marked
+// aria-disabled="true" stays readable (its reason sits in .cl-menu-reason) but does nothing. Near the bottom of the
+// window the list opens upwards (.is-up) instead of changing the overflow of the table around it.
 (function () {
     'use strict';
 
     var open = null;
 
-    function items(list) {
-        return Array.prototype.slice.call(list.querySelectorAll('.cl-menu-item:not([aria-disabled="true"])'));
+    function items(menu) {
+        return Array.prototype.slice.call(menu.querySelectorAll('.cl-menu-item:not([aria-disabled="true"])'));
     }
 
-    function close(focusButton) {
+    function summaryOf(menu) {
+        return menu.querySelector(':scope > summary');
+    }
+
+    function close(focusSummary) {
         if (!open) {
             return;
         }
         var current = open;
         open = null;
-        current.list.hidden = true;
-        current.list.classList.remove('is-up');
-        current.button.setAttribute('aria-expanded', 'false');
-        if (focusButton) {
-            current.button.focus();
+        current.open = false;
+        if (focusSummary) {
+            summaryOf(current).focus();
         }
     }
 
-    function show(button) {
-        var list = document.getElementById(button.getAttribute('aria-controls'));
-        if (!list) {
+    // toggle does not bubble; a capturing listener on the document still sees it for every menu
+    document.addEventListener('toggle', function (event) {
+        var menu = event.target;
+        if (!menu.matches || !menu.matches('details.cl-menu')) {
             return;
         }
-        close(false);
-        list.hidden = false;
-        button.setAttribute('aria-expanded', 'true');
-        var box = list.getBoundingClientRect();
-        list.classList.toggle('is-up', box.bottom > window.innerHeight && button.getBoundingClientRect().top > box.height);
-        open = { button: button, list: list };
-        var first = items(list)[0];
-        if (first) {
-            first.focus();
-        }
-    }
-
-    document.addEventListener('click', function (event) {
-        var button = event.target.closest && event.target.closest('.cl-menu > button[aria-controls]');
-        if (button) {
-            event.preventDefault();
-            if (open && open.button === button) {
-                close(true);
-            } else {
-                show(button);
+        var list = menu.querySelector(':scope > .cl-menu-list');
+        if (!menu.open) {
+            if (list) {
+                list.classList.remove('is-up');
+            }
+            if (open === menu) {
+                open = null;
             }
             return;
         }
-        if (!open) {
+        if (open && open !== menu) {
+            open.open = false;
+        }
+        open = menu;
+        if (list) {
+            var box = list.getBoundingClientRect();
+            list.classList.toggle('is-up', box.bottom > window.innerHeight
+                && summaryOf(menu).getBoundingClientRect().top > box.height);
+        }
+        var first = items(menu)[0];
+        if (first) {
+            first.focus();
+        }
+    }, true);
+
+    document.addEventListener('click', function (event) {
+        if (!open || !event.target.closest) {
             return;
         }
-        var item = event.target.closest && event.target.closest('.cl-menu-item');
-        if (item && open.list.contains(item)) {
+        if (summaryOf(open).contains(event.target)) {
+            // the browser toggles the details itself
+            return;
+        }
+        var item = event.target.closest('.cl-menu-item');
+        if (item && open.contains(item)) {
             if (item.getAttribute('aria-disabled') === 'true') {
                 event.preventDefault();
                 event.stopImmediatePropagation();
@@ -68,7 +79,7 @@
             close(false);
             return;
         }
-        if (!open.list.contains(event.target)) {
+        if (!open.contains(event.target)) {
             close(false);
         }
     }, true);
@@ -82,7 +93,7 @@
             close(true);
         } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
             event.preventDefault();
-            var list = items(open.list);
+            var list = items(open);
             if (!list.length) {
                 return;
             }

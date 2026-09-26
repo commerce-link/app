@@ -9,12 +9,12 @@
         <div class="cl-card-actions" th:unless="${page.readOnly()}">
             <button th:if="${documents.canAdd()}" type="button" class="cl-button" data-cl-dialog-open="document-dialog"
                     th:text="#{order.documents.add}"></button>
-            <div class="cl-menu" th:if="${documents.canIssue()}">
-                <button type="button" class="cl-button" aria-expanded="false" aria-controls="issue-menu" aria-haspopup="true">
+            <details class="cl-menu" th:if="${documents.canIssue()}">
+                <summary class="cl-button">
                     <span th:text="#{order.documents.issue}"></span>
                     <span class="icon is-small" aria-hidden="true"><i class="fas fa-chevron-down"></i></span>
-                </button>
-                <ul class="cl-menu-list" id="issue-menu" hidden>
+                </summary>
+                <ul class="cl-menu-list" id="issue-menu">
                     <li th:if="${documents.goodsIssue()}">
                         <a class="cl-menu-item" data-cl-confirm data-cl-confirm-tone="primary"
                            th:href="@{/dashboard/orders/{o}/goods-out(o=${page.orderId()})}"
@@ -23,13 +23,15 @@
                                     data-cl-confirm-action=#{order.documents.goods.issue.confirm.action}"
                            th:text="#{order.documents.goods.issue}"></a>
                     </li>
+                    <!--/* without JavaScript the link leads to the confirmation page with the same checkbox */-->
                     <li th:each="type : ${documents.issuable()}">
-                        <button type="button" class="cl-menu-item" data-cl-dialog-open="issue-dialog"
-                                th:attr="data-document-type=${type.value().name()}, data-label=#{${type.labelKey()}}"
-                                th:text="#{${type.labelKey()}}"></button>
+                        <a class="cl-menu-item" data-cl-dialog-open="issue-dialog"
+                           th:href="@{/dashboard/orders/{o}/invoicing(o=${page.orderId()}, documentType=${type.value().name()})}"
+                           th:attr="data-document-type=${type.value().name()}, data-label=#{${type.labelKey()}}"
+                           th:text="#{${type.labelKey()}}"></a>
                     </li>
                 </ul>
-            </div>
+            </details>
         </div>
     </div>
     <ul class="cl-list" th:if="${!documents.rows().isEmpty()}">

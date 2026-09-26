@@ -202,6 +202,60 @@ class OrderDetailsTemplateTest {
                 .contains("/clear-supplier?itemId=").contains("data-cl-confirm");
     }
 
+    /**
+     * Spec §4.10: without JavaScript a button toggling a hidden list opens nothing, so prints, the item history,
+     * cancelling, the row actions and issuing documents were unreachable. A native details opens by itself; a dialog
+     * opener inside it keeps an href to a page doing the same (§4.8).
+     */
+    @Test
+    void everyMenuIsANativeDetailsAndEveryDialogOpenerInItHasAPageToFallBackOn() {
+        // when
+        String html = page(render(b2bOrder(OrderStatus.Realization), ADMIN));
+
+        // then
+        java.util.regex.Matcher menus = Pattern.compile("<(\\w+)[^>]*class=\"cl-menu\"").matcher(html);
+        int count = 0;
+        while (menus.find()) {
+            assertThat(menus.group(1)).as(menus.group()).isEqualTo("details");
+            count++;
+        }
+        assertThat(count).as("Więcej, Wystaw and a row menu per item").isGreaterThanOrEqualTo(4);
+        assertThat(html).doesNotContain("aria-controls=\"order-more-menu\"").doesNotContainPattern("class=\"cl-menu-list\"[^>]*hidden")
+                .containsPattern("<summary class=\"cl-button is-icon\" aria-label=\"[^\"]+\"");
+        int openers = 0;
+        for (String menu : html.split("<details class=\"cl-menu\"")) {
+            String body = menu.contains("</details>") ? menu.substring(0, menu.indexOf("</details>")) : "";
+            java.util.regex.Matcher opener = Pattern.compile("<\\w+[^>]*data-cl-dialog-open=[^>]*>").matcher(body);
+            while (opener.find()) {
+                assertThat(opener.group()).as(opener.group()).startsWith("<a ").contains(" href=\"/dashboard/orders/");
+                openers++;
+            }
+        }
+        assertThat(openers).as("assign SKU/supplier/warehouse and the invoice types").isGreaterThanOrEqualTo(3);
+        assertThat(html).containsPattern("<a class=\"cl-menu-item\" data-cl-dialog-open=\"issue-dialog\"\\s+href=\"/dashboard/orders/[^\"]+/invoicing\\?documentType=InvoiceVat\"");
+    }
+
+    @Test
+    void theInvoiceConfirmationPageAsksTheDialogsQuestionWithTheSameCheckbox() {
+        // given
+        java.util.Map<String, Object> variables = new java.util.HashMap<>();
+        variables.put("orderId", "3e373abc-1111-2222-3333-444455556666");
+        variables.put("documentType", "InvoiceVat");
+        variables.put("documentLabelKey", "DocumentType.InvoiceVat");
+        variables.put("backLabel", "Zamówienie 3e373abc");
+
+        // when
+        String html = page(SettingsTemplateRenderer.render("orders/invoicing-confirm", variables));
+
+        // then
+        assertThat(html).contains("Wystawić: Faktura VAT")
+                .contains("action=\"/dashboard/orders/3e373abc-1111-2222-3333-444455556666/invoicing\"")
+                .containsPattern("<input type=\"hidden\" name=\"documentType\" value=\"InvoiceVat\">")
+                .containsPattern("<input type=\"checkbox\" name=\"send\" value=\"true\">")
+                .contains("Wyślij do klienta").contains("Wystaw dokument")
+                .doesNotContain("style=").doesNotContain("onclick=");
+    }
+
     @Test
     void menuSeparatorsAreHiddenFromAssistiveTechnologySoTheListHoldsOnlyListItems() {
         // when

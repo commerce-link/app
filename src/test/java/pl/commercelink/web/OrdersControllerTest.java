@@ -163,6 +163,8 @@ class OrdersControllerTest {
     private OrderReferenceResolver orderReferenceResolver;
     @Mock
     private ShipmentCancelService shipmentCancelService;
+    @Mock
+    private pl.commercelink.invoicing.InvoiceCreationEventPublisher invoiceCreationEventPublisher;
 
     // Real resolver over the test classpath registry (`Stub` is a registered supplier type).
     @Spy
@@ -1786,6 +1788,43 @@ class OrdersControllerTest {
         }
 
         @Test
+        void theInvoiceConfirmationPageCarriesTheTypeAndPostsToTheUnchangedEndpoint() {
+            // given: without JavaScript the "Wystaw" entry leads here instead of the issue dialog
+            Order order = order(OrderStatus.Realization);
+            BillingDetails billing = new BillingDetails();
+            billing.setTaxId("5250000000");
+            order.setBillingDetails(billing);
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            ExtendedModelMap model = new ExtendedModelMap();
+
+            // when
+            String view = ordersController.confirmInvoice(ORDER_ID, DocumentType.InvoiceVat, model, polish,
+                    new RedirectAttributesModelMap());
+
+            // then
+            assertThat(view).isEqualTo("orders/invoicing-confirm");
+            assertThat(model.getAttribute("orderId")).isEqualTo(ORDER_ID);
+            assertThat(model.getAttribute("documentType")).isEqualTo("InvoiceVat");
+            assertThat(model.getAttribute("documentLabelKey")).isEqualTo("DocumentType.InvoiceVat");
+            verifyNoInteractions(invoiceCreationEventPublisher);
+        }
+
+        @Test
+        void theInvoiceConfirmationOfATypeThatCannotBeIssuedGoesBackToTheOrder() {
+            // given: a consumer order has no invoice to issue from the menu
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order(OrderStatus.Realization));
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            String view = ordersController.confirmInvoice(ORDER_ID, DocumentType.InvoiceVat, new ExtendedModelMap(), polish, redirect);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+            assertThat(flash(redirect)).containsEntry("errorMessage", "error.message.no.eligible.invoice.to.create");
+            verifyNoInteractions(invoiceCreationEventPublisher);
+        }
+
+        @Test
         void theRemoveDocumentConfirmationOfAMissingDocumentGoesBackToTheOrder() {
             // given
             when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order(OrderStatus.New));
@@ -2180,22 +2219,44 @@ class OrdersControllerTest {
         }
 
         @Test
-        void theShippingAddressCannotChangeOnceTheOrderIsShipping() {
+        void theShippingAddressCannotChangeOnceTheOrderIsShippingAndTheRefusalSaysWhy() {
             // given
             Order order = order(OrderStatus.Shipping);
             when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            ordersController.updateAddressDetails(ORDER_ID, "shipping", shippingPayload(), redirect, polish);
+
+            // then: no label, the status alone locks it
+            verify(ordersRepository, never()).save(any());
+            assertThat(flash(redirect)).containsEntry("errorMessage", "order.customer.shipping.locked.status");
+        }
+
+        @Test
+        void aLabelLocksTheShippingAddressEvenBeforeShippingAndTheRefusalNamesTheLabel() {
+            // given
+            Order order = order(OrderStatus.Realization);
+            Shipment labelled = new Shipment(ShipmentType.Courier);
+            labelled.setTrackingNo("T-1");
+            order.setShipments(new ArrayList<>(List.of(labelled)));
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            ordersController.updateAddressDetails(ORDER_ID, "shipping", shippingPayload(), redirect, polish);
+
+            // then
+            verify(ordersRepository, never()).save(any());
+            assertThat(flash(redirect)).containsEntry("errorMessage", "order.customer.shipping.locked.label");
+        }
+
+        private Order shippingPayload() {
             ShippingDetails posted = new ShippingDetails();
             posted.setCity("Wroclaw");
             Order payload = new Order(STORE_ID);
             payload.setShippingDetails(posted);
-            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
-
-            // when
-            ordersController.updateAddressDetails(ORDER_ID, "shipping", payload, redirect, polish);
-
-            // then
-            verify(ordersRepository, never()).save(any());
-            assertThat(flash(redirect)).containsEntry("errorMessage", "error.message.shipping.details.locked");
+            return payload;
         }
 
         @Test
