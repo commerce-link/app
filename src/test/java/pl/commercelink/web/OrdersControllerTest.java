@@ -740,6 +740,29 @@ class OrdersControllerTest {
     }
 
     @Test
+    void saveOrderItemRefusesACancelledOrder() {
+        // given
+        OrderItem item = existingOrderItem("Obudowy", false);
+        Order cancelled = orderBase();
+        cancelled.setStatus(OrderStatus.Cancelled);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(cancelled);
+        when(messageSource.getMessage(eq("order.item.error.closed"), any(), any(Locale.class))).thenReturn("closed");
+        OrderItem posted = postedOrderItem("Obudowy");
+        posted.setService(true);
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        String view = ordersController.saveOrderItem(ORDER_ID, item.getItemId(), posted, model);
+
+        // then
+        assertThat(view).isEqualTo("orderItem");
+        assertThat(model.getAttribute("errorMessage")).isEqualTo("closed");
+        assertThat(item.isService()).isFalse();
+        verify(orderItemsRepository, never()).save(any());
+        verifyNoInteractions(orderLifecycle);
+    }
+
+    @Test
     void savingItemRefusesADeliveryIdTheMarketplaceDidNotChoose() {
         // given
         OrderItem item = existingOrderItem("Laptopy", false);

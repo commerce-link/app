@@ -8,6 +8,8 @@ import pl.commercelink.orders.BillingDetails;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderReview;
 import pl.commercelink.orders.OrderReviewStatus;
+import pl.commercelink.orders.OrderSource;
+import pl.commercelink.orders.OrderSourceType;
 import pl.commercelink.orders.Payment;
 import pl.commercelink.orders.PaymentSource;
 import pl.commercelink.orders.Shipment;
@@ -211,5 +213,22 @@ class OrderClosingChecklistTest {
         assertThat(review.state()).isEqualTo(OrderClosingChecklist.State.NOT_APPLICABLE);
         assertThat(review.text()).isEqualTo("Opinia nie jest zbierana");
         assertThat(checklist.allDone()).isTrue();
+    }
+
+    @Test
+    void aReplacementOrderFromAReturnNeedsNoInvoiceAndSaysItDoesNotApply() {
+        // given
+        Order order = settledOrder();
+        order.setDocuments(new java.util.ArrayList<>());
+        order.setSource(new OrderSource("RMA", OrderSourceType.Other));
+
+        // when
+        OrderClosingChecklist checklist = OrderClosingChecklist.of(order, false, messages(), PL);
+
+        // then
+        OrderClosingChecklist.Item invoice = checklist.items().get(2);
+        assertThat(invoice.state()).isEqualTo(OrderClosingChecklist.State.NOT_APPLICABLE);
+        assertThat(invoice.text()).isEqualTo("Zamówienie zastępcze z reklamacji — bez faktury");
+        assertThat(checklist.allDone()).isTrue().isEqualTo(order.isSettled(false));
     }
 }

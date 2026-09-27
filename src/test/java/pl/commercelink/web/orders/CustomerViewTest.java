@@ -90,8 +90,8 @@ class CustomerViewTest {
 
     @Test
     void lockedKeyIsTheSingleRuleTheCardAndTheAddressPageBothRead() {
-        // given (B3, P17): the order/address page (OrderDetailsController) calls this same static method, so the
-        // card and the page can no longer drift apart the way two hand-copied conditions could
+        // given: the address page and its save (OrdersController) call this same static method, so the card and
+        // the page cannot drift apart the way two hand-copied conditions could
         Order open = order();
 
         // given: delivered but never labelled — only a label fixes the shipping address

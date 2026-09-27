@@ -19,7 +19,8 @@ public record OrderClosingChecklist(List<Item> items) {
 
     /**
      * {@code NOT_APPLICABLE} does not block closing, like {@code DONE}, but it is not ticked: nothing was done, the
-     * condition simply does not concern this order (no shipments, reviews not collected).
+     * condition simply does not concern this order (no shipments, reviews not collected, no invoice on a replacement
+     * order from a return).
      */
     public enum State { DONE, TODO, NOT_APPLICABLE }
 
@@ -82,7 +83,7 @@ public record OrderClosingChecklist(List<Item> items) {
         }
 
         if (order.isRMAReplacementOrder()) {
-            items.add(Item.done(text(messages, locale, "order.closing.invoice.rma")));
+            items.add(Item.notApplicable(text(messages, locale, "order.closing.invoice.rma")));
         } else if (order.isInvoiced()) {
             Document closing = order.getClosingDocument().orElseThrow();
             items.add(Item.done(text(messages, locale, "order.closing.invoice.done",
