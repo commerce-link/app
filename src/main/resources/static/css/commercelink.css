@@ -6317,3 +6317,249 @@ a.cl-link-button:hover {
     .cl-page .cl-table.is-wrap tbody tr:not(.cl-table-group):not(:has(.cl-table-check)) > td.cl-table-actions { grid-column: 2; grid-row: 1; }
 }
 
+
+/* --- Order details: product cell — the name with its markers, then the labelled codes (two lines) --- */
+/* Markers follow the name on its line and wrap like words: condition and service pills, then the note toggles. The
+   markup's whitespace plus 2 px on each side keeps them 6-7 px apart (toggle centres 28 px apart). */
+.cl-page .cl-table .cl-table-marks {
+    font-weight: 400;
+}
+
+.cl-page .cl-table .cl-table-marks > * {
+    margin: 0 2px;
+    vertical-align: middle;
+}
+
+.cl-page .cl-table th.cl-table-key .cl-table-marks .cl-status {
+    margin: 0 2px;
+    padding: 1px 8px;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+/* The dot between two codes: one ordinary space on each side, from the markup's own whitespace. */
+.cl-page .cl-table .cl-table-sep {
+    color: var(--cl-ink-3);
+}
+
+/* Codes copy on click; the icon is laid over the space after the code instead of widening it, so hidden it leaves no
+   gap. It shows on hover and on keyboard focus (the base .cl-copy-inline rules). */
+.cl-page .cl-table-sub .cl-copy-inline {
+    position: relative;
+}
+
+.cl-page .cl-table-sub .cl-copy-inline .cl-copy-icon {
+    position: absolute;
+    top: 0;
+    left: 100%;
+    margin-left: 0;
+    padding-left: 2px;
+    pointer-events: none;
+}
+
+/* The SN with a history link: the link and a copy icon right behind it. The icon's button takes no width; the icon
+   is its click area and shows while the pointer is on the link or on the icon. */
+.cl-page .cl-table-sub .cl-copy-inline.is-icon {
+    display: inline-block;
+    width: 0;
+    height: 1em;
+    vertical-align: baseline;
+}
+
+.cl-page .cl-table-sub .cl-copy-inline.is-icon .cl-copy-icon {
+    top: -0.1em;
+    pointer-events: auto;
+}
+
+.cl-page .cl-table-sub .cl-copy-pair:hover .cl-copy-icon {
+    opacity: 1;
+}
+
+.cl-page .cl-table-sub .cl-copy-inline.is-icon:focus-visible {
+    outline: 0;
+}
+
+.cl-page .cl-table-sub .cl-copy-inline.is-icon:focus-visible .cl-copy-icon {
+    opacity: 1;
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 1px;
+    border-radius: 2px;
+}
+
+/* Without a pointer that hovers, the SN's copy icon has no other way to be found: it stays visible. */
+@media (hover: none) {
+    .cl-page .cl-table-sub .cl-copy-inline.is-icon .cl-copy-icon {
+        opacity: 1;
+    }
+}
+
+/* One link look in the row: the SN link is the accent link of the Stan column, not the quiet name link. */
+.cl-page .cl-table .cl-table-key .cl-table-sub a.cl-table-link {
+    color: var(--cl-accent-ink);
+    text-decoration-color: currentColor;
+    text-underline-offset: 2px;
+}
+
+/* Marker with a popover: details.cl-note > summary.cl-note-toggle + .cl-note-panel. The browser opens it (also
+   without JavaScript); menu.js keeps one popover or menu open, closes it on Escape (focus back on the toggle) and on
+   an outside click, and flips the panel (.is-up, .is-end) to keep it in the window. The panel is the menu's panel. */
+.cl-page .cl-note {
+    position: relative;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.cl-page .cl-note,
+.cl-page .cl-note * {
+    box-sizing: border-box;
+}
+
+.cl-page .cl-note > summary {
+    list-style: none;
+    cursor: pointer;
+}
+
+.cl-page .cl-note > summary::-webkit-details-marker {
+    display: none;
+}
+
+.cl-page .cl-note > summary::marker {
+    content: "";
+}
+
+.cl-page .cl-note-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    font-size: 13px;
+    color: var(--cl-ink-3);
+}
+
+/* The visible part of the toggle: hover, open and focus mark this 22 px square, not the larger touch target. */
+.cl-page .cl-note-toggle .icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 4px;
+}
+
+.cl-page .cl-note.is-accent > .cl-note-toggle {
+    color: var(--cl-accent);
+}
+
+.cl-page .cl-note-toggle:hover .icon,
+.cl-page .cl-note[open] > .cl-note-toggle .icon {
+    background: var(--cl-accent-soft);
+    color: var(--cl-accent-ink);
+}
+
+.cl-page .cl-note-toggle:focus-visible {
+    outline: 0;
+}
+
+.cl-page .cl-note-toggle:focus-visible .icon {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 1px;
+}
+
+.cl-page .cl-note-panel {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    z-index: var(--cl-z-pop);
+    width: max-content;
+    max-width: min(320px, calc(100vw - 32px));
+    padding: 10px 12px;
+    border: 1px solid var(--cl-line);
+    border-radius: var(--cl-radius);
+    background: var(--cl-surface);
+    box-shadow: var(--cl-shadow);
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 1.45;
+    color: var(--cl-ink);
+    text-align: left;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+.cl-page .cl-note-panel.is-end {
+    left: auto;
+    right: 0;
+}
+
+.cl-page .cl-note-panel.is-up {
+    top: auto;
+    bottom: calc(100% + 4px);
+}
+
+.cl-page .cl-note-title {
+    margin: 0 0 4px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-note-text {
+    margin: 0;
+}
+
+.cl-page .cl-note-text.is-pre {
+    white-space: pre-line;
+}
+
+/* Below 1024 px: a 44 px target around the small icon, grown by negative margins so neither the line nor the group
+   grows (two toggles' centres stay 28 px apart, so their targets never sit closer than 24 px); the panel hangs off the
+   product cell (720-1023 px) or spans the whole card (< 720 px) instead of the icon, so it fits wherever the icon is. */
+@media screen and (max-width: 1023px) {
+    .cl-page .cl-note-toggle {
+        width: 44px;
+        height: 44px;
+        margin: -11px;
+    }
+
+    .cl-page .cl-note {
+        position: static;
+    }
+
+    .cl-page .cl-table tbody th.cl-table-key:has(.cl-note) {
+        position: relative;
+    }
+
+    .cl-page .cl-note-panel,
+    .cl-page .cl-note-panel.is-end {
+        left: 0;
+        right: 0;
+        width: auto;
+        max-width: none;
+        top: auto;
+        margin-top: 4px;
+    }
+
+    .cl-page .cl-note-panel.is-up {
+        top: auto;
+        bottom: 100%;
+        margin: 0 0 4px;
+    }
+}
+
+@media screen and (max-width: 719px) {
+    .cl-page .cl-table tbody th.cl-table-key:has(.cl-note) {
+        position: static;
+    }
+
+    .cl-page .cl-table tbody tr:has(.cl-note) {
+        position: relative;
+    }
+
+    .cl-page .cl-note-panel,
+    .cl-page .cl-note-panel.is-end,
+    .cl-page .cl-note-panel.is-up {
+        left: 8px;
+        right: 8px;
+    }
+}

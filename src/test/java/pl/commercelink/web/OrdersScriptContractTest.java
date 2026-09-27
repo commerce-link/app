@@ -42,7 +42,8 @@ class OrdersScriptContractTest {
                 ".cl-page .cl-timeline {", ".cl-page .cl-copy-inline {", ".cl-page .cl-record-title {",
                 ".cl-page dl.cl-kv {", ".cl-status.is-bad {", ".cl-page .cl-dialog.is-form {",
                 ".cl-page .cl-address {", ".cl-page .cl-list-summary {",
-                ".cl-page .cl-card-toggle {", ".cl-page .cl-card-grid {", ".cl-page.cl-dialog-host {")) {
+                ".cl-page .cl-card-toggle {", ".cl-page .cl-card-grid {", ".cl-page.cl-dialog-host {",
+                ".cl-page .cl-note {", ".cl-page .cl-note-panel {", ".cl-page .cl-table .cl-table-marks {")) {
             String topLevel = "\n" + selector;
             assertThat(css).as(selector).contains(topLevel);
             assertThat(css.split(java.util.regex.Pattern.quote(topLevel), -1)).as("one top-level definition of " + selector)
@@ -79,6 +80,8 @@ class OrdersScriptContractTest {
         assertThat(menu).contains("details.cl-menu").contains("'toggle'").contains(":scope > summary")
                 .contains("Escape").contains("ArrowDown").contains("aria-disabled").contains("is-up").contains(".open = false")
                 .doesNotContain(".hidden =").doesNotContain("aria-controls");
+        // a marker's popover (details.cl-note) shares the menus' one-open rule, Escape and outside click, and flips
+        assertThat(menu).contains("details.cl-note").contains(".cl-note-panel").contains("is-end");
         assertThat(dialog).contains("data-cl-dialog-open").contains("data-cl-dialog-close").contains("showModal")
                 .contains("cl:dialog-open").contains("details.cl-menu").contains(":scope > summary");
         assertThat(collapse).contains("data-cl-collapse").contains("cl-card-toggle").contains("(max-width: 719px)");

@@ -57,6 +57,21 @@ public record OrderItemRow(String itemId, int index, String name, String categor
                 context.readOnly() && !context.superAdmin() ? itemHref : null);
     }
 
+    /** The SKU is printed only when it says more than the manufacturer code beside it. */
+    public boolean skuShown() {
+        return sku != null && !sku.equals(mfn);
+    }
+
+    /** The markers after the name: condition and service pills, the "on the invoice together" and comment toggles. */
+    public boolean hasMarkers() {
+        return conditionKey != null || consolidated || service || comment != null;
+    }
+
+    /** Any part of the codes line under the name: category, MFN, SKU, SN. */
+    public boolean hasCodes() {
+        return category != null || mfn != null || skuShown() || serialNo != null;
+    }
+
     /** The conditions of the old order-details item menu, plus: consolidation stops at the closing invoice. */
     public static List<ItemAction.State> actions(OrderItem item, Order order) {
         List<ItemAction.State> states = new ArrayList<>();

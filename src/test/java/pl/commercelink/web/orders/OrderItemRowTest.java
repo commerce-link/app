@@ -242,4 +242,43 @@ class OrderItemRowTest {
         assertThat(row.viewHref()).isNull();
         assertThat(row.editHref()).isNotNull();
     }
+
+    @Test
+    void theSkuIsShownOnlyWhenItDiffersFromTheManufacturerCode() {
+        // given
+        OrderItem same = item(FulfilmentStatus.New, "MFN-1");
+        same.setManufacturerCode("MFN-1");
+        OrderItem different = item(FulfilmentStatus.New, "SKU-1");
+        different.setManufacturerCode("MFN-1");
+
+        // when
+        OrderItemRow sameRow = OrderItemRow.of(same, 0, context());
+        OrderItemRow differentRow = OrderItemRow.of(different, 1, context());
+
+        // then
+        assertThat(sameRow.skuShown()).isFalse();
+        assertThat(differentRow.skuShown()).isTrue();
+        assertThat(sameRow.hasCodes()).isTrue();
+    }
+
+    @Test
+    void aCommentOrConsolidationIsAMarkerAfterTheName() {
+        // given
+        OrderItem plain = item(FulfilmentStatus.New, "MFN-1");
+        OrderItem commented = item(FulfilmentStatus.New, "MFN-1");
+        commented.setComment("  Check the box  ");
+        OrderItem consolidated = item(FulfilmentStatus.New, "MFN-1");
+        consolidated.setConsolidated(true);
+
+        // when
+        OrderItemRow plainRow = OrderItemRow.of(plain, 0, context());
+        OrderItemRow commentedRow = OrderItemRow.of(commented, 1, context());
+        OrderItemRow consolidatedRow = OrderItemRow.of(consolidated, 2, context());
+
+        // then
+        assertThat(plainRow.hasMarkers()).isFalse();
+        assertThat(commentedRow.hasMarkers()).isTrue();
+        assertThat(commentedRow.comment()).isEqualTo("Check the box");
+        assertThat(consolidatedRow.hasMarkers()).isTrue();
+    }
 }

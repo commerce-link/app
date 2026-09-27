@@ -151,40 +151,43 @@
                                               th:attr="aria-label=#{order.items.select(${row.name()})}"></label>
         <input type="hidden" th:name="|orderItems[${row.index()}].itemId|" th:value="${row.itemId()}">
     </td>
+    <!--/* Two lines: the name with its markers, then the labelled codes. Physical state stays a pill; "on the invoice
+           together" and the comment are small toggles whose popover the browser opens (details.cl-note, also without
+           JavaScript); menu.js keeps one popover or menu open and adds Escape and the outside click. */-->
     <th scope="row" class="cl-table-key" th:attr="data-label=#{order.items.column.product}">
         <a th:if="${row.viewHref() != null}" class="cl-table-link" th:href="@{${row.viewHref()}}" th:text="${row.name()}"></a>
         <span th:unless="${row.viewHref() != null}" th:text="${row.name()}"></span>
-        <span class="cl-table-sub">
+        <span th:if="${row.hasMarkers()}" class="cl-table-marks">
+            <span th:if="${row.conditionKey() != null}" class="cl-status" th:classappend="${row.conditionTone()}" th:text="#{${row.conditionKey()}}"></span>
+            <span th:if="${row.service()}" class="cl-status is-neutral" th:text="#{order.items.pill.service}"></span>
+            <details th:if="${row.consolidated()}" class="cl-note">
+                <summary class="cl-note-toggle" th:attr="aria-label=#{order.items.note.consolidated}"><span class="icon is-small" aria-hidden="true"><i class="far fa-file-alt"></i></span></summary>
+                <div class="cl-note-panel"><p class="cl-note-text" th:text="#{order.items.note.consolidated.text}"></p></div>
+            </details>
+            <details th:if="${row.comment() != null}" class="cl-note is-accent">
+                <summary class="cl-note-toggle" th:attr="aria-label=#{order.items.note.comment}"><span class="icon is-small" aria-hidden="true"><i class="far fa-comment-alt"></i></span></summary>
+                <div class="cl-note-panel"><p class="cl-note-title" th:text="#{order.items.note.comment}"></p><p class="cl-note-text is-pre" th:text="${row.comment()}"></p></div>
+            </details>
+        </span>
+        <!--/* Every code carries its label; the code itself copies (the icon shows on hover and focus without taking
+               width, so no gap opens before the next separator). The label and its code never part at a line end. */-->
+        <span th:if="${row.hasCodes()}" class="cl-table-sub">
             <span th:if="${row.category() != null}" th:text="${row.category()}"></span>
             <th:block th:if="${row.mfn() != null}">
-                <span th:if="${row.category() != null}"> · </span>
-                <button type="button" class="cl-copy-inline" th:attr="data-cl-copy=${row.mfn()}, aria-label=#{order.items.copy.mfn(${row.mfn()})}">
-                    <span th:text="${row.mfn()}"></span><span class="cl-copy-icon"><span class="icon is-small" aria-hidden="true"><i class="far fa-copy"></i></span></span>
-                </button>
+                <span th:if="${row.category() != null}" class="cl-table-sep">·</span>
+                <span th:text="#{order.items.mfn.prefix}"></span>&nbsp;<button type="button" class="cl-copy-inline" th:attr="data-cl-copy=${row.mfn()}, aria-label=#{order.items.copy.mfn(${row.mfn()})}"><span th:text="${row.mfn()}"></span><span class="cl-copy-icon" aria-hidden="true"><i class="far fa-copy"></i></span></button>
             </th:block>
-            <th:block th:if="${row.sku() != null and row.sku() != row.mfn()}">
-                <span th:text="' · ' + #{order.items.sku.prefix} + ' '"></span>
-                <button type="button" class="cl-copy-inline"
-                        th:attr="data-cl-copy=${row.sku()}, title=${row.sku()}, aria-label=#{order.items.copy.sku(${row.sku()})}">
-                    <span th:text="${#strings.abbreviate(row.sku(), 28)}"></span><span class="cl-copy-icon"><span class="icon is-small" aria-hidden="true"><i class="far fa-copy"></i></span></span>
-                </button>
+            <th:block th:if="${row.skuShown()}">
+                <span th:if="${row.category() != null or row.mfn() != null}" class="cl-table-sep">·</span>
+                <span th:text="#{order.items.sku.prefix}"></span>&nbsp;<button type="button" class="cl-copy-inline" th:attr="data-cl-copy=${row.sku()}, title=${row.sku()}, aria-label=#{order.items.copy.sku(${row.sku()})}"><span th:text="${#strings.abbreviate(row.sku(), 28)}"></span><span class="cl-copy-icon" aria-hidden="true"><i class="far fa-copy"></i></span></button>
             </th:block>
             <th:block th:if="${row.serialNo() != null}">
-                <span th:text="' · ' + #{order.items.sn.prefix} + ' '"></span>
-                <a th:if="${row.serialHref() != null}" class="cl-table-link" th:href="@{${row.serialHref()}}" th:text="${row.serialNo()}"></a>
-                <span th:unless="${row.serialHref() != null}" th:text="${row.serialNo()}"></span>
-                <!--/* the SN itself is easy to read but tedious to type into a search box — offer a copy button too */-->
-                <button type="button" class="cl-copy-inline" th:attr="data-cl-copy=${row.serialNo()}, aria-label=#{order.items.copy.sn(${row.serialNo()})}">
-                    <span class="cl-copy-icon"><span class="icon is-small" aria-hidden="true"><i class="far fa-copy"></i></span></span>
-                </button>
+                <span th:if="${row.category() != null or row.mfn() != null or row.skuShown()}" class="cl-table-sep">·</span>
+                <!--/* with a history page the SN is a link and a copy icon follows it; without one the SN itself copies */-->
+                <span th:if="${row.serialHref() != null}" class="cl-copy-pair"><span th:text="#{order.items.sn.prefix}"></span>&nbsp;<a class="cl-table-link" th:href="@{${row.serialHref()}}" th:text="${row.serialNo()}"></a><button type="button" class="cl-copy-inline is-icon" th:attr="data-cl-copy=${row.serialNo()}, aria-label=#{order.items.copy.sn(${row.serialNo()})}"><span class="cl-copy-icon" aria-hidden="true"><i class="far fa-copy"></i></span></button></span>
+                <th:block th:unless="${row.serialHref() != null}"><span th:text="#{order.items.sn.prefix}"></span>&nbsp;<button type="button" class="cl-copy-inline" th:attr="data-cl-copy=${row.serialNo()}, aria-label=#{order.items.copy.sn(${row.serialNo()})}"><span th:text="${row.serialNo()}"></span><span class="cl-copy-icon" aria-hidden="true"><i class="far fa-copy"></i></span></button></th:block>
             </th:block>
         </span>
-        <span th:if="${row.conditionKey() != null or row.consolidated() or row.service()}" class="cl-table-pills">
-            <span th:if="${row.conditionKey() != null}" class="cl-status" th:classappend="${row.conditionTone()}" th:text="#{${row.conditionKey()}}"></span>
-            <span th:if="${row.consolidated()}" class="cl-status is-info" th:text="#{order.items.pill.consolidated}"></span>
-            <span th:if="${row.service()}" class="cl-status is-neutral" th:text="#{order.items.pill.service}"></span>
-        </span>
-        <span th:if="${row.comment() != null}" class="cl-table-sub" th:text="${row.comment()}"></span>
     </th>
     <td class="is-numeric" th:attr="data-label=#{order.items.column.price}">
         <span th:text="#{order.items.qty.price(${row.qty()}, ${row.unitPrice()})}"></span>

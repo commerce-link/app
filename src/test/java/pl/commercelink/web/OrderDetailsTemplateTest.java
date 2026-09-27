@@ -30,6 +30,7 @@ import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.taxonomy.TaxonomyCache;
+import pl.commercelink.warehouse.api.ItemCondition;
 import pl.commercelink.web.orders.OrderPageModel;
 import pl.commercelink.web.orders.OrderPageModelFactory;
 import pl.commercelink.web.orders.OrderLabels;
@@ -1189,18 +1190,109 @@ class OrderDetailsTemplateTest {
                 .containsPattern("<option value=\"ToBeCollected\"\\s+selected=\"selected\">Do zebrania</option>");
     }
 
+    /** The product cell of a row: from its th to the price cell. */
+    static String productCell(String html, String name) {
+        int start = html.lastIndexOf("<th scope=\"row\" class=\"cl-table-key\"", html.indexOf(">" + name + "<"));
+        return html.substring(start, html.indexOf("</th>", start));
+    }
+
     @Test
-    void theConsolidatedPillIsInformationNotAState() {
+    void consolidationIsAToggleWithAPopoverAfterTheNameNotAPill() {
         // given
         Order order = order(OrderStatus.New);
         List<OrderItem> items = items(order);
         items.get(0).setConsolidated(true);
 
         // when
-        String html = page(render(order, items, ADMIN, Set.of()));
+        String cell = productCell(page(render(order, items, ADMIN, Set.of())), "AMD Ryzen 7 9800X3D");
+
+        // then: invoicing is a property, not a state, so it is a grey icon toggle on the name's line
+        assertThat(cell).doesNotContain("Na fakturze łącznie</span>").doesNotContain("cl-status is-info");
+        assertThat(cell).contains("<details class=\"cl-note\">")
+                .contains("<summary class=\"cl-note-toggle\" aria-label=\"Łącznie na fakturze\">")
+                .contains("<i class=\"far fa-file-alt\"></i>")
+                .contains("<p class=\"cl-note-text\">Na fakturze łącznie z innymi pozycjami</p>");
+        assertThat(cell.indexOf("cl-table-marks")).isLessThan(cell.indexOf("cl-table-sub"));
+    }
+
+    @Test
+    void theCommentIsAnAccentToggleWhosePopoverKeepsItsLinesAndHasNoHeadingElement() {
+        // given
+        Order order = order(OrderStatus.New);
+        List<OrderItem> items = items(order);
+        items.get(0).setComment("Check the box.\nShip with the SSD.");
+
+        // when
+        String cell = productCell(page(render(order, items, ADMIN, Set.of())), "AMD Ryzen 7 9800X3D");
+
+        // then: the comment is no longer a plain line under the codes
+        assertThat(cell).contains("<details class=\"cl-note is-accent\">")
+                .contains("<summary class=\"cl-note-toggle\" aria-label=\"Komentarz\">")
+                .contains("<i class=\"far fa-comment-alt\"></i>")
+                .contains("<p class=\"cl-note-title\">Komentarz</p><p class=\"cl-note-text is-pre\">Check the box.\nShip with the SSD.</p>")
+                .doesNotContainPattern("<h[1-6]");
+        assertThat(cell.indexOf("cl-note is-accent")).isLessThan(cell.indexOf("cl-table-sub"));
+        assertThat(cell.substring(cell.indexOf("cl-table-sub"))).doesNotContain("Check the box.");
+    }
+
+    @Test
+    void theConditionPillSitsOnTheNamesLineBeforeTheToggles() {
+        // given
+        Order order = order(OrderStatus.New);
+        List<OrderItem> items = items(order);
+        items.get(0).setCondition(ItemCondition.OpenBox);
+        items.get(0).setConsolidated(true);
+        items.get(0).setComment("Note");
+
+        // when
+        String cell = productCell(page(render(order, items, ADMIN, Set.of())), "AMD Ryzen 7 9800X3D");
 
         // then
-        assertThat(html).contains("<span class=\"cl-status is-info\">Na fakturze łącznie</span>");
+        String marks = cell.substring(cell.indexOf("<span class=\"cl-table-marks\">"), cell.indexOf("<span class=\"cl-table-sub\">"));
+        assertThat(marks).containsPattern("<span class=\"cl-status is-warn\">[^<]+</span>");
+        assertThat(marks.indexOf("cl-status")).isLessThan(marks.indexOf("<details class=\"cl-note\">"));
+        assertThat(marks.indexOf("<details class=\"cl-note\">")).isLessThan(marks.indexOf("cl-note is-accent"));
+        assertThat(cell).doesNotContain("cl-table-pills");
+    }
+
+    @Test
+    void everyCodeIsLabelledAndTheCodeItselfCopies() {
+        // given
+        Order order = order(OrderStatus.New);
+        OrderItem item = new OrderItem(order.getOrderId(), "Akcesoria", "Kabel", 1, 20, "ACME-KAB-1", false, 0);
+        item.setStatus(FulfilmentStatus.New);
+        item.setManufacturerCode("SIM-OK");
+        item.setSerialNo("23213123");
+
+        // when
+        String cell = productCell(page(render(order, List.of(item), ADMIN, Set.of())), "Kabel");
+
+        // then: "MFN", "SKU" and "SN" each stay glued to their code, one dot between the parts
+        assertThat(cell).contains("<span>MFN</span>&nbsp;<button type=\"button\" class=\"cl-copy-inline\" data-cl-copy=\"SIM-OK\"")
+                .contains("<span>SKU</span>&nbsp;<button type=\"button\" class=\"cl-copy-inline\" data-cl-copy=\"ACME-KAB-1\"")
+                .contains("<span>SN</span>&nbsp;<a class=\"cl-table-link\" href=\"/dashboard/item/history?serialNo=23213123\">23213123</a>"
+                        + "<button type=\"button\" class=\"cl-copy-inline is-icon\" data-cl-copy=\"23213123\" aria-label=\"Kopiuj numer seryjny 23213123\">");
+        assertThat(occurrences(cell, "<span class=\"cl-table-sep\">·</span>")).isEqualTo(3);
+        assertThat(cell).doesNotContain("class=\"icon is-small\" aria-hidden=\"true\"><i class=\"far fa-copy\">");
+    }
+
+    @Test
+    void withoutAHistoryLinkTheSerialNumberItselfCopiesAndNoLeadingDotAppears() {
+        // given
+        Order completed = order(OrderStatus.Completed);
+        OrderItem item = new OrderItem(completed.getOrderId(), null, "Kabel", 1, 20, "ACME-KAB-1", false, 0);
+        item.setStatus(FulfilmentStatus.Delivered);
+        item.setSerialNo("SN-9");
+        item.setComment("Read-only note");
+
+        // when
+        String cell = productCell(page(render(completed, List.of(item), SUPER_ADMIN, Set.of())), "Kabel");
+
+        // then: a super admin has no history page, the popovers are information and stay
+        assertThat(cell).contains("<span class=\"cl-table-sub\">")
+                .contains("<span>SN</span>&nbsp;<button type=\"button\" class=\"cl-copy-inline\" data-cl-copy=\"SN-9\"")
+                .doesNotContain("cl-table-sep").doesNotContain("/dashboard/item/history")
+                .contains("<details class=\"cl-note is-accent\">");
     }
 
     @Test
@@ -1213,8 +1305,9 @@ class OrderDetailsTemplateTest {
         String html = page(render(order(OrderStatus.New), ADMIN));
 
         // then
-        assertThat(template).doesNotContain("· SKU").doesNotContain("· SN")
-                .contains("#{order.items.sku.prefix}").contains("#{order.items.sn.prefix}");
+        assertThat(template).doesNotContain("· SKU").doesNotContain("· SN").doesNotContain("· MFN")
+                .contains("#{order.items.sku.prefix}").contains("#{order.items.sn.prefix}")
+                .contains("#{order.items.mfn.prefix}");
         assertThat(html).contains(">Stan</th>").doesNotContain(">Realizacja</th>");
     }
 
