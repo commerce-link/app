@@ -359,10 +359,9 @@ class CatalogScriptContractTest {
         }
         assertThat(css).doesNotContain("picker-option-checkbox").doesNotContain(".picker-option-text")
                 .doesNotContain("font-size: 11.5px");
-        assertThat(css).contains("""
-                .cl-page .cl-selection-bar .cl-button.is-primary {
-                    background: var(--cl-accent);
-                    color: var(--cl-surface);""");
+        // the selection row takes the look of the table header it stands in for, not an accent box of its own
+        assertThat(rule(css, ".cl-page .cl-selection-row")).contains("background: var(--cl-surface-2);")
+                .contains("border-bottom: 1px solid var(--cl-line);").doesNotContain("--cl-accent");
         String chipRemove = css.split("\\.cl-page \\.cl-chip-tag-remove \\{")[1].split("}")[0];
         assertThat(chipRemove).contains("border-radius: calc(var(--cl-radius) - 2px);");
     }

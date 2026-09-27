@@ -217,9 +217,6 @@ public class OrderPageModelFactory {
             bulk.add(new OrderPageModel.BulkActionButton(action, reason == null, reason,
                     "/dashboard/orders/" + order.getOrderId() + "/" + action.path()));
         }
-        // each reason is printed once under the bar and the buttons it greys point to it
-        List<String> bulkReasonKeys = bulk.stream().map(OrderPageModel.BulkActionButton::reasonKey)
-                .filter(Objects::nonNull).distinct().toList();
         boolean selectable = !readOnly && !hasWarehouseDocument;
         Map<String, SplitGroupPreviewDto> previews = readOnly ? Map.of() : items.stream()
                 .filter(OrderItem::isNew).filter(OrderItem::isGroup)
@@ -227,7 +224,7 @@ public class OrderPageModelFactory {
         return new OrderPageModel.ItemsCard(products, services, items.size(), selectable,
                 !readOnly && addReason == null, readOnly ? null : addReason,
                 !readOnly && !order.hasStatus(OrderStatus.New) && !serialItems.isEmpty(), serialItems,
-                bulk, selectable && (canSplitOrder || !hasDropshipItems), bulkReasonKeys,
+                bulk, selectable && (canSplitOrder || !hasDropshipItems),
                 readOnly ? List.of() : productCatalogRepository.findAll(order.getStoreId()),
                 readOnly ? List.of() : labels.options(), previews);
     }

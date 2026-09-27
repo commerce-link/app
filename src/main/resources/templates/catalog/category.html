@@ -98,11 +98,16 @@
                 </div>
 
                 <!--/* The count is announced from a region that is always in the page: one that appears in the same
-                       frame as its text is often skipped by a screen reader. The bar keeps the visible count. */-->
+                       frame as its text is often skipped by a screen reader. The selection row keeps the visible count. */-->
                 <p th:unless="${page.dynamic()}" class="cl-visually-hidden" role="status" data-cl-selection-status></p>
-                <div th:unless="${page.dynamic()}" class="cl-selection-bar" hidden data-cl-selection-bar>
+                <!--/* The selection row stands in for the table header while rows are checked (table-select.js). */-->
+                <div th:unless="${page.dynamic()}" class="cl-selection-row" hidden data-cl-selection-bar>
+                    <label class="cl-check-target">
+                        <input type="checkbox" class="cl-check-input" data-cl-select-all
+                               th:attr="aria-label=#{catalog.products.selectAll}">
+                    </label>
                     <span class="cl-selection-count" data-cl-selection-count
-                          th:attr="data-template=#{catalog.products.selected('{n}')}"></span>
+                          th:attr="data-template=#{catalog.products.selected('{k}', '{n}')}"></span>
                     <div class="cl-selection-actions">
                         <button type="button" class="cl-button" data-cl-select-action="enable">
                             <span class="icon is-small" aria-hidden="true"><i class="fas fa-check"></i></span>
@@ -112,16 +117,14 @@
                             <span class="icon is-small" aria-hidden="true"><i class="fas fa-ban"></i></span>
                             <span th:text="#{catalog.products.bulk.disable}"></span>
                         </button>
-                        <button type="button" class="cl-button is-danger" data-cl-select-action="delete"
+                        <button type="button" class="cl-link-button is-danger cl-selection-remove" data-cl-select-action="delete"
                                 th:attr="data-cl-select-confirm-title=#{catalog.products.bulk.delete.title('{n}')},
                                          data-cl-select-confirm-message=#{catalog.products.bulk.delete.message},
-                                         data-cl-select-confirm-action=#{catalog.products.bulk.delete}">
-                            <span class="icon is-small" aria-hidden="true"><i class="fas fa-trash-alt"></i></span>
-                            <span th:text="#{catalog.products.bulk.delete}"></span>
-                        </button>
-                        <button type="button" class="cl-link-button cl-selection-clear" data-cl-select-clear
-                                th:text="#{catalog.products.clear}"></button>
+                                         data-cl-select-confirm-action=#{catalog.products.bulk.delete}"
+                                th:text="#{catalog.products.bulk.delete}"></button>
                     </div>
+                    <button type="button" class="cl-link-button cl-selection-clear" data-cl-select-clear
+                            th:text="#{catalog.products.clear}"></button>
                 </div>
 
                 <!--/* Only a manual category is selectable; the attribute needs a value, as Thymeleaf drops an empty one. */-->

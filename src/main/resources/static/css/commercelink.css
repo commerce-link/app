@@ -3366,58 +3366,120 @@ a.cl-link-button:hover {
     }
 }
 
-/* --- Catalog: Selection bar (actions on the checked rows of a cl-table) --- */
-.cl-page .cl-selection-bar {
+/* --- Selection row: the actions on the checked rows of a cl-table, in the place of the table's header --- */
+/* While rows are checked table-select.js puts .has-selection on the table, which collapses its thead, and shows this row
+   directly above the table in the header's look (surface-2, 12.5 px, line borders). Its minimum height is the header's
+   own, measured by the script (--cl-selection-head), so the rows below stay where they are. visibility: collapse keeps
+   the column widths of the collapsed header (the columns do not move either) and takes its controls out of the tab order
+   and the accessibility tree while the row shows; with nothing checked the header is the ordinary one. Controls are
+   30 px tall so the row fits the header; below 1024 px the menu buttons reach 44 px through an invisible hit area and
+   the link buttons through a negative margin, as the row checkbox does. */
+.cl-page .cl-selection-row {
     position: sticky;
     top: calc(var(--cl-topbar-height) + 8px);
     z-index: 5;
+    box-sizing: border-box;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: var(--cl-gap-related);
-    margin: 0 20px 12px;
-    padding: 10px 14px;
-    border: 1px solid var(--cl-accent);
-    border-radius: var(--cl-radius);
-    background: var(--cl-accent-soft);
-    box-shadow: var(--cl-shadow-card);
+    column-gap: 16px;
+    row-gap: 2px;
+    min-height: var(--cl-selection-head, 40px);
+    padding: 0 20px;
+    border-top: 1px solid var(--cl-line);
+    border-bottom: 1px solid var(--cl-line);
+    background: var(--cl-surface-2);
+    font-size: 12.5px;
+    color: var(--cl-ink-2);
 }
 
-.cl-page .cl-selection-bar[hidden] {
+.cl-page .cl-selection-row[hidden] {
     display: none;
 }
 
+.cl-page .cl-table.has-selection > thead {
+    visibility: collapse;
+}
+
+/* the count starts where the header text of the first column after the checkboxes does */
 .cl-page .cl-selection-count {
-    font-size: 14px;
+    margin-left: 2px;
+    font-size: 12.5px;
     font-weight: 600;
-    color: var(--cl-accent-ink);
+    color: var(--cl-ink-2);
     font-variant-numeric: tabular-nums;
-    margin-right: 6px;
+    white-space: nowrap;
 }
 
 .cl-page .cl-selection-actions {
     display: flex;
+    flex: 1 1 auto;
     flex-wrap: wrap;
-    gap: var(--cl-gap-related);
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
 }
 
-.cl-page .cl-selection-bar .cl-button:not(.is-danger) {
-    background: var(--cl-surface);
+.cl-page .cl-selection-row .cl-button {
+    height: 30px;
+    padding: 0 10px;
+    gap: 6px;
+    font-size: 13px;
 }
 
-.cl-page .cl-selection-clear {
+.cl-page .cl-selection-row .cl-link-button {
+    min-height: 30px;
+    font-size: 13px;
+}
+
+/* the destructive action and "Clear" sit at the end of the row, away from the menus */
+.cl-page .cl-selection-remove {
     margin-left: auto;
 }
 
-/* the primary action keeps its accent fill */
-.cl-page .cl-selection-bar .cl-button.is-primary {
-    background: var(--cl-accent);
-    color: var(--cl-surface);
-    border-color: var(--cl-accent);
+/* the menus open from the start of the row, where they sit, not leftwards out of the card */
+.cl-page .cl-selection-row .cl-menu-list {
+    left: 0;
+    right: auto;
 }
 
-.cl-page .cl-selection-bar .cl-button.is-primary:hover {
-    background: var(--cl-accent-ink);
+/* why "Remove" is greyed: a line of its own under the row's controls, ending under the button */
+.cl-page .cl-selection-reason {
+    flex: 1 1 100%;
+    margin: 0 0 6px;
+    font-size: 12.5px;
+    color: var(--cl-ink-2);
+    text-align: right;
+}
+
+.cl-page .cl-selection-reason[hidden] {
+    display: none;
+}
+
+/* a link-style action that cannot run: greyed, still focusable, its reason in visible text next to it */
+.cl-page .cl-link-button[aria-disabled="true"],
+.cl-page .cl-link-button[aria-disabled="true"]:hover {
+    color: var(--cl-ink-3);
+    text-decoration: none;
+    cursor: not-allowed;
+}
+
+@media screen and (max-width: 1023px) {
+    .cl-page .cl-selection-row .cl-menu > summary {
+        position: relative;
+    }
+
+    .cl-page .cl-selection-row .cl-menu > summary::after {
+        content: "";
+        position: absolute;
+        inset: -7px 0;
+    }
+
+    .cl-page .cl-selection-row .cl-link-button {
+        min-height: 44px;
+        margin-top: -7px;
+        margin-bottom: -7px;
+    }
 }
 
 /* --- Catalog: Selectable rows --- */
@@ -3426,6 +3488,7 @@ a.cl-link-button:hover {
     padding-right: 4px;
 }
 
+.cl-page .cl-selection-row .cl-check-input,
 .cl-page .cl-table .cl-check-input {
     width: 18px;
     height: 18px;
@@ -3437,6 +3500,7 @@ a.cl-link-button:hover {
 /* The label around a row checkbox is its touch target: 44 px (36 px from 1024 px) centred on the 18 px box. The negative
    margin keeps the row and the header as tall as the box alone would make them; position: relative keeps the part of
    the target that reaches over the next cell above that cell. */
+.cl-page .cl-selection-row .cl-check-target,
 .cl-page .cl-table .cl-check-target {
     position: relative;
     display: flex;
@@ -3453,6 +3517,7 @@ a.cl-link-button:hover {
     opacity: .45;
 }
 
+.cl-page .cl-selection-row .cl-check-input:focus-visible,
 .cl-page .cl-table .cl-check-input:focus-visible {
     outline: 2px solid var(--cl-accent);
     outline-offset: 2px;
@@ -3944,6 +4009,7 @@ a.cl-link-button:hover {
         height: 36px;
     }
 
+    .cl-page .cl-selection-row .cl-check-target,
     .cl-page .cl-table .cl-check-target {
         width: 36px;
         height: 36px;
@@ -4100,19 +4166,66 @@ a.cl-link-button:hover {
 
 /* --- Catalog: phone layout for the selection bar, selectable rows and the stacked toolbar --- */
 @media screen and (max-width: 719px) {
-    .cl-page .cl-selection-bar {
-        margin: 0 16px 12px;
-        flex-direction: column;
-        align-items: stretch;
+    /* card mode: no header to stand in for; the row stands above the cards in two lines, the count and "Clear" first,
+       then the menus and "Remove", every control 44 px tall. The menus open from the row's start (the sticky row is
+       their containing block), so the list never reaches past the right edge of a narrow screen. */
+    .cl-page .cl-selection-row {
+        padding: 0 16px;
+        column-gap: 12px;
+        row-gap: 0;
     }
 
-    .cl-page .cl-selection-actions .cl-button {
-        flex: 1 1 100%;
-        justify-content: center;
+    /* the box lines up with the checkboxes of the cards below: a product card starts it at the card's edge, a wrapping
+       card (order items) one step further in */
+    .cl-page .cl-selection-row > .cl-check-target {
+        margin-left: -16px;
+    }
+
+    .cl-page .cl-selection-row:has(+ .cl-table.is-wrap) > .cl-check-target {
+        margin-left: 0;
+    }
+
+    .cl-page .cl-selection-count {
+        margin-left: 0;
     }
 
     .cl-page .cl-selection-clear {
-        margin-left: 0;
+        order: 1;
+        margin-left: auto;
+    }
+
+    .cl-page .cl-selection-actions {
+        order: 2;
+        flex-basis: 100%;
+        padding-bottom: 8px;
+    }
+
+    .cl-page .cl-selection-reason {
+        order: 3;
+        text-align: left;
+    }
+
+    .cl-page .cl-selection-row .cl-button {
+        height: 44px;
+        padding: 0 10px;
+        font-size: 14px;
+    }
+
+    .cl-page .cl-selection-row .cl-menu > summary::after {
+        content: none;
+    }
+
+    .cl-page .cl-selection-row .cl-link-button {
+        margin-top: 0;
+        margin-bottom: 0;
+    }
+
+    .cl-page .cl-selection-row .cl-menu {
+        position: static;
+    }
+
+    .cl-page .cl-selection-row .cl-menu-list {
+        left: 16px;
     }
 
     .cl-page .cl-table .cl-table-check {

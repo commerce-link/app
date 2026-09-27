@@ -12,6 +12,7 @@ import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.web.dtos.RoutedSupplierView;
 import pl.commercelink.web.dtos.SplitGroupPreviewDto;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -40,8 +41,24 @@ public record OrderPageModel(String orderId, String shortId, String backHref, bo
     public record ItemsCard(List<OrderItemRow> products, List<OrderItemRow> services, int count, boolean selectable,
                             boolean canAddItems, String addItemsReasonKey, boolean canAddSerials,
                             List<SerialItemRow> serialItems, List<BulkActionButton> bulkActions, boolean bulkAvailable,
-                            List<String> bulkReasonKeys, List<ProductCatalog> catalogs,
-                            List<SupplierLabelMap.Option> suppliers, Map<String, SplitGroupPreviewDto> splitPreviews) {
+                            List<ProductCatalog> catalogs, List<SupplierLabelMap.Option> suppliers,
+                            Map<String, SplitGroupPreviewDto> splitPreviews) {
+
+        /** The drop-downs of the selection row, each with its actions in the order of BulkAction; none is empty. */
+        public List<BulkMenu> bulkMenus() {
+            return Arrays.stream(BulkAction.Menu.values())
+                    .map(menu -> new BulkMenu(menu, bulkActions.stream().filter(b -> b.action().menu() == menu).toList()))
+                    .filter(menu -> !menu.actions().isEmpty())
+                    .toList();
+        }
+
+        /** The action standing on its own at the end of the selection row (REMOVE), or null when the order offers none. */
+        public BulkActionButton bulkStandalone() {
+            return bulkActions.stream().filter(b -> b.action().menu() == null).findFirst().orElse(null);
+        }
+    }
+
+    public record BulkMenu(BulkAction.Menu menu, List<BulkActionButton> actions) {
     }
 
     /** The serial-number dialog needs no cost, so it gets a slim row instead of the raw OrderItem. */

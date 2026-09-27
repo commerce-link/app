@@ -57,22 +57,27 @@
                         </div>
                     </div>
 
-                    <!--/* The bar declares no bulk action for the script: what is added are the checked rows of the
-                           form below, which the button submits itself, so table-select.js only shows the bar and
-                           keeps the count. */-->
-                    <!--/* Announced from a region always in the page; the bar keeps the visible count. */-->
+                    <!--/* The selection row declares no bulk action for the script: what is added are the checked rows
+                           of the form below, which the button submits itself, so table-select.js only shows the row
+                           and keeps the count. */-->
+                    <!--/* Announced from a region always in the page; the selection row keeps the visible count. */-->
                     <p class="cl-visually-hidden" role="status" data-cl-selection-status></p>
-                    <div class="cl-selection-bar" hidden data-cl-selection-bar>
+                    <!--/* The selection row stands in for the table header while rows are checked (table-select.js). */-->
+                    <div class="cl-selection-row" hidden data-cl-selection-bar>
+                        <label class="cl-check-target">
+                            <input type="checkbox" class="cl-check-input" data-cl-select-all
+                                   th:attr="aria-label=#{catalog.products.selectAll}">
+                        </label>
                         <span class="cl-selection-count" data-cl-selection-count
-                              th:attr="data-template=#{catalog.products.selected('{n}')}"></span>
+                              th:attr="data-template=#{catalog.products.selected('{k}', '{n}')}"></span>
                         <div class="cl-selection-actions">
                             <button type="submit" form="add-products-form" class="cl-button is-primary">
                                 <span class="icon is-small" aria-hidden="true"><i class="fas fa-plus"></i></span>
                                 <span th:text="#{catalog.products.add.selected}"></span>
                             </button>
-                            <button type="button" class="cl-link-button cl-selection-clear" data-cl-select-clear
-                                    th:text="#{catalog.products.clear}"></button>
                         </div>
+                        <button type="button" class="cl-link-button cl-selection-clear" data-cl-select-clear
+                                th:text="#{catalog.products.clear}"></button>
                     </div>
 
                     <form id="add-products-form" method="post" th:action="@{${reviewAction}}">

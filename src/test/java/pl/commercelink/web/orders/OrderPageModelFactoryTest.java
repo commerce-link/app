@@ -664,7 +664,7 @@ class OrderPageModelFactoryTest {
     }
 
     @Test
-    void theBulkBarListsEachDistinctReasonOnce() {
+    void theSelectionRowGroupsTheActionsIntoRouteAndMoveMenusEachCarryingItsOwnReason() {
         // given
         Order order = order(OrderStatus.New);
         order.addPayment(Payment.bankTransfer("R/1", "Jan", 10));
@@ -675,7 +675,32 @@ class OrderPageModelFactoryTest {
         OrderPageModel.ItemsCard items = factory.build(order, List.of(item), ADMIN, PL).items();
 
         // then
-        assertThat(items.bulkReasonKeys()).containsExactly("order.items.action.dropship.locked", "order.bulk.unavailable.split");
+        assertThat(items.bulkMenus()).extracting(OrderPageModel.BulkMenu::menu)
+                .containsExactly(BulkAction.Menu.ROUTE, BulkAction.Menu.MOVE);
+        assertThat(items.bulkMenus().get(0).actions()).extracting(OrderPageModel.BulkActionButton::action)
+                .containsExactly(BulkAction.ALLOCATE, BulkAction.TO_WAREHOUSE, BulkAction.TO_WAREHOUSE_RMA);
+        assertThat(items.bulkMenus().get(0).actions()).extracting(OrderPageModel.BulkActionButton::reasonKey)
+                .containsOnly("order.items.action.dropship.locked");
+        assertThat(items.bulkMenus().get(1).actions()).extracting(OrderPageModel.BulkActionButton::action)
+                .containsExactly(BulkAction.SPLIT, BulkAction.MOVE);
+        assertThat(items.bulkMenus().get(1).actions()).extracting(OrderPageModel.BulkActionButton::reasonKey)
+                .containsOnly("order.bulk.unavailable.split");
+        assertThat(items.bulkStandalone().action()).isEqualTo(BulkAction.REMOVE);
+        assertThat(items.bulkStandalone().reasonKey()).isEqualTo("order.items.action.dropship.locked");
+    }
+
+    @Test
+    void anInvoicedOrderHasNoStandaloneRemoveInTheSelectionRow() {
+        // given
+        Order order = order(OrderStatus.Assembly);
+        order.addDocument(new Document("fv", "FV/2026/09/1", null, DocumentType.InvoiceVat));
+
+        // when
+        OrderPageModel.ItemsCard items = factory.build(order, List.of(item(FulfilmentStatus.New)), ADMIN, PL).items();
+
+        // then
+        assertThat(items.bulkStandalone()).isNull();
+        assertThat(items.bulkMenus()).hasSize(2);
     }
 
     @Test

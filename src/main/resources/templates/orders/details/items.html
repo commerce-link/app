@@ -24,31 +24,67 @@
                    action=${page.readOnly()} ? null : @{/dashboard/orders/{id}/moveSelectedItemsToAllocation(id=${page.orderId()})}">
         <th:block th:if="${items.selectable()}">
             <p class="cl-visually-hidden" role="status" data-cl-selection-status></p>
-            <div class="cl-selection-bar" data-cl-selection-bar hidden>
-                <span class="cl-selection-count" data-cl-selection-count th:attr="data-template=#{order.bulk.selected}"></span>
+            <!--/* The selection row stands in for the table header while items are checked (table-select.js collapses
+                   the thead): its own select-all box, the count, the menus and "Remove". An entry that cannot run
+                   says why in its .cl-menu-reason, as in the row menu; order-items.js greys what fits none of the
+                   checked items. */-->
+            <div class="cl-selection-row" data-cl-selection-bar hidden>
+                <label class="cl-check-target"><input class="cl-check-input" type="checkbox" data-cl-select-all
+                                                      th:attr="aria-label=#{order.items.select.all}"></label>
+                <span class="cl-selection-count" data-cl-selection-count
+                      th:attr="data-template=#{order.bulk.selected('{k}', '{n}')}"></span>
                 <div class="cl-selection-actions"
                      th:attr="data-cl-scope-template=#{order.bulk.scope}, data-cl-scope-count-template=#{order.bulk.scope.count}">
-                    <th:block th:each="bulk : ${items.bulkActions()}">
-                        <button th:if="${bulk.action().name() != 'MOVE'}" type="button" class="cl-button"
-                                th:classappend="${bulk.action().danger()} ? 'is-danger' : ''" th:disabled="${!bulk.available()}"
-                                th:attr="data-cl-bulk-action=@{${bulk.href()}}, data-cl-bulk-scope=${bulk.action().scope()},
-                                         data-label=#{${bulk.action().labelKey()}},
-                                         data-cl-bulk-confirm-title=#{${bulk.action().confirmTitleKey()}},
-                                         data-cl-bulk-confirm-message=#{${bulk.action().confirmMessageKey()}},
-                                         data-cl-bulk-confirm-action=#{${bulk.action().confirmActionKey()}},
-                                         aria-describedby=${bulk.reasonKey() != null} ? |bulk-reason-${items.bulkReasonKeys().indexOf(bulk.reasonKey())}| : null"
-                                th:text="#{${bulk.action().labelKey()}}"></button>
-                        <button th:if="${bulk.action().name() == 'MOVE'}" type="button" class="cl-button"
-                                data-cl-dialog-open="move-dialog" th:disabled="${!bulk.available()}"
-                                th:attr="data-cl-bulk-scope=${bulk.action().scope()}, data-label=#{${bulk.action().labelKey()}},
-                                         aria-describedby=${bulk.reasonKey() != null} ? |bulk-reason-${items.bulkReasonKeys().indexOf(bulk.reasonKey())}| : null"
-                                th:text="#{${bulk.action().labelKey()}}"></button>
-                    </th:block>
+                    <details class="cl-menu" th:each="menu : ${items.bulkMenus()}">
+                        <summary class="cl-button">
+                            <span th:text="#{${menu.menu().labelKey()}}"></span>
+                            <span class="icon is-small" aria-hidden="true"><i class="fas fa-chevron-down"></i></span>
+                        </summary>
+                        <ul class="cl-menu-list" th:id="|bulk-menu-${#strings.toLowerCase(menu.menu().name())}|">
+                            <li th:each="bulk : ${menu.actions()}">
+                                <button th:if="${bulk.action().name() != 'MOVE'}" type="button" class="cl-menu-item"
+                                        th:attr="data-cl-bulk-action=@{${bulk.href()}}, data-cl-bulk-scope=${bulk.action().scope()},
+                                                 data-label=#{${bulk.action().labelKey()}}, data-skipped=#{${bulk.action().skippedKey()}},
+                                                 data-cl-bulk-unavailable=${bulk.available()} ? null : 'true',
+                                                 aria-disabled=${bulk.available()} ? null : 'true',
+                                                 data-cl-bulk-confirm-title=#{${bulk.action().confirmTitleKey()}},
+                                                 data-cl-bulk-confirm-message=#{${bulk.action().confirmMessageKey()}},
+                                                 data-cl-bulk-confirm-action=#{${bulk.action().confirmActionKey()}}">
+                                    <span data-cl-bulk-label th:text="#{${bulk.action().labelKey()}}"></span>
+                                    <span class="cl-menu-reason" data-cl-bulk-reason th:hidden="${bulk.available()}"
+                                          th:text="${bulk.available()} ? '' : #{${bulk.reasonKey()}}"></span>
+                                </button>
+                                <button th:if="${bulk.action().name() == 'MOVE'}" type="button" class="cl-menu-item"
+                                        data-cl-dialog-open="move-dialog"
+                                        th:attr="data-cl-bulk-scope=${bulk.action().scope()}, data-label=#{${bulk.action().labelKey()}},
+                                                 data-skipped=#{${bulk.action().skippedKey()}},
+                                                 data-cl-bulk-unavailable=${bulk.available()} ? null : 'true',
+                                                 aria-disabled=${bulk.available()} ? null : 'true'">
+                                    <span data-cl-bulk-label th:text="#{${bulk.action().labelKey()}}"></span>
+                                    <span class="cl-menu-reason" data-cl-bulk-reason th:hidden="${bulk.available()}"
+                                          th:text="${bulk.available()} ? '' : #{${bulk.reasonKey()}}"></span>
+                                </button>
+                            </li>
+                        </ul>
+                    </details>
+                    <!--/* "Remove" stands alone at the end; greyed, it keeps focus and names its reason in visible text */-->
+                    <button th:if="${items.bulkStandalone() != null}" th:with="bulk=${items.bulkStandalone()}" type="button"
+                            class="cl-link-button is-danger cl-selection-remove"
+                            th:attr="data-cl-bulk-action=@{${bulk.href()}}, data-cl-bulk-scope=${bulk.action().scope()},
+                                     data-label=#{${bulk.action().labelKey()}}, data-skipped=#{${bulk.action().skippedKey()}},
+                                     data-cl-bulk-unavailable=${bulk.available()} ? null : 'true',
+                                     aria-disabled=${bulk.available()} ? null : 'true',
+                                     data-cl-bulk-reason-id='bulk-remove-reason', aria-describedby='bulk-remove-reason',
+                                     data-cl-bulk-confirm-title=#{${bulk.action().confirmTitleKey()}},
+                                     data-cl-bulk-confirm-message=#{${bulk.action().confirmMessageKey()}},
+                                     data-cl-bulk-confirm-action=#{${bulk.action().confirmActionKey()}}">
+                        <span data-cl-bulk-label th:text="#{${bulk.action().labelKey()}}"></span>
+                    </button>
                 </div>
-                <!--/* the reasons are text in the bar, not tooltips, so a touch screen shows them too */-->
-                <p th:each="key, i : ${items.bulkReasonKeys()}" class="cl-help is-note" th:id="|bulk-reason-${i.index}|"
-                   th:text="#{${key}}"></p>
                 <button type="button" class="cl-link-button cl-selection-clear" data-cl-select-clear th:text="#{order.bulk.clear}"></button>
+                <p th:if="${items.bulkStandalone() != null}" th:with="bulk=${items.bulkStandalone()}" class="cl-selection-reason"
+                   id="bulk-remove-reason" th:hidden="${bulk.available()}"
+                   th:text="${bulk.available()} ? '' : #{${bulk.reasonKey()}}"></p>
             </div>
         </th:block>
 

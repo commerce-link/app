@@ -102,7 +102,8 @@ class ProductsAddTemplateTest {
         String html = renderedProposals();
 
         // then
-        assertThat(occurrences(html, "<label class=\"cl-check-target\">")).isEqualTo(3);
+        // two rows, the header's "select visible" and the selection row's own
+        assertThat(occurrences(html, "<label class=\"cl-check-target\">")).isEqualTo(4);
         assertThat(html).containsPattern("<label class=\"cl-check-target\">\\s*<input type=\"checkbox\" class=\"cl-check-input\" data-cl-select-all")
                 .containsPattern("<label class=\"cl-check-target\">\\s*<input type=\"checkbox\" class=\"cl-check-input\" name=\"eans\"");
     }
@@ -236,7 +237,7 @@ class ProductsAddTemplateTest {
         // then
         assertThat(source("products-add")).doesNotContain("PLN");
         assertThat(html).contains("2 749,00 PLN")
-                .containsPattern("<p class=\"cl-visually-hidden\" role=\"status\" data-cl-selection-status></p>\\s*<div class=\"cl-selection-bar\"");
+                .containsPattern("<p class=\"cl-visually-hidden\" role=\"status\" data-cl-selection-status></p>\\s*<div class=\"cl-selection-row\"");
         String bar = html.substring(html.indexOf("data-cl-selection-bar"), html.indexOf("cl-selection-actions"));
         assertThat(bar).doesNotContain("role=\"status\"");
     }

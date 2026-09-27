@@ -1,7 +1,11 @@
 // Row selection for a cl-table with bulk actions. table[data-cl-select-table] has a header checkbox [data-cl-select-all]
-// (checks the visible rows) and row checkboxes [data-cl-select-row][value]. The bar [data-cl-selection-bar] shows while
-// anything is checked: [data-cl-selection-count][data-template="... {n}"] says how many, buttons [data-cl-select-action=x]
-// submit form[data-cl-select-form] with hidden inputs name=action / name=productIds, [data-cl-select-clear] unchecks all.
+// (checks the visible rows) and row checkboxes [data-cl-select-row][value]. The selection row [data-cl-selection-bar]
+// shows while anything is checked and stands in for the table header: the table gets .has-selection, whose CSS collapses
+// the thead, and the row takes the header's measured height (--cl-selection-head) so the rows below do not move. The
+// selection row carries a select-all box of its own [data-cl-select-all] in the header's place; the focus moves between
+// the two boxes as one of them disappears. [data-cl-selection-count][data-template="... {k} ... {n}"] says how many of
+// the visible rows are checked, buttons [data-cl-select-action=x] submit form[data-cl-select-form] with hidden inputs
+// name=action / name=productIds, [data-cl-select-clear] unchecks all.
 // A button with [data-cl-select-confirm-title] first opens the page's dialog#cl-confirm-dialog (fragments/confirm-dialog,
 // whose confirm-dialog.js closes it on Cancel) and submits on confirm; "{n}" in the title and the message becomes the
 // number of checked rows. Such a button does nothing at all when the page has no usable dialog -- an action worth
@@ -9,10 +13,10 @@
 // the selection so a bulk action never touches what the operator cannot see. Without JavaScript nothing here is shown.
 //
 // The count is announced from [data-cl-selection-status] (a visually hidden role=status that is always in the page,
-// outside the bar -- a live region revealed in the same frame as its text is often not read); it speaks only when the
-// count changes, never on load. The bulk form takes the page's query string along (the filter as the operator left it,
-// kept in the address by table-filter.js), so the redirect after the action can come back to it. "Clear" moves the
-// focus to the header checkbox, as the bar it was pressed in disappears.
+// outside the selection row -- a live region revealed in the same frame as its text is often not read); it speaks only
+// when the count changes, never on load. The bulk form takes the page's query string along (the filter as the operator
+// left it, kept in the address by table-filter.js), so the redirect after the action can come back to it. "Clear" moves
+// the focus to the header checkbox, as the row it was pressed in disappears.
 (function () {
     'use strict';
 
@@ -53,6 +57,31 @@
         status.setAttribute('data-count', String(count));
     }
 
+    // the header's select-all box and the selection row's own
+    function allBoxes(table) {
+        var bar = barOf(table);
+        var boxes = Array.prototype.slice.call(table.querySelectorAll('[data-cl-select-all]'));
+        return bar ? boxes.concat(Array.prototype.slice.call(bar.querySelectorAll('[data-cl-select-all]'))) : boxes;
+    }
+
+    // The header's height, taken while the header shows, becomes the selection row's minimum height. Below 720 px the
+    // header is visually hidden (card mode) and measures next to nothing: the row then keeps its own height.
+    function measureHead(table, bar) {
+        var head = table.tHead;
+        if (!head || !bar) {
+            return;
+        }
+        var selecting = table.classList.contains('has-selection');
+        table.classList.remove('has-selection');
+        var height = head.getBoundingClientRect().height;
+        table.classList.toggle('has-selection', selecting);
+        if (height > 8) {
+            bar.style.setProperty('--cl-selection-head', height + 'px');
+        } else {
+            bar.style.removeProperty('--cl-selection-head');
+        }
+    }
+
     function refresh(table) {
         var bar = barOf(table);
         var selected = checked(table);
@@ -62,21 +91,41 @@
                 row.classList.toggle('is-selected', box.checked);
             }
         });
-        var all = table.querySelector('[data-cl-select-all]');
-        if (all) {
-            var shown = rowsOf(table).filter(visible);
+        var shown = rowsOf(table).filter(visible);
+        allBoxes(table).forEach(function (all) {
             all.checked = shown.length > 0 && shown.every(function (box) { return box.checked; });
             all.indeterminate = selected.length > 0 && !all.checked;
-        }
+        });
         if (!bar) {
             return;
         }
+        if (selected.length > 0 && !table.classList.contains('has-selection')) {
+            measureHead(table, bar);
+        }
         bar.hidden = selected.length === 0;
+        table.classList.toggle('has-selection', selected.length > 0);
         var count = bar.querySelector('[data-cl-selection-count]');
         if (count) {
-            var text = (count.getAttribute('data-template') || '{n}').replace('{n}', String(selected.length));
+            var text = (count.getAttribute('data-template') || '{k}')
+                .replace('{k}', String(selected.length)).replace('{n}', String(shown.length));
             count.textContent = text;
             announce(table, text, selected.length);
+        }
+    }
+
+    // The select-all box that was just used may have disappeared with the header or the selection row; the focus
+    // moves to the one that shows now.
+    function keepFocus(table) {
+        var active = document.activeElement;
+        if (!active || !active.matches || !active.matches('[data-cl-select-all]')) {
+            return;
+        }
+        var bar = barOf(table);
+        var inBar = bar && bar.contains(active);
+        var target = inBar && bar.hidden ? table.querySelector('[data-cl-select-all]')
+            : !inBar && bar && !bar.hidden ? bar.querySelector('[data-cl-select-all]') : null;
+        if (target) {
+            target.focus();
         }
     }
 
@@ -176,7 +225,7 @@
             box.hidden = false;
         });
         var bar = barOf(table);
-        table.addEventListener('change', function (event) {
+        var onChange = function (event) {
             if (event.target.matches('[data-cl-select-all]')) {
                 var on = event.target.checked;
                 rowsOf(table).forEach(function (box) {
@@ -186,8 +235,16 @@
                 });
             }
             refresh(table);
-        });
+            keepFocus(table);
+        };
+        table.addEventListener('change', onChange);
         if (bar) {
+            bar.addEventListener('change', onChange);
+            window.addEventListener('resize', function () {
+                if (!bar.hidden) {
+                    measureHead(table, bar);
+                }
+            });
             bar.addEventListener('click', function (event) {
                 if (!event.target.closest) {
                     return;
@@ -195,7 +252,7 @@
                 if (event.target.closest('[data-cl-select-clear]')) {
                     rowsOf(table).forEach(function (box) { box.checked = false; });
                     refresh(table);
-                    // The bar, and the button in it, is hidden now; the focus would fall to the body.
+                    // The selection row, and the button in it, is hidden now; the focus would fall to the body.
                     var all = table.querySelector('[data-cl-select-all]');
                     if (all) {
                         all.focus();

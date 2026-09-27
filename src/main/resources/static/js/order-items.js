@@ -1,8 +1,11 @@
-// Bulk actions of the order's items. table-select.js keeps the checkboxes, the count and the bar; this script labels
-// an action with how many of the checked items it applies to when not all of them fit ("To allocation (2 of 3)" — a
-// row's data-<scope> flag is the server's own predicate), disables an action none of them fits, asks in the page's
-// dialog#cl-confirm-dialog (through table-select.js's shared window.CL_confirmBulk) and posts form#order-items-form to
-// the action's address. Without JavaScript the <noscript> buttons open a confirmation page instead.
+// Bulk actions of the order's items, in the selection row (the "Route to" and "Move" menus and "Remove"). table-select.js
+// keeps the checkboxes, the count and the row; this script labels an action with how many of the checked items it
+// applies to when not all of them fit ("To allocation (2 of 3)" — a row's data-<scope> flag is the server's own
+// predicate), greys an action none of them fits (aria-disabled, with its data-skipped text as the visible reason, as the
+// row menu names its reasons), asks in the page's dialog#cl-confirm-dialog (through table-select.js's shared
+// window.CL_confirmBulk) and posts form#order-items-form to the action's address. An action the server marked
+// unavailable (data-cl-bulk-unavailable) stays greyed with the server's reason. Without JavaScript the <noscript> buttons
+// open a confirmation page instead.
 (function () {
     'use strict';
 
@@ -29,17 +32,36 @@
         }).length;
     }
 
+    function off(button) {
+        return button.getAttribute('aria-disabled') === 'true';
+    }
+
+    // the reason sits inside a menu entry, or (for "Remove", a link-style button) in the element its id names
+    function reasonOf(button) {
+        return button.querySelector('[data-cl-bulk-reason]')
+            || document.getElementById(button.getAttribute('data-cl-bulk-reason-id') || '');
+    }
+
     function refresh() {
         var rows = checkedRows();
-        form.querySelectorAll('button[data-cl-bulk-scope]').forEach(function (button) {
-            if (!button.hasAttribute('data-server-disabled')) {
-                button.setAttribute('data-server-disabled', String(button.disabled));
-            }
+        form.querySelectorAll('[data-cl-bulk-scope]').forEach(function (button) {
             var fits = fitting(rows, button);
-            button.disabled = button.getAttribute('data-server-disabled') === 'true' || (rows.length > 0 && fits === 0);
+            var unavailable = button.hasAttribute('data-cl-bulk-unavailable');
+            var none = rows.length > 0 && fits === 0;
+            if (unavailable || none) {
+                button.setAttribute('aria-disabled', 'true');
+            } else {
+                button.removeAttribute('aria-disabled');
+            }
+            var reason = reasonOf(button);
+            if (reason && !unavailable) {
+                reason.textContent = none ? button.getAttribute('data-skipped') : '';
+                reason.hidden = !none;
+            }
             var label = button.getAttribute('data-label');
+            var text = button.querySelector('[data-cl-bulk-label]') || button;
             // the "(k of n)" suffix only when some checked items do not fit; all of them fitting needs no count
-            button.textContent = rows.length === 0 || fits === rows.length ? label
+            text.textContent = rows.length === 0 || fits === rows.length ? label
                 : template.replace('{label}', label).replace('{n}', String(fits)).replace('{m}', String(rows.length));
         });
     }
@@ -50,6 +72,11 @@
         // the dialog names how many items the action will touch: "k of n" when some are left out
         var count = fits < rows.length
             ? countTemplate.replace('{k}', String(fits)).replace('{n}', String(rows.length)) : String(rows.length);
+        // the entry sits in a menu that closes now: the dialog hands the focus back to the menu's button, not the body
+        var menu = button.closest('details.cl-menu');
+        if (menu) {
+            menu.querySelector(':scope > summary').focus();
+        }
         window.CL_confirmBulk(button, count, function () {
             form.action = button.getAttribute('data-cl-bulk-action');
             form.submit();
@@ -61,7 +88,7 @@
             return;
         }
         var button = event.target.closest('button[data-cl-bulk-action]');
-        if (button && !button.disabled && checkedRows().length) {
+        if (button && !off(button) && checkedRows().length) {
             event.preventDefault();
             confirmThen(button);
             return;
@@ -71,6 +98,7 @@
             window.setTimeout(refresh, 0);
         }
     });
-    table.addEventListener('change', refresh);
+    // the checkboxes of the table and the select-all box of the selection row, which sits outside the table
+    form.addEventListener('change', refresh);
     refresh();
 })();

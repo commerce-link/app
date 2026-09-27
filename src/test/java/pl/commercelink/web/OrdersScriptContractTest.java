@@ -341,6 +341,34 @@ class OrdersScriptContractTest {
     }
 
     @Test
+    void theItemsScriptGreysAnActionNoCheckedItemFitsWithItsSkippedReasonAndKeepsTheServersReason() throws Exception {
+        // given
+        String script = read("src/main/resources/static/js/order-items.js");
+
+        // then
+        assertThat(script).contains("button.setAttribute('aria-disabled', 'true')").contains("button.hasAttribute('data-cl-bulk-unavailable')")
+                .contains("button.getAttribute('data-skipped')").contains("reason && !unavailable")
+                .contains("form.addEventListener('change', refresh)").doesNotContain("button.disabled");
+    }
+
+    @Test
+    void theSelectionRowTakesTheHeadersPlaceWithoutMovingTheRows() throws Exception {
+        // given
+        String select = read("src/main/resources/static/js/table-select.js");
+        String css = css();
+
+        // then: the header collapses (column widths kept), the row takes the header's measured height and stays sticky
+        assertThat(select).contains("table.classList.toggle('has-selection', selected.length > 0)")
+                .contains("bar.style.setProperty('--cl-selection-head'").contains("replace('{k}', String(selected.length))")
+                .contains("replace('{n}', String(shown.length))").contains("function keepFocus(table)");
+        assertThat(rule(css, ".cl-page .cl-table.has-selection > thead")).contains("visibility: collapse;");
+        assertThat(rule(css, ".cl-page .cl-selection-row")).contains("position: sticky;")
+                .contains("top: calc(var(--cl-topbar-height) + 8px);").contains("min-height: var(--cl-selection-head, 40px);")
+                .contains("background: var(--cl-surface-2);");
+        assertThat(css).doesNotContain(".cl-selection-bar");
+    }
+
+    @Test
     void theScopeSuffixAppearsOnlyWhenSomeSelectedItemsDoNotFit() throws Exception {
         // given
         String script = read("src/main/resources/static/js/order-items.js");
