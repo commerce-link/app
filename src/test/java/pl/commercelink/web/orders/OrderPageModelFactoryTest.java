@@ -690,6 +690,16 @@ class OrderPageModelFactoryTest {
     }
 
     @Test
+    void aReadOnlyViewerIsNotToldWhichDocumentToIssueNext() {
+        // when
+        OrderPageModel.DocumentsCard superAdmin = factory.build(b2b(order(OrderStatus.New)), List.of(),
+                new OrderPageModelFactory.Viewer(true, false, null), PL).documents();
+
+        // then
+        assertThat(superAdmin.emptyKey()).isEqualTo("order.documents.empty");
+    }
+
+    @Test
     void aDocumentLinkWithAScriptSchemeIsShownAsText() {
         // given
         Order order = order(OrderStatus.New);

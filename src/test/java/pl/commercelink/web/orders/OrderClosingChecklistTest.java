@@ -79,6 +79,12 @@ class OrderClosingChecklistTest {
         return order;
     }
 
+    private static Order reviewNotApplicableOrder() {
+        Order order = settledOrder();
+        order.setReview(new OrderReview(OrderReviewStatus.NotApplicable));
+        return order;
+    }
+
     @Test
     void listsExactlyTheConditionsOfSettlingAndWhatIsMissing() {
         // when
@@ -120,7 +126,8 @@ class OrderClosingChecklistTest {
     @Test
     void allDoneEqualsOrderIsSettledForEveryFixture() {
         // given — the fixtures the test already builds: fresh, partly delivered, unpaid, invoiced, review pending
-        for (Order order : List.of(freshOrder(), partlyDeliveredOrder(), unpaidOrder(), settledOrder(), reviewPendingOrder())) {
+        for (Order order : List.of(freshOrder(), partlyDeliveredOrder(), unpaidOrder(), settledOrder(), reviewPendingOrder(),
+                reviewNotApplicableOrder())) {
             for (boolean goodsIssueRequired : new boolean[]{false, true}) {
                 // when
                 OrderClosingChecklist checklist = OrderClosingChecklist.of(order, goodsIssueRequired, messages(), PL);
@@ -229,6 +236,22 @@ class OrderClosingChecklistTest {
         OrderClosingChecklist.Item invoice = checklist.items().get(2);
         assertThat(invoice.state()).isEqualTo(OrderClosingChecklist.State.NOT_APPLICABLE);
         assertThat(invoice.text()).isEqualTo("Zamówienie zastępcze z reklamacji — bez faktury");
+        assertThat(checklist.allDone()).isTrue().isEqualTo(order.isSettled(false));
+    }
+
+    @Test
+    void aReviewMarkedNotApplicableIsNotApplicable() {
+        // given
+        Order order = settledOrder();
+        order.setReview(new OrderReview(OrderReviewStatus.NotApplicable));
+
+        // when
+        OrderClosingChecklist checklist = OrderClosingChecklist.of(order, false, messages(), PL);
+
+        // then
+        OrderClosingChecklist.Item review = checklist.items().get(checklist.items().size() - 1);
+        assertThat(review.state()).isEqualTo(OrderClosingChecklist.State.NOT_APPLICABLE);
+        assertThat(review.text()).isEqualTo("Opinia nie jest zbierana");
         assertThat(checklist.allDone()).isTrue().isEqualTo(order.isSettled(false));
     }
 }

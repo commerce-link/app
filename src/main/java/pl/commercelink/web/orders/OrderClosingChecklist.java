@@ -4,6 +4,7 @@ import org.springframework.context.MessageSource;
 import pl.commercelink.documents.Document;
 import pl.commercelink.documents.DocumentType;
 import pl.commercelink.orders.Order;
+import pl.commercelink.orders.OrderReviewStatus;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 
@@ -104,7 +105,9 @@ public record OrderClosingChecklist(List<Item> items) {
                     : Item.todo(text(messages, locale, "order.closing.goods.issue.todo"), "#dokumenty"));
         }
 
-        if (order.getReview() == null || order.getReview().getStatus() == null) {
+        if (order.getReview() == null || order.getReview().getStatus() == null
+                || order.getReview().getStatus() == OrderReviewStatus.NotApplicable) {
+            // a review marked "not applicable" does not concern the order, like one that is not collected at all
             items.add(Item.notApplicable(text(messages, locale, "order.closing.review.none")));
         } else if (!order.isAwaitingReview()) {
             items.add(Item.done(text(messages, locale, "order.closing.review.done",

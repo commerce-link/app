@@ -575,6 +575,29 @@ class OrderDetailsTemplateTest {
     }
 
     @Test
+    void aReviewMarkedNotApplicableIsADashNotATick() {
+        // given
+        Order order = order(OrderStatus.Assembly);
+        order.setReview(new OrderReview(OrderReviewStatus.NotApplicable));
+
+        // when
+        String html = page(render(order, ADMIN));
+
+        // then
+        String strip = html.substring(html.indexOf("class=\"cl-doc-marks is-sentences\""), html.indexOf("</ul>", html.indexOf("cl-doc-marks is-sentences")));
+        assertThat(strip).containsPattern("class=\"cl-doc-mark is-na\">\\s*<span class=\"cl-doc-mark-icon\" aria-hidden=\"true\">–</span>\\s*<span class=\"cl-visually-hidden\">Nie dotyczy:</span>\\s*<span>Opinia nie jest zbierana</span>");
+    }
+
+    @Test
+    void aSuperAdminIsNotToldWhichDocumentToIssueNext() {
+        // when
+        String html = page(render(b2bOrder(OrderStatus.New), SUPER_ADMIN));
+
+        // then
+        assertThat(html).doesNotContain("Następny do wystawienia").contains("Brak paragonu/faktury");
+    }
+
+    @Test
     void dropshipItemsGreyOutWarehouseMovesAndAddingItems() {
         // given (intent of DropshipTemplateTest#orderDetailsGreysOutWarehouseMoves… and …DisablesAddingItems…)
         Order order = order(OrderStatus.Assembly);

@@ -288,9 +288,9 @@ public class OrderPageModelFactory {
         List<OrderPageModel.DocumentRow> rows = order.getDocuments().stream().map(d -> documentRow(order, d, viewer, closed)).toList();
         List<DocumentType> issuable = order.getIssuableDocumentTypes();
         // a consumer receipt is never issued from here, it is typed in with "Add document"; the text says so.
-        // A closed order will not get another document, so it names none.
-        String emptyKey = closed || next == null ? "order.documents.empty"
-                : readOnly || issuable.contains(next) ? "order.documents.empty.next" : "order.documents.empty.next.manual";
+        // A closed order will not get another document and a read-only viewer cannot issue one, so neither names it.
+        String emptyKey = readOnly || next == null ? "order.documents.empty"
+                : issuable.contains(next) ? "order.documents.empty.next" : "order.documents.empty.next.manual";
         return new OrderPageModel.DocumentsCard(rows, emptyKey, !readOnly && addDocumentLockedKey(order, null) == null,
                 OrderLabels.Option.of(manual, OrderLabels::documentType), next,
                 next == null ? null : OrderLabels.documentType(next), OrderLabels.Option.of(issuable, OrderLabels::documentType),
