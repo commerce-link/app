@@ -374,6 +374,8 @@ class OrdersScriptContractTest {
         assertThat(rule(css, ".cl-page .cl-closing-title")).contains("font-size: 16px");
         assertThat(rule(css, ".cl-page .cl-closing")).contains("gap: 8px 20px");
         assertThat(rule(css, ".cl-page .cl-doc-marks.is-sentences")).contains("gap: 8px 16px");
+        // the "does not apply" mark stays readable on the strip: --cl-ink-3 there is 4.47:1, below AA
+        assertThat(rule(css, ".cl-page .cl-doc-marks.is-sentences .cl-doc-mark.is-na")).contains("var(--cl-ink-2)");
         // the uppercase label is .cl-eyebrow; the layout classes keep only their spacing
         for (String selector : List.of(".cl-page .cl-address-head", ".cl-page .cl-table tbody tr.cl-table-group > th",
                 ".cl-page .cl-item-add-basket-head")) {
