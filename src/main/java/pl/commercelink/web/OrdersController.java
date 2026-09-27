@@ -1083,7 +1083,7 @@ public class OrdersController extends BaseController {
             ordersManager.cancelOrder(getStoreId(), orderId);
             OrderFlash.saved(redirectAttributes, messageSource.getMessage("order.cancelled", null, locale));
         } catch (IllegalStateException e) {
-            redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage("error.message.order.cannot.be.cancelled", null, locale));
+            return refuse(redirectAttributes, orderId, "error.message.order.cannot.be.cancelled", locale);
         }
         return details(orderId);
     }

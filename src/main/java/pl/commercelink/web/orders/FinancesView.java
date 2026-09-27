@@ -6,7 +6,10 @@ import pl.commercelink.orders.OrderItem;
 
 import java.util.List;
 
-/** Totals of the order; cost and profit only for an admin, and then only in the model (never rendered for a user, not merely hidden by CSS). */
+/**
+ * Totals of the order; cost and profit only for an admin, and then only in the model (never rendered for a
+ * user, not merely hidden by CSS).
+ */
 public record FinancesView(String itemsValue, String servicesValue, String total, String paid, String unpaid,
                            boolean unpaidDue, AdminCosts costs) {
 

@@ -249,7 +249,8 @@ public class OrderPageModelFactory {
         boolean cancellable = order.firstShipmentWithShippingData()
                 .map(s -> s.getExternalId() != null && s.getDeliveredAt() == null).orElse(false);
         // an order can genuinely have zero shipments (not yet allocated); the dialog needs one blank row to edit,
-        // not an empty table that posts nothing on Save (an extra blank row next to existing ones would post an empty shipment)
+        // not an empty table that posts nothing on Save (an extra blank row next to existing ones would post
+        // an empty shipment)
         List<Shipment> editable = order.getShipments().isEmpty() ? List.of(new Shipment()) : order.getShipments();
         return new OrderPageModel.ShipmentsCard(rows,
                 !readOnly && order.canOrderShipment() && cancellable, OrderLabels.Option.of(ShipmentType.values(), OrderLabels::shipmentType),
