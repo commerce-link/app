@@ -925,6 +925,20 @@ class OrderDetailsTemplateTest {
     }
 
     @Test
+    void aDocumentLinkWithAScriptSchemeIsPrintedAsTextNotALink() {
+        // given
+        Order order = order(OrderStatus.Delivered);
+        order.addDocument(new Document("r1", "PAR/1", "javascript:alert(1)", DocumentType.Receipt));
+
+        // when
+        String html = page(render(order, ADMIN));
+
+        // then
+        assertThat(html).doesNotContain("href=\"javascript:");
+        assertThat(html).contains("<span>PAR/1</span>");
+    }
+
+    @Test
     void bothMoveTargetFieldsAcceptNoLongerANumberThanTheResolverLooksUp() {
         // when
         String html = page(render(order(OrderStatus.New), ADMIN));
