@@ -357,13 +357,16 @@ class OrdersScriptContractTest {
         String select = read("src/main/resources/static/js/table-select.js");
         String css = css();
 
-        // then: the header collapses (column widths kept), the row takes the header's measured height and stays sticky
+        // then: the header keeps its place with its contents hidden and the row lies over it — as tall as the measured
+        // header, pulling the table up by the same amount — the same in Chromium and WebKit (no visibility: collapse,
+        // which WebKit leaves as an empty gap); the row sticks flush under the top bar and follows the markup's order
         assertThat(select).contains("table.classList.toggle('has-selection', selected.length > 0)")
                 .contains("bar.style.setProperty('--cl-selection-head'").contains("replace('{k}', String(selected.length))")
                 .contains("replace('{n}', String(shown.length))").contains("function keepFocus(table)");
-        assertThat(rule(css, ".cl-page .cl-table.has-selection > thead")).contains("visibility: collapse;");
+        assertThat(rule(css, ".cl-page .cl-table.has-selection > thead")).contains("visibility: hidden;");
         assertThat(rule(css, ".cl-page .cl-selection-row")).contains("position: sticky;")
-                .contains("top: calc(var(--cl-topbar-height) + 8px);").contains("min-height: var(--cl-selection-head, 40px);")
+                .contains("top: var(--cl-topbar-height);").contains("min-height: var(--cl-selection-head, 40px);")
+                .contains("margin-bottom: calc(-1 * var(--cl-selection-head, 40px));")
                 .contains("background: var(--cl-surface-2);");
         assertThat(css).doesNotContain(".cl-selection-bar");
     }

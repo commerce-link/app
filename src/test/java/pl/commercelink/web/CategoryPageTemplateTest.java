@@ -338,6 +338,19 @@ class CategoryPageTemplateTest {
      * its text is often skipped. The bar keeps the visible count.
      */
     @Test
+    void theSelectionRowPutsClearAfterTheCountAndKeepsTheTrashIconOnRemove() {
+        // when
+        String html = rendered(false);
+        String row = html.substring(html.indexOf("<div class=\"cl-selection-row\""), html.indexOf("<table"));
+
+        // then: the markup's order is the order on screen and in Tab; "Remove" is a danger link with its icon
+        assertThat(row.indexOf("data-cl-selection-count")).isLessThan(row.indexOf("data-cl-select-clear"));
+        assertThat(row.indexOf("data-cl-select-clear")).isLessThan(row.indexOf("data-cl-select-action=\"enable\""));
+        assertThat(row).containsPattern("<button type=\"button\" class=\"cl-link-button is-danger cl-selection-remove\" "
+                + "data-cl-select-action=\"delete\"[^>]*>\\s*<span class=\"icon is-small\" aria-hidden=\"true\"><i class=\"fas fa-trash-alt\"></i></span>");
+    }
+
+    @Test
     void theSelectionIsAnnouncedFromAPermanentRegionOutsideTheBar() {
         // when
         String html = rendered(false);

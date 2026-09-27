@@ -1,6 +1,6 @@
 // Bulk actions of the order's items, in the selection row (the "Route to" and "Move" menus and "Remove"). table-select.js
 // keeps the checkboxes, the count and the row; this script labels an action with how many of the checked items it
-// applies to when not all of them fit ("To allocation (2 of 3)" — a row's data-<scope> flag is the server's own
+// applies to when some but not all of them fit ("To allocation (2 of 3)" — a row's data-<scope> flag is the server's own
 // predicate), greys an action none of them fits (aria-disabled, with its data-skipped text as the visible reason, as the
 // row menu names its reasons), asks in the page's dialog#cl-confirm-dialog (through table-select.js's shared
 // window.CL_confirmBulk) and posts form#order-items-form to the action's address. An action the server marked
@@ -60,8 +60,9 @@
             }
             var label = button.getAttribute('data-label');
             var text = button.querySelector('[data-cl-bulk-label]') || button;
-            // the "(k of n)" suffix only when some checked items do not fit; all of them fitting needs no count
-            text.textContent = rows.length === 0 || fits === rows.length ? label
+            // the "(k of n)" suffix only when some but not all checked items fit: all of them fitting needs no count,
+            // none fitting greys the action and its reason says why
+            text.textContent = rows.length === 0 || fits === 0 || fits === rows.length ? label
                 : template.replace('{label}', label).replace('{n}', String(fits)).replace('{m}', String(rows.length));
         });
     }

@@ -1,11 +1,12 @@
 // Row selection for a cl-table with bulk actions. table[data-cl-select-table] has a header checkbox [data-cl-select-all]
 // (checks the visible rows) and row checkboxes [data-cl-select-row][value]. The selection row [data-cl-selection-bar]
-// shows while anything is checked and stands in for the table header: the table gets .has-selection, whose CSS collapses
-// the thead, and the row takes the header's measured height (--cl-selection-head) so the rows below do not move. The
-// selection row carries a select-all box of its own [data-cl-select-all] in the header's place; the focus moves between
-// the two boxes as one of them disappears. [data-cl-selection-count][data-template="... {k} ... {n}"] says how many of
-// the visible rows are checked, buttons [data-cl-select-action=x] submit form[data-cl-select-form] with hidden inputs
-// name=action / name=productIds, [data-cl-select-clear] unchecks all.
+// shows while anything is checked and covers the table header: the table gets .has-selection, whose CSS hides the
+// header's contents while the header keeps its place, and the row, placed right before the table, takes the header's
+// measured height (--cl-selection-head) and pulls the table up under itself by the same amount, so nothing below moves.
+// The selection row carries a select-all box of its own [data-cl-select-all] in the header's place; the focus moves
+// between the two boxes as one of them disappears. [data-cl-selection-count][data-template="... {k} ... {n}"] says how
+// many of the visible rows are checked, buttons [data-cl-select-action=x] submit form[data-cl-select-form] with hidden
+// inputs name=action / name=productIds, [data-cl-select-clear] unchecks all.
 // A button with [data-cl-select-confirm-title] first opens the page's dialog#cl-confirm-dialog (fragments/confirm-dialog,
 // whose confirm-dialog.js closes it on Cancel) and submits on confirm; "{n}" in the title and the message becomes the
 // number of checked rows. Such a button does nothing at all when the page has no usable dialog -- an action worth
@@ -64,17 +65,15 @@
         return bar ? boxes.concat(Array.prototype.slice.call(bar.querySelectorAll('[data-cl-select-all]'))) : boxes;
     }
 
-    // The header's height, taken while the header shows, becomes the selection row's minimum height. Below 720 px the
-    // header is visually hidden (card mode) and measures next to nothing: the row then keeps its own height.
+    // The header's height (it keeps its place while hidden) becomes the selection row's height and the overlap the table
+    // is pulled up by. Below 720 px the header is visually hidden (card mode) and measures next to nothing: the row then
+    // stands above the cards at its own height.
     function measureHead(table, bar) {
         var head = table.tHead;
         if (!head || !bar) {
             return;
         }
-        var selecting = table.classList.contains('has-selection');
-        table.classList.remove('has-selection');
         var height = head.getBoundingClientRect().height;
-        table.classList.toggle('has-selection', selecting);
         if (height > 8) {
             bar.style.setProperty('--cl-selection-head', height + 'px');
         } else {

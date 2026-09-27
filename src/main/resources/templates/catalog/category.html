@@ -108,6 +108,8 @@
                     </label>
                     <span class="cl-selection-count" data-cl-selection-count
                           th:attr="data-template=#{catalog.products.selected('{k}', '{n}')}"></span>
+                    <button type="button" class="cl-link-button cl-selection-clear" data-cl-select-clear
+                            th:text="#{catalog.products.clear}"></button>
                     <div class="cl-selection-actions">
                         <button type="button" class="cl-button" data-cl-select-action="enable">
                             <span class="icon is-small" aria-hidden="true"><i class="fas fa-check"></i></span>
@@ -120,11 +122,11 @@
                         <button type="button" class="cl-link-button is-danger cl-selection-remove" data-cl-select-action="delete"
                                 th:attr="data-cl-select-confirm-title=#{catalog.products.bulk.delete.title('{n}')},
                                          data-cl-select-confirm-message=#{catalog.products.bulk.delete.message},
-                                         data-cl-select-confirm-action=#{catalog.products.bulk.delete}"
-                                th:text="#{catalog.products.bulk.delete}"></button>
+                                         data-cl-select-confirm-action=#{catalog.products.bulk.delete}">
+                            <span class="icon is-small" aria-hidden="true"><i class="fas fa-trash-alt"></i></span>
+                            <span th:text="#{catalog.products.bulk.delete}"></span>
+                        </button>
                     </div>
-                    <button type="button" class="cl-link-button cl-selection-clear" data-cl-select-clear
-                            th:text="#{catalog.products.clear}"></button>
                 </div>
 
                 <!--/* Only a manual category is selectable; the attribute needs a value, as Thymeleaf drops an empty one. */-->

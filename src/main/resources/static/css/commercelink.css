@@ -3367,24 +3367,26 @@ a.cl-link-button:hover {
 }
 
 /* --- Selection row: the actions on the checked rows of a cl-table, in the place of the table's header --- */
-/* While rows are checked table-select.js puts .has-selection on the table, which collapses its thead, and shows this row
-   directly above the table in the header's look (surface-2, 12.5 px, line borders). Its minimum height is the header's
-   own, measured by the script (--cl-selection-head), so the rows below stay where they are. visibility: collapse keeps
-   the column widths of the collapsed header (the columns do not move either) and takes its controls out of the tab order
-   and the accessibility tree while the row shows; with nothing checked the header is the ordinary one. Controls are
-   30 px tall so the row fits the header; below 1024 px the menu buttons reach 44 px through an invisible hit area and
-   the link buttons through a negative margin, as the row checkbox does. */
+/* While rows are checked table-select.js puts .has-selection on the table and shows this row directly before it, in the
+   header's look (surface-2, 12.5 px, line borders). From 720 px the header keeps its place with its contents hidden
+   (visibility: hidden also takes its controls out of the tab order and the accessibility tree while the row shows) and
+   the row lies exactly over it: the row is at least as tall as the header, measured by the script (--cl-selection-head),
+   and a negative bottom margin of the header's height pulls the table up under it. The rows and the columns below do not move, in
+   Chromium and WebKit alike (visibility: collapse on the thead was dropped: WebKit keeps the collapsed header's space).
+   With nothing checked the header is the ordinary one. The row sticks right under the top bar, with no gap for the
+   scrolled rows to show through. Controls are 30 px tall so the row fits the header; below 1024 px the menu buttons reach
+   44 px through an invisible hit area and the link buttons through a negative margin, as the row checkbox does. The
+   order of the controls is the order of the markup (count, "Clear", actions, "Remove"), so Tab follows the eye. */
 .cl-page .cl-selection-row {
     position: sticky;
-    top: calc(var(--cl-topbar-height) + 8px);
+    top: var(--cl-topbar-height);
     z-index: 5;
     box-sizing: border-box;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    column-gap: 16px;
+    column-gap: 10px;
     row-gap: 2px;
-    min-height: var(--cl-selection-head, 40px);
     padding: 0 20px;
     border-top: 1px solid var(--cl-line);
     border-bottom: 1px solid var(--cl-line);
@@ -3397,13 +3399,26 @@ a.cl-link-button:hover {
     display: none;
 }
 
+/* only the reason gives way when the row is short of room; the box, the count and "Clear" keep their size */
+.cl-page .cl-selection-row > :not(.cl-selection-actions) {
+    flex: none;
+}
+
 .cl-page .cl-table.has-selection > thead {
-    visibility: collapse;
+    visibility: hidden;
+}
+
+@media screen and (min-width: 720px) {
+    .cl-page .cl-selection-row {
+        flex-wrap: nowrap;
+        min-height: var(--cl-selection-head, 40px);
+        margin-bottom: calc(-1 * var(--cl-selection-head, 40px));
+    }
 }
 
 /* the count starts where the header text of the first column after the checkboxes does */
 .cl-page .cl-selection-count {
-    margin-left: 2px;
+    margin-left: 8px;
     font-size: 12.5px;
     font-weight: 600;
     color: var(--cl-ink-2);
@@ -3416,23 +3431,24 @@ a.cl-link-button:hover {
     flex: 1 1 auto;
     flex-wrap: wrap;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     min-width: 0;
 }
 
 .cl-page .cl-selection-row .cl-button {
     height: 30px;
-    padding: 0 10px;
-    gap: 6px;
+    padding: 0 8px;
+    gap: 4px;
     font-size: 13px;
 }
 
 .cl-page .cl-selection-row .cl-link-button {
     min-height: 30px;
     font-size: 13px;
+    white-space: nowrap;
 }
 
-/* the destructive action and "Clear" sit at the end of the row, away from the menus */
+/* the destructive action sits at the end of the row, away from the menus */
 .cl-page .cl-selection-remove {
     margin-left: auto;
 }
@@ -3443,17 +3459,30 @@ a.cl-link-button:hover {
     right: auto;
 }
 
-/* why "Remove" is greyed: a line of its own under the row's controls, ending under the button */
+/* why "Remove" is greyed: a short text right before it, on the row's own line. It fits in two lines from about 800 px;
+   on a narrower tablet a third line makes the row taller than the header, and only then the rows below move down by
+   the difference (the negative margin is the header's height, so the row never covers a table row). */
 .cl-page .cl-selection-reason {
-    flex: 1 1 100%;
-    margin: 0 0 6px;
-    font-size: 12.5px;
+    margin: 0 0 0 auto;
+    min-width: 0;
+    font-size: 12px;
+    line-height: 15px;
     color: var(--cl-ink-2);
     text-align: right;
 }
 
 .cl-page .cl-selection-reason[hidden] {
     display: none;
+}
+
+.cl-page .cl-selection-reason:not([hidden]) + .cl-selection-remove {
+    margin-left: 0;
+}
+
+@media screen and (min-width: 720px) {
+    .cl-page .cl-selection-actions {
+        flex-wrap: nowrap;
+    }
 }
 
 /* a link-style action that cannot run: greyed, still focusable, its reason in visible text next to it */
@@ -4166,9 +4195,10 @@ a.cl-link-button:hover {
 
 /* --- Catalog: phone layout for the selection bar, selectable rows and the stacked toolbar --- */
 @media screen and (max-width: 719px) {
-    /* card mode: no header to stand in for; the row stands above the cards in two lines, the count and "Clear" first,
-       then the menus and "Remove", every control 44 px tall. The menus open from the row's start (the sticky row is
-       their containing block), so the list never reaches past the right edge of a narrow screen. */
+    /* card mode: no header to cover; the row stands above the cards in two lines, the markup's order: the count and
+       "Clear" (pushed to the end of the first line), then the menus, the reason and "Remove", every control 44 px tall.
+       The menus open from the row's start (the sticky row is their containing block), so the list never reaches past
+       the right edge of a narrow screen. */
     .cl-page .cl-selection-row {
         padding: 0 16px;
         column-gap: 12px;
@@ -4190,19 +4220,12 @@ a.cl-link-button:hover {
     }
 
     .cl-page .cl-selection-clear {
-        order: 1;
         margin-left: auto;
     }
 
     .cl-page .cl-selection-actions {
-        order: 2;
         flex-basis: 100%;
         padding-bottom: 8px;
-    }
-
-    .cl-page .cl-selection-reason {
-        order: 3;
-        text-align: left;
     }
 
     .cl-page .cl-selection-row .cl-button {

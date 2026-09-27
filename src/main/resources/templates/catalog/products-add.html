@@ -70,14 +70,14 @@
                         </label>
                         <span class="cl-selection-count" data-cl-selection-count
                               th:attr="data-template=#{catalog.products.selected('{k}', '{n}')}"></span>
+                        <button type="button" class="cl-link-button cl-selection-clear" data-cl-select-clear
+                                th:text="#{catalog.products.clear}"></button>
                         <div class="cl-selection-actions">
                             <button type="submit" form="add-products-form" class="cl-button is-primary">
                                 <span class="icon is-small" aria-hidden="true"><i class="fas fa-plus"></i></span>
                                 <span th:text="#{catalog.products.add.selected}"></span>
                             </button>
                         </div>
-                        <button type="button" class="cl-link-button cl-selection-clear" data-cl-select-clear
-                                th:text="#{catalog.products.clear}"></button>
                     </div>
 
                     <form id="add-products-form" method="post" th:action="@{${reviewAction}}">

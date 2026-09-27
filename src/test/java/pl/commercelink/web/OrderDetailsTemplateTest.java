@@ -237,8 +237,8 @@ class OrderDetailsTemplateTest {
         java.util.regex.Matcher menus = Pattern.compile("<(\\w+)[^>]*class=\"cl-menu\"").matcher(html);
         // the selection row's menus are left out of the fallback check: the row is hidden until table-select.js shows
         // it, and without JavaScript the <noscript> block under the table offers the same actions
-        String withoutSelectionRow = html.substring(0, html.indexOf("data-cl-selection-bar"))
-                + html.substring(html.indexOf("data-cl-select-clear"));
+        int rowStart = html.indexOf("data-cl-selection-bar");
+        String withoutSelectionRow = html.substring(0, rowStart) + html.substring(html.indexOf("<table", rowStart));
         int count = 0;
         while (menus.find()) {
             assertThat(menus.group(1)).as(menus.group()).isEqualTo("details");
@@ -1230,15 +1230,18 @@ class OrderDetailsTemplateTest {
         String row = html.substring(html.indexOf("data-cl-selection-bar"), html.indexOf("</form>"));
         row = row.substring(0, row.indexOf("<table"));
 
-        // then: every greyed entry names its reason as text inside it, as the row menu does; "Remove" points to its own
+        // then: every greyed entry names its reason as text inside it, as the row menu does; "Remove" points to a short
+        // form of the same reason right before it, which fits the row's one line
+        String shortReason = ResourceBundle.getBundle("messages", PL).getString("order.items.action.dropship.locked.short");
         assertThat(row).containsPattern("data-cl-bulk-action=\"[^\"]*moveSelectedItemsToAllocation\"[^>]*aria-disabled=\"true\"[^>]*>"
                         + "\\s*<span data-cl-bulk-label>Do alokacji</span>\\s*<span class=\"cl-menu-reason\" data-cl-bulk-reason>"
                         + Pattern.quote(reason) + "</span>")
+                .containsPattern("<span class=\"cl-help cl-selection-reason\" id=\"bulk-remove-reason\">"
+                        + Pattern.quote(shortReason) + "</span>\\s*<button[^>]*class=\"cl-link-button is-danger cl-selection-remove\"")
                 .containsPattern("data-cl-bulk-action=\"[^\"]*removeSelectedItemsFromOrder\"[^>]*aria-describedby=\"bulk-remove-reason\"")
-                .containsPattern("<p class=\"cl-selection-reason\"\\s+id=\"bulk-remove-reason\">" + Pattern.quote(reason) + "</p>")
                 .doesNotContainPattern("\\stitle=").doesNotContain("cl-visually-hidden").doesNotContain("cl-help is-note");
-        // three routing entries and "Remove"
-        assertThat(occurrences(row, reason)).isEqualTo(4);
+        // the three routing entries
+        assertThat(occurrences(row, reason)).isEqualTo(3);
     }
 
     @Test
@@ -1250,7 +1253,8 @@ class OrderDetailsTemplateTest {
         assertThat(html).containsPattern("data-cl-bulk-action=\"[^\"]*moveSelectedItemsToAllocation\"[^>]*"
                         + "data-skipped=\"Pominięte pozycje nie mają kompletu danych alokacji albo nie są nowe.\"")
                 .containsPattern("<span class=\"cl-menu-reason\" data-cl-bulk-reason hidden=\"hidden\"></span>")
-                .containsPattern("<p class=\"cl-selection-reason\"\\s+id=\"bulk-remove-reason\" hidden=\"hidden\"></p>")
+                .contains("<span class=\"cl-help cl-selection-reason\" id=\"bulk-remove-reason\" hidden=\"hidden\"></span>")
+                .containsPattern("removeSelectedItemsFromOrder\"[^>]*data-skipped=\"Tylko nowe i usługi\"")
                 .doesNotContainPattern("data-cl-bulk-action=\"[^\"]*moveSelectedItemsToAllocation\"[^>]*aria-disabled");
     }
 
@@ -1260,14 +1264,14 @@ class OrderDetailsTemplateTest {
         String html = page(render(order(OrderStatus.New), ADMIN));
         String row = html.substring(html.indexOf("<div class=\"cl-selection-row\""), html.indexOf("<table"));
 
-        // then: left to right — select-all, "k of n", "Route to", "Move", then "Remove" and "Clear" at the end
+        // then: left to right, which is also the tab order — select-all, "k of n", "Clear", "Route to", "Move", "Remove"
         assertThat(html).contains("<div class=\"cl-selection-row\" data-cl-selection-bar hidden>");
         assertThat(row).containsPattern("<label class=\"cl-check-target\"><input class=\"cl-check-input\" type=\"checkbox\" "
                         + "data-cl-select-all\\s+aria-label=\"Zaznacz wszystkie pozycje\">")
                 .contains("data-template=\"Zaznaczono {k} z {n}\"");
-        List<String> sequence = List.of("data-cl-select-all", "data-cl-selection-count", "<span>Skieruj</span>", "Do alokacji",
-                "Do magazynu", "Do magazynu (RMA)", "<span>Przenieś</span>", "Do nowego zamówienia", "Do istniejącego…",
-                "cl-link-button is-danger cl-selection-remove", "data-cl-select-clear");
+        List<String> sequence = List.of("data-cl-select-all", "data-cl-selection-count", "data-cl-select-clear",
+                "<span>Skieruj</span>", "Do alokacji", "Do magazynu", "Do magazynu (RMA)", "<span>Przenieś</span>",
+                "Do nowego zamówienia", "Do istniejącego…", "cl-link-button is-danger cl-selection-remove");
         int at = -1;
         for (String part : sequence) {
             int next = row.indexOf(part, at + 1);
