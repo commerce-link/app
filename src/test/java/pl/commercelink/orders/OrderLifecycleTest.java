@@ -32,6 +32,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -147,6 +148,42 @@ class OrderLifecycleTest {
         assertEquals(OrderStatus.Cancelled, order.getStatus());
         verify(orderLifecycleEventPublisher).publish(order, OrderLifecycleEventType.OrderCancelled);
         verifyNoMoreInteractions(orderLifecycleEventPublisher);
+    }
+
+    @Test
+    void aDeliveredOrderWithoutItemsIsNotCancelled() {
+        // given
+        Order order = spy(new Order("store-1"));
+        order.setStatus(OrderStatus.Delivered);
+        doReturn(false).when(order).isAwaitingInvoiceGeneration();
+        doReturn(false).when(order).isAwaitingDocumentsGeneration(anyBoolean());
+        doReturn(false).when(order).isSettled(anyBoolean());
+
+        // when
+        orderLifecycle.update(order, List.of());
+
+        // then
+        assertThat(order.getStatus()).isNotEqualTo(OrderStatus.Cancelled);
+        verify(orderLifecycleEventPublisher, never()).publish(order, OrderLifecycleEventType.OrderCancelled);
+    }
+
+    @Test
+    void anOrderWithoutAReviewIsCancelledAfterAFullReturnWithoutFailing() {
+        // given
+        Order order = spy(new Order("store-1"));
+        order.setStatus(OrderStatus.Delivered);
+        order.setReview(null);
+        doReturn(false).when(order).isAwaitingInvoiceGeneration();
+        doReturn(false).when(order).isAwaitingDocumentsGeneration(anyBoolean());
+        doReturn(false).when(order).isSettled(anyBoolean());
+        OrderItem item = mock(OrderItem.class);
+        when(item.isReturned()).thenReturn(true);
+
+        // when
+        orderLifecycle.update(order, List.of(item));
+
+        // then
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.Cancelled);
     }
 
     @Test

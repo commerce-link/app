@@ -385,4 +385,19 @@ class OrderTest {
         order.setShipments(List.of(labelled));
         assertThat(order.canOperatorChangeShippingAddress()).isFalse();
     }
+
+    @Test
+    void aLegacyOrderWithoutAddressesSplitsWithoutFailing() {
+        // given
+        Order order = new Order("s");
+        order.setBillingDetails(null);
+        order.setShippingDetails(null);
+
+        // when
+        Order split = order.createSplit();
+
+        // then
+        assertThat(split.getBillingDetails()).isNull();
+        assertThat(split.getShippingDetails()).isNull();
+    }
 }

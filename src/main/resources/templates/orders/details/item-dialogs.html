@@ -197,7 +197,7 @@
                 <!--/* Starts disabled so it is not a successful control of #order-items-form until the script that
                        can open this dialog runs; items.html's <noscript> fallback is the only targetOrderId field a
                        browser without JavaScript ever submits, so exactly one reaches the server either way. */-->
-                <input class="cl-input" id="move-target" name="targetOrderId" type="text" form="order-items-form" autocomplete="off"
+                <input class="cl-input" id="move-target" name="targetOrderId" type="text" form="order-items-form" autocomplete="off" maxlength="64"
                        aria-describedby="move-target-help" data-cl-move-target disabled>
                 <p class="cl-help" id="move-target-help" th:text="#{order.move.help}"></p>
             </div>

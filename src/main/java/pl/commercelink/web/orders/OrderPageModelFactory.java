@@ -236,7 +236,7 @@ public class OrderPageModelFactory {
         boolean canOrderShipment = !order.getStatus().isOneOf(OrderStatus.New, OrderStatus.Blocked, OrderStatus.Assembly);
         List<OrderPageModel.ShipmentRow> rows = order.getShipments().stream()
                 .map(s -> new OrderPageModel.ShipmentRow(OrderLabels.shipmentType(s.getType()), s.getCarrier(),
-                        s.getTrackingNo(), s.getTrackingUrl(), s.getCollectionPointCode(),
+                        s.getTrackingNo(), safeTrackingUrl(s.getTrackingUrl()), s.getCollectionPointCode(),
                         OrderFormats.dateTime(s.getShippedAt()), OrderFormats.dateTime(s.getDeliveredAt()),
                         order.hasTrackedShipments() ? OrderLabels.tracking(s.getTrackingSubscriptionStatus()) : null))
                 .toList();
@@ -253,16 +253,44 @@ public class OrderPageModelFactory {
 
     private OrderPageModel.DocumentsCard documents(Order order, Viewer viewer, boolean closed, boolean readOnly,
                                                    boolean goodsIssue) {
-        List<DocumentType> manual = order.isB2B()
-                ? List.of(DocumentType.InvoiceVat, DocumentType.InvoiceAdvance, DocumentType.InvoiceFinal)
-                : List.of(DocumentType.Receipt, DocumentType.InvoicePersonal);
+        List<DocumentType> manual = manualDocumentTypes(order);
         DocumentType next = order.getNextDocumentToIssue().orElse(null);
         List<OrderPageModel.DocumentRow> rows = order.getDocuments().stream().map(d -> documentRow(order, d, viewer, closed)).toList();
         List<DocumentType> issuable = order.getIssuableDocumentTypes();
-        return new OrderPageModel.DocumentsCard(rows, !readOnly && next != null && manual.contains(next),
+        return new OrderPageModel.DocumentsCard(rows, !readOnly && addDocumentLockedKey(order, null) == null,
                 OrderLabels.Option.of(manual, OrderLabels::documentType), next,
                 next == null ? null : OrderLabels.documentType(next), OrderLabels.Option.of(issuable, OrderLabels::documentType),
                 !readOnly && goodsIssue, !readOnly && (goodsIssue || !issuable.isEmpty()), OrderFormats.isoDate(LocalDate.now()));
+    }
+
+    /** The documents an operator may add by hand: B2B invoices, or a receipt / personal invoice for a consumer. */
+    public static List<DocumentType> manualDocumentTypes(Order order) {
+        return order.isB2B()
+                ? List.of(DocumentType.InvoiceVat, DocumentType.InvoiceAdvance, DocumentType.InvoiceFinal)
+                : List.of(DocumentType.Receipt, DocumentType.InvoicePersonal);
+    }
+
+    /** Why a document cannot be added by hand (null when it can): the card hides "Add document" for the same reasons. */
+    public static String addDocumentLockedKey(Order order, DocumentType posted) {
+        if (order.hasOneOfStatuses(OrderStatus.Completed, OrderStatus.Cancelled)) {
+            return "order.documents.add.locked.closed";
+        }
+        List<DocumentType> manual = manualDocumentTypes(order);
+        DocumentType next = order.getNextDocumentToIssue().orElse(null);
+        if (next == null || !manual.contains(next) || (posted != null && !manual.contains(posted))) {
+            return "order.documents.add.locked";
+        }
+        return null;
+    }
+
+    /** A tracking link is typed by any store user and shown to every other: only a web address becomes a link. */
+    static String safeTrackingUrl(String url) {
+        String trimmed = StringUtils.trimToNull(url);
+        if (trimmed == null) {
+            return null;
+        }
+        String lower = trimmed.toLowerCase(Locale.ROOT);
+        return lower.startsWith("https://") || lower.startsWith("http://") ? trimmed : null;
     }
 
     private OrderPageModel.DocumentRow documentRow(Order order, Document document, Viewer viewer, boolean closed) {

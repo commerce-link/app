@@ -1,12 +1,14 @@
 package pl.commercelink.web;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.orders.*;
 import pl.commercelink.shipping.AbstractShippingController;
@@ -41,7 +43,7 @@ public class OrdersShippingController extends AbstractShippingController {
     @GetMapping("")
     public String initiate(@PathVariable("orderId") String orderId, Model model,
                            RedirectAttributes redirectAttributes, Locale locale) {
-        Order order = ordersRepository.findById(getStoreId(), orderId);
+        Order order = requireOrder(orderId);
         if (!order.hasShipmentWithoutShippingData()) {
             redirectAttributes.addFlashAttribute("errorMessage",
                     messageSource.getMessage("shipping.error.all.defined", null, locale));
@@ -53,7 +55,7 @@ public class OrdersShippingController extends AbstractShippingController {
 
     @Override
     protected String renderShippingForm(Store store, ShippingForm form, List<ShippingDetails> shippingDetailsList, Model model) {
-        Order order = ordersRepository.findById(getStoreId(), form.getShippingEntityId());
+        Order order = requireOrder(form.getShippingEntityId());
         if (order.isCourierBookingEarlierThanPreferred(LocalDate.now())) {
             model.addAttribute("preferredShippingWarning", order.getPreferredShippingAt());
         }
@@ -62,19 +64,19 @@ public class OrdersShippingController extends AbstractShippingController {
 
     @Override
     protected double calculateShippingInsurance(ShippingForm form) {
-        Order order = ordersRepository.findById(getStoreId(), form.getShippingEntityId());
+        Order order = requireOrder(form.getShippingEntityId());
         return order.getTotalPrice();
     }
 
     @Override
     protected List<ShippingDetails> retrieveShippingDetailsList(ShippingForm form) {
-        Order order = ordersRepository.findById(getStoreId(), form.getShippingEntityId());
+        Order order = requireOrder(form.getShippingEntityId());
         return Collections.singletonList(order.getShippingDetails());
     }
 
     @Override
     protected DeliveryTarget resolveDeliveryTarget(ShippingForm form) {
-        Order order = ordersRepository.findById(getStoreId(), form.getShippingEntityId());
+        Order order = requireOrder(form.getShippingEntityId());
         String shippingProvider = getStore().getConfigurationValue(IntegrationType.SHIPPING_PROVIDER);
         return order.firstShipment()
                 .map(shipment -> new DeliveryTarget(shippingProvider, shipment.getCarrier(),
@@ -84,12 +86,20 @@ public class OrdersShippingController extends AbstractShippingController {
 
     @Override
     protected void onShippingCreated(ShippingForm form, List<Shipment> shipments) {
-        Order order = ordersRepository.findById(getStoreId(), form.getShippingEntityId());
+        Order order = requireOrder(form.getShippingEntityId());
 
         order.replaceShipments(shipments);
         shipmentTrackingSubscriber.subscribe(getStoreId(), order);
 
         orderLifecycle.update(order);
         orderLifecycleEventPublisher.publish(order, OrderLifecycleEventType.ShipmentCreated);
+    }
+
+    private Order requireOrder(String orderId) {
+        Order order = ordersRepository.findById(getStoreId(), orderId);
+        if (order == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+        return order;
     }
 }

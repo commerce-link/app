@@ -362,8 +362,8 @@ public class Order {
     @DynamoDBIgnore
     public Order createSplit() {
         Order copy = new Order(this.storeId);
-        copy.setBillingDetails(this.billingDetails.copy());
-        copy.setShippingDetails(this.shippingDetails.copy());
+        copy.setBillingDetails(this.billingDetails == null ? null : this.billingDetails.copy());
+        copy.setShippingDetails(this.shippingDetails == null ? null : this.shippingDetails.copy());
         copy.setFulfilmentType(this.fulfilmentType);
         copy.setSource(this.source);
         copy.setAffiliateId(this.affiliateId);

@@ -503,8 +503,13 @@ public class OrdersController extends BaseController {
 
     @GetMapping("/dashboard/orders/{orderId}/status")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String statusPage(@PathVariable String orderId, Model model, Locale locale) {
+    public String statusPage(@PathVariable String orderId, Model model, RedirectAttributes redirectAttributes,
+                             Locale locale) {
         Order order = requireOrder(ordersRepository, getStoreId(), orderId);
+        if (order.hasOneOfStatuses(OrderStatus.Completed, OrderStatus.Cancelled)) {
+            redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage("order.status.error.closed", null, locale));
+            return "redirect:/dashboard/orders/" + orderId;
+        }
         model.addAttribute("statusOptions", OrderStatusOptions.of(order));
         model.addAttribute("orderId", orderId);
         model.addAttribute("shortId", order.getShortenedOrderId());
@@ -551,8 +556,13 @@ public class OrdersController extends BaseController {
     /** The settings dialog as its own page, for a browser without JavaScript. */
     @GetMapping("/dashboard/orders/{orderId}/settings")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String settingsPage(@PathVariable String orderId, Model model, Locale locale) {
+    public String settingsPage(@PathVariable String orderId, Model model, RedirectAttributes redirectAttributes,
+                               Locale locale) {
         Order order = requireOrder(ordersRepository, getStoreId(), orderId);
+        if (order.hasOneOfStatuses(OrderStatus.Completed, OrderStatus.Cancelled)) {
+            redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage("order.settings.error.closed", null, locale));
+            return "redirect:/dashboard/orders/" + orderId;
+        }
         List<OrderItem> items = orderItemsRepository.findByOrderId(orderId);
         model.addAttribute("settings", pageModelFactory.settings(order, items, false));
         model.addAttribute("orderId", orderId);
@@ -573,8 +583,11 @@ public class OrdersController extends BaseController {
         FulfilmentType requestedFulfilmentType = updatedOrder.getFulfilmentType();
         boolean fulfilmentTypeChanged = requestedFulfilmentType != null
                 && requestedFulfilmentType != existingOrder.getFulfilmentType();
-        if (fulfilmentTypeChanged && !existingOrder.canChangeFulfilmentType(items)) {
-            String error = messageSource.getMessage("order.fulfilment.type.locked", null, locale);
+        String refusal = existingOrder.hasOneOfStatuses(OrderStatus.Completed, OrderStatus.Cancelled) ? "order.settings.error.closed"
+                : fulfilmentTypeChanged && !existingOrder.canChangeFulfilmentType(items) ? "order.fulfilment.type.locked"
+                : null;
+        if (refusal != null) {
+            String error = messageSource.getMessage(refusal, null, locale);
             if (async) {
                 response.setStatus(HttpStatus.UNPROCESSABLE_ENTITY.value());
                 return settingsFragment(existingOrder, items, model, error, null);
@@ -678,14 +691,14 @@ public class OrdersController extends BaseController {
     @GetMapping("/dashboard/orders/{orderId}/collection")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String getOrderCollectionProtocol(@PathVariable("orderId") String orderId, Model model) {
-        Order order = ordersRepository.findById(getStoreId(), orderId);
+        Order order = requireOrder(ordersRepository, getStoreId(), orderId);
         return renderOrderCollectionProtocol(order, model);
     }
 
     @GetMapping("/dashboard/store/{storeId}/orders/{orderId}/collection")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     public String getOrderCollectionProtocolForSuperAdmin(@PathVariable("storeId") String storeId, @PathVariable("orderId") String orderId, Model model) {
-        Order order = ordersRepository.findById(storeId, orderId);
+        Order order = requireOrder(ordersRepository, storeId, orderId);
         return renderOrderCollectionProtocol(order, model);
     }
 
@@ -705,7 +718,7 @@ public class OrdersController extends BaseController {
     @GetMapping("/dashboard/orders/{orderId}/card")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String getOrderCard(@PathVariable("orderId") String orderId, Model model) {
-        model.addAttribute("order", ordersRepository.findById(getStoreId(), orderId));
+        model.addAttribute("order", requireOrder(ordersRepository, getStoreId(), orderId));
         model.addAttribute("orderItems", orderItemsRepository.findByOrderId(orderId));
 
         return "orderCard";
@@ -714,7 +727,7 @@ public class OrdersController extends BaseController {
     @GetMapping("/dashboard/store/{storeId}/orders/{orderId}/card")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     public String getOrderCardForSuperAdmin(@PathVariable("storeId") String storeId, @PathVariable("orderId") String orderId, Model model) {
-        model.addAttribute("order", ordersRepository.findById(storeId, orderId));
+        model.addAttribute("order", requireOrder(ordersRepository, storeId, orderId));
         model.addAttribute("orderItems", orderItemsRepository.findByOrderId(orderId));
 
         return "orderCard";
@@ -792,15 +805,15 @@ public class OrdersController extends BaseController {
     @GetMapping("/dashboard/orders/{orderId}/items/{itemId}")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String getOrderItem(@PathVariable String orderId, @PathVariable String itemId, Model model) {
-        Order order = ordersRepository.findById(getStoreId(), orderId);
-        OrderItem orderItem = orderItemsRepository.findById(orderId, itemId);
+        Order order = requireOrder(ordersRepository, getStoreId(), orderId);
+        OrderItem orderItem = requireItem(orderId, itemId);
         return showOrderItemDetails(order, orderItem, model);
     }
 
     @PostMapping("/dashboard/orders/{orderId}/items/{itemId}/save")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String saveOrderItem(@PathVariable String orderId, @PathVariable String itemId, @ModelAttribute OrderItem updatedItem, Model model) {
-        Order order = ordersRepository.findById(getStoreId(), orderId);
+        Order order = requireOrder(ordersRepository, getStoreId(), orderId);
         List<OrderItem> orderItems = orderItemsRepository.findByOrderId(orderId);
 
         Optional<OrderItem> op = orderItems.stream()
@@ -1007,6 +1020,8 @@ public class OrdersController extends BaseController {
     public String assignFromWarehouse(@PathVariable String orderId, @RequestParam String itemId,
                                       @RequestParam String warehouseItemId,
                                       RedirectAttributes redirectAttributes, Locale locale) {
+        requireOrder(ordersRepository, getStoreId(), orderId);
+        requireItem(orderId, itemId);
         try {
             ordersManager.assignFromWarehouse(getStoreId(), orderId, itemId, warehouseItemId);
         } catch (IllegalStateException e) {
@@ -1020,6 +1035,8 @@ public class OrdersController extends BaseController {
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String splitGroupItem(@PathVariable String orderId, @ModelAttribute SplitGroupForm form,
                                  RedirectAttributes redirectAttributes, Locale locale) {
+        requireOrder(ordersRepository, getStoreId(), orderId);
+        requireItem(orderId, form.getItemId());
         try {
             ordersManager.splitGroupItem(orderId, form.getItemId(), form.toComponents());
         } catch (IllegalStateException e) {
@@ -1062,6 +1079,7 @@ public class OrdersController extends BaseController {
     @PostMapping("/dashboard/orders/{orderId}/delete")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String deleteOrder(@PathVariable String orderId) {
+        requireOrder(ordersRepository, getStoreId(), orderId);
         ordersManager.deleteOrder(getStoreId(), orderId);
         return "redirect:/dashboard/orders";
     }
@@ -1069,6 +1087,7 @@ public class OrdersController extends BaseController {
     @PostMapping("/dashboard/orders/{orderId}/cancel")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String cancelOrder(@PathVariable String orderId, RedirectAttributes redirectAttributes, Locale locale) {
+        requireOrder(ordersRepository, getStoreId(), orderId);
         try {
             ordersManager.cancelOrder(getStoreId(), orderId);
             OrderFlash.saved(redirectAttributes, messageSource.getMessage("order.cancelled", null, locale));
@@ -1113,6 +1132,7 @@ public class OrdersController extends BaseController {
     /** A complete action says how many items changed; a partial one warns and says why the rest was left. */
     private String bulk(BulkAction action, String orderId, OrderItemsForm form, RedirectAttributes redirectAttributes,
                         Locale locale, Function<List<String>, OrdersManager.Result> run) {
+        requireOrder(ordersRepository, getStoreId(), orderId);
         List<String> selected = form.getSelectedOrderItemIds();
         if (selected.isEmpty()) {
             redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage("order.bulk.none.selected", null, locale));
@@ -1132,6 +1152,7 @@ public class OrdersController extends BaseController {
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String splitOrder(@PathVariable String orderId, @ModelAttribute OrderItemsForm form,
                              RedirectAttributes redirectAttributes, Locale locale) {
+        requireOrder(ordersRepository, getStoreId(), orderId);
         try {
             Order newOrder = ordersManager.splitOrder(getStoreId(), orderId, form.getSelectedOrderItemIds());
             OrderFlash.saved(redirectAttributes, messageSource.getMessage("order.bulk.split.done",
@@ -1149,6 +1170,7 @@ public class OrdersController extends BaseController {
     public String moveItemsToOrder(@PathVariable String orderId, @ModelAttribute OrderItemsForm form,
                                    @RequestParam(required = false) String targetOrderId,
                                    RedirectAttributes redirectAttributes, Locale locale) {
+        requireOrder(ordersRepository, getStoreId(), orderId);
         List<String> selected = form.getSelectedOrderItemIds();
         String refusal = selected.isEmpty() ? "order.bulk.none.selected" : null;
         OrderReferenceResolver.Resolution resolution = refusal != null ? null
@@ -1182,6 +1204,7 @@ public class OrdersController extends BaseController {
     @ResponseBody
     public ResponseEntity<MoveTargetView> moveTarget(@PathVariable String orderId, @RequestParam(required = false) String q,
                                                      Locale locale) {
+        requireOrder(ordersRepository, getStoreId(), orderId);
         OrderReferenceResolver.Resolution resolution = orderReferenceResolver.resolve(getStoreId(), q);
         if (resolution.outcome() == OrderReferenceResolver.Outcome.AMBIGUOUS) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(MoveTargetView.ambiguous(
@@ -1195,8 +1218,10 @@ public class OrdersController extends BaseController {
                 : target.canBeSplit() ? null : messageSource.getMessage("order.move.target.locked", null, locale);
         // the amount leaves the server fully formatted, so the dialog script only prints it
         String amount = messageSource.getMessage("general.currency.amount", new Object[]{Money.format(target.getTotalPrice())}, locale);
+        String status = target.getStatus() == null ? null
+                : messageSource.getMessage(OrderLabels.status(target.getStatus()), null, locale);
         return ResponseEntity.ok(MoveTargetView.of(target, orderItemsRepository.findByOrderId(target.getOrderId()).size(),
-                messageSource.getMessage(OrderLabels.status(target.getStatus()), null, locale), amount, reason));
+                status, amount, reason));
     }
 
     @PostMapping("/dashboard/orders/{orderId}/updateSerialNumbers")
@@ -1221,8 +1246,16 @@ public class OrdersController extends BaseController {
 
     @GetMapping("/dashboard/orders/{orderId}/address")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String showAddressDetails(@PathVariable String orderId, @RequestParam String type, Model model) {
-        Order order = ordersRepository.findById(getStoreId(), orderId);
+    public String showAddressDetails(@PathVariable String orderId, @RequestParam String type, Model model,
+                                     RedirectAttributes redirectAttributes, Locale locale) {
+        Order order = requireOrder(ordersRepository, getStoreId(), orderId);
+        // the customer card hides "Edit" for the same reasons; a typed address must not reach a form that cannot be saved
+        String locked = order.hasOneOfStatuses(OrderStatus.Completed, OrderStatus.Cancelled) ? "order.address.error.closed"
+                : CustomerView.lockedKey(order, "billing".equals(type));
+        if (locked != null) {
+            redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage(locked, null, locale));
+            return "redirect:/dashboard/orders/" + orderId;
+        }
         model.addAttribute("order", order);
         model.addAttribute("type", type);
         return "orderAddressDetails";
@@ -1231,7 +1264,11 @@ public class OrdersController extends BaseController {
     @PostMapping("/dashboard/orders/{orderId}/updateAddressDetails")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String updateAddressDetails(@PathVariable String orderId, @RequestParam String type, @ModelAttribute("order") Order updatedOrder, RedirectAttributes redirectAttributes, Locale locale) {
-        Order existingOrder = ordersRepository.findById(getStoreId(), orderId);
+        Order existingOrder = requireOrder(ordersRepository, getStoreId(), orderId);
+        if (existingOrder.hasOneOfStatuses(OrderStatus.Completed, OrderStatus.Cancelled)) {
+            redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage("order.address.error.closed", null, locale));
+            return "redirect:/dashboard/orders/" + orderId;
+        }
         // once a label exists (or the parcel is on its way) the address is fixed; the page greys the edit link with the same reason
         if ("shipping".equals(type) && !existingOrder.canOperatorChangeShippingAddress()) {
             redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage(CustomerView.lockedKey(existingOrder, false), null, locale));
@@ -1393,6 +1430,11 @@ public class OrdersController extends BaseController {
     public String addReceipt(@PathVariable String orderId, @ModelAttribute Document document,
                              RedirectAttributes redirectAttributes, Locale locale) {
         Order order = requireOrder(ordersRepository, getStoreId(), orderId);
+        String locked = OrderPageModelFactory.addDocumentLockedKey(order, document.getType());
+        if (locked != null) {
+            redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage(locked, null, locale));
+            return "redirect:/dashboard/orders/" + orderId;
+        }
         // the dialog marks the number as required; a blank one would add a row nobody can unpin (removal matches on it)
         if (StringUtils.isBlank(document.getNumber()) || document.getType() == null) {
             redirectAttributes.addFlashAttribute("errorMessage",

@@ -765,6 +765,33 @@ class OrderDetailsTemplateTest {
     }
 
     @Test
+    void aTrackingLinkWithAScriptSchemeIsPrintedAsTextNotALink() {
+        // given
+        Order order = order(OrderStatus.Shipping);
+        Shipment parcel = order.getShipments().get(0);
+        parcel.setCarrier("DPD");
+        parcel.setTrackingNo("T-1");
+        parcel.setTrackingUrl("javascript:alert(1)");
+
+        // when
+        String html = page(render(order, ADMIN));
+
+        // then
+        assertThat(html).doesNotContain("href=\"javascript:");
+        assertThat(html).containsPattern("<span>T-1</span>");
+    }
+
+    @Test
+    void bothMoveTargetFieldsAcceptNoLongerANumberThanTheResolverLooksUp() {
+        // when
+        String html = page(render(order(OrderStatus.New), ADMIN));
+
+        // then
+        assertThat(html).containsPattern("<input[^>]*id=\"move-target\"[^>]*maxlength=\"64\"[^>]*>");
+        assertThat(html).containsPattern("<input[^>]*id=\"move-target-fallback\"[^>]*maxlength=\"64\"[^>]*>");
+    }
+
+    @Test
     void theEditableDetailsPageLoadsMoneyJsExactlyOnce() {
         // given (Task 24 hygiene: fragments/item-add-modal.html and fragments/add-payment-modal.html are both
         // included on this page; before the fix each one loaded its own copy of money.js)

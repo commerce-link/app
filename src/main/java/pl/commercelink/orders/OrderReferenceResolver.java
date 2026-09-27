@@ -10,13 +10,14 @@ import java.util.regex.Pattern;
 
 /**
  * Turns what an operator types as "the other order" into an order of the store: a full number, the short number the
- * list shows (a prefix of the id) or the marketplace's number. A short number shared by several orders is ambiguous.
+ * list shows (a prefix of the id) or the marketplace's number. A number shared by several orders is ambiguous.
  */
 @Component
 @RequiredArgsConstructor
 public class OrderReferenceResolver {
 
     public static final int MIN_SHORT_ID = 4;
+    public static final int MAX_REFERENCE = 64;
 
     private static final Pattern FULL_ID =
             Pattern.compile("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}");
@@ -26,7 +27,8 @@ public class OrderReferenceResolver {
 
     public Resolution resolve(String storeId, String reference) {
         String value = StringUtils.trimToEmpty(reference);
-        if (value.isEmpty()) {
+        // DynamoDB rejects a key condition over 1024 bytes with a 500; nothing an operator types is that long
+        if (value.isEmpty() || value.length() > MAX_REFERENCE) {
             return Resolution.notFound();
         }
         if (FULL_ID.matcher(value).matches()) {
@@ -45,8 +47,13 @@ public class OrderReferenceResolver {
         if (value.length() < MIN_SHORT_ID) {
             return Resolution.notFound();
         }
-        Order external = ordersRepository.findByStoreIdAndExternalOrderId(storeId, value);
-        return external == null ? Resolution.notFound() : Resolution.found(external);
+        List<Order> hits = ordersRepository.findAllByStoreIdAndExternalOrderId(storeId, value);
+        if (hits.size() > 1) {
+            return Resolution.ambiguous(hits.size());
+        }
+        // the index returns a skeleton (keys and orderId only), so the preview reads the order itself
+        Order order = hits.isEmpty() ? null : ordersRepository.findById(storeId, hits.get(0).getOrderId());
+        return order == null ? Resolution.notFound() : Resolution.found(order);
     }
 
     public enum Outcome { FOUND, NOT_FOUND, AMBIGUOUS }

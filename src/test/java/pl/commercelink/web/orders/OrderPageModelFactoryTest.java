@@ -401,4 +401,63 @@ class OrderPageModelFactoryTest {
         order.getShipments().get(0).setTrackingNo("T");
         assertThat(factory.build(order, List.of(), viewer(), PL).header().primaryAction()).isNull();
     }
+
+    @Test
+    void addDocumentLockedKeyAgreesWithTheCardsAddDocumentEntry() {
+        // given
+        Order consumer = order(OrderStatus.Delivered);
+        Order business = b2b(order(OrderStatus.Delivered));
+        Order invoiced = b2b(order(OrderStatus.Delivered));
+        invoiced.addDocument(new Document("fv", "FV/2026/09/1", null, DocumentType.InvoiceVat));
+        Order completed = order(OrderStatus.Completed);
+        OrderPageModelFactory.Viewer admin = new OrderPageModelFactory.Viewer(false, true, null);
+
+        // when / then
+        for (Order order : List.of(consumer, business, invoiced, completed)) {
+            boolean canAdd = factory.build(order, List.of(), admin, PL).documents().canAdd();
+            assertThat(canAdd).isEqualTo(OrderPageModelFactory.addDocumentLockedKey(order, null) == null);
+        }
+        assertThat(OrderPageModelFactory.addDocumentLockedKey(consumer, null)).isNull();
+        assertThat(OrderPageModelFactory.addDocumentLockedKey(business, null)).isNull();
+        assertThat(OrderPageModelFactory.addDocumentLockedKey(invoiced, null)).isEqualTo("order.documents.add.locked");
+        assertThat(OrderPageModelFactory.addDocumentLockedKey(completed, null)).isEqualTo("order.documents.add.locked.closed");
+        assertThat(OrderPageModelFactory.addDocumentLockedKey(consumer, DocumentType.InvoiceVat)).isEqualTo("order.documents.add.locked");
+        assertThat(OrderPageModelFactory.manualDocumentTypes(business))
+                .containsExactly(DocumentType.InvoiceVat, DocumentType.InvoiceAdvance, DocumentType.InvoiceFinal);
+        assertThat(OrderPageModelFactory.manualDocumentTypes(consumer))
+                .containsExactly(DocumentType.Receipt, DocumentType.InvoicePersonal);
+    }
+
+    private static Order b2b(Order order) {
+        BillingDetails billing = new BillingDetails();
+        billing.setTaxId("1234567890");
+        order.setBillingDetails(billing);
+        return order;
+    }
+
+    @Test
+    void aTrackingLinkWithAScriptSchemeIsShownAsText() {
+        // when / then
+        assertThat(OrderPageModelFactory.safeTrackingUrl("javascript:alert(1)")).isNull();
+        assertThat(OrderPageModelFactory.safeTrackingUrl(" JAVASCRIPT:alert(1)")).isNull();
+        assertThat(OrderPageModelFactory.safeTrackingUrl("data:text/html,<script>alert(1)</script>")).isNull();
+        assertThat(OrderPageModelFactory.safeTrackingUrl("  ")).isNull();
+        assertThat(OrderPageModelFactory.safeTrackingUrl(" https://x ")).isEqualTo("https://x");
+        assertThat(OrderPageModelFactory.safeTrackingUrl("HTTP://tracking.example/T-1")).isEqualTo("HTTP://tracking.example/T-1");
+    }
+
+    @Test
+    void theShipmentRowCarriesOnlyAWebTrackingLink() {
+        // given
+        Order order = order(OrderStatus.Shipping);
+        order.getShipments().get(0).setTrackingNo("T-1");
+        order.getShipments().get(0).setTrackingUrl("javascript:alert(1)");
+
+        // when
+        OrderPageModel page = factory.build(order, List.of(), new OrderPageModelFactory.Viewer(false, true, null), PL);
+
+        // then
+        assertThat(page.shipments().rows().get(0).trackingUrl()).isNull();
+        assertThat(page.shipments().rows().get(0).trackingNo()).isEqualTo("T-1");
+    }
 }

@@ -50,6 +50,7 @@ import pl.commercelink.orders.OrdersManager;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.StoreCategories;
 import pl.commercelink.web.dtos.OrderItemsForm;
+import pl.commercelink.web.dtos.SplitGroupForm;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.PositionGroup;
 import pl.commercelink.orders.Shipment;
@@ -100,6 +101,7 @@ import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
@@ -1606,7 +1608,7 @@ class OrdersControllerTest {
             ExtendedModelMap model = new ExtendedModelMap();
 
             // when
-            String view = ordersController.statusPage(ORDER_ID, model, polish);
+            String view = ordersController.statusPage(ORDER_ID, model, new RedirectAttributesModelMap(), polish);
 
             // then
             assertThat(view).isEqualTo("orders/status");
@@ -1697,11 +1699,69 @@ class OrdersControllerTest {
             ExtendedModelMap model = new ExtendedModelMap();
 
             // when
-            String view = ordersController.settingsPage(ORDER_ID, model, Locale.ROOT);
+            String view = ordersController.settingsPage(ORDER_ID, model, new RedirectAttributesModelMap(), Locale.ROOT);
 
             // then
             assertThat(view).isEqualTo("orders/settings");
             assertThat(model).containsKeys("settings", "orderId", "shortId");
+        }
+
+        @Test
+        void statusPageOfAClosedOrderGoesBackWithTheReason() {
+            // given
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order(OrderStatus.Cancelled));
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            String view = ordersController.statusPage(ORDER_ID, new ExtendedModelMap(), redirect, polish);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+            assertThat(flash(redirect)).containsEntry("errorMessage", "order.status.error.closed");
+        }
+
+        @Test
+        void settingsPageOfAClosedOrderGoesBackWithTheReason() {
+            // given
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order(OrderStatus.Completed));
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            String view = ordersController.settingsPage(ORDER_ID, new ExtendedModelMap(), redirect, polish);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+            assertThat(flash(redirect)).containsEntry("errorMessage", "order.settings.error.closed");
+            verifyNoInteractions(pageModelFactory);
+        }
+
+        @Test
+        void updateOrderInfoRefusesAClosedOrderAndSavesNothing() {
+            // given
+            Order order = order(OrderStatus.Completed);
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
+            when(pageModelFactory.settings(eq(order), anyList(), eq(false))).thenReturn(mock(OrderSettingsView.class));
+            Order posted = new Order(STORE_ID);
+            posted.setComment("changed");
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+            MockHttpServletResponse response = new MockHttpServletResponse();
+            ExtendedModelMap model = new ExtendedModelMap();
+
+            // when
+            String syncView = ordersController.updateOrderInfo(ORDER_ID, posted, null, new MockHttpServletResponse(),
+                    new ExtendedModelMap(), redirect, polish);
+            String asyncView = ordersController.updateOrderInfo(ORDER_ID, posted, "fetch", response, model,
+                    new RedirectAttributesModelMap(), polish);
+
+            // then
+            assertThat(syncView).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+            assertThat(flash(redirect)).containsEntry("errorMessage", "order.settings.error.closed");
+            assertThat(asyncView).isEqualTo("orders/details/settings :: dialogForm");
+            assertThat(response.getStatus()).isEqualTo(422);
+            assertThat(model.getAttribute("settingsError")).isEqualTo("order.settings.error.closed");
+            assertThat(order.getComment()).isNull();
+            verifyNoInteractions(orderLifecycle);
         }
 
         @Test
@@ -2013,6 +2073,85 @@ class OrdersControllerTest {
         }
 
         @Test
+        void addReceiptRefusesASecondClosingDocumentOnAnInvoicedOrder() {
+            // given
+            Order order = order(OrderStatus.Delivered);
+            BillingDetails company = new BillingDetails();
+            company.setTaxId("5250000000");
+            order.setBillingDetails(company);
+            order.addDocument(document(DocumentType.InvoiceVat, "FV/1"));
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            Document forged = new Document();
+            forged.setType(DocumentType.Receipt);
+            forged.setNumber("FORGED/1");
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            ordersController.addReceipt(ORDER_ID, forged, redirect, polish);
+
+            // then
+            assertThat(flash(redirect)).containsEntry("errorMessage", "order.documents.add.locked");
+            assertThat(order.getDocuments()).extracting(Document::getNumber).containsExactly("FV/1");
+            verifyNoInteractions(orderLifecycle);
+        }
+
+        @Test
+        void addReceiptRefusesOnACompletedOrder() {
+            // given
+            Order order = order(OrderStatus.Completed);
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            Document receipt = new Document();
+            receipt.setType(DocumentType.Receipt);
+            receipt.setNumber("PAR/1");
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            ordersController.addReceipt(ORDER_ID, receipt, redirect, polish);
+
+            // then
+            assertThat(flash(redirect)).containsEntry("errorMessage", "order.documents.add.locked.closed");
+            assertThat(order.getDocuments()).isEmpty();
+            verifyNoInteractions(orderLifecycle);
+        }
+
+        @Test
+        void addReceiptRefusesATypeOutsideTheManualOnes() {
+            // given
+            Order order = order(OrderStatus.Delivered);
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            Document invoice = new Document();
+            invoice.setType(DocumentType.InvoiceVat);
+            invoice.setNumber("FV/1");
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            ordersController.addReceipt(ORDER_ID, invoice, redirect, polish);
+
+            // then
+            assertThat(flash(redirect)).containsEntry("errorMessage", "order.documents.add.locked");
+            assertThat(order.getDocuments()).isEmpty();
+            verifyNoInteractions(orderLifecycle);
+        }
+
+        @Test
+        void addReceiptAddsTheNextManualDocument() {
+            // given
+            Order order = order(OrderStatus.Delivered);
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            Document receipt = new Document();
+            receipt.setType(DocumentType.Receipt);
+            receipt.setNumber("PAR/1");
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            ordersController.addReceipt(ORDER_ID, receipt, redirect, polish);
+
+            // then
+            assertThat(order.getDocuments()).extracting(Document::getType).containsExactly(DocumentType.Receipt);
+            verify(orderLifecycle).update(order);
+        }
+
+        @Test
         void updateSerialNumbersTouchesOnlyThePostedItems() {
             // given
             OrderItem posted = item("i1", FulfilmentStatus.Delivered, "MFN-1");
@@ -2040,6 +2179,7 @@ class OrdersControllerTest {
         @Test
         void bulkActionReportsSkippedItems() {
             // given
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(orderBase());
             when(ordersManager.moveItemsToAllocation(STORE_ID, ORDER_ID, List.of("i1", "i2")))
                     .thenReturn(new OrdersManager.Result(orderBase(), List.of(), 0, 1, 2));
             RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
@@ -2056,6 +2196,7 @@ class OrdersControllerTest {
         @Test
         void aCompleteBulkActionSaysHowManyItemsChanged() {
             // given
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(orderBase());
             when(ordersManager.removeFromOrder(STORE_ID, ORDER_ID, List.of("a", "b")))
                     .thenReturn(new OrdersManager.Result(orderBase(), List.of(), 0, 2, 2));
             RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
@@ -2071,6 +2212,7 @@ class OrdersControllerTest {
         @Test
         void movingDropshipItemsToTheWarehouseIsReportedAsSkipped() {
             // given
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(orderBase());
             when(ordersManager.moveOrderItemsToTheWarehouse(STORE_ID, ORDER_ID, List.of("item-1")))
                     .thenReturn(new OrdersManager.Result(orderBase(), List.of(), 1, 0, 1));
             RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
@@ -2086,6 +2228,7 @@ class OrdersControllerTest {
         @Test
         void aBulkActionWithoutSelectedItemsAsksForASelectionAndChangesNothing() {
             // given
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(orderBase());
             RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
             // when
@@ -2099,6 +2242,7 @@ class OrdersControllerTest {
         @Test
         void itemsMoveToAnOrderFoundByItsShortNumber() {
             // given
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(orderBase());
             Order target = new Order(STORE_ID);
             when(orderReferenceResolver.resolve(STORE_ID, "51aa")).thenReturn(OrderReferenceResolver.Resolution.found(target));
             when(ordersManager.moveOrderItemsToOrder(STORE_ID, ORDER_ID, target.getOrderId(), List.of("a"))).thenReturn(target);
@@ -2115,6 +2259,7 @@ class OrdersControllerTest {
         @Test
         void anAmbiguousUnknownOrOwnNumberIsRefusedWithoutMovingAnything() {
             // given
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(orderBase());
             when(orderReferenceResolver.resolve(STORE_ID, "3e37")).thenReturn(OrderReferenceResolver.Resolution.ambiguous(2));
             when(orderReferenceResolver.resolve(STORE_ID, "zzzz")).thenReturn(OrderReferenceResolver.Resolution.notFound());
             when(orderReferenceResolver.resolve(STORE_ID, "self")).thenReturn(OrderReferenceResolver.Resolution.found(orderBase()));
@@ -2137,6 +2282,7 @@ class OrdersControllerTest {
         @Test
         void moveTargetAnswersThePreviewOr404() {
             // given
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(orderBase());
             Order target = order(OrderStatus.New);
             target.setOrderId("bbbbbbbb-0000-0000-0000-000000000000");
             when(orderReferenceResolver.resolve(STORE_ID, "bbbbbbbb")).thenReturn(OrderReferenceResolver.Resolution.found(target));
@@ -2160,6 +2306,23 @@ class OrdersControllerTest {
             assertThat(ambiguous.getStatusCode().value()).isEqualTo(409);
             assertThat(self.getBody().canReceiveItems()).isFalse();
             assertThat(self.getBody().reason()).isEqualTo("order.move.self");
+        }
+
+        @Test
+        void moveTargetPreviewsAnOrderWithoutAStatusWithoutFailing() {
+            // given
+            Order bare = new Order();
+            bare.setOrderId("bbbbbbbb-0000-0000-0000-000000000000");
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(orderBase());
+            when(orderReferenceResolver.resolve(STORE_ID, "bbbbbbbb")).thenReturn(OrderReferenceResolver.Resolution.found(bare));
+
+            // when
+            ResponseEntity<MoveTargetView> preview = ordersController.moveTarget(ORDER_ID, "bbbbbbbb", polish);
+
+            // then
+            assertThat(preview.getStatusCode().value()).isEqualTo(200);
+            assertThat(preview.getBody().statusLabel()).isNull();
+            verify(messageSource, never()).getMessage(isNull(), any(), any(Locale.class));
         }
 
         @Test
@@ -2249,6 +2412,86 @@ class OrdersControllerTest {
             // then
             verify(ordersRepository, never()).save(any());
             assertThat(flash(redirect)).containsEntry("errorMessage", "order.customer.shipping.locked.label");
+        }
+
+        @Test
+        void theShippingAddressPageOfALabelledOrderGoesBackWithTheReason() {
+            // given
+            Order order = order(OrderStatus.Realization);
+            Shipment labelled = new Shipment(ShipmentType.Courier);
+            labelled.setCarrier("DPD");
+            labelled.setTrackingNo("T-1");
+            labelled.setShippedAt(LocalDateTime.now());
+            order.setShipments(new ArrayList<>(List.of(labelled)));
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            String view = ordersController.showAddressDetails(ORDER_ID, "shipping", new ExtendedModelMap(), redirect, polish);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+            assertThat(flash(redirect)).containsEntry("errorMessage", "order.customer.shipping.locked.label");
+        }
+
+        @Test
+        void theBillingAddressPageOfAnInvoicedOrderGoesBack() {
+            // given
+            Order order = order(OrderStatus.Delivered);
+            order.addDocument(document(DocumentType.Receipt, "PAR/1"));
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            String view = ordersController.showAddressDetails(ORDER_ID, "billing", new ExtendedModelMap(), redirect, polish);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+            assertThat(flash(redirect)).containsEntry("errorMessage", "order.customer.billing.locked");
+        }
+
+        @Test
+        void addressesOfAClosedOrderCannotBeOpenedOrSaved() {
+            // given
+            Order order = order(OrderStatus.Completed);
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            Order billingPayload = new Order(STORE_ID);
+            billingPayload.setBillingDetails(new BillingDetails());
+            RedirectAttributesModelMap openBilling = new RedirectAttributesModelMap();
+            RedirectAttributesModelMap openShipping = new RedirectAttributesModelMap();
+            RedirectAttributesModelMap saveBilling = new RedirectAttributesModelMap();
+            RedirectAttributesModelMap saveShipping = new RedirectAttributesModelMap();
+
+            // when
+            String billingView = ordersController.showAddressDetails(ORDER_ID, "billing", new ExtendedModelMap(), openBilling, polish);
+            String shippingView = ordersController.showAddressDetails(ORDER_ID, "shipping", new ExtendedModelMap(), openShipping, polish);
+            ordersController.updateAddressDetails(ORDER_ID, "billing", billingPayload, saveBilling, polish);
+            ordersController.updateAddressDetails(ORDER_ID, "shipping", shippingPayload(), saveShipping, polish);
+
+            // then
+            assertThat(billingView).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+            assertThat(shippingView).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+            assertThat(flash(openBilling)).containsEntry("errorMessage", "order.address.error.closed");
+            assertThat(flash(openShipping)).containsEntry("errorMessage", "order.address.error.closed");
+            assertThat(flash(saveBilling)).containsEntry("errorMessage", "order.address.error.closed");
+            assertThat(flash(saveShipping)).containsEntry("errorMessage", "order.address.error.closed");
+            verify(ordersRepository, never()).save(any());
+        }
+
+        @Test
+        void theShippingAddressPageOfAnOpenOrderRendersTheForm() {
+            // given
+            Order order = order(OrderStatus.New);
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            ExtendedModelMap model = new ExtendedModelMap();
+
+            // when
+            String view = ordersController.showAddressDetails(ORDER_ID, "shipping", model, new RedirectAttributesModelMap(), polish);
+
+            // then
+            assertThat(view).isEqualTo("orderAddressDetails");
+            assertThat(model.getAttribute("order")).isSameAs(order);
+            assertThat(model.getAttribute("type")).isEqualTo("shipping");
         }
 
         private Order shippingPayload() {
@@ -2356,6 +2599,125 @@ class OrdersControllerTest {
             when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(orderBase());
             when(storesRepository.findById(STORE_ID)).thenReturn(new Store());
             return item;
+        }
+    }
+
+    /** An order id from another store (or none at all) is answered like a missing page, before anything is read or saved. */
+    @Nested
+    class ForeignOrder {
+
+        private final Locale polish = Locale.forLanguageTag("pl");
+
+        @BeforeEach
+        void anotherStoresOrder() {
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(null);
+        }
+
+        private OrderItemsForm selectedItem() {
+            OrderItem item = new OrderItem();
+            item.setItemId("i1");
+            item.setSelected(true);
+            return new OrderItemsForm(new ArrayList<>(List.of(item)));
+        }
+
+        @Test
+        void splittingASetOfAnotherStoresOrderIsNotFoundAndSavesNothing() {
+            // given
+            SplitGroupForm form = new SplitGroupForm();
+            form.setItemId("i1");
+
+            // when / then
+            assertThatThrownBy(() -> ordersController.splitGroupItem(ORDER_ID, form, new RedirectAttributesModelMap(), polish))
+                    .isInstanceOf(ResponseStatusException.class);
+            verify(ordersManager, never()).splitGroupItem(any(), any(), any());
+        }
+
+        @Test
+        void assigningFromTheWarehouseToAnotherStoresOrderIsNotFound() {
+            // when / then
+            assertThatThrownBy(() -> ordersController.assignFromWarehouse(ORDER_ID, "i1", "w1",
+                    new RedirectAttributesModelMap(), polish))
+                    .isInstanceOf(ResponseStatusException.class);
+            verify(ordersManager, never()).assignFromWarehouse(any(), any(), any(), any());
+        }
+
+        @Test
+        void printsAndTheItemPageOfAnotherStoresOrderAreNotFound() {
+            // when / then
+            assertThatThrownBy(() -> ordersController.getOrderCard(ORDER_ID, new ExtendedModelMap()))
+                    .isInstanceOf(ResponseStatusException.class);
+            assertThatThrownBy(() -> ordersController.getOrderCollectionProtocol(ORDER_ID, new ExtendedModelMap()))
+                    .isInstanceOf(ResponseStatusException.class);
+            assertThatThrownBy(() -> ordersController.getOrderItem(ORDER_ID, "i1", new ExtendedModelMap()))
+                    .isInstanceOf(ResponseStatusException.class);
+            assertThatThrownBy(() -> ordersController.saveOrderItem(ORDER_ID, "i1", new OrderItem(), new ExtendedModelMap()))
+                    .isInstanceOf(ResponseStatusException.class);
+            verifyNoInteractions(orderItemsRepository);
+        }
+
+        @Test
+        void printsOfAnotherStoresOrderAreNotFoundForTheSuperAdmin() {
+            // given
+            when(ordersRepository.findById("other-store", ORDER_ID)).thenReturn(null);
+
+            // when / then
+            assertThatThrownBy(() -> ordersController.getOrderCardForSuperAdmin("other-store", ORDER_ID, new ExtendedModelMap()))
+                    .isInstanceOf(ResponseStatusException.class);
+            assertThatThrownBy(() -> ordersController.getOrderCollectionProtocolForSuperAdmin("other-store", ORDER_ID,
+                    new ExtendedModelMap()))
+                    .isInstanceOf(ResponseStatusException.class);
+            verifyNoInteractions(orderItemsRepository);
+        }
+
+        @Test
+        void deleteCancelSplitAndMoveOfAnotherStoresOrderAreNotFound() {
+            // when / then
+            assertThatThrownBy(() -> ordersController.deleteOrder(ORDER_ID))
+                    .isInstanceOf(ResponseStatusException.class);
+            assertThatThrownBy(() -> ordersController.cancelOrder(ORDER_ID, new RedirectAttributesModelMap(), polish))
+                    .isInstanceOf(ResponseStatusException.class);
+            assertThatThrownBy(() -> ordersController.splitOrder(ORDER_ID, selectedItem(), new RedirectAttributesModelMap(), polish))
+                    .isInstanceOf(ResponseStatusException.class);
+            assertThatThrownBy(() -> ordersController.moveItemsToOrder(ORDER_ID, selectedItem(), "51aa",
+                    new RedirectAttributesModelMap(), polish))
+                    .isInstanceOf(ResponseStatusException.class);
+            assertThatThrownBy(() -> ordersController.moveTarget(ORDER_ID, "51aa", polish))
+                    .isInstanceOf(ResponseStatusException.class);
+            verifyNoInteractions(ordersManager, orderReferenceResolver);
+        }
+
+        @Test
+        void everyBulkActionOnAnotherStoresOrderIsNotFound() {
+            // when / then
+            assertThatThrownBy(() -> ordersController.removeSelectedItemsFromOrder(ORDER_ID, selectedItem(),
+                    new RedirectAttributesModelMap(), polish))
+                    .isInstanceOf(ResponseStatusException.class);
+            assertThatThrownBy(() -> ordersController.moveSelectedItemsToAllocation(ORDER_ID, selectedItem(),
+                    new RedirectAttributesModelMap(), polish))
+                    .isInstanceOf(ResponseStatusException.class);
+            assertThatThrownBy(() -> ordersController.moveSelectedItemsToTheWarehouse(ORDER_ID, selectedItem(),
+                    new RedirectAttributesModelMap(), polish))
+                    .isInstanceOf(ResponseStatusException.class);
+            assertThatThrownBy(() -> ordersController.moveSelectedItemsToTheWarehouseForRMA(ORDER_ID, selectedItem(),
+                    new RedirectAttributesModelMap(), polish))
+                    .isInstanceOf(ResponseStatusException.class);
+            verifyNoInteractions(ordersManager);
+        }
+
+        @Test
+        void theAddressPageAndItsSaveForAnotherStoresOrderAreNotFound() {
+            // given
+            Order posted = new Order(STORE_ID);
+            posted.setShippingDetails(new ShippingDetails());
+
+            // when / then
+            assertThatThrownBy(() -> ordersController.showAddressDetails(ORDER_ID, "shipping", new ExtendedModelMap(),
+                    new RedirectAttributesModelMap(), polish))
+                    .isInstanceOf(ResponseStatusException.class);
+            assertThatThrownBy(() -> ordersController.updateAddressDetails(ORDER_ID, "shipping", posted,
+                    new RedirectAttributesModelMap(), polish))
+                    .isInstanceOf(ResponseStatusException.class);
+            verify(ordersRepository, never()).save(any());
         }
     }
 }

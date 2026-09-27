@@ -127,11 +127,13 @@ public class OrderLifecycle {
                 goodsOutEventPublisher.publish(order, createdBy);
             }
 
-            boolean hasAllOrderItemsReturned = getOrFetchOrderItems(order.getOrderId(), orderItems).stream().allMatch(OrderItem::isReturned);
+            List<OrderItem> items = getOrFetchOrderItems(order.getOrderId(), orderItems);
+            // allMatch on no items is true: an order without items must not read as fully returned and be cancelled
+            boolean hasAllOrderItemsReturned = !items.isEmpty() && items.stream().allMatch(OrderItem::isReturned);
             if (hasAllOrderItemsReturned) {
                 order.setStatus(OrderStatus.Cancelled);
 
-                if (order.getReview().getStatus() == OrderReviewStatus.ToBeCollected) {
+                if (order.getReview() != null && order.getReview().getStatus() == OrderReviewStatus.ToBeCollected) {
                     order.getReview().setStatus(OrderReviewStatus.NotApplicable);
                 }
             }

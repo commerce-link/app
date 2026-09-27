@@ -156,7 +156,8 @@ public class OrdersRepository extends DynamoDbRepository<Order> {
         return orders;
     }
 
-    public Order findByStoreIdAndExternalOrderId(String storeId, String externalOrderId) {
+    /** Hits of ExternalOrderIdIndex: the index projects only the keys and orderId, so every other field is null. */
+    public List<Order> findAllByStoreIdAndExternalOrderId(String storeId, String externalOrderId) {
         Map<String, AttributeValue> eav = new HashMap<>();
         eav.put(":storeId", new AttributeValue().withS(storeId));
         eav.put(":externalOrderId", new AttributeValue().withS(externalOrderId));
@@ -167,7 +168,11 @@ public class OrdersRepository extends DynamoDbRepository<Order> {
                 .withKeyConditionExpression("storeId = :storeId AND externalOrderId = :externalOrderId")
                 .withExpressionAttributeValues(eav);
 
-        List<Order> orders = query(queryRequest, Order.class);
+        return query(queryRequest, Order.class);
+    }
+
+    public Order findByStoreIdAndExternalOrderId(String storeId, String externalOrderId) {
+        List<Order> orders = findAllByStoreIdAndExternalOrderId(storeId, externalOrderId);
         return orders.isEmpty() ? null : orders.get(0);
     }
 

@@ -88,7 +88,7 @@
                             th:formaction="@{${bulk.href()}}" th:text="#{${bulk.action().labelKey()}}"></button>
                     <th:block th:if="${bulk.available() and bulk.action().name() == 'MOVE'}">
                         <label class="cl-visually-hidden" for="move-target-fallback" th:text="#{order.move.target}"></label>
-                        <input class="cl-input is-code" id="move-target-fallback" name="targetOrderId" type="text"
+                        <input class="cl-input is-code" id="move-target-fallback" name="targetOrderId" type="text" maxlength="64"
                                th:placeholder="#{order.move.target}">
                         <button type="submit" class="cl-button" th:formaction="@{${bulk.href()}}"
                                 th:text="#{${bulk.action().labelKey()}}"></button>
