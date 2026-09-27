@@ -38,9 +38,11 @@ public class ItemHistoryService {
         if (orderItems != null && !orderItems.isEmpty()) {
             // Related Delivery
             OrderItem firstOrderItem = orderItems.get(0);
-            if (isNotBlank(firstOrderItem.getDeliveryId())) {
-
-                Delivery delivery = deliveriesRepository.findById(storeId, firstOrderItem.getDeliveryId());
+            // before a delivery exists the field may hold something else (a supplier name): no delivery event then
+            Delivery delivery = isNotBlank(firstOrderItem.getDeliveryId())
+                    ? deliveriesRepository.findById(storeId, firstOrderItem.getDeliveryId())
+                    : null;
+            if (delivery != null) {
                 history.add(new ItemHistoryEvent(
                         delivery.getDeliveryId(),
                         delivery.getOrderedAt(),
@@ -61,8 +63,11 @@ public class ItemHistoryService {
             }
 
             for (OrderItem orderItem : orderItems) {
-                // Related Order
+                // Related Order (skipped when the order no longer resolves)
                 Order order = ordersRepository.findById(storeId, orderItem.getOrderId());
+                if (order == null) {
+                    continue;
+                }
                 history.add(new ItemHistoryEvent(
                         order.getOrderId(),
                         order.getLastEventDate(),
@@ -77,9 +82,12 @@ public class ItemHistoryService {
         List<RMAItem> rmaItems = rmaItemsRepository.findBySerialNo(serialNo);
         boolean movedToWarehouse = false;
 
-        if (!rmaItems.isEmpty()) {
+        if (rmaItems != null && !rmaItems.isEmpty()) {
             for (RMAItem rmaItem : rmaItems) {
                 RMA rma = rmaRepository.findById(storeId, rmaItem.getRmaId());
+                if (rma == null) {
+                    continue;
+                }
                 String actualResolution = (rmaItem.getActualResolution() != null)
                         ? rmaItem.getActualResolution().toString()
                         : "N/A";
@@ -100,7 +108,8 @@ public class ItemHistoryService {
             }
         }
 
-        history.sort(Comparator.comparing(ItemHistoryEvent::getDate));
+        // an order without any date yet must not break the sort
+        history.sort(Comparator.comparing(ItemHistoryEvent::getDate, Comparator.nullsLast(Comparator.naturalOrder())));
 
         // Warehouse Item
         WarehouseItemView warehouseItem = warehouse.stockQueryService(storeId).findBySerialNo(storeId, serialNo);
