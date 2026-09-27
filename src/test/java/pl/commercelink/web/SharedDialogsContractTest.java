@@ -17,7 +17,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Review Focus 5: the add-items and add-payment dialogs are shared with Offers, Payments and Deliveries (Bulma pages).
+ * The add-items and add-payment dialogs are shared with Offers, Payments and Deliveries (Bulma pages).
  * They keep their public JavaScript functions and bring their own .cl-page wrapper and script.
  */
 class SharedDialogsContractTest {
@@ -55,7 +55,7 @@ class SharedDialogsContractTest {
         assertThat(offer).contains("fragments/item-add-modal :: itemAddModal(").contains("toggleAddItemModal(");
     }
 
-    /** T9b turned PaymentsCard.sources into a precomputed Option<PaymentSource> list; templates read labelKey, never build the key themselves. */
+    /** PaymentsCard.sources is a precomputed Option<PaymentSource> list; templates read labelKey, never build the key themselves. */
     static Map<String, Object> paymentVariables() {
         Map<String, Object> variables = new HashMap<>();
         variables.put("paymentSources", OrderLabels.Option.of(PaymentSource.values(), OrderLabels::paymentSource));
@@ -82,7 +82,7 @@ class SharedDialogsContractTest {
 
     @Test
     void theAddPaymentDialogSkipsMoneyJsOnlyWhenToldTo() {
-        // given (Task 24 hygiene): the order details page includes this fragment next to fragments/item-add-modal.html,
+        // given: the order details page includes this fragment next to fragments/item-add-modal.html,
         // which already loads money.js -- loading it twice would run its IIFE twice, so that one caller passes
         // loadMoneyJs=false. Thymeleaf requires every caller to pass the parameter; every other caller passes
         // true explicitly and keeps getting it, pinned by the test above.
@@ -112,7 +112,7 @@ class SharedDialogsContractTest {
                 .contains("openAddPaymentModalFromButton(this)").contains("id=\"addPaymentModal\"")
                 .contains("action=\"/dashboard/deliveries/d-1/addPayment\"");
         // the edit modal's own <select> (payments-section.html) must read the same Option value/labelKey the add
-        // dialog does, not Option's own toString() (Critical 1, task-17 review round 1)
+        // dialog does, not Option's own toString(), or no option can be preselected or saved
         assertThat(html).doesNotContain("Option[")
                 .containsPattern("<option value=\"BankTransfer\"[^>]*selected[^>]*>Przelew bankowy<");
     }

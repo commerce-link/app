@@ -32,7 +32,7 @@ import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
 /**
- * Review Focus 5, Task 17 fix round 1: renders the real Payments page (payments.html) through the exact model
+ * Renders the real Payments page (payments.html) through the exact model
  * {@link WebController#payments} builds, not a hand-picked stand-in. This is what should have caught the
  * paymentSources type mismatch before it reached a browser (the report only opened the dialog in a manual E2E
  * check, which happened to catch it that time, but no automated test did).
@@ -107,7 +107,7 @@ class PaymentSourcesPageRenderTest {
                 .containsPattern("<option[^>]*value=\"Cash\"")
                 .contains(">Gotówka<")
                 .doesNotContain("Option[").doesNotContain("??");
-        // Task 24 hygiene ruling (c): this page's own add-payment dialog must load money.js exactly once
+        // this page's own add-payment dialog must load money.js exactly once
         assertThat(occurrences(html, "/js/money.js")).isEqualTo(1);
     }
 

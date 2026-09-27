@@ -8,7 +8,7 @@ class OrderBackLinkTest {
 
     @Test
     void acceptsOnlyAddressesOfTheOrderList() {
-        // when / then (Review Focus 4)
+        // when / then: only a path on the order list survives, anything else falls back to the list
         assertThat(OrderBackLink.sanitize("/dashboard/orders?view=Completed&page=3")).isEqualTo("/dashboard/orders?view=Completed&page=3");
         assertThat(OrderBackLink.sanitize("/dashboard/orders")).isEqualTo("/dashboard/orders");
         assertThat(OrderBackLink.sanitize(null)).isEqualTo("/dashboard/orders");
@@ -19,6 +19,7 @@ class OrderBackLinkTest {
 
     @Test
     void rejectsForeignPathsDoubleSlashesAndOverlongValues() {
+        // when / then
         assertThat(OrderBackLink.sanitize("/dashboard/warehouse")).isEqualTo(OrderBackLink.LIST);
         assertThat(OrderBackLink.sanitize("/dashboard/orders?q=a//b")).isEqualTo(OrderBackLink.LIST);
         assertThat(OrderBackLink.sanitize("/dashboard/orders?q=" + "x".repeat(300))).isEqualTo(OrderBackLink.LIST);

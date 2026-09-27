@@ -97,7 +97,7 @@ class OrderItemRowTest {
 
     @Test
     void consolidationStopsOnceTheOrderIsInvoiced() {
-        // given (P13)
+        // given
         Order invoiced = new Order("store-1");
         invoiced.addDocument(new Document("fv", "FV/1", null, DocumentType.InvoiceVat));
 
@@ -111,7 +111,7 @@ class OrderItemRowTest {
 
     @Test
     void aUserDoesNotGetTheCostAndAReadOnlyViewerGetsNoActions() {
-        // when (B10, P12)
+        // when
         OrderItemRow forUser = OrderItemRow.of(item(FulfilmentStatus.New, "MFN-1"), 0, context(ORDER, false, false));
         OrderItemRow forSuperAdmin = OrderItemRow.of(item(FulfilmentStatus.New, "MFN-1"), 0, context(ORDER, true, true));
 

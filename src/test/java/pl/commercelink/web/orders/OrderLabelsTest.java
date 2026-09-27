@@ -74,6 +74,7 @@ class OrderLabelsTest {
 
     @Test
     void statusToneMatchesTheListPill() {
+        // when / then
         for (OrderStatus status : OrderStatus.values()) {
             assertThat(OrderLabels.tone(status)).isEqualTo(OrderRowMapper.statusTone(status));
         }
@@ -81,7 +82,7 @@ class OrderLabelsTest {
 
     @Test
     void itemStatusTonesFollowTheSpec() {
-        // when / then: spec §4.3
+        // when / then: each item status has a fixed pill tone
         assertThat(OrderLabels.tone(FulfilmentStatus.New)).isEqualTo("is-neutral");
         assertThat(OrderLabels.tone(FulfilmentStatus.Allocation)).isEqualTo("is-info");
         assertThat(OrderLabels.tone(FulfilmentStatus.Ordered)).isEqualTo("is-info");

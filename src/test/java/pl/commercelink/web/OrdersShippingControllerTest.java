@@ -90,7 +90,7 @@ class OrdersShippingControllerTest {
 
     @Test
     void whenEveryShipmentHasDataTheOperatorReturnsToTheOrderWithAMessage() {
-        // given (P9)
+        // given
         Shipment sent = new Shipment(ShipmentType.Courier);
         sent.setCarrier("DPD");
         sent.setTrackingNo("T-1");

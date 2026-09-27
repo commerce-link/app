@@ -149,7 +149,7 @@ class OrderDetailsTemplateTest {
     static final OrderPageModelFactory.Viewer USER = new OrderPageModelFactory.Viewer(false, false, null);
     static final OrderPageModelFactory.Viewer SUPER_ADMIN = new OrderPageModelFactory.Viewer(true, false, null);
 
-    /** C-08: cuts before the layout tail (</main>), which carries the old delete/save modals (onclick=, class="button"). */
+    /** Cuts before the layout tail (</main>), which carries the old delete/save modals (onclick=, class="button"). */
     static String page(String html) {
         int start = html.indexOf("<section class=\"cl-page\"");
         return html.substring(start, html.indexOf("</main>", start));
@@ -224,9 +224,9 @@ class OrderDetailsTemplateTest {
     }
 
     /**
-     * Spec §4.10: without JavaScript a button toggling a hidden list opens nothing, so prints, the item history,
-     * cancelling, the row actions and issuing documents were unreachable. A native details opens by itself; a dialog
-     * opener inside it keeps an href to a page doing the same (§4.8).
+     * Without JavaScript a button toggling a hidden list opens nothing, so prints, the item history, cancelling,
+     * the row actions and issuing documents were unreachable. A native details opens by itself; a dialog opener
+     * inside it keeps an href to a page doing the same.
      */
     @Test
     void everyMenuIsANativeDetailsAndEveryDialogOpenerInItHasAPageToFallBackOn() {
@@ -288,7 +288,7 @@ class OrderDetailsTemplateTest {
 
     @Test
     void aUserReceivesNoCostOrProfitInTheHtml() {
-        // when (B10)
+        // when
         String user = page(render(order(OrderStatus.New), USER));
         String admin = page(render(order(OrderStatus.New), ADMIN));
 
@@ -313,7 +313,7 @@ class OrderDetailsTemplateTest {
 
     @Test
     void superAdminPageCarriesNoFormDialogOrMenu() {
-        // when (Review Focus 1, P12)
+        // when
         String html = page(render(order(OrderStatus.Assembly), SUPER_ADMIN));
 
         // then
@@ -377,7 +377,7 @@ class OrderDetailsTemplateTest {
         // when
         String html = page(render(order, ADMIN));
 
-        // then (B12, P25)
+        // then
         assertThat(html).contains("id=\"shipments-dialog\"").contains("name=\"shipments[0].type\"")
                 .doesNotContain("name=\"shipments[1].type\"").contains("data-cl-shipment-template")
                 .contains("data-cl-carrier-select").contains("value=\"__other__\"")
@@ -387,7 +387,7 @@ class OrderDetailsTemplateTest {
 
     @Test
     void theShipmentsDialogRendersOneBlankRowWhenTheOrderHasNoShipments() {
-        // given (P25): a blank row lets the operator fill in the first shipment; "Save" posting nothing must not be silent
+        // given: a blank row lets the operator fill in the first shipment; "Save" posting nothing must not be silent
         Order order = order(OrderStatus.Realization);
         order.setShipments(List.of());
 
@@ -430,7 +430,7 @@ class OrderDetailsTemplateTest {
 
     @Test
     void aDeliveredOrderWithSerialItemsRendersTheSerialNumbersDialog() {
-        // given (B10): canAddSerials() needs a non-New order with a Delivered product item
+        // given: canAddSerials() needs a non-New order with a Delivered product item
         Order order = order(OrderStatus.Delivered);
         OrderItem cpu = new OrderItem(order.getOrderId(), "CPU", "AMD Ryzen 7 9800X3D", 1, 749, "100-100001084WOF", false, 0);
         cpu.setStatus(FulfilmentStatus.Delivered);
@@ -544,7 +544,7 @@ class OrderDetailsTemplateTest {
         // when
         String html = page(render(order, ADMIN));
 
-        // then (B1)
+        // then
         assertThat(html).contains("class=\"cl-card is-status cl-closing\"").contains("class=\"cl-doc-marks is-sentences\"")
                 .contains("<span class=\"cl-doc-mark-icon\" aria-hidden=\"true\">✗</span>")
                 .contains("<span class=\"cl-doc-mark-icon\" aria-hidden=\"true\">✓</span>")
@@ -624,8 +624,8 @@ class OrderDetailsTemplateTest {
 
     @Test
     void theMissingEanMessageAppearsAboveTheItemsCard() {
-        // given (P40 CARRY from Task 3: order.items.add.error.no.mfn flashes through the shared errorMessage
-        // banner, which the layout renders once, above <main>, so it lands above every card on this page)
+        // given: order.items.add.error.no.mfn flashes through the shared errorMessage banner, which the layout
+        // renders once, above <main>, so it lands above every card on this page
         Order order = order(OrderStatus.New);
         OrderPageModel page = factory(Set.of()).build(order, items(order), ADMIN, PL);
         Map<String, Object> variables = new HashMap<>();
@@ -764,7 +764,7 @@ class OrderDetailsTemplateTest {
         // appends it at the end of the rendered tag's attributes, after everything th:attr expands
         assertThat(html).containsPattern("data-cl-bulk-action=\"[^\"]*moveSelectedItemsToTheWarehouse\"[^>]*disabled=\"disabled\"")
                 .containsPattern("data-cl-bulk-action=\"[^\"]*moveSelectedItemsToAllocation\"[^>]*disabled=\"disabled\"")
-                // D-06/D-07: the dropship lock disables every bulk action, not only the two above
+                // the dropship lock disables every bulk action, not only the two above
                 .containsPattern("data-cl-bulk-action=\"[^\"]*moveSelectedItemsToTheWarehouseForRMA\"[^>]*disabled=\"disabled\"")
                 .containsPattern("data-cl-bulk-action=\"[^\"]*removeSelectedItemsFromOrder\"[^>]*disabled=\"disabled\"")
                 .containsPattern("data-cl-dialog-open=\"item-add-dialog\"[^>]*disabled=\"disabled\"")
@@ -863,7 +863,7 @@ class OrderDetailsTemplateTest {
     @Test
     void theGoodsIssueIsOfferedOnlyWhenTheStoreKeepsWarehouseDocumentsForWarehouseItems() {
         // given (was DropshipTemplateTest#orderDetailsHidesTheGoodsIssueActionForOrdersWithoutWarehouseItems)
-        // D-06: the old test was vacuous — the test store never had warehouse documents enabled, so the
+        // the old test was vacuous — the test store never had warehouse documents enabled, so the
         // assertion passed whatever the flag. Make it two-sided: a warehouse item with the flag on shows the
         // action, the same order with the flag off does not.
         Order order = order(OrderStatus.Realization);
@@ -936,8 +936,8 @@ class OrderDetailsTemplateTest {
 
     @Test
     void theEditableDetailsPageLoadsMoneyJsExactlyOnce() {
-        // given (Task 24 hygiene: fragments/item-add-modal.html and fragments/add-payment-modal.html are both
-        // included on this page; before the fix each one loaded its own copy of money.js)
+        // given: fragments/item-add-modal.html and fragments/add-payment-modal.html are both included on this
+        // page, and each used to load its own copy of money.js
         String html = render(order(OrderStatus.New), ADMIN);
 
         // when

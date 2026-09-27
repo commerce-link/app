@@ -93,7 +93,7 @@ class OrderPageModelFactoryTest {
 
     @Test
     void aSuperAdminSeesTheOrderReadOnlyWithoutActions() {
-        // when (P12, Review Focus 1)
+        // when
         OrderPageModel page = factory.build(order(OrderStatus.New), List.of(item(FulfilmentStatus.New)),
                 new OrderPageModelFactory.Viewer(true, false, null), PL);
 
@@ -112,7 +112,7 @@ class OrderPageModelFactoryTest {
 
     @Test
     void aSuperAdminGetsNoItemActionsWhileAUserOnAnOpenOrderDoes() {
-        // when (9a CARRY: OrderItemRow.Context.readOnly = closed OR SUPER_ADMIN, spec §3.5)
+        // when: OrderItemRow.Context.readOnly is closed OR SUPER_ADMIN
         OrderPageModel superAdmin = factory.build(order(OrderStatus.New), List.of(item(FulfilmentStatus.New)),
                 new OrderPageModelFactory.Viewer(true, false, null), PL);
         OrderPageModel user = factory.build(order(OrderStatus.New), List.of(item(FulfilmentStatus.New)),
@@ -131,7 +131,7 @@ class OrderPageModelFactoryTest {
 
     @Test
     void aPlainOrderKeepsItsBulkActionsAvailable() {
-        // when (moved from OrderDetailsControllerTest, Task 10)
+        // when
         OrderPageModel page = factory.build(order(OrderStatus.New), List.of(item(FulfilmentStatus.New)),
                 new OrderPageModelFactory.Viewer(false, true, null), PL);
 
@@ -155,7 +155,7 @@ class OrderPageModelFactoryTest {
 
     @Test
     void aUserNeverReceivesCostOrProfit() {
-        // when (B10)
+        // when
         OrderPageModel user = factory.build(order(OrderStatus.New), List.of(item(FulfilmentStatus.New)),
                 new OrderPageModelFactory.Viewer(false, false, null), PL);
         OrderPageModel admin = factory.build(order(OrderStatus.New), List.of(item(FulfilmentStatus.New)),
@@ -169,7 +169,7 @@ class OrderPageModelFactoryTest {
 
     @Test
     void anIncompletePaymentStillAppearsInThePaymentsList() {
-        // given (D-11): a zero-amount payment with no reference is not Payment.isComplete(), but it is still a
+        // given: a zero-amount payment with no reference is not Payment.isComplete(), but it is still a
         // recorded payment attempt the operator must see, not one that silently disappears from the list
         Order order = order(OrderStatus.New);
         order.addPayment(new Payment(null, null, PaymentSource.BankTransfer, 0, 0));
@@ -230,7 +230,7 @@ class OrderPageModelFactoryTest {
 
     @Test
     void aDropshipOrderWithItemsWaitingForTheSupplierOffersTheSupplierOrderToAnAdminOnly() {
-        // given (B8)
+        // given
         Order dropship = order(OrderStatus.New);
         dropship.setFulfilmentType(FulfilmentType.DirectToConsumer);
         OrderItem allocated = item(FulfilmentStatus.Allocation);

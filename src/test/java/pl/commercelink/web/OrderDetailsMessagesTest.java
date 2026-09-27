@@ -19,7 +19,8 @@ class OrderDetailsMessagesTest {
 
     static Stream<Path> sources() throws IOException {
         List<Path> files = new ArrayList<>();
-        // Task 6 creates this directory; Files.walk itself (unlike the per-file Files.exists guard below) throws on a missing root.
+        // the directory may be missing; Files.walk itself (unlike the per-file Files.exists guard below)
+        // throws on a missing root
         Path detailsDir = Path.of("src/main/resources/templates/orders/details");
         if (Files.exists(detailsDir)) {
             try (Stream<Path> t = Files.walk(detailsDir)) { t.filter(Files::isRegularFile).forEach(files::add); }
@@ -34,8 +35,11 @@ class OrderDetailsMessagesTest {
 
     @Test
     void everyKeyUsedByTheDetailsPageExistsInBothBundles() throws IOException {
+        // given
         Properties pl = load("messages_pl.properties"), en = load("messages_en.properties");
         Set<String> missing = new TreeSet<>();
+
+        // when
         for (Path p : sources().toList()) {
             if (!Files.exists(p)) continue;
             String text = Files.readString(p);
@@ -49,6 +53,8 @@ class OrderDetailsMessagesTest {
                 }
             }
         }
+
+        // then
         assertThat(missing).isEmpty();
     }
 

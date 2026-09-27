@@ -61,7 +61,7 @@ class CustomerViewTest {
 
     @Test
     void anInvoiceLocksTheBillingDataAndALabelLocksTheShippingAddressWithAReason() {
-        // given (B3)
+        // given
         Order order = order();
         order.addDocument(new Document("fv", "FV/1", null, DocumentType.InvoiceVat));
         order.getShipments().get(0).setTrackingNo("T-1");

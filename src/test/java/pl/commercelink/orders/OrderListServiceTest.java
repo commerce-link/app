@@ -337,7 +337,7 @@ class OrderListServiceTest {
         assertThat(page(query()).rows().get(0).marks()).extracting(m -> m.kind() + ":" + m.state()).contains("wz:is-todo");
     }
 
-    // a row's link carries the list's returnTo (D11); these tests look at which orders are listed, in what order
+    // a row's link carries the list's returnTo; these tests look at which orders are listed, in what order
     private static String path(OrderRow row) {
         return row.href().replaceFirst("\\?.*", "");
     }

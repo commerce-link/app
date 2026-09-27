@@ -14,7 +14,7 @@ import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Global rules of the plan for the redesigned order details templates: no inline style or behaviour, no Bulma look. */
+/** Global rules for the redesigned order details templates: no inline style or behaviour, no Bulma look. */
 class OrdersTemplatesHygieneTest {
 
     static final Path TEMPLATES = Path.of("src/main/resources/templates");

@@ -32,7 +32,7 @@ import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
 /**
- * Review Focus 5, Task 17 fix round 1: renders the real {@code fragments/payments-section :: paymentsSection(...)}
+ * Renders the real {@code fragments/payments-section :: paymentsSection(...)}
  * call that {@code deliveryDetails.html} makes (same arguments, same order), fed by the exact model
  * {@link DeliveriesController#showDeliveryDetails} builds for real (mocked repositories, real controller method) —
  * not a hand-picked {@code paymentSources} stand-in. Rendering {@code deliveryDetails.html} itself is not possible
@@ -41,11 +41,11 @@ import static org.mockito.Mockito.when;
  * payments section does not use {@code th:field} (raw {@code name=}, see payments-section.html's own doc comment),
  * so rendering that fragment directly is both possible and exactly where the regression lived.
  * <p>
- * This is the render the task-17 review found nothing covering: the shared "paymentSources" attribute became an
+ * Nothing covered this render before: the shared "paymentSources" attribute became an
  * {@code OrderLabels.Option} list, but the Bulma edit modal (#paymentsEditModal) still read it as raw
  * {@code PaymentSource} values, so options rendered as {@code Option[value=..., labelKey=...]} and nothing could
- * be preselected or saved. This test fails on b2ca7cb5 (before payments-section.html was fixed to read
- * value()/labelKey()).
+ * be preselected or saved. This test fails while payments-section.html reads the raw values instead of
+ * value()/labelKey().
  */
 @ExtendWith(MockitoExtension.class)
 class DeliveryPaymentsSectionPageRenderTest {
@@ -110,7 +110,7 @@ class DeliveryPaymentsSectionPageRenderTest {
                 .doesNotContain("Option[")
                 .containsPattern("<option value=\"BankTransfer\"[^>]*selected[^>]*>Przelew bankowy<")
                 .contains(">Gotówka<");
-        // Task 24 hygiene ruling (c): the delivery details page's payments section must load money.js exactly once
+        // the delivery details page's payments section must load money.js exactly once
         assertThat(occurrences(html, "/js/money.js")).isEqualTo(1);
     }
 

@@ -75,7 +75,7 @@ class OrdersScriptContractTest {
         String copy = read("src/main/resources/static/js/copy-field.js");
 
         // then
-        // the menus are native details (spec §4.10): the script enhances them and never hides the list itself
+        // the menus are native details: the script enhances them and never hides the list itself
         assertThat(menu).contains("details.cl-menu").contains("'toggle'").contains(":scope > summary")
                 .contains("Escape").contains("ArrowDown").contains("aria-disabled").contains("is-up").contains(".open = false")
                 .doesNotContain(".hidden =").doesNotContain("aria-controls");
@@ -89,7 +89,7 @@ class OrdersScriptContractTest {
     }
 
     /**
-     * Task 10 CARRY (from Task 7): a card marked data-cl-collapse re-enhances on cl:form-replaced (the order settings
+     * A card marked data-cl-collapse re-enhances on cl:form-replaced (the order settings
      * form saved without reloading), which used to always collapse it back on phones — hiding a 422 validation error
      * that async-form.js focuses right after the same event. The re-collapse must stay open when the swapped-in body
      * carries data-cl-error-summary.
@@ -131,8 +131,8 @@ class OrdersScriptContractTest {
     }
 
     /**
-     * Task 13 fix round 1 (Important 1): D-23 mapped item-add-check to cl-table-check, but the class landed on a
-     * decorative span instead of the cell the design system's {@code .cl-page .cl-table .cl-table-check} rule
+     * The add-items pick indicator maps to cl-table-check; the class once landed on a decorative span instead of
+     * the cell the design system's {@code .cl-page .cl-table .cl-table-check} rule
      * expects (44 px, a table cell) — the pick indicator was invisible. The cell now carries the class and holds a
      * presentational {@code cl-check-input} checkbox, reusing the existing checkbox styling instead of adding new
      * CSS for it.
@@ -149,11 +149,11 @@ class OrdersScriptContractTest {
     }
 
     /**
-     * Task 13 fix round 1 (Important 2 + Extra): the money formatter (NBSP thousands, U+2212 minus) used to be
+     * The money formatter (NBSP thousands, U+2212 minus) used to be
      * copied verbatim into item-add-dialog.js from order-item-dialogs.js; now both call one shared
      * {@code window.CL_formatMoney}, which also adds the currency unit from a pattern the layout renders once
      * per page (data-cl-amount-format), so neither script builds the number or hard-codes "PLN"/"zł" itself.
-     * Task 17's add-payment-dialog.js (fragments/add-payment-modal.html) joins the same rule.
+     * The add-payment-dialog.js (fragments/add-payment-modal.html) follows the same rule.
      */
     @Test
     void theMoneyFormatterIsSharedNotDuplicated() throws Exception {
@@ -216,14 +216,14 @@ class OrdersScriptContractTest {
     }
 
     /**
-     * The closing strip (spec §4.2) restyles the list's doc marks inline, as full sentences: both glyph and tone
-     * carry the meaning, and the side column never drops below 320 px at its widest breakpoint (spec §4).
+     * The closing strip restyles the list's doc marks inline, as full sentences: both glyph and tone carry the
+     * meaning, and the side column never drops below 320 px at its widest breakpoint.
      * <p>
-     * Review fix round 1: the inline mark must not inherit the list's pill chrome (padding, fixed line-height,
+     * The inline mark must not inherit the list's pill chrome (padding, fixed line-height,
      * {@code white-space: nowrap}) or the list's {@code .is-todo} background — the tone belongs on the icon only,
      * so the sentence itself can wrap and does not carry a second warn-soft pill behind it. The side-column check
      * is scoped to the {@code .cl-layout-aside} rule bodies only: the add-items dialog's own, unrelated
-     * {@code .cl-item-add-scroll} height legitimately keeps 340 px (Task 4 review round 1).
+     * {@code .cl-item-add-scroll} height legitimately keeps 340 px.
      */
     @Test
     void theClosingStripStylesTheInlineMarksWithBothGlyphAndTone() throws Exception {
