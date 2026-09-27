@@ -825,6 +825,12 @@ public class OrdersController extends BaseController {
 
         if (op.isPresent()) {
             OrderItem orderItem = op.get();
+            // the item page of a closed order is read-only; a replayed or hand-made post must not change it either
+            if (order.isClosed()) {
+                model.addAttribute("errorMessage",
+                        messageSource.getMessage("order.item.error.closed", null, LocaleContextHolder.getLocale()));
+                return showOrderItemDetails(order, orderItem, model);
+            }
 
             boolean wasService = orderItem.isService();
             boolean serviceFlagLocked = orderItem.hasSupplierAllocation();
@@ -1284,7 +1290,7 @@ public class OrdersController extends BaseController {
         if (existingOrder.isClosed()) {
             return refuse(redirectAttributes, orderId, "order.address.error.closed", locale);
         }
-        // once a label exists (or the parcel is on its way) the address is fixed; the page greys the edit link with the same reason
+        // once a label exists the address is fixed; the page greys the edit link with the same reason
         if ("shipping".equals(type) && !existingOrder.canOperatorChangeShippingAddress()) {
             return refuse(redirectAttributes, orderId, CustomerView.lockedKey(existingOrder, false), locale);
         }

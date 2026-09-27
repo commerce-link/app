@@ -68,6 +68,7 @@ import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.taxonomy.TaxonomyCache;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -713,6 +714,29 @@ class OrdersControllerTest {
 
         // then
         assertThat(item.getPrice()).isEqualTo(100.0);
+    }
+
+    @Test
+    void saveOrderItemRefusesAClosedOrder() {
+        // given
+        OrderItem item = existingOrderItem("Obudowy", false);
+        Order closed = orderBase();
+        closed.setStatus(OrderStatus.Completed);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(closed);
+        when(messageSource.getMessage(eq("order.item.error.closed"), any(), any(Locale.class))).thenReturn("closed");
+        OrderItem posted = postedOrderItem("Obudowy");
+        posted.setService(true);
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        String view = ordersController.saveOrderItem(ORDER_ID, item.getItemId(), posted, model);
+
+        // then
+        assertThat(view).isEqualTo("orderItem");
+        assertThat(model.getAttribute("errorMessage")).isEqualTo("closed");
+        assertThat(item.isService()).isFalse();
+        verify(orderItemsRepository, never()).save(any());
+        verifyNoInteractions(orderLifecycle);
     }
 
     @Test
@@ -2465,18 +2489,20 @@ class OrdersControllerTest {
         }
 
         @Test
-        void theShippingAddressCannotChangeOnceTheOrderIsShippingAndTheRefusalSaysWhy() {
+        void theShippingAddressStillChangesInShippingWithoutALabel() {
             // given
             Order order = order(OrderStatus.Shipping);
             when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
             RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+            Order posted = shippingPayload();
 
             // when
-            ordersController.updateAddressDetails(ORDER_ID, "shipping", shippingPayload(), redirect, polish);
+            ordersController.updateAddressDetails(ORDER_ID, "shipping", posted, redirect, polish);
 
-            // then: no label, the status alone locks it
-            verify(ordersRepository, never()).save(any());
-            assertThat(flash(redirect)).containsEntry("errorMessage", "order.customer.shipping.locked.status");
+            // then: only a label fixes the parcel address, the status does not
+            verify(ordersRepository).save(order);
+            assertThat(order.getShippingDetails()).isSameAs(posted.getShippingDetails());
+            assertThat(flash(redirect)).doesNotContainKey("errorMessage");
         }
 
         @Test
@@ -2708,7 +2734,8 @@ class OrdersControllerTest {
             // when / then
             assertThatThrownBy(() -> ordersController.confirmBulk(ORDER_ID, BulkAction.REMOVE, selectedItem(),
                     new ExtendedModelMap(), new RedirectAttributesModelMap(), polish))
-                    .isInstanceOf(ResponseStatusException.class);
+                    .isInstanceOf(ResponseStatusException.class)
+                    .extracting("statusCode").isEqualTo(HttpStatus.NOT_FOUND);
             verifyNoInteractions(ordersManager, orderItemsRepository);
         }
 

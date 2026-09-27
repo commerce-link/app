@@ -18,7 +18,11 @@ class OrderItemRowTest {
     private static final Order ORDER = new Order("store-1");
 
     private static OrderItemRow.Context context(Order order, boolean admin, boolean readOnly) {
-        return new OrderItemRow.Context(order, admin, readOnly, new SupplierLabels(mock(StoresRepository.class)).forStore(null),
+        return context(order, admin, readOnly, false);
+    }
+
+    private static OrderItemRow.Context context(Order order, boolean admin, boolean readOnly, boolean superAdmin) {
+        return new OrderItemRow.Context(order, admin, readOnly, superAdmin, new SupplierLabels(mock(StoresRepository.class)).forStore(null),
                 item -> "/dashboard/deliveries/details?deliveryId=" + item.getDeliveryId(),
                 serial -> "/dashboard/item/history?serialNo=" + serial);
     }
@@ -205,5 +209,37 @@ class OrderItemRowTest {
         // then
         assertThat(state(row, ItemAction.ASSIGN_WAREHOUSE).reasonKey()).isEqualTo("order.item.unavailable.routed");
         assertThat(state(row, ItemAction.ASSIGN_SUPPLIER).available()).isTrue();
+    }
+
+    @Test
+    void aClosedOrderLinksTheNameToTheItemPage() {
+        // given
+        OrderItem item = item(FulfilmentStatus.Delivered, "MFN-1");
+
+        // when
+        OrderItemRow row = OrderItemRow.of(item, 0, context(ORDER, true, true));
+
+        // then
+        assertThat(row.viewHref()).isEqualTo("/dashboard/orders/" + ORDER.getOrderId() + "/items/" + item.getItemId());
+        assertThat(row.editHref()).isNull();
+    }
+
+    @Test
+    void aClosedOrderLinksTheNameToTheItemPageNotForASuperAdmin() {
+        // when
+        OrderItemRow row = OrderItemRow.of(item(FulfilmentStatus.Delivered, "MFN-1"), 0, context(ORDER, false, true, true));
+
+        // then
+        assertThat(row.viewHref()).isNull();
+    }
+
+    @Test
+    void aClosedOrderLinksTheNameToTheItemPageNotForAnOpenOrder() {
+        // when
+        OrderItemRow row = OrderItemRow.of(item(FulfilmentStatus.New, "MFN-1"), 0, context(ORDER, true, false));
+
+        // then: the open order reaches the item page through the item menu
+        assertThat(row.viewHref()).isNull();
+        assertThat(row.editHref()).isNotNull();
     }
 }

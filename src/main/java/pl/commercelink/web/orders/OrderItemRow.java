@@ -21,13 +21,18 @@ public record OrderItemRow(String itemId, int index, String name, String categor
                            String unitCost, String statusKey, String statusTone, String deliveryLabel, String deliveryHref,
                            boolean readyForAllocation, boolean allocatedProduct, boolean deliveredProduct, boolean movable,
                            boolean removable, List<ItemAction.State> actions, String editHref, double price, double tax,
-                           boolean group) {
+                           boolean group, String viewHref) {
 
-    public record Context(Order order, boolean admin, boolean readOnly, SupplierLabelMap labels,
+    /**
+     * {@code superAdmin} matters on its own besides {@code readOnly}: a closed order is read-only too, but only the
+     * store's own users have a route to the item page.
+     */
+    public record Context(Order order, boolean admin, boolean readOnly, boolean superAdmin, SupplierLabelMap labels,
                           Function<OrderItem, String> deliveryHref, Function<String, String> serialHref) {
     }
 
     public static OrderItemRow of(OrderItem item, int index, Context context) {
+        String itemHref = "/dashboard/orders/" + context.order().getOrderId() + "/items/" + item.getItemId();
         String deliveryId = StringUtils.trimToNull(item.getDeliveryId());
         String deliveryLabel = deliveryId == null ? null
                 : context.labels().has(deliveryId) ? context.labels().of(deliveryId) : item.getShortenedDeliveryId();
@@ -46,8 +51,10 @@ public record OrderItemRow(String itemId, int index, String name, String categor
                 item.isReadyForAllocation(), item.isProduct() && item.isAllocated(), item.isProduct() && item.isDelivered(),
                 item.canBeMovedToAnotherOrder(), item.isNew() || item.isService(),
                 context.readOnly() ? List.of() : actions(item, context.order()),
-                context.readOnly() ? null : "/dashboard/orders/" + context.order().getOrderId() + "/items/" + item.getItemId(),
-                item.getPrice(), item.getTax(), item.isGroup());
+                context.readOnly() ? null : itemHref,
+                item.getPrice(), item.getTax(), item.isGroup(),
+                // without the item menu a closed order would have no way to its item page (EAN, VAT, delivery dates)
+                context.readOnly() && !context.superAdmin() ? itemHref : null);
     }
 
     /** The conditions of the old order-details item menu, plus: consolidation stops at the closing invoice. */

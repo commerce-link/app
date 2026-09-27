@@ -356,9 +356,9 @@ class OrdersScriptContractTest {
         // given
         String css = css();
 
-        // then: the orders list's overdue note still needs .cl-table-sub.is-bad
+        // then: the orders list's overdue note takes its colour and weight from .cl-due-note.is-bad
         assertThat(css).doesNotContain(".cl-menu-check").doesNotContain("ol.cl-stepper").doesNotContain("ul.cl-checklist")
-                .doesNotContain(".cl-table-order").contains(".cl-page .cl-table .cl-table-sub.is-bad {");
+                .doesNotContain(".cl-table-order").doesNotContain(".cl-page .cl-table .cl-table-sub.is-bad {");
     }
 
     @Test

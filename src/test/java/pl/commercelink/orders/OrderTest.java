@@ -375,14 +375,43 @@ class OrderTest {
     }
 
     @Test
-    void operatorCannotChangeShippingAddressOnceALabelExists() {
+    void shippingAddressCanChangeInShippingWithoutALabel() {
         // given
         Order order = new Order("store-1");
-        Shipment labelled = new Shipment(ShipmentType.Courier);
-        labelled.setTrackingNo("T-1");
+        order.setStatus(OrderStatus.Shipping);
+        order.setShipments(List.of(new Shipment(ShipmentType.PersonalCollection)));
+
         // then
         assertThat(order.canOperatorChangeShippingAddress()).isTrue();
+    }
+
+    @Test
+    void shippingAddressIsLockedOnAClosedOrder() {
+        // given
+        Order completed = new Order("store-1");
+        completed.setStatus(OrderStatus.Completed);
+        Order cancelled = new Order("store-1");
+        cancelled.setStatus(OrderStatus.Cancelled);
+
+        // then
+        assertThat(completed.canOperatorChangeShippingAddress()).isFalse();
+        assertThat(cancelled.canOperatorChangeShippingAddress()).isFalse();
+    }
+
+    @Test
+    void shippingAddressIsLockedByALabel() {
+        // given
+        Order order = new Order("store-1");
+        order.setStatus(OrderStatus.Realization);
+        Shipment labelled = new Shipment(ShipmentType.Courier);
+        labelled.setTrackingNo("T-1");
+        boolean before = order.canOperatorChangeShippingAddress();
+
+        // when
         order.setShipments(List.of(labelled));
+
+        // then
+        assertThat(before).isTrue();
         assertThat(order.canOperatorChangeShippingAddress()).isFalse();
     }
 

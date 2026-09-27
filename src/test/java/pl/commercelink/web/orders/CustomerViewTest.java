@@ -94,13 +94,13 @@ class CustomerViewTest {
         // card and the page can no longer drift apart the way two hand-copied conditions could
         Order open = order();
 
-        // given: past the operator's window but never labelled — a different reason than "already labelled"
+        // given: delivered but never labelled — only a label fixes the shipping address
         Order inTransit = order();
         inTransit.setStatus(OrderStatus.Delivered);
 
         // then
         assertThat(CustomerView.lockedKey(open, true)).isNull();
         assertThat(CustomerView.lockedKey(open, false)).isNull();
-        assertThat(CustomerView.lockedKey(inTransit, false)).isEqualTo("order.customer.shipping.locked.status");
+        assertThat(CustomerView.lockedKey(inTransit, false)).isNull();
     }
 }

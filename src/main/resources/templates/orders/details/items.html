@@ -115,7 +115,8 @@
         <input type="hidden" th:name="|orderItems[${row.index()}].itemId|" th:value="${row.itemId()}">
     </td>
     <th scope="row" class="cl-table-key" th:attr="data-label=#{order.items.column.product}">
-        <span th:text="${row.name()}"></span>
+        <a th:if="${row.viewHref() != null}" class="cl-table-link" th:href="@{${row.viewHref()}}" th:text="${row.name()}"></a>
+        <span th:unless="${row.viewHref() != null}" th:text="${row.name()}"></span>
         <span class="cl-table-sub">
             <span th:if="${row.category() != null}" th:text="${row.category()}"></span>
             <th:block th:if="${row.mfn() != null}">

@@ -12,6 +12,7 @@ import pl.commercelink.orders.Payment;
 import pl.commercelink.orders.PaymentSource;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShipmentType;
+import pl.commercelink.orders.fulfilment.FulfilmentType;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -162,5 +163,53 @@ class OrderClosingChecklistTest {
         // then
         assertThat(unpaidTexts).contains("Brakuje wpłaty: 10 000,00 PLN");
         assertThat(overpaidTexts).contains("Nadpłata: 1,00 PLN");
+    }
+
+    @Test
+    void anOrderWithoutShipmentsShowsNotApplicable() {
+        // given
+        Order order = settledOrder();
+        order.setShipments(new java.util.ArrayList<>());
+
+        // when
+        OrderClosingChecklist checklist = OrderClosingChecklist.of(order, false, messages(), PL);
+
+        // then: not ticked as done, yet it does not block closing either
+        OrderClosingChecklist.Item shipments = checklist.items().get(0);
+        assertThat(shipments.state()).isEqualTo(OrderClosingChecklist.State.NOT_APPLICABLE);
+        assertThat(shipments.done()).isFalse();
+        assertThat(shipments.text()).isEqualTo("Brak przesyłek (odbiór osobisty lub wysyłka poza systemem)");
+        assertThat(checklist.missing()).isZero();
+        assertThat(checklist.allDone()).isTrue();
+    }
+
+    @Test
+    void aDropshipOrderWithoutShipmentsSaysTheSupplierShips() {
+        // given
+        Order order = unpaidOrder();
+        order.setFulfilmentType(FulfilmentType.DirectToConsumer);
+
+        // when
+        OrderClosingChecklist checklist = OrderClosingChecklist.of(order, false, messages(), PL);
+
+        // then
+        assertThat(checklist.items().get(0).state()).isEqualTo(OrderClosingChecklist.State.NOT_APPLICABLE);
+        assertThat(checklist.items().get(0).text()).isEqualTo("Przesyłki: nada je dostawca");
+    }
+
+    @Test
+    void aReviewNotCollectedIsNotApplicable() {
+        // given
+        Order order = settledOrder();
+        order.setReview(null);
+
+        // when
+        OrderClosingChecklist checklist = OrderClosingChecklist.of(order, false, messages(), PL);
+
+        // then
+        OrderClosingChecklist.Item review = checklist.items().get(checklist.items().size() - 1);
+        assertThat(review.state()).isEqualTo(OrderClosingChecklist.State.NOT_APPLICABLE);
+        assertThat(review.text()).isEqualTo("Opinia nie jest zbierana");
+        assertThat(checklist.allDone()).isTrue();
     }
 }

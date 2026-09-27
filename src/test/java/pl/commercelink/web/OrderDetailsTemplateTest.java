@@ -38,6 +38,7 @@ import pl.commercelink.web.settings.SettingsTemplateRenderer;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -482,6 +483,24 @@ class OrderDetailsTemplateTest {
     }
 
     @Test
+    void aClosedOrderLinksEachItemNameToItsReadOnlyItemPage() {
+        // given
+        Order completed = order(OrderStatus.Completed);
+        List<OrderItem> items = items(completed);
+        String itemPage = "href=\"/dashboard/orders/3e373abc-1111-2222-3333-444455556666/items/" + items.get(0).getItemId() + "\"";
+
+        // when
+        String closed = page(render(completed, items, ADMIN, Set.of()));
+        String superAdmin = page(render(completed, items, SUPER_ADMIN, Set.of()));
+        String open = page(render(order(OrderStatus.Assembly), ADMIN));
+
+        // then
+        assertThat(closed).containsPattern("<a class=\"cl-table-link\" " + Pattern.quote(itemPage) + ">AMD Ryzen 7 9800X3D</a>");
+        assertThat(superAdmin).doesNotContain("class=\"cl-table-link\" href=\"/dashboard/orders/");
+        assertThat(open).doesNotContain(">AMD Ryzen 7 9800X3D</a>");
+    }
+
+    @Test
     void theClosedOrderMenuKeepsNoGreyedOutCancelOrDelete() {
         // when
         String completed = page(render(order(OrderStatus.Completed), ADMIN));
@@ -534,6 +553,25 @@ class OrderDetailsTemplateTest {
         assertThat(html).contains("Do zamknięcia brakuje:").contains("href=\"#platnosci\"")
                 .contains("data-cl-dialog-open=\"review-dialog\"").contains("Do zrobienia:").doesNotContain("brakuje:</span>")
                 .contains("Faktura już wystawiona");
+    }
+
+    @Test
+    void theChecklistMarksWhatDoesNotApplyWithoutATick() {
+        // given
+        Order order = order(OrderStatus.Assembly);
+        order.setShipments(new ArrayList<>());
+        order.setReview(null);
+
+        // when
+        String html = page(render(order, ADMIN));
+
+        // then
+        String strip = html.substring(html.indexOf("class=\"cl-doc-marks is-sentences\""), html.indexOf("</ul>", html.indexOf("cl-doc-marks is-sentences")));
+        assertThat(occurrences(strip, "class=\"cl-doc-mark is-na\"")).isEqualTo(2);
+        assertThat(occurrences(strip, "<span class=\"cl-doc-mark-icon\" aria-hidden=\"true\">–</span>")).isEqualTo(2);
+        assertThat(occurrences(strip, "Nie dotyczy:")).isEqualTo(2);
+        assertThat(strip).doesNotContain("✓").contains("Brak przesyłek (odbiór osobisty lub wysyłka poza systemem)")
+                .contains("Opinia nie jest zbierana");
     }
 
     @Test
@@ -781,7 +819,7 @@ class OrderDetailsTemplateTest {
         assertThat(fallback).contains("formaction=\"/dashboard/orders/3e373abc-1111-2222-3333-444455556666/bulk-confirm?action=ALLOCATE\"")
                 .contains("formaction=\"/dashboard/orders/3e373abc-1111-2222-3333-444455556666/bulk-confirm?action=REMOVE\"")
                 .doesNotContain("/moveSelectedItemsToAllocation\"").doesNotContain("/removeSelectedItemsFromOrder\"")
-                .containsPattern("class=\"cl-button is-danger\"\s+formaction=\"[^\"]+action=REMOVE\"");
+                .containsPattern("class=\"cl-button is-danger\"\\s+formaction=\"[^\"]+action=REMOVE\"");
     }
 
     @Test

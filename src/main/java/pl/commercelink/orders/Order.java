@@ -602,14 +602,13 @@ public class Order {
     }
 
     /**
-     * The operator's version of the customer's rule for the shipping address, without its customer-only conditions
-     * (courier, not marketplace, e-mail for the code), so a pickup point or a marketplace order can still be
-     * corrected before the parcel is labelled. A tracking number typed by hand counts as a label, as for the customer.
+     * Once a label exists the parcel address is fixed; before that the operator may still correct it, whatever the
+     * status of an open order (a personal pickup already in Shipping can still get a corrected address). A tracking
+     * number typed by hand counts as a label, as for the customer.
      */
     @DynamoDBIgnore
     public boolean canOperatorChangeShippingAddress() {
-        return hasOneOfStatuses(OrderStatus.New, OrderStatus.Blocked, OrderStatus.Assembly, OrderStatus.Assembled,
-                OrderStatus.Realization) && !hasShippingLabel();
+        return !isClosed() && !hasShippingLabel();
     }
 
     @DynamoDBIgnore

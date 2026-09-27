@@ -32,9 +32,6 @@ public record CustomerView(AddressBlock billing, AddressBlock shipping, boolean 
         if (billing) {
             return order.isInvoiced() ? "order.customer.billing.locked" : null;
         }
-        if (order.canOperatorChangeShippingAddress()) {
-            return null;
-        }
-        return order.hasShippingLabel() ? "order.customer.shipping.locked.label" : "order.customer.shipping.locked.status";
+        return order.hasShippingLabel() ? "order.customer.shipping.locked.label" : null;
     }
 }

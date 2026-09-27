@@ -182,7 +182,7 @@ public class OrderPageModelFactory {
                                            boolean readOnly, OrderLinks links, boolean hasDropshipItems,
                                            boolean hasWarehouseDocument) {
         SupplierLabelMap labels = supplierLabels.forStore(store);
-        OrderItemRow.Context context = new OrderItemRow.Context(order, viewer.admin(), readOnly, labels,
+        OrderItemRow.Context context = new OrderItemRow.Context(order, viewer.admin(), readOnly, viewer.superAdmin(), labels,
                 item -> deliveryHref(order, item, viewer, links),
                 serial -> viewer.superAdmin() ? null
                         : "/dashboard/item/history?serialNo=" + URLEncoder.encode(serial, StandardCharsets.UTF_8));

@@ -5521,12 +5521,6 @@ a.cl-link-button:hover {
 .cl-page .cl-table col.cl-col-state { width: 158px; }
 .cl-page .cl-table col.cl-col-menu { width: 56px; }
 
-/* Secondary lines in a cell with a tone (urgency, amount due) */
-.cl-page .cl-table .cl-table-sub.is-bad {
-    color: var(--cl-bad);
-    font-weight: 600;
-}
-
 /* .cl-page .cl-table .cl-table-sub .cl-status and .cl-page .cl-table .cl-table-pills already style every .cl-table
    on main (catalog/inventory tables included); not repeated unscoped here, or a merged catalog/inventory screen
    would silently change size. The order items table needs the tighter spacing only in its own phone card layout, so
@@ -6156,6 +6150,9 @@ a.cl-link-button:hover {
 .cl-page .cl-doc-marks.is-sentences .cl-doc-mark-icon { width: 18px; height: 18px; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; }
 .cl-page .cl-doc-marks.is-sentences .is-done .cl-doc-mark-icon { color: var(--cl-ok); }
 .cl-page .cl-doc-marks.is-sentences .is-todo .cl-doc-mark-icon { color: var(--cl-warn); background: var(--cl-warn-soft); }
+/* "does not apply": neutral ink, no tile behind the dash, so it reads neither as done nor as missing */
+.cl-page .cl-doc-marks.is-sentences .cl-doc-mark.is-na { color: var(--cl-ink-3); }
+.cl-page .cl-doc-marks.is-sentences .is-na .cl-doc-mark-icon { color: var(--cl-ink-3); background: none; }
 .cl-page .cl-doc-marks.is-sentences .cl-doc-mark a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
 .cl-page .cl-doc-marks.is-sentences .cl-doc-mark a:hover { color: var(--cl-accent-ink); }
 @media (max-width: 1023px) { .cl-page .cl-doc-marks.is-sentences .cl-doc-mark a, .cl-page .cl-doc-marks.is-sentences .cl-doc-mark button { min-height: 44px; display: inline-flex; align-items: center; } }
