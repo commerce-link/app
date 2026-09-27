@@ -1296,6 +1296,20 @@ class OrderDetailsTemplateTest {
     }
 
     @Test
+    void anItemWithoutCategoryAndCodesRendersNoEmptyCodesLine() {
+        // given
+        Order order = order(OrderStatus.New);
+        OrderItem bare = new OrderItem(order.getOrderId(), null, "Montaż", 1, 99, null, false, 0);
+        bare.setStatus(FulfilmentStatus.New);
+
+        // when
+        String cell = productCell(page(render(order, List.of(bare), ADMIN, Set.of())), "Montaż");
+
+        // then
+        assertThat(cell).doesNotContain("cl-table-sub").doesNotContain("cl-table-marks");
+    }
+
+    @Test
     void theSkuAndSerialPrefixesComeFromTheBundles() throws Exception {
         // given
         String template = java.nio.file.Files.readString(

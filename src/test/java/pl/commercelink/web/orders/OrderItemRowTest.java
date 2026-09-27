@@ -281,4 +281,17 @@ class OrderItemRowTest {
         assertThat(commentedRow.comment()).isEqualTo("Check the box");
         assertThat(consolidatedRow.hasMarkers()).isTrue();
     }
+
+    @Test
+    void anItemWithoutCategoryAndCodesHasNoCodesLine() {
+        // given
+        OrderItem bare = new OrderItem(ORDER.getOrderId(), null, "Montaż", 1, 99, null, false);
+        bare.setStatus(FulfilmentStatus.New);
+
+        // when
+        OrderItemRow row = OrderItemRow.of(bare, 0, context());
+
+        // then
+        assertThat(row.hasCodes()).isFalse();
+    }
 }

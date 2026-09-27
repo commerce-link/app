@@ -161,11 +161,11 @@
             <span th:if="${row.conditionKey() != null}" class="cl-status" th:classappend="${row.conditionTone()}" th:text="#{${row.conditionKey()}}"></span>
             <span th:if="${row.service()}" class="cl-status is-neutral" th:text="#{order.items.pill.service}"></span>
             <details th:if="${row.consolidated()}" class="cl-note">
-                <summary class="cl-note-toggle" th:attr="aria-label=#{order.items.note.consolidated}"><span class="icon is-small" aria-hidden="true"><i class="far fa-file-alt"></i></span></summary>
+                <summary class="cl-note-toggle" th:attr="aria-label=#{order.items.note.consolidated}"><span class="cl-note-glyph" aria-hidden="true"><i class="far fa-file-alt"></i></span></summary>
                 <div class="cl-note-panel"><p class="cl-note-text" th:text="#{order.items.note.consolidated.text}"></p></div>
             </details>
             <details th:if="${row.comment() != null}" class="cl-note is-accent">
-                <summary class="cl-note-toggle" th:attr="aria-label=#{order.items.note.comment}"><span class="icon is-small" aria-hidden="true"><i class="far fa-comment-alt"></i></span></summary>
+                <summary class="cl-note-toggle" th:attr="aria-label=#{order.items.note.comment}"><span class="cl-note-glyph" aria-hidden="true"><i class="far fa-comment-alt"></i></span></summary>
                 <div class="cl-note-panel"><p class="cl-note-title" th:text="#{order.items.note.comment}"></p><p class="cl-note-text is-pre" th:text="${row.comment()}"></p></div>
             </details>
         </span>

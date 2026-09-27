@@ -6320,7 +6320,7 @@ a.cl-link-button:hover {
 
 /* --- Order details: product cell — the name with its markers, then the labelled codes (two lines) --- */
 /* Markers follow the name on its line and wrap like words: condition and service pills, then the note toggles. The
-   markup's whitespace plus 2 px on each side keeps them 6-7 px apart (toggle centres 28 px apart). */
+   markup's whitespace plus 2 px on each side keeps them 6-7 px apart. */
 .cl-page .cl-table .cl-table-marks {
     font-weight: 400;
 }
@@ -6342,23 +6342,33 @@ a.cl-link-button:hover {
     color: var(--cl-ink-3);
 }
 
-/* Codes copy on click; the icon is laid over the space after the code instead of widening it, so hidden it leaves no
-   gap. It shows on hover and on keyboard focus (the base .cl-copy-inline rules). */
+/* Codes copy on click; the icon shows on hover and on keyboard focus (the base .cl-copy-inline rules). It takes no
+   width, so hidden it leaves no gap, and it is laid over the end of its own code (the last line of a wrapped one) on
+   the row's background: it never covers the next "·", the line above or anything past the cell's edge. The code is
+   in the button's accessible name and copied whole, so hiding its last characters while hovering loses nothing. */
 .cl-page .cl-table-sub .cl-copy-inline {
     position: relative;
 }
 
 .cl-page .cl-table-sub .cl-copy-inline .cl-copy-icon {
     position: absolute;
-    top: 0;
-    left: 100%;
-    margin-left: 0;
-    padding-left: 2px;
+    right: 0;
+    bottom: 0;
+    display: inline-flex;
+    align-items: center;
+    height: 100%;
+    margin: 0;
+    padding: 0 1px 0 3px;
+    background: var(--cl-surface);
     pointer-events: none;
 }
 
-/* The SN with a history link: the link and a copy icon right behind it. The icon's button takes no width; the icon
-   is its click area and shows while the pointer is on the link or on the icon. */
+.cl-page .cl-table tr.is-selected .cl-table-sub .cl-copy-icon {
+    background: var(--cl-accent-soft);
+}
+
+/* The SN with a history link: the link and a copy button right behind it. The button takes no width; its icon, laid
+   over the end of the SN, is the click area and shows while the pointer is on the link or on the icon. */
 .cl-page .cl-table-sub .cl-copy-inline.is-icon {
     display: inline-block;
     width: 0;
@@ -6367,7 +6377,8 @@ a.cl-link-button:hover {
 }
 
 .cl-page .cl-table-sub .cl-copy-inline.is-icon .cl-copy-icon {
-    top: -0.1em;
+    height: auto;
+    padding: 0 1px 0 3px;
     pointer-events: auto;
 }
 
@@ -6383,12 +6394,19 @@ a.cl-link-button:hover {
     opacity: 1;
     outline: 2px solid var(--cl-accent);
     outline-offset: 1px;
-    border-radius: 2px;
 }
 
-/* Without a pointer that hovers, the SN's copy icon has no other way to be found: it stays visible. */
+/* Without a pointer that hovers, the SN's copy icon has no other way to be found: it stays visible, in the line after
+   the SN (the last code, so it opens no gap before anything) and wraps with it instead of leaving the cell. */
 @media (hover: none) {
+    .cl-page .cl-table-sub .cl-copy-inline.is-icon {
+        width: auto;
+        height: auto;
+        margin-left: 4px;
+    }
+
     .cl-page .cl-table-sub .cl-copy-inline.is-icon .cl-copy-icon {
+        position: static;
         opacity: 1;
     }
 }
@@ -6438,7 +6456,7 @@ a.cl-link-button:hover {
 }
 
 /* The visible part of the toggle: hover, open and focus mark this 22 px square, not the larger touch target. */
-.cl-page .cl-note-toggle .icon {
+.cl-page .cl-note-toggle .cl-note-glyph {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -6451,8 +6469,8 @@ a.cl-link-button:hover {
     color: var(--cl-accent);
 }
 
-.cl-page .cl-note-toggle:hover .icon,
-.cl-page .cl-note[open] > .cl-note-toggle .icon {
+.cl-page .cl-note-toggle:hover .cl-note-glyph,
+.cl-page .cl-note[open] > .cl-note-toggle .cl-note-glyph {
     background: var(--cl-accent-soft);
     color: var(--cl-accent-ink);
 }
@@ -6461,7 +6479,7 @@ a.cl-link-button:hover {
     outline: 0;
 }
 
-.cl-page .cl-note-toggle:focus-visible .icon {
+.cl-page .cl-note-toggle:focus-visible .cl-note-glyph {
     outline: 2px solid var(--cl-accent);
     outline-offset: 1px;
 }
@@ -6512,14 +6530,14 @@ a.cl-link-button:hover {
     white-space: pre-line;
 }
 
-/* Below 1024 px: a 44 px target around the small icon, grown by negative margins so neither the line nor the group
-   grows (two toggles' centres stay 28 px apart, so their targets never sit closer than 24 px); the panel hangs off the
-   product cell (720-1023 px) or spans the whole card (< 720 px) instead of the icon, so it fits wherever the icon is. */
+/* Below 1024 px: a 44 px target around the 22 px icon, in the line box itself — only a row with markers gets the
+   taller name line, so the target overlaps neither the codes line below nor a wrapped name above, and two toggles
+   side by side do not overlap either; the panel hangs off the product cell (720-1023 px) or spans the whole card
+   (< 720 px) instead of the icon, so it fits wherever the icon is. */
 @media screen and (max-width: 1023px) {
     .cl-page .cl-note-toggle {
         width: 44px;
         height: 44px;
-        margin: -11px;
     }
 
     .cl-page .cl-note {
