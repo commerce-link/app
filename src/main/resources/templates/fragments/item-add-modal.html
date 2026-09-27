@@ -15,7 +15,7 @@
                      data-summary-unpriced=#{item.add.summary.unpriced}">
         <h2 class="cl-dialog-title" id="item-add-title" th:text="#{item.add.title}"></h2>
         <div class="cl-dialog-body">
-            <div class="cl-segmented is-inline" role="group" th:attr="aria-label=#{item.add.source}">
+            <div class="cl-segmented is-fit" role="group" th:attr="aria-label=#{item.add.source}">
                 <button type="button" class="cl-segment" id="itemAddTabPricelist" data-item-add-tab="pricelist" aria-pressed="true"
                         th:text="#{item.add.tab.pricelist}"></button>
                 <button type="button" class="cl-segment" id="itemAddTabInventory" data-item-add-tab="inventory" aria-pressed="false"
@@ -99,7 +99,7 @@
             <div class="cl-item-add-basket" id="itemAddBasket">
                 <button type="button" class="cl-item-add-basket-head" aria-expanded="true" aria-controls="itemAddBasketBody" data-item-add-basket-toggle>
                     <span class="cl-item-add-chev" aria-hidden="true">▾</span>
-                    <span th:text="#{item.add.list.title}"></span>
+                    <span class="cl-eyebrow" th:text="#{item.add.list.title}"></span>
                     <span class="cl-item-add-basket-n" id="itemAddBasketCount">0</span>
                 </button>
                 <button type="button" class="cl-link-button cl-item-add-basket-clear" data-item-add-clear th:text="#{item.add.list.clear}"></button>

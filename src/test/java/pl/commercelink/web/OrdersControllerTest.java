@@ -79,6 +79,7 @@ import pl.commercelink.documents.DocumentType;
 import pl.commercelink.orders.OrderReferenceResolver;
 import pl.commercelink.shipping.ShipmentCancelService;
 import pl.commercelink.web.dtos.AssignSupplierForm;
+import pl.commercelink.web.orders.BulkAction;
 import pl.commercelink.web.orders.MoveTargetView;
 import pl.commercelink.web.orders.OrderFlash;
 import pl.commercelink.web.orders.OrderNotice;
@@ -2279,6 +2280,49 @@ class OrdersControllerTest {
         }
 
         @Test
+        void aBulkActionWithoutJavaScriptIsConfirmedOnAPage() {
+            // given
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(orderBase());
+            OrderItem chosen = item("a", FulfilmentStatus.New, "SKU-A");
+            OrderItem other = item("b", FulfilmentStatus.New, "SKU-B");
+            when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(chosen, other));
+            when(messageSource.getMessage(eq("order.bulk.remove.confirm.message"), any(), any(Locale.class)))
+                    .thenReturn("Usuniesz zaznaczone pozycje ({n}).");
+            ExtendedModelMap model = new ExtendedModelMap();
+
+            // when
+            String view = ordersController.confirmBulk(ORDER_ID, BulkAction.REMOVE, selected("a"), model,
+                    new RedirectAttributesModelMap(), polish);
+
+            // then
+            assertThat(view).isEqualTo("orders/bulk-confirm");
+            assertThat(model.getAttribute("title")).isEqualTo("order.bulk.remove.confirm.title");
+            assertThat(model.getAttribute("message")).isEqualTo("Usuniesz zaznaczone pozycje (1).");
+            assertThat(model.getAttribute("confirmLabel")).isEqualTo("order.bulk.remove.confirm.action");
+            assertThat(model.getAttribute("danger")).isEqualTo(true);
+            assertThat(model.getAttribute("actionPath")).isEqualTo("/dashboard/orders/" + ORDER_ID + "/removeSelectedItemsFromOrder");
+            assertThat(model.getAttribute("items")).isEqualTo(List.of(chosen));
+            verifyNoInteractions(ordersManager);
+            verify(orderItemsRepository, never()).save(any());
+        }
+
+        @Test
+        void aBulkConfirmationWithNothingSelectedGoesBack() {
+            // given
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(orderBase());
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            String view = ordersController.confirmBulk(ORDER_ID, BulkAction.ALLOCATE, new OrderItemsForm(List.of()),
+                    new ExtendedModelMap(), redirect, polish);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+            assertThat(flash(redirect)).containsEntry("errorMessage", "order.bulk.none.selected");
+            verifyNoInteractions(ordersManager);
+        }
+
+        @Test
         void itemsMoveToAnOrderFoundByItsShortNumber() {
             // given
             when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(orderBase());
@@ -2657,6 +2701,15 @@ class OrdersControllerTest {
             item.setItemId("i1");
             item.setSelected(true);
             return new OrderItemsForm(new ArrayList<>(List.of(item)));
+        }
+
+        @Test
+        void aBulkConfirmationForAnotherStoreIsNotFound() {
+            // when / then
+            assertThatThrownBy(() -> ordersController.confirmBulk(ORDER_ID, BulkAction.REMOVE, selectedItem(),
+                    new ExtendedModelMap(), new RedirectAttributesModelMap(), polish))
+                    .isInstanceOf(ResponseStatusException.class);
+            verifyNoInteractions(ordersManager, orderItemsRepository);
         }
 
         @Test

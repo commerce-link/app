@@ -174,7 +174,20 @@ class OrderDetailsTemplateTest {
         int shipments = html.indexOf("id=\"przesylki\"");
         assertThat(closing).isPositive().isLessThan(items);
         assertThat(items).isLessThan(shipments);
-        assertThat(html).contains("data-order=\"3\"").contains("data-cl-collapse");
+        assertThat(html).doesNotContain("data-order=").contains("data-cl-collapse");
+    }
+
+    @Test
+    void theCardsFollowOneReadingOrderInTheHtmlSoPhonesNeedNoReordering() {
+        // when
+        String html = page(render(order(OrderStatus.Assembly), ADMIN));
+
+        // then: main column first, side column after; the stylesheet stacks them in this same order below 1366 px
+        List<Integer> positions = List.of(html.indexOf("id=\"items-title\""), html.indexOf("id=\"shipments-title\""),
+                html.indexOf("id=\"documents-title\""), html.indexOf("id=\"payments-title\""),
+                html.indexOf("id=\"customer-title\""), html.indexOf("id=\"settings-title\""),
+                html.indexOf("id=\"finances-title\""), html.indexOf("id=\"history-title\""));
+        assertThat(positions).doesNotContain(-1).isSorted();
     }
 
     @Test
@@ -281,6 +294,20 @@ class OrderDetailsTemplateTest {
         // then
         assertThat(user).doesNotContain("koszt 579").doesNotContain("Zysk (z VAT)").doesNotContain("Koszt produktów");
         assertThat(admin).contains("Zysk (z VAT)").contains("Koszt produktów (brutto)");
+    }
+
+    @Test
+    void costAndProfitAreACollapsedSectionOfTheFinancesCardForAnAdminOnly() {
+        // when
+        String user = page(render(order(OrderStatus.New), USER));
+        String admin = page(render(order(OrderStatus.New), ADMIN));
+
+        // then
+        java.util.regex.Matcher costs = Pattern.compile("(?s)<details class=\"cl-disclosure\" id=\"finances-costs\">(.*?)</details>")
+                .matcher(admin);
+        assertThat(costs.find()).isTrue();
+        assertThat(costs.group(1)).contains("<summary>Koszt i zysk</summary>").contains("Zysk (bez VAT)");
+        assertThat(user).doesNotContain("finances-costs").doesNotContain("cl-kv-group");
     }
 
     @Test
@@ -450,7 +477,7 @@ class OrderDetailsTemplateTest {
                 .contains("id=\"settings-dialog\"").contains("id=\"order-settings-form\"")
                 .contains("action=\"/dashboard/orders/3e373abc-1111-2222-3333-444455556666/updateOrderInfo\"")
                 .contains("data-cl-dialog-close-on-success=\"true\"").contains("data-cl-async")
-                .containsPattern("<section class=\"cl-card\" aria-labelledby=\"settings-title\" data-order=\"7\"");
+                .containsPattern("<section class=\"cl-card\" aria-labelledby=\"settings-title\" data-cl-collapse");
         assertThat(html.indexOf("id=\"settings-title\"")).isLessThan(html.indexOf("id=\"settings-dialog\""));
     }
 
@@ -499,8 +526,11 @@ class OrderDetailsTemplateTest {
         String html = page(render(order, ADMIN));
 
         // then (B1)
-        assertThat(html).contains("class=\"cl-card is-status cl-closing\"").contains("class=\"cl-doc-marks is-inline\"")
-                .contains("fa-times").contains("aria-label=\"Warunki zamknięcia zamówienia\"");
+        assertThat(html).contains("class=\"cl-card is-status cl-closing\"").contains("class=\"cl-doc-marks is-sentences\"")
+                .contains("<span class=\"cl-doc-mark-icon\" aria-hidden=\"true\">✗</span>")
+                .contains("<span class=\"cl-doc-mark-icon\" aria-hidden=\"true\">✓</span>")
+                .doesNotContain("fa-times").doesNotContain("fa-check")
+                .contains("aria-label=\"Warunki zamknięcia zamówienia\"");
         assertThat(html).contains("Do zamknięcia brakuje:").contains("href=\"#platnosci\"")
                 .contains("data-cl-dialog-open=\"review-dialog\"").contains("Do zrobienia:").doesNotContain("brakuje:</span>")
                 .contains("Faktura już wystawiona");
@@ -722,6 +752,74 @@ class OrderDetailsTemplateTest {
         // fallback -- doesNotContain above would stay green even if <noscript> were removed outright
         String available = page(render(order(OrderStatus.New), List.of(dropship), ADMIN, Set.of()));
         assertThat(available).contains("<noscript>");
+    }
+
+    @Test
+    void theNoScriptMoveFieldComesBeforeTheOtherBulkButtons() {
+        // when
+        String html = page(render(order(OrderStatus.New), ADMIN));
+        String fallback = html.substring(html.indexOf("<noscript>"), html.indexOf("</noscript>"));
+
+        // then: Enter in the order number field submits the first submit button of the form, which must be "move"
+        int field = fallback.indexOf("id=\"move-target-fallback\"");
+        int move = fallback.indexOf("/moveItemsToOrder\"");
+        int confirm = fallback.indexOf("/bulk-confirm");
+        assertThat(field).isNotNegative().isLessThan(move);
+        assertThat(move).isLessThan(confirm);
+        assertThat(fallback).contains("class=\"cl-selection-actions is-static\"")
+                .contains("<label class=\"cl-label\" for=\"move-target-fallback\">")
+                .contains("class=\"cl-input is-reference\"");
+    }
+
+    @Test
+    void noScriptBulkButtonsLeadToTheConfirmationPage() {
+        // when
+        String html = page(render(order(OrderStatus.New), ADMIN));
+        String fallback = html.substring(html.indexOf("<noscript>"), html.indexOf("</noscript>"));
+
+        // then: nothing but "move" posts straight to the action, so removing items is never one click away
+        assertThat(fallback).contains("formaction=\"/dashboard/orders/3e373abc-1111-2222-3333-444455556666/bulk-confirm?action=ALLOCATE\"")
+                .contains("formaction=\"/dashboard/orders/3e373abc-1111-2222-3333-444455556666/bulk-confirm?action=REMOVE\"")
+                .doesNotContain("/moveSelectedItemsToAllocation\"").doesNotContain("/removeSelectedItemsFromOrder\"")
+                .containsPattern("class=\"cl-button is-danger\"\s+formaction=\"[^\"]+action=REMOVE\"");
+    }
+
+    @Test
+    void theBulkConfirmationPageListsTheItemsAndPostsThemToTheAction() {
+        // given
+        OrderItem cpu = items(order(OrderStatus.New)).get(0);
+        cpu.setItemId("item-7");
+        java.util.Map<String, Object> variables = new java.util.HashMap<>();
+        variables.put("title", "Usunąć zaznaczone pozycje?");
+        variables.put("message", "Usuniesz zaznaczone pozycje (1).");
+        variables.put("confirmLabel", "Usuń pozycje");
+        variables.put("danger", true);
+        variables.put("actionPath", "/dashboard/orders/3e373abc/removeSelectedItemsFromOrder");
+        variables.put("items", List.of(cpu));
+        variables.put("orderId", "3e373abc");
+        variables.put("backLabel", "Zamówienie 3e373abc");
+
+        // when
+        String html = page(SettingsTemplateRenderer.render("orders/bulk-confirm", variables));
+
+        // then
+        assertThat(html).contains("<h1 class=\"cl-page-title\">Usunąć zaznaczone pozycje?</h1>")
+                .contains("Usuniesz zaznaczone pozycje (1).").contains("AMD Ryzen 7 9800X3D")
+                .contains("action=\"/dashboard/orders/3e373abc/removeSelectedItemsFromOrder\"")
+                .contains("name=\"orderItems[0].itemId\" value=\"item-7\"")
+                .contains("name=\"orderItems[0].selected\" value=\"true\"")
+                .contains("class=\"cl-button is-danger\"").contains("href=\"/dashboard/orders/3e373abc\"")
+                .doesNotContain("style=");
+    }
+
+    @Test
+    void theRowMenuTriggerIsATextGlyphThatShowsWithoutTheIconFont() {
+        // when
+        String html = page(render(order(OrderStatus.New), ADMIN));
+
+        // then
+        assertThat(html).contains("<span class=\"cl-menu-glyph\" aria-hidden=\"true\">⋯</span>")
+                .doesNotContain("fa-ellipsis-h");
     }
 
     @Test
@@ -1077,7 +1175,8 @@ class OrderDetailsTemplateTest {
 
         // then
         assertThat(html).doesNotContainPattern("<dt[^>]*title=")
-                .contains("<span class=\"cl-help is-note\">Ustawia klient na stronie zamówienia.</span>");
+                .contains("<p class=\"cl-help is-note\">Ustawia klient na stronie zamówienia.</p>")
+                .containsPattern("<div class=\"cl-kv-wide\"><dt>Preferowana");
     }
 
     @Test

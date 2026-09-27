@@ -1,7 +1,7 @@
 <!DOCTYPE HTML>
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
-<section th:fragment="card" class="cl-card" id="pozycje" aria-labelledby="items-title" data-order="2"
+<section th:fragment="card" class="cl-card" id="pozycje" aria-labelledby="items-title"
          th:with="items=${page.items()}, menus=${!page.readOnly()}">
     <div class="cl-card-head">
         <h2 class="cl-card-title" id="items-title" th:text="#{order.card.items(${items.count()})}"></h2>
@@ -77,25 +77,26 @@
             <tbody>
             <th:block th:each="row : ${items.products()}"><tr th:replace="~{orders/details/items :: row(${row})}"></tr></th:block>
             <tr th:if="${!items.services().isEmpty()}" class="cl-table-group">
-                <th scope="rowgroup" th:colspan="${(items.selectable() ? 1 : 0) + 3 + (menus ? 1 : 0)}"
-                    th:text="#{order.items.group.services}"></th>
+                <th scope="rowgroup" th:colspan="${(items.selectable() ? 1 : 0) + 3 + (menus ? 1 : 0)}"><span class="cl-eyebrow"
+                    th:text="#{order.items.group.services}"></span></th>
             </tr>
             <th:block th:each="row : ${items.services()}"><tr th:replace="~{orders/details/items :: row(${row})}"></tr></th:block>
             </tbody>
         </table>
         <p th:if="${items.count() == 0}" class="cl-list-empty" th:text="#{order.items.empty}"></p>
         <noscript th:if="${items.bulkAvailable()}">
-            <div class="cl-selection-actions">
-                <th:block th:each="bulk : ${items.bulkActions()}">
-                    <button th:if="${bulk.available() and bulk.action().name() != 'MOVE'}" type="submit" class="cl-button"
-                            th:formaction="@{${bulk.href()}}" th:text="#{${bulk.action().labelKey()}}"></button>
-                    <th:block th:if="${bulk.available() and bulk.action().name() == 'MOVE'}">
-                        <label class="cl-visually-hidden" for="move-target-fallback" th:text="#{order.move.target}"></label>
-                        <input class="cl-input is-code" id="move-target-fallback" name="targetOrderId" type="text" maxlength="64"
-                               th:placeholder="#{order.move.target}">
-                        <button type="submit" class="cl-button" th:formaction="@{${bulk.href()}}"
-                                th:text="#{${bulk.action().labelKey()}}"></button>
-                    </th:block>
+            <div class="cl-selection-actions is-static">
+                <!--/* the move field comes first: Enter in it submits the first button of the form, which must be "move" */-->
+                <th:block th:each="bulk : ${items.bulkActions()}" th:if="${bulk.available() and bulk.action().name() == 'MOVE'}">
+                    <label class="cl-label" for="move-target-fallback" th:text="#{order.move.target}"></label>
+                    <input class="cl-input is-reference" id="move-target-fallback" name="targetOrderId" type="text" maxlength="64">
+                    <button type="submit" class="cl-button" th:formaction="@{${bulk.href()}}" th:text="#{${bulk.action().labelKey()}}"></button>
+                </th:block>
+                <!--/* every other action is confirmed on a page listing the chosen items, as the dialog does with JavaScript */-->
+                <th:block th:each="bulk : ${items.bulkActions()}" th:if="${bulk.available() and bulk.action().name() != 'MOVE'}">
+                    <button type="submit" class="cl-button" th:classappend="${bulk.action().danger()} ? 'is-danger' : ''"
+                            th:formaction="@{|/dashboard/orders/${page.orderId()}/bulk-confirm?action=${bulk.action().name()}|}"
+                            th:text="#{${bulk.action().labelKey()}}"></button>
                 </th:block>
             </div>
         </noscript>
@@ -161,7 +162,7 @@
     <td th:if="${menus}" class="cl-table-actions">
         <details class="cl-menu" th:if="${!row.actions().isEmpty()}">
             <summary class="cl-button is-icon" th:attr="aria-label=#{order.items.menu(${row.name()})}">
-                <span class="icon is-small" aria-hidden="true"><i class="fas fa-ellipsis-h"></i></span>
+                <span class="cl-menu-glyph" aria-hidden="true">⋯</span>
             </summary>
             <ul class="cl-menu-list" th:id="|item-menu-${row.index()}|">
                 <th:block th:each="state : ${row.actions()}">

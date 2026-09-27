@@ -2,7 +2,7 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
 <!--/* Review status and the event timeline. */-->
-<section th:fragment="card" class="cl-card" id="historia" aria-labelledby="history-title" data-order="9" data-cl-collapse
+<section th:fragment="card" class="cl-card" id="historia" aria-labelledby="history-title" data-cl-collapse
          th:with="h=${page.history()}">
     <div class="cl-card-head"><h2 class="cl-card-title" id="history-title" th:text="#{order.card.history}"></h2></div>
     <div class="cl-collapse-body" id="history-body">

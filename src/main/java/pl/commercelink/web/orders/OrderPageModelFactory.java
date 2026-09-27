@@ -262,7 +262,8 @@ public class OrderPageModelFactory {
                         OrderFormats.dateTime(s.getShippedAt()), OrderFormats.dateTime(s.getDeliveredAt()),
                         order.hasTrackedShipments() ? OrderLabels.tracking(s.getTrackingSubscriptionStatus()) : null,
                         OrderLabels.tone(s.getTrackingSubscriptionStatus()),
-                        s.getTrackingSubscriptionStatus() == ShipmentTrackingStatus.FAILED
+                        // the help sends the reader to "Edit shipments", which a read-only page does not offer
+                        !readOnly && s.getTrackingSubscriptionStatus() == ShipmentTrackingStatus.FAILED
                                 ? "order.shipment.tracking.failed.help" : null))
                 .toList();
         String emptyKey = readOnly ? "order.shipments.empty.readonly"

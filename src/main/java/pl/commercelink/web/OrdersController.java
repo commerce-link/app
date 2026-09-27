@@ -1120,6 +1120,39 @@ public class OrdersController extends BaseController {
                 ids -> ordersManager.moveOrderItemsToTheWarehouseForRMA(getStoreId(), orderId, ids));
     }
 
+    /**
+     * Without JavaScript a bulk action is confirmed on a page listing the chosen items, as the dialog does with JS;
+     * rendering it changes nothing. Moving to another order has its own field and is not confirmed here.
+     */
+    @PostMapping("/dashboard/orders/{orderId}/bulk-confirm")
+    @PreAuthorize("!hasRole('SUPER_ADMIN')")
+    public String confirmBulk(@PathVariable String orderId, @RequestParam BulkAction action,
+                              @ModelAttribute OrderItemsForm form, Model model, RedirectAttributes redirectAttributes,
+                              Locale locale) {
+        Order order = requireOrder(ordersRepository, getStoreId(), orderId);
+        List<String> selected = form.getSelectedOrderItemIds();
+        if (selected.isEmpty() || action == BulkAction.MOVE) {
+            return refuse(redirectAttributes, orderId, "order.bulk.none.selected", locale);
+        }
+        List<OrderItem> items = orderItemsRepository.findByOrderId(orderId).stream()
+                .filter(item -> selected.contains(item.getItemId()))
+                .toList();
+        if (items.isEmpty()) {
+            return refuse(redirectAttributes, orderId, "order.bulk.none.selected", locale);
+        }
+        // the texts are the dialog's, whose "{n}" is a plain placeholder the script fills in, not a MessageFormat argument
+        model.addAttribute("title", messageSource.getMessage(action.confirmTitleKey(), null, locale));
+        model.addAttribute("message", messageSource.getMessage(action.confirmMessageKey(), null, locale)
+                .replace("{n}", String.valueOf(items.size())));
+        model.addAttribute("confirmLabel", messageSource.getMessage(action.confirmActionKey(), null, locale));
+        model.addAttribute("danger", action.danger());
+        model.addAttribute("actionPath", "/dashboard/orders/" + orderId + "/" + action.path());
+        model.addAttribute("items", items);
+        model.addAttribute("orderId", orderId);
+        model.addAttribute("backLabel", orderPageTitle(order, locale));
+        return "orders/bulk-confirm";
+    }
+
     /** A complete action says how many items changed; a partial one warns and says why the rest was left. */
     private String bulk(BulkAction action, String orderId, OrderItemsForm form, RedirectAttributes redirectAttributes,
                         Locale locale, Function<List<String>, OrdersManager.Result> run) {

@@ -5077,6 +5077,17 @@ a.cl-link-button:hover {
     text-align: left;
 }
 
+/* A long text value (the order comment): label above, text below, line breaks kept. */
+.cl-page .cl-kv.is-column > div.cl-kv-wide {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+}
+
+.cl-page .cl-kv.is-column dd.cl-kv-text {
+    white-space: pre-line;
+    text-align: left;
+}
+
 .cl-page .cl-kv > div.cl-kv-total {
     padding-top: 8px;
     border-top: 1px solid var(--cl-line);
@@ -5090,17 +5101,6 @@ a.cl-link-button:hover {
 .cl-page .cl-kv dd.is-bad {
     color: var(--cl-bad);
     font-weight: 600;
-}
-
-.cl-page .cl-kv-group {
-    margin: 4px 20px 0;
-    padding-top: 10px;
-    border-top: 1px dashed var(--cl-line);
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: .12em;
-    text-transform: uppercase;
-    color: var(--cl-ink-2);
 }
 
 
@@ -5118,6 +5118,8 @@ a.cl-link-button:hover {
     max-height: 60vh;
     overflow: auto;
     display: grid;
+    /* one explicit column: an implicit auto column grows to the widest child (the tabs of "add items") */
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--cl-gap-fields);
 }
 
@@ -5156,6 +5158,12 @@ a.cl-link-button:hover {
 .cl-page .cl-menu {
     position: relative;
     display: inline-block;
+}
+
+/* A native <details> gives its content a content-box slot, so menu entries grew to 52 px and stuck out of the panel. */
+.cl-page .cl-menu,
+.cl-page .cl-menu * {
+    box-sizing: border-box;
 }
 
 .cl-page .cl-menu > summary {
@@ -5259,12 +5267,10 @@ a.cl-link-button:hover {
     background: var(--cl-line);
 }
 
-.cl-page .cl-menu-check {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    padding: 8px 14px;
-    font-size: 14px;
+/* The "more" trigger of a row menu is a text glyph, so it shows without the icon font too. */
+.cl-page .cl-menu-glyph {
+    font-size: 18px;
+    line-height: 1;
 }
 
 /* Icon-only trigger in a table row: 36 px from 1024 px, 44 px below */
@@ -5281,15 +5287,9 @@ a.cl-link-button:hover {
 .cl-page .cl-layout-aside {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 320px;
-    grid-template-areas:
-        "closing closing"
-        "main side";
+    grid-template-areas: "main side";
     gap: 16px;
     align-items: start;
-}
-
-.cl-page .cl-layout-aside > .cl-layout-full {
-    grid-area: closing;
 }
 
 .cl-page .cl-layout-main {
@@ -5309,6 +5309,21 @@ a.cl-link-button:hover {
 .cl-page .cl-layout-main > *,
 .cl-page .cl-layout-side > * {
     min-width: 0;
+}
+
+/* Below 1366 px the side column left the product name ~110-180 px (four lines and more): one column instead, cards in
+   DOM order (items, shipments, documents, payments, then customer, dates, finances, history), so focus order and reading
+   order match what the eye sees. Declared after the column rules so its grid-area wins. */
+@media screen and (max-width: 1365px) {
+    .cl-page .cl-layout-aside {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-areas: none;
+    }
+
+    .cl-page .cl-layout-main,
+    .cl-page .cl-layout-side {
+        grid-area: auto;
+    }
 }
 
 /* Table whose key column (product name) wraps instead of widening the table */
@@ -5393,16 +5408,13 @@ a.cl-link-button:hover {
 
 /* Bulma .content styles lists and paragraphs; these components are not prose */
 .cl-page ol.cl-timeline,
-.cl-page ol.cl-stepper,
-.cl-page ul.cl-checklist,
 .cl-page ul.cl-menu-list {
     margin-left: 0;
     margin-top: 0;
     list-style: none;
 }
 
-.cl-page .cl-timeline p,
-.cl-page .cl-checklist p {
+.cl-page .cl-timeline p {
     margin-bottom: 0;
 }
 
@@ -5456,13 +5468,8 @@ a.cl-link-button:hover {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 6px 12px;
+    gap: 8px 12px;
     min-width: 0;
-}
-
-.cl-page .cl-record-title .cl-status {
-    font-size: 13px;
-    padding: 3px 11px;
 }
 
 .cl-page .cl-record-title .cl-copy-inline {
@@ -5475,7 +5482,7 @@ a.cl-link-button:hover {
     gap: 2px 0;
     margin: 6px 0 0;
     max-width: none;
-    font-size: 14.5px;
+    font-size: 14px;
     color: var(--cl-ink-2);
 }
 
@@ -5492,7 +5499,7 @@ a.cl-link-button:hover {
 
 .cl-page .cl-record-meta.is-secondary {
     margin-top: 2px;
-    font-size: 13.5px;
+    font-size: 13px;
 }
 
 .cl-page .cl-record-meta a {
@@ -5506,11 +5513,6 @@ a.cl-link-button:hover {
     padding-top: 14px;
     padding-bottom: 6px;
     background: var(--cl-surface-2);
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: .12em;
-    text-transform: uppercase;
-    color: var(--cl-ink-2);
 }
 
 /* Column widths of the order items table (fixed layout) */
@@ -5541,11 +5543,6 @@ a.cl-link-button:hover {
     color: var(--cl-accent-ink);
     text-decoration: underline;
     text-underline-offset: 2px;
-}
-
-.cl-page .cl-table .cl-table-order {
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
 }
 
 /* Card head: several actions on the right */
@@ -5605,17 +5602,10 @@ a.cl-link-button:hover {
     align-items: center;
     gap: 8px;
     margin-bottom: 4px;
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: .12em;
-    text-transform: uppercase;
-    color: var(--cl-ink-2);
 }
 
 .cl-page .cl-address-head .cl-link-button {
     font-size: 13px;
-    letter-spacing: 0;
-    text-transform: none;
 }
 
 .cl-page .cl-address a {
@@ -5630,41 +5620,7 @@ a.cl-link-button:hover {
 /* ------------------------------------------------------------------------------------------------------------------
    Breakpoints
    ------------------------------------------------------------------------------------------------------------------ */
-/* 1024-1215 px: a 320 px side column left the items table too tight; narrow it to 300 px instead of stacking. */
-@media screen and (max-width: 1215px) {
-    .cl-page .cl-layout-aside {
-        grid-template-columns: minmax(0, 1fr) 300px;
-    }
-}
-
 @media screen and (max-width: 1023px) {
-    .cl-page .cl-layout-aside {
-        grid-template-columns: minmax(0, 1fr);
-        grid-template-areas: none;
-    }
-
-    .cl-page .cl-layout-aside > .cl-layout-full,
-    .cl-page .cl-layout-main,
-    .cl-page .cl-layout-side {
-        grid-area: auto;
-    }
-
-    /* one column: the DOM order of cards decides (display: contents lets side cards interleave with main ones) */
-    .cl-page .cl-layout-main,
-    .cl-page .cl-layout-side {
-        display: contents;
-    }
-
-    .cl-page .cl-layout-aside [data-order="1"] { order: 1; }
-    .cl-page .cl-layout-aside [data-order="2"] { order: 2; }
-    .cl-page .cl-layout-aside [data-order="3"] { order: 3; }
-    .cl-page .cl-layout-aside [data-order="4"] { order: 4; }
-    .cl-page .cl-layout-aside [data-order="5"] { order: 5; }
-    .cl-page .cl-layout-aside [data-order="6"] { order: 6; }
-    .cl-page .cl-layout-aside [data-order="7"] { order: 7; }
-    .cl-page .cl-layout-aside [data-order="8"] { order: 8; }
-    .cl-page .cl-layout-aside [data-order="9"] { order: 9; }
-
     .cl-page .cl-button.is-icon {
         width: 44px;
         height: 44px;
@@ -5672,6 +5628,28 @@ a.cl-link-button:hover {
 
     .cl-page .cl-menu-item {
         min-height: 44px;
+    }
+
+    /* touch targets: the e-mail and phone links of an address, the sort buttons of the add-items table */
+    .cl-page .cl-address a {
+        display: inline-flex;
+        align-items: center;
+        min-height: 44px;
+    }
+
+    .cl-page .cl-item-add-table .cl-table-sort {
+        min-height: 44px;
+    }
+}
+
+/* The items table is not a dense dialog table: its first and last cells line up with the card title. */
+@media screen and (min-width: 720px) {
+    .cl-page .cl-table.is-wrap :is(th, td):first-child {
+        padding-left: 20px;
+    }
+
+    .cl-page .cl-table.is-wrap :is(th, td):last-child {
+        padding-right: 20px;
     }
 }
 
@@ -5689,11 +5667,6 @@ a.cl-link-button:hover {
     .cl-page .cl-kv.is-column > div {
         grid-template-columns: minmax(0, 1fr) auto;
         gap: 8px;
-    }
-
-    .cl-page .cl-kv-group {
-        margin-left: 16px;
-        margin-right: 16px;
     }
 
     .cl-page .cl-timeline,
@@ -5904,10 +5877,23 @@ a.cl-link-button:hover {
     width: 110px;
 }
 
-/* A segmented switch as wide as its segments (tabs of the add-items dialog). */
-.cl-page .cl-segmented.is-inline {
+/* A segmented switch as wide as its segments (tabs of the add-items dialog). Not "is-inline": Bulma's helper of that
+   name forces display: inline !important. */
+.cl-page .cl-segmented.is-fit {
     width: max-content;
     max-width: 100%;
+}
+
+/* On a phone the wrapped switch spans the dialog, segments sharing the width, instead of two loose buttons. */
+@media screen and (max-width: 719px) {
+    .cl-page .cl-segmented.is-fit {
+        width: 100%;
+    }
+
+    /* auto basis: a label too long to share the line wraps onto its own full-width row instead of squeezing the other */
+    .cl-page .cl-segmented.is-fit > * {
+        flex: 1 1 auto;
+    }
 }
 
 /* A card inside a dialog (preview of the target order): outlined, without the resting shadow. */
@@ -6068,18 +6054,14 @@ a.cl-link-button:hover {
     padding: 8px 12px;
     border: 0;
     background: none;
-    color: var(--cl-ink-2);
     font: inherit;
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: .04em;
-    text-transform: uppercase;
     text-align: left;
     cursor: pointer;
 }
 
 .cl-page .cl-item-add-basket-n {
     padding: 0 8px;
+    font-size: 12px;
     border-radius: 999px;
     background: var(--cl-accent);
     color: var(--cl-surface);
@@ -6092,6 +6074,7 @@ a.cl-link-button:hover {
 }
 
 .cl-page .cl-item-add-chev {
+    color: var(--cl-ink-2);
     transition: transform .15s;
 }
 
@@ -6117,6 +6100,23 @@ a.cl-link-button:hover {
     }
 }
 
+/* Card mode of the add-items table (< 720 px): the other cells carry their column name, the pick box and the product
+   name need no label and take the whole line. */
+@media screen and (max-width: 719px) {
+    .cl-page .cl-item-add-table td:is(.cl-table-check, .cl-item-add-name) {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .cl-page .cl-item-add-table td:is(.cl-table-check, .cl-item-add-name)::before {
+        content: none;
+    }
+
+    /* the code line stays under the name (the shared card rule moves a cell's second line to the value column) */
+    .cl-page .cl-item-add-table td.cl-item-add-name > :is(div, .cl-table-sub) {
+        grid-column: 1;
+    }
+}
+
 /* --- Add-payment dialog (order details, Payments, Deliveries) --- */
 
 /* The booked/fee/status hint appears only once an amount is typed; reserve its line so the fields below it stay put. */
@@ -6124,25 +6124,44 @@ a.cl-link-button:hover {
     min-height: 1.5em;
 }
 
+/* A description list inside a disclosure (cost and profit): the disclosure body already insets it. */
+.cl-page .cl-disclosure-body > dl.cl-kv.is-column {
+    padding: 0;
+}
+
+/* --- Order details: bulk actions without JavaScript — a row of buttons inside the card's inset --- */
+.cl-page .cl-selection-actions.is-static {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+    padding: 12px 20px 16px;
+}
+
+/* An order number typed by hand: wide enough for a marketplace reference */
+.cl-page .cl-input.is-reference {
+    width: 22ch;
+    max-width: 100%;
+}
+
 /* --- Order details: "Do zamknięcia" strip — the list's doc marks, inline, as full sentences --- */
-.cl-page .cl-closing { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 24px; padding: 12px 20px; }
-.cl-page .cl-closing-title { font-size: 15px; font-weight: 650; }
+.cl-page .cl-closing { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px; padding: 12px 20px; margin-bottom: 16px; }
+.cl-page .cl-closing-title { font-size: 16px; font-weight: 650; }
 .cl-page .cl-closing-title.is-warn { color: var(--cl-warn); }
 .cl-page .cl-closing-title.is-ok { color: var(--cl-ok); }
-.cl-page .cl-doc-marks.is-inline { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 0; padding: 0; list-style: none; }
-.cl-page .cl-doc-marks.is-inline .cl-doc-mark { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; height: auto; background: none; padding: 0; white-space: normal; font-weight: 400; letter-spacing: 0; }
-.cl-page .cl-doc-marks.is-inline .cl-doc-mark.is-done { color: var(--cl-ink-2); }
-.cl-page .cl-doc-marks.is-inline .cl-doc-mark.is-todo { color: var(--cl-ink); }
-.cl-page .cl-doc-marks.is-inline .cl-doc-mark-icon { width: 18px; height: 18px; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; }
-.cl-page .cl-doc-marks.is-inline .is-done .cl-doc-mark-icon { color: var(--cl-ok); }
-.cl-page .cl-doc-marks.is-inline .is-todo .cl-doc-mark-icon { color: var(--cl-warn); background: var(--cl-warn-soft); }
-.cl-page .cl-doc-marks.is-inline .cl-doc-mark a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
-.cl-page .cl-doc-marks.is-inline .cl-doc-mark a:hover { color: var(--cl-accent-ink); }
-@media (max-width: 1023px) { .cl-page .cl-doc-marks.is-inline .cl-doc-mark a, .cl-page .cl-doc-marks.is-inline .cl-doc-mark button { min-height: 44px; display: inline-flex; align-items: center; } }
+.cl-page .cl-doc-marks.is-sentences { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 0; padding: 0; list-style: none; }
+.cl-page .cl-doc-marks.is-sentences .cl-doc-mark { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; height: auto; background: none; padding: 0; white-space: normal; font-weight: 400; letter-spacing: 0; }
+.cl-page .cl-doc-marks.is-sentences .cl-doc-mark.is-done { color: var(--cl-ink-2); }
+.cl-page .cl-doc-marks.is-sentences .cl-doc-mark.is-todo { color: var(--cl-ink); }
+.cl-page .cl-doc-marks.is-sentences .cl-doc-mark-icon { width: 18px; height: 18px; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; }
+.cl-page .cl-doc-marks.is-sentences .is-done .cl-doc-mark-icon { color: var(--cl-ok); }
+.cl-page .cl-doc-marks.is-sentences .is-todo .cl-doc-mark-icon { color: var(--cl-warn); background: var(--cl-warn-soft); }
+.cl-page .cl-doc-marks.is-sentences .cl-doc-mark a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+.cl-page .cl-doc-marks.is-sentences .cl-doc-mark a:hover { color: var(--cl-accent-ink); }
+@media (max-width: 1023px) { .cl-page .cl-doc-marks.is-sentences .cl-doc-mark a, .cl-page .cl-doc-marks.is-sentences .cl-doc-mark button { min-height: 44px; display: inline-flex; align-items: center; } }
 /* the review todo opens a dialog (a button) but reads like the other todos (links): underlined text, no accent */
-.cl-page .cl-doc-marks.is-inline .cl-doc-mark .cl-link-button { color: inherit; font-size: inherit; font-weight: 400; text-decoration: underline; text-underline-offset: 2px; padding: 0; }
-.cl-page .cl-doc-marks.is-inline .cl-doc-mark .cl-link-button:hover { color: var(--cl-accent-ink); }
-@media (max-width: 1023px) { .cl-page .cl-closing { margin-bottom: 16px; } }
+.cl-page .cl-doc-marks.is-sentences .cl-doc-mark .cl-link-button { color: inherit; font-size: inherit; font-weight: 400; text-decoration: underline; text-underline-offset: 2px; padding: 0; }
+.cl-page .cl-doc-marks.is-sentences .cl-doc-mark .cl-link-button:hover { color: var(--cl-accent-ink); }
 
 /* Order details: short notes beside a title or an address (why items cannot be added, a locked address, "completed
    automatically") — help-sized, and under a card title they start at its left edge */

@@ -2,7 +2,7 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
 <!--/* Read-only card; the edit happens in the dialog below, or on orders/settings without JS. */-->
-<section th:fragment="card" class="cl-card" aria-labelledby="settings-title" data-order="7" data-cl-collapse>
+<section th:fragment="card" class="cl-card" aria-labelledby="settings-title" data-cl-collapse>
     <div class="cl-card-head">
         <h2 class="cl-card-title" id="settings-title" th:text="#{order.card.settings}"></h2>
         <a th:if="${settings.editable()}" class="cl-link-button" th:href="@{/dashboard/orders/{o}/settings(o=${orderId})}"
@@ -12,8 +12,9 @@
         <dl class="cl-kv is-column">
             <div><dt th:text="#{order.settings.assembly}"></dt><dd th:text="${settings.estimatedAssemblyText() ?: '—'}"></dd></div>
             <div><dt th:text="#{order.settings.shipping}"></dt><dd th:text="${settings.estimatedShippingText() ?: '—'}"></dd></div>
-            <div><dt th:text="#{order.settings.preferred}"></dt><dd><span th:text="${settings.preferredShippingText() ?: '—'}"></span>
-                <span class="cl-help is-note" th:text="#{order.settings.preferred.help}"></span></dd></div>
+            <!--/* a long label with a line of help: label above, value and help below, like the order comment */-->
+            <div class="cl-kv-wide"><dt th:text="#{order.settings.preferred}"></dt><dd><span th:text="${settings.preferredShippingText() ?: '—'}"></span>
+                <p class="cl-help is-note" th:text="#{order.settings.preferred.help}"></p></dd></div>
             <div th:if="${settings.fulfilmentTypeKey() != null}"><dt th:text="#{order.settings.fulfilment}"></dt><dd th:text="#{${settings.fulfilmentTypeKey()}}"></dd></div>
             <div><dt th:text="#{order.settings.notifications}"></dt><dd th:text="${settings.emailNotificationsEnabled()} ? #{order.settings.yes} : #{order.settings.no}"></dd></div>
             <div th:if="${!#strings.isEmpty(settings.comment())}" class="cl-kv-wide"><dt th:text="#{order.settings.comment}"></dt><dd class="cl-kv-text" th:text="${settings.comment()}"></dd></div>

@@ -150,6 +150,9 @@
 
         const catalogId = document.getElementById('itemAddCatalog').value;
         const tbody = document.getElementById('itemAddRows');
+        // below 720 px the table shows as cards and every cell names its column from data-label
+        const labels = Array.from(document.querySelectorAll('.cl-item-add-table thead th'))
+            .map(th => (th.querySelector('span') || th).textContent.trim());
         tbody.replaceChildren();
         rows.forEach(p => {
             const entry = findItemAddPicked(catalogId, p);
@@ -167,6 +170,7 @@
             checkCell.appendChild(check);
 
             const nameCell = document.createElement('td');
+            nameCell.className = 'cl-item-add-name';
             const nameLine = document.createElement('div');
             nameLine.textContent = p.name;
             const subLine = document.createElement('div');
@@ -205,6 +209,7 @@
             }
 
             row.append(checkCell, nameCell, categoryCell, priceCell, qtyCell, deliveryCell, pickCell);
+            Array.from(row.children).forEach((cell, i) => { cell.dataset.label = i === 0 ? '' : (labels[i] || ''); });
             row.addEventListener('click', event => {
                 if (event.target.closest('.cl-item-add-stepper')) return;
                 toggleItemAddPick(catalogId, p);

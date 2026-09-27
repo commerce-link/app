@@ -2,7 +2,7 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
 <!--/* Payment rows, paid/unpaid summary and the payment dialog triggers. */-->
-<section th:fragment="card" class="cl-card" id="platnosci" aria-labelledby="payments-title" data-order="6"
+<section th:fragment="card" class="cl-card" id="platnosci" aria-labelledby="payments-title"
          th:with="payments=${page.payments()}">
     <div class="cl-card-head">
         <h2 class="cl-card-title" id="payments-title" th:text="#{order.card.payments}"></h2>

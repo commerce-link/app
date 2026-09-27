@@ -232,8 +232,8 @@ class OrdersScriptContractTest {
 
         // then
         assertThat(css).contains(".cl-page .cl-closing {")
-                .contains(".cl-page .cl-doc-marks.is-inline .is-todo .cl-doc-mark-icon { color: var(--cl-warn); background: var(--cl-warn-soft); }")
-                .contains(".cl-page .cl-doc-marks.is-inline .cl-doc-mark { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; height: auto; background: none; padding: 0; white-space: normal; font-weight: 400; letter-spacing: 0; }");
+                .contains(".cl-page .cl-doc-marks.is-sentences .is-todo .cl-doc-mark-icon { color: var(--cl-warn); background: var(--cl-warn-soft); }")
+                .contains(".cl-page .cl-doc-marks.is-sentences .cl-doc-mark { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; height: auto; background: none; padding: 0; white-space: normal; font-weight: 400; letter-spacing: 0; }");
 
         String aside = rule(css, ".cl-page .cl-layout-aside");
         assertThat(aside).contains("320px").doesNotContain("340px");
@@ -246,13 +246,164 @@ class OrdersScriptContractTest {
 
         // then: the review todo reads like the other todos, the dialog form lines up with its title, the strip keeps a
         // gap to the next card on phones, and card-mode rows do not indent the name by the list's checkbox padding
-        assertThat(rule(css, ".cl-page .cl-doc-marks.is-inline .cl-doc-mark .cl-link-button"))
+        assertThat(rule(css, ".cl-page .cl-doc-marks.is-sentences .cl-doc-mark .cl-link-button"))
                 .contains("text-decoration: underline").contains("font-weight: 400").contains("color: inherit");
         assertThat(rule(css, ".cl-page .cl-dialog-body .cl-card-grid")).contains("padding: 4px 0 0");
-        assertThat(css).contains("@media (max-width: 1023px) { .cl-page .cl-closing { margin-bottom: 16px; } }")
+        assertThat(css).doesNotContain("@media (max-width: 1023px) { .cl-page .cl-closing")
                 .contains(".cl-page .cl-table.is-wrap tbody tr > th.cl-table-key { padding-left: 0; padding-right: 0; }")
                 .contains(".cl-page .cl-table.is-wrap tbody tr:not(.cl-table-group):not(:has(.cl-table-check)) > td.cl-table-actions { grid-column: 2; grid-row: 1; }");
         assertThat(rule(css, ".cl-page .cl-help.is-note")).contains("font-size: 13px");
+        assertThat(rule(css, ".cl-page .cl-closing")).contains("margin-bottom: 16px");
+    }
+
+    /** The body of the first {@code @media} block that starts with {@code query}. */
+    private static String media(String css, String query) {
+        int start = css.indexOf(query + " {");
+        assertThat(start).as(query).isNotNegative();
+        int depth = 0;
+        for (int i = css.indexOf('{', start); i < css.length(); i++) {
+            depth += css.charAt(i) == '{' ? 1 : css.charAt(i) == '}' ? -1 : 0;
+            if (depth == 0) {
+                return css.substring(start, i + 1);
+            }
+        }
+        throw new IllegalStateException("unclosed " + query);
+    }
+
+    @Test
+    void noComponentModifierCollidesWithBulmasDisplayHelpers() throws Exception {
+        // given: Bulma's .is-inline / .is-block / .is-flex set display with !important, so a cl-* rule never wins
+        String css = css();
+        String templates = read("src/main/resources/templates/fragments/item-add-modal.html")
+                + read("src/main/resources/templates/orders/details/closing.html");
+
+        // then
+        assertThat(css).doesNotContainPattern("\\.cl-[a-z-]+\\.is-(inline|block|flex)\\b");
+        assertThat(templates).doesNotContainPattern("class=\"cl-[a-z-]+ is-(inline|block|flex)\\b");
+    }
+
+    @Test
+    void theActionMenuIsBorderBox() throws Exception {
+        // given
+        String css = css();
+
+        // then
+        assertThat(rule(css, ".cl-page .cl-menu,\n.cl-page .cl-menu *")).contains("box-sizing: border-box");
+    }
+
+    @Test
+    void theOrderCommentTakesTheWholeLineAndKeepsItsLineBreaks() throws Exception {
+        // given
+        String css = css();
+
+        // then: the phone rule for ".cl-kv.is-column > div" is less specific than the ".cl-kv-wide" one
+        assertThat(rule(css, ".cl-page .cl-kv.is-column > div.cl-kv-wide")).contains("grid-template-columns: minmax(0, 1fr)");
+        assertThat(rule(css, ".cl-page .cl-kv.is-column dd.cl-kv-text")).contains("white-space: pre-line")
+                .contains("text-align: left");
+        assertThat(css).doesNotContain(".cl-kv-group");
+        assertThat(rule(css, ".cl-page .cl-disclosure-body > dl.cl-kv.is-column")).contains("padding: 0");
+    }
+
+    @Test
+    void aFormDialogHasOneExplicitColumnSoNothingScrollsSideways() throws Exception {
+        // given
+        String css = css();
+
+        // then
+        assertThat(rule(css, ".cl-page .cl-dialog.is-form .cl-dialog-body")).contains("grid-template-columns: minmax(0, 1fr)");
+        assertThat(css).containsPattern("@media screen and \\(max-width: 719px\\) \\{\\s+\\.cl-page \\.cl-segmented\\.is-fit \\{\\s+width: 100%;");
+        assertThat(rule(css, ".cl-page .cl-segmented.is-fit > *")).contains("flex: 1 1 auto");
+    }
+
+    @Test
+    void theSideColumnStartsAt1366AndPhonesFollowTheDom() throws Exception {
+        // given
+        String css = css();
+
+        // when
+        String below1366 = media(css, "@media screen and (max-width: 1365px)");
+
+        // then
+        assertThat(below1366).contains(".cl-page .cl-layout-aside {").contains("grid-template-columns: minmax(0, 1fr)");
+        assertThat(rule(css, ".cl-page .cl-layout-main,\n.cl-page .cl-layout-side")).doesNotContain("display: contents");
+        assertThat(css).doesNotContain("[data-order=")
+                .doesNotContain("minmax(0, 1fr) 300px").doesNotContain("\"closing").doesNotContain(".cl-layout-full");
+        assertThat(rule(css, ".cl-page .cl-layout-aside")).contains("320px");
+        // same specificity as the column rules, so it must come after them or "grid-area: main" wins and the cards overlap
+        assertThat(css.indexOf("@media screen and (max-width: 1365px)"))
+                .isGreaterThan(css.indexOf("\n.cl-page .cl-layout-main {"))
+                .isGreaterThan(css.indexOf("\n.cl-page .cl-layout-side {"));
+        String[] blocks = css.split("@media screen and \\(max-width: 1023px\\)");
+        for (int i = 1; i < blocks.length; i++) {
+            String body = blocks[i].substring(0, Math.max(blocks[i].indexOf("\n}\n"), 0));
+            assertThat(body).doesNotContainPattern("[\\s;{]order:");
+        }
+    }
+
+    @Test
+    void theScopeSuffixAppearsOnlyWhenSomeSelectedItemsDoNotFit() throws Exception {
+        // given
+        String script = read("src/main/resources/static/js/order-items.js");
+
+        // then
+        assertThat(script).contains("fits === rows.length ? label").contains("data-cl-scope-count-template")
+                .contains("replace('{k}', String(fits))").contains("window.CL_confirmBulk(button, count,")
+                .doesNotContain("({n}/{m})");
+    }
+
+    @Test
+    void deadRulesOfAbandonedComponentsAreGone() throws Exception {
+        // given
+        String css = css();
+
+        // then: the orders list's overdue note still needs .cl-table-sub.is-bad
+        assertThat(css).doesNotContain(".cl-menu-check").doesNotContain("ol.cl-stepper").doesNotContain("ul.cl-checklist")
+                .doesNotContain(".cl-table-order").contains(".cl-page .cl-table .cl-table-sub.is-bad {");
+    }
+
+    @Test
+    void theDetailsFollowTheDesignSystemScale() throws Exception {
+        // given
+        String css = css();
+
+        // then
+        assertThat(css).doesNotContain(".cl-page .cl-record-title .cl-status {");
+        assertThat(rule(css, ".cl-page .cl-record-title")).contains("gap: 8px 12px");
+        assertThat(rule(css, ".cl-page .cl-record-meta")).contains("font-size: 14px;");
+        assertThat(rule(css, ".cl-page .cl-record-meta.is-secondary")).contains("font-size: 13px;");
+        assertThat(rule(css, ".cl-page .cl-closing-title")).contains("font-size: 16px");
+        assertThat(rule(css, ".cl-page .cl-closing")).contains("gap: 8px 20px");
+        assertThat(rule(css, ".cl-page .cl-doc-marks.is-sentences")).contains("gap: 8px 16px");
+        // the uppercase label is .cl-eyebrow; the layout classes keep only their spacing
+        for (String selector : List.of(".cl-page .cl-address-head", ".cl-page .cl-table tbody tr.cl-table-group > th",
+                ".cl-page .cl-item-add-basket-head")) {
+            assertThat(rule(css, selector)).as(selector).doesNotContain("text-transform").doesNotContain("letter-spacing")
+                    .doesNotContain("font-size");
+        }
+        String wide = media(css.substring(css.indexOf("/* The items table is not a dense dialog table")),
+                "@media screen and (min-width: 720px)");
+        assertThat(wide).contains(".cl-page .cl-table.is-wrap :is(th, td):first-child {").contains("padding-left: 20px")
+                .contains("padding-right: 20px");
+        assertThat(rule(css, ".cl-page .cl-menu-glyph")).contains("font-size: 18px");
+    }
+
+    @Test
+    void theAddItemsCardsNameTheirColumnsAndTouchTargetsAreLargeEnough() throws Exception {
+        // given
+        String css = css();
+        String script = read("src/main/resources/static/js/item-add-dialog.js");
+
+        // then
+        assertThat(script).contains("cell.dataset.label").contains(".cl-item-add-table thead th")
+                .contains("nameCell.className = 'cl-item-add-name'");
+        assertThat(rule(css, ".cl-page .cl-item-add-table td:is(.cl-table-check, .cl-item-add-name)"))
+                .contains("grid-template-columns: minmax(0, 1fr)");
+        String touch = media(css.substring(css.indexOf("@media screen and (max-width: 1023px) {\n    .cl-page .cl-button.is-icon")),
+                "@media screen and (max-width: 1023px)");
+        assertThat(touch).contains(".cl-page .cl-address a {").contains("min-height: 44px")
+                .contains(".cl-page .cl-item-add-table .cl-table-sort {");
+        assertThat(rule(css, ".cl-page .cl-selection-actions.is-static")).contains("padding: 12px 20px 16px");
+        assertThat(rule(css, ".cl-page .cl-input.is-reference")).contains("width: 22ch");
     }
 
     @Test

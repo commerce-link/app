@@ -561,6 +561,25 @@ class OrderPageModelFactoryTest {
     }
 
     @Test
+    void aFailedTrackingSubscriptionOnAReadOnlyPageKeepsItsToneWithoutTheEditHelp() {
+        // given
+        Order order = order(OrderStatus.Completed);
+        order.getShipments().get(0).setTrackingSubscriptionStatus(pl.commercelink.orders.ShipmentTrackingStatus.FAILED);
+        Order open = order(OrderStatus.Shipping);
+        open.getShipments().get(0).setTrackingSubscriptionStatus(pl.commercelink.orders.ShipmentTrackingStatus.FAILED);
+
+        // when
+        OrderPageModel.ShipmentRow closed = factory.build(order, List.of(), ADMIN, PL).shipments().rows().get(0);
+        OrderPageModel.ShipmentRow superAdmin = factory.build(open, List.of(),
+                new OrderPageModelFactory.Viewer(true, false, null), PL).shipments().rows().get(0);
+
+        // then
+        assertThat(closed.trackingTone()).isEqualTo("is-bad");
+        assertThat(closed.trackingHelpKey()).isNull();
+        assertThat(superAdmin.trackingHelpKey()).isNull();
+    }
+
+    @Test
     void theHeaderNamesTheClientLikeTheList() {
         // given
         Order business = order(OrderStatus.New);

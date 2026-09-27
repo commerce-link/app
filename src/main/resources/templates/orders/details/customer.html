@@ -3,11 +3,11 @@
 <body>
 <!--/* Billing and shipping address blocks. The shipping condition sits on a th:block wrapper around the
        th:replace, because th:unless and th:replace on the same element discard the condition. */-->
-<section th:fragment="card" class="cl-card" aria-labelledby="customer-title" data-order="3" th:with="c=${page.customer()}">
+<section th:fragment="card" class="cl-card" aria-labelledby="customer-title" th:with="c=${page.customer()}">
     <div class="cl-card-head"><h2 class="cl-card-title" id="customer-title" th:text="#{order.card.customer}"></h2></div>
     <div class="cl-address">
         <div class="cl-address-head">
-            <span th:text="#{order.customer.billing}"></span>
+            <span class="cl-eyebrow" th:text="#{order.customer.billing}"></span>
             <a th:if="${c.billingEditHref() != null}" class="cl-link-button" th:href="@{${c.billingEditHref()}}"
                th:attr="aria-label=#{order.customer.billing.edit}" th:text="#{general.edit}"></a>
         </div>
@@ -16,7 +16,7 @@
     </div>
     <div class="cl-address">
         <div class="cl-address-head">
-            <span th:text="${c.shipmentTypeKey() != null} ? #{order.customer.shipping(${#messages.msg(c.shipmentTypeKey())})} : #{order.customer.shipping.plain}"></span>
+            <span class="cl-eyebrow" th:text="${c.shipmentTypeKey() != null} ? #{order.customer.shipping(${#messages.msg(c.shipmentTypeKey())})} : #{order.customer.shipping.plain}"></span>
             <a th:if="${c.shippingEditHref() != null}" class="cl-link-button" th:href="@{${c.shippingEditHref()}}"
                th:attr="aria-label=#{order.customer.shipping.edit}" th:text="#{general.edit}"></a>
         </div>

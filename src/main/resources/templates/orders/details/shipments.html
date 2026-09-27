@@ -2,7 +2,7 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
 <!--/* Shipment rows, courier cancellation and the shipments dialog trigger. */-->
-<section th:fragment="card" class="cl-card" id="przesylki" aria-labelledby="shipments-title" data-order="4"
+<section th:fragment="card" class="cl-card" id="przesylki" aria-labelledby="shipments-title"
          th:with="shipments=${page.shipments()}">
     <div class="cl-card-head">
         <h2 class="cl-card-title" id="shipments-title" th:text="#{order.card.shipments}"></h2>

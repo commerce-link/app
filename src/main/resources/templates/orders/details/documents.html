@@ -2,7 +2,7 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
 <!--/* Document rows, issuing and unpinning. Issuable types and the next type come as Option/key from the model. */-->
-<section th:fragment="card" class="cl-card" id="dokumenty" aria-labelledby="documents-title" data-order="5"
+<section th:fragment="card" class="cl-card" id="dokumenty" aria-labelledby="documents-title"
          th:with="documents=${page.documents()}">
     <div class="cl-card-head">
         <h2 class="cl-card-title" id="documents-title" th:text="#{order.card.documents}"></h2>
