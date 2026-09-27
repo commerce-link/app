@@ -23,7 +23,10 @@
                 <p class="cl-list-title">
                     <span th:text="#{${s.typeKey()}}"></span>
                     <span th:if="${s.carrier() != null}" th:text="' · ' + ${s.carrier()}"></span>
-                    <span th:if="${s.trackingKey() != null}" class="cl-status is-info" th:text="#{${s.trackingKey()}}"></span>
+                    <!--/* the pill text carries the state; the title only adds what to do about a failure */-->
+                    <span th:if="${s.trackingKey() != null}" class="cl-status" th:classappend="${s.trackingTone()}"
+                          th:attr="title=${s.trackingHelpKey() != null} ? #{${s.trackingHelpKey()}} : null"
+                          th:text="#{${s.trackingKey()}}"></span>
                 </p>
                 <p class="cl-list-desc">
                     <th:block th:if="${s.trackingNo() != null}">
@@ -42,7 +45,7 @@
             </div>
         </li>
     </ul>
-    <p th:if="${shipments.rows().isEmpty()}" class="cl-list-empty" th:text="#{order.shipments.empty}"></p>
+    <p th:if="${shipments.rows().isEmpty()}" class="cl-list-empty" th:text="#{${shipments.emptyKey()}}"></p>
 </section>
 
 <dialog th:fragment="dialog" class="cl-dialog is-form is-wide" id="shipments-dialog" aria-labelledby="shipments-dialog-title"

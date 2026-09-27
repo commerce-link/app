@@ -46,7 +46,9 @@
                 <div class="cl-span-6 cl-field">
                     <label class="cl-label" for="review-status" th:text="#{order.review.status}"></label>
                     <select class="cl-select" id="review-status" name="review.status">
-                        <option th:each="status : ${h.reviewStatuses()}" th:value="${status.value().name()}" th:selected="${r != null and r.status == status.value()}" th:text="#{${status.labelKey()}}"></option>
+                        <option th:if="${r == null or r.status == null}" value="" selected th:text="#{order.review.status.none}"></option>
+                        <option th:each="status : ${h.reviewStatuses()}" th:value="${status.value().name()}"
+                                th:selected="${r != null and r.status == status.value()}" th:text="#{${status.labelKey()}}"></option>
                     </select>
                 </div>
                 <div class="cl-span-3 cl-field">

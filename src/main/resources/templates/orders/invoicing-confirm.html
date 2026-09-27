@@ -8,7 +8,7 @@
     <section class="cl-page">
         <div class="cl-page-body">
             <div th:replace="~{fragments/settings-header :: subpage('/dashboard/orders/' + ${orderId}, ${backLabel},
-                    #{order.documents.issue.title} + ' ' + #{${documentLabelKey}})}"></div>
+                    #{order.documents.issue.title(${#messages.msg(documentLabelKey)})})}"></div>
             <form class="cl-form" method="post" th:action="@{/dashboard/orders/{o}/invoicing(o=${orderId})}">
                 <input type="hidden" name="documentType" th:value="${documentType}">
                 <div class="cl-card">

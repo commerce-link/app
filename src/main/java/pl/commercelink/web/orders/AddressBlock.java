@@ -51,6 +51,11 @@ public record AddressBlock(String name, String company, String taxId, String str
                 && Objects.equals(country, other.country);
     }
 
+    /** The name the orders list shows for this address: the company, else the person. */
+    public String companyOrPerson() {
+        return company != null ? company : name;
+    }
+
     public boolean isEmpty() {
         return Stream.of(name, company, street, cityLine, email, phone).allMatch(Objects::isNull);
     }

@@ -85,7 +85,7 @@ class OrderClosingChecklistTest {
         assertThat(checklist.items()).extracting(OrderClosingChecklist.Item::text).containsExactly(
                 "Przesyłki dostarczone: 1 z 2",
                 "Brakuje wpłaty: 6 653,00 PLN",
-                "Do wystawienia: Paragon",
+                "Paragon — dodaj przyciskiem „Dodaj dokument”",
                 "Brak dokumentu wydania (WZ)",
                 "Opinia do zebrania — zamówienie nie zamknie się, dopóki nie zmienisz statusu opinii");
         assertThat(checklist.missing()).isEqualTo(5);
@@ -107,7 +107,7 @@ class OrderClosingChecklistTest {
 
         // then
         assertThat(checklist.missing()).isZero();
-        assertThat(checklist.title(messages(), PL)).isEqualTo("Zamówienie zamknie się samo po zapisie");
+        assertThat(checklist.title(messages(), PL)).isEqualTo("Wszystko rozliczone — zamówienie zamknie się przy najbliższym zapisie (np. wpłaty, opinii albo statusu).");
         assertThat(checklist.items().get(0).text()).isEqualTo("Brak przesyłek (odbiór osobisty lub wysyłka poza systemem)");
         assertThat(checklist.items()).extracting(OrderClosingChecklist.Item::text)
                 .contains("Dokument zamykający: Paragon PAR/1", "Opinia: Pozytywna")
@@ -125,5 +125,42 @@ class OrderClosingChecklistTest {
                 assertThat(checklist.allDone()).as(order.getOrderId() + " wz=" + goodsIssueRequired).isEqualTo(order.isSettled(goodsIssueRequired));
             }
         }
+    }
+
+    @Test
+    void aConsumerReceiptTodoPointsToAddDocument() {
+        // given
+        Order consumer = unpaidOrder();
+        Order business = unpaidOrder();
+        BillingDetails company = new BillingDetails();
+        company.setTaxId("5250000000");
+        business.setBillingDetails(company);
+
+        // when
+        List<String> consumerTexts = OrderClosingChecklist.of(consumer, false, messages(), PL).items().stream()
+                .map(OrderClosingChecklist.Item::text).toList();
+        List<String> businessTexts = OrderClosingChecklist.of(business, false, messages(), PL).items().stream()
+                .map(OrderClosingChecklist.Item::text).toList();
+
+        // then
+        assertThat(consumerTexts).contains("Paragon — dodaj przyciskiem „Dodaj dokument”");
+        assertThat(businessTexts).contains("Do wystawienia: Faktura VAT");
+    }
+
+    @Test
+    void theMissingAndOverpaidAmountsCarryTheSharedCurrency() {
+        // given
+        Order overpaid = unpaidOrder();
+        overpaid.addPayment(new Payment("R", "Jan", PaymentSource.BankTransfer, 10001, 0));
+
+        // when
+        List<String> unpaidTexts = OrderClosingChecklist.of(unpaidOrder(), false, messages(), PL).items().stream()
+                .map(OrderClosingChecklist.Item::text).toList();
+        List<String> overpaidTexts = OrderClosingChecklist.of(overpaid, false, messages(), PL).items().stream()
+                .map(OrderClosingChecklist.Item::text).toList();
+
+        // then
+        assertThat(unpaidTexts).contains("Brakuje wpłaty: 10 000,00 PLN");
+        assertThat(overpaidTexts).contains("Nadpłata: 1,00 PLN");
     }
 }

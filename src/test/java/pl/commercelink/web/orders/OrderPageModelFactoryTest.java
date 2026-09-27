@@ -460,4 +460,202 @@ class OrderPageModelFactoryTest {
         assertThat(page.shipments().rows().get(0).trackingUrl()).isNull();
         assertThat(page.shipments().rows().get(0).trackingNo()).isEqualTo("T-1");
     }
+
+    private static final OrderPageModelFactory.Viewer ADMIN = new OrderPageModelFactory.Viewer(false, true, null);
+
+    private static Payment refund(double amount) {
+        return new Payment("ZW/1", "Zwrot", PaymentSource.BankTransfer, pl.commercelink.orders.PaymentDirection.Outgoing,
+                amount, 0, null, null);
+    }
+
+    @Test
+    void aRefundIsShownWithOneMinusWhateverItsSign() {
+        // given
+        Order typedNegative = order(OrderStatus.New);
+        typedNegative.addPayment(refund(-100));
+        Order storedPositive = order(OrderStatus.New);
+        storedPositive.addPayment(refund(100));
+
+        // when
+        OrderPageModel.PaymentRow negative = factory.build(typedNegative, List.of(), ADMIN, PL).payments().rows().get(0);
+        OrderPageModel.PaymentRow positive = factory.build(storedPositive, List.of(), ADMIN, PL).payments().rows().get(0);
+
+        // then
+        assertThat(negative.amount()).isEqualTo("−100,00");
+        assertThat(positive.amount()).isEqualTo("−100,00");
+        assertThat(negative.refund()).isTrue();
+    }
+
+    @Test
+    void aPlaceholderPaymentReadsAsExpected() {
+        // given
+        Order order = order(OrderStatus.New);
+        order.addPayment(new Payment(PaymentSource.BankTransfer));
+        order.addPayment(Payment.bankTransfer("R/1", "Jan", 10));
+
+        // when
+        List<OrderPageModel.PaymentRow> rows = factory.build(order, List.of(), ADMIN, PL).payments().rows();
+
+        // then
+        assertThat(rows).extracting(OrderPageModel.PaymentRow::pending).containsExactly(true, false);
+    }
+
+    @Test
+    void anOverpaidOrderShowsTheOverpaymentNotANegativeDue() {
+        // given
+        Order overpaid = order(OrderStatus.New);
+        overpaid.setTotalPrice(100);
+        overpaid.addPayment(Payment.bankTransfer("R/1", "Jan", 101));
+        Order unpaid = order(OrderStatus.New);
+        unpaid.setTotalPrice(100);
+
+        // when
+        OrderPageModel.PaymentsCard over = factory.build(overpaid, List.of(), ADMIN, PL).payments();
+        OrderPageModel.PaymentsCard due = factory.build(unpaid, List.of(), ADMIN, PL).payments();
+
+        // then
+        assertThat(over.overpaid()).isTrue();
+        assertThat(over.overpaidAmount()).isEqualTo("1,00");
+        assertThat(over.unpaid()).isEqualTo("0,00");
+        assertThat(due.overpaid()).isFalse();
+        assertThat(due.overpaidAmount()).isNull();
+        assertThat(due.unpaid()).isEqualTo("100,00");
+    }
+
+    @Test
+    void theEmptyShipmentsTextSaysWhatCanBeDoneNow() {
+        // given
+        Order warehouse = order(OrderStatus.New);
+        warehouse.setShipments(new java.util.ArrayList<>());
+        Order dropship = order(OrderStatus.New);
+        dropship.setShipments(new java.util.ArrayList<>());
+        dropship.setFulfilmentType(FulfilmentType.DirectToConsumer);
+        Order completed = order(OrderStatus.Completed);
+        completed.setShipments(new java.util.ArrayList<>());
+
+        // when / then
+        assertThat(factory.build(warehouse, List.of(), ADMIN, PL).shipments().emptyKey()).isEqualTo("order.shipments.empty");
+        assertThat(factory.build(dropship, List.of(), ADMIN, PL).shipments().emptyKey()).isEqualTo("order.shipments.empty.dropship");
+        assertThat(factory.build(completed, List.of(), ADMIN, PL).shipments().emptyKey()).isEqualTo("order.shipments.empty.readonly");
+        assertThat(factory.build(warehouse, List.of(), new OrderPageModelFactory.Viewer(true, false, null), PL).shipments().emptyKey())
+                .isEqualTo("order.shipments.empty.readonly");
+    }
+
+    @Test
+    void aFailedTrackingSubscriptionCarriesItsToneAndExplanation() {
+        // given
+        Order order = order(OrderStatus.Shipping);
+        order.getShipments().get(0).setTrackingSubscriptionStatus(pl.commercelink.orders.ShipmentTrackingStatus.FAILED);
+        Shipment active = new Shipment(ShipmentType.Courier);
+        active.setTrackingSubscriptionStatus(pl.commercelink.orders.ShipmentTrackingStatus.ACTIVE);
+        order.addShipment(active);
+
+        // when
+        List<OrderPageModel.ShipmentRow> rows = factory.build(order, List.of(), ADMIN, PL).shipments().rows();
+
+        // then
+        assertThat(rows.get(0).trackingTone()).isEqualTo("is-bad");
+        assertThat(rows.get(0).trackingHelpKey()).isEqualTo("order.shipment.tracking.failed.help");
+        assertThat(rows.get(1).trackingTone()).isEqualTo("is-info");
+        assertThat(rows.get(1).trackingHelpKey()).isNull();
+    }
+
+    @Test
+    void theHeaderNamesTheClientLikeTheList() {
+        // given
+        Order business = order(OrderStatus.New);
+        BillingDetails company = new BillingDetails();
+        company.setName("Jan");
+        company.setSurname("Kowalski");
+        company.setCompanyName("Firma Sp. z o.o.");
+        business.setBillingDetails(company);
+        Order person = order(OrderStatus.New);
+        BillingDetails jan = new BillingDetails();
+        jan.setName("Jan");
+        jan.setSurname("Kowalski");
+        jan.setEmail("jan@example.pl");
+        person.setBillingDetails(jan);
+        Order shipped = order(OrderStatus.New);
+        shipped.setBillingDetails(jan);
+        pl.commercelink.orders.ShippingDetails shipping = new pl.commercelink.orders.ShippingDetails();
+        shipping.setName("Anna");
+        shipping.setSurname("Nowak");
+        shipped.setShippingDetails(shipping);
+        Order emailOnly = order(OrderStatus.New);
+        BillingDetails email = new BillingDetails();
+        email.setEmail("anon@example.pl");
+        emailOnly.setBillingDetails(email);
+
+        // when / then
+        assertThat(factory.build(business, List.of(), ADMIN, PL).header().clientName()).isEqualTo("Firma Sp. z o.o.");
+        assertThat(factory.build(person, List.of(), ADMIN, PL).header().clientName()).isEqualTo("Jan Kowalski");
+        assertThat(factory.build(shipped, List.of(), ADMIN, PL).header().clientName()).isEqualTo("Anna Nowak");
+        assertThat(factory.build(emailOnly, List.of(), ADMIN, PL).header().clientName()).isEqualTo("anon@example.pl");
+        assertThat(MoveTargetView.of(business, 1, "Nowe", "1,00 PLN", null).clientName()).isEqualTo("Firma Sp. z o.o.");
+    }
+
+    private String itemHistory(String... serials) {
+        List<OrderItem> items = java.util.Arrays.stream(serials).map(sn -> {
+            OrderItem item = item(FulfilmentStatus.Delivered);
+            item.setSerialNo(sn);
+            return item;
+        }).toList();
+        return factory.build(order(OrderStatus.Delivered), items, ADMIN, PL).header().itemHistoryHref();
+    }
+
+    @Test
+    void theItemHistoryLinkNeedsExactlyOneSerialNumber() {
+        // when / then
+        assertThat(itemHistory()).isNull();
+        assertThat(itemHistory(new String[]{null})).isNull();
+        assertThat(itemHistory("SN-1")).isEqualTo("/dashboard/item/history?serialNo=SN-1");
+        assertThat(itemHistory("A, B")).isNull();
+        assertThat(itemHistory("A", "B")).isNull();
+        assertThat(itemHistory("SN-1", " SN-1 ")).isEqualTo("/dashboard/item/history?serialNo=SN-1");
+    }
+
+    @Test
+    void aMarketplaceSourceShowsItsNameOnly() {
+        // given
+        Order named = order(OrderStatus.New);
+        named.setSource(new pl.commercelink.orders.OrderSource("Allegro", pl.commercelink.orders.OrderSourceType.Marketplace));
+        Order unnamed = order(OrderStatus.New);
+        unnamed.setSource(new pl.commercelink.orders.OrderSource(null, pl.commercelink.orders.OrderSourceType.WebStore));
+
+        // when
+        OrderPageModel.Header withName = factory.build(named, List.of(), ADMIN, PL).header();
+        OrderPageModel.Header withoutName = factory.build(unnamed, List.of(), ADMIN, PL).header();
+
+        // then
+        assertThat(withName.sourceName()).isEqualTo("Allegro");
+        assertThat(withName.sourceTypeKey()).isNull();
+        assertThat(withoutName.sourceName()).isNull();
+        assertThat(withoutName.sourceTypeKey()).isEqualTo("order.source.type.WebStore");
+    }
+
+    @Test
+    void theEmptyDocumentsTextPointsToWhereTheNextDocumentIsMade() {
+        // when
+        OrderPageModel.DocumentsCard consumer = factory.build(order(OrderStatus.New), List.of(), ADMIN, PL).documents();
+        OrderPageModel.DocumentsCard business = factory.build(b2b(order(OrderStatus.New)), List.of(), ADMIN, PL).documents();
+
+        // then
+        assertThat(consumer.emptyKey()).isEqualTo("order.documents.empty.next.manual");
+        assertThat(business.emptyKey()).isEqualTo("order.documents.empty.next");
+    }
+
+    @Test
+    void theBulkBarListsEachDistinctReasonOnce() {
+        // given
+        Order order = order(OrderStatus.New);
+        order.addPayment(Payment.bankTransfer("R/1", "Jan", 10));
+        OrderItem item = item(FulfilmentStatus.New);
+        when(dropshipItemLookup.itemIdsInDropshipDeliveries(anyString(), any())).thenReturn(Set.of(item.getItemId()));
+
+        // when
+        OrderPageModel.ItemsCard items = factory.build(order, List.of(item), ADMIN, PL).items();
+
+        // then
+        assertThat(items.bulkReasonKeys()).containsExactly("order.items.action.dropship.locked", "order.bulk.unavailable.split");
+    }
 }

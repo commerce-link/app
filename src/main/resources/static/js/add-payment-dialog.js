@@ -3,8 +3,8 @@
 // (dialog.js fires cl:dialog-open). The mode picks the fee checkboxes: "order" (autofill the difference, the amount
 // includes the fee) or "delivery" (the surplus is the fee) and the default direction. The hint under the amounts says
 // what will be booked and whether it is a full, short or over payment; its words come from the dialog's data-hint-*.
-// Every amount goes through window.CL_formatMoney (money.js), which already carries the currency unit, so neither
-// this script nor the message keys hard-code "PLN"/"zł".
+// Every amount goes through window.CL_formatMoney (money.js), which takes the unit from general.currency.amount, so
+// neither this script nor the order.payment.hint.* keys spell the currency.
 (function () {
     'use strict';
 

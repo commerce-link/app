@@ -26,7 +26,8 @@
             <p class="cl-visually-hidden" role="status" data-cl-selection-status></p>
             <div class="cl-selection-bar" data-cl-selection-bar hidden>
                 <span class="cl-selection-count" data-cl-selection-count th:attr="data-template=#{order.bulk.selected}"></span>
-                <div class="cl-selection-actions" th:attr="data-cl-scope-template=#{order.bulk.scope}">
+                <div class="cl-selection-actions"
+                     th:attr="data-cl-scope-template=#{order.bulk.scope}, data-cl-scope-count-template=#{order.bulk.scope.count}">
                     <th:block th:each="bulk : ${items.bulkActions()}">
                         <button th:if="${bulk.action().name() != 'MOVE'}" type="button" class="cl-button"
                                 th:classappend="${bulk.action().danger()} ? 'is-danger' : ''" th:disabled="${!bulk.available()}"
@@ -35,16 +36,18 @@
                                          data-cl-bulk-confirm-title=#{${bulk.action().confirmTitleKey()}},
                                          data-cl-bulk-confirm-message=#{${bulk.action().confirmMessageKey()}},
                                          data-cl-bulk-confirm-action=#{${bulk.action().confirmActionKey()}},
-                                         title=${bulk.reasonKey() != null} ? #{${bulk.reasonKey()}} : null"
+                                         aria-describedby=${bulk.reasonKey() != null} ? |bulk-reason-${items.bulkReasonKeys().indexOf(bulk.reasonKey())}| : null"
                                 th:text="#{${bulk.action().labelKey()}}"></button>
                         <button th:if="${bulk.action().name() == 'MOVE'}" type="button" class="cl-button"
                                 data-cl-dialog-open="move-dialog" th:disabled="${!bulk.available()}"
                                 th:attr="data-cl-bulk-scope=${bulk.action().scope()}, data-label=#{${bulk.action().labelKey()}},
-                                         title=${bulk.reasonKey() != null} ? #{${bulk.reasonKey()}} : null"
+                                         aria-describedby=${bulk.reasonKey() != null} ? |bulk-reason-${items.bulkReasonKeys().indexOf(bulk.reasonKey())}| : null"
                                 th:text="#{${bulk.action().labelKey()}}"></button>
-                        <span th:if="${bulk.reasonKey() != null}" class="cl-visually-hidden" th:text="#{${bulk.reasonKey()}}"></span>
                     </th:block>
                 </div>
+                <!--/* the reasons are text in the bar, not tooltips, so a touch screen shows them too */-->
+                <p th:each="key, i : ${items.bulkReasonKeys()}" class="cl-help is-note" th:id="|bulk-reason-${i.index}|"
+                   th:text="#{${key}}"></p>
                 <button type="button" class="cl-link-button cl-selection-clear" data-cl-select-clear th:text="#{order.bulk.clear}"></button>
             </div>
         </th:block>
@@ -121,14 +124,14 @@
                 </button>
             </th:block>
             <th:block th:if="${row.sku() != null and row.sku() != row.mfn()}">
-                <span> · SKU </span>
+                <span th:text="' · ' + #{order.items.sku.prefix} + ' '"></span>
                 <button type="button" class="cl-copy-inline"
                         th:attr="data-cl-copy=${row.sku()}, title=${row.sku()}, aria-label=#{order.items.copy.sku(${row.sku()})}">
                     <span th:text="${#strings.abbreviate(row.sku(), 28)}"></span><span class="cl-copy-icon"><span class="icon is-small" aria-hidden="true"><i class="far fa-copy"></i></span></span>
                 </button>
             </th:block>
             <th:block th:if="${row.serialNo() != null}">
-                <span> · SN </span>
+                <span th:text="' · ' + #{order.items.sn.prefix} + ' '"></span>
                 <a th:if="${row.serialHref() != null}" class="cl-table-link" th:href="@{${row.serialHref()}}" th:text="${row.serialNo()}"></a>
                 <span th:unless="${row.serialHref() != null}" th:text="${row.serialNo()}"></span>
                 <!--/* the SN itself is easy to read but tedious to type into a search box — offer a copy button too */-->
@@ -139,7 +142,7 @@
         </span>
         <span th:if="${row.conditionKey() != null or row.consolidated() or row.service()}" class="cl-table-pills">
             <span th:if="${row.conditionKey() != null}" class="cl-status" th:classappend="${row.conditionTone()}" th:text="#{${row.conditionKey()}}"></span>
-            <span th:if="${row.consolidated()}" class="cl-status is-neutral" th:text="#{order.items.pill.consolidated}"></span>
+            <span th:if="${row.consolidated()}" class="cl-status is-info" th:text="#{order.items.pill.consolidated}"></span>
             <span th:if="${row.service()}" class="cl-status is-neutral" th:text="#{order.items.pill.service}"></span>
         </span>
         <span th:if="${row.comment() != null}" class="cl-table-sub" th:text="${row.comment()}"></span>

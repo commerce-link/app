@@ -56,7 +56,7 @@
         </li>
     </ul>
     <p th:if="${documents.rows().isEmpty()}" class="cl-list-empty"
-       th:text="${documents.nextTypeKey() != null} ? #{order.documents.empty.next(${#messages.msg(documents.nextTypeKey())})} : #{order.documents.empty}"></p>
+       th:text="${documents.nextTypeKey() != null} ? #{${documents.emptyKey()}(${#messages.msg(documents.nextTypeKey())})} : #{${documents.emptyKey()}}"></p>
 </section>
 
 <!--/* "Add document" (manual receipt/invoice) and "Issue" (invoicing-system document, with an explicit send choice). */-->
@@ -98,9 +98,9 @@
 <dialog th:fragment="issueDialog" class="cl-dialog is-form" id="issue-dialog" aria-labelledby="issue-dialog-title">
     <form method="post" th:action="@{/dashboard/orders/{o}/invoicing(o=${page.orderId()})}">
         <input type="hidden" name="documentType" value="">
-        <h2 class="cl-dialog-title" id="issue-dialog-title">
-            <span th:text="#{order.documents.issue.title}"></span> <span data-cl-issue-type></span>
-        </h2>
+        <!--/* order-documents.js puts the chosen type into {type}, so the title stays one translated sentence */-->
+        <h2 class="cl-dialog-title" id="issue-dialog-title" data-cl-issue-title
+            th:attr="data-template=#{order.documents.issue.title('{type}')}"></h2>
         <div class="cl-dialog-body">
             <p class="cl-dialog-effect" th:text="#{order.documents.issue.effect}"></p>
             <label class="cl-check">

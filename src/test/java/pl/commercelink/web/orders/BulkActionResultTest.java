@@ -35,7 +35,7 @@ class BulkActionResultTest {
         // when / then
         assertThat(partial.complete()).isFalse();
         assertThat(partial.message(messages(), PL))
-                .isEqualTo("Zmieniono: 2 z 3. Pominięte pozycje nie mają kompletu danych przydziału albo nie są nowe.");
+                .isEqualTo("Zmieniono: 2 z 3. Pominięte pozycje nie mają kompletu danych alokacji albo nie są nowe.");
         assertThat(dropship.message(messages(), PL))
                 .isEqualTo("Zmieniono: 0 z 2. Pominięto pozycje w dostawie dropship — nie trafiają do magazynu.");
         assertThat(complete.complete()).isTrue();

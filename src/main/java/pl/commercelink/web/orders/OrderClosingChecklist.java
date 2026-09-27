@@ -37,10 +37,10 @@ public record OrderClosingChecklist(List<Item> items) {
         if (order.isFullyPaid()) {
             items.add(new Item(true, text(messages, locale, "order.closing.paid.done"), null, false));
         } else if (unpaid < 0) {
-            items.add(new Item(false, text(messages, locale, "order.closing.paid.overpaid", Money.format(-unpaid)),
+            items.add(new Item(false, text(messages, locale, "order.closing.paid.overpaid", amount(messages, locale, -unpaid)),
                     "#platnosci", false));
         } else {
-            items.add(new Item(false, text(messages, locale, "order.closing.paid.todo", Money.format(unpaid)),
+            items.add(new Item(false, text(messages, locale, "order.closing.paid.todo", amount(messages, locale, unpaid)),
                     "#platnosci", false));
         }
 
@@ -52,8 +52,10 @@ public record OrderClosingChecklist(List<Item> items) {
                     label(messages, locale, closing.getType()), closing.getNumber()), null, false));
         } else {
             DocumentType next = order.getNextDocumentToIssue().orElse(order.getReceiptType());
-            items.add(new Item(false, text(messages, locale, "order.closing.invoice.todo", label(messages, locale, next)),
-                    "#dokumenty", false));
+            // "Issue" only offers the invoicing system's documents; a consumer receipt is typed in with "Add document"
+            String key = order.getIssuableDocumentTypes().contains(next)
+                    ? "order.closing.invoice.todo" : "order.closing.invoice.todo.manual";
+            items.add(new Item(false, text(messages, locale, key, label(messages, locale, next)), "#dokumenty", false));
         }
 
         if (goodsIssueRequired) {
@@ -92,6 +94,10 @@ public record OrderClosingChecklist(List<Item> items) {
 
     private static String label(MessageSource messages, Locale locale, DocumentType type) {
         return messages.getMessage(OrderLabels.documentType(type), null, locale);
+    }
+
+    private static String amount(MessageSource messages, Locale locale, double value) {
+        return messages.getMessage("general.currency.amount", new Object[]{Money.format(value)}, locale);
     }
 
     private static String text(MessageSource messages, Locale locale, String key, Object... args) {

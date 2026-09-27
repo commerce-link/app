@@ -52,6 +52,30 @@ class OrderDetailsMessagesTest {
         assertThat(missing).isEmpty();
     }
 
+    @Test
+    void amountKeysTakeTheCurrencyFromTheSharedAmountKey() throws IOException {
+        // given
+        Properties pl = load("messages_pl.properties"), en = load("messages_en.properties");
+
+        // then
+        for (Properties bundle : List.of(pl, en)) {
+            for (String key : List.of("order.closing.paid.todo", "order.closing.paid.overpaid", "order.payments.fee",
+                    "order.payments.overpaid")) {
+                assertThat(bundle.getProperty(key)).as(key).contains("{0}").doesNotContain("PLN");
+            }
+        }
+    }
+
+    @Test
+    void theDetailsCallAReviewAnOpinionNotARecension() throws IOException {
+        // given
+        Properties pl = load("messages_pl.properties");
+
+        // then
+        assertThat(pl.stringPropertyNames().stream().filter(key -> key.startsWith("order."))
+                .filter(key -> pl.getProperty(key).toLowerCase(Locale.ROOT).contains("recenzj"))).isEmpty();
+    }
+
     private static Properties load(String name) throws IOException {
         Properties p = new Properties();
         try (var r = new InputStreamReader(Files.newInputStream(Path.of("src/main/resources", name)), StandardCharsets.UTF_8)) { p.load(r); }

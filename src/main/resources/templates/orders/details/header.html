@@ -18,13 +18,11 @@
         <span th:if="${page.header().completedAutomatically()}" class="cl-help is-note" th:text="#{order.page.status.completed.note}"></span>
     </th:block>
 
-    <th:block th:fragment="orderMeta" th:with="h=${page.header()},
-            typeLabel=${h.sourceTypeKey() != null} ? ${#messages.msg(h.sourceTypeKey())} : null">
+    <th:block th:fragment="orderMeta" th:with="h=${page.header()}">
         <p class="cl-record-meta">
             <span th:if="${h.clientName() != null}"><strong th:text="${h.clientName()}"></strong></span>
-            <span th:if="${h.sourceName() != null or typeLabel != null}"
-                  th:text="${h.sourceName() == null} ? ${typeLabel}
-                          : (${typeLabel == null or typeLabel == h.sourceName()} ? ${h.sourceName()} : #{order.page.meta.source(${h.sourceName()}, ${typeLabel})})"></span>
+            <span th:if="${h.sourceName() != null or h.sourceTypeKey() != null}"
+                  th:text="${h.sourceName() != null} ? ${h.sourceName()} : #{${h.sourceTypeKey()}}"></span>
             <span th:text="${h.orderedAt()}"></span>
             <span><strong th:text="#{general.currency.amount(${h.total()})}"></strong></span>
             <span th:if="${h.fulfilmentTypeKey() != null}" th:text="#{${h.fulfilmentTypeKey()}}"></span>

@@ -23,6 +23,7 @@ import pl.commercelink.orders.PaymentSource;
 import pl.commercelink.orders.PositionGroup;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShipmentCarrierOptions;
+import pl.commercelink.orders.ShipmentTrackingStatus;
 import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.event.EventType;
 import pl.commercelink.orders.event.OrderEvent;
@@ -50,6 +51,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Component
 @RequiredArgsConstructor
@@ -120,20 +122,24 @@ public class OrderPageModelFactory {
         } else if (!readOnly && canOrderShipment && order.hasShipmentWithoutShippingData()) {
             primary = new OrderPageModel.PrimaryAction("order.page.action.courier", links.details() + "/shipping", "fa-truck");
         }
-        String itemHistory = viewer.superAdmin() ? null : items.stream()
-                .map(OrderItem::getSerialNo).filter(Objects::nonNull).map(String::trim).filter(sn -> !sn.isEmpty())
-                .findFirst().map(sn -> "/dashboard/item/history?serialNo="
-                        + URLEncoder.encode(sn.split(",")[0].trim(), StandardCharsets.UTF_8)).orElse(null);
+        // the header link names one physical item; with several serial numbers the rows link each of theirs
+        List<String> serials = items.stream().map(OrderItem::getSerialNo).filter(Objects::nonNull)
+                .flatMap(sn -> Arrays.stream(sn.split(","))).map(String::trim).filter(sn -> !sn.isEmpty())
+                .distinct().toList();
+        String itemHistory = viewer.superAdmin() || serials.size() != 1 ? null
+                : "/dashboard/item/history?serialNo=" + URLEncoder.encode(serials.get(0), StandardCharsets.UTF_8);
         String splitFrom = order.getSplitFromOrderId();
         boolean clientPage = store != null && store.isClientOrderPageEnabled() && !order.hasStatus(OrderStatus.Completed);
-        AddressBlock billing = AddressBlock.of(order.getBillingDetails(), Locale.ROOT);
-        String client = billing.name() != null ? billing.name() : billing.company() != null ? billing.company() : billing.email();
+        String sourceName = order.getSource() == null ? null : StringUtils.trimToNull(order.getSource().getName());
+        // the type only stands in for a missing name: "Allegro (Marketplace)" says nothing the name does not
+        String sourceTypeKey = order.getSource() == null || sourceName != null ? null
+                : OrderLabels.sourceType(order.getSource().getType());
         return new OrderPageModel.Header(
                 OrderLabels.status(order.getStatus()), OrderLabels.tone(order.getStatus()), !readOnly,
                 order.hasStatus(OrderStatus.Completed),
-                client,
-                order.getSource() == null ? null : order.getSource().getName(),
-                order.getSource() == null ? null : OrderLabels.sourceType(order.getSource().getType()),
+                clientName(order),
+                sourceName,
+                sourceTypeKey,
                 OrderFormats.dateTime(order.getOrderedAt()), Money.format(order.getTotalPrice()),
                 OrderLabels.fulfilmentType(order.getFulfilmentType()), order.getExternalOrderId(),
                 RoutedSupplierView.from(order, store),
@@ -146,6 +152,14 @@ public class OrderPageModelFactory {
                 !viewer.superAdmin() && order.canBeCancelled(items),
                 !viewer.superAdmin() && order.hasStatus(OrderStatus.New) && items.isEmpty() && !order.isInvoiced(),
                 deleteMessage(order, messageSource, locale));
+    }
+
+    /** The client as the orders list names it (shipping first, company before person), then the billing e-mail. */
+    public static String clientName(Order order) {
+        AddressBlock shipping = AddressBlock.of(order.getShippingDetails(), Locale.ROOT);
+        AddressBlock billing = AddressBlock.of(order.getBillingDetails(), Locale.ROOT);
+        return Stream.of(shipping.companyOrPerson(), billing.companyOrPerson(), billing.email())
+                .filter(Objects::nonNull).findFirst().orElse(null);
     }
 
     /** The delete confirmation warns that a marketplace order is cancelled there too. */
@@ -203,6 +217,9 @@ public class OrderPageModelFactory {
             bulk.add(new OrderPageModel.BulkActionButton(action, reason == null, reason,
                     "/dashboard/orders/" + order.getOrderId() + "/" + action.path()));
         }
+        // each reason is printed once under the bar and the buttons it greys point to it
+        List<String> bulkReasonKeys = bulk.stream().map(OrderPageModel.BulkActionButton::reasonKey)
+                .filter(Objects::nonNull).distinct().toList();
         boolean selectable = !readOnly && !hasWarehouseDocument;
         Map<String, SplitGroupPreviewDto> previews = readOnly ? Map.of() : items.stream()
                 .filter(OrderItem::isNew).filter(OrderItem::isGroup)
@@ -210,7 +227,7 @@ public class OrderPageModelFactory {
         return new OrderPageModel.ItemsCard(products, services, items.size(), selectable,
                 !readOnly && addReason == null, readOnly ? null : addReason,
                 !readOnly && !order.hasStatus(OrderStatus.New) && !serialItems.isEmpty(), serialItems,
-                bulk, selectable && (canSplitOrder || !hasDropshipItems),
+                bulk, selectable && (canSplitOrder || !hasDropshipItems), bulkReasonKeys,
                 readOnly ? List.of() : productCatalogRepository.findAll(order.getStoreId()),
                 readOnly ? List.of() : labels.options(), previews);
     }
@@ -243,8 +260,14 @@ public class OrderPageModelFactory {
                 .map(s -> new OrderPageModel.ShipmentRow(OrderLabels.shipmentType(s.getType()), s.getCarrier(),
                         s.getTrackingNo(), safeTrackingUrl(s.getTrackingUrl()), s.getCollectionPointCode(),
                         OrderFormats.dateTime(s.getShippedAt()), OrderFormats.dateTime(s.getDeliveredAt()),
-                        order.hasTrackedShipments() ? OrderLabels.tracking(s.getTrackingSubscriptionStatus()) : null))
+                        order.hasTrackedShipments() ? OrderLabels.tracking(s.getTrackingSubscriptionStatus()) : null,
+                        OrderLabels.tone(s.getTrackingSubscriptionStatus()),
+                        s.getTrackingSubscriptionStatus() == ShipmentTrackingStatus.FAILED
+                                ? "order.shipment.tracking.failed.help" : null))
                 .toList();
+        String emptyKey = readOnly ? "order.shipments.empty.readonly"
+                : order.getFulfilmentType() == FulfilmentType.DirectToConsumer ? "order.shipments.empty.dropship"
+                : "order.shipments.empty";
         // the courier order can be cancelled only while its labelled parcel is still on the way
         boolean cancellable = order.firstShipmentWithShippingData()
                 .map(s -> s.getExternalId() != null && s.getDeliveredAt() == null).orElse(false);
@@ -252,7 +275,7 @@ public class OrderPageModelFactory {
         // not an empty table that posts nothing on Save (an extra blank row next to existing ones would post
         // an empty shipment)
         List<Shipment> editable = order.getShipments().isEmpty() ? List.of(new Shipment()) : order.getShipments();
-        return new OrderPageModel.ShipmentsCard(rows,
+        return new OrderPageModel.ShipmentsCard(rows, emptyKey,
                 !readOnly && order.canOrderShipment() && cancellable, OrderLabels.Option.of(ShipmentType.values(), OrderLabels::shipmentType),
                 store == null ? List.of() : shipmentCarrierOptions.forOrder(order, store), editable);
     }
@@ -263,7 +286,10 @@ public class OrderPageModelFactory {
         DocumentType next = order.getNextDocumentToIssue().orElse(null);
         List<OrderPageModel.DocumentRow> rows = order.getDocuments().stream().map(d -> documentRow(order, d, viewer, closed)).toList();
         List<DocumentType> issuable = order.getIssuableDocumentTypes();
-        return new OrderPageModel.DocumentsCard(rows, !readOnly && addDocumentLockedKey(order, null) == null,
+        // a consumer receipt is never issued from here, it is typed in with "Add document"; the text says so
+        String emptyKey = next == null ? "order.documents.empty"
+                : readOnly || issuable.contains(next) ? "order.documents.empty.next" : "order.documents.empty.next.manual";
+        return new OrderPageModel.DocumentsCard(rows, emptyKey, !readOnly && addDocumentLockedKey(order, null) == null,
                 OrderLabels.Option.of(manual, OrderLabels::documentType), next,
                 next == null ? null : OrderLabels.documentType(next), OrderLabels.Option.of(issuable, OrderLabels::documentType),
                 !readOnly && goodsIssue, !readOnly && (goodsIssue || !issuable.isEmpty()), OrderFormats.isoDate(LocalDate.now()));
@@ -316,13 +342,22 @@ public class OrderPageModelFactory {
         // every payment is listed, complete or not: an incomplete one is still money recorded against the order
         List<Payment> payments = order.getPayments() == null ? List.of() : order.getPayments();
         List<OrderPageModel.PaymentRow> rows = payments.stream()
-                .map(p -> new OrderPageModel.PaymentRow(Money.format(p.getAmount()), p.getDirection() == PaymentDirection.Outgoing,
-                        OrderLabels.paymentSource(p.getSource()), p.getName(), p.getReferenceNo(), p.getBankTransactionNo(),
-                        OrderFormats.date(p.getBankTransactionDate()), p.getFee() > 0 ? Money.format(p.getFee()) : null))
+                .map(p -> {
+                    boolean refund = p.getDirection() == PaymentDirection.Outgoing;
+                    // a refund is typed with either sign (the dialog asks for a minus, supplier payouts are stored
+                    // positive); the page shows one minus whichever way it was saved
+                    double shown = refund ? -Math.abs(p.getAmount()) : p.getAmount();
+                    return new OrderPageModel.PaymentRow(Money.format(shown), refund, p.isUnsettled(),
+                            OrderLabels.paymentSource(p.getSource()), p.getName(), p.getReferenceNo(),
+                            p.getBankTransactionNo(), OrderFormats.date(p.getBankTransactionDate()),
+                            p.getFee() > 0 ? Money.format(p.getFee()) : null);
+                })
                 .toList();
         double unpaid = order.getUnpaidAmount();
-        return new OrderPageModel.PaymentsCard(rows, Money.format(order.getPaidAmount()), Money.format(unpaid),
-                unpaid > 0.005, !readOnly && !payments.isEmpty(), Math.max(0, unpaid),
+        boolean overpaid = unpaid < -0.005;
+        return new OrderPageModel.PaymentsCard(rows, Money.format(order.getPaidAmount()), Money.format(Math.max(0, unpaid)),
+                unpaid > 0.005, overpaid, overpaid ? Money.format(-unpaid) : null, !readOnly && !payments.isEmpty(),
+                Math.max(0, unpaid),
                 order.getPendingPayment(), OrderLabels.Option.of(PaymentSource.values(), OrderLabels::paymentSource),
                 payments);
     }

@@ -40,8 +40,8 @@ public record OrderPageModel(String orderId, String shortId, String backHref, bo
     public record ItemsCard(List<OrderItemRow> products, List<OrderItemRow> services, int count, boolean selectable,
                             boolean canAddItems, String addItemsReasonKey, boolean canAddSerials,
                             List<SerialItemRow> serialItems, List<BulkActionButton> bulkActions, boolean bulkAvailable,
-                            List<ProductCatalog> catalogs, List<SupplierLabelMap.Option> suppliers,
-                            Map<String, SplitGroupPreviewDto> splitPreviews) {
+                            List<String> bulkReasonKeys, List<ProductCatalog> catalogs,
+                            List<SupplierLabelMap.Option> suppliers, Map<String, SplitGroupPreviewDto> splitPreviews) {
     }
 
     /** The serial-number dialog needs no cost, so it gets a slim row instead of the raw OrderItem. */
@@ -51,30 +51,36 @@ public record OrderPageModel(String orderId, String shortId, String backHref, bo
     public record BulkActionButton(BulkAction action, boolean available, String reasonKey, String href) {
     }
 
-    public record ShipmentsCard(List<ShipmentRow> rows, boolean canCancelCourier,
+    /** emptyKey: what the card says with no shipment, i.e. what the viewer can do about it now. */
+    public record ShipmentsCard(List<ShipmentRow> rows, String emptyKey, boolean canCancelCourier,
                                 List<OrderLabels.Option<ShipmentType>> types, List<String> carriers, List<Shipment> editable) {
     }
 
     public record ShipmentRow(String typeKey, String carrier, String trackingNo, String trackingUrl, String pickupPoint,
-                              String shippedAt, String deliveredAt, String trackingKey) {
+                              String shippedAt, String deliveredAt, String trackingKey, String trackingTone,
+                              String trackingHelpKey) {
     }
 
-    public record DocumentsCard(List<DocumentRow> rows, boolean canAdd, List<OrderLabels.Option<DocumentType>> manualTypes,
-                                DocumentType nextType, String nextTypeKey, List<OrderLabels.Option<DocumentType>> issuable,
-                                boolean goodsIssue, boolean canIssue, String today) {
+    /** emptyKey takes the next type's label as its argument: "Issue" makes it, or "Add document" when it is typed by hand. */
+    public record DocumentsCard(List<DocumentRow> rows, String emptyKey, boolean canAdd,
+                                List<OrderLabels.Option<DocumentType>> manualTypes, DocumentType nextType, String nextTypeKey,
+                                List<OrderLabels.Option<DocumentType>> issuable, boolean goodsIssue, boolean canIssue,
+                                String today) {
     }
 
     public record DocumentRow(String typeKey, String number, String href, boolean external, String issuedAt,
                               boolean removable, String removeHref) {
     }
 
-    public record PaymentsCard(List<PaymentRow> rows, String paid, String unpaid, boolean unpaidDue,
-                               boolean canEdit, double expected, Payment pending, List<OrderLabels.Option<PaymentSource>> sources,
-                               List<Payment> editable) {
+    /** unpaid never goes below zero: an order paid above its total shows overpaidAmount instead. */
+    public record PaymentsCard(List<PaymentRow> rows, String paid, String unpaid, boolean unpaidDue, boolean overpaid,
+                               String overpaidAmount, boolean canEdit, double expected, Payment pending,
+                               List<OrderLabels.Option<PaymentSource>> sources, List<Payment> editable) {
     }
 
-    public record PaymentRow(String amount, boolean refund, String sourceKey, String name, String referenceNo,
-                             String bankTransactionNo, String bankTransactionDate, String fee) {
+    /** pending: a payment recorded with no amount yet (the method is known, the money has not arrived). */
+    public record PaymentRow(String amount, boolean refund, boolean pending, String sourceKey, String name,
+                             String referenceNo, String bankTransactionNo, String bankTransactionDate, String fee) {
     }
 
     public record HistoryCard(List<EventRow> events, OrderReview review, String reviewStatusKey, String reviewRequestedAt,

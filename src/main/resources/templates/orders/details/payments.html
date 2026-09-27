@@ -19,8 +19,11 @@
         <li class="cl-list-item" th:each="p : ${payments.rows()}">
             <div>
                 <p class="cl-list-title">
-                    <span th:text="${p.refund()} ? '−' + #{general.currency.amount(${p.amount()})} : #{general.currency.amount(${p.amount()})}"></span>
+                    <!--/* a payment with no amount yet is the one the order waits for, not a payment of 0,00 */-->
+                    <span th:if="${p.pending()}" th:text="#{order.payments.pending}"></span>
+                    <span th:unless="${p.pending()}" th:text="#{general.currency.amount(${p.amount()})}"></span>
                     <span th:if="${p.sourceKey() != null}" th:text="' · ' + #{${p.sourceKey()}}"></span>
+                    <span th:if="${p.pending()}" class="cl-status is-neutral" th:text="#{order.payments.pending.pill}"></span>
                     <span th:if="${p.refund()}" class="cl-status is-warn" th:text="#{order.payments.refund}"></span>
                 </p>
                 <p class="cl-list-desc">
@@ -28,7 +31,8 @@
                     <span th:if="${p.referenceNo() != null}" th:text="' · ' + #{order.payments.reference(${p.referenceNo()})}"></span>
                     <span th:if="${p.bankTransactionNo() != null}"
                           th:text="' · ' + #{order.payments.operation(${p.bankTransactionNo()}, ${p.bankTransactionDate() != null ? p.bankTransactionDate() : '—'})}"></span>
-                    <span th:if="${p.fee() != null}" th:text="' · ' + #{order.payments.fee(${p.fee()})}"></span>
+                    <span th:if="${p.fee() != null}"
+                          th:text="' · ' + #{order.payments.fee(${#messages.msg('general.currency.amount', p.fee())})}"></span>
                 </p>
             </div>
         </li>
@@ -36,8 +40,10 @@
     <p th:if="${payments.rows().isEmpty()}" class="cl-list-empty" th:text="#{order.payments.empty}"></p>
     <p class="cl-list-summary">
         <span><span th:text="#{order.payments.paid}"></span> <strong th:text="#{general.currency.amount(${payments.paid()})}"></strong></span>
-        <span th:classappend="${payments.unpaidDue()} ? 'is-bad' : ''"
+        <span th:if="${!payments.overpaid()}" th:classappend="${payments.unpaidDue()} ? 'is-bad' : ''"
               th:text="#{order.payments.unpaid(${#messages.msg('general.currency.amount', payments.unpaid())})}"></span>
+        <span th:if="${payments.overpaid()}" class="is-warn"
+              th:text="#{order.payments.overpaid(${#messages.msg('general.currency.amount', payments.overpaidAmount())})}"></span>
     </p>
 </section>
 

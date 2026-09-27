@@ -101,4 +101,13 @@ class OrderLabelsTest {
         assertThat(OrderLabels.tone((OrderStatus) null)).isNull();
         assertThat(OrderLabels.sourceType(null)).isNull();
     }
+
+    @Test
+    void trackingToneFollowsTheSubscriptionState() {
+        // when / then
+        assertThat(OrderLabels.tone(ShipmentTrackingStatus.PENDING)).isEqualTo(OrderLabels.NEUTRAL);
+        assertThat(OrderLabels.tone(ShipmentTrackingStatus.ACTIVE)).isEqualTo(OrderLabels.INFO);
+        assertThat(OrderLabels.tone(ShipmentTrackingStatus.FAILED)).isEqualTo(OrderLabels.BAD);
+        assertThat(OrderLabels.tone((ShipmentTrackingStatus) null)).isNull();
+    }
 }

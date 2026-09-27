@@ -32,6 +32,7 @@ import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.inventory.InventoryView;
 import pl.commercelink.inventory.MatchedInventory;
 import pl.commercelink.orders.Order;
+import pl.commercelink.orders.OrderReviewStatus;
 import pl.commercelink.orders.OrderItemDraft;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.pricelist.PricelistFinder;
@@ -280,7 +281,7 @@ class OrdersControllerTest {
         Order updatedPayload = new Order(STORE_ID);
         updatedPayload.setBillingDetails(newBilling);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(existingOrder);
-        when(messageSource.getMessage(eq("error.message.billing.details.locked"), any(), eq(Locale.ENGLISH)))
+        when(messageSource.getMessage(eq("order.customer.billing.locked"), any(), eq(Locale.ENGLISH)))
                 .thenReturn("Billing locked");
 
         // when
@@ -1185,6 +1186,45 @@ class OrdersControllerTest {
         // then
         assertThat(existingOrder.getFulfilmentType())
                 .isEqualTo(pl.commercelink.orders.fulfilment.FulfilmentType.DirectToConsumer);
+        verify(orderLifecycle).update(existingOrder);
+    }
+
+    @Test
+    @DisplayName("updateReview leaves an order without a review when the dialog posts no status")
+    void updateReviewWithoutAStatusLeavesAnOrderWithoutAReview() {
+        // given
+        Order existingOrder = orderBase();
+        existingOrder.setReview(null);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(existingOrder);
+        Order payload = new Order(STORE_ID);
+        payload.setReview(new pl.commercelink.orders.OrderReview());
+
+        // when
+        ordersController.updateReview(ORDER_ID, payload, redirectAttributes, Locale.ENGLISH);
+
+        // then
+        assertThat(existingOrder.getReview()).isNull();
+        verify(orderLifecycle).update(existingOrder);
+    }
+
+    @Test
+    @DisplayName("updateReview saves the chosen review status")
+    void updateReviewSavesAChosenStatus() {
+        // given
+        Order existingOrder = orderBase();
+        existingOrder.setReview(null);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(existingOrder);
+        Order payload = new Order(STORE_ID);
+        pl.commercelink.orders.OrderReview posted = new pl.commercelink.orders.OrderReview(OrderReviewStatus.ToBeCollected);
+        posted.setReferenceNo("REF-1");
+        payload.setReview(posted);
+
+        // when
+        ordersController.updateReview(ORDER_ID, payload, redirectAttributes, Locale.ENGLISH);
+
+        // then
+        assertThat(existingOrder.getReview().getStatus()).isEqualTo(OrderReviewStatus.ToBeCollected);
+        assertThat(existingOrder.getReview().getReferenceNo()).isEqualTo("REF-1");
         verify(orderLifecycle).update(existingOrder);
     }
 

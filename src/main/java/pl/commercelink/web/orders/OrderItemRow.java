@@ -53,20 +53,29 @@ public record OrderItemRow(String itemId, int index, String name, String categor
     /** The conditions of the old order-details item menu, plus: consolidation stops at the closing invoice. */
     public static List<ItemAction.State> actions(OrderItem item, Order order) {
         List<ItemAction.State> states = new ArrayList<>();
+        // an item that already has a supplier (Allocation) is released first, then reassigned
         String assignReason = item.isGroup() ? "order.item.unavailable.group"
-                : item.isNew() ? null : "order.item.unavailable.not.new";
+                : item.isNew() ? null
+                : item.isReleasable() ? "order.item.unavailable.clear.first"
+                : "order.item.unavailable.not.new";
         states.add(ItemAction.State.of(ItemAction.ASSIGN_SKU, assignReason, null));
         states.add(ItemAction.State.of(ItemAction.ASSIGN_SUPPLIER, assignReason, null));
-        states.add(ItemAction.State.of(ItemAction.ASSIGN_WAREHOUSE, assignReason, null));
+        // a marketplace-routed order keeps the supplier the marketplace chose; the server refuses the warehouse too
+        String warehouseReason = assignReason != null ? assignReason
+                : order.isBoundToExternalSupplier() ? "order.item.unavailable.routed" : null;
+        states.add(ItemAction.State.of(ItemAction.ASSIGN_WAREHOUSE, warehouseReason, null));
         String clearReason = item.isGroup() ? "order.item.unavailable.group"
                 : item.isClaimed() ? "order.item.unavailable.claimed"
+                : StringUtils.isBlank(item.getDeliveryId()) ? "order.item.unavailable.no.supplier"
                 : item.isReleasable() ? null : "order.item.unavailable.fulfilled";
         states.add(ItemAction.State.of(ItemAction.CLEAR_SUPPLIER, clearReason,
                 item.isClaimed() ? ConversionUtil.getShortenedId(item.getClaimedDeliveryId()) : null));
-        String splitReason = !item.isGroup() ? "order.item.unavailable.not.group"
-                : item.isService() ? "order.item.unavailable.service"
-                : item.isNew() ? null : "order.item.unavailable.not.new";
-        states.add(ItemAction.State.of(ItemAction.SPLIT_GROUP, splitReason, null));
+        // "Split set" only exists for a set; for any other item it is not greyed out but absent
+        if (item.isGroup()) {
+            String splitReason = item.isService() ? "order.item.unavailable.service"
+                    : item.isNew() ? null : "order.item.unavailable.not.new";
+            states.add(ItemAction.State.of(ItemAction.SPLIT_GROUP, splitReason, null));
+        }
         boolean invoiced = order.isInvoiced();
         states.add(new ItemAction.State(ItemAction.CONSOLIDATE,
                 item.isConsolidated() ? "order.item.menu.deconsolidate" : "order.item.menu.consolidate",

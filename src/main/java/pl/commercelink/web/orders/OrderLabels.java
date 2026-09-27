@@ -105,4 +105,15 @@ public final class OrderLabels {
     public static String tracking(ShipmentTrackingStatus status) {
         return status == null ? null : "order.shipment.tracking.status." + status.name();
     }
+
+    public static String tone(ShipmentTrackingStatus status) {
+        if (status == null) {
+            return null;
+        }
+        return switch (status) {
+            case PENDING -> NEUTRAL;
+            case ACTIVE -> INFO;
+            case FAILED -> BAD;
+        };
+    }
 }

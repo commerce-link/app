@@ -201,6 +201,8 @@ class OrdersScriptContractTest {
         // then
         assertThat(script).contains("cl:dialog-open").contains("data-document-type").contains("documentType")
                 .contains("'use strict'").doesNotContain("innerHTML").doesNotContain("confirm(");
+        // the title is one translated sentence with a {type} slot, not a fixed prefix followed by the type
+        assertThat(script).contains("data-template").contains("replace('{type}'");
     }
 
     @Test

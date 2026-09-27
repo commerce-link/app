@@ -1257,7 +1257,7 @@ public class OrdersController extends BaseController {
         }
         if ("billing".equals(type) && updatedOrder.getBillingDetails() != null) {
             if (existingOrder.isInvoiced()) {
-                return refuse(redirectAttributes, orderId, "error.message.billing.details.locked", locale);
+                return refuse(redirectAttributes, orderId, CustomerView.lockedKey(existingOrder, true), locale);
             }
             existingOrder.setBillingDetails(updatedOrder.getBillingDetails());
         }
@@ -1273,8 +1273,10 @@ public class OrdersController extends BaseController {
     public String updateReview(@PathVariable String orderId, @ModelAttribute("order") Order updatedOrder,
                                RedirectAttributes redirectAttributes, Locale locale) {
         Order existingOrder = requireOrder(ordersRepository, getStoreId(), orderId);
-        if (updatedOrder.getReview() != null) {
-            existingOrder.setReview(updatedOrder.getReview());
+        OrderReview posted = updatedOrder.getReview();
+        // "not collected" posts an empty status: saving the dialog unchanged must not start collecting a review
+        if (posted != null && posted.getStatus() != null) {
+            existingOrder.setReview(posted);
         }
         orderLifecycle.update(existingOrder);
         OrderFlash.saved(redirectAttributes, messageSource.getMessage("order.review.saved", null, locale));

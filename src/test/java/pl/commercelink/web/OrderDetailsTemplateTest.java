@@ -185,7 +185,7 @@ class OrderDetailsTemplateTest {
         // then
         assertThat(html).contains("<col class=\"cl-col-check\">").contains("<col class=\"cl-col-menu\">")
                 .contains("class=\"cl-table-group\"").contains("Usługi i dostawa")
-                .contains("2 × 749,00").contains("koszt 579,00")
+                .contains("2 × 749,00").contains("koszt 579,00 netto")
                 .contains("data-cl-copy=\"100-100001084WOF\"")
                 .containsPattern("data-ready-for-allocation=\"false\"[^>]*data-removable=\"true\"")
                 .contains("name=\"orderItems[0].selected\"").contains("name=\"orderItems[0].itemId\"");
@@ -193,13 +193,20 @@ class OrderDetailsTemplateTest {
 
     @Test
     void unavailableMenuEntriesStayVisibleWithTheirReason() {
-        // when
-        String html = page(render(order(OrderStatus.New), ADMIN));
+        // given
+        Order order = order(OrderStatus.New);
+        OrderItem allocated = inDelivery(order, "Acme", FulfilmentStatus.Allocation);
 
-        // then (B11)
-        assertThat(html).containsPattern("aria-disabled=\"true\">\\s*<span>Podziel zestaw</span>\\s*<span class=\"cl-menu-reason\">To nie jest zestaw</span>")
-                .contains("data-cl-dialog-open=\"assign-sku-dialog\"").contains("data-cl-dialog-open=\"assign-supplier-dialog\"")
-                .contains("/clear-supplier?itemId=").contains("data-cl-confirm");
+        // when
+        String html = page(render(order, ADMIN));
+        String withSupplier = page(render(order, List.of(allocated), ADMIN, Set.of()));
+
+        // then: "Split set" is absent for an item that is not a set, not greyed out
+        assertThat(html).containsPattern("aria-disabled=\"true\">\\s*<span>Usuń dostawcę</span>\\s*<span class=\"cl-menu-reason\">Pozycja nie ma dostawcy</span>")
+                .doesNotContain("<span>Podziel zestaw</span>").doesNotContain("data-cl-dialog-open=\"split-group-dialog\"")
+                .contains("data-cl-dialog-open=\"assign-sku-dialog\"").contains("data-cl-dialog-open=\"assign-supplier-dialog\"");
+        assertThat(withSupplier).contains("/clear-supplier?itemId=").contains("data-cl-confirm")
+                .containsPattern("<span>Przypisz dostawcę</span>\\s*<span class=\"cl-menu-reason\">Najpierw usuń obecnego dostawcę</span>");
     }
 
     /**
@@ -248,7 +255,7 @@ class OrderDetailsTemplateTest {
         String html = page(SettingsTemplateRenderer.render("orders/invoicing-confirm", variables));
 
         // then
-        assertThat(html).contains("Wystawić: Faktura VAT")
+        assertThat(html).contains("Wystawić dokument: Faktura VAT?")
                 .contains("action=\"/dashboard/orders/3e373abc-1111-2222-3333-444455556666/invoicing\"")
                 .containsPattern("<input type=\"hidden\" name=\"documentType\" value=\"InvoiceVat\">")
                 .containsPattern("<input type=\"checkbox\" name=\"send\" value=\"true\">")
@@ -272,8 +279,8 @@ class OrderDetailsTemplateTest {
         String admin = page(render(order(OrderStatus.New), ADMIN));
 
         // then
-        assertThat(user).doesNotContain("koszt 579").doesNotContain("Zysk brutto").doesNotContain("Koszt produktów");
-        assertThat(admin).contains("Zysk brutto").contains("Koszt produktów");
+        assertThat(user).doesNotContain("koszt 579").doesNotContain("Zysk (z VAT)").doesNotContain("Koszt produktów");
+        assertThat(admin).contains("Zysk (z VAT)").contains("Koszt produktów (brutto)");
     }
 
     @Test
@@ -534,7 +541,7 @@ class OrderDetailsTemplateTest {
 
         // then
         assertThat(html).contains("data-cl-scope-template=\"{label} ({n} z {m})\"").contains("/js/order-items.js")
-                .contains("data-cl-bulk-confirm-message=\"Skierujesz do alokacji zaznaczone pozycje: {n}.");
+                .contains("data-cl-bulk-confirm-message=\"Do alokacji trafią zaznaczone pozycje: {n}.");
     }
 
     @Test
@@ -620,7 +627,7 @@ class OrderDetailsTemplateTest {
         String html = page(render(order, ADMIN));
 
         // then
-        assertThat(html).contains("Opinia:").contains("Brak").contains("data-cl-dialog-open=\"review-dialog\"")
+        assertThat(html).contains("Opinia:").contains("nie jest zbierana").contains("data-cl-dialog-open=\"review-dialog\"")
                 .contains("id=\"review-dialog\"").contains("name=\"review.status\"").contains("name=\"review.requestedAt\"")
                 .contains(">Do zebrania</option>").doesNotContain(">ToBeCollected<");
     }
@@ -895,5 +902,214 @@ class OrderDetailsTemplateTest {
 
         // then
         assertThat(html).containsPattern("<input[^>]*type=\"hidden\"[^>]*name=\"fulfilmentType\"[^>]*value=\"WarehouseFulfilment\"");
+    }
+
+    static String card(String html, String id) {
+        int start = html.indexOf("id=\"" + id + "\"");
+        return html.substring(start, html.indexOf("</section>", start));
+    }
+
+    static String dialog(String html, String id) {
+        int start = html.indexOf("id=\"" + id + "\"");
+        return html.substring(start, html.indexOf("</dialog>", start));
+    }
+
+    static Payment refund(double amount) {
+        return new Payment("ZW/1", "Zwrot", PaymentSource.BankTransfer, pl.commercelink.orders.PaymentDirection.Outgoing,
+                amount, 0, null, null);
+    }
+
+    @Test
+    void aRefundShowsOneMinus() {
+        // given: the dialog asks for a minus, supplier payouts are stored positive
+        Order typedNegative = order(OrderStatus.Realization);
+        typedNegative.addPayment(refund(-100));
+        Order storedPositive = order(OrderStatus.Realization);
+        storedPositive.addPayment(refund(100));
+
+        // when
+        String negative = card(page(render(typedNegative, ADMIN)), "platnosci");
+        String positive = card(page(render(storedPositive, ADMIN)), "platnosci");
+
+        // then
+        for (String html : List.of(negative, positive)) {
+            String list = html.substring(html.indexOf("<ul class=\"cl-list\""), html.indexOf("</ul>"));
+            assertThat(list).doesNotContain("−−").contains("−100,00 PLN").contains(">Zwrot<");
+            assertThat(occurrences(list, "−")).as(list).isEqualTo(1);
+        }
+    }
+
+    @Test
+    void anExpectedPaymentReadsAsExpectedInsteadOfAZeroAmount() {
+        // given
+        Order order = order(OrderStatus.New);
+        order.addPayment(new Payment(PaymentSource.BankTransfer));
+
+        // when
+        String html = card(page(render(order, ADMIN)), "platnosci");
+        String list = html.substring(html.indexOf("<ul class=\"cl-list\""), html.indexOf("</ul>"));
+
+        // then
+        assertThat(list).contains("Oczekiwana wpłata").contains("cl-status is-neutral").contains("nierozliczona")
+                .doesNotContain("0,00");
+    }
+
+    @Test
+    void anOverpaidOrderShowsTheOverpaymentNotANegativeDue() {
+        // given
+        Order order = order(OrderStatus.Realization);
+        order.addPayment(Payment.bankTransfer("R/1", "Jan", 2 * 749 + 299 + 1));
+
+        // when
+        String html = card(page(render(order, ADMIN)), "platnosci");
+
+        // then
+        assertThat(html).contains("Nadpłata: 1,00 PLN").contains("is-warn").doesNotContain("−1,00")
+                .doesNotContain("Do zapłaty");
+    }
+
+    @Test
+    void aPaymentFeeIsFormattedWithTheSharedCurrencyKey() {
+        // given
+        Order order = order(OrderStatus.Realization);
+        order.addPayment(new Payment("R/1", "Jan", PaymentSource.BankTransfer, 100, 2.5));
+
+        // when
+        String html = card(page(render(order, ADMIN)), "platnosci");
+
+        // then
+        assertThat(html).contains("prowizja 2,50 PLN").doesNotContain("PLN PLN");
+    }
+
+    @Test
+    void aFailedTrackingSubscriptionIsABadPillWithItsExplanation() {
+        // given
+        Order order = order(OrderStatus.Shipping);
+        Shipment parcel = order.getShipments().get(0);
+        parcel.setCarrier("DPD");
+        parcel.setTrackingNo("T-1");
+        parcel.setTrackingSubscriptionStatus(ShipmentTrackingStatus.FAILED);
+        String help = ResourceBundle.getBundle("messages", PL).getString("order.shipment.tracking.failed.help");
+
+        // when
+        String html = card(page(render(order, ADMIN)), "przesylki");
+
+        // then
+        assertThat(html).containsPattern("<span class=\"cl-status is-bad\" title=\"" + Pattern.quote(help) + "\">Błąd subskrypcji</span>");
+    }
+
+    @Test
+    void theReviewDialogOfAnOrderWithoutAReviewPreselectsNotCollected() {
+        // given
+        Order withoutReview = order(OrderStatus.Delivered);
+        withoutReview.setReview(null);
+
+        // when
+        String none = dialog(page(render(withoutReview, ADMIN)), "review-dialog");
+        String collected = dialog(page(render(order(OrderStatus.Delivered), ADMIN)), "review-dialog");
+
+        // then
+        assertThat(none).contains("<option value=\"\" selected>— nie zbieramy —</option>").contains("Status opinii");
+        assertThat(collected).doesNotContain("nie zbieramy")
+                .containsPattern("<option value=\"ToBeCollected\"\\s+selected=\"selected\">Do zebrania</option>");
+    }
+
+    @Test
+    void theConsolidatedPillIsInformationNotAState() {
+        // given
+        Order order = order(OrderStatus.New);
+        List<OrderItem> items = items(order);
+        items.get(0).setConsolidated(true);
+
+        // when
+        String html = page(render(order, items, ADMIN, Set.of()));
+
+        // then
+        assertThat(html).contains("<span class=\"cl-status is-info\">Na fakturze łącznie</span>");
+    }
+
+    @Test
+    void theSkuAndSerialPrefixesComeFromTheBundles() throws Exception {
+        // given
+        String template = java.nio.file.Files.readString(
+                java.nio.file.Path.of("src/main/resources/templates/orders/details/items.html"));
+
+        // when
+        String html = page(render(order(OrderStatus.New), ADMIN));
+
+        // then
+        assertThat(template).doesNotContain("· SKU").doesNotContain("· SN")
+                .contains("#{order.items.sku.prefix}").contains("#{order.items.sn.prefix}");
+        assertThat(html).contains(">Stan</th>").doesNotContain(">Realizacja</th>");
+    }
+
+    @Test
+    void theReasonABulkActionIsUnavailableIsVisibleTextTheButtonPointsTo() {
+        // given
+        Order order = order(OrderStatus.Assembly);
+        OrderItem dropship = inDelivery(order, "delivery-9", FulfilmentStatus.Ordered);
+        String reason = ResourceBundle.getBundle("messages", PL).getString("order.items.action.dropship.locked");
+
+        // when
+        String html = page(render(order, List.of(dropship), ADMIN, Set.of(dropship.getItemId())));
+        String bar = html.substring(html.indexOf("data-cl-selection-bar"), html.indexOf("data-cl-select-clear"));
+
+        // then
+        assertThat(bar).contains("<p class=\"cl-help is-note\" id=\"bulk-reason-0\">" + reason + "</p>")
+                .containsPattern("data-cl-bulk-action=\"[^\"]*moveSelectedItemsToAllocation\"[^>]*aria-describedby=\"bulk-reason-0\"")
+                .doesNotContainPattern("\\stitle=").doesNotContain("cl-visually-hidden");
+        assertThat(occurrences(bar, reason)).isEqualTo(1);
+    }
+
+    @Test
+    void theSelectionActionsCarryTheScopeCountTemplate() {
+        // when
+        String html = page(render(order(OrderStatus.New), ADMIN));
+
+        // then
+        assertThat(html).contains("data-cl-scope-count-template=\"{k} z {n}\"");
+    }
+
+    @Test
+    void thePreferredShippingExplanationIsVisibleNotATooltip() {
+        // when
+        String html = page(render(order(OrderStatus.New), ADMIN));
+
+        // then
+        assertThat(html).doesNotContainPattern("<dt[^>]*title=")
+                .contains("<span class=\"cl-help is-note\">Ustawia klient na stronie zamówienia.</span>");
+    }
+
+    @Test
+    void theEmptyDocumentsTextLeadsAConsumerOrderToAddDocument() {
+        // when
+        String b2c = card(page(render(order(OrderStatus.Realization), ADMIN)), "dokumenty");
+        String b2b = card(page(render(b2bOrder(OrderStatus.Realization), ADMIN)), "dokumenty");
+
+        // then
+        assertThat(b2c).contains("Brak dokumentów. Paragon dodasz przyciskiem „Dodaj dokument”.");
+        assertThat(b2b).contains("Brak dokumentów. Następny do wystawienia: Faktura VAT.");
+    }
+
+    @Test
+    void theIssueDialogTitleIsOneSentenceFilledWithTheType() {
+        // when
+        String html = dialog(page(render(b2bOrder(OrderStatus.Realization), ADMIN)), "issue-dialog");
+
+        // then
+        assertThat(html).contains("data-template=\"Wystawić dokument: {type}?\"").contains("data-cl-issue-title");
+    }
+
+    @Test
+    void theShipmentsEmptyTextSaysWhatCanBeDone() {
+        // given
+        Order order = order(OrderStatus.New);
+        order.setShipments(new java.util.ArrayList<>());
+
+        // when
+        String html = card(page(render(order, ADMIN)), "przesylki");
+
+        // then
+        assertThat(html).contains("Brak przesyłek. Dodaj przesyłkę przyciskiem „Edytuj przesyłki”.");
     }
 }
