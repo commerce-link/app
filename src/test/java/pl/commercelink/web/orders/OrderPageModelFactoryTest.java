@@ -438,12 +438,12 @@ class OrderPageModelFactoryTest {
     @Test
     void aTrackingLinkWithAScriptSchemeIsShownAsText() {
         // when / then
-        assertThat(OrderPageModelFactory.safeTrackingUrl("javascript:alert(1)")).isNull();
-        assertThat(OrderPageModelFactory.safeTrackingUrl(" JAVASCRIPT:alert(1)")).isNull();
-        assertThat(OrderPageModelFactory.safeTrackingUrl("data:text/html,<script>alert(1)</script>")).isNull();
-        assertThat(OrderPageModelFactory.safeTrackingUrl("  ")).isNull();
-        assertThat(OrderPageModelFactory.safeTrackingUrl(" https://x ")).isEqualTo("https://x");
-        assertThat(OrderPageModelFactory.safeTrackingUrl("HTTP://tracking.example/T-1")).isEqualTo("HTTP://tracking.example/T-1");
+        assertThat(OrderPageModelFactory.safeWebUrl("javascript:alert(1)")).isNull();
+        assertThat(OrderPageModelFactory.safeWebUrl(" JAVASCRIPT:alert(1)")).isNull();
+        assertThat(OrderPageModelFactory.safeWebUrl("data:text/html,<script>alert(1)</script>")).isNull();
+        assertThat(OrderPageModelFactory.safeWebUrl("  ")).isNull();
+        assertThat(OrderPageModelFactory.safeWebUrl(" https://x ")).isEqualTo("https://x");
+        assertThat(OrderPageModelFactory.safeWebUrl("HTTP://tracking.example/T-1")).isEqualTo("HTTP://tracking.example/T-1");
     }
 
     @Test
@@ -676,5 +676,32 @@ class OrderPageModelFactoryTest {
 
         // then
         assertThat(items.bulkReasonKeys()).containsExactly("order.items.action.dropship.locked", "order.bulk.unavailable.split");
+    }
+
+    @Test
+    void aClosedOrderWithoutDocumentsDoesNotNameANextDocument() {
+        // when
+        OrderPageModel.DocumentsCard cancelled = factory.build(order(OrderStatus.Cancelled), List.of(), ADMIN, PL).documents();
+        OrderPageModel.DocumentsCard completed = factory.build(b2b(order(OrderStatus.Completed)), List.of(), ADMIN, PL).documents();
+
+        // then
+        assertThat(cancelled.emptyKey()).isEqualTo("order.documents.empty");
+        assertThat(completed.emptyKey()).isEqualTo("order.documents.empty");
+    }
+
+    @Test
+    void aDocumentLinkWithAScriptSchemeIsShownAsText() {
+        // given
+        Order order = order(OrderStatus.New);
+        order.addDocument(new Document("r1", "PAR/1", "javascript:alert(1)", DocumentType.Receipt));
+        order.addDocument(new Document("r2", "PAR/2", "https://receipts.example/2", DocumentType.Receipt));
+
+        // when
+        List<OrderPageModel.DocumentRow> rows = factory.build(order, List.of(), ADMIN, PL).documents().rows();
+
+        // then
+        assertThat(rows.get(0).href()).isNull();
+        assertThat(rows.get(0).number()).isEqualTo("PAR/1");
+        assertThat(rows.get(1).href()).isEqualTo("https://receipts.example/2");
     }
 }

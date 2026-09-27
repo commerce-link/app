@@ -2101,7 +2101,7 @@ class OrdersControllerTest {
                     .isInstanceOf(ResponseStatusException.class);
             assertThatThrownBy(() -> ordersController.clearSupplier(ORDER_ID, "i1", new RedirectAttributesModelMap(), polish))
                     .isInstanceOf(ResponseStatusException.class);
-            assertThatThrownBy(() -> ordersController.updateSerialNumbers(ORDER_ID, new OrderItemsForm()))
+            assertThatThrownBy(() -> ordersController.updateSerialNumbers(ORDER_ID, new OrderItemsForm(), new RedirectAttributesModelMap(), polish))
                     .isInstanceOf(ResponseStatusException.class);
             verify(orderItemsRepository, never()).save(any());
         }
@@ -2239,6 +2239,104 @@ class OrdersControllerTest {
         }
 
         @Test
+        void addReceiptRefusesALinkThatIsNotAWebAddress() {
+            // given
+            Order order = order(OrderStatus.Delivered);
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            Document receipt = new Document();
+            receipt.setType(DocumentType.Receipt);
+            receipt.setNumber("PAR/1");
+            receipt.setLink(" javascript:alert(1) ");
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            String view = ordersController.addReceipt(ORDER_ID, receipt, redirect, polish);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+            assertThat(flash(redirect)).containsEntry("errorMessage", "order.documents.add.error.link");
+            assertThat(order.getDocuments()).isEmpty();
+            verifyNoInteractions(orderLifecycle);
+        }
+
+        @Test
+        void addReceiptKeepsATrimmedWebLink() {
+            // given
+            Order order = order(OrderStatus.Delivered);
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            Document receipt = new Document();
+            receipt.setType(DocumentType.Receipt);
+            receipt.setNumber("PAR/1");
+            receipt.setLink(" https://receipts.example/1 ");
+
+            // when
+            ordersController.addReceipt(ORDER_ID, receipt, new RedirectAttributesModelMap(), polish);
+
+            // then
+            assertThat(order.getDocuments()).extracting(Document::getLink).containsExactly("https://receipts.example/1");
+            verify(orderLifecycle).update(order);
+        }
+
+        @Test
+        void deletingAnOrderThatCanNoLongerBeDeletedGoesBackWithTheReason() {
+            // given
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order(OrderStatus.New));
+            org.mockito.Mockito.doThrow(new IllegalStateException("not deletable")).when(ordersManager).deleteOrder(STORE_ID, ORDER_ID);
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            String view = ordersController.deleteOrder(ORDER_ID, redirect, polish);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+            assertThat(flash(redirect)).containsEntry("errorMessage", "order.page.delete.unavailable");
+        }
+
+        @Test
+        void deletingADeletableOrderGoesToTheList() {
+            // given
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order(OrderStatus.New));
+
+            // when
+            String view = ordersController.deleteOrder(ORDER_ID, new RedirectAttributesModelMap(), polish);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/orders");
+            verify(ordersManager).deleteOrder(STORE_ID, ORDER_ID);
+        }
+
+        @Test
+        void reviewShipmentsAndSerialNumbersOfAClosedOrderAreRefusedAndNothingIsSaved() {
+            // given
+            Order closed = order(OrderStatus.Completed);
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(closed);
+            pl.commercelink.orders.OrderReview reviewBefore = closed.getReview();
+            Order review = new Order(STORE_ID);
+            review.setReview(new pl.commercelink.orders.OrderReview(OrderReviewStatus.ToBeCollected));
+            Shipment shipment = new Shipment(ShipmentType.Courier);
+            shipment.setTrackingNo("T-1");
+            Order shipments = new Order(STORE_ID);
+            shipments.setShipments(List.of(shipment));
+            RedirectAttributesModelMap reviewRedirect = new RedirectAttributesModelMap();
+            RedirectAttributesModelMap shipmentsRedirect = new RedirectAttributesModelMap();
+            RedirectAttributesModelMap serialRedirect = new RedirectAttributesModelMap();
+
+            // when
+            ordersController.updateReview(ORDER_ID, review, reviewRedirect, polish);
+            ordersController.updateShipments(ORDER_ID, shipments, shipmentsRedirect, polish);
+            ordersController.updateSerialNumbers(ORDER_ID, new OrderItemsForm(), serialRedirect, polish);
+
+            // then
+            assertThat(flash(reviewRedirect)).containsEntry("errorMessage", "order.review.error.closed");
+            assertThat(flash(shipmentsRedirect)).containsEntry("errorMessage", "order.shipments.error.closed");
+            assertThat(flash(serialRedirect)).containsEntry("errorMessage", "order.item.error.closed");
+            assertThat(closed.getReview()).isSameAs(reviewBefore);
+            verifyNoInteractions(orderLifecycle, orderLifecycleEventPublisher, shipmentTrackingSubscriber);
+            verify(orderItemsRepository, never()).findByOrderId(any());
+            verify(orderItemsRepository, never()).save(any());
+        }
+
+        @Test
         void updateSerialNumbersTouchesOnlyThePostedItems() {
             // given
             OrderItem posted = item("i1", FulfilmentStatus.Delivered, "MFN-1");
@@ -2254,7 +2352,7 @@ class OrdersControllerTest {
             form.setOrderItems(List.of(draft));
 
             // when
-            ordersController.updateSerialNumbers(ORDER_ID, form);
+            ordersController.updateSerialNumbers(ORDER_ID, form, new RedirectAttributesModelMap(), polish);
 
             // then
             assertThat(posted.getSerialNo()).isEqualTo("NEW");
@@ -2814,7 +2912,7 @@ class OrdersControllerTest {
         @Test
         void deleteCancelSplitAndMoveOfAnotherStoresOrderAreNotFound() {
             // when / then
-            assertThatThrownBy(() -> ordersController.deleteOrder(ORDER_ID))
+            assertThatThrownBy(() -> ordersController.deleteOrder(ORDER_ID, new RedirectAttributesModelMap(), polish))
                     .isInstanceOf(ResponseStatusException.class);
             assertThatThrownBy(() -> ordersController.cancelOrder(ORDER_ID, new RedirectAttributesModelMap(), polish))
                     .isInstanceOf(ResponseStatusException.class);

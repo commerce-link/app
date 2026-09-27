@@ -258,7 +258,7 @@ public class OrderPageModelFactory {
     private OrderPageModel.ShipmentsCard shipments(Order order, Store store, boolean readOnly) {
         List<OrderPageModel.ShipmentRow> rows = order.getShipments().stream()
                 .map(s -> new OrderPageModel.ShipmentRow(OrderLabels.shipmentType(s.getType()), s.getCarrier(),
-                        s.getTrackingNo(), safeTrackingUrl(s.getTrackingUrl()), s.getCollectionPointCode(),
+                        s.getTrackingNo(), safeWebUrl(s.getTrackingUrl()), s.getCollectionPointCode(),
                         OrderFormats.dateTime(s.getShippedAt()), OrderFormats.dateTime(s.getDeliveredAt()),
                         order.hasTrackedShipments() ? OrderLabels.tracking(s.getTrackingSubscriptionStatus()) : null,
                         OrderLabels.tone(s.getTrackingSubscriptionStatus()),
@@ -287,8 +287,9 @@ public class OrderPageModelFactory {
         DocumentType next = order.getNextDocumentToIssue().orElse(null);
         List<OrderPageModel.DocumentRow> rows = order.getDocuments().stream().map(d -> documentRow(order, d, viewer, closed)).toList();
         List<DocumentType> issuable = order.getIssuableDocumentTypes();
-        // a consumer receipt is never issued from here, it is typed in with "Add document"; the text says so
-        String emptyKey = next == null ? "order.documents.empty"
+        // a consumer receipt is never issued from here, it is typed in with "Add document"; the text says so.
+        // A closed order will not get another document, so it names none.
+        String emptyKey = closed || next == null ? "order.documents.empty"
                 : readOnly || issuable.contains(next) ? "order.documents.empty.next" : "order.documents.empty.next.manual";
         return new OrderPageModel.DocumentsCard(rows, emptyKey, !readOnly && addDocumentLockedKey(order, null) == null,
                 OrderLabels.Option.of(manual, OrderLabels::documentType), next,
@@ -316,8 +317,11 @@ public class OrderPageModelFactory {
         return null;
     }
 
-    /** A tracking link is typed by any store user and shown to every other: only a web address becomes a link. */
-    static String safeTrackingUrl(String url) {
+    /**
+     * A tracking or document link is typed by any store user and shown to every other: only a web address becomes a
+     * link, anything else (javascript:, data:, ...) is dropped.
+     */
+    public static String safeWebUrl(String url) {
         String trimmed = StringUtils.trimToNull(url);
         if (trimmed == null) {
             return null;
@@ -329,7 +333,8 @@ public class OrderPageModelFactory {
     private OrderPageModel.DocumentRow documentRow(Order order, Document document, Viewer viewer, boolean closed) {
         boolean removable = viewer.admin() && !viewer.superAdmin() && !closed && document.getType() != null
                 && document.getType().isInvoiceOrReceipt();
-        String href = document.getViewUrl();
+        // an external link is typed in by hand, so only a web address is rendered; the internal warehouse path is ours
+        String href = document.isExternal() ? safeWebUrl(document.getLink()) : document.getViewUrl();
         if (viewer.superAdmin() && href != null && !document.isExternal()) {
             href = null;
         }

@@ -1075,9 +1075,14 @@ public class OrdersController extends BaseController {
 
     @PostMapping("/dashboard/orders/{orderId}/delete")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String deleteOrder(@PathVariable String orderId) {
+    public String deleteOrder(@PathVariable String orderId, RedirectAttributes redirectAttributes, Locale locale) {
         requireOrder(ordersRepository, getStoreId(), orderId);
-        ordersManager.deleteOrder(getStoreId(), orderId);
+        try {
+            ordersManager.deleteOrder(getStoreId(), orderId);
+        } catch (IllegalStateException e) {
+            // a page left open while the order gained an item or an invoice: the reason, not an error page
+            return refuse(redirectAttributes, orderId, "order.page.delete.unavailable", locale);
+        }
         return "redirect:/dashboard/orders";
     }
 
@@ -1250,8 +1255,12 @@ public class OrdersController extends BaseController {
 
     @PostMapping("/dashboard/orders/{orderId}/updateSerialNumbers")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String updateSerialNumbers(@PathVariable String orderId, @ModelAttribute OrderItemsForm form) {
-        requireOrder(ordersRepository, getStoreId(), orderId);
+    public String updateSerialNumbers(@PathVariable String orderId, @ModelAttribute OrderItemsForm form,
+                                      RedirectAttributes redirectAttributes, Locale locale) {
+        Order order = requireOrder(ordersRepository, getStoreId(), orderId);
+        if (order.isClosed()) {
+            return refuse(redirectAttributes, orderId, "order.item.error.closed", locale);
+        }
         // The dialog lists delivered products only; an item missing from the form keeps its number.
         Map<String, String> postedByItemId = new HashMap<>();
         form.getOrderItems().stream()
@@ -1312,6 +1321,9 @@ public class OrdersController extends BaseController {
     public String updateReview(@PathVariable String orderId, @ModelAttribute("order") Order updatedOrder,
                                RedirectAttributes redirectAttributes, Locale locale) {
         Order existingOrder = requireOrder(ordersRepository, getStoreId(), orderId);
+        if (existingOrder.isClosed()) {
+            return refuse(redirectAttributes, orderId, "order.review.error.closed", locale);
+        }
         OrderReview posted = updatedOrder.getReview();
         // "not collected" posts an empty status: saving the dialog unchanged must not start collecting a review
         if (posted != null && posted.getStatus() != null) {
@@ -1390,10 +1402,10 @@ public class OrdersController extends BaseController {
     public String updateShipments(@PathVariable String orderId, @ModelAttribute("order") Order updatedOrder,
                                   RedirectAttributes redirectAttributes, Locale locale) {
         Order existingOrder = requireOrder(ordersRepository, getStoreId(), orderId);
-        // OrderLifecycle.update never persists cancelled orders, so publishing here
-        // would announce a shipment change that was never saved
-        if (existingOrder.getStatus() == OrderStatus.Cancelled) {
-            return details(orderId);
+        // the card hides "Edit" on a closed order; besides, OrderLifecycle.update never persists a cancelled one,
+        // so publishing here would announce a shipment change that was never saved
+        if (existingOrder.isClosed()) {
+            return refuse(redirectAttributes, orderId, "order.shipments.error.closed", locale);
         }
         // the dialog always posts at least one row; nothing posted is a stale page, not "delete every shipment"
         if (updatedOrder.getShipments() == null || updatedOrder.getShipments().isEmpty()) {
@@ -1453,8 +1465,13 @@ public class OrdersController extends BaseController {
         if (StringUtils.isBlank(document.getNumber()) || document.getType() == null) {
             return refuse(redirectAttributes, orderId, "order.documents.add.error.number", locale);
         }
+        // the link is shown to every user of the store as a clickable address: only a web address is accepted
+        String link = StringUtils.trimToNull(document.getLink());
+        if (link != null && OrderPageModelFactory.safeWebUrl(link) == null) {
+            return refuse(redirectAttributes, orderId, "order.documents.add.error.link", locale);
+        }
         document.setNumber(document.getNumber().trim());
-        document.setLink(StringUtils.trimToNull(document.getLink()));
+        document.setLink(link);
         order.addDocument(document);
         orderLifecycle.update(order);
         OrderFlash.saved(redirectAttributes, messageSource.getMessage("order.documents.added", null, locale));
