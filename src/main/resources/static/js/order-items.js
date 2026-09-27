@@ -57,6 +57,14 @@
             if (reason && !unavailable) {
                 reason.textContent = none ? button.getAttribute('data-skipped') : '';
                 reason.hidden = !none;
+                // a reason outside the button ("Remove") describes it only while it shows
+                if (reason.id && !button.contains(reason)) {
+                    if (none) {
+                        button.setAttribute('aria-describedby', reason.id);
+                    } else {
+                        button.removeAttribute('aria-describedby');
+                    }
+                }
             }
             var label = button.getAttribute('data-label');
             var text = button.querySelector('[data-cl-bulk-label]') || button;

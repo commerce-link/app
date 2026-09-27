@@ -65,7 +65,13 @@ public record OrderPageModel(String orderId, String shortId, String backHref, bo
     public record SerialItemRow(String itemId, String name, String mfn, int qty, String deliveryLabel, String serialNo) {
     }
 
-    public record BulkActionButton(BulkAction action, boolean available, String reasonKey, String href) {
+    /** reasonKey/shortReasonKey: the sentence and the few words saying why the action is unavailable, or null. */
+    public record BulkActionButton(BulkAction action, boolean available, String reasonKey, String shortReasonKey, String href) {
+
+        static BulkActionButton of(BulkAction action, BulkReason reason, String href) {
+            return new BulkActionButton(action, reason == null, reason == null ? null : reason.key(),
+                    reason == null ? null : reason.shortKey(), href);
+        }
     }
 
     /** emptyKey: what the card says with no shipment, i.e. what the viewer can do about it now. */

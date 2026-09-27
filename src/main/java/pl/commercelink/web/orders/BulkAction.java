@@ -4,7 +4,8 @@ package pl.commercelink.web.orders;
  * An action of the selection row of the items table. scope names the data-* flag of a row the action works on (the
  * same predicate as OrdersManager), so the entry can show "(2 of 3)"; skippedKey explains the rest after the action and
  * is the entry's reason while none of the checked items fits. menu is the drop-down of the row the action sits in; an
- * action without one (REMOVE) stands on its own at the row's end.
+ * action without one (REMOVE) stands on its own at the row's end, where shortSkippedKey is the few words it shows
+ * instead of the sentence (null for the actions in a menu, which show the sentence).
  */
 public enum BulkAction {
 
@@ -13,7 +14,10 @@ public enum BulkAction {
     TO_WAREHOUSE_RMA("moveSelectedItemsToTheWarehouseForRMA", "order.bulk.warehouse.rma", "delivered-product", "order.bulk.skipped.warehouse.rma", false, Menu.ROUTE),
     SPLIT("splitOrder", "order.bulk.split", "movable", "order.bulk.skipped.movable", false, Menu.MOVE),
     MOVE("moveItemsToOrder", "order.bulk.move", "movable", "order.bulk.skipped.movable", false, Menu.MOVE),
-    REMOVE("removeSelectedItemsFromOrder", "order.bulk.remove", "removable", "order.bulk.skipped.remove", true, null);
+    REMOVE("removeSelectedItemsFromOrder", "order.bulk.remove", "removable", "order.bulk.skipped.remove", true, null) {
+        @Override
+        public String shortSkippedKey() { return "order.bulk.skipped.remove.short"; }
+    };
 
     /** A drop-down of the selection row: "Route to" (allocation, warehouse) and "Move" (to a new or an existing order). */
     public enum Menu {
@@ -51,6 +55,7 @@ public enum BulkAction {
     public String skippedKey() { return skippedKey; }
     public boolean danger() { return danger; }
     public Menu menu() { return menu; }
+    public String shortSkippedKey() { return null; }
     public String confirmTitleKey() { return labelKey + ".confirm.title"; }
     public String confirmMessageKey() { return labelKey + ".confirm.message"; }
     public String confirmActionKey() { return labelKey + ".confirm.action"; }

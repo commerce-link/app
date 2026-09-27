@@ -69,17 +69,18 @@
                         </ul>
                     </details>
                     <!--/* "Remove" stands alone at the end; greyed, it keeps focus and names its reason in a short
-                           visible text right before it (the ".short" wording fits the row's one line) */-->
+                           visible text right before it (the short wording fits the row's one line) */-->
                     <span th:if="${items.bulkStandalone() != null}" th:with="bulk=${items.bulkStandalone()}"
                           class="cl-help cl-selection-reason" id="bulk-remove-reason" th:hidden="${bulk.available()}"
-                          th:text="${bulk.available()} ? '' : #{${bulk.reasonKey() + '.short'}}"></span>
+                          th:text="${bulk.available()} ? '' : #{${bulk.shortReasonKey()}}"></span>
                     <button th:if="${items.bulkStandalone() != null}" th:with="bulk=${items.bulkStandalone()}" type="button"
                             class="cl-link-button is-danger cl-selection-remove"
                             th:attr="data-cl-bulk-action=@{${bulk.href()}}, data-cl-bulk-scope=${bulk.action().scope()},
-                                     data-label=#{${bulk.action().labelKey()}}, data-skipped=#{${bulk.action().skippedKey() + '.short'}},
+                                     data-label=#{${bulk.action().labelKey()}}, data-skipped=#{${bulk.action().shortSkippedKey()}},
                                      data-cl-bulk-unavailable=${bulk.available()} ? null : 'true',
                                      aria-disabled=${bulk.available()} ? null : 'true',
-                                     data-cl-bulk-reason-id='bulk-remove-reason', aria-describedby='bulk-remove-reason',
+                                     data-cl-bulk-reason-id='bulk-remove-reason',
+                                     aria-describedby=${bulk.available()} ? null : 'bulk-remove-reason',
                                      data-cl-bulk-confirm-title=#{${bulk.action().confirmTitleKey()}},
                                      data-cl-bulk-confirm-message=#{${bulk.action().confirmMessageKey()}},
                                      data-cl-bulk-confirm-action=#{${bulk.action().confirmActionKey()}}">

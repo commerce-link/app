@@ -3459,9 +3459,11 @@ a.cl-link-button:hover {
     right: auto;
 }
 
-/* why "Remove" is greyed: a short text right before it, on the row's own line. It fits in two lines from about 800 px;
-   on a narrower tablet a third line makes the row taller than the header, and only then the rows below move down by
-   the difference (the negative margin is the header's height, so the row never covers a table row). */
+/* why "Remove" is greyed: a short text right before it, on the row's own line. The short wordings (BulkReason.shortKey,
+   BulkAction.shortSkippedKey) take one or two 15 px lines inside the 35-36 px row at every width from 720 px, PL and EN,
+   Chromium and WebKit (measured 720, 768, 800, 1024, 1366, 1440), so the rows below do not move. A new wording must stay
+   as short: a third line would make the row taller than the header and push the table down by the difference (the
+   negative margin is the header's height, so the row still never covers a table row). */
 .cl-page .cl-selection-reason {
     margin: 0 0 0 auto;
     min-width: 0;

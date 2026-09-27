@@ -210,11 +210,8 @@ public class OrderPageModelFactory {
             if (action == BulkAction.REMOVE && order.isInvoiced()) {
                 continue;
             }
-            String reason = switch (action) {
-                case SPLIT, MOVE -> canSplitOrder ? null : "order.bulk.unavailable.split";
-                default -> hasDropshipItems ? "order.items.action.dropship.locked" : null;
-            };
-            bulk.add(new OrderPageModel.BulkActionButton(action, reason == null, reason,
+            BulkReason reason = bulkReason(action, canSplitOrder, hasDropshipItems);
+            bulk.add(OrderPageModel.BulkActionButton.of(action, reason,
                     "/dashboard/orders/" + order.getOrderId() + "/" + action.path()));
         }
         boolean selectable = !readOnly && !hasWarehouseDocument;
@@ -227,6 +224,14 @@ public class OrderPageModelFactory {
                 bulk, selectable && (canSplitOrder || !hasDropshipItems),
                 readOnly ? List.of() : productCatalogRepository.findAll(order.getStoreId()),
                 readOnly ? List.of() : labels.options(), previews);
+    }
+
+    /** Why a bulk action is unavailable for the whole order, or null; package-visible so a test can walk every case. */
+    static BulkReason bulkReason(BulkAction action, boolean canSplitOrder, boolean hasDropshipItems) {
+        return switch (action) {
+            case SPLIT, MOVE -> canSplitOrder ? null : BulkReason.SPLIT_UNAVAILABLE;
+            default -> hasDropshipItems ? BulkReason.DROPSHIP_LOCKED : null;
+        };
     }
 
     // the serial-number dialog only ever assigns serials, so it gets a slim row with no cost, not the raw item.

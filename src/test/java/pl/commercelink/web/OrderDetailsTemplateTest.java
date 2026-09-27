@@ -1255,6 +1255,8 @@ class OrderDetailsTemplateTest {
                 .containsPattern("<span class=\"cl-menu-reason\" data-cl-bulk-reason hidden=\"hidden\"></span>")
                 .contains("<span class=\"cl-help cl-selection-reason\" id=\"bulk-remove-reason\" hidden=\"hidden\"></span>")
                 .containsPattern("removeSelectedItemsFromOrder\"[^>]*data-skipped=\"Tylko nowe i usługi\"")
+                // the hidden reason describes nothing; order-items.js links it while it shows
+                .doesNotContainPattern("removeSelectedItemsFromOrder\"[^>]*aria-describedby")
                 .doesNotContainPattern("data-cl-bulk-action=\"[^\"]*moveSelectedItemsToAllocation\"[^>]*aria-disabled");
     }
 

@@ -348,6 +348,7 @@ class OrdersScriptContractTest {
         // then
         assertThat(script).contains("button.setAttribute('aria-disabled', 'true')").contains("button.hasAttribute('data-cl-bulk-unavailable')")
                 .contains("button.getAttribute('data-skipped')").contains("reason && !unavailable")
+                .contains("button.setAttribute('aria-describedby', reason.id)").contains("button.removeAttribute('aria-describedby')")
                 .contains("form.addEventListener('change', refresh)").doesNotContain("button.disabled");
     }
 

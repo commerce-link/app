@@ -687,6 +687,46 @@ class OrderPageModelFactoryTest {
                 .containsOnly("order.bulk.unavailable.split");
         assertThat(items.bulkStandalone().action()).isEqualTo(BulkAction.REMOVE);
         assertThat(items.bulkStandalone().reasonKey()).isEqualTo("order.items.action.dropship.locked");
+        assertThat(items.bulkStandalone().shortReasonKey()).isEqualTo("order.items.action.dropship.locked.short");
+    }
+
+    @Test
+    void everyReasonRemoveCanShowHasItsShortWordingInBothBundles() throws Exception {
+        // given: every reason the factory can give REMOVE (and, as each reason carries both keys, any other action)
+        java.util.Set<BulkReason> reasons = new java.util.LinkedHashSet<>();
+        for (boolean canSplit : List.of(true, false)) {
+            for (boolean dropship : List.of(true, false)) {
+                BulkReason reason = OrderPageModelFactory.bulkReason(BulkAction.REMOVE, canSplit, dropship);
+                if (reason != null) {
+                    reasons.add(reason);
+                }
+            }
+        }
+        reasons.addAll(List.of(BulkReason.values()));
+        List<String> keys = new java.util.ArrayList<>();
+        reasons.forEach(r -> keys.addAll(List.of(r.key(), r.shortKey())));
+        keys.add(BulkAction.REMOVE.skippedKey());
+        keys.add(BulkAction.REMOVE.shortSkippedKey());
+
+        // when
+        java.util.Properties pl = bundle("messages_pl.properties");
+        java.util.Properties en = bundle("messages_en.properties");
+
+        // then: "Remove" prints its reason from these keys; a missing one would render as ??key?? with every test green
+        assertThat(reasons).contains(BulkReason.DROPSHIP_LOCKED);
+        assertThat(keys).doesNotContainNull().allSatisfy(key -> {
+            assertThat(pl.getProperty(key)).as("pl:" + key).isNotBlank();
+            assertThat(en.getProperty(key)).as("en:" + key).isNotBlank();
+        });
+    }
+
+    private static java.util.Properties bundle(String name) throws Exception {
+        java.util.Properties properties = new java.util.Properties();
+        try (var reader = java.nio.file.Files.newBufferedReader(java.nio.file.Path.of("src/main/resources", name),
+                java.nio.charset.StandardCharsets.UTF_8)) {
+            properties.load(reader);
+        }
+        return properties;
     }
 
     @Test
