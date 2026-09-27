@@ -6,7 +6,10 @@
 // The selection row carries a select-all box of its own [data-cl-select-all] in the header's place; the focus moves
 // between the two boxes as one of them disappears. [data-cl-selection-count][data-template="... {k} ... {n}"] says how
 // many of the visible rows are checked, buttons [data-cl-select-action=x] submit form[data-cl-select-form] with hidden
-// inputs name=action / name=productIds, [data-cl-select-clear] unchecks all.
+// inputs name=action / name=productIds.
+// A select-all box clears the whole selection whenever anything is checked (also from the indeterminate state, which a
+// browser would turn into "all checked") and checks the visible rows only when nothing is; its accessible name follows,
+// from data-cl-label-select / data-cl-label-clear. Clearing hides the selection row, so the focus goes to the header's box.
 // A button with [data-cl-select-confirm-title] first opens the page's dialog#cl-confirm-dialog (fragments/confirm-dialog,
 // whose confirm-dialog.js closes it on Cancel) and submits on confirm; "{n}" in the title and the message becomes the
 // number of checked rows. Such a button does nothing at all when the page has no usable dialog -- an action worth
@@ -16,8 +19,7 @@
 // The count is announced from [data-cl-selection-status] (a visually hidden role=status that is always in the page,
 // outside the selection row -- a live region revealed in the same frame as its text is often not read); it speaks only
 // when the count changes, never on load. The bulk form takes the page's query string along (the filter as the operator
-// left it, kept in the address by table-filter.js), so the redirect after the action can come back to it. "Clear" moves
-// the focus to the header checkbox, as the row it was pressed in disappears.
+// left it, kept in the address by table-filter.js), so the redirect after the action can come back to it.
 (function () {
     'use strict';
 
@@ -94,6 +96,10 @@
         allBoxes(table).forEach(function (all) {
             all.checked = shown.length > 0 && shown.every(function (box) { return box.checked; });
             all.indeterminate = selected.length > 0 && !all.checked;
+            var label = all.getAttribute(selected.length > 0 ? 'data-cl-label-clear' : 'data-cl-label-select');
+            if (label) {
+                all.setAttribute('aria-label', label);
+            }
         });
         if (!bar) {
             return;
@@ -225,12 +231,22 @@
         });
         var bar = barOf(table);
         var onChange = function (event) {
-            if (event.target.matches('[data-cl-select-all]')) {
-                var on = event.target.checked;
+            if (event.target.matches('[data-cl-select-all]') && checked(table).length > 0) {
+                // The rows still hold the state from before the click: anything checked means "clear". The selection
+                // row is hidden now and a mouse click may not have focused the box at all, so the focus is set here.
                 rowsOf(table).forEach(function (box) {
-                    if (visible(box)) {
-                        box.checked = on;
-                    }
+                    box.checked = false;
+                });
+                refresh(table);
+                var header = table.querySelector('[data-cl-select-all]');
+                if (header) {
+                    header.focus();
+                }
+                return;
+            }
+            if (event.target.matches('[data-cl-select-all]')) {
+                rowsOf(table).filter(visible).forEach(function (box) {
+                    box.checked = true;
                 });
             }
             refresh(table);
@@ -246,16 +262,6 @@
             });
             bar.addEventListener('click', function (event) {
                 if (!event.target.closest) {
-                    return;
-                }
-                if (event.target.closest('[data-cl-select-clear]')) {
-                    rowsOf(table).forEach(function (box) { box.checked = false; });
-                    refresh(table);
-                    // The selection row, and the button in it, is hidden now; the focus would fall to the body.
-                    var all = table.querySelector('[data-cl-select-all]');
-                    if (all) {
-                        all.focus();
-                    }
                     return;
                 }
                 var action = event.target.closest('[data-cl-select-action]');

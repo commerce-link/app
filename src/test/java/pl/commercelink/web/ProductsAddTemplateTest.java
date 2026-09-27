@@ -45,7 +45,8 @@ class ProductsAddTemplateTest {
         assertThat(source("products-add")).contains("data-cl-table-filter").contains("data-cl-filter-default=\"brand:all\"")
                 .contains("data-cl-filter-group=\"brand\"").contains("data-cl-filter-brand=")
                 .contains("data-cl-search=").contains("data-cl-table-search")
-                .contains("data-cl-selection-bar").contains("data-cl-selection-count").contains("data-cl-select-clear")
+                .contains("data-cl-selection-bar").contains("data-cl-selection-count").doesNotContain("data-cl-select-clear")
+                .contains("data-cl-label-select=").contains("data-cl-label-clear=")
                 .contains("data-cl-select-table=\"true\"").contains("data-cl-select-all").contains("data-cl-select-row")
                 .contains("@{/js/table-filter.js}").contains("@{/js/table-sort.js}").contains("@{/js/table-select.js}");
     }

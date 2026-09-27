@@ -25,15 +25,14 @@
         <th:block th:if="${items.selectable()}">
             <p class="cl-visually-hidden" role="status" data-cl-selection-status></p>
             <!--/* The selection row covers the table header while items are checked (table-select.js): its own
-                   select-all box, the count, "Clear", the menus and "Remove", in this order for the eye and for Tab.
+                   select-all box (which clears the selection), the count, the menus and "Remove", in this order for the eye and for Tab.
                    An entry that cannot run says why in its .cl-menu-reason, as in the row menu; order-items.js greys
                    what fits none of the checked items. */-->
             <div class="cl-selection-row" data-cl-selection-bar hidden>
                 <label class="cl-check-target"><input class="cl-check-input" type="checkbox" data-cl-select-all
-                                                      th:attr="aria-label=#{order.items.select.all}"></label>
+                                                      th:attr="aria-label=#{order.items.select.all}, data-cl-label-select=#{order.items.select.all}, data-cl-label-clear=#{order.items.select.none}"></label>
                 <span class="cl-selection-count" data-cl-selection-count
                       th:attr="data-template=#{order.bulk.selected('{k}', '{n}')}"></span>
-                <button type="button" class="cl-link-button cl-selection-clear" data-cl-select-clear th:text="#{order.bulk.clear}"></button>
                 <div class="cl-selection-actions"
                      th:attr="data-cl-scope-template=#{order.bulk.scope}, data-cl-scope-count-template=#{order.bulk.scope.count}">
                     <details class="cl-menu" th:each="menu : ${items.bulkMenus()}">
@@ -104,7 +103,7 @@
             <tr>
                 <th th:if="${items.selectable()}" scope="col" class="cl-table-check">
                     <label class="cl-check-target"><input class="cl-check-input" type="checkbox" data-cl-select-all
-                                                          th:attr="aria-label=#{order.items.select.all}"></label>
+                                                          th:attr="aria-label=#{order.items.select.all}, data-cl-label-select=#{order.items.select.all}, data-cl-label-clear=#{order.items.select.none}"></label>
                 </th>
                 <th scope="col" th:text="#{order.items.column.product}"></th>
                 <th scope="col" class="is-numeric" th:text="#{order.items.column.price}"></th>

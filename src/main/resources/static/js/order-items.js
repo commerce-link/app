@@ -100,11 +100,6 @@
         if (button && !off(button) && checkedRows().length) {
             event.preventDefault();
             confirmThen(button);
-            return;
-        }
-        if (event.target.closest('[data-cl-select-clear]')) {
-            // table-select.js unchecks the rows in its own handler of the same click
-            window.setTimeout(refresh, 0);
         }
     });
     // the checkboxes of the table and the select-all box of the selection row, which sits outside the table

@@ -1261,17 +1261,20 @@ class OrderDetailsTemplateTest {
     }
 
     @Test
-    void theSelectionRowStandsInForTheHeaderWithItsOwnSelectAllTheCountTwoMenusRemoveAndClear() {
+    void theSelectionRowStandsInForTheHeaderWithItsOwnSelectAllTheCountTwoMenusAndRemove() {
         // when
         String html = page(render(order(OrderStatus.New), ADMIN));
         String row = html.substring(html.indexOf("<div class=\"cl-selection-row\""), html.indexOf("<table"));
 
-        // then: left to right, which is also the tab order — select-all, "k of n", "Clear", "Route to", "Move", "Remove"
+        // then: left to right, which is also the tab order — select-all, "k of n", "Route to", "Move", "Remove"; the
+        // select-all box itself clears the selection, so there is no separate "Clear"
         assertThat(html).contains("<div class=\"cl-selection-row\" data-cl-selection-bar hidden>");
         assertThat(row).containsPattern("<label class=\"cl-check-target\"><input class=\"cl-check-input\" type=\"checkbox\" "
-                        + "data-cl-select-all\\s+aria-label=\"Zaznacz wszystkie pozycje\">")
+                        + "data-cl-select-all\\s+aria-label=\"Zaznacz wszystkie\" data-cl-label-select=\"Zaznacz wszystkie\" "
+                        + "data-cl-label-clear=\"Odznacz wszystkie\">")
                 .contains("data-template=\"Zaznaczono {k} z {n}\"");
-        List<String> sequence = List.of("data-cl-select-all", "data-cl-selection-count", "data-cl-select-clear",
+        assertThat(row).doesNotContain("data-cl-select-clear").doesNotContain("cl-selection-clear");
+        List<String> sequence = List.of("data-cl-select-all", "data-cl-selection-count",
                 "<span>Skieruj</span>", "Do alokacji", "Do magazynu", "Do magazynu (RMA)", "<span>Przenieś</span>",
                 "Do nowego zamówienia", "Do istniejącego…", "cl-link-button is-danger cl-selection-remove");
         int at = -1;
@@ -1298,7 +1301,7 @@ class OrderDetailsTemplateTest {
 
         // then
         assertThat(row).doesNotContain("removeSelectedItemsFromOrder").doesNotContain("bulk-remove-reason")
-                .contains("<span>Skieruj</span>").contains("data-cl-select-clear");
+                .contains("<span>Skieruj</span>").contains("data-cl-select-all");
     }
 
     @Test

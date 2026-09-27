@@ -66,12 +66,10 @@
                     <div class="cl-selection-row" hidden data-cl-selection-bar>
                         <label class="cl-check-target">
                             <input type="checkbox" class="cl-check-input" data-cl-select-all
-                                   th:attr="aria-label=#{catalog.products.selectAll}">
+                                   th:attr="aria-label=#{catalog.products.selectAll}, data-cl-label-select=#{catalog.products.selectAll}, data-cl-label-clear=#{catalog.products.deselectAll}">
                         </label>
                         <span class="cl-selection-count" data-cl-selection-count
                               th:attr="data-template=#{catalog.products.selected('{k}', '{n}')}"></span>
-                        <button type="button" class="cl-link-button cl-selection-clear" data-cl-select-clear
-                                th:text="#{catalog.products.clear}"></button>
                         <div class="cl-selection-actions">
                             <button type="submit" form="add-products-form" class="cl-button is-primary">
                                 <span class="icon is-small" aria-hidden="true"><i class="fas fa-plus"></i></span>
@@ -87,7 +85,7 @@
                                 <th scope="col" class="cl-table-check">
                                     <label class="cl-check-target">
                                         <input type="checkbox" class="cl-check-input" data-cl-select-all hidden
-                                               th:attr="aria-label=#{catalog.products.selectAll}">
+                                               th:attr="aria-label=#{catalog.products.selectAll}, data-cl-label-select=#{catalog.products.selectAll}, data-cl-label-clear=#{catalog.products.deselectAll}">
                                     </label>
                                 </th>
                                 <th scope="col" aria-sort="none">

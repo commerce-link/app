@@ -50,7 +50,8 @@ class CatalogScriptContractTest {
 
         // then
         for (String hook : List.of("data-cl-select-table", "data-cl-select-all", "data-cl-select-row", "data-cl-selection-bar",
-                "data-cl-selection-count", "data-cl-select-action", "data-cl-select-clear", "data-cl-select-form",
+                "data-cl-selection-count", "data-cl-select-action", "data-cl-select-form", "data-cl-label-select",
+                "data-cl-label-clear",
                 "data-cl-select-confirm-title", "data-cl-select-confirm-message", "data-cl-select-confirm-action",
                 "is-selected", "cl:table-filtered")) {
             assertThat(script).as("table-select.js handles " + hook).contains(hook);
@@ -487,7 +488,8 @@ class CatalogScriptContractTest {
 
     /**
      * RF-10/D-M7, D-M16, D-M19: the bulk form takes the address along, the count is announced from a region that is
-     * always there, and "Odznacz" leaves the focus on "Zaznacz widoczne" rather than on a bar that disappears.
+     * always there, and clearing through a select-all box leaves the focus on the header's box rather than on a row that
+     * disappears.
      */
     @Test
     void theSelectionCopiesTheAddressAnnouncesFromAPermanentRegionAndKeepsTheFocus() throws Exception {
@@ -496,7 +498,7 @@ class CatalogScriptContractTest {
 
         // then
         assertThat(script).contains("window.location.search").contains("data-cl-selection-status")
-                .containsPattern("all\\.focus\\(\\)");
+                .containsPattern("header\\.focus\\(\\)").doesNotContain("data-cl-select-clear");
     }
 
     /**

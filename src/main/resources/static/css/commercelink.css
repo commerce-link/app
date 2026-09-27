@@ -4197,8 +4197,8 @@ a.cl-link-button:hover {
 
 /* --- Catalog: phone layout for the selection bar, selectable rows and the stacked toolbar --- */
 @media screen and (max-width: 719px) {
-    /* card mode: no header to cover; the row stands above the cards in two lines, the markup's order: the count and
-       "Clear" (pushed to the end of the first line), then the menus, the reason and "Remove", every control 44 px tall.
+    /* card mode: no header to cover; the row stands above the cards in two lines, the markup's order: the select-all box and
+       the count, then the menus, the reason and "Remove", every control 44 px tall.
        The menus open from the row's start (the sticky row is their containing block), so the list never reaches past
        the right edge of a narrow screen. */
     .cl-page .cl-selection-row {
@@ -4219,10 +4219,6 @@ a.cl-link-button:hover {
 
     .cl-page .cl-selection-count {
         margin-left: 0;
-    }
-
-    .cl-page .cl-selection-clear {
-        margin-left: auto;
     }
 
     .cl-page .cl-selection-actions {

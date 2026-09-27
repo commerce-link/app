@@ -338,14 +338,17 @@ class CategoryPageTemplateTest {
      * its text is often skipped. The bar keeps the visible count.
      */
     @Test
-    void theSelectionRowPutsClearAfterTheCountAndKeepsTheTrashIconOnRemove() {
+    void theSelectionRowHasNoClearButtonAndKeepsTheTrashIconOnRemove() {
         // when
         String html = rendered(false);
         String row = html.substring(html.indexOf("<div class=\"cl-selection-row\""), html.indexOf("<table"));
 
-        // then: the markup's order is the order on screen and in Tab; "Remove" is a danger link with its icon
-        assertThat(row.indexOf("data-cl-selection-count")).isLessThan(row.indexOf("data-cl-select-clear"));
-        assertThat(row.indexOf("data-cl-select-clear")).isLessThan(row.indexOf("data-cl-select-action=\"enable\""));
+        // then: the markup's order is the order on screen and in Tab, the select-all box clears the selection itself
+        // and names what it does; "Remove" is a danger link with its icon
+        assertThat(row).doesNotContain("data-cl-select-clear")
+                .contains("data-cl-label-select=\"Select all\" data-cl-label-clear=\"Deselect all\"");
+        assertThat(row.indexOf("data-cl-select-all")).isLessThan(row.indexOf("data-cl-selection-count"));
+        assertThat(row.indexOf("data-cl-selection-count")).isLessThan(row.indexOf("data-cl-select-action=\"enable\""));
         assertThat(row).containsPattern("<button type=\"button\" class=\"cl-link-button is-danger cl-selection-remove\" "
                 + "data-cl-select-action=\"delete\"[^>]*>\\s*<span class=\"icon is-small\" aria-hidden=\"true\"><i class=\"fas fa-trash-alt\"></i></span>");
     }
