@@ -344,9 +344,11 @@ class CategoryPageTemplateTest {
         String row = html.substring(html.indexOf("<div class=\"cl-selection-row\""), html.indexOf("<table"));
 
         // then: the markup's order is the order on screen and in Tab, the select-all box clears the selection itself
-        // and names what it does; "Remove" is a danger link with its icon
+        // and names what it does: with a filter it checks only the visible rows, so it says so; "Remove" is a danger
+        // link with its icon
         assertThat(row).doesNotContain("data-cl-select-clear")
-                .contains("data-cl-label-select=\"Select all\" data-cl-label-clear=\"Deselect all\"");
+                .contains("aria-label=\"Select the visible rows\" data-cl-label-select=\"Select the visible rows\" "
+                        + "data-cl-label-clear=\"Deselect all\"");
         assertThat(row.indexOf("data-cl-select-all")).isLessThan(row.indexOf("data-cl-selection-count"));
         assertThat(row.indexOf("data-cl-selection-count")).isLessThan(row.indexOf("data-cl-select-action=\"enable\""));
         assertThat(row).containsPattern("<button type=\"button\" class=\"cl-link-button is-danger cl-selection-remove\" "
