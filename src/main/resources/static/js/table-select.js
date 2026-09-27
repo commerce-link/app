@@ -123,7 +123,7 @@
         form.submit();
     }
 
-    // Shared with order-items.js (Task 11, D-12): opens #cl-confirm-dialog, fills it from the button's title/message/
+    // Shared with order-items.js: opens #cl-confirm-dialog, fills it from the button's title/message/
     // action attributes (named by the caller, with "{n}" replaced by count) and wires the accept button to onConfirm.
     // Fails closed: without the dialog the operator never gets asked, and a bulk action is not something to do on a
     // page whose confirmation markup is missing. Returns whether the dialog was shown.

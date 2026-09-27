@@ -131,7 +131,7 @@
                 <span> · SN </span>
                 <a th:if="${row.serialHref() != null}" class="cl-table-link" th:href="@{${row.serialHref()}}" th:text="${row.serialNo()}"></a>
                 <span th:unless="${row.serialHref() != null}" th:text="${row.serialNo()}"></span>
-                <!--/* D-09: the SN itself is easy to read but tedious to type into a search box — offer a copy button too */-->
+                <!--/* the SN itself is easy to read but tedious to type into a search box — offer a copy button too */-->
                 <button type="button" class="cl-copy-inline" th:attr="data-cl-copy=${row.serialNo()}, aria-label=#{order.items.copy.sn(${row.serialNo()})}">
                     <span class="cl-copy-icon"><span class="icon is-small" aria-hidden="true"><i class="far fa-copy"></i></span></span>
                 </button>

@@ -8,7 +8,8 @@ import org.springframework.web.servlet.support.RequestContextUtils;
 
 /**
  * Outcomes of order actions, shown in the page (orders/parts :: notice) instead of the layout's full-width Bulma banner.
- * Refusals keep going through errorMessage, which the layout shows for every screen (design-system debt §7).
+ * Refusals keep going through errorMessage, which the layout shows for every screen; moving refusals into the page
+ * body is a separate change.
  */
 public final class OrderFlash {
 

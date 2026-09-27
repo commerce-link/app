@@ -1,4 +1,4 @@
-// The shipments dialog: no blank row is added on its own (P25); "Add shipment" clones the <template> row, "Delete" removes
+// The shipments dialog: no blank row is added on its own (it would post an empty shipment); "Add shipment" clones the <template> row, "Delete" removes
 // a row (the last one stays, the server keeps at least one shipment), and the rows are renumbered shipments[0..n] so
 // Spring binds them without gaps. The carrier is chosen from the store's carriers or typed after "Other…": the select
 // only fills the named text field, so without JavaScript the text field alone is posted.

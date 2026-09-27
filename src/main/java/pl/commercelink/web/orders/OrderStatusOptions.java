@@ -7,7 +7,7 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
- * The "Change status" dialog (decision 4): the manual statuses as today (every direction allowed, Completed and
+ * The "Change status" dialog: the manual statuses as today (every direction allowed, Completed and
  * Cancelled only when current), each with the sentence of its effect; Delivered unavailable without shipment data.
  */
 public record OrderStatusOptions(List<Option> options, boolean emailNote, String marketplaceName) {

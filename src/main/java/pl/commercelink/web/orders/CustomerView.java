@@ -25,8 +25,8 @@ public record CustomerView(AddressBlock billing, AddressBlock shipping, boolean 
     }
 
     /**
-     * The operator's reason an address can no longer change (B3, P17), or null when it can — the single rule the
-     * customer card and the address page (OrderDetailsController) both read, so they never disagree.
+     * The operator's reason an address can no longer change, or null when it can — the single rule the customer card
+     * and the address page (OrdersController.showAddressDetails) both read, so they never disagree.
      */
     public static String lockedKey(Order order, boolean billing) {
         if (billing) {

@@ -4,7 +4,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 import pl.commercelink.documents.DocumentType;
 import pl.commercelink.orders.Order;
 
-/** Addresses of an order for the one looking at it: a super admin gets the store-scoped variants (P12). */
+/** Addresses of an order for the one looking at it: a super admin gets the store-scoped variants. */
 public record OrderLinks(String base, String storeId, boolean superAdmin) {
 
     public static OrderLinks of(Order order, boolean superAdmin) {

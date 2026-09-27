@@ -27,7 +27,7 @@ public enum ItemAction {
         return dialogId;
     }
 
-    /** One entry as the menu shows it: available, or greyed out with the reason in a second line (spec B11). */
+    /** One entry as the menu shows it: available, or greyed out with the reason in a second line. */
     public record State(ItemAction action, String labelKey, boolean available, String reasonKey, String reasonArg) {
 
         public static State of(ItemAction action, String reasonKey, String reasonArg) {

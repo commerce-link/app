@@ -5,7 +5,7 @@ import pl.commercelink.orders.OrdersManager;
 
 import java.util.Locale;
 
-/** B2: "Changed: N of M" and, when something was left, why (instead of skipping items silently, P14). */
+/** "Changed: N of M" and, when something was left, why — never skipped silently. */
 public record BulkActionResult(BulkAction action, int changed, int requested, int skippedDropship) {
 
     public static BulkActionResult of(BulkAction action, OrdersManager.Result result) {

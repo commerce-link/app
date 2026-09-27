@@ -127,6 +127,17 @@ public class Order {
     }
 
     @DynamoDBIgnore
+    public boolean isClosed() {
+        return hasOneOfStatuses(OrderStatus.Completed, OrderStatus.Cancelled);
+    }
+
+    /** A courier can be ordered once the goods are assembled; earlier the parcel contents are not known. */
+    @DynamoDBIgnore
+    public boolean canOrderShipment() {
+        return !status.isOneOf(OrderStatus.New, OrderStatus.Blocked, OrderStatus.Assembly);
+    }
+
+    @DynamoDBIgnore
     public boolean isFullyPaid() {
         return getUnpaidAmount() == 0;
     }
@@ -591,8 +602,8 @@ public class Order {
     }
 
     /**
-     * The operator's rule for the shipping address (spec B3, D-S12): the customer's own rule without its customer-only
-     * conditions (courier, not marketplace, e-mail for the code), so a pickup point or a marketplace order can still be
+     * The operator's version of the customer's rule for the shipping address, without its customer-only conditions
+     * (courier, not marketplace, e-mail for the code), so a pickup point or a marketplace order can still be
      * corrected before the parcel is labelled. A tracking number typed by hand counts as a label, as for the customer.
      */
     @DynamoDBIgnore

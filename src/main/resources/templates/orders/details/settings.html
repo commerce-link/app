@@ -1,7 +1,7 @@
 <!DOCTYPE HTML>
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
-<!--/* Read-only card (spec §4.7); the edit happens in the dialog below, or on orders/settings without JS. */-->
+<!--/* Read-only card; the edit happens in the dialog below, or on orders/settings without JS. */-->
 <section th:fragment="card" class="cl-card" aria-labelledby="settings-title" data-order="7" data-cl-collapse>
     <div class="cl-card-head">
         <h2 class="cl-card-title" id="settings-title" th:text="#{order.card.settings}"></h2>

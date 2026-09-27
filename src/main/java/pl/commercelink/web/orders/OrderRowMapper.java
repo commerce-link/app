@@ -52,7 +52,7 @@ public class OrderRowMapper {
         return map(order, today, null);
     }
 
-    /** returnTo: the list as the operator sees it, so the details page's "‹ Zamówienia" leads back to it (spec §4.1). */
+    /** returnTo: the list as the operator sees it, so the details page's "‹ Zamówienia" leads back to it. */
     public OrderRow map(Order order, LocalDate today, String returnTo) {
         ShippingDetails shipping = order.getShippingDetails();
         BillingDetails billing = order.getBillingDetails();

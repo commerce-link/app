@@ -45,7 +45,7 @@ class OrderLabelsTest {
         keys.addAll(keys(ShipmentType.values(), OrderLabels::shipmentType));
         keys.addAll(keys(DocumentType.values(), OrderLabels::documentType));
         keys.addAll(keys(PaymentSource.values(), OrderLabels::paymentSource));
-        keys.addAll(keys(PaymentDirection.values(), OrderLabels::paymentDirection));
+        keys.addAll(keys(PaymentDirection.values(), d -> "PaymentDirection." + d.name()));
         keys.addAll(keys(OrderReviewStatus.values(), OrderLabels::reviewStatus));
         keys.addAll(keys(ItemCondition.values(), OrderLabels::condition));
         keys.addAll(keys(ShipmentTrackingStatus.values(), OrderLabels::tracking));

@@ -1,7 +1,7 @@
 <!DOCTYPE HTML>
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
-<!--/* "Do zamknięcia" strip (spec §4.2): one row, the list's doc marks inline as full sentences; only for open orders. */-->
+<!--/* "Do zamknięcia" strip: one row, the list's doc marks inline as full sentences; only for open orders. */-->
 <section th:fragment="strip" th:if="${page.checklist() != null}" class="cl-card is-status cl-closing"
          aria-labelledby="closing-title">
     <h2 class="cl-closing-title" id="closing-title"

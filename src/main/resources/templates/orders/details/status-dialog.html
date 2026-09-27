@@ -8,7 +8,7 @@
 <form th:fragment="dialogForm" th:replace="~{orders/details/status-dialog :: statusForm(true)}"></form>
 <form th:fragment="pageForm" th:replace="~{orders/details/status-dialog :: statusForm(false)}"></form>
 
-<!--/* The status choice (decision 4): the manual statuses with the sentence of their effect, the current one marked. */-->
+<!--/* The status choice: the manual statuses with the sentence of their effect, the current one marked. */-->
 <form th:fragment="statusForm(inDialog)" method="post" th:action="@{/dashboard/orders/{o}/status(o=${orderId})}"
       th:with="options=${statusOptions}">
     <h2 th:if="${inDialog}" class="cl-dialog-title" id="status-dialog-title" th:text="#{order.status.dialog.title(${shortId})}"></h2>

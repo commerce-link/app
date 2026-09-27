@@ -6,7 +6,7 @@ import pl.commercelink.orders.fulfilment.FulfilmentType;
 
 import java.util.List;
 
-/** The "Dates and settings" card: a form for the store, a description once the order is closed or read-only. */
+/** The read-only "Terminy i ustawienia" card and the form of its dialog and no-JS page. */
 public record OrderSettingsView(String estimatedAssemblyAt, String estimatedShippingAt, String preferredShippingAt,
                                 String estimatedAssemblyText, String estimatedShippingText, String preferredShippingText,
                                 FulfilmentType fulfilmentType, String fulfilmentTypeKey, boolean fulfilmentTypeLocked,

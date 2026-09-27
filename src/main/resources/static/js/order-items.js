@@ -1,7 +1,7 @@
 // Bulk actions of the order's items. table-select.js keeps the checkboxes, the count and the bar; this script labels
 // each action with how many of the checked items it applies to ("To allocation (2 of 3)" — a row's data-<scope> flag is
 // the server's own predicate), disables an action none of them fits, asks in the page's dialog#cl-confirm-dialog
-// (through table-select.js's shared window.CL_confirmBulk, D-12) and posts form#order-items-form to the action's
+// (through table-select.js's shared window.CL_confirmBulk) and posts form#order-items-form to the action's
 // address. Without JavaScript the <noscript> buttons post the same form.
 (function () {
     'use strict';

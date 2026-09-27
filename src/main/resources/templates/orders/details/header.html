@@ -1,7 +1,7 @@
 <!DOCTYPE HTML>
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
-<!--/* Record header (spec §5.2.1): back to the list as left, h1 with the number, the status and its action, the meta
+<!--/* Record header: back to the list as left, h1 with the number, the status and its action, the meta
        lines and the actions. The slots are defined inside the replaced element, so they are never rendered twice. */-->
 <div th:fragment="header"
      th:replace="~{fragments/settings-header :: record(${page.backHref()}, #{orders.list.title},
@@ -90,8 +90,7 @@
                         <a th:if="${h.canDelete()}" class="cl-menu-item is-danger"
                            th:href="@{/dashboard/orders/{id}/delete(id=${page.orderId()})}" data-cl-confirm
                            th:attr="data-cl-confirm-title=#{order.page.delete.confirm.title(${page.shortId()})},
-                                    data-cl-confirm-message=${h.marketplaceName() != null and h.deleteMessageKey() == 'order.page.delete.confirm.marketplace'}
-                                        ? #{order.page.delete.confirm.marketplace(${h.marketplaceName()})} : #{order.page.delete.confirm.message},
+                                    data-cl-confirm-message=${h.deleteMessage()},
                                     data-cl-confirm-action=#{order.page.delete.confirm.action}"
                            th:text="#{order.page.delete}"></a>
                         <button th:unless="${h.canDelete()}" type="button" class="cl-menu-item is-danger" aria-disabled="true">

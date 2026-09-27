@@ -76,7 +76,7 @@ public class OrderPageModelFactory {
 
     public OrderPageModel build(Order order, List<OrderItem> items, Viewer viewer, Locale locale) {
         Store store = storesRepository.findById(order.getStoreId());
-        boolean closed = order.hasOneOfStatuses(OrderStatus.Completed, OrderStatus.Cancelled);
+        boolean closed = order.isClosed();
         boolean readOnly = closed || viewer.superAdmin();
         OrderLinks links = OrderLinks.of(order, viewer.superAdmin());
         Set<String> dropshipItemIds = dropshipItemLookup.itemIdsInDropshipDeliveries(order.getStoreId(), items);
@@ -89,7 +89,7 @@ public class OrderPageModelFactory {
         return new OrderPageModel(order.getOrderId(), order.getShortenedOrderId(),
                 viewer.superAdmin() ? null : OrderBackLink.sanitize(viewer.back()),
                 closed, readOnly, viewer.superAdmin(), viewer.admin(), store == null ? null : store.getName(),
-                header(order, items, store, viewer, readOnly, links),
+                header(order, items, store, viewer, readOnly, links, locale),
                 checklist, checklist == null ? null : checklist.title(messageSource, locale),
                 items(order, items, store, viewer, readOnly, links, hasDropshipItems, hasWarehouseDocument),
                 shipments(order, store, readOnly),
@@ -107,8 +107,8 @@ public class OrderPageModelFactory {
     }
 
     private OrderPageModel.Header header(Order order, List<OrderItem> items, Store store, Viewer viewer, boolean readOnly,
-                                         OrderLinks links) {
-        boolean canOrderShipment = !order.getStatus().isOneOf(OrderStatus.New, OrderStatus.Blocked, OrderStatus.Assembly);
+                                         OrderLinks links, Locale locale) {
+        boolean canOrderShipment = order.canOrderShipment();
         OrderPageModel.PrimaryAction primary = null;
         // with items at several suppliers the dropship page without ?provider= sends the operator back to choose one,
         // so the button names the first waiting supplier, as DeliveryRedirectResolver does for the delivery link
@@ -145,8 +145,14 @@ public class OrderPageModelFactory {
                 // a completed order can still be cancelled after a full return, so this follows the viewer, not readOnly
                 !viewer.superAdmin() && order.canBeCancelled(items),
                 !viewer.superAdmin() && order.hasStatus(OrderStatus.New) && items.isEmpty() && !order.isInvoiced(),
-                order.isMarketplaceOrder() ? "order.page.delete.confirm.marketplace" : "order.page.delete.confirm.message",
-                order.getSource() == null ? null : order.getSource().getName());
+                deleteMessage(order, messageSource, locale));
+    }
+
+    /** The delete confirmation warns that a marketplace order is cancelled there too. */
+    public static String deleteMessage(Order order, MessageSource messages, Locale locale) {
+        return order.isMarketplaceOrder()
+                ? messages.getMessage("order.page.delete.confirm.marketplace", new Object[]{order.getSource().getName()}, locale)
+                : messages.getMessage("order.page.delete.confirm.message", null, locale);
     }
 
     // What DropshipEligibility accepts: an item in Allocation with its supplier, not yet claimed by a delivery. A New
@@ -209,7 +215,7 @@ public class OrderPageModelFactory {
                 readOnly ? List.of() : labels.options(), previews);
     }
 
-    // B10: the serial-number dialog only ever assigns serials, so it gets a slim row with no cost, not the raw item.
+    // the serial-number dialog only ever assigns serials, so it gets a slim row with no cost, not the raw item.
     private static OrderPageModel.SerialItemRow serialItemRow(OrderItem item, SupplierLabelMap labels) {
         String deliveryId = StringUtils.trimToNull(item.getDeliveryId());
         String deliveryLabel = deliveryId == null ? null
@@ -220,7 +226,7 @@ public class OrderPageModelFactory {
 
     private String deliveryHref(Order order, OrderItem item, Viewer viewer, OrderLinks links) {
         String href = deliveryRedirectResolver.resolveFor(order, item);
-        // the dropship screens are the admin's; a user or a super admin only sees the supplier's name (P12)
+        // the dropship screens are the admin's; a user or a super admin only sees the supplier's name
         if (href.contains("/dropship") && (!viewer.admin() || viewer.superAdmin())) {
             return null;
         }
@@ -233,7 +239,6 @@ public class OrderPageModelFactory {
     }
 
     private OrderPageModel.ShipmentsCard shipments(Order order, Store store, boolean readOnly) {
-        boolean canOrderShipment = !order.getStatus().isOneOf(OrderStatus.New, OrderStatus.Blocked, OrderStatus.Assembly);
         List<OrderPageModel.ShipmentRow> rows = order.getShipments().stream()
                 .map(s -> new OrderPageModel.ShipmentRow(OrderLabels.shipmentType(s.getType()), s.getCarrier(),
                         s.getTrackingNo(), safeTrackingUrl(s.getTrackingUrl()), s.getCollectionPointCode(),
@@ -244,10 +249,10 @@ public class OrderPageModelFactory {
         boolean cancellable = order.firstShipmentWithShippingData()
                 .map(s -> s.getExternalId() != null && s.getDeliveredAt() == null).orElse(false);
         // an order can genuinely have zero shipments (not yet allocated); the dialog needs one blank row to edit,
-        // not an empty table that posts nothing on Save (P25 forbids only an extra blank row next to existing ones)
+        // not an empty table that posts nothing on Save (an extra blank row next to existing ones would post an empty shipment)
         List<Shipment> editable = order.getShipments().isEmpty() ? List.of(new Shipment()) : order.getShipments();
-        return new OrderPageModel.ShipmentsCard(rows, order.hasTrackedShipments(), !readOnly,
-                !readOnly && canOrderShipment && cancellable, OrderLabels.Option.of(ShipmentType.values(), OrderLabels::shipmentType),
+        return new OrderPageModel.ShipmentsCard(rows,
+                !readOnly && order.canOrderShipment() && cancellable, OrderLabels.Option.of(ShipmentType.values(), OrderLabels::shipmentType),
                 store == null ? List.of() : shipmentCarrierOptions.forOrder(order, store), editable);
     }
 
@@ -272,7 +277,7 @@ public class OrderPageModelFactory {
 
     /** Why a document cannot be added by hand (null when it can): the card hides "Add document" for the same reasons. */
     public static String addDocumentLockedKey(Order order, DocumentType posted) {
-        if (order.hasOneOfStatuses(OrderStatus.Completed, OrderStatus.Cancelled)) {
+        if (order.isClosed()) {
             return "order.documents.add.locked.closed";
         }
         List<DocumentType> manual = manualDocumentTypes(order);
@@ -307,8 +312,7 @@ public class OrderPageModelFactory {
     }
 
     private OrderPageModel.PaymentsCard payments(Order order, boolean readOnly) {
-        // D-11: today's page lists every payment, complete or not — an incomplete one (no source, no reference) is
-        // still money recorded against the order and must stay visible, not disappear silently.
+        // every payment is listed, complete or not: an incomplete one is still money recorded against the order
         List<Payment> payments = order.getPayments() == null ? List.of() : order.getPayments();
         List<OrderPageModel.PaymentRow> rows = payments.stream()
                 .map(p -> new OrderPageModel.PaymentRow(Money.format(p.getAmount()), p.getDirection() == PaymentDirection.Outgoing,
@@ -317,7 +321,7 @@ public class OrderPageModelFactory {
                 .toList();
         double unpaid = order.getUnpaidAmount();
         return new OrderPageModel.PaymentsCard(rows, Money.format(order.getPaidAmount()), Money.format(unpaid),
-                unpaid > 0.005, !readOnly, !readOnly && !payments.isEmpty(), Math.max(0, unpaid),
+                unpaid > 0.005, !readOnly && !payments.isEmpty(), Math.max(0, unpaid),
                 order.getPendingPayment(), OrderLabels.Option.of(PaymentSource.values(), OrderLabels::paymentSource),
                 payments);
     }
@@ -348,7 +352,7 @@ public class OrderPageModelFactory {
 
     /** Why items cannot be added (null when they can): the page greys the button with it, the controller refuses with it. */
     public static String addItemsLockedKey(Order order, boolean hasDropshipItems) {
-        if (order.hasOneOfStatuses(OrderStatus.Completed, OrderStatus.Cancelled)) {
+        if (order.isClosed()) {
             return "order.items.add.locked.closed";
         }
         if (order.getDocumentByType(DocumentType.GoodsIssue).isPresent()) {

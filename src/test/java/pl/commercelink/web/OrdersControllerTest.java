@@ -1552,7 +1552,6 @@ class OrdersControllerTest {
             assertThat(model.getAttribute("page")).isSameAs(page);
             assertThat(model.getAttribute("settings")).isSameAs(settings);
             assertThat(model.getAttribute("orderId")).isEqualTo(ORDER_ID);
-            assertThat(model.getAttribute("order")).isSameAs(order);
         }
 
         @Test

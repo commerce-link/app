@@ -118,9 +118,11 @@ class OrderListServiceTest {
 
     @Test
     void aRowLinksToTheDetailsWithTheListItCameFrom() {
+        // given
         add("new-1", OrderStatus.New, TODAY, 10, 10, null);
 
-        // a narrowed list travels to the details page, so its "‹ Zamówienia" returns to it (D11)
+        // when / then
+        // a narrowed list travels to the details page, so its "‹ Zamówienia" returns to it
         assertThat(page(query("status", "New")).rows().get(0).href())
                 .isEqualTo("/dashboard/orders/new-1?returnTo=%2Fdashboard%2Forders%3Fstatus%3DNew");
         // the default list adds nothing: the details page falls back to the bare list anyway

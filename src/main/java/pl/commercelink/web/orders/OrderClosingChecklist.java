@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * The "To close" card (spec B1, §5.2.2): exactly the parts of Order.isSettled, each with what is missing. Nothing here
+ * The "Do zamknięcia" strip: exactly the parts of Order.isSettled, each with what is missing. Nothing here
  * decides anything; OrderLifecycle closes the order.
  */
 public record OrderClosingChecklist(List<Item> items) {

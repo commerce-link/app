@@ -9,7 +9,6 @@ public final class OrderFormats {
 
     private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("dd.MM.yyyy");
     private static final DateTimeFormatter DATE_TIME = DateTimeFormatter.ofPattern("dd.MM.yyyy, HH:mm");
-    private static final DateTimeFormatter DAY_MONTH = DateTimeFormatter.ofPattern("dd.MM");
 
     private OrderFormats() {
     }
@@ -24,10 +23,6 @@ public final class OrderFormats {
 
     public static String dateTime(LocalDateTime dateTime) {
         return dateTime == null ? null : DATE_TIME.format(dateTime);
-    }
-
-    public static String dayMonth(LocalDate date) {
-        return date == null ? null : DAY_MONTH.format(date);
     }
 
     // The ISO form is the value an <input type="date"> needs, not display text.

@@ -13,7 +13,7 @@
                         data-cl-confirm-message=#{order.shipments.cancel.confirm.message},
                         data-cl-confirm-action=#{order.shipments.cancel.confirm.action}"
                th:text="#{order.shipments.cancel}"></a>
-            <button type="button" class="cl-button" data-cl-dialog-open="shipments-dialog" th:disabled="${!shipments.canEdit()}"
+            <button type="button" class="cl-button" data-cl-dialog-open="shipments-dialog"
                     th:text="#{order.shipments.edit}"></button>
         </div>
     </div>

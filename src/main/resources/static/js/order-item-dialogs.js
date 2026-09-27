@@ -616,7 +616,7 @@
         }
     })();
 
-    // --- Move to an existing order: preview of the target (B5) ----------------------------------------------------
+    // --- Move to an existing order: preview of the target ----------------------------------------------------------
     (function () {
         var dialog = document.getElementById('move-dialog');
         if (!dialog) {

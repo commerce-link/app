@@ -16,8 +16,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Everything the order details page shows, worked out once (spec §5.2). closed = Completed or Cancelled; readOnly =
- * closed or a super admin looking at a store's order (P12). The template only prints.
+ * Everything the order details page shows, worked out once. closed = Completed or Cancelled; readOnly =
+ * closed or a super admin looking at a store's order. The template only prints.
  */
 public record OrderPageModel(String orderId, String shortId, String backHref, boolean closed, boolean readOnly,
                              boolean superAdmin, boolean admin, String storeName, Header header,
@@ -31,7 +31,7 @@ public record OrderPageModel(String orderId, String shortId, String backHref, bo
                          String fulfilmentTypeKey, String externalOrderId, RoutedSupplierView routedSupplier,
                          String splitFromShortId, String splitFromHref, String clientOrderUrl, PrimaryAction primaryAction,
                          String cardHref, String collectionHref, String itemHistoryHref, boolean canCancel,
-                         boolean canDelete, String deleteMessageKey, String marketplaceName) {
+                         boolean canDelete, String deleteMessage) {
     }
 
     public record PrimaryAction(String labelKey, String href, String icon) {
@@ -44,14 +44,14 @@ public record OrderPageModel(String orderId, String shortId, String backHref, bo
                             Map<String, SplitGroupPreviewDto> splitPreviews) {
     }
 
-    /** B10: the serial-number dialog needs no cost, so it gets a slim row instead of the raw OrderItem. */
+    /** The serial-number dialog needs no cost, so it gets a slim row instead of the raw OrderItem. */
     public record SerialItemRow(String itemId, String name, String mfn, int qty, String deliveryLabel, String serialNo) {
     }
 
     public record BulkActionButton(BulkAction action, boolean available, String reasonKey, String href) {
     }
 
-    public record ShipmentsCard(List<ShipmentRow> rows, boolean tracked, boolean canEdit, boolean canCancelCourier,
+    public record ShipmentsCard(List<ShipmentRow> rows, boolean canCancelCourier,
                                 List<OrderLabels.Option<ShipmentType>> types, List<String> carriers, List<Shipment> editable) {
     }
 
@@ -68,7 +68,7 @@ public record OrderPageModel(String orderId, String shortId, String backHref, bo
                               boolean removable, String removeHref) {
     }
 
-    public record PaymentsCard(List<PaymentRow> rows, String paid, String unpaid, boolean unpaidDue, boolean canAdd,
+    public record PaymentsCard(List<PaymentRow> rows, String paid, String unpaid, boolean unpaidDue,
                                boolean canEdit, double expected, Payment pending, List<OrderLabels.Option<PaymentSource>> sources,
                                List<Payment> editable) {
     }

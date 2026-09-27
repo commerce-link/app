@@ -5,7 +5,6 @@ import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.OrderReviewStatus;
 import pl.commercelink.orders.OrderSourceType;
 import pl.commercelink.orders.OrderStatus;
-import pl.commercelink.orders.PaymentDirection;
 import pl.commercelink.orders.PaymentSource;
 import pl.commercelink.orders.ShipmentTrackingStatus;
 import pl.commercelink.orders.ShipmentType;
@@ -28,7 +27,7 @@ public final class OrderLabels {
     private OrderLabels() {
     }
 
-    /** An enum value paired with its message key (D-10): a template reads labelKey, it never builds "Type." + name. */
+    /** An enum value paired with its message key: a template reads labelKey, it never builds "Type." + name. */
     public record Option<T>(T value, String labelKey) {
 
         public static <T> List<Option<T>> of(T[] values, Function<T, String> labelKey) {
@@ -66,7 +65,7 @@ public final class OrderLabels {
             return null;
         }
         return switch (status) {
-            // spec §4.3
+            // waiting states neutral/info, trouble warn/bad
             case New -> NEUTRAL;
             case Allocation, Ordered, Reserved -> INFO;
             case Delivered -> OK;
@@ -93,10 +92,6 @@ public final class OrderLabels {
 
     public static String paymentSource(PaymentSource source) {
         return source == null ? null : "PaymentSource." + source.name();
-    }
-
-    public static String paymentDirection(PaymentDirection direction) {
-        return direction == null ? null : "PaymentDirection." + direction.name();
     }
 
     public static String reviewStatus(OrderReviewStatus status) {

@@ -50,7 +50,7 @@ public record OrderItemRow(String itemId, int index, String name, String categor
                 item.getPrice(), item.getTax(), item.isGroup());
     }
 
-    /** The conditions of the old order-details item menu plus P13: consolidation stops at the closing invoice. */
+    /** The conditions of the old order-details item menu, plus: consolidation stops at the closing invoice. */
     public static List<ItemAction.State> actions(OrderItem item, Order order) {
         List<ItemAction.State> states = new ArrayList<>();
         String assignReason = item.isGroup() ? "order.item.unavailable.group"

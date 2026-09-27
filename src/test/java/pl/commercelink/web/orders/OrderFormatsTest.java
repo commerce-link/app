@@ -18,7 +18,6 @@ class OrderFormatsTest {
         assertThat(OrderFormats.date(orderedAt.toLocalDate())).isEqualTo("03.09.2026");
         assertThat(OrderFormats.date(orderedAt)).isEqualTo("03.09.2026");
         assertThat(OrderFormats.dateTime(orderedAt)).isEqualTo("03.09.2026, 09:07");
-        assertThat(OrderFormats.dayMonth(orderedAt.toLocalDate())).isEqualTo("03.09");
         assertThat(OrderFormats.isoDate(orderedAt.toLocalDate())).isEqualTo("2026-09-03");
     }
 

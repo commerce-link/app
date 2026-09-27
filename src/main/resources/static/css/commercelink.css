@@ -6124,7 +6124,7 @@ a.cl-link-button:hover {
     min-height: 1.5em;
 }
 
-/* --- Order details: "Do zamknięcia" strip (spec §4.2) — the list's doc marks, inline, as full sentences --- */
+/* --- Order details: "Do zamknięcia" strip — the list's doc marks, inline, as full sentences --- */
 .cl-page .cl-closing { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 24px; padding: 12px 20px; }
 .cl-page .cl-closing-title { font-size: 15px; font-weight: 650; }
 .cl-page .cl-closing-title.is-warn { color: var(--cl-warn); }

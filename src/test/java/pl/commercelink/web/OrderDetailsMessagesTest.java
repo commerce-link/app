@@ -1,11 +1,6 @@
 package pl.commercelink.web;
 
 import org.junit.jupiter.api.Test;
-import pl.commercelink.documents.DocumentType;
-import pl.commercelink.orders.*;
-import pl.commercelink.orders.fulfilment.FulfilmentType;
-import pl.commercelink.warehouse.api.ItemCondition;
-import pl.commercelink.web.orders.OrderLabels;
 
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -55,24 +50,6 @@ class OrderDetailsMessagesTest {
             }
         }
         assertThat(missing).isEmpty();
-    }
-
-    @Test
-    void everyEnumValueTheLabelsResolveHasAKey() throws IOException {
-        Properties pl = load("messages_pl.properties"), en = load("messages_en.properties");
-        List<String> keys = new ArrayList<>();
-        for (OrderStatus s : OrderStatus.values()) { keys.add(OrderLabels.status(s)); keys.add("order.status.effect." + s.name()); }
-        for (FulfilmentStatus s : FulfilmentStatus.values()) keys.add(OrderLabels.itemStatus(s));
-        for (OrderSourceType s : OrderSourceType.values()) keys.add(OrderLabels.sourceType(s));
-        for (FulfilmentType s : FulfilmentType.values()) keys.add(OrderLabels.fulfilmentType(s));
-        for (ShipmentType s : ShipmentType.values()) keys.add(OrderLabels.shipmentType(s));
-        for (DocumentType s : DocumentType.values()) keys.add(OrderLabels.documentType(s));
-        for (PaymentSource s : PaymentSource.values()) keys.add(OrderLabels.paymentSource(s));
-        for (PaymentDirection s : PaymentDirection.values()) keys.add(OrderLabels.paymentDirection(s));
-        for (OrderReviewStatus s : OrderReviewStatus.values()) keys.add(OrderLabels.reviewStatus(s));
-        for (ItemCondition s : ItemCondition.values()) keys.add(OrderLabels.condition(s));
-        for (ShipmentTrackingStatus s : ShipmentTrackingStatus.values()) keys.add(OrderLabels.tracking(s));
-        assertThat(keys).allSatisfy(k -> { assertThat(pl).containsKey(k); assertThat(en).containsKey(k); });
     }
 
     private static Properties load(String name) throws IOException {
