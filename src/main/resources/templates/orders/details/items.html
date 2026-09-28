@@ -107,7 +107,8 @@
                                                           th:attr="aria-label=#{order.items.select.all}, data-cl-label-select=#{order.items.select.all}, data-cl-label-clear=#{order.items.select.none}"></label>
                 </th>
                 <th scope="col" th:text="#{order.items.column.product}"></th>
-                <th scope="col" class="is-numeric" th:text="#{order.items.column.price}"></th>
+                <!--/* the unit comes from the same pattern every amount on the page is written with (general.currency.amount) */-->
+                <th scope="col" class="is-numeric" th:text="#{order.items.column.price(${#strings.trim(#messages.msg('general.currency.amount', ''))})}"></th>
                 <th scope="col" th:text="#{order.items.column.fulfilment}"></th>
                 <th scope="col" class="cl-table-flag" th:text="#{order.items.column.consolidated}"></th>
                 <th th:if="${menus}" scope="col" class="cl-table-actions"><span class="cl-visually-hidden" th:text="#{order.items.column.actions}"></span></th>
@@ -188,9 +189,9 @@
             </th:block>
         </span>
     </th>
-    <td class="is-numeric" th:attr="data-label=#{order.items.column.price}">
+    <td class="is-numeric" th:attr="data-label=#{order.items.column.price(${#strings.trim(#messages.msg('general.currency.amount', ''))})}">
         <span th:text="#{order.items.qty.price(${row.qty()}, ${row.unitPrice()})}"></span>
-        <span th:if="${row.unitCost() != null}" class="cl-table-sub" th:text="#{order.items.cost(${row.unitCost()})}"></span>
+        <span class="cl-table-sub" th:text="#{order.items.cost(${row.unitCost()})}"></span>
     </td>
     <td class="cl-table-fulfilment" th:attr="data-label=#{order.items.column.fulfilment}">
         <span class="cl-status" th:classappend="${row.statusTone()}" th:text="#{${row.statusKey()}}"></span>

@@ -336,40 +336,51 @@ class OrderDetailsTemplateTest {
     }
 
     @Test
-    void aUserReceivesNoCostOrProfitInTheHtml() {
+    void aUserSeesTheItemCostAndProfitLikeAnAdmin() {
         // when
         String user = page(render(order(OrderStatus.New), USER));
         String admin = page(render(order(OrderStatus.New), ADMIN));
 
         // then
-        assertThat(user).doesNotContain("koszt 579").doesNotContain("Zysk (z VAT)").doesNotContain("Koszt produktów");
-        assertThat(admin).contains("Zysk (z VAT)").contains("Koszt produktów (brutto)");
+        assertThat(user).contains("koszt 579").contains("Zysk (z VAT)").contains("Koszt produktów (brutto)");
+        assertThat(admin).contains("koszt 579").contains("Zysk (z VAT)").contains("Koszt produktów (brutto)");
     }
 
     @Test
-    void theFinancesCardShowsTheTotalWhatWasPaidAndWhatIsDueOnly() {
+    void thePriceColumnNamesTheCurrencyOfThePageAmounts() {
+        // when
+        String html = page(render(order(OrderStatus.New), USER));
+
+        // then: the header and the card-mode label carry the unit; the cells keep bare numbers
+        assertThat(html).contains("<th scope=\"col\" class=\"is-numeric\">Ilość × cena (PLN)</th>")
+                .contains("<td class=\"is-numeric\" data-label=\"Ilość × cena (PLN)\">")
+                .contains("<span>2 × 749,00</span>");
+    }
+
+    @Test
+    void theFinancesCardShowsTheTotalWhatWasPaidAndWhatIsDueAboveTheCosts() {
         // when
         String html = page(render(order(OrderStatus.New), USER));
 
         // then: the products and services values are gone at the client's request
         String card = card(html, "finances-title");
+        String totals = card.substring(0, card.indexOf("id=\"finances-costs\""));
         assertThat(card).doesNotContain("Wartość produktów").doesNotContain("Wartość usług");
-        assertThat(Pattern.compile("<dt>([^<]+)</dt>").matcher(card).results().map(m -> m.group(1)).toList())
+        assertThat(Pattern.compile("<dt>([^<]+)</dt>").matcher(totals).results().map(m -> m.group(1)).toList())
                 .containsExactly("Razem", "Wpłacono", "Do zapłaty");
     }
 
     @Test
-    void costAndProfitAreACollapsedSectionOfTheFinancesCardForAnAdminOnly() {
+    void costAndProfitAreACollapsedSectionOfTheFinancesCardForEveryRole() {
         // when
         String user = page(render(order(OrderStatus.New), USER));
-        String admin = page(render(order(OrderStatus.New), ADMIN));
 
         // then
         Matcher costs = Pattern.compile("(?s)<details class=\"cl-disclosure\" id=\"finances-costs\">(.*?)</details>")
-                .matcher(admin);
+                .matcher(user);
         assertThat(costs.find()).isTrue();
         assertThat(costs.group(1)).contains("<summary>Koszt i zysk</summary>").contains("Zysk (bez VAT)");
-        assertThat(user).doesNotContain("finances-costs").doesNotContain("cl-kv-group");
+        assertThat(user).doesNotContain("cl-kv-group");
     }
 
     @Test

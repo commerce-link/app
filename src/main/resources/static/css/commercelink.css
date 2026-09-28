@@ -5709,6 +5709,18 @@ a.cl-link-button:hover {
     border-radius: 2px;
 }
 
+/* Codes on neighbouring lines of a product cell (18.75 px apart): the later button paints over the earlier one's lower
+   padding, so 3 px would leave the upper code under 24 px. 9 px reaches over the line above as well, whose links and
+   toggles sit one level higher and keep every point of their own. Below 1024 px the 44 px rules apply. */
+@media screen and (min-width: 1024px) {
+    .cl-page .cl-table-sub .cl-copy-inline {
+        padding-top: 9px;
+        padding-bottom: 9px;
+        margin-top: -9px;
+        margin-bottom: -9px;
+    }
+}
+
 
 /* Record header with status: h1 + pill + status action in one line */
 .cl-page .cl-record-title {

@@ -17,18 +17,18 @@ class OrderItemRowTest {
 
     private static final Order ORDER = new Order("store-1");
 
-    private static OrderItemRow.Context context(Order order, boolean admin, boolean readOnly) {
-        return context(order, admin, readOnly, false);
+    private static OrderItemRow.Context context(Order order, boolean readOnly) {
+        return context(order, readOnly, false);
     }
 
-    private static OrderItemRow.Context context(Order order, boolean admin, boolean readOnly, boolean superAdmin) {
-        return new OrderItemRow.Context(order, admin, readOnly, superAdmin, new SupplierLabels(mock(StoresRepository.class)).forStore(null),
+    private static OrderItemRow.Context context(Order order, boolean readOnly, boolean superAdmin) {
+        return new OrderItemRow.Context(order, readOnly, superAdmin, new SupplierLabels(mock(StoresRepository.class)).forStore(null),
                 item -> "/dashboard/deliveries/details?deliveryId=" + item.getDeliveryId(),
                 serial -> "/dashboard/item/history?serialNo=" + serial);
     }
 
     private static OrderItemRow.Context context() {
-        return context(ORDER, true, false);
+        return context(ORDER, false);
     }
 
     private static OrderItem item(FulfilmentStatus status, String sku) {
@@ -45,7 +45,7 @@ class OrderItemRowTest {
     @Test
     void aNewItemOffersEveryAssignmentAndExplainsWhatItCannotDo() {
         // when
-        OrderItemRow row = OrderItemRow.of(item(FulfilmentStatus.New, "MFN-1"), 0, context(ORDER, true, false));
+        OrderItemRow row = OrderItemRow.of(item(FulfilmentStatus.New, "MFN-1"), 0, context(ORDER, false));
 
         // then
         assertThat(state(row, ItemAction.ASSIGN_SKU).available()).isTrue();
@@ -71,8 +71,8 @@ class OrderItemRowTest {
         OrderItem bundle = item(FulfilmentStatus.New, "#1xA|1xB");
 
         // when
-        OrderItemRow orderedRow = OrderItemRow.of(ordered, 0, context(ORDER, true, false));
-        OrderItemRow bundleRow = OrderItemRow.of(bundle, 1, context(ORDER, true, false));
+        OrderItemRow orderedRow = OrderItemRow.of(ordered, 0, context(ORDER, false));
+        OrderItemRow bundleRow = OrderItemRow.of(bundle, 1, context(ORDER, false));
 
         // then
         assertThat(state(orderedRow, ItemAction.ASSIGN_SKU).reasonKey()).isEqualTo("order.item.unavailable.not.new");
@@ -88,7 +88,7 @@ class OrderItemRowTest {
         claimed.markAsClaimed("7f3a9c2e-0000-0000-0000-000000000000");
 
         // when
-        OrderItemRow row = OrderItemRow.of(claimed, 0, context(ORDER, true, false));
+        OrderItemRow row = OrderItemRow.of(claimed, 0, context(ORDER, false));
 
         // then
         assertThat(state(row, ItemAction.CLEAR_SUPPLIER).reasonKey()).isEqualTo("order.item.unavailable.claimed");
@@ -102,7 +102,7 @@ class OrderItemRowTest {
         invoiced.addDocument(new Document("fv", "FV/1", null, DocumentType.InvoiceVat));
 
         // when
-        OrderItemRow row = OrderItemRow.of(item(FulfilmentStatus.Delivered, "MFN-1"), 0, context(invoiced, true, false));
+        OrderItemRow row = OrderItemRow.of(item(FulfilmentStatus.Delivered, "MFN-1"), 0, context(invoiced, false));
 
         // then
         assertThat(state(row, ItemAction.CONSOLIDATE).available()).isFalse();
@@ -110,13 +110,12 @@ class OrderItemRowTest {
     }
 
     @Test
-    void aUserDoesNotGetTheCostAndAReadOnlyViewerGetsNoActions() {
+    void aReadOnlyViewerGetsNoActionsButStillTheCost() {
         // when
-        OrderItemRow forUser = OrderItemRow.of(item(FulfilmentStatus.New, "MFN-1"), 0, context(ORDER, false, false));
         OrderItemRow forSuperAdmin = OrderItemRow.of(item(FulfilmentStatus.New, "MFN-1"), 0, context(ORDER, true, true));
 
         // then
-        assertThat(forUser.unitCost()).isNull();
+        assertThat(forSuperAdmin.unitCost()).isEqualTo("579,00");
         assertThat(forSuperAdmin.actions()).isEmpty();
         assertThat(forSuperAdmin.editHref()).isNull();
     }
@@ -129,7 +128,7 @@ class OrderItemRowTest {
         damaged.setSerialNo("SN-1");
 
         // when
-        OrderItemRow row = OrderItemRow.of(damaged, 0, context(ORDER, true, false));
+        OrderItemRow row = OrderItemRow.of(damaged, 0, context(ORDER, false));
 
         // then
         assertThat(row.conditionKey()).isEqualTo("ItemCondition.Damaged");
@@ -204,7 +203,7 @@ class OrderItemRowTest {
         routed.setExternalSupplierId("company-7");
 
         // when
-        OrderItemRow row = OrderItemRow.of(item(FulfilmentStatus.New, "MFN-1"), 0, context(routed, true, false));
+        OrderItemRow row = OrderItemRow.of(item(FulfilmentStatus.New, "MFN-1"), 0, context(routed, false));
 
         // then
         assertThat(state(row, ItemAction.ASSIGN_WAREHOUSE).reasonKey()).isEqualTo("order.item.unavailable.routed");
@@ -217,7 +216,7 @@ class OrderItemRowTest {
         OrderItem item = item(FulfilmentStatus.Delivered, "MFN-1");
 
         // when
-        OrderItemRow row = OrderItemRow.of(item, 0, context(ORDER, true, true));
+        OrderItemRow row = OrderItemRow.of(item, 0, context(ORDER, true));
 
         // then
         assertThat(row.viewHref()).isEqualTo("/dashboard/orders/" + ORDER.getOrderId() + "/items/" + item.getItemId());
@@ -227,7 +226,7 @@ class OrderItemRowTest {
     @Test
     void aClosedOrderLinksTheNameToTheItemPageNotForASuperAdmin() {
         // when
-        OrderItemRow row = OrderItemRow.of(item(FulfilmentStatus.Delivered, "MFN-1"), 0, context(ORDER, false, true, true));
+        OrderItemRow row = OrderItemRow.of(item(FulfilmentStatus.Delivered, "MFN-1"), 0, context(ORDER, true, true));
 
         // then
         assertThat(row.viewHref()).isNull();
@@ -236,7 +235,7 @@ class OrderItemRowTest {
     @Test
     void aClosedOrderLinksTheNameToTheItemPageNotForAnOpenOrder() {
         // when
-        OrderItemRow row = OrderItemRow.of(item(FulfilmentStatus.New, "MFN-1"), 0, context(ORDER, true, false));
+        OrderItemRow row = OrderItemRow.of(item(FulfilmentStatus.New, "MFN-1"), 0, context(ORDER, false));
 
         // then: the open order reaches the item page through the item menu
         assertThat(row.viewHref()).isNull();
