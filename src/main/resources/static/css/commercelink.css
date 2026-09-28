@@ -5653,12 +5653,20 @@ a.cl-link-button:hover {
     color: var(--cl-ink-2);
 }
 
-/* Copy inline (codes in a table cell) */
+/* Copy inline: button.cl-copy-inline > .cl-copy-code (the code, then its icon), or > .cl-copy-icon alone (.is-icon, a
+   copy button after a link or a heading). The icon is always shown, muted, and takes the link colour on hover and
+   focus; one click anywhere on the button copies. The hit area reaches 24 px (44 px below 1024 px) through padding
+   pulled back by an equal negative margin, so no line or row grows. The button is positioned, so its enlarged area
+   lies over the plain text around it; its own content and every control of the container that holds it sit one
+   level higher, so the area never takes a point of a neighbouring control or of another code. Level 1 stays under
+   the sticky selection row, the top bar and every popover. */
 .cl-page .cl-copy-inline {
+    position: relative;
     display: inline;
     text-align: left;
     overflow-wrap: anywhere;
-    padding: 0;
+    padding: 3px 0;
+    margin: -3px 0;
     border: 0;
     background: none;
     font: inherit;
@@ -5666,19 +5674,36 @@ a.cl-link-button:hover {
     cursor: pointer;
 }
 
+.cl-page .cl-copy-inline > *,
+.cl-page :is(.cl-table, .cl-record-title, .cl-record-meta, .cl-address):has(.cl-copy-inline)
+        :is(a, summary, label, input, button:not(.cl-copy-inline)) {
+    position: relative;
+    z-index: 1;
+}
+
+/* The icon after a link or a heading: the extra width goes to the right, never over the link it follows. */
+.cl-page .cl-copy-inline.is-icon {
+    padding-right: 10px;
+    margin-right: -10px;
+}
+
 .cl-page .cl-copy-inline .cl-copy-icon {
     margin-left: 4px;
-    opacity: 0;
     font-size: 11px;
     color: var(--cl-ink-3);
 }
 
 .cl-page .cl-copy-inline:hover .cl-copy-icon,
 .cl-page .cl-copy-inline:focus-visible .cl-copy-icon {
-    opacity: 1;
+    color: var(--cl-accent-ink);
 }
 
+/* The ring goes around what is seen (the code and its icon, or the lone icon), not around the enlarged hit area. */
 .cl-page .cl-copy-inline:focus-visible {
+    outline: 0;
+}
+
+.cl-page .cl-copy-inline:focus-visible > :is(.cl-copy-code, .cl-copy-icon) {
     outline: 2px solid var(--cl-accent);
     outline-offset: 2px;
     border-radius: 2px;
@@ -5877,13 +5902,37 @@ a.cl-link-button:hover {
         min-height: 44px;
     }
 
+    /* copy buttons: a 44 px hit area, the line still as tall as before (see the base rules) */
+    .cl-page .cl-copy-inline {
+        padding-top: 13px;
+        padding-bottom: 13px;
+        margin-top: -13px;
+        margin-bottom: -13px;
+    }
+
+    .cl-page .cl-copy-inline.is-icon {
+        padding-right: 30px;
+        margin-right: -30px;
+    }
+
+    /* the order number's icon sits between the heading and the status pill: its area reaches over the heading's end
+       and up to the pill, not under it */
+    .cl-page .cl-record-title .cl-copy-inline.is-icon {
+        padding-left: 18px;
+        padding-right: 12px;
+        margin-left: -18px;
+        margin-right: -12px;
+    }
+
+    /* the e-mail line is 44 px tall already (its link is), the button simply fills a 44 px square in it */
     .cl-page .cl-address .cl-copy-inline {
         display: inline-flex;
         align-items: center;
         justify-content: center;
         min-width: 44px;
         min-height: 44px;
-        margin-left: 0;
+        padding: 0;
+        margin: 0;
         vertical-align: top;
     }
 
@@ -6089,12 +6138,6 @@ a.cl-link-button:hover {
     border-top: 1px solid var(--cl-line);
 }
 
-@media (prefers-reduced-motion: reduce) {
-    .cl-page .cl-copy-inline .cl-copy-icon {
-        transition: none;
-    }
-}
-
 /* --- Orders redesign: helpers that replace the mockups' inline styles --- */
 
 /* Room between a card head and the table or bar below it (mockups: a 12 px spacer). */
@@ -6151,11 +6194,6 @@ a.cl-link-button:hover {
 .cl-page .cl-card.is-flat {
     box-shadow: none;
     border: 1px solid var(--cl-line);
-}
-
-/* The copy icon next to the order number is always visible (in table cells it shows on hover and focus only). */
-.cl-page .cl-copy-inline.is-pinned .cl-copy-icon {
-    opacity: 1;
 }
 
 /* A shared dialog on a page not yet redesigned carries its own .cl-page wrapper so its rules apply; no page padding. */
@@ -6444,75 +6482,6 @@ a.cl-link-button:hover {
 /* The dot between two codes: one ordinary space on each side, from the markup's own whitespace. */
 .cl-page .cl-table .cl-table-sep {
     color: var(--cl-ink-3);
-}
-
-/* Codes copy on click; the icon shows on hover and on keyboard focus (the base .cl-copy-inline rules). It takes no
-   width, so hidden it leaves no gap, and it is laid over the end of its own code (the last line of a wrapped one) on
-   the row's background: it never covers the next "·", the line above or anything past the cell's edge. The code is
-   in the button's accessible name and copied whole, so hiding its last characters while hovering loses nothing. */
-.cl-page .cl-table-sub .cl-copy-inline {
-    position: relative;
-}
-
-.cl-page .cl-table-sub .cl-copy-inline .cl-copy-icon {
-    position: absolute;
-    right: 0;
-    bottom: 0;
-    display: inline-flex;
-    align-items: center;
-    height: 100%;
-    margin: 0;
-    padding: 0 1px 0 3px;
-    background: var(--cl-surface);
-    pointer-events: none;
-}
-
-.cl-page .cl-table tr.is-selected .cl-table-sub .cl-copy-icon {
-    background: var(--cl-accent-soft);
-}
-
-/* The SN with a history link: the link and a copy button right behind it. The button takes no width; its icon, laid
-   over the end of the SN, is the click area and shows while the pointer is on the link or on the icon. */
-.cl-page .cl-table-sub .cl-copy-inline.is-icon {
-    display: inline-block;
-    width: 0;
-    height: 1em;
-    vertical-align: baseline;
-}
-
-.cl-page .cl-table-sub .cl-copy-inline.is-icon .cl-copy-icon {
-    height: auto;
-    padding: 0 1px 0 3px;
-    pointer-events: auto;
-}
-
-.cl-page .cl-table-sub .cl-copy-pair:hover .cl-copy-icon {
-    opacity: 1;
-}
-
-.cl-page .cl-table-sub .cl-copy-inline.is-icon:focus-visible {
-    outline: 0;
-}
-
-.cl-page .cl-table-sub .cl-copy-inline.is-icon:focus-visible .cl-copy-icon {
-    opacity: 1;
-    outline: 2px solid var(--cl-accent);
-    outline-offset: 1px;
-}
-
-/* Without a pointer that hovers, the SN's copy icon has no other way to be found: it stays visible, in the line after
-   the SN (the last code, so it opens no gap before anything) and wraps with it instead of leaving the cell. */
-@media (hover: none) {
-    .cl-page .cl-table-sub .cl-copy-inline.is-icon {
-        width: auto;
-        height: auto;
-        margin-left: 4px;
-    }
-
-    .cl-page .cl-table-sub .cl-copy-inline.is-icon .cl-copy-icon {
-        position: static;
-        opacity: 1;
-    }
 }
 
 /* One link look in the row: the SN link is the accent link of the Stan column, not the quiet name link. */

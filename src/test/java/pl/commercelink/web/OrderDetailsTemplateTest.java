@@ -638,8 +638,9 @@ class OrderDetailsTemplateTest {
         // when
         String html = page(render(order, ADMIN));
 
-        // then: the mailto link stays and the order number's copy button follows it, its glyph hidden
-        assertThat(html).contains("<a href=\"mailto:piotr@example.com\">piotr@example.com</a><button type=\"button\" class=\"cl-copy-inline is-pinned\" data-cl-copy=\"piotr@example.com\" aria-label=\"Kopiuj e-mail piotr@example.com\"><span class=\"cl-copy-icon\" aria-hidden=\"true\"><i class=\"far fa-copy\"></i></span></button>")
+        // then: the mailto link stays and an icon-only copy button follows it, glued to it by a word joiner, its
+        // glyph hidden
+        assertThat(html).contains("<a href=\"mailto:piotr@example.com\">piotr@example.com</a>&#8288;<button type=\"button\" class=\"cl-copy-inline is-icon\" data-cl-copy=\"piotr@example.com\" aria-label=\"Kopiuj e-mail piotr@example.com\"><span class=\"cl-copy-icon\" aria-hidden=\"true\"><i class=\"far fa-copy\"></i></span></button>")
                 .contains("data-cl-copy=\"odbiorca@example.com\" aria-label=\"Kopiuj e-mail odbiorca@example.com\"");
     }
 
@@ -1373,10 +1374,43 @@ class OrderDetailsTemplateTest {
         // then: "MFN", "SKU" and "SN" each stay glued to their code, one dot between the parts
         assertThat(cell).contains("<span>MFN</span>&nbsp;<button type=\"button\" class=\"cl-copy-inline\" data-cl-copy=\"SIM-OK\"")
                 .contains("<span>SKU</span>&nbsp;<button type=\"button\" class=\"cl-copy-inline\" data-cl-copy=\"ACME-KAB-1\"")
-                .contains("<span>SN</span>&nbsp;<a class=\"cl-table-link\" href=\"/dashboard/item/history?serialNo=23213123\">23213123</a>"
+                .contains("<span>SN</span>&nbsp;<a class=\"cl-table-link\" href=\"/dashboard/item/history?serialNo=23213123\">23213123</a>&#8288;"
                         + "<button type=\"button\" class=\"cl-copy-inline is-icon\" data-cl-copy=\"23213123\" aria-label=\"Kopiuj numer seryjny 23213123\">");
         assertThat(occurrences(cell, "<span class=\"cl-table-sep\">·</span>")).isEqualTo(3);
         assertThat(cell).doesNotContain("class=\"icon is-small\" aria-hidden=\"true\"><i class=\"far fa-copy\">");
+    }
+
+    @Test
+    void everyCodeCarriesItsOwnCopyIconAndIsOneButton() {
+        // given
+        Order order = order(OrderStatus.New);
+        OrderItem item = new OrderItem(order.getOrderId(), "Akcesoria", "Kabel", 1, 20, "ACME-KAB-1", false, 0);
+        item.setStatus(FulfilmentStatus.New);
+        item.setManufacturerCode("SIM-OK");
+        item.setSerialNo("23213123");
+
+        // when
+        String cell = productCell(page(render(order, List.of(item), ADMIN, Set.of())), "Kabel");
+
+        // then: the code and its icon sit in one button (one focus stop), the icon glued to the code's end by a word
+        // joiner; the SN link is followed by its own icon-only button; nothing is pinned or hidden any more
+        String icon = "<span class=\"cl-copy-icon\" aria-hidden=\"true\">&#8288;<i class=\"far fa-copy\"></i></span>";
+        assertThat(cell).contains("aria-label=\"Kopiuj kod producenta SIM-OK\"><span class=\"cl-copy-code\"><span>SIM-OK</span>" + icon + "</span></button>")
+                .contains("aria-label=\"Kopiuj SKU ACME-KAB-1\"><span class=\"cl-copy-code\"><span>ACME-KAB-1</span>" + icon + "</span></button>")
+                .contains("aria-label=\"Kopiuj numer seryjny 23213123\"><span class=\"cl-copy-icon\" aria-hidden=\"true\"><i class=\"far fa-copy\"></i></span></button>");
+        assertThat(occurrences(cell, "<button type=\"button\" class=\"cl-copy-inline")).isEqualTo(3);
+        assertThat(occurrences(cell, "fa-copy")).isEqualTo(3);
+        assertThat(cell).doesNotContain("is-pinned").doesNotContain("cl-copy-pair").doesNotContain("style=");
+    }
+
+    @Test
+    void theHeaderCopyButtonsAreIconButtonsLikeTheCodes() {
+        // when
+        String html = page(render(order(OrderStatus.New), ADMIN));
+
+        // then
+        assertThat(html).doesNotContain("is-pinned")
+                .containsPattern("<button type=\"button\" class=\"cl-copy-inline is-icon\"\\s+data-cl-copy=\"[^\"]+\" aria-label=\"[^\"]+\" title=\"[^\"]+\">\\s+<span class=\"cl-copy-icon\"><span class=\"icon is-small\" aria-hidden=\"true\"><i class=\"far fa-copy\"></i></span></span>");
     }
 
     @Test

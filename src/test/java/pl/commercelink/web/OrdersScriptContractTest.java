@@ -237,6 +237,42 @@ class OrdersScriptContractTest {
     }
 
     @Test
+    void theCopyIconIsAlwaysShownAndEveryCopyButtonReachesItsTargetSizeWithoutGrowingTheLine() throws Exception {
+        // given
+        String css = css();
+        String copyRules = css.substring(css.indexOf("/* Copy inline:"), css.indexOf("/* Record header with status"))
+                .replaceAll("(?s)/\\*.*?\\*/", "");
+
+        // then: nothing hides the icon; it is muted and takes the link colour on hover and focus
+        assertThat(css).doesNotContain("cl-copy-icon {\n    opacity").doesNotContain(".cl-copy-inline.is-pinned")
+                .doesNotContain(".cl-copy-pair");
+        assertThat(copyRules).doesNotContain("opacity").doesNotContain("position: absolute");
+        assertThat(rule(css, ".cl-page .cl-copy-inline .cl-copy-icon")).contains("color: var(--cl-ink-3)");
+        assertThat(rule(css, ".cl-page .cl-copy-inline:hover .cl-copy-icon,\n.cl-page .cl-copy-inline:focus-visible .cl-copy-icon"))
+                .contains("color: var(--cl-accent-ink)");
+        // 24 px on desktop: padding pulled back by an equal negative margin; icon-only buttons grow to the right
+        assertThat(rule(css, ".cl-page .cl-copy-inline")).contains("padding: 3px 0").contains("margin: -3px 0");
+        assertThat(rule(css, ".cl-page .cl-copy-inline.is-icon")).contains("padding-right: 10px").contains("margin-right: -10px");
+        // the button is positioned (its area lies over plain text); its own content and every control around it sit
+        // one level higher, below the sticky selection row (5), the top bar and the popovers
+        assertThat(rule(css, ".cl-page .cl-copy-inline")).contains("position: relative");
+        assertThat(css).contains(".cl-page .cl-copy-inline > *,\n.cl-page :is(.cl-table, .cl-record-title, .cl-record-meta, "
+                + ".cl-address):has(.cl-copy-inline)\n        :is(a, summary, label, input, button:not(.cl-copy-inline)) {\n"
+                + "    position: relative;\n    z-index: 1;\n}");
+        assertThat(copyRules.split("z-index", -1)).hasSize(2);
+        // the ring marks what is seen, not the hit area
+        assertThat(rule(css, ".cl-page .cl-copy-inline:focus-visible > :is(.cl-copy-code, .cl-copy-icon)"))
+                .contains("outline: 2px solid var(--cl-accent)");
+        // 44 px below 1024 px
+        String touch = media(css.substring(css.indexOf("@media screen and (max-width: 1023px) {\n    .cl-page .cl-button.is-icon")),
+                "@media screen and (max-width: 1023px)");
+        assertThat(touch).contains(".cl-page .cl-copy-inline {\n        padding-top: 13px;\n        padding-bottom: 13px;\n"
+                        + "        margin-top: -13px;\n        margin-bottom: -13px;")
+                .contains(".cl-page .cl-copy-inline.is-icon {\n        padding-right: 30px;\n        margin-right: -30px;")
+                .contains(".cl-page .cl-address .cl-copy-inline {");
+    }
+
+    @Test
     void theE2eFixesKeepTheDetailsLayoutTight() throws Exception {
         // given
         String css = css();

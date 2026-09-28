@@ -167,23 +167,24 @@
                 <div class="cl-note-panel"><p class="cl-note-title" th:text="#{order.items.note.comment}"></p><p class="cl-note-text is-pre" th:text="${row.comment()}"></p></div>
             </details>
         </span>
-        <!--/* Every code carries its label; the code itself copies (the icon shows on hover and focus without taking
-               width, so no gap opens before the next separator). The label and its code never part at a line end. */-->
+        <!--/* Every code carries its label and copies on click; its copy icon always follows it. The label and its code
+               never part at a line end, nor the code and its icon (the word joiner before the icon). */-->
         <span th:if="${row.hasCodes()}" class="cl-table-sub">
             <span th:if="${row.category() != null}" th:text="${row.category()}"></span>
             <th:block th:if="${row.mfn() != null}">
                 <span th:if="${row.category() != null}" class="cl-table-sep">·</span>
-                <span th:text="#{order.items.mfn.prefix}"></span>&nbsp;<button type="button" class="cl-copy-inline" th:attr="data-cl-copy=${row.mfn()}, aria-label=#{order.items.copy.mfn(${row.mfn()})}"><span th:text="${row.mfn()}"></span><span class="cl-copy-icon" aria-hidden="true"><i class="far fa-copy"></i></span></button>
+                <span th:text="#{order.items.mfn.prefix}"></span>&nbsp;<button type="button" class="cl-copy-inline" th:attr="data-cl-copy=${row.mfn()}, aria-label=#{order.items.copy.mfn(${row.mfn()})}"><span class="cl-copy-code"><span th:text="${row.mfn()}"></span><span class="cl-copy-icon" aria-hidden="true">&#8288;<i class="far fa-copy"></i></span></span></button>
             </th:block>
             <th:block th:if="${row.skuShown()}">
                 <span th:if="${row.category() != null or row.mfn() != null}" class="cl-table-sep">·</span>
-                <span th:text="#{order.items.sku.prefix}"></span>&nbsp;<button type="button" class="cl-copy-inline" th:attr="data-cl-copy=${row.sku()}, title=${row.sku()}, aria-label=#{order.items.copy.sku(${row.sku()})}"><span th:text="${#strings.abbreviate(row.sku(), 28)}"></span><span class="cl-copy-icon" aria-hidden="true"><i class="far fa-copy"></i></span></button>
+                <span th:text="#{order.items.sku.prefix}"></span>&nbsp;<button type="button" class="cl-copy-inline" th:attr="data-cl-copy=${row.sku()}, title=${row.sku()}, aria-label=#{order.items.copy.sku(${row.sku()})}"><span class="cl-copy-code"><span th:text="${#strings.abbreviate(row.sku(), 28)}"></span><span class="cl-copy-icon" aria-hidden="true">&#8288;<i class="far fa-copy"></i></span></span></button>
             </th:block>
             <th:block th:if="${row.serialNo() != null}">
                 <span th:if="${row.category() != null or row.mfn() != null or row.skuShown()}" class="cl-table-sep">·</span>
-                <!--/* with a history page the SN is a link and a copy icon follows it; without one the SN itself copies */-->
-                <span th:if="${row.serialHref() != null}" class="cl-copy-pair"><span th:text="#{order.items.sn.prefix}"></span>&nbsp;<a class="cl-table-link" th:href="@{${row.serialHref()}}" th:text="${row.serialNo()}"></a><button type="button" class="cl-copy-inline is-icon" th:attr="data-cl-copy=${row.serialNo()}, aria-label=#{order.items.copy.sn(${row.serialNo()})}"><span class="cl-copy-icon" aria-hidden="true"><i class="far fa-copy"></i></span></button></span>
-                <th:block th:unless="${row.serialHref() != null}"><span th:text="#{order.items.sn.prefix}"></span>&nbsp;<button type="button" class="cl-copy-inline" th:attr="data-cl-copy=${row.serialNo()}, aria-label=#{order.items.copy.sn(${row.serialNo()})}"><span th:text="${row.serialNo()}"></span><span class="cl-copy-icon" aria-hidden="true"><i class="far fa-copy"></i></span></button></th:block>
+                <!--/* with a history page the SN is a link and its own copy button follows it (glued by a word joiner); without
+                       one the SN itself copies */-->
+                <th:block th:if="${row.serialHref() != null}"><span th:text="#{order.items.sn.prefix}"></span>&nbsp;<a class="cl-table-link" th:href="@{${row.serialHref()}}" th:text="${row.serialNo()}"></a>&#8288;<button type="button" class="cl-copy-inline is-icon" th:attr="data-cl-copy=${row.serialNo()}, aria-label=#{order.items.copy.sn(${row.serialNo()})}"><span class="cl-copy-icon" aria-hidden="true"><i class="far fa-copy"></i></span></button></th:block>
+                <th:block th:unless="${row.serialHref() != null}"><span th:text="#{order.items.sn.prefix}"></span>&nbsp;<button type="button" class="cl-copy-inline" th:attr="data-cl-copy=${row.serialNo()}, aria-label=#{order.items.copy.sn(${row.serialNo()})}"><span class="cl-copy-code"><span th:text="${row.serialNo()}"></span><span class="cl-copy-icon" aria-hidden="true">&#8288;<i class="far fa-copy"></i></span></span></button></th:block>
             </th:block>
         </span>
     </th>

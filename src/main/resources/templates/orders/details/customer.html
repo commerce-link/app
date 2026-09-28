@@ -33,7 +33,7 @@
     <th:block th:if="${block.taxId() != null}"><span th:text="#{order.customer.tax.id(${block.taxId()})}"></span><br></th:block>
     <th:block th:if="${block.street() != null}"><span th:text="${block.street()}"></span><br></th:block>
     <th:block th:if="${block.cityLine() != null}"><span th:text="${block.country() != null} ? ${block.cityLine() + ', ' + block.country()} : ${block.cityLine()}"></span><br></th:block>
-    <div th:if="${block.email() != null}"><a th:href="'mailto:' + ${block.email()}" th:text="${block.email()}"></a><button type="button" class="cl-copy-inline is-pinned"
+    <div th:if="${block.email() != null}"><a th:href="'mailto:' + ${block.email()}" th:text="${block.email()}"></a>&#8288;<button type="button" class="cl-copy-inline is-icon"
             th:attr="data-cl-copy=${block.email()}, aria-label=#{order.customer.copy.email(${block.email()})}"><span class="cl-copy-icon" aria-hidden="true"><i class="far fa-copy"></i></span></button></div>
     <div th:if="${block.phone() != null}"><a th:href="'tel:' + ${block.phone()}" th:text="${block.phone()}"></a></div>
 </th:block>

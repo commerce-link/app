@@ -7,7 +7,7 @@
      th:replace="~{fragments/settings-header :: record(${page.backHref()}, #{orders.list.title},
              #{order.page.title(${page.shortId()})}, ~{::orderStatus}, ~{::orderMeta}, ~{::orderActions})}">
     <th:block th:fragment="orderStatus">
-        <button type="button" class="cl-copy-inline is-pinned"
+        <button type="button" class="cl-copy-inline is-icon"
                 th:attr="data-cl-copy=${page.orderId()}, aria-label=#{order.page.copy.id}, title=${page.orderId()}">
             <span class="cl-copy-icon"><span class="icon is-small" aria-hidden="true"><i class="far fa-copy"></i></span></span>
         </button>
@@ -46,7 +46,7 @@
             </span>
             <span th:if="${h.clientOrderUrl() != null}">
                 <span th:text="#{order.page.meta.client.link}"></span>
-                <button type="button" class="cl-copy-inline is-pinned"
+                <button type="button" class="cl-copy-inline is-icon"
                         th:attr="data-cl-copy=${h.clientOrderUrl()}, aria-label=#{order.page.copy.client.link}">
                     <span class="cl-copy-icon"><span class="icon is-small" aria-hidden="true"><i class="fas fa-link"></i></span></span>
                 </button>
