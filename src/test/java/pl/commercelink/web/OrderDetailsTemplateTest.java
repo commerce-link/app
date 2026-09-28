@@ -24,6 +24,8 @@ import pl.commercelink.orders.ShipmentCarrierOptions;
 import pl.commercelink.orders.ShipmentTrackingStatus;
 import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
+import pl.commercelink.orders.event.EventType;
+import pl.commercelink.orders.event.OrderEvent;
 import pl.commercelink.orders.event.OrderEventsRepository;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.products.ProductCatalogRepository;
@@ -65,6 +67,11 @@ class OrderDetailsTemplateTest {
     }
 
     static OrderPageModelFactory factory(Set<String> dropshipItemIds, boolean documentsGenerationEnabled) {
+        return factory(dropshipItemIds, documentsGenerationEnabled, List.of());
+    }
+
+    static OrderPageModelFactory factory(Set<String> dropshipItemIds, boolean documentsGenerationEnabled,
+                                         List<OrderEvent> orderEvents) {
         StoresRepository stores = mock(StoresRepository.class);
         Store store = new Store();
         store.setStoreId("store-1");
@@ -80,7 +87,7 @@ class OrderDetailsTemplateTest {
         DropshipItemLookup dropship = mock(DropshipItemLookup.class);
         when(dropship.itemIdsInDropshipDeliveries(anyString(), any())).thenReturn(dropshipItemIds);
         OrderEventsRepository events = mock(OrderEventsRepository.class);
-        when(events.findByOrderId(anyString())).thenReturn(List.of());
+        when(events.findByOrderId(anyString())).thenReturn(orderEvents);
         ShipmentCarrierOptions carrierOptions = mock(ShipmentCarrierOptions.class);
         when(carrierOptions.forOrder(any(), any())).thenReturn(List.of("DPD", "InPost"));
         ResourceBundleMessageSource messages = new ResourceBundleMessageSource();
@@ -1535,5 +1542,78 @@ class OrderDetailsTemplateTest {
 
         // then
         assertThat(html).contains("Brak przesyłek. Dodaj przesyłkę przyciskiem „Edytuj przesyłki”.");
+    }
+
+    /** The order with {@code count} events, one hour apart, "Zdarzenie 1" the newest; rendered for an admin. */
+    static String renderWithEvents(int count) {
+        Order order = order(OrderStatus.New);
+        List<OrderEvent> events = new ArrayList<>();
+        for (int i = 1; i <= count; i++) {
+            events.add(new OrderEvent(order.getOrderId(), EventType.action, "Zdarzenie " + i,
+                    LocalDateTime.of(2026, 9, 28, 12, 0).minusHours(i)));
+        }
+        OrderPageModel page = factory(Set.of(), false, events).build(order, items(order), ADMIN, PL);
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("navigation", null);
+        variables.put("page", page);
+        variables.put("order", order);
+        variables.put("orderId", order.getOrderId());
+        variables.put("settings", page.settings());
+        return SettingsTemplateRenderer.render("orders/details", variables);
+    }
+
+    static String historyCard(String html) {
+        int start = html.indexOf("<section class=\"cl-card\" id=\"historia\"");
+        return html.substring(start, html.indexOf("</section>", start));
+    }
+
+    @Test
+    void theHistoryIsOneListWithTheToggleUnderItAndEveryEventInTheMarkup() {
+        // given
+        String card = historyCard(renderWithEvents(8));
+
+        // when
+        int lists = card.split("<ol ", -1).length - 1;
+        int items = card.split("class=\"cl-timeline-item\"", -1).length - 1;
+
+        // then: one list with all eight events, newest first, none hidden in the markup (no-JS shows them all)
+        assertThat(lists).isEqualTo(1);
+        assertThat(items).isEqualTo(8);
+        assertThat(card).doesNotContain("<details").doesNotContain("<li class=\"cl-timeline-item\" hidden");
+        assertThat(card.indexOf("Zdarzenie 1<")).isLessThan(card.indexOf("Zdarzenie 8<"));
+        assertThat(card).contains("<ol class=\"cl-timeline\" id=\"history-events\" data-cl-timeline-limit=\"5\">");
+        // the toggle sits after the list, hidden until timeline.js shows it, and names the list it controls
+        int list = card.indexOf("</ol>");
+        int toggle = card.indexOf("data-cl-timeline-toggle");
+        assertThat(toggle).isGreaterThan(list);
+        assertThat(card).contains("<p class=\"cl-timeline-more\" hidden>")
+                .contains("<button type=\"button\" class=\"cl-link-button\" aria-controls=\"history-events\" aria-expanded=\"false\" data-cl-timeline-toggle")
+                .contains(">Pokaż wszystkie (8)</button>")
+                .contains("data-less-text=\"Zwiń\"")
+                .contains("data-shown-text=\"Pokazano starsze zdarzenia: 3\"")
+                .contains("data-hidden-text=\"Ukryto starsze zdarzenia: 3\"")
+                .contains("<p class=\"cl-visually-hidden\" role=\"status\" data-cl-timeline-status></p>");
+        assertThat(card).doesNotContain("style=").doesNotContain("is-hidden");
+    }
+
+    @Test
+    void upToFiveEventsHaveNoToggleAndNoLimit() {
+        // given
+        String card = historyCard(renderWithEvents(5));
+
+        // then
+        assertThat(card.split("class=\"cl-timeline-item\"", -1).length - 1).isEqualTo(5);
+        assertThat(card).contains("<ol class=\"cl-timeline\" id=\"history-events\">")
+                .doesNotContain("data-cl-timeline-limit").doesNotContain("data-cl-timeline-toggle")
+                .doesNotContain("data-cl-timeline-status");
+    }
+
+    @Test
+    void theDetailsPageLoadsTheTimelineScript() {
+        // when
+        String html = renderWithEvents(6);
+
+        // then
+        assertThat(html).contains("/js/timeline.js");
     }
 }

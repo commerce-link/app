@@ -461,4 +461,23 @@ class OrdersScriptContractTest {
         assertThat(depth).isZero();
         assertThat(minimum).isZero();
     }
+
+    @Test
+    void theTimelineScriptHidesOnlyTheExtraEventsAndKeepsTheLineUnbroken() throws Exception {
+        // given
+        String timeline = read("src/main/resources/static/js/timeline.js");
+        String css = css();
+
+        // then: the extra events are hidden inside the same list, the toggle keeps the focus and announces the change
+        assertThat(timeline).contains("'use strict'").contains("data-cl-timeline-limit").contains("data-cl-timeline-toggle")
+                .contains("aria-expanded").contains("aria-controls").contains("data-cl-timeline-status")
+                .contains("button.focus()").contains("button.parentElement.hidden = false")
+                .doesNotContain("style.").doesNotContain("innerHTML");
+        // the last visible event ends the line, the toggle lines up with the event text
+        assertThat(rule(css, ".cl-page .cl-timeline-item:has(+ .cl-timeline-item[hidden])::after")).contains("display: none");
+        assertThat(rule(css, ".cl-page .cl-timeline-item:has(+ .cl-timeline-item[hidden])")).contains("padding-bottom: 0");
+        assertThat(rule(css, ".cl-page .cl-timeline-more")).contains("padding: 0 20px 8px 36px");
+        // the line reaches the next dot's ring instead of stopping short of it
+        assertThat(rule(css, ".cl-page .cl-timeline-item::after")).contains("bottom: -5px");
+    }
 }

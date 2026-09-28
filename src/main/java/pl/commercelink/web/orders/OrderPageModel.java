@@ -111,8 +111,9 @@ public record OrderPageModel(String orderId, String shortId, String backHref, bo
 
         public static final int VISIBLE = 5;
 
-        public List<EventRow> first() {
-            return events.subList(0, Math.min(VISIBLE, events.size()));
+        /** How many of the newest events show before "show all"; the rest stay in the same list, hidden by script. */
+        public int visible() {
+            return VISIBLE;
         }
 
         public List<EventRow> rest() {

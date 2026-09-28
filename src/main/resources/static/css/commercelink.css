@@ -5495,12 +5495,13 @@ a.cl-link-button:hover {
     box-shadow: 0 0 0 2px var(--cl-ink-3);
 }
 
+/* The line runs from under this dot into the next item, up to the ring of the next dot (its top 7px minus the 2px ring). */
 .cl-page .cl-timeline-item::after {
     content: "";
     position: absolute;
     left: 6px;
     top: 17px;
-    bottom: 0;
+    bottom: -5px;
     width: 2px;
     background: var(--cl-line);
 }
@@ -5511,6 +5512,25 @@ a.cl-link-button:hover {
 
 .cl-page .cl-timeline-item:last-child::after {
     display: none;
+}
+
+/* Events hidden behind "show all" stay in the same list (timeline.js): the last visible event ends the line and the
+   toggle sits under it, aligned with the event text. */
+.cl-page .cl-timeline-item:has(+ .cl-timeline-item[hidden]) {
+    padding-bottom: 0;
+}
+
+.cl-page .cl-timeline-item:has(+ .cl-timeline-item[hidden])::after {
+    display: none;
+}
+
+.cl-page .cl-timeline:has(+ .cl-timeline-more:not([hidden])) {
+    padding-bottom: 4px;
+}
+
+.cl-page .cl-timeline-more {
+    margin: 0;
+    padding: 0 20px 8px 36px;
 }
 
 .cl-page .cl-timeline time {
