@@ -67,7 +67,8 @@
     </dl>
 
     <h2 th:text="#{devReceipts.payments}"></h2>
-    <dl class="cl-receipt-meta">
+    <p th:if="*{payments.isEmpty()}" th:text="#{devReceipts.payments.none}"></p>
+    <dl class="cl-receipt-meta" th:unless="*{payments.isEmpty()}">
         <th:block th:each="payment : *{payments}">
             <dt th:with="formName=#{${'devReceipts.payment.' + payment.form}}, label=${#strings.trim(payment.label)}"><span
                     th:text="${formName}"></span><th:block

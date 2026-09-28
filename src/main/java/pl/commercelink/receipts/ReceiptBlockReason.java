@@ -8,6 +8,7 @@ public enum ReceiptBlockReason {
     TOTAL_MISMATCH,
     EMPTY_NAME,
     MISSING_EMAIL,
+    /** No longer raised (an unpaid order gets a receipt without payments); kept for attempts stored with it. */
     NO_PAYMENT,
     MIXED_PAYMENTS,
     MEDIUM_UNSUPPORTED,
