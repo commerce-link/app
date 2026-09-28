@@ -12,8 +12,9 @@ import java.util.regex.Pattern;
  * The billing or the shipping address of an order as its edit form shows it: in the dialog of the customer card and
  * on the address page without JavaScript. Fields post under the names the order binds ({@code billingDetails.city},
  * {@code shippingDetails.city}), which are also their ids. The rules are the ones the old address page enforced in
- * the browser (required fields, a two-letter country code, the phone pattern), checked on the server so an error can
- * be shown next to its field; the company and the tax id stay optional.
+ * the browser (required fields, a two-letter country code), checked on the server so an error can be shown next to its
+ * field; the phone counts digits (9-15) instead of the old page's pattern, which refused real numbers written with
+ * separators ("+48 22 390 45 10"). The company and the tax id stay optional; values are stored as typed.
  */
 public record OrderAddressForm(String orderId, String type, String name, String surname, String companyName,
                                String taxId, String streetAndNumber, String postalCode, String city, String country,
@@ -23,7 +24,8 @@ public record OrderAddressForm(String orderId, String type, String name, String 
     public static final String SHIPPING = "shipping";
 
     private static final Pattern COUNTRY = Pattern.compile("[A-Z]{2}");
-    private static final Pattern PHONE = Pattern.compile("[0-9+ ]{9,15}");
+    /** An optional leading "+", then digits with spaces, dashes, dots or parentheses between them. */
+    private static final Pattern PHONE = Pattern.compile("\\+?[0-9 ().-]+");
     private static final Pattern EMAIL = Pattern.compile("[^@\\s]+@[^@\\s]+\\.[^@\\s]+");
 
     public static boolean isType(String type) {
@@ -72,10 +74,19 @@ public record OrderAddressForm(String orderId, String type, String name, String 
         if (require(found, "email", email, "billing.email.required") && !EMAIL.matcher(email.trim()).matches()) {
             found.put(field("email"), "billing.email.invalid");
         }
-        if (require(found, "phone", phone, "billing.phone.required") && !PHONE.matcher(phone).matches()) {
+        if (require(found, "phone", phone, "billing.phone.required") && !isPhone(phone)) {
             found.put(field("phone"), "billing.phone.invalid");
         }
         return found;
+    }
+
+    /** "+48 22 390 45 10", "(22) 390-45-10", "600700800": allowed characters only, 9 to 15 digits. */
+    public static boolean isPhone(String value) {
+        if (!PHONE.matcher(value.trim()).matches()) {
+            return false;
+        }
+        long digits = value.chars().filter(Character::isDigit).count();
+        return digits >= 9 && digits <= 15;
     }
 
     public OrderAddressForm withErrors(Map<String, String> found) {
