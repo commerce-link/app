@@ -475,13 +475,13 @@ class OrdersScriptContractTest {
                 .contains("aria-controls").contains("data-cl-timeline-status")
                 .contains("(expanded ? collapse : expand).focus()").contains("more.hidden = false")
                 .doesNotContain("style.").doesNotContain("innerHTML");
-        // collapsed, the last visible event carries the line on, dashed, down to the node; the node sits on the axis
+        // collapsed, the last visible event carries the line on, dashed, down to the node; the node sits on the axis, larger than a dot
         assertThat(rule(css, ".cl-page .cl-timeline-item:has(+ .cl-timeline-item[hidden])::after"))
-                .contains("bottom: -16px").contains("repeating-linear-gradient(to bottom, var(--cl-line)");
+                .contains("bottom: -13px").contains("repeating-linear-gradient(to bottom, var(--cl-line)");
         assertThat(rule(css, ".cl-page .cl-timeline-item:has(+ .cl-timeline-item[hidden])")).contains("padding-bottom: 0");
         assertThat(rule(css, ".cl-page .cl-timeline-more")).contains("padding: 0 20px 8px");
-        assertThat(rule(css, ".cl-page .cl-timeline-node-dot")).contains("width: 8px").contains("margin: 18px 0 0 3px")
-                .contains("box-shadow: 0 0 0 2px var(--cl-ink-3)");
+        assertThat(rule(css, ".cl-page .cl-timeline-node-dot")).contains("width: 18px").contains("margin: 13px 0 0 -2px")
+                .contains("border: 2px solid var(--cl-line)");
         assertThat(rule(css, ".cl-page .cl-timeline-less")).contains("margin-left: 16px");
         // the line reaches the next dot's ring instead of stopping short of it
         assertThat(rule(css, ".cl-page .cl-timeline-item::after")).contains("bottom: -5px");

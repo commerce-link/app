@@ -5515,15 +5515,15 @@ a.cl-link-button:hover {
 }
 
 /* Events hidden by timeline.js stay in the same list. Collapsed, the last visible event carries the line on, dashed,
-   down to the ring of the "show earlier events" node under the list: the row is 44px tall and the node dot is centred
-   22px from its top, so its ring starts 16px below the list. Expanded, nothing is hidden and the line ends at the
+   down to the ring of the "show earlier events" node under the list: the row is 44px tall and the 18px node is centred
+   22px from its top, so its ring starts 13px below the list. Expanded, nothing is hidden and the line ends at the
    oldest event as usual. */
 .cl-page .cl-timeline-item:has(+ .cl-timeline-item[hidden]) {
     padding-bottom: 0;
 }
 
 .cl-page .cl-timeline-item:has(+ .cl-timeline-item[hidden])::after {
-    bottom: -16px;
+    bottom: -13px;
     background: repeating-linear-gradient(to bottom, var(--cl-line) 0 4px, transparent 4px 8px);
 }
 
@@ -5540,11 +5540,12 @@ a.cl-link-button:hover {
     padding: 0 20px 8px;
 }
 
-/* The node sits on the axis exactly where an event dot would (3px in, same size and ring), its label where the event
-   text starts (20px in). The whole row is the button. */
+/* The node is larger than an event dot so its three dots read, and centred on the same axis: event dots are centred
+   7px in (3px offset + half of 8px), so the 18px node starts 2px before the list edge. Its label keeps the event
+   text's 7px distance from the ring. The whole row is the button. */
 .cl-page .cl-timeline-node {
     align-items: flex-start;
-    gap: 9px;
+    gap: 7px;
     padding: 0;
     text-align: left;
 }
@@ -5552,25 +5553,26 @@ a.cl-link-button:hover {
 .cl-page .cl-timeline-node-dot {
     position: relative;
     flex: none;
-    width: 8px;
-    height: 8px;
-    margin: 18px 0 0 3px;
+    box-sizing: border-box;
+    width: 18px;
+    height: 18px;
+    margin: 13px 0 0 -2px;
+    border: 2px solid var(--cl-line);
     border-radius: 50%;
     background: var(--cl-surface);
-    box-shadow: 0 0 0 2px var(--cl-ink-3);
 }
 
 /* Three dots: the middle one drawn by the pseudo-element, the outer two by its shadows. */
 .cl-page .cl-timeline-node-dot::before {
     content: "";
     position: absolute;
-    left: 3px;
-    top: 3px;
-    width: 2px;
-    height: 2px;
+    left: calc(50% - 1.5px);
+    top: calc(50% - 1.5px);
+    width: 3px;
+    height: 3px;
     border-radius: 50%;
     background: var(--cl-ink-3);
-    box-shadow: -3px 0 0 var(--cl-ink-3), 3px 0 0 var(--cl-ink-3);
+    box-shadow: -4.5px 0 0 var(--cl-ink-3), 4.5px 0 0 var(--cl-ink-3);
 }
 
 .cl-page .cl-timeline-node > span:last-child {
