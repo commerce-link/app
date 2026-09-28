@@ -671,7 +671,8 @@ class OrderDetailsTemplateTest {
                 .contains("href=\"#shippingDetails.name\"")
                 .containsPattern("id=\"shippingDetails.name\"[^>]*aria-invalid=\"true\"[^>]*aria-describedby=\"shippingDetails.name-error\"")
                 .contains("id=\"shippingDetails.name-error\"").contains("Imię jest wymagane")
-                .contains("Telefon jest wymagany").doesNotContain("??");
+                .contains("Telefon jest wymagany")
+                .contains("Dwuliterowy kod, np. PL.").doesNotContain("wielkimi literami").doesNotContain("??");
         // the surname is optional: seven required fields
         assertThat(occurrences(html, "class=\"cl-field-error\"")).isEqualTo(7);
     }
