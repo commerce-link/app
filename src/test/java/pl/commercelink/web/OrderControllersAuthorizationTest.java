@@ -109,4 +109,28 @@ class OrderControllersAuthorizationTest {
         // then
         assertThat(remove.getAnnotation(PreAuthorize.class).value()).isEqualTo("hasRole('ADMIN')");
     }
+
+    @Test
+    void theSuperAdminIsDeniedTheAsyncAddressSaveWhichAStoreAdminMayCall() throws Exception {
+        // given: the handler's own @PreAuthorize evaluated as method security does; a denial becomes a 403
+        Method save = handler("updateAddressDetails");
+        Object[] asyncPost = {"order-1", "billing", new pl.commercelink.orders.Order("store-1"), "fetch", null, null, null,
+                null, java.util.Locale.ENGLISH};
+        org.springframework.security.authorization.method.PreAuthorizeAuthorizationManager manager =
+                new org.springframework.security.authorization.method.PreAuthorizeAuthorizationManager();
+        org.springframework.security.util.SimpleMethodInvocation invocation =
+                new org.springframework.security.util.SimpleMethodInvocation(org.mockito.Mockito.mock(OrdersController.class), save, asyncPost);
+        org.springframework.security.core.Authentication superAdmin = new org.springframework.security.authentication.TestingAuthenticationToken(
+                "super", "x", "ROLE_SUPER_ADMIN");
+        org.springframework.security.core.Authentication admin = new org.springframework.security.authentication.TestingAuthenticationToken(
+                "admin", "x", "ROLE_ADMIN");
+
+        // when
+        boolean superAdminGranted = manager.authorize(() -> superAdmin, invocation).isGranted();
+        boolean adminGranted = manager.authorize(() -> admin, invocation).isGranted();
+
+        // then
+        assertThat(superAdminGranted).isFalse();
+        assertThat(adminGranted).isTrue();
+    }
 }

@@ -1284,13 +1284,13 @@ public class OrdersController extends BaseController {
     public String showAddressDetails(@PathVariable String orderId, @RequestParam String type, Model model,
                                      RedirectAttributes redirectAttributes, Locale locale) {
         Order order = requireOrder(ordersRepository, getStoreId(), orderId);
+        if (!OrderAddressForm.isType(type)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
         // the customer card hides "Edit" for the same reasons; a typed address must not reach a form that cannot be saved
         String locked = order.isClosed() ? "order.address.error.closed" : CustomerView.lockedKey(order, "billing".equals(type));
         if (locked != null) {
             return refuse(redirectAttributes, orderId, locked, locale);
-        }
-        if (!OrderAddressForm.isType(type)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
         OrderAddressForm form = OrderAddressForm.BILLING.equals(type)
                 ? OrderAddressForm.billing(orderId, order.getBillingDetails())
@@ -1319,10 +1319,7 @@ public class OrdersController extends BaseController {
                 : OrderAddressForm.shipping(orderId, updatedOrder.getShippingDetails());
 
         // once an invoice or a label exists the address is fixed; the card hides "Edit" with the same reason
-        String refusal = existingOrder.isClosed() ? "order.address.error.closed"
-                : billing && existingOrder.isInvoiced() ? CustomerView.lockedKey(existingOrder, true)
-                : !billing && !existingOrder.canOperatorChangeShippingAddress() ? CustomerView.lockedKey(existingOrder, false)
-                : null;
+        String refusal = existingOrder.isClosed() ? "order.address.error.closed" : CustomerView.lockedKey(existingOrder, billing);
         if (refusal != null) {
             if (async) {
                 response.setStatus(HttpStatus.UNPROCESSABLE_ENTITY.value());
@@ -1332,7 +1329,9 @@ public class OrdersController extends BaseController {
             return refuse(redirectAttributes, orderId, refusal, locale);
         }
 
-        Map<String, String> errors = posted.validate();
+        OrderAddressForm saved = billing ? OrderAddressForm.billing(orderId, existingOrder.getBillingDetails())
+                : OrderAddressForm.shipping(orderId, existingOrder.getShippingDetails());
+        Map<String, String> errors = posted.validate(saved);
         if (!errors.isEmpty()) {
             if (async) {
                 response.setStatus(HttpStatus.UNPROCESSABLE_ENTITY.value());
@@ -1343,22 +1342,26 @@ public class OrdersController extends BaseController {
         }
 
         if (billing) {
-            existingOrder.setBillingDetails(updatedOrder.getBillingDetails());
+            BillingDetails details = updatedOrder.getBillingDetails() != null ? updatedOrder.getBillingDetails() : new BillingDetails();
+            details.setCountry(posted.countryToStore(saved));
+            existingOrder.setBillingDetails(details);
         } else {
-            existingOrder.setShippingDetails(updatedOrder.getShippingDetails());
+            ShippingDetails details = updatedOrder.getShippingDetails() != null ? updatedOrder.getShippingDetails() : new ShippingDetails();
+            details.setCountry(posted.countryToStore(saved));
+            existingOrder.setShippingDetails(details);
         }
         ordersRepository.save(existingOrder);
 
-        String saved = messageSource.getMessage(billing ? "order.address.billing.saved" : "order.address.shipping.saved",
+        String notice = messageSource.getMessage(billing ? "order.address.billing.saved" : "order.address.shipping.saved",
                 null, locale);
         if (async) {
             // the dialog reloads the page it is on (keeping its returnTo), which takes this notice
             OrderFlash.forNextPage(request, response, "/dashboard/orders/" + orderId,
-                    new OrderNotice(OrderLabels.OK, saved, null, null));
+                    new OrderNotice(OrderLabels.OK, notice, null, null));
             model.addAttribute("address", posted);
             return "orders/details/address :: dialogForm";
         }
-        OrderFlash.saved(redirectAttributes, saved);
+        OrderFlash.saved(redirectAttributes, notice);
         return details(orderId);
     }
 

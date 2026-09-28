@@ -2752,12 +2752,12 @@ class OrdersControllerTest {
             String view = ordersController.updateAddressDetails(ORDER_ID, "billing", posted, "fetch",
                     new MockHttpServletRequest(), response, model, new RedirectAttributesModelMap(), polish);
 
-            // then: the dialog's form is re-rendered with the posted values and an error per field
+            // then: the dialog's form is re-rendered with the posted values and an error per changed field (the blank
+            // name equals the saved one, so it passes as it is)
             assertThat(view).isEqualTo("orders/details/address :: dialogForm");
             assertThat(response.getStatus()).isEqualTo(422);
             OrderAddressForm form = (OrderAddressForm) model.getAttribute("address");
             assertThat(form.errors()).containsExactly(
-                    Map.entry("billingDetails.name", "billing.name.required"),
                     Map.entry("billingDetails.country", "order.address.country.invalid"),
                     Map.entry("billingDetails.phone", "billing.phone.invalid"));
             assertThat(form.country()).isEqualTo("Polska");
@@ -2877,6 +2877,157 @@ class OrdersControllerTest {
             assertThat(((OrderAddressForm) labelledModel.getAttribute("address")).refusal()).isEqualTo("order.customer.shipping.locked.label");
             assertThat(((OrderAddressForm) closedModel.getAttribute("address")).refusal()).isEqualTo("order.address.error.closed");
             verify(ordersRepository, never()).save(any());
+        }
+
+        private BillingDetails saveBilling(Order order, BillingDetails posted, RedirectAttributesModelMap redirect,
+                                           ExtendedModelMap model) {
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            Order payload = new Order(STORE_ID);
+            payload.setBillingDetails(posted);
+            ordersController.updateAddressDetails(ORDER_ID, "billing", payload, null, new MockHttpServletRequest(),
+                    new MockHttpServletResponse(), model, redirect, polish);
+            return order.getBillingDetails();
+        }
+
+        private BillingDetails copyOf(BillingDetails source) {
+            BillingDetails copy = new BillingDetails();
+            copy.setName(source.getName());
+            copy.setSurname(source.getSurname());
+            copy.setCompanyName(source.getCompanyName());
+            copy.setTaxId(source.getTaxId());
+            copy.setStreetAndNumber(source.getStreetAndNumber());
+            copy.setPostalCode(source.getPostalCode());
+            copy.setCity(source.getCity());
+            copy.setCountry(source.getCountry());
+            copy.setEmail(source.getEmail());
+            copy.setPhone(source.getPhone());
+            return copy;
+        }
+
+        @Test
+        void aCompanyBillingWithoutAPersonSavesWhenOnlyTheCityChanges() {
+            // given: a marketplace company billing, imported without a person's name
+            Order order = order(OrderStatus.New);
+            BillingDetails company = validBilling();
+            company.setName(null);
+            company.setSurname(null);
+            company.setCompanyName("TechNova Sp. z o.o.");
+            order.setBillingDetails(company);
+            BillingDetails posted = copyOf(company);
+            posted.setCity("Kraków");
+            ExtendedModelMap model = new ExtendedModelMap();
+
+            // when
+            BillingDetails saved = saveBilling(order, posted, new RedirectAttributesModelMap(), model);
+
+            // then
+            verify(ordersRepository).save(order);
+            assertThat(saved.getCity()).isEqualTo("Kraków");
+            assertThat(model.getAttribute("address")).isNull();
+        }
+
+        @Test
+        void aStoredCountryNameAndAMissingPhoneStayWhenOnlyTheStreetChanges() {
+            // given
+            Order order = order(OrderStatus.New);
+            BillingDetails imported = validBilling();
+            imported.setCountry("Polska");
+            imported.setPhone(null);
+            order.setBillingDetails(imported);
+            BillingDetails posted = copyOf(imported);
+            posted.setPhone("");
+            posted.setStreetAndNumber("ul. Nowa 3");
+
+            // when
+            BillingDetails saved = saveBilling(order, posted, new RedirectAttributesModelMap(), new ExtendedModelMap());
+
+            // then
+            verify(ordersRepository).save(order);
+            assertThat(saved.getStreetAndNumber()).isEqualTo("ul. Nowa 3");
+            assertThat(saved.getCountry()).isEqualTo("Polska");
+        }
+
+        @Test
+        void aNewlyTypedCountryNameIsStillRefused() {
+            // given
+            Order order = order(OrderStatus.New);
+            order.setBillingDetails(validBilling());
+            BillingDetails posted = validBilling();
+            posted.setCountry("Polska");
+            ExtendedModelMap model = new ExtendedModelMap();
+
+            // when
+            saveBilling(order, posted, new RedirectAttributesModelMap(), model);
+
+            // then
+            assertThat(((OrderAddressForm) model.getAttribute("address")).errors())
+                    .containsExactly(Map.entry("billingDetails.country", "order.address.country.invalid"));
+            verify(ordersRepository, never()).save(any());
+        }
+
+        @Test
+        void aCountryCodeTypedInLowerCaseIsStoredInCapitals() {
+            // given
+            Order order = order(OrderStatus.New);
+            BillingDetails german = validBilling();
+            german.setCountry("DE");
+            order.setBillingDetails(german);
+            BillingDetails posted = copyOf(german);
+            posted.setCountry(" pl ");
+
+            // when
+            BillingDetails saved = saveBilling(order, posted, new RedirectAttributesModelMap(), new ExtendedModelMap());
+
+            // then
+            verify(ordersRepository).save(order);
+            assertThat(saved.getCountry()).isEqualTo("PL");
+        }
+
+        @Test
+        void aSingleWordNameWithAnEmptySurnameSaves() {
+            // given
+            Order order = order(OrderStatus.New);
+            order.setBillingDetails(validBilling());
+            BillingDetails posted = validBilling();
+            posted.setName("Madonna");
+            posted.setSurname("");
+
+            // when
+            BillingDetails saved = saveBilling(order, posted, new RedirectAttributesModelMap(), new ExtendedModelMap());
+
+            // then
+            verify(ordersRepository).save(order);
+            assertThat(saved.getName()).isEqualTo("Madonna");
+        }
+
+        @Test
+        void aBillingWithNeitherNameNorCompanyIsRefusedAtTheName() {
+            // given
+            Order order = order(OrderStatus.New);
+            order.setBillingDetails(validBilling());
+            BillingDetails posted = validBilling();
+            posted.setName(" ");
+            posted.setCompanyName("");
+            ExtendedModelMap model = new ExtendedModelMap();
+
+            // when
+            saveBilling(order, posted, new RedirectAttributesModelMap(), model);
+
+            // then
+            assertThat(((OrderAddressForm) model.getAttribute("address")).errors())
+                    .containsExactly(Map.entry("billingDetails.name", "order.address.name.or.company.required"));
+            verify(ordersRepository, never()).save(any());
+        }
+
+        @Test
+        void anUnknownAddressTypeOfTheAddressPageIsNotFoundEvenOnALockedOrder() {
+            // given
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order(OrderStatus.Completed));
+
+            // when / then
+            assertThatThrownBy(() -> ordersController.showAddressDetails(ORDER_ID, "other", new ExtendedModelMap(),
+                    new RedirectAttributesModelMap(), polish))
+                    .isInstanceOf(ResponseStatusException.class);
         }
 
         @Test

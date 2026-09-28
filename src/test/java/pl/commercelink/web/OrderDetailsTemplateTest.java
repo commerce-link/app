@@ -614,6 +614,21 @@ class OrderDetailsTemplateTest {
     }
 
     @Test
+    void aScriptTypedIntoTheAddressIsPrintedAsTextInTheCardAndTheDialog() {
+        // given
+        Order order = order(OrderStatus.Assembly);
+        order.getBillingDetails().setCity("<script>alert(1)</script>");
+
+        // when
+        String html = page(render(order, ADMIN));
+
+        // then
+        assertThat(html).doesNotContain("<script>alert(1)</script>")
+                .contains("&lt;script&gt;alert(1)&lt;/script&gt;")
+                .contains("name=\"billingDetails.city\" type=\"text\" value=\"&lt;script&gt;alert(1)&lt;/script&gt;\"");
+    }
+
+    @Test
     void aLockedAddressHasNeitherEditLinkNorDialog() {
         // given
         Order invoiced = order(OrderStatus.Delivered);
@@ -657,7 +672,8 @@ class OrderDetailsTemplateTest {
                 .containsPattern("id=\"shippingDetails.name\"[^>]*aria-invalid=\"true\"[^>]*aria-describedby=\"shippingDetails.name-error\"")
                 .contains("id=\"shippingDetails.name-error\"").contains("Imię jest wymagane")
                 .contains("Telefon jest wymagany").doesNotContain("??");
-        assertThat(occurrences(html, "class=\"cl-field-error\"")).isEqualTo(8);
+        // the surname is optional: seven required fields
+        assertThat(occurrences(html, "class=\"cl-field-error\"")).isEqualTo(7);
     }
 
     @Test
