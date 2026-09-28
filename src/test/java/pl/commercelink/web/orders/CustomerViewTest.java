@@ -53,7 +53,6 @@ class CustomerViewTest {
         assertThat(view.billing().name()).isEqualTo("Jan Kowalski");
         assertThat(view.billing().cityLine()).isEqualTo("31-147 Kraków");
         assertThat(view.billing().country()).isEqualTo("Polska");
-        assertThat(view.shippingSameAsBilling()).isTrue();
         assertThat(view.shipmentTypeKey()).isEqualTo("ShipmentType.Courier");
         assertThat(view.billingEditHref()).isEqualTo("/dashboard/orders/o-1/address?type=billing");
         assertThat(view.shippingEditHref()).isEqualTo("/dashboard/orders/o-1/address?type=shipping");
@@ -105,54 +104,19 @@ class CustomerViewTest {
     }
 
     @Test
-    void theRecipientsOwnPhoneAndEmailStayVisibleWhenTheAddressIsTheSameAsBilling() {
-        // given: the parcel goes to the billing address, but to a recipient with their own contact
+    void theShippingBlockKeepsEveryFieldEvenWhenItMatchesBilling() {
+        // given: the parcel goes to the billing address, with the buyer's own e-mail and phone
         Order order = order();
-        order.getShippingDetails().setPhone("+48 600 700 800");
-        order.getShippingDetails().setEmail("odbiorca@example.com");
+        order.getShippingDetails().setEmail("jan@example.pl");
+        order.getShippingDetails().setPhone("+48600123456");
 
         // when
         CustomerView view = CustomerView.of(order, false, PL);
 
         // then
-        assertThat(view.shippingSameAsBilling()).isTrue();
-        assertThat(view.shippingPhone()).isEqualTo("+48 600 700 800");
-        assertThat(view.shippingEmail()).isEqualTo("odbiorca@example.com");
-    }
-
-    @Test
-    void aRecipientContactEqualToBillingOrMissingIsNotRepeated() {
-        // given: the same e-mail (other case) as billing, no phone of its own
-        Order order = order();
-        order.getShippingDetails().setEmail("JAN@example.pl");
-
-        // when
-        CustomerView view = CustomerView.of(order, false, PL);
-
-        // then
-        assertThat(view.shippingSameAsBilling()).isTrue();
-        assertThat(view.shippingEmail()).isNull();
-        assertThat(view.shippingPhone()).isNull();
-    }
-
-    @Test
-    void aRecipientPhoneWrittenWithSpacesOrDashesIsTheBuyersNumber() {
-        // given: billing "+48600123456", shipping the same number formatted
-        Order spaced = order();
-        spaced.getShippingDetails().setPhone("+48 600 123 456");
-        Order dashed = order();
-        dashed.getShippingDetails().setPhone("+48-600-123-456");
-        Order other = order();
-        other.getShippingDetails().setPhone("+48 600 123 457");
-
-        // when
-        CustomerView spacedView = CustomerView.of(spaced, false, PL);
-        CustomerView dashedView = CustomerView.of(dashed, false, PL);
-        CustomerView otherView = CustomerView.of(other, false, PL);
-
-        // then
-        assertThat(spacedView.shippingPhone()).isNull();
-        assertThat(dashedView.shippingPhone()).isNull();
-        assertThat(otherView.shippingPhone()).isEqualTo("+48 600 123 457");
+        assertThat(view.shipping()).isEqualTo(view.billing());
+        assertThat(view.shipping().street()).isEqualTo("ul. Długa 14/3");
+        assertThat(view.shipping().email()).isEqualTo("jan@example.pl");
+        assertThat(view.shipping().phone()).isEqualTo("+48600123456");
     }
 }

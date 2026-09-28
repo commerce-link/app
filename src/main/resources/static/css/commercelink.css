@@ -5844,6 +5844,11 @@ a.cl-link-button:hover {
     margin: 6px 0 0;
 }
 
+/* The e-mail's copy button: the order number's pinned icon, a little apart from the link. */
+.cl-page .cl-address .cl-copy-inline {
+    margin-left: 6px;
+}
+
 
 /* ------------------------------------------------------------------------------------------------------------------
    Breakpoints
@@ -5863,6 +5868,16 @@ a.cl-link-button:hover {
         display: inline-flex;
         align-items: center;
         min-height: 44px;
+    }
+
+    .cl-page .cl-address .cl-copy-inline {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 44px;
+        min-height: 44px;
+        margin-left: 0;
+        vertical-align: top;
     }
 
     .cl-page .cl-item-add-table .cl-table-sort {

@@ -582,50 +582,52 @@ class OrderDetailsTemplateTest {
     }
 
     @Test
-    void theShippingAddressPrintsOnceWhenItMatchesBilling() {
-        // given: th:unless and th:replace on the same element would discard the condition and print the
-        // shipping block a second time even though it is the same as billing
+    void bothAddressBlocksPrintInFullWhenTheyAreTheSame() {
+        // given: the shipping address, e-mail and phone equal the billing ones
         Order order = order(OrderStatus.Assembly);
         order.getBillingDetails().setStreetAndNumber("ul. Przykładowa 5");
         order.getBillingDetails().setPostalCode("00-001");
         order.getBillingDetails().setCity("Warszawa");
+        order.getBillingDetails().setEmail("piotr@example.com");
+        order.getBillingDetails().setPhone("+48 600 700 800");
         ShippingDetails shipping = new ShippingDetails();
         shipping.setName("Piotr");
         shipping.setSurname("Wiśniewski");
         shipping.setStreetAndNumber("ul. Przykładowa 5");
         shipping.setPostalCode("00-001");
         shipping.setCity("Warszawa");
+        shipping.setEmail("piotr@example.com");
+        shipping.setPhone("+48 600 700 800");
         order.setShippingDetails(shipping);
 
         // when
         String html = page(render(order, ADMIN));
 
         // then
-        assertThat(html).contains("jak dane rozliczeniowe");
-        assertThat(occurrences(html, "ul. Przykładowa 5")).isEqualTo(1);
+        String card = html.substring(html.indexOf("id=\"customer-title\""), html.indexOf("</section>", html.indexOf("id=\"customer-title\"")));
+        assertThat(card).doesNotContain("jak dane rozliczeniowe");
+        assertThat(occurrences(card, "ul. Przykładowa 5")).isEqualTo(2);
+        assertThat(occurrences(card, "00-001 Warszawa")).isEqualTo(2);
+        assertThat(occurrences(card, "href=\"mailto:piotr@example.com\"")).isEqualTo(2);
+        assertThat(occurrences(card, "href=\"tel:+48 600 700 800\"")).isEqualTo(2);
     }
 
     @Test
-    void theRecipientsPhoneAndEmailPrintUnderSameAsBilling() {
+    void everyEmailOfTheCustomerCardCopiesWithANamedButton() {
         // given
         Order order = order(OrderStatus.Assembly);
-        order.getBillingDetails().setStreetAndNumber("ul. Przykładowa 5");
+        order.getBillingDetails().setEmail("piotr@example.com");
         ShippingDetails shipping = new ShippingDetails();
-        shipping.setName("Piotr");
-        shipping.setSurname("Wiśniewski");
-        shipping.setStreetAndNumber("ul. Przykładowa 5");
-        shipping.setPhone("+48 600 700 800");
+        shipping.setName("Anna");
         shipping.setEmail("odbiorca@example.com");
         order.setShippingDetails(shipping);
 
         // when
         String html = page(render(order, ADMIN));
 
-        // then
-        assertThat(html).contains("jak dane rozliczeniowe")
-                .contains("<div><a href=\"tel:+48 600 700 800\">+48 600 700 800</a></div>")
-                .contains("<div><a href=\"mailto:odbiorca@example.com\">odbiorca@example.com</a></div>");
-        assertThat(occurrences(html, "ul. Przykładowa 5")).isEqualTo(1);
+        // then: the mailto link stays and the order number's copy button follows it, its glyph hidden
+        assertThat(html).contains("<a href=\"mailto:piotr@example.com\">piotr@example.com</a><button type=\"button\" class=\"cl-copy-inline is-pinned\" data-cl-copy=\"piotr@example.com\" aria-label=\"Kopiuj e-mail piotr@example.com\"><span class=\"cl-copy-icon\" aria-hidden=\"true\"><i class=\"far fa-copy\"></i></span></button>")
+                .contains("data-cl-copy=\"odbiorca@example.com\" aria-label=\"Kopiuj e-mail odbiorca@example.com\"");
     }
 
     @Test

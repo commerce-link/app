@@ -44,16 +44,6 @@ public record AddressBlock(String name, String company, String taxId, String str
         return new AddressBlock(null, null, null, null, null, null, null, null);
     }
 
-    /**
-     * The shipping block reads "same as billing" when the parcel goes where the invoice does; the recipient's own
-     * e-mail and phone are compared separately (CustomerView), so they stay visible under that line.
-     */
-    public boolean sameAs(AddressBlock other) {
-        return Objects.equals(name, other.name) && Objects.equals(company, other.company)
-                && Objects.equals(street, other.street) && Objects.equals(cityLine, other.cityLine)
-                && Objects.equals(country, other.country);
-    }
-
     /** The name the orders list shows for this address: the company, else the person. */
     public String companyOrPerson() {
         return company != null ? company : name;
