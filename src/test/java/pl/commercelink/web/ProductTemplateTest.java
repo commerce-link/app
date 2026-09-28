@@ -75,11 +75,22 @@ class ProductTemplateTest {
         assertThat(occurrences(page, "<noscript>")).isEqualTo(4);
     }
 
+    /**
+     * The category of a custom filter is an internal grouping of filters and attributes ("GPU", "Cooler"), not a
+     * product category, so it is a free text field rather than the PIM category picker.
+     */
     @Test
-    void theCustomFilterCategoryGoesThroughTheSharedPicker() throws Exception {
-        // when / then
-        assertThat(page()).contains("category-picker :: picker(")
-                .contains("category-picker :: pickerScript(${productCategories}, ${categoryAncestors})");
+    void theCustomFilterCategoryIsAFreeTextField() throws Exception {
+        // when
+        String html = rendered(true, form -> form.getCustomAttributesFilters().getFirst().setCategory("GPU"));
+
+        // then
+        assertThat(page()).doesNotContain("category-picker");
+        int id = html.indexOf("id=\"customAttributeFilter-0-category\"");
+        String field = html.substring(html.lastIndexOf("<input", id), html.indexOf(">", id));
+        assertThat(field).contains("type=\"text\"").contains("name=\"customAttributesFilters[0].category\"")
+                .contains("value=\"GPU\"");
+        assertThat(html).contains("<label class=\"cl-label\" for=\"customAttributeFilter-0-category\">Filter category</label>");
     }
 
     @Test
@@ -147,8 +158,6 @@ class ProductTemplateTest {
         variables.put("pricingGroups", List.of("Default", "Ultra Premium"));
         variables.put("availabilityTypes", Arrays.stream(ProductAvailabilityType.values()).map(Enum::name).toList());
         variables.put("storeMarketplaces", List.of(Map.of("name", "allegro", "displayName", "Allegro")));
-        variables.put("productCategories", List.of());
-        variables.put("categoryAncestors", List.of());
         variables.put("formAction", "/dashboard/catalogs/c1/category/k1/products/p1");
         variables.put("backHref", "/dashboard/catalogs/c1/category/k1");
         variables.put("pageTitle", "Gigabyte RTX 5080");
@@ -225,8 +234,6 @@ class ProductTemplateTest {
         variables.put("pricingGroups", List.of("Default"));
         variables.put("availabilityTypes", List.of("BasedOnSupply"));
         variables.put("storeMarketplaces", List.of());
-        variables.put("productCategories", List.of());
-        variables.put("categoryAncestors", List.of());
         variables.put("formAction", "/dashboard/catalogs/c1/category/k1/products/p1");
         variables.put("backHref", "/dashboard/catalogs/c1/category/k1");
         variables.put("pageTitle", "X");
@@ -341,6 +348,19 @@ class ProductTemplateTest {
         assertThat(html).doesNotContain("RTX 4060 (outside the list)").doesNotContain("value=\"RTX 4060\"");
         assertThat(rendered(true, form -> form.setLabel("RTX 4060")))
                 .contains("<option value=\"RTX 4060\" selected>RTX 4060 (outside the list)</option>");
+    }
+
+    @Test
+    void aFilterWithoutItsCategoryIsMarkedAtTheCategoryField() {
+        // when
+        String html = rendered(true, Map.of(ProductForm.fieldId(ProductForm.FILTER, 0, "category"),
+                "product.error.filter.incomplete"));
+
+        // then
+        int id = html.indexOf("id=\"customAttributeFilter-0-category\"");
+        String field = html.substring(html.lastIndexOf("<input", id), html.indexOf(">", id));
+        assertThat(field).contains("is-invalid").contains("aria-invalid=\"true\"");
+        assertThat(occurrences(html, "cl-field-error")).isEqualTo(1);
     }
 
     /** RF-29: the error of an unfinished filter is shown and marked at the field its key names, here the operator. */

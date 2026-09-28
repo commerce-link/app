@@ -1469,7 +1469,7 @@ class CatalogProductsControllerTest {
                         .param("pricingGroup", "Default").param("customAttributesFilters[0].name", "Socket"))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(model().attribute("errors",
-                        hasEntry("customAttributeFilter-0-value", "product.error.filter.incomplete")))
+                        hasEntry("customAttributeFilter-0-category", "product.error.filter.incomplete")))
                 .andExpect(model().attribute("openClient", true))
                 .andExpect(model().attribute("openStock", false));
         verify(productRepository, never()).save(any(Product.class));
