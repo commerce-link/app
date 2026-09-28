@@ -37,6 +37,7 @@ import pl.commercelink.web.orders.OrderLabels;
 import pl.commercelink.web.orders.OrderSettingsView;
 import pl.commercelink.web.settings.SettingsTemplateRenderer;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.ArrayList;
@@ -45,6 +46,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.ResourceBundle;
 import java.util.Set;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -235,7 +237,7 @@ class OrderDetailsTemplateTest {
         String html = page(render(b2bOrder(OrderStatus.Realization), ADMIN));
 
         // then
-        java.util.regex.Matcher menus = Pattern.compile("<(\\w+)[^>]*class=\"cl-menu\"").matcher(html);
+        Matcher menus = Pattern.compile("<(\\w+)[^>]*class=\"cl-menu\"").matcher(html);
         // the selection row's menus are left out of the fallback check: the row is hidden until table-select.js shows
         // it, and without JavaScript the <noscript> block under the table offers the same actions
         int rowStart = html.indexOf("data-cl-selection-bar");
@@ -251,7 +253,7 @@ class OrderDetailsTemplateTest {
         int openers = 0;
         for (String menu : withoutSelectionRow.split("<details class=\"cl-menu\"")) {
             String body = menu.contains("</details>") ? menu.substring(0, menu.indexOf("</details>")) : "";
-            java.util.regex.Matcher opener = Pattern.compile("<\\w+[^>]*data-cl-dialog-open=[^>]*>").matcher(body);
+            Matcher opener = Pattern.compile("<\\w+[^>]*data-cl-dialog-open=[^>]*>").matcher(body);
             while (opener.find()) {
                 assertThat(opener.group()).as(opener.group()).startsWith("<a ").contains(" href=\"/dashboard/orders/");
                 openers++;
@@ -309,7 +311,7 @@ class OrderDetailsTemplateTest {
         String admin = page(render(order(OrderStatus.New), ADMIN));
 
         // then
-        java.util.regex.Matcher costs = Pattern.compile("(?s)<details class=\"cl-disclosure\" id=\"finances-costs\">(.*?)</details>")
+        Matcher costs = Pattern.compile("(?s)<details class=\"cl-disclosure\" id=\"finances-costs\">(.*?)</details>")
                 .matcher(admin);
         assertThat(costs.find()).isTrue();
         assertThat(costs.group(1)).contains("<summary>Koszt i zysk</summary>").contains("Zysk (bez VAT)");
@@ -464,10 +466,13 @@ class OrderDetailsTemplateTest {
         String html = page(render(order, List.of(first, second), ADMIN, Set.of()));
 
         // then
-        java.util.regex.Matcher dialog = Pattern.compile("(?s)id=\"serials-dialog\"(.*?)</dialog>").matcher(html);
+        Matcher dialog = Pattern.compile("(?s)id=\"serials-dialog\"(.*?)</dialog>").matcher(html);
         assertThat(dialog.find()).isTrue();
+        assertThat(dialog.group(1)).contains("<td data-label=\"Kod producenta\">")
+                .contains("<td class=\"is-numeric\" data-label=\"Ilość\">1</td>")
+                .contains("<td data-label=\"Nr dostawy\">—</td>").contains("<td data-label=\"Nr seryjny\">");
         assertThat(dialog.group(1)).contains("<th scope=\"col\">Nr dostawy</th>")
-                .contains("<td>" + first.getShortenedDeliveryId() + "</td>").contains("<td>—</td>");
+                .contains("<td data-label=\"Nr dostawy\">" + first.getShortenedDeliveryId() + "</td>");
     }
 
     @Test
@@ -598,7 +603,7 @@ class OrderDetailsTemplateTest {
         // given
         Order order = order(OrderStatus.Realization);
         Payment payment = new Payment("REF-2", "Jan Kowalski", PaymentSource.BankTransfer, 300, 0);
-        payment.setBankTransactionDate(java.time.LocalDate.of(2026, 9, 20));
+        payment.setBankTransactionDate(LocalDate.of(2026, 9, 20));
         order.addPayment(payment);
 
         // when

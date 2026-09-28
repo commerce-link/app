@@ -10,8 +10,9 @@ import java.util.Locale;
  * when it differs from the buyer's (a gift or a courier contact), which the collapsed block would otherwise hide.
  */
 public record CustomerView(AddressBlock billing, AddressBlock shipping, boolean shippingSameAsBilling,
-                           String shippingEmail, String shippingPhone, String shipmentTypeKey, String pickupPoint, String billingEditHref, String billingLockedKey,
-                           String shippingEditHref, String shippingLockedKey) {
+                           String shippingEmail, String shippingPhone, String shipmentTypeKey, String pickupPoint,
+                           String billingEditHref, String billingLockedKey, String shippingEditHref,
+                           String shippingLockedKey) {
 
     public static CustomerView of(Order order, boolean readOnly, Locale locale) {
         AddressBlock billing = AddressBlock.of(order.getBillingDetails(), locale);
@@ -22,7 +23,7 @@ public record CustomerView(AddressBlock billing, AddressBlock shipping, boolean 
         boolean sameAsBilling = !shipping.isEmpty() && shipping.sameAs(billing);
         return new CustomerView(billing, shipping, sameAsBilling,
                 sameAsBilling ? differing(shipping.email(), billing.email()) : null,
-                sameAsBilling ? differing(shipping.phone(), billing.phone()) : null,
+                sameAsBilling && !samePhone(shipping.phone(), billing.phone()) ? shipping.phone() : null,
                 OrderLabels.shipmentType(order.firstShipment().map(Shipment::getType).orElse(null)),
                 order.firstShipment().map(Shipment::getCollectionPointCode).orElse(null),
                 readOnly || billingLockedKey != null ? null : base + "billing",
@@ -33,6 +34,15 @@ public record CustomerView(AddressBlock billing, AddressBlock shipping, boolean 
 
     private static String differing(String shippingValue, String billingValue) {
         return shippingValue != null && !shippingValue.equalsIgnoreCase(billingValue) ? shippingValue : null;
+    }
+
+    /** "+48 600-700-800" and "+48600700800" are one number: spaces, dashes, dots and brackets do not count. */
+    private static boolean samePhone(String shippingPhone, String billingPhone) {
+        return shippingPhone == null || billingPhone != null && digits(shippingPhone).equals(digits(billingPhone));
+    }
+
+    private static String digits(String phone) {
+        return phone.replaceAll("[\\s\\-.()/]", "");
     }
 
     /**

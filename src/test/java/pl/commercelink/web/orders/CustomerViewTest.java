@@ -134,4 +134,25 @@ class CustomerViewTest {
         assertThat(view.shippingEmail()).isNull();
         assertThat(view.shippingPhone()).isNull();
     }
+
+    @Test
+    void aRecipientPhoneWrittenWithSpacesOrDashesIsTheBuyersNumber() {
+        // given: billing "+48600123456", shipping the same number formatted
+        Order spaced = order();
+        spaced.getShippingDetails().setPhone("+48 600 123 456");
+        Order dashed = order();
+        dashed.getShippingDetails().setPhone("+48-600-123-456");
+        Order other = order();
+        other.getShippingDetails().setPhone("+48 600 123 457");
+
+        // when
+        CustomerView spacedView = CustomerView.of(spaced, false, PL);
+        CustomerView dashedView = CustomerView.of(dashed, false, PL);
+        CustomerView otherView = CustomerView.of(other, false, PL);
+
+        // then
+        assertThat(spacedView.shippingPhone()).isNull();
+        assertThat(dashedView.shippingPhone()).isNull();
+        assertThat(otherView.shippingPhone()).isEqualTo("+48 600 123 457");
+    }
 }

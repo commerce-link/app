@@ -30,6 +30,7 @@ import pl.commercelink.orders.event.OrderEvent;
 import pl.commercelink.orders.event.OrderEventsRepository;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.products.ProductCatalogRepository;
+import pl.commercelink.stores.FulfilmentConfiguration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.taxonomy.TaxonomyCache;
@@ -149,7 +150,7 @@ class OrderPageModelFactoryTest {
     @Test
     void aSuperAdminMayCopyTheCustomerLinkUnderTheSameConditionsAsTheStore() {
         // given
-        pl.commercelink.stores.FulfilmentConfiguration fulfilment = new pl.commercelink.stores.FulfilmentConfiguration();
+        FulfilmentConfiguration fulfilment = new FulfilmentConfiguration();
         fulfilment.setClientOrderPageEnabled(true);
         storesRepository.findById("store-1").setFulfilmentConfiguration(fulfilment);
         OrderPageModelFactory.Viewer superAdmin = new OrderPageModelFactory.Viewer(true, false, null);

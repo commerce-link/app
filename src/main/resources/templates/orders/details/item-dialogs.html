@@ -168,10 +168,10 @@
                     <tbody>
                     <tr th:each="item, i : ${items.serialItems()}">
                         <th scope="row" class="cl-table-key" th:text="${item.name}"></th>
-                        <td th:text="${item.mfn}"></td>
-                        <td class="is-numeric" th:text="${item.qty}"></td>
-                        <td th:text="${item.deliveryLabel != null ? item.deliveryLabel : '—'}"></td>
-                        <td>
+                        <td th:attr="data-label=#{general.manufacturer.code}" th:text="${item.mfn}"></td>
+                        <td class="is-numeric" th:attr="data-label=#{order.item.quantity}" th:text="${item.qty}"></td>
+                        <td th:attr="data-label=#{general.delivery.id}" th:text="${item.deliveryLabel != null ? item.deliveryLabel : '—'}"></td>
+                        <td th:attr="data-label=#{order.item.serial.no}">
                             <input class="cl-input" type="text" th:name="|orderItems[${i.index}].serialNo|" th:value="${item.serialNo}"
                                    th:attr="aria-label=#{order.items.serial.for(${item.name})}">
                             <input type="hidden" th:name="|orderItems[${i.index}].itemId|" th:value="${item.itemId}">
