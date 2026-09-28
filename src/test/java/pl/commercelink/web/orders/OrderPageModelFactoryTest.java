@@ -9,6 +9,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.context.MessageSource;
+import org.springframework.context.support.ResourceBundleMessageSource;
 import org.springframework.test.util.ReflectionTestUtils;
 import pl.commercelink.documents.Document;
 import pl.commercelink.documents.DocumentType;
@@ -60,9 +61,17 @@ class OrderPageModelFactoryTest {
     @Mock private ProductCatalogRepository productCatalogRepository;
     @Mock private TaxonomyCache taxonomyCache;
     private final DeliveryRedirectResolver deliveryRedirectResolver = new DeliveryRedirectResolver();
-    private final MessageSource messageSource = OrderClosingChecklistTest.messages();
+    private final MessageSource messageSource = messages();
 
     private OrderPageModelFactory factory;
+
+    private static MessageSource messages() {
+        ResourceBundleMessageSource source = new ResourceBundleMessageSource();
+        source.setBasename("messages");
+        source.setDefaultEncoding("UTF-8");
+        source.setFallbackToSystemLocale(false);
+        return source;
+    }
 
     @BeforeEach
     void setUp() {
@@ -183,7 +192,6 @@ class OrderPageModelFactoryTest {
         // then
         assertThat(page.closed()).isTrue();
         assertThat(page.readOnly()).isTrue();
-        assertThat(page.checklist()).isNull();
         assertThat(page.header().completedAutomatically()).isTrue();
         assertThat(page.backHref()).isEqualTo("/dashboard/orders?view=Completed");
     }
@@ -421,7 +429,6 @@ class OrderPageModelFactoryTest {
         // then
         assertThat(page.header().clientName()).isNull();
         assertThat(page.customer().billing().isEmpty()).isTrue();
-        assertThat(page.checklist()).isNotNull();
         assertThat(page.payments().rows()).isEmpty();
     }
 

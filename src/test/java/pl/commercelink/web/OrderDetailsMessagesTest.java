@@ -15,7 +15,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class OrderDetailsMessagesTest {
 
     private static final Pattern KEY = Pattern.compile("#\\{([a-zA-Z0-9_.]+)[(}]");
-    private static final Pattern QUOTED = Pattern.compile("\"(order\\.(page|closing|card|items|item|bulk|shipments|documents|payments|payment|status|settings|finances|customer|history|event|review|move|address)\\.[a-zA-Z0-9_.]+)\"");
+    private static final Pattern QUOTED = Pattern.compile("\"(order\\.(page|card|items|item|bulk|shipments|documents|payments|payment|status|settings|finances|customer|history|event|review|move|address)\\.[a-zA-Z0-9_.]+)\"");
 
     static Stream<Path> sources() throws IOException {
         List<Path> files = new ArrayList<>();
@@ -65,8 +65,7 @@ class OrderDetailsMessagesTest {
 
         // then
         for (Properties bundle : List.of(pl, en)) {
-            for (String key : List.of("order.closing.paid.todo", "order.closing.paid.overpaid", "order.payments.fee",
-                    "order.payments.overpaid")) {
+            for (String key : List.of("order.payments.fee", "order.payments.overpaid")) {
                 assertThat(bundle.getProperty(key)).as(key).contains("{0}").doesNotContain("PLN");
             }
         }

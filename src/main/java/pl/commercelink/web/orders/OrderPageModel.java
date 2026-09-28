@@ -22,7 +22,7 @@ import java.util.Map;
  */
 public record OrderPageModel(String orderId, String shortId, String backHref, boolean closed, boolean readOnly,
                              boolean superAdmin, boolean admin, String storeName, Header header,
-                             OrderClosingChecklist checklist, String checklistTitle, ItemsCard items,
+                             ItemsCard items,
                              ShipmentsCard shipments, DocumentsCard documents, PaymentsCard payments,
                              CustomerView customer, OrderSettingsView settings, FinancesView finances,
                              HistoryCard history, OrderStatusOptions statusOptions) {

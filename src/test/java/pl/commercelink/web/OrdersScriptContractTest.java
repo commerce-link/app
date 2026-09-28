@@ -219,25 +219,19 @@ class OrdersScriptContractTest {
     }
 
     /**
-     * The closing strip restyles the list's doc marks inline, as full sentences: both glyph and tone carry the
-     * meaning, and the side column never drops below 320 px at its widest breakpoint.
-     * <p>
-     * The inline mark must not inherit the list's pill chrome (padding, fixed line-height,
-     * {@code white-space: nowrap}) or the list's {@code .is-todo} background — the tone belongs on the icon only,
-     * so the sentence itself can wrap and does not carry a second warn-soft pill behind it. The side-column check
-     * is scoped to the {@code .cl-layout-aside} rule bodies only: the add-items dialog's own, unrelated
-     * {@code .cl-item-add-scroll} height legitimately keeps 340 px.
+     * The side column never drops below 320 px at its widest breakpoint. The check is scoped to the
+     * {@code .cl-layout-aside} rule bodies only: the add-items dialog's own, unrelated {@code .cl-item-add-scroll}
+     * height legitimately keeps 340 px. The closing strip is gone, and with it every rule only it used; the list's
+     * doc marks stay.
      */
     @Test
-    void theClosingStripStylesTheInlineMarksWithBothGlyphAndTone() throws Exception {
+    void theSideColumnKeepsItsWidthAndTheClosingStripRulesAreGone() throws Exception {
         // given
         String css = css();
 
         // then
-        assertThat(css).contains(".cl-page .cl-closing {")
-                .contains(".cl-page .cl-doc-marks.is-sentences .is-todo .cl-doc-mark-icon { color: var(--cl-warn); background: var(--cl-warn-soft); }")
-                .contains(".cl-page .cl-doc-marks.is-sentences .cl-doc-mark { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; height: auto; background: none; padding: 0; white-space: normal; font-weight: 400; letter-spacing: 0; }");
-
+        assertThat(css).doesNotContain(".cl-closing").doesNotContain(".cl-doc-marks.is-sentences")
+                .contains(".cl-page .cl-doc-marks {").contains(".cl-page .cl-doc-mark.is-todo {");
         String aside = rule(css, ".cl-page .cl-layout-aside");
         assertThat(aside).contains("320px").doesNotContain("340px");
     }
@@ -247,16 +241,12 @@ class OrdersScriptContractTest {
         // given
         String css = css();
 
-        // then: the review todo reads like the other todos, the dialog form lines up with its title, the strip keeps a
-        // gap to the next card on phones, and card-mode rows do not indent the name by the list's checkbox padding
-        assertThat(rule(css, ".cl-page .cl-doc-marks.is-sentences .cl-doc-mark .cl-link-button"))
-                .contains("text-decoration: underline").contains("font-weight: 400").contains("color: inherit");
+        // then: the dialog form lines up with its title, and card-mode rows do not indent the name by the list's
+        // checkbox padding
         assertThat(rule(css, ".cl-page .cl-dialog-body .cl-card-grid")).contains("padding: 4px 0 0");
-        assertThat(css).doesNotContain("@media (max-width: 1023px) { .cl-page .cl-closing")
-                .contains(".cl-page .cl-table.is-wrap tbody tr > th.cl-table-key { padding-left: 0; padding-right: 0; }")
+        assertThat(css).contains(".cl-page .cl-table.is-wrap tbody tr > th.cl-table-key { padding-left: 0; padding-right: 0; }")
                 .contains(".cl-page .cl-table.is-wrap tbody tr:not(.cl-table-group):not(:has(.cl-table-check)) > td.cl-table-actions { grid-column: 2; grid-row: 1; }");
         assertThat(rule(css, ".cl-page .cl-help.is-note")).contains("font-size: 13px");
-        assertThat(rule(css, ".cl-page .cl-closing")).contains("margin-bottom: 16px");
     }
 
     /** The body of the first {@code @media} block that starts with {@code query}. */
@@ -277,8 +267,7 @@ class OrdersScriptContractTest {
     void noComponentModifierCollidesWithBulmasDisplayHelpers() throws Exception {
         // given: Bulma's .is-inline / .is-block / .is-flex set display with !important, so a cl-* rule never wins
         String css = css();
-        String templates = read("src/main/resources/templates/fragments/item-add-modal.html")
-                + read("src/main/resources/templates/orders/details/closing.html");
+        String templates = read("src/main/resources/templates/fragments/item-add-modal.html");
 
         // then
         assertThat(css).doesNotContainPattern("\\.cl-[a-z-]+\\.is-(inline|block|flex)\\b");
@@ -406,11 +395,6 @@ class OrdersScriptContractTest {
         assertThat(rule(css, ".cl-page .cl-record-title")).contains("gap: 8px 12px");
         assertThat(rule(css, ".cl-page .cl-record-meta")).contains("font-size: 14px;");
         assertThat(rule(css, ".cl-page .cl-record-meta.is-secondary")).contains("font-size: 13px;");
-        assertThat(rule(css, ".cl-page .cl-closing-title")).contains("font-size: 16px");
-        assertThat(rule(css, ".cl-page .cl-closing")).contains("gap: 8px 20px");
-        assertThat(rule(css, ".cl-page .cl-doc-marks.is-sentences")).contains("gap: 8px 16px");
-        // the "does not apply" mark stays readable on the strip: --cl-ink-3 there is 4.47:1, below AA
-        assertThat(rule(css, ".cl-page .cl-doc-marks.is-sentences .cl-doc-mark.is-na")).contains("var(--cl-ink-2)");
         // the uppercase label is .cl-eyebrow; the layout classes keep only their spacing
         for (String selector : List.of(".cl-page .cl-address-head", ".cl-page .cl-table tbody tr.cl-table-group > th",
                 ".cl-page .cl-item-add-basket-head")) {
@@ -445,7 +429,7 @@ class OrdersScriptContractTest {
 
     @Test
     void everyCssBlockIsClosedSoNoLaterRuleEndsUpInsideAMediaQuery() throws Exception {
-        // given: two missing braces once swallowed every later rule (the closing strip, the side layout) into a
+        // given: two missing braces once swallowed every later rule (the side layout among them) into a
         // prefers-reduced-motion block, so the browser ignored them on ordinary screens
         String css = css().replaceAll("(?s)/\\*.*?\\*/", "");
 

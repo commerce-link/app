@@ -15,8 +15,6 @@ class BulkActionResultTest {
 
     private static final Locale PL = Locale.forLanguageTag("pl");
 
-    // Local copy of the messages() helper (rather than a dependency on OrderClosingChecklistTest, which
-    // belongs to the 9b dispatch and is not implemented yet): both test classes build the same lookup.
     private static MessageSource messages() {
         ResourceBundleMessageSource source = new ResourceBundleMessageSource();
         source.setBasename("messages");

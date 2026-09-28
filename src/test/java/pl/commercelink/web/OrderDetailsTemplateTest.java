@@ -183,12 +183,9 @@ class OrderDetailsTemplateTest {
         assertThat(html).contains("Zamówienie 3e373abc").contains("cl-status is-info").contains("W kompletacji")
                 .contains("data-cl-dialog-open=\"status-dialog\"").contains("Piotr Wiśniewski").contains("1 797,00 PLN")
                 .doesNotContain("??");
-        int closing = html.indexOf("id=\"closing-title\"");
         int items = html.indexOf("id=\"pozycje\"");
-        int customer = html.indexOf("id=\"customer-title\"");
         int shipments = html.indexOf("id=\"przesylki\"");
-        assertThat(closing).isPositive().isLessThan(items);
-        assertThat(items).isLessThan(shipments);
+        assertThat(items).isPositive().isLessThan(shipments);
         assertThat(html).doesNotContain("data-order=").contains("data-cl-collapse");
     }
 
@@ -416,7 +413,7 @@ class OrderDetailsTemplateTest {
         String html = page(render(bare, List.of(), ADMIN, Set.of()));
 
         // then
-        assertThat(html).contains("cl-closing").contains("id=\"customer-title\"").contains(">Klient<").doesNotContain("??");
+        assertThat(html).contains("id=\"customer-title\"").contains(">Klient<").doesNotContain("??");
     }
 
     @Test
@@ -530,13 +527,12 @@ class OrderDetailsTemplateTest {
     }
 
     @Test
-    void aCompletedOrderShowsItsSettingsReadOnlyAndNoClosingStrip() {
+    void aCompletedOrderShowsItsSettingsReadOnly() {
         // when
         String html = page(render(order(OrderStatus.Completed), ADMIN));
 
         // then
-        assertThat(html).doesNotContain("id=\"closing-title\"").doesNotContain("cl-closing")
-                .doesNotContain("id=\"order-settings-form\"").doesNotContain("settings-dialog")
+        assertThat(html).doesNotContain("id=\"order-settings-form\"").doesNotContain("settings-dialog")
                 .contains("id=\"settings-title\"").contains("class=\"cl-kv is-column\"")
                 .contains("Zakończone automatycznie po rozliczeniu")
                 .doesNotContain("data-cl-dialog-open=\"status-dialog\"");
@@ -658,56 +654,17 @@ class OrderDetailsTemplateTest {
     }
 
     @Test
-    void theChecklistSaysWhatIsMissingWithLinksToTheCards() {
-        // given
+    void anOpenOrderShowsNoClosingStrip() {
+        // given: an open order that misses a payment, the WZ and the review
         Order order = order(OrderStatus.Assembly);
-        order.addDocument(new Document("fv", "FV/2026/09/118", null, DocumentType.InvoiceVat));
 
         // when
         String html = page(render(order, ADMIN));
 
-        // then
-        assertThat(html).contains("class=\"cl-card is-status cl-closing\"").contains("class=\"cl-doc-marks is-sentences\"")
-                .contains("<span class=\"cl-doc-mark-icon\" aria-hidden=\"true\">✗</span>")
-                .contains("<span class=\"cl-doc-mark-icon\" aria-hidden=\"true\">✓</span>")
-                .doesNotContain("fa-times").doesNotContain("fa-check")
-                .contains("aria-label=\"Warunki zamknięcia zamówienia\"");
-        assertThat(html).contains("Do zamknięcia brakuje:").contains("href=\"#platnosci\"")
-                .contains("data-cl-dialog-open=\"review-dialog\"").contains("Do zrobienia:").doesNotContain("brakuje:</span>")
-                .contains("Faktura już wystawiona");
-    }
-
-    @Test
-    void theChecklistMarksWhatDoesNotApplyWithoutATick() {
-        // given
-        Order order = order(OrderStatus.Assembly);
-        order.setShipments(new ArrayList<>());
-        order.setReview(null);
-
-        // when
-        String html = page(render(order, ADMIN));
-
-        // then
-        String strip = html.substring(html.indexOf("class=\"cl-doc-marks is-sentences\""), html.indexOf("</ul>", html.indexOf("cl-doc-marks is-sentences")));
-        assertThat(occurrences(strip, "class=\"cl-doc-mark is-na\"")).isEqualTo(2);
-        assertThat(occurrences(strip, "<span class=\"cl-doc-mark-icon\" aria-hidden=\"true\">–</span>")).isEqualTo(2);
-        assertThat(occurrences(strip, "Nie dotyczy:")).isEqualTo(2);
-        assertThat(strip).doesNotContain("✓").contains("Brak przesyłek (odbiór osobisty lub wysyłka poza systemem)")
-                .contains("Opinia nie jest zbierana");
-    }
-
-    @Test
-    void aReviewMarkedNotApplicableIsADashNotATick() {
-        // given
-        Order order = order(OrderStatus.Assembly);
-        order.setReview(new OrderReview(OrderReviewStatus.NotApplicable));
-
-        // when
-        String html = page(render(order, ADMIN));
-
-        // then
-        String strip = html.substring(html.indexOf("class=\"cl-doc-marks is-sentences\""), html.indexOf("</ul>", html.indexOf("cl-doc-marks is-sentences")));
-        assertThat(strip).containsPattern("class=\"cl-doc-mark is-na\">\\s*<span class=\"cl-doc-mark-icon\" aria-hidden=\"true\">–</span>\\s*<span class=\"cl-visually-hidden\">Nie dotyczy:</span>\\s*<span>Opinia nie jest zbierana</span>");
+        // then: the client asked for the strip to go; the cards keep their anchors
+        assertThat(html).doesNotContain("Do zamknięcia").doesNotContain("closing-title").doesNotContain("cl-closing")
+                .doesNotContain("cl-doc-marks").doesNotContain("Warunki zamknięcia zamówienia")
+                .contains("id=\"platnosci\"").contains("id=\"dokumenty\"").contains("id=\"przesylki\"");
     }
 
     @Test

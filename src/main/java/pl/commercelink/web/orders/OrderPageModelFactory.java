@@ -91,13 +91,10 @@ public class OrderPageModelFactory {
         boolean hasWarehouseDocument = order.getDocumentByType(DocumentType.GoodsIssue).isPresent();
         boolean hasWarehouseItems = items.stream().filter(OrderItem::isProduct).anyMatch(i -> !dropshipItemIds.contains(i.getItemId()));
         boolean documentsEnabled = store != null && store.hasDocumentsGenerationEnabled();
-        OrderClosingChecklist checklist = closed ? null
-                : OrderClosingChecklist.of(order, documentsEnabled && hasWarehouseItems, messageSource, locale);
         return new OrderPageModel(order.getOrderId(), order.getShortenedOrderId(),
                 viewer.superAdmin() ? null : OrderBackLink.sanitize(viewer.back()),
                 closed, readOnly, viewer.superAdmin(), viewer.admin(), store == null ? null : store.getName(),
                 header(order, items, store, viewer, readOnly, links, locale),
-                checklist, checklist == null ? null : checklist.title(messageSource, locale),
                 items(order, items, store, viewer, readOnly, links, hasDropshipItems, hasWarehouseDocument),
                 shipments(order, store, readOnly),
                 documents(order, viewer, closed, readOnly, documentsEnabled && hasWarehouseItems && !hasWarehouseDocument),

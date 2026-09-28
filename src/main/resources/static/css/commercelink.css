@@ -6373,29 +6373,6 @@ a.cl-link-button:hover {
     max-width: 100%;
 }
 
-/* --- Order details: "Do zamknięcia" strip — the list's doc marks, inline, as full sentences --- */
-.cl-page .cl-closing { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px; padding: 12px 20px; margin-bottom: 16px; }
-.cl-page .cl-closing-title { font-size: 16px; font-weight: 650; }
-.cl-page .cl-closing-title.is-warn { color: var(--cl-warn); }
-.cl-page .cl-closing-title.is-ok { color: var(--cl-ok); }
-.cl-page .cl-doc-marks.is-sentences { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 0; padding: 0; list-style: none; }
-.cl-page .cl-doc-marks.is-sentences .cl-doc-mark { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; height: auto; background: none; padding: 0; white-space: normal; font-weight: 400; letter-spacing: 0; }
-.cl-page .cl-doc-marks.is-sentences .cl-doc-mark.is-done { color: var(--cl-ink-2); }
-.cl-page .cl-doc-marks.is-sentences .cl-doc-mark.is-todo { color: var(--cl-ink); }
-.cl-page .cl-doc-marks.is-sentences .cl-doc-mark-icon { width: 18px; height: 18px; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; }
-.cl-page .cl-doc-marks.is-sentences .is-done .cl-doc-mark-icon { color: var(--cl-ok); }
-.cl-page .cl-doc-marks.is-sentences .is-todo .cl-doc-mark-icon { color: var(--cl-warn); background: var(--cl-warn-soft); }
-/* "does not apply": neutral ink, no tile behind the dash, so it reads neither as done nor as missing; --cl-ink-2
-   because --cl-ink-3 on the strip is 4.47:1, below AA */
-.cl-page .cl-doc-marks.is-sentences .cl-doc-mark.is-na { color: var(--cl-ink-2); }
-.cl-page .cl-doc-marks.is-sentences .is-na .cl-doc-mark-icon { color: var(--cl-ink-2); background: none; }
-.cl-page .cl-doc-marks.is-sentences .cl-doc-mark a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
-.cl-page .cl-doc-marks.is-sentences .cl-doc-mark a:hover { color: var(--cl-accent-ink); }
-@media (max-width: 1023px) { .cl-page .cl-doc-marks.is-sentences .cl-doc-mark a, .cl-page .cl-doc-marks.is-sentences .cl-doc-mark button { min-height: 44px; display: inline-flex; align-items: center; } }
-/* the review todo opens a dialog (a button) but reads like the other todos (links): underlined text, no accent */
-.cl-page .cl-doc-marks.is-sentences .cl-doc-mark .cl-link-button { color: inherit; font-size: inherit; font-weight: 400; text-decoration: underline; text-underline-offset: 2px; padding: 0; }
-.cl-page .cl-doc-marks.is-sentences .cl-doc-mark .cl-link-button:hover { color: var(--cl-accent-ink); }
-
 /* Order details: short notes beside a title or an address (why items cannot be added, a locked address, "completed
    automatically") — help-sized, and under a card title they start at its left edge */
 .cl-page .cl-help.is-note { font-size: 13px; line-height: 1.4; color: var(--cl-ink-2); }
