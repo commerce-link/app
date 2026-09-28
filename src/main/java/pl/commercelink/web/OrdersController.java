@@ -483,6 +483,7 @@ public class OrdersController extends BaseController {
         model.addAttribute("today", LocalDate.now());
         model.addAttribute("canAddDocumentManually", manualDocumentTypes.contains(nextDocumentToIssue));
         model.addAttribute("issuableDocumentTypes", order.getIssuableDocumentTypes());
+        model.addAttribute("canIssueReceipt", receiptAttemptService.canIssueManually(store, order));
 
         SupplierLabelMap labels = supplierLabels.forStore(store);
         model.addAttribute("supplierLabels", labels);

@@ -1242,7 +1242,7 @@
                         <div class="dropdown is-hoverable">
                             <div class="dropdown-trigger">
                                 <button class="button is-link is-small" type="button"
-                                        th:disabled="${isCompletedOrder or (#lists.isEmpty(issuableDocumentTypes) and !(hasWarehouseDocumentsEnabled and hasWarehouseItems and !hasWarehouseDocument))}"
+                                        th:disabled="${isCompletedOrder or (#lists.isEmpty(issuableDocumentTypes) and !canIssueReceipt and !(hasWarehouseDocumentsEnabled and hasWarehouseItems and !hasWarehouseDocument))}"
                                         aria-haspopup="true" aria-controls="createDocumentMenu">
                                     <span th:text="#{order.action.create.document}"></span>
                                     <span class="icon is-small"><i class="fas fa-angle-down" aria-hidden="true"></i></span>
@@ -1255,6 +1255,13 @@
                                         <button type="submit" class="dropdown-item button is-ghost is-shadowless has-text-left"
                                                 th:disabled="${isCompletedOrder}"
                                                 th:text="#{order.action.create.goods.issue}" onclick="confirmSave(this)"></button>
+                                    </form>
+                                    <!--/* The e-receipt goes to the store's receipt provider like the automatic one and shows up in
+                                           the "E-paragon" section above; the buyer's e-mail follows the store's receipt settings. */-->
+                                    <form th:if="${canIssueReceipt}"
+                                          th:action="@{/dashboard/orders/{orderId}/receipts/issue(orderId=${order.orderId})}" method="post" style="margin: 0;" onsubmit="event.preventDefault();">
+                                        <button type="submit" class="dropdown-item button is-ghost is-shadowless has-text-left"
+                                                th:text="#{receipts.action.issue}" onclick="confirmSave(this)"></button>
                                     </form>
                                     <form th:action="@{/dashboard/orders/{orderId}/invoicing(orderId=${order.orderId})}" method="post" style="margin: 0;" onsubmit="event.preventDefault();">
                                         <input type="hidden" name="documentType" id="invoiceDocumentType"/>

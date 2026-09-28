@@ -54,6 +54,13 @@ public class OrderReceiptsController {
                 () -> attemptService.reissue(CustomSecurityContext.getStoreId(), orderId, actor()));
     }
 
+    @PostMapping("/dashboard/orders/{orderId}/receipts/issue")
+    @PreAuthorize("!hasRole('SUPER_ADMIN')")
+    public String issue(@PathVariable String orderId, Locale locale, RedirectAttributes redirectAttributes) {
+        return run(orderId, locale, redirectAttributes, "receipts.action.issue.done",
+                () -> attemptService.issueManually(CustomSecurityContext.getStoreId(), orderId, actor()));
+    }
+
     @PostMapping("/dashboard/orders/{orderId}/receipts/check")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String check(@PathVariable String orderId, @RequestParam String receiptKey, Locale locale,

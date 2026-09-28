@@ -83,14 +83,11 @@ public class ReceiptRequestConverter {
         if (provider.requiresBuyerEmail() && email == null) {
             return new ReceiptConversion.Blocked(ReceiptBlockReason.MISSING_EMAIL, null);
         }
-        List<Payment> incoming = order.getPayments().stream()
+        List<Payment> paid = order.getPayments().stream()
                 .filter(p -> p.getDirection() != PaymentDirection.Outgoing)
                 .filter(p -> !p.isUnsettled())
                 .toList();
-        if (incoming.isEmpty()) {
-            return new ReceiptConversion.Blocked(ReceiptBlockReason.NO_PAYMENT, null);
-        }
-        List<ReceiptRequestSnapshot.Pay> payments = payments(incoming, linesTotal);
+        List<ReceiptRequestSnapshot.Pay> payments = payments(paid, linesTotal);
         if (payments == null) {
             return new ReceiptConversion.Blocked(ReceiptBlockReason.MIXED_PAYMENTS, null);
         }
@@ -133,8 +130,39 @@ public class ReceiptRequestConverter {
         return StringUtils.isNotBlank(billing) ? billing.strip() : null;
     }
 
+    /**
+     * What the buyer has actually paid, for the receipt. Nothing paid yet gives no payments: a fiscal receipt does not
+     * need a payment form, and the provider then marks nothing as paid. The method chosen at checkout (the unsettled
+     * placeholder payment, amount 0) is deliberately not used — declaring it would record a payment that has not
+     * happened. A partly paid order declares what was paid, by form; a fully paid one the whole total.
+     */
+    private static List<ReceiptRequestSnapshot.Pay> payments(List<Payment> paid, long total) {
+        if (paid.isEmpty()) {
+            return List.of();
+        }
+        long paidTotal = paid.stream().mapToLong(p -> Money.of(BigDecimal.valueOf(p.getAppliedAmount())).grosze()).sum();
+        if (paidTotal >= total - ONE_GROSZ) {
+            return settledPayments(paid, total);
+        }
+        Map<PaymentForm, Long> byForm = new EnumMap<>(PaymentForm.class);
+        for (Payment payment : paid) {
+            long amount = Money.of(BigDecimal.valueOf(payment.getAppliedAmount())).grosze();
+            if (amount <= 0) {
+                return null;
+            }
+            byForm.merge(form(payment.getSource()), amount, Long::sum);
+        }
+        String label = byForm.size() == 1
+                ? paid.stream().map(Payment::getName).filter(StringUtils::isNotBlank).findFirst().orElse(null)
+                : null;
+        return byForm.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .map(e -> new ReceiptRequestSnapshot.Pay(e.getKey(), e.getValue(), label))
+                .toList();
+    }
+
     /** One form covers the whole total; several forms only with positive amounts that add up to it. */
-    private static List<ReceiptRequestSnapshot.Pay> payments(List<Payment> incoming, long total) {
+    private static List<ReceiptRequestSnapshot.Pay> settledPayments(List<Payment> incoming, long total) {
         List<PaymentForm> forms = incoming.stream().map(p -> form(p.getSource())).distinct().toList();
         if (forms.size() == 1) {
             String label = incoming.stream().map(Payment::getName).filter(StringUtils::isNotBlank).findFirst().orElse(null);

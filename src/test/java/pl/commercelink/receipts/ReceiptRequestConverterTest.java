@@ -101,16 +101,6 @@ class ReceiptRequestConverterTest {
     }
 
     @Test
-    void mixedPaymentFormsThatDoNotAddUpToTheTotalBlock() {
-        // Two settled forms whose amounts fall short of the total: unlike a zero-amount placeholder, this is not
-        // something the converter can safely ignore, so it blocks rather than guessing.
-        Order order = order(100.00, payment(PaymentSource.BankTransfer, 60.00), payment(PaymentSource.Card, 10.00));
-
-        assertThat(blocked(order, items(item("Mysz", 1, 100.00, 1.23))).reason())
-                .isEqualTo(ReceiptBlockReason.MIXED_PAYMENTS);
-    }
-
-    @Test
     void mixedPaymentFormsWithAmountsThatAddUpSplitThePayment() {
         Order order = b2cOrder(100.00);
         order.getPayments().clear();
@@ -187,6 +177,46 @@ class ReceiptRequestConverterTest {
 
         assertThat(converted(order, items(item("Mysz", 1, 100.00, 1.23))).payments())
                 .containsExactly(new ReceiptRequestSnapshot.Pay(PaymentForm.CARD, 10000, null));
+    }
+
+    @Test
+    void unpaidOrderIsIssuedWithoutPayments() {
+        // cash on delivery, courier has not paid it in yet: only the 0.00 placeholder of the chosen method exists
+        Order order = order(100.00, payment(PaymentSource.CashOnDelivery, 0.00));
+
+        assertThat(converted(order, items(item("Mysz", 1, 100.00, 1.23))).payments()).isEmpty();
+    }
+
+    @Test
+    void orderWithoutAnyPaymentEntryIsIssuedWithoutPayments() {
+        assertThat(converted(order(100.00), items(item("Mysz", 1, 100.00, 1.23))).payments()).isEmpty();
+    }
+
+    @Test
+    void partlyPaidOrderDeclaresOnlyWhatWasPaid() {
+        // the placeholder of the method chosen at checkout does not stand in for the unpaid rest
+        Order order = order(100.00, payment(PaymentSource.Card, 60.00), payment(PaymentSource.BankTransfer, 0.00));
+
+        assertThat(converted(order, items(item("Mysz", 1, 100.00, 1.23))).payments())
+                .containsExactly(new ReceiptRequestSnapshot.Pay(PaymentForm.CARD, 6000, null));
+    }
+
+    @Test
+    void partlyPaidInTwoFormsDeclaresEachPaidAmount() {
+        Order order = order(100.00, payment(PaymentSource.BankTransfer, 60.00), payment(PaymentSource.Card, 10.00));
+
+        assertThat(converted(order, items(item("Mysz", 1, 100.00, 1.23))).payments())
+                .containsExactlyInAnyOrder(new ReceiptRequestSnapshot.Pay(PaymentForm.TRANSFER, 6000, null),
+                        new ReceiptRequestSnapshot.Pay(PaymentForm.CARD, 1000, null));
+    }
+
+    @Test
+    void overpaidMixedFormsStillBlock() {
+        // two forms whose amounts exceed the total cannot be cut down to it without guessing which one to cut
+        Order order = order(100.00, payment(PaymentSource.BankTransfer, 60.00), payment(PaymentSource.Card, 50.00));
+
+        assertThat(blocked(order, items(item("Mysz", 1, 100.00, 1.23))).reason())
+                .isEqualTo(ReceiptBlockReason.MIXED_PAYMENTS);
     }
 
     @Test
