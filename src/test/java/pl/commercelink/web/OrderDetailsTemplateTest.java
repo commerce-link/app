@@ -451,6 +451,26 @@ class OrderDetailsTemplateTest {
     }
 
     @Test
+    void theSerialNumbersDialogNamesEachItemsDelivery() {
+        // given: two delivered pieces of one product from different deliveries
+        Order order = order(OrderStatus.Delivered);
+        OrderItem first = new OrderItem(order.getOrderId(), "CPU", "AMD Ryzen 7 9800X3D", 1, 749, "SKU-1", false, 0);
+        first.setStatus(FulfilmentStatus.Delivered);
+        first.setDeliveryId("abcd1234-0000-0000-0000-000000000001");
+        OrderItem second = new OrderItem(order.getOrderId(), "CPU", "AMD Ryzen 7 9800X3D", 1, 749, "SKU-1", false, 1);
+        second.setStatus(FulfilmentStatus.Delivered);
+
+        // when
+        String html = page(render(order, List.of(first, second), ADMIN, Set.of()));
+
+        // then
+        java.util.regex.Matcher dialog = Pattern.compile("(?s)id=\"serials-dialog\"(.*?)</dialog>").matcher(html);
+        assertThat(dialog.find()).isTrue();
+        assertThat(dialog.group(1)).contains("<th scope=\"col\">Nr dostawy</th>")
+                .contains("<td>" + first.getShortenedDeliveryId() + "</td>").contains("<td>—</td>");
+    }
+
+    @Test
     void theItemsTableCarriesTheSelectTableHookWhenItemsAreSelectable() {
         // when: table-select.js only wires up table[data-cl-select-table]; a th:attr with an empty-string true
         // value is dropped by Thymeleaf, so the value must not be the empty string
@@ -538,6 +558,54 @@ class OrderDetailsTemplateTest {
         // then
         assertThat(html).contains("jak dane rozliczeniowe");
         assertThat(occurrences(html, "ul. Przykładowa 5")).isEqualTo(1);
+    }
+
+    @Test
+    void theRecipientsPhoneAndEmailPrintUnderSameAsBilling() {
+        // given
+        Order order = order(OrderStatus.Assembly);
+        order.getBillingDetails().setStreetAndNumber("ul. Przykładowa 5");
+        ShippingDetails shipping = new ShippingDetails();
+        shipping.setName("Piotr");
+        shipping.setSurname("Wiśniewski");
+        shipping.setStreetAndNumber("ul. Przykładowa 5");
+        shipping.setPhone("+48 600 700 800");
+        shipping.setEmail("odbiorca@example.com");
+        order.setShippingDetails(shipping);
+
+        // when
+        String html = page(render(order, ADMIN));
+
+        // then
+        assertThat(html).contains("jak dane rozliczeniowe")
+                .contains("<div><a href=\"tel:+48 600 700 800\">+48 600 700 800</a></div>")
+                .contains("<div><a href=\"mailto:odbiorca@example.com\">odbiorca@example.com</a></div>");
+        assertThat(occurrences(html, "ul. Przykładowa 5")).isEqualTo(1);
+    }
+
+    @Test
+    void aSuperAdminSeesTheCostSectionAndItemCostButNoActions() {
+        // when
+        String html = page(render(order(OrderStatus.New), SUPER_ADMIN));
+
+        // then
+        assertThat(html).contains("id=\"finances-costs\"").contains("<summary>Koszt i zysk</summary>").contains("koszt 579")
+                .doesNotContain("data-cl-dialog-open").doesNotContain("item-menu-");
+    }
+
+    @Test
+    void aPaymentShowsItsBankDateEvenWithoutAnOperationNumber() {
+        // given
+        Order order = order(OrderStatus.Realization);
+        Payment payment = new Payment("REF-2", "Jan Kowalski", PaymentSource.BankTransfer, 300, 0);
+        payment.setBankTransactionDate(java.time.LocalDate.of(2026, 9, 20));
+        order.addPayment(payment);
+
+        // when
+        String html = page(render(order, ADMIN));
+
+        // then
+        assertThat(html).contains("data operacji 20.09.2026").doesNotContain("operacja null");
     }
 
     @Test

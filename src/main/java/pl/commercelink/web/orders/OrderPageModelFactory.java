@@ -74,6 +74,11 @@ public class OrderPageModelFactory {
 
     /** Who looks: a super admin (read-only, store-scoped links), an admin (costs, dropship), and the list to return to. */
     public record Viewer(boolean superAdmin, boolean admin, String back) {
+
+        /** Cost and profit: the store admin, and the super admin read-only; never the store user. */
+        public boolean costsVisible() {
+            return admin || superAdmin;
+        }
     }
 
     public OrderPageModel build(Order order, List<OrderItem> items, Viewer viewer, Locale locale) {
@@ -99,7 +104,7 @@ public class OrderPageModelFactory {
                 payments(order, readOnly),
                 CustomerView.of(order, readOnly, locale),
                 settings(order, items, readOnly),
-                FinancesView.of(order, items, viewer.admin()),
+                FinancesView.of(order, items, viewer.costsVisible()),
                 history(order, readOnly),
                 OrderStatusOptions.of(order));
     }
@@ -146,7 +151,8 @@ public class OrderPageModelFactory {
                 splitFrom == null ? null : ConversionUtil.getShortenedId(splitFrom),
                 splitFrom == null ? null : (viewer.superAdmin()
                         ? "/dashboard/store/" + order.getStoreId() + "/orders/" + splitFrom : "/dashboard/orders/" + splitFrom),
-                clientPage && !viewer.superAdmin() ? order.createClientOrderUrl(appDomain) : null,
+                // the link is public and changes nothing, so a super admin (support) may copy it too
+                clientPage ? order.createClientOrderUrl(appDomain) : null,
                 primary, links.card(), links.collection(), itemHistory,
                 // a completed order can still be cancelled after a full return, so this follows the viewer, not readOnly
                 !viewer.superAdmin() && order.canBeCancelled(items),
@@ -182,7 +188,7 @@ public class OrderPageModelFactory {
                                            boolean readOnly, OrderLinks links, boolean hasDropshipItems,
                                            boolean hasWarehouseDocument) {
         SupplierLabelMap labels = supplierLabels.forStore(store);
-        OrderItemRow.Context context = new OrderItemRow.Context(order, viewer.admin(), readOnly, viewer.superAdmin(), labels,
+        OrderItemRow.Context context = new OrderItemRow.Context(order, viewer.costsVisible(), readOnly, viewer.superAdmin(), labels,
                 item -> deliveryHref(order, item, viewer, links),
                 serial -> viewer.superAdmin() ? null
                         : "/dashboard/item/history?serialNo=" + URLEncoder.encode(serial, StandardCharsets.UTF_8));

@@ -27,7 +27,7 @@ public record OrderItemRow(String itemId, int index, String name, String categor
      * {@code superAdmin} matters on its own besides {@code readOnly}: a closed order is read-only too, but only the
      * store's own users have a route to the item page.
      */
-    public record Context(Order order, boolean admin, boolean readOnly, boolean superAdmin, SupplierLabelMap labels,
+    public record Context(Order order, boolean costsVisible, boolean readOnly, boolean superAdmin, SupplierLabelMap labels,
                           Function<OrderItem, String> deliveryHref, Function<String, String> serialHref) {
     }
 
@@ -45,7 +45,7 @@ public record OrderItemRow(String itemId, int index, String name, String categor
                 showCondition ? OrderLabels.condition(item.getCondition()) : null,
                 item.getCondition() == ItemCondition.Damaged ? OrderLabels.BAD : OrderLabels.WARN,
                 item.isConsolidated(), item.isService(), StringUtils.trimToNull(item.getComment()), item.getQty(),
-                Money.format(item.getPrice()), context.admin() ? Money.format(item.getCost()) : null,
+                Money.format(item.getPrice()), context.costsVisible() ? Money.format(item.getCost()) : null,
                 OrderLabels.itemStatus(item.getStatus()), OrderLabels.tone(item.getStatus()),
                 deliveryLabel, deliveryId == null ? null : context.deliveryHref().apply(item),
                 item.isReadyForAllocation(), item.isProduct() && item.isAllocated(), item.isProduct() && item.isDelivered(),

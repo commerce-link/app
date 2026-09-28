@@ -130,6 +130,40 @@ class OrderPageModelFactoryTest {
     }
 
     @Test
+    void aSuperAdminSeesCostAndProfitReadOnlyWhileAUserStillDoesNot() {
+        // when
+        OrderPageModel superAdmin = factory.build(order(OrderStatus.New), List.of(item(FulfilmentStatus.New)),
+                new OrderPageModelFactory.Viewer(true, false, null), PL);
+        OrderPageModel user = factory.build(order(OrderStatus.New), List.of(item(FulfilmentStatus.New)),
+                new OrderPageModelFactory.Viewer(false, false, null), PL);
+
+        // then
+        assertThat(superAdmin.finances().costs()).isNotNull();
+        assertThat(superAdmin.items().products().get(0).unitCost()).isNotNull();
+        assertThat(superAdmin.readOnly()).isTrue();
+        assertThat(superAdmin.admin()).isFalse();
+        assertThat(user.finances().costs()).isNull();
+        assertThat(user.items().products().get(0).unitCost()).isNull();
+    }
+
+    @Test
+    void aSuperAdminMayCopyTheCustomerLinkUnderTheSameConditionsAsTheStore() {
+        // given
+        pl.commercelink.stores.FulfilmentConfiguration fulfilment = new pl.commercelink.stores.FulfilmentConfiguration();
+        fulfilment.setClientOrderPageEnabled(true);
+        storesRepository.findById("store-1").setFulfilmentConfiguration(fulfilment);
+        OrderPageModelFactory.Viewer superAdmin = new OrderPageModelFactory.Viewer(true, false, null);
+
+        // when
+        OrderPageModel open = factory.build(order(OrderStatus.Assembly), List.of(), superAdmin, PL);
+        OrderPageModel completed = factory.build(order(OrderStatus.Completed), List.of(), superAdmin, PL);
+
+        // then
+        assertThat(open.header().clientOrderUrl()).startsWith("https://app.example");
+        assertThat(completed.header().clientOrderUrl()).isNull();
+    }
+
+    @Test
     void aPlainOrderKeepsItsBulkActionsAvailable() {
         // when
         OrderPageModel page = factory.build(order(OrderStatus.New), List.of(item(FulfilmentStatus.New)),

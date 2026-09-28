@@ -31,6 +31,8 @@
                     <span th:if="${p.referenceNo() != null}" th:text="' · ' + #{order.payments.reference(${p.referenceNo()})}"></span>
                     <span th:if="${p.bankTransactionNo() != null}"
                           th:text="' · ' + #{order.payments.operation(${p.bankTransactionNo()}, ${p.bankTransactionDate() != null ? p.bankTransactionDate() : '—'})}"></span>
+                    <span th:if="${p.bankTransactionNo() == null and p.bankTransactionDate() != null}"
+                          th:text="' · ' + #{order.payments.operation.date(${p.bankTransactionDate()})}"></span>
                     <span th:if="${p.fee() != null}"
                           th:text="' · ' + #{order.payments.fee(${#messages.msg('general.currency.amount', p.fee())})}"></span>
                 </p>

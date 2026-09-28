@@ -162,6 +162,7 @@
                         <th scope="col" th:text="#{order.item.name}"></th>
                         <th scope="col" th:text="#{general.manufacturer.code}"></th>
                         <th scope="col" class="is-numeric" th:text="#{order.item.quantity}"></th>
+                        <th scope="col" th:text="#{general.delivery.id}"></th>
                         <th scope="col" th:text="#{order.item.serial.no}"></th>
                     </tr></thead>
                     <tbody>
@@ -169,6 +170,7 @@
                         <th scope="row" class="cl-table-key" th:text="${item.name}"></th>
                         <td th:text="${item.mfn}"></td>
                         <td class="is-numeric" th:text="${item.qty}"></td>
+                        <td th:text="${item.deliveryLabel != null ? item.deliveryLabel : '—'}"></td>
                         <td>
                             <input class="cl-input" type="text" th:name="|orderItems[${i.index}].serialNo|" th:value="${item.serialNo}"
                                    th:attr="aria-label=#{order.items.serial.for(${item.name})}">

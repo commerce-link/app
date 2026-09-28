@@ -103,4 +103,35 @@ class CustomerViewTest {
         assertThat(CustomerView.lockedKey(open, false)).isNull();
         assertThat(CustomerView.lockedKey(inTransit, false)).isNull();
     }
+
+    @Test
+    void theRecipientsOwnPhoneAndEmailStayVisibleWhenTheAddressIsTheSameAsBilling() {
+        // given: the parcel goes to the billing address, but to a recipient with their own contact
+        Order order = order();
+        order.getShippingDetails().setPhone("+48 600 700 800");
+        order.getShippingDetails().setEmail("odbiorca@example.com");
+
+        // when
+        CustomerView view = CustomerView.of(order, false, PL);
+
+        // then
+        assertThat(view.shippingSameAsBilling()).isTrue();
+        assertThat(view.shippingPhone()).isEqualTo("+48 600 700 800");
+        assertThat(view.shippingEmail()).isEqualTo("odbiorca@example.com");
+    }
+
+    @Test
+    void aRecipientContactEqualToBillingOrMissingIsNotRepeated() {
+        // given: the same e-mail (other case) as billing, no phone of its own
+        Order order = order();
+        order.getShippingDetails().setEmail("JAN@example.pl");
+
+        // when
+        CustomerView view = CustomerView.of(order, false, PL);
+
+        // then
+        assertThat(view.shippingSameAsBilling()).isTrue();
+        assertThat(view.shippingEmail()).isNull();
+        assertThat(view.shippingPhone()).isNull();
+    }
 }
