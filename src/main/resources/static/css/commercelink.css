@@ -6170,9 +6170,12 @@ a.cl-link-button:hover {
     padding-top: 12px;
 }
 
-/* A form grid placed straight in a card (settings of the order), and the rare fields in the disclosure below it. */
+/* A form grid placed straight in a card (settings of the order), and the rare fields in the disclosure below it. Its
+   rows are spaced by the fields' own margins (see "Order forms in a card grid" below), the last one taken back here. */
 .cl-page .cl-card-grid {
     padding: 12px 20px 4px;
+    row-gap: 0;
+    margin-bottom: calc(-1 * var(--cl-gap-fields));
 }
 
 .cl-page .cl-card-extras .cl-card-grid {
@@ -6467,6 +6470,37 @@ a.cl-link-button:hover {
 .cl-page .cl-dialog-body .cl-card-grid { padding: 4px 0 0; }
 .cl-page .cl-dialog-body .cl-card-extras > summary { padding: 0; }
 .cl-page .cl-dialog-body .cl-card-extras > .cl-disclosure-body > .cl-form-grid { padding: 4px 0 0; }
+
+/* Order forms in a card grid (settings, billing/shipping address; in their dialogs and on their no-JS pages): the fields
+   of one grid row share row lines, so a label that wraps or a help text under one field never moves its neighbour's
+   control. Each field spans four row tracks of the grid (label, control, help, error) through subgrid; the label sits
+   on the control, the control of every field in the row starts on the same line. An empty track must not add a gap,
+   so the grid has no row gap and the token gaps are margins: 6 px label -> control -> help/error, 12 px between rows
+   (the last row's margin is taken back by the grid's own rule above). A field inserted into a sized wrapper (div.cl-span-3 > .cl-field)
+   passes the tracks on through a second subgrid. */
+.cl-page .cl-card-grid > * { margin-bottom: var(--cl-gap-fields); }
+.cl-page .cl-card-grid > :is(.cl-field, :has(> .cl-field)) {
+    display: grid;
+    grid-row: span 4;
+    grid-template-rows: subgrid;
+    gap: 0;
+}
+.cl-page .cl-card-grid > * > .cl-field {
+    display: grid;
+    grid-row: 1 / -1;
+    grid-template-rows: subgrid;
+    gap: 0;
+}
+.cl-page .cl-card-grid .cl-field > .cl-label { grid-row: 1; align-self: end; margin-top: 0; }
+.cl-page .cl-card-grid .cl-field > :is(.cl-input, .cl-select) { grid-row: 2; margin-top: var(--cl-gap-attached); }
+.cl-page .cl-card-grid .cl-field > .cl-help { grid-row: 3; margin-top: var(--cl-gap-attached); }
+.cl-page .cl-card-grid .cl-field > .cl-field-error { grid-row: 4; margin-top: var(--cl-gap-attached); }
+/* the checkbox keeps its 36/44 px target, but the gap to its neighbours is measured from its text line (1.5em) */
+.cl-page .cl-card-grid > .cl-check-field { display: flex; }
+.cl-page .cl-card-grid > .cl-check-field > .cl-check { margin-block: calc((1.5em - 36px) / 2); }
+@media screen and (max-width: 1023px) {
+    .cl-page .cl-card-grid > .cl-check-field > .cl-check { margin-block: calc((1.5em - 44px) / 2); }
+}
 
 /* Order details items as cards (< 720 px): the checkbox column fits its 44 px target and the product name starts right
    after it (the list's padding for an overlaid checkbox does not apply here) */

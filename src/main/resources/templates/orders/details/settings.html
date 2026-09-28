@@ -49,7 +49,7 @@
                 <input class="cl-input" type="date" id="estimatedShippingAt" name="estimatedShippingAt" th:value="${settings.estimatedShippingAt()}">
             </div>
             <div class="cl-span-3 cl-field">
-                <label class="cl-label" for="preferredShippingAt"><span th:text="#{order.settings.preferred}"></span><span class="cl-optional" th:text="#{form.optional}"></span></label>
+                <label class="cl-label" for="preferredShippingAt"><span th:text="#{order.settings.preferred}"></span> <span class="cl-optional" th:text="#{form.optional}"></span></label>
                 <input class="cl-input" type="date" id="preferredShippingAt" name="preferredShippingAt" aria-describedby="preferredShippingAt-help" th:value="${settings.preferredShippingAt()}">
                 <p class="cl-help" id="preferredShippingAt-help" th:text="#{order.settings.preferred.help}"></p>
             </div>
@@ -67,7 +67,7 @@
                 <label class="cl-check"><input type="checkbox" name="emailNotificationsEnabled" value="true" th:checked="${settings.emailNotificationsEnabled()}"><span th:text="#{order.settings.notifications}"></span></label>
             </div>
             <div class="cl-span-6 cl-field">
-                <label class="cl-label" for="comment"><span th:text="#{order.settings.comment}"></span><span class="cl-optional" th:text="#{form.optional}"></span></label>
+                <label class="cl-label" for="comment"><span th:text="#{order.settings.comment}"></span> <span class="cl-optional" th:text="#{form.optional}"></span></label>
                 <textarea class="cl-input cl-textarea" id="comment" name="comment" rows="3" th:text="${settings.comment()}"></textarea>
             </div>
         </div>
@@ -76,11 +76,11 @@
             <div class="cl-disclosure-body">
                 <div class="cl-form-grid cl-card-grid">
                     <div class="cl-span-3 cl-field">
-                        <label class="cl-label" for="affiliateId"><span th:text="#{order.affiliate.id}"></span><span class="cl-optional" th:text="#{form.optional}"></span></label>
+                        <label class="cl-label" for="affiliateId"><span th:text="#{order.affiliate.id}"></span> <span class="cl-optional" th:text="#{form.optional}"></span></label>
                         <input class="cl-input" type="text" id="affiliateId" name="affiliateId" th:value="${settings.affiliateId()}">
                     </div>
                     <div class="cl-span-3 cl-field">
-                        <label class="cl-label" for="gclid"><span th:text="#{order.gclid}"></span><span class="cl-optional" th:text="#{form.optional}"></span></label>
+                        <label class="cl-label" for="gclid"><span th:text="#{order.gclid}"></span> <span class="cl-optional" th:text="#{form.optional}"></span></label>
                         <input class="cl-input" type="text" id="gclid" name="gclid" th:value="${settings.gclid()}">
                     </div>
                 </div>

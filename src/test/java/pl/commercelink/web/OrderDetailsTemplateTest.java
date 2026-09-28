@@ -696,6 +696,16 @@ class OrderDetailsTemplateTest {
     }
 
     @Test
+    void everyOptionalMarkerOfTheFormDialogsIsSeparatedFromItsLabelByASpace() {
+        // when
+        String html = page(render(order(OrderStatus.Assembly), ADMIN));
+
+        // then: the marker's dot comes from CSS, the space before it only from the markup
+        assertThat(html).contains("<span class=\"cl-optional\">opcjonalne</span>")
+                .doesNotContain("</span><span class=\"cl-optional\"");
+    }
+
+    @Test
     void aClosedOrderLinksEachItemNameToItsReadOnlyItemPage() {
         // given
         Order completed = order(OrderStatus.Completed);
