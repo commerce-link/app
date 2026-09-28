@@ -178,6 +178,12 @@ class OrdersControllerTest {
     private SupplierChoice supplierChoice = new SupplierChoice(new SupplierRegistry(
             new SupplierProviderFactory(new ProviderConfigurationManager(mock(SecretsManager.class)))));
 
+    @Mock
+    private pl.commercelink.inventory.deliveries.DeliveriesRepository deliveriesRepository;
+    @Spy
+    private pl.commercelink.inventory.deliveries.DeliveryRedirectResolver deliveryRedirectResolver =
+            new pl.commercelink.inventory.deliveries.DeliveryRedirectResolver();
+
     @InjectMocks
     private OrdersController ordersController;
 
@@ -707,7 +713,7 @@ class OrdersControllerTest {
         posted.setService(true);
 
         // when
-        ordersController.saveOrderItem(ORDER_ID, item.getItemId(), posted, new ExtendedModelMap());
+        ordersController.saveOrderItem(ORDER_ID, item.getItemId(), posted, null, new ExtendedModelMap());
 
         // then
         assertThat(item.isService()).isTrue();
@@ -722,7 +728,7 @@ class OrdersControllerTest {
         posted.setService(false);
 
         // when
-        ordersController.saveOrderItem(ORDER_ID, item.getItemId(), posted, new ExtendedModelMap());
+        ordersController.saveOrderItem(ORDER_ID, item.getItemId(), posted, null, new ExtendedModelMap());
 
         // then
         assertThat(item.isService()).isFalse();
@@ -736,7 +742,7 @@ class OrdersControllerTest {
         posted.setService(true);
 
         // when
-        ordersController.saveOrderItem(ORDER_ID, item.getItemId(), posted, new ExtendedModelMap());
+        ordersController.saveOrderItem(ORDER_ID, item.getItemId(), posted, null, new ExtendedModelMap());
 
         // then
         assertThat(item.getCategory()).isNull();
@@ -752,7 +758,7 @@ class OrdersControllerTest {
         posted.setService(true);
 
         // when
-        ordersController.saveOrderItem(ORDER_ID, item.getItemId(), posted, new ExtendedModelMap());
+        ordersController.saveOrderItem(ORDER_ID, item.getItemId(), posted, null, new ExtendedModelMap());
 
         // then
         assertThat(item.isService()).isTrue();
@@ -772,7 +778,7 @@ class OrdersControllerTest {
         posted.setService(false);
 
         // when
-        ordersController.saveOrderItem(ORDER_ID, item.getItemId(), posted, new ExtendedModelMap());
+        ordersController.saveOrderItem(ORDER_ID, item.getItemId(), posted, null, new ExtendedModelMap());
 
         // then
         assertThat(item.isService()).isFalse();
@@ -794,7 +800,7 @@ class OrdersControllerTest {
         posted.setService(true);
 
         // when
-        ordersController.saveOrderItem(ORDER_ID, item.getItemId(), posted, new ExtendedModelMap());
+        ordersController.saveOrderItem(ORDER_ID, item.getItemId(), posted, null, new ExtendedModelMap());
 
         // then
         assertThat(item.isService()).isFalse();
@@ -815,7 +821,7 @@ class OrdersControllerTest {
         posted.setPrice(150.0);
 
         // when
-        ordersController.saveOrderItem(ORDER_ID, item.getItemId(), posted, new ExtendedModelMap());
+        ordersController.saveOrderItem(ORDER_ID, item.getItemId(), posted, null, new ExtendedModelMap());
 
         // then
         assertThat(item.getPrice()).isEqualTo(150.0);
@@ -832,7 +838,7 @@ class OrdersControllerTest {
         posted.setPrice(150.0);
 
         // when
-        ordersController.saveOrderItem(ORDER_ID, item.getItemId(), posted, new ExtendedModelMap());
+        ordersController.saveOrderItem(ORDER_ID, item.getItemId(), posted, null, new ExtendedModelMap());
 
         // then
         assertThat(item.getPrice()).isEqualTo(100.0);
@@ -851,11 +857,11 @@ class OrdersControllerTest {
         ExtendedModelMap model = new ExtendedModelMap();
 
         // when
-        String view = ordersController.saveOrderItem(ORDER_ID, item.getItemId(), posted, model);
+        String view = ordersController.saveOrderItem(ORDER_ID, item.getItemId(), posted, null, model);
 
         // then
-        assertThat(view).isEqualTo("orderItem");
-        assertThat(model.getAttribute("errorMessage")).isEqualTo("closed");
+        assertThat(view).isEqualTo("orders/item");
+        assertThat(model.getAttribute("itemError")).isEqualTo("closed");
         assertThat(item.isService()).isFalse();
         verify(orderItemsRepository, never()).save(any());
         verifyNoInteractions(orderLifecycle);
@@ -874,11 +880,11 @@ class OrdersControllerTest {
         ExtendedModelMap model = new ExtendedModelMap();
 
         // when
-        String view = ordersController.saveOrderItem(ORDER_ID, item.getItemId(), posted, model);
+        String view = ordersController.saveOrderItem(ORDER_ID, item.getItemId(), posted, null, model);
 
         // then
-        assertThat(view).isEqualTo("orderItem");
-        assertThat(model.getAttribute("errorMessage")).isEqualTo("closed");
+        assertThat(view).isEqualTo("orders/item");
+        assertThat(model.getAttribute("itemError")).isEqualTo("closed");
         assertThat(item.isService()).isFalse();
         verify(orderItemsRepository, never()).save(any());
         verifyNoInteractions(orderLifecycle);
@@ -896,11 +902,11 @@ class OrdersControllerTest {
         ExtendedModelMap model = new ExtendedModelMap();
 
         // when
-        ordersController.saveOrderItem(ORDER_ID, item.getItemId(), posted, model);
+        ordersController.saveOrderItem(ORDER_ID, item.getItemId(), posted, null, model);
 
         // then
         assertThat(item.getDeliveryId()).isNull();
-        assertThat(model.getAttribute("errorMessage")).isEqualTo("routed");
+        assertThat(model.getAttribute("itemError")).isEqualTo("routed");
         verify(orderItemsRepository, never()).save(any());
     }
 
@@ -914,7 +920,7 @@ class OrdersControllerTest {
         when(storesRepository.findById(STORE_ID)).thenReturn(storeRouting("Acme", "2"));
 
         // when
-        ordersController.saveOrderItem(ORDER_ID, item.getItemId(), posted, new ExtendedModelMap());
+        ordersController.saveOrderItem(ORDER_ID, item.getItemId(), posted, null, new ExtendedModelMap());
 
         // then
         assertThat(item.getDeliveryId()).isEqualTo("Acme");
@@ -1256,7 +1262,7 @@ class OrdersControllerTest {
         when(storesRepository.findById(STORE_ID)).thenReturn(storeRouting("Acme", "2"));
 
         // when
-        ordersController.saveOrderItem(ORDER_ID, item.getItemId(), posted, new ExtendedModelMap());
+        ordersController.saveOrderItem(ORDER_ID, item.getItemId(), posted, null, new ExtendedModelMap());
 
         // then
         assertThat(item.getDeliveryId()).isEqualTo("HURT-ABC");
@@ -1275,12 +1281,165 @@ class OrdersControllerTest {
         ExtendedModelMap model = new ExtendedModelMap();
 
         // when
-        ordersController.saveOrderItem(ORDER_ID, item.getItemId(), posted, model);
+        ordersController.saveOrderItem(ORDER_ID, item.getItemId(), posted, null, model);
 
         // then
         assertThat(item.getDeliveryId()).isNull();
-        assertThat(model.getAttribute("errorMessage")).isEqualTo("unknown");
+        assertThat(model.getAttribute("itemError")).isEqualTo("unknown");
         verify(orderItemsRepository, never()).save(any());
+    }
+
+    @Test
+    void savingItemTakesTheNameTypedForOtherSupplier() {
+        // given
+        OrderItem item = existingOrderItem("Laptopy", false);
+        OrderItem posted = postedOrderItem("Laptopy");
+        posted.setDeliveryId("__custom__");
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(routedOrder(null));
+        when(storesRepository.findById(STORE_ID)).thenReturn(storeRouting("Acme", "2"));
+
+        // when
+        ordersController.saveOrderItem(ORDER_ID, item.getItemId(), posted, " HURT-ABC ", new ExtendedModelMap());
+
+        // then
+        assertThat(item.getDeliveryId()).isEqualTo("HURT-ABC");
+        verify(orderItemsRepository).save(item);
+    }
+
+    @Test
+    void savingItemWithoutJavaScriptTakesATypedNameWhenTheSelectStayedEmpty() {
+        // given
+        OrderItem item = existingOrderItem("Laptopy", false);
+        OrderItem posted = postedOrderItem("Laptopy");
+        posted.setDeliveryId("");
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(routedOrder(null));
+        when(storesRepository.findById(STORE_ID)).thenReturn(storeRouting("Acme", "2"));
+
+        // when
+        ordersController.saveOrderItem(ORDER_ID, item.getItemId(), posted, "HURT-ABC", new ExtendedModelMap());
+
+        // then
+        assertThat(item.getDeliveryId()).isEqualTo("HURT-ABC");
+    }
+
+    @Test
+    void savingItemKeepsAnUnchangedSupplierThatIsNoLongerOffered() {
+        // given
+        OrderItem item = existingOrderItem("Laptopy", false);
+        item.setDeliveryId("Bravo-k7f3a9c2");
+        OrderItem posted = postedOrderItem("Laptopy");
+        posted.setDeliveryId("__custom__");
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        ordersController.saveOrderItem(ORDER_ID, item.getItemId(), posted, "Bravo-k7f3a9c2", model);
+
+        // then
+        assertThat(model.getAttribute("itemError")).isNull();
+        assertThat(item.getDeliveryId()).isEqualTo("Bravo-k7f3a9c2");
+        verify(orderItemsRepository).save(item);
+    }
+
+    @Test
+    void savingItemKeepsTheConsolidationFlagOnceTheOrderIsInvoiced() {
+        // given
+        OrderItem item = existingOrderItem("Laptopy", false);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(invoicedOrder());
+        OrderItem posted = postedOrderItem("Laptopy");
+        posted.setConsolidated(true);
+
+        // when
+        ordersController.saveOrderItem(ORDER_ID, item.getItemId(), posted, null, new ExtendedModelMap());
+
+        // then
+        assertThat(item.isConsolidated()).isFalse();
+        verify(orderItemsRepository).save(item);
+    }
+
+    static final String DELIVERY_ID = "b58e2f14-0001-4c7a-8b21-demo00000002";
+
+    @Test
+    void savingANewItemKeepsTheDeliveryIdItHolds() {
+        // given: old data, a new item whose deliveryId is a supplier delivery
+        OrderItem item = existingOrderItem("Laptopy", false);
+        item.setDeliveryId(DELIVERY_ID);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(new pl.commercelink.inventory.deliveries.Delivery());
+        OrderItem posted = postedOrderItem("Laptopy");
+        posted.setDeliveryId("__custom__");
+
+        // when
+        ordersController.saveOrderItem(ORDER_ID, item.getItemId(), posted, "HURT-ABC", new ExtendedModelMap());
+
+        // then
+        assertThat(item.getDeliveryId()).isEqualTo(DELIVERY_ID);
+        verify(orderItemsRepository).save(item);
+    }
+
+    @Test
+    void theItemPageShowsAnOrderedItemsDeliveryAsTheItemsTableDoes() {
+        // given
+        OrderItem item = existingOrderItem("Laptopy", false);
+        item.markAsOrdered(DELIVERY_ID, 10.0);
+        when(orderItemsRepository.findById(ORDER_ID, item.getItemId())).thenReturn(item);
+        pl.commercelink.web.orders.OrderItemRow.Delivery cell = new pl.commercelink.web.orders.OrderItemRow.Delivery(
+                "b58e2f14", "/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID, true);
+        when(pageModelFactory.delivery(any(), eq(item), any())).thenReturn(cell);
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        ordersController.getOrderItem(ORDER_ID, item.getItemId(), model);
+
+        // then
+        assertThat(model.getAttribute("delivery")).isEqualTo(cell);
+        assertThat(model.getAttribute("deliveryHeld")).isEqualTo(true);
+        assertThat(model.getAttribute("supplierCustom")).isNull();
+        verifyNoInteractions(deliveriesRepository);
+    }
+
+    @Test
+    void theItemPageOfAnItemWithoutDeliveryOffersNoSupplierAndLooksNothingUp() {
+        // given
+        OrderItem item = existingOrderItem("Laptopy", false);
+        when(orderItemsRepository.findById(ORDER_ID, item.getItemId())).thenReturn(item);
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        ordersController.getOrderItem(ORDER_ID, item.getItemId(), model);
+
+        // then
+        assertThat(model.getAttribute("deliveryHeld")).isEqualTo(false);
+        assertThat(model.getAttribute("supplierCurrent")).isNull();
+        assertThat(model.getAttribute("supplierCustom")).isNull();
+        verifyNoInteractions(deliveriesRepository);
+    }
+
+    @Test
+    void theItemPageOffersTheStoredSupplierAsAChoiceOrAsATypedName() {
+        // given
+        OrderItem offered = existingOrderItem("Laptopy", false);
+        offered.setDeliveryId("Acme");
+        OrderItem typed = new OrderItem(ORDER_ID, "Laptopy", "inna", 1, 100.0, null, false);
+        typed.setDeliveryId("HURT-ABC");
+        when(orderItemsRepository.findById(ORDER_ID, offered.getItemId())).thenReturn(offered);
+        when(orderItemsRepository.findById(ORDER_ID, typed.getItemId())).thenReturn(typed);
+        Store store = storeRouting("Acme", null);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(supplierLabels.forStore(any())).thenReturn(new SupplierLabels(mock(StoresRepository.class)).forStore(store));
+        ExtendedModelMap offeredModel = new ExtendedModelMap();
+        ExtendedModelMap typedModel = new ExtendedModelMap();
+
+        // when
+        String view = ordersController.getOrderItem(ORDER_ID, offered.getItemId(), offeredModel);
+        ordersController.getOrderItem(ORDER_ID, typed.getItemId(), typedModel);
+
+        // then
+        assertThat(view).isEqualTo("orders/item");
+        assertThat(offeredModel.getAttribute("supplierCurrent")).isEqualTo("Acme");
+        assertThat(offeredModel.getAttribute("supplierCustom")).isNull();
+        assertThat(offeredModel.getAttribute("statusKey")).isEqualTo("FulfilmentStatus.New");
+        assertThat(typedModel.getAttribute("supplierCurrent")).isNull();
+        assertThat(typedModel.getAttribute("supplierCustom")).isEqualTo("HURT-ABC");
+        assertThat(typedModel.getAttribute("deliveryHeld")).isEqualTo(false);
     }
 
     @Test
@@ -3309,7 +3468,7 @@ class OrdersControllerTest {
                     .isInstanceOf(ResponseStatusException.class);
             assertThatThrownBy(() -> ordersController.getOrderItem(ORDER_ID, "i1", new ExtendedModelMap()))
                     .isInstanceOf(ResponseStatusException.class);
-            assertThatThrownBy(() -> ordersController.saveOrderItem(ORDER_ID, "i1", new OrderItem(), new ExtendedModelMap()))
+            assertThatThrownBy(() -> ordersController.saveOrderItem(ORDER_ID, "i1", new OrderItem(), null, new ExtendedModelMap()))
                     .isInstanceOf(ResponseStatusException.class);
             verifyNoInteractions(orderItemsRepository);
         }

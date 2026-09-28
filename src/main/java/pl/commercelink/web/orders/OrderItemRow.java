@@ -34,8 +34,7 @@ public record OrderItemRow(String itemId, int index, String name, String categor
     public static OrderItemRow of(OrderItem item, int index, Context context) {
         String itemHref = "/dashboard/orders/" + context.order().getOrderId() + "/items/" + item.getItemId();
         String deliveryId = StringUtils.trimToNull(item.getDeliveryId());
-        String deliveryLabel = deliveryId == null ? null
-                : context.labels().has(deliveryId) ? context.labels().of(deliveryId) : item.getShortenedDeliveryId();
+        String deliveryLabel = deliveryLabel(item, context.labels());
         String serial = StringUtils.trimToNull(item.getSerialNo());
         boolean showCondition = item.getCondition() != null && !item.isSealed();
         return new OrderItemRow(
@@ -55,6 +54,22 @@ public record OrderItemRow(String itemId, int index, String name, String categor
                 item.getPrice(), item.getTax(), item.isGroup(),
                 // without the item menu a closed order would have no way to its item page (EAN, VAT, delivery dates)
                 context.readOnly() && !context.superAdmin() ? itemHref : null);
+    }
+
+    /**
+     * The fulfilment cell's second line on its own (the item page's header): the label and link of the table row, and
+     * whether the value is a supplier delivery's id rather than a supplier.
+     */
+    public record Delivery(String label, String href, boolean delivery) {
+    }
+
+    /** A store connection by its label; anything else (a delivery id, a typed supplier name) by its short form. */
+    public static String deliveryLabel(OrderItem item, SupplierLabelMap labels) {
+        String deliveryId = StringUtils.trimToNull(item.getDeliveryId());
+        if (deliveryId == null) {
+            return null;
+        }
+        return labels.has(deliveryId) ? labels.of(deliveryId) : item.getShortenedDeliveryId();
     }
 
     /** The SKU is printed only when it says more than the manufacturer code beside it. */

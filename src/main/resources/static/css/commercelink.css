@@ -6720,3 +6720,400 @@ a.cl-link-button:hover {
         right: 8px;
     }
 }
+
+/* --- Order printouts (orders/card, orders/collection) ---
+   On screen: a subpage with one card as the sheet, sections split by a line like field groups. Printed: only the sheet
+   on A4, black text, table headers repeated on every page and no row cut in half. */
+.cl-page .cl-print-sheet {
+    padding-bottom: 4px;
+}
+
+.cl-page dl.cl-kv.cl-print-meta {
+    padding-top: 16px;
+}
+
+.cl-page .cl-print-section {
+    padding-top: 14px;
+    border-top: 1px solid var(--cl-line);
+}
+
+.cl-page .cl-print-title {
+    margin: 0 20px 10px;
+    font-size: 16px;
+    font-weight: 650;
+    line-height: 1.3;
+    color: var(--cl-ink);
+}
+
+.cl-page .cl-print-empty,
+.cl-page p.cl-print-text,
+.cl-page .cl-print-statement {
+    margin: 0;
+    padding: 0 20px 16px;
+    font-size: 14px;
+    color: var(--cl-ink);
+}
+
+.cl-page .cl-print-empty {
+    color: var(--cl-ink-2);
+}
+
+/* the order and item comments keep the line breaks they were typed with */
+.cl-page .cl-print-text {
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+}
+
+/* A serial number or manufacturer code is copied by hand from paper, so it never breaks inside itself; several serial
+   numbers in one cell are separate spans and wrap only between them. On a phone a long code may still break so the
+   card row never scrolls sideways. */
+.cl-page .cl-print-table .cl-print-code {
+    white-space: nowrap;
+}
+
+.cl-page .cl-print-statement {
+    font-weight: 600;
+}
+
+/* Signature lines: the line is an input, so the name can be typed in before printing; the label sits under the line
+   like on a paper form. */
+.cl-page .cl-signatures {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 40px;
+    padding: 32px 20px 20px;
+}
+
+.cl-page .cl-signature {
+    display: flex;
+    flex-direction: column;
+    gap: var(--cl-gap-attached);
+}
+
+.cl-page .cl-signature-input {
+    width: 100%;
+    height: 44px;
+    padding: 0 4px;
+    border: 0;
+    border-bottom: 1px solid var(--cl-ink);
+    border-radius: 0;
+    background: transparent;
+    font: inherit;
+    font-size: 15px;
+    color: var(--cl-ink);
+    text-align: center;
+}
+
+.cl-page .cl-signature-input:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
+}
+
+.cl-page .cl-signature-label {
+    font-size: 13.5px;
+    font-weight: 500;
+    color: var(--cl-ink-2);
+    text-align: center;
+}
+
+/* .cl-table.is-compact (declared later with the same weight) takes back the 20 px edge of the first and last cell; the
+   printout's cells line up with its section titles instead, and in the phone's card rows sit flush like any cl-table. */
+@media screen and (min-width: 720px) {
+    .cl-page .cl-table.cl-print-table :is(th, td):first-child {
+        padding-left: 20px;
+    }
+
+    .cl-page .cl-table.cl-print-table :is(th, td):last-child {
+        padding-right: 20px;
+    }
+}
+
+@media screen and (max-width: 719px) {
+    .cl-page .cl-table.cl-print-table td {
+        padding: 3px 0;
+    }
+
+    .cl-page .cl-print-table .cl-print-code {
+        white-space: normal;
+        overflow-wrap: anywhere;
+    }
+
+    .cl-page .cl-print-title {
+        margin-left: 16px;
+        margin-right: 16px;
+    }
+
+    .cl-page .cl-print-empty,
+    .cl-page p.cl-print-text,
+    .cl-page .cl-print-statement {
+        padding-left: 16px;
+        padding-right: 16px;
+    }
+
+    .cl-page .cl-signatures {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 24px;
+        padding: 24px 16px 16px;
+    }
+}
+
+/* A named page, so the A4 size and margins apply to the printouts only, not to any other page someone prints. */
+@page cl-print-a4 {
+    size: A4;
+    margin: 14mm 12mm;
+}
+
+@media print {
+    .cl-page.cl-print-page {
+        page: cl-print-a4;
+        color: #000;
+        font-size: 10pt;
+    }
+
+    .cl-page.cl-print-page .cl-page-body {
+        max-width: none;
+    }
+
+    .cl-page.cl-print-page .cl-page-header {
+        margin-bottom: 8pt;
+    }
+
+    .cl-page.cl-print-page .cl-page-title {
+        font-size: 16pt;
+    }
+
+    .cl-page.cl-print-page :is(.cl-page-title, .cl-print-title, dt, dd, th, td, p, a, label, input) {
+        color: #000;
+    }
+
+    .cl-page .cl-print-sheet {
+        padding: 0;
+        border: 0;
+        border-radius: 0;
+        box-shadow: none;
+        background: none;
+    }
+
+    .cl-page dl.cl-kv.cl-print-meta {
+        gap: 4pt 16pt;
+        padding: 0 0 10pt;
+    }
+
+    .cl-page .cl-print-meta dt,
+    .cl-page .cl-print-meta dd {
+        font-size: 10pt;
+    }
+
+    .cl-page .cl-kv.cl-print-meta > div {
+        grid-template-columns: 32mm minmax(0, 1fr);
+    }
+
+    .cl-page .cl-kv.cl-print-meta dd a {
+        text-decoration: none;
+    }
+
+    .cl-page .cl-print-section {
+        padding-top: 8pt;
+        border-top-color: #000;
+    }
+
+    .cl-page .cl-print-title {
+        margin: 0 0 4pt;
+        font-size: 11pt;
+        break-after: avoid;
+    }
+
+    .cl-page .cl-print-empty,
+    .cl-page p.cl-print-text,
+    .cl-page .cl-print-statement {
+        padding: 0 0 8pt;
+        font-size: 10pt;
+    }
+
+    .cl-page .cl-print-table {
+        font-size: 9pt;
+    }
+
+    .cl-page .cl-print-table thead {
+        display: table-header-group;
+    }
+
+    .cl-page .cl-table.cl-print-table thead th {
+        padding: 4pt 6pt;
+        border-top: 0;
+        border-bottom: 1px solid #000;
+        background: none;
+        font-size: 9pt;
+        white-space: normal;
+    }
+
+    .cl-page .cl-table.cl-print-table td {
+        padding: 4pt 6pt;
+        border-bottom: 1px solid #999;
+    }
+
+    .cl-page .cl-table.cl-print-table :is(th, td):first-child {
+        padding-left: 0;
+    }
+
+    .cl-page .cl-table.cl-print-table :is(th, td):last-child {
+        padding-right: 0;
+    }
+
+    .cl-page .cl-print-table tr {
+        break-inside: avoid;
+    }
+
+    .cl-page .cl-print-signoff {
+        break-inside: avoid;
+    }
+
+    .cl-page .cl-signatures {
+        gap: 20mm;
+        padding: 22mm 0 0;
+    }
+
+    .cl-page .cl-signature-input {
+        height: auto;
+        min-height: 8mm;
+        border-bottom-color: #000;
+        font-size: 10pt;
+    }
+
+    .cl-page .cl-signature-label {
+        font-size: 9pt;
+    }
+}
+
+/* --- Dropship pages (dropshipCreate, dropshipConfirmation; order details subpages, group C, 2026-09-28) --- */
+/* Checkboxes stacked in one table cell (a product's order lines): no bullets, 4 px apart, each keeps its target. */
+.cl-page .cl-check-list {
+    display: grid;
+    gap: 4px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.cl-page .cl-check-list > li {
+    margin: 0;
+}
+
+/* The money input (a unit cost in a table row, the courier's cash-on-delivery amount): wide enough for 12 345,67 with
+   the number spinner, never wider than its cell. */
+.cl-page .cl-input.is-price {
+    width: 140px;
+    max-width: 100%;
+}
+
+/* A footer whose default (Enter) action is not its main one: the primary button comes later in the markup, first on
+   screen. */
+.cl-page .cl-card-footer.is-primary-first > .cl-button.is-primary {
+    order: -1;
+}
+
+.cl-page .cl-table col.cl-col-qty { width: 120px; }
+/* A column holding .cl-input.is-price: the input's 140 px plus the cell padding (12 px, 20 px at the row's end). */
+.cl-page .cl-table col.cl-col-price-input { width: 172px; }
+
+/* Work in progress in a card (a supplier being asked): spinner and one line of text beside it. */
+.cl-page .cl-loading {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+    font-size: 14px;
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-loading .cl-spinner {
+    width: 20px;
+    height: 20px;
+    border-width: 2px;
+    flex: none;
+}
+
+/* An alert alone in a padded wrapper (the validation area) ends with the wrapper's padding, not its own margin. */
+.cl-page .cl-card-inset > .cl-alert:only-child {
+    margin-bottom: 0;
+}
+
+/* ------------------------------------------------------------------------------------------------------------------
+   Courier booking page (shipping.html; orders, RMA and warehouse items) -- order details subpages, 2026-09-28
+   ------------------------------------------------------------------------------------------------------------------ */
+
+/* An address shown inside a form group (the recipient of a booking): the block's own padding and top rule belong to a
+   card section, while the fieldset already has both. */
+.cl-page .cl-fieldset > .cl-address {
+    padding: 0;
+    border-top: 0;
+}
+
+.cl-page .cl-fieldset > .cl-field + .cl-address {
+    margin-top: var(--cl-gap-fields);
+}
+
+/* A group that follows an edge-to-edge table in a card (booking options under the parcels) is set off like the next
+   fieldset would be. */
+.cl-page .cl-card > .cl-table + .cl-fieldset {
+    border-top: 1px solid var(--cl-line);
+}
+
+/* A warning under an option (a carrier's remark on its offer); the tone of .cl-help.is-warn. */
+.cl-page .cl-choice-description.is-warn {
+    color: var(--cl-warn);
+}
+
+/* --- Order item page (orders/item): a one-sixth column of the form grid for a short number (quantity, VAT multiplier).
+       On a phone it takes half the width, so the number is not stretched across the screen. --- */
+.cl-form-grid > .cl-span-1 { grid-column: span 1; }
+
+@media screen and (max-width: 719px) {
+    .cl-form-grid > .cl-span-1 {
+        grid-column: span 3;
+    }
+}
+
+/* An editable table of many short number fields (the parcels of a booking): column names wrap instead of pushing the
+   table past the page between 720 and 1023 px, and the row key is as wide as its text, not the 12rem product cell. */
+.cl-page .cl-table.is-editable.is-narrow thead th {
+    white-space: normal;
+    vertical-align: bottom;
+}
+
+@media screen and (min-width: 720px) {
+    .cl-page .cl-table.is-editable.is-narrow tbody th {
+        min-width: 0;
+        white-space: nowrap;
+    }
+}
+
+/* A data table whose key column (a product name) wraps instead of widening the table, without the order items table's
+   phone layout that .is-wrap brings: below 720 px it stays the generic card with a label beside every value. */
+.cl-page .cl-table.is-key-wrap {
+    table-layout: fixed;
+}
+
+.cl-page .cl-table.is-key-wrap .cl-table-key {
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+@media screen and (max-width: 719px) {
+    .cl-page .cl-table.is-key-wrap {
+        table-layout: auto;
+    }
+}
+
+/* A list summary with a form option on its left (dropship: "Usuń odznaczone" beside the net value). */
+.cl-page .cl-list-summary:has(> .cl-check) {
+    align-items: center;
+}
+
+.cl-page .cl-list-summary > .cl-check {
+    margin-right: auto;
+}
+
+.cl-page .cl-list-summary > p {
+    margin: 0;
+}

@@ -3,137 +3,183 @@
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
       layout:decorate="~{layout}">
 <body>
-
+<!--/* Second step of "Zamów u dostawcy" on a dropship delivery: the supplier's live availability and prices (fetched by
+       dropship-confirmation.js from .../dropship/validate, the validationResult fragment below), the supplier's order
+       options, then the order is forwarded. The form carries the first step's values in hidden fields; "Cofnij" posts
+       them back to the first step. */-->
 <div layout:fragment="content">
-
-    <section class="section">
-        <div class="container">
-            <h1 class="title" th:text="#{orders.dropship.confirm.title}">Dropship order confirmation</h1>
-            <h2 class="subtitle" th:text="${supplierLabels.of(form.provider)}">Supplier</h2>
-
-
-            <div th:replace="~{fragments/consignee-address :: consigneeAddress(${consignee}, ${pickupShipment})}"></div>
-
-            <div id="validation-area" class="mb-6">
-                <p class="mb-2" th:text="#{deliveries.purchase.confirm.checking}">Checking availability at the supplier...</p>
-                <progress class="progress is-small is-primary" max="100"></progress>
+    <section class="cl-page"
+             th:with="orderPath=${isSuperAdmin} ? |/dashboard/store/${form.storeId}/orders/${order.orderId}| : |/dashboard/orders/${order.orderId}|,
+                      supplierName=${supplierLabels.of(form.provider)}">
+        <div class="cl-page-body">
+            <!--/* The lead is defined inside the replaced element: the body of a th:replace host is dropped. */-->
+            <div th:replace="~{fragments/settings-header :: subpageWithActions(${orderPath}, #{order.page.title(${order.shortenedOrderId})},
+                    #{orders.dropship.confirm.title}, ~{::confirmationLead}, null)}">
+                <th:block th:fragment="confirmationLead"><span class="cl-status is-info is-leading" th:text="#{deliveries.dropship.badge}"></span> <span th:text="${supplierName}"></span></th:block>
             </div>
 
-            <form id="purchase-confirm-form"
-                  th:action="${isSuperAdmin} ? @{/dashboard/store/{storeId}/orders/{orderId}/dropship/confirm(storeId=${form.storeId},orderId=${order.orderId})} : @{/dashboard/orders/{orderId}/dropship/confirm(orderId=${order.orderId})}"
-                  th:attr="data-validate-url=${isSuperAdmin} ? @{/dashboard/store/{storeId}/orders/{orderId}/dropship/validate(storeId=${form.storeId},orderId=${order.orderId})} : @{/dashboard/orders/{orderId}/dropship/validate(orderId=${order.orderId})}"
-                  th:object="${form}" method="post"
-                  onsubmit="document.getElementById('purchase-confirm-submit').disabled = true;">
-                <div class="notification is-danger" th:if="${purchaseBlockedReason != null}"
-                     th:text="#{${purchaseBlockedReason}}">Blocked</div>
+            <div th:if="${purchaseBlockedReason != null}" class="cl-alert is-warn" id="purchase-blocked-reason">
+                <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+                <p class="cl-alert-text" th:text="#{${purchaseBlockedReason}}"></p>
+            </div>
+            <div th:if="${orderOptionsError}" class="cl-alert is-bad" id="order-options-blocked">
+                <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
+                <p class="cl-alert-text"><span th:text="#{deliveries.options.error}"></span> <span th:text="'(' + ${orderOptionsError} + ')'"></span></p>
+            </div>
+            <div th:if="${requiresApproval}" class="cl-alert is-info">
+                <i class="fas fa-info-circle cl-alert-icon" aria-hidden="true"></i>
+                <p class="cl-alert-text" th:text="#{deliveries.purchase.confirm.approvalNote}"></p>
+            </div>
 
-                <input type="hidden" id="order-options-blocked" th:if="${orderOptionsError}"/>
-                <div class="notification is-danger" th:if="${orderOptionsError}">
-                    <span th:text="#{deliveries.options.error}"></span>
-                    <span th:text="' (' + ${orderOptionsError} + ')'"></span>
+            <div class="cl-layout-aside">
+                <div class="cl-layout-main">
+                    <section class="cl-card" aria-labelledby="availability-title">
+                        <form id="purchase-confirm-form" method="post" th:object="${form}"
+                              th:action="@{${orderPath + '/dropship/confirm'}}"
+                              th:attr="data-validate-url=@{${orderPath + '/dropship/validate'}}">
+                            <div class="cl-card-head">
+                                <h2 class="cl-card-title" id="availability-title" th:text="#{orders.dropship.page.card.availability}"></h2>
+                            </div>
+                            <div id="validation-area" class="cl-card-section" aria-live="polite" aria-busy="true">
+                                <p class="cl-card-inset cl-loading">
+                                    <span class="cl-spinner" aria-hidden="true"></span>
+                                    <span th:text="#{deliveries.purchase.confirm.checking}"></span>
+                                </p>
+                            </div>
+
+                            <th:block th:replace="~{fragments/order-options :: clOrderOptions(${orderOptions}, ${selectedOptions})}"></th:block>
+
+                            <input type="hidden" name="purchaseRef" th:value="${purchaseRef}"/>
+                            <input type="hidden" th:field="*{storeId}"/>
+                            <input type="hidden" th:field="*{provider}"/>
+                            <input type="hidden" th:field="*{tax}"/>
+                            <input type="hidden" th:field="*{sourceCurrency}"/>
+                            <input type="hidden" th:field="*{removeUnselected}"/>
+                            <input type="hidden" th:field="*{externalDeliveryId}"/>
+                            <input type="hidden" th:field="*{shippingCost}"/>
+                            <input type="hidden" th:field="*{paymentCost}"/>
+                            <input type="hidden" th:field="*{paymentTerms}"/>
+
+                            <th:block th:each="item, itemStat : *{items}">
+                                <input type="hidden" th:field="*{items[__${itemStat.index}__].name}"/>
+                                <input type="hidden" th:field="*{items[__${itemStat.index}__].ean}"/>
+                                <input type="hidden" th:field="*{items[__${itemStat.index}__].mfn}"/>
+                                <input type="hidden" th:field="*{items[__${itemStat.index}__].orderedQty}"/>
+                                <input type="hidden" th:field="*{items[__${itemStat.index}__].requestedQty}"/>
+                                <input type="hidden" th:field="*{items[__${itemStat.index}__].unitCost}"/>
+                                <th:block th:each="allocation, allocStat : ${item.allocations}">
+                                    <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].key.orderId}"/>
+                                    <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].key.itemId}"/>
+                                    <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].key.name}"/>
+                                    <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].type}"/>
+                                    <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].name}"/>
+                                    <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].qty}"/>
+                                    <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].ean}"/>
+                                    <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].mfn}"/>
+                                    <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].deliveryId}"/>
+                                    <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].unitCost}"/>
+                                    <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].selected}"/>
+                                </th:block>
+                            </th:block>
+
+                            <div class="cl-card-footer">
+                                <!--/* Enabled by the script once the supplier confirmed full availability and every required
+                                       option is chosen; without JavaScript it stays disabled, as the check never runs. */-->
+                                <button type="submit" id="purchase-confirm-submit" class="cl-button is-primary" disabled
+                                        th:attr="data-blocked=${purchaseBlockedReason != null or orderOptionsError != null}"
+                                        th:text="${requiresApproval} ? #{deliveries.purchase.confirm.submitForApproval} : #{orders.dropship.confirm.submit}"></button>
+                                <button type="submit" class="cl-button" formnovalidate
+                                        th:formaction="@{${orderPath + '/dropship/purchase/back'}}"
+                                        th:text="#{deliveries.purchase.confirm.back}"></button>
+                            </div>
+                        </form>
+                    </section>
                 </div>
-                <div th:replace="~{fragments/order-options :: orderOptions(${orderOptions}, ${selectedOptions})}"></div>
-                <th:block th:replace="~{fragments/order-options :: orderOptionsScript}"></th:block>
 
-                <input type="hidden" name="purchaseRef" th:value="${purchaseRef}"/>
-
-                <input type="hidden" th:field="*{storeId}"/>
-                <input type="hidden" th:field="*{provider}"/>
-                <input type="hidden" th:field="*{tax}"/>
-                <input type="hidden" th:field="*{sourceCurrency}"/>
-                <input type="hidden" th:field="*{removeUnselected}"/>
-                <input type="hidden" th:field="*{externalDeliveryId}"/>
-                <input type="hidden" th:field="*{shippingCost}"/>
-                <input type="hidden" th:field="*{paymentCost}"/>
-                <input type="hidden" th:field="*{paymentTerms}"/>
-
-                <th:block th:each="item, itemStat : *{items}">
-                    <input type="hidden" th:field="*{items[__${itemStat.index}__].name}"/>
-                    <input type="hidden" th:field="*{items[__${itemStat.index}__].ean}"/>
-                    <input type="hidden" th:field="*{items[__${itemStat.index}__].mfn}"/>
-                    <input type="hidden" th:field="*{items[__${itemStat.index}__].orderedQty}"/>
-                    <input type="hidden" th:field="*{items[__${itemStat.index}__].requestedQty}"/>
-                    <input type="hidden" th:field="*{items[__${itemStat.index}__].unitCost}"/>
-                    <th:block th:each="allocation, allocStat : ${item.allocations}">
-                        <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].key.orderId}"/>
-                        <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].key.itemId}"/>
-                        <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].key.name}"/>
-                        <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].type}"/>
-                        <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].name}"/>
-                        <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].qty}"/>
-                        <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].ean}"/>
-                        <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].mfn}"/>
-                        <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].deliveryId}"/>
-                        <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].unitCost}"/>
-                        <input type="hidden" th:field="*{items[__${itemStat.index}__].allocations[__${allocStat.index}__].selected}"/>
-                    </th:block>
-                </th:block>
-
-                <div class="notification is-info is-light" th:if="${requiresApproval}"
-                     th:text="#{deliveries.purchase.confirm.approvalNote}">Handled by the platform administrator.</div>
-
-                <div class="buttons">
-                    <button type="submit" id="purchase-confirm-submit" class="button is-primary" disabled
-                            th:disabled="${purchaseBlockedReason != null}"
-                            th:attr="data-blocked=${purchaseBlockedReason != null}"
-                            th:text="${requiresApproval} ? #{deliveries.purchase.confirm.submitForApproval} : #{orders.dropship.confirm.submit}">Forward to supplier</button>
-                    <button type="submit" class="button" formnovalidate
-                            th:formaction="${isSuperAdmin} ? @{/dashboard/store/{storeId}/orders/{orderId}/dropship/purchase/back(storeId=${form.storeId},orderId=${order.orderId})} : @{/dashboard/orders/{orderId}/dropship/purchase/back(orderId=${order.orderId})}"
-                            th:text="#{deliveries.purchase.confirm.back}">Back</button>
-                </div>
-            </form>
-
-            <script th:inline="none">
-                let validationPassed = false;
-
-                function refreshSubmitState() {
-                    const submitButton = document.getElementById('purchase-confirm-submit');
-                    const optionsBlocked = document.getElementById('order-options-blocked') !== null;
-                    submitButton.disabled = !validationPassed || submitButton.dataset.blocked === 'true'
-                        || optionsBlocked || !orderOptionsComplete();
-                }
-
-                function loadValidation() {
-                    const form = document.getElementById('purchase-confirm-form');
-                    const area = document.getElementById('validation-area');
-                    validationPassed = false;
-                    refreshSubmitState();
-                    area.innerHTML = document.getElementById('validation-spinner-template').innerHTML;
-                    fetch(form.dataset.validateUrl, {method: 'POST', body: new URLSearchParams(new FormData(form))})
-                        .then(function (response) {
-                            if (!response.ok) {
-                                throw new Error('HTTP ' + response.status);
-                            }
-                            return response.text();
-                        })
-                        .then(function (html) {
-                            area.innerHTML = html;
-                            const result = area.querySelector('[data-fully-available]');
-                            validationPassed = !!(result && result.dataset.fullyAvailable === 'true');
-                            refreshSubmitState();
-                        })
-                        .catch(function () {
-                            area.innerHTML = document.getElementById('validation-error-template').innerHTML;
-                            validationPassed = false;
-                            refreshSubmitState();
-                        });
-                }
-                document.addEventListener('DOMContentLoaded', loadValidation);
-            </script>
+                <aside class="cl-layout-side">
+                    <section th:replace="~{fragments/consignee-address :: clConsignee(${consignee}, ${pickupShipment})}"></section>
+                </aside>
+            </div>
 
             <template id="validation-spinner-template">
-                <p class="mb-2" th:text="#{deliveries.purchase.confirm.checking}">Checking availability at the supplier...</p>
-                <progress class="progress is-small is-primary" max="100"></progress>
+                <p class="cl-card-inset cl-loading">
+                    <span class="cl-spinner" aria-hidden="true"></span>
+                    <span th:text="#{deliveries.purchase.confirm.checking}"></span>
+                </p>
             </template>
             <template id="validation-error-template">
-                <div class="notification is-danger">
-                    <span th:text="#{deliveries.purchase.confirm.checkFailed}">Failed to fetch availability from the supplier.</span>
-                    <a href="javascript:void(0)" onclick="loadValidation()" th:text="#{deliveries.purchase.confirm.retry}">Retry</a>
+                <div class="cl-card-inset">
+                    <div class="cl-alert is-bad">
+                        <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
+                        <p class="cl-alert-text"><span th:text="#{deliveries.purchase.confirm.checkFailed}"></span>
+                            <button type="button" class="cl-link-button" data-cl-validation-retry th:text="#{deliveries.purchase.confirm.retry}"></button></p>
+                    </div>
                 </div>
             </template>
+
+            <!--/* The availability check's answer (DropshipController#validateDropship): absent from the page itself, where
+                   neither validation nor validationError is set. */-->
+            <div th:fragment="validationResult" th:remove="${validation == null && validationError == null} ? all : none"
+                 th:attr="data-fully-available=${validation != null && validation.fullyAvailable()}">
+                <div class="cl-card-inset" th:if="${validationError}">
+                    <div class="cl-alert is-bad">
+                        <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
+                        <p class="cl-alert-text"><span th:text="${validationError}"></span>
+                            <button type="button" class="cl-link-button" data-cl-validation-retry th:text="#{deliveries.purchase.confirm.retry}"></button></p>
+                    </div>
+                </div>
+                <th:block th:if="${validation != null}">
+                    <div class="cl-card-inset" th:if="${!validation.fullyAvailable()}">
+                        <div class="cl-alert is-warn">
+                            <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+                            <p class="cl-alert-text" th:text="#{deliveries.purchase.confirm.unavailable.note}"></p>
+                        </div>
+                    </div>
+                    <table class="cl-table is-key-wrap">
+                        <colgroup>
+                            <col>
+                            <col class="cl-col-qty">
+                            <col class="cl-col-qty">
+                            <col class="cl-col-price">
+                            <col class="cl-col-price">
+                            <col class="cl-col-price">
+                        </colgroup>
+                        <thead>
+                        <tr>
+                            <th scope="col" th:text="#{general.product}"></th>
+                            <th scope="col" class="is-numeric" th:text="#{deliveries.purchase.confirm.requested}"></th>
+                            <th scope="col" class="is-numeric" th:text="#{deliveries.purchase.confirm.available}"></th>
+                            <th scope="col" class="is-numeric" th:text="#{deliveries.purchase.confirm.feedPrice}"></th>
+                            <th scope="col" class="is-numeric" th:text="#{deliveries.purchase.confirm.livePrice}"></th>
+                            <th scope="col" class="is-numeric"><abbr th:title="#{orders.dropship.page.priceDelta}">&Delta;</abbr></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="line : ${validation.lines()}">
+                            <th scope="row" class="cl-table-key" th:attr="data-label=#{general.product}">
+                                <span th:text="${line.name}"></span>
+                                <span class="cl-table-sub" th:text="#{orders.dropship.page.line.ean(${line.ean})}"></span>
+                            </th>
+                            <td class="is-numeric" th:attr="data-label=#{deliveries.purchase.confirm.requested}"><span th:text="${line.requestedQty}"></span></td>
+                            <td class="is-numeric" th:attr="data-label=#{deliveries.purchase.confirm.available}">
+                                <span><span th:text="${line.availableQty}"></span>
+                                    <span class="cl-status is-bad" th:if="${!line.isAvailable()}"
+                                          th:text="#{deliveries.purchase.confirm.missing} + ' ' + ${line.missingQty}"></span></span>
+                            </td>
+                            <td class="is-numeric" th:attr="data-label=#{deliveries.purchase.confirm.feedPrice}"><span th:text="${#numbers.formatDecimal(line.feedUnitCost, 1, 'WHITESPACE', 2, 'COMMA')}"></span></td>
+                            <td class="is-numeric" th:attr="data-label=#{deliveries.purchase.confirm.livePrice}"><span th:text="${#numbers.formatDecimal(line.liveUnitCost, 1, 'WHITESPACE', 2, 'COMMA')}"></span></td>
+                            <td class="is-numeric" th:attr="data-label=#{orders.dropship.page.priceDelta}"><span th:text="${#numbers.formatDecimal(line.priceDelta, 1, 'WHITESPACE', 2, 'COMMA')}"></span></td>
+                        </tr>
+                        </tbody>
+                    </table>
+                    <p class="cl-list-summary">
+                        <span><span th:text="#{deliveries.purchase.confirm.total}"></span>: <strong th:text="${#numbers.formatDecimal(validation.totalNet(), 1, 'WHITESPACE', 2, 'COMMA')} + ' ' + ${validation.currency()}"></strong></span>
+                    </p>
+                </th:block>
+            </div>
         </div>
     </section>
-
+    <script th:src="@{/js/dropship-confirmation.js}" defer></script>
 </div>
 </body>
 </html>

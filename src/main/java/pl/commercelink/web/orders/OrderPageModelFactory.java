@@ -241,6 +241,17 @@ public class OrderPageModelFactory {
                 item.getQty(), deliveryLabel, item.getSerialNo());
     }
 
+    /** The delivery of one item as its row in the items table shows it; null when the item has none. */
+    public OrderItemRow.Delivery delivery(Order order, OrderItem item, Viewer viewer) {
+        if (StringUtils.isBlank(item.getDeliveryId())) {
+            return null;
+        }
+        SupplierLabelMap labels = supplierLabels.forStore(storesRepository.findById(order.getStoreId()));
+        return new OrderItemRow.Delivery(OrderItemRow.deliveryLabel(item, labels),
+                deliveryHref(order, item, viewer, OrderLinks.of(order, viewer.superAdmin())),
+                deliveryRedirectResolver.pointsToDelivery(item));
+    }
+
     private String deliveryHref(Order order, OrderItem item, Viewer viewer, OrderLinks links) {
         String href = deliveryRedirectResolver.resolveFor(order, item);
         // the dropship screens are the admin's; a user or a super admin only sees the supplier's name

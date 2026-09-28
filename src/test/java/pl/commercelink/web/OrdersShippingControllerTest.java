@@ -20,6 +20,7 @@ import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.ShippingForm;
+import pl.commercelink.shipping.ShippingPageView;
 import pl.commercelink.shipping.ShippingService;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.stores.Store;
@@ -86,6 +87,8 @@ class OrdersShippingControllerTest {
         // then
         assertThat(view).isEqualTo("shipping");
         assertThat(((ShippingForm) model.get("shippingForm")).getShippingEntityType()).isEqualTo("orders");
+        assertThat(model.get("shippingPage")).isEqualTo(new ShippingPageView("/dashboard/orders/" + order.getOrderId(),
+                "order.page.title", order.getShortenedOrderId(), "shipping.lead.order", order.getShortenedOrderId()));
     }
 
     @Test

@@ -15,13 +15,17 @@ class DropshipTemplateTest {
         return Files.readString(Path.of("src/main/resources/templates/" + template), StandardCharsets.UTF_8);
     }
 
+    private static String script(String file) throws Exception {
+        return Files.readString(Path.of("src/main/resources/static/js/" + file), StandardCharsets.UTF_8);
+    }
+
     @Test
     void confirmationShowsTheConsigneeInsteadOfAnAddressPicker() throws Exception {
         // when
         String html = read("dropshipConfirmation.html");
 
         // then
-        assertThat(html).contains("fragments/consignee-address :: consigneeAddress(${consignee}, ${pickupShipment})");
+        assertThat(html).contains("fragments/consignee-address :: clConsignee(${consignee}, ${pickupShipment})");
         assertThat(html).doesNotContain("${consignee.streetAndNumber}");
         assertThat(html).doesNotContain("address-modal");
         assertThat(html).doesNotContain("deliveryAddressId");
@@ -83,7 +87,7 @@ class DropshipTemplateTest {
         String warehouse = read("deliveryCreate.html");
 
         // then
-        assertThat(dropship).contains("deliveries.create.title");
+        assertThat(dropship).contains("orders.dropship.page.create.title");
         assertThat(dropship).doesNotContain("deliveries.preview.dropship.order");
         assertThat(dropship).contains("dropship/create");
         assertThat(dropship).contains("dropship/purchase");
@@ -331,8 +335,8 @@ class DropshipTemplateTest {
         String html = read("dropshipCreate.html");
 
         // then
-        assertThat(html).contains("<span class=\"tag is-info ml-2\" th:text=\"#{deliveries.dropship.badge}\">");
-        assertThat(html).contains("fragments/consignee-address :: consigneeAddress(${consignee}, ${pickupShipment})");
+        assertThat(html).contains("<span class=\"cl-status is-info is-leading\" th:text=\"#{deliveries.dropship.badge}\">");
+        assertThat(html).contains("fragments/consignee-address :: clConsignee(${consignee}, ${pickupShipment})");
     }
 
     @Test
@@ -354,11 +358,12 @@ class DropshipTemplateTest {
         // then
         assertThat(create).contains("th:disabled=\"${purchaseBlockedReason != null}\"");
         assertThat(create).contains("#{${purchaseBlockedReason}}");
-        assertThat(create).contains("consigneeAddress(${consignee}, ${pickupShipment})");
+        assertThat(create).contains("clConsignee(${consignee}, ${pickupShipment})");
         assertThat(fragment).contains("th:fragment=\"consigneeAddress(consignee, pickupShipment)\"");
+        assertThat(fragment).contains("th:fragment=\"clConsignee(consignee, pickupShipment)\"");
         assertThat(fragment).contains("#{orders.dropship.confirm.pickupPoint}");
         assertThat(fragment).contains("${pickupShipment.collectionPointCode}");
-        assertThat(read("dropshipConfirmation.html")).contains("consigneeAddress(${consignee}, ${pickupShipment})");
+        assertThat(read("dropshipConfirmation.html")).contains("clConsignee(${consignee}, ${pickupShipment})");
         assertThat(read("deliveryApproval.html")).contains("consigneeAddress(${consignee}, ${pickupShipment})");
     }
 
@@ -370,10 +375,9 @@ class DropshipTemplateTest {
         // then
         assertThat(html).contains("th:if=\"${purchaseBlockedReason != null}\"");
         assertThat(html).contains("#{${purchaseBlockedReason}}");
-        assertThat(html).contains("id=\"purchase-confirm-submit\"");
-        assertThat(html).contains("th:disabled=\"${purchaseBlockedReason != null}\"");
-        assertThat(html).contains("th:attr=\"data-blocked=${purchaseBlockedReason != null}\"");
-        assertThat(html).contains("submitButton.dataset.blocked === 'true'");
+        assertThat(html).contains("id=\"purchase-confirm-submit\" class=\"cl-button is-primary\" disabled");
+        assertThat(html).contains("th:attr=\"data-blocked=${purchaseBlockedReason != null or orderOptionsError != null}\"");
+        assertThat(script("dropship-confirmation.js")).contains("submit.getAttribute('data-blocked') === 'true'");
     }
 
     @Test
@@ -394,16 +398,16 @@ class DropshipTemplateTest {
     void dropshipConfirmationRendersOrderOptionsInsideTheFormAndGatesSubmitOnThem() throws Exception {
         // when
         String html = read("dropshipConfirmation.html");
+        String script = script("dropship-confirmation.js");
 
         // then
-        assertThat(html).contains("fragments/order-options :: orderOptions(${orderOptions}, ${selectedOptions})");
+        assertThat(html).contains("fragments/order-options :: clOrderOptions(${orderOptions}, ${selectedOptions})");
+        assertThat(html.indexOf("clOrderOptions")).isBetween(html.indexOf("<form"), html.indexOf("</form>"));
         assertThat(html).contains("id=\"order-options-blocked\"");
         assertThat(html).contains("deliveries.options.error");
-        String script = html.substring(html.indexOf("<script th:inline=\"none\">"), html.indexOf("</script>"));
-        assertThat(script).contains("function refreshSubmitState()");
-        int refreshStart = script.indexOf("function refreshSubmitState()");
+        int refreshStart = script.indexOf("function refreshSubmitState(form)");
         int refreshEnd = script.indexOf("}", refreshStart);
-        assertThat(script.substring(refreshStart, refreshEnd)).contains("orderOptionsComplete()");
+        assertThat(script.substring(refreshStart, refreshEnd)).contains("optionsComplete(form)").contains("order-options-blocked");
     }
 
     @Test

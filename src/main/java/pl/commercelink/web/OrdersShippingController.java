@@ -19,6 +19,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import pl.commercelink.shipping.DeliveryTarget;
+import pl.commercelink.shipping.ShippingPageView;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.stores.IntegrationType;
 import pl.commercelink.stores.Store;
@@ -93,6 +94,13 @@ public class OrdersShippingController extends AbstractShippingController {
 
         orderLifecycle.update(order);
         orderLifecycleEventPublisher.publish(order, OrderLifecycleEventType.ShipmentCreated);
+    }
+
+    @Override
+    protected ShippingPageView pageView(ShippingForm form) {
+        Order order = requireOrder(form.getShippingEntityId());
+        return new ShippingPageView("/dashboard/orders/" + order.getOrderId(), "order.page.title",
+                order.getShortenedOrderId(), "shipping.lead.order", order.getShortenedOrderId());
     }
 
     private Order requireOrder(String orderId) {

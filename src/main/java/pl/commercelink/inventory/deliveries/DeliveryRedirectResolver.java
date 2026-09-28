@@ -32,6 +32,15 @@ public class DeliveryRedirectResolver {
         return resolveFor(item);
     }
 
+    /**
+     * Whether the item's deliveryId is the id of a supplier delivery (claimed, ordered, delivered) rather than the
+     * supplier it waits for (New, unclaimed Allocation) or the warehouse; the same split as the links above.
+     */
+    public boolean pointsToDelivery(Item item) {
+        return item.getDeliveryId() != null && !SupplierRegistry.WAREHOUSE.equalsIgnoreCase(item.getDeliveryId())
+                && !isAwaitingDelivery(item);
+    }
+
     private boolean isAwaitingDropshipDelivery(Order order, Item item) {
         return order.getFulfilmentType() == FulfilmentType.DirectToConsumer
                 && isAwaitingDelivery(item)

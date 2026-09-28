@@ -106,6 +106,7 @@ public abstract class AbstractShippingController {
         model.addAttribute("deliveryPointCode", resolveDeliveryTarget(shippingForm).pointCode());
         model.addAttribute("pickUpAddresses", store.getPickUpAddresses());
         model.addAttribute("packageTemplates", store.getPackageTemplates());
+        model.addAttribute("shippingPage", pageView(shippingForm));
 
         return "shipping";
     }
@@ -155,6 +156,8 @@ public abstract class AbstractShippingController {
     protected abstract void onShippingCreated(ShippingForm form, List<Shipment> shipments);
 
     protected abstract DeliveryTarget resolveDeliveryTarget(ShippingForm form);
+
+    protected abstract ShippingPageView pageView(ShippingForm form);
 
 }
 

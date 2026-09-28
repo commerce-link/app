@@ -75,9 +75,13 @@ import pl.commercelink.web.orders.OrderFlash;
 import pl.commercelink.web.orders.OrderLabels;
 import pl.commercelink.web.orders.OrderShipmentForm;
 import pl.commercelink.web.orders.OrderLinks;
+import pl.commercelink.web.orders.OrderPrintView;
 import pl.commercelink.web.orders.OrderNotice;
 import pl.commercelink.web.orders.OrderPageModel;
 import pl.commercelink.web.orders.OrderPageModelFactory;
+import pl.commercelink.web.orders.OrderItemRow;
+import pl.commercelink.inventory.deliveries.DeliveriesRepository;
+import pl.commercelink.inventory.deliveries.DeliveryRedirectResolver;
 import pl.commercelink.web.orders.OrderStatusOptions;
 import pl.commercelink.web.settings.SettingsPaths;
 import pl.commercelink.web.orders.OrderListQuery;
@@ -93,6 +97,7 @@ import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import pl.commercelink.inventory.deliveries.DropshipItemLookup;
 import pl.commercelink.inventory.supplier.SupplierChoice;
+import pl.commercelink.inventory.supplier.SupplierLabelMap;
 import pl.commercelink.inventory.supplier.SupplierLabels;
 
 import java.util.*;
@@ -175,6 +180,12 @@ public class OrdersController extends BaseController {
 
     @Autowired
     private OrderPageModelFactory pageModelFactory;
+
+    @Autowired
+    private DeliveryRedirectResolver deliveryRedirectResolver;
+
+    @Autowired
+    private DeliveriesRepository deliveriesRepository;
 
     @Autowired
     private OrderReferenceResolver orderReferenceResolver;
@@ -707,45 +718,43 @@ public class OrdersController extends BaseController {
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String getOrderCollectionProtocol(@PathVariable("orderId") String orderId, Model model) {
         Order order = requireOrder(ordersRepository, getStoreId(), orderId);
-        return renderOrderCollectionProtocol(order, model);
+        return renderOrderCollectionProtocol(order, false, model);
     }
 
     @GetMapping("/dashboard/store/{storeId}/orders/{orderId}/collection")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     public String getOrderCollectionProtocolForSuperAdmin(@PathVariable("storeId") String storeId, @PathVariable("orderId") String orderId, Model model) {
         Order order = requireOrder(ordersRepository, storeId, orderId);
-        return renderOrderCollectionProtocol(order, model);
+        return renderOrderCollectionProtocol(order, true, model);
     }
 
-    private String renderOrderCollectionProtocol(Order order, Model model) {
+    private String renderOrderCollectionProtocol(Order order, boolean superAdmin, Model model) {
         Store store = storesRepository.findById(order.getStoreId());
         List<OrderItem> orderItems = orderItemsRepository.findByOrderId(order.getOrderId());
 
-        model.addAttribute("store", store);
-        model.addAttribute("orderId", order.getOrderId());
-        model.addAttribute("collectedAt", LocalDate.now());
-        model.addAttribute("location", "Kraków, PL");
-        model.addAttribute("orderItems", orderItems);
-
-        return "orderPersonalCollection";
+        // the place is fixed text since the page was introduced; the store address is not used for it
+        model.addAttribute("print", OrderPrintView.collection(order, orderItems, store, LocalDate.now(), "Kraków, PL",
+                OrderLinks.of(order, superAdmin), supplierLabels.forStore(store)));
+        return "orders/collection";
     }
 
     @GetMapping("/dashboard/orders/{orderId}/card")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String getOrderCard(@PathVariable("orderId") String orderId, Model model) {
-        model.addAttribute("order", requireOrder(ordersRepository, getStoreId(), orderId));
-        model.addAttribute("orderItems", orderItemsRepository.findByOrderId(orderId));
-
-        return "orderCard";
+        return renderOrderCard(requireOrder(ordersRepository, getStoreId(), orderId), false, model);
     }
 
     @GetMapping("/dashboard/store/{storeId}/orders/{orderId}/card")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     public String getOrderCardForSuperAdmin(@PathVariable("storeId") String storeId, @PathVariable("orderId") String orderId, Model model) {
-        model.addAttribute("order", requireOrder(ordersRepository, storeId, orderId));
-        model.addAttribute("orderItems", orderItemsRepository.findByOrderId(orderId));
+        return renderOrderCard(requireOrder(ordersRepository, storeId, orderId), true, model);
+    }
 
-        return "orderCard";
+    private String renderOrderCard(Order order, boolean superAdmin, Model model) {
+        List<OrderItem> orderItems = orderItemsRepository.findByOrderId(order.getOrderId());
+        model.addAttribute("print", OrderPrintView.card(order, orderItems, OrderLinks.of(order, superAdmin),
+                supplierLabels.forStoreId(order.getStoreId())));
+        return "orders/card";
     }
 
     // Without JavaScript the "Wystaw" menu entry leads here instead of opening the issue dialog: the same question with
@@ -820,7 +829,8 @@ public class OrdersController extends BaseController {
 
     @PostMapping("/dashboard/orders/{orderId}/items/{itemId}/save")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String saveOrderItem(@PathVariable String orderId, @PathVariable String itemId, @ModelAttribute OrderItem updatedItem, Model model) {
+    public String saveOrderItem(@PathVariable String orderId, @PathVariable String itemId, @ModelAttribute OrderItem updatedItem,
+                                @RequestParam(required = false) String customSupplier, Model model) {
         Order order = requireOrder(ordersRepository, getStoreId(), orderId);
         List<OrderItem> orderItems = orderItemsRepository.findByOrderId(orderId);
 
@@ -832,7 +842,7 @@ public class OrdersController extends BaseController {
             OrderItem orderItem = op.get();
             // the item page of a closed order is read-only; a replayed or hand-made post must not change it either
             if (order.isClosed()) {
-                model.addAttribute("errorMessage",
+                model.addAttribute("itemError",
                         messageSource.getMessage("order.item.error.closed", null, LocaleContextHolder.getLocale()));
                 return showOrderItemDetails(order, orderItem, model);
             }
@@ -841,21 +851,33 @@ public class OrdersController extends BaseController {
             boolean serviceFlagLocked = orderItem.hasSupplierAllocation();
             boolean priceLocked = !order.getDocuments().isEmpty();
 
+            // The page offers the supplier as the assign-supplier dialog does: a connection, "Other supplier…" with a
+            // typed name, or none. Without JavaScript the typed-name field is always shown, so a name typed there
+            // counts even when the select was left on "none".
             String postedDeliveryId = StringUtils.trimToNull(updatedItem.getDeliveryId());
+            if (SupplierChoice.CUSTOM.equals(postedDeliveryId) || (postedDeliveryId == null && StringUtils.isNotBlank(customSupplier))) {
+                postedDeliveryId = StringUtils.trimToNull(customSupplier);
+            }
+            // a value that names a supplier delivery is not a supplier choice: the page shows it locked, and a
+            // hand-made post must not swap the delivery for a supplier either
+            if (holdsDelivery(order, orderItem)) {
+                postedDeliveryId = orderItem.getDeliveryId();
+            }
+            updatedItem.setDeliveryId(postedDeliveryId);
             boolean deliveryIdChanged = postedDeliveryId != null && !postedDeliveryId.equals(orderItem.getDeliveryId());
             if (deliveryIdChanged) {
                 Store store = storesRepository.findById(getStoreId());
                 // Same rules as the "assign supplier" modal: a connection identity or a typed name.
                 SupplierChoice.Resolution resolution = supplierChoice.resolve(store, postedDeliveryId, null);
                 if (!resolution.accepted()) {
-                    model.addAttribute("errorMessage", messageSource.getMessage(
+                    model.addAttribute("itemError", messageSource.getMessage(
                             resolution.errorCode(), resolution.errorArgs(), LocaleContextHolder.getLocale()));
                     return showOrderItemDetails(order, orderItem, model);
                 }
                 postedDeliveryId = resolution.identity();
                 updatedItem.setDeliveryId(postedDeliveryId);
                 if (!ExternalSupplierBinding.of(store, List.of(order)).permits(orderId, postedDeliveryId)) {
-                    model.addAttribute("errorMessage",
+                    model.addAttribute("itemError",
                             messageSource.getMessage("order.item.assign.supplier.routed", null, LocaleContextHolder.getLocale()));
                     return showOrderItemDetails(order, orderItem, model);
                 }
@@ -869,6 +891,11 @@ public class OrdersController extends BaseController {
             }
             if (priceLocked) {
                 updatedItem.setPrice(orderItem.getPrice());
+            }
+            // Same lock as the item menu's toggle: the flag is only read when the closing invoice is issued, so after
+            // that a change would silently not apply; the page shows the box disabled and the stored value stays.
+            if (order.isInvoiced()) {
+                updatedItem.setConsolidated(orderItem.isConsolidated());
             }
             orderItem.update(updatedItem);
 
@@ -1067,15 +1094,50 @@ public class OrdersController extends BaseController {
 
     private String showOrderItemDetails(Order order, OrderItem orderItem, Model model) {
         model.addAttribute("orderId", order.getOrderId());
+        model.addAttribute("shortId", order.getShortenedOrderId());
         model.addAttribute("orderItem", orderItem);
         model.addAttribute("categories", storeCategories.namesFor(order.getStoreId()));
         model.addAttribute("categoryGroups", storeCategories.groupsFor(order.getStoreId()));
-        model.addAttribute("fulfilmentStatuses", FulfilmentStatus.values());
         model.addAttribute("isCompletedOrder", order.isClosed());
         model.addAttribute("serviceFlagLocked", orderItem.hasSupplierAllocation());
         model.addAttribute("priceLocked", !order.getDocuments().isEmpty());
+        model.addAttribute("consolidationLocked", order.isInvoiced());
+        model.addAttribute("statusKey", OrderLabels.itemStatus(orderItem.getStatus()));
+        model.addAttribute("statusTone", OrderLabels.tone(orderItem.getStatus()));
 
-        return "orderItem";
+        // The header shows the item's delivery as its row in the items table does (supplier label, or the short id of
+        // a supplier delivery with its link).
+        OrderItemRow.Delivery delivery = pageModelFactory.delivery(order, orderItem,
+                new OrderPageModelFactory.Viewer(false, isAdmin(), null));
+        boolean deliveryHeld = holdsDelivery(order, orderItem);
+        model.addAttribute("delivery", delivery);
+        model.addAttribute("deliveryHeld", deliveryHeld);
+
+        // The supplier is chosen like in the assign-supplier dialog: a stored identity that is not an enabled
+        // connection (a typed name, a switched-off connection) comes back as "Other supplier…" with the name filled.
+        // A delivery id is never offered as a typed supplier name; the page keeps it as it is.
+        SupplierLabelMap labels = supplierLabels.forStore(storesRepository.findById(order.getStoreId()));
+        String deliveryId = StringUtils.trimToNull(orderItem.getDeliveryId());
+        boolean offered = deliveryId != null && labels.options().stream().anyMatch(option -> option.identity().equals(deliveryId));
+        model.addAttribute("suppliers", labels.options());
+        model.addAttribute("supplierCurrent", offered ? deliveryId : null);
+        model.addAttribute("supplierCustom", offered || deliveryHeld ? null : deliveryId);
+
+        return "orders/item";
+    }
+
+    /**
+     * Whether the item's deliveryId is a supplier delivery's id. The item's status says so once it is claimed, ordered
+     * or delivered (DeliveryRedirectResolver, as the items table links it); a new item holding one is only possible
+     * through old data, so there the delivery itself is looked up.
+     */
+    private boolean holdsDelivery(Order order, OrderItem item) {
+        String deliveryId = StringUtils.trimToNull(item.getDeliveryId());
+        if (deliveryId == null) {
+            return false;
+        }
+        return deliveryRedirectResolver.pointsToDelivery(item)
+                || (item.isNew() && deliveriesRepository.findById(order.getStoreId(), deliveryId) != null);
     }
 
     @PostMapping("/dashboard/orders/{orderId}/delete")

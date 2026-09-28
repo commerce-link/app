@@ -1,0 +1,81 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+<!--/* The collection protocol: printed and signed by both sides when the customer picks the order up in person. */-->
+<div layout:fragment="content" th:with="p=${print}">
+    <section class="cl-page cl-print-page">
+        <div class="cl-page-body">
+            <div th:replace="~{fragments/settings-header :: subpageWithActions(${p.detailsHref()},
+                    #{order.page.title(${p.shortId()})}, #{collection.title}, null, ~{orders/card :: printAction})}"></div>
+
+            <article class="cl-card cl-print-sheet">
+                <dl class="cl-kv cl-print-meta">
+                    <div>
+                        <dt th:text="#{collection.store.id}"></dt>
+                        <dd th:text="${p.store()}"></dd>
+                    </div>
+                    <div>
+                        <dt th:text="#{collection.order.id}"></dt>
+                        <dd><a th:href="@{${p.detailsHref()}}" th:text="${p.orderId()}"></a></dd>
+                    </div>
+                    <div>
+                        <dt th:text="#{collection.date}"></dt>
+                        <dd class="is-numeric" th:text="${p.date()}"></dd>
+                    </div>
+                    <div>
+                        <dt th:text="#{collection.location}"></dt>
+                        <dd th:text="${p.location()}"></dd>
+                    </div>
+                </dl>
+
+                <section class="cl-print-section" aria-labelledby="print-items-title">
+                    <h2 class="cl-print-title" id="print-items-title" th:text="#{collection.items}"></h2>
+                    <table th:if="${!p.items().isEmpty()}" class="cl-table is-compact cl-print-table">
+                        <thead>
+                        <tr>
+                            <th scope="col" th:text="#{collection.category}"></th>
+                            <th scope="col" th:text="#{collection.name}"></th>
+                            <th scope="col" class="is-numeric" th:text="#{collection.quantity}"></th>
+                            <th scope="col" th:text="#{collection.manufacturer.code}"></th>
+                            <th scope="col" th:text="#{collection.serial.no}"></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="r : ${p.items()}">
+                            <td th:attr="data-label=#{collection.category}" th:classappend="${r.category() == null} ? 'is-empty'" th:text="${r.category()}"></td>
+                            <td th:attr="data-label=#{collection.name}" th:text="${r.name()}"></td>
+                            <td class="is-numeric" th:attr="data-label=#{collection.quantity}" th:text="${r.qty()}"></td>
+                            <td class="cl-print-code" th:attr="data-label=#{collection.manufacturer.code}" th:classappend="${r.mfn() == null} ? 'is-empty'" th:text="${r.mfn()}"></td>
+                            <!--/* each serial number stays whole; a line may break only between two of them */-->
+                            <td th:attr="data-label=#{collection.serial.no}" th:classappend="${r.serialNo() == null} ? 'is-empty'"><span
+                                    th:if="${r.serialNo() != null}"><th:block th:each="sn, st : ${#strings.arraySplit(r.serialNo(), ',')}"><span
+                                    class="cl-print-code" th:text="${#strings.trim(sn)}"></span><th:block th:unless="${st.last}">, </th:block></th:block></span></td>
+                        </tr>
+                        </tbody>
+                    </table>
+                    <p th:if="${p.items().isEmpty()}" class="cl-print-empty" th:text="#{order.print.empty.products}"></p>
+                </section>
+
+                <div class="cl-print-section cl-print-signoff">
+                    <p class="cl-print-statement" th:text="#{collection.confirm}"></p>
+                    <!--/* Not a form: the fields only let the name be typed in before printing; the sheet is signed by hand. */-->
+                    <div class="cl-signatures">
+                        <div class="cl-signature">
+                            <input class="cl-signature-input" type="text" id="signature-store" autocomplete="off">
+                            <label class="cl-signature-label" for="signature-store" th:text="#{collection.store.signature}"></label>
+                        </div>
+                        <div class="cl-signature">
+                            <input class="cl-signature-input" type="text" id="signature-client" autocomplete="off">
+                            <label class="cl-signature-label" for="signature-client" th:text="#{collection.client.signature}"></label>
+                        </div>
+                    </div>
+                </div>
+            </article>
+        </div>
+    </section>
+    <script th:src="@{/js/print.js}" defer></script>
+</div>
+</body>
+</html>

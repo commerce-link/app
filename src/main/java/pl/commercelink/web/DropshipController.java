@@ -305,7 +305,7 @@ public class DropshipController extends BaseController {
                     messageSource.getMessage("deliveries.purchase.confirm.checkFailed", null, locale)
                             + (e.getMessage() != null ? " (" + e.getMessage() + ")" : ""));
         }
-        return "deliveryPurchaseConfirmation :: validationResult";
+        return "dropshipConfirmation :: validationResult";
     }
 
     private String executeDropship(String storeId, String orderId, String purchaseRef, DeliveryCreationForm form,
