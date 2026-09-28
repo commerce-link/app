@@ -109,7 +109,7 @@ public record OrderPageModel(String orderId, String shortId, String backHref, bo
     public record HistoryCard(List<EventRow> events, OrderReview review, String reviewStatusKey, String reviewRequestedAt,
                               boolean reviewEditable, List<OrderLabels.Option<OrderReviewStatus>> reviewStatuses) {
 
-        public static final int VISIBLE = 5;
+        public static final int VISIBLE = 3;
 
         /** How many of the newest events show before the "show earlier events" node; the rest stay in the same list, hidden by script. */
         public int visible() {
