@@ -7,7 +7,6 @@ import pl.commercelink.web.dtos.CountryOptions;
 
 import java.util.Locale;
 import java.util.Objects;
-import java.util.stream.Stream;
 
 public record AddressBlock(String name, String company, String taxId, String street, String cityLine, String country,
                            String email, String phone) {
@@ -47,9 +46,5 @@ public record AddressBlock(String name, String company, String taxId, String str
     /** The name the orders list shows for this address: the company, else the person. */
     public String companyOrPerson() {
         return company != null ? company : name;
-    }
-
-    public boolean isEmpty() {
-        return Stream.of(name, company, street, cityLine, email, phone).allMatch(Objects::isNull);
     }
 }

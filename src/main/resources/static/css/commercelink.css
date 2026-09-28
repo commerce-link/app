@@ -5447,8 +5447,8 @@ a.cl-link-button:hover {
 }
 
 /* Below 1366 px the side column left the product name ~110-180 px (four lines and more): one column instead, cards in
-   DOM order (items, shipments, documents, payments, then customer, dates, finances, history), so focus order and reading
-   order match what the eye sees. Declared after the column rules so its grid-area wins. */
+   DOM order (items, shipments, documents, payments, then dates and settings, customer, finances, history), so focus
+   order and reading order match what the eye sees. Declared after the column rules so its grid-area wins. */
 @media screen and (max-width: 1365px) {
     .cl-page .cl-layout-aside {
         grid-template-columns: minmax(0, 1fr);

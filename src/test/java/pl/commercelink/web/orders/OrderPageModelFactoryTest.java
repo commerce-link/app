@@ -428,7 +428,7 @@ class OrderPageModelFactoryTest {
 
         // then
         assertThat(page.header().clientName()).isNull();
-        assertThat(page.customer().billing().isEmpty()).isTrue();
+        assertThat(page.customer().billing()).isEqualTo(new AddressBlock(null, null, null, null, null, null, null, null));
         assertThat(page.payments().rows()).isEmpty();
     }
 
