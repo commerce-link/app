@@ -192,7 +192,7 @@
         <span th:text="#{order.items.qty.price(${row.qty()}, ${row.unitPrice()})}"></span>
         <span th:if="${row.unitCost() != null}" class="cl-table-sub" th:text="#{order.items.cost(${row.unitCost()})}"></span>
     </td>
-    <td th:attr="data-label=#{order.items.column.fulfilment}">
+    <td class="cl-table-fulfilment" th:attr="data-label=#{order.items.column.fulfilment}">
         <span class="cl-status" th:classappend="${row.statusTone()}" th:text="#{${row.statusKey()}}"></span>
         <span th:if="${row.deliveryLabel() != null}" class="cl-table-sub">
             <a th:if="${row.deliveryHref() != null}" class="cl-table-link" th:href="@{${row.deliveryHref()}}" th:text="${row.deliveryLabel()}"></a>

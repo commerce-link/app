@@ -5777,7 +5777,7 @@ a.cl-link-button:hover {
 /* Column widths of the order items table (fixed layout) */
 .cl-page .cl-table col.cl-col-check { width: 44px; }
 .cl-page .cl-table col.cl-col-price { width: 128px; }
-.cl-page .cl-table col.cl-col-state { width: 158px; }
+.cl-page .cl-table col.cl-col-state { width: 130px; }
 .cl-page .cl-table col.cl-col-menu { width: 56px; }
 /* A narrow yes/no column (a check mark or nothing), centred; its header may take two lines. As the last column
    (no menu: read-only order) it also carries the card's 20 px right edge. */
@@ -5786,6 +5786,19 @@ a.cl-link-button:hover {
 .cl-page .cl-table :is(th, td).cl-table-flag { padding-left: 6px; padding-right: 6px; text-align: center; }
 .cl-page .cl-table thead th.cl-table-flag { white-space: normal; line-height: 1.25; }
 .cl-page .cl-table .cl-table-flag-mark { color: var(--cl-ok); font-weight: 600; }
+
+/* The fulfilment-status pill in the 130 px state column: every normal label ("Nowy", "W alokacji", "Zamówiony"...)
+   still fits on one line; only the rare longest one ("W serwisie zewnętrznym") wraps inside the pill instead of
+   overflowing the cell. align-items switches to flex-start so the dot stays pinned to the first line instead of
+   drifting to the vertical centre of both lines, with a matching top offset so it still reads level with that line. */
+.cl-page .cl-table .cl-table-fulfilment .cl-status {
+    white-space: normal;
+    align-items: flex-start;
+}
+
+.cl-page .cl-table .cl-table-fulfilment .cl-status::before {
+    margin-top: 6px;
+}
 
 /* .cl-page .cl-table .cl-table-sub .cl-status and .cl-page .cl-table .cl-table-pills already style every .cl-table
    on main (catalog/inventory tables included); not repeated unscoped here, or a merged catalog/inventory screen
