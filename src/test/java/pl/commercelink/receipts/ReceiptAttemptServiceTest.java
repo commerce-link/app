@@ -249,6 +249,59 @@ class ReceiptAttemptServiceTest {
     }
 
     @Test
+    void manualIssueCreatesTheFirstAttemptBeforeDeliveryAndWithAutomationSwitchedOff() {
+        order.setStatus(pl.commercelink.orders.OrderStatus.Shipping);
+        order.getShipments().forEach(s -> s.setDeliveredAt(null));
+        store.getReceiptConfiguration().disable();
+
+        assertThat(service.canIssueManually(store, order)).isTrue();
+        ReceiptAttempt attempt = service.issueManually(STORE_ID, ORDER_ID, "operator");
+
+        assertThat(attempt.getReceiptKey()).isEqualTo(ORDER_ID + ":R1");
+        assertThat(attempt.getState()).isEqualTo(ReceiptAttemptState.ISSUING);
+        assertThat(attempt.getCreatedBy()).isEqualTo("operator");
+        verify(publisher).publishDue(attempt);
+        assertThat(service.startAutomatic(store, order)).isEmpty();
+    }
+
+    @Test
+    void manualIssueIsRefusedOnceTheOrderHasAnAttempt() {
+        service.startAutomatic(store, order);
+        attempts.update(STORE_ID, ORDER_ID + ":R1", a -> {
+            a.setState(ReceiptAttemptState.FAILED);
+            return true;
+        });
+
+        assertThat(service.canIssueManually(store, order)).isFalse();
+        assertThatThrownBy(() -> service.issueManually(STORE_ID, ORDER_ID, "operator"))
+                .extracting(e -> ((ReceiptActionException) e).getMessageKey())
+                .isEqualTo("receipts.action.issue.exists");
+        assertThat(attempts.all()).hasSize(1);
+    }
+
+    @Test
+    void manualIssueIsRefusedForAnOrderThatAlreadyHasAReceiptDocument() {
+        order.addDocument(new pl.commercelink.documents.Document("x", "PAR/1", null,
+                pl.commercelink.documents.DocumentType.Receipt));
+
+        assertThat(service.canIssueManually(store, order)).isFalse();
+        assertThatThrownBy(() -> service.issueManually(STORE_ID, ORDER_ID, "operator"))
+                .extracting(e -> ((ReceiptActionException) e).getMessageKey())
+                .isEqualTo("receipts.action.reissue.notEligible");
+        assertThat(attempts.all()).isEmpty();
+    }
+
+    @Test
+    void manualIssueIsRefusedWithoutAReceiptProvider() {
+        store.setConfigurationValue(IntegrationType.RECEIPT_PROVIDER, "uninstalled-adapter");
+
+        assertThat(service.canIssueManually(store, order)).isFalse();
+        assertThatThrownBy(() -> service.issueManually(STORE_ID, ORDER_ID, "operator"))
+                .extracting(e -> ((ReceiptActionException) e).getMessageKey())
+                .isEqualTo("receipts.action.reissue.noProvider");
+    }
+
+    @Test
     void manualReceiptIsBlockedWhileAnAttemptOwnsTheReceiptIncludingAfterAManualClose() {
         assertThat(service.blocksManualReceipt(STORE_ID, ORDER_ID)).isFalse();
         service.startAutomatic(store, order);

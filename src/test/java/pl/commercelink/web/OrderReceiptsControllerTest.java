@@ -96,6 +96,30 @@ class OrderReceiptsControllerTest {
     }
 
     @Test
+    void issueStartsTheFirstAttemptAsTheOperator() {
+        when(attemptService.issueManually(STORE_ID, ORDER_ID, "Jan Kowalski")).thenReturn(new ReceiptAttempt());
+        when(messageSource.getMessage("receipts.action.issue.done", null, LOCALE)).thenReturn("E-paragon jest wystawiany.");
+
+        String view = controller.issue(ORDER_ID, LOCALE, redirectAttributes);
+
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+        assertThat(redirectAttributes.getFlashAttributes().get("successMessage")).isEqualTo("E-paragon jest wystawiany.");
+        verify(attemptService).issueManually(STORE_ID, ORDER_ID, "Jan Kowalski");
+    }
+
+    @Test
+    void refusedIssueShowsTheReason() {
+        when(attemptService.issueManually(STORE_ID, ORDER_ID, "Jan Kowalski"))
+                .thenThrow(new ReceiptActionException("receipts.action.issue.exists"));
+        when(messageSource.getMessage("receipts.action.issue.exists", null, LOCALE)).thenReturn("Ma już e-paragon.");
+
+        controller.issue(ORDER_ID, LOCALE, redirectAttributes);
+
+        assertThat(redirectAttributes.getFlashAttributes().get("errorMessage")).isEqualTo("Ma już e-paragon.");
+        assertThat(redirectAttributes.getFlashAttributes()).doesNotContainKey("successMessage");
+    }
+
+    @Test
     void checkPassesTheKey() {
         String receiptKey = ORDER_ID + ":R1";
         when(messageSource.getMessage("receipts.action.check.done", null, LOCALE)).thenReturn("Stan paragonu zostanie sprawdzony za chwilę.");

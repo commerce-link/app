@@ -102,10 +102,7 @@ public class ReceiptAttemptService {
         if (store == null || order == null || !eligibility.orderQualifies(order)) {
             throw new ReceiptActionException("receipts.action.reissue.notEligible");
         }
-        String providerName = store.getConfigurationValue(IntegrationType.RECEIPT_PROVIDER);
-        if (providerName == null || providerFactory.getDescriptor(providerName) == null) {
-            // No provider chosen, or the chosen one's adapter is gone (uninstalled): either way there is nothing
-            // to issue with, and going on would fail deep inside convert() instead of with a clean refusal here.
+        if (!hasProvider(store)) {
             throw new ReceiptActionException("receipts.action.reissue.noProvider");
         }
         int next = existing.stream().mapToInt(ReceiptAttempt::getAttemptNo).max().orElse(0) + 1;
@@ -116,6 +113,43 @@ public class ReceiptAttemptService {
         // untouched, so the order page still shows why it needed correcting.
         existing.forEach(alerts::resolve);
         return created;
+    }
+
+    /**
+     * The order's first e-receipt, issued by the operator from the order's documents like an invoice. Unlike the
+     * automatic start it does not wait for delivery and does not need the store's automation switched on — only a
+     * provider to issue with; the attempt then runs exactly like an automatic one. An order that already has an
+     * attempt is refused: a live one owns the receipt, a dead one is replaced with "Wystaw ponownie".
+     */
+    public ReceiptAttempt issueManually(String storeId, String orderId, String actor) {
+        if (!attempts.findByOrder(storeId, orderId).isEmpty()) {
+            throw new ReceiptActionException("receipts.action.issue.exists");
+        }
+        Store store = storesRepository.findById(storeId);
+        Order order = ordersRepository.findById(storeId, orderId);
+        if (store == null || order == null || !eligibility.orderQualifies(order)) {
+            throw new ReceiptActionException("receipts.action.reissue.notEligible");
+        }
+        if (!hasProvider(store)) {
+            throw new ReceiptActionException("receipts.action.reissue.noProvider");
+        }
+        return create(store, order, 1, actor)
+                .orElseThrow(() -> new ReceiptActionException("receipts.action.reissue.concurrent"));
+    }
+
+    /** Whether the order documents offer "E-paragon": the conditions of {@link #issueManually} hold. */
+    public boolean canIssueManually(Store store, Order order) {
+        return store != null && hasProvider(store) && eligibility.orderQualifies(order)
+                && attemptsOf(order.getStoreId(), order.getOrderId()).isEmpty();
+    }
+
+    /**
+     * No provider chosen, or the chosen one's adapter is gone (uninstalled): either way there is nothing to issue
+     * with, and going on would fail deep inside convert() instead of with a clean refusal.
+     */
+    private boolean hasProvider(Store store) {
+        String providerName = store.getConfigurationValue(IntegrationType.RECEIPT_PROVIDER);
+        return providerName != null && providerFactory.getDescriptor(providerName) != null;
     }
 
     public void checkNow(String storeId, String receiptKey) {
