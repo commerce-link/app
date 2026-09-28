@@ -5200,6 +5200,7 @@ a.cl-link-button:hover {
 
 .cl-page .cl-kv.is-column > div {
     grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
 }
 
 .cl-page .cl-kv.is-column dd {

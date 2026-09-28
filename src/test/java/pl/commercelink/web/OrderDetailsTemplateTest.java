@@ -1505,14 +1505,25 @@ class OrderDetailsTemplateTest {
     }
 
     @Test
-    void thePreferredShippingExplanationIsVisibleNotATooltip() {
+    void thePreferredShippingRowInTheCardIsOrdinaryWithTheChosenDateLabel() {
         // when
-        String html = page(render(order(OrderStatus.New), ADMIN));
+        String card = card(page(render(order(OrderStatus.New), ADMIN)), "settings-title");
 
         // then
-        assertThat(html).doesNotContainPattern("<dt[^>]*title=")
-                .contains("<p class=\"cl-help is-note\">Ustawia klient na stronie zamówienia.</p>")
-                .containsPattern("<div class=\"cl-kv-wide\"><dt>Preferowana");
+        assertThat(card).containsPattern("<div><dt>Termin wybrany przez klienta</dt><dd>")
+                .doesNotContain("cl-kv-wide").doesNotContain("Preferowana wysyłka lub odbiór")
+                .doesNotContain("Ustawia klient na stronie zamówienia.");
+    }
+
+    @Test
+    void theSettingsDialogStillExplainsThePreferredDateIsSetByTheCustomerVisiblyNotAsATooltip() {
+        // when
+        String dialog = dialog(page(render(order(OrderStatus.New), ADMIN)), "settings-dialog");
+
+        // then
+        assertThat(dialog).doesNotContainPattern("<label[^>]*title=")
+                .contains("Preferowana wysyłka lub odbiór")
+                .contains("<p class=\"cl-help\" id=\"preferredShippingAt-help\">Ustawia klient na stronie zamówienia.</p>");
     }
 
     @Test
