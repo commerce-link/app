@@ -48,94 +48,32 @@
     <p th:if="${shipments.rows().isEmpty()}" class="cl-list-empty" th:text="#{${shipments.emptyKey()}}"></p>
 </section>
 
-<dialog th:fragment="dialog" class="cl-dialog is-form is-wide" id="shipments-dialog" aria-labelledby="shipments-dialog-title"
+<!--/* One group of fields per shipment (the design system's repeatable groups, repeat-fields.js): two columns instead
+     of an eight-column table, so the dialog never scrolls sideways and every select shows its whole option. */-->
+<dialog th:fragment="dialog" class="cl-dialog is-form" id="shipments-dialog" aria-labelledby="shipments-dialog-title"
         th:with="shipments=${page.shipments()}">
     <form method="post" th:action="@{/dashboard/orders/{o}/updateShipments(o=${page.orderId()})}" data-cl-shipments-form>
         <h2 class="cl-dialog-title" id="shipments-dialog-title" th:text="#{order.card.shipments}"></h2>
         <div class="cl-dialog-body">
-            <table class="cl-table is-compact is-editable">
-                <caption class="cl-visually-hidden" th:text="#{order.card.shipments}"></caption>
-                <thead><tr>
-                    <th scope="col" th:text="#{order.shipment.type}"></th>
-                    <th scope="col" th:text="#{order.shipment.carrier}"></th>
-                    <th scope="col" th:text="#{order.shipment.tracking.no}"></th>
-                    <th scope="col" th:text="#{order.collection.point}"></th>
-                    <th scope="col" th:text="#{order.shipment.tracking.url}"></th>
-                    <th scope="col" th:text="#{order.shipments.dialog.shipped}"></th>
-                    <th scope="col" th:text="#{order.shipments.dialog.delivered}"></th>
-                    <th scope="col"><span class="cl-visually-hidden" th:text="#{order.items.column.actions}"></span></th>
-                </tr></thead>
-                <tbody data-cl-shipment-rows>
-                <tr th:each="s, i : ${shipments.editable()}" th:with="known=${s.carrier == null or shipments.carriers().contains(s.carrier)}">
-                    <td th:attr="data-label=#{order.shipment.type}">
-                        <select class="cl-select" th:name="|shipments[${i.index}].type|" th:attr="aria-label=#{order.shipments.dialog.type(${i.count})}">
-                            <option th:each="type : ${shipments.types()}" th:value="${type.value().name()}" th:selected="${type.value() == s.type}"
-                                    th:text="#{${type.labelKey()}}"></option>
-                        </select>
-                    </td>
-                    <td th:attr="data-label=#{order.shipment.carrier}">
-                        <select th:if="${!shipments.carriers().isEmpty()}" class="cl-select" data-cl-carrier-select hidden
-                                th:attr="aria-label=#{order.shipments.dialog.carrier(${i.count})}">
-                            <option value=""></option>
-                            <option th:each="carrier : ${shipments.carriers()}" th:value="${carrier}" th:selected="${carrier == s.carrier}" th:text="${carrier}"></option>
-                            <option value="__other__" th:selected="${!known}" th:text="#{order.shipments.dialog.carrier.other}"></option>
-                        </select>
-                        <input class="cl-input" type="text" data-cl-carrier-input th:name="|shipments[${i.index}].carrier|" th:value="${s.carrier}"
-                               th:attr="aria-label=#{order.shipments.dialog.carrier.name(${i.count})}">
-                    </td>
-                    <td th:attr="data-label=#{order.shipment.tracking.no}">
-                        <input class="cl-input" type="text" th:name="|shipments[${i.index}].trackingNo|" th:value="${s.trackingNo}"
-                               th:attr="aria-label=#{order.shipments.dialog.tracking(${i.count})}">
-                    </td>
-                    <td th:attr="data-label=#{order.collection.point}">
-                        <input class="cl-input" type="text" th:name="|shipments[${i.index}].collectionPointCode|" th:value="${s.collectionPointCode}"
-                               th:attr="aria-label=#{order.shipments.dialog.point(${i.count})}">
-                    </td>
-                    <td th:attr="data-label=#{order.shipment.tracking.url}">
-                        <input class="cl-input" type="url" th:name="|shipments[${i.index}].trackingUrl|" th:value="${s.trackingUrl}"
-                               th:attr="aria-label=#{order.shipments.dialog.url(${i.count})}">
-                    </td>
-                    <td th:attr="data-label=#{order.shipments.dialog.shipped}">
-                        <input class="cl-input" type="datetime-local" th:name="|shipments[${i.index}].shippedAt|"
-                               th:value="${s.shippedAt != null} ? ${#temporals.format(s.shippedAt, 'yyyy-MM-dd''T''HH:mm')} : ''"
-                               th:attr="aria-label=#{order.shipments.dialog.shipped.row(${i.count})}">
-                    </td>
-                    <td th:attr="data-label=#{order.shipments.dialog.delivered}">
-                        <input class="cl-input" type="datetime-local" th:name="|shipments[${i.index}].deliveredAt|"
-                               th:value="${s.deliveredAt != null} ? ${#temporals.format(s.deliveredAt, 'yyyy-MM-dd''T''HH:mm')} : ''"
-                               th:attr="aria-label=#{order.shipments.dialog.delivered.row(${i.count})}">
-                    </td>
-                    <td class="cl-table-actions">
-                        <button type="button" class="cl-link-button is-danger" data-cl-shipment-remove th:text="#{general.delete}"></button>
-                    </td>
-                </tr>
-                </tbody>
-            </table>
-            <template data-cl-shipment-template>
-                <tr>
-                    <td><select class="cl-select" name="shipments[0].type">
-                        <option th:each="type : ${shipments.types()}" th:value="${type.value().name()}" th:text="#{${type.labelKey()}}"></option>
-                    </select></td>
-                    <td>
-                        <select th:if="${!shipments.carriers().isEmpty()}" class="cl-select" data-cl-carrier-select>
-                            <option value=""></option>
-                            <option th:each="carrier : ${shipments.carriers()}" th:value="${carrier}" th:text="${carrier}"></option>
-                            <option value="__other__" th:text="#{order.shipments.dialog.carrier.other}"></option>
-                        </select>
-                        <input class="cl-input" type="text" data-cl-carrier-input name="shipments[0].carrier">
-                    </td>
-                    <td><input class="cl-input" type="text" name="shipments[0].trackingNo"></td>
-                    <td><input class="cl-input" type="text" name="shipments[0].collectionPointCode"></td>
-                    <td><input class="cl-input" type="url" name="shipments[0].trackingUrl"></td>
-                    <td><input class="cl-input" type="datetime-local" name="shipments[0].shippedAt"></td>
-                    <td><input class="cl-input" type="datetime-local" name="shipments[0].deliveredAt"></td>
-                    <td class="cl-table-actions"><button type="button" class="cl-link-button is-danger" data-cl-shipment-remove th:text="#{general.delete}"></button></td>
-                </tr>
-            </template>
-            <p><button type="button" class="cl-link-button" data-cl-shipment-add>
-                <span class="icon is-small" aria-hidden="true"><i class="fas fa-plus"></i></span>
-                <span th:text="#{order.shipments.dialog.add}"></span>
-            </button></p>
+            <!--/* No noscript spare group: the dialog itself only opens with JavaScript. */-->
+            <div class="cl-repeat" data-cl-repeat="shipments" data-cl-repeat-id="shipment" id="shipments-groups">
+                <th:block th:each="s, i : ${shipments.editable()}">
+                    <fieldset class="cl-fieldset" data-cl-repeat-item
+                              th:insert="~{orders/details/shipments :: shipmentFields(${i.index}, ${i.count}, ${s}, ${shipments})}"></fieldset>
+                </th:block>
+                <template data-cl-repeat-template>
+                    <fieldset class="cl-fieldset" data-cl-repeat-item
+                              th:insert="~{orders/details/shipments :: shipmentFields('@INDEX@', '@NUMBER@', null, ${shipments})}"></fieldset>
+                </template>
+                <div class="cl-repeat-add">
+                    <button type="button" class="cl-button" data-cl-repeat-add hidden>
+                        <i class="fas fa-plus" aria-hidden="true"></i>
+                        <span th:text="#{order.shipments.dialog.add}"></span>
+                    </button>
+                    <span class="cl-visually-hidden" role="status" data-cl-repeat-status
+                          th:attr="data-template=#{order.shipments.dialog.removed('@N@')}"></span>
+                </div>
+            </div>
             <p class="cl-dialog-effect" th:text="#{order.shipments.dialog.effect}"></p>
         </div>
         <div class="cl-dialog-actions">
@@ -144,5 +82,68 @@
         </div>
     </form>
 </dialog>
+
+<!--/* The fields of one shipment; s is null in the blank template. The carrier is picked from the store's carriers,
+     or typed after "Other…": the select only fills the named text field (order-shipments.js). */-->
+<th:block th:fragment="shipmentFields(index, number, s, shipments)"
+          th:with="id=${'shipment-' + index}, name=${'shipments[' + index + '].'},
+                   carrier=${s != null ? s.carrier : null},
+                   picker=${!shipments.carriers().isEmpty()},
+                   known=${carrier == null or shipments.carriers().contains(carrier)}">
+    <legend class="cl-fieldset-title">
+        <span th:text="#{order.shipments.dialog.shipment}"></span>
+        <span data-cl-repeat-number th:text="${number}"></span>
+    </legend>
+    <div class="cl-form-grid">
+        <div class="cl-span-3 cl-field">
+            <label class="cl-label" th:for="${id + '-type'}" th:text="#{order.shipments.dialog.type}"></label>
+            <select class="cl-select" th:id="${id + '-type'}" th:name="${name + 'type'}">
+                <option th:each="type : ${shipments.types()}" th:value="${type.value().name()}"
+                        th:selected="${s != null and type.value() == s.type}" th:text="#{${type.labelKey()}}"></option>
+            </select>
+        </div>
+        <div class="cl-span-3 cl-field">
+            <label class="cl-label" th:for="${id + (picker ? '-carrier-select' : '-carrier')}" th:text="#{order.shipments.dialog.carrier}"></label>
+            <select th:if="${picker}" class="cl-select" data-cl-carrier-select hidden th:id="${id + '-carrier-select'}">
+                <option value=""></option>
+                <option th:each="c : ${shipments.carriers()}" th:value="${c}" th:selected="${c == carrier}" th:text="${c}"></option>
+                <option value="__other__" th:selected="${!known}" th:text="#{order.shipments.dialog.carrier.other}"></option>
+            </select>
+            <input class="cl-input" type="text" autocomplete="off" data-cl-carrier-input th:id="${id + '-carrier'}"
+                   th:name="${name + 'carrier'}" th:value="${carrier}"
+                   th:attr="aria-label=${picker} ? #{order.shipments.dialog.carrier.name} : null">
+        </div>
+        <div class="cl-span-3 cl-field">
+            <label class="cl-label" th:for="${id + '-tracking'}" th:text="#{order.shipments.dialog.tracking}"></label>
+            <input class="cl-input" type="text" autocomplete="off" th:id="${id + '-tracking'}" th:name="${name + 'trackingNo'}"
+                   th:value="${s != null ? s.trackingNo : null}">
+        </div>
+        <div class="cl-span-3 cl-field">
+            <label class="cl-label" th:for="${id + '-point'}" th:text="#{order.shipments.dialog.point}"></label>
+            <input class="cl-input" type="text" autocomplete="off" th:id="${id + '-point'}" th:name="${name + 'collectionPointCode'}"
+                   th:value="${s != null ? s.collectionPointCode : null}">
+        </div>
+        <div class="cl-field">
+            <label class="cl-label" th:for="${id + '-url'}" th:text="#{order.shipments.dialog.url}"></label>
+            <input class="cl-input" type="url" autocomplete="off" th:id="${id + '-url'}" th:name="${name + 'trackingUrl'}"
+                   th:value="${s != null ? s.trackingUrl : null}">
+        </div>
+        <div class="cl-span-3 cl-field">
+            <label class="cl-label" th:for="${id + '-shipped'}" th:text="#{order.shipments.dialog.shipped}"></label>
+            <input class="cl-input" type="datetime-local" th:id="${id + '-shipped'}" th:name="${name + 'shippedAt'}"
+                   th:value="${s != null and s.shippedAt != null} ? ${#temporals.format(s.shippedAt, 'yyyy-MM-dd''T''HH:mm')} : ''">
+        </div>
+        <div class="cl-span-3 cl-field">
+            <label class="cl-label" th:for="${id + '-delivered'}" th:text="#{order.shipments.dialog.delivered}"></label>
+            <input class="cl-input" type="datetime-local" th:id="${id + '-delivered'}" th:name="${name + 'deliveredAt'}"
+                   th:value="${s != null and s.deliveredAt != null} ? ${#temporals.format(s.deliveredAt, 'yyyy-MM-dd''T''HH:mm')} : ''">
+        </div>
+    </div>
+    <!--/* After the grid: the floated legend is cleared by the element that follows it, so it must be the grid. */-->
+    <button type="button" class="cl-link-button is-danger cl-repeat-remove" data-cl-repeat-remove hidden
+            th:text="#{general.delete}"
+            th:attr="aria-label=#{order.shipments.dialog.remove(${number})},
+                     data-cl-repeat-label=#{order.shipments.dialog.remove('@N@')}"></button>
+</th:block>
 </body>
 </html>

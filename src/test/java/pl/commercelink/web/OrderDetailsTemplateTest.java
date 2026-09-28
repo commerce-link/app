@@ -452,10 +452,33 @@ class OrderDetailsTemplateTest {
 
         // then
         assertThat(html).contains("id=\"shipments-dialog\"").contains("name=\"shipments[0].type\"")
-                .doesNotContain("name=\"shipments[1].type\"").contains("data-cl-shipment-template")
+                .doesNotContain("name=\"shipments[1].type\"").contains("data-cl-repeat=\"shipments\"")
+                .contains("data-cl-repeat-template").contains("name=\"shipments[@INDEX@].type\"")
                 .contains("data-cl-carrier-select").contains("value=\"__other__\"")
                 .containsPattern("<option[^>]*value=\"Courier\"[^>]*selected[^>]*>Kurier</option>")
                 .contains("name=\"shipments[0].trackingUrl\"");
+    }
+
+    @Test
+    void theShipmentsDialogLabelsEveryFieldOfAShipmentGroupInsteadOfATable() {
+        // given: a table of seven inputs scrolled sideways; one group per shipment keeps two columns of labelled fields
+        Order order = order(OrderStatus.Realization);
+        order.getShipments().get(0).setCarrier("DPD");
+
+        // when
+        String html = page(render(order, ADMIN));
+        int start = html.indexOf("<dialog class=\"cl-dialog is-form\" id=\"shipments-dialog\"");
+        assertThat(start).as("the standard form dialog, not the wide one of the table").isNotNegative();
+        String dialog = html.substring(start, html.indexOf("</dialog>", start));
+
+        // then: a label per field, the carrier label on the picker (the text field is named for "Other…")
+        assertThat(dialog).doesNotContain("<table").contains("<legend class=\"cl-fieldset-title\">")
+                .contains(">Przesyłka</span>").contains("aria-label=\"Usuń przesyłkę 1\"")
+                .contains("data-template=\"Usunięto przesyłkę @N@.\"")
+                .contains("for=\"shipment-0-carrier-select\"").contains("aria-label=\"Nazwa innego przewoźnika\"");
+        for (String field : List.of("type", "tracking", "point", "url", "shipped", "delivered")) {
+            assertThat(dialog).contains("for=\"shipment-0-" + field + "\"").contains("id=\"shipment-0-" + field + "\"");
+        }
     }
 
     @Test

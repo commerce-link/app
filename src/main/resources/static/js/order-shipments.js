@@ -1,8 +1,7 @@
-// The shipments dialog: no blank row is added on its own (it would post an empty shipment); "Add shipment"
-// clones the <template> row, "Delete" removes a row (the last one stays, the server keeps at least one
-// shipment), and the rows are renumbered shipments[0..n] so
-// Spring binds them without gaps. The carrier is chosen from the store's carriers or typed after "Other…": the select
-// only fills the named text field, so without JavaScript the text field alone is posted.
+// The shipments dialog: repeat-fields.js adds, removes and renumbers the shipment groups (no blank group is added on
+// its own, it would post an empty shipment; the last group stays, the server keeps at least one shipment). This script
+// only handles the carrier: it is chosen from the store's carriers or typed after "Other…", and the select only fills
+// the named text field, so the text field alone is what gets posted.
 (function () {
     'use strict';
 
@@ -10,21 +9,10 @@
     if (!form) {
         return;
     }
-    var body = form.querySelector('[data-cl-shipment-rows]');
-    var template = form.querySelector('template[data-cl-shipment-template]');
 
-    function renumber() {
-        Array.prototype.forEach.call(body.rows, function (row, index) {
-            row.querySelectorAll('[name^="shipments["]').forEach(function (field) {
-                field.name = field.name.replace(/shipments\[\d+]/, 'shipments[' + index + ']');
-            });
-            row.querySelector('[data-cl-shipment-remove]').hidden = body.rows.length <= 1;
-        });
-    }
-
-    function syncCarrier(row) {
-        var select = row.querySelector('select[data-cl-carrier-select]');
-        var input = row.querySelector('input[data-cl-carrier-input]');
+    function syncCarrier(group) {
+        var select = group.querySelector('select[data-cl-carrier-select]');
+        var input = group.querySelector('input[data-cl-carrier-input]');
         if (!select) {
             return;
         }
@@ -36,37 +24,21 @@
         }
     }
 
-    body.addEventListener('change', function (event) {
+    form.addEventListener('change', function (event) {
         if (event.target.matches('select[data-cl-carrier-select]')) {
-            var row = event.target.closest('tr');
-            syncCarrier(row);
+            var group = event.target.closest('[data-cl-repeat-item]');
+            syncCarrier(group);
             if (event.target.value === '__other__') {
-                var input = row.querySelector('input[data-cl-carrier-input]');
+                var input = group.querySelector('input[data-cl-carrier-input]');
                 input.value = '';
                 input.focus();
             }
         }
     });
 
-    body.addEventListener('click', function (event) {
-        var remove = event.target.closest && event.target.closest('[data-cl-shipment-remove]');
-        if (remove && body.rows.length > 1) {
-            var row = remove.closest('tr');
-            var next = row.nextElementSibling || row.previousElementSibling;
-            row.remove();
-            renumber();
-            next.querySelector('select, input').focus();
-        }
+    form.addEventListener('cl:repeat-added', function (event) {
+        syncCarrier(event.target);
     });
 
-    form.querySelector('[data-cl-shipment-add]').addEventListener('click', function () {
-        var row = template.content.firstElementChild.cloneNode(true);
-        body.appendChild(row);
-        renumber();
-        syncCarrier(row);
-        row.querySelector('select').focus();
-    });
-
-    Array.prototype.forEach.call(body.rows, syncCarrier);
-    renumber();
+    form.querySelectorAll('[data-cl-repeat-item]').forEach(syncCarrier);
 })();
