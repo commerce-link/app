@@ -35,6 +35,7 @@ import pl.commercelink.taxonomy.TaxonomyCache;
 import pl.commercelink.warehouse.api.ItemCondition;
 import pl.commercelink.web.orders.OrderPageModel;
 import pl.commercelink.web.orders.OrderPageModelFactory;
+import pl.commercelink.web.orders.OrderAddressForm;
 import pl.commercelink.web.orders.OrderLabels;
 import pl.commercelink.web.orders.OrderSettingsView;
 import pl.commercelink.web.settings.SettingsTemplateRenderer;
@@ -574,6 +575,124 @@ class OrderDetailsTemplateTest {
                 .contains("data-cl-dialog-close-on-success=\"true\"").contains("data-cl-async")
                 .containsPattern("<section class=\"cl-card\" aria-labelledby=\"settings-title\" data-cl-collapse");
         assertThat(html.indexOf("id=\"settings-title\"")).isLessThan(html.indexOf("id=\"settings-dialog\""));
+    }
+
+    @Test
+    void theAddressEditLinksOpenDialogsAndStillLeadToTheAddressPage() {
+        // given
+        Order order = order(OrderStatus.Assembly);
+        order.getBillingDetails().setCity("Warszawa");
+        order.getBillingDetails().setTaxId("5250000000");
+        ShippingDetails shipping = new ShippingDetails();
+        shipping.setName("Anna");
+        shipping.setCity("Kraków");
+        order.setShippingDetails(shipping);
+
+        // when
+        String html = page(render(order, ADMIN));
+
+        // then: each "Edytuj" is a link to the page, enhanced to open its own dialog
+        assertThat(html).containsPattern("href=\"/dashboard/orders/3e373abc-1111-2222-3333-444455556666/address\\?type=billing\"[^>]*data-cl-dialog-open=\"address-dialog-billing\"")
+                .containsPattern("href=\"/dashboard/orders/3e373abc-1111-2222-3333-444455556666/address\\?type=shipping\"[^>]*data-cl-dialog-open=\"address-dialog-shipping\"");
+        String billing = dialog(html, "address-dialog-billing");
+        assertThat(html).contains("<dialog class=\"cl-dialog is-form\" id=\"address-dialog-billing\"");
+        assertThat(billing).contains("aria-labelledby=\"address-billing-title\"")
+                .contains("id=\"address-billing-title\"").contains("Edytuj dane rozliczeniowe")
+                .contains("id=\"address-form-billing\"").contains("novalidate").contains("data-cl-async")
+                .contains("data-cl-dialog-close-on-success=\"true\"")
+                .contains("action=\"/dashboard/orders/3e373abc-1111-2222-3333-444455556666/updateAddressDetails?type=billing\"")
+                .contains("for=\"billingDetails.name\"").contains("id=\"billingDetails.name\" name=\"billingDetails.name\" type=\"text\" value=\"Piotr\"")
+                .contains("name=\"billingDetails.city\" type=\"text\" value=\"Warszawa\"")
+                .contains("name=\"billingDetails.taxId\" type=\"text\" value=\"5250000000\"")
+                .contains("autocomplete=\"off\"").contains("data-cl-dialog-close")
+                .doesNotContain("data-cl-error-summary").doesNotContain("aria-invalid");
+        String shippingDialog = dialog(html, "address-dialog-shipping");
+        assertThat(shippingDialog).contains("Edytuj adres wysyłki").contains("id=\"address-form-shipping\"")
+                .contains("name=\"shippingDetails.name\" type=\"text\" value=\"Anna\"")
+                .contains("name=\"shippingDetails.city\" type=\"text\" value=\"Kraków\"")
+                .contains("name=\"shippingDetails.companyName\"").doesNotContain("taxId");
+    }
+
+    @Test
+    void aLockedAddressHasNeitherEditLinkNorDialog() {
+        // given
+        Order invoiced = order(OrderStatus.Delivered);
+        invoiced.addDocument(new Document("fv", "FV/1", null, DocumentType.InvoiceVat));
+        Order labelled = order(OrderStatus.Realization);
+        Shipment parcel = new Shipment(ShipmentType.Courier);
+        parcel.setTrackingNo("T-1");
+        labelled.setShipments(new ArrayList<>(List.of(parcel)));
+
+        // when
+        String invoicedHtml = page(render(invoiced, ADMIN));
+        String labelledHtml = page(render(labelled, ADMIN));
+        String closedHtml = page(render(order(OrderStatus.Completed), ADMIN));
+        String superAdminHtml = page(render(order(OrderStatus.Assembly), SUPER_ADMIN));
+
+        // then
+        assertThat(invoicedHtml).doesNotContain("address-dialog-billing").contains("address-dialog-shipping")
+                .contains("Po wystawieniu faktury danych rozliczeniowych nie zmienisz.");
+        assertThat(labelledHtml).doesNotContain("address-dialog-shipping").contains("address-dialog-billing")
+                .contains("Etykieta już nadana — adresu wysyłki nie zmienisz.");
+        assertThat(closedHtml).doesNotContain("address-dialog").doesNotContain("updateAddressDetails");
+        assertThat(superAdminHtml).doesNotContain("address-dialog").doesNotContain("updateAddressDetails");
+    }
+
+    @Test
+    void theAsyncAddressAnswerShowsEachErrorNextToItsFieldAndASummary() {
+        // given: on the async path the model attribute "order" is the posted form, so the fragment reads only address
+        OrderAddressForm form = OrderAddressForm.shipping("3e373abc-1111-2222-3333-444455556666", new ShippingDetails());
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("order", new Object());
+        variables.put("address", form.withErrors(form.validate()));
+
+        // when
+        String html = SettingsTemplateRenderer.render("<div th:replace=\"~{orders/details/address :: dialogForm}\"></div>", variables);
+
+        // then
+        assertThat(html).startsWith("<form").contains("id=\"address-form-shipping\"")
+                .contains("data-cl-dialog-close-on-success=\"true\"").contains("id=\"address-shipping-title\"")
+                .contains("id=\"address-shipping-errors\"").contains("data-cl-error-summary")
+                .contains("href=\"#shippingDetails.name\"")
+                .containsPattern("id=\"shippingDetails.name\"[^>]*aria-invalid=\"true\"[^>]*aria-describedby=\"shippingDetails.name-error\"")
+                .contains("id=\"shippingDetails.name-error\"").contains("Imię jest wymagane")
+                .contains("Telefon jest wymagany").doesNotContain("??");
+        assertThat(occurrences(html, "class=\"cl-field-error\"")).isEqualTo(8);
+    }
+
+    @Test
+    void aRefusedAsyncAddressAnswerNamesTheReasonAboveTheFields() {
+        // given
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("address", OrderAddressForm.billing("3e373abc-1111-2222-3333-444455556666", new BillingDetails())
+                .withRefusal("Po wystawieniu faktury danych rozliczeniowych nie zmienisz."));
+
+        // when
+        String html = SettingsTemplateRenderer.render("<div th:replace=\"~{orders/details/address :: dialogForm}\"></div>", variables);
+
+        // then
+        assertThat(html).contains("data-cl-error-summary").contains("Po wystawieniu faktury danych rozliczeniowych nie zmienisz.")
+                .doesNotContain("aria-invalid");
+    }
+
+    @Test
+    void theAddressPageWithoutJavascriptPostsTheSameFormAndCancelsBackToTheOrder() {
+        // given
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("navigation", null);
+        variables.put("shortId", "3e373abc");
+        variables.put("address", OrderAddressForm.billing("3e373abc-1111-2222-3333-444455556666", order(OrderStatus.New).getBillingDetails()));
+
+        // when
+        String html = page(SettingsTemplateRenderer.render("orders/address", variables));
+
+        // then
+        assertThat(html).contains("id=\"address-form-billing\"")
+                .contains("action=\"/dashboard/orders/3e373abc-1111-2222-3333-444455556666/updateAddressDetails?type=billing\"")
+                .contains("href=\"/dashboard/orders/3e373abc-1111-2222-3333-444455556666\"")
+                .contains("Dane rozliczeniowe zamówienia 3e373abc").contains("value=\"Piotr\"")
+                .doesNotContain("data-cl-dialog-close-on-success").doesNotContain("data-cl-dialog-close")
+                .doesNotContain("class=\"input").doesNotContain("class=\"box").doesNotContain("??");
     }
 
     @Test

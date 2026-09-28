@@ -63,7 +63,8 @@ document.addEventListener('cl:form-replaced', (e) => {
   const dialog = form.closest('dialog');
   if (dialog && dialog.open) {
     dialog.close();
-    // the read-only card shows the saved values only after a reload; the toast already said "Zapisano"
+    // the read-only card shows the saved values only after a reload; the settings dialog's toast already said
+    // "Zapisano", an address dialog's notice waits for the reloaded page (flash)
     const card = document.getElementById('settings-body');
     if (card) card.setAttribute('aria-busy', 'true');
     window.location.reload();

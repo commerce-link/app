@@ -7,11 +7,12 @@ import java.util.Locale;
 
 /**
  * The billing and the shipping block are always shown in full, even when they are the same (the client wants both
- * readable at a glance, without a "same as billing" shortcut).
+ * readable at a glance, without a "same as billing" shortcut). An editable block carries its form: "Edit" opens it
+ * in a dialog, and leads to the address page without JavaScript.
  */
 public record CustomerView(AddressBlock billing, AddressBlock shipping, String shipmentTypeKey, String pickupPoint,
                            String billingEditHref, String billingLockedKey, String shippingEditHref,
-                           String shippingLockedKey) {
+                           String shippingLockedKey, OrderAddressForm billingForm, OrderAddressForm shippingForm) {
 
     public static CustomerView of(Order order, boolean readOnly, Locale locale) {
         String base = "/dashboard/orders/" + order.getOrderId() + "/address?type=";
@@ -24,7 +25,10 @@ public record CustomerView(AddressBlock billing, AddressBlock shipping, String s
                 readOnly || billingLockedKey != null ? null : base + "billing",
                 readOnly ? null : billingLockedKey,
                 readOnly || shippingLockedKey != null ? null : base + "shipping",
-                readOnly ? null : shippingLockedKey);
+                readOnly ? null : shippingLockedKey,
+                // the dialogs of the "Edit" links, filled with the saved address; none where there is no link
+                readOnly || billingLockedKey != null ? null : OrderAddressForm.billing(order.getOrderId(), order.getBillingDetails()),
+                readOnly || shippingLockedKey != null ? null : OrderAddressForm.shipping(order.getOrderId(), order.getShippingDetails()));
     }
 
     /**

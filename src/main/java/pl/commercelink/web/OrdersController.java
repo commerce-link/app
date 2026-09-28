@@ -68,6 +68,7 @@ import pl.commercelink.web.orders.BulkActionResult;
 import pl.commercelink.web.orders.CustomerView;
 import pl.commercelink.web.orders.Money;
 import pl.commercelink.web.orders.MoveTargetView;
+import pl.commercelink.web.orders.OrderAddressForm;
 import pl.commercelink.web.orders.OrderBackLink;
 import pl.commercelink.web.orders.OrderConfirmPages;
 import pl.commercelink.web.orders.OrderFlash;
@@ -1277,6 +1278,7 @@ public class OrdersController extends BaseController {
         return details(orderId);
     }
 
+    /** The address dialog of the customer card as its own page, for a browser without JavaScript. */
     @GetMapping("/dashboard/orders/{orderId}/address")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String showAddressDetails(@PathVariable String orderId, @RequestParam String type, Model model,
@@ -1287,33 +1289,83 @@ public class OrdersController extends BaseController {
         if (locked != null) {
             return refuse(redirectAttributes, orderId, locked, locale);
         }
-        model.addAttribute("order", order);
-        model.addAttribute("type", type);
-        return "orderAddressDetails";
+        if (!OrderAddressForm.isType(type)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+        OrderAddressForm form = OrderAddressForm.BILLING.equals(type)
+                ? OrderAddressForm.billing(orderId, order.getBillingDetails())
+                : OrderAddressForm.shipping(orderId, order.getShippingDetails());
+        return addressPage(order, form, model);
     }
 
+    /**
+     * Saves the billing or the shipping address from the customer card's dialog (async: 422 with the errors next to the
+     * fields, 200 once saved, the dialog then reloads the page) or from the address page without JavaScript.
+     */
     @PostMapping("/dashboard/orders/{orderId}/updateAddressDetails")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String updateAddressDetails(@PathVariable String orderId, @RequestParam String type, @ModelAttribute("order") Order updatedOrder, RedirectAttributes redirectAttributes, Locale locale) {
+    public String updateAddressDetails(@PathVariable String orderId, @RequestParam String type,
+                                       @ModelAttribute("order") Order updatedOrder,
+                                       @RequestHeader(value = SettingsPaths.ASYNC_HEADER, required = false) String requestedWith,
+                                       HttpServletRequest request, HttpServletResponse response, Model model,
+                                       RedirectAttributes redirectAttributes, Locale locale) {
         Order existingOrder = requireOrder(ordersRepository, getStoreId(), orderId);
-        if (existingOrder.isClosed()) {
-            return refuse(redirectAttributes, orderId, "order.address.error.closed", locale);
+        boolean async = SettingsPaths.isAsync(requestedWith);
+        if (!OrderAddressForm.isType(type)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
-        // once a label exists the address is fixed; the page greys the edit link with the same reason
-        if ("shipping".equals(type) && !existingOrder.canOperatorChangeShippingAddress()) {
-            return refuse(redirectAttributes, orderId, CustomerView.lockedKey(existingOrder, false), locale);
-        }
-        if ("billing".equals(type) && updatedOrder.getBillingDetails() != null) {
-            if (existingOrder.isInvoiced()) {
-                return refuse(redirectAttributes, orderId, CustomerView.lockedKey(existingOrder, true), locale);
+        boolean billing = OrderAddressForm.BILLING.equals(type);
+        OrderAddressForm posted = billing ? OrderAddressForm.billing(orderId, updatedOrder.getBillingDetails())
+                : OrderAddressForm.shipping(orderId, updatedOrder.getShippingDetails());
+
+        // once an invoice or a label exists the address is fixed; the card hides "Edit" with the same reason
+        String refusal = existingOrder.isClosed() ? "order.address.error.closed"
+                : billing && existingOrder.isInvoiced() ? CustomerView.lockedKey(existingOrder, true)
+                : !billing && !existingOrder.canOperatorChangeShippingAddress() ? CustomerView.lockedKey(existingOrder, false)
+                : null;
+        if (refusal != null) {
+            if (async) {
+                response.setStatus(HttpStatus.UNPROCESSABLE_ENTITY.value());
+                model.addAttribute("address", posted.withRefusal(messageSource.getMessage(refusal, null, locale)));
+                return "orders/details/address :: dialogForm";
             }
-            existingOrder.setBillingDetails(updatedOrder.getBillingDetails());
+            return refuse(redirectAttributes, orderId, refusal, locale);
         }
-        if ("shipping".equals(type) && updatedOrder.getShippingDetails() != null) {
+
+        Map<String, String> errors = posted.validate();
+        if (!errors.isEmpty()) {
+            if (async) {
+                response.setStatus(HttpStatus.UNPROCESSABLE_ENTITY.value());
+                model.addAttribute("address", posted.withErrors(errors));
+                return "orders/details/address :: dialogForm";
+            }
+            return addressPage(existingOrder, posted.withErrors(errors), model);
+        }
+
+        if (billing) {
+            existingOrder.setBillingDetails(updatedOrder.getBillingDetails());
+        } else {
             existingOrder.setShippingDetails(updatedOrder.getShippingDetails());
         }
         ordersRepository.save(existingOrder);
+
+        String saved = messageSource.getMessage(billing ? "order.address.billing.saved" : "order.address.shipping.saved",
+                null, locale);
+        if (async) {
+            // the dialog reloads the page it is on (keeping its returnTo), which takes this notice
+            OrderFlash.forNextPage(request, response, "/dashboard/orders/" + orderId,
+                    new OrderNotice(OrderLabels.OK, saved, null, null));
+            model.addAttribute("address", posted);
+            return "orders/details/address :: dialogForm";
+        }
+        OrderFlash.saved(redirectAttributes, saved);
         return details(orderId);
+    }
+
+    private String addressPage(Order order, OrderAddressForm form, Model model) {
+        model.addAttribute("address", form);
+        model.addAttribute("shortId", order.getShortenedOrderId());
+        return "orders/address";
     }
 
     @PostMapping("/dashboard/orders/{orderId}/updateReview")

@@ -82,6 +82,7 @@ import pl.commercelink.shipping.ShipmentCancelService;
 import pl.commercelink.web.dtos.AssignSupplierForm;
 import pl.commercelink.web.orders.BulkAction;
 import pl.commercelink.web.orders.MoveTargetView;
+import pl.commercelink.web.orders.OrderAddressForm;
 import pl.commercelink.web.orders.OrderFlash;
 import pl.commercelink.web.orders.OrderNotice;
 import pl.commercelink.web.orders.OrderPageModel;
@@ -257,14 +258,15 @@ class OrdersControllerTest {
     void updateAddressDetailsSetsBillingDetailsOnNonInvoicedOrderAndSaves() {
         // given
         Order existingOrder = orderBase();
-        BillingDetails newBilling = new BillingDetails();
+        BillingDetails newBilling = validBilling();
         newBilling.setCity("Krakow");
         Order updatedPayload = new Order(STORE_ID);
         updatedPayload.setBillingDetails(newBilling);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(existingOrder);
 
         // when
-        String view = ordersController.updateAddressDetails(ORDER_ID, "billing", updatedPayload, redirectAttributes, Locale.ENGLISH);
+        String view = ordersController.updateAddressDetails(ORDER_ID, "billing", updatedPayload, null, new MockHttpServletRequest(),
+                    new MockHttpServletResponse(), new ExtendedModelMap(), redirectAttributes, Locale.ENGLISH);
 
         // then
         ArgumentCaptor<Order> orderCaptor = ArgumentCaptor.forClass(Order.class);
@@ -278,7 +280,7 @@ class OrdersControllerTest {
     void updateAddressDetailsSetsFlashMessageAndSkipsSaveWhenOrderAlreadyInvoiced() {
         // given
         Order existingOrder = invoicedOrder();
-        BillingDetails newBilling = new BillingDetails();
+        BillingDetails newBilling = validBilling();
         newBilling.setCity("Krakow");
         Order updatedPayload = new Order(STORE_ID);
         updatedPayload.setBillingDetails(newBilling);
@@ -287,7 +289,8 @@ class OrdersControllerTest {
                 .thenReturn("Billing locked");
 
         // when
-        ordersController.updateAddressDetails(ORDER_ID, "billing", updatedPayload, redirectAttributes, Locale.ENGLISH);
+        ordersController.updateAddressDetails(ORDER_ID, "billing", updatedPayload, null, new MockHttpServletRequest(),
+                    new MockHttpServletResponse(), new ExtendedModelMap(), redirectAttributes, Locale.ENGLISH);
 
         // then
         verify(ordersRepository, never()).save(any());
@@ -299,14 +302,15 @@ class OrdersControllerTest {
     void updateAddressDetailsSetsShippingDetailsAndSavesWhenTypeIsShipping() {
         // given
         Order existingOrder = orderBase();
-        ShippingDetails newShipping = new ShippingDetails();
+        ShippingDetails newShipping = validShipping();
         newShipping.setCity("Wroclaw");
         Order updatedPayload = new Order(STORE_ID);
         updatedPayload.setShippingDetails(newShipping);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(existingOrder);
 
         // when
-        ordersController.updateAddressDetails(ORDER_ID, "shipping", updatedPayload, redirectAttributes, Locale.ENGLISH);
+        ordersController.updateAddressDetails(ORDER_ID, "shipping", updatedPayload, null, new MockHttpServletRequest(),
+                    new MockHttpServletResponse(), new ExtendedModelMap(), redirectAttributes, Locale.ENGLISH);
 
         // then
         ArgumentCaptor<Order> orderCaptor = ArgumentCaptor.forClass(Order.class);
@@ -2618,7 +2622,8 @@ class OrdersControllerTest {
             Order posted = shippingPayload();
 
             // when
-            ordersController.updateAddressDetails(ORDER_ID, "shipping", posted, redirect, polish);
+            ordersController.updateAddressDetails(ORDER_ID, "shipping", posted, null, new MockHttpServletRequest(),
+                    new MockHttpServletResponse(), new ExtendedModelMap(), redirect, polish);
 
             // then: only a label fixes the parcel address, the status does not
             verify(ordersRepository).save(order);
@@ -2637,7 +2642,8 @@ class OrdersControllerTest {
             RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
             // when
-            ordersController.updateAddressDetails(ORDER_ID, "shipping", shippingPayload(), redirect, polish);
+            ordersController.updateAddressDetails(ORDER_ID, "shipping", shippingPayload(), null, new MockHttpServletRequest(),
+                    new MockHttpServletResponse(), new ExtendedModelMap(), redirect, polish);
 
             // then
             verify(ordersRepository, never()).save(any());
@@ -2695,8 +2701,10 @@ class OrdersControllerTest {
             // when
             String billingView = ordersController.showAddressDetails(ORDER_ID, "billing", new ExtendedModelMap(), openBilling, polish);
             String shippingView = ordersController.showAddressDetails(ORDER_ID, "shipping", new ExtendedModelMap(), openShipping, polish);
-            ordersController.updateAddressDetails(ORDER_ID, "billing", billingPayload, saveBilling, polish);
-            ordersController.updateAddressDetails(ORDER_ID, "shipping", shippingPayload(), saveShipping, polish);
+            ordersController.updateAddressDetails(ORDER_ID, "billing", billingPayload, null, new MockHttpServletRequest(),
+                    new MockHttpServletResponse(), new ExtendedModelMap(), saveBilling, polish);
+            ordersController.updateAddressDetails(ORDER_ID, "shipping", shippingPayload(), null, new MockHttpServletRequest(),
+                    new MockHttpServletResponse(), new ExtendedModelMap(), saveShipping, polish);
 
             // then
             assertThat(billingView).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
@@ -2719,13 +2727,173 @@ class OrdersControllerTest {
             String view = ordersController.showAddressDetails(ORDER_ID, "shipping", model, new RedirectAttributesModelMap(), polish);
 
             // then
-            assertThat(view).isEqualTo("orderAddressDetails");
-            assertThat(model.getAttribute("order")).isSameAs(order);
-            assertThat(model.getAttribute("type")).isEqualTo("shipping");
+            assertThat(view).isEqualTo("orders/address");
+            OrderAddressForm form = (OrderAddressForm) model.getAttribute("address");
+            assertThat(form.type()).isEqualTo("shipping");
+            assertThat(form.orderId()).isEqualTo(ORDER_ID);
+            assertThat(form.errors()).isEmpty();
+        }
+
+        @Test
+        void anInvalidAddressFromTheDialogComesBackWithItsFieldErrorsAndSavesNothing() {
+            // given
+            Order order = order(OrderStatus.New);
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            Order posted = new Order(STORE_ID);
+            BillingDetails billing = validBilling();
+            billing.setName(" ");
+            billing.setCountry("Polska");
+            billing.setPhone("12");
+            posted.setBillingDetails(billing);
+            MockHttpServletResponse response = new MockHttpServletResponse();
+            ExtendedModelMap model = new ExtendedModelMap();
+
+            // when
+            String view = ordersController.updateAddressDetails(ORDER_ID, "billing", posted, "fetch",
+                    new MockHttpServletRequest(), response, model, new RedirectAttributesModelMap(), polish);
+
+            // then: the dialog's form is re-rendered with the posted values and an error per field
+            assertThat(view).isEqualTo("orders/details/address :: dialogForm");
+            assertThat(response.getStatus()).isEqualTo(422);
+            OrderAddressForm form = (OrderAddressForm) model.getAttribute("address");
+            assertThat(form.errors()).containsExactly(
+                    Map.entry("billingDetails.name", "billing.name.required"),
+                    Map.entry("billingDetails.country", "order.address.country.invalid"),
+                    Map.entry("billingDetails.phone", "billing.phone.invalid"));
+            assertThat(form.country()).isEqualTo("Polska");
+            verify(ordersRepository, never()).save(any());
+        }
+
+        @Test
+        void anInvalidAddressFromThePageWithoutJavascriptRendersThePageWithTheErrors() {
+            // given
+            Order order = order(OrderStatus.New);
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            Order posted = new Order(STORE_ID);
+            ShippingDetails shipping = validShipping();
+            shipping.setEmail("not-an-email");
+            posted.setShippingDetails(shipping);
+            ExtendedModelMap model = new ExtendedModelMap();
+
+            // when
+            String view = ordersController.updateAddressDetails(ORDER_ID, "shipping", posted, null,
+                    new MockHttpServletRequest(), new MockHttpServletResponse(), model, new RedirectAttributesModelMap(), polish);
+
+            // then
+            assertThat(view).isEqualTo("orders/address");
+            assertThat(((OrderAddressForm) model.getAttribute("address")).errors())
+                    .containsExactly(Map.entry("shippingDetails.email", "billing.email.invalid"));
+            verify(ordersRepository, never()).save(any());
+        }
+
+        @Test
+        void aValidAddressFromTheDialogIsSavedAndLeavesTheNoticeForTheReloadedPage() {
+            // given
+            Order order = order(OrderStatus.New);
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            Order posted = new Order(STORE_ID);
+            posted.setShippingDetails(validShipping());
+            MockHttpServletRequest request = new MockHttpServletRequest();
+            FlashMap flashMap = new FlashMap();
+            request.setAttribute(DispatcherServlet.OUTPUT_FLASH_MAP_ATTRIBUTE, flashMap);
+            request.setAttribute(DispatcherServlet.FLASH_MAP_MANAGER_ATTRIBUTE, new SessionFlashMapManager());
+            MockHttpServletResponse response = new MockHttpServletResponse();
+            ExtendedModelMap model = new ExtendedModelMap();
+
+            // when
+            String view = ordersController.updateAddressDetails(ORDER_ID, "shipping", posted, "fetch", request, response,
+                    model, new RedirectAttributesModelMap(), polish);
+
+            // then: 200 with the form lets the dialog close and reload; the notice waits for the order page
+            assertThat(view).isEqualTo("orders/details/address :: dialogForm");
+            assertThat(response.getStatus()).isEqualTo(200);
+            assertThat(((OrderAddressForm) model.getAttribute("address")).errors()).isEmpty();
+            assertThat(order.getShippingDetails()).isSameAs(posted.getShippingDetails());
+            verify(ordersRepository).save(order);
+            assertThat(flashMap.getTargetRequestPath()).isEqualTo("/dashboard/orders/" + ORDER_ID);
+            assertThat(((OrderNotice) flashMap.get(OrderFlash.ATTRIBUTE)).text()).isEqualTo("order.address.shipping.saved");
+        }
+
+        @Test
+        void aValidAddressFromThePageIsSavedAndReturnsToTheOrderWithTheNotice() {
+            // given
+            Order order = order(OrderStatus.New);
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            Order posted = new Order(STORE_ID);
+            posted.setBillingDetails(validBilling());
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            String view = ordersController.updateAddressDetails(ORDER_ID, "billing", posted, null,
+                    new MockHttpServletRequest(), new MockHttpServletResponse(), new ExtendedModelMap(), redirect, polish);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+            assertThat(order.getBillingDetails()).isSameAs(posted.getBillingDetails());
+            assertThat(((OrderNotice) flash(redirect).get(OrderFlash.ATTRIBUTE)).text()).isEqualTo("order.address.billing.saved");
+        }
+
+        @Test
+        void theDialogOfAnInvoicedOrderIsRefusedInsideTheDialogEvenWithAValidAddress() {
+            // given
+            Order order = order(OrderStatus.Delivered);
+            order.addDocument(document(DocumentType.Receipt, "PAR/1"));
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            Order posted = new Order(STORE_ID);
+            posted.setBillingDetails(validBilling());
+            MockHttpServletResponse response = new MockHttpServletResponse();
+            ExtendedModelMap model = new ExtendedModelMap();
+
+            // when
+            String view = ordersController.updateAddressDetails(ORDER_ID, "billing", posted, "fetch",
+                    new MockHttpServletRequest(), response, model, new RedirectAttributesModelMap(), polish);
+
+            // then
+            assertThat(view).isEqualTo("orders/details/address :: dialogForm");
+            assertThat(response.getStatus()).isEqualTo(422);
+            assertThat(((OrderAddressForm) model.getAttribute("address")).refusal()).isEqualTo("order.customer.billing.locked");
+            verify(ordersRepository, never()).save(any());
+        }
+
+        @Test
+        void theDialogOfALabelledOrOfAClosedOrderIsRefusedInsideTheDialog() {
+            // given
+            Order labelled = order(OrderStatus.Realization);
+            Shipment shipment = new Shipment(ShipmentType.Courier);
+            shipment.setTrackingNo("T-1");
+            labelled.setShipments(new ArrayList<>(List.of(shipment)));
+            Order closed = order(OrderStatus.Completed);
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(labelled, closed);
+            ExtendedModelMap labelledModel = new ExtendedModelMap();
+            ExtendedModelMap closedModel = new ExtendedModelMap();
+
+            // when
+            ordersController.updateAddressDetails(ORDER_ID, "shipping", shippingPayload(), "fetch",
+                    new MockHttpServletRequest(), new MockHttpServletResponse(), labelledModel, new RedirectAttributesModelMap(), polish);
+            ordersController.updateAddressDetails(ORDER_ID, "shipping", shippingPayload(), "fetch",
+                    new MockHttpServletRequest(), new MockHttpServletResponse(), closedModel, new RedirectAttributesModelMap(), polish);
+
+            // then
+            assertThat(((OrderAddressForm) labelledModel.getAttribute("address")).refusal()).isEqualTo("order.customer.shipping.locked.label");
+            assertThat(((OrderAddressForm) closedModel.getAttribute("address")).refusal()).isEqualTo("order.address.error.closed");
+            verify(ordersRepository, never()).save(any());
+        }
+
+        @Test
+        void anUnknownAddressTypeIsNotFound() {
+            // given
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order(OrderStatus.New));
+
+            // when / then
+            assertThatThrownBy(() -> ordersController.updateAddressDetails(ORDER_ID, "other", new Order(STORE_ID), null,
+                    new MockHttpServletRequest(), new MockHttpServletResponse(), new ExtendedModelMap(),
+                    new RedirectAttributesModelMap(), polish))
+                    .isInstanceOf(ResponseStatusException.class);
+            verify(ordersRepository, never()).save(any());
         }
 
         private Order shippingPayload() {
-            ShippingDetails posted = new ShippingDetails();
+            ShippingDetails posted = validShipping();
             posted.setCity("Wroclaw");
             Order payload = new Order(STORE_ID);
             payload.setShippingDetails(posted);
@@ -2954,10 +3122,36 @@ class OrdersControllerTest {
             assertThatThrownBy(() -> ordersController.showAddressDetails(ORDER_ID, "shipping", new ExtendedModelMap(),
                     new RedirectAttributesModelMap(), polish))
                     .isInstanceOf(ResponseStatusException.class);
-            assertThatThrownBy(() -> ordersController.updateAddressDetails(ORDER_ID, "shipping", posted,
-                    new RedirectAttributesModelMap(), polish))
+            assertThatThrownBy(() -> ordersController.updateAddressDetails(ORDER_ID, "shipping", posted, null, new MockHttpServletRequest(),
+                    new MockHttpServletResponse(), new ExtendedModelMap(), new RedirectAttributesModelMap(), polish))
                     .isInstanceOf(ResponseStatusException.class);
             verify(ordersRepository, never()).save(any());
         }
+    }
+
+    static BillingDetails validBilling() {
+        BillingDetails billing = new BillingDetails();
+        billing.setName("Jan");
+        billing.setSurname("Kowalski");
+        billing.setStreetAndNumber("ul. Prosta 1");
+        billing.setPostalCode("00-001");
+        billing.setCity("Warszawa");
+        billing.setCountry("PL");
+        billing.setEmail("jan@example.pl");
+        billing.setPhone("+48 600 700 800");
+        return billing;
+    }
+
+    static ShippingDetails validShipping() {
+        ShippingDetails shipping = new ShippingDetails();
+        shipping.setName("Anna");
+        shipping.setSurname("Nowak");
+        shipping.setStreetAndNumber("ul. Krzywa 2");
+        shipping.setPostalCode("30-001");
+        shipping.setCity("Kraków");
+        shipping.setCountry("PL");
+        shipping.setEmail("anna@example.pl");
+        shipping.setPhone("600700800");
+        return shipping;
     }
 }

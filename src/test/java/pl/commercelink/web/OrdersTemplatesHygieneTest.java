@@ -19,7 +19,7 @@ class OrdersTemplatesHygieneTest {
 
     static final Path TEMPLATES = Path.of("src/main/resources/templates");
     static final List<String> SINGLE_FILES = List.of("orders/details.html", "orders/status.html", "orders/settings.html",
-            "orders/parts.html", "orders/bulk-confirm.html");
+            "orders/address.html", "orders/parts.html", "orders/bulk-confirm.html");
     static final Pattern INLINE_SCRIPT = Pattern.compile("<script(?![^>]*\\bsrc=)([^>]*)>(.*?)</script>", Pattern.DOTALL);
 
     static List<Path> templates() throws IOException {

@@ -43,6 +43,8 @@
                     <th:block th:if="${page.documents().canAdd()}"><dialog th:replace="~{orders/details/documents :: documentDialog}"></dialog></th:block>
                     <th:block th:if="${!page.documents().issuable().isEmpty()}"><dialog th:replace="~{orders/details/documents :: issueDialog}"></dialog></th:block>
                     <dialog th:replace="~{orders/details/history :: reviewDialog}"></dialog>
+                    <th:block th:if="${page.customer().billingForm() != null}"><dialog th:replace="~{orders/details/address :: dialog(${page.customer().billingForm()})}"></dialog></th:block>
+                    <th:block th:if="${page.customer().shippingForm() != null}"><dialog th:replace="~{orders/details/address :: dialog(${page.customer().shippingForm()})}"></dialog></th:block>
                     <div th:replace="~{fragments/add-payment-modal :: addPaymentModal(
                             formAction=@{/dashboard/orders/{o}/addPayment(o=${page.orderId()})},
                             expectedAmount=${page.payments().expected()},

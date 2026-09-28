@@ -28,6 +28,7 @@ class OrderDetailsMessagesTest {
         files.add(Path.of("src/main/resources/templates/orders/details.html"));
         files.add(Path.of("src/main/resources/templates/orders/status.html"));
         files.add(Path.of("src/main/resources/templates/orders/settings.html"));
+        files.add(Path.of("src/main/resources/templates/orders/address.html"));
         files.add(Path.of("src/main/resources/templates/orders/parts.html"));
         try (Stream<Path> j = Files.walk(Path.of("src/main/java/pl/commercelink/web/orders"))) { j.filter(p -> p.toString().endsWith(".java")).forEach(files::add); }
         return files.stream();
