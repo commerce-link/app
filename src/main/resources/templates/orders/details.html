@@ -39,7 +39,7 @@
                     <th:block th:with="catalogs=${page.items().catalogs()}">
                         <div th:replace="~{fragments/item-add-modal :: itemAddModal(${page.orderId()}, '/dashboard/orders')}"></div>
                     </th:block>
-                    <dialog th:replace="~{orders/details/shipments :: dialog}"></dialog>
+                    <th:block th:replace="~{orders/details/shipments :: dialogs}"></th:block>
                     <th:block th:if="${page.documents().canAdd()}"><dialog th:replace="~{orders/details/documents :: documentDialog}"></dialog></th:block>
                     <th:block th:if="${!page.documents().issuable().isEmpty()}"><dialog th:replace="~{orders/details/documents :: issueDialog}"></dialog></th:block>
                     <dialog th:replace="~{orders/details/history :: reviewDialog}"></dialog>
@@ -67,7 +67,6 @@
     <script th:src="@{/js/order-items.js}" defer></script>
     <script th:src="@{/js/supplier-choice.js}" defer></script>
     <script th:src="@{/js/order-item-dialogs.js}" defer></script>
-    <script th:src="@{/js/repeat-fields.js}" defer></script>
     <script th:src="@{/js/order-shipments.js}" defer></script>
     <script th:src="@{/js/order-documents.js}" defer></script>
     <script th:src="@{/js/order-payments.js}" defer></script>

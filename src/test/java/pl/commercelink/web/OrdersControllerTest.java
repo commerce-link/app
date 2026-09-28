@@ -88,6 +88,7 @@ import pl.commercelink.web.orders.OrderNotice;
 import pl.commercelink.web.orders.OrderPageModel;
 import pl.commercelink.web.orders.OrderPageModelFactory;
 import pl.commercelink.web.orders.OrderSettingsView;
+import pl.commercelink.web.orders.OrderShipmentForm;
 import pl.commercelink.web.settings.ConfirmAction;
 
 import java.time.LocalDateTime;
@@ -318,267 +319,384 @@ class OrdersControllerTest {
         assertThat(orderCaptor.getValue().getShippingDetails().getCity()).isEqualTo("Wroclaw");
     }
 
-    @Test
-    @DisplayName("updateShipments publishes ShipmentCreated when the saved order has a shipment with shipping data")
-    void updateShipmentsPublishesShipmentCreatedWhenShippingDataPresent() {
-        // given
-        Order existingOrder = orderBase();
-        Shipment shipment = new Shipment(ShipmentType.Courier);
-        shipment.setCarrier("DPD");
-        shipment.setTrackingNo("TRACK-1");
-        shipment.setShippedAt(LocalDateTime.now());
-        Order updatedPayload = new Order(STORE_ID);
-        updatedPayload.setShipments(List.of(shipment));
-        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(existingOrder);
+    /** One shipment saved or removed at a time from its own dialog of the shipments card. */
+    @Nested
+    class Shipments {
 
-        // when
-        ordersController.updateShipments(ORDER_ID, updatedPayload, redirectAttributes, Locale.ENGLISH);
+        private final RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
-        // then
-        verify(orderLifecycleEventPublisher).publish(existingOrder, OrderLifecycleEventType.ShipmentCreated);
-    }
+        @BeforeEach
+        void messagesEchoTheirKeys() {
+            when(messageSource.getMessage(any(String.class), any(), any(Locale.class)))
+                    .thenAnswer(invocation -> invocation.getArgument(0));
+        }
 
-    @Test
-    @DisplayName("updateShipments keeps a shipment that only carries a manually entered collection point")
-    void updateShipmentsKeepsShipmentWithCollectionPointOnly() {
-        // given
-        Order existingOrder = orderBase();
-        Shipment dispatched = new Shipment(ShipmentType.Courier);
-        dispatched.setCarrier("DPD");
-        dispatched.setTrackingNo("TRACK-1");
-        dispatched.setShippedAt(LocalDateTime.now());
-        Shipment pointOnly = new Shipment(ShipmentType.PickupPoint);
-        pointOnly.setCollectionPointCode("KRA01M");
-        Order updatedPayload = new Order(STORE_ID);
-        updatedPayload.setShipments(List.of(dispatched, pointOnly));
-        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(existingOrder);
+        private Shipment courier(String trackingNo, LocalDateTime shippedAt) {
+            Shipment shipment = new Shipment(ShipmentType.Courier);
+            shipment.setCarrier("DPD");
+            shipment.setTrackingNo(trackingNo);
+            shipment.setShippedAt(shippedAt);
+            return shipment;
+        }
 
-        // when
-        ordersController.updateShipments(ORDER_ID, updatedPayload, redirectAttributes, Locale.ENGLISH);
+        private Order orderWith(Shipment... shipments) {
+            Order order = orderBase();
+            order.setShipments(new ArrayList<>(List.of(shipments)));
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            return order;
+        }
 
-        // then
-        assertThat(existingOrder.getShipments()).hasSize(2);
-        assertThat(existingOrder.getShipments().get(1).getCollectionPointCode()).isEqualTo("KRA01M");
-    }
+        /** Posts the fields of shipment as its form would: index null adds it, otherwise it replaces the one at index. */
+        private String save(Integer index, String version, Shipment shipment, String requestedWith,
+                            MockHttpServletResponse response, ExtendedModelMap model) {
+            return ordersController.saveShipment(ORDER_ID, index, version, shipment.getType(), shipment.getCarrier(),
+                    shipment.getTrackingNo(), shipment.getCollectionPointCode(), shipment.getTrackingUrl(),
+                    date(shipment.getShippedAt()), time(shipment.getShippedAt()),
+                    date(shipment.getDeliveredAt()), time(shipment.getDeliveredAt()), requestedWith,
+                    new MockHttpServletRequest(), response, model, redirect, Locale.ENGLISH);
+        }
 
-    @Test
-    @DisplayName("updateShipments lets the operator change a pickup-point shipment into a courier one and drop the point")
-    void updateShipmentsAppliesOperatorTypeChangeFromPickupPointToCourier() {
-        // given
-        Order existingOrder = orderBase();
-        Shipment locker = new Shipment(ShipmentType.PickupPoint);
-        locker.setCarrier("InPost");
-        locker.setCollectionPointCode("KRA01M");
-        existingOrder.setShipments(new ArrayList<>(List.of(locker)));
-        Shipment courier = new Shipment(ShipmentType.Courier);
-        courier.setCarrier("DPD");
-        courier.setTrackingNo("TRACK-9");
-        courier.setShippedAt(LocalDateTime.now());
-        courier.setCollectionPointCode(" ");
-        Order updatedPayload = new Order(STORE_ID);
-        updatedPayload.setShipments(List.of(courier));
-        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(existingOrder);
+        private String save(Integer index, String version, Shipment shipment) {
+            return save(index, version, shipment, null, new MockHttpServletResponse(), new ExtendedModelMap());
+        }
 
-        // when
-        ordersController.updateShipments(ORDER_ID, updatedPayload, redirectAttributes, Locale.ENGLISH);
+        private String date(LocalDateTime value) {
+            return value == null ? null : value.toLocalDate().toString();
+        }
 
-        // then
-        Shipment saved = existingOrder.getShipments().get(0);
-        assertThat(saved.getType()).isEqualTo(ShipmentType.Courier);
-        assertThat(saved.getCollectionPointCode()).isNull();
-        assertThat(saved.getCarrier()).isEqualTo("DPD");
-    }
+        private String time(LocalDateTime value) {
+            return value == null ? null : String.format("%02d:%02d", value.getHour(), value.getMinute());
+        }
 
-    @Test
-    @DisplayName("updateShipments does not publish ShipmentCreated when no shipment has shipping data")
-    void updateShipmentsSkipsPublishWhenShippingDataAbsent() {
-        // given
-        Order existingOrder = orderBase();
-        Shipment shipment = new Shipment(ShipmentType.PersonalCollection);
-        Order updatedPayload = new Order(STORE_ID);
-        updatedPayload.setShipments(List.of(shipment));
-        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(existingOrder);
+        private Object errorMessage() {
+            return redirect.getFlashAttributes().get("errorMessage");
+        }
 
-        // when
-        ordersController.updateShipments(ORDER_ID, updatedPayload, redirectAttributes, Locale.ENGLISH);
+        @Test
+        void aNewShipmentWithShippingDataIsAddedAndAnnounced() {
+            // given
+            Order order = orderWith(courier("TRACK-0", LocalDateTime.of(2026, 9, 1, 9, 0)));
 
-        // then
-        verify(orderLifecycleEventPublisher, never()).publish(any(), any());
-    }
+            // when
+            save(null, null, courier("TRACK-1", LocalDateTime.of(2026, 9, 2, 10, 30)));
 
-    @Test
-    @DisplayName("updateShipments publishes ShipmentCreated when the saved order has a personal-collection shipment")
-    void updateShipmentsPublishesShipmentCreatedWhenCollectionDataPresent() {
-        // given
-        Order existingOrder = orderBase();
-        Shipment shipment = new Shipment(ShipmentType.PersonalCollection);
-        shipment.setShippedAt(LocalDateTime.now());
-        Order updatedPayload = new Order(STORE_ID);
-        updatedPayload.setShipments(List.of(shipment));
-        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(existingOrder);
+            // then
+            assertThat(order.getShipments()).extracting(Shipment::getTrackingNo).containsExactly("TRACK-0", "TRACK-1");
+            assertThat(order.getShipments().get(1).getShippedAt()).isEqualTo(LocalDateTime.of(2026, 9, 2, 10, 30));
+            verify(orderLifecycleEventPublisher).publish(order, OrderLifecycleEventType.ShipmentCreated);
+        }
 
-        // when
-        ordersController.updateShipments(ORDER_ID, updatedPayload, redirectAttributes, Locale.ENGLISH);
+        @Test
+        void anIncompleteShipmentIsStoredAsTypedNextToACompleteOne() {
+            // given: the whole-list save dropped a courier shipment without carrier or date when another qualified
+            Order order = orderWith(courier("TRACK-1", LocalDateTime.of(2026, 9, 1, 9, 0)));
+            Shipment trackingOnly = new Shipment(ShipmentType.Courier);
+            trackingOnly.setTrackingNo("TRACK-2");
 
-        // then
-        verify(orderLifecycleEventPublisher).publish(existingOrder, OrderLifecycleEventType.ShipmentCreated);
-    }
+            // when
+            save(null, null, trackingOnly);
 
-    @Test
-    @DisplayName("updateShipments leaves existing shipments untouched when the payload carries no shipments list")
-    void updateShipmentsKeepsExistingShipmentsWhenPayloadShipmentsIsNull() {
-        // given
-        Order existingOrder = orderBase();
-        Shipment shipment = new Shipment(ShipmentType.Courier);
-        shipment.setCarrier("DPD");
-        shipment.setTrackingNo("TRACK-1");
-        shipment.setShippedAt(LocalDateTime.now());
-        existingOrder.setShipments(List.of(shipment));
-        Order updatedPayload = new Order(STORE_ID);
-        updatedPayload.setShipments(null);
-        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(existingOrder);
+            // then
+            assertThat(order.getShipments()).extracting(Shipment::getTrackingNo).containsExactly("TRACK-1", "TRACK-2");
+        }
 
-        // when
-        ordersController.updateShipments(ORDER_ID, updatedPayload, redirectAttributes, Locale.ENGLISH);
+        @Test
+        void aShipmentWithOnlyACollectionPointIsStored() {
+            // given
+            Order order = orderWith(courier("TRACK-1", LocalDateTime.of(2026, 9, 1, 9, 0)));
+            Shipment pointOnly = new Shipment(ShipmentType.PickupPoint);
+            pointOnly.setCollectionPointCode(" KRA01M ");
 
-        // then
-        assertThat(existingOrder.getShipments()).containsExactly(shipment);
-        verifyNoInteractions(orderLifecycleEventPublisher);
-    }
+            // when
+            save(null, null, pointOnly);
 
-    @Test
-    @DisplayName("updateShipments does not republish ShipmentCreated when resubmitted shipment data is unchanged")
-    void updateShipmentsDoesNotRepublishWhenShipmentDataUnchanged() {
-        // given
-        LocalDateTime shippedAt = LocalDateTime.now();
-        Order existingOrder = orderBase();
-        Shipment existingShipment = new Shipment(ShipmentType.Courier);
-        existingShipment.setCarrier("DPD");
-        existingShipment.setTrackingNo("TRACK-1");
-        existingShipment.setShippedAt(shippedAt);
-        existingOrder.setShipments(List.of(existingShipment));
-        Shipment resubmittedShipment = new Shipment(ShipmentType.Courier);
-        resubmittedShipment.setCarrier("DPD");
-        resubmittedShipment.setTrackingNo("TRACK-1");
-        resubmittedShipment.setShippedAt(shippedAt);
-        Order updatedPayload = new Order(STORE_ID);
-        updatedPayload.setShipments(List.of(resubmittedShipment));
-        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(existingOrder);
+            // then
+            assertThat(order.getShipments()).hasSize(2);
+            assertThat(order.getShipments().get(1).getCollectionPointCode()).isEqualTo("KRA01M");
+        }
 
-        // when
-        ordersController.updateShipments(ORDER_ID, updatedPayload, redirectAttributes, Locale.ENGLISH);
+        @Test
+        void thePickupPointOfAShipmentTurnedIntoACourierOneIsDropped() {
+            // given
+            Shipment locker = new Shipment(ShipmentType.PickupPoint);
+            locker.setCarrier("InPost");
+            locker.setCollectionPointCode("KRA01M");
+            Order order = orderWith(locker);
+            Shipment courier = courier("TRACK-9", LocalDateTime.of(2026, 9, 2, 10, 30));
+            courier.setCollectionPointCode(" ");
 
-        // then
-        verify(orderLifecycleEventPublisher, never()).publish(any(), any());
-    }
+            // when
+            save(0, OrderShipmentForm.version(locker), courier);
 
-    @Test
-    @DisplayName("updateShipments does not republish ShipmentCreated when only sub-minute shippedAt precision differs")
-    void updateShipmentsDoesNotRepublishWhenShippedAtLosesSubMinutePrecision() {
-        // given
-        Order existingOrder = orderBase();
-        Shipment existingShipment = new Shipment(ShipmentType.Courier);
-        existingShipment.setCarrier("DPD");
-        existingShipment.setTrackingNo("TRACK-1");
-        existingShipment.setShippedAt(LocalDateTime.of(2026, 7, 2, 14, 31, 22));
-        existingOrder.setShipments(List.of(existingShipment));
-        Shipment resubmittedShipment = new Shipment(ShipmentType.Courier);
-        resubmittedShipment.setCarrier("DPD");
-        resubmittedShipment.setTrackingNo("TRACK-1");
-        resubmittedShipment.setShippedAt(LocalDateTime.of(2026, 7, 2, 14, 31));
-        Order updatedPayload = new Order(STORE_ID);
-        updatedPayload.setShipments(List.of(resubmittedShipment));
-        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(existingOrder);
+            // then
+            Shipment saved = order.getShipments().get(0);
+            assertThat(saved.getType()).isEqualTo(ShipmentType.Courier);
+            assertThat(saved.getCollectionPointCode()).isNull();
+            assertThat(saved.getCarrier()).isEqualTo("DPD");
+        }
 
-        // when
-        ordersController.updateShipments(ORDER_ID, updatedPayload, redirectAttributes, Locale.ENGLISH);
+        @Test
+        void editingOneShipmentLeavesTheOthersAsTheyWere() {
+            // given
+            Shipment first = courier("TRACK-1", LocalDateTime.of(2026, 9, 1, 9, 0));
+            first.setExternalId("PKG-1");
+            Shipment second = courier("TRACK-2", LocalDateTime.of(2026, 9, 1, 9, 0));
+            Order order = orderWith(first, second);
+            Shipment edited = courier("TRACK-2", LocalDateTime.of(2026, 9, 1, 9, 0));
+            edited.setCarrier("GLS");
 
-        // then
-        verify(orderLifecycleEventPublisher, never()).publish(any(), any());
-    }
+            // when
+            save(1, OrderShipmentForm.version(second), edited);
 
-    @Test
-    @DisplayName("updateShipments does not publish ShipmentCreated when the order is cancelled")
-    void updateShipmentsDoesNotPublishWhenOrderIsCancelled() {
-        // given
-        Order existingOrder = orderBase();
-        existingOrder.setStatus(OrderStatus.Cancelled);
-        Shipment shipment = new Shipment(ShipmentType.Courier);
-        shipment.setCarrier("DPD");
-        shipment.setTrackingNo("TRACK-1");
-        shipment.setShippedAt(LocalDateTime.now());
-        Order updatedPayload = new Order(STORE_ID);
-        updatedPayload.setShipments(List.of(shipment));
-        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(existingOrder);
+            // then
+            assertThat(order.getShipments().get(0)).isSameAs(first);
+            assertThat(order.getShipments().get(1).getCarrier()).isEqualTo("GLS");
+        }
 
-        // when
-        String view = ordersController.updateShipments(ORDER_ID, updatedPayload, redirectAttributes, Locale.ENGLISH);
+        @Test
+        void aNewEmptyShipmentIsRefusedInTheDialog() {
+            // given: it would only hold the order back from Delivered, which needs a delivery date on every shipment
+            orderWith();
+            MockHttpServletResponse response = new MockHttpServletResponse();
+            ExtendedModelMap model = new ExtendedModelMap();
 
-        // then
-        verify(orderLifecycleEventPublisher, never()).publish(any(), any());
-        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
-    }
+            // when
+            save(null, null, new Shipment(ShipmentType.PersonalCollection), "fetch", response, model);
 
-    @Test
-    @DisplayName("updateShipments republishes ShipmentCreated when the resubmitted tracking number changes")
-    void updateShipmentsPublishesWhenTrackingNumberChanges() {
-        // given
-        LocalDateTime shippedAt = LocalDateTime.now();
-        Order existingOrder = orderBase();
-        Shipment existingShipment = new Shipment(ShipmentType.Courier);
-        existingShipment.setCarrier("DPD");
-        existingShipment.setTrackingNo("TRACK-1");
-        existingShipment.setShippedAt(shippedAt);
-        existingOrder.setShipments(List.of(existingShipment));
-        Shipment resubmittedShipment = new Shipment(ShipmentType.Courier);
-        resubmittedShipment.setCarrier("DPD");
-        resubmittedShipment.setTrackingNo("TRACK-2");
-        resubmittedShipment.setShippedAt(shippedAt);
-        Order updatedPayload = new Order(STORE_ID);
-        updatedPayload.setShipments(List.of(resubmittedShipment));
-        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(existingOrder);
+            // then
+            assertThat(response.getStatus()).isEqualTo(422);
+            assertThat(((OrderShipmentForm) model.getAttribute("shipment")).errors())
+                    .containsEntry("shipment-new-trackingNo", "order.shipments.error.empty");
+            verifyNoInteractions(orderLifecycle);
+        }
 
-        // when
-        ordersController.updateShipments(ORDER_ID, updatedPayload, redirectAttributes, Locale.ENGLISH);
+        @Test
+        void addingAShipmentWithoutShippingDataDoesNotAnnounceTheOneAlreadySent() {
+            // given
+            Order order = orderWith(courier("TRACK-1", LocalDateTime.of(2026, 9, 1, 9, 0)));
+            Shipment carrierOnly = new Shipment(ShipmentType.Courier);
+            carrierOnly.setCarrier("GLS");
 
-        // then
-        verify(orderLifecycleEventPublisher).publish(existingOrder, OrderLifecycleEventType.ShipmentCreated);
-    }
+            // when
+            save(null, null, carrierOnly);
 
-    @Test
-    @DisplayName("updateShipments keeps tracking subscription of an unchanged shipment and subscribes new ones")
-    void updateShipmentsKeepsTrackingSubscriptionOfUnchangedShipmentAndSubscribesNewOnes() {
-        // given
-        Order existingOrder = orderBase();
-        Shipment tracked = new Shipment(ShipmentType.Courier);
-        tracked.setCarrier("DPD");
-        tracked.setTrackingNo("PKG-1");
-        tracked.setShippedAt(LocalDateTime.now());
-        tracked.markTrackingActive("21037943");
-        existingOrder.setShipments(new ArrayList<>(List.of(tracked)));
-        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(existingOrder);
-        Shipment resubmittedFirst = new Shipment(ShipmentType.Courier);
-        resubmittedFirst.setCarrier("DPD");
-        resubmittedFirst.setTrackingNo("PKG-1");
-        resubmittedFirst.setShippedAt(LocalDateTime.now());
-        Shipment resubmittedSecond = new Shipment(ShipmentType.Courier);
-        resubmittedSecond.setCarrier("DPD");
-        resubmittedSecond.setTrackingNo("PKG-2");
-        resubmittedSecond.setShippedAt(LocalDateTime.now());
-        Order updatedPayload = new Order(STORE_ID);
-        updatedPayload.setShipments(List.of(resubmittedFirst, resubmittedSecond));
+            // then
+            assertThat(order.getShipments()).hasSize(2);
+            verify(orderLifecycleEventPublisher, never()).publish(any(), any());
+        }
 
-        // when
-        ordersController.updateShipments(ORDER_ID, updatedPayload, redirectAttributes, Locale.ENGLISH);
+        @Test
+        void clearingADateClearsItEvenWithItsTimeStillFilledIn() {
+            // given
+            Shipment existing = courier("TRACK-1", LocalDateTime.of(2026, 9, 1, 14, 30));
+            Order order = orderWith(existing);
 
-        // then
-        assertThat(existingOrder.getShipments()).hasSize(2);
-        assertThat(existingOrder.getShipments().get(0).getTrackingSubscriptionStatus()).isEqualTo(ShipmentTrackingStatus.ACTIVE);
-        assertThat(existingOrder.getShipments().get(1).hasTrackingSubscription()).isFalse();
-        verify(shipmentTrackingSubscriber).subscribe(STORE_ID, existingOrder);
-        InOrder order = inOrder(shipmentTrackingSubscriber, orderLifecycle);
-        order.verify(shipmentTrackingSubscriber).subscribe(STORE_ID, existingOrder);
-        order.verify(orderLifecycle).update(existingOrder);
+            // when
+            ordersController.saveShipment(ORDER_ID, 0, OrderShipmentForm.version(existing), ShipmentType.Courier, "DPD",
+                    "TRACK-1", null, null, "", "14:30", null, null, null, new MockHttpServletRequest(),
+                    new MockHttpServletResponse(), new ExtendedModelMap(), redirect, Locale.ENGLISH);
+
+            // then
+            assertThat(order.getShipments().get(0).getShippedAt()).isNull();
+        }
+
+        @Test
+        void aPersonalCollectionWithADateIsAnnounced() {
+            // given
+            Order order = orderWith();
+            Shipment collection = new Shipment(ShipmentType.PersonalCollection);
+            collection.setShippedAt(LocalDateTime.of(2026, 9, 2, 12, 0));
+
+            // when
+            save(null, null, collection);
+
+            // then
+            verify(orderLifecycleEventPublisher).publish(order, OrderLifecycleEventType.ShipmentCreated);
+        }
+
+        @Test
+        void reSavingAnUntouchedShipmentKeepsItsSecondsAndIsNotAnnouncedAgain() {
+            // given: the form shows the time to the minute; the tracking stored it to the second
+            Shipment existing = courier("TRACK-1", LocalDateTime.of(2026, 7, 2, 14, 31, 22));
+            Order order = orderWith(existing);
+
+            // when
+            save(0, OrderShipmentForm.version(existing), courier("TRACK-1", LocalDateTime.of(2026, 7, 2, 14, 31)));
+
+            // then
+            assertThat(order.getShipments().get(0).getShippedAt()).isEqualTo(LocalDateTime.of(2026, 7, 2, 14, 31, 22));
+            verify(orderLifecycleEventPublisher, never()).publish(any(), any());
+        }
+
+        @Test
+        void aChangedTrackingNumberIsAnnounced() {
+            // given
+            Shipment existing = courier("TRACK-1", LocalDateTime.of(2026, 9, 1, 9, 0));
+            Order order = orderWith(existing);
+
+            // when
+            save(0, OrderShipmentForm.version(existing), courier("TRACK-2", LocalDateTime.of(2026, 9, 1, 9, 0)));
+
+            // then
+            verify(orderLifecycleEventPublisher).publish(order, OrderLifecycleEventType.ShipmentCreated);
+        }
+
+        @Test
+        void anEditedShipmentKeepsItsTrackingAndCourierOrderWhileTheNumberIsTheSame() {
+            // given
+            Shipment tracked = courier("PKG-1", LocalDateTime.of(2026, 9, 1, 9, 0));
+            tracked.setExternalId("EXT-1");
+            tracked.markTrackingActive("21037943");
+            Order order = orderWith(tracked);
+            Shipment edited = courier("PKG-1", LocalDateTime.of(2026, 9, 1, 9, 0));
+            edited.setTrackingUrl("https://tracking.example/PKG-1");
+
+            // when
+            save(0, OrderShipmentForm.version(tracked), edited);
+
+            // then
+            Shipment saved = order.getShipments().get(0);
+            assertThat(saved.getTrackingSubscriptionStatus()).isEqualTo(ShipmentTrackingStatus.ACTIVE);
+            assertThat(saved.getExternalId()).isEqualTo("EXT-1");
+            InOrder inOrder = inOrder(shipmentTrackingSubscriber, orderLifecycle);
+            inOrder.verify(shipmentTrackingSubscriber).subscribe(STORE_ID, order);
+            inOrder.verify(orderLifecycle).update(order);
+        }
+
+        @Test
+        void aShipmentChangedSinceTheFormWasShownIsNotOverwritten() {
+            // given: the tracking filled the delivery date after the dialog was rendered
+            Shipment rendered = courier("TRACK-1", LocalDateTime.of(2026, 9, 1, 9, 0));
+            String version = OrderShipmentForm.version(rendered);
+            rendered.setDeliveredAt(LocalDateTime.of(2026, 9, 2, 11, 0));
+            orderWith(rendered);
+
+            // when
+            String view = save(0, version, courier("TRACK-9", LocalDateTime.of(2026, 9, 1, 9, 0)));
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+            assertThat(errorMessage()).isEqualTo("order.shipments.error.stale");
+            verifyNoInteractions(orderLifecycle, orderLifecycleEventPublisher, shipmentTrackingSubscriber);
+        }
+
+        @Test
+        void aCancelledOrderRefusesTheSaveAndAnnouncesNothing() {
+            // given
+            Order order = orderWith();
+            order.setStatus(OrderStatus.Cancelled);
+
+            // when
+            String view = save(null, null, courier("TRACK-1", LocalDateTime.of(2026, 9, 1, 9, 0)));
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+            assertThat(errorMessage()).isEqualTo("order.shipments.error.closed");
+            verifyNoInteractions(orderLifecycle, orderLifecycleEventPublisher);
+        }
+
+        @Test
+        void aWrongTimeComesBackToTheDialogWith422() {
+            // given
+            orderWith();
+            MockHttpServletResponse response = new MockHttpServletResponse();
+            ExtendedModelMap model = new ExtendedModelMap();
+
+            // when
+            String view = ordersController.saveShipment(ORDER_ID, null, null, ShipmentType.Courier, "DPD", "TRACK-1",
+                    null, null, "2026-09-02", "25:00", null, null, "fetch", new MockHttpServletRequest(), response,
+                    model, redirect, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo("orders/details/shipments :: dialogForm");
+            assertThat(response.getStatus()).isEqualTo(422);
+            assertThat(((OrderShipmentForm) model.getAttribute("shipment")).errors())
+                    .containsEntry("shipment-new-shippedTime", "order.shipments.error.time");
+            verifyNoInteractions(orderLifecycle);
+        }
+
+        @Test
+        void aDateWithoutATimeKeepsTheSavedTime() {
+            // given
+            Shipment existing = courier("TRACK-1", LocalDateTime.of(2026, 9, 1, 14, 31, 22));
+            Order order = orderWith(existing);
+
+            // when
+            ordersController.saveShipment(ORDER_ID, 0, OrderShipmentForm.version(existing), ShipmentType.Courier, "DPD",
+                    "TRACK-1", null, null, "2026-09-03", "", "2026-09-04", "", null, new MockHttpServletRequest(),
+                    new MockHttpServletResponse(), new ExtendedModelMap(), redirect, Locale.ENGLISH);
+
+            // then: nothing was saved for the delivery, so it starts at midnight
+            assertThat(order.getShipments().get(0).getShippedAt()).isEqualTo(LocalDateTime.of(2026, 9, 3, 14, 31, 22));
+            assertThat(order.getShipments().get(0).getDeliveredAt()).isEqualTo(LocalDateTime.of(2026, 9, 4, 0, 0));
+        }
+
+        @Test
+        void removingAShipmentKeepsTheOthersAndAnnouncesNothing() {
+            // given
+            Shipment first = courier("TRACK-1", LocalDateTime.of(2026, 9, 1, 9, 0));
+            Shipment second = courier("TRACK-2", LocalDateTime.of(2026, 9, 1, 9, 0));
+            Order order = orderWith(first, second);
+
+            // when
+            String view = ordersController.removeShipment(ORDER_ID, 0, OrderShipmentForm.version(first), redirect, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+            assertThat(order.getShipments()).containsExactly(second);
+            verify(orderLifecycle).update(order);
+            verify(orderLifecycleEventPublisher, never()).publish(any(), any());
+        }
+
+        @Test
+        void theOnlyShipmentAndOneWithACourierOrderAreNotRemoved() {
+            // given
+            Shipment only = courier("TRACK-1", LocalDateTime.of(2026, 9, 1, 9, 0));
+            orderWith(only);
+
+            // when
+            ordersController.removeShipment(ORDER_ID, 0, OrderShipmentForm.version(only), redirect, Locale.ENGLISH);
+
+            // then
+            assertThat(errorMessage()).isEqualTo("order.shipments.remove.error.last");
+
+            // given
+            Shipment labelled = courier("TRACK-2", LocalDateTime.of(2026, 9, 1, 9, 0));
+            labelled.setExternalId("EXT-2");
+            orderWith(only, labelled);
+            RedirectAttributesModelMap second = new RedirectAttributesModelMap();
+
+            // when
+            ordersController.removeShipment(ORDER_ID, 1, OrderShipmentForm.version(labelled), second, Locale.ENGLISH);
+
+            // then
+            assertThat(second.getFlashAttributes().get("errorMessage")).isEqualTo("order.shipments.remove.error.courier");
+            verifyNoInteractions(orderLifecycle);
+        }
+
+        @Test
+        void aRemovalOfAShipmentChangedMeanwhileIsRefused() {
+            // given
+            Shipment first = courier("TRACK-1", LocalDateTime.of(2026, 9, 1, 9, 0));
+            orderWith(first, courier("TRACK-2", LocalDateTime.of(2026, 9, 1, 9, 0)));
+
+            // when
+            ordersController.removeShipment(ORDER_ID, 0, "stale", redirect, Locale.ENGLISH);
+
+            // then
+            assertThat(errorMessage()).isEqualTo("order.shipments.error.stale");
+            verifyNoInteractions(orderLifecycle);
+        }
+
+        @Test
+        void theShipmentPageOfAnUnknownIndexIsNotFound() {
+            // given
+            orderWith(courier("TRACK-1", LocalDateTime.of(2026, 9, 1, 9, 0)));
+
+            // when / then
+            assertThatThrownBy(() -> ordersController.showShipment(ORDER_ID, "3", new ExtendedModelMap(), redirect,
+                    Locale.ENGLISH)).isInstanceOf(ResponseStatusException.class);
+        }
     }
 
     @Test
@@ -2317,17 +2435,15 @@ class OrdersControllerTest {
             pl.commercelink.orders.OrderReview reviewBefore = closed.getReview();
             Order review = new Order(STORE_ID);
             review.setReview(new pl.commercelink.orders.OrderReview(OrderReviewStatus.ToBeCollected));
-            Shipment shipment = new Shipment(ShipmentType.Courier);
-            shipment.setTrackingNo("T-1");
-            Order shipments = new Order(STORE_ID);
-            shipments.setShipments(List.of(shipment));
             RedirectAttributesModelMap reviewRedirect = new RedirectAttributesModelMap();
             RedirectAttributesModelMap shipmentsRedirect = new RedirectAttributesModelMap();
             RedirectAttributesModelMap serialRedirect = new RedirectAttributesModelMap();
 
             // when
             ordersController.updateReview(ORDER_ID, review, reviewRedirect, polish);
-            ordersController.updateShipments(ORDER_ID, shipments, shipmentsRedirect, polish);
+            ordersController.saveShipment(ORDER_ID, null, null, ShipmentType.Courier, null, "T-1", null, null, null,
+                    null, null, null, null, new MockHttpServletRequest(), new MockHttpServletResponse(),
+                    new ExtendedModelMap(), shipmentsRedirect, polish);
             ordersController.updateSerialNumbers(ORDER_ID, new OrderItemsForm(), serialRedirect, polish);
 
             // then
@@ -2595,22 +2711,6 @@ class OrdersControllerTest {
             // then
             assertThat(flash(redirect)).containsEntry("errorMessage", "order.payments.edit.empty");
             verifyNoInteractions(orderLifecycle);
-        }
-
-        @Test
-        void updateShipmentsIgnoresAPostWithoutShipments() {
-            // given
-            Order order = order(OrderStatus.Shipping);
-            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
-            Order posted = new Order(STORE_ID);
-            posted.setShipments(new ArrayList<>());
-
-            // when
-            String view = ordersController.updateShipments(ORDER_ID, posted, new RedirectAttributesModelMap(), polish);
-
-            // then
-            assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
-            verifyNoInteractions(orderLifecycle, shipmentTrackingSubscriber);
         }
 
         @Test

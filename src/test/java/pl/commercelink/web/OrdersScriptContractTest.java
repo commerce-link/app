@@ -186,15 +186,13 @@ class OrdersScriptContractTest {
     }
 
     @Test
-    void theShipmentsScriptOnlyPicksTheCarrierAndLeavesTheGroupsToRepeatFields() throws Exception {
+    void theShipmentsScriptOnlyPicksTheCarrierAndResyncsAReplacedForm() throws Exception {
         // given
         String script = read("src/main/resources/static/js/order-shipments.js");
-        String page = read("src/main/resources/templates/orders/details.html");
 
-        // then: adding, removing and renumbering the shipment groups is repeat-fields.js, loaded before this script
-        assertThat(script).contains("data-cl-carrier-select").contains("__other__").contains("cl:repeat-added")
-                .contains("'use strict'").doesNotContain("shipments[").doesNotContain("innerHTML");
-        assertThat(page.indexOf("/js/repeat-fields.js")).isNotNegative().isLessThan(page.indexOf("/js/order-shipments.js"));
+        // then: one form per shipment dialog, swapped by async-form.js after a failed save
+        assertThat(script).contains("form[data-cl-shipment-form]").contains("data-cl-carrier-select").contains("__other__")
+                .contains("cl:form-replaced").contains("'use strict'").doesNotContain("innerHTML");
     }
 
     @Test

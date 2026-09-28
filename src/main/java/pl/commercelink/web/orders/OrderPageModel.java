@@ -6,8 +6,6 @@ import pl.commercelink.orders.OrderReview;
 import pl.commercelink.orders.OrderReviewStatus;
 import pl.commercelink.orders.Payment;
 import pl.commercelink.orders.PaymentSource;
-import pl.commercelink.orders.Shipment;
-import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.web.dtos.RoutedSupplierView;
 import pl.commercelink.web.dtos.SplitGroupPreviewDto;
@@ -74,14 +72,23 @@ public record OrderPageModel(String orderId, String shortId, String backHref, bo
         }
     }
 
-    /** emptyKey: what the card says with no shipment, i.e. what the viewer can do about it now. */
+    /**
+     * emptyKey: what the card says with no shipment, i.e. what the viewer can do about it now. forms: one edit form per
+     * shipment, in the order of rows; blank: the form of "Add shipment". Both empty/null on a read-only page.
+     */
     public record ShipmentsCard(List<ShipmentRow> rows, String emptyKey, boolean canCancelCourier,
-                                List<OrderLabels.Option<ShipmentType>> types, List<String> carriers, List<Shipment> editable) {
+                                List<OrderShipmentForm> forms, OrderShipmentForm blank) {
     }
 
-    public record ShipmentRow(String typeKey, String carrier, String trackingNo, String trackingUrl, String pickupPoint,
-                              String shippedAt, String deliveredAt, String trackingKey, String trackingTone,
-                              String trackingHelpKey) {
+    /**
+     * number counts from 1. editHref leads to the shipment page (its dialog, dialogId, intercepts it) and removeHref to
+     * the removal confirmation; both null on a read-only page, removeHref also for the only shipment and for one with
+     * a courier order (cancelled with "Cancel courier order" instead).
+     */
+    public record ShipmentRow(int number, String typeKey, String carrier, String trackingNo, String trackingUrl,
+                              String pickupPoint, String shippedAt, String deliveredAt, String trackingKey,
+                              String trackingTone, String trackingHelpKey, String dialogId, String editHref,
+                              String removeHref) {
     }
 
     /** emptyKey takes the next type's label as its argument: "Issue" makes it, or "Add document" when it is typed by hand. */

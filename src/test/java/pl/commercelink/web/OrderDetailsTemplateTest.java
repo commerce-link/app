@@ -38,6 +38,7 @@ import pl.commercelink.web.orders.OrderPageModelFactory;
 import pl.commercelink.web.orders.OrderAddressForm;
 import pl.commercelink.web.orders.OrderLabels;
 import pl.commercelink.web.orders.OrderSettingsView;
+import pl.commercelink.web.orders.OrderShipmentForm;
 import pl.commercelink.web.settings.SettingsTemplateRenderer;
 
 import java.time.LocalDate;
@@ -442,57 +443,88 @@ class OrderDetailsTemplateTest {
     }
 
     @Test
-    void theShipmentsDialogHasOneRowPerShipmentAndNoAutomaticBlankOne() {
-        // given
+    void eachShipmentHasEditAndRemoveAndTheCardHeadAddsOne() {
+        // given: the second shipment has a courier order, cancelled with "Cancel courier order" instead of removed
         Order order = order(OrderStatus.Realization);
-        order.getShipments().get(0).setCarrier("DPD");
+        Shipment labelled = new Shipment(ShipmentType.Courier);
+        labelled.setExternalId("EXT-1");
+        order.addShipment(labelled);
+        String version = OrderShipmentForm.version(order.getShipments().get(0));
 
         // when
-        String html = page(render(order, ADMIN));
+        String card = card(page(render(order, ADMIN)), "przesylki");
 
         // then
-        assertThat(html).contains("id=\"shipments-dialog\"").contains("name=\"shipments[0].type\"")
-                .doesNotContain("name=\"shipments[1].type\"").contains("data-cl-repeat=\"shipments\"")
-                .contains("data-cl-repeat-template").contains("name=\"shipments[@INDEX@].type\"")
-                .contains("data-cl-carrier-select").contains("value=\"__other__\"")
-                .containsPattern("<option[^>]*value=\"Courier\"[^>]*selected[^>]*>Kurier</option>")
-                .contains("name=\"shipments[0].trackingUrl\"");
+        assertThat(card).contains("href=\"/dashboard/orders/" + order.getOrderId() + "/shipments/new\"")
+                .contains("data-cl-dialog-open=\"shipment-dialog-new\"").contains(">Dodaj przesyłkę<")
+                .contains("data-cl-dialog-open=\"shipment-dialog-0\"").contains("aria-label=\"Edytuj przesyłkę 1\"")
+                .contains("data-cl-dialog-open=\"shipment-dialog-1\"").contains("aria-label=\"Edytuj przesyłkę 2\"")
+                .contains("/shipments/0/remove?version=" + version).contains("aria-label=\"Usuń przesyłkę 1\"")
+                .contains("data-cl-confirm-title=\"Usunąć przesyłkę 1?\"")
+                .doesNotContain("/shipments/1/remove").doesNotContain("Edytuj przesyłki");
     }
 
     @Test
-    void theShipmentsDialogLabelsEveryFieldOfAShipmentGroupInsteadOfATable() {
-        // given: a table of seven inputs scrolled sideways; one group per shipment keeps two columns of labelled fields
+    void theOnlyShipmentIsEditedNotRemoved() {
+        // given
         Order order = order(OrderStatus.Realization);
-        order.getShipments().get(0).setCarrier("DPD");
 
         // when
-        String html = page(render(order, ADMIN));
-        int start = html.indexOf("<dialog class=\"cl-dialog is-form\" id=\"shipments-dialog\"");
-        assertThat(start).as("the standard form dialog, not the wide one of the table").isNotNegative();
-        String dialog = html.substring(start, html.indexOf("</dialog>", start));
+        String card = card(page(render(order, ADMIN)), "przesylki");
 
-        // then: a label per field, the carrier label on the picker (the text field is named for "Other…")
-        assertThat(dialog).doesNotContain("<table").contains("<legend class=\"cl-fieldset-title\">")
-                .contains(">Przesyłka</span>").contains("aria-label=\"Usuń przesyłkę 1\"")
-                .contains("data-template=\"Usunięto przesyłkę @N@.\"")
-                .contains("for=\"shipment-0-carrier-select\"").contains("aria-label=\"Nazwa innego przewoźnika\"");
-        for (String field : List.of("type", "tracking", "point", "url", "shipped", "delivered")) {
+        // then
+        assertThat(card).contains("aria-label=\"Edytuj przesyłkę 1\"").doesNotContain("/remove");
+    }
+
+    @Test
+    void aShipmentDialogHoldsOneShipmentWithADateAndATypedTime() {
+        // given: a date-and-time picker waited for the time too; the date picker closes on the first click
+        Order order = order(OrderStatus.Realization);
+        Shipment shipment = order.getShipments().get(0);
+        shipment.setCarrier("DPD");
+        shipment.setShippedAt(LocalDateTime.of(2026, 9, 27, 10, 30, 12));
+
+        // when
+        String dialog = dialog(page(render(order, ADMIN)), "shipment-dialog-0");
+
+        // then
+        assertThat(dialog).startsWith("id=\"shipment-dialog-0\"").doesNotContain("<table").doesNotContain("datetime-local")
+                .contains(">Przesyłka 1<").contains("name=\"index\" value=\"0\"")
+                .contains("name=\"version\" value=\"" + OrderShipmentForm.version(shipment) + "\"")
+                .containsPattern("<option[^>]*value=\"Courier\"[^>]*selected[^>]*>Kurier</option>")
+                .contains("for=\"shipment-0-carrierSelect\"").contains("aria-label=\"Nazwa innego przewoźnika\"")
+                .containsPattern("type=\"date\" id=\"shipment-0-shippedDate\" name=\"shippedDate\" value=\"2026-09-27\"")
+                .containsPattern("id=\"shipment-0-shippedTime\" name=\"shippedTime\" value=\"10:30\"")
+                .contains("placeholder=\"gg:mm\"").contains("aria-label=\"Godzina nadania\"")
+                .contains("aria-label=\"Godzina dostarczenia\"").contains(">Zapisz przesyłkę<")
+                .contains("data-cl-dialog-close-on-success=\"true\"");
+        for (String field : List.of("type", "trackingNo", "collectionPointCode", "trackingUrl", "shippedDate", "deliveredDate")) {
             assertThat(dialog).contains("for=\"shipment-0-" + field + "\"").contains("id=\"shipment-0-" + field + "\"");
         }
     }
 
     @Test
-    void theShipmentsDialogRendersOneBlankRowWhenTheOrderHasNoShipments() {
-        // given: a blank row lets the operator fill in the first shipment; "Save" posting nothing must not be silent
+    void theNewShipmentDialogIsBlankAndPostsNoIndex() {
+        // given
         Order order = order(OrderStatus.Realization);
-        order.setShipments(List.of());
+        order.setShipments(new ArrayList<>());
 
         // when
-        String html = page(render(order, ADMIN));
+        String dialog = dialog(page(render(order, ADMIN)), "shipment-dialog-new");
 
-        // then: exactly one row, no automatic extra one next to it
-        assertThat(html).contains("id=\"shipments-dialog\"").contains("name=\"shipments[0].type\"")
-                .doesNotContain("name=\"shipments[1].type\"");
+        // then
+        assertThat(dialog).contains(">Nowa przesyłka<").doesNotContain("name=\"index\"").doesNotContain("name=\"version\"")
+                .contains("name=\"trackingNo\"").contains(">Dodaj przesyłkę<");
+    }
+
+    @Test
+    void aReadOnlyPageHasNeitherShipmentActionsNorDialogs() {
+        // when
+        String html = page(render(order(OrderStatus.Realization), SUPER_ADMIN));
+
+        // then
+        assertThat(html).doesNotContain("shipment-dialog-").doesNotContain("Dodaj przesyłkę")
+                .doesNotContain("Edytuj przesyłkę");
     }
 
     @Test
@@ -1789,7 +1821,7 @@ class OrderDetailsTemplateTest {
         String html = card(page(render(order, ADMIN)), "przesylki");
 
         // then
-        assertThat(html).contains("Brak przesyłek. Dodaj przesyłkę przyciskiem „Edytuj przesyłki”.");
+        assertThat(html).contains("Brak przesyłek. Dodaj przesyłkę przyciskiem „Dodaj przesyłkę”.");
     }
 
     /** The order with {@code count} events, one hour apart, "Zdarzenie 1" the newest; rendered for an admin. */

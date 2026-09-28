@@ -24,7 +24,6 @@ import pl.commercelink.orders.PositionGroup;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShipmentCarrierOptions;
 import pl.commercelink.orders.ShipmentTrackingStatus;
-import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.event.EventType;
 import pl.commercelink.orders.event.OrderEvent;
 import pl.commercelink.orders.event.OrderEventsRepository;
@@ -257,29 +256,51 @@ public class OrderPageModelFactory {
     }
 
     private OrderPageModel.ShipmentsCard shipments(Order order, Store store, boolean readOnly) {
-        List<OrderPageModel.ShipmentRow> rows = order.getShipments().stream()
-                .map(s -> new OrderPageModel.ShipmentRow(OrderLabels.shipmentType(s.getType()), s.getCarrier(),
-                        s.getTrackingNo(), safeWebUrl(s.getTrackingUrl()), s.getCollectionPointCode(),
-                        OrderFormats.dateTime(s.getShippedAt()), OrderFormats.dateTime(s.getDeliveredAt()),
-                        order.hasTrackedShipments() ? OrderLabels.tracking(s.getTrackingSubscriptionStatus()) : null,
-                        OrderLabels.tone(s.getTrackingSubscriptionStatus()),
-                        // the help sends the reader to "Edit shipments", which a read-only page does not offer
-                        !readOnly && s.getTrackingSubscriptionStatus() == ShipmentTrackingStatus.FAILED
-                                ? "order.shipment.tracking.failed.help" : null))
-                .toList();
+        List<Shipment> shipments = order.getShipments();
+        List<String> carriers = readOnly || store == null ? List.of() : shipmentCarrierOptions.forOrder(order, store);
+        String base = "/dashboard/orders/" + order.getOrderId() + "/shipments/";
+        List<OrderPageModel.ShipmentRow> rows = new ArrayList<>();
+        List<OrderShipmentForm> forms = new ArrayList<>();
+        for (int i = 0; i < shipments.size(); i++) {
+            Shipment s = shipments.get(i);
+            OrderShipmentForm form = OrderShipmentForm.of(order.getOrderId(), i, s, carriers);
+            rows.add(new OrderPageModel.ShipmentRow(i + 1, OrderLabels.shipmentType(s.getType()), s.getCarrier(),
+                    s.getTrackingNo(), safeWebUrl(s.getTrackingUrl()), s.getCollectionPointCode(),
+                    OrderFormats.dateTime(s.getShippedAt()), OrderFormats.dateTime(s.getDeliveredAt()),
+                    order.hasTrackedShipments() ? OrderLabels.tracking(s.getTrackingSubscriptionStatus()) : null,
+                    OrderLabels.tone(s.getTrackingSubscriptionStatus()),
+                    // the help sends the reader to "Edit", which a read-only page does not offer
+                    !readOnly && s.getTrackingSubscriptionStatus() == ShipmentTrackingStatus.FAILED
+                            ? "order.shipment.tracking.failed.help" : null,
+                    form.dialogId(), readOnly ? null : base + i,
+                    readOnly || removeLockedKey(order, i) != null ? null : base + i + "/remove?version=" + form.version()));
+            if (!readOnly) {
+                forms.add(form);
+            }
+        }
         String emptyKey = readOnly ? "order.shipments.empty.readonly"
                 : order.getFulfilmentType() == FulfilmentType.DirectToConsumer ? "order.shipments.empty.dropship"
                 : "order.shipments.empty";
         // the courier order can be cancelled only while its labelled parcel is still on the way
         boolean cancellable = order.firstShipmentWithShippingData()
                 .map(s -> s.getExternalId() != null && s.getDeliveredAt() == null).orElse(false);
-        // an order can genuinely have zero shipments (not yet allocated); the dialog needs one blank row to edit,
-        // not an empty table that posts nothing on Save (an extra blank row next to existing ones would post
-        // an empty shipment)
-        List<Shipment> editable = order.getShipments().isEmpty() ? List.of(new Shipment()) : order.getShipments();
         return new OrderPageModel.ShipmentsCard(rows, emptyKey,
-                !readOnly && order.canOrderShipment() && cancellable, OrderLabels.Option.of(ShipmentType.values(), OrderLabels::shipmentType),
-                store == null ? List.of() : shipmentCarrierOptions.forOrder(order, store), editable);
+                !readOnly && order.canOrderShipment() && cancellable, forms,
+                readOnly ? null : OrderShipmentForm.of(order.getOrderId(), null, null, carriers));
+    }
+
+    /**
+     * Why the shipment at index cannot be removed, or null. The only shipment stays (the customer card reads the
+     * delivery type from it, and "Edit" corrects it instead); one with a courier order is cancelled with "Cancel
+     * courier order", which also cancels the label at the carrier, never by dropping the record.
+     */
+    public static String removeLockedKey(Order order, int index) {
+        List<Shipment> shipments = order.getShipments();
+        if (shipments.size() <= 1) {
+            return "order.shipments.remove.error.last";
+        }
+        Shipment shipment = shipments.get(index);
+        return shipment.getExternalId() != null ? "order.shipments.remove.error.courier" : null;
     }
 
     private OrderPageModel.DocumentsCard documents(Order order, Viewer viewer, boolean closed, boolean readOnly,

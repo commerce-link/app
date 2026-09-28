@@ -5262,41 +5262,11 @@ a.cl-link-button:hover {
     padding-bottom: 12px;
 }
 
-/* Repeatable groups inside a form dialog (the shipments of an order): the dialog body already has the side padding, so
-   the groups lose theirs and "Remove" sits on the right edge of the body. */
-.cl-page .cl-dialog-body .cl-repeat > .cl-fieldset {
-    padding: 14px 0 16px;
-}
-
-/* A lone group starts right under the title; with several, the first keeps its top padding, which holds the 44 px
-   "Remove" inside the scrolling body (above it the body would clip the button and its focus ring). */
-.cl-page .cl-dialog-body .cl-repeat > .cl-fieldset:only-of-type {
-    padding-top: 0;
-}
-
-.cl-page .cl-dialog-body .cl-repeat .cl-repeat-remove {
-    top: 0;
-    right: 0;
-}
-
-.cl-page .cl-dialog-body .cl-repeat-add {
-    padding: 12px 0 0;
-}
-
-/* Under the dialog title a group heading is a step smaller; with one shipment only, "Shipment 1" would repeat the
-   title, so it stays for screen readers alone (:only-of-type — the template and "Add" are not fieldsets). */
-.cl-page .cl-dialog-body .cl-repeat .cl-fieldset-title {
-    font-size: 14px;
-}
-
-.cl-page .cl-dialog-body .cl-repeat > .cl-fieldset:only-of-type > .cl-fieldset-title {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
+/* A date with its time (the shipment dialog): the date picker closes on the first click, the time is typed. */
+.cl-page .cl-date-time {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 84px;
+    gap: 8px;
 }
 
 .cl-page .cl-dialog .cl-table.is-compact {

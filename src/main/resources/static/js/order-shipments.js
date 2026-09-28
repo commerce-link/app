@@ -1,18 +1,12 @@
-// The shipments dialog: repeat-fields.js adds, removes and renumbers the shipment groups (no blank group is added on
-// its own, it would post an empty shipment; the last group stays, the server keeps at least one shipment). This script
-// only handles the carrier: it is chosen from the store's carriers or typed after "Other…", and the select only fills
-// the named text field, so the text field alone is what gets posted.
+// The shipment dialogs: the carrier is chosen from the store's carriers or typed after "Other…". The select only fills
+// the named text field, so the text field alone is posted (and, without JavaScript, the only one shown). A form that
+// async-form.js replaced after a failed save (422) is synced again.
 (function () {
     'use strict';
 
-    var form = document.querySelector('form[data-cl-shipments-form]');
-    if (!form) {
-        return;
-    }
-
-    function syncCarrier(group) {
-        var select = group.querySelector('select[data-cl-carrier-select]');
-        var input = group.querySelector('input[data-cl-carrier-input]');
+    function syncCarrier(form) {
+        var select = form.querySelector('select[data-cl-carrier-select]');
+        var input = form.querySelector('input[data-cl-carrier-input]');
         if (!select) {
             return;
         }
@@ -24,21 +18,26 @@
         }
     }
 
-    form.addEventListener('change', function (event) {
-        if (event.target.matches('select[data-cl-carrier-select]')) {
-            var group = event.target.closest('[data-cl-repeat-item]');
-            syncCarrier(group);
-            if (event.target.value === '__other__') {
-                var input = group.querySelector('input[data-cl-carrier-input]');
-                input.value = '';
-                input.focus();
-            }
+    document.addEventListener('change', function (event) {
+        if (!event.target.matches('form[data-cl-shipment-form] select[data-cl-carrier-select]')) {
+            return;
+        }
+        var form = event.target.closest('form');
+        syncCarrier(form);
+        if (event.target.value === '__other__') {
+            var input = form.querySelector('input[data-cl-carrier-input]');
+            input.value = '';
+            input.focus();
         }
     });
 
-    form.addEventListener('cl:repeat-added', function (event) {
-        syncCarrier(event.target);
+    document.addEventListener('cl:form-replaced', function (event) {
+        var form = event.target.matches && event.target.matches('form[data-cl-shipment-form]')
+            ? event.target : event.target.querySelector && event.target.querySelector('form[data-cl-shipment-form]');
+        if (form) {
+            syncCarrier(form);
+        }
     });
 
-    form.querySelectorAll('[data-cl-repeat-item]').forEach(syncCarrier);
+    document.querySelectorAll('form[data-cl-shipment-form]').forEach(syncCarrier);
 })();

@@ -73,6 +73,7 @@ import pl.commercelink.web.orders.OrderBackLink;
 import pl.commercelink.web.orders.OrderConfirmPages;
 import pl.commercelink.web.orders.OrderFlash;
 import pl.commercelink.web.orders.OrderLabels;
+import pl.commercelink.web.orders.OrderShipmentForm;
 import pl.commercelink.web.orders.OrderLinks;
 import pl.commercelink.web.orders.OrderNotice;
 import pl.commercelink.web.orders.OrderPageModel;
@@ -116,6 +117,9 @@ public class OrdersController extends BaseController {
 
     @Autowired
     private StoresRepository storesRepository;
+
+    @Autowired
+    private ShipmentCarrierOptions shipmentCarrierOptions;
 
     @Autowired
     private SupplierLabels supplierLabels;
@@ -1452,59 +1456,192 @@ public class OrdersController extends BaseController {
         return details(orderId);
     }
 
-    @PostMapping("/dashboard/orders/{orderId}/updateShipments")
+    /** A shipment's dialog as its own page, for a browser without JavaScript: "new" or the shipment's index. */
+    @GetMapping("/dashboard/orders/{orderId}/shipments/{key}")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String updateShipments(@PathVariable String orderId, @ModelAttribute("order") Order updatedOrder,
-                                  RedirectAttributes redirectAttributes, Locale locale) {
-        Order existingOrder = requireOrder(ordersRepository, getStoreId(), orderId);
-        // the card hides "Edit" on a closed order; besides, OrderLifecycle.update never persists a cancelled one,
-        // so publishing here would announce a shipment change that was never saved
-        if (existingOrder.isClosed()) {
+    public String showShipment(@PathVariable String orderId, @PathVariable String key, Model model,
+                               RedirectAttributes redirectAttributes, Locale locale) {
+        Order order = requireOrder(ordersRepository, getStoreId(), orderId);
+        Integer index = shipmentIndex(order, key);
+        // the card offers no "Edit" or "Add shipment" on a closed order
+        if (order.isClosed()) {
             return refuse(redirectAttributes, orderId, "order.shipments.error.closed", locale);
         }
-        // the dialog always posts at least one row; nothing posted is a stale page, not "delete every shipment"
-        if (updatedOrder.getShipments() == null || updatedOrder.getShipments().isEmpty()) {
-            return details(orderId);
+        OrderShipmentForm form = OrderShipmentForm.of(orderId, index, index == null ? null : order.getShipments().get(index),
+                shipmentCarriers(order));
+        return shipmentPage(order, form, model);
+    }
+
+    /**
+     * Saves one shipment from its dialog (async: 422 with the errors next to the fields, 200 once saved, the dialog then
+     * reloads the page) or from the shipment page without JavaScript. index is absent for a new shipment; version is the
+     * fingerprint of the shipment the form showed, so a shipment changed meanwhile (tracking, another operator) is not
+     * overwritten. The other shipments of the order stay as they are.
+     */
+    @PostMapping("/dashboard/orders/{orderId}/shipments")
+    @PreAuthorize("!hasRole('SUPER_ADMIN')")
+    public String saveShipment(@PathVariable String orderId, @RequestParam(required = false) Integer index,
+                               @RequestParam(required = false) String version, @RequestParam(required = false) ShipmentType type,
+                               @RequestParam(required = false) String carrier, @RequestParam(required = false) String trackingNo,
+                               @RequestParam(required = false) String collectionPointCode,
+                               @RequestParam(required = false) String trackingUrl,
+                               @RequestParam(required = false) String shippedDate, @RequestParam(required = false) String shippedTime,
+                               @RequestParam(required = false) String deliveredDate,
+                               @RequestParam(required = false) String deliveredTime,
+                               @RequestHeader(value = SettingsPaths.ASYNC_HEADER, required = false) String requestedWith,
+                               HttpServletRequest request, HttpServletResponse response, Model model,
+                               RedirectAttributes redirectAttributes, Locale locale) {
+        Order existingOrder = requireOrder(ordersRepository, getStoreId(), orderId);
+        boolean async = SettingsPaths.isAsync(requestedWith);
+        OrderShipmentForm posted = new OrderShipmentForm(orderId, index, version, type, carrier, trackingNo,
+                collectionPointCode, trackingUrl, shippedDate, shippedTime, deliveredDate, deliveredTime,
+                shipmentCarriers(existingOrder), null, null);
+        List<Shipment> current = existingOrder.getShipments();
+        boolean stale = index != null && (index < 0 || index >= current.size()
+                || !OrderShipmentForm.version(current.get(index)).equals(version));
+        // the card hides "Edit" on a closed order; besides, OrderLifecycle.update never persists a cancelled one
+        String refusal = existingOrder.isClosed() ? "order.shipments.error.closed"
+                : stale ? "order.shipments.error.stale" : null;
+        if (refusal != null) {
+            if (async) {
+                response.setStatus(HttpStatus.UNPROCESSABLE_ENTITY.value());
+                model.addAttribute("shipment", posted.withRefusal(messageSource.getMessage(refusal, null, locale)));
+                return "orders/details/shipments :: dialogForm";
+            }
+            return refuse(redirectAttributes, orderId, refusal, locale);
         }
-        List<String> shipmentDataBeforeUpdate = shipmentDataSnapshot(existingOrder);
-        List<Shipment> shipments = updatedOrder.getShipments().stream()
-                .filter(s -> s.hasShippingData() || s.hasCollectionData() || s.isDeliveredToCollectionPoint())
-                .collect(Collectors.toList());
-        if (shipments.isEmpty()) {
-            shipments.add(updatedOrder.getShipments().get(0));
+        Map<String, String> errors = posted.validate();
+        if (!errors.isEmpty()) {
+            if (async) {
+                response.setStatus(HttpStatus.UNPROCESSABLE_ENTITY.value());
+                model.addAttribute("shipment", posted.withErrors(errors));
+                return "orders/details/shipments :: dialogForm";
+            }
+            return shipmentPage(existingOrder, posted.withErrors(errors), model);
         }
-        List<Shipment> previousShipments = existingOrder.getShipments();
-        shipments.forEach(shipment -> previousShipments.stream()
-                .filter(previous -> previous.hasTrackingNo(shipment.getTrackingNo()))
-                .findFirst()
-                .ifPresent(shipment::inheritTrackingSubscriptionFrom));
-        // The operator's edit is authoritative: replaceShipments would re-inherit the previous collection
-        // point and force the type back to PickupPoint, making a change of delivery type impossible.
-        shipments.forEach(shipment -> shipment.setCollectionPointCode(StringUtils.trimToNull(shipment.getCollectionPointCode())));
-        existingOrder.setShipments(shipments);
-        shipmentTrackingSubscriber.subscribe(getStoreId(), existingOrder);
-        orderLifecycle.update(existingOrder);
-        boolean hasNotifiableShipmentData = existingOrder.getShipments().stream()
-                .anyMatch(s -> s.hasShippingData() || s.hasCollectionData());
-        boolean shipmentDataChanged = !shipmentDataBeforeUpdate.equals(shipmentDataSnapshot(existingOrder));
-        if (hasNotifiableShipmentData && shipmentDataChanged) {
-            orderLifecycleEventPublisher.publish(existingOrder, OrderLifecycleEventType.ShipmentCreated);
+
+        List<Shipment> shipments = new ArrayList<>(current);
+        Shipment before = index == null ? null : current.get(index);
+        Shipment saved = posted.toShipment(before);
+        if (index == null) {
+            shipments.add(saved);
+        } else {
+            shipments.set(index, saved);
         }
-        OrderFlash.saved(redirectAttributes, messageSource.getMessage("order.shipments.saved", null, locale));
+        storeShipments(existingOrder, shipments, saved, before);
+
+        String notice = index == null ? messageSource.getMessage("order.shipments.added", null, locale)
+                : messageSource.getMessage("order.shipments.saved", new Object[]{index + 1}, locale);
+        if (async) {
+            // the dialog reloads the page it is on (keeping its returnTo), which takes this notice
+            OrderFlash.forNextPage(request, response, "/dashboard/orders/" + orderId,
+                    new OrderNotice(OrderLabels.OK, notice, null, null));
+            model.addAttribute("shipment", posted);
+            return "orders/details/shipments :: dialogForm";
+        }
+        OrderFlash.saved(redirectAttributes, notice);
         return details(orderId);
     }
 
-    private List<String> shipmentDataSnapshot(Order order) {
-        return order.getShipments().stream()
-                .map(s -> String.join("|",
-                        String.valueOf(s.getType()),
-                        Objects.toString(s.getCarrier(), ""),
-                        Objects.toString(s.getTrackingNo(), ""),
-                        Objects.toString(s.getTrackingUrl(), ""),
-                        // the shipments form round-trips shippedAt at minute precision,
-                        // so sub-minute digits must not count as a data change
-                        s.getShippedAt() == null ? "" : s.getShippedAt().truncatedTo(ChronoUnit.MINUTES).toString()))
-                .collect(Collectors.toList());
+    @GetMapping("/dashboard/orders/{orderId}/shipments/{index}/remove")
+    @PreAuthorize("!hasRole('SUPER_ADMIN')")
+    public String confirmRemoveShipment(@PathVariable String orderId, @PathVariable int index,
+                                        @RequestParam(required = false) String version, Model model,
+                                        RedirectAttributes redirectAttributes, Locale locale) {
+        Order order = requireOrder(ordersRepository, getStoreId(), orderId);
+        String refusal = removeShipmentRefusal(order, index, version);
+        if (refusal != null) {
+            return refuse(redirectAttributes, orderId, refusal, locale);
+        }
+        return confirmPage(model, order, "order.shipments.remove", new Object[]{index + 1}, null,
+                "/dashboard/orders/" + orderId + "/shipments/" + index + "/remove?version=" + version, true, locale);
+    }
+
+    /** Removes one shipment. No "shipment created" notice goes out: nothing was shipped by removing a record. */
+    @PostMapping("/dashboard/orders/{orderId}/shipments/{index}/remove")
+    @PreAuthorize("!hasRole('SUPER_ADMIN')")
+    public String removeShipment(@PathVariable String orderId, @PathVariable int index,
+                                 @RequestParam(required = false) String version,
+                                 RedirectAttributes redirectAttributes, Locale locale) {
+        Order existingOrder = requireOrder(ordersRepository, getStoreId(), orderId);
+        String refusal = removeShipmentRefusal(existingOrder, index, version);
+        if (refusal != null) {
+            return refuse(redirectAttributes, orderId, refusal, locale);
+        }
+        List<Shipment> shipments = new ArrayList<>(existingOrder.getShipments());
+        shipments.remove(index);
+        storeShipments(existingOrder, shipments, null, null);
+        OrderFlash.saved(redirectAttributes, messageSource.getMessage("order.shipments.removed", new Object[]{index + 1}, locale));
+        return details(orderId);
+    }
+
+    /** "new" is a new shipment (null); anything else must be the index of one of the order's shipments. */
+    private static Integer shipmentIndex(Order order, String key) {
+        if ("new".equals(key)) {
+            return null;
+        }
+        try {
+            int index = Integer.parseInt(key);
+            if (index >= 0 && index < order.getShipments().size()) {
+                return index;
+            }
+        } catch (NumberFormatException ignored) {
+            // falls through to 404
+        }
+        throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+    }
+
+    private static String removeShipmentRefusal(Order order, int index, String version) {
+        if (order.isClosed()) {
+            return "order.shipments.error.closed";
+        }
+        List<Shipment> shipments = order.getShipments();
+        if (index < 0 || index >= shipments.size() || !OrderShipmentForm.version(shipments.get(index)).equals(version)) {
+            return "order.shipments.error.stale";
+        }
+        return OrderPageModelFactory.removeLockedKey(order, index);
+    }
+
+    /**
+     * Stores the order's new list of shipments: subscribes the new tracking numbers and saves through the lifecycle (a
+     * delivery date on every shipment moves the order to Delivered). saved is the shipment just added or edited (null
+     * for a removal) and before its previous state (null for a new one): only its own shipping data, when new or
+     * changed, is announced (the e-mail to the customer, the number to the marketplace), never a shipment already
+     * announced that merely sits next to it.
+     */
+    private void storeShipments(Order existingOrder, List<Shipment> shipments, Shipment saved, Shipment before) {
+        existingOrder.setShipments(shipments);
+        shipmentTrackingSubscriber.subscribe(getStoreId(), existingOrder);
+        orderLifecycle.update(existingOrder);
+        boolean notifiable = saved != null && (saved.hasShippingData() || saved.hasCollectionData());
+        boolean changed = saved != null && (before == null || !shipmentData(saved).equals(shipmentData(before)));
+        if (notifiable && changed) {
+            orderLifecycleEventPublisher.publish(existingOrder, OrderLifecycleEventType.ShipmentCreated);
+        }
+    }
+
+    private List<String> shipmentCarriers(Order order) {
+        Store store = storesRepository.findById(getStoreId());
+        return store == null ? List.of() : shipmentCarrierOptions.forOrder(order, store);
+    }
+
+    private String shipmentPage(Order order, OrderShipmentForm form, Model model) {
+        model.addAttribute("shipment", form);
+        model.addAttribute("shortId", order.getShortenedOrderId());
+        return "orders/shipment";
+    }
+
+    /**
+     * What a customer is told about a shipment. The form round-trips shippedAt at minute precision, so sub-minute digits
+     * do not count as a change.
+     */
+    private static String shipmentData(Shipment s) {
+        return String.join("|",
+                String.valueOf(s.getType()),
+                Objects.toString(s.getCarrier(), ""),
+                Objects.toString(s.getTrackingNo(), ""),
+                Objects.toString(s.getTrackingUrl(), ""),
+                s.getShippedAt() == null ? "" : s.getShippedAt().truncatedTo(ChronoUnit.MINUTES).toString());
     }
 
     @PostMapping("/dashboard/orders/{orderId}/addReceipt")
