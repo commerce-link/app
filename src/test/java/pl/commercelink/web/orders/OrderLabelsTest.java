@@ -42,6 +42,7 @@ class OrderLabelsTest {
         keys.addAll(keys(FulfilmentStatus.values(), OrderLabels::itemStatus));
         keys.addAll(keys(OrderSourceType.values(), OrderLabels::sourceType));
         keys.addAll(keys(FulfilmentType.values(), OrderLabels::fulfilmentType));
+        keys.addAll(keys(FulfilmentType.values(), OrderLabels::fulfilmentTypeShort));
         keys.addAll(keys(ShipmentType.values(), OrderLabels::shipmentType));
         keys.addAll(keys(DocumentType.values(), OrderLabels::documentType));
         keys.addAll(keys(PaymentSource.values(), OrderLabels::paymentSource));
@@ -101,6 +102,15 @@ class OrderLabelsTest {
         assertThat(OrderLabels.status(null)).isNull();
         assertThat(OrderLabels.tone((OrderStatus) null)).isNull();
         assertThat(OrderLabels.sourceType(null)).isNull();
+        assertThat(OrderLabels.fulfilmentTypeShort(null)).isNull();
+        assertThat(OrderLabels.fulfilmentTypeIcon(null)).isNull();
+    }
+
+    @Test
+    void fulfilmentTypeIconMatchesEachType() {
+        // when / then: a decorative icon paired with the short label, the text carries the meaning
+        assertThat(OrderLabels.fulfilmentTypeIcon(FulfilmentType.WarehouseFulfilment)).isEqualTo("fa-warehouse");
+        assertThat(OrderLabels.fulfilmentTypeIcon(FulfilmentType.DirectToConsumer)).isEqualTo("fa-truck");
     }
 
     @Test

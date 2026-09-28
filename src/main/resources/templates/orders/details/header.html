@@ -25,7 +25,10 @@
                   th:text="${h.sourceName() != null} ? ${h.sourceName()} : #{${h.sourceTypeKey()}}"></span>
             <span th:text="${h.orderedAt()}"></span>
             <span><strong th:text="#{general.currency.amount(${h.total()})}"></strong></span>
-            <span th:if="${h.fulfilmentTypeKey() != null}" th:text="#{${h.fulfilmentTypeKey()}}"></span>
+            <span th:if="${h.fulfilmentTypeShortKey() != null}" class="cl-icon-text">
+                <i class="fas" th:classappend="${h.fulfilmentTypeIcon()}" aria-hidden="true"></i>
+                <span th:text="#{${h.fulfilmentTypeShortKey()}}"></span>
+            </span>
         </p>
         <p class="cl-record-meta is-secondary"
            th:if="${h.externalOrderId() != null or h.routedSupplier() != null or h.splitFromHref() != null or h.clientOrderUrl() != null}">

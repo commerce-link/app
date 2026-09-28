@@ -193,6 +193,39 @@ class OrderDetailsTemplateTest {
     }
 
     @Test
+    void theFulfilmentTypeShowsAsAnIconAndAShortLabelInTheHeaderAndTheSettingsCard() {
+        // given: WarehouseFulfilment is order()'s default
+        Order warehouse = order(OrderStatus.Assembly);
+        Order dropship = order(OrderStatus.Assembly);
+        dropship.setFulfilmentType(FulfilmentType.DirectToConsumer);
+
+        // when
+        String warehouseFullHtml = page(render(warehouse, ADMIN));
+        String dropshipFullHtml = page(render(dropship, ADMIN));
+        String warehouseHeader = header(warehouseFullHtml);
+        String warehouseSettings = card(warehouseFullHtml, "settings-title");
+        String dropshipHeader = header(dropshipFullHtml);
+        String dropshipSettings = card(dropshipFullHtml, "settings-title");
+
+        // then: decorative icon + short text in both read-only places, not the long store-settings label
+        for (String html : List.of(warehouseHeader, warehouseSettings)) {
+            assertThat(html).contains("cl-icon-text").contains("fas fa-warehouse\" aria-hidden=\"true\"")
+                    .contains("Magazyn sklepu").doesNotContain("Przez magazyn sklepu");
+        }
+        for (String html : List.of(dropshipHeader, dropshipSettings)) {
+            assertThat(html).contains("cl-icon-text").contains("fas fa-truck\" aria-hidden=\"true\"")
+                    .contains("Dropshipping").doesNotContain("Wysyłką od dostawcy do klienta");
+        }
+        // then: the settings dialog/no-JS form still offers the full labels to choose from
+        assertThat(warehouseFullHtml).contains("Przez magazyn sklepu").contains("Wysyłką od dostawcy do klienta");
+    }
+
+    /** The record header: everything before the main/side card layout starts. */
+    static String header(String html) {
+        return html.substring(0, html.indexOf("cl-layout-aside"));
+    }
+
+    @Test
     void theCardsFollowOneReadingOrderInTheHtmlSoPhonesNeedNoReordering() {
         // when
         String html = page(render(order(OrderStatus.Assembly), ADMIN));
@@ -1134,8 +1167,8 @@ class OrderDetailsTemplateTest {
 
     static OrderSettingsView lockedSettings(FulfilmentType type) {
         return new OrderSettingsView("2026-09-20", "2026-09-22", null, "20.09.2026", "22.09.2026", null,
-                type, type == null ? null : OrderLabels.fulfilmentType(type), true, false, null, null, null, true,
-                OrderLabels.Option.of(FulfilmentType.values(), OrderLabels::fulfilmentType));
+                type, OrderLabels.fulfilmentTypeShort(type), OrderLabels.fulfilmentTypeIcon(type), true, false, null,
+                null, null, true, OrderLabels.Option.of(FulfilmentType.values(), OrderLabels::fulfilmentType));
     }
 
     static String renderDialogForm(OrderSettingsView settings) {

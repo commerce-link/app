@@ -13,7 +13,8 @@
             <div><dt th:text="#{order.settings.assembly}"></dt><dd th:text="${settings.estimatedAssemblyText() ?: '—'}"></dd></div>
             <div><dt th:text="#{order.settings.shipping}"></dt><dd th:text="${settings.estimatedShippingText() ?: '—'}"></dd></div>
             <div><dt th:text="#{order.settings.preferred.chosen}"></dt><dd th:text="${settings.preferredShippingText() ?: '—'}"></dd></div>
-            <div th:if="${settings.fulfilmentTypeKey() != null}"><dt th:text="#{order.settings.fulfilment}"></dt><dd th:text="#{${settings.fulfilmentTypeKey()}}"></dd></div>
+            <div th:if="${settings.fulfilmentTypeShortKey() != null}"><dt th:text="#{order.settings.fulfilment}"></dt>
+                <dd><span class="cl-icon-text"><i class="fas" th:classappend="${settings.fulfilmentTypeIcon()}" aria-hidden="true"></i><span th:text="#{${settings.fulfilmentTypeShortKey()}}"></span></span></dd></div>
             <div><dt th:text="#{order.settings.notifications}"></dt><dd th:text="${settings.emailNotificationsEnabled()} ? #{order.settings.yes} : #{order.settings.no}"></dd></div>
             <div th:if="${!#strings.isEmpty(settings.comment())}" class="cl-kv-wide"><dt th:text="#{order.settings.comment}"></dt><dd class="cl-kv-text" th:text="${settings.comment()}"></dd></div>
             <div th:if="${!#strings.isEmpty(settings.affiliateId())}"><dt th:text="#{order.affiliate.id}"></dt><dd th:text="${settings.affiliateId()}"></dd></div>

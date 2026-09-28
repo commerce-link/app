@@ -29,7 +29,7 @@ public record OrderPageModel(String orderId, String shortId, String backHref, bo
 
     public record Header(String statusKey, String statusTone, boolean canChangeStatus, boolean completedAutomatically,
                          String clientName, String sourceName, String sourceTypeKey, String orderedAt, String total,
-                         String fulfilmentTypeKey, String externalOrderId, RoutedSupplierView routedSupplier,
+                         String fulfilmentTypeShortKey, String fulfilmentTypeIcon, String externalOrderId, RoutedSupplierView routedSupplier,
                          String splitFromShortId, String splitFromHref, String clientOrderUrl, PrimaryAction primaryAction,
                          String cardHref, String collectionHref, String itemHistoryHref, boolean canCancel,
                          boolean canDelete, String deleteMessage) {

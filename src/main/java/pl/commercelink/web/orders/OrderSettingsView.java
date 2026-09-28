@@ -9,9 +9,10 @@ import java.util.List;
 /** The read-only "Terminy i ustawienia" card and the form of its dialog and no-JS page. */
 public record OrderSettingsView(String estimatedAssemblyAt, String estimatedShippingAt, String preferredShippingAt,
                                 String estimatedAssemblyText, String estimatedShippingText, String preferredShippingText,
-                                FulfilmentType fulfilmentType, String fulfilmentTypeKey, boolean fulfilmentTypeLocked,
-                                boolean emailNotificationsEnabled, String comment, String affiliateId, String gclid,
-                                boolean editable, List<OrderLabels.Option<FulfilmentType>> fulfilmentTypes) {
+                                FulfilmentType fulfilmentType, String fulfilmentTypeShortKey, String fulfilmentTypeIcon,
+                                boolean fulfilmentTypeLocked, boolean emailNotificationsEnabled, String comment,
+                                String affiliateId, String gclid, boolean editable,
+                                List<OrderLabels.Option<FulfilmentType>> fulfilmentTypes) {
 
     public static OrderSettingsView of(Order order, List<OrderItem> items, boolean readOnly) {
         return new OrderSettingsView(
@@ -19,7 +20,8 @@ public record OrderSettingsView(String estimatedAssemblyAt, String estimatedShip
                 OrderFormats.isoDate(order.getPreferredShippingAt()),
                 OrderFormats.date(order.getEstimatedAssemblyAt()), OrderFormats.date(order.getEstimatedShippingAt()),
                 OrderFormats.date(order.getPreferredShippingAt()),
-                order.getFulfilmentType(), OrderLabels.fulfilmentType(order.getFulfilmentType()),
+                order.getFulfilmentType(), OrderLabels.fulfilmentTypeShort(order.getFulfilmentType()),
+                OrderLabels.fulfilmentTypeIcon(order.getFulfilmentType()),
                 !order.canChangeFulfilmentType(items), order.isEmailNotificationsEnabled(), order.getComment(),
                 order.getAffiliateId(), order.getGclid(), !readOnly,
                 OrderLabels.Option.of(FulfilmentType.values(), OrderLabels::fulfilmentType));

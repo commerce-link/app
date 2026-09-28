@@ -82,6 +82,22 @@ public final class OrderLabels {
         return type == null ? null : "store.fulfilment.type." + type.name();
     }
 
+    /** Short label for the read-only places (record header, settings card) that pair it with a decorative icon. */
+    public static String fulfilmentTypeShort(FulfilmentType type) {
+        return type == null ? null : "order.fulfilment.short." + type.name();
+    }
+
+    /** Font Awesome class of the decorative icon paired with {@link #fulfilmentTypeShort}; the text carries the meaning. */
+    public static String fulfilmentTypeIcon(FulfilmentType type) {
+        if (type == null) {
+            return null;
+        }
+        return switch (type) {
+            case WarehouseFulfilment -> "fa-warehouse";
+            case DirectToConsumer -> "fa-truck";
+        };
+    }
+
     public static String shipmentType(ShipmentType type) {
         return type == null ? null : "ShipmentType." + type.name();
     }

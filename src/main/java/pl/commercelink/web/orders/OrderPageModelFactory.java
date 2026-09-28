@@ -146,7 +146,8 @@ public class OrderPageModelFactory {
                 sourceName,
                 sourceTypeKey,
                 OrderFormats.dateTime(order.getOrderedAt()), Money.format(order.getTotalPrice()),
-                OrderLabels.fulfilmentType(order.getFulfilmentType()), order.getExternalOrderId(),
+                OrderLabels.fulfilmentTypeShort(order.getFulfilmentType()), OrderLabels.fulfilmentTypeIcon(order.getFulfilmentType()),
+                order.getExternalOrderId(),
                 RoutedSupplierView.from(order, store),
                 splitFrom == null ? null : ConversionUtil.getShortenedId(splitFrom),
                 splitFrom == null ? null : (viewer.superAdmin()

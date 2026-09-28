@@ -5730,6 +5730,18 @@ a.cl-link-button:hover {
     text-underline-offset: 2px;
 }
 
+/* Decorative icon + short text: the icon carries no meaning on its own, the text does (fulfilment type). */
+.cl-icon-text {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.cl-icon-text i {
+    font-size: 0.9em;
+    color: var(--cl-ink-3);
+}
+
 /* Table group header (services and delivery below products) */
 .cl-page .cl-table tbody tr.cl-table-group > th {
     padding-top: 14px;
