@@ -62,9 +62,9 @@ public record OrderItemRow(String itemId, int index, String name, String categor
         return sku != null && !sku.equals(mfn);
     }
 
-    /** The markers after the name: condition and service pills, the "on the invoice together" and comment toggles. */
+    /** The markers after the name: condition and service pills and the comment toggle. */
     public boolean hasMarkers() {
-        return conditionKey != null || consolidated || service || comment != null;
+        return conditionKey != null || service || comment != null;
     }
 
     /** Any part of the codes line under the name: category, MFN, SKU, SN. */

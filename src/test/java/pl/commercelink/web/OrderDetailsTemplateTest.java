@@ -237,12 +237,12 @@ class OrderDetailsTemplateTest {
     }
 
     @Test
-    void theItemsTableHasFiveColumnsAndServicesInTheirOwnGroup() {
+    void theItemsTableHasSixColumnsAndServicesInTheirOwnGroup() {
         // when
         String html = page(render(order(OrderStatus.New), ADMIN));
 
         // then
-        assertThat(html).contains("<col class=\"cl-col-check\">").contains("<col class=\"cl-col-menu\">")
+        assertThat(html).contains("<col class=\"cl-col-check\">").contains("<col class=\"cl-col-flag\">").contains("<col class=\"cl-col-menu\">")
                 .contains("class=\"cl-table-group\"").contains("Usługi i dostawa")
                 .contains("2 × 749,00").contains("koszt 579,00 netto")
                 .contains("data-cl-copy=\"100-100001084WOF\"")
@@ -1286,22 +1286,36 @@ class OrderDetailsTemplateTest {
     }
 
     @Test
-    void consolidationIsAToggleWithAPopoverAfterTheNameNotAPill() {
+    void consolidationIsACheckInItsOwnColumnNotAMarkerBesideTheName() {
         // given
         Order order = order(OrderStatus.New);
         List<OrderItem> items = items(order);
         items.get(0).setConsolidated(true);
 
         // when
-        String cell = productCell(page(render(order, items, ADMIN, Set.of())), "AMD Ryzen 7 9800X3D");
+        String html = page(render(order, items, ADMIN, Set.of()));
+        String cell = productCell(html, "AMD Ryzen 7 9800X3D");
 
-        // then: invoicing is a property, not a state, so it is a grey icon toggle on the name's line
-        assertThat(cell).doesNotContain("Na fakturze łącznie</span>").doesNotContain("cl-status is-info");
-        assertThat(cell).contains("<details class=\"cl-note\">")
-                .contains("<summary class=\"cl-note-toggle\" aria-label=\"Łącznie na fakturze\">")
-                .contains("<i class=\"far fa-file-alt\"></i>")
-                .contains("<p class=\"cl-note-text\">Na fakturze łącznie z innymi pozycjami</p>");
-        assertThat(cell.indexOf("cl-table-marks")).isLessThan(cell.indexOf("cl-table-sub"));
+        // then: the glyph is hidden from screen readers, the hidden word says it; other rows leave the cell empty
+        assertThat(cell).doesNotContain("fa-file-alt").doesNotContain("Łącznie na fakturze").doesNotContain("cl-table-marks");
+        String row = html.substring(html.indexOf(cell), html.indexOf("</tr>", html.indexOf(cell)));
+        assertThat(row).contains("<td class=\"cl-table-flag\" data-label=\"Połącz na\u00a0FV\"><span class=\"cl-table-flag-mark\" aria-hidden=\"true\">✓</span><span class=\"cl-visually-hidden\">Tak</span></td>");
+        assertThat(occurrences(html, "cl-table-flag-mark")).isEqualTo(1);
+        assertThat(html).contains("<td class=\"cl-table-flag is-empty\" data-label=\"Połącz na\u00a0FV\"></td>");
+    }
+
+    @Test
+    void theConsolidationColumnSitsAfterTheStateAndBeforeTheMenuAndTheGroupRowSpansIt() {
+        // when
+        String admin = page(render(order(OrderStatus.New), ADMIN));
+        String closed = page(render(order(OrderStatus.Completed), ADMIN));
+
+        // then
+        assertThat(admin).containsPattern("<col class=\"cl-col-state\">\\s*<col class=\"cl-col-flag\">\\s*<col class=\"cl-col-menu\">")
+                .containsPattern(">Stan</th>\\s*<th scope=\"col\" class=\"cl-table-flag\">Połącz na\u00a0FV</th>\\s*<th scope=\"col\" class=\"cl-table-actions\">")
+                .contains("<th scope=\"rowgroup\" colspan=\"6\">");
+        assertThat(closed).containsPattern("<col class=\"cl-col-state\">\\s*<col class=\"cl-col-flag\">\\s*</colgroup>")
+                .contains("<th scope=\"rowgroup\" colspan=\"4\">");
     }
 
     @Test
@@ -1325,7 +1339,7 @@ class OrderDetailsTemplateTest {
     }
 
     @Test
-    void theConditionPillSitsOnTheNamesLineBeforeTheToggles() {
+    void theConditionPillSitsOnTheNamesLineBeforeTheCommentToggle() {
         // given
         Order order = order(OrderStatus.New);
         List<OrderItem> items = items(order);
@@ -1339,8 +1353,8 @@ class OrderDetailsTemplateTest {
         // then
         String marks = cell.substring(cell.indexOf("<span class=\"cl-table-marks\">"), cell.indexOf("<span class=\"cl-table-sub\">"));
         assertThat(marks).containsPattern("<span class=\"cl-status is-warn\">[^<]+</span>");
-        assertThat(marks.indexOf("cl-status")).isLessThan(marks.indexOf("<details class=\"cl-note\">"));
-        assertThat(marks.indexOf("<details class=\"cl-note\">")).isLessThan(marks.indexOf("cl-note is-accent"));
+        assertThat(marks.indexOf("cl-status")).isPositive().isLessThan(marks.indexOf("<details class=\"cl-note is-accent\">"));
+        assertThat(marks).doesNotContain("<details class=\"cl-note\">");
         assertThat(cell).doesNotContain("cl-table-pills");
     }
 

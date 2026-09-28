@@ -97,6 +97,7 @@
                 <col>
                 <col class="cl-col-price">
                 <col class="cl-col-state">
+                <col class="cl-col-flag">
                 <col th:if="${menus}" class="cl-col-menu">
             </colgroup>
             <thead>
@@ -108,13 +109,14 @@
                 <th scope="col" th:text="#{order.items.column.product}"></th>
                 <th scope="col" class="is-numeric" th:text="#{order.items.column.price}"></th>
                 <th scope="col" th:text="#{order.items.column.fulfilment}"></th>
+                <th scope="col" class="cl-table-flag" th:text="#{order.items.column.consolidated}"></th>
                 <th th:if="${menus}" scope="col" class="cl-table-actions"><span class="cl-visually-hidden" th:text="#{order.items.column.actions}"></span></th>
             </tr>
             </thead>
             <tbody>
             <th:block th:each="row : ${items.products()}"><tr th:replace="~{orders/details/items :: row(${row})}"></tr></th:block>
             <tr th:if="${!items.services().isEmpty()}" class="cl-table-group">
-                <th scope="rowgroup" th:colspan="${(items.selectable() ? 1 : 0) + 3 + (menus ? 1 : 0)}"><span class="cl-eyebrow"
+                <th scope="rowgroup" th:colspan="${(items.selectable() ? 1 : 0) + 4 + (menus ? 1 : 0)}"><span class="cl-eyebrow"
                     th:text="#{order.items.group.services}"></span></th>
             </tr>
             <th:block th:each="row : ${items.services()}"><tr th:replace="~{orders/details/items :: row(${row})}"></tr></th:block>
@@ -151,19 +153,15 @@
                                               th:attr="aria-label=#{order.items.select(${row.name()})}"></label>
         <input type="hidden" th:name="|orderItems[${row.index()}].itemId|" th:value="${row.itemId()}">
     </td>
-    <!--/* Two lines: the name with its markers, then the labelled codes. Physical state stays a pill; "on the invoice
-           together" and the comment are small toggles whose popover the browser opens (details.cl-note, also without
-           JavaScript); menu.js keeps one popover or menu open and adds Escape and the outside click. */-->
+    <!--/* Two lines: the name with its markers, then the labelled codes. Physical state stays a pill; the comment is a
+           small toggle whose popover the browser opens (details.cl-note, also without JavaScript); menu.js keeps one
+           popover or menu open and adds Escape and the outside click. */-->
     <th scope="row" class="cl-table-key" th:attr="data-label=#{order.items.column.product}">
         <a th:if="${row.viewHref() != null}" class="cl-table-link" th:href="@{${row.viewHref()}}" th:text="${row.name()}"></a>
         <span th:unless="${row.viewHref() != null}" th:text="${row.name()}"></span>
         <span th:if="${row.hasMarkers()}" class="cl-table-marks">
             <span th:if="${row.conditionKey() != null}" class="cl-status" th:classappend="${row.conditionTone()}" th:text="#{${row.conditionKey()}}"></span>
             <span th:if="${row.service()}" class="cl-status is-neutral" th:text="#{order.items.pill.service}"></span>
-            <details th:if="${row.consolidated()}" class="cl-note">
-                <summary class="cl-note-toggle" th:attr="aria-label=#{order.items.note.consolidated}"><span class="cl-note-glyph" aria-hidden="true"><i class="far fa-file-alt"></i></span></summary>
-                <div class="cl-note-panel"><p class="cl-note-text" th:text="#{order.items.note.consolidated.text}"></p></div>
-            </details>
             <details th:if="${row.comment() != null}" class="cl-note is-accent">
                 <summary class="cl-note-toggle" th:attr="aria-label=#{order.items.note.comment}"><span class="cl-note-glyph" aria-hidden="true"><i class="far fa-comment-alt"></i></span></summary>
                 <div class="cl-note-panel"><p class="cl-note-title" th:text="#{order.items.note.comment}"></p><p class="cl-note-text is-pre" th:text="${row.comment()}"></p></div>
@@ -200,6 +198,9 @@
             <span th:unless="${row.deliveryHref() != null}" th:text="${row.deliveryLabel()}"></span>
         </span>
     </td>
+    <!--/* display only: the item menu toggles it. The glyph is hidden from screen readers, the hidden word says it; an
+           unconsolidated item leaves the cell empty, and in card mode an empty cell is not shown at all. */-->
+    <td class="cl-table-flag" th:classappend="${row.consolidated()} ? '' : 'is-empty'" th:attr="data-label=#{order.items.column.consolidated}"><th:block th:if="${row.consolidated()}"><span class="cl-table-flag-mark" aria-hidden="true">✓</span><span class="cl-visually-hidden" th:text="#{order.items.consolidated.yes}"></span></th:block></td>
     <td th:if="${menus}" class="cl-table-actions">
         <details class="cl-menu" th:if="${!row.actions().isEmpty()}">
             <summary class="cl-button is-icon" th:attr="aria-label=#{order.items.menu(${row.name()})}">

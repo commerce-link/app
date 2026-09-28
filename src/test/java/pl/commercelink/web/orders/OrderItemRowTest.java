@@ -262,7 +262,7 @@ class OrderItemRowTest {
     }
 
     @Test
-    void aCommentOrConsolidationIsAMarkerAfterTheName() {
+    void aCommentIsAMarkerAfterTheNameButConsolidationIsNot() {
         // given
         OrderItem plain = item(FulfilmentStatus.New, "MFN-1");
         OrderItem commented = item(FulfilmentStatus.New, "MFN-1");
@@ -279,7 +279,8 @@ class OrderItemRowTest {
         assertThat(plainRow.hasMarkers()).isFalse();
         assertThat(commentedRow.hasMarkers()).isTrue();
         assertThat(commentedRow.comment()).isEqualTo("Check the box");
-        assertThat(consolidatedRow.hasMarkers()).isTrue();
+        assertThat(consolidatedRow.hasMarkers()).isFalse();
+        assertThat(consolidatedRow.consolidated()).isTrue();
     }
 
     @Test
