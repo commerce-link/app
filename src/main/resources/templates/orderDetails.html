@@ -1188,6 +1188,7 @@
             </div>
         </div>
         <div class="column">
+            <div th:replace="~{fragments/order-receipts :: section(${receiptView}, ${order.orderId})}"></div>
             <h2 class="subtitle" th:text="#{order.documents}"></h2>
             <div class="box">
                 <table class="table is-fullwidth">

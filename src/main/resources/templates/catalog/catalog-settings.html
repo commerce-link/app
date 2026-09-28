@@ -67,7 +67,7 @@
                         <legend class="cl-fieldset-title" th:text="#{catalog.settings.section.safety}"></legend>
                         <div class="cl-form-grid">
                             <div class="cl-span-6">
-                                <div th:replace="~{fragments/settings-form :: check('deletionProtection', 'catalog.protect', *{deletionProtection}, 'catalog.protect.desc', null)}"></div>
+                                <div th:replace="~{fragments/settings-form :: check('deletionProtection', 'catalog.protect', *{deletionProtection}, 'catalog.protect.desc', null, null)}"></div>
                             </div>
                         </div>
                     </fieldset>

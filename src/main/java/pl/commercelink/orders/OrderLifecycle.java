@@ -8,6 +8,7 @@ import pl.commercelink.inventory.deliveries.Delivery;
 import pl.commercelink.inventory.deliveries.DropshipItemLookup;
 import pl.commercelink.invoicing.InvoiceCreationEventPublisher;
 import pl.commercelink.orders.notifications.OrderNotificationsEventPublisher;
+import pl.commercelink.receipts.ReceiptTrigger;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.starter.security.model.CustomUser;
 import pl.commercelink.stores.Store;
@@ -40,6 +41,8 @@ public class OrderLifecycle {
     private GoodsOutEventPublisher goodsOutEventPublisher;
     @Autowired
     private DropshipItemLookup dropshipItemLookup;
+    @Autowired
+    private ReceiptTrigger receiptTrigger;
 
     public void update(Order order) {
         update(order, null);
@@ -143,6 +146,8 @@ public class OrderLifecycle {
 
         // Save the updated order back to the database
         ordersRepository.save(order);
+
+        receiptTrigger.onOrderSaved(order);
 
         notificationEventPublisher.publish(order);
 

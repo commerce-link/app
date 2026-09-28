@@ -30,7 +30,7 @@ class StoreSettingsCatalogTest {
         List<SettingsTile> tiles = allTiles();
 
         // then
-        assertThat(tiles).hasSize(15);
+        assertThat(tiles).hasSize(16);
         assertThat(tiles).extracting(SettingsTile::key).doesNotHaveDuplicates();
         assertThat(tiles).extracting(SettingsTile::icon).doesNotHaveDuplicates();
         assertThat(tiles).extracting(SettingsTile::relativePath).doesNotHaveDuplicates();
@@ -84,13 +84,13 @@ class StoreSettingsCatalogTest {
         // then
         List<SettingsTileView> adminTiles = adminSections.stream().flatMap(section -> section.tiles().stream()).toList();
         assertThat(adminSections).hasSize(6);
-        assertThat(adminTiles).hasSize(15);
+        assertThat(adminTiles).hasSize(16);
         assertThat(adminTiles).filteredOn(tile -> tile.tile().key().equals("warehouse"))
                 .extracting(SettingsTileView::href).containsExactly("/dashboard/store/warehouse");
 
         List<SettingsTileView> superAdminTiles =
                 superAdminSections.stream().flatMap(section -> section.tiles().stream()).toList();
-        assertThat(superAdminTiles).hasSize(14);
+        assertThat(superAdminTiles).hasSize(15);
         assertThat(superAdminTiles).noneMatch(tile -> tile.tile().key().equals("rmaCenters"));
         assertThat(superAdminTiles).filteredOn(tile -> tile.tile().key().equals("warehouse"))
                 .extracting(SettingsTileView::href).containsExactly("/dashboard/store/store-1/warehouse");

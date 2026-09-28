@@ -1455,6 +1455,34 @@ body.cl-drawer-open .cl-sidebar {
     margin: 0;
 }
 
+/* A row action that opens its form in place (details.cl-row-form, e.g. "Zamknij ręcznie"). Open, the form would widen
+   the auto actions column and squeeze the record column to one character, so the row turns into one column and the
+   form takes the full width under the record. */
+.cl-page .cl-list .cl-list-item:has(.cl-row-form[open]) {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.cl-page .cl-list .cl-list-item:has(.cl-row-form[open]) .cl-list-actions {
+    justify-content: flex-start;
+}
+
+.cl-page .cl-list-actions .cl-row-form[open] {
+    flex-basis: 100%;
+}
+
+.cl-page .cl-row-form > .cl-form {
+    max-width: 480px;
+    margin-top: 8px;
+}
+
+/* The same ::details-content box-sizing break as in .cl-disclosure-body below. */
+.cl-page .cl-row-form,
+.cl-page .cl-row-form *,
+.cl-page .cl-row-form *::before,
+.cl-page .cl-row-form *::after {
+    box-sizing: border-box;
+}
+
 .cl-page .cl-card .cl-list-group {
     margin: 0;
     padding: 14px 20px 6px;
@@ -1487,6 +1515,11 @@ body.cl-drawer-open .cl-sidebar {
 .cl-status.is-info {
     color: var(--cl-info);
     background: var(--cl-info-soft);
+}
+
+.cl-status.is-bad {
+    color: var(--cl-bad);
+    background: var(--cl-bad-soft);
 }
 
 /* --cl-ink-2: --cl-ink-3 on --cl-surface-2 is 4.48:1 at 12 px, below AA */
@@ -4196,5 +4229,148 @@ a.cl-link-button:hover {
 
     .cl-page .cl-table tbody td.cl-table-actions {
         text-align: left;
+    }
+}
+
+/* Receipt-like document page without the app frame (dev e-receipt preview): a narrow printable card, monospace
+   figures, a tone banner on top. Generic so a real receipt or document preview can reuse it. */
+.cl-receipt-page {
+    min-height: 100vh;
+    margin: 0;
+    padding: 28px 16px 40px;
+    background: var(--cl-bg);
+    color: var(--cl-ink);
+}
+
+.cl-receipt {
+    max-width: 420px;
+    margin: 0 auto;
+    padding: 20px;
+    background: var(--cl-surface);
+    border: 1px solid var(--cl-line);
+    border-radius: var(--cl-radius);
+    box-shadow: var(--cl-shadow-card);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 13px;
+    line-height: 1.45;
+}
+
+.cl-receipt-banner {
+    margin: 0 0 16px;
+    padding: 10px 12px;
+    border: 1px solid var(--cl-warn);
+    border-radius: var(--cl-radius);
+    background: var(--cl-warn-soft);
+    color: var(--cl-warn);
+    font-weight: 700;
+    text-align: center;
+}
+
+.cl-receipt-head {
+    text-align: center;
+    padding-bottom: 12px;
+    border-bottom: 1px dashed var(--cl-line);
+}
+
+.cl-receipt-head h1 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 650;
+}
+
+.cl-receipt-kind {
+    margin: 4px 0 0;
+    font-weight: 700;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+}
+
+.cl-receipt-meta {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 2px 12px;
+    margin: 12px 0;
+}
+
+.cl-receipt-meta dt {
+    color: var(--cl-ink-2);
+}
+
+.cl-receipt-meta dd {
+    margin: 0;
+    text-align: right;
+    overflow-wrap: anywhere;
+}
+
+.cl-receipt-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0;
+}
+
+.cl-receipt-table th,
+.cl-receipt-table td {
+    padding: 4px 0;
+    vertical-align: top;
+    text-align: right;
+    font-weight: 400;
+}
+
+.cl-receipt-table th:first-child,
+.cl-receipt-table td:first-child {
+    text-align: left;
+    padding-right: 8px;
+}
+
+.cl-receipt-table thead th {
+    color: var(--cl-ink-2);
+    border-bottom: 1px dashed var(--cl-line);
+}
+
+.cl-receipt-table td + td,
+.cl-receipt-table th + th {
+    padding-left: 8px;
+    white-space: nowrap;
+}
+
+.cl-receipt-total {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-top: 1px dashed var(--cl-line);
+    border-bottom: 1px dashed var(--cl-line);
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.cl-receipt h2 {
+    margin: 12px 0 0;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--cl-ink-2);
+}
+
+.cl-receipt-back {
+    display: block;
+    margin-top: 16px;
+    text-align: center;
+    color: var(--cl-accent-ink);
+}
+
+@media print {
+    .cl-receipt-page {
+        padding: 0;
+        background: none;
+    }
+
+    .cl-receipt {
+        border: 0;
+        box-shadow: none;
+    }
+
+    .cl-receipt-back {
+        display: none;
     }
 }
