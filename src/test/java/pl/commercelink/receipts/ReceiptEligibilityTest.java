@@ -90,13 +90,13 @@ class ReceiptEligibilityTest {
     }
 
     @Test
-    void orderWithZeroPaymentDoesNotQualify() {
-        assertThat(eligibility.orderQualifies(order(100.0, payment(PaymentSource.BankTransfer, 0.0)))).isFalse();
+    void unpaidOrderQualifies() {
+        assertThat(eligibility.orderQualifies(order(100.0, payment(PaymentSource.CashOnDelivery, 0.0)))).isTrue();
     }
 
     @Test
-    void partiallyPaidOrderDoesNotQualify() {
-        assertThat(eligibility.orderQualifies(order(100.0, payment(PaymentSource.BankTransfer, 60.0)))).isFalse();
+    void partiallyPaidOrderQualifies() {
+        assertThat(eligibility.orderQualifies(order(100.0, payment(PaymentSource.BankTransfer, 60.0)))).isTrue();
     }
 
     @Test

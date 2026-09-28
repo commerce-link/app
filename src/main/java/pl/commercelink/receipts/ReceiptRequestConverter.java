@@ -85,12 +85,13 @@ public class ReceiptRequestConverter {
         }
         List<Payment> incoming = order.getPayments().stream()
                 .filter(p -> p.getDirection() != PaymentDirection.Outgoing)
-                .filter(p -> !p.isUnsettled())
                 .toList();
         if (incoming.isEmpty()) {
             return new ReceiptConversion.Blocked(ReceiptBlockReason.NO_PAYMENT, null);
         }
-        List<ReceiptRequestSnapshot.Pay> payments = payments(incoming, linesTotal);
+        List<Payment> settled = incoming.stream().filter(p -> !p.isUnsettled()).toList();
+        List<Payment> declared = incoming.stream().filter(Payment::isUnsettled).toList();
+        List<ReceiptRequestSnapshot.Pay> payments = payments(settled, declared, linesTotal);
         if (payments == null) {
             return new ReceiptConversion.Blocked(ReceiptBlockReason.MIXED_PAYMENTS, null);
         }
@@ -133,8 +134,51 @@ public class ReceiptRequestConverter {
         return StringUtils.isNotBlank(billing) ? billing.strip() : null;
     }
 
+    /**
+     * The payment forms of the receipt. An unsettled payment (amount 0) is the method the buyer chose at checkout, e.g.
+     * cash on delivery, recorded before any money arrives. An order that is not paid yet declares that method for the
+     * whole total; a partly paid one declares what was paid in its own form and the rest in the chosen method (or, when
+     * the payment replaced the placeholder, in the one form paid so far); a fully paid one declares only what was paid.
+     */
+    private static List<ReceiptRequestSnapshot.Pay> payments(List<Payment> settled, List<Payment> declared, long total) {
+        List<PaymentForm> declaredForms = declared.stream().map(p -> form(p.getSource())).distinct().toList();
+        if (settled.isEmpty()) {
+            if (declaredForms.size() != 1) {
+                return null;
+            }
+            String label = declared.stream().map(Payment::getName).filter(StringUtils::isNotBlank).findFirst().orElse(null);
+            return List.of(new ReceiptRequestSnapshot.Pay(declaredForms.get(0), total, label));
+        }
+        long paid = settled.stream().mapToLong(p -> Money.of(BigDecimal.valueOf(p.getAppliedAmount())).grosze()).sum();
+        if (paid >= total - ONE_GROSZ) {
+            return settledPayments(settled, total);
+        }
+        List<PaymentForm> settledForms = settled.stream().map(p -> form(p.getSource())).distinct().toList();
+        List<PaymentForm> restForms = declaredForms.isEmpty() ? settledForms : declaredForms;
+        if (restForms.size() != 1) {
+            return null;
+        }
+        Map<PaymentForm, Long> byForm = new EnumMap<>(PaymentForm.class);
+        for (Payment payment : settled) {
+            long amount = Money.of(BigDecimal.valueOf(payment.getAppliedAmount())).grosze();
+            if (amount <= 0) {
+                return null;
+            }
+            byForm.merge(form(payment.getSource()), amount, Long::sum);
+        }
+        byForm.merge(restForms.get(0), total - paid, Long::sum);
+        if (byForm.size() == 1) {
+            String label = settled.stream().map(Payment::getName).filter(StringUtils::isNotBlank).findFirst().orElse(null);
+            return List.of(new ReceiptRequestSnapshot.Pay(restForms.get(0), total, label));
+        }
+        return byForm.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .map(e -> new ReceiptRequestSnapshot.Pay(e.getKey(), e.getValue(), null))
+                .toList();
+    }
+
     /** One form covers the whole total; several forms only with positive amounts that add up to it. */
-    private static List<ReceiptRequestSnapshot.Pay> payments(List<Payment> incoming, long total) {
+    private static List<ReceiptRequestSnapshot.Pay> settledPayments(List<Payment> incoming, long total) {
         List<PaymentForm> forms = incoming.stream().map(p -> form(p.getSource())).distinct().toList();
         if (forms.size() == 1) {
             String label = incoming.stream().map(Payment::getName).filter(StringUtils::isNotBlank).findFirst().orElse(null);

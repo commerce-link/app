@@ -190,6 +190,54 @@ class ReceiptRequestConverterTest {
     }
 
     @Test
+    void unpaidOrderDeclaresTheMethodChosenAtCheckoutForTheWholeTotal() {
+        // cash on delivery, courier has not paid it in yet: only the 0.00 placeholder exists
+        Order order = order(100.00, payment(PaymentSource.CashOnDelivery, 0.00));
+
+        assertThat(converted(order, items(item("Mysz", 1, 100.00, 1.23))).payments())
+                .containsExactly(new ReceiptRequestSnapshot.Pay(PaymentForm.CASH, 10000, null));
+    }
+
+    @Test
+    void partlyPaidOrderDeclaresTheRestInTheMethodChosenAtCheckout() {
+        Order order = order(100.00, payment(PaymentSource.Card, 60.00), payment(PaymentSource.BankTransfer, 0.00));
+
+        assertThat(converted(order, items(item("Mysz", 1, 100.00, 1.23))).payments())
+                .containsExactlyInAnyOrder(new ReceiptRequestSnapshot.Pay(PaymentForm.CARD, 6000, null),
+                        new ReceiptRequestSnapshot.Pay(PaymentForm.TRANSFER, 4000, null));
+    }
+
+    @Test
+    void partlyPaidOrderInTheChosenMethodIsOnePayment() {
+        Order order = order(100.00, payment(PaymentSource.Card, 60.00), payment(PaymentSource.Card, 0.00));
+
+        assertThat(converted(order, items(item("Mysz", 1, 100.00, 1.23))).payments())
+                .containsExactly(new ReceiptRequestSnapshot.Pay(PaymentForm.CARD, 10000, null));
+    }
+
+    @Test
+    void partlyPaidOrderWhosePaymentReplacedThePlaceholderDeclaresTheRestInTheSameForm() {
+        Order order = order(100.00, payment(PaymentSource.BankTransfer, 60.00));
+
+        assertThat(converted(order, items(item("Mysz", 1, 100.00, 1.23))).payments())
+                .containsExactly(new ReceiptRequestSnapshot.Pay(PaymentForm.TRANSFER, 10000, null));
+    }
+
+    @Test
+    void partlyPaidInTwoFormsWithoutAChosenMethodBlocks() {
+        Order order = order(100.00, payment(PaymentSource.BankTransfer, 30.00), payment(PaymentSource.Card, 30.00));
+
+        assertThat(blocked(order, items(item("Mysz", 1, 100.00, 1.23))).reason())
+                .isEqualTo(ReceiptBlockReason.MIXED_PAYMENTS);
+    }
+
+    @Test
+    void orderWithoutAnyPaymentMethodBlocks() {
+        assertThat(blocked(order(100.00), items(item("Mysz", 1, 100.00, 1.23))).reason())
+                .isEqualTo(ReceiptBlockReason.NO_PAYMENT);
+    }
+
+    @Test
     void quantityIsCarriedAsDecimal() {
         assertThat(converted(b2cOrder(30.00), items(item("Kabel", 3, 10.00, 1.23))).lines().get(0).quantity())
                 .isEqualByComparingTo(new BigDecimal("3"));
