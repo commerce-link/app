@@ -1575,16 +1575,17 @@ class OrderDetailsTemplateTest {
         assertThat(card).doesNotContain("<details").doesNotContain("<li class=\"cl-timeline-item\" hidden");
         assertThat(card.indexOf("Zdarzenie 1<")).isLessThan(card.indexOf("Zdarzenie 8<"));
         assertThat(card).contains("<ol class=\"cl-timeline\" id=\"history-events\" data-cl-timeline-limit=\"5\">");
-        // the toggle sits after the list, hidden until timeline.js shows it, and names the list it controls
+        // the row sits after the list, hidden until timeline.js shows it; both buttons name the list they control
         int list = card.indexOf("</ol>");
         int toggle = card.indexOf("data-cl-timeline-toggle");
         assertThat(toggle).isGreaterThan(list);
-        assertThat(card).contains("<p class=\"cl-timeline-more\" hidden>")
-                .contains("<button type=\"button\" class=\"cl-link-button\" aria-controls=\"history-events\" aria-expanded=\"false\" data-cl-timeline-toggle")
-                .contains(">Pokaż wszystkie (8)</button>")
-                .contains("data-less-text=\"Zwiń\"")
+        assertThat(card).contains("<div class=\"cl-timeline-more\" hidden data-cl-timeline-more")
                 .contains("data-shown-text=\"Pokazano starsze zdarzenia: 3\"")
                 .contains("data-hidden-text=\"Ukryto starsze zdarzenia: 3\"")
+                .contains("<button type=\"button\" class=\"cl-link-button cl-timeline-node\" aria-controls=\"history-events\" aria-expanded=\"false\"")
+                .contains("data-cl-timeline-toggle=\"expand\"><span class=\"cl-timeline-node-dot\" aria-hidden=\"true\"></span><span>Pokaż 3 wcześniejsze zdarzenia</span></button>")
+                .contains("<button type=\"button\" class=\"cl-link-button cl-timeline-less\" aria-controls=\"history-events\" aria-expanded=\"true\"")
+                .contains("data-cl-timeline-toggle=\"collapse\" hidden>Zwiń</button>")
                 .contains("<p class=\"cl-visually-hidden\" role=\"status\" data-cl-timeline-status></p>");
         assertThat(card).doesNotContain("style=").doesNotContain("is-hidden");
     }
@@ -1599,6 +1600,19 @@ class OrderDetailsTemplateTest {
         assertThat(card).contains("<ol class=\"cl-timeline\" id=\"history-events\">")
                 .doesNotContain("data-cl-timeline-limit").doesNotContain("data-cl-timeline-toggle")
                 .doesNotContain("data-cl-timeline-status");
+    }
+
+    @Test
+    void theNodeLabelCountsTheHiddenEventsInTheRightPluralForm() {
+        // given: 1, 5 and 13 hidden events behind the five visible ones
+        String one = card(renderWithEvents(6), "historia");
+        String many = card(renderWithEvents(10), "historia");
+        String teen = card(renderWithEvents(18), "historia");
+
+        // then
+        assertThat(one).contains("<span>Pokaż 1 wcześniejsze zdarzenie</span>");
+        assertThat(many).contains("<span>Pokaż 5 wcześniejszych zdarzeń</span>");
+        assertThat(teen).contains("<span>Pokaż 13 wcześniejszych zdarzeń</span>");
     }
 
     @Test

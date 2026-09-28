@@ -111,13 +111,18 @@ public record OrderPageModel(String orderId, String shortId, String backHref, bo
 
         public static final int VISIBLE = 5;
 
-        /** How many of the newest events show before "show all"; the rest stay in the same list, hidden by script. */
+        /** How many of the newest events show before the "show earlier events" node; the rest stay in the same list, hidden by script. */
         public int visible() {
             return VISIBLE;
         }
 
         public List<EventRow> rest() {
             return events.size() <= VISIBLE ? List.of() : events.subList(VISIBLE, events.size());
+        }
+
+        /** The label of the "show earlier events" node, in the plural form that fits the number of hidden events. */
+        public String moreKey() {
+            return "order.history.more." + PluralForm.of(rest().size());
         }
     }
 

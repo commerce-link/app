@@ -5514,23 +5514,83 @@ a.cl-link-button:hover {
     display: none;
 }
 
-/* Events hidden behind "show all" stay in the same list (timeline.js): the last visible event ends the line and the
-   toggle sits under it, aligned with the event text. */
+/* Events hidden by timeline.js stay in the same list. Collapsed, the last visible event carries the line on, dashed,
+   down to the ring of the "show earlier events" node under the list: the row is 44px tall and the node dot is centred
+   22px from its top, so its ring starts 16px below the list. Expanded, nothing is hidden and the line ends at the
+   oldest event as usual. */
 .cl-page .cl-timeline-item:has(+ .cl-timeline-item[hidden]) {
     padding-bottom: 0;
 }
 
 .cl-page .cl-timeline-item:has(+ .cl-timeline-item[hidden])::after {
-    display: none;
+    bottom: -16px;
+    background: repeating-linear-gradient(to bottom, var(--cl-line) 0 4px, transparent 4px 8px);
 }
 
 .cl-page .cl-timeline:has(+ .cl-timeline-more:not([hidden])) {
     padding-bottom: 4px;
 }
 
+.cl-page .cl-timeline:has(> .cl-timeline-item[hidden]) {
+    padding-bottom: 0;
+}
+
 .cl-page .cl-timeline-more {
     margin: 0;
-    padding: 0 20px 8px 36px;
+    padding: 0 20px 8px;
+}
+
+/* The node sits on the axis exactly where an event dot would (3px in, same size and ring), its label where the event
+   text starts (20px in). The whole row is the button. */
+.cl-page .cl-timeline-node {
+    align-items: flex-start;
+    gap: 9px;
+    padding: 0;
+    text-align: left;
+}
+
+.cl-page .cl-timeline-node-dot {
+    position: relative;
+    flex: none;
+    width: 8px;
+    height: 8px;
+    margin: 18px 0 0 3px;
+    border-radius: 50%;
+    background: var(--cl-surface);
+    box-shadow: 0 0 0 2px var(--cl-ink-3);
+}
+
+/* Three dots: the middle one drawn by the pseudo-element, the outer two by its shadows. */
+.cl-page .cl-timeline-node-dot::before {
+    content: "";
+    position: absolute;
+    left: 3px;
+    top: 3px;
+    width: 2px;
+    height: 2px;
+    border-radius: 50%;
+    background: var(--cl-ink-3);
+    box-shadow: -3px 0 0 var(--cl-ink-3), 3px 0 0 var(--cl-ink-3);
+}
+
+.cl-page .cl-timeline-node > span:last-child {
+    align-self: center;
+    padding: 4px 0;
+}
+
+.cl-page .cl-timeline-less {
+    margin-left: 16px;
+}
+
+/* Up chevron before "collapse", drawn in the text colour. */
+.cl-page .cl-timeline-less::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    margin: 4px 2px 0;
+    border-top: 2px solid currentColor;
+    border-left: 2px solid currentColor;
+    transform: rotate(45deg);
 }
 
 .cl-page .cl-timeline time {
@@ -5566,6 +5626,11 @@ a.cl-link-button:hover {
     margin-left: 0;
     margin-top: 0;
     list-style: none;
+}
+
+/* The "show earlier events" row follows the list directly: the dashed line runs from the list into it. */
+.cl-page ol.cl-timeline {
+    margin-bottom: 0;
 }
 
 .cl-page .cl-timeline p {
@@ -5818,6 +5883,7 @@ a.cl-link-button:hover {
     }
 
     .cl-page .cl-timeline,
+    .cl-page .cl-timeline-more,
     .cl-page .cl-address,
     .cl-page .cl-list-summary {
         padding-left: 16px;

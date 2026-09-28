@@ -15,19 +15,23 @@
             <th:block th:if="${h.reviewEditable()}"><span> · </span><button type="button" class="cl-link-button"
                     data-cl-dialog-open="review-dialog" th:attr="aria-label=#{order.review.edit}" th:text="#{general.edit}"></button></th:block>
         </p>
-        <!--/* One list, newest first. timeline.js hides the events past data-cl-timeline-limit and shows the toggle under
-               the list; without JavaScript every event stays visible and the toggle stays hidden. */-->
+        <!--/* One list, newest first. timeline.js hides the events past data-cl-timeline-limit and shows the row under the
+               list: collapsed, a node on the timeline axis that expands it (the line runs on dashed down to it);
+               expanded, a plain "collapse" link under the list. Without JavaScript every event stays visible and the
+               row stays hidden. */-->
         <ol class="cl-timeline" id="history-events" th:if="${!h.events().isEmpty()}"
             th:attr="data-cl-timeline-limit=${h.rest().isEmpty()} ? null : ${h.visible()}">
             <th:block th:each="e : ${h.events()}"><li class="cl-timeline-item" th:insert="~{orders/details/history :: event(${e})}"></li></th:block>
         </ol>
         <th:block th:if="${!h.rest().isEmpty()}">
-            <p class="cl-timeline-more" hidden>
-                <button type="button" class="cl-link-button" aria-controls="history-events" aria-expanded="false" data-cl-timeline-toggle
-                        th:attr="data-more-text=#{order.history.more(${h.events().size()})}, data-less-text=#{order.history.less},
-                                 data-shown-text=#{order.history.shown(${h.rest().size()})}, data-hidden-text=#{order.history.hidden(${h.rest().size()})}"
-                        th:text="#{order.history.more(${h.events().size()})}"></button>
-            </p>
+            <div class="cl-timeline-more" hidden data-cl-timeline-more
+                 th:attr="data-shown-text=#{order.history.shown(${h.rest().size()})}, data-hidden-text=#{order.history.hidden(${h.rest().size()})}">
+                <button type="button" class="cl-link-button cl-timeline-node" aria-controls="history-events" aria-expanded="false"
+                        data-cl-timeline-toggle="expand"><span class="cl-timeline-node-dot" aria-hidden="true"></span><span
+                        th:text="#{${h.moreKey()}(${h.rest().size()})}"></span></button>
+                <button type="button" class="cl-link-button cl-timeline-less" aria-controls="history-events" aria-expanded="true"
+                        data-cl-timeline-toggle="collapse" hidden th:text="#{order.history.less}"></button>
+            </div>
             <p class="cl-visually-hidden" role="status" data-cl-timeline-status></p>
         </th:block>
         <p th:if="${h.events().isEmpty()}" class="cl-list-empty" th:text="#{order.history.empty}"></p>

@@ -468,15 +468,21 @@ class OrdersScriptContractTest {
         String timeline = read("src/main/resources/static/js/timeline.js");
         String css = css();
 
-        // then: the extra events are hidden inside the same list, the toggle keeps the focus and announces the change
-        assertThat(timeline).contains("'use strict'").contains("data-cl-timeline-limit").contains("data-cl-timeline-toggle")
-                .contains("aria-expanded").contains("aria-controls").contains("data-cl-timeline-status")
-                .contains("button.focus()").contains("button.parentElement.hidden = false")
+        // then: the extra events are hidden inside the same list, the focus moves to the button that is left and the
+        // change is announced
+        assertThat(timeline).contains("'use strict'").contains("data-cl-timeline-limit").contains("data-cl-timeline-more")
+                .contains("data-cl-timeline-toggle=\"expand\"").contains("data-cl-timeline-toggle=\"collapse\"")
+                .contains("aria-controls").contains("data-cl-timeline-status")
+                .contains("(expanded ? collapse : expand).focus()").contains("more.hidden = false")
                 .doesNotContain("style.").doesNotContain("innerHTML");
-        // the last visible event ends the line, the toggle lines up with the event text
-        assertThat(rule(css, ".cl-page .cl-timeline-item:has(+ .cl-timeline-item[hidden])::after")).contains("display: none");
+        // collapsed, the last visible event carries the line on, dashed, down to the node; the node sits on the axis
+        assertThat(rule(css, ".cl-page .cl-timeline-item:has(+ .cl-timeline-item[hidden])::after"))
+                .contains("bottom: -16px").contains("repeating-linear-gradient(to bottom, var(--cl-line)");
         assertThat(rule(css, ".cl-page .cl-timeline-item:has(+ .cl-timeline-item[hidden])")).contains("padding-bottom: 0");
-        assertThat(rule(css, ".cl-page .cl-timeline-more")).contains("padding: 0 20px 8px 36px");
+        assertThat(rule(css, ".cl-page .cl-timeline-more")).contains("padding: 0 20px 8px");
+        assertThat(rule(css, ".cl-page .cl-timeline-node-dot")).contains("width: 8px").contains("margin: 18px 0 0 3px")
+                .contains("box-shadow: 0 0 0 2px var(--cl-ink-3)");
+        assertThat(rule(css, ".cl-page .cl-timeline-less")).contains("margin-left: 16px");
         // the line reaches the next dot's ring instead of stopping short of it
         assertThat(rule(css, ".cl-page .cl-timeline-item::after")).contains("bottom: -5px");
     }
