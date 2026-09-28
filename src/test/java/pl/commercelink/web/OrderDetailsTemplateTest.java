@@ -227,10 +227,11 @@ class OrderDetailsTemplateTest {
         // when
         String html = page(render(order(OrderStatus.Assembly), ADMIN));
 
-        // then: main column first, side column after; the stylesheet stacks them in this same order below 1366 px
+        // then: main column first, side column after (dates and settings, customer, finances, history — the client's
+        // order); the stylesheet stacks them in this same order below 1366 px and never reorders them
         List<Integer> positions = List.of(html.indexOf("id=\"items-title\""), html.indexOf("id=\"shipments-title\""),
                 html.indexOf("id=\"documents-title\""), html.indexOf("id=\"payments-title\""),
-                html.indexOf("id=\"customer-title\""), html.indexOf("id=\"settings-title\""),
+                html.indexOf("id=\"settings-title\""), html.indexOf("id=\"customer-title\""),
                 html.indexOf("id=\"finances-title\""), html.indexOf("id=\"history-title\""));
         assertThat(positions).doesNotContain(-1).isSorted();
     }
@@ -343,6 +344,18 @@ class OrderDetailsTemplateTest {
         // then
         assertThat(user).doesNotContain("koszt 579").doesNotContain("Zysk (z VAT)").doesNotContain("Koszt produktów");
         assertThat(admin).contains("Zysk (z VAT)").contains("Koszt produktów (brutto)");
+    }
+
+    @Test
+    void theFinancesCardShowsTheTotalWhatWasPaidAndWhatIsDueOnly() {
+        // when
+        String html = page(render(order(OrderStatus.New), USER));
+
+        // then: the products and services values are gone at the client's request
+        String card = card(html, "finances-title");
+        assertThat(card).doesNotContain("Wartość produktów").doesNotContain("Wartość usług");
+        assertThat(Pattern.compile("<dt>([^<]+)</dt>").matcher(card).results().map(m -> m.group(1)).toList())
+                .containsExactly("Razem", "Wpłacono", "Do zapłaty");
     }
 
     @Test

@@ -1,15 +1,13 @@
 <!DOCTYPE HTML>
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
-<!--/* Order value breakdown, paid/unpaid and the admin-only cost and profit block, hidden by the model, not CSS;
+<!--/* Order total, paid/unpaid and the admin-only cost and profit block, hidden by the model, not CSS;
        cost and profit are collapsed, as they matter less often than what the customer owes. */-->
 <section th:fragment="card" class="cl-card" aria-labelledby="finances-title" data-cl-collapse
          th:with="f=${page.finances()}">
     <div class="cl-card-head"><h2 class="cl-card-title" id="finances-title" th:text="#{order.card.finances}"></h2></div>
     <div class="cl-collapse-body" id="finances-body">
         <dl class="cl-kv is-column">
-            <div><dt th:text="#{order.finances.items}"></dt><dd class="is-numeric" th:text="#{general.currency.amount(${f.itemsValue()})}"></dd></div>
-            <div><dt th:text="#{order.finances.services}"></dt><dd class="is-numeric" th:text="#{general.currency.amount(${f.servicesValue()})}"></dd></div>
             <div class="cl-kv-total"><dt th:text="#{order.finances.total}"></dt><dd class="is-numeric" th:text="#{general.currency.amount(${f.total()})}"></dd></div>
             <div><dt th:text="#{order.finances.paid}"></dt><dd class="is-numeric" th:text="#{general.currency.amount(${f.paid()})}"></dd></div>
             <div><dt th:text="#{order.finances.unpaid}"></dt><dd class="is-numeric" th:classappend="${f.unpaidDue()} ? 'is-bad' : ''"
