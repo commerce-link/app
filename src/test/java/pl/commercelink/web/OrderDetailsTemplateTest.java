@@ -142,6 +142,10 @@ class OrderDetailsTemplateTest {
     static String render(Order order, List<OrderItem> items, OrderPageModelFactory.Viewer viewer, Set<String> dropship,
                          boolean documentsGenerationEnabled) {
         OrderPageModel page = factory(dropship, documentsGenerationEnabled).build(order, items, viewer, PL);
+        return renderPage(page, order);
+    }
+
+    static String renderPage(OrderPageModel page, Order order) {
         Map<String, Object> variables = new HashMap<>();
         variables.put("navigation", null);
         variables.put("page", page);
@@ -1553,24 +1557,13 @@ class OrderDetailsTemplateTest {
                     LocalDateTime.of(2026, 9, 28, 12, 0).minusHours(i)));
         }
         OrderPageModel page = factory(Set.of(), false, events).build(order, items(order), ADMIN, PL);
-        Map<String, Object> variables = new HashMap<>();
-        variables.put("navigation", null);
-        variables.put("page", page);
-        variables.put("order", order);
-        variables.put("orderId", order.getOrderId());
-        variables.put("settings", page.settings());
-        return SettingsTemplateRenderer.render("orders/details", variables);
-    }
-
-    static String historyCard(String html) {
-        int start = html.indexOf("<section class=\"cl-card\" id=\"historia\"");
-        return html.substring(start, html.indexOf("</section>", start));
+        return renderPage(page, order);
     }
 
     @Test
     void theHistoryIsOneListWithTheToggleUnderItAndEveryEventInTheMarkup() {
         // given
-        String card = historyCard(renderWithEvents(8));
+        String card = card(renderWithEvents(8), "historia");
 
         // when
         int lists = card.split("<ol ", -1).length - 1;
@@ -1599,7 +1592,7 @@ class OrderDetailsTemplateTest {
     @Test
     void upToFiveEventsHaveNoToggleAndNoLimit() {
         // given
-        String card = historyCard(renderWithEvents(5));
+        String card = card(renderWithEvents(5), "historia");
 
         // then
         assertThat(card.split("class=\"cl-timeline-item\"", -1).length - 1).isEqualTo(5);
