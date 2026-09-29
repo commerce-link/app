@@ -119,4 +119,23 @@ class ReceiptAttentionMessagesTest {
             }
         }
     }
+
+    @Test
+    void formatsThePosBlockedMessageWithoutLosingApostrophesInBothLanguages() {
+        // given
+        ResourceBundleMessageSource messageSource = messageSource();
+
+        for (String language : java.util.List.of("pl", "en")) {
+            Locale locale = Locale.forLanguageTag(language);
+            String raw = ResourceBundle.getBundle("messages", locale).getString("receipts.attention.BLOCKED_POS");
+
+            // when
+            String formatted = messageSource.getMessage("receipts.attention.BLOCKED_POS", ARGS, locale);
+
+            // then
+            assertThat(formatted).as(language).contains("ORDER-1");
+            assertThat(StringUtils.countMatches(formatted, "'")).as(language + " apostrophes")
+                    .isEqualTo(StringUtils.countMatches(raw, "''"));
+        }
+    }
 }

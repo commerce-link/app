@@ -8,6 +8,8 @@ public enum ReceiptBlockReason {
     TOTAL_MISMATCH,
     EMPTY_NAME,
     MISSING_EMAIL,
+    /** A point-of-sale sale without the customer's own e-mail: the shop may already have printed its receipt. */
+    POS_NO_CUSTOMER_EMAIL,
     /** No longer raised (an unpaid order gets a receipt without payments); kept for attempts stored with it. */
     NO_PAYMENT,
     MIXED_PAYMENTS,

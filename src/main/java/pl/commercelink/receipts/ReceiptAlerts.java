@@ -151,6 +151,15 @@ public class ReceiptAlerts {
                 blocked + (attempt.getBlockedDetail() == null ? "" : " (" + attempt.getBlockedDetail() + ")"),
                 attempt.getIssueCalls()
         };
-        return messageSource.getMessage(attention.messageKey(), args, attention.name(), locale);
+        return messageSource.getMessage(messageKey(attempt, attention), args, attention.name(), locale);
+    }
+
+    /** A point-of-sale sale blocked for want of the customer's e-mail needs the cash register advice, not "Reissue". */
+    private static String messageKey(ReceiptAttempt attempt, ReceiptAttention attention) {
+        if (attention == ReceiptAttention.BLOCKED
+                && ReceiptBlockReason.POS_NO_CUSTOMER_EMAIL.name().equals(attempt.getBlockedReason())) {
+            return "receipts.attention.BLOCKED_POS";
+        }
+        return attention.messageKey();
     }
 }

@@ -265,6 +265,17 @@ public class ReceiptAttemptService {
     }
 
     /**
+     * The order now has its closing document (a receipt from the shop's cash register, an invoice): the bell alerts of
+     * its dead attempts no longer ask for anything. Their stored attention stays, so the order page still shows why
+     * they stopped; live attempts keep their alerts (a fiscalised receipt whose e-mail failed still needs sending).
+     */
+    public void resolveDeadAttemptAlerts(String storeId, String orderId) {
+        attemptsOf(storeId, orderId).stream()
+                .filter(a -> a.getState() == ReceiptAttemptState.BLOCKED || a.getState() == ReceiptAttemptState.FAILED)
+                .forEach(alerts::resolve);
+    }
+
+    /**
      * Whether an attempt already owns the order's receipt, so a manual "add Receipt" would give it a second one: the
      * attempt is issuing or fiscalised, or an operator closed it with the document they resolved at the provider.
      */
@@ -374,8 +385,9 @@ public class ReceiptAttemptService {
             log.warn("Receipt provider {} of store {} has no descriptor (adapter missing)", providerName, store.getStoreId());
             return new ReceiptConversion.Blocked(ReceiptBlockReason.PROVIDER_UNAVAILABLE, null);
         }
+        String storeEmail = store.getBillingDetails() == null ? null : store.getBillingDetails().getEmail();
         return converter.convert(order, orderItemsRepository.findByOrderId(order.getOrderId()), key, provider,
-                LocalDateTime.now(clock));
+                LocalDateTime.now(clock), storeEmail);
     }
 
     private static String blankToNull(String value) {
