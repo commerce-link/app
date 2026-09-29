@@ -32,6 +32,8 @@ import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.receipts.ReceiptAlerts;
 import pl.commercelink.receipts.ReceiptAttemptService;
 import pl.commercelink.receipts.ReceiptOrderState;
+import pl.commercelink.receipts.ReceiptOrderView;
+import pl.commercelink.receipts.ReceiptAttemptState;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.taxonomy.TaxonomyCache;
@@ -2468,9 +2470,9 @@ class OrderDetailsTemplateTest {
         // given
         Order order = order(OrderStatus.Cancelled);
         ReceiptOrderState settled = new ReceiptOrderState(
-                List.of(attempt(1, pl.commercelink.receipts.ReceiptAttemptState.FAILED)),
-                new pl.commercelink.receipts.ReceiptOrderView(List.of(new pl.commercelink.receipts.ReceiptOrderView.Row(
-                        ORDER_ID + ":R1", pl.commercelink.receipts.ReceiptAttemptState.FAILED,
+                List.of(attempt(1, ReceiptAttemptState.FAILED)),
+                new ReceiptOrderView(List.of(new ReceiptOrderView.Row(
+                        ORDER_ID + ":R1", ReceiptAttemptState.FAILED,
                         "receipts.state.FAILED", "is-neutral", null, null, null, null, false, false, false, 1, null,
                         null, "zła stawka VAT", true)), false), false, false);
 

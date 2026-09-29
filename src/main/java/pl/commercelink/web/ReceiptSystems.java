@@ -13,6 +13,7 @@ import pl.commercelink.stores.IntegrationType;
 import pl.commercelink.stores.Store;
 import pl.commercelink.web.settings.IntegrationStatus;
 
+import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -141,5 +142,6 @@ class ReceiptSystems {
         receiptProviderFactory.deleteConfiguration(store, providerName);
         store.removeIntegration(IntegrationType.RECEIPT_PROVIDER);
         store.getReceiptConfiguration().disable();
+        store.getReceiptConfiguration().setDisconnectedAt(LocalDateTime.now());
     }
 }

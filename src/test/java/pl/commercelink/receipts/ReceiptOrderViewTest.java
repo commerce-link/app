@@ -1,6 +1,8 @@
 package pl.commercelink.receipts;
 
 import org.junit.jupiter.api.Test;
+import pl.commercelink.orders.Order;
+import pl.commercelink.orders.OrderStatus;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -162,8 +164,8 @@ class ReceiptOrderViewTest {
         // given: the e-receipt failed, then the order was cancelled; "Wystaw ponownie" is gone with the sale
         ReceiptAttempt failed = deadAttempt("order-1:R1", ReceiptAttemptState.FAILED, 1);
         when(alerts.outcome(failed, Locale.ENGLISH)).thenReturn("invalid VAT rate");
-        pl.commercelink.orders.Order cancelled = ReceiptFixtures.b2cOrder(100);
-        cancelled.setStatus(pl.commercelink.orders.OrderStatus.Cancelled);
+        Order cancelled = ReceiptFixtures.b2cOrder(100);
+        cancelled.setStatus(OrderStatus.Cancelled);
 
         // when
         ReceiptOrderView view = ReceiptOrderView.of(List.of(failed), false,

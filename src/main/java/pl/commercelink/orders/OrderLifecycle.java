@@ -148,8 +148,10 @@ public class OrderLifecycle {
             if (hasAllOrderItemsReturned && receiptAttemptService.locksOrder(order)) {
                 // the e-receipt attempt owns the sale but its outcome is not on the order yet: cancelling now could
                 // leave a fiscalised receipt on a cancelled order, the case the manual cancel refuses. The first save
-                // after the receipt document is attached (ReceiptEffects saves through here) cancels the order.
-                log.info("Order {} of store {} has every item returned; cancelling waits for its e-receipt",
+                // once the lock is gone cancels the order: after fiscalisation the one attaching the document
+                // (ReceiptEffects saves through here); after an attempt dies (FAILED/BLOCKED, the processor saves no
+                // order) the next save, at the latest the lifecycle cron's pass over Delivered orders.
+                log.debug("Order {} of store {} has every item returned; cancelling waits for its e-receipt",
                         order.getOrderId(), order.getStoreId());
             } else if (hasAllOrderItemsReturned) {
                 order.setStatus(OrderStatus.Cancelled);
@@ -167,7 +169,7 @@ public class OrderLifecycle {
         // Save the updated order back to the database
         ordersRepository.save(order);
 
-        receiptTrigger.onOrderSaved(order);
+        receiptTrigger.onOrderSaved(order, store);
 
         notificationEventPublisher.publish(order);
 

@@ -9,6 +9,7 @@ import pl.commercelink.notifications.StoreNotificationService;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrderLifecycle;
+import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.stores.IntegrationType;
@@ -25,6 +26,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -161,7 +163,7 @@ class ReceiptAttemptServiceTest {
     void reconcileResolvesDeadAttemptAlertsOfACancelledOrder() {
         // given: nothing fiscalised, and the order was cancelled since
         ReceiptAttempt failed = storedAttempt(1, ReceiptAttemptState.FAILED);
-        order.setStatus(pl.commercelink.orders.OrderStatus.Cancelled);
+        order.setStatus(OrderStatus.Cancelled);
 
         // when
         service.reconcileDeadAttemptAlerts(order);
@@ -175,7 +177,7 @@ class ReceiptAttemptServiceTest {
     void reconcileKeepsTheAlertOfAFiscalisedReceiptOnACancelledOrder() {
         // given: fiscalised, its document not attached yet; the order cancelled
         ReceiptAttempt fiscalised = storedAttempt(1, ReceiptAttemptState.FISCALISED);
-        order.setStatus(pl.commercelink.orders.OrderStatus.Cancelled);
+        order.setStatus(OrderStatus.Cancelled);
 
         // when
         service.reconcileDeadAttemptAlerts(order);
@@ -237,7 +239,7 @@ class ReceiptAttemptServiceTest {
         when(alerts.republish(any(), any())).thenThrow(new IllegalStateException("notifications down"));
 
         // when / then
-        org.assertj.core.api.Assertions.assertThatCode(() -> service.reconcileDeadAttemptAlerts(order))
+        assertThatCode(() -> service.reconcileDeadAttemptAlerts(order))
                 .doesNotThrowAnyException();
     }
 

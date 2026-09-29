@@ -5,8 +5,8 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderStatus;
+import pl.commercelink.stores.IntegrationType;
 import pl.commercelink.stores.Store;
-import pl.commercelink.stores.StoresRepository;
 
 /**
  * Called after the order lifecycle saved an order: a delivered consumer order of a store with e-receipts gets its
@@ -18,31 +18,44 @@ import pl.commercelink.stores.StoresRepository;
 @Component
 public class ReceiptTrigger {
 
-    private final StoresRepository storesRepository;
     private final ReceiptEligibility eligibility;
     private final ReceiptAttemptService attemptService;
 
-    public ReceiptTrigger(StoresRepository storesRepository, ReceiptEligibility eligibility,
-                          @Lazy ReceiptAttemptService attemptService) {
-        this.storesRepository = storesRepository;
+    public ReceiptTrigger(ReceiptEligibility eligibility, @Lazy ReceiptAttemptService attemptService) {
         this.eligibility = eligibility;
         this.attemptService = attemptService;
     }
 
-    public void onOrderSaved(Order order) {
-        reconcileDeadAttemptAlerts(order);
-        if (order.getStatus() != OrderStatus.Delivered) {
+    /**
+     * store: the order's store as the lifecycle read it for this save (null when it could not be found), so a save
+     * of a store without e-receipts costs no attempts query.
+     */
+    public void onOrderSaved(Order order, Store store) {
+        if (store == null || mayHaveAttempts(store)) {
+            reconcileDeadAttemptAlerts(order);
+        }
+        if (store == null || order.getStatus() != OrderStatus.Delivered) {
             return;
         }
         try {
-            Store store = storesRepository.findById(order.getStoreId());
-            if (store != null && eligibility.automaticCandidate(store, order)) {
+            if (eligibility.automaticCandidate(store, order)) {
                 attemptService.startAutomatic(store, order);
             }
         } catch (RuntimeException e) {
             log.error("Automatic receipt for order {} of store {} could not be started",
                     order.getOrderId(), order.getStoreId(), e);
         }
+    }
+
+    /**
+     * Whether the store's orders can have e-receipt attempts: every attempt is created with the store's receipt
+     * system, so a store that has one, or had one and disconnected it (its dead attempts and their alerts stay), may.
+     * A store that never chose a receipt system has none, and the order lifecycle (which the cron runs over every
+     * Shipping and Delivered order) skips the attempts query for it.
+     */
+    static boolean mayHaveAttempts(Store store) {
+        return store.getConfigurationValue(IntegrationType.RECEIPT_PROVIDER) != null
+                || store.getReceiptConfiguration().getDisconnectedAt() != null;
     }
 
     /**
@@ -55,7 +68,7 @@ public class ReceiptTrigger {
         try {
             attemptService.reconcileDeadAttemptAlerts(order);
         } catch (RuntimeException e) {
-            log.error("Receipt alerts of order {} of store {} could not be reconciled",
+            log.warn("Receipt alerts of order {} of store {} could not be reconciled",
                     order.getOrderId(), order.getStoreId(), e);
         }
     }

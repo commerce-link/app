@@ -291,9 +291,10 @@ public class ReceiptAttemptService {
      * order settles them, their alerts are resolved (their stored attention stays, so the page still shows why they
      * stopped; live attempts keep theirs, a fiscalised receipt whose e-mail failed still needs sending); otherwise the
      * newest attempt, when dead, has its alert raised again (it may have been resolved by a closing document that is
-     * gone now). Earlier, superseded attempts are left resolved: only the newest one asks for anything. Called by every write that can change the rule's
-     * inputs: an order saved through the lifecycle, a document unpinned, an invoice issued, the order cancelled,
-     * an attempt blocked while the order changed under it. Never throws: the alerts must not break the order write.
+     * gone now). Earlier, superseded attempts are left resolved: only the newest one asks for anything. Called by
+     * every write that can change the rule's inputs: an order saved through the lifecycle, a document unpinned, an
+     * invoice issued, the order cancelled, an attempt that died while the order changed under it. Never throws: the
+     * alerts must not break the order write.
      */
     public void reconcileDeadAttemptAlerts(Order order) {
         try {
@@ -307,7 +308,9 @@ public class ReceiptAttemptService {
                     .filter(a -> a.getState().isDead())
                     .ifPresent(this::raiseAgain);
         } catch (RuntimeException e) {
-            log.error("Receipt alerts of order {} of store {} could not be reconciled",
+            // WARN, not ERROR: the lifecycle cron reconciles every open order, so an outage of the notifications
+            // table would raise one alert per order per run; the next save reconciles again
+            log.warn("Receipt alerts of order {} of store {} could not be reconciled",
                     order.getOrderId(), order.getStoreId(), e);
         }
     }
@@ -320,7 +323,7 @@ public class ReceiptAttemptService {
                 reconcileDeadAttemptAlerts(order);
             }
         } catch (RuntimeException e) {
-            log.error("Receipt alerts of order {} of store {} could not be reconciled", orderId, storeId, e);
+            log.warn("Receipt alerts of order {} of store {} could not be reconciled", orderId, storeId, e);
         }
     }
 

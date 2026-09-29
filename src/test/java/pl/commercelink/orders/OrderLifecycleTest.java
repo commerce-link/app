@@ -207,6 +207,23 @@ class OrderLifecycleTest {
         verify(orderLifecycleEventPublisher).publish(order, OrderLifecycleEventType.OrderCancelled);
     }
 
+    @Test
+    void aHeldBackCancelGoesThroughOnTheNextSaveOnceTheAttemptDied() {
+        // given: cancelling was held back while the e-receipt was being issued
+        Order order = fullyReturnedDeliveredOrder();
+        ReceiptAttempt attempt = withAttempt(order, ReceiptAttemptState.ISSUING);
+        OrderItem item = returnedItem();
+        orderLifecycle.update(order, List.of(item));
+        attempt.setState(ReceiptAttemptState.FAILED);
+
+        // when: the next save (the processor saves no order; the lifecycle cron's pass at the latest)
+        orderLifecycle.update(order, List.of(item));
+
+        // then: a dead attempt fiscalised nothing, so nothing holds the cancel any more
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.Cancelled);
+        verify(orderLifecycleEventPublisher).publish(order, OrderLifecycleEventType.OrderCancelled);
+    }
+
     private static Order fullyReturnedDeliveredOrder() {
         Order order = spy(new Order("store-1"));
         order.setStatus(OrderStatus.Delivered);
@@ -288,7 +305,7 @@ class OrderLifecycleTest {
         verifyNoMoreInteractions(orderLifecycleEventPublisher);
         InOrder inOrder = inOrder(ordersRepository, receiptTrigger);
         inOrder.verify(ordersRepository).save(order);
-        inOrder.verify(receiptTrigger).onOrderSaved(order);
+        inOrder.verify(receiptTrigger).onOrderSaved(eq(order), any());
     }
 
     @Test

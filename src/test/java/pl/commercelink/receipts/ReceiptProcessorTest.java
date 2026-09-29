@@ -3,6 +3,8 @@ package pl.commercelink.receipts;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import pl.commercelink.documents.Document;
+import pl.commercelink.documents.DocumentType;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.OrdersRepository;
@@ -20,6 +22,7 @@ import pl.commercelink.stores.StoresRepository;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -353,8 +356,7 @@ class ReceiptProcessorTest {
     @Test
     void anAttemptBlockedAsNotEligibleRaisesNoAlertWhenTheOrderIsSettled() {
         // given: "Wystaw ponownie" raced "Dodaj dokument": the cash register receipt is on the order by now
-        order.addDocument(new pl.commercelink.documents.Document(null, "KASA/13", null,
-                pl.commercelink.documents.DocumentType.Receipt, java.time.LocalDate.of(2026, 9, 23)));
+        order.addDocument(new Document(null, "KASA/13", null, DocumentType.Receipt, LocalDate.of(2026, 9, 23)));
 
         // when
         processor.process(STORE_ID, KEY);
@@ -363,8 +365,54 @@ class ReceiptProcessorTest {
         // as it is after the block (the document may have gone meanwhile)
         assertThat(stored().getState()).isEqualTo(ReceiptAttemptState.BLOCKED);
         assertThat(stored().getBlockedReason()).isEqualTo(ReceiptBlockReason.NOT_ELIGIBLE.name());
+        verify(alerts).sync(any(), isNull());
         verify(alerts, never()).sync(any(), eq(ReceiptAttention.BLOCKED));
+        assertThat(stored().getAttention()).isNull();
         verify(attemptService).reconcileDeadAttemptAlerts(STORE_ID, ORDER_ID);
+    }
+
+    @Test
+    void anAttemptRefusedAfterTheOrderWasInvoicedRaisesNoAlert() {
+        // given: an invoice is issued while the provider call is in flight (InvoicingService has no receipt guard)
+        provider.answerIssue(r -> {
+            order.addDocument(new Document("inv-1", "FV/1/2026", null, DocumentType.InvoicePersonal,
+                    LocalDate.of(2026, 9, 23)));
+            throw new ReceiptRejectedException("fiscal_error", "stawka VAT");
+        });
+
+        // when
+        processor.process(STORE_ID, KEY);
+
+        // then: the attempt fiscalised nothing and the order has its sale document, so the bell stays silent
+        assertThat(stored().getState()).isEqualTo(ReceiptAttemptState.FAILED);
+        verify(alerts).sync(any(), isNull());
+        verify(alerts, never()).sync(any(), eq(ReceiptAttention.FAILED));
+        assertThat(stored().getAttention()).isNull();
+        verify(attemptService).reconcileDeadAttemptAlerts(STORE_ID, ORDER_ID);
+    }
+
+    @Test
+    void anAttemptRefusedOnAnOrderWithoutItsDocumentRaisesItsAlert() {
+        // given
+        provider.answerIssue(r -> { throw new ReceiptRejectedException("fiscal_error", "stawka VAT"); });
+
+        // when
+        processor.process(STORE_ID, KEY);
+
+        // then
+        assertThat(stored().getState()).isEqualTo(ReceiptAttemptState.FAILED);
+        verify(alerts).sync(any(), eq(ReceiptAttention.FAILED));
+        verify(attemptService).reconcileDeadAttemptAlerts(STORE_ID, ORDER_ID);
+    }
+
+    @Test
+    void aLiveAttemptIsNotReconciled() {
+        // when: accepted by the provider, waiting for fiscalisation
+        processor.process(STORE_ID, KEY);
+
+        // then
+        assertThat(stored().getState()).isEqualTo(ReceiptAttemptState.PENDING);
+        verifyNoInteractions(attemptService);
     }
 
     @Test

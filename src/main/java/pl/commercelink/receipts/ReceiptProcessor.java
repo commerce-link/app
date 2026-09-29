@@ -79,17 +79,12 @@ public class ReceiptProcessor {
             return;
         }
         boolean effectsFailed = false;
-        boolean blockedAsNotEligible = false;
         boolean orderSettled = false;
+        boolean dead = false;
         try {
             ReceiptAttempt attempt = leased.get();
             switch (attempt.getState()) {
-                case ISSUING -> {
-                    blockedAsNotEligible = issue(attempt, owner);
-                    if (blockedAsNotEligible) {
-                        orderSettled = orderSettlesDeadAttempts(attempt);
-                    }
-                }
+                case ISSUING -> issue(attempt, owner);
                 case PENDING -> poll(attempt);
                 case FISCALISED -> {
                     if (attempt.getDocumentUrl() == null && attempt.getLinkGaveUpAt() == null) {
@@ -111,29 +106,35 @@ public class ReceiptProcessor {
                     log.error("Effects of fiscalised receipt {} failed; retrying later", receiptKey, e);
                 }
             }
+            // An attempt that is dead now (blocked as not eligible, refused by the provider, failed on a poll, or
+            // created blocked and woken to raise its alert) asks for nothing when its order got its closing document
+            // or was cancelled meanwhile (an invoice issued while the attempt was live, "Dodaj dokument" racing
+            // "Wystaw ponownie"): the order's own reconcile ran while the attempt was still live and skipped it.
+            dead = attempts.find(storeId, receiptKey).map(a -> a.getState().isDead()).orElse(false);
+            if (dead) {
+                orderSettled = orderSettlesDeadAttempts(storeId, leased.get().getOrderId());
+            }
         } catch (RuntimeException e) {
             log.error("Receipt attempt {} could not be processed", receiptKey, e);
         } finally {
             finish(storeId, receiptKey, owner, effectsFailed, orderSettled);
         }
-        if (blockedAsNotEligible) {
+        if (dead) {
             // The order may have gained or lost its closing document between the read above and the alert written
-            // by finish (a reissue racing "Dodaj dokument"): the bell follows the order as it is now. After finish,
-            // not before, so whichever write comes last, the order's or this attempt's, is seen by a reconcile.
+            // by finish: the bell follows the order as it is now. After finish, not before, so whichever write comes
+            // last, the order's or this attempt's, is seen by a reconcile.
             attemptService.reconcileDeadAttemptAlerts(storeId, leased.get().getOrderId());
         }
     }
 
-    /**
-     * Whether the order, read afresh, settles the attempt just blocked ({@link ReceiptTrigger#settlesDeadAttempts}):
-     * an attempt refused because the order got its receipt or invoice meanwhile asks the operator for nothing.
-     */
-    private boolean orderSettlesDeadAttempts(ReceiptAttempt attempt) {
+    /** Whether the order, read afresh, settles its dead attempts ({@link ReceiptTrigger#settlesDeadAttempts}). */
+    private boolean orderSettlesDeadAttempts(String storeId, String orderId) {
         try {
-            Order order = ordersRepository.findById(attempt.getStoreId(), attempt.getOrderId());
+            Order order = ordersRepository.findById(storeId, orderId);
             return order != null && ReceiptTrigger.settlesDeadAttempts(order);
         } catch (RuntimeException e) {
-            log.warn("Order of receipt attempt {} could not be read; its alert follows the attempt", attempt.getReceiptKey(), e);
+            log.warn("Order {} of store {} could not be read; the alert of its dead attempt follows the attempt",
+                    orderId, storeId, e);
             return false;
         }
     }
@@ -165,8 +166,7 @@ public class ReceiptProcessor {
         });
     }
 
-    /** Returns whether this call blocked the attempt as no longer eligible. */
-    private boolean issue(ReceiptAttempt attempt, String owner) {
+    private void issue(ReceiptAttempt attempt, String owner) {
         String storeId = attempt.getStoreId();
         String key = attempt.getReceiptKey();
         if (attempt.getIssueCalls() == 0 && !stillQualifies(attempt)) {
@@ -187,7 +187,7 @@ public class ReceiptProcessor {
             if (!blockedByUs) {
                 log.warn("Receipt attempt {} lost its lease before it could be blocked as not eligible; leaving it untouched", key);
             }
-            return blockedByUs;
+            return;
         }
         ReceiptProvider provider;
         ReceiptRequest request;
@@ -201,7 +201,7 @@ public class ReceiptProcessor {
             request = ReceiptSnapshotJson.read(attempt.getRequestSnapshot()).toRequest(key);
         } catch (RuntimeException e) {
             recordPreSendFailure(attempt, e);   // nothing was sent; issueCalls is never touched here
-            return false;
+            return;
         }
         // Defence in depth: acquire() proved ownership at the start of process(), but a lot can happen between
         // then and here (a slow store/order lookup letting the lease expire under us, a sweep taking it over).
@@ -217,7 +217,7 @@ public class ReceiptProcessor {
         }).isPresent();
         if (!stillOurs) {
             log.warn("Receipt attempt {} lost its lease before issue; not calling the provider", key);
-            return false;
+            return;
         }
         try {
             Receipt receipt = provider.issue(request);
@@ -271,7 +271,6 @@ public class ReceiptProcessor {
         } catch (RuntimeException e) {
             recordError(attempt, e, false);
         }
-        return false;
     }
 
     private void poll(ReceiptAttempt attempt) {
