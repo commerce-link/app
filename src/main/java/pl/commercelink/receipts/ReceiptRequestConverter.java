@@ -39,6 +39,12 @@ public class ReceiptRequestConverter {
 
     public ReceiptConversion convert(Order order, List<OrderItem> items, String receiptKey, ReceiptProvider provider,
                                      LocalDateTime fallbackSaleDate) {
+        return convert(order, items, receiptKey, provider, fallbackSaleDate, null);
+    }
+
+    /** {@code storeEmail} is the store's own e-mail, never a point-of-sale buyer's (see {@link BuyerEmail}). */
+    public ReceiptConversion convert(Order order, List<OrderItem> items, String receiptKey, ReceiptProvider provider,
+                                     LocalDateTime fallbackSaleDate, String storeEmail) {
         if (!provider.supportedMedia().contains(ReceiptMedium.ELECTRONIC)) {
             return new ReceiptConversion.Blocked(ReceiptBlockReason.MEDIUM_UNSUPPORTED, null);
         }
@@ -79,7 +85,7 @@ public class ReceiptRequestConverter {
             return new ReceiptConversion.Blocked(ReceiptBlockReason.TOTAL_MISMATCH,
                     Money.ofGrosze(linesTotal).toBigDecimal() + " ≠ " + Money.ofGrosze(orderTotal).toBigDecimal());
         }
-        String email = buyerEmail(order);
+        String email = BuyerEmail.of(order, storeEmail);
         if (provider.requiresBuyerEmail() && email == null) {
             return new ReceiptConversion.Blocked(ReceiptBlockReason.MISSING_EMAIL, null);
         }
@@ -118,16 +124,6 @@ public class ReceiptRequestConverter {
             case VAT_0 -> "0";
             case EXEMPT -> "zw";
         };
-    }
-
-    /**
-     * {@code Order.getEmail()} always mirrors {@code getBillingDetails().getEmail()} live (it is a
-     * write-only projection field used for persistence, never read back by the getter), so the billing address is
-     * the only real source of the buyer's e-mail; there is no independent order-level value to fall back to.
-     */
-    private static String buyerEmail(Order order) {
-        String billing = order.getBillingDetails() == null ? null : order.getBillingDetails().getEmail();
-        return StringUtils.isNotBlank(billing) ? billing.strip() : null;
     }
 
     /**

@@ -333,8 +333,9 @@ public class ReceiptAttemptService {
             log.warn("Receipt provider {} of store {} has no descriptor (adapter missing)", providerName, store.getStoreId());
             return new ReceiptConversion.Blocked(ReceiptBlockReason.PROVIDER_UNAVAILABLE, null);
         }
+        String storeEmail = store.getBillingDetails() == null ? null : store.getBillingDetails().getEmail();
         return converter.convert(order, orderItemsRepository.findByOrderId(order.getOrderId()), key, provider,
-                LocalDateTime.now(clock));
+                LocalDateTime.now(clock), storeEmail);
     }
 
     private static String blankToNull(String value) {

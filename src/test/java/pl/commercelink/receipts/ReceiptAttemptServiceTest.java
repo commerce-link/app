@@ -10,6 +10,7 @@ import pl.commercelink.orders.OrderLifecycle;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.stores.IntegrationType;
+import pl.commercelink.stores.PosReceiptMode;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoreNotification;
 import pl.commercelink.stores.StoreNotificationType;
@@ -262,6 +263,17 @@ class ReceiptAttemptServiceTest {
         assertThat(attempt.getCreatedBy()).isEqualTo("operator");
         verify(publisher).publishDue(attempt);
         assertThat(service.startAutomatic(store, order)).isEmpty();
+    }
+
+    @Test
+    void manualIssueForAPosOrderNeverAddressesTheStoresOwnEmail() {
+        order = posOrder(100.00);
+        withPosMode(store, PosReceiptMode.ASK);
+
+        ReceiptAttempt attempt = service.issueManually(STORE_ID, ORDER_ID, "operator");
+
+        assertThat(attempt.getState()).isEqualTo(ReceiptAttemptState.BLOCKED);
+        assertThat(attempt.getBlockedReason()).isEqualTo(ReceiptBlockReason.MISSING_EMAIL.name());
     }
 
     @Test

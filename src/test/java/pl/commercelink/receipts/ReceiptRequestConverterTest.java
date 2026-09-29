@@ -224,4 +224,24 @@ class ReceiptRequestConverterTest {
         assertThat(converted(b2cOrder(30.00), items(item("Kabel", 3, 10.00, 1.23))).lines().get(0).quantity())
                 .isEqualByComparingTo(new BigDecimal("3"));
     }
+
+    @Test
+    void blocksAPosReceiptAddressedToTheStoresOwnEmail() {
+        ReceiptConversion conversion = converter.convert(posOrder(100.00), items(item("Mysz", 1, 100.00, 1.23)),
+                KEY, provider, NOW, STORE_EMAIL);
+
+        assertThat(conversion).isInstanceOf(ReceiptConversion.Blocked.class);
+        assertThat(((ReceiptConversion.Blocked) conversion).reason()).isEqualTo(ReceiptBlockReason.MISSING_EMAIL);
+    }
+
+    @Test
+    void sendsAPosReceiptToTheCustomersEmail() {
+        Order order = posOrder(100.00);
+        order.getBillingDetails().setEmail("klient@example.com");
+
+        ReceiptConversion conversion = converter.convert(order, items(item("Mysz", 1, 100.00, 1.23)),
+                KEY, provider, NOW, STORE_EMAIL);
+
+        assertThat(((ReceiptConversion.Converted) conversion).snapshot().buyerEmail()).isEqualTo("klient@example.com");
+    }
 }
