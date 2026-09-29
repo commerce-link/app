@@ -107,6 +107,35 @@ class ReceiptAttemptServiceTest {
     }
 
     @Test
+    void automaticStartOfAPosSaleWithTheStoresEmailBlocksInsteadOfMailingTheStore() {
+        // given
+        withStoreEmail(store);
+        order = posOrder(100.00);
+
+        // when
+        ReceiptAttempt attempt = service.startAutomatic(store, order).orElseThrow();
+
+        // then
+        assertThat(attempt.getState()).isEqualTo(ReceiptAttemptState.BLOCKED);
+        assertThat(attempt.getBlockedReason()).isEqualTo(ReceiptBlockReason.POS_NO_CUSTOMER_EMAIL.name());
+    }
+
+    @Test
+    void manualEReceiptOfAPosSaleWithTheStoresEmailBlocksInsteadOfMailingTheStore() {
+        // given
+        withStoreEmail(store);
+        order = posOrder(100.00);
+
+        // when
+        ReceiptAttempt attempt = service.issueManually(STORE_ID, ORDER_ID, "operator");
+
+        // then
+        assertThat(attempt.getState()).isEqualTo(ReceiptAttemptState.BLOCKED);
+        assertThat(attempt.getBlockedReason()).isEqualTo(ReceiptBlockReason.POS_NO_CUSTOMER_EMAIL.name());
+        assertThat(provider.issueCalls.get()).isZero();
+    }
+
+    @Test
     void providerThatCannotBeCreatedBlocksTheAttempt() {
         when(factory.get(any(Store.class), anyString())).thenThrow(new IllegalStateException("no secret"));
 
