@@ -181,6 +181,12 @@ public class OrdersController extends BaseController {
         if (legacy.isPresent()) {
             return "redirect:" + legacy.get();
         }
+        if (OrderListQuery.isEntry(params)) {
+            Optional<String> start = orderListService.defaultFilterHref(actor());
+            if (start.isPresent()) {
+                return "redirect:" + start.get();
+            }
+        }
         OrderListQuery query = OrderListQuery.parse(params);
         addListAttributes(model, query, locale);
         return "orders/list";
@@ -205,7 +211,10 @@ public class OrdersController extends BaseController {
     public String createOrderFilter(OrderFilterForm form, RedirectAttributes redirectAttributes, Model model, Locale locale,
                                     HttpServletResponse response) {
         return filterAction(form.getReturnTo(), redirectAttributes, model, locale, response, form, null, () -> {
-            orderFilters.create(actor(), form.isSharedWithStore(), form.getLabel(), form.toConditions());
+            OrderFilter created = orderFilters.create(actor(), form.isSharedWithStore(), form.getLabel(), form.toConditions());
+            if (form.isOpenByDefault()) {
+                orderFilters.setDefault(actor(), created.getId());
+            }
             return safeReturnTo(form.getReturnTo());
         });
     }
@@ -216,7 +225,36 @@ public class OrdersController extends BaseController {
                                     Model model, Locale locale, HttpServletResponse response) {
         return filterAction(form.getReturnTo(), redirectAttributes, model, locale, response, form, filterId, () -> {
             orderFilters.update(actor(), filterId, form.isSharedWithStore(), form.getLabel(), form.toConditions());
+            if (form.isOpenByDefault()) {
+                orderFilters.setDefault(actor(), filterId);
+            } else {
+                orderFilters.clearDefault(actor(), filterId);
+            }
             return safeReturnTo(form.getReturnTo());
+        });
+    }
+
+    /** "Ustaw jako domyślny" on the management page: the user's orders list opens with this filter from now on. */
+    @PostMapping(FILTERS_PATH + "/default")
+    @PreAuthorize("!hasRole('SUPER_ADMIN')")
+    public String setDefaultOrderFilter(@RequestParam String filterId, @RequestParam(required = false) String returnTo,
+                                        RedirectAttributes redirectAttributes, Model model, Locale locale,
+                                        HttpServletResponse response) {
+        return filterAction(returnTo, redirectAttributes, model, locale, response, null, null, () -> {
+            orderFilters.setDefault(actor(), filterId);
+            return safeReturnTo(returnTo);
+        });
+    }
+
+    /** "Nie otwieraj domyślnie": the user's orders list opens unfiltered again. */
+    @PostMapping(FILTERS_PATH + "/default/clear")
+    @PreAuthorize("!hasRole('SUPER_ADMIN')")
+    public String clearDefaultOrderFilter(@RequestParam String filterId, @RequestParam(required = false) String returnTo,
+                                          RedirectAttributes redirectAttributes, Model model, Locale locale,
+                                          HttpServletResponse response) {
+        return filterAction(returnTo, redirectAttributes, model, locale, response, null, null, () -> {
+            orderFilters.clearDefault(actor(), filterId);
+            return safeReturnTo(returnTo);
         });
     }
 
@@ -288,7 +326,9 @@ public class OrdersController extends BaseController {
         if (shared && !isAdmin()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
-        addFilterEditAttributes(model, safeListReturnTo(returnTo), filterId, formOf(filter, shared), locale);
+        OrderFilterForm form = formOf(filter, shared);
+        form.setOpenByDefault(filters.isDefault(filterId));
+        addFilterEditAttributes(model, safeListReturnTo(returnTo), filterId, form, locale);
         return "orders/filter-edit";
     }
 

@@ -155,6 +155,37 @@ class OrderListServiceTest {
     }
 
     @Test
+    void theDefaultFilterOpensTheUntouchedListWithItsStatusAndIsMarkedInTheMenu() {
+        // given
+        OrderFilter assembled = OrderFilter.of("Do wysłania", List.of(OrderFilterCondition.of(OrderFilterField.Status, "Assembled")));
+        OrderFilter allegro = OrderFilter.of("Allegro", List.of(OrderFilterCondition.of(OrderFilterField.SourceName, "Allegro")));
+        when(orderFilters.list(ACTOR)).thenReturn(new ListOrderFiltersView(List.of(allegro), List.of(assembled), assembled.getId()));
+
+        // when
+        Optional<String> start = service.defaultFilterHref(ACTOR);
+        OrdersPageModel model = page(query("q", "a"));
+
+        // then
+        assertThat(start).contains("/dashboard/orders?status=Assembled&filterId=" + assembled.getId());
+        assertThat(model.filterOptions()).extracting(o -> o.isDefault()).containsExactly(false, true);
+    }
+
+    @Test
+    void withoutADefaultFilterTheListOpensUnfilteredAndNoFilterIsMarked() {
+        // given
+        OrderFilter allegro = OrderFilter.of("Allegro", List.of(OrderFilterCondition.of(OrderFilterField.SourceName, "Allegro")));
+        when(orderFilters.list(ACTOR)).thenReturn(new ListOrderFiltersView(List.of(), List.of(allegro)));
+
+        // when
+        Optional<String> start = service.defaultFilterHref(ACTOR);
+        OrdersPageModel model = page(query());
+
+        // then
+        assertThat(start).isEmpty();
+        assertThat(model.filterOptions()).extracting(o -> o.isDefault()).containsExactly(false);
+    }
+
+    @Test
     void tilesCountTheWholeStoreWhileStatusCountsStayWithinTheFilter() {
         add("a", OrderStatus.New, TODAY.minusDays(1), 100, 0, "Allegro");
         add("b", OrderStatus.New, TODAY, 100, 100, null);
@@ -173,7 +204,7 @@ class OrderListServiceTest {
         assertThat(model.statusSummary()).isEqualTo("Otwarte");
         assertThat(model.rows()).hasSize(2);
         assertThat(model.chips()).extracting(c -> c.label()).containsExactly("Filtr: Allegro");
-        assertThat(model.chips().get(0).clearHref()).isEqualTo("/dashboard/orders");
+        assertThat(model.chips().get(0).clearHref()).isEqualTo("/dashboard/orders?filterId=");
     }
 
     @Test
@@ -186,7 +217,7 @@ class OrderListServiceTest {
             OrdersPageModel model = page(query("focus", focus, "status", "Blocked"));
             assertThat(model.rows()).extracting(r -> r.href()).containsExactly("/dashboard/orders/b");
             assertThat(model.chips()).extracting(c -> c.label()).containsExactly("Status: Zablokowane");
-            assertThat(model.chips().get(0).clearHref()).isEqualTo("/dashboard/orders");
+            assertThat(model.chips().get(0).clearHref()).isEqualTo("/dashboard/orders?filterId=");
         }
     }
 
@@ -248,7 +279,7 @@ class OrderListServiceTest {
         OrdersPageModel beyond = page(query("page", "9"));
         assertThat(beyond.rows()).hasSize(1);
         assertThat(beyond.pagination().page()).isEqualTo(2);
-        assertThat(beyond.pagination().previousHref()).isEqualTo("/dashboard/orders");
+        assertThat(beyond.pagination().previousHref()).isEqualTo("/dashboard/orders?filterId=");
     }
 
     @Test
@@ -257,12 +288,12 @@ class OrderListServiceTest {
         assertThat(page(query()).emptyState().actionHref()).isNull();
         add("a", OrderStatus.New, TODAY.plusDays(1), 10, 10, null);
         assertThat(page(query("q", "zzz")).emptyState().text()).startsWith("Brak wyników dla „zzz”");
-        assertThat(page(query("q", "zzz")).emptyState().actionHref()).isEqualTo("/dashboard/orders");
+        assertThat(page(query("q", "zzz")).emptyState().actionHref()).isEqualTo("/dashboard/orders?filterId=");
         assertThat(page(query("status", "Blocked")).emptyState().text()).isEqualTo("Brak zamówień w statusie „Zablokowane”.");
         OrderFilter f = OrderFilter.of("Kurier", List.of(OrderFilterCondition.of(OrderFilterField.ShipmentType, "PickupPoint")));
         when(orderFilters.list(ACTOR)).thenReturn(new ListOrderFiltersView(List.of(), List.of(f)));
         assertThat(page(query("filterId", f.getId())).emptyState().text()).isEqualTo("Ten filtr nie ma dziś zamówień.");
-        assertThat(page(query("filterId", f.getId())).emptyState().actionHref()).isEqualTo("/dashboard/orders");
+        assertThat(page(query("filterId", f.getId())).emptyState().actionHref()).isEqualTo("/dashboard/orders?filterId=");
         assertThat(page(query()).emptyState()).isNull();
     }
 
@@ -299,7 +330,7 @@ class OrderListServiceTest {
         assertThat(model.chips()).extracting(c -> c.label()).containsExactly("Status: Nowe", "Status: Zablokowane");
         assertThat(model.chips()).extracting(c -> c.clearHref())
                 .containsExactly("/dashboard/orders?status=Blocked", "/dashboard/orders?status=New");
-        assertThat(page(query("status", "New")).chips().get(0).clearHref()).isEqualTo("/dashboard/orders");
+        assertThat(page(query("status", "New")).chips().get(0).clearHref()).isEqualTo("/dashboard/orders?filterId=");
         assertThat(page(query("status", "New")).statusSummary()).isEqualTo("Nowe");
         assertThat(page(query("status", "Shipping", "status", "Delivered")).emptyState().text()).isEqualTo("Brak zamówień w wybranych statusach.");
     }

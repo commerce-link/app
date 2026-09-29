@@ -6,6 +6,8 @@ import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBIgnore;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBRangeKey;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTable;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBVersionAttribute;
+import lombok.Getter;
+import lombok.Setter;
 import pl.commercelink.orders.filters.exceptions.OrderFilterInvalidException;
 
 import java.util.LinkedList;
@@ -27,6 +29,15 @@ public class OwnedOrderFilters {
 
     @DynamoDBAttribute(attributeName = "filters")
     private List<OrderFilter> filters = new LinkedList<>();
+
+    /**
+     * The filter the orders list opens with for this user: one of their own or a store filter, kept in the user's own
+     * row because it is a personal choice even when it names a shared filter. Only a user's row carries one.
+     */
+    @Getter
+    @Setter
+    @DynamoDBAttribute(attributeName = "defaultFilterId")
+    private String defaultFilterId;
 
     @DynamoDBVersionAttribute
     private Long version;
@@ -82,6 +93,11 @@ public class OwnedOrderFilters {
 
     public void setUserId(String userId) {
         this.userId = userId;
+    }
+
+    @DynamoDBIgnore
+    public boolean isDefault(String filterId) {
+        return filterId != null && filterId.equals(defaultFilterId);
     }
 
     public List<OrderFilter> getFilters() {

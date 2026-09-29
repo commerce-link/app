@@ -100,10 +100,13 @@ class OrdersListTemplateTest {
     @Test
     void managementIsAPageWithAnEditSubpage() throws Exception {
         String html = filters();
-        // the management page: list in a card, "Nowy filtr" in the card head, edit on a subpage, star and delete here
+        // the management page: list in a card, "Nowy filtr" in the card head, edit on a subpage, delete here, and the
+        // default filter set by a plain POST form in the row's title line (no star)
         assertThat(html).contains("layout:fragment=\"content\"").contains("cl-card-head").contains("/dashboard/orders/filters/add")
                 .contains("/dashboard/orders/filters/{id}/edit").contains("data-cl-confirm")
-                .doesNotContain("cl-star").doesNotContain("/default").doesNotContain("makeDefault").doesNotContain("is-filter")
+                .contains("'/dashboard/orders/filters/default/clear' : '/dashboard/orders/filters/default'")
+                .contains("<form class=\"cl-list-title-action\" method=\"post\"").contains("name=\"openByDefault\"")
+                .doesNotContain("cl-star").doesNotContain("is-filter")
                 .contains("settings-header :: subpage(${listHref}")
                 .doesNotContain("filtersDialog").doesNotContain("dialogBody").doesNotContain("data-cl-filter-edit")
                 .doesNotContain("style=").doesNotContain("onclick=").doesNotContain("class=\"button");

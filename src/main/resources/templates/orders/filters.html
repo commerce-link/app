@@ -55,6 +55,10 @@
         <label class="cl-label" for="filter-postal-code" th:text="#{orders.filters.field.postal.code}"></label>
         <input class="cl-input" type="text" id="filter-postal-code" name="shippingPostalCode" th:value="${filterForm?.shippingPostalCode}" inputmode="numeric" data-cl-postal-code/>
     </div>
+    <div class="cl-check-field cl-span-6">
+        <label class="cl-check"><input type="checkbox" name="openByDefault" value="true" th:checked="${filterForm != null and filterForm.openByDefault}"/> <span th:text="#{orders.filters.default.field}"></span></label>
+        <p class="cl-check-description" th:text="#{orders.filters.default.field.help}"></p>
+    </div>
     <div class="cl-check-field cl-span-6" th:if="${canManageStoreFilters}">
         <label class="cl-check"><input type="checkbox" name="sharedWithStore" value="true" th:checked="${filterForm != null and filterForm.sharedWithStore}"/> <span th:text="#{orders.filters.share}"></span></label>
         <p class="cl-check-description" th:text="#{orders.filters.share.help}"></p>
@@ -62,7 +66,7 @@
 </div>
 
 <!--/* Filter management page (design system: a list of records in a card, "Nowy filtr" in the card head, editing on a
-       subpage, deleting through the confirm dialog or its page). The delete link returns to this page ($returnTo);
+       subpage, deleting through the confirm dialog or its page, the user's default filter set in the row's title line). The delete link returns to this page ($returnTo);
        "‹ Zamówienia" goes back to the list view the user came from ($listHref). */-->
 <div layout:fragment="content">
     <section class="cl-page">
@@ -82,9 +86,22 @@
                 <p class="cl-card-desc" th:text="#{orders.filters.list.desc}"></p>
                 <ul class="cl-list" th:unless="${filters.sharedWithStore().isEmpty() and filters.own().isEmpty()}">
                     <th:block th:each="group : ${ {filters.sharedWithStore(), filters.own()} }" th:with="shared=${groupStat.first}">
-                        <li class="cl-list-item" th:each="filter : ${group}">
+                        <li class="cl-list-item" th:each="filter : ${group}" th:with="isDefault=${filters.isDefault(filter.id)}">
                             <div>
-                                <span class="cl-list-title" th:text="${filter.label}"></span>
+                                <!--/* The default is personal, so every user sets it on any filter they see, a store filter
+                                       too (design system: a record's state shortcut sits in its title line). */-->
+                                <div class="cl-list-title">
+                                    <span th:text="${filter.label}"></span>
+                                    <span th:if="${isDefault}" class="cl-status is-info" th:text="#{settings.list.default}"></span>
+                                    <form class="cl-list-title-action" method="post"
+                                          th:action="@{${isDefault} ? '/dashboard/orders/filters/default/clear' : '/dashboard/orders/filters/default'}">
+                                        <input type="hidden" name="filterId" th:value="${filter.id}"/>
+                                        <input type="hidden" name="returnTo" th:value="${returnTo}"/>
+                                        <button type="submit" class="cl-link-button"
+                                                th:text="${isDefault} ? #{orders.filters.default.clear} : #{settings.list.makeDefault}"
+                                                th:attr="aria-label=${isDefault} ? #{orders.filters.default.clear.label(${filter.label})} : #{settings.list.makeDefault.for(${filter.label})}"></button>
+                                    </form>
+                                </div>
                                 <div class="cl-filter-conditions">
                                     <span class="cl-status is-neutral" th:each="c : ${filter.conditions}" th:text="${#messages.msg('orders.filters.field.' + T(pl.commercelink.web.orders.FilterConditionLabels).fieldKey(c.field))} + ': ' + ${T(pl.commercelink.web.orders.FilterConditionLabels).value(c, #messages)}"></span>
                                     <span class="cl-status is-neutral" th:text="${shared} ? #{orders.filters.scope.store} : #{orders.filters.scope.private}"></span>

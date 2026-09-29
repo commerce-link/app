@@ -10,6 +10,7 @@ public class OrderFilterForm {
 
     private String label;
     private boolean sharedWithStore;
+    private boolean openByDefault;
     private String status;
     private String shipmentType;
     private String paymentSource;
@@ -49,6 +50,14 @@ public class OrderFilterForm {
 
     public void setSharedWithStore(boolean sharedWithStore) {
         this.sharedWithStore = sharedWithStore;
+    }
+
+    public boolean isOpenByDefault() {
+        return openByDefault;
+    }
+
+    public void setOpenByDefault(boolean openByDefault) {
+        this.openByDefault = openByDefault;
     }
 
     public String getStatus() {

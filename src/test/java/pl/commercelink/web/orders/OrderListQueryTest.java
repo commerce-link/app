@@ -26,7 +26,7 @@ class OrderListQueryTest {
         assertThat(query.effectiveSort()).isEqualTo(OrderListQuery.Sort.DUE);
         assertThat(query.effectiveDir()).isEqualTo(OrderListQuery.Direction.ASC);
         assertThat(query.page()).isEqualTo(1);
-        assertThat(query.href()).isEqualTo("/dashboard/orders");
+        assertThat(query.href()).isEqualTo("/dashboard/orders?filterId=");
     }
 
     @Test
@@ -34,7 +34,7 @@ class OrderListQueryTest {
         // focus (the clickable tiles) and sort=ordered (the history) are gone: old bookmarks open the plain list
         OrderListQuery query = OrderListQuery.parse(params("status", "Bogus", "focus", "overdue", "sort", "ordered", "dir", "z", "page", "abc"));
         assertThat(query.statuses()).isEmpty();
-        assertThat(query.href()).isEqualTo("/dashboard/orders");
+        assertThat(query.href()).isEqualTo("/dashboard/orders?filterId=");
         assertThat(query.sort()).isNull();
         assertThat(query.page()).isEqualTo(1);
         assertThat(OrderListQuery.parse(params("page", "0")).page()).isEqualTo(1);
@@ -52,11 +52,21 @@ class OrderListQueryTest {
     }
 
     @Test
+    void onlyAnAddressWithoutListStateIsAnEntry() {
+        // when / then
+        assertThat(OrderListQuery.isEntry(params())).isTrue();
+        assertThat(OrderListQuery.isEntry(params("lang", "pl"))).isTrue();
+        assertThat(OrderListQuery.isEntry(params("filterId", ""))).isFalse();
+        assertThat(OrderListQuery.isEntry(params("status", "New"))).isFalse();
+        assertThat(OrderListQuery.isEntry(params("q", ""))).isFalse();
+    }
+
+    @Test
     void emptyFilterIdMeansNoFilter() {
-        // the start filter's "filterId=" marker is gone; an old link with it opens the clean list
+        // "filterId=" is the list's own "no filter": it keeps the user's default filter from coming back
         OrderListQuery query = OrderListQuery.parse(params("filterId", ""));
         assertThat(query.hasFilter()).isFalse();
-        assertThat(query.href()).isEqualTo("/dashboard/orders");
+        assertThat(query.href()).isEqualTo("/dashboard/orders?filterId=");
     }
 
     @Test
@@ -104,9 +114,9 @@ class OrderListQueryTest {
     void legacyStatusesAndShowAllRedirect() {
         assertThat(OrderListQuery.legacyRedirect(params("statuses", "Blocked", "statuses", "New")))
                 .contains("/dashboard/orders?status=New&status=Blocked");
-        assertThat(OrderListQuery.legacyRedirect(params("showAll", "true"))).contains("/dashboard/orders");
+        assertThat(OrderListQuery.legacyRedirect(params("showAll", "true"))).contains("/dashboard/orders?filterId=");
         assertThat(OrderListQuery.legacyRedirect(params("showAll", "true", "filterId", "f1"))).contains("/dashboard/orders?filterId=f1");
-        assertThat(OrderListQuery.legacyRedirect(params("statuses", "Bogus"))).contains("/dashboard/orders");
+        assertThat(OrderListQuery.legacyRedirect(params("statuses", "Bogus"))).contains("/dashboard/orders?filterId=");
         assertThat(OrderListQuery.legacyRedirect(params("status", "New"))).isEmpty();
     }
 
