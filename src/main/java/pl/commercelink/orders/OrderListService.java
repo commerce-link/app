@@ -68,6 +68,7 @@ public class OrderListService {
 
         List<Order> filtered = open.stream()
                 .filter(order -> activeFilter.map(f -> f.matchesIgnoring(OrderFilterField.Status, order, today)).orElse(true))
+                .filter(order -> query.focus() == null || query.focus().matches(order, today))
                 .filter(order -> OrderSearch.matches(order, query.q()))
                 .toList();
         List<Order> inStatus = filtered.stream()
@@ -83,7 +84,7 @@ public class OrderListService {
 
         return new OrdersPageModel(
                 query,
-                tiles(open, today, locale),
+                tiles(open, query, today, locale),
                 statusOptions(filtered, OPEN, query, locale),
                 statusSummary(query, locale),
                 filterOptions(filters, query),
@@ -120,10 +121,13 @@ public class OrderListService {
         return base.reversed();
     }
 
-    private List<Tile> tiles(List<Order> open, LocalDate today, Locale locale) {
+    private List<Tile> tiles(List<Order> open, OrderListQuery query, LocalDate today, Locale locale) {
         return Arrays.stream(OrderAttention.values()).map(kind -> {
             String key = "orders.list.attention." + kind.param();
-            return new Tile(text(key, locale), open.stream().filter(o -> kind.matches(o, today)).count(), text(key + ".hint", locale));
+            boolean active = kind == query.focus();
+            String href = active ? query.withoutFocus().href() : query.withFocus(kind).href();
+            return new Tile(text(key, locale), open.stream().filter(o -> kind.matches(o, today)).count(), text(key + ".hint", locale),
+                    href, active);
         }).toList();
     }
 
@@ -158,7 +162,7 @@ public class OrderListService {
      * the menu of an untouched list would give.
      */
     public Optional<String> defaultFilterHref(FilterActor actor) {
-        OrderListQuery untouched = new OrderListQuery(List.of(), null, null, null, null, 1);
+        OrderListQuery untouched = new OrderListQuery(List.of(), null, null, null, null, null, 1);
         return orderFilters.list(actor).defaultFilter().map(filter -> chosen(filter, untouched).href());
     }
 
@@ -186,6 +190,10 @@ public class OrderListService {
 
     private List<Chip> chips(OrderListQuery query, Optional<OrderFilter> activeFilter, Locale locale) {
         List<Chip> chips = new ArrayList<>();
+        if (query.focus() != null) {
+            String label = text("orders.list.attention." + query.focus().param(), locale);
+            chips.add(new Chip(label, query.withoutFocus().href(), text("orders.list.chip.clearLabel", locale, label)));
+        }
         // one chip per ticked status, so its "×" drops just that status; dropping the last one returns to all open
         for (OrderStatus status : query.statuses()) {
             String label = text("orders.list.chip.status", locale, text("OrderStatus." + status.name(), locale));
@@ -226,6 +234,10 @@ public class OrderListService {
         }
         if (activeFilter.isPresent()) {
             return new EmptyState(text("orders.list.empty.filter", locale),
+                    text("general.clear.filters", locale), query.cleared().href());
+        }
+        if (query.focus() != null) {
+            return new EmptyState(text("orders.list.empty.focus", locale, text("orders.list.attention." + query.focus().param(), locale)),
                     text("general.clear.filters", locale), query.cleared().href());
         }
         if (!query.isOpen()) {

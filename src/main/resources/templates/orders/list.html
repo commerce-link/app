@@ -32,13 +32,17 @@
 
         <div data-cl-orders-results th:fragment="results" th:with="q=${page.query()}">
 
-            <!--/* Four read-only figures of the whole store in the design system's cl-stat tile, exactly as Asortyment uses
-                   it: label, number, short hint. */-->
+            <!--/* Four figures of the whole store in the design system's cl-stat tile, as Asortyment uses it (label, number,
+                   short hint), each a link that narrows the list to the orders it counts; at rest it looks the same, the
+                   hover and the pressed tile show it can be clicked (design system "Kafelek liczbowy jako filtr"). */-->
             <ul class="cl-stat-grid is-orders" th:attr="aria-label=#{orders.list.attention.label}">
-                <li class="cl-stat" th:each="tile : ${page.tiles()}">
-                    <span class="cl-eyebrow" th:text="${tile.label()}"></span>
-                    <span class="cl-stat-value" th:text="${tile.count()}"></span>
-                    <span class="cl-stat-hint" th:text="${tile.hint()}"></span>
+                <li th:each="tile : ${page.tiles()}">
+                    <a class="cl-stat is-link" th:href="@{${tile.href()}}" th:attr="aria-current=${tile.active()} ? 'true' : null" data-cl-orders-nav>
+                        <span class="cl-eyebrow" th:text="${tile.label()}"></span>
+                        <span class="cl-stat-value" th:text="${tile.count()}"></span>
+                        <span class="cl-stat-hint" th:text="${tile.hint()}"></span>
+                        <span class="cl-visually-hidden" th:if="${tile.active()}" th:text="#{orders.list.attention.active}"></span>
+                    </a>
                 </li>
             </ul>
 

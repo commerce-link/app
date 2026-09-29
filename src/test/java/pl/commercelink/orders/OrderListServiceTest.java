@@ -208,17 +208,64 @@ class OrderListServiceTest {
     }
 
     @Test
-    void anOldFocusBookmarkOpensTheUnnarrowedList() {
-        add("a", OrderStatus.New, TODAY.minusDays(1), 100, 100, null);
-        add("b", OrderStatus.Blocked, null, 100, 100, null);
+    void aTileShowsExactlyTheOrdersItCounts() {
+        // given
+        add("late", OrderStatus.New, TODAY.minusDays(1), 100, 100, "Allegro");
+        add("lateBlocked", OrderStatus.Blocked, TODAY.minusDays(3), 100, 100, null);
+        add("onTime", OrderStatus.New, TODAY.plusDays(2), 100, 100, "Allegro");
+        add("shipped", OrderStatus.Shipping, TODAY.minusDays(1), 100, 100, null);
 
-        // ?focus= came from the clickable tiles, which are read-only now; no value may break the page (newToday used to)
-        for (String focus : List.of("overdue", "today", "decide", "unpaid", "newToday")) {
-            OrdersPageModel model = page(query("focus", focus, "status", "Blocked"));
-            assertThat(model.rows()).extracting(r -> r.href()).containsExactly("/dashboard/orders/b");
-            assertThat(model.chips()).extracting(c -> c.label()).containsExactly("Status: Zablokowane");
-            assertThat(model.chips().get(0).clearHref()).isEqualTo("/dashboard/orders?filterId=");
-        }
+        // when
+        OrdersPageModel all = page(query("status", "New", "q", "kowalski"));
+        OrdersPageModel overdue = page(query("focus", "overdue"));
+
+        // then
+        // the tile link starts from the tile alone, whatever else narrowed the list
+        assertThat(all.tiles().get(0).href()).isEqualTo("/dashboard/orders?focus=overdue");
+        assertThat(all.tiles().get(0).active()).isFalse();
+        assertThat(overdue.rows()).extracting(r -> r.href()).containsExactly("/dashboard/orders/lateBlocked", "/dashboard/orders/late");
+        assertThat(overdue.rows()).hasSize((int) overdue.tiles().get(0).count());
+        assertThat(overdue.tiles().get(0).active()).isTrue();
+        // a second click on the pressed tile lets it go
+        assertThat(overdue.tiles().get(0).href()).isEqualTo("/dashboard/orders?filterId=");
+        assertThat(overdue.tiles().get(1).href()).isEqualTo("/dashboard/orders?focus=today");
+        assertThat(overdue.chips()).extracting(c -> c.label()).containsExactly("Po terminie");
+        assertThat(overdue.chips().get(0).clearHref()).isEqualTo("/dashboard/orders?filterId=");
+    }
+
+    @Test
+    void aTileCombinesWithWhatIsAddedAfterItAndStatusCountsStayWithinIt() {
+        // given
+        add("late", OrderStatus.New, TODAY.minusDays(1), 100, 100, "Allegro");
+        add("lateBlocked", OrderStatus.Blocked, TODAY.minusDays(3), 100, 100, null);
+        add("onTime", OrderStatus.Blocked, TODAY.plusDays(2), 100, 100, null);
+
+        // when
+        OrdersPageModel model = page(query("focus", "overdue", "status", "Blocked"));
+
+        // then
+        assertThat(model.rows()).extracting(r -> r.href()).containsExactly("/dashboard/orders/lateBlocked");
+        assertThat(option(model, "Nowe").count()).isEqualTo(1);
+        assertThat(option(model, "Zablokowane").count()).isEqualTo(1);
+        assertThat(model.chips()).extracting(c -> c.label()).containsExactly("Po terminie", "Status: Zablokowane");
+        // dropping the tile keeps the status the user added
+        assertThat(model.chips().get(0).clearHref()).isEqualTo("/dashboard/orders?status=Blocked");
+        assertThat(model.tiles().get(0).href()).isEqualTo("/dashboard/orders?status=Blocked");
+    }
+
+    @Test
+    void anEmptyTileSaysSoAndOffersToClearEverything() {
+        // given
+        add("onTime", OrderStatus.New, TODAY.plusDays(2), 100, 100, null);
+
+        // when
+        OrdersPageModel model = page(query("focus", "overdue", "sort", "amount"));
+
+        // then
+        assertThat(model.rows()).isEmpty();
+        assertThat(model.emptyState().text()).isEqualTo("Brak zamówień „Po terminie”.");
+        assertThat(model.emptyState().actionLabel()).isEqualTo("Wyczyść filtry");
+        assertThat(model.emptyState().actionHref()).isEqualTo("/dashboard/orders?sort=amount");
     }
 
     @Test

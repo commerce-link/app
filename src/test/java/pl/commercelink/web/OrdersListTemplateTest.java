@@ -74,6 +74,22 @@ class OrdersListTemplateTest {
         assertThat(html.substring(html.lastIndexOf("<a", clear), clear)).contains("th:if=\"${!page.chips().isEmpty()}\"");
     }
 
+    /** The four tiles narrow the list: the same cl-stat, as a link, pressed state for the one narrowing now. */
+    @Test
+    void tilesAreLinksThatNarrowTheList() throws Exception {
+        // given
+        String html = page();
+
+        // when
+        int grid = html.indexOf("cl-stat-grid is-orders");
+        String tiles = html.substring(grid, html.indexOf("</ul>", grid));
+
+        // then
+        assertThat(tiles).contains("<a class=\"cl-stat is-link\"").contains("th:href=\"@{${tile.href()}}\"")
+                .contains("aria-current=${tile.active()} ? 'true' : null").contains("data-cl-orders-nav")
+                .contains("#{orders.list.attention.active}").contains("cl-visually-hidden");
+    }
+
     /** WZ · FV/PAR · review under the status pill (spec §25): a labelled list, state as a class, text for screen readers. */
     @Test
     void documentMarksSitUnderTheStatusPill() throws Exception {

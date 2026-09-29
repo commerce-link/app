@@ -31,8 +31,8 @@ class OrderListQueryTest {
 
     @Test
     void unknownValuesFallBackToDefaultsAndPageIsClampedToOne() {
-        // focus (the clickable tiles) and sort=ordered (the history) are gone: old bookmarks open the plain list
-        OrderListQuery query = OrderListQuery.parse(params("status", "Bogus", "focus", "overdue", "sort", "ordered", "dir", "z", "page", "abc"));
+        // an unknown tile (focus=decide, from an older version) and sort=ordered (the history) are gone: old bookmarks open the plain list
+        OrderListQuery query = OrderListQuery.parse(params("status", "Bogus", "focus", "decide", "sort", "ordered", "dir", "z", "page", "abc"));
         assertThat(query.statuses()).isEmpty();
         assertThat(query.href()).isEqualTo("/dashboard/orders?filterId=");
         assertThat(query.sort()).isNull();
@@ -145,5 +145,36 @@ class OrderListQueryTest {
         // then
         assertThat(cleared.href()).isEqualTo("/dashboard/orders?sort=amount&dir=desc");
         assertThat(OrderListQuery.parse(params("status", "New", "filterId", "f1")).cleared().href()).isEqualTo("/dashboard/orders?filterId=");
+    }
+
+    @Test
+    void aTileNarrowsTheListOnItsOwnAndKeepsTheSort() {
+        // given
+        OrderListQuery query = OrderListQuery.parse(params("status", "New", "filterId", "f1", "q", "kowalski", "sort", "amount", "page", "2"));
+
+        // when
+        OrderListQuery overdue = query.withFocus(OrderAttention.Overdue);
+
+        // then
+        assertThat(overdue.focus()).isEqualTo(OrderAttention.Overdue);
+        assertThat(overdue.href()).isEqualTo("/dashboard/orders?focus=overdue&sort=amount");
+        assertThat(OrderListQuery.parse(params("focus", "newToday")).focus()).isEqualTo(OrderAttention.NewToday);
+        assertThat(OrderListQuery.parse(params("focus", "NEWTODAY")).focus()).isEqualTo(OrderAttention.NewToday);
+    }
+
+    @Test
+    void otherChangesKeepTheTileWhileDroppingItOrClearingAllLetItGo() {
+        // given
+        OrderListQuery query = OrderListQuery.parse(params("focus", "unpaid", "status", "New", "filterId", "f1", "q", "a"));
+
+        // when / then
+        assertThat(query.href()).isEqualTo("/dashboard/orders?status=New&filterId=f1&focus=unpaid&q=a");
+        assertThat(query.toggleStatus(OrderStatus.Blocked).focus()).isEqualTo(OrderAttention.Unpaid);
+        assertThat(query.withFilterId("f2").focus()).isEqualTo(OrderAttention.Unpaid);
+        assertThat(query.withQ("b").focus()).isEqualTo(OrderAttention.Unpaid);
+        assertThat(query.withPage(2).focus()).isEqualTo(OrderAttention.Unpaid);
+        assertThat(query.toggleSort(OrderListQuery.Sort.AMOUNT).focus()).isEqualTo(OrderAttention.Unpaid);
+        assertThat(query.withoutFocus().href()).isEqualTo("/dashboard/orders?status=New&filterId=f1&q=a");
+        assertThat(query.cleared().href()).isEqualTo("/dashboard/orders?filterId=");
     }
 }
