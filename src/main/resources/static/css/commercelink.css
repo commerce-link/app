@@ -3551,6 +3551,14 @@ a.cl-link-button:hover {
     }
 }
 
+/* a button that cannot run but stays focusable so its reason (aria-describedby) is read: the look of a disabled one
+   (the Documents card's "Dodaj dokument" while an e-receipt is issued) */
+.cl-page .cl-button[aria-disabled="true"],
+.cl-page .cl-button[aria-disabled="true"]:hover {
+    opacity: .6;
+    cursor: not-allowed;
+}
+
 /* a link-style action that cannot run: greyed, still focusable, its reason in visible text next to it */
 .cl-page .cl-link-button[aria-disabled="true"],
 .cl-page .cl-link-button[aria-disabled="true"]:hover {
@@ -4233,6 +4241,14 @@ a.cl-link-button:hover {
    pricing group -- looked like one to type in: the tinted ground and the darker grey (--cl-ink-2 on a tint, §2) say it
    is shown, not edited. The order item page uses it too, for the name, quantity and VAT rate a sale document fixed. */
 .cl-page .cl-form .cl-input[readonly] {
+    background: var(--cl-surface-2);
+    color: var(--cl-ink-2);
+}
+
+/* A disabled field (not posted: the item page's codes, quantity, price and cost of an item already in fulfilment) kept
+   the white ground of an editable one and read as typeable; it takes the read-only look. */
+.cl-page .cl-form .cl-input:disabled,
+.cl-page .cl-form .cl-select:disabled {
     background: var(--cl-surface-2);
     color: var(--cl-ink-2);
 }
