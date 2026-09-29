@@ -49,6 +49,8 @@ import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrdersManager;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.StoreCategories;
+import pl.commercelink.receipts.PosReceiptDecisionForm;
+import pl.commercelink.receipts.PosReceiptDecisions;
 import pl.commercelink.receipts.ReceiptAlerts;
 import pl.commercelink.receipts.ReceiptAttempt;
 import pl.commercelink.receipts.ReceiptAttemptService;
@@ -63,6 +65,7 @@ import pl.commercelink.shipping.ShipmentTrackingSubscriber;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.FulfilmentConfiguration;
+import pl.commercelink.stores.PosReceiptMode;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoreSupplierConnection;
 import pl.commercelink.stores.StoresRepository;
@@ -143,6 +146,8 @@ class OrdersControllerTest {
     private ReceiptAttemptService receiptAttemptService;
     @Mock
     private ReceiptAlerts receiptAlerts;
+    @Mock
+    private PosReceiptDecisions posReceiptDecisions;
 
     // Real resolver over the test classpath registry (`Stub` is a registered supplier type).
     @Spy
@@ -1174,7 +1179,7 @@ class OrdersControllerTest {
         payload.setFulfilmentType(pl.commercelink.orders.fulfilment.FulfilmentType.DirectToConsumer);
 
         // when
-        String view = ordersController.updateOrderInfo(ORDER_ID, payload, redirectAttributes, Locale.ENGLISH);
+        String view = ordersController.updateOrderInfo(ORDER_ID, payload, new PosReceiptDecisionForm(), redirectAttributes, Locale.ENGLISH);
 
         // then
         assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
@@ -1200,7 +1205,7 @@ class OrdersControllerTest {
         payload.setFulfilmentType(pl.commercelink.orders.fulfilment.FulfilmentType.DirectToConsumer);
 
         // when
-        ordersController.updateOrderInfo(ORDER_ID, payload, redirectAttributes, Locale.ENGLISH);
+        ordersController.updateOrderInfo(ORDER_ID, payload, new PosReceiptDecisionForm(), redirectAttributes, Locale.ENGLISH);
 
         // then
         assertThat(existingOrder.getFulfilmentType())
@@ -1221,7 +1226,7 @@ class OrdersControllerTest {
         payload.setFulfilmentType(null);
 
         // when
-        ordersController.updateOrderInfo(ORDER_ID, payload, redirectAttributes, Locale.ENGLISH);
+        ordersController.updateOrderInfo(ORDER_ID, payload, new PosReceiptDecisionForm(), redirectAttributes, Locale.ENGLISH);
 
         // then
         assertThat(existingOrder.getFulfilmentType())
@@ -1243,6 +1248,86 @@ class OrdersControllerTest {
         posted.setName("pozycja");
         posted.setQty(1);
         return posted;
+    }
+
+    @Test
+    @DisplayName("updateOrderInfo refuses Delivered for a POS order without a receipt decision and keeps the status")
+    void updateOrderInfoRefusesDeliveredWithoutPosReceiptDecision() {
+        // given
+        Order existingOrder = readyForCollection();
+        existingOrder.setStatus(OrderStatus.Shipping);
+        Store store = new Store();
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(existingOrder);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(posReceiptDecisions.required(store, existingOrder, OrderStatus.Delivered)).thenReturn(Optional.of(PosReceiptMode.ASK));
+        when(posReceiptDecisions.apply(eq(store), eq(PosReceiptMode.ASK), eq(existingOrder), any(), any()))
+                .thenReturn(Optional.of("receipts.pos.decision.choiceRequired"));
+        when(messageSource.getMessage(eq("receipts.pos.decision.choiceRequired"), any(), eq(Locale.ENGLISH))).thenReturn("Choose");
+        Order payload = new Order(STORE_ID);
+        payload.setStatus(OrderStatus.Delivered);
+
+        // when
+        String view = ordersController.updateOrderInfo(ORDER_ID, payload, new PosReceiptDecisionForm(), redirectAttributes, Locale.ENGLISH);
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+        verify(redirectAttributes).addFlashAttribute("errorMessage", "Choose");
+        verify(orderLifecycle, never()).update(any());
+        assertThat(existingOrder.getStatus()).isEqualTo(OrderStatus.Shipping);
+    }
+
+    @Test
+    @DisplayName("updateOrderInfo applies the POS receipt decision before the save that makes the order Delivered")
+    void updateOrderInfoAppliesPosReceiptDecisionWithDelivered() {
+        // given
+        Order existingOrder = readyForCollection();
+        existingOrder.setStatus(OrderStatus.Shipping);
+        Store store = new Store();
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(existingOrder);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(posReceiptDecisions.required(store, existingOrder, OrderStatus.Delivered)).thenReturn(Optional.of(PosReceiptMode.ASK));
+        when(posReceiptDecisions.apply(eq(store), eq(PosReceiptMode.ASK), eq(existingOrder), any(), any())).thenReturn(Optional.empty());
+        Order payload = new Order(STORE_ID);
+        payload.setStatus(OrderStatus.Delivered);
+
+        // when
+        ordersController.updateOrderInfo(ORDER_ID, payload, new PosReceiptDecisionForm(), redirectAttributes, Locale.ENGLISH);
+
+        // then
+        InOrder inOrder = inOrder(posReceiptDecisions, orderLifecycle);
+        inOrder.verify(posReceiptDecisions).apply(eq(store), eq(PosReceiptMode.ASK), eq(existingOrder), any(), any());
+        inOrder.verify(orderLifecycle).update(existingOrder);
+        assertThat(existingOrder.getStatus()).isEqualTo(OrderStatus.Delivered);
+    }
+
+    @Test
+    @DisplayName("order details model carries the POS receipt mode the status form must ask for")
+    void orderDetailsCarriesThePosReceiptModeToAskFor() {
+        // given
+        Order order = orderBase();
+        Store store = new Store();
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(dropshipItemLookup.itemIdsInDropshipDeliveries(eq(STORE_ID), any())).thenReturn(Set.of());
+        when(posReceiptDecisions.required(store, order, OrderStatus.Delivered)).thenReturn(Optional.of(PosReceiptMode.CASH_REGISTER));
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        ordersController.getOrderDetails(ORDER_ID, model, Locale.ENGLISH);
+
+        // then
+        assertThat(model.getAttribute("posReceiptMode")).isEqualTo(PosReceiptMode.CASH_REGISTER);
+    }
+
+    /** A shipping order whose personal collection is ready, so Delivered passes the status form's own guard. */
+    private Order readyForCollection() {
+        Order order = orderBase();
+        pl.commercelink.orders.Shipment collection = new pl.commercelink.orders.Shipment();
+        collection.setType(ShipmentType.PersonalCollection);
+        collection.setShippedAt(java.time.LocalDateTime.of(2026, 9, 29, 10, 0));
+        order.getShipments().add(collection);
+        return order;
     }
 
     private Order orderBase() {

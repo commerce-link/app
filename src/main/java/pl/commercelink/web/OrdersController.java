@@ -45,6 +45,8 @@ import pl.commercelink.pricelist.PricelistFinder;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.StoreCategories;
+import pl.commercelink.receipts.PosReceiptDecisionForm;
+import pl.commercelink.receipts.PosReceiptDecisions;
 import pl.commercelink.receipts.ReceiptAlerts;
 import pl.commercelink.receipts.ReceiptAttemptService;
 import pl.commercelink.rest.client.HttpClientException;
@@ -56,6 +58,7 @@ import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.starter.security.model.CustomUser;
 import pl.commercelink.stores.DeliveryOption;
 import pl.commercelink.stores.MarketplaceIntegration;
+import pl.commercelink.stores.PosReceiptMode;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.warehouse.GoodsOutEventPublisher;
@@ -173,6 +176,9 @@ public class OrdersController extends BaseController {
 
     @Autowired
     private ReceiptAlerts receiptAlerts;
+
+    @Autowired
+    private PosReceiptDecisions posReceiptDecisions;
 
     @GetMapping("/dashboard/orders")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
@@ -638,6 +644,7 @@ public class OrdersController extends BaseController {
         model.addAttribute("canAddDocumentManually", manualDocumentTypes.contains(nextDocumentToIssue));
         model.addAttribute("issuableDocumentTypes", order.getIssuableDocumentTypes());
         model.addAttribute("canIssueReceipt", receiptAttemptService.canIssueManually(store, order));
+        model.addAttribute("posReceiptMode", posReceiptDecisions.required(store, order, OrderStatus.Delivered).orElse(null));
 
         SupplierLabelMap labels = supplierLabels.forStore(store);
         model.addAttribute("supplierLabels", labels);
@@ -728,7 +735,9 @@ public class OrdersController extends BaseController {
 
     @PostMapping("/dashboard/orders/{orderId}/updateOrderInfo")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String updateOrderInfo(@PathVariable String orderId, @ModelAttribute("order") Order updatedOrder, RedirectAttributes redirectAttributes, Locale locale) {
+    public String updateOrderInfo(@PathVariable String orderId, @ModelAttribute("order") Order updatedOrder,
+                                  @ModelAttribute("posReceipt") PosReceiptDecisionForm posReceipt,
+                                  RedirectAttributes redirectAttributes, Locale locale) {
         Order existingOrder = ordersRepository.findById(getStoreId(), orderId);
 
         if (!existingOrder.canTransitionToDelivered(updatedOrder.getStatus())) {
@@ -753,6 +762,19 @@ public class OrdersController extends BaseController {
                 && !existingOrder.canChangeFulfilmentType(orderItemsRepository.findByOrderId(orderId))) {
             redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage("order.fulfilment.type.locked", null, locale));
             return "redirect:/dashboard/orders/" + orderId;
+        }
+
+        // a point-of-sale sale moving to Delivered carries its receipt decision into the same save, so the automatic
+        // e-receipt trigger sees a recorded cash-register receipt or the chosen e-receipt, never neither
+        Store store = storesRepository.findById(getStoreId());
+        Optional<PosReceiptMode> posDecision = posReceiptDecisions.required(store, existingOrder, updatedOrder.getStatus());
+        if (posDecision.isPresent()) {
+            Optional<String> refusal = posReceiptDecisions.apply(store, posDecision.get(), existingOrder, posReceipt,
+                    LocalDate.now());
+            if (refusal.isPresent()) {
+                redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage(refusal.get(), null, locale));
+                return "redirect:/dashboard/orders/" + orderId;
+            }
         }
 
         existingOrder.setStatus(updatedOrder.getStatus());

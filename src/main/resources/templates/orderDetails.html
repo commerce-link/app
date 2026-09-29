@@ -204,13 +204,62 @@
                                     <label class="label" th:text="#{order.status}"></label>
                                     <div class="control">
                                         <div class="select">
-                                            <select th:field="*{status}" th:disabled="${isCompletedOrder}">
+                                            <select id="order-status" th:field="*{status}" th:disabled="${isCompletedOrder}">
                                                 <option th:each="status : ${orderStatuses}" th:value="${status}"
                                                         th:text="${enumI18n.localize(status)}"></option>
                                             </select>
                                         </div>
                                     </div>
                                 </div>
+                                <!--/* Point-of-sale sale moving to Delivered: the receipt decision goes with the status, so
+                                       the automatic e-receipt never runs next to a receipt printed on the shop's cash
+                                       register. Shown only while "Delivered" is selected; the server enforces it too. */-->
+                                <div class="field" id="pos-receipt-decision" th:if="${posReceiptMode != null}" hidden>
+                                    <label class="label" th:text="#{receipts.pos.decision.title}"></label>
+                                    <p class="help" th:text="#{receipts.pos.decision.help}"></p>
+                                    <div class="control" th:if="${posReceiptMode.name() == 'ASK'}">
+                                        <label class="radio"><input type="radio" name="choice" value="CASH_REGISTER" checked>
+                                            <span th:text="#{receipts.pos.decision.cashRegister}"></span></label>
+                                        <label class="radio"><input type="radio" name="choice" value="E_RECEIPT">
+                                            <span th:text="#{receipts.pos.decision.eReceipt}"></span></label>
+                                    </div>
+                                    <input th:unless="${posReceiptMode.name() == 'ASK'}" type="hidden" name="choice"
+                                           th:value="${posReceiptMode.name()}"/>
+                                    <div class="field" data-pos-choice="CASH_REGISTER" th:unless="${posReceiptMode.name() == 'E_RECEIPT'}">
+                                        <label class="label" for="pos-receipt-number" th:text="#{receipts.pos.decision.number}"></label>
+                                        <div class="control">
+                                            <input class="input" id="pos-receipt-number" type="text" name="receiptNumber" autocomplete="off"/>
+                                        </div>
+                                    </div>
+                                    <div class="field" data-pos-choice="E_RECEIPT" th:unless="${posReceiptMode.name() == 'CASH_REGISTER'}">
+                                        <label class="label" for="pos-customer-email" th:text="#{receipts.pos.decision.email}"></label>
+                                        <div class="control">
+                                            <input class="input" id="pos-customer-email" type="email" name="customerEmail" autocomplete="off"/>
+                                        </div>
+                                    </div>
+                                </div>
+                                <script th:if="${posReceiptMode != null}">
+                                    (function () {
+                                        var box = document.getElementById('pos-receipt-decision');
+                                        var status = document.getElementById('order-status');
+                                        function refresh() {
+                                            var delivered = status.value === 'Delivered';
+                                            box.hidden = !delivered;
+                                            var chosen = box.querySelector('input[name="choice"]:checked')
+                                                || box.querySelector('input[name="choice"]');
+                                            box.querySelectorAll('[data-pos-choice]').forEach(function (field) {
+                                                var on = delivered && field.getAttribute('data-pos-choice') === chosen.value;
+                                                field.hidden = !on;
+                                                field.querySelector('input').required = on;
+                                            });
+                                        }
+                                        status.addEventListener('change', refresh);
+                                        box.querySelectorAll('input[name="choice"]').forEach(function (radio) {
+                                            radio.addEventListener('change', refresh);
+                                        });
+                                        refresh();
+                                    })();
+                                </script>
                                 <div class="field">
                                     <label class="label" th:text="#{offers.fulfilment.type}"></label>
                                     <div class="control">
