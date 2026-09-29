@@ -48,6 +48,8 @@
                     <span th:if="${s.shippedAt() != null and s.deliveredAt() == null}" th:text="' · ' + #{order.shipments.in.transit}"></span>
                     <span th:if="${s.shippedAt() == null}" th:text="#{order.shipments.waiting}"></span>
                 </p>
+                <p th:if="${s.removeReasonKey() != null}" class="cl-list-desc" th:id="|shipment-${s.number()}-remove-reason|"
+                   th:text="#{${s.removeReasonKey()}}"></p>
             </div>
             <div class="cl-list-actions" th:if="${s.editHref() != null}">
                 <a class="cl-link-button" th:href="@{${s.editHref()}}" th:attr="data-cl-dialog-open=${s.dialogId()},
@@ -58,6 +60,11 @@
                             data-cl-confirm-message=#{order.shipments.remove.confirm.message},
                             data-cl-confirm-action=#{order.shipments.remove.confirm.action}"
                    th:text="#{general.delete}"></a>
+                <!--/* greyed, still focusable, its reason in the text of the row (design system: link action that cannot run) */-->
+                <button th:if="${s.removeReasonKey() != null}" type="button" class="cl-link-button" aria-disabled="true"
+                        th:attr="aria-label=#{order.shipments.remove.for(${s.number()})},
+                                 aria-describedby=|shipment-${s.number()}-remove-reason|"
+                        th:text="#{general.delete}"></button>
             </div>
         </li>
     </ul>

@@ -461,7 +461,9 @@ class OrderDetailsTemplateTest {
                 .contains("data-cl-dialog-open=\"shipment-dialog-1\"").contains("aria-label=\"Edytuj przesyłkę 2\"")
                 .contains("/shipments/0/remove?version=" + version).contains("aria-label=\"Usuń przesyłkę 1\"")
                 .contains("data-cl-confirm-title=\"Usunąć przesyłkę 1?\"")
-                .doesNotContain("/shipments/1/remove").doesNotContain("Edytuj przesyłki");
+                .doesNotContain("/shipments/1/remove").doesNotContain("Edytuj przesyłki")
+                .contains("id=\"shipment-2-remove-reason\">Najpierw anuluj zamówienie kuriera, potem usuniesz przesyłkę.</p>")
+                .doesNotContain("shipment-1-remove-reason");
     }
 
     @Test
@@ -473,7 +475,9 @@ class OrderDetailsTemplateTest {
         String card = card(page(render(order, ADMIN)), "przesylki");
 
         // then
-        assertThat(card).contains("aria-label=\"Edytuj przesyłkę 1\"").doesNotContain("/remove");
+        assertThat(card).contains("aria-label=\"Edytuj przesyłkę 1\"").doesNotContain("/remove")
+                .containsPattern("<button type=\"button\" class=\"cl-link-button\" aria-disabled=\"true\"[^>]*aria-label=\"Usuń przesyłkę 1\"[^>]*aria-describedby=\"shipment-1-remove-reason\"")
+                .contains("id=\"shipment-1-remove-reason\">Jedynej przesyłki nie usuniesz — popraw ją przez „Edytuj”.</p>");
     }
 
     @Test

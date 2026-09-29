@@ -82,13 +82,14 @@ public record OrderPageModel(String orderId, String shortId, String backHref, bo
 
     /**
      * number counts from 1. editHref leads to the shipment page (its dialog, dialogId, intercepts it) and removeHref to
-     * the removal confirmation; both null on a read-only page, removeHref also for the only shipment and for one with
-     * a courier order (cancelled with "Cancel courier order" instead).
+     * the removal confirmation; both null on a read-only page. For the only shipment and one with a courier order
+     * (cancelled with "Cancel courier order" instead) removeHref is null and removeReasonKey says why, so "Remove" shows
+     * greyed with that reason instead of disappearing.
      */
     public record ShipmentRow(int number, String typeKey, String carrier, String trackingNo, String trackingUrl,
                               String pickupPoint, String shippedAt, String deliveredAt, String trackingKey,
                               String trackingTone, String trackingHelpKey, String dialogId, String editHref,
-                              String removeHref) {
+                              String removeHref, String removeReasonKey) {
     }
 
     /** emptyKey takes the next type's label as its argument: "Issue" makes it, or "Add document" when it is typed by hand. */

@@ -302,7 +302,8 @@ public class OrderPageModelFactory {
                     !readOnly && s.getTrackingSubscriptionStatus() == ShipmentTrackingStatus.FAILED
                             ? "order.shipment.tracking.failed.help" : null,
                     form.dialogId(), readOnly ? null : base + i,
-                    readOnly || removeLockedKey(order, i) != null ? null : base + i + "/remove?version=" + form.version()));
+                    readOnly || removeLockedKey(order, i) != null ? null : base + i + "/remove?version=" + form.version(),
+                    readOnly ? null : removeReasonKey(order, i)));
             if (!readOnly) {
                 forms.add(form);
             }
@@ -323,6 +324,12 @@ public class OrderPageModelFactory {
      * delivery type from it, and "Edit" corrects it instead); one with a courier order is cancelled with "Cancel
      * courier order", which also cancels the label at the carrier, never by dropping the record.
      */
+    /** The short reason next to a greyed "Remove" in the row; the refusal of a forced removal says it in full. */
+    private static String removeReasonKey(Order order, int index) {
+        String locked = removeLockedKey(order, index);
+        return locked == null ? null : locked.replace(".remove.error.", ".remove.locked.");
+    }
+
     public static String removeLockedKey(Order order, int index) {
         List<Shipment> shipments = order.getShipments();
         if (shipments.size() <= 1) {
