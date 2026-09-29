@@ -57,7 +57,7 @@
                 <a th:if="${s.removeHref() != null}" class="cl-link-button is-danger" data-cl-confirm th:href="@{${s.removeHref()}}"
                    th:attr="aria-label=#{order.shipments.remove.for(${s.number()})},
                             data-cl-confirm-title=#{order.shipments.remove.confirm.title(${s.number()})},
-                            data-cl-confirm-message=#{order.shipments.remove.confirm.message},
+                            data-cl-confirm-message=#{${s.removeMessageKey()}},
                             data-cl-confirm-action=#{order.shipments.remove.confirm.action}"
                    th:text="#{general.delete}"></a>
                 <!--/* greyed, still focusable, its reason in the text of the row (design system: link action that cannot run) */-->
@@ -90,7 +90,8 @@
        with the errors next to the fields and the dialog stays open; 200 closes it and reloads the page, which shows the
        saved shipment and the notice stored for it. The carrier is picked from the store's carriers, or typed after
        "Inny…": the select only fills the named text field (order-shipments.js), so without JavaScript the text field
-       alone is posted. A date and a typed time are separate fields, so the calendar closes on the first click. */-->
+       alone is posted. The shipped and delivered moments are dates only (OrderShipmentForm keeps a saved time on the
+       same day). */-->
 <form th:fragment="shipmentForm(shipment, inDialog)" th:id="|${shipment.dialogId()}-form|" class="cl-form" method="post"
       novalidate data-cl-async data-cl-shipment-form
       th:action="@{/dashboard/orders/{o}/shipments(o=${shipment.orderId()})}"
@@ -132,8 +133,8 @@
             <div class="cl-span-3" th:insert="~{orders/details/shipments :: text(${shipment}, 'trackingNo', 'order.shipments.dialog.tracking', 'text', ${shipment.trackingNo()})}"></div>
             <div class="cl-span-3" th:insert="~{orders/details/shipments :: text(${shipment}, 'collectionPointCode', 'order.shipments.dialog.point', 'text', ${shipment.collectionPointCode()})}"></div>
             <div th:insert="~{orders/details/shipments :: text(${shipment}, 'trackingUrl', 'order.shipments.dialog.url', 'url', ${shipment.trackingUrl()})}"></div>
-            <div class="cl-span-3" th:insert="~{orders/details/shipments :: moment(${shipment}, 'shipped', ${shipment.shippedDate()}, ${shipment.shippedTime()})}"></div>
-            <div class="cl-span-3" th:insert="~{orders/details/shipments :: moment(${shipment}, 'delivered', ${shipment.deliveredDate()}, ${shipment.deliveredTime()})}"></div>
+            <div class="cl-span-3" th:insert="~{orders/details/shipments :: dateField(${shipment}, 'shipped', ${shipment.shippedDate()})}"></div>
+            <div class="cl-span-3" th:insert="~{orders/details/shipments :: dateField(${shipment}, 'delivered', ${shipment.deliveredDate()})}"></div>
         </div>
         <p th:class="${inDialog} ? 'cl-dialog-effect' : 'cl-help'" th:text="#{order.shipments.dialog.effect}"></p>
     </div>
@@ -159,31 +160,16 @@
     </p>
 </div>
 
-<!--/* A date with its optional time ("shipped" or "delivered"): the visible label names the date, the time field
-       carries its own name for a screen reader and a "gg:mm" hint. */-->
-<div th:fragment="moment(shipment, name, date, time)" class="cl-field"
-     th:with="dateId=${shipment.field(name + 'Date')}, timeId=${shipment.field(name + 'Time')},
-              dateError=${shipment.error(name + 'Date')}, timeError=${shipment.error(name + 'Time')}">
-    <label class="cl-label" th:for="${dateId}" th:text="#{|order.shipments.dialog.${name}|}"></label>
-    <div class="cl-date-time">
-        <input class="cl-input" type="date" th:id="${dateId}" th:name="${name + 'Date'}" th:value="${date}"
-               th:classappend="${dateError != null} ? 'is-invalid'"
-               th:attr="aria-invalid=${dateError != null ? 'true' : null}, aria-describedby=${dateError != null ? dateId + '-error' : null}">
-        <input class="cl-input" type="text" inputmode="numeric" autocomplete="off" maxlength="5"
-               th:id="${timeId}" th:name="${name + 'Time'}" th:value="${time}"
-               th:classappend="${timeError != null} ? 'is-invalid'"
-               th:attr="placeholder=#{order.shipments.dialog.time.placeholder},
-                        aria-label=#{|order.shipments.dialog.${name}.time|},
-                        aria-invalid=${timeError != null ? 'true' : null},
-                        aria-describedby=${timeError != null ? timeId + '-error' : null}">
-    </div>
-    <p th:if="${dateError != null}" class="cl-field-error" th:id="${dateId} + '-error'">
+<!--/* The shipped or delivered date ("shipped" or "delivered"); the posted name is shippedDate or deliveredDate. */-->
+<div th:fragment="dateField(shipment, name, value)" class="cl-field"
+     th:with="id=${shipment.field(name + 'Date')}, error=${shipment.error(name + 'Date')}">
+    <label class="cl-label" th:for="${id}" th:text="#{|order.shipments.dialog.${name}|}"></label>
+    <input class="cl-input" type="date" th:id="${id}" th:name="${name + 'Date'}" th:value="${value}"
+           th:classappend="${error != null} ? 'is-invalid'"
+           th:attr="aria-invalid=${error != null ? 'true' : null}, aria-describedby=${error != null ? id + '-error' : null}">
+    <p th:if="${error != null}" class="cl-field-error" th:id="${id} + '-error'">
         <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
-        <span th:text="#{${dateError}}"></span>
-    </p>
-    <p th:if="${timeError != null}" class="cl-field-error" th:id="${timeId} + '-error'">
-        <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
-        <span th:text="#{${timeError}}"></span>
+        <span th:text="#{${error}}"></span>
     </p>
 </div>
 </body>

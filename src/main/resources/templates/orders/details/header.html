@@ -66,8 +66,10 @@
                 <span class="icon is-small" aria-hidden="true"><i class="fas fa-chevron-down"></i></span>
             </summary>
             <ul class="cl-menu-list" id="order-more-menu">
-                <li><a class="cl-menu-item" th:href="@{${h.cardHref()}}" th:text="#{order.page.print.card}"></a></li>
-                <li><a class="cl-menu-item" th:href="@{${h.collectionHref()}}" th:text="#{order.page.print.collection}"></a></li>
+                <!--/* print.js prints these sheets from a hidden frame without leaving the order; without JavaScript
+                       the link opens the sheet and the browser prints it */-->
+                <li><a class="cl-menu-item" th:href="@{${h.cardHref()}}" data-cl-print-frame th:text="#{order.page.print.card}"></a></li>
+                <li><a class="cl-menu-item" th:href="@{${h.collectionHref()}}" data-cl-print-frame th:text="#{order.page.print.collection}"></a></li>
                 <li th:if="${h.itemHistoryHref() != null}">
                     <a class="cl-menu-item" th:href="@{${h.itemHistoryHref()}}" th:text="#{item.history}"></a>
                 </li>

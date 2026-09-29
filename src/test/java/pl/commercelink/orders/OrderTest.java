@@ -5,6 +5,8 @@ import org.junit.jupiter.api.Test;
 import pl.commercelink.documents.Document;
 import pl.commercelink.documents.DocumentType;
 
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -428,5 +430,48 @@ class OrderTest {
         // then
         assertThat(split.getBillingDetails()).isNull();
         assertThat(split.getShippingDetails()).isNull();
+    }
+
+    @Test
+    void anOrderWithoutShipmentsIsNotDelivered() {
+        // given: allMatch on an empty list is true; the only shipment may have been removed
+        Order order = new Order("s");
+        order.setShipments(new ArrayList<>());
+
+        // when / then
+        assertThat(order.isDelivered()).isFalse();
+    }
+
+    @Test
+    void anOrderIsDeliveredOnceEveryShipmentHasADeliveryDate() {
+        // given
+        Order order = new Order("s");
+        Shipment first = new Shipment(ShipmentType.Courier);
+        first.setDeliveredAt(LocalDateTime.of(2026, 9, 28, 10, 0));
+        Shipment second = new Shipment(ShipmentType.Courier);
+        order.setShipments(new ArrayList<>(List.of(first, second)));
+
+        // when
+        boolean partly = order.isDelivered();
+        second.setDeliveredAt(LocalDateTime.of(2026, 9, 29, 0, 0));
+
+        // then
+        assertThat(partly).isFalse();
+        assertThat(order.isDelivered()).isTrue();
+    }
+
+    @Test
+    void anOrderThatNeverShippedHasNothingLeftToDeliverButAShippingOneWithoutShipmentsHas() {
+        // given
+        Order service = new Order("s");
+        service.setShipments(new ArrayList<>());
+        Order shipping = new Order("s");
+        shipping.setShipments(new ArrayList<>());
+        shipping.setStatus(OrderStatus.Shipping);
+
+        // when / then: an order without shipments has always settled on payment and invoice; a Shipping one lost
+        // its only shipment to a removal and waits for a new one
+        assertThat(service.hasNothingLeftToDeliver()).isTrue();
+        assertThat(shipping.hasNothingLeftToDeliver()).isFalse();
     }
 }

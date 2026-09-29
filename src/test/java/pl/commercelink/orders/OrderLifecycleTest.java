@@ -21,6 +21,8 @@ import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.warehouse.GoodsOutEventPublisher;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
@@ -474,7 +476,7 @@ class OrderLifecycleTest {
         // given
         Order order = spy(new Order("store-1"));
         order.setStatus(OrderStatus.Assembly);
-        doReturn(false).when(order).isDelivered();
+        order.setShipments(new ArrayList<>(List.of(new Shipment(ShipmentType.Courier))));
         OrderItem item = mock(OrderItem.class);
         when(item.isOrdered()).thenReturn(false);
         when(item.isDelivered()).thenReturn(false);
@@ -488,5 +490,40 @@ class OrderLifecycleTest {
 
         // then
         verifyNoInteractions(dropshipItemLookup);
+    }
+
+    @Test
+    void aShippingOrderWhoseOnlyShipmentWasRemovedStaysShipping() {
+        // given: allMatch on no shipments is true, which delivered (and could complete) the order
+        Order order = new Order("store-1");
+        order.setStatus(OrderStatus.Shipping);
+        order.setShipments(new ArrayList<>());
+        order.addDocument(new Document("doc-1", "FV/1/2026", "https://example.com/fv/1", DocumentType.InvoiceVat));
+
+        // when
+        orderLifecycle.update(order, List.of());
+
+        // then
+        assertEquals(OrderStatus.Shipping, order.getStatus());
+        verifyNoInteractions(orderLifecycleEventPublisher, goodsOutEventPublisher);
+    }
+
+    @Test
+    void aShippingOrderIsDeliveredOnceEveryShipmentHasADeliveryDate() {
+        // given
+        Order order = new Order("store-1");
+        order.setStatus(OrderStatus.Shipping);
+        Shipment shipment = new Shipment(ShipmentType.Courier);
+        shipment.setShippedAt(LocalDateTime.of(2026, 9, 27, 9, 0));
+        shipment.setDeliveredAt(LocalDateTime.of(2026, 9, 28, 0, 0));
+        order.setShipments(new ArrayList<>(List.of(shipment)));
+        OrderItem item = mock(OrderItem.class);
+        when(item.isReturned()).thenReturn(false);
+
+        // when
+        orderLifecycle.update(order, List.of(item));
+
+        // then
+        assertEquals(OrderStatus.Delivered, order.getStatus());
     }
 }

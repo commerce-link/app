@@ -230,12 +230,12 @@ class OrderDetailsTemplateTest {
         // when
         String html = page(render(order(OrderStatus.Assembly), ADMIN));
 
-        // then: main column first, side column after (dates and settings, customer, finances, history — the client's
-        // order); the stylesheet stacks them in this same order below 1366 px and never reorders them
+        // then: main column first, side column after (dates and settings, finances, customer, history — the client's
+        // order, customer moved below finances on 2026-09-29); the stylesheet stacks them in this same order below 1366 px and never reorders them
         List<Integer> positions = List.of(html.indexOf("id=\"items-title\""), html.indexOf("id=\"shipments-title\""),
                 html.indexOf("id=\"documents-title\""), html.indexOf("id=\"payments-title\""),
-                html.indexOf("id=\"settings-title\""), html.indexOf("id=\"customer-title\""),
-                html.indexOf("id=\"finances-title\""), html.indexOf("id=\"history-title\""));
+                html.indexOf("id=\"settings-title\""), html.indexOf("id=\"finances-title\""),
+                html.indexOf("id=\"customer-title\""), html.indexOf("id=\"history-title\""));
         assertThat(positions).doesNotContain(-1).isSorted();
     }
 
@@ -462,28 +462,76 @@ class OrderDetailsTemplateTest {
                 .contains("data-cl-dialog-open=\"shipment-dialog-1\"").contains("aria-label=\"Edytuj przesyłkę 2\"")
                 .contains("/shipments/0/remove?version=" + version).contains("aria-label=\"Usuń przesyłkę 1\"")
                 .contains("data-cl-confirm-title=\"Usunąć przesyłkę 1?\"")
+                .contains("data-cl-confirm-message=\"Przesyłka zniknie z zamówienia. Klient nie dostanie o tym wiadomości.\"")
                 .doesNotContain("/shipments/1/remove").doesNotContain("Edytuj przesyłki")
                 .contains("id=\"shipment-2-remove-reason\">Najpierw anuluj zamówienie kuriera, potem usuniesz przesyłkę.</p>")
                 .doesNotContain("shipment-1-remove-reason");
     }
 
     @Test
-    void theOnlyShipmentIsEditedNotRemoved() {
+    void theOnlyShipmentCanBeRemovedAndTheConfirmationWarnsTheDeliveryMethodGoesWithIt() {
         // given
         Order order = order(OrderStatus.Realization);
+        String version = OrderShipmentForm.version(order.getShipments().get(0));
 
         // when
         String card = card(page(render(order, ADMIN)), "przesylki");
 
         // then
-        assertThat(card).contains("aria-label=\"Edytuj przesyłkę 1\"").doesNotContain("/remove")
-                .containsPattern("<button type=\"button\" class=\"cl-link-button\" aria-disabled=\"true\"[^>]*aria-label=\"Usuń przesyłkę 1\"[^>]*aria-describedby=\"shipment-1-remove-reason\"")
-                .contains("id=\"shipment-1-remove-reason\">Jedynej przesyłki nie usuniesz — popraw ją przez „Edytuj”.</p>");
+        assertThat(card).contains("aria-label=\"Edytuj przesyłkę 1\"").contains("/shipments/0/remove?version=" + version)
+                .doesNotContain("aria-disabled").doesNotContain("remove-reason")
+                .contains("data-cl-confirm-message=\"To jedyna przesyłka — razem z nią zniknie sposób dostawy wybrany przez klienta");
     }
 
     @Test
-    void aShipmentDialogHoldsOneShipmentWithADateAndATypedTime() {
-        // given: a date-and-time picker waited for the time too; the date picker closes on the first click
+    void noShipmentOfADeliveredOrderCanBeRemovedAndTheRowSaysWhy() {
+        // given
+        Order order = order(OrderStatus.Delivered);
+        order.addShipment(new Shipment(ShipmentType.Courier));
+
+        // when
+        String card = card(page(render(order, ADMIN)), "przesylki");
+
+        // then
+        assertThat(card).doesNotContain("/remove")
+                .containsPattern("<button type=\"button\" class=\"cl-link-button\" aria-disabled=\"true\"[^>]*aria-label=\"Usuń przesyłkę 1\"[^>]*aria-describedby=\"shipment-1-remove-reason\"")
+                .contains("id=\"shipment-1-remove-reason\">Zamówienie jest dostarczone — przesyłek nie usuniesz.</p>")
+                .contains("id=\"shipment-2-remove-reason\">Zamówienie jest dostarczone — przesyłek nie usuniesz.</p>");
+    }
+
+    @Test
+    void aShipmentWithADeliveryDateCannotBeRemovedAndTheOthersCan() {
+        // given
+        Order order = order(OrderStatus.Shipping);
+        order.getShipments().get(0).setDeliveredAt(LocalDateTime.of(2026, 9, 28, 0, 0));
+        order.addShipment(new Shipment(ShipmentType.Courier));
+
+        // when
+        String card = card(page(render(order, ADMIN)), "przesylki");
+
+        // then
+        assertThat(card).doesNotContain("/shipments/0/remove").contains("/shipments/1/remove?version=")
+                .contains("id=\"shipment-1-remove-reason\">Przesyłka ma datę dostarczenia — nie usuniesz jej.</p>")
+                .doesNotContain("shipment-2-remove-reason");
+    }
+
+    @Test
+    void aDateEnteredWithoutATimeShowsAsTheDateAloneAndATrackedTimeStays() {
+        // given
+        Order order = order(OrderStatus.Shipping);
+        order.getShipments().get(0).setShippedAt(LocalDateTime.of(2026, 9, 27, 0, 0));
+        order.getShipments().get(0).setDeliveredAt(LocalDateTime.of(2026, 9, 28, 13, 20));
+
+        // when
+        String card = card(page(render(order, ADMIN)), "przesylki");
+
+        // then
+        assertThat(card).contains("27.09.2026").doesNotContain("27.09.2026, 00:00").contains("28.09.2026, 13:20");
+    }
+
+    @Test
+    void aShipmentDialogHoldsOneShipmentWithDatesOnly() {
+        // given: the operator does not need the hour; a same-day save keeps the time the tracking stored
         Order order = order(OrderStatus.Realization);
         Shipment shipment = order.getShipments().get(0);
         shipment.setCarrier("DPD");
@@ -499,9 +547,9 @@ class OrderDetailsTemplateTest {
                 .containsPattern("<option[^>]*value=\"Courier\"[^>]*selected[^>]*>Kurier</option>")
                 .contains("for=\"shipment-0-carrierSelect\"").contains("aria-label=\"Nazwa innego przewoźnika\"")
                 .containsPattern("type=\"date\" id=\"shipment-0-shippedDate\" name=\"shippedDate\" value=\"2026-09-27\"")
-                .containsPattern("id=\"shipment-0-shippedTime\" name=\"shippedTime\" value=\"10:30\"")
-                .contains("placeholder=\"gg:mm\"").contains("aria-label=\"Godzina nadania\"")
-                .contains("aria-label=\"Godzina dostarczenia\"").contains(">Zapisz przesyłkę<")
+                .containsPattern("type=\"date\" id=\"shipment-0-deliveredDate\" name=\"deliveredDate\"")
+                .doesNotContain("shippedTime").doesNotContain("deliveredTime").doesNotContain("Godzina")
+                .doesNotContain("cl-date-time").contains(">Zapisz przesyłkę<")
                 .contains("data-cl-dialog-close-on-success=\"true\"");
         for (String field : List.of("type", "trackingNo", "collectionPointCode", "trackingUrl", "shippedDate", "deliveredDate")) {
             assertThat(dialog).contains("for=\"shipment-0-" + field + "\"").contains("id=\"shipment-0-" + field + "\"");
@@ -934,6 +982,21 @@ class OrderDetailsTemplateTest {
         assertThat(html).contains("/js/menu.js").contains("/js/dialog.js").contains("/js/collapse.js")
                 .contains("/js/copy-field.js").contains("/js/confirm-dialog.js").contains("/js/async-form.js")
                 .contains("/js/table-select.js");
+    }
+
+    @Test
+    void bothPrintoutsInTheMenuPrintFromAFrameAndStillLinkToTheirSheet() {
+        // given
+        Order order = order(OrderStatus.Assembly);
+
+        // when
+        String html = render(order, ADMIN);
+
+        // then: print.js prints the linked sheet in place; without it the href still opens the sheet
+        String base = "/dashboard/orders/" + order.getOrderId();
+        assertThat(html).containsPattern("<a class=\"cl-menu-item\" href=\"" + base + "/card\" data-cl-print-frame>Drukuj kartę zamówienia</a>")
+                .containsPattern("<a class=\"cl-menu-item\" href=\"" + base + "/collection\" data-cl-print-frame>Drukuj protokół odbioru</a>")
+                .contains("/js/print.js");
     }
 
     @Test

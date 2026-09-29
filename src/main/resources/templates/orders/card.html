@@ -1,14 +1,22 @@
 <!DOCTYPE HTML>
 <html xmlns:th="http://www.thymeleaf.org"
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
-      layout:decorate="~{layout}">
+      layout:decorate="~{layout-print}">
+<head>
+    <title th:text="#{order.card.title} + ' · ' + #{order.page.title(${print.shortId()})}"></title>
+</head>
 <body>
-<!--/* The order card: a printout for the packing table. On screen a sheet in the frame; printed, only the sheet (A4). */-->
+<!--/* The order card: a printout for the packing table, printed on A4 straight from the order page's menu. */-->
 <div layout:fragment="content" th:with="p=${print}">
     <section class="cl-page cl-print-page">
         <div class="cl-page-body">
-            <div th:replace="~{fragments/settings-header :: subpageWithActions(${p.detailsHref()},
-                    #{order.page.title(${p.shortId()})}, #{order.card.title}, null, ~{orders/card :: printAction})}"></div>
+            <!--/* only the title: the sheet is printed straight from the order page, so there is no way back or Print
+                   button to offer; the order id below still links to the order when the page is opened without JavaScript */-->
+            <div class="cl-page-header">
+                <div class="cl-page-header-row">
+                    <h1 class="cl-page-title" th:text="#{order.card.title}"></h1>
+                </div>
+            </div>
 
             <article class="cl-card cl-print-sheet">
                 <dl class="cl-kv cl-print-meta">
@@ -106,16 +114,6 @@
             </article>
         </div>
     </section>
-    <script th:src="@{/js/print.js}" defer></script>
 </div>
-
-<!--/* The Print button of both printouts. Hidden until print.js runs: without the script it could not print, and the
-       browser's own Print menu works either way. */-->
-<th:block th:fragment="printAction">
-    <button type="button" class="cl-button is-primary" data-cl-print hidden>
-        <span class="icon is-small" aria-hidden="true"><i class="fas fa-print"></i></span>
-        <span th:text="#{order.print.print}"></span>
-    </button>
-</th:block>
 </body>
 </html>

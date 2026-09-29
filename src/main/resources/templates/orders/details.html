@@ -22,8 +22,8 @@
                 </div>
                 <div class="cl-layout-side">
                     <section th:replace="~{orders/details/settings :: card}"></section>
-                    <section th:replace="~{orders/details/customer :: card}"></section>
                     <section th:replace="~{orders/details/finances :: card}"></section>
+                    <section th:replace="~{orders/details/customer :: card}"></section>
                     <section th:replace="~{orders/details/history :: card}"></section>
                 </div>
             </div>
@@ -57,6 +57,7 @@
         </div>
     </section>
     <script th:src="@{/js/menu.js}" defer></script>
+    <script th:src="@{/js/print.js}" defer></script>
     <script th:src="@{/js/dialog.js}" defer></script>
     <script th:src="@{/js/collapse.js}" defer></script>
     <script th:src="@{/js/timeline.js}" defer></script>

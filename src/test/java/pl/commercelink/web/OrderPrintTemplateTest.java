@@ -120,16 +120,42 @@ class OrderPrintTemplateTest {
     }
 
     @Test
-    void theCardUsesTheNewLayerAndPrintsFromItsOwnButton() {
+    void theCardUsesTheNewLayer() {
         // when
         String html = card(order(), items(), false);
 
         // then
         assertThat(html).contains("class=\"cl-card cl-print-sheet\"").contains("class=\"cl-table is-compact cl-print-table\"")
                 .contains("data-label=\"Kod producenta\"").contains("<th scope=\"col\"")
-                .contains("data-cl-print hidden").contains("/js/print.js")
-                .contains("class=\"cl-back\" href=\"/dashboard/orders/" + ORDER_ID + "\"")
                 .doesNotContain("class=\"box").doesNotContain("class=\"table");
+    }
+
+    /**
+     * The order page prints both sheets from a hidden frame (print.js), so the page is no longer a preview: it carries
+     * the sheet and its title only, without the app frame, a way back, a Print button, scripts or analytics.
+     */
+    @Test
+    void bothPrintoutsAreTheBareSheetWithoutThePreviewChrome() {
+        // given
+        Order order = order();
+
+        // when
+        String card = render("orders/card", OrderPrintView.card(order, items(), OrderLinks.of(order, false), noLabels()));
+        String collection = render("orders/collection", OrderPrintView.collection(order, items(), store(),
+                LocalDate.of(2026, 9, 28), "Kraków, PL", OrderLinks.of(order, false), noLabels()));
+
+        // then
+        for (String html : List.of(card, collection)) {
+            assertThat(html).contains("<main id=\"clContent\" class=\"cl-content\">")
+                    .contains("<div class=\"container content is-fluid\">")
+                    .contains("/css/commercelink.css")
+                    .doesNotContain("<script").doesNotContain("data-cl-print").doesNotContain("cl-back")
+                    .doesNotContain("cl-page-actions").doesNotContain("cl-sidebar").doesNotContain("cl-topbar")
+                    .doesNotContain("deleteModal").doesNotContain("googletagmanager");
+            assertThat(occurrences(html, "<h1")).isEqualTo(1);
+        }
+        assertThat(card).contains("<title>Karta zamówienia · Zamówienie " + order.getShortenedOrderId() + "</title>");
+        assertThat(collection).contains("<title>Protokół odbioru · Zamówienie " + order.getShortenedOrderId() + "</title>");
     }
 
     @Test
@@ -193,7 +219,7 @@ class OrderPrintTemplateTest {
                 .contains("Potwierdzam odbiór towaru")
                 .contains("id=\"signature-store\"").contains("for=\"signature-store\"").contains("Podpis pracownika sklepu")
                 .contains("id=\"signature-client\"").contains("for=\"signature-client\"").contains("Podpis klienta")
-                .contains("data-cl-print hidden").doesNotContain("??").doesNotContain("class=\"input");
+                .doesNotContain("??").doesNotContain("class=\"input");
     }
 
     @Test

@@ -1,14 +1,22 @@
 <!DOCTYPE HTML>
 <html xmlns:th="http://www.thymeleaf.org"
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
-      layout:decorate="~{layout}">
+      layout:decorate="~{layout-print}">
+<head>
+    <title th:text="#{collection.title} + ' · ' + #{order.page.title(${print.shortId()})}"></title>
+</head>
 <body>
 <!--/* The collection protocol: printed and signed by both sides when the customer picks the order up in person. */-->
 <div layout:fragment="content" th:with="p=${print}">
     <section class="cl-page cl-print-page">
         <div class="cl-page-body">
-            <div th:replace="~{fragments/settings-header :: subpageWithActions(${p.detailsHref()},
-                    #{order.page.title(${p.shortId()})}, #{collection.title}, null, ~{orders/card :: printAction})}"></div>
+            <!--/* only the title: the sheet is printed straight from the order page, so there is no way back or Print
+                   button to offer; the order id below still links to the order when the page is opened without JavaScript */-->
+            <div class="cl-page-header">
+                <div class="cl-page-header-row">
+                    <h1 class="cl-page-title" th:text="#{collection.title}"></h1>
+                </div>
+            </div>
 
             <article class="cl-card cl-print-sheet">
                 <dl class="cl-kv cl-print-meta">
@@ -60,7 +68,8 @@
 
                 <div class="cl-print-section cl-print-signoff">
                     <p class="cl-print-statement" th:text="#{collection.confirm}"></p>
-                    <!--/* Not a form: the fields only let the name be typed in before printing; the sheet is signed by hand. */-->
+                    <!--/* Not a form: the sheet is signed by hand. Printed from the order page the fields are blank signature lines;
+                           opened as a page (no JavaScript) a name can still be typed in before printing. */-->
                     <div class="cl-signatures">
                         <div class="cl-signature">
                             <input class="cl-signature-input" type="text" id="signature-store" autocomplete="off">
@@ -75,7 +84,6 @@
             </article>
         </div>
     </section>
-    <script th:src="@{/js/print.js}" defer></script>
 </div>
 </body>
 </html>

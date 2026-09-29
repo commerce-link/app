@@ -149,12 +149,24 @@ public class Order {
 
     @DynamoDBIgnore
     public boolean isDelivered() {
-        return shipments.stream().allMatch(shipment -> shipment.getDeliveredAt() != null);
+        // allMatch is true for no shipments: an order whose only shipment was removed has delivered nothing
+        return !shipments.isEmpty() && shipments.stream().allMatch(shipment -> shipment.getDeliveredAt() != null);
+    }
+
+    /**
+     * Nothing is left to deliver before the order can settle: every shipment is delivered, or the order has none and
+     * has not gone out. An order that never had a shipment (a service, a sale settled on the spot) completes on payment
+     * and invoice alone, as it always has; a Shipping order without shipments lost its only one to a removal and waits
+     * for a new one instead of completing.
+     */
+    @DynamoDBIgnore
+    public boolean hasNothingLeftToDeliver() {
+        return shipments.isEmpty() ? status != OrderStatus.Shipping : isDelivered();
     }
 
     @DynamoDBIgnore
     public boolean isSettled(boolean warehouseDocumentsRequired) {
-        return isDelivered() && isFullyPaid() && isInvoiced() && !isAwaitingDocumentsGeneration(warehouseDocumentsRequired) && !isAwaitingReview();
+        return hasNothingLeftToDeliver() && isFullyPaid() && isInvoiced() && !isAwaitingDocumentsGeneration(warehouseDocumentsRequired) && !isAwaitingReview();
     }
 
     @DynamoDBIgnore

@@ -295,7 +295,7 @@ public class OrderPageModelFactory {
             OrderShipmentForm form = OrderShipmentForm.of(order.getOrderId(), i, s, carriers);
             rows.add(new OrderPageModel.ShipmentRow(i + 1, OrderLabels.shipmentType(s.getType()), s.getCarrier(),
                     s.getTrackingNo(), safeWebUrl(s.getTrackingUrl()), s.getCollectionPointCode(),
-                    OrderFormats.dateTime(s.getShippedAt()), OrderFormats.dateTime(s.getDeliveredAt()),
+                    OrderFormats.moment(s.getShippedAt()), OrderFormats.moment(s.getDeliveredAt()),
                     order.hasTrackedShipments() ? OrderLabels.tracking(s.getTrackingSubscriptionStatus()) : null,
                     OrderLabels.tone(s.getTrackingSubscriptionStatus()),
                     // the help sends the reader to "Edit", which a read-only page does not offer
@@ -303,7 +303,7 @@ public class OrderPageModelFactory {
                             ? "order.shipment.tracking.failed.help" : null,
                     form.dialogId(), readOnly ? null : base + i,
                     readOnly || removeLockedKey(order, i) != null ? null : base + i + "/remove?version=" + form.version(),
-                    readOnly ? null : removeReasonKey(order, i)));
+                    readOnly ? null : removeReasonKey(order, i), removeShipmentMessageKey(order)));
             if (!readOnly) {
                 forms.add(form);
             }
@@ -319,23 +319,27 @@ public class OrderPageModelFactory {
                 readOnly ? null : OrderShipmentForm.of(order.getOrderId(), null, null, carriers));
     }
 
-    /**
-     * Why the shipment at index cannot be removed, or null. The only shipment stays (the customer card reads the
-     * delivery type from it, and "Edit" corrects it instead); one with a courier order is cancelled with "Cancel
-     * courier order", which also cancels the label at the carrier, never by dropping the record.
-     */
     /** The short reason next to a greyed "Remove" in the row; the refusal of a forced removal says it in full. */
     private static String removeReasonKey(Order order, int index) {
         String locked = removeLockedKey(order, index);
         return locked == null ? null : locked.replace(".remove.error.", ".remove.locked.");
     }
 
+    /**
+     * Why the shipment at index cannot be removed, or null. The only shipment can go: without shipments the order
+     * simply waits for one (OrderLifecycle does not deliver an order that has none). A delivered order keeps its
+     * shipments, they are the record of the delivery; so does a shipment with a delivery date. One with a courier order
+     * is cancelled with "Cancel courier order", which also cancels the paid label at the carrier, never by dropping
+     * the record.
+     */
     public static String removeLockedKey(Order order, int index) {
-        List<Shipment> shipments = order.getShipments();
-        if (shipments.size() <= 1) {
-            return "order.shipments.remove.error.last";
+        if (order.getStatus() == OrderStatus.Delivered) {
+            return "order.shipments.remove.error.delivered";
         }
-        Shipment shipment = shipments.get(index);
+        Shipment shipment = order.getShipments().get(index);
+        if (shipment.getDeliveredAt() != null) {
+            return "order.shipments.remove.error.shipmentDelivered";
+        }
         return shipment.getExternalId() != null ? "order.shipments.remove.error.courier" : null;
     }
 
@@ -443,6 +447,15 @@ public class OrderPageModelFactory {
      */
     public static String removePaymentLockedKey(Order order, int index) {
         return order.getPayments().get(index).isUnsettled() ? "order.payments.remove.error.pending" : null;
+    }
+
+    /**
+     * The confirmation's text. The first shipment carries how the customer asked to receive the order (type, pickup
+     * point); removing the only one drops that until a shipment is added again, which the operator is told first.
+     */
+    public static String removeShipmentMessageKey(Order order) {
+        return order.getShipments().size() == 1 ? "order.shipments.remove.confirm.message.last"
+                : "order.shipments.remove.confirm.message";
     }
 
     /**

@@ -505,4 +505,25 @@ class OrdersScriptContractTest {
         // the line reaches the next dot's ring instead of stopping short of it
         assertThat(rule(css, ".cl-page .cl-timeline-item::after")).contains("bottom: -5px");
     }
+
+    @Test
+    void aPrintLinkPrintsItsPageFromAHiddenFrameWithoutLeavingTheOrder() throws Exception {
+        // given
+        String print = read("src/main/resources/static/js/print.js");
+        String css = css();
+
+        // then: a plain click prints the linked sheet in a same-origin frame; a new-tab click and no JavaScript keep
+        // the link, and a page that is not a sheet (login, error) is shown instead of printed
+        assertThat(print).contains("'use strict'").contains("a[data-cl-print-frame]").contains("event.preventDefault()")
+                .contains("event.ctrlKey").contains("event.metaKey").contains("createElement('iframe')")
+                .contains("view.focus()").contains("view.print()").contains("'afterprint'")
+                .contains("FALLBACK_MS").contains(".cl-print-sheet").contains("window.location.assign(href)")
+                .contains("menu.open = false")
+                .doesNotContain("innerHTML").doesNotContain("style.").doesNotContain("window.open");
+        // the old preview page's button is gone
+        assertThat(print).doesNotContain("[data-cl-print]");
+        // off screen, not display: none or visibility: hidden, which some browsers print as a blank page
+        assertThat(rule(css, ".cl-print-frame")).contains("position: fixed").contains("left: -10000px")
+                .contains("width: 210mm").doesNotContain("display: none").doesNotContain("visibility");
+    }
 }

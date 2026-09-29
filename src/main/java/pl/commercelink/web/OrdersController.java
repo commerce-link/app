@@ -1677,16 +1677,15 @@ public class OrdersController extends BaseController {
                                @RequestParam(required = false) String carrier, @RequestParam(required = false) String trackingNo,
                                @RequestParam(required = false) String collectionPointCode,
                                @RequestParam(required = false) String trackingUrl,
-                               @RequestParam(required = false) String shippedDate, @RequestParam(required = false) String shippedTime,
+                               @RequestParam(required = false) String shippedDate,
                                @RequestParam(required = false) String deliveredDate,
-                               @RequestParam(required = false) String deliveredTime,
                                @RequestHeader(value = SettingsPaths.ASYNC_HEADER, required = false) String requestedWith,
                                HttpServletRequest request, HttpServletResponse response, Model model,
                                RedirectAttributes redirectAttributes, Locale locale) {
         Order existingOrder = requireOrder(ordersRepository, getStoreId(), orderId);
         boolean async = SettingsPaths.isAsync(requestedWith);
         OrderShipmentForm posted = new OrderShipmentForm(orderId, index, version, type, carrier, trackingNo,
-                collectionPointCode, trackingUrl, shippedDate, shippedTime, deliveredDate, deliveredTime,
+                collectionPointCode, trackingUrl, shippedDate, deliveredDate,
                 shipmentCarriers(existingOrder), null, null);
         List<Shipment> current = existingOrder.getShipments();
         boolean stale = index != null && (index < 0 || index >= current.size()
@@ -1745,7 +1744,8 @@ public class OrdersController extends BaseController {
         if (refusal != null) {
             return refuse(redirectAttributes, orderId, refusal, locale);
         }
-        return confirmPage(model, order, "order.shipments.remove", new Object[]{index + 1}, null,
+        return confirmPage(model, order, "order.shipments.remove", new Object[]{index + 1},
+                messageSource.getMessage(OrderPageModelFactory.removeShipmentMessageKey(order), null, locale),
                 "/dashboard/orders/" + orderId + "/shipments/" + index + "/remove?version=" + version, true, locale);
     }
 
@@ -1824,8 +1824,8 @@ public class OrdersController extends BaseController {
     }
 
     /**
-     * What a customer is told about a shipment. The form round-trips shippedAt at minute precision, so sub-minute digits
-     * do not count as a change.
+     * What a customer is told about a shipment. The form keeps the saved shippedAt on the same day; sub-minute digits
+     * still do not count as a change, for shipments saved before the form edited dates only.
      */
     private static String shipmentData(Shipment s) {
         return String.join("|",

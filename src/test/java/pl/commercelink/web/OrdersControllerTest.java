@@ -363,8 +363,7 @@ class OrdersControllerTest {
                             MockHttpServletResponse response, ExtendedModelMap model) {
             return ordersController.saveShipment(ORDER_ID, index, version, shipment.getType(), shipment.getCarrier(),
                     shipment.getTrackingNo(), shipment.getCollectionPointCode(), shipment.getTrackingUrl(),
-                    date(shipment.getShippedAt()), time(shipment.getShippedAt()),
-                    date(shipment.getDeliveredAt()), time(shipment.getDeliveredAt()), requestedWith,
+                    date(shipment.getShippedAt()), date(shipment.getDeliveredAt()), requestedWith,
                     new MockHttpServletRequest(), response, model, redirect, Locale.ENGLISH);
         }
 
@@ -374,10 +373,6 @@ class OrdersControllerTest {
 
         private String date(LocalDateTime value) {
             return value == null ? null : value.toLocalDate().toString();
-        }
-
-        private String time(LocalDateTime value) {
-            return value == null ? null : String.format("%02d:%02d", value.getHour(), value.getMinute());
         }
 
         private Object errorMessage() {
@@ -394,7 +389,8 @@ class OrdersControllerTest {
 
             // then
             assertThat(order.getShipments()).extracting(Shipment::getTrackingNo).containsExactly("TRACK-0", "TRACK-1");
-            assertThat(order.getShipments().get(1).getShippedAt()).isEqualTo(LocalDateTime.of(2026, 9, 2, 10, 30));
+            // the form posts the date alone: a new date starts at midnight
+            assertThat(order.getShipments().get(1).getShippedAt()).isEqualTo(LocalDateTime.of(2026, 9, 2, 0, 0));
             verify(orderLifecycleEventPublisher).publish(order, OrderLifecycleEventType.ShipmentCreated);
         }
 
@@ -498,14 +494,14 @@ class OrdersControllerTest {
         }
 
         @Test
-        void clearingADateClearsItEvenWithItsTimeStillFilledIn() {
+        void clearingADateClearsTheSavedMoment() {
             // given
             Shipment existing = courier("TRACK-1", LocalDateTime.of(2026, 9, 1, 14, 30));
             Order order = orderWith(existing);
 
             // when
             ordersController.saveShipment(ORDER_ID, 0, OrderShipmentForm.version(existing), ShipmentType.Courier, "DPD",
-                    "TRACK-1", null, null, "", "14:30", null, null, null, new MockHttpServletRequest(),
+                    "TRACK-1", null, null, "", null, null, new MockHttpServletRequest(),
                     new MockHttpServletResponse(), new ExtendedModelMap(), redirect, Locale.ENGLISH);
 
             // then
@@ -528,12 +524,12 @@ class OrdersControllerTest {
 
         @Test
         void reSavingAnUntouchedShipmentKeepsItsSecondsAndIsNotAnnouncedAgain() {
-            // given: the form shows the time to the minute; the tracking stored it to the second
+            // given: the form shows the date only; the tracking stored the moment to the second
             Shipment existing = courier("TRACK-1", LocalDateTime.of(2026, 7, 2, 14, 31, 22));
             Order order = orderWith(existing);
 
             // when
-            save(0, OrderShipmentForm.version(existing), courier("TRACK-1", LocalDateTime.of(2026, 7, 2, 14, 31)));
+            save(0, OrderShipmentForm.version(existing), courier("TRACK-1", LocalDateTime.of(2026, 7, 2, 0, 0)));
 
             // then
             assertThat(order.getShipments().get(0).getShippedAt()).isEqualTo(LocalDateTime.of(2026, 7, 2, 14, 31, 22));
@@ -608,7 +604,7 @@ class OrdersControllerTest {
         }
 
         @Test
-        void aWrongTimeComesBackToTheDialogWith422() {
+        void aWrongDateComesBackToTheDialogWith422() {
             // given
             orderWith();
             MockHttpServletResponse response = new MockHttpServletResponse();
@@ -616,31 +612,46 @@ class OrdersControllerTest {
 
             // when
             String view = ordersController.saveShipment(ORDER_ID, null, null, ShipmentType.Courier, "DPD", "TRACK-1",
-                    null, null, "2026-09-02", "25:00", null, null, "fetch", new MockHttpServletRequest(), response,
+                    null, null, "02.09.2026", null, "fetch", new MockHttpServletRequest(), response,
                     model, redirect, Locale.ENGLISH);
 
             // then
             assertThat(view).isEqualTo("orders/details/shipments :: dialogForm");
             assertThat(response.getStatus()).isEqualTo(422);
             assertThat(((OrderShipmentForm) model.getAttribute("shipment")).errors())
-                    .containsEntry("shipment-new-shippedTime", "order.shipments.error.time");
+                    .containsEntry("shipment-new-shippedDate", "order.shipments.error.date");
             verifyNoInteractions(orderLifecycle);
         }
 
         @Test
-        void aDateWithoutATimeKeepsTheSavedTime() {
+        void theSavedDateKeepsItsTimeAndANewOneStartsAtMidnight() {
             // given
             Shipment existing = courier("TRACK-1", LocalDateTime.of(2026, 9, 1, 14, 31, 22));
             Order order = orderWith(existing);
 
             // when
             ordersController.saveShipment(ORDER_ID, 0, OrderShipmentForm.version(existing), ShipmentType.Courier, "DPD",
-                    "TRACK-1", null, null, "2026-09-03", "", "2026-09-04", "", null, new MockHttpServletRequest(),
+                    "TRACK-1", null, null, "2026-09-01", "2026-09-04", null, new MockHttpServletRequest(),
                     new MockHttpServletResponse(), new ExtendedModelMap(), redirect, Locale.ENGLISH);
 
-            // then: nothing was saved for the delivery, so it starts at midnight
-            assertThat(order.getShipments().get(0).getShippedAt()).isEqualTo(LocalDateTime.of(2026, 9, 3, 14, 31, 22));
+            // then
+            assertThat(order.getShipments().get(0).getShippedAt()).isEqualTo(LocalDateTime.of(2026, 9, 1, 14, 31, 22));
             assertThat(order.getShipments().get(0).getDeliveredAt()).isEqualTo(LocalDateTime.of(2026, 9, 4, 0, 0));
+        }
+
+        @Test
+        void aChangedDateStartsAtMidnight() {
+            // given
+            Shipment existing = courier("TRACK-1", LocalDateTime.of(2026, 9, 1, 14, 31, 22));
+            Order order = orderWith(existing);
+
+            // when
+            ordersController.saveShipment(ORDER_ID, 0, OrderShipmentForm.version(existing), ShipmentType.Courier, "DPD",
+                    "TRACK-1", null, null, "2026-09-03", null, null, new MockHttpServletRequest(),
+                    new MockHttpServletResponse(), new ExtendedModelMap(), redirect, Locale.ENGLISH);
+
+            // then
+            assertThat(order.getShipments().get(0).getShippedAt()).isEqualTo(LocalDateTime.of(2026, 9, 3, 0, 0));
         }
 
         @Test
@@ -661,28 +672,90 @@ class OrdersControllerTest {
         }
 
         @Test
-        void theOnlyShipmentAndOneWithACourierOrderAreNotRemoved() {
+        void theOnlyShipmentOfAShippingOrderIsRemoved() {
+            // given: OrderLifecycle keeps an order without shipments in Shipping (OrderLifecycleTest)
+            Shipment only = courier("TRACK-1", LocalDateTime.of(2026, 9, 1, 9, 0));
+            Order order = orderWith(only);
+            order.setStatus(OrderStatus.Shipping);
+
+            // when
+            String view = ordersController.removeShipment(ORDER_ID, 0, OrderShipmentForm.version(only), redirect, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+            assertThat(errorMessage()).isNull();
+            assertThat(order.getShipments()).isEmpty();
+            assertThat(order.getStatus()).isEqualTo(OrderStatus.Shipping);
+            verify(orderLifecycle).update(order);
+            verify(orderLifecycleEventPublisher, never()).publish(any(), any());
+        }
+
+        @Test
+        void theRemovalConfirmationOfTheOnlyShipmentSaysTheDeliveryMethodGoesWithIt() {
             // given
             Shipment only = courier("TRACK-1", LocalDateTime.of(2026, 9, 1, 9, 0));
             orderWith(only);
+            ExtendedModelMap model = new ExtendedModelMap();
 
             // when
-            ordersController.removeShipment(ORDER_ID, 0, OrderShipmentForm.version(only), redirect, Locale.ENGLISH);
+            ordersController.confirmRemoveShipment(ORDER_ID, 0, OrderShipmentForm.version(only), model, redirect, Locale.ENGLISH);
 
             // then
-            assertThat(errorMessage()).isEqualTo("order.shipments.remove.error.last");
+            ConfirmAction confirm = (ConfirmAction) model.getAttribute("confirm");
+            assertThat(confirm.message()).isEqualTo("order.shipments.remove.confirm.message.last");
+            assertThat(confirm.actionPath()).endsWith("/shipments/0/remove?version=" + OrderShipmentForm.version(only));
+        }
 
+        @Test
+        void noShipmentOfADeliveredOrderIsRemoved() {
             // given
+            Shipment first = courier("TRACK-1", LocalDateTime.of(2026, 9, 1, 9, 0));
+            Shipment second = courier("TRACK-2", LocalDateTime.of(2026, 9, 1, 9, 0));
+            Order order = orderWith(first, second);
+            order.setStatus(OrderStatus.Delivered);
+            ExtendedModelMap model = new ExtendedModelMap();
+
+            // when
+            String confirm = ordersController.confirmRemoveShipment(ORDER_ID, 1, OrderShipmentForm.version(second), model,
+                    redirect, Locale.ENGLISH);
+            ordersController.removeShipment(ORDER_ID, 1, OrderShipmentForm.version(second), redirect, Locale.ENGLISH);
+
+            // then
+            assertThat(confirm).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+            assertThat(errorMessage()).isEqualTo("order.shipments.remove.error.delivered");
+            assertThat(order.getShipments()).containsExactly(first, second);
+            verifyNoInteractions(orderLifecycle);
+        }
+
+        @Test
+        void aShipmentWithADeliveryDateIsNotRemoved() {
+            // given
+            Shipment delivered = courier("TRACK-1", LocalDateTime.of(2026, 9, 1, 9, 0));
+            delivered.setDeliveredAt(LocalDateTime.of(2026, 9, 2, 11, 0));
+            Order order = orderWith(delivered, courier("TRACK-2", LocalDateTime.of(2026, 9, 1, 9, 0)));
+            order.setStatus(OrderStatus.Shipping);
+
+            // when
+            ordersController.removeShipment(ORDER_ID, 0, OrderShipmentForm.version(delivered), redirect, Locale.ENGLISH);
+
+            // then
+            assertThat(errorMessage()).isEqualTo("order.shipments.remove.error.shipmentDelivered");
+            assertThat(order.getShipments()).hasSize(2);
+            verifyNoInteractions(orderLifecycle);
+        }
+
+        @Test
+        void aShipmentWithACourierOrderIsNotRemovedEvenWhenItIsTheOnlyOne() {
+            // given: dropping it would orphan the paid label at the carrier
             Shipment labelled = courier("TRACK-2", LocalDateTime.of(2026, 9, 1, 9, 0));
             labelled.setExternalId("EXT-2");
-            orderWith(only, labelled);
-            RedirectAttributesModelMap second = new RedirectAttributesModelMap();
+            orderWith(labelled);
 
             // when
-            ordersController.removeShipment(ORDER_ID, 1, OrderShipmentForm.version(labelled), second, Locale.ENGLISH);
+            ordersController.removeShipment(ORDER_ID, 0, OrderShipmentForm.version(labelled), redirect, Locale.ENGLISH);
 
             // then
-            assertThat(second.getFlashAttributes().get("errorMessage")).isEqualTo("order.shipments.remove.error.courier");
+            assertThat(errorMessage()).isEqualTo("order.shipments.remove.error.courier");
             verifyNoInteractions(orderLifecycle);
         }
 
@@ -2959,7 +3032,7 @@ class OrdersControllerTest {
             // when
             ordersController.updateReview(ORDER_ID, review, reviewRedirect, polish);
             ordersController.saveShipment(ORDER_ID, null, null, ShipmentType.Courier, null, "T-1", null, null, null,
-                    null, null, null, null, new MockHttpServletRequest(), new MockHttpServletResponse(),
+                    null, null, new MockHttpServletRequest(), new MockHttpServletResponse(),
                     new ExtendedModelMap(), shipmentsRedirect, polish);
             ordersController.updateSerialNumbers(ORDER_ID, new OrderItemsForm(), serialRedirect, polish);
 
