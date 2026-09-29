@@ -227,4 +227,25 @@ public class Shipment {
             this.externalId = previous.externalId;
         }
     }
+
+    /**
+     * What is left of removed when the order's only shipment is removed: the customer's choice of delivery (the type,
+     * the pickup point and, for a pickup point, its carrier), waiting to go out again. Its tracking, dates and courier
+     * order go with the removal.
+     */
+    public static Shipment placeholderFor(Shipment removed) {
+        Shipment placeholder = new Shipment(removed.type);
+        placeholder.collectionPointCode = removed.collectionPointCode;
+        if (removed.type == ShipmentType.PickupPoint) {
+            placeholder.carrier = removed.carrier;
+        }
+        return placeholder;
+    }
+
+    /** Nothing but the delivery choice: no tracking, no dates, no courier order. */
+    @DynamoDBIgnore
+    public boolean isPlaceholder() {
+        return isEmpty(trackingNo) && isEmpty(trackingUrl) && isEmpty(externalId) && shippedAt == null
+                && deliveredAt == null;
+    }
 }

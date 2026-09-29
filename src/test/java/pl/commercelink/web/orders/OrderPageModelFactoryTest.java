@@ -462,6 +462,30 @@ class OrderPageModelFactoryTest {
         assertThat(forms.get(0).today()).isEqualTo(java.time.LocalDate.now(OrderShipmentForm.OPERATOR_ZONE));
     }
 
+    @Test
+    void theRowOfTheLastUndeliveredShipmentSaysRemovingItDeliversTheOrder() {
+        // given: shipment 1 delivered, shipment 2 on the way (Realization: both went out, so Shipping -> Delivered)
+        Order order = order(OrderStatus.Realization);
+        Shipment delivered = order.getShipments().get(0);
+        delivered.setCarrier("DPD");
+        delivered.setTrackingNo("T-1");
+        delivered.setShippedAt(LocalDateTime.now().minusDays(3));
+        delivered.setDeliveredAt(LocalDateTime.now().minusDays(1));
+        Shipment onTheWay = new Shipment(ShipmentType.Courier);
+        onTheWay.setCarrier("DPD");
+        onTheWay.setTrackingNo("T-2");
+        onTheWay.setShippedAt(LocalDateTime.now().minusDays(2));
+        order.getShipments().add(onTheWay);
+
+        // when
+        OrderPageModel.ShipmentRow row = factory.build(order, List.of(), ADMIN, PL).shipments().rows().get(1);
+
+        // then
+        assertThat(row.removeHref()).isNotNull();
+        assertThat(row.removeMessageKey()).isEqualTo("order.shipments.remove.confirm.delivers");
+        assertThat(row.removeActionKey()).isEqualTo("order.shipments.remove.confirm.action.delivers");
+    }
+
     private static void labelled(Shipment shipment, String trackingNo, String packageId) {
         shipment.setCarrier("InPost");
         shipment.setTrackingNo(trackingNo);

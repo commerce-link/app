@@ -679,26 +679,88 @@ class OrdersControllerTest {
         }
 
         @Test
-        void theOnlyShipmentOfAShippingOrderIsRemoved() {
-            // given: OrderLifecycle keeps an order without shipments in Shipping (OrderLifecycleTest)
-            Shipment only = courier("TRACK-1", LocalDateTime.of(2026, 9, 1, 9, 0));
+        void removingTheOnlyShipmentLeavesAPlaceholderWithTheCustomersChoice() {
+            // given: a pickup-point shipment with a number typed by hand; the customer card, the client page and the
+            // dropship flow read the delivery type and the pickup point from the shipment
+            Shipment only = new Shipment(ShipmentType.PickupPoint);
+            only.setCarrier("InPost");
+            only.setCollectionPointCode("KRA01M");
+            only.setTrackingNo("TRACK-1");
+            only.setTrackingUrl("https://tracking.example/TRACK-1");
+            only.setShippedAt(LocalDateTime.of(2026, 9, 1, 9, 0));
+            only.markTrackingActive("21037943");
             Order order = orderWith(only);
             order.setStatus(OrderStatus.Shipping);
 
             // when
             String view = ordersController.removeShipment(ORDER_ID, 0, OrderShipmentForm.version(only), redirect, Locale.ENGLISH);
 
-            // then
+            // then: the choice stays, waiting to go out again; the order keeps a shipment to deliver
             assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
             assertThat(errorMessage()).isNull();
-            assertThat(order.getShipments()).isEmpty();
+            assertThat(order.getShipments()).singleElement().satisfies(placeholder -> {
+                assertThat(placeholder).isNotSameAs(only);
+                assertThat(placeholder.getType()).isEqualTo(ShipmentType.PickupPoint);
+                assertThat(placeholder.getCollectionPointCode()).isEqualTo("KRA01M");
+                assertThat(placeholder.getCarrier()).isEqualTo("InPost");
+                assertThat(placeholder.getTrackingNo()).isNull();
+                assertThat(placeholder.getTrackingUrl()).isNull();
+                assertThat(placeholder.getShippedAt()).isNull();
+                assertThat(placeholder.getDeliveredAt()).isNull();
+                assertThat(placeholder.getExternalId()).isNull();
+                assertThat(placeholder.hasTrackingSubscription()).isFalse();
+            });
             assertThat(order.getStatus()).isEqualTo(OrderStatus.Shipping);
             verify(orderLifecycle).update(order);
             verify(orderLifecycleEventPublisher, never()).publish(any(), any());
         }
 
         @Test
-        void theRemovalConfirmationOfTheOnlyShipmentSaysTheDeliveryMethodGoesWithIt() {
+        void theCourierPlaceholderKeepsOnlyTheType() {
+            // given: a courier carrier is not part of the customer's choice, a pickup point's carrier is
+            Shipment only = courier("TRACK-1", null);
+            Order order = orderWith(only);
+
+            // when
+            ordersController.removeShipment(ORDER_ID, 0, OrderShipmentForm.version(only), redirect, Locale.ENGLISH);
+
+            // then
+            assertThat(order.getShipments()).singleElement().satisfies(placeholder -> {
+                assertThat(placeholder.getType()).isEqualTo(ShipmentType.Courier);
+                assertThat(placeholder.getCarrier()).isNull();
+                assertThat(placeholder.getTrackingNo()).isNull();
+            });
+        }
+
+        @Test
+        void removingTheLastUndeliveredShipmentConfirmsThatTheOrderBecomesDelivered() {
+            // given: Q1 = A, the removal may deliver the order, and the confirmation must say so plainly
+            Shipment delivered = courier("TRACK-1", LocalDateTime.of(2026, 9, 1, 9, 0));
+            delivered.setDeliveredAt(LocalDateTime.of(2026, 9, 2, 11, 0));
+            Shipment onTheWay = courier("TRACK-2", LocalDateTime.of(2026, 9, 1, 9, 0));
+            Order order = orderWith(delivered, onTheWay);
+            order.setStatus(OrderStatus.Shipping);
+            ExtendedModelMap model = new ExtendedModelMap();
+
+            // when
+            ordersController.confirmRemoveShipment(ORDER_ID, 1, OrderShipmentForm.version(onTheWay), model, redirect, Locale.ENGLISH);
+
+            // then
+            ConfirmAction confirm = (ConfirmAction) model.getAttribute("confirm");
+            assertThat(confirm.message()).isEqualTo("order.shipments.remove.confirm.delivers");
+            assertThat(confirm.confirmLabel()).isEqualTo("order.shipments.remove.confirm.action.delivers");
+            assertThat(OrderPageModelFactory.removeShipmentMessageKey(order, 1)).isEqualTo("order.shipments.remove.confirm.delivers");
+            // removing an undelivered one next to another undelivered one delivers nothing
+            Order twoOnTheWay = orderBase();
+            twoOnTheWay.setStatus(OrderStatus.Shipping);
+            twoOnTheWay.setShipments(new ArrayList<>(List.of(courier("TRACK-1", LocalDateTime.of(2026, 9, 1, 9, 0)),
+                    courier("TRACK-2", LocalDateTime.of(2026, 9, 1, 9, 0)))));
+            assertThat(OrderPageModelFactory.removeShipmentMessageKey(twoOnTheWay, 1)).isEqualTo("order.shipments.remove.confirm.message");
+            assertThat(OrderPageModelFactory.removeShipmentActionKey(twoOnTheWay, 1)).isEqualTo("order.shipments.remove.confirm.action");
+        }
+
+        @Test
+        void theRemovalConfirmationOfTheOnlyShipmentSaysItGoesBackToWaiting() {
             // given
             Shipment only = courier("TRACK-1", LocalDateTime.of(2026, 9, 1, 9, 0));
             orderWith(only);

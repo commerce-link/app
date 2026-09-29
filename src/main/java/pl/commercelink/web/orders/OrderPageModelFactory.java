@@ -355,8 +355,10 @@ public class OrderPageModelFactory {
                     !readOnly && s.getTrackingSubscriptionStatus() == ShipmentTrackingStatus.FAILED
                             ? "order.shipment.tracking.failed.help" : null,
                     form.dialogId(), readOnly ? null : base + i,
-                    readOnly || removeLockedKey(order, i) != null ? null : base + i + "/remove?version=" + form.version(),
-                    readOnly ? null : removeReasonKey(order, i, s == courierCancellable), removeShipmentMessageKey(order)));
+                    readOnly || removeLockedKey(order, i) != null || isBarePlaceholder(order, i) ? null
+                            : base + i + "/remove?version=" + form.version(),
+                    readOnly ? null : removeReasonKey(order, i, s == courierCancellable), removeShipmentMessageKey(order, i),
+                    removeShipmentActionKey(order, i)));
             if (!readOnly) {
                 forms.add(form);
             }
@@ -597,12 +599,46 @@ public class OrderPageModelFactory {
     }
 
     /**
-     * The confirmation's text. The first shipment carries how the customer asked to receive the order (type, pickup
-     * point); removing the only one drops that until a shipment is added again, which the operator is told first.
+     * The only shipment with nothing but the customer's choice of delivery: removing it would leave the same placeholder
+     * (OrdersController keeps one in place of the only shipment), so the row offers no "Remove" and needs no reason.
      */
-    public static String removeShipmentMessageKey(Order order) {
+    private static boolean isBarePlaceholder(Order order, int index) {
+        return order.getShipments().size() == 1 && order.getShipments().get(index).isPlaceholder();
+    }
+
+    /**
+     * The confirmation's text, which says what the removal does. Removing the last shipment not yet delivered while the
+     * others are delivered moves the order to Delivered in the same save (OrderLifecycle), with what follows from it: the
+     * goods issue note, the e-receipt for the customer, the notice to the marketplace. Removing the only shipment keeps
+     * it as a placeholder waiting to go out, with how the customer asked to receive the order (type, pickup point).
+     */
+    public static String removeShipmentMessageKey(Order order, int index) {
+        if (removalDelivers(order, index)) {
+            return "order.shipments.remove.confirm.delivers";
+        }
         return order.getShipments().size() == 1 ? "order.shipments.remove.confirm.message.last"
                 : "order.shipments.remove.confirm.message";
+    }
+
+    /** The confirmation's button: it names the delivery when the removal delivers the order. */
+    public static String removeShipmentActionKey(Order order, int index) {
+        return removalDelivers(order, index) ? "order.shipments.remove.confirm.action.delivers"
+                : "order.shipments.remove.confirm.action";
+    }
+
+    /**
+     * Whether OrderLifecycle moves the order to Delivered once the shipment at index is gone: every other shipment is
+     * delivered, and the order is Shipping or, from Assembled or Realization, every other shipment has gone out.
+     */
+    static boolean removalDelivers(Order order, int index) {
+        List<Shipment> rest = new ArrayList<>(order.getShipments());
+        rest.remove(index);
+        if (rest.isEmpty() || !rest.stream().allMatch(s -> s.getDeliveredAt() != null)) {
+            return false;
+        }
+        return order.getStatus() == OrderStatus.Shipping
+                || order.getStatus().isOneOf(OrderStatus.Assembled, OrderStatus.Realization)
+                && rest.stream().allMatch(s -> s.hasShippingData() || s.hasCollectionData());
     }
 
     /**

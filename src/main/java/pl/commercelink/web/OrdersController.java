@@ -1904,15 +1904,23 @@ public class OrdersController extends BaseController {
         if (refusal != null) {
             return refuse(redirectAttributes, orderId, refusal, locale);
         }
-        return confirmPage(model, order, "order.shipments.remove", new Object[]{index + 1},
-                messageSource.getMessage(OrderPageModelFactory.removeShipmentMessageKey(order), null, locale),
-                "/dashboard/orders/" + orderId + "/shipments/" + index + "/remove?version=" + version, true, locale);
+        // the same text and button as the card's confirmation dialog: they say when the removal delivers the order
+        return OrderConfirmPages.render(model, new ConfirmAction(
+                messageSource.getMessage("order.shipments.remove.confirm.title", new Object[]{index + 1}, locale),
+                messageSource.getMessage(OrderPageModelFactory.removeShipmentMessageKey(order, index), null, locale),
+                messageSource.getMessage(OrderPageModelFactory.removeShipmentActionKey(order, index), null, locale),
+                "/dashboard/orders/" + orderId + "/shipments/" + index + "/remove?version=" + version,
+                "/dashboard/orders/" + orderId, true), orderPageTitle(order, locale));
     }
 
     /**
-     * Removes one shipment. No "shipment created" notice goes out: nothing was shipped by removing a record. Once no
-     * shipment has shipping data left, the shipping e-mail is forgotten (as "Cancel courier order" does), so the
-     * customer gets it with the number of the shipment added next instead of keeping a link to the removed one.
+     * Removes one shipment. No "shipment created" notice goes out: nothing was shipped by removing a record. The only
+     * shipment is not dropped but goes back to waiting to be shipped: a placeholder keeps how the customer asked to
+     * receive the order (type, pickup point), which the customer card, the client page and the dropship flow read from
+     * the shipment, and the order keeps a shipment to deliver. Once no shipment has shipping data left, the shipping
+     * e-mail is forgotten (as "Cancel courier order" does), so the customer gets it with the number of the shipment
+     * added next instead of keeping a link to the removed one. Removing the last undelivered shipment while the others
+     * are delivered delivers the order; the confirmation says so (OrderPageModelFactory.removeShipmentMessageKey).
      */
     @PostMapping("/dashboard/orders/{orderId}/shipments/{index}/remove")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
@@ -1926,6 +1934,9 @@ public class OrdersController extends BaseController {
         }
         List<Shipment> shipments = new ArrayList<>(existingOrder.getShipments());
         Shipment removed = shipments.remove(index);
+        if (shipments.isEmpty()) {
+            shipments.add(Shipment.placeholderFor(removed));
+        }
         storeShipments(existingOrder, shipments, null, null);
         if (removed.hasShippingData() && existingOrder.firstShipmentWithShippingData().isEmpty()) {
             orderEventsRepository.deleteByOrderIdAndName(orderId, EmailNotificationType.ORDER_SHIPPING.name());

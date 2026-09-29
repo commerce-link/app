@@ -4,7 +4,8 @@
 <!--/* Shipment rows with their own "Edytuj" and "Usuń", "Dodaj przesyłkę" and the courier cancellation in the head.
        "Edytuj" and "Dodaj przesyłkę" open the shipment's dialog (one per shipment, a fixed size whatever the number of
        shipments); without JavaScript they lead to the shipment page. "Usuń" goes through the confirmation dialog, or
-       its page without JavaScript. */-->
+       its page without JavaScript; its text and button say when the removal delivers the order. The only shipment
+       with nothing but the delivery choice has no "Usuń": removing it would leave the same placeholder. */-->
 <section th:fragment="card" class="cl-card" id="przesylki" aria-labelledby="shipments-title"
          th:with="shipments=${page.shipments()}">
     <div class="cl-card-head">
@@ -58,7 +59,7 @@
                    th:attr="aria-label=#{order.shipments.remove.for(${s.number()})},
                             data-cl-confirm-title=#{order.shipments.remove.confirm.title(${s.number()})},
                             data-cl-confirm-message=#{${s.removeMessageKey()}},
-                            data-cl-confirm-action=#{order.shipments.remove.confirm.action}"
+                            data-cl-confirm-action=#{${s.removeActionKey()}}"
                    th:text="#{general.delete}"></a>
                 <!--/* greyed, still focusable, its reason in the text of the row (design system: link action that cannot run) */-->
                 <button th:if="${s.removeReasonKey() != null}" type="button" class="cl-link-button" aria-disabled="true"

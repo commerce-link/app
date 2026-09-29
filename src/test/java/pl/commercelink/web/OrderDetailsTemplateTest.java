@@ -484,18 +484,24 @@ class OrderDetailsTemplateTest {
     }
 
     @Test
-    void theOnlyShipmentCanBeRemovedAndTheConfirmationWarnsTheDeliveryMethodGoesWithIt() {
-        // given
+    void theOnlyShipmentCanBeRemovedBackToWaitingButABarePlaceholderOffersNoRemove() {
+        // given: a number typed by hand on the only shipment; another order with nothing but the delivery choice
         Order order = order(OrderStatus.Realization);
+        order.getShipments().get(0).setTrackingNo("T-1");
         String version = OrderShipmentForm.version(order.getShipments().get(0));
+        Order bare = order(OrderStatus.Realization);
 
         // when
         String card = card(page(render(order, ADMIN)), "przesylki");
+        String bareCard = card(page(render(bare, ADMIN)), "przesylki");
 
-        // then
+        // then: removing it leaves a placeholder that keeps the customer's choice, which the confirmation says
         assertThat(card).contains("aria-label=\"Edytuj przesyłkę 1\"").contains("/shipments/0/remove?version=" + version)
                 .doesNotContain("aria-disabled").doesNotContain("remove-reason")
-                .contains("data-cl-confirm-message=\"To jedyna przesyłka — razem z nią zniknie sposób dostawy wybrany przez klienta");
+                .contains("data-cl-confirm-message=\"Przesyłka wróci do stanu „czeka na nadanie”")
+                .contains("data-cl-confirm-action=\"Usuń przesyłkę\"");
+        assertThat(bareCard).contains("aria-label=\"Edytuj przesyłkę 1\"").doesNotContain("/remove?version=")
+                .doesNotContain("aria-label=\"Usuń przesyłkę 1\"").doesNotContain("remove-reason");
     }
 
     @Test
