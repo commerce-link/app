@@ -28,7 +28,14 @@ public record OrderItemRow(String itemId, int index, String name, String categor
      * store's own users have a route to the item page.
      */
     public record Context(Order order, boolean readOnly, boolean superAdmin, SupplierLabelMap labels,
-                          Function<OrderItem, String> deliveryHref, Function<String, String> serialHref) {
+                          Function<OrderItem, String> deliveryHref, Function<String, String> serialHref,
+                          boolean receiptLocked) {
+
+        /** receiptLocked: an e-receipt is being issued for the order (ReceiptOrderState#locksOrder). */
+        public Context(Order order, boolean readOnly, boolean superAdmin, SupplierLabelMap labels,
+                       Function<OrderItem, String> deliveryHref, Function<String, String> serialHref) {
+            this(order, readOnly, superAdmin, labels, deliveryHref, serialHref, false);
+        }
     }
 
     public static OrderItemRow of(OrderItem item, int index, Context context) {
@@ -49,7 +56,7 @@ public record OrderItemRow(String itemId, int index, String name, String categor
                 deliveryLabel, deliveryId == null ? null : context.deliveryHref().apply(item),
                 item.isReadyForAllocation(), item.isProduct() && item.isAllocated(), item.isProduct() && item.isDelivered(),
                 item.canBeMovedToAnotherOrder(), item.isNew() || item.isService(),
-                context.readOnly() ? List.of() : actions(item, context.order()),
+                context.readOnly() ? List.of() : actions(item, context.order(), context.receiptLocked()),
                 context.readOnly() ? null : itemHref,
                 item.getPrice(), item.getTax(), item.isGroup(),
                 // without the item menu a closed order would have no way to its item page (EAN, VAT, delivery dates)
@@ -87,8 +94,19 @@ public record OrderItemRow(String itemId, int index, String name, String categor
         return category != null || mfn != null || skuShown() || serialNo != null;
     }
 
-    /** The conditions of the old order-details item menu, plus: consolidation stops at the closing invoice. */
+    /**
+     * The conditions of the old order-details item menu, plus: consolidation and splitting a set stop at the closing
+     * invoice.
+     */
     public static List<ItemAction.State> actions(OrderItem item, Order order) {
+        return actions(item, order, false);
+    }
+
+    /**
+     * receiptLocked: an e-receipt is being issued, so merging on the invoice and splitting a set are locked as once the
+     * invoice is issued (the same refusals as OrdersController#toggleConsolidation and #splitGroupItem).
+     */
+    public static List<ItemAction.State> actions(OrderItem item, Order order, boolean receiptLocked) {
         List<ItemAction.State> states = new ArrayList<>();
         // an item that already has a supplier (Allocation) is released first, then reassigned
         String assignReason = item.isGroup() ? "order.item.unavailable.group"
@@ -109,14 +127,19 @@ public record OrderItemRow(String itemId, int index, String name, String categor
                 item.isClaimed() ? ConversionUtil.getShortenedId(item.getClaimedDeliveryId()) : null));
         // "Split set" only exists for a set; for any other item it is not greyed out but absent
         if (item.isGroup()) {
+            // splitting rewrites the lines the sale document lists (OrdersController#splitGroupItem refuses the same)
+            ItemSaleLock saleLock = ItemSaleLock.of(order, receiptLocked);
             String splitReason = item.isService() ? "order.item.unavailable.service"
-                    : item.isNew() ? null : "order.item.unavailable.not.new";
+                    : !item.isNew() ? "order.item.unavailable.not.new"
+                    : saleLock != null ? saleLock.menuReasonKey() : null;
             states.add(ItemAction.State.of(ItemAction.SPLIT_GROUP, splitReason, null));
         }
         boolean invoiced = order.isInvoiced();
+        String consolidateReason = invoiced ? "order.item.unavailable.invoiced"
+                : receiptLocked ? "order.item.unavailable.receipt" : null;
         states.add(new ItemAction.State(ItemAction.CONSOLIDATE,
                 item.isConsolidated() ? "order.item.menu.deconsolidate" : "order.item.menu.consolidate",
-                !invoiced, invoiced ? "order.item.unavailable.invoiced" : null, null));
+                consolidateReason == null, consolidateReason, null));
         states.add(ItemAction.State.of(ItemAction.EDIT, null, null));
         return states;
     }

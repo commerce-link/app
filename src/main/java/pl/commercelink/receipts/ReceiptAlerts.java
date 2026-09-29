@@ -3,6 +3,7 @@ package pl.commercelink.receipts;
 import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Component;
 import pl.commercelink.notifications.StoreNotificationService;
+import pl.commercelink.receipts.api.ReceiptProviderDescriptor;
 import pl.commercelink.stores.StoreNotification;
 import pl.commercelink.stores.StoreNotificationSeverity;
 import pl.commercelink.stores.StoreNotificationType;
@@ -21,10 +22,13 @@ public class ReceiptAlerts {
 
     private final StoreNotificationService notifications;
     private final MessageSource messageSource;
+    private final ReceiptProviderFactory providerFactory;
 
-    public ReceiptAlerts(StoreNotificationService notifications, MessageSource messageSource) {
+    public ReceiptAlerts(StoreNotificationService notifications, MessageSource messageSource,
+                         ReceiptProviderFactory providerFactory) {
         this.notifications = notifications;
         this.messageSource = messageSource;
+        this.providerFactory = providerFactory;
     }
 
     /** Returns whether the attempt's stored reason changed (the caller saves the attempt). */
@@ -54,6 +58,85 @@ public class ReceiptAlerts {
     /** Bell notifications always read in the fixed operator locale, whatever the caller's own request locale is. */
     public String message(ReceiptAttempt attempt, ReceiptAttention attention) {
         return message(attempt, attention, OPERATOR_LOCALE);
+    }
+
+    /**
+     * Why a dead attempt fiscalised nothing, in a few words and without advice (the advice of {@link #message} is
+     * about the newest attempt only): the blocked reason with its detail, or the provider's refusal. Null when the
+     * attempt carries neither.
+     */
+    public String outcome(ReceiptAttempt attempt, Locale locale) {
+        if (attempt.getState() == ReceiptAttemptState.BLOCKED && attempt.getBlockedReason() != null) {
+            String blocked = messageSource.getMessage("receipts.blocked." + attempt.getBlockedReason(), null,
+                    attempt.getBlockedReason(), locale);
+            return blocked + (attempt.getBlockedDetail() == null ? "" : " (" + attempt.getBlockedDetail() + ")");
+        }
+        if (attempt.getState() == ReceiptAttemptState.FAILED) {
+            return attempt.getFailureMessage();
+        }
+        return null;
+    }
+
+    /**
+     * The problem as the order page shows it in the e-receipt row: unlike the bell {@link #message}, it names no
+     * receipt key or order id (the row is the receipt), points at a button of the same row and keeps the provider's
+     * technical hints apart, under a disclosure. Each text may be overridden per provider with a key suffixed by the
+     * provider id (e.g. {@code .fakturownia}), because those hints (fiscal_status, the print marker) are specific to
+     * one provider and would mislead the operator of another.
+     */
+    public ReceiptPageProblem pageProblem(ReceiptAttempt attempt, ReceiptAttention attention, Locale locale) {
+        String providerName = providerName(attempt.getProvider(), locale);
+        Object[] args = {
+                providerName,
+                clause(attempt.getLastError(), locale),
+                clause(attempt.getFailureMessage(), locale),
+                blockedText(attempt, locale),
+                attempt.getIssueCalls(),
+                attempt.getReceiptKey()
+        };
+        String base = "receipts.page." + attention.name() + ".";
+        String cause = pageText(base + "cause", attempt.getProvider(), args, locale);
+        String action = pageText(base + "action", attempt.getProvider(), args, locale);
+        String details = pageText(base + "details", attempt.getProvider(), args, locale);
+        String summary = details == null ? null : messageSource.getMessage("receipts.page.details.summary",
+                new Object[]{providerName}, locale);
+        return new ReceiptPageProblem(cause == null ? attention.name() : cause, action, summary, details);
+    }
+
+    /** The provider-specific text when the provider has one, the generic one otherwise; null when neither exists. */
+    private String pageText(String key, String providerId, Object[] args, Locale locale) {
+        String specific = providerId == null ? null : messageSource.getMessage(key + "." + providerId, args, null, locale);
+        return specific != null ? specific : messageSource.getMessage(key, args, null, locale);
+    }
+
+    /**
+     * The attempt's provider (stored when it was created, so a later switch of the store's system does not rename
+     * old attempts) by its display name; the stored id when its adapter is no longer installed.
+     */
+    private String providerName(String providerId, Locale locale) {
+        if (providerId == null || providerId.isBlank()) {
+            return messageSource.getMessage("receipts.page.provider.unknown", null, locale);
+        }
+        ReceiptProviderDescriptor descriptor = providerFactory.getDescriptor(providerId);
+        return descriptor == null || descriptor.displayName() == null ? providerId : descriptor.displayName();
+    }
+
+    /** Free provider text dropped into a sentence that ends with its own full stop. */
+    private String clause(String text, Locale locale) {
+        if (text == null || text.isBlank()) {
+            return messageSource.getMessage("receipts.page.noDetail", null, locale);
+        }
+        String trimmed = text.strip();
+        return trimmed.endsWith(".") ? trimmed.substring(0, trimmed.length() - 1) : trimmed;
+    }
+
+    private String blockedText(ReceiptAttempt attempt, Locale locale) {
+        if (attempt.getBlockedReason() == null) {
+            return messageSource.getMessage("receipts.page.noDetail", null, locale);
+        }
+        String blocked = messageSource.getMessage("receipts.blocked." + attempt.getBlockedReason(), null,
+                attempt.getBlockedReason(), locale);
+        return blocked + (attempt.getBlockedDetail() == null ? "" : " (" + attempt.getBlockedDetail() + ")");
     }
 
     /** Same message, in the given locale: the order page shows it to the operator viewing it in their own language. */

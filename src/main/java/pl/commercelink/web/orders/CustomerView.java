@@ -15,8 +15,13 @@ public record CustomerView(AddressBlock billing, AddressBlock shipping, String s
                            String shippingLockedKey, OrderAddressForm billingForm, OrderAddressForm shippingForm) {
 
     public static CustomerView of(Order order, boolean readOnly, Locale locale) {
+        return of(order, readOnly, false, locale);
+    }
+
+    /** receiptLocked: an e-receipt is being issued for the order (ReceiptOrderState#locksOrder). */
+    public static CustomerView of(Order order, boolean readOnly, boolean receiptLocked, Locale locale) {
         String base = "/dashboard/orders/" + order.getOrderId() + "/address?type=";
-        String billingLockedKey = lockedKey(order, true);
+        String billingLockedKey = lockedKey(order, true, receiptLocked);
         String shippingLockedKey = lockedKey(order, false);
         return new CustomerView(AddressBlock.of(order.getBillingDetails(), locale),
                 AddressBlock.of(order.getShippingDetails(), locale),
@@ -36,8 +41,18 @@ public record CustomerView(AddressBlock billing, AddressBlock shipping, String s
      * and the address page (OrdersController.showAddressDetails) both read, so they never disagree.
      */
     public static String lockedKey(Order order, boolean billing) {
+        return lockedKey(order, billing, false);
+    }
+
+    /**
+     * receiptLocked: while an e-receipt is being issued its request (buyer, e-mail) is frozen, and a tax id added now
+     * would turn the order into a business one that the invoicing system would invoice a second time — the billing
+     * address is fixed as once the invoice is issued. The shipping address is not part of the receipt.
+     */
+    public static String lockedKey(Order order, boolean billing, boolean receiptLocked) {
         if (billing) {
-            return order.isInvoiced() ? "order.customer.billing.locked" : null;
+            return order.isInvoiced() ? "order.customer.billing.locked"
+                    : receiptLocked ? "order.customer.billing.locked.receipt" : null;
         }
         return order.hasShippingLabel() ? "order.customer.shipping.locked.label" : null;
     }

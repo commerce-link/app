@@ -65,4 +65,58 @@ class ReceiptAttentionMessagesTest {
 
         assertThat(formatted).contains("store's email templates").contains("order's documents");
     }
+
+    private static java.util.Properties raw(String file) throws java.io.IOException {
+        java.util.Properties properties = new java.util.Properties();
+        try (java.io.Reader reader = new java.io.InputStreamReader(
+                ReceiptAttentionMessagesTest.class.getResourceAsStream("/" + file),
+                java.nio.charset.StandardCharsets.UTF_8)) {
+            properties.load(reader);
+        }
+        return properties;
+    }
+
+    @Test
+    void everyAttentionHasAnOrderPageCauseAndActionInPolishAndEnglish() throws java.io.IOException {
+        // given
+        java.util.Properties pl = raw("messages_pl.properties");
+        java.util.Properties en = raw("messages_en.properties");
+
+        for (ReceiptAttention attention : ReceiptAttention.values()) {
+            for (String part : java.util.List.of("cause", "action")) {
+                // when
+                String key = "receipts.page." + attention.name() + "." + part;
+
+                // then
+                assertThat(pl.getProperty(key)).as("pl " + key).isNotBlank();
+                assertThat(en.getProperty(key)).as("en " + key).isNotBlank();
+            }
+        }
+    }
+
+    @Test
+    void everyOrderPageKeyExistsInBothLanguagesAndKeepsItsApostrophes() throws java.io.IOException {
+        // given: the page texts are always formatted with arguments, so a lone ' would swallow text
+        java.util.Properties pl = raw("messages_pl.properties");
+        java.util.Properties en = raw("messages_en.properties");
+        ResourceBundleMessageSource messageSource = messageSource();
+        Object[] args = {"PROVIDER", "LAST-ERROR", "FAILURE", "BLOCKED", 7, "ORDER-1:R1"};
+
+        for (java.util.Properties bundle : java.util.List.of(pl, en)) {
+            java.util.Properties other = bundle == pl ? en : pl;
+            Locale locale = Locale.forLanguageTag(bundle == pl ? "pl" : "en");
+            for (String key : bundle.stringPropertyNames()) {
+                if (!key.startsWith("receipts.page.")) {
+                    continue;
+                }
+                // when
+                String formatted = messageSource.getMessage(key, args, locale);
+
+                // then
+                assertThat(other.getProperty(key)).as(locale + " " + key + " in the other bundle").isNotBlank();
+                assertThat(StringUtils.countMatches(formatted, "'")).as(locale + " " + key + " apostrophes")
+                        .isEqualTo(StringUtils.countMatches(bundle.getProperty(key), "''"));
+            }
+        }
+    }
 }

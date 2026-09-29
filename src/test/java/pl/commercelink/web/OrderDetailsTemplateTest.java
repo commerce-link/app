@@ -29,6 +29,9 @@ import pl.commercelink.orders.event.OrderEvent;
 import pl.commercelink.orders.event.OrderEventsRepository;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.products.ProductCatalogRepository;
+import pl.commercelink.receipts.ReceiptAlerts;
+import pl.commercelink.receipts.ReceiptAttemptService;
+import pl.commercelink.receipts.ReceiptOrderState;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.taxonomy.TaxonomyCache;
@@ -75,6 +78,12 @@ class OrderDetailsTemplateTest {
 
     static OrderPageModelFactory factory(Set<String> dropshipItemIds, boolean documentsGenerationEnabled,
                                          List<OrderEvent> orderEvents) {
+        return factory(dropshipItemIds, documentsGenerationEnabled, orderEvents, ReceiptOrderState.NONE);
+    }
+
+    /** receipts: what the order's e-receipt attempts say (ReceiptAttemptService#orderState is stubbed with it). */
+    static OrderPageModelFactory factory(Set<String> dropshipItemIds, boolean documentsGenerationEnabled,
+                                         List<OrderEvent> orderEvents, ReceiptOrderState receipts) {
         StoresRepository stores = mock(StoresRepository.class);
         Store store = new Store();
         store.setStoreId("store-1");
@@ -97,8 +106,11 @@ class OrderDetailsTemplateTest {
         messages.setBasename("messages");
         messages.setDefaultEncoding("UTF-8");
         messages.setFallbackToSystemLocale(false);
+        ReceiptAttemptService receiptService = mock(ReceiptAttemptService.class);
+        when(receiptService.orderState(any(), any(), any(), any())).thenReturn(receipts);
         OrderPageModelFactory factory = new OrderPageModelFactory(stores, events, dropship, new DeliveryRedirectResolver(),
-                pl.commercelink.web.orders.DropshipEligibilityStubs.acceptingEverySupplier(), labels, carrierOptions, mock(ProductCatalogRepository.class), mock(TaxonomyCache.class), messages);
+                pl.commercelink.web.orders.DropshipEligibilityStubs.acceptingEverySupplier(), labels, carrierOptions, mock(ProductCatalogRepository.class), mock(TaxonomyCache.class), messages,
+                receiptService, mock(ReceiptAlerts.class));
         ReflectionTestUtils.setField(factory, "appDomain", "https://app.example");
         return factory;
     }
@@ -2120,5 +2132,276 @@ class OrderDetailsTemplateTest {
 
         // then
         assertThat(html).contains("/js/timeline.js");
+    }
+
+    // --- e-receipt row in the documents card ---------------------------------------------------------------------
+
+    private static final String ORDER_ID = "3e373abc-1111-2222-3333-444455556666";
+
+    private static pl.commercelink.receipts.ReceiptAttempt attempt(int attemptNo,
+                                                                   pl.commercelink.receipts.ReceiptAttemptState state) {
+        pl.commercelink.receipts.ReceiptAttempt attempt = new pl.commercelink.receipts.ReceiptAttempt();
+        attempt.setReceiptKey(ORDER_ID + ":R" + attemptNo);
+        attempt.setAttemptNo(attemptNo);
+        attempt.setState(state);
+        return attempt;
+    }
+
+    private static pl.commercelink.receipts.ReceiptOrderView.Row receiptRow(int attemptNo,
+            pl.commercelink.receipts.ReceiptAttemptState state, String tone, String url, String number,
+            pl.commercelink.receipts.ReceiptPageProblem problem, boolean canCheck, boolean canClose, boolean canResend,
+            String outcome) {
+        return new pl.commercelink.receipts.ReceiptOrderView.Row(ORDER_ID + ":R" + attemptNo, state,
+                "receipts.state." + state.name(), tone, url, problem, canResend ? null : java.time.Instant.parse("2026-09-28T10:00:00Z"),
+                null, canCheck, canClose, canResend, attemptNo, number,
+                state == pl.commercelink.receipts.ReceiptAttemptState.FISCALISED ? java.time.Instant.parse("2026-09-28T10:00:00Z") : null,
+                outcome);
+    }
+
+    private static String renderWithReceipts(Order order, OrderPageModelFactory.Viewer viewer, ReceiptOrderState receipts) {
+        OrderPageModel page = factory(Set.of(), false, List.of(), receipts).build(order, items(order), viewer, PL);
+        return page(renderPage(page, order));
+    }
+
+    private static ReceiptOrderState pendingAfterABlockedAttempt() {
+        return new ReceiptOrderState(
+                List.of(attempt(1, pl.commercelink.receipts.ReceiptAttemptState.BLOCKED),
+                        attempt(2, pl.commercelink.receipts.ReceiptAttemptState.PENDING)),
+                new pl.commercelink.receipts.ReceiptOrderView(List.of(
+                        receiptRow(2, pl.commercelink.receipts.ReceiptAttemptState.PENDING, "is-warn", null, null,
+                                new pl.commercelink.receipts.ReceiptPageProblem(
+                                        "Paragon czeka na drukarkę fiskalną ponad 48 h.",
+                                        "Sprawdź, czy drukarka albo moduł Paragony.pl działa.",
+                                        "Szczegóły dla Paragony.pl (Fakturownia)",
+                                        "Sprawdź fiscal_status paragonu."), true, true, false, null),
+                        receiptRow(1, pl.commercelink.receipts.ReceiptAttemptState.BLOCKED, "is-bad", null, null, null,
+                                false, false, false, "brak e-maila kupującego")), false),
+                false, true);
+    }
+
+    @Test
+    void theEReceiptIsTheFirstRowOfTheDocumentsCardWithItsPillProblemAndEarlierAttempts() {
+        // when
+        String html = renderWithReceipts(order(OrderStatus.Shipping), ADMIN, pendingAfterABlockedAttempt());
+
+        // then
+        String documents = html.substring(html.indexOf("id=\"dokumenty\""), html.indexOf("id=\"platnosci\""));
+        assertThat(documents).contains("id=\"e-paragon\"").contains("E-paragon")
+                .contains("<span class=\"cl-status is-warn\">Czeka na drukarkę</span>")
+                .contains("Paragon czeka na drukarkę fiskalną ponad 48 h.")
+                .contains("<details class=\"cl-row-disclosure\">").contains("Wcześniejsze próby (1)")
+                .contains("Próba 1").contains("<span class=\"cl-status is-bad\">Zablokowany</span>")
+                .contains("brak e-maila kupującego")
+                .contains("Sprawdź teraz").contains("Zamknij ręcznie")
+                .doesNotContain("Wystaw ponownie").doesNotContain("Brak paragonu").doesNotContain("??");
+        // the earlier attempt has no actions: the only receiptKey posted is the newest one's
+        assertThat(documents).contains("value=\"" + ORDER_ID + ":R2\"").doesNotContain("value=\"" + ORDER_ID + ":R1\"");
+    }
+
+    @Test
+    void theEReceiptProblemShowsItsCauseInTheWarnToneTheActionAndTheProviderDetailsFolded() {
+        // when
+        String html = renderWithReceipts(order(OrderStatus.Shipping), ADMIN, pendingAfterABlockedAttempt());
+
+        // then: cause in the warn tone, action as a plain help line, provider hints under a native disclosure
+        String row = html.substring(html.indexOf("id=\"e-paragon\""), html.indexOf("Wcześniejsze próby (1)"));
+        assertThat(row)
+                .contains("<p class=\"cl-list-desc is-warn\" id=\"e-paragon-problem-2\">"
+                        + "Paragon czeka na drukarkę fiskalną ponad 48 h.</p>")
+                .contains("<p class=\"cl-list-desc\" id=\"e-paragon-action-2\">"
+                        + "Sprawdź, czy drukarka albo moduł Paragony.pl działa.</p>")
+                .containsPattern("<details class=\"cl-row-disclosure\" id=\"e-paragon-details-2\">\\s*"
+                        + "<summary>Szczegóły dla Paragony.pl \\(Fakturownia\\)</summary>\\s*"
+                        + "<p class=\"cl-list-desc\">Sprawdź fiscal_status paragonu.</p>\\s*</details>");
+        assertThat(occurrences(html, "id=\"e-paragon-problem-2\"")).isEqualTo(1);
+        assertThat(occurrences(html, "id=\"e-paragon-details-2\"")).isEqualTo(1);
+        // the superseded attempt shows its short outcome only, never a problem of its own
+        assertThat(html).doesNotContain("e-paragon-problem-1");
+    }
+
+    @Test
+    void anEReceiptProblemWithoutProviderDetailsHasNoDisclosure() {
+        // given: a failed attempt whose problem has a cause and an action only
+        ReceiptOrderState failed = new ReceiptOrderState(
+                List.of(attempt(1, pl.commercelink.receipts.ReceiptAttemptState.FAILED)),
+                new pl.commercelink.receipts.ReceiptOrderView(List.of(receiptRow(1,
+                        pl.commercelink.receipts.ReceiptAttemptState.FAILED, "is-bad", null, null,
+                        new pl.commercelink.receipts.ReceiptPageProblem("System Dev Receipts odrzucił paragon: VAT.",
+                                "Popraw przyczynę i kliknij „Wystaw ponownie”.", null, null),
+                        false, false, false, "VAT")), true),
+                true, false);
+
+        // when
+        String html = renderWithReceipts(order(OrderStatus.Shipping), ADMIN, failed);
+
+        // then
+        assertThat(html).contains("id=\"e-paragon-problem-1\">System Dev Receipts odrzucił paragon: VAT.</p>")
+                .contains("id=\"e-paragon-action-1\">Popraw przyczynę i kliknij „Wystaw ponownie”.</p>")
+                .doesNotContain("e-paragon-details-1").doesNotContain("Szczegóły dla");
+    }
+
+    @Test
+    void zamknijRecznieOpensItsOwnDialogWithRequiredNumberAndOptionalLinkOrItsPageWithoutJavascript() {
+        // when
+        String html = renderWithReceipts(order(OrderStatus.Shipping), ADMIN, pendingAfterABlockedAttempt());
+
+        // then: the trigger names the dialog and links to the page; the dialog is not named "dialog"
+        assertThat(html).containsPattern("<a class=\"cl-link-button\" href=\"/dashboard/orders/" + ORDER_ID
+                + "/receipts/close\\?receiptKey=" + ORDER_ID + "%3AR2\"\\s+data-cl-dialog-open=\"receipt-close-2\">Zamknij ręcznie</a>");
+        assertThat(occurrences(html, "id=\"receipt-close-2\"")).isEqualTo(1);
+        String dialog = html.substring(html.indexOf("<dialog class=\"cl-dialog is-form\" id=\"receipt-close-2\""));
+        dialog = dialog.substring(0, dialog.indexOf("</dialog>"));
+        assertThat(dialog).contains("aria-labelledby=\"receipt-close-2-title\"").contains("id=\"receipt-close-2-title\"")
+                .contains("action=\"/dashboard/orders/" + ORDER_ID + "/receipts/close\"")
+                .contains("name=\"receiptKey\" value=\"" + ORDER_ID + ":R2\"")
+                .containsPattern("<label class=\"cl-label\" for=\"receipt-close-2-number\">Numer paragonu</label>")
+                .containsPattern("name=\"number\" required autocomplete=\"off\" id=\"receipt-close-2-number\"")
+                .contains("for=\"receipt-close-2-link\"").contains("type=\"url\" name=\"link\"")
+                .contains("opcjonalne").contains("rozstrzygnąłeś")
+                .contains("data-cl-dialog-close").doesNotContain("style=").doesNotContain("onclick=");
+    }
+
+    @Test
+    void theCloseReceiptPageWithoutJavascriptPostsTheSameFormAndCancelsBackToTheOrder() {
+        // given
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("navigation", null);
+        variables.put("shortId", "3e373abc");
+        variables.put("close", new pl.commercelink.web.orders.ReceiptCloseForm(ORDER_ID, ORDER_ID + ":R2", 2));
+
+        // when
+        String html = page(SettingsTemplateRenderer.render("orders/receipt-close", variables));
+
+        // then
+        assertThat(html).contains("action=\"/dashboard/orders/" + ORDER_ID + "/receipts/close\"")
+                .contains("id=\"receipt-close-2-number\"").contains("id=\"receipt-close-2-link\"")
+                .contains("href=\"/dashboard/orders/" + ORDER_ID + "\"").contains("Zamknij paragon ręcznie")
+                .doesNotContain("data-cl-dialog-close").doesNotContain("<dialog").doesNotContain("??");
+    }
+
+    @Test
+    void aFiscalisedEReceiptLinksItsNumberAndIsNeverUnpinned() {
+        // given: its order document is on the order and is the row itself
+        Order order = order(OrderStatus.Delivered);
+        order.addDocument(new Document(ORDER_ID + ":R1", "PAR/7/2026", "https://paragony.example/7", DocumentType.Receipt,
+                LocalDate.of(2026, 9, 28)));
+        ReceiptOrderState receipts = new ReceiptOrderState(List.of(attempt(1, pl.commercelink.receipts.ReceiptAttemptState.FISCALISED)),
+                new pl.commercelink.receipts.ReceiptOrderView(List.of(receiptRow(1,
+                        pl.commercelink.receipts.ReceiptAttemptState.FISCALISED, "is-ok", "https://paragony.example/7",
+                        "PAR/7/2026", null, false, false, false, null)), false), false, true);
+
+        // when
+        String html = renderWithReceipts(order, ADMIN, receipts);
+
+        // then
+        String documents = html.substring(html.indexOf("id=\"dokumenty\""), html.indexOf("id=\"platnosci\""));
+        assertThat(documents).containsPattern("<a href=\"https://paragony.example/7\" target=\"_blank\" rel=\"noopener\">PAR/7/2026</a>")
+                .contains("<span class=\"cl-status is-ok\">Zafiskalizowany</span>")
+                .contains("zafiskalizowano 28.09.2026").contains("mail wysłany")
+                .doesNotContain("Odepnij").doesNotContain("Paragon PAR").doesNotContain("cl-list-actions");
+        assertThat(occurrences(documents, "PAR/7/2026")).isEqualTo(1);
+    }
+
+    @Test
+    void eParagonIsAConfirmedEntryOfTheIssueMenu() {
+        // given
+        ReceiptOrderState receipts = new ReceiptOrderState(List.of(),
+                new pl.commercelink.receipts.ReceiptOrderView(List.of(), false), true, false);
+
+        // when
+        String html = renderWithReceipts(order(OrderStatus.Shipping), ADMIN, receipts);
+
+        // then: without JavaScript the link leads to the confirmation page
+        assertThat(html).contains("id=\"issue-menu\"")
+                .containsPattern("<a class=\"cl-menu-item\" data-cl-confirm data-cl-confirm-tone=\"primary\"\\s+href=\"/dashboard/orders/"
+                        + ORDER_ID + "/receipts/issue\"")
+                .contains("data-cl-confirm-title=\"Wystawić e-paragon?\"")
+                .contains("data-cl-confirm-action=\"Wystaw e-paragon\"")
+                .contains("E-paragon wystawisz z menu „Wystaw”");
+    }
+
+    @Test
+    void whileTheEReceiptIsBeingIssuedTheLockedActionsShowGreyedWithTheirReason() {
+        // given
+        ReceiptOrderState receipts = new ReceiptOrderState(List.of(attempt(1, pl.commercelink.receipts.ReceiptAttemptState.ISSUING)),
+                new pl.commercelink.receipts.ReceiptOrderView(List.of(receiptRow(1,
+                        pl.commercelink.receipts.ReceiptAttemptState.ISSUING, "is-info", null, null, null, true, true,
+                        false, null)), false), false, true);
+
+        // when
+        String html = renderWithReceipts(order(OrderStatus.New), ADMIN, receipts);
+
+        // then
+        assertThat(html).contains("Dodawanie pozycji: Trwa wystawianie e-paragonu.")
+                .contains("Trwa wystawianie e-paragonu — danych rozliczeniowych nie zmienisz.")
+                .containsPattern("<button type=\"button\" class=\"cl-button\" aria-disabled=\"true\"\\s+aria-describedby=\"document-add-reason\">Dodaj dokument</button>")
+                .contains("id=\"document-add-reason\"").contains("Trwa wystawianie e-paragonu — dokumentu nie dodasz ręcznie.")
+                .contains("Trwa wystawianie e-paragonu — pozycji nie usuniesz")
+                .doesNotContain("id=\"document-dialog\"").doesNotContain("??");
+    }
+
+    @Test
+    void aSuperAdminSeesTheEReceiptRowWithoutActionsOrDialogs() {
+        // when
+        String html = renderWithReceipts(order(OrderStatus.Shipping), SUPER_ADMIN, pendingAfterABlockedAttempt());
+
+        // then
+        assertThat(html).contains("id=\"e-paragon\"").contains("Czeka na drukarkę")
+                .doesNotContain("Sprawdź teraz").doesNotContain("Zamknij ręcznie").doesNotContain("receipt-close-2")
+                .doesNotContain("/receipts/");
+    }
+
+    // --- cancelling against the e-receipt ---
+
+    /** The order with its product returned, so Order#canBeCancelled holds and only the e-receipt decides. */
+    private static String renderCancellable(Order order, ReceiptOrderState receipts) {
+        List<OrderItem> items = items(order);
+        items.get(0).setStatus(FulfilmentStatus.Returned);
+        OrderPageModel page = factory(Set.of(), false, List.of(), receipts).build(order, items, ADMIN, PL);
+        return page(renderPage(page, order));
+    }
+
+    @Test
+    void whileAnEReceiptIsBeingIssuedCancelIsGreyedWithItsReason() {
+        // given
+        ReceiptOrderState issuing = new ReceiptOrderState(
+                List.of(attempt(1, pl.commercelink.receipts.ReceiptAttemptState.ISSUING)),
+                new pl.commercelink.receipts.ReceiptOrderView(List.of(receiptRow(1,
+                        pl.commercelink.receipts.ReceiptAttemptState.ISSUING, "is-info", null, null, null,
+                        true, false, false, null)), false), false, true);
+
+        // when
+        String html = renderCancellable(order(OrderStatus.Delivered), issuing);
+
+        // then
+        assertThat(html).doesNotContain("href=\"/dashboard/orders/" + ORDER_ID + "/cancel\"")
+                .containsPattern("<button type=\"button\" class=\"cl-menu-item is-danger\" aria-disabled=\"true\">\\s*"
+                        + "<span>Anuluj zamówienie</span>\\s*<span class=\"cl-menu-reason\">Trwa wystawianie e-paragonu — "
+                        + "poczekaj na wynik, zanim anulujesz zamówienie.</span>");
+    }
+
+    @Test
+    void theCancelDialogOfAnOrderWithAFiscalisedEReceiptSaysCancellingDoesNotUndoIt() {
+        // given: fiscalised and attached
+        Order order = order(OrderStatus.Delivered);
+        order.addDocument(new pl.commercelink.documents.Document(ORDER_ID + ":R1", "PAR/1", null,
+                pl.commercelink.documents.DocumentType.Receipt));
+        ReceiptOrderState fiscalised = new ReceiptOrderState(
+                List.of(attempt(1, pl.commercelink.receipts.ReceiptAttemptState.FISCALISED)),
+                new pl.commercelink.receipts.ReceiptOrderView(List.of(receiptRow(1,
+                        pl.commercelink.receipts.ReceiptAttemptState.FISCALISED, "is-ok", null, "PAR/1", null,
+                        false, false, false, null)), false), false, true);
+
+        // when
+        String withReceipt = renderCancellable(order, fiscalised);
+        String without = renderCancellable(order(OrderStatus.Delivered), ReceiptOrderState.NONE);
+
+        // then
+        assertThat(withReceipt).contains("href=\"/dashboard/orders/" + ORDER_ID + "/cancel\"")
+                .contains("data-cl-confirm-message=\"Zamówienie przejdzie w status Anulowane, a ceny usług zostaną wyzerowane. "
+                        + "Zamówienie ma zafiskalizowany e-paragon — anulowanie go nie cofa. Zwrot rozlicz osobno (korekta lub zwrot).\"");
+        assertThat(without).contains("href=\"/dashboard/orders/" + ORDER_ID + "/cancel\"")
+                .contains("data-cl-confirm-message=\"Zamówienie przejdzie w status Anulowane, a ceny usług zostaną wyzerowane.\"")
+                .doesNotContain("zafiskalizowany e-paragon");
     }
 }

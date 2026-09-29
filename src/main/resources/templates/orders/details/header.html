@@ -76,17 +76,18 @@
                 <!--/* a closed order keeps an available cancel (a completed order can still be cancelled after a full
                        return), but not the greyed-out placeholders: there is nothing left to explain */-->
                 <th:block th:unless="${page.superAdmin()}">
-                    <li th:if="${h.canCancel() or h.canDelete() or !page.closed()}" class="cl-menu-sep" aria-hidden="true"></li>
-                    <li th:if="${h.canCancel() or !page.closed()}">
+                    <li th:if="${h.canCancel() or h.cancelLockedKey() != null or h.canDelete() or !page.closed()}" class="cl-menu-sep" aria-hidden="true"></li>
+                    <!--/* while an e-receipt is being issued cancelling waits for its outcome: greyed with that reason */-->
+                    <li th:if="${h.canCancel() or h.cancelLockedKey() != null or !page.closed()}">
                         <a th:if="${h.canCancel()}" class="cl-menu-item is-danger"
                            th:href="@{/dashboard/orders/{id}/cancel(id=${page.orderId()})}" data-cl-confirm
                            th:attr="data-cl-confirm-title=#{order.page.cancel.confirm.title(${page.shortId()})},
-                                    data-cl-confirm-message=#{order.page.cancel.confirm.message},
+                                    data-cl-confirm-message=${h.cancelMessage()},
                                     data-cl-confirm-action=#{order.page.cancel.confirm.action}"
                            th:text="#{order.page.cancel}"></a>
                         <button th:unless="${h.canCancel()}" type="button" class="cl-menu-item is-danger" aria-disabled="true">
                             <span th:text="#{order.page.cancel}"></span>
-                            <span class="cl-menu-reason" th:text="#{order.page.cancel.unavailable}"></span>
+                            <span class="cl-menu-reason" th:text="#{${h.cancelLockedKey() != null ? h.cancelLockedKey() : 'order.page.cancel.unavailable'}}"></span>
                         </button>
                     </li>
                     <li th:if="${h.canDelete() or !page.closed()}">

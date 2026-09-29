@@ -139,8 +139,12 @@ public class ReceiptAttemptService {
 
     /** Whether the order documents offer "E-paragon": the conditions of {@link #issueManually} hold. */
     public boolean canIssueManually(Store store, Order order) {
-        return store != null && hasProvider(store) && eligibility.orderQualifies(order)
-                && attemptsOf(order.getStoreId(), order.getOrderId()).isEmpty();
+        return canIssueManually(store, order, attemptsOf(order.getStoreId(), order.getOrderId()));
+    }
+
+    /** {@link #canIssueManually(Store, Order)} over attempts the caller already read. */
+    boolean canIssueManually(Store store, Order order, List<ReceiptAttempt> orderAttempts) {
+        return store != null && hasProvider(store) && eligibility.orderQualifies(order) && orderAttempts.isEmpty();
     }
 
     /**
@@ -265,8 +269,29 @@ public class ReceiptAttemptService {
      * attempt is issuing or fiscalised, or an operator closed it with the document they resolved at the provider.
      */
     public boolean blocksManualReceipt(String storeId, String orderId) {
-        return attemptsOf(storeId, orderId).stream()
+        return blocksManualReceipt(attemptsOf(storeId, orderId));
+    }
+
+    /** {@link #blocksManualReceipt(String, String)} over attempts the caller already read. */
+    public static boolean blocksManualReceipt(List<ReceiptAttempt> orderAttempts) {
+        return orderAttempts.stream()
                 .anyMatch(a -> a.getState().isLive() || a.getState() == ReceiptAttemptState.CLOSED_MANUALLY);
+    }
+
+    /**
+     * Whether the order's edits are locked for its e-receipt ({@link ReceiptOrderState#locksOrder}): the check an
+     * order edit endpoint runs before changing anything the receipt's frozen request depends on.
+     */
+    public boolean locksOrder(Order order) {
+        return ReceiptOrderState.locksOrder(blocksManualReceipt(order.getStoreId(), order.getOrderId()), order);
+    }
+
+    /**
+     * Whether the order has a fiscalised (or manually closed) e-receipt ({@link ReceiptOrderState#hasFiscalisedReceipt}):
+     * the cancel confirmation warns that cancelling the order does not undo it.
+     */
+    public boolean hasFiscalisedReceipt(Order order) {
+        return ReceiptOrderState.hasFiscalisedReceipt(attemptsOf(order.getStoreId(), order.getOrderId()), order);
     }
 
     /**
@@ -274,8 +299,24 @@ public class ReceiptAttemptService {
      * {@code locale} is the viewer's own request locale, not the fixed operator locale bell notifications use.
      */
     public ReceiptOrderView orderView(Order order, ReceiptAlerts alerts, Locale locale) {
-        return ReceiptOrderView.of(attemptsOf(order.getStoreId(), order.getOrderId()),
-                eligibility.orderQualifies(order), alerts, clock.instant(), locale);
+        return orderView(order, attemptsOf(order.getStoreId(), order.getOrderId()), alerts, locale);
+    }
+
+    private ReceiptOrderView orderView(Order order, List<ReceiptAttempt> orderAttempts, ReceiptAlerts alerts, Locale locale) {
+        return ReceiptOrderView.of(orderAttempts, eligibility.orderQualifies(order), alerts, clock.instant(), locale);
+    }
+
+    /**
+     * The order page's whole e-receipt picture from a single read of the order's attempts: the rows, whether
+     * "E-paragon" may be issued and whether an attempt owns the receipt. The same rules as {@link #orderView},
+     * {@link #canIssueManually(Store, Order)} and {@link #blocksManualReceipt(String, String)}, which each read the
+     * attempts again. A failing attempts store fails the page, as the old order page did: the operator must not see
+     * an order without its receipt and be offered a second one.
+     */
+    public ReceiptOrderState orderState(Store store, Order order, ReceiptAlerts alerts, Locale locale) {
+        List<ReceiptAttempt> orderAttempts = attemptsOf(order.getStoreId(), order.getOrderId());
+        return new ReceiptOrderState(orderAttempts, orderView(order, orderAttempts, alerts, locale),
+                canIssueManually(store, order, orderAttempts), blocksManualReceipt(orderAttempts));
     }
 
     void saveThroughLifecycle(Order order) {

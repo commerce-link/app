@@ -12,6 +12,7 @@ import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.FulfilmentConfiguration;
 import pl.commercelink.stores.StoreSupplierConnection;
+import pl.commercelink.web.orders.ItemSaleLock;
 import pl.commercelink.web.orders.OrderItemRow;
 import pl.commercelink.web.orders.OrderLabels;
 import pl.commercelink.web.settings.SettingsTemplateRenderer;
@@ -146,6 +147,69 @@ class OrderItemPageTemplateTest {
                 .doesNotContain(">" + DELIVERY_ID + "<").contains("Zamówiony");
         assertThat(html).doesNotContainPattern("id=\"item-name\"[^>]*disabled")
                 .doesNotContainPattern("id=\"item-serial\"[^>]*disabled");
+    }
+
+    @Test
+    void aNewItemOfAnInvoicedOrderShowsItsSaleFieldsReadOnlyWithTheReason() {
+        // given
+        Map<String, Object> variables = variables(item(FulfilmentStatus.New), false);
+        variables.put("saleLock", ItemSaleLock.INVOICED);
+        variables.put("priceLocked", true);
+        variables.put("priceLockedKey", ItemSaleLock.INVOICED.priceKey());
+
+        // when
+        String html = render(variables);
+
+        // then: read-only, not disabled, so the values are posted and the server sees them unchanged
+        assertThat(html).contains("id=\"item-name\" type=\"text\" name=\"name\" value=\"Laptop Pro 14\" aria-describedby=\"item-name-help\" readonly=\"readonly\">")
+                .contains("id=\"item-qty\" type=\"text\" inputmode=\"numeric\" name=\"qty\" value=\"2\" aria-describedby=\"item-sale-help\" readonly=\"readonly\">")
+                .contains("id=\"item-tax\" type=\"text\" name=\"tax\" value=\"1.23\" aria-describedby=\"item-sale-help item-numbers-help\" readonly=\"readonly\">")
+                .containsPattern("id=\"item-price\"[^>]*aria-describedby=\"item-price-help\"[^>]*disabled")
+                .contains("<p class=\"cl-help\" id=\"item-name-help\">Zamówienie ma już fakturę albo paragon — nazwy nie zmienisz.</p>")
+                .contains("<p class=\"cl-help\" id=\"item-sale-help\">Zamówienie ma już fakturę albo paragon — ilości ani stawki VAT nie zmienisz.</p>")
+                .contains("Zamówienie ma już fakturę albo paragon — ceny nie zmienisz.")
+                .doesNotContainPattern("id=\"item-name\"[^>]*disabled")
+                .doesNotContainPattern("id=\"item-qty\"[^>]*disabled")
+                .doesNotContainPattern("id=\"item-serial\"[^>]*(readonly|disabled)")
+                .doesNotContainPattern("id=\"item-comment\"[^>]*(readonly|disabled)")
+                .doesNotContainPattern("id=\"item-cost\"[^>]*(readonly|disabled)");
+    }
+
+    @Test
+    void whileAnEReceiptIsBeingIssuedTheSaleFieldsSayWhyInItsOwnWords() {
+        // given
+        Map<String, Object> variables = variables(item(FulfilmentStatus.New), false);
+        variables.put("saleLock", ItemSaleLock.RECEIPT_ISSUING);
+        variables.put("priceLocked", true);
+        variables.put("priceLockedKey", ItemSaleLock.RECEIPT_ISSUING.priceKey());
+
+        // when
+        String html = render(variables);
+
+        // then
+        assertThat(html).contains("Trwa wystawianie e-paragonu — nazwy nie zmienisz.")
+                .contains("Trwa wystawianie e-paragonu — ilości ani stawki VAT nie zmienisz.")
+                .contains("Trwa wystawianie e-paragonu — ceny nie zmienisz.")
+                .containsPattern("id=\"item-name\"[^>]*readonly");
+    }
+
+    @Test
+    void aFulfilledItemOfAnInvoicedOrderKeepsQuantityAndVatDisabledAndLocksTheName() {
+        // given: quantity and VAT are already fixed by fulfilment (not posted at all), the name is the only sale field
+        OrderItem item = item(FulfilmentStatus.Ordered);
+        Map<String, Object> variables = variables(item, false);
+        variables.put("saleLock", ItemSaleLock.INVOICED);
+        variables.put("priceLocked", true);
+        variables.put("priceLockedKey", ItemSaleLock.INVOICED.priceKey());
+
+        // when
+        String html = render(variables);
+
+        // then
+        assertThat(html).containsPattern("id=\"item-name\"[^>]*readonly")
+                .containsPattern("id=\"item-qty\"[^>]*disabled").doesNotContainPattern("id=\"item-qty\"[^>]*readonly")
+                .contains("id=\"item-tax\" type=\"text\" name=\"tax\" value=\"1.23\" aria-describedby=\"item-numbers-help\" disabled=\"disabled\">")
+                .doesNotContain("id=\"item-sale-help\"");
     }
 
     @Test

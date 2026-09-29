@@ -50,11 +50,11 @@ import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrdersManager;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.StoreCategories;
-import pl.commercelink.receipts.ReceiptAlerts;
 import pl.commercelink.receipts.ReceiptAttempt;
 import pl.commercelink.receipts.ReceiptAttemptService;
 import pl.commercelink.web.dtos.OrderItemsForm;
 import pl.commercelink.web.dtos.SplitGroupForm;
+import pl.commercelink.web.orders.ItemSaleLock;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.Payment;
 import pl.commercelink.orders.PaymentDirection;
@@ -184,8 +184,6 @@ class OrdersControllerTest {
     private pl.commercelink.invoicing.InvoiceCreationEventPublisher invoiceCreationEventPublisher;
     @Mock
     private ReceiptAttemptService receiptAttemptService;
-    @Mock
-    private ReceiptAlerts receiptAlerts;
 
     // Real resolver over the test classpath registry (`Stub` is a registered supplier type).
     @Spy
@@ -2790,7 +2788,7 @@ class OrdersControllerTest {
             ExtendedModelMap unpin = new ExtendedModelMap();
             List<String> views = List.of(
                     ordersController.confirmDeleteOrder(ORDER_ID, delete, polish),
-                    ordersController.confirmCancelOrder(ORDER_ID, cancel, polish),
+                    ordersController.confirmCancelOrder(ORDER_ID, cancel, new RedirectAttributesModelMap(), polish),
                     ordersController.confirmGoodsOut(ORDER_ID, goodsOut, polish),
                     ordersController.confirmCancelShipment(ORDER_ID, shipment, polish),
                     ordersController.confirmRemoveDocument(ORDER_ID, DocumentType.InvoiceVat, "FV/1", unpin, polish));
@@ -3974,6 +3972,389 @@ class OrdersControllerTest {
         // a name typed next to "Other supplier…" is accepted without a connection
         private AssignSupplierForm supplierForm(String cost, String priceType) {
             return AssignSupplierForm.of("i1", "MFN-1", cost, priceType, SupplierChoice.CUSTOM, "HURT-ABC");
+        }
+
+        // --- e-receipt: the locks while it is being issued, refused on the server (never only greyed in the UI) ---
+
+        @Test
+        void whileAnEReceiptIsBeingIssuedItemEditsAreRefusedWithItsOwnReason() {
+            // given
+            Order order = order(OrderStatus.Delivered);
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            when(receiptAttemptService.locksOrder(order)).thenReturn(true);
+            RedirectAttributesModelMap add = new RedirectAttributesModelMap();
+            RedirectAttributesModelMap remove = new RedirectAttributesModelMap();
+            RedirectAttributesModelMap split = new RedirectAttributesModelMap();
+            RedirectAttributesModelMap move = new RedirectAttributesModelMap();
+            RedirectAttributesModelMap consolidate = new RedirectAttributesModelMap();
+            RedirectAttributesModelMap delete = new RedirectAttributesModelMap();
+            RedirectAttributesModelMap document = new RedirectAttributesModelMap();
+
+            // when
+            ordersController.addOrderItems(ORDER_ID, new AddItemsForm(), add, polish);
+            ordersController.removeSelectedItemsFromOrder(ORDER_ID, selected("a"), remove, polish);
+            ordersController.splitOrder(ORDER_ID, selected("a"), split, polish);
+            ordersController.moveItemsToOrder(ORDER_ID, selected("a"), "51aa", move, polish);
+            ordersController.toggleConsolidation(ORDER_ID, "i1", consolidate, polish);
+            ordersController.deleteOrder(ORDER_ID, delete, polish);
+            ordersController.addReceipt(ORDER_ID, document(DocumentType.InvoicePersonal, "FV/1"), document, polish);
+
+            // then
+            assertThat(flash(add)).containsEntry("errorMessage", "order.items.add.locked.receipt");
+            assertThat(flash(remove)).containsEntry("errorMessage", "order.bulk.unavailable.receipt");
+            assertThat(flash(split)).containsEntry("errorMessage", "order.bulk.unavailable.receipt");
+            assertThat(flash(move)).containsEntry("errorMessage", "order.bulk.unavailable.receipt");
+            assertThat(flash(consolidate)).containsEntry("errorMessage", "order.item.consolidation.locked.receipt");
+            assertThat(flash(delete)).containsEntry("errorMessage", "order.page.delete.locked.receipt");
+            assertThat(flash(document)).containsEntry("errorMessage", "order.documents.add.locked.receipt");
+            assertThat(order.getDocuments()).isEmpty();
+            verifyNoInteractions(ordersManager, orderReferenceResolver, orderLifecycle);
+            verify(orderItemsRepository, never()).save(any());
+            verify(ordersRepository, never()).save(any());
+        }
+
+        @Test
+        void itemsOfAnInvoicedOrderAreNotRemovedEvenFromAStalePage() {
+            // given: the page no longer offers "Usuń" once the receipt document is on the order
+            Order order = order(OrderStatus.Delivered);
+            order.addDocument(new Document("o:R1", "PAR/1", null, DocumentType.Receipt));
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            RedirectAttributesModelMap remove = new RedirectAttributesModelMap();
+
+            // when
+            ordersController.removeSelectedItemsFromOrder(ORDER_ID, selected("a"), remove, polish);
+
+            // then
+            assertThat(flash(remove)).containsEntry("errorMessage", "order.items.remove.locked.invoiced");
+            verifyNoInteractions(ordersManager, orderLifecycle);
+        }
+
+        @Test
+        void anInvoicedOrderKeepsItsInvoicedReasonsWhateverTheReceipt() {
+            // given: the receipt document is on the order, so the order is invoiced and the invoiced reason wins
+            Order order = order(OrderStatus.Delivered);
+            order.addDocument(new Document("o:R1", "PAR/1", null, DocumentType.Receipt));
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            RedirectAttributesModelMap add = new RedirectAttributesModelMap();
+            RedirectAttributesModelMap consolidate = new RedirectAttributesModelMap();
+
+            // when
+            ordersController.addOrderItems(ORDER_ID, new AddItemsForm(), add, polish);
+            ordersController.toggleConsolidation(ORDER_ID, "i1", consolidate, polish);
+
+            // then
+            assertThat(flash(add)).containsEntry("errorMessage", "order.items.add.locked.invoiced");
+            assertThat(flash(consolidate)).containsEntry("errorMessage", "order.item.consolidation.locked");
+            verifyNoInteractions(ordersManager);
+        }
+
+        @Test
+        void itemsCannotMoveToAnOrderWhoseEReceiptIsBeingIssued() {
+            // given
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(orderBase());
+            Order target = new Order(STORE_ID);
+            when(orderReferenceResolver.resolve(STORE_ID, "51aa")).thenReturn(OrderReferenceResolver.Resolution.found(target));
+            when(receiptAttemptService.locksOrder(target)).thenReturn(true);
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            String view = ordersController.moveItemsToOrder(ORDER_ID, selected("a"), "51aa", redirect, polish);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+            assertThat(flash(redirect)).containsEntry("errorMessage", "order.move.target.locked.receipt");
+            verifyNoInteractions(ordersManager);
+        }
+
+        @Test
+        void theBillingAddressIsFixedWhileAnEReceiptIsBeingIssuedButTheShippingOneIsNot() {
+            // given
+            Order order = order(OrderStatus.Delivered);
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            when(receiptAttemptService.locksOrder(order)).thenReturn(true);
+            Order posted = new Order(STORE_ID);
+            posted.setBillingDetails(new BillingDetails());
+            RedirectAttributesModelMap page = new RedirectAttributesModelMap();
+            RedirectAttributesModelMap save = new RedirectAttributesModelMap();
+
+            // when
+            String pageView = ordersController.showAddressDetails(ORDER_ID, "billing", new ExtendedModelMap(), page, polish);
+            ordersController.updateAddressDetails(ORDER_ID, "billing", posted, null, new MockHttpServletRequest(),
+                    new MockHttpServletResponse(), new ExtendedModelMap(), save, polish);
+            String shippingView = ordersController.showAddressDetails(ORDER_ID, "shipping", new ExtendedModelMap(),
+                    new RedirectAttributesModelMap(), polish);
+
+            // then
+            assertThat(pageView).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+            assertThat(flash(page)).containsEntry("errorMessage", "order.customer.billing.locked.receipt");
+            assertThat(flash(save)).containsEntry("errorMessage", "order.customer.billing.locked.receipt");
+            assertThat(shippingView).isEqualTo("orders/address");
+            verify(ordersRepository, never()).save(any());
+        }
+
+        @Test
+        void savingAnItemWhileAnEReceiptIsBeingIssuedKeepsItsPriceAndConsolidation() {
+            // given
+            Order order = order(OrderStatus.New);
+            OrderItem item = item("i1", FulfilmentStatus.New, "MFN-1");
+            item.setConsolidated(false);
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item));
+            when(receiptAttemptService.locksOrder(order)).thenReturn(true);
+            OrderItem posted = new OrderItem();
+            posted.setName("Ryzen");
+            posted.setQty(1);
+            posted.setPrice(1.0);
+            posted.setConsolidated(true);
+
+            // when
+            ordersController.saveOrderItem(ORDER_ID, "i1", posted, null, new ExtendedModelMap());
+
+            // then
+            assertThat(item.getPrice()).isEqualTo(100.0);
+            assertThat(item.isConsolidated()).isFalse();
+        }
+
+        @Test
+        void noInvoiceIsIssuedWhileAnEReceiptAttemptOwnsTheSale() {
+            // given: a business order that could otherwise be invoiced
+            Order order = order(OrderStatus.Realization);
+            BillingDetails billing = new BillingDetails();
+            billing.setTaxId("5250000000");
+            order.setBillingDetails(billing);
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            when(receiptAttemptService.blocksManualReceipt(STORE_ID, ORDER_ID)).thenReturn(true);
+            RedirectAttributesModelMap confirm = new RedirectAttributesModelMap();
+            RedirectAttributesModelMap issue = new RedirectAttributesModelMap();
+
+            // when
+            String confirmView = ordersController.confirmInvoice(ORDER_ID, DocumentType.InvoiceVat, new ExtendedModelMap(),
+                    polish, confirm);
+            String issueView = ordersController.createInvoice(ORDER_ID, DocumentType.InvoiceVat, false, polish, issue);
+
+            // then
+            assertThat(confirmView).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+            assertThat(issueView).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+            assertThat(flash(confirm)).containsEntry("errorMessage", "receipts.invoicing.blocked");
+            assertThat(flash(issue)).containsEntry("errorMessage", "receipts.invoicing.blocked");
+            verifyNoInteractions(invoiceCreationEventPublisher);
+        }
+
+        // --- the sale fields (name, quantity, VAT rate) and cancelling, against the sale document ---
+
+        private OrderItem storedNewItem(Order order) {
+            OrderItem item = item("i1", FulfilmentStatus.New, "MFN-1");
+            item.setTax(1.23);
+            item.setComment("old");
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item));
+            when(orderItemsRepository.findById(ORDER_ID, "i1")).thenReturn(item);
+            return item;
+        }
+
+        /** What the item page posts for it: every field, the read-only ones with their stored values. */
+        private OrderItem postedUnchanged(OrderItem item) {
+            OrderItem posted = new OrderItem();
+            posted.setName(item.getName());
+            posted.setQty(item.getQty());
+            posted.setTax(item.getTax());
+            posted.setCategory(item.getCategory());
+            posted.setComment("new comment");
+            posted.setSerialNo("SN-1");
+            return posted;
+        }
+
+        private Order invoiced(OrderStatus status) {
+            Order order = order(status);
+            order.addDocument(new Document("o:R1", "PAR/1", null, DocumentType.Receipt));
+            return order;
+        }
+
+        @Test
+        void savingAnItemOfAnInvoicedOrderRefusesAChangedNameQuantityOrVatRate() {
+            // given
+            OrderItem item = storedNewItem(invoiced(OrderStatus.Delivered));
+            OrderItem name = postedUnchanged(item);
+            name.setName("Ryzen 9");
+            OrderItem qty = postedUnchanged(item);
+            qty.setQty(5);
+            OrderItem tax = postedUnchanged(item);
+            tax.setTax(1.08);
+            List<ExtendedModelMap> models = List.of(new ExtendedModelMap(), new ExtendedModelMap(), new ExtendedModelMap());
+
+            // when
+            List<String> views = List.of(
+                    ordersController.saveOrderItem(ORDER_ID, "i1", name, null, models.get(0)),
+                    ordersController.saveOrderItem(ORDER_ID, "i1", qty, null, models.get(1)),
+                    ordersController.saveOrderItem(ORDER_ID, "i1", tax, null, models.get(2)));
+
+            // then: the page comes back with the full reason, and nothing is saved, not even the comment
+            assertThat(views).containsOnly("orders/item");
+            assertThat(models).allSatisfy(model -> assertThat(model.getAttribute("itemError"))
+                    .isEqualTo("order.item.error.sale.locked.invoiced"));
+            assertThat(item.getName()).isEqualTo("Ryzen");
+            assertThat(item.getQty()).isEqualTo(1);
+            assertThat(item.getTax()).isEqualTo(1.23);
+            assertThat(item.getComment()).isEqualTo("old");
+            verify(orderItemsRepository, never()).save(any());
+            verifyNoInteractions(orderLifecycle);
+        }
+
+        @Test
+        void savingAnItemOfAnInvoicedOrderWithItsSaleFieldsUnchangedSavesTheOtherFields() {
+            // given: the form posts every field, the read-only ones unchanged
+            OrderItem item = storedNewItem(invoiced(OrderStatus.Delivered));
+            OrderItem posted = postedUnchanged(item);
+            posted.setName(" Ryzen ");
+
+            // when
+            String view = ordersController.saveOrderItem(ORDER_ID, "i1", posted, null, new ExtendedModelMap());
+
+            // then: the stored name is kept exactly, the comment and serial number are saved
+            assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+            assertThat(item.getName()).isEqualTo("Ryzen");
+            assertThat(item.getComment()).isEqualTo("new comment");
+            assertThat(item.getSerialNo()).isEqualTo("SN-1");
+            verify(orderItemsRepository).save(item);
+        }
+
+        @Test
+        void whileAnEReceiptIsBeingIssuedAChangedItemNameIsRefusedWithItsOwnReason() {
+            // given
+            Order order = order(OrderStatus.Realization);
+            OrderItem item = storedNewItem(order);
+            when(receiptAttemptService.locksOrder(order)).thenReturn(true);
+            OrderItem posted = postedUnchanged(item);
+            posted.setName("Ryzen 9");
+            ExtendedModelMap model = new ExtendedModelMap();
+
+            // when
+            String view = ordersController.saveOrderItem(ORDER_ID, "i1", posted, null, model);
+
+            // then
+            assertThat(view).isEqualTo("orders/item");
+            assertThat(model.getAttribute("itemError")).isEqualTo("order.item.error.sale.locked.receipt");
+            assertThat(item.getName()).isEqualTo("Ryzen");
+            verify(orderItemsRepository, never()).save(any());
+        }
+
+        @Test
+        void anOpenOrderStillSavesAChangedNameQuantityAndVatRate() {
+            // given
+            OrderItem item = storedNewItem(order(OrderStatus.New));
+            OrderItem posted = postedUnchanged(item);
+            posted.setName("Ryzen 9");
+            posted.setQty(2);
+            posted.setTax(1.08);
+
+            // when
+            ordersController.saveOrderItem(ORDER_ID, "i1", posted, null, new ExtendedModelMap());
+
+            // then
+            assertThat(item.getName()).isEqualTo("Ryzen 9");
+            assertThat(item.getQty()).isEqualTo(2);
+            assertThat(item.getTax()).isEqualTo(1.08);
+        }
+
+        @Test
+        void theItemPageNamesWhyTheSaleFieldsAreFixed() {
+            // given
+            Order invoicedOrder = invoiced(OrderStatus.Delivered);
+            storedNewItem(invoicedOrder);
+            ExtendedModelMap invoicedModel = new ExtendedModelMap();
+            ExtendedModelMap issuingModel = new ExtendedModelMap();
+            ExtendedModelMap openModel = new ExtendedModelMap();
+
+            // when
+            ordersController.getOrderItem(ORDER_ID, "i1", invoicedModel);
+            Order issuing = order(OrderStatus.Realization);
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(issuing);
+            when(receiptAttemptService.locksOrder(issuing)).thenReturn(true);
+            ordersController.getOrderItem(ORDER_ID, "i1", issuingModel);
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order(OrderStatus.New));
+            ordersController.getOrderItem(ORDER_ID, "i1", openModel);
+
+            // then
+            assertThat(invoicedModel.getAttribute("saleLock")).isEqualTo(ItemSaleLock.INVOICED);
+            assertThat(invoicedModel.getAttribute("priceLockedKey")).isEqualTo("order.item.form.price.locked.invoiced");
+            assertThat(issuingModel.getAttribute("saleLock")).isEqualTo(ItemSaleLock.RECEIPT_ISSUING);
+            assertThat(issuingModel.getAttribute("priceLockedKey")).isEqualTo("order.item.form.price.locked.receipt");
+            assertThat(openModel.getAttribute("saleLock")).isNull();
+            assertThat(openModel.getAttribute("priceLocked")).isEqualTo(false);
+        }
+
+        @Test
+        void splittingASetIsRefusedOnceInvoicedAndWhileAnEReceiptIsBeingIssued() {
+            // given
+            SplitGroupForm form = new SplitGroupForm();
+            form.setItemId("i1");
+            Order issuing = order(OrderStatus.Realization);
+            when(receiptAttemptService.locksOrder(issuing)).thenReturn(true);
+            RedirectAttributesModelMap afterDocument = new RedirectAttributesModelMap();
+            RedirectAttributesModelMap whileIssuing = new RedirectAttributesModelMap();
+
+            // when
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(invoiced(OrderStatus.Delivered));
+            ordersController.splitGroupItem(ORDER_ID, form, afterDocument, polish);
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(issuing);
+            ordersController.splitGroupItem(ORDER_ID, form, whileIssuing, polish);
+
+            // then
+            assertThat(flash(afterDocument)).containsEntry("errorMessage", "order.item.split.group.locked.invoiced");
+            assertThat(flash(whileIssuing)).containsEntry("errorMessage", "order.item.split.group.locked.receipt");
+            verifyNoInteractions(ordersManager);
+        }
+
+        @Test
+        void cancellingIsRefusedWhileAnEReceiptIsBeingIssued() {
+            // given
+            Order order = order(OrderStatus.Delivered);
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            when(receiptAttemptService.locksOrder(order)).thenReturn(true);
+            RedirectAttributesModelMap page = new RedirectAttributesModelMap();
+            RedirectAttributesModelMap cancel = new RedirectAttributesModelMap();
+
+            // when
+            String pageView = ordersController.confirmCancelOrder(ORDER_ID, new ExtendedModelMap(), page, polish);
+            String cancelView = ordersController.cancelOrder(ORDER_ID, cancel, polish);
+
+            // then
+            assertThat(pageView).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+            assertThat(cancelView).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+            assertThat(flash(page)).containsEntry("errorMessage", "order.page.cancel.locked.receipt");
+            assertThat(flash(cancel)).containsEntry("errorMessage", "order.page.cancel.locked.receipt");
+            verifyNoInteractions(ordersManager);
+        }
+
+        @Test
+        void theNoJsCancelConfirmationWarnsAboutAFiscalisedEReceipt() {
+            // given
+            Order order = invoiced(OrderStatus.Delivered);
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            when(receiptAttemptService.hasFiscalisedReceipt(order)).thenReturn(true);
+            ExtendedModelMap model = new ExtendedModelMap();
+
+            // when
+            String view = ordersController.confirmCancelOrder(ORDER_ID, model, new RedirectAttributesModelMap(), polish);
+
+            // then
+            assertThat(view).isEqualTo("settings-confirm");
+            assertThat(((ConfirmAction) model.get("confirm")).message())
+                    .isEqualTo("order.page.cancel.confirm.message order.page.cancel.confirm.receipt");
+        }
+
+        @Test
+        void aCancelAfterTheEReceiptIsFiscalisedGoesThrough() {
+            // given: the document is on the order, so no attempt waits any more
+            Order order = invoiced(OrderStatus.Delivered);
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            ordersController.cancelOrder(ORDER_ID, redirect, polish);
+
+            // then
+            verify(ordersManager).cancelOrder(STORE_ID, ORDER_ID);
         }
 
         private OrderItem supplierItem(double tax) {

@@ -115,13 +115,18 @@ public record OrderShipmentForm(String orderId, Integer index, String version, S
      * with it while the tracking number is the same one. Call only after {@link #validate()} found nothing.
      */
     public Shipment toShipment(Shipment saved) {
+        return toShipment(saved, LocalDateTime.now());
+    }
+
+    /** {@link #toShipment(Shipment)} at a given moment: {@code now} is what "today" is saved as. */
+    Shipment toShipment(Shipment saved, LocalDateTime now) {
         Shipment shipment = new Shipment(type);
         shipment.setCarrier(StringUtils.trimToNull(carrier));
         shipment.setTrackingNo(StringUtils.trimToNull(trackingNo));
         shipment.setCollectionPointCode(StringUtils.trimToNull(collectionPointCode));
         shipment.setTrackingUrl(StringUtils.trimToNull(trackingUrl));
-        shipment.setShippedAt(moment(shippedDate, saved == null ? null : saved.getShippedAt()));
-        shipment.setDeliveredAt(moment(deliveredDate, saved == null ? null : saved.getDeliveredAt()));
+        shipment.setShippedAt(moment(shippedDate, saved == null ? null : saved.getShippedAt(), now));
+        shipment.setDeliveredAt(moment(deliveredDate, saved == null ? null : saved.getDeliveredAt(), now));
         shipment.inheritTrackingSubscriptionFrom(saved);
         return shipment;
     }
@@ -145,14 +150,19 @@ public record OrderShipmentForm(String orderId, Integer index, String version, S
 
     /**
      * The moment of the date: the saved one itself when the date is the saved day (its time and seconds kept, so
-     * re-saving an untouched form changes nothing), otherwise the start of the day.
+     * re-saving an untouched form changes nothing); today is saved as now, since it is being recorded as it happens and
+     * the day's start would put it before anything switched on earlier today (an automatic e-receipt starts only for
+     * orders delivered after the store switched e-receipts on); any other day is saved as its start.
      */
-    private static LocalDateTime moment(String date, LocalDateTime saved) {
+    private static LocalDateTime moment(String date, LocalDateTime saved, LocalDateTime now) {
         LocalDate day = parseDate(date);
         if (day == null) {
             return null;
         }
-        return saved != null && saved.toLocalDate().equals(day) ? saved : day.atStartOfDay();
+        if (saved != null && saved.toLocalDate().equals(day)) {
+            return saved;
+        }
+        return day.equals(now.toLocalDate()) ? now.truncatedTo(ChronoUnit.SECONDS) : day.atStartOfDay();
     }
 
     private static LocalDate parseDate(String value) {

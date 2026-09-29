@@ -1,11 +1,14 @@
 package pl.commercelink.receipts;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.context.support.ResourceBundleMessageSource;
 import org.springframework.context.support.StaticMessageSource;
 import pl.commercelink.notifications.StoreNotificationService;
+import pl.commercelink.receipts.api.ReceiptProviderDescriptor;
 import pl.commercelink.stores.StoreNotification;
 import pl.commercelink.stores.StoreNotificationType;
 
+import java.util.List;
 import java.util.Locale;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -18,7 +21,8 @@ class ReceiptAlertsTest {
 
     private final StoreNotificationService notifications = mock(StoreNotificationService.class);
     private final StaticMessageSource messages = new StaticMessageSource();
-    private final ReceiptAlerts alerts = new ReceiptAlerts(notifications, messages);
+    private final ReceiptProviderFactory providerFactory = mock(ReceiptProviderFactory.class);
+    private final ReceiptAlerts alerts = new ReceiptAlerts(notifications, messages, providerFactory);
 
     private ReceiptAttempt attempt(String attention) {
         ReceiptAttempt attempt = new ReceiptAttempt();
@@ -59,5 +63,220 @@ class ReceiptAlertsTest {
         verify(notifications).resolve("s1", StoreNotificationType.RECEIPT_ATTENTION, "o1:R1");
         verify(notifications, never()).publish(any(), any());
         assertThat(attempt.getAttention()).isNull();
+    }
+
+    @Test
+    void theOutcomeOfADeadAttemptIsItsBlockedReasonOrTheProvidersRefusalWithoutAdvice() {
+        // given
+        messages.addMessage("receipts.blocked.NO_LINES", new Locale("pl"), "brak pozycji");
+        ReceiptAttempt blocked = attempt(null);
+        blocked.setState(ReceiptAttemptState.BLOCKED);
+        blocked.setBlockedReason("NO_LINES");
+        blocked.setBlockedDetail("0 zł");
+        ReceiptAttempt failed = attempt(null);
+        failed.setState(ReceiptAttemptState.FAILED);
+        failed.setFailureMessage("Nieprawidłowa stawka VAT");
+        ReceiptAttempt fiscalised = attempt(null);
+        fiscalised.setState(ReceiptAttemptState.FISCALISED);
+        fiscalised.setFailureMessage("stale");
+
+        // when / then
+        assertThat(alerts.outcome(blocked, new Locale("pl"))).isEqualTo("brak pozycji (0 zł)");
+        assertThat(alerts.outcome(failed, new Locale("pl"))).isEqualTo("Nieprawidłowa stawka VAT");
+        assertThat(alerts.outcome(fiscalised, new Locale("pl"))).isNull();
+    }
+
+    // ---- the order page's wording (pageProblem), against the real message bundles ----
+
+    private static final String ORDER_ID = "ORDER-77";
+    private static final String KEY = ORDER_ID + ":R3";
+
+    private static ResourceBundleMessageSource bundles() {
+        ResourceBundleMessageSource source = new ResourceBundleMessageSource();
+        source.setBasename("messages");
+        source.setDefaultEncoding("UTF-8");
+        return source;
+    }
+
+    private ReceiptAlerts pageAlerts() {
+        ReceiptProviderDescriptor fakturownia = mock(ReceiptProviderDescriptor.class);
+        when(fakturownia.displayName()).thenReturn("Paragony.pl (Fakturownia)");
+        ReceiptProviderDescriptor dev = mock(ReceiptProviderDescriptor.class);
+        when(dev.displayName()).thenReturn("Dev Receipts");
+        when(providerFactory.getDescriptor("fakturownia")).thenReturn(fakturownia);
+        when(providerFactory.getDescriptor("receipts-dev")).thenReturn(dev);
+        return new ReceiptAlerts(notifications, bundles(), providerFactory);
+    }
+
+    /** An attempt carrying every value a page text may use, so a text that leaks an id would show it. */
+    private static ReceiptAttempt troubled(String provider) {
+        ReceiptAttempt attempt = new ReceiptAttempt();
+        attempt.setStoreId("s1");
+        attempt.setOrderId(ORDER_ID);
+        attempt.setReceiptKey(KEY);
+        attempt.setProvider(provider);
+        attempt.setLastError("read timed out");
+        attempt.setFailureMessage("Nieprawidłowa stawka VAT.");
+        attempt.setBlockedReason("MISSING_EMAIL");
+        attempt.setIssueCalls(7);
+        return attempt;
+    }
+
+    @Test
+    void everyAttentionHasAPageCauseAndActionWithoutTheReceiptKeyOrOrderIdInBothLanguages() {
+        // given
+        ReceiptAlerts page = pageAlerts();
+
+        for (Locale locale : List.of(Locale.forLanguageTag("pl"), Locale.ENGLISH)) {
+            for (ReceiptAttention attention : ReceiptAttention.values()) {
+                // when
+                ReceiptPageProblem problem = page.pageProblem(troubled("fakturownia"), attention, locale);
+
+                // then
+                String what = locale + " " + attention;
+                assertThat(problem.cause()).as(what).isNotBlank().doesNotContain(ORDER_ID).doesNotContain("{")
+                        .isNotEqualTo(attention.name());
+                assertThat(problem.action()).as(what).isNotBlank().doesNotContain(ORDER_ID).doesNotContain("{");
+                assertThat(problem.cause() + problem.action()).as(what)
+                        .doesNotContain("fiscal_status").doesNotContain("commercelink:fiscal-print-ordered")
+                        .doesNotContain("..");
+                if (problem.details() != null) {
+                    assertThat(problem.detailsSummary()).as(what).contains("Paragony.pl (Fakturownia)");
+                    assertThat(problem.details()).as(what).doesNotContain("{");
+                } else {
+                    assertThat(problem.detailsSummary()).as(what).isNull();
+                }
+            }
+        }
+    }
+
+    @Test
+    void thePageCausesNameTheAttemptsProviderByItsDisplayName() {
+        // given
+        ReceiptAlerts page = pageAlerts();
+        Locale pl = Locale.forLanguageTag("pl");
+
+        // when / then
+        assertThat(page.pageProblem(troubled("fakturownia"), ReceiptAttention.FAILED, pl).cause())
+                .isEqualTo("System Paragony.pl (Fakturownia) odrzucił paragon: Nieprawidłowa stawka VAT.");
+        assertThat(page.pageProblem(troubled("fakturownia"), ReceiptAttention.FAILED, pl).action())
+                .isEqualTo("Popraw przyczynę i kliknij „Wystaw ponownie”. "
+                        + "Nie zlecaj starego paragonu w systemie Paragony.pl (Fakturownia).");
+        for (ReceiptAttention attention : List.of(ReceiptAttention.FAILED, ReceiptAttention.INVALID_AFTER_SEND,
+                ReceiptAttention.ISSUING_UNKNOWN, ReceiptAttention.PROVIDER_UNAVAILABLE)) {
+            assertThat(page.pageProblem(troubled("receipts-dev"), attention, pl).cause()).as(attention.name())
+                    .contains("Dev Receipts");
+            assertThat(page.pageProblem(troubled("receipts-dev"), attention, Locale.ENGLISH).cause())
+                    .as(attention.name()).contains("Dev Receipts");
+        }
+    }
+
+    @Test
+    void theProviderIdStandsInForItsNameOnceItsAdapterIsGone() {
+        // given: no descriptor for the stored provider id
+        ReceiptAlerts page = pageAlerts();
+
+        // when
+        ReceiptPageProblem problem = page.pageProblem(troubled("old-system"), ReceiptAttention.FAILED,
+                Locale.forLanguageTag("pl"));
+
+        // then
+        assertThat(problem.cause()).isEqualTo("System old-system odrzucił paragon: Nieprawidłowa stawka VAT.");
+    }
+
+    @Test
+    void anAttemptWithoutAProviderIsTheEReceiptSystem() {
+        // given
+        ReceiptAlerts page = pageAlerts();
+
+        // when
+        ReceiptPageProblem problem = page.pageProblem(troubled(null), ReceiptAttention.FAILED, Locale.forLanguageTag("pl"));
+
+        // then
+        assertThat(problem.cause()).isEqualTo("System e-paragonów odrzucił paragon: Nieprawidłowa stawka VAT.");
+    }
+
+    @Test
+    void theFiscalPrinterHintsAreFakturowniasOwnAndFoldedUnderItsDetails() {
+        // given
+        ReceiptAlerts page = pageAlerts();
+        Locale pl = Locale.forLanguageTag("pl");
+
+        // when
+        ReceiptPageProblem fakturownia = page.pageProblem(troubled("fakturownia"), ReceiptAttention.PENDING_LONG, pl);
+        ReceiptPageProblem dev = page.pageProblem(troubled("receipts-dev"), ReceiptAttention.PENDING_LONG, pl);
+
+        // then: the agreed wording for Fakturownia, and none of its internals for another provider
+        assertThat(fakturownia.cause()).isEqualTo("Paragon czeka na drukarkę fiskalną ponad 48 h.");
+        assertThat(fakturownia.action()).isEqualTo("Sprawdź, czy drukarka albo moduł Paragony.pl działa.");
+        assertThat(fakturownia.detailsSummary()).isEqualTo("Szczegóły dla Paragony.pl (Fakturownia)");
+        assertThat(fakturownia.details()).contains("to_print").contains("commercelink:fiscal-print-ordered")
+                .contains("Nigdy nie zlecaj paragonu, który ma jakikolwiek fiscal_status.");
+        assertThat(dev.action()).isEqualTo("Sprawdź, czy drukarka fiskalna działa.");
+        assertThat(dev.details()).isNull();
+        assertThat(dev.detailsSummary()).isNull();
+    }
+
+    @Test
+    void theUnknownOutcomeKeepsTheSafetyAdviceAndNamesTheKeyOnlyInTheDetails() {
+        // given
+        ReceiptAlerts page = pageAlerts();
+        Locale pl = Locale.forLanguageTag("pl");
+
+        // when
+        ReceiptPageProblem unknown = page.pageProblem(troubled("fakturownia"), ReceiptAttention.ISSUING_UNKNOWN, pl);
+        ReceiptPageProblem invalid = page.pageProblem(troubled("fakturownia"), ReceiptAttention.INVALID_AFTER_SEND, pl);
+
+        // then
+        assertThat(unknown.cause()).contains("po 7 próbach").contains("read timed out").doesNotContain(KEY);
+        assertThat(unknown.action()).contains("nie wystawiaj nowego, dopóki nie wiesz, że poprzedni nie został "
+                + "zafiskalizowany");
+        assertThat(unknown.details()).contains(KEY).contains("nic nie ruszaj i zgłoś to");
+        assertThat(invalid.action()).contains("dopóki nie wiesz").contains("„Zamknij ręcznie”");
+    }
+
+    @Test
+    void blockedAndEmailProblemsPointAtTheRowsButtons() {
+        // given
+        ReceiptAlerts page = pageAlerts();
+        Locale pl = Locale.forLanguageTag("pl");
+        ReceiptAttempt blocked = troubled("fakturownia");
+        blocked.setBlockedDetail("pusty adres");
+
+        // when / then
+        ReceiptPageProblem blockedProblem = page.pageProblem(blocked, ReceiptAttention.BLOCKED, pl);
+        assertThat(blockedProblem.cause()).isEqualTo("Paragonu nie wysłano: brak e-maila kupującego (pusty adres).");
+        assertThat(blockedProblem.action()).isEqualTo("Popraw dane zamówienia i kliknij „Wystaw ponownie”.");
+        ReceiptPageProblem email = page.pageProblem(troubled("fakturownia"), ReceiptAttention.EMAIL_NOT_SENT, pl);
+        assertThat(email.cause()).isEqualTo("Mail z e-paragonem nie wyszedł.");
+        assertThat(email.action()).isEqualTo("Sprawdź szablon „E-paragon” i kliknij „Wyślij mail ponownie”.");
+        assertThat(page.pageProblem(troubled("fakturownia"), ReceiptAttention.EFFECTS_FAILED, pl).cause())
+                .contains("marketplace'u");
+    }
+
+    @Test
+    void aMissingErrorReadsAsNoDetailsRatherThanAnEmptyGap() {
+        // given
+        ReceiptAlerts page = pageAlerts();
+        ReceiptAttempt attempt = troubled("fakturownia");
+        attempt.setFailureMessage(null);
+
+        // when
+        String cause = page.pageProblem(attempt, ReceiptAttention.FAILED, Locale.forLanguageTag("pl")).cause();
+
+        // then
+        assertThat(cause).isEqualTo("System Paragony.pl (Fakturownia) odrzucił paragon: brak szczegółów.");
+    }
+
+    @Test
+    void theBellMessageIsUnchangedByThePageWording() {
+        // given
+        ReceiptAlerts page = pageAlerts();
+
+        // when
+        String bell = page.message(troubled("fakturownia"), ReceiptAttention.FAILED);
+
+        // then: the bell still names the receipt, as before
+        assertThat(bell).startsWith("Paragon " + KEY + " nie został zafiskalizowany: Nieprawidłowa stawka VAT.");
     }
 }

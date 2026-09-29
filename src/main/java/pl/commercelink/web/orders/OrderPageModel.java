@@ -7,6 +7,7 @@ import pl.commercelink.orders.OrderReviewStatus;
 import pl.commercelink.orders.Payment;
 import pl.commercelink.orders.PaymentSource;
 import pl.commercelink.products.ProductCatalog;
+import pl.commercelink.receipts.ReceiptPageProblem;
 import pl.commercelink.web.dtos.RoutedSupplierView;
 import pl.commercelink.web.dtos.SplitGroupPreviewDto;
 
@@ -25,12 +26,16 @@ public record OrderPageModel(String orderId, String shortId, String backHref, bo
                              CustomerView customer, OrderSettingsView settings, FinancesView finances,
                              HistoryCard history, OrderStatusOptions statusOptions) {
 
+    /**
+     * cancelLockedKey: why "Cancel order" is greyed although the order could otherwise be cancelled (an e-receipt
+     * being issued), null for the general reason; cancelMessage: the confirmation, with the fiscalised-receipt warning.
+     */
     public record Header(String statusKey, String statusTone, boolean canChangeStatus, boolean completedAutomatically,
                          String clientName, String sourceName, String sourceTypeKey, String orderedAt, String total,
                          String fulfilmentTypeShortKey, String fulfilmentTypeIcon, String externalOrderId, RoutedSupplierView routedSupplier,
                          String splitFromShortId, String splitFromHref, String clientOrderUrl, PrimaryAction primaryAction,
                          String cardHref, String collectionHref, String itemHistoryHref, boolean canCancel,
-                         boolean canDelete, String deleteMessage) {
+                         String cancelLockedKey, String cancelMessage, boolean canDelete, String deleteMessage) {
     }
 
     public record PrimaryAction(String labelKey, String href, String icon) {
@@ -92,11 +97,45 @@ public record OrderPageModel(String orderId, String shortId, String backHref, bo
                               String removeHref, String removeReasonKey, String removeMessageKey) {
     }
 
-    /** emptyKey takes the next type's label as its argument: "Issue" makes it, or "Add document" when it is typed by hand. */
-    public record DocumentsCard(List<DocumentRow> rows, String emptyKey, boolean canAdd,
-                                List<OrderLabels.Option<DocumentType>> manualTypes, DocumentType nextType, String nextTypeKey,
-                                List<OrderLabels.Option<DocumentType>> issuable, boolean goodsIssue, boolean canIssue,
-                                String today) {
+    /**
+     * emptyKey takes the next type's label as its argument: "Issue" makes it, or "Add document" when it is typed by hand.
+     * receipt: the order's e-receipt, or null when it has no attempt; its document is not repeated in rows.
+     * addLockedKey: why "Add document" shows greyed (an e-receipt being issued), null when it is available or simply
+     * absent. canIssueReceipt: "E-paragon" in the "Issue" menu.
+     */
+    public record DocumentsCard(List<DocumentRow> rows, ReceiptRow receipt, String emptyKey, boolean canAdd,
+                                String addLockedKey, List<OrderLabels.Option<DocumentType>> manualTypes,
+                                DocumentType nextType, String nextTypeKey, List<OrderLabels.Option<DocumentType>> issuable,
+                                boolean goodsIssue, boolean canIssueReceipt, boolean canIssue, String today,
+                                List<ReceiptCloseForm> closeForms) {
+
+        /** No document row and no e-receipt: the card shows its empty text. */
+        public boolean isEmpty() {
+            return rows.isEmpty() && receipt == null;
+        }
+    }
+
+    /**
+     * The order's e-receipt as one row of the documents card: its newest attempt, with the earlier (dead, superseded)
+     * attempts under it. number and href once known (href only a web address); dateKey/date say when it was
+     * fiscalised or closed by hand; emailKey whether the buyer's e-mail went out or was skipped; problem what went
+     * wrong (warning tone), what the operator should do and the provider's technical hints, null without a problem.
+     * The actions are false on a super admin's page; closeHref is the "Zamknij ręcznie" page without JavaScript,
+     * closeDialogId its dialog.
+     */
+    public record ReceiptRow(String key, int attemptNo, String number, String href, String statusKey, String statusTone,
+                             String dateKey, String date, String emailKey, ReceiptPageProblem problem, boolean canCheck,
+                             boolean canResendEmail, boolean canClose, boolean canReissue, String closeDialogId,
+                             String closeHref, List<ReceiptEarlierRow> earlier) {
+
+        /** Whether the row offers any action at all (the actions column is left out otherwise). */
+        public boolean hasActions() {
+            return canCheck || canResendEmail || canClose || canReissue;
+        }
+    }
+
+    /** An earlier attempt: dead, superseded by a newer one, listed without actions. outcome: why it fiscalised nothing. */
+    public record ReceiptEarlierRow(int attemptNo, String statusKey, String statusTone, String outcome) {
     }
 
     public record DocumentRow(String typeKey, String number, String href, boolean external, String issuedAt,

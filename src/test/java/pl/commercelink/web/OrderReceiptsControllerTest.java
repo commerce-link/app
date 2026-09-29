@@ -19,8 +19,14 @@ import pl.commercelink.receipts.ReceiptAttempt;
 import pl.commercelink.receipts.ReceiptAttemptService;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.starter.security.model.CustomUser;
+import pl.commercelink.receipts.ReceiptAttemptState;
+import pl.commercelink.web.orders.OrderFlash;
+import pl.commercelink.web.orders.OrderLabels;
+import pl.commercelink.web.orders.OrderNotice;
+import pl.commercelink.web.orders.ReceiptCloseForm;
 import pl.commercelink.web.settings.ConfirmAction;
 
+import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 
@@ -67,6 +73,15 @@ class OrderReceiptsControllerTest {
         securityStub.close();
     }
 
+    /** A success is the order page's own notice (OrderFlash), like every other action of the redesigned page. */
+    private String notice() {
+        OrderNotice notice = (OrderNotice) redirectAttributes.getFlashAttributes().get(OrderFlash.ATTRIBUTE);
+        assertThat(notice).isNotNull();
+        assertThat(notice.tone()).isEqualTo(OrderLabels.OK);
+        assertThat(redirectAttributes.getFlashAttributes()).doesNotContainKey("successMessage");
+        return notice.text();
+    }
+
     @Test
     void reissueRedirectsWithSuccess() {
         when(attemptService.reissue(STORE_ID, ORDER_ID, "Jan Kowalski")).thenReturn(new ReceiptAttempt());
@@ -75,7 +90,7 @@ class OrderReceiptsControllerTest {
         String view = controller.reissue(ORDER_ID, LOCALE, redirectAttributes);
 
         assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
-        assertThat(redirectAttributes.getFlashAttributes().get("successMessage")).isEqualTo("Nowy paragon jest wystawiany.");
+        assertThat(notice()).isEqualTo("Nowy paragon jest wystawiany.");
         assertThat(redirectAttributes.getFlashAttributes()).doesNotContainKey("errorMessage");
         verify(attemptService).reissue(STORE_ID, ORDER_ID, "Jan Kowalski");
     }
@@ -92,7 +107,7 @@ class OrderReceiptsControllerTest {
         assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
         assertThat(redirectAttributes.getFlashAttributes().get("errorMessage"))
                 .isEqualTo("Poprzedni paragon nie jest rozstrzygnięty — nowego nie można wystawić.");
-        assertThat(redirectAttributes.getFlashAttributes()).doesNotContainKey("successMessage");
+        assertThat(redirectAttributes.getFlashAttributes()).doesNotContainKey(OrderFlash.ATTRIBUTE);
     }
 
     @Test
@@ -103,7 +118,7 @@ class OrderReceiptsControllerTest {
         String view = controller.issue(ORDER_ID, LOCALE, redirectAttributes);
 
         assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
-        assertThat(redirectAttributes.getFlashAttributes().get("successMessage")).isEqualTo("E-paragon jest wystawiany.");
+        assertThat(notice()).isEqualTo("E-paragon jest wystawiany.");
         verify(attemptService).issueManually(STORE_ID, ORDER_ID, "Jan Kowalski");
     }
 
@@ -116,7 +131,7 @@ class OrderReceiptsControllerTest {
         controller.issue(ORDER_ID, LOCALE, redirectAttributes);
 
         assertThat(redirectAttributes.getFlashAttributes().get("errorMessage")).isEqualTo("Ma już e-paragon.");
-        assertThat(redirectAttributes.getFlashAttributes()).doesNotContainKey("successMessage");
+        assertThat(redirectAttributes.getFlashAttributes()).doesNotContainKey(OrderFlash.ATTRIBUTE);
     }
 
     @Test
@@ -127,7 +142,7 @@ class OrderReceiptsControllerTest {
         String view = controller.check(ORDER_ID, receiptKey, LOCALE, redirectAttributes);
 
         assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
-        assertThat(redirectAttributes.getFlashAttributes().get("successMessage")).isEqualTo("Stan paragonu zostanie sprawdzony za chwilę.");
+        assertThat(notice()).isEqualTo("Stan paragonu zostanie sprawdzony za chwilę.");
         verify(attemptService).checkNow(STORE_ID, receiptKey);
     }
 
@@ -140,8 +155,7 @@ class OrderReceiptsControllerTest {
         String view = controller.resendEmail(ORDER_ID, receiptKey, LOCALE, redirectAttributes);
 
         assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
-        assertThat(redirectAttributes.getFlashAttributes().get("successMessage"))
-                .isEqualTo("The e-receipt e-mail will be sent again.");
+        assertThat(notice()).isEqualTo("The e-receipt e-mail will be sent again.");
         verify(attemptService).resendEmail(STORE_ID, ORDER_ID, receiptKey, "Jan Kowalski");
     }
 
@@ -170,7 +184,7 @@ class OrderReceiptsControllerTest {
         assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
         assertThat(redirectAttributes.getFlashAttributes().get("errorMessage"))
                 .isEqualTo("This e-mail is not waiting to be resent.");
-        assertThat(redirectAttributes.getFlashAttributes()).doesNotContainKey("successMessage");
+        assertThat(redirectAttributes.getFlashAttributes()).doesNotContainKey(OrderFlash.ATTRIBUTE);
     }
 
     @Test
@@ -193,7 +207,7 @@ class OrderReceiptsControllerTest {
         String view = controller.close(ORDER_ID, receiptKey, "PAR/1", "https://x", LOCALE, redirectAttributes);
 
         assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
-        assertThat(redirectAttributes.getFlashAttributes().get("successMessage")).isEqualTo("Paragon zamknięty ręcznie.");
+        assertThat(notice()).isEqualTo("Paragon zamknięty ręcznie.");
         verify(attemptService).closeManually(STORE_ID, receiptKey, "PAR/1", "https://x", "Jan Kowalski");
     }
 
@@ -210,7 +224,7 @@ class OrderReceiptsControllerTest {
         assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
         assertThat(redirectAttributes.getFlashAttributes().get("errorMessage"))
                 .isEqualTo("Link do e-paragonu musi zaczynać się od http:// lub https://.");
-        assertThat(redirectAttributes.getFlashAttributes()).doesNotContainKey("successMessage");
+        assertThat(redirectAttributes.getFlashAttributes()).doesNotContainKey(OrderFlash.ATTRIBUTE);
     }
 
     @Test
@@ -230,7 +244,7 @@ class OrderReceiptsControllerTest {
         when(messageSource.getMessage(eq("receipts.action.reissue.confirm.title"), any(), eq(LOCALE))).thenReturn("Wystawić nowy paragon?");
         when(messageSource.getMessage(eq("receipts.action.reissue.confirm.message"), any(), eq(LOCALE))).thenReturn("message");
         when(messageSource.getMessage(eq("receipts.action.reissue"), any(), eq(LOCALE))).thenReturn("Wystaw ponownie");
-        when(messageSource.getMessage(eq("receipts.action.reissue.confirm.back"), any(), eq(LOCALE))).thenReturn("Powrót do zamówienia");
+        when(messageSource.getMessage(eq("order.page.title"), any(), eq(LOCALE))).thenReturn("Zamówienie order-1");
         Model model = new ExtendedModelMap();
 
         String view = controller.confirmReissue(ORDER_ID, LOCALE, model);
@@ -241,6 +255,104 @@ class OrderReceiptsControllerTest {
         assertThat(confirm.title()).isEqualTo("Wystawić nowy paragon?");
         assertThat(confirm.actionPath()).isEqualTo("/dashboard/orders/" + ORDER_ID + "/receipts/reissue");
         assertThat(confirm.cancelPath()).isEqualTo("/dashboard/orders/" + ORDER_ID);
-        assertThat(model.getAttribute("backLabel")).isEqualTo("Powrót do zamówienia");
+        // back to the order by its number, as the order page's own confirmation pages lead
+        assertThat(model.getAttribute("backLabel")).isEqualTo("Zamówienie order-1");
+    }
+
+    private static ReceiptAttempt attempt(String receiptKey, int attemptNo, ReceiptAttemptState state) {
+        ReceiptAttempt attempt = new ReceiptAttempt();
+        attempt.setReceiptKey(receiptKey);
+        attempt.setAttemptNo(attemptNo);
+        attempt.setState(state);
+        return attempt;
+    }
+
+    @Test
+    void confirmIssueRendersAPrimaryConfirmationPageThatPostsTheIssue() {
+        // given
+        when(attemptService.attemptsOf(STORE_ID, ORDER_ID)).thenReturn(List.of());
+        when(messageSource.getMessage(eq("receipts.action.issue.confirm.title"), any(), eq(LOCALE))).thenReturn("Wystawić e-paragon?");
+        when(messageSource.getMessage(eq("receipts.action.issue.confirm.message"), any(), eq(LOCALE))).thenReturn("message");
+        when(messageSource.getMessage(eq("receipts.action.issue.confirm.action"), any(), eq(LOCALE))).thenReturn("Wystaw e-paragon");
+        when(messageSource.getMessage(eq("order.page.title"), any(), eq(LOCALE))).thenReturn("Zamówienie order-1");
+        Model model = new ExtendedModelMap();
+
+        // when
+        String view = controller.confirmIssue(ORDER_ID, LOCALE, model, redirectAttributes);
+
+        // then: issuing is not a removal, so the button is the primary one, not red
+        assertThat(view).isEqualTo("settings-confirm");
+        ConfirmAction confirm = (ConfirmAction) model.getAttribute("confirm");
+        assertThat(confirm.title()).isEqualTo("Wystawić e-paragon?");
+        assertThat(confirm.confirmLabel()).isEqualTo("Wystaw e-paragon");
+        assertThat(confirm.actionPath()).isEqualTo("/dashboard/orders/" + ORDER_ID + "/receipts/issue");
+        assertThat(confirm.cancelPath()).isEqualTo("/dashboard/orders/" + ORDER_ID);
+        assertThat(confirm.destructive()).isFalse();
+        assertThat(model.getAttribute("backLabel")).isEqualTo("Zamówienie order-1");
+        verify(attemptService, never()).issueManually(any(), any(), any());
+    }
+
+    @Test
+    void confirmIssueOfAnOrderThatAlreadyHasAnAttemptGoesBackWithTheReason() {
+        // given
+        when(attemptService.attemptsOf(STORE_ID, ORDER_ID))
+                .thenReturn(List.of(attempt(ORDER_ID + ":R1", 1, ReceiptAttemptState.FAILED)));
+        when(messageSource.getMessage("receipts.action.issue.exists", null, LOCALE)).thenReturn("Ma już e-paragon.");
+
+        // when
+        String view = controller.confirmIssue(ORDER_ID, LOCALE, new ExtendedModelMap(), redirectAttributes);
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+        assertThat(redirectAttributes.getFlashAttributes().get("errorMessage")).isEqualTo("Ma już e-paragon.");
+    }
+
+    @Test
+    void closePageRendersTheFormOfAHungAttempt() {
+        // given
+        String receiptKey = ORDER_ID + ":R2";
+        when(attemptService.attemptsOf(STORE_ID, ORDER_ID)).thenReturn(List.of(
+                attempt(ORDER_ID + ":R1", 1, ReceiptAttemptState.FAILED), attempt(receiptKey, 2, ReceiptAttemptState.PENDING)));
+        Model model = new ExtendedModelMap();
+
+        // when
+        String view = controller.closePage(ORDER_ID, receiptKey, LOCALE, model, redirectAttributes);
+
+        // then
+        assertThat(view).isEqualTo("orders/receipt-close");
+        assertThat(model.getAttribute("close")).isEqualTo(new ReceiptCloseForm(ORDER_ID, receiptKey, 2));
+        assertThat(model.getAttribute("shortId")).isNotNull();
+    }
+
+    @Test
+    void closePageOfAnAttemptThatCannotBeClosedGoesBackWithTheReason() {
+        // given
+        String receiptKey = ORDER_ID + ":R1";
+        when(attemptService.attemptsOf(STORE_ID, ORDER_ID))
+                .thenReturn(List.of(attempt(receiptKey, 1, ReceiptAttemptState.FISCALISED)));
+        when(messageSource.getMessage("receipts.action.close.notHung", null, LOCALE)).thenReturn("Tylko w trakcie wystawiania.");
+        Model model = new ExtendedModelMap();
+
+        // when
+        String view = controller.closePage(ORDER_ID, receiptKey, LOCALE, model, redirectAttributes);
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+        assertThat(redirectAttributes.getFlashAttributes().get("errorMessage")).isEqualTo("Tylko w trakcie wystawiania.");
+        assertThat(model.getAttribute("close")).isNull();
+    }
+
+    @Test
+    void closePageWithAnotherOrdersKeyIsRefusedWithoutReadingAttempts() {
+        // given
+        when(messageSource.getMessage("receipts.action.notFound", null, LOCALE)).thenReturn("Nie znaleziono paragonu.");
+
+        // when
+        String view = controller.closePage(ORDER_ID, "other-order:R1", LOCALE, new ExtendedModelMap(), redirectAttributes);
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+        assertThat(redirectAttributes.getFlashAttributes().get("errorMessage")).isEqualTo("Nie znaleziono paragonu.");
+        verifyNoInteractions(attemptService);
     }
 }

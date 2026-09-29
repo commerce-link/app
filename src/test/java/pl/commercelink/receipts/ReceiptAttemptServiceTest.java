@@ -317,6 +317,52 @@ class ReceiptAttemptServiceTest {
     }
 
     @Test
+    void theOrderStateAnswersAsTheSeparateQueriesFromOneReadOfTheAttempts() {
+        // given: no attempt yet — E-paragon may be issued, nothing owns the receipt, nothing is locked
+        ReceiptAttemptStore counting = org.mockito.Mockito.spy(attempts);
+        ReceiptAttemptService countingService = new ReceiptAttemptService(counting, stores, orders, orderItems, factory,
+                new ReceiptRequestConverter(), new ReceiptEligibility(factory), publisher, locking, lifecycle,
+                alerts, clock);
+        ReceiptOrderState none = countingService.orderState(store, order, alerts, java.util.Locale.ENGLISH);
+
+        // when: an attempt starts issuing
+        service.startAutomatic(store, order);
+        org.mockito.Mockito.clearInvocations(counting);
+        ReceiptOrderState issuing = countingService.orderState(store, order, alerts, java.util.Locale.ENGLISH);
+
+        // then
+        assertThat(none.canIssueManually()).isTrue();
+        assertThat(none.blocksManualReceipt()).isFalse();
+        assertThat(none.locksOrder(order)).isFalse();
+        assertThat(none.view().isEmpty()).isTrue();
+        verify(counting, org.mockito.Mockito.times(1)).findByOrder(STORE_ID, ORDER_ID);
+        assertThat(issuing.canIssueManually()).isEqualTo(service.canIssueManually(store, order)).isFalse();
+        assertThat(issuing.blocksManualReceipt()).isEqualTo(service.blocksManualReceipt(STORE_ID, ORDER_ID)).isTrue();
+        assertThat(issuing.locksOrder(order)).isEqualTo(service.locksOrder(order)).isTrue();
+        assertThat(issuing.view().rows()).extracting(ReceiptOrderView.Row::key).containsExactly(ORDER_ID + ":R1");
+        assertThat(issuing.attemptOfDocument(ORDER_ID + ":R1")).isPresent();
+    }
+
+    @Test
+    void theOrderIsLockedWhileAnAttemptOwnsTheReceiptUntilItsDocumentMakesTheOrderInvoiced() {
+        // given
+        service.startAutomatic(store, order);
+
+        for (ReceiptAttemptState state : ReceiptAttemptState.values()) {
+            attempts.update(STORE_ID, ORDER_ID + ":R1", a -> {
+                a.setState(state);
+                return true;
+            });
+            // then: a dead attempt locks nothing; any other owns the frozen sale
+            assertThat(service.locksOrder(order)).as(state.name()).isEqualTo(!state.isDead());
+        }
+        order.addDocument(new pl.commercelink.documents.Document(ORDER_ID + ":R1", "PAR/1", null,
+                pl.commercelink.documents.DocumentType.Receipt));
+        // the document is on the order: the invoiced locks take over
+        assertThat(service.locksOrder(order)).isFalse();
+    }
+
+    @Test
     void closeManuallyAttachesTheOperatorsDocumentAndStopsPolling() {
         service.startAutomatic(store, order);
 
@@ -469,7 +515,7 @@ class ReceiptAttemptServiceTest {
         // see "no change" and the operator would never hear that the resent mail failed too.
         StoreNotificationService notifications = mock(StoreNotificationService.class);
         StaticMessageSource messages = new StaticMessageSource();
-        ReceiptAlerts realAlerts = new ReceiptAlerts(notifications, messages);
+        ReceiptAlerts realAlerts = new ReceiptAlerts(notifications, messages, factory);
         service = new ReceiptAttemptService(attempts, stores, orders, orderItems, factory,
                 new ReceiptRequestConverter(), new ReceiptEligibility(factory), publisher, locking, lifecycle,
                 realAlerts, clock);

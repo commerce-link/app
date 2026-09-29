@@ -1455,32 +1455,68 @@ body.cl-drawer-open .cl-sidebar {
     margin: 0;
 }
 
-/* A row action that opens its form in place (details.cl-row-form, e.g. "Zamknij ręcznie"). Open, the form would widen
-   the auto actions column and squeeze the record column to one character, so the row turns into one column and the
-   form takes the full width under the record. */
-.cl-page .cl-list .cl-list-item:has(.cl-row-form[open]) {
-    grid-template-columns: minmax(0, 1fr);
+/* Secondary records collapsed inside a list row's record column (details.cl-row-disclosure, e.g. an e-receipt's
+   earlier attempts): a small summary with the .cl-disclosure arrow, then one line per record. Native details/summary,
+   so it opens with the keyboard and without JavaScript. */
+.cl-page .cl-row-disclosure {
+    margin-top: 2px;
 }
 
-.cl-page .cl-list .cl-list-item:has(.cl-row-form[open]) .cl-list-actions {
-    justify-content: flex-start;
+.cl-page .cl-row-disclosure > summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--cl-accent-ink);
+    cursor: pointer;
+    list-style: none;
 }
 
-.cl-page .cl-list-actions .cl-row-form[open] {
+.cl-page .cl-row-disclosure > summary::-webkit-details-marker {
+    display: none;
+}
+
+.cl-page .cl-row-disclosure > summary::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-right: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    transform: rotate(-45deg);
+    transition: transform .15s;
+}
+
+.cl-page .cl-row-disclosure[open] > summary::before {
+    transform: rotate(45deg);
+}
+
+.cl-page .cl-row-disclosure > summary:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
+}
+
+.cl-page .cl-row-disclosure-list {
+    margin: 0 0 4px;
+    padding: 0;
+    list-style: none;
+}
+
+.cl-page .cl-row-disclosure-list > li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+    padding: 2px 0;
+    font-size: 13.5px;
+    line-height: 1.4;
+    color: var(--cl-ink-2);
+    overflow-wrap: anywhere;
+}
+
+.cl-page .cl-row-disclosure-note {
     flex-basis: 100%;
-}
-
-.cl-page .cl-row-form > .cl-form {
-    max-width: 480px;
-    margin-top: 8px;
-}
-
-/* The same ::details-content box-sizing break as in .cl-disclosure-body below. */
-.cl-page .cl-row-form,
-.cl-page .cl-row-form *,
-.cl-page .cl-row-form *::before,
-.cl-page .cl-row-form *::after {
-    box-sizing: border-box;
 }
 
 .cl-page .cl-card .cl-list-group {
@@ -4195,7 +4231,7 @@ a.cl-link-button:hover {
 
 /* A read-only field of a catalog form -- the EAN and code of a product the PIM knows, its brand, the name of the Default
    pricing group -- looked like one to type in: the tinted ground and the darker grey (--cl-ink-2 on a tint, §2) say it
-   is shown, not edited. Only catalog forms have read-only inputs. */
+   is shown, not edited. The order item page uses it too, for the name, quantity and VAT rate a sale document fixed. */
 .cl-page .cl-form .cl-input[readonly] {
     background: var(--cl-surface-2);
     color: var(--cl-ink-2);

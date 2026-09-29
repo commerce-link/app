@@ -1,7 +1,9 @@
 <!DOCTYPE HTML>
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
-<!--/* Document rows, issuing and unpinning. Issuable types and the next type come as Option/key from the model. */-->
+<!--/* Document rows, issuing and unpinning. Issuable types and the next type come as Option/key from the model. The
+       order's e-receipt is the first row: its newest attempt with its own actions, the earlier attempts collapsed
+       under it; the document the attempt attached is that row, never a second "Paragon" row. */-->
 <section th:fragment="card" class="cl-card" id="dokumenty" aria-labelledby="documents-title"
          th:with="documents=${page.documents()}">
     <div class="cl-card-head">
@@ -9,12 +11,24 @@
         <div class="cl-card-actions" th:unless="${page.readOnly()}">
             <button th:if="${documents.canAdd()}" type="button" class="cl-button" data-cl-dialog-open="document-dialog"
                     th:text="#{order.documents.add}"></button>
+            <!--/* greyed, still focusable, its reason under the head (design system: action that cannot run) */-->
+            <button th:if="${documents.addLockedKey() != null}" type="button" class="cl-button" aria-disabled="true"
+                    aria-describedby="document-add-reason" th:text="#{order.documents.add}"></button>
             <details class="cl-menu" th:if="${documents.canIssue()}">
                 <summary class="cl-button">
                     <span th:text="#{order.documents.issue}"></span>
                     <span class="icon is-small" aria-hidden="true"><i class="fas fa-chevron-down"></i></span>
                 </summary>
                 <ul class="cl-menu-list" id="issue-menu">
+                    <!--/* without JavaScript the link leads to the confirmation page (GET …/receipts/issue) */-->
+                    <li th:if="${documents.canIssueReceipt()}">
+                        <a class="cl-menu-item" data-cl-confirm data-cl-confirm-tone="primary"
+                           th:href="@{/dashboard/orders/{o}/receipts/issue(o=${page.orderId()})}"
+                           th:attr="data-cl-confirm-title=#{receipts.action.issue.confirm.title},
+                                    data-cl-confirm-message=#{receipts.action.issue.confirm.message},
+                                    data-cl-confirm-action=#{receipts.action.issue.confirm.action}"
+                           th:text="#{receipts.action.issue}"></a>
+                    </li>
                     <li th:if="${documents.goodsIssue()}">
                         <a class="cl-menu-item" data-cl-confirm data-cl-confirm-tone="primary"
                            th:href="@{/dashboard/orders/{o}/goods-out(o=${page.orderId()})}"
@@ -33,8 +47,11 @@
                 </ul>
             </details>
         </div>
+        <p th:if="${documents.addLockedKey() != null}" class="cl-help is-note" id="document-add-reason"
+           th:text="#{${documents.addLockedKey()}}"></p>
     </div>
-    <ul class="cl-list" th:if="${!documents.rows().isEmpty()}">
+    <ul class="cl-list" th:if="${!documents.isEmpty()}">
+        <li th:replace="~{orders/details/documents :: receiptRow(${documents.receipt()})}"></li>
         <li class="cl-list-item" th:each="d : ${documents.rows()}">
             <div>
                 <p class="cl-list-title">
@@ -55,9 +72,114 @@
             </div>
         </li>
     </ul>
-    <p th:if="${documents.rows().isEmpty()}" class="cl-list-empty"
+    <p th:if="${documents.isEmpty()}" class="cl-list-empty"
        th:text="${documents.nextTypeKey() != null} ? #{${documents.emptyKey()}(${#messages.msg(documents.nextTypeKey())})} : #{${documents.emptyKey()}}"></p>
 </section>
+
+<!--/* The e-receipt row (web.orders.OrderPageModel.ReceiptRow), nothing when the order has no attempt. The number
+       links to the e-receipt at the provider. Actions: "Sprawdź teraz" and "Wyślij mail ponownie" post at once,
+       "Zamknij ręcznie" opens the attempt's dialog (its page without JavaScript), "Wystaw ponownie" is confirmed. */-->
+<li th:fragment="receiptRow(r)" th:if="${r != null}" class="cl-list-item" id="e-paragon">
+    <div>
+        <p class="cl-list-title">
+            <span th:text="#{receipts.section.title}"></span>
+            <a th:if="${r.href() != null}" th:href="${r.href()}" target="_blank" rel="noopener"
+               th:text="${r.number() != null} ? ${r.number()} : #{receipts.document.open}"></a>
+            <span th:if="${r.href() == null and r.number() != null}" th:text="${r.number()}"></span>
+            <span th:if="${r.href() != null}" class="icon is-small" aria-hidden="true"><i class="fas fa-external-link-alt"></i></span>
+            <span class="cl-status" th:classappend="${r.statusTone()}" th:text="#{${r.statusKey()}}"></span>
+        </p>
+        <p class="cl-list-desc" th:if="${r.date() != null or r.emailKey() != null}">
+            <span th:if="${r.date() != null}" th:text="#{${r.dateKey()}(${r.date()})}"></span>
+            <span th:if="${r.date() != null and r.emailKey() != null}" aria-hidden="true"> · </span>
+            <span th:if="${r.emailKey() != null}" th:text="#{${r.emailKey()}}"></span>
+        </p>
+        <!--/* The problem in the operator's words (cause, then what to do with this row's buttons); the provider's
+               technical hints stay folded under their own disclosure. */-->
+        <th:block th:if="${r.problem() != null}">
+            <p class="cl-list-desc is-warn" th:id="|e-paragon-problem-${r.attemptNo()}|" th:text="${r.problem().cause()}"></p>
+            <p class="cl-list-desc" th:if="${r.problem().action() != null}" th:id="|e-paragon-action-${r.attemptNo()}|"
+               th:text="${r.problem().action()}"></p>
+            <details class="cl-row-disclosure" th:if="${r.problem().details() != null}"
+                     th:id="|e-paragon-details-${r.attemptNo()}|">
+                <summary th:text="${r.problem().detailsSummary()}"></summary>
+                <p class="cl-list-desc" th:text="${r.problem().details()}"></p>
+            </details>
+        </th:block>
+        <!--/* native details/summary: keyboard-operable and open without JavaScript */-->
+        <details class="cl-row-disclosure" th:if="${!r.earlier().isEmpty()}">
+            <summary th:text="#{receipts.row.earlier(${r.earlier().size()})}"></summary>
+            <ul class="cl-row-disclosure-list">
+                <li th:each="e : ${r.earlier()}">
+                    <span th:text="#{receipts.row.attempt(${e.attemptNo()})}"></span>
+                    <span class="cl-status" th:classappend="${e.statusTone()}" th:text="#{${e.statusKey()}}"></span>
+                    <span th:if="${e.outcome() != null}" class="cl-row-disclosure-note" th:text="${e.outcome()}"></span>
+                </li>
+            </ul>
+        </details>
+    </div>
+    <div class="cl-list-actions" th:if="${r.hasActions()}">
+        <form th:if="${r.canCheck()}" method="post" th:action="@{/dashboard/orders/{o}/receipts/check(o=${page.orderId()})}">
+            <input type="hidden" name="receiptKey" th:value="${r.key()}">
+            <button type="submit" class="cl-link-button" th:text="#{receipts.action.check}"></button>
+        </form>
+        <form th:if="${r.canResendEmail()}" method="post"
+              th:action="@{/dashboard/orders/{o}/receipts/resend-email(o=${page.orderId()})}">
+            <input type="hidden" name="receiptKey" th:value="${r.key()}">
+            <button type="submit" class="cl-link-button" th:text="#{receipts.action.resendEmail}"></button>
+        </form>
+        <a th:if="${r.canClose()}" class="cl-link-button" th:href="@{${r.closeHref()}}"
+           th:attr="data-cl-dialog-open=${r.closeDialogId()}" th:text="#{receipts.action.close}"></a>
+        <a th:if="${r.canReissue()}" class="cl-link-button" data-cl-confirm
+           th:href="@{/dashboard/orders/{o}/receipts/reissue(o=${page.orderId()})}"
+           th:attr="data-cl-confirm-title=#{receipts.action.reissue.confirm.title},
+                    data-cl-confirm-message=#{receipts.action.reissue.confirm.message},
+                    data-cl-confirm-action=#{receipts.action.reissue}"
+           th:text="#{receipts.action.reissue}"></a>
+    </div>
+</li>
+
+<!--/* One "Zamknij ręcznie" dialog per attempt that offers it (th:replace runs before th:each, so it sits on its own
+       block); the same form is the page GET …/receipts/close without JavaScript. */-->
+<th:block th:fragment="receiptDialogs">
+    <th:block th:each="close : ${page.documents().closeForms()}"><dialog th:replace="~{orders/details/documents :: receiptCloseDialog(${close})}"></dialog></th:block>
+</th:block>
+
+<dialog th:fragment="receiptCloseDialog(close)" class="cl-dialog is-form" th:id="${close.dialogId()}"
+        th:attr="aria-labelledby=|${close.dialogId()}-title|">
+    <form th:replace="~{orders/details/documents :: receiptCloseForm(${close}, true)}"></form>
+</dialog>
+
+<!--/* The operator records a receipt resolved at the provider: the number is required, the link optional and only a
+       web address (ReceiptAttemptService#closeManually refuses anything else; refusals come back as the page's error). */-->
+<form th:fragment="receiptCloseForm(close, inDialog)" class="cl-form" method="post"
+      th:action="@{/dashboard/orders/{o}/receipts/close(o=${close.orderId()})}">
+    <h2 th:if="${inDialog}" class="cl-dialog-title" th:id="|${close.dialogId()}-title|" th:text="#{receipts.action.close.title}"></h2>
+    <input type="hidden" name="receiptKey" th:value="${close.receiptKey()}">
+    <div th:class="${inDialog} ? 'cl-dialog-body' : 'cl-card-inset'">
+        <p class="cl-help" th:id="${close.helpId()}" th:text="#{receipts.action.close.help}"></p>
+        <div class="cl-form-grid">
+            <div class="cl-span-6 cl-field">
+                <label class="cl-label" th:for="${close.numberId()}" th:text="#{receipts.action.close.number}"></label>
+                <input class="cl-input" type="text" name="number" required autocomplete="off" th:id="${close.numberId()}">
+            </div>
+            <div class="cl-span-6 cl-field">
+                <label class="cl-label" th:for="${close.linkId()}">
+                    <span th:text="#{receipts.action.close.link}"></span>
+                    <span class="cl-optional" th:text="#{form.optional}"></span>
+                </label>
+                <input class="cl-input" type="url" name="link" inputmode="url" autocomplete="off"
+                       th:id="${close.linkId()}" th:attr="aria-describedby=|${close.linkId()}-help|">
+                <p class="cl-help" th:id="|${close.linkId()}-help|" th:text="#{receipts.action.close.link.help}"></p>
+            </div>
+        </div>
+    </div>
+    <div th:class="${inDialog} ? 'cl-dialog-actions' : 'cl-card-footer'">
+        <button type="submit" class="cl-button is-primary" th:text="#{receipts.action.close.submit}"></button>
+        <button th:if="${inDialog}" type="button" class="cl-button" data-cl-dialog-close th:text="#{general.cancel}"></button>
+        <a th:unless="${inDialog}" class="cl-button" th:href="@{/dashboard/orders/{o}(o=${close.orderId()})}" th:text="#{general.cancel}"></a>
+    </div>
+</form>
 
 <!--/* "Add document" (manual receipt/invoice) and "Issue" (invoicing-system document, with an explicit send choice). */-->
 <dialog th:fragment="documentDialog" class="cl-dialog is-form" id="document-dialog" aria-labelledby="document-dialog-title"

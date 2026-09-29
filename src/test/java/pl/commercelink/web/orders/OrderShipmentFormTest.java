@@ -11,6 +11,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class OrderShipmentFormTest {
 
+    // a day after every date the tests type, so "today" is never one of them unless a test says so
+    private static final LocalDateTime NOW = LocalDateTime.of(2026, 9, 30, 15, 42, 7, 500_000_000);
+
     private static OrderShipmentForm posted(String shippedDate) {
         return new OrderShipmentForm("o-1", 0, "v", ShipmentType.Courier, "DPD", "T-1", null, null,
                 shippedDate, null, List.of(), null, null);
@@ -80,6 +83,20 @@ class OrderShipmentFormTest {
     }
 
     @Test
+    void todayIsSavedAsNowSoItNeverFallsBeforeSomethingSwitchedOnEarlierToday() {
+        // given: delivered today, typed by hand into a new shipment; shipped yesterday
+        OrderShipmentForm form = new OrderShipmentForm("o-1", null, null, ShipmentType.Courier, "DPD", "T-1", null, null,
+                "2026-09-29", "2026-09-30", List.of(), null, null);
+
+        // when
+        Shipment shipment = form.toShipment(null, NOW);
+
+        // then
+        assertThat(shipment.getShippedAt()).isEqualTo(LocalDateTime.of(2026, 9, 29, 0, 0));
+        assertThat(shipment.getDeliveredAt()).isEqualTo(LocalDateTime.of(2026, 9, 30, 15, 42, 7));
+    }
+
+    @Test
     void aChangedOrNewDateStartsAtMidnightAndBlankTextFieldsAreStoredAsNothing() {
         // given
         Shipment saved = new Shipment(ShipmentType.Courier);
@@ -88,7 +105,7 @@ class OrderShipmentFormTest {
                 "2026-09-26", "2026-09-29", List.of(), null, null);
 
         // when
-        Shipment shipment = form.toShipment(saved);
+        Shipment shipment = form.toShipment(saved, NOW);
 
         // then
         assertThat(shipment.getShippedAt()).isEqualTo(LocalDateTime.of(2026, 9, 26, 0, 0));

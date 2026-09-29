@@ -294,4 +294,27 @@ class OrderItemRowTest {
         // then
         assertThat(row.hasCodes()).isFalse();
     }
+
+    @Test
+    void splittingASetIsGreyedOnceTheOrderIsInvoicedOrWhileAnEReceiptIsBeingIssued() {
+        // given: splitting rewrites the lines the sale document lists
+        OrderItem bundle = item(FulfilmentStatus.New, "#1xA|1xB");
+        Order invoiced = new Order("store-1");
+        invoiced.addDocument(new Document("r1", "PAR/1", null, DocumentType.Receipt));
+
+        // when
+        ItemAction.State afterDocument = OrderItemRow.actions(bundle, invoiced, false).stream()
+                .filter(a -> a.action() == ItemAction.SPLIT_GROUP).findFirst().orElseThrow();
+        ItemAction.State whileIssuing = OrderItemRow.actions(bundle, new Order("store-1"), true).stream()
+                .filter(a -> a.action() == ItemAction.SPLIT_GROUP).findFirst().orElseThrow();
+        ItemAction.State open = OrderItemRow.actions(bundle, new Order("store-1"), false).stream()
+                .filter(a -> a.action() == ItemAction.SPLIT_GROUP).findFirst().orElseThrow();
+
+        // then
+        assertThat(afterDocument.available()).isFalse();
+        assertThat(afterDocument.reasonKey()).isEqualTo("order.item.unavailable.sale.invoiced");
+        assertThat(whileIssuing.available()).isFalse();
+        assertThat(whileIssuing.reasonKey()).isEqualTo("order.item.unavailable.receipt");
+        assertThat(open.available()).isTrue();
+    }
 }

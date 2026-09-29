@@ -34,6 +34,13 @@ import pl.commercelink.orders.event.OrderEvent;
 import pl.commercelink.orders.event.OrderEventsRepository;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.products.ProductCatalogRepository;
+import pl.commercelink.receipts.ReceiptAlerts;
+import pl.commercelink.receipts.ReceiptAttempt;
+import pl.commercelink.receipts.ReceiptAttemptState;
+import pl.commercelink.receipts.ReceiptOrderView;
+import pl.commercelink.receipts.ReceiptAttemptService;
+import pl.commercelink.receipts.ReceiptOrderState;
+import pl.commercelink.receipts.ReceiptPageProblem;
 import pl.commercelink.stores.FulfilmentConfiguration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
@@ -63,6 +70,8 @@ class OrderPageModelFactoryTest {
     @Mock private ShipmentCarrierOptions shipmentCarrierOptions;
     @Mock private ProductCatalogRepository productCatalogRepository;
     @Mock private TaxonomyCache taxonomyCache;
+    @Mock private ReceiptAttemptService receiptAttemptService;
+    @Mock private ReceiptAlerts receiptAlerts;
     private final DeliveryRedirectResolver deliveryRedirectResolver = new DeliveryRedirectResolver();
     private final DropshipEligibility dropshipEligibility = DropshipEligibilityStubs.acceptingEverySupplier();
     private final MessageSource messageSource = messages();
@@ -82,7 +91,7 @@ class OrderPageModelFactoryTest {
     void setUp() {
         factory = new OrderPageModelFactory(storesRepository, orderEventsRepository, dropshipItemLookup,
                 deliveryRedirectResolver, dropshipEligibility, supplierLabels, shipmentCarrierOptions, productCatalogRepository, taxonomyCache,
-                messageSource);
+                messageSource, receiptAttemptService, receiptAlerts);
         ReflectionTestUtils.setField(factory, "appDomain", "https://app.example");
         Store store = new Store();
         store.setStoreId("store-1");
@@ -90,6 +99,7 @@ class OrderPageModelFactoryTest {
         when(supplierLabels.forStore(any())).thenReturn(new SupplierLabels(mock(StoresRepository.class)).forStore(null));
         when(dropshipItemLookup.itemIdsInDropshipDeliveries(anyString(), any())).thenReturn(Set.of());
         when(orderEventsRepository.findByOrderId(anyString())).thenReturn(List.of());
+        when(receiptAttemptService.orderState(any(), any(), any(), any())).thenReturn(ReceiptOrderState.NONE);
     }
 
     private static Order order(OrderStatus status) {
@@ -879,5 +889,357 @@ class OrderPageModelFactoryTest {
         assertThat(rows.get(0).href()).isNull();
         assertThat(rows.get(0).number()).isEqualTo("PAR/1");
         assertThat(rows.get(1).href()).isEqualTo("https://receipts.example/2");
+    }
+
+    // --- e-receipt in the documents card and the locks while it is being issued -------------------------------------
+
+    private static final String KEY_1 = "o:R1";
+    private static final String KEY_2 = "o:R2";
+
+    private static ReceiptAttempt attempt(String key, int attemptNo, ReceiptAttemptState state) {
+        ReceiptAttempt attempt = new ReceiptAttempt();
+        attempt.setReceiptKey(key);
+        attempt.setAttemptNo(attemptNo);
+        attempt.setState(state);
+        return attempt;
+    }
+
+    private static final ReceiptPageProblem WAITING = new ReceiptPageProblem("Czeka ponad 48 h",
+            "Sprawdź, czy drukarka fiskalna działa.", null, null);
+
+    /** A view row as ReceiptOrderView.of would give it; the flags are what the attempt allows at the moment. */
+    private static ReceiptOrderView.Row row(String key, int attemptNo, ReceiptAttemptState state, String url,
+                                            String number, java.time.Instant fiscalisedAt, ReceiptPageProblem problem,
+                                            boolean canCheck, boolean canClose, boolean canResendEmail, String outcome) {
+        return new ReceiptOrderView.Row(key, state, "receipts.state." + state.name(), "is-info", url, problem, null,
+                null, canCheck, canClose, canResendEmail, attemptNo, number, fiscalisedAt, outcome);
+    }
+
+    private void receipts(ReceiptOrderState state) {
+        when(receiptAttemptService.orderState(any(), any(), any(), any())).thenReturn(state);
+    }
+
+    private static ReceiptOrderState issuing() {
+        return new ReceiptOrderState(List.of(attempt(KEY_1, 1, ReceiptAttemptState.ISSUING)),
+                new ReceiptOrderView(List.of(row(KEY_1, 1, ReceiptAttemptState.ISSUING, null, null, null, null,
+                        true, true, false, null)), false), false, true);
+    }
+
+    @Test
+    void aFiscalisedEReceiptIsOneRowAndItsOrderDocumentIsNotListedAgain() {
+        // given: the attempt attached its document (id = its key); a receipt typed in by hand stays a document row
+        Order order = order(OrderStatus.Delivered);
+        order.addDocument(new Document(KEY_1, "PAR/7/2026", "https://paragony.example/7", DocumentType.Receipt,
+                java.time.LocalDate.of(2026, 9, 28)));
+        order.addDocument(new Document("typed", "PAR/R/1", null, DocumentType.Receipt));
+        receipts(new ReceiptOrderState(List.of(attempt(KEY_1, 1, ReceiptAttemptState.FISCALISED)),
+                new ReceiptOrderView(List.of(row(KEY_1, 1, ReceiptAttemptState.FISCALISED, "https://paragony.example/7",
+                        "PAR/7/2026", java.time.Instant.parse("2026-09-27T23:30:00Z"), null, false, false, false, null)),
+                        false), false, true));
+
+        // when
+        OrderPageModel.DocumentsCard documents = factory.build(order, List.of(), ADMIN, PL).documents();
+
+        // then: the fiscal date is the Polish date (23:30 UTC on the 27th is the 28th in Warsaw)
+        assertThat(documents.rows()).extracting(OrderPageModel.DocumentRow::number).containsExactly("PAR/R/1");
+        OrderPageModel.ReceiptRow receipt = documents.receipt();
+        assertThat(receipt.number()).isEqualTo("PAR/7/2026");
+        assertThat(receipt.href()).isEqualTo("https://paragony.example/7");
+        assertThat(receipt.statusKey()).isEqualTo("receipts.state.FISCALISED");
+        assertThat(receipt.dateKey()).isEqualTo("receipts.row.fiscalised");
+        assertThat(receipt.date()).isEqualTo(OrderFormats.date(java.time.LocalDate.of(2026, 9, 28)));
+        assertThat(receipt.hasActions()).isFalse();
+        assertThat(receipt.earlier()).isEmpty();
+        assertThat(documents.isEmpty()).isFalse();
+    }
+
+    @Test
+    void aDocumentUrlThatIsNotAWebAddressIsNotLinked() {
+        // given
+        receipts(new ReceiptOrderState(List.of(attempt(KEY_1, 1, ReceiptAttemptState.FISCALISED)),
+                new ReceiptOrderView(List.of(row(KEY_1, 1, ReceiptAttemptState.FISCALISED, "javascript:alert(1)",
+                        "PAR/1", null, null, false, false, false, null)), false), false, true));
+
+        // when
+        OrderPageModel.ReceiptRow receipt = factory.build(order(OrderStatus.Delivered), List.of(), ADMIN, PL)
+                .documents().receipt();
+
+        // then
+        assertThat(receipt.href()).isNull();
+        assertThat(receipt.number()).isEqualTo("PAR/1");
+    }
+
+    @Test
+    void earlierAttemptsCollapseUnderTheNewestRowWithTheirOutcomeAndNoActions() {
+        // given: R1 blocked and superseded, R2 waiting for the printer
+        receipts(new ReceiptOrderState(List.of(attempt(KEY_1, 1, ReceiptAttemptState.BLOCKED),
+                attempt(KEY_2, 2, ReceiptAttemptState.PENDING)),
+                new ReceiptOrderView(List.of(
+                        row(KEY_2, 2, ReceiptAttemptState.PENDING, null, null, null, WAITING, true, true, false, null),
+                        row(KEY_1, 1, ReceiptAttemptState.BLOCKED, null, null, null, null, false, false, false, "brak pozycji")),
+                        false), false, true));
+
+        // when
+        OrderPageModel.DocumentsCard documents = factory.build(order(OrderStatus.Shipping), List.of(), ADMIN, PL).documents();
+
+        // then
+        OrderPageModel.ReceiptRow receipt = documents.receipt();
+        assertThat(receipt.attemptNo()).isEqualTo(2);
+        // the page problem travels unchanged from the view row (cause, action, provider details)
+        assertThat(receipt.problem()).isSameAs(WAITING);
+        assertThat(receipt.earlier()).containsExactly(new OrderPageModel.ReceiptEarlierRow(1,
+                "receipts.state.BLOCKED", "is-info", "brak pozycji"));
+        assertThat(receipt.canCheck()).isTrue();
+        assertThat(receipt.canClose()).isTrue();
+        assertThat(receipt.canReissue()).isFalse();
+        assertThat(receipt.closeDialogId()).isEqualTo("receipt-close-2");
+        assertThat(receipt.closeHref()).isEqualTo("/dashboard/orders/" + documents.closeForms().get(0).orderId()
+                + "/receipts/close?receiptKey=o%3AR2");
+        assertThat(documents.closeForms()).extracting(ReceiptCloseForm::dialogId).containsExactly("receipt-close-2");
+    }
+
+    @Test
+    void aSuperAdminSeesTheEReceiptWithoutAnyAction() {
+        // given
+        receipts(issuing());
+
+        // when
+        OrderPageModel.DocumentsCard documents = factory.build(order(OrderStatus.Shipping), List.of(),
+                new OrderPageModelFactory.Viewer(true, false, null), PL).documents();
+
+        // then
+        assertThat(documents.receipt()).isNotNull();
+        assertThat(documents.receipt().hasActions()).isFalse();
+        assertThat(documents.receipt().closeHref()).isNull();
+        assertThat(documents.closeForms()).isEmpty();
+        assertThat(documents.canIssueReceipt()).isFalse();
+    }
+
+    @Test
+    void aClosedOrderKeepsTheReceiptActionsThatChangeTheReceiptButNeverReissues() {
+        // given: a completed order whose e-receipt e-mail failed; a cancelled one whose attempt is still issuing
+        receipts(new ReceiptOrderState(List.of(attempt(KEY_1, 1, ReceiptAttemptState.FISCALISED)),
+                new ReceiptOrderView(List.of(row(KEY_1, 1, ReceiptAttemptState.FISCALISED, "https://p.example/1",
+                        "PAR/1", null, new ReceiptPageProblem("Mail nie wyszedł", null, null, null), false, false, true, null)), true), false, true));
+
+        // when
+        OrderPageModel.ReceiptRow completed = factory.build(order(OrderStatus.Completed), List.of(), ADMIN, PL)
+                .documents().receipt();
+
+        // then
+        assertThat(completed.canResendEmail()).isTrue();
+        assertThat(completed.canReissue()).isFalse();
+    }
+
+    @Test
+    void wystawPonownieIsOfferedOnTheNewestRowOnceEveryAttemptIsDead() {
+        // given
+        receipts(new ReceiptOrderState(List.of(attempt(KEY_1, 1, ReceiptAttemptState.FAILED)),
+                new ReceiptOrderView(List.of(row(KEY_1, 1, ReceiptAttemptState.FAILED, null, null, null,
+                        new ReceiptPageProblem("Odrzucony: VAT", null, null, null), false, false, false, "VAT")), true), false, false));
+
+        // when
+        OrderPageModel.DocumentsCard documents = factory.build(order(OrderStatus.Shipping), List.of(), ADMIN, PL).documents();
+
+        // then: a dead attempt locks nothing, so a receipt may be typed in again as well
+        assertThat(documents.receipt().canReissue()).isTrue();
+        assertThat(documents.receipt().earlier()).isEmpty();
+        assertThat(documents.manualTypes()).extracting(o -> o.value()).contains(DocumentType.Receipt);
+        assertThat(documents.canAdd()).isTrue();
+    }
+
+    @Test
+    void eParagonIsInTheIssueMenuWhenTheOrderCanGetOne() {
+        // given
+        receipts(new ReceiptOrderState(List.of(), new ReceiptOrderView(List.of(), false), true, false));
+
+        // when
+        OrderPageModel.DocumentsCard documents = factory.build(order(OrderStatus.New), List.of(), ADMIN, PL).documents();
+        OrderPageModel.DocumentsCard superAdmin = factory.build(order(OrderStatus.New), List.of(),
+                new OrderPageModelFactory.Viewer(true, false, null), PL).documents();
+
+        // then: a consumer order issues nothing else from the menu, which now exists for the e-receipt alone
+        assertThat(documents.canIssueReceipt()).isTrue();
+        assertThat(documents.canIssue()).isTrue();
+        assertThat(documents.issuable()).isEmpty();
+        assertThat(documents.receipt()).isNull();
+        assertThat(documents.emptyKey()).isEqualTo("order.documents.empty.next.receipt");
+        assertThat(superAdmin.canIssueReceipt()).isFalse();
+        assertThat(superAdmin.canIssue()).isFalse();
+    }
+
+    @Test
+    void whileAnAttemptOwnsTheReceiptNoReceiptIsTypedInAndNothingIsInvoiced() {
+        // given: a business order (issuable types) whose receipt attempt was fiscalised before the document came
+        Order order = b2b(order(OrderStatus.Shipping));
+        receipts(new ReceiptOrderState(List.of(attempt(KEY_1, 1, ReceiptAttemptState.FISCALISED)),
+                new ReceiptOrderView(List.of(row(KEY_1, 1, ReceiptAttemptState.FISCALISED, null, "PAR/1", null, null,
+                        true, false, false, null)), false), false, true));
+
+        // when
+        OrderPageModel.DocumentsCard documents = factory.build(order, List.of(), ADMIN, PL).documents();
+
+        // then: a second sale document is offered neither from the invoicing system nor by hand
+        assertThat(documents.issuable()).isEmpty();
+        assertThat(documents.canIssue()).isFalse();
+        assertThat(documents.canAdd()).isFalse();
+        assertThat(documents.addLockedKey()).isEqualTo("order.documents.add.locked.receipt");
+    }
+
+    @Test
+    void manualTypesLeaveReceiptOutWhileAnAttemptOwnsIt() {
+        // given
+        Order consumer = order(OrderStatus.Shipping);
+
+        // when / then
+        assertThat(OrderPageModelFactory.manualDocumentTypes(consumer, true))
+                .containsExactly(DocumentType.InvoicePersonal);
+        assertThat(OrderPageModelFactory.manualDocumentTypes(consumer, false))
+                .containsExactly(DocumentType.Receipt, DocumentType.InvoicePersonal);
+    }
+
+    @Test
+    void anEReceiptBeingIssuedLocksTheEditsAnIssuedInvoiceLocksWithItsOwnReason() {
+        // given
+        receipts(issuing());
+        OrderItem item = item(FulfilmentStatus.New);
+
+        // when
+        OrderPageModel page = factory.build(order(OrderStatus.New), List.of(item), ADMIN, PL);
+        OrderPageModel empty = factory.build(order(OrderStatus.New), List.of(), ADMIN, PL);
+
+        // then: adding items
+        assertThat(page.items().canAddItems()).isFalse();
+        assertThat(page.items().addItemsReasonKey()).isEqualTo("order.items.add.locked.receipt");
+        // removing, splitting off and moving items (greyed with the reason); routing stays
+        assertThat(page.items().bulkStandalone().action()).isEqualTo(BulkAction.REMOVE);
+        assertThat(page.items().bulkStandalone().reasonKey()).isEqualTo("order.bulk.unavailable.receipt");
+        assertThat(page.items().bulkStandalone().shortReasonKey()).isEqualTo("order.bulk.unavailable.receipt.short");
+        assertThat(page.items().bulkMenus().get(1).actions()).extracting(OrderPageModel.BulkActionButton::reasonKey)
+                .containsOnly("order.bulk.unavailable.receipt");
+        assertThat(page.items().bulkMenus().get(0).actions()).allMatch(OrderPageModel.BulkActionButton::available);
+        // merge on invoice
+        assertThat(page.items().products().get(0).actions()).filteredOn(a -> a.action() == ItemAction.CONSOLIDATE)
+                .singleElement().satisfies(a -> {
+                    assertThat(a.available()).isFalse();
+                    assertThat(a.reasonKey()).isEqualTo("order.item.unavailable.receipt");
+                });
+        // billing details
+        assertThat(page.customer().billingLockedKey()).isEqualTo("order.customer.billing.locked.receipt");
+        assertThat(page.customer().billingEditHref()).isNull();
+        assertThat(page.customer().shippingEditHref()).isNotNull();
+        // documents typed in by hand
+        assertThat(page.documents().canAdd()).isFalse();
+        assertThat(page.documents().addLockedKey()).isEqualTo("order.documents.add.locked.receipt");
+        // deleting the (item-less) order
+        assertThat(empty.header().canDelete()).isFalse();
+    }
+
+    @Test
+    void onceTheReceiptDocumentIsOnTheOrderTheInvoicedLocksApplyByThemselves() {
+        // given: fiscalised and attached — Receipt is a closing document, so the order is invoiced
+        Order order = order(OrderStatus.Delivered);
+        order.addDocument(new Document(KEY_1, "PAR/1", null, DocumentType.Receipt));
+        receipts(new ReceiptOrderState(List.of(attempt(KEY_1, 1, ReceiptAttemptState.FISCALISED)),
+                new ReceiptOrderView(List.of(row(KEY_1, 1, ReceiptAttemptState.FISCALISED, null, "PAR/1", null, null,
+                        false, false, false, null)), false), false, true));
+
+        // when
+        OrderPageModel page = factory.build(order, List.of(item(FulfilmentStatus.Delivered)), ADMIN, PL);
+
+        // then
+        assertThat(order.isInvoiced()).isTrue();
+        assertThat(page.items().addItemsReasonKey()).isEqualTo("order.items.add.locked.invoiced");
+        assertThat(page.items().bulkStandalone()).isNull();
+        assertThat(page.customer().billingLockedKey()).isEqualTo("order.customer.billing.locked");
+        assertThat(page.documents().canAdd()).isFalse();
+        assertThat(page.documents().addLockedKey()).isNull();
+    }
+
+    @Test
+    void theLockKeysOfTheControllerAgreeWithThePage() {
+        // given
+        Order order = order(OrderStatus.New);
+
+        // when / then
+        assertThat(OrderPageModelFactory.addItemsLockedKey(order, false, true)).isEqualTo("order.items.add.locked.receipt");
+        assertThat(OrderPageModelFactory.addItemsLockedKey(order, false, false)).isNull();
+        assertThat(OrderPageModelFactory.addDocumentLockedKey(order, DocumentType.InvoicePersonal, true))
+                .isEqualTo("order.documents.add.locked.receipt");
+        assertThat(OrderPageModelFactory.addDocumentLockedKey(order, DocumentType.InvoicePersonal, false)).isNull();
+        assertThat(OrderPageModelFactory.bulkReason(BulkAction.ALLOCATE, true, false, true)).isNull();
+        assertThat(OrderPageModelFactory.bulkReason(BulkAction.SPLIT, true, false, true)).isEqualTo(BulkReason.RECEIPT_ISSUING);
+        assertThat(CustomerView.lockedKey(order, false, true)).isNull();
+    }
+
+    // --- cancelling against the e-receipt: waits for the outcome, warns once it is fiscalised ------------------------
+
+    /** A delivered order whose only product came back: the order could be cancelled (Order#canBeCancelled). */
+    private static List<OrderItem> returnedItems() {
+        return List.of(item(FulfilmentStatus.Returned));
+    }
+
+    @Test
+    void cancellingWaitsForTheEReceiptBeingIssuedWithItsOwnReason() {
+        // given
+        receipts(issuing());
+
+        // when
+        OrderPageModel.Header header = factory.build(order(OrderStatus.Delivered), returnedItems(), ADMIN, PL).header();
+
+        // then
+        assertThat(header.canCancel()).isFalse();
+        assertThat(header.cancelLockedKey()).isEqualTo("order.page.cancel.locked.receipt");
+    }
+
+    @Test
+    void anOrderThatCannotBeCancelledAnywayKeepsTheGeneralReasonWhileIssuing() {
+        // given
+        receipts(issuing());
+
+        // when
+        OrderPageModel.Header header = factory.build(order(OrderStatus.Shipping), List.of(item(FulfilmentStatus.Delivered)),
+                ADMIN, PL).header();
+
+        // then
+        assertThat(header.canCancel()).isFalse();
+        assertThat(header.cancelLockedKey()).isNull();
+    }
+
+    @Test
+    void theCancelConfirmationWarnsOnlyOnceTheEReceiptIsFiscalised() {
+        // given: fiscalised and attached, so the order is invoiced and nothing waits any more
+        Order fiscalised = order(OrderStatus.Delivered);
+        fiscalised.addDocument(new Document(KEY_1, "PAR/1", null, DocumentType.Receipt));
+        receipts(new ReceiptOrderState(List.of(attempt(KEY_1, 1, ReceiptAttemptState.FISCALISED)),
+                new ReceiptOrderView(List.of(row(KEY_1, 1, ReceiptAttemptState.FISCALISED, null, "PAR/1", null, null,
+                        false, false, false, null)), false), false, true));
+
+        // when
+        OrderPageModel.Header withReceipt = factory.build(fiscalised, returnedItems(), ADMIN, PL).header();
+        receipts(ReceiptOrderState.NONE);
+        OrderPageModel.Header without = factory.build(order(OrderStatus.Delivered), returnedItems(), ADMIN, PL).header();
+
+        // then
+        assertThat(withReceipt.canCancel()).isTrue();
+        assertThat(withReceipt.cancelLockedKey()).isNull();
+        assertThat(withReceipt.cancelMessage()).isEqualTo(
+                "Zamówienie przejdzie w status Anulowane, a ceny usług zostaną wyzerowane. Zamówienie ma zafiskalizowany"
+                        + " e-paragon — anulowanie go nie cofa. Zwrot rozlicz osobno (korekta lub zwrot).");
+        assertThat(without.canCancel()).isTrue();
+        assertThat(without.cancelMessage()).isEqualTo("Zamówienie przejdzie w status Anulowane, a ceny usług zostaną wyzerowane.");
+    }
+
+    @Test
+    void aManuallyClosedEReceiptCountsAsFiscalisedForTheWarning() {
+        // given
+        Order order = order(OrderStatus.Delivered);
+
+        // when / then
+        assertThat(new ReceiptOrderState(List.of(attempt(KEY_1, 1, ReceiptAttemptState.CLOSED_MANUALLY)),
+                new ReceiptOrderView(List.of(), false), false, true).hasFiscalisedReceipt(order)).isTrue();
+        assertThat(new ReceiptOrderState(List.of(attempt(KEY_1, 1, ReceiptAttemptState.FAILED)),
+                new ReceiptOrderView(List.of(), true), false, false).hasFiscalisedReceipt(order)).isFalse();
+        assertThat(ReceiptOrderState.NONE.hasFiscalisedReceipt(order)).isFalse();
     }
 }

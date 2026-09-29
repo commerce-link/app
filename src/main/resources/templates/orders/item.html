@@ -77,7 +77,10 @@
                             <div class="cl-form-grid">
                                 <div class="cl-span-6 cl-field">
                                     <label class="cl-label" for="item-name" th:text="#{order.item.name}"></label>
-                                    <input class="cl-input" id="item-name" type="text" name="name" th:value="${item.name}">
+                                    <!--/* read-only, not disabled: the value is posted and the server checks it is unchanged */-->
+                                    <input class="cl-input" id="item-name" type="text" name="name" th:value="${item.name}" th:readonly="${saleLock != null}"
+                                           th:attr="aria-describedby=${saleLock != null} ? 'item-name-help' : null">
+                                    <p th:if="${saleLock != null}" class="cl-help" id="item-name-help" th:text="#{${saleLock.nameKey()}}"></p>
                                 </div>
                                 <div class="cl-span-3 cl-field">
                                     <label class="cl-label" for="item-category" th:text="#{order.item.category}"></label>
@@ -119,13 +122,15 @@
                             <div class="cl-form-grid">
                                 <div class="cl-span-1 cl-field">
                                     <label class="cl-label" for="item-qty" th:text="#{order.item.quantity}"></label>
-                                    <input class="cl-input" id="item-qty" type="text" inputmode="numeric" name="qty" th:value="${item.qty}" th:disabled="${!fullEdit}">
+                                    <input class="cl-input" id="item-qty" type="text" inputmode="numeric" name="qty" th:value="${item.qty}" th:disabled="${!fullEdit}"
+                                           th:readonly="${fullEdit and saleLock != null}"
+                                           th:attr="aria-describedby=${fullEdit and saleLock != null} ? 'item-sale-help' : null">
                                 </div>
                                 <div class="cl-span-2 cl-field">
                                     <label class="cl-label" for="item-price" th:text="#{order.item.form.price}"></label>
                                     <input class="cl-input" id="item-price" type="text" name="price" th:value="${item.price}" th:disabled="${priceLocked}"
                                            th:attr="aria-describedby=${priceLocked} ? 'item-price-help' : null">
-                                    <p th:if="${priceLocked}" class="cl-help" id="item-price-help" th:text="#{order.item.form.price.locked}"></p>
+                                    <p th:if="${priceLocked}" class="cl-help" id="item-price-help" th:text="#{${priceLockedKey != null ? priceLockedKey : 'order.item.form.price.locked'}}"></p>
                                 </div>
                                 <div class="cl-span-2 cl-field">
                                     <label class="cl-label" for="item-cost" th:text="#{order.item.form.cost}"></label>
@@ -134,9 +139,11 @@
                                 <div class="cl-span-1 cl-field">
                                     <label class="cl-label" for="item-tax" th:text="#{order.item.page.tax}"></label>
                                     <input class="cl-input" id="item-tax" type="text" name="tax" th:value="${item.tax}" th:disabled="${!fullEdit}"
-                                           aria-describedby="item-numbers-help">
+                                           th:readonly="${fullEdit and saleLock != null}"
+                                           th:attr="aria-describedby=${fullEdit and saleLock != null} ? 'item-sale-help item-numbers-help' : 'item-numbers-help'">
                                 </div>
                             </div>
+                            <p th:if="${fullEdit and saleLock != null}" class="cl-help" id="item-sale-help" th:text="#{${saleLock.numbersKey()}}"></p>
                             <p class="cl-help" id="item-numbers-help" th:text="#{order.item.page.numbers.help}"></p>
                         </fieldset>
 
@@ -168,7 +175,7 @@
                                         <span th:text="#{order.item.consolidated}"></span>
                                     </label>
                                     <p th:if="${consolidationLocked}" class="cl-check-description" id="item-consolidated-help"
-                                       th:text="#{order.item.consolidation.locked}"></p>
+                                       th:text="#{${consolidationLockedKey != null ? consolidationLockedKey : 'order.item.consolidation.locked'}}"></p>
                                 </div>
                                 <div class="cl-span-6 cl-field">
                                     <label class="cl-label" for="item-comment"><span th:text="#{order.item.comment}"></span> <span class="cl-optional" th:text="#{form.optional}"></span></label>

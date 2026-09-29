@@ -30,6 +30,8 @@
 
             <th:block th:unless="${page.superAdmin()}">
                 <dialog th:replace="~{fragments/confirm-dialog :: dialog}"></dialog>
+                <!--/* e-receipt actions change the receipt, not the order, so a closed order keeps them (not in readOnly) */-->
+                <th:block th:replace="~{orders/details/documents :: receiptDialogs}"></th:block>
                 <th:block th:unless="${page.readOnly()}">
                     <th:block th:with="statusOptions=${page.statusOptions()}, orderId=${page.orderId()}, shortId=${page.shortId()}">
                         <dialog th:replace="~{orders/details/status-dialog :: dialog}"></dialog>

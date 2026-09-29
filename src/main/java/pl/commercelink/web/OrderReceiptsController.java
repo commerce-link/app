@@ -16,15 +16,23 @@ import pl.commercelink.receipts.ReceiptAttemptKeys;
 import pl.commercelink.receipts.ReceiptAttemptService;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.starter.security.model.CustomUser;
+import pl.commercelink.receipts.ReceiptAttempt;
+import pl.commercelink.receipts.ReceiptAttemptState;
+import pl.commercelink.starter.util.ConversionUtil;
+import pl.commercelink.web.orders.OrderConfirmPages;
+import pl.commercelink.web.orders.OrderFlash;
+import pl.commercelink.web.orders.ReceiptCloseForm;
 import pl.commercelink.web.settings.ConfirmAction;
 
 import java.util.Locale;
+import java.util.Optional;
 
 /**
- * Operator actions on an order's e-receipt attempts. Each refusal names its reason; nothing here calls a provider.
- * "Wystaw ponownie" is confirmed first: there is no button variant of {@code confirm-dialog.js}, only the
- * {@code a[data-cl-confirm]} link one used across the settings screens, so it links here for a plain confirmation
- * page and is enhanced into the same dialog with JavaScript, exactly like every other confirmed link in the app.
+ * Operator actions on an order's e-receipt attempts, from the e-receipt row of the order's documents card. Each
+ * refusal names its reason (the layout's error flash); a success is the order page's own notice (OrderFlash), like
+ * every other action of the page. Nothing here calls a provider. "E-paragon" and "Wystaw ponownie" are confirmed
+ * first: the {@code a[data-cl-confirm]} links lead to a plain confirmation page here, which JavaScript turns into the
+ * page's confirmation dialog; "Zamknij ręcznie" opens its dialog, or its own page here without JavaScript.
  */
 @Controller
 @RequiredArgsConstructor
@@ -43,7 +51,7 @@ public class OrderReceiptsController {
                 messageSource.getMessage("receipts.action.reissue", null, locale),
                 orderPath + "/receipts/reissue",
                 orderPath));
-        model.addAttribute("backLabel", messageSource.getMessage("receipts.action.reissue.confirm.back", null, locale));
+        model.addAttribute("backLabel", backLabel(orderId, locale));
         return "settings-confirm";
     }
 
@@ -52,6 +60,25 @@ public class OrderReceiptsController {
     public String reissue(@PathVariable String orderId, Locale locale, RedirectAttributes redirectAttributes) {
         return run(orderId, locale, redirectAttributes, "receipts.action.reissue.done",
                 () -> attemptService.reissue(CustomSecurityContext.getStoreId(), orderId, actor()));
+    }
+
+    /**
+     * The "E-paragon" entry of the "Issue" menu without JavaScript. An order that already has an attempt is sent back
+     * with the reason at once, as the POST would refuse it; the POST still checks everything itself.
+     */
+    @GetMapping("/dashboard/orders/{orderId}/receipts/issue")
+    @PreAuthorize("!hasRole('SUPER_ADMIN')")
+    public String confirmIssue(@PathVariable String orderId, Locale locale, Model model,
+                               RedirectAttributes redirectAttributes) {
+        if (!attemptService.attemptsOf(CustomSecurityContext.getStoreId(), orderId).isEmpty()) {
+            return refuse(orderId, "receipts.action.issue.exists", locale, redirectAttributes);
+        }
+        String orderPath = "/dashboard/orders/" + orderId;
+        return OrderConfirmPages.render(model, new ConfirmAction(
+                messageSource.getMessage("receipts.action.issue.confirm.title", null, locale),
+                messageSource.getMessage("receipts.action.issue.confirm.message", null, locale),
+                messageSource.getMessage("receipts.action.issue.confirm.action", null, locale),
+                orderPath + "/receipts/issue", orderPath, false), backLabel(orderId, locale));
     }
 
     @PostMapping("/dashboard/orders/{orderId}/receipts/issue")
@@ -81,6 +108,31 @@ public class OrderReceiptsController {
         });
     }
 
+    /**
+     * "Zamknij ręcznie" without JavaScript: the dialog's form on its own page. Only an attempt of this order that can
+     * still be closed (issuing or waiting for the printer) gets the form; anything else goes back with the reason.
+     */
+    @GetMapping("/dashboard/orders/{orderId}/receipts/close")
+    @PreAuthorize("!hasRole('SUPER_ADMIN')")
+    public String closePage(@PathVariable String orderId, @RequestParam String receiptKey, Locale locale, Model model,
+                            RedirectAttributes redirectAttributes) {
+        if (!receiptKey.startsWith(ReceiptAttemptKeys.orderPrefix(orderId))) {
+            return refuse(orderId, "receipts.action.notFound", locale, redirectAttributes);
+        }
+        Optional<ReceiptAttempt> attempt = attemptService.attemptsOf(CustomSecurityContext.getStoreId(), orderId).stream()
+                .filter(a -> receiptKey.equals(a.getReceiptKey())).findFirst();
+        if (attempt.isEmpty()) {
+            return refuse(orderId, "receipts.action.notFound", locale, redirectAttributes);
+        }
+        ReceiptAttemptState state = attempt.get().getState();
+        if (state != ReceiptAttemptState.ISSUING && state != ReceiptAttemptState.PENDING) {
+            return refuse(orderId, "receipts.action.close.notHung", locale, redirectAttributes);
+        }
+        model.addAttribute("close", new ReceiptCloseForm(orderId, receiptKey, attempt.get().getAttemptNo()));
+        model.addAttribute("shortId", ConversionUtil.getShortenedId(orderId));
+        return "orders/receipt-close";
+    }
+
     @PostMapping("/dashboard/orders/{orderId}/receipts/close")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String close(@PathVariable String orderId, @RequestParam String receiptKey,
@@ -99,11 +151,21 @@ public class OrderReceiptsController {
                        Runnable action) {
         try {
             action.run();
-            redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage(successKey, null, locale));
+            OrderFlash.saved(redirectAttributes, messageSource.getMessage(successKey, null, locale));
         } catch (ReceiptActionException e) {
             redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage(e.getMessageKey(), null, locale));
         }
         return "redirect:/dashboard/orders/" + orderId;
+    }
+
+    private String refuse(String orderId, String key, Locale locale, RedirectAttributes redirectAttributes) {
+        redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage(key, null, locale));
+        return "redirect:/dashboard/orders/" + orderId;
+    }
+
+    /** The confirmation pages lead back to the order by its number, as the order page's own confirmation pages do. */
+    private String backLabel(String orderId, Locale locale) {
+        return messageSource.getMessage("order.page.title", new Object[]{ConversionUtil.getShortenedId(orderId)}, locale);
     }
 
     private static void requireOwnKey(String orderId, String receiptKey) {

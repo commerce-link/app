@@ -7,9 +7,16 @@ import java.util.Locale;
 /** The e-receipt section of the order screen: every attempt, newest first, and whether a new one may be issued. */
 public record ReceiptOrderView(List<Row> rows, boolean canReissue) {
 
+    /**
+     * problem is the newest attempt's problem as the order page words it (cause, action, provider details), null
+     * without one; attemptNo, receiptNumber and fiscalisedAt are the attempt's own; outcome is the short reason a dead attempt
+     * fiscalised nothing (blocked reason or the provider's refusal), shown for earlier attempts, whose problem is
+     * cleared once a newer attempt supersedes them.
+     */
     public record Row(String key, ReceiptAttemptState state, String statusKey, String statusTone, String documentUrl,
-                      String problem, Instant emailSentAt, Instant emailSkippedAt, boolean canCheck, boolean canClose,
-                      boolean canResendEmail) {
+                      ReceiptPageProblem problem, Instant emailSentAt, Instant emailSkippedAt, boolean canCheck, boolean canClose,
+                      boolean canResendEmail, int attemptNo, String receiptNumber, Instant fiscalisedAt,
+                      String outcome) {
     }
 
     public boolean isEmpty() {
@@ -26,14 +33,17 @@ public record ReceiptOrderView(List<Row> rows, boolean canReissue) {
                     // A dead attempt superseded by a newer one no longer needs the operator's attention: only the
                     // newest attempt of the order still shows a problem.
                     boolean superseded = a.getState().isDead() && a.getAttemptNo() < maxAttemptNo;
-                    String problem = attention == null || superseded ? null : alerts.message(a, attention, locale);
+                    ReceiptPageProblem problem = attention == null || superseded ? null
+                            : alerts.pageProblem(a, attention, locale);
                     return new Row(a.getReceiptKey(), a.getState(), "receipts.state." + a.getState().name(),
                             tone(a.getState()), a.getDocumentUrl(), problem, a.getEmailSentAt(),
                             a.getEmailSkippedAt(),
                             a.isScheduled() && !a.isLeasedAt(now),
                             (a.getState() == ReceiptAttemptState.ISSUING || a.getState() == ReceiptAttemptState.PENDING)
                                     && !a.isLeasedAt(now),
-                            a.emailFailed() && !a.isLeasedAt(now));
+                            a.emailFailed() && !a.isLeasedAt(now),
+                            a.getAttemptNo(), a.getReceiptNumber(), a.getFiscalisedAt(),
+                            a.getState().isDead() ? alerts.outcome(a, locale) : null);
                 })
                 .toList();
         boolean allDead = attempts.stream().allMatch(a -> a.getState().isDead());
