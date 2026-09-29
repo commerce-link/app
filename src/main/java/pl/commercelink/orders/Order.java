@@ -160,14 +160,15 @@ public class Order {
     }
 
     /**
-     * Nothing is left to deliver before the order can settle: every shipment is delivered, or the order has none and
-     * has not gone out. An order that never had a shipment (a service, a sale settled on the spot) completes on payment
-     * and invoice alone, as it always has; a Shipping order without shipments lost its only one to a removal and waits
-     * for a new one instead of completing.
+     * Nothing is left to deliver before the order can settle: every shipment is delivered. An order without shipments
+     * waits in every status before Delivered: every order is created with a shipment waiting to go out and removing
+     * the only one leaves such a placeholder, so an empty list before delivery means the shipments were lost, never
+     * that the goods reached the customer; settling it on payment and invoice alone would complete an order that never
+     * shipped. Only a legacy order already Delivered (or Completed) without shipments settles.
      */
     @DynamoDBIgnore
     public boolean hasNothingLeftToDeliver() {
-        return shipments.isEmpty() ? status != OrderStatus.Shipping : isDelivered();
+        return shipments.isEmpty() ? hasOneOfStatuses(OrderStatus.Delivered, OrderStatus.Completed) : isDelivered();
     }
 
     @DynamoDBIgnore

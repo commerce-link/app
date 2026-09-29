@@ -460,6 +460,9 @@ class OrderDetailsTemplateTest {
         // given: the second shipment has a courier order, cancelled with "Cancel courier order" instead of removed
         Order order = order(OrderStatus.Realization);
         Shipment labelled = new Shipment(ShipmentType.Courier);
+        labelled.setCarrier("DPD");
+        labelled.setTrackingNo("T-1");
+        labelled.setShippedAt(java.time.LocalDateTime.of(2026, 9, 28, 9, 0));
         labelled.setExternalId("EXT-1");
         order.addShipment(labelled);
         String version = OrderShipmentForm.version(order.getShipments().get(0));
@@ -566,6 +569,30 @@ class OrderDetailsTemplateTest {
         for (String field : List.of("type", "trackingNo", "collectionPointCode", "trackingUrl", "shippedDate", "deliveredDate")) {
             assertThat(dialog).contains("for=\"shipment-0-" + field + "\"").contains("id=\"shipment-0-" + field + "\"");
         }
+    }
+
+    @Test
+    void aCourierShipmentDialogShowsItsCarrierAndNumberReadOnlyAndNoDateAfterToday() {
+        // given: the carrier gave the number with the courier order
+        Order order = order(OrderStatus.Shipping);
+        Shipment shipment = order.getShipments().get(0);
+        shipment.setCarrier("DPD");
+        shipment.setTrackingNo("T-1");
+        shipment.setShippedAt(LocalDateTime.of(2026, 9, 27, 10, 30));
+        shipment.setExternalId("EXT-1");
+        String today = java.time.LocalDate.now(OrderShipmentForm.OPERATOR_ZONE).toString();
+
+        // when
+        String dialog = dialog(page(render(order, ADMIN)), "shipment-dialog-0");
+
+        // then: no picker to change the carrier with, both fields posted as they are, the reason read with them
+        assertThat(dialog).doesNotContain("shipment-0-carrierSelect")
+                .containsPattern("id=\"shipment-0-carrier\"[^>]*aria-describedby=\"shipment-0-courierLocked\"[^>]*readonly")
+                .containsPattern("id=\"shipment-0-trackingNo\"[^>]*value=\"T-1\"[^>]*aria-describedby=\"shipment-0-courierLocked\"[^>]*readonly")
+                .contains("id=\"shipment-0-courierLocked\">Numer nadał przewoźnik — anuluj zamówienie kuriera, żeby go zmienić.</p>")
+                .doesNotContainPattern("id=\"shipment-0-collectionPointCode\"[^>]*readonly")
+                .containsPattern("id=\"shipment-0-shippedDate\"[^>]*max=\"" + today + "\"")
+                .containsPattern("id=\"shipment-0-deliveredDate\"[^>]*max=\"" + today + "\"");
     }
 
     @Test

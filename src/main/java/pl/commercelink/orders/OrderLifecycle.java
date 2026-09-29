@@ -61,8 +61,8 @@ public class OrderLifecycle {
         // The item fetch + dropship lookup below is only relevant once the order can possibly be Delivered
         // (either already is, or has just reached that point earlier in this same update). Every other status
         // short-circuits before paying for it, keeping this out of the hot path for New/Assembly/Shipping etc.
-        // It asks what isSettled asks, so an order without shipments that settles on payment and invoice still
-        // waits for its warehouse document.
+        // It asks what isSettled asks, so a legacy Delivered order without shipments still waits for its
+        // warehouse document.
         boolean warehouseDocumentsRequired = documentsGenerationEnabled
                 && (order.getStatus() == OrderStatus.Delivered || order.hasNothingLeftToDeliver())
                 && warehouseDocumentsRequired(order, orderItems);
@@ -109,7 +109,8 @@ public class OrderLifecycle {
                     });
         }
 
-        // isDelivered is false without shipments: removing the only shipment of a Shipping order keeps it Shipping
+        // isDelivered is false without shipments, and so is hasNothingLeftToDeliver before Delivered: an order that
+        // lost its shipments waits for a new one in whatever status it is, it is neither delivered nor completed
         if (order.getStatus() == OrderStatus.Shipping && order.isDelivered()) {
             order.setStatus(OrderStatus.Delivered);
         }

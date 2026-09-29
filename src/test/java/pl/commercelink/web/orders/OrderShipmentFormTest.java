@@ -4,8 +4,13 @@ import org.junit.jupiter.api.Test;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShipmentType;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -130,5 +135,101 @@ class OrderShipmentFormTest {
         // then
         assertThat(sameMinute).isEqualTo(version);
         assertThat(OrderShipmentForm.version(shipment)).isNotEqualTo(version);
+    }
+
+    // 2026-09-29 15:00 in Warsaw
+    private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-09-29T13:00:00Z"), ZoneOffset.UTC);
+
+    private static OrderShipmentForm dated(String shippedDate, String deliveredDate) {
+        return new OrderShipmentForm("o-1", 0, "v", ShipmentType.Courier, "DPD", "T-1", null, null,
+                shippedDate, deliveredDate, List.of(), null, null).withClock(CLOCK);
+    }
+
+    private static Shipment courierOrder() {
+        Shipment saved = new Shipment(ShipmentType.Courier);
+        saved.setCarrier("DPD");
+        saved.setTrackingNo("T-1");
+        saved.setExternalId("EXT-1");
+        saved.markTrackingActive("21037943");
+        return saved;
+    }
+
+    @Test
+    void editingTheTrackingNumberKeepsTheCourierOrder() {
+        // given: whatever reaches toShipment, the paid label at the carrier must not be lost with a changed number
+        Shipment saved = courierOrder();
+        OrderShipmentForm form = new OrderShipmentForm("o-1", 0, "v", ShipmentType.Courier, "DPD", "T-2", null, null,
+                null, null, List.of(), null, null);
+
+        // when
+        Shipment shipment = form.toShipment(saved);
+
+        // then: the courier order stays, the tracking subscription belonged to the old number
+        assertThat(shipment.getExternalId()).isEqualTo("EXT-1");
+        assertThat(shipment.getTrackingSubscriptionStatus()).isNull();
+    }
+
+    @Test
+    void changingTheCarrierOfACourierShipmentIsAFieldError() {
+        // given
+        Shipment saved = courierOrder();
+        OrderShipmentForm carrierChanged = new OrderShipmentForm("o-1", 0, "v", ShipmentType.Courier, "GLS", "T-1",
+                null, null, null, null, List.of(), null, null);
+        OrderShipmentForm numberCleared = new OrderShipmentForm("o-1", 0, "v", ShipmentType.Courier, "DPD", " ",
+                null, null, null, null, List.of(), null, null);
+        OrderShipmentForm urlAdded = new OrderShipmentForm("o-1", 0, "v", ShipmentType.Courier, " DPD ", "T-1",
+                null, "https://tracking.example/T-1", null, null, List.of(), null, null);
+
+        // when / then
+        assertThat(carrierChanged.validate(saved)).containsOnly(
+                Map.entry("shipment-0-carrier", "order.shipments.error.courierLocked"));
+        assertThat(numberCleared.validate(saved)).containsOnly(
+                Map.entry("shipment-0-trackingNo", "order.shipments.error.courierLocked"));
+        assertThat(urlAdded.validate(saved)).isEmpty();
+        assertThat(OrderShipmentForm.of("o-1", 0, saved, List.of()).courierOrder()).isTrue();
+    }
+
+    @Test
+    void aDeliveryDateInTheFutureIsAFieldError() {
+        // when
+        Map<String, String> tomorrow = dated("2026-09-29", "2026-09-30").validate();
+        Map<String, String> shippedTomorrow = dated("2026-09-30", null).validate();
+        Map<String, String> today = dated("2026-09-29", "2026-09-29").validate();
+
+        // then
+        assertThat(tomorrow).containsOnly(Map.entry("shipment-0-deliveredDate", "order.shipments.error.future"));
+        assertThat(shippedTomorrow).containsOnly(Map.entry("shipment-0-shippedDate", "order.shipments.error.future"));
+        assertThat(today).isEmpty();
+    }
+
+    @Test
+    void aDeliveryDateBeforeTheShippedDateIsAFieldError() {
+        // when
+        Map<String, String> before = dated("2026-09-28", "2026-09-27").validate();
+        Map<String, String> sameDay = dated("2026-09-28", "2026-09-28").validate();
+        Map<String, String> deliveredOnly = dated(null, "2026-09-27").validate();
+
+        // then
+        assertThat(before).containsOnly(
+                Map.entry("shipment-0-deliveredDate", "order.shipments.error.deliveredBeforeShipped"));
+        assertThat(sameDay).isEmpty();
+        assertThat(deliveredOnly).isEmpty();
+    }
+
+    @Test
+    void todayIsTheWarsawDayOnAServerRunningInUtc() {
+        // given: 23:30 UTC on the 29th is 01:30 on the 30th in Warsaw
+        Clock utcLateEvening = Clock.fixed(Instant.parse("2026-09-29T23:30:00Z"), ZoneOffset.UTC);
+        OrderShipmentForm form = new OrderShipmentForm("o-1", null, null, ShipmentType.Courier, "DPD", "T-1", null, null,
+                "2026-09-30", "2026-09-30", List.of(), null, null).withClock(utcLateEvening);
+
+        // when
+        Map<String, String> errors = form.validate();
+        Shipment shipment = form.toShipment(null);
+
+        // then: the operator's today is offered, accepted and saved as the moment it is recorded
+        assertThat(form.today()).isEqualTo(LocalDate.of(2026, 9, 30));
+        assertThat(errors).isEmpty();
+        assertThat(shipment.getDeliveredAt()).isEqualTo(LocalDateTime.of(2026, 9, 30, 1, 30));
     }
 }

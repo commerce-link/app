@@ -4,8 +4,10 @@ import org.apache.commons.lang3.StringUtils;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShipmentType;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
 import java.util.LinkedHashMap;
@@ -23,17 +25,35 @@ import java.util.stream.Stream;
  * The shipped and delivered moments are edited as dates only: the operator does not need the hour, and a date picker
  * closes on the first click. A date equal to the saved one keeps the saved moment with its time (the tracking and the
  * integrations store it to the minute); a new or changed date starts at midnight, which the card shows as the date
- * alone. A blank date clears the moment.
+ * alone. A blank date clears the moment. Both are facts that already happened, so neither may be after today, and
+ * the delivery not before the shipping; "today" is the operator's day, in Warsaw, whatever the server's zone.
+ * <p>
+ * courierOrder: the shipment has a courier order (a paid label whose number the carrier gave), so its carrier and
+ * tracking number are shown read-only and a change of either is refused; "Cancel courier order" is the way to change
+ * them.
  */
 public record OrderShipmentForm(String orderId, Integer index, String version, ShipmentType type, String carrier,
                                 String trackingNo, String collectionPointCode, String trackingUrl,
                                 String shippedDate, String deliveredDate,
-                                List<String> carriers, Map<String, String> errors, String refusal) {
+                                List<String> carriers, Map<String, String> errors, String refusal,
+                                boolean courierOrder, Clock clock) {
+
+    /** The operator's day: the store's customers and staff are in Poland, the server runs in UTC. */
+    public static final ZoneId OPERATOR_ZONE = ZoneId.of("Europe/Warsaw");
 
     public OrderShipmentForm {
         type = type != null ? type : ShipmentType.Courier;
         carriers = carriers != null ? carriers : List.of();
         errors = errors != null ? errors : Map.of();
+        clock = clock != null ? clock : Clock.system(OPERATOR_ZONE);
+    }
+
+    public OrderShipmentForm(String orderId, Integer index, String version, ShipmentType type, String carrier,
+                             String trackingNo, String collectionPointCode, String trackingUrl,
+                             String shippedDate, String deliveredDate,
+                             List<String> carriers, Map<String, String> errors, String refusal) {
+        this(orderId, index, version, type, carrier, trackingNo, collectionPointCode, trackingUrl, shippedDate,
+                deliveredDate, carriers, errors, refusal, false, null);
     }
 
     /** The form of the shipment at index, or of a new one when shipment is null. */
@@ -44,7 +64,23 @@ public record OrderShipmentForm(String orderId, Integer index, String version, S
         }
         return new OrderShipmentForm(orderId, index, version(shipment), shipment.getType(), shipment.getCarrier(),
                 shipment.getTrackingNo(), shipment.getCollectionPointCode(), shipment.getTrackingUrl(),
-                date(shipment.getShippedAt()), date(shipment.getDeliveredAt()), carriers, Map.of(), null);
+                date(shipment.getShippedAt()), date(shipment.getDeliveredAt()), carriers, Map.of(), null,
+                shipment.getExternalId() != null, null);
+    }
+
+    /** The same form telling "today" by clock. */
+    public OrderShipmentForm withClock(Clock clock) {
+        return new OrderShipmentForm(orderId, index, version, type, carrier, trackingNo, collectionPointCode, trackingUrl,
+                shippedDate, deliveredDate, carriers, errors, refusal, courierOrder, clock);
+    }
+
+    /** The operator's today, the latest date the date fields offer (their max), whatever zone clock is in. */
+    public LocalDate today() {
+        return now().toLocalDate();
+    }
+
+    private LocalDateTime now() {
+        return LocalDateTime.ofInstant(clock.instant(), OPERATOR_ZONE);
     }
 
     /**
@@ -96,8 +132,16 @@ public record OrderShipmentForm(String orderId, Integer index, String version, S
         return StringUtils.isBlank(carrier) || carriers.contains(carrier);
     }
 
-    /** Field id to message key, in the order of the form. */
+    /** {@link #validate(Shipment)} of a new shipment. */
     public Map<String, String> validate() {
+        return validate(null);
+    }
+
+    /**
+     * Field id to message key, in the order of the form. saved is the shipment the form edits (null for a new one): one
+     * with a courier order keeps its carrier and tracking number.
+     */
+    public Map<String, String> validate(Shipment saved) {
         Map<String, String> found = new LinkedHashMap<>();
         // a new shipment with nothing in it would only hold the order back from Delivered (every shipment needs a
         // delivery date); the type alone is not a shipment
@@ -105,17 +149,29 @@ public record OrderShipmentForm(String orderId, Integer index, String version, S
                 .allMatch(StringUtils::isBlank)) {
             found.put(field("trackingNo"), "order.shipments.error.empty");
         }
-        checkDate(found, "shippedDate", shippedDate);
-        checkDate(found, "deliveredDate", deliveredDate);
+        if (saved != null && saved.getExternalId() != null) {
+            if (!Objects.equals(StringUtils.trimToNull(carrier), StringUtils.trimToNull(saved.getCarrier()))) {
+                found.put(field("carrier"), "order.shipments.error.courierLocked");
+            }
+            if (!Objects.equals(StringUtils.trimToNull(trackingNo), StringUtils.trimToNull(saved.getTrackingNo()))) {
+                found.put(field("trackingNo"), "order.shipments.error.courierLocked");
+            }
+        }
+        LocalDate shipped = checkDate(found, "shippedDate", shippedDate);
+        LocalDate delivered = checkDate(found, "deliveredDate", deliveredDate);
+        if (shipped != null && delivered != null && delivered.isBefore(shipped)) {
+            found.put(field("deliveredDate"), "order.shipments.error.deliveredBeforeShipped");
+        }
         return found;
     }
 
     /**
-     * The shipment to store in place of saved (null for a new one). Its tracking subscription and courier order stay
-     * with it while the tracking number is the same one. Call only after {@link #validate()} found nothing.
+     * The shipment to store in place of saved (null for a new one). Its courier order stays with it, its tracking
+     * subscription while the tracking number is the same one. Call only after {@link #validate(Shipment)} found
+     * nothing.
      */
     public Shipment toShipment(Shipment saved) {
-        return toShipment(saved, LocalDateTime.now());
+        return toShipment(saved, now());
     }
 
     /** {@link #toShipment(Shipment)} at a given moment: {@code now} is what "today" is saved as. */
@@ -128,24 +184,36 @@ public record OrderShipmentForm(String orderId, Integer index, String version, S
         shipment.setShippedAt(moment(shippedDate, saved == null ? null : saved.getShippedAt(), now));
         shipment.setDeliveredAt(moment(deliveredDate, saved == null ? null : saved.getDeliveredAt(), now));
         shipment.inheritTrackingSubscriptionFrom(saved);
+        shipment.inheritCourierOrderFrom(saved);
         return shipment;
     }
 
     public OrderShipmentForm withErrors(Map<String, String> found) {
         return new OrderShipmentForm(orderId, index, version, type, carrier, trackingNo, collectionPointCode, trackingUrl,
-                shippedDate, deliveredDate, carriers, found, refusal);
+                shippedDate, deliveredDate, carriers, found, refusal, courierOrder, clock);
     }
 
     /** A reason the whole form was refused (a closed order, a shipment changed meanwhile), already translated. */
     public OrderShipmentForm withRefusal(String text) {
         return new OrderShipmentForm(orderId, index, version, type, carrier, trackingNo, collectionPointCode, trackingUrl,
-                shippedDate, deliveredDate, carriers, errors, text);
+                shippedDate, deliveredDate, carriers, errors, text, courierOrder, clock);
     }
 
-    private void checkDate(Map<String, String> found, String dateField, String date) {
-        if (StringUtils.isNotBlank(date) && parseDate(date) == null) {
-            found.put(field(dateField), "order.shipments.error.date");
+    /** The typed day, or null when blank or refused (a wrong date, one after today). */
+    private LocalDate checkDate(Map<String, String> found, String dateField, String date) {
+        if (StringUtils.isBlank(date)) {
+            return null;
         }
+        LocalDate day = parseDate(date);
+        if (day == null) {
+            found.put(field(dateField), "order.shipments.error.date");
+            return null;
+        }
+        if (day.isAfter(today())) {
+            found.put(field(dateField), "order.shipments.error.future");
+            return null;
+        }
+        return day;
     }
 
     /**

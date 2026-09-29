@@ -3,6 +3,8 @@ package pl.commercelink.web;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.apache.logging.log4j.util.Strings;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.MessageSource;
@@ -38,6 +40,8 @@ import pl.commercelink.orders.fulfilment.ExternalSupplierBinding;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.orders.imports.BasketOrderImporter;
 import pl.commercelink.orders.pos.PosOrderCreator;
+import pl.commercelink.orders.event.OrderEventsRepository;
+import pl.commercelink.orders.notifications.EmailNotificationType;
 import pl.commercelink.taxonomy.TaxonomyCache;
 import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
@@ -100,7 +104,6 @@ import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
 import pl.commercelink.inventory.deliveries.DropshipItemLookup;
 import pl.commercelink.inventory.supplier.SupplierChoice;
 import pl.commercelink.inventory.supplier.SupplierLabelMap;
@@ -112,6 +115,8 @@ import java.util.function.Supplier;
 
 @Controller
 public class OrdersController extends BaseController {
+
+    private static final Logger log = LoggerFactory.getLogger(OrdersController.class);
 
     @Autowired
     private Inventory inventory;
@@ -163,6 +168,9 @@ public class OrdersController extends BaseController {
 
     @Autowired
     private ShipmentCancelService shipmentCancelService;
+
+    @Autowired
+    private OrderEventsRepository orderEventsRepository;
 
     @Autowired
     private GoodsOutEventPublisher goodsOutEventPublisher;
@@ -1832,12 +1840,13 @@ public class OrdersController extends BaseController {
                                RedirectAttributes redirectAttributes, Locale locale) {
         Order existingOrder = requireOrder(ordersRepository, getStoreId(), orderId);
         boolean async = SettingsPaths.isAsync(requestedWith);
-        OrderShipmentForm posted = new OrderShipmentForm(orderId, index, version, type, carrier, trackingNo,
-                collectionPointCode, trackingUrl, shippedDate, deliveredDate,
-                shipmentCarriers(existingOrder), null, null);
         List<Shipment> current = existingOrder.getShipments();
         boolean stale = index != null && (index < 0 || index >= current.size()
                 || !OrderShipmentForm.version(current.get(index)).equals(version));
+        Shipment before = index == null || stale ? null : current.get(index);
+        OrderShipmentForm posted = new OrderShipmentForm(orderId, index, version, type, carrier, trackingNo,
+                collectionPointCode, trackingUrl, shippedDate, deliveredDate,
+                shipmentCarriers(existingOrder), null, null, before != null && before.getExternalId() != null, null);
         // the card hides "Edit" on a closed order; besides, OrderLifecycle.update never persists a cancelled one
         String refusal = existingOrder.isClosed() ? "order.shipments.error.closed"
                 : stale ? "order.shipments.error.stale" : null;
@@ -1849,7 +1858,11 @@ public class OrdersController extends BaseController {
             }
             return refuse(redirectAttributes, orderId, refusal, locale);
         }
-        Map<String, String> errors = posted.validate();
+        Map<String, String> errors = new LinkedHashMap<>(posted.validate(before));
+        // a double click or a second operator would store the same parcel twice and announce it twice
+        if (index == null && StringUtils.isNotBlank(trackingNo) && current.stream().anyMatch(s -> s.hasTrackingNo(trackingNo))) {
+            errors.putIfAbsent(posted.field("trackingNo"), "order.shipments.error.duplicateTracking");
+        }
         if (!errors.isEmpty()) {
             if (async) {
                 response.setStatus(HttpStatus.UNPROCESSABLE_ENTITY.value());
@@ -1860,7 +1873,6 @@ public class OrdersController extends BaseController {
         }
 
         List<Shipment> shipments = new ArrayList<>(current);
-        Shipment before = index == null ? null : current.get(index);
         Shipment saved = posted.toShipment(before);
         if (index == null) {
             shipments.add(saved);
@@ -1897,7 +1909,11 @@ public class OrdersController extends BaseController {
                 "/dashboard/orders/" + orderId + "/shipments/" + index + "/remove?version=" + version, true, locale);
     }
 
-    /** Removes one shipment. No "shipment created" notice goes out: nothing was shipped by removing a record. */
+    /**
+     * Removes one shipment. No "shipment created" notice goes out: nothing was shipped by removing a record. Once no
+     * shipment has shipping data left, the shipping e-mail is forgotten (as "Cancel courier order" does), so the
+     * customer gets it with the number of the shipment added next instead of keeping a link to the removed one.
+     */
     @PostMapping("/dashboard/orders/{orderId}/shipments/{index}/remove")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String removeShipment(@PathVariable String orderId, @PathVariable int index,
@@ -1909,8 +1925,11 @@ public class OrdersController extends BaseController {
             return refuse(redirectAttributes, orderId, refusal, locale);
         }
         List<Shipment> shipments = new ArrayList<>(existingOrder.getShipments());
-        shipments.remove(index);
+        Shipment removed = shipments.remove(index);
         storeShipments(existingOrder, shipments, null, null);
+        if (removed.hasShippingData() && existingOrder.firstShipmentWithShippingData().isEmpty()) {
+            orderEventsRepository.deleteByOrderIdAndName(orderId, EmailNotificationType.ORDER_SHIPPING.name());
+        }
         OrderFlash.saved(redirectAttributes, messageSource.getMessage("order.shipments.removed", new Object[]{index + 1}, locale));
         return details(orderId);
     }
@@ -1947,15 +1966,17 @@ public class OrdersController extends BaseController {
      * delivery date on every shipment moves the order to Delivered). saved is the shipment just added or edited (null
      * for a removal) and before its previous state (null for a new one): only its own shipping data, when new or
      * changed, is announced (the e-mail to the customer, the number to the marketplace), never a shipment already
-     * announced that merely sits next to it.
+     * announced that merely sits next to it, nor a corrected date of one already announced.
      */
     private void storeShipments(Order existingOrder, List<Shipment> shipments, Shipment saved, Shipment before) {
         existingOrder.setShipments(shipments);
         shipmentTrackingSubscriber.subscribe(getStoreId(), existingOrder);
         orderLifecycle.update(existingOrder);
-        boolean notifiable = saved != null && (saved.hasShippingData() || saved.hasCollectionData());
-        boolean changed = saved != null && (before == null || !shipmentData(saved).equals(shipmentData(before)));
+        boolean notifiable = saved != null && isAnnounceable(saved);
+        boolean changed = saved != null && (before == null || !isAnnounceable(before)
+                || !shipmentData(saved).equals(shipmentData(before)));
         if (notifiable && changed) {
+            log.info("Order {}: shipment {} announced", existingOrder.getOrderId(), saved.getTrackingNo());
             orderLifecycleEventPublisher.publish(existingOrder, OrderLifecycleEventType.ShipmentCreated);
         }
     }
@@ -1991,17 +2012,21 @@ public class OrdersController extends BaseController {
                 .anyMatch(d -> attempts.stream().anyMatch(a -> a.getReceiptKey().equals(d.getId())));
     }
 
+    /** A shipment the customer and the marketplace are told about: it went out, with its number or for collection. */
+    private static boolean isAnnounceable(Shipment s) {
+        return s.hasShippingData() || s.hasCollectionData();
+    }
+
     /**
-     * What a customer is told about a shipment. The form keeps the saved shippedAt on the same day; sub-minute digits
-     * still do not count as a change, for shipments saved before the form edited dates only.
+     * What the marketplace is told about a shipment (ShipmentUpdate: number, carrier, link). The shipped date is not
+     * part of it: a corrected date of a shipment already announced would send the same shipOrder again.
      */
     private static String shipmentData(Shipment s) {
         return String.join("|",
                 String.valueOf(s.getType()),
                 Objects.toString(s.getCarrier(), ""),
                 Objects.toString(s.getTrackingNo(), ""),
-                Objects.toString(s.getTrackingUrl(), ""),
-                s.getShippedAt() == null ? "" : s.getShippedAt().truncatedTo(ChronoUnit.MINUTES).toString());
+                Objects.toString(s.getTrackingUrl(), ""));
     }
 
     @PostMapping("/dashboard/orders/{orderId}/addReceipt")

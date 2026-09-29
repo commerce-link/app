@@ -91,12 +91,14 @@
        saved shipment and the notice stored for it. The carrier is picked from the store's carriers, or typed after
        "Inny…": the select only fills the named text field (order-shipments.js), so without JavaScript the text field
        alone is posted. The shipped and delivered moments are dates only (OrderShipmentForm keeps a saved time on the
-       same day). */-->
+       same day) and offer nothing after the operator's today (max). A shipment with a courier order shows its carrier and
+       tracking number read-only (posted, the server refuses a change) with the reason under them. */-->
 <form th:fragment="shipmentForm(shipment, inDialog)" th:id="|${shipment.dialogId()}-form|" class="cl-form" method="post"
       novalidate data-cl-async data-cl-shipment-form
       th:action="@{/dashboard/orders/{o}/shipments(o=${shipment.orderId()})}"
       th:attr="data-error-message=#{form.save.failed}, data-cl-dialog-close-on-success=${inDialog} ? 'true' : null"
-      th:with="picker=${!shipment.carriers().isEmpty()}">
+      th:with="picker=${!shipment.carriers().isEmpty() and !shipment.courierOrder()},
+               lockedHelp=${shipment.courierOrder()} ? ${shipment.field('courierLocked')} : null">
     <h2 th:if="${inDialog}" class="cl-dialog-title" th:id="|${shipment.dialogId()}-title|"
         th:text="${shipment.isNew()} ? #{order.shipments.dialog.title.new} : #{order.shipments.dialog.title.edit(${shipment.number()})}"></h2>
     <input th:unless="${shipment.isNew()}" type="hidden" name="index" th:value="${shipment.index()}">
@@ -126,13 +128,24 @@
                     <option th:each="c : ${shipment.carriers()}" th:value="${c}" th:selected="${c == shipment.carrier()}" th:text="${c}"></option>
                     <option value="__other__" th:selected="${!shipment.knownCarrier()}" th:text="#{order.shipments.dialog.carrier.other}"></option>
                 </select>
-                <input class="cl-input" type="text" autocomplete="off" data-cl-carrier-input th:id="${shipment.field('carrier')}"
-                       name="carrier" th:value="${shipment.carrier()}"
-                       th:attr="aria-label=${picker} ? #{order.shipments.dialog.carrier.name} : null">
+                <th:block th:with="carrierId=${shipment.field('carrier')}, carrierError=${shipment.error('carrier')},
+                                   carrierDescribedBy=${#strings.trim((carrierError != null ? carrierId + '-error ' : '') + (lockedHelp != null ? lockedHelp : ''))}">
+                    <input class="cl-input" type="text" autocomplete="off" data-cl-carrier-input th:id="${carrierId}"
+                           name="carrier" th:value="${shipment.carrier()}" th:readonly="${shipment.courierOrder()}"
+                           th:classappend="${carrierError != null} ? 'is-invalid'"
+                           th:attr="aria-label=${picker} ? #{order.shipments.dialog.carrier.name} : null,
+                                    aria-invalid=${carrierError != null ? 'true' : null},
+                                    aria-describedby=${carrierDescribedBy.isEmpty() ? null : carrierDescribedBy}">
+                    <p th:if="${carrierError != null}" class="cl-field-error" th:id="${carrierId} + '-error'">
+                        <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                        <span th:text="#{${carrierError}}"></span>
+                    </p>
+                </th:block>
             </div>
-            <div class="cl-span-3" th:insert="~{orders/details/shipments :: text(${shipment}, 'trackingNo', 'order.shipments.dialog.tracking', 'text', ${shipment.trackingNo()})}"></div>
-            <div class="cl-span-3" th:insert="~{orders/details/shipments :: text(${shipment}, 'collectionPointCode', 'order.shipments.dialog.point', 'text', ${shipment.collectionPointCode()})}"></div>
-            <div th:insert="~{orders/details/shipments :: text(${shipment}, 'trackingUrl', 'order.shipments.dialog.url', 'url', ${shipment.trackingUrl()})}"></div>
+            <div class="cl-span-3" th:insert="~{orders/details/shipments :: text(${shipment}, 'trackingNo', 'order.shipments.dialog.tracking', 'text', ${shipment.trackingNo()}, ${lockedHelp})}"></div>
+            <div class="cl-span-3" th:insert="~{orders/details/shipments :: text(${shipment}, 'collectionPointCode', 'order.shipments.dialog.point', 'text', ${shipment.collectionPointCode()}, null)}"></div>
+            <p th:if="${lockedHelp != null}" class="cl-help" th:id="${lockedHelp}" th:text="#{order.shipments.dialog.courierLocked}"></p>
+            <div th:insert="~{orders/details/shipments :: text(${shipment}, 'trackingUrl', 'order.shipments.dialog.url', 'url', ${shipment.trackingUrl()}, null)}"></div>
             <div class="cl-span-3" th:insert="~{orders/details/shipments :: dateField(${shipment}, 'shipped', ${shipment.shippedDate()})}"></div>
             <div class="cl-span-3" th:insert="~{orders/details/shipments :: dateField(${shipment}, 'delivered', ${shipment.deliveredDate()})}"></div>
         </div>
@@ -147,13 +160,15 @@
 </form>
 
 <!--/* A labelled text field of the shipment form: the id carries the form's key (several dialogs on one page), the
-       posted name is the property alone. */-->
-<div th:fragment="text(shipment, property, labelKey, type, value)" class="cl-field"
-     th:with="id=${shipment.field(property)}, error=${shipment.error(property)}">
+       posted name is the property alone. lockedHelp: the id of the reason the field is read-only, or null when it is
+       editable. */-->
+<div th:fragment="text(shipment, property, labelKey, type, value, lockedHelp)" class="cl-field"
+     th:with="id=${shipment.field(property)}, error=${shipment.error(property)},
+              describedBy=${#strings.trim((error != null ? id + '-error ' : '') + (lockedHelp != null ? lockedHelp : ''))}">
     <label class="cl-label" th:for="${id}" th:text="#{${labelKey}}"></label>
     <input class="cl-input" autocomplete="off" th:type="${type}" th:id="${id}" th:name="${property}"
-           th:value="${value}" th:classappend="${error != null} ? 'is-invalid'"
-           th:attr="aria-invalid=${error != null ? 'true' : null}, aria-describedby=${error != null ? id + '-error' : null}">
+           th:value="${value}" th:readonly="${lockedHelp != null}" th:classappend="${error != null} ? 'is-invalid'"
+           th:attr="aria-invalid=${error != null ? 'true' : null}, aria-describedby=${describedBy.isEmpty() ? null : describedBy}">
     <p th:if="${error != null}" class="cl-field-error" th:id="${id} + '-error'">
         <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
         <span th:text="#{${error}}"></span>
@@ -165,7 +180,7 @@
      th:with="id=${shipment.field(name + 'Date')}, error=${shipment.error(name + 'Date')}">
     <label class="cl-label" th:for="${id}" th:text="#{|order.shipments.dialog.${name}|}"></label>
     <input class="cl-input" type="date" th:id="${id}" th:name="${name + 'Date'}" th:value="${value}"
-           th:classappend="${error != null} ? 'is-invalid'"
+           th:max="${shipment.today()}" th:classappend="${error != null} ? 'is-invalid'"
            th:attr="aria-invalid=${error != null ? 'true' : null}, aria-describedby=${error != null ? id + '-error' : null}">
     <p th:if="${error != null}" class="cl-field-error" th:id="${id} + '-error'">
         <i class="fas fa-exclamation-circle" aria-hidden="true"></i>

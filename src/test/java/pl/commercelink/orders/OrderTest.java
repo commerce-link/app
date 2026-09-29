@@ -2,6 +2,8 @@ package pl.commercelink.orders;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import pl.commercelink.documents.Document;
 import pl.commercelink.documents.DocumentType;
 
@@ -460,18 +462,34 @@ class OrderTest {
         assertThat(order.isDelivered()).isTrue();
     }
 
-    @Test
-    void anOrderThatNeverShippedHasNothingLeftToDeliverButAShippingOneWithoutShipmentsHas() {
-        // given
-        Order service = new Order("s");
-        service.setShipments(new ArrayList<>());
-        Order shipping = new Order("s");
-        shipping.setShipments(new ArrayList<>());
-        shipping.setStatus(OrderStatus.Shipping);
+    @ParameterizedTest
+    @EnumSource(value = OrderStatus.class, names = {"New", "Blocked", "Assembly", "Assembled", "Realization", "Shipping"})
+    void anOrderWithoutShipmentsBeforeDeliveryHasSomethingLeftToDeliver(OrderStatus status) {
+        // given: every order is created with a shipment waiting to go out, so an empty list before delivery means its
+        // only shipment was removed, never that the goods reached the customer
+        Order order = new Order("s");
+        order.setShipments(new ArrayList<>());
+        order.setStatus(status);
 
-        // when / then: an order without shipments has always settled on payment and invoice; a Shipping one lost
-        // its only shipment to a removal and waits for a new one
-        assertThat(service.hasNothingLeftToDeliver()).isTrue();
-        assertThat(shipping.hasNothingLeftToDeliver()).isFalse();
+        // when
+        boolean nothingLeft = order.hasNothingLeftToDeliver();
+
+        // then: settling it on payment and invoice would complete an order that never shipped
+        assertThat(nothingLeft).isFalse();
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = OrderStatus.class, names = {"Delivered", "Completed"})
+    void anOrderWithoutShipmentsInDeliveredHasNothingLeftToDeliver(OrderStatus status) {
+        // given: a legacy order delivered without any shipment recorded
+        Order order = new Order("s");
+        order.setShipments(new ArrayList<>());
+        order.setStatus(status);
+
+        // when
+        boolean nothingLeft = order.hasNothingLeftToDeliver();
+
+        // then
+        assertThat(nothingLeft).isTrue();
     }
 }

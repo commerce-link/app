@@ -340,6 +340,9 @@ public class OrderPageModelFactory {
         String base = "/dashboard/orders/" + order.getOrderId() + "/shipments/";
         List<OrderPageModel.ShipmentRow> rows = new ArrayList<>();
         List<OrderShipmentForm> forms = new ArrayList<>();
+        // the courier order can be cancelled only while its labelled parcel is still on the way
+        Shipment courierCancellable = order.canOrderShipment() ? order.firstShipmentWithShippingData()
+                .filter(s -> s.getExternalId() != null && s.getDeliveredAt() == null).orElse(null) : null;
         for (int i = 0; i < shipments.size(); i++) {
             Shipment s = shipments.get(i);
             OrderShipmentForm form = OrderShipmentForm.of(order.getOrderId(), i, s, carriers);
@@ -353,7 +356,7 @@ public class OrderPageModelFactory {
                             ? "order.shipment.tracking.failed.help" : null,
                     form.dialogId(), readOnly ? null : base + i,
                     readOnly || removeLockedKey(order, i) != null ? null : base + i + "/remove?version=" + form.version(),
-                    readOnly ? null : removeReasonKey(order, i), removeShipmentMessageKey(order)));
+                    readOnly ? null : removeReasonKey(order, i, s == courierCancellable), removeShipmentMessageKey(order)));
             if (!readOnly) {
                 forms.add(form);
             }
@@ -361,18 +364,26 @@ public class OrderPageModelFactory {
         String emptyKey = readOnly ? "order.shipments.empty.readonly"
                 : order.getFulfilmentType() == FulfilmentType.DirectToConsumer ? "order.shipments.empty.dropship"
                 : "order.shipments.empty";
-        // the courier order can be cancelled only while its labelled parcel is still on the way
-        boolean cancellable = order.firstShipmentWithShippingData()
-                .map(s -> s.getExternalId() != null && s.getDeliveredAt() == null).orElse(false);
-        return new OrderPageModel.ShipmentsCard(rows, emptyKey,
-                !readOnly && order.canOrderShipment() && cancellable, forms,
+        return new OrderPageModel.ShipmentsCard(rows, emptyKey, !readOnly && courierCancellable != null, forms,
                 readOnly ? null : OrderShipmentForm.of(order.getOrderId(), null, null, carriers));
     }
 
-    /** The short reason next to a greyed "Remove" in the row; the refusal of a forced removal says it in full. */
-    private static String removeReasonKey(Order order, int index) {
+    /**
+     * The short reason next to a greyed "Remove" in the row; the refusal of a forced removal says it in full. A
+     * shipment with a courier order points to "Cancel courier order" only when the card offers it for that shipment:
+     * before the order is ready to ship the button is not there yet, and it only ever cancels the first shipment that
+     * went out.
+     */
+    private static String removeReasonKey(Order order, int index, boolean courierCancellable) {
         String locked = removeLockedKey(order, index);
-        return locked == null ? null : locked.replace(".remove.error.", ".remove.locked.");
+        if (locked == null) {
+            return null;
+        }
+        if (locked.equals("order.shipments.remove.error.courier") && !courierCancellable) {
+            return order.canOrderShipment() ? "order.shipments.remove.locked.courierNotFirst"
+                    : "order.shipments.remove.locked.courierLater";
+        }
+        return locked.replace(".remove.error.", ".remove.locked.");
     }
 
     /**

@@ -207,6 +207,7 @@ public class Shipment {
         this.trackingSubscriptionStatus = ShipmentTrackingStatus.FAILED;
     }
 
+    /** The tracking subscription follows the tracking number: a changed number is tracked anew. */
     public void inheritTrackingSubscriptionFrom(Shipment previous) {
         if (previous == null || !previous.hasTrackingNo(trackingNo)) {
             return;
@@ -214,7 +215,15 @@ public class Shipment {
         this.trackingSubscriptionStatus = previous.trackingSubscriptionStatus;
         this.trackingSubscriptionId = previous.trackingSubscriptionId;
         this.trackingExternalId = previous.trackingExternalId;
-        if (externalId == null) {
+    }
+
+    /**
+     * The courier order (the paid label at the carrier) stays with the shipment whatever an edit does to its fields:
+     * only "Cancel courier order" cancels it at the carrier, and a shipment that lost it could be removed and leave the
+     * label orphaned.
+     */
+    public void inheritCourierOrderFrom(Shipment previous) {
+        if (previous != null && previous.externalId != null) {
             this.externalId = previous.externalId;
         }
     }

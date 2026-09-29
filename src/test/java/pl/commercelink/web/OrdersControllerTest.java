@@ -61,6 +61,7 @@ import pl.commercelink.orders.PaymentDirection;
 import pl.commercelink.orders.PaymentSource;
 import pl.commercelink.orders.PositionGroup;
 import pl.commercelink.orders.Shipment;
+import pl.commercelink.orders.notifications.EmailNotificationType;
 import pl.commercelink.orders.ShipmentTrackingStatus;
 import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
@@ -777,6 +778,104 @@ class OrdersControllerTest {
             // then
             assertThat(errorMessage()).isEqualTo("order.shipments.error.stale");
             verifyNoInteractions(orderLifecycle);
+        }
+
+        @Test
+        void correctingOnlyTheShippedDateAnnouncesNothing() {
+            // given: the marketplace is told the number, carrier and link, never the date
+            Shipment existing = courier("TRACK-1", LocalDateTime.of(2026, 9, 1, 9, 0));
+            Order order = orderWith(existing);
+
+            // when
+            save(0, OrderShipmentForm.version(existing), courier("TRACK-1", LocalDateTime.of(2026, 9, 2, 0, 0)));
+
+            // then
+            assertThat(order.getShipments().get(0).getShippedAt()).isEqualTo(LocalDateTime.of(2026, 9, 2, 0, 0));
+            verify(orderLifecycle).update(order);
+            verify(orderLifecycleEventPublisher, never()).publish(any(), any());
+        }
+
+        @Test
+        void aShipmentThatGetsItsShippedDateIsAnnouncedOnce() {
+            // given: the number was typed earlier, without a date, so nothing was announced yet
+            Shipment typed = courier("TRACK-1", null);
+            Order order = orderWith(typed);
+
+            // when
+            save(0, OrderShipmentForm.version(typed), courier("TRACK-1", LocalDateTime.of(2026, 9, 2, 0, 0)));
+
+            // then
+            verify(orderLifecycleEventPublisher).publish(order, OrderLifecycleEventType.ShipmentCreated);
+        }
+
+        @Test
+        void aNewShipmentWithATrackingNumberAlreadyOnTheOrderIsRefused() {
+            // given: a double click, or a second operator adding the same parcel
+            Order order = orderWith(courier("TRACK-1", LocalDateTime.of(2026, 9, 1, 9, 0)));
+            MockHttpServletResponse response = new MockHttpServletResponse();
+            ExtendedModelMap model = new ExtendedModelMap();
+
+            // when: carriers echo numbers upper-cased, so the comparison ignores case
+            save(null, null, courier(" track-1 ", LocalDateTime.of(2026, 9, 1, 9, 0)), "fetch", response, model);
+
+            // then
+            assertThat(response.getStatus()).isEqualTo(422);
+            assertThat(((OrderShipmentForm) model.getAttribute("shipment")).errors())
+                    .containsEntry("shipment-new-trackingNo", "order.shipments.error.duplicateTracking");
+            assertThat(order.getShipments()).hasSize(1);
+            verifyNoInteractions(orderLifecycle, orderLifecycleEventPublisher);
+        }
+
+        @Test
+        void removingAShipmentWithShippingDataClearsTheShippingEmailEvent() {
+            // given: the customer got the shipping e-mail with this shipment's link
+            Shipment only = courier("TRACK-1", LocalDateTime.of(2026, 9, 1, 9, 0));
+            orderWith(only);
+
+            // when
+            ordersController.removeShipment(ORDER_ID, 0, OrderShipmentForm.version(only), redirect, Locale.ENGLISH);
+
+            // then: the next shipment with a number sends the e-mail again, as after "Cancel courier order"
+            verify(orderEventsRepository).deleteByOrderIdAndName(ORDER_ID, EmailNotificationType.ORDER_SHIPPING.name());
+        }
+
+        @Test
+        void removingOneOfTwoShippedShipmentsKeepsTheShippingEmailEvent() {
+            // given: forgetting the e-mail would send it again at once, with the link of the shipment that stays
+            Shipment first = courier("TRACK-1", LocalDateTime.of(2026, 9, 1, 9, 0));
+            orderWith(first, courier("TRACK-2", LocalDateTime.of(2026, 9, 1, 9, 0)));
+
+            // when
+            ordersController.removeShipment(ORDER_ID, 0, OrderShipmentForm.version(first), redirect, Locale.ENGLISH);
+
+            // then
+            verify(orderEventsRepository, never()).deleteByOrderIdAndName(any(), any());
+        }
+
+        @Test
+        void aForcedCarrierChangeOfACourierShipmentIsRefused() {
+            // given: the dialog shows the carrier and number read-only; a hand-made POST changes them anyway
+            Shipment labelled = courier("TRACK-1", LocalDateTime.of(2026, 9, 1, 9, 0));
+            labelled.setExternalId("EXT-1");
+            Order order = orderWith(labelled);
+            Shipment forced = courier("TRACK-9", LocalDateTime.of(2026, 9, 1, 9, 0));
+            forced.setCarrier("GLS");
+            MockHttpServletResponse response = new MockHttpServletResponse();
+            ExtendedModelMap model = new ExtendedModelMap();
+
+            // when
+            save(0, OrderShipmentForm.version(labelled), forced, "fetch", response, model);
+
+            // then
+            assertThat(response.getStatus()).isEqualTo(422);
+            OrderShipmentForm form = (OrderShipmentForm) model.getAttribute("shipment");
+            assertThat(form.errors())
+                    .containsEntry("shipment-0-carrier", "order.shipments.error.courierLocked")
+                    .containsEntry("shipment-0-trackingNo", "order.shipments.error.courierLocked");
+            assertThat(form.courierOrder()).isTrue();
+            assertThat(order.getShipments().get(0)).isSameAs(labelled);
+            assertThat(labelled.getExternalId()).isEqualTo("EXT-1");
+            verifyNoInteractions(orderLifecycle, orderLifecycleEventPublisher);
         }
 
         @Test

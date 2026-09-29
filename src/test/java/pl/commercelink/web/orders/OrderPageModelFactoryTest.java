@@ -420,6 +420,56 @@ class OrderPageModelFactoryTest {
     }
 
     @Test
+    void aCourierShipmentOfAnOrderNotYetShippingSaysWhenItCanBeCancelled() {
+        // given: a courier ordered while the order is still being assembled; "Cancel courier order" is not offered yet
+        Order assembling = order(OrderStatus.Assembly);
+        labelled(assembling.getShipments().get(0), "T-1", "PKG-1");
+        // two couriers: the button only ever cancels the first shipment that went out
+        Order twoCouriers = order(OrderStatus.Shipping);
+        labelled(twoCouriers.getShipments().get(0), "T-1", "PKG-1");
+        Shipment second = new Shipment(ShipmentType.Courier);
+        labelled(second, "T-2", "PKG-2");
+        twoCouriers.getShipments().add(second);
+
+        // when
+        OrderPageModel.ShipmentsCard early = factory.build(assembling, List.of(), ADMIN, PL).shipments();
+        OrderPageModel.ShipmentsCard shipping = factory.build(twoCouriers, List.of(), ADMIN, PL).shipments();
+
+        // then: the reason never points to a button the page does not show
+        assertThat(early.canCancelCourier()).isFalse();
+        assertThat(early.rows().get(0).removeHref()).isNull();
+        assertThat(early.rows().get(0).removeReasonKey()).isEqualTo("order.shipments.remove.locked.courierLater");
+        assertThat(shipping.canCancelCourier()).isTrue();
+        assertThat(shipping.rows().get(0).removeReasonKey()).isEqualTo("order.shipments.remove.locked.courier");
+        assertThat(shipping.rows().get(1).removeReasonKey()).isEqualTo("order.shipments.remove.locked.courierNotFirst");
+    }
+
+    @Test
+    void aCourierShipmentOffersNoCarrierOrNumberEdit() {
+        // given
+        Order order = order(OrderStatus.Shipping);
+        labelled(order.getShipments().get(0), "T-1", "PKG-1");
+        Shipment typed = new Shipment(ShipmentType.Courier);
+        typed.setTrackingNo("T-2");
+        order.getShipments().add(typed);
+
+        // when
+        List<OrderShipmentForm> forms = factory.build(order, List.of(), ADMIN, PL).shipments().forms();
+
+        // then: the carrier gave the number; only "Cancel courier order" changes it
+        assertThat(forms.get(0).courierOrder()).isTrue();
+        assertThat(forms.get(1).courierOrder()).isFalse();
+        assertThat(forms.get(0).today()).isEqualTo(java.time.LocalDate.now(OrderShipmentForm.OPERATOR_ZONE));
+    }
+
+    private static void labelled(Shipment shipment, String trackingNo, String packageId) {
+        shipment.setCarrier("InPost");
+        shipment.setTrackingNo(trackingNo);
+        shipment.setShippedAt(LocalDateTime.now().minusDays(1));
+        shipment.setExternalId(packageId);
+    }
+
+    @Test
     void dropshipItemsLockTheWarehouseMovesAndTheCourierCancellationNeedsAPackageId() {
         // given
         Order order = order(OrderStatus.Realization);

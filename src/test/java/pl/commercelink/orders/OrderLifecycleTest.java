@@ -239,6 +239,7 @@ class OrderLifecycleTest {
         Order order = new Order("store-1");
         order.setStatus(OrderStatus.Blocked);
         order.addDocument(new Document("doc-1", "FV/1/2026", "https://example.com/fv/1", DocumentType.InvoiceVat));
+        order.addShipment(deliveredShipment());
 
         // when
         orderLifecycle.update(order);
@@ -272,6 +273,7 @@ class OrderLifecycleTest {
         // given
         Order order = new Order("store-1");
         order.addDocument(new Document("doc-1", "FV/1/2026", "https://example.com/fv/1", DocumentType.InvoiceVat));
+        order.addShipment(deliveredShipment());
         OrderItem item = mock(OrderItem.class);
         when(item.isOrdered()).thenReturn(true);
         when(item.isDelivered()).thenReturn(true);
@@ -530,5 +532,55 @@ class OrderLifecycleTest {
 
         // then
         assertEquals(OrderStatus.Delivered, order.getStatus());
+    }
+
+    @Test
+    void removingTheOnlyShipmentOfAPaidInvoicedOrderInRealizationDoesNotCompleteIt() {
+        // given: paid in full, invoiced, no review to collect; its only shipment (still waiting to go out) was removed
+        Order order = new Order("store-1");
+        order.setStatus(OrderStatus.Realization);
+        order.setTotalPrice(100);
+        order.addPayment(new Payment("ref-1", "Wpłata", PaymentSource.BankTransfer, 100, 0));
+        order.addDocument(new Document("doc-1", "FV/1/2026", "https://example.com/fv/1", DocumentType.InvoiceVat));
+        order.setShipments(new ArrayList<>());
+
+        // when
+        orderLifecycle.update(order, List.of());
+
+        // then: it never shipped, so it is neither delivered nor completed, and the marketplace hears nothing
+        assertEquals(OrderStatus.Realization, order.getStatus());
+        verify(orderLifecycleEventPublisher, never()).publish(order, OrderLifecycleEventType.OrderCompleted);
+        verifyNoInteractions(goodsOutEventPublisher);
+    }
+
+    @Test
+    void editingAPaymentAfterTheOnlyShipmentWasRemovedDoesNotCompleteTheOrder() {
+        // given: an invoiced Realization order left without shipments, paid only in part
+        Order order = new Order("store-1");
+        order.setStatus(OrderStatus.Realization);
+        order.setTotalPrice(100);
+        Payment payment = new Payment("ref-1", "Wpłata", PaymentSource.BankTransfer, 40, 0);
+        order.addPayment(payment);
+        order.addDocument(new Document("doc-1", "FV/1/2026", "https://example.com/fv/1", DocumentType.InvoiceVat));
+        order.setShipments(new ArrayList<>());
+        orderLifecycle.update(order, List.of());
+
+        // when: the payment is corrected to the full amount, which is saved through the lifecycle
+        payment.setAmount(100);
+        orderLifecycle.update(order, List.of());
+
+        // then
+        assertEquals(OrderStatus.Realization, order.getStatus());
+        verify(orderLifecycleEventPublisher, never()).publish(order, OrderLifecycleEventType.OrderCompleted);
+    }
+
+    /** Shipped and delivered: without shipments an order waits before Delivered instead of settling. */
+    private static Shipment deliveredShipment() {
+        Shipment shipment = new Shipment(ShipmentType.Courier);
+        shipment.setCarrier("DPD");
+        shipment.setTrackingNo("T-1");
+        shipment.setShippedAt(LocalDateTime.of(2026, 9, 27, 9, 0));
+        shipment.setDeliveredAt(LocalDateTime.of(2026, 9, 28, 10, 0));
+        return shipment;
     }
 }
