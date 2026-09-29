@@ -1324,6 +1324,35 @@ class OrdersControllerTest {
     }
 
     @Test
+    @DisplayName("order details model prefills the POS decision with the customer's e-mail, never the store's")
+    void orderDetailsPrefillsThePosDecisionWithTheCustomerEmail() {
+        // given
+        Order order = orderBase();
+        order.setSource(new pl.commercelink.orders.OrderSource("operator", pl.commercelink.orders.OrderSourceType.PointOfSale));
+        order.setBillingDetails(new BillingDetails());
+        order.getBillingDetails().setEmail("klient@example.com");
+        Store store = new Store();
+        store.setBillingDetails(new BillingDetails());
+        store.getBillingDetails().setEmail("sklep@example.com");
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(dropshipItemLookup.itemIdsInDropshipDeliveries(eq(STORE_ID), any())).thenReturn(Set.of());
+        when(posReceiptDecisions.required(store, order, OrderStatus.Delivered)).thenReturn(Optional.of(PosReceiptMode.ASK));
+        ExtendedModelMap customer = new ExtendedModelMap();
+        ExtendedModelMap storeOwn = new ExtendedModelMap();
+
+        // when
+        ordersController.getOrderDetails(ORDER_ID, customer, Locale.ENGLISH);
+        order.getBillingDetails().setEmail("sklep@example.com");
+        ordersController.getOrderDetails(ORDER_ID, storeOwn, Locale.ENGLISH);
+
+        // then
+        assertThat(customer.getAttribute("posCustomerEmail")).isEqualTo("klient@example.com");
+        assertThat(storeOwn.getAttribute("posCustomerEmail")).isNull();
+    }
+
+    @Test
     @DisplayName("order details model flags a delivered POS sale that still needs its receipt, until an attempt exists")
     void orderDetailsFlagsAPosSaleWithoutReceiptDecision() {
         // given

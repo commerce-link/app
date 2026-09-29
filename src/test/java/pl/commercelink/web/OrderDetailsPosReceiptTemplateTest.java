@@ -50,4 +50,17 @@ class OrderDetailsPosReceiptTemplateTest {
         // then: .cl-page is there only for CSS scoping; its 40px bottom padding left a gap above "Documents"
         assertThat(wrapper).contains("class=\"cl-page pb-0\"");
     }
+
+    @Test
+    void customerEmailFieldIsPrefilledFromTheOrder() throws Exception {
+        // given
+        String html = Files.readString(Path.of("src/main/resources/templates/orderDetails.html"), StandardCharsets.UTF_8);
+
+        // when
+        int start = html.indexOf("id=\"pos-customer-email\"");
+        String input = html.substring(html.lastIndexOf('<', start), html.indexOf('>', start));
+
+        // then: the operator only confirms an e-mail the order already has
+        assertThat(input).contains("th:value=\"${posCustomerEmail}\"");
+    }
 }

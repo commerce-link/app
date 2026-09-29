@@ -234,7 +234,8 @@
                                     <div class="field" data-pos-choice="E_RECEIPT" th:unless="${posReceiptMode.name() == 'CASH_REGISTER'}">
                                         <label class="label" for="pos-customer-email" th:text="#{receipts.pos.decision.email}"></label>
                                         <div class="control">
-                                            <input class="input" id="pos-customer-email" type="email" name="customerEmail" autocomplete="off"/>
+                                            <input class="input" id="pos-customer-email" type="email" name="customerEmail" autocomplete="off"
+                                                   th:value="${posCustomerEmail}"/>
                                         </div>
                                     </div>
                                 </div>

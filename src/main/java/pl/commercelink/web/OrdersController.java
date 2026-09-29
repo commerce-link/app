@@ -45,6 +45,7 @@ import pl.commercelink.pricelist.PricelistFinder;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.StoreCategories;
+import pl.commercelink.receipts.BuyerEmail;
 import pl.commercelink.receipts.PosReceiptDecisionForm;
 import pl.commercelink.receipts.PosReceiptDecisions;
 import pl.commercelink.receipts.ReceiptAlerts;
@@ -649,6 +650,8 @@ public class OrdersController extends BaseController {
         model.addAttribute("issuableDocumentTypes", order.getIssuableDocumentTypes());
         model.addAttribute("canIssueReceipt", receiptAttemptService.canIssueManually(store, order));
         model.addAttribute("posReceiptMode", posReceiptDecisions.required(store, order, OrderStatus.Delivered).orElse(null));
+        // the decision's e-mail field starts with the customer's e-mail the order already has (never the store's)
+        model.addAttribute("posCustomerEmail", store == null ? null : BuyerEmail.of(order, store));
         model.addAttribute("posReceiptDecisionMissing", store != null && receiptEligibility.posDecisionMissing(store, order)
                 && receiptAttemptService.attemptsOf(order.getStoreId(), order.getOrderId()).isEmpty());
 
