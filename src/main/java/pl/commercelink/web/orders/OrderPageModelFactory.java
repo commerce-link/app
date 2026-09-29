@@ -8,6 +8,9 @@ import org.springframework.stereotype.Component;
 import pl.commercelink.documents.Document;
 import pl.commercelink.documents.DocumentType;
 import pl.commercelink.inventory.deliveries.DeliveryRedirectResolver;
+import pl.commercelink.inventory.deliveries.DropshipAssessment;
+import pl.commercelink.inventory.deliveries.DropshipEligibility;
+import pl.commercelink.inventory.deliveries.DropshipRejection;
 import pl.commercelink.inventory.deliveries.DropshipItemLookup;
 import pl.commercelink.inventory.supplier.SupplierLabelMap;
 import pl.commercelink.inventory.supplier.SupplierLabels;
@@ -62,6 +65,7 @@ public class OrderPageModelFactory {
     private final OrderEventsRepository orderEventsRepository;
     private final DropshipItemLookup dropshipItemLookup;
     private final DeliveryRedirectResolver deliveryRedirectResolver;
+    private final DropshipEligibility dropshipEligibility;
     private final SupplierLabels supplierLabels;
     private final ShipmentCarrierOptions shipmentCarrierOptions;
     private final ProductCatalogRepository productCatalogRepository;
@@ -85,11 +89,12 @@ public class OrderPageModelFactory {
         boolean hasWarehouseDocument = order.getDocumentByType(DocumentType.GoodsIssue).isPresent();
         boolean hasWarehouseItems = items.stream().filter(OrderItem::isProduct).anyMatch(i -> !dropshipItemIds.contains(i.getItemId()));
         boolean documentsEnabled = store != null && store.hasDocumentsGenerationEnabled();
+        DropshipAssessment dropship = dropship(order, items);
         return new OrderPageModel(order.getOrderId(), order.getShortenedOrderId(),
                 viewer.superAdmin() ? null : OrderBackLink.sanitize(viewer.back()),
                 closed, readOnly, viewer.superAdmin(), viewer.admin(), store == null ? null : store.getName(),
-                header(order, items, store, viewer, readOnly, links, locale),
-                items(order, items, store, viewer, readOnly, links, hasDropshipItems, hasWarehouseDocument),
+                header(order, items, store, viewer, readOnly, links, locale, dropship),
+                items(order, items, store, viewer, readOnly, links, hasDropshipItems, hasWarehouseDocument, dropship),
                 shipments(order, store, readOnly),
                 documents(order, viewer, closed, readOnly, documentsEnabled && hasWarehouseItems && !hasWarehouseDocument),
                 payments(order, readOnly),
@@ -105,13 +110,16 @@ public class OrderPageModelFactory {
     }
 
     private OrderPageModel.Header header(Order order, List<OrderItem> items, Store store, Viewer viewer, boolean readOnly,
-                                         OrderLinks links, Locale locale) {
+                                         OrderLinks links, Locale locale, DropshipAssessment dropship) {
         boolean canOrderShipment = order.canOrderShipment();
         OrderPageModel.PrimaryAction primary = null;
         // with items at several suppliers the dropship page without ?provider= sends the operator back to choose one,
-        // so the button names the first waiting supplier, as DeliveryRedirectResolver does for the delivery link
+        // so the button names the first waiting supplier the dropship page accepts (DropshipEligibility, as the
+        // delivery link and the deliveries planning); a supplier without dropshipping is ordered through the
+        // warehouse route, so it gets no button that would only end on the page's refusal
         OrderItem firstDropship = !readOnly && viewer.admin() && order.getFulfilmentType() == FulfilmentType.DirectToConsumer
-                ? items.stream().filter(OrderPageModelFactory::awaitsDropship).findFirst().orElse(null) : null;
+                ? items.stream().filter(OrderPageModelFactory::awaitsDropship)
+                        .filter(item -> dropship.supports(item.getDeliveryId())).findFirst().orElse(null) : null;
         if (firstDropship != null) {
             primary = new OrderPageModel.PrimaryAction("order.page.action.dropship", links.details() + "/dropship?provider="
                     + URLEncoder.encode(firstDropship.getDeliveryId(), StandardCharsets.UTF_8), "fa-truck");
@@ -178,10 +186,10 @@ public class OrderPageModelFactory {
 
     private OrderPageModel.ItemsCard items(Order order, List<OrderItem> items, Store store, Viewer viewer,
                                            boolean readOnly, OrderLinks links, boolean hasDropshipItems,
-                                           boolean hasWarehouseDocument) {
+                                           boolean hasWarehouseDocument, DropshipAssessment dropship) {
         SupplierLabelMap labels = supplierLabels.forStore(store);
         OrderItemRow.Context context = new OrderItemRow.Context(order, readOnly, viewer.superAdmin(), labels,
-                item -> deliveryHref(order, item, viewer, links),
+                item -> deliveryHref(order, item, viewer, links, dropship),
                 serial -> viewer.superAdmin() ? null
                         : "/dashboard/item/history?serialNo=" + URLEncoder.encode(serial, StandardCharsets.UTF_8));
         List<OrderItem> sorted = items.stream().sorted(Comparator.comparingInt(OrderItem::getPosition)).toList();
@@ -241,19 +249,29 @@ public class OrderPageModelFactory {
                 item.getQty(), deliveryLabel, item.getSerialNo());
     }
 
-    /** The delivery of one item as its row in the items table shows it; null when the item has none. */
-    public OrderItemRow.Delivery delivery(Order order, OrderItem item, Viewer viewer) {
+    /**
+     * The delivery of one item as its row in the items table shows it; null when the item has none. items are all of
+     * the order's items: whether the item's supplier may dropship depends on the whole order.
+     */
+    public OrderItemRow.Delivery delivery(Order order, OrderItem item, List<OrderItem> items, Viewer viewer) {
         if (StringUtils.isBlank(item.getDeliveryId())) {
             return null;
         }
         SupplierLabelMap labels = supplierLabels.forStore(storesRepository.findById(order.getStoreId()));
         return new OrderItemRow.Delivery(OrderItemRow.deliveryLabel(item, labels),
-                deliveryHref(order, item, viewer, OrderLinks.of(order, viewer.superAdmin())),
+                deliveryHref(order, item, viewer, OrderLinks.of(order, viewer.superAdmin()), dropship(order, items)),
                 deliveryRedirectResolver.pointsToDelivery(item));
     }
 
-    private String deliveryHref(Order order, OrderItem item, Viewer viewer, OrderLinks links) {
-        String href = deliveryRedirectResolver.resolveFor(order, item);
+    /** Assessed only for a direct-to-consumer order: a warehouse order never leads to the dropship page anyway. */
+    private DropshipAssessment dropship(Order order, List<OrderItem> items) {
+        return order.getFulfilmentType() == FulfilmentType.DirectToConsumer
+                ? dropshipEligibility.assess(order, items)
+                : DropshipAssessment.rejected(DropshipRejection.WAREHOUSE_FULFILMENT);
+    }
+
+    private String deliveryHref(Order order, OrderItem item, Viewer viewer, OrderLinks links, DropshipAssessment dropship) {
+        String href = deliveryRedirectResolver.resolveFor(order, item, dropship);
         // the dropship screens are the admin's; a user or a super admin only sees the supplier's name
         if (href.contains("/dropship") && (!viewer.admin() || viewer.superAdmin())) {
             return null;

@@ -14,6 +14,9 @@ import org.springframework.test.util.ReflectionTestUtils;
 import pl.commercelink.documents.Document;
 import pl.commercelink.documents.DocumentType;
 import pl.commercelink.inventory.deliveries.DeliveryRedirectResolver;
+import pl.commercelink.inventory.deliveries.DropshipAssessment;
+import pl.commercelink.inventory.deliveries.DropshipEligibility;
+import pl.commercelink.inventory.deliveries.DropshipRejection;
 import pl.commercelink.inventory.deliveries.DropshipItemLookup;
 import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.orders.BillingDetails;
@@ -61,6 +64,7 @@ class OrderPageModelFactoryTest {
     @Mock private ProductCatalogRepository productCatalogRepository;
     @Mock private TaxonomyCache taxonomyCache;
     private final DeliveryRedirectResolver deliveryRedirectResolver = new DeliveryRedirectResolver();
+    private final DropshipEligibility dropshipEligibility = DropshipEligibilityStubs.acceptingEverySupplier();
     private final MessageSource messageSource = messages();
 
     private OrderPageModelFactory factory;
@@ -73,10 +77,11 @@ class OrderPageModelFactoryTest {
         return source;
     }
 
+
     @BeforeEach
     void setUp() {
         factory = new OrderPageModelFactory(storesRepository, orderEventsRepository, dropshipItemLookup,
-                deliveryRedirectResolver, supplierLabels, shipmentCarrierOptions, productCatalogRepository, taxonomyCache,
+                deliveryRedirectResolver, dropshipEligibility, supplierLabels, shipmentCarrierOptions, productCatalogRepository, taxonomyCache,
                 messageSource);
         ReflectionTestUtils.setField(factory, "appDomain", "https://app.example");
         Store store = new Store();
@@ -307,6 +312,60 @@ class OrderPageModelFactoryTest {
 
         // then
         assertThat(page.header().primaryAction().href()).endsWith("/dropship?provider=Acme+B");
+    }
+
+    @Test
+    void aSupplierWithoutDropshippingGetsNoSupplierOrderButItsWarehouseDeliveryPlanning() {
+        // given: the dropship page and the deliveries planning accept only Acme; AcmeB goes the warehouse route
+        Order dropship = order(OrderStatus.New);
+        dropship.setFulfilmentType(FulfilmentType.DirectToConsumer);
+        OrderItem atAcmeB = item(FulfilmentStatus.Allocation);
+        atAcmeB.setDeliveryId("AcmeB");
+        OrderItem atAcme = item(FulfilmentStatus.Allocation);
+        atAcme.setDeliveryId("Acme");
+        org.mockito.Mockito.doReturn(DropshipAssessment.of(List.of("Acme"))).when(dropshipEligibility).assess(any(), any());
+        OrderPageModelFactory.Viewer admin = new OrderPageModelFactory.Viewer(false, true, null);
+
+        // when
+        OrderPageModel onlyAcmeB = factory.build(dropship, List.of(atAcmeB), admin, PL);
+        OrderPageModel both = factory.build(dropship, List.of(atAcmeB, atAcme), admin, PL);
+
+        // then
+        assertThat(onlyAcmeB.header().primaryAction()).isNull();
+        assertThat(onlyAcmeB.items().products().get(0).deliveryHref()).isEqualTo("/dashboard/deliveries/create/AcmeB");
+        assertThat(both.header().primaryAction().href()).endsWith("/dropship?provider=Acme");
+        assertThat(both.items().products().get(1).deliveryHref()).endsWith("/dropship?provider=Acme");
+    }
+
+    @Test
+    void anOrderTheDropshipPageRefusesAsAWholeOffersNoSupplierOrder() {
+        // given: e.g. no shipping address; the page would only redirect back with the reason
+        Order dropship = order(OrderStatus.New);
+        dropship.setFulfilmentType(FulfilmentType.DirectToConsumer);
+        OrderItem allocated = item(FulfilmentStatus.Allocation);
+        allocated.setDeliveryId("Acme");
+        org.mockito.Mockito.doReturn(DropshipAssessment.rejected(DropshipRejection.NO_SHIPPING_DETAILS)).when(dropshipEligibility).assess(any(), any());
+
+        // when
+        OrderPageModel page = factory.build(dropship, List.of(allocated), new OrderPageModelFactory.Viewer(false, true, null), PL);
+
+        // then
+        assertThat(page.header().primaryAction()).isNull();
+        assertThat(page.items().products().get(0).deliveryHref()).isEqualTo("/dashboard/deliveries/create/Acme");
+    }
+
+    @Test
+    void aWarehouseOrderIsNeverAssessedForDropshipping() {
+        // given
+        Order warehouse = order(OrderStatus.New);
+        OrderItem allocated = item(FulfilmentStatus.Allocation);
+        allocated.setDeliveryId("Acme");
+
+        // when
+        factory.build(warehouse, List.of(allocated), new OrderPageModelFactory.Viewer(false, true, null), PL);
+
+        // then
+        org.mockito.Mockito.verify(dropshipEligibility, org.mockito.Mockito.never()).assess(any(), any());
     }
 
     @Test

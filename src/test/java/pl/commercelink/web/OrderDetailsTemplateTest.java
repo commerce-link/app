@@ -97,7 +97,7 @@ class OrderDetailsTemplateTest {
         messages.setDefaultEncoding("UTF-8");
         messages.setFallbackToSystemLocale(false);
         OrderPageModelFactory factory = new OrderPageModelFactory(stores, events, dropship, new DeliveryRedirectResolver(),
-                labels, carrierOptions, mock(ProductCatalogRepository.class), mock(TaxonomyCache.class), messages);
+                pl.commercelink.web.orders.DropshipEligibilityStubs.acceptingEverySupplier(), labels, carrierOptions, mock(ProductCatalogRepository.class), mock(TaxonomyCache.class), messages);
         ReflectionTestUtils.setField(factory, "appDomain", "https://app.example");
         return factory;
     }
@@ -1057,15 +1057,16 @@ class OrderDetailsTemplateTest {
     @Test
     void theSupplierColumnLinksToTheDeliveryTheResolverPicksForTheOrder() {
         // given (was DropshipTemplateTest#orderDetailsResolvesTheDeliveryLinkWithTheOrder): the order-aware
-        // overload (resolveFor(Order, OrderItem)) must be used, not resolveFor(OrderItem) alone. The two only
-        // diverge for a DirectToConsumer order with an item still awaiting delivery (New/Allocation, unclaimed) —
-        // there the order-aware resolver sends the operator to the dropship confirmation page instead of
-        // "create a warehouse delivery".
+        // overload (resolveFor(Order, OrderItem, DropshipAssessment)) must be used, not resolveFor(OrderItem) alone.
+        // The two only diverge for a DirectToConsumer order with an item still awaiting delivery (New/Allocation,
+        // unclaimed) at a supplier the dropship assessment accepts — there the order-aware resolver sends the
+        // operator to the dropship confirmation page instead of "create a warehouse delivery".
         Order order = order(OrderStatus.Assembly);
         order.setFulfilmentType(FulfilmentType.DirectToConsumer);
         OrderItem awaiting = inDelivery(order, "Acme", FulfilmentStatus.Allocation);
         DeliveryRedirectResolver resolver = new DeliveryRedirectResolver();
-        String expected = resolver.resolveFor(order, awaiting);
+        String expected = resolver.resolveFor(order, awaiting,
+                pl.commercelink.inventory.deliveries.DropshipAssessment.of(List.of("Acme")));
         String itemOnly = resolver.resolveFor(awaiting);
         // the fixture is only useful if the two overloads actually disagree
         assertThat(expected).contains("/dropship?provider=");

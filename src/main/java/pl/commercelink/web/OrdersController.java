@@ -1108,7 +1108,7 @@ public class OrdersController extends BaseController {
         // The header shows the item's delivery as its row in the items table does (supplier label, or the short id of
         // a supplier delivery with its link).
         OrderItemRow.Delivery delivery = pageModelFactory.delivery(order, orderItem,
-                new OrderPageModelFactory.Viewer(false, isAdmin(), null));
+                orderItemsRepository.findByOrderId(order.getOrderId()), new OrderPageModelFactory.Viewer(false, isAdmin(), null));
         boolean deliveryHeld = holdsDelivery(order, orderItem);
         model.addAttribute("delivery", delivery);
         model.addAttribute("deliveryHeld", deliveryHeld);

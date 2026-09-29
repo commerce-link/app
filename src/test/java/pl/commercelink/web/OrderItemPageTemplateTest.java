@@ -240,8 +240,8 @@ class OrderItemPageTemplateTest {
                 new pl.commercelink.web.orders.OrderPageModelFactory.Viewer(false, true, null);
 
         // when
-        OrderItemRow.Delivery delivery = factory.delivery(order, ordered, admin);
-        OrderItemRow.Delivery supplier = factory.delivery(order, allocated, admin);
+        OrderItemRow.Delivery delivery = factory.delivery(order, ordered, List.of(ordered), admin);
+        OrderItemRow.Delivery supplier = factory.delivery(order, allocated, List.of(allocated), admin);
         OrderItemRow row = factory.build(order, List.of(ordered), admin, OrderDetailsTemplateTest.PL).items().products().get(0);
 
         // then
@@ -251,6 +251,6 @@ class OrderItemPageTemplateTest {
         assertThat(delivery.href()).isEqualTo(row.deliveryHref());
         assertThat(supplier.delivery()).isFalse();
         assertThat(supplier.label()).isEqualTo("HURT-ABC");
-        assertThat(factory.delivery(order, none, admin)).isNull();
+        assertThat(factory.delivery(order, none, List.of(none), admin)).isNull();
     }
 }
