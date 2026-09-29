@@ -5,6 +5,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.orders.filters.FilterActor;
@@ -320,6 +321,133 @@ class OrderFiltersServiceTest {
 
             assertThat(storeRow.getFilters()).isEmpty();
             verify(repository).save(storeRow);
+        }
+    }
+
+    @Nested
+    class DefaultFilter {
+
+        @Test
+        @DisplayName("a user's default names a filter of theirs or of the store and is kept in their own row")
+        void defaultIsKeptInTheUsersOwnRow() {
+            // given
+            OrderFilter shared = filter("Courier");
+            when(repository.findByOwner(STORE_ID, OwnedOrderFilters.STORE_FILTER))
+                    .thenReturn(Optional.of(rowOf(OwnedOrderFilters.STORE_FILTER, shared)));
+            when(repository.findByOwner(STORE_ID, "user-1")).thenReturn(Optional.empty());
+
+            // when
+            service().setDefault(user("user-1"), shared.getId());
+
+            // then
+            ArgumentCaptor<OwnedOrderFilters> saved = ArgumentCaptor.forClass(OwnedOrderFilters.class);
+            verify(repository).save(saved.capture());
+            assertThat(saved.getValue().getUserId()).isEqualTo("user-1");
+            assertThat(saved.getValue().getDefaultFilterId()).isEqualTo(shared.getId());
+            assertThat(saved.getValue().getFilters()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("a filter the user cannot see cannot become their default")
+        void filterOutOfSightCannotBecomeDefault() {
+            // given
+            when(repository.findByOwner(STORE_ID, OwnedOrderFilters.STORE_FILTER)).thenReturn(Optional.empty());
+            when(repository.findByOwner(STORE_ID, "user-1")).thenReturn(Optional.empty());
+
+            // when / then
+            assertThatThrownBy(() -> service().setDefault(user("user-1"), "someone-elses"))
+                    .isInstanceOf(OrderFilterInvalidException.class);
+            verify(repository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("the list view reports the default only while its filter is still visible")
+        void defaultOfAVanishedFilterReadsAsNone() {
+            // given
+            OrderFilter mine = filter("Mine");
+            OwnedOrderFilters own = rowOf("user-1", mine);
+            own.setDefaultFilterId("deleted-store-filter");
+            when(repository.findByOwner(STORE_ID, OwnedOrderFilters.STORE_FILTER)).thenReturn(Optional.empty());
+            when(repository.findByOwner(STORE_ID, "user-1")).thenReturn(Optional.of(own));
+
+            // when
+            ListOrderFiltersView stale = service().list(user("user-1"));
+
+            // then
+            assertThat(stale.defaultFilterId()).isNull();
+            assertThat(stale.defaultFilter()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("the list view names the default filter the user chose")
+        void listViewNamesTheDefault() {
+            // given
+            OrderFilter mine = filter("Mine");
+            OwnedOrderFilters own = rowOf("user-1", mine);
+            own.setDefaultFilterId(mine.getId());
+            when(repository.findByOwner(STORE_ID, OwnedOrderFilters.STORE_FILTER)).thenReturn(Optional.empty());
+            when(repository.findByOwner(STORE_ID, "user-1")).thenReturn(Optional.of(own));
+
+            // when
+            ListOrderFiltersView visible = service().list(user("user-1"));
+
+            // then
+            assertThat(visible.defaultFilter()).contains(mine);
+            assertThat(visible.isDefault(mine.getId())).isTrue();
+        }
+
+        @Test
+        @DisplayName("clearing a filter that is no longer the default leaves the newer default alone")
+        void clearingLeavesANewerDefaultAlone() {
+            // given
+            OrderFilter first = filter("First");
+            OrderFilter second = filter("Second");
+            OwnedOrderFilters own = rowOf("user-1", first, second);
+            own.setDefaultFilterId(second.getId());
+            when(repository.findByOwner(STORE_ID, "user-1")).thenReturn(Optional.of(own));
+
+            // when
+            service().clearDefault(user("user-1"), first.getId());
+
+            // then
+            assertThat(own.getDefaultFilterId()).isEqualTo(second.getId());
+            verify(repository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("clearing the default filter leaves the list without one")
+        void clearingTheDefault() {
+            // given
+            OrderFilter mine = filter("Mine");
+            OwnedOrderFilters own = rowOf("user-1", mine);
+            own.setDefaultFilterId(mine.getId());
+            when(repository.findByOwner(STORE_ID, "user-1")).thenReturn(Optional.of(own));
+
+            // when
+            service().clearDefault(user("user-1"), mine.getId());
+
+            // then
+            assertThat(own.getDefaultFilterId()).isNull();
+            verify(repository).save(own);
+        }
+
+        @Test
+        @DisplayName("deleting the user's default filter clears the default in the same write")
+        void deletingTheDefaultClearsIt() {
+            // given
+            OrderFilter mine = filter("Mine");
+            OwnedOrderFilters own = rowOf("user-1", mine);
+            own.setDefaultFilterId(mine.getId());
+            when(repository.findByOwner(STORE_ID, OwnedOrderFilters.STORE_FILTER)).thenReturn(Optional.empty());
+            when(repository.findByOwner(STORE_ID, "user-1")).thenReturn(Optional.of(own));
+
+            // when
+            service().delete(user("user-1"), mine.getId());
+
+            // then
+            assertThat(own.getFilters()).isEmpty();
+            assertThat(own.getDefaultFilterId()).isNull();
+            verify(repository).save(own);
         }
     }
 }

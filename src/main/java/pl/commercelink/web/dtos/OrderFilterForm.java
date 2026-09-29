@@ -10,12 +10,14 @@ public class OrderFilterForm {
 
     private String label;
     private boolean sharedWithStore;
+    private boolean openByDefault;
     private String status;
     private String shipmentType;
     private String paymentSource;
     private String shippingDue;
     private String sourceName;
     private String shippingPostalCode;
+    private String returnTo;
 
     public List<OrderFilterCondition> toConditions() {
         List<OrderFilterCondition> conditions = new LinkedList<>();
@@ -48,6 +50,14 @@ public class OrderFilterForm {
 
     public void setSharedWithStore(boolean sharedWithStore) {
         this.sharedWithStore = sharedWithStore;
+    }
+
+    public boolean isOpenByDefault() {
+        return openByDefault;
+    }
+
+    public void setOpenByDefault(boolean openByDefault) {
+        this.openByDefault = openByDefault;
     }
 
     public String getStatus() {
@@ -97,4 +107,13 @@ public class OrderFilterForm {
     public void setShippingPostalCode(String shippingPostalCode) {
         this.shippingPostalCode = shippingPostalCode;
     }
+
+    public String getReturnTo() {
+        return returnTo;
+    }
+
+    public void setReturnTo(String returnTo) {
+        this.returnTo = returnTo;
+    }
+
 }
