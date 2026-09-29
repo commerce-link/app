@@ -3607,6 +3607,12 @@ a.cl-link-button:hover {
     gap: var(--cl-gap-related);
 }
 
+/* "Wyczyść filtry" right after the filter menus: a text action, so it never reads as a third menu. */
+.cl-page .cl-toolbar-clear {
+    margin-left: 4px;
+    white-space: nowrap;
+}
+
 .cl-page .cl-table-toolbar .cl-select.is-compact {
     min-width: 180px;
 }
@@ -4627,12 +4633,6 @@ a.cl-link-button:hover {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
-}
-
-/* "Wyczyść filtry" closes the chip row as a text action, centred on the chips' line. */
-.cl-page .cl-filter-chips-clear {
-    align-self: center;
-    margin-left: 4px;
 }
 
 .cl-page .cl-filter-chip {

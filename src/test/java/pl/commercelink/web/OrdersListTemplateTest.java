@@ -57,19 +57,21 @@ class OrdersListTemplateTest {
                 .contains("cl-list-empty").contains("orders.new.pos.button");
     }
 
-    /** One way to clear every narrowing at once, at the end of the chip row (not inside the filter menu). */
+    /** One way to clear every narrowing at once, right after the filter menu in the toolbar, only when something narrows. */
     @Test
-    void clearFiltersSitsAfterTheChips() throws Exception {
+    void clearFiltersSitsNextToTheFilterMenu() throws Exception {
         // given
         String html = page();
 
         // when
-        int chips = html.indexOf("class=\"cl-filter-chips\"");
+        int filterMenu = html.indexOf("data-cl-filter-menu=\"filter\"");
         int clear = html.indexOf("q.cleared().href()");
 
         // then
-        assertThat(clear).isGreaterThan(chips).isLessThan(html.indexOf("class=\"cl-table-results\""));
-        assertThat(html).contains("class=\"cl-link-button cl-filter-chips-clear\"").contains("#{general.clear.filters}");
+        assertThat(clear).isGreaterThan(filterMenu).isLessThan(html.indexOf("class=\"cl-search-form\""));
+        assertThat(html).contains("class=\"cl-link-button cl-toolbar-clear\"").contains("#{general.clear.filters}")
+                .doesNotContain("cl-filter-chips-clear");
+        assertThat(html.substring(html.lastIndexOf("<a", clear), clear)).contains("th:if=\"${!page.chips().isEmpty()}\"");
     }
 
     /** WZ · FV/PAR · review under the status pill (spec §25): a labelled list, state as a class, text for screen readers. */

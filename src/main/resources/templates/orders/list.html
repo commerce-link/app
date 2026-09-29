@@ -105,6 +105,10 @@
                                 </ul>
                             </div>
                         </details>
+                        <!--/* Clears every narrowing at once (statuses, filter, search) — switching a filter off alone
+                               would leave the statuses it ticked; the chips' "×" still drops one. Shown when a chip is. */-->
+                        <a th:if="${!page.chips().isEmpty()}" class="cl-link-button cl-toolbar-clear" th:href="@{${q.cleared().href()}}"
+                           th:text="#{general.clear.filters}" data-cl-orders-nav></a>
                     </div>
 
                     <form method="get" th:action="@{/dashboard/orders}" class="cl-search-form" role="search" data-cl-orders-form>
@@ -141,10 +145,6 @@
                             <a class="cl-filter-chip-clear" th:href="@{${chip.clearHref()}}" th:attr="aria-label=${chip.clearLabel()}"
                                data-cl-orders-nav><span aria-hidden="true">×</span></a>
                         </span>
-                        <!--/* Clears every narrowing at once — the chips' "×" drops one; switching a filter off alone would
-                               leave the statuses it ticked. */-->
-                        <a class="cl-link-button cl-filter-chips-clear" th:href="@{${q.cleared().href()}}"
-                           th:text="#{general.clear.filters}" data-cl-orders-nav></a>
                     </div>
                     <p class="cl-table-results" role="status" th:classappend="${page.chips().isEmpty()} ? 'cl-visually-hidden' : ''"
                        th:text="${page.resultsLine()}"></p>
