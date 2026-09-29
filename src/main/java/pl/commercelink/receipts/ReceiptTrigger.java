@@ -6,6 +6,7 @@ import org.springframework.stereotype.Component;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.stores.IntegrationType;
+import pl.commercelink.stores.ReceiptConfiguration;
 import pl.commercelink.stores.Store;
 
 /**
@@ -49,13 +50,17 @@ public class ReceiptTrigger {
 
     /**
      * Whether the store's orders can have e-receipt attempts: every attempt is created with the store's receipt
-     * system, so a store that has one, or had one and disconnected it (its dead attempts and their alerts stay), may.
-     * A store that never chose a receipt system has none, and the order lifecycle (which the cron runs over every
-     * Shipping and Delivered order) skips the attempts query for it.
+     * system, automatic ones only after automatic receipts were switched on. So a store may have attempts when it has a
+     * receipt system now, ever switched automatic receipts on ({@code enabledAt} is never cleared, not even by a
+     * disconnect), or disconnected a system it used only by hand ({@code disconnectedAt}; V019 marks the stores that
+     * did so before the field existed). A store with none of these never had attempts, and the order lifecycle (which
+     * the cron runs over every Shipping and Delivered order) skips the attempts query for it.
      */
     static boolean mayHaveAttempts(Store store) {
+        ReceiptConfiguration receipts = store.getReceiptConfiguration();
         return store.getConfigurationValue(IntegrationType.RECEIPT_PROVIDER) != null
-                || store.getReceiptConfiguration().getDisconnectedAt() != null;
+                || receipts.getEnabledAt() != null
+                || receipts.getDisconnectedAt() != null;
     }
 
     /**

@@ -130,6 +130,21 @@ class ReceiptTriggerTest {
     }
 
     @Test
+    void aStoreDisconnectedBeforeTheMarkerExistedStillReconciles() {
+        // given: automatic receipts were on once (enabledAt is never cleared), the system was disconnected before
+        // disconnectedAt existed
+        Store store = new Store();
+        store.getReceiptConfiguration().setEnabledAt(LocalDateTime.of(2026, 9, 28, 12, 0));
+        Order order = b2cOrder(100);
+
+        // when
+        trigger.onOrderSaved(order, store);
+
+        // then
+        verify(service).reconcileDeadAttemptAlerts(order);
+    }
+
+    @Test
     void anUnknownStoreStillReconciles() {
         // given
         Order order = b2cOrder(100);
