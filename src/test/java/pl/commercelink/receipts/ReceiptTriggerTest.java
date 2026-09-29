@@ -73,6 +73,7 @@ class ReceiptTriggerTest {
 
     @Test
     void raisesAnAlertInsteadOfAnAttemptForAPosOrderWithoutDecision() {
+        // given
         Store store = new Store();
         store.setStoreId(STORE_ID);
         Order order = posOrder(100);
@@ -80,14 +81,17 @@ class ReceiptTriggerTest {
         when(eligibility.posDecisionMissing(store, order)).thenReturn(true);
         when(service.attemptsOf(STORE_ID, ORDER_ID)).thenReturn(List.of());
 
+        // when
         trigger.onOrderSaved(order);
 
+        // then
         verify(alerts).raisePosDecision(STORE_ID, ORDER_ID);
         verify(service, never()).startAutomatic(any(), any());
     }
 
     @Test
     void resolvesThePosAlertOnceTheOrderHasAReceiptOrIsCancelled() {
+        // given
         Store store = new Store();
         store.setStoreId(STORE_ID);
         when(stores.findById(STORE_ID)).thenReturn(store);
@@ -95,15 +99,33 @@ class ReceiptTriggerTest {
         Order cancelled = posOrder(100);
         cancelled.setStatus(OrderStatus.Cancelled);
 
+        // when
         trigger.onOrderSaved(withReceipt);
         trigger.onOrderSaved(cancelled);
 
+        // then
         verify(alerts, times(2)).resolvePosDecision(STORE_ID, ORDER_ID);
         verify(alerts, never()).raisePosDecision(any(), any());
     }
 
     @Test
+    void resolvesThePosAlertWhenARecordedReceiptCompletesThePaidSale() {
+        // given: "Dodaj → Paragon" on a delivered, paid POS order makes the lifecycle complete it before the trigger
+        Store store = new Store();
+        store.setStoreId(STORE_ID);
+        when(stores.findById(STORE_ID)).thenReturn(store);
+        Order completed = posOrder(100);
+        completed.setStatus(OrderStatus.Completed);
+
+        trigger.onOrderSaved(completed);
+
+        verify(alerts).resolvePosDecision(STORE_ID, ORDER_ID);
+        verify(service, never()).startAutomatic(any(), any());
+    }
+
+    @Test
     void noAlertWhenAnAttemptAlreadyExists() {
+        // given
         Store store = new Store();
         store.setStoreId(STORE_ID);
         Order order = posOrder(100);
@@ -111,18 +133,23 @@ class ReceiptTriggerTest {
         when(eligibility.posDecisionMissing(store, order)).thenReturn(true);
         when(service.attemptsOf(STORE_ID, ORDER_ID)).thenReturn(List.of(new ReceiptAttempt()));
 
+        // when
         trigger.onOrderSaved(order);
 
+        // then
         verify(alerts, never()).raisePosDecision(any(), any());
     }
 
     @Test
     void ignoresPosOrdersStillInProgress() {
+        // given
         Order order = posOrder(100);
         order.setStatus(OrderStatus.New);
 
+        // when
         trigger.onOrderSaved(order);
 
+        // then
         verifyNoInteractions(stores, alerts);
     }
 }

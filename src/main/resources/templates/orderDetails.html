@@ -249,8 +249,12 @@
                                                 || box.querySelector('input[name="choice"]');
                                             box.querySelectorAll('[data-pos-choice]').forEach(function (field) {
                                                 var on = delivered && field.getAttribute('data-pos-choice') === chosen.value;
+                                                var input = field.querySelector('input');
                                                 field.hidden = !on;
-                                                field.querySelector('input').required = on;
+                                                // a disabled field is neither validated nor sent, so a value typed
+                                                // for the other choice can never block the save
+                                                input.disabled = !on;
+                                                input.required = on;
                                             });
                                         }
                                         status.addEventListener('change', refresh);

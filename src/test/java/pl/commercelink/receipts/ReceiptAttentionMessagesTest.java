@@ -65,4 +65,20 @@ class ReceiptAttentionMessagesTest {
 
         assertThat(formatted).contains("store's email templates").contains("order's documents");
     }
+
+    @Test
+    void keepsTheApostrophesInThePointOfSaleAlertInBothLanguages() {
+        // given
+        ResourceBundleMessageSource messageSource = messageSource();
+
+        // when
+        String english = messageSource.getMessage("receipts.pos.decision.missing", new Object[]{"ORDER-1"},
+                Locale.forLanguageTag("en"));
+        String polish = messageSource.getMessage("receipts.pos.decision.missing", new Object[]{"ORDER-1"},
+                Locale.forLanguageTag("pl"));
+
+        // then
+        assertThat(english).contains("ORDER-1").contains("shop's cash register").contains("record its number");
+        assertThat(polish).contains("ORDER-1").contains("kasa sklepu");
+    }
 }

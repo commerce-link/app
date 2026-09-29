@@ -12,6 +12,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import pl.commercelink.inventory.InventoryKey;
 import pl.commercelink.inventory.MatchedInventory;
+import pl.commercelink.receipts.ReceiptTrigger;
 import pl.commercelink.taxonomy.Categories;
 import pl.commercelink.taxonomy.Taxonomy;
 import pl.commercelink.invoicing.api.Price;
@@ -66,6 +67,8 @@ class OrdersManagerTest {
     private AutomatedOrderFulfilment automatedOrderFulfilment;
     @Mock
     private OrderLifecycleEventPublisher orderLifecycleEventPublisher;
+    @Mock
+    private ReceiptTrigger receiptTrigger;
     @Mock
     private OrderLifecycle orderLifecycle;
     @Mock
@@ -337,6 +340,8 @@ class OrdersManagerTest {
         verify(orderItemsRepository).batchSave(List.of(product, service));
         verify(ordersRepository).save(order);
         verify(orderLifecycleEventPublisher).publish(order, OrderLifecycleEventType.OrderCancelled);
+        // the cancel skips the order lifecycle, so the receipt trigger is told directly (it settles a POS alert)
+        verify(receiptTrigger).onOrderSaved(order);
     }
 
     @Test

@@ -8,6 +8,7 @@ import pl.commercelink.orders.fulfilment.AutomatedOrderFulfilment;
 import pl.commercelink.orders.fulfilment.ManualWarehouseItemFulfilment;
 import pl.commercelink.orders.fulfilment.OrderFulfilmentEventPublisher;
 import pl.commercelink.orders.notifications.OrderNotificationsEventPublisher;
+import pl.commercelink.receipts.ReceiptTrigger;
 import pl.commercelink.stores.Store;
 import pl.commercelink.warehouse.api.Reservation;
 import pl.commercelink.warehouse.api.ReservationRemovalItem;
@@ -48,6 +49,8 @@ public class OrdersManager {
     private DropshipItemLookup dropshipItemLookup;
     @Autowired
     private OrderNotificationsEventPublisher notificationEventPublisher;
+    @Autowired
+    private ReceiptTrigger receiptTrigger;
 
     /**
      * Places the drafts in the order in the given sequence: a product joins the last item of its
@@ -444,6 +447,8 @@ public class OrdersManager {
         orderItemsRepository.batchSave(orderItems);
         ordersRepository.save(order);
         orderLifecycleEventPublisher.publish(order, OrderLifecycleEventType.OrderCancelled);
+        // saved without the order lifecycle, so the receipt trigger is told here (it settles a POS receipt alert)
+        receiptTrigger.onOrderSaved(order);
     }
 
     /** @return false when an order with the same externalOrderId already exists and nothing was saved. */

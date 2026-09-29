@@ -34,7 +34,10 @@ public class ReceiptTrigger {
 
     public void onOrderSaved(Order order) {
         boolean pos = order.isPointOfSale();
-        if (order.getStatus() != OrderStatus.Delivered && !(pos && order.getStatus() == OrderStatus.Cancelled)) {
+        // a POS order's alert is also settled once it moves on: a recorded receipt completes a paid sale, and a
+        // cancelled sale needs no receipt
+        boolean settledPos = pos && order.getStatus().isOneOf(OrderStatus.Completed, OrderStatus.Cancelled);
+        if (order.getStatus() != OrderStatus.Delivered && !settledPos) {
             return;
         }
         try {

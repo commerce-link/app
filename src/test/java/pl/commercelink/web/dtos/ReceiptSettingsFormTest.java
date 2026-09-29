@@ -56,31 +56,39 @@ class ReceiptSettingsFormTest {
 
     @Test
     void defaultsPosReceiptModeToAskForAStoreThatNeverChoseOne() {
+        // given
         ReceiptSettingsForm form = ReceiptSettingsForm.from(new ReceiptConfiguration());
 
+        // when / then
         assertThat(form.getPosReceiptMode()).isEqualTo(PosReceiptMode.ASK);
     }
 
     @Test
     void appliesThePosReceiptModeEvenWhenAutomaticReceiptsStayOff() {
+        // given
         Store store = new Store();
         ReceiptSettingsForm form = new ReceiptSettingsForm();
         form.setEnabled(false);
         form.setPosReceiptMode(PosReceiptMode.CASH_REGISTER);
 
+        // when
         form.applyTo(store, NOW);
 
+        // then
         assertThat(store.getReceiptConfiguration().getPosReceiptMode()).isEqualTo(PosReceiptMode.CASH_REGISTER);
     }
 
     @Test
     void keepsTheStoredModeWhenTheFieldIsMissingFromTheRequest() {
+        // given
         Store store = new Store();
         store.getReceiptConfiguration().setPosReceiptMode(PosReceiptMode.E_RECEIPT);
         ReceiptSettingsForm form = new ReceiptSettingsForm();
 
+        // when
         form.applyTo(store, NOW);
 
+        // then
         assertThat(store.getReceiptConfiguration().getPosReceiptMode()).isEqualTo(PosReceiptMode.E_RECEIPT);
     }
 }

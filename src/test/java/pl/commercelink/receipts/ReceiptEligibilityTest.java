@@ -71,10 +71,12 @@ class ReceiptEligibilityTest {
 
     @Test
     void pointOfSaleOrdersQualifyOnceTheOperatorChoseAnEReceipt() {
+        // given
         Order pos = b2cOrder(100);
         pos.setSource(new OrderSource("kasa", OrderSourceType.PointOfSale));
         Store store = store();
 
+        // when / then
         assertThat(eligibility.automaticCandidate(store, pos)).isFalse();
         pos.setPosEReceiptRequested(true);
         assertThat(eligibility.automaticCandidate(store, pos)).isTrue();
@@ -135,6 +137,7 @@ class ReceiptEligibilityTest {
 
     @Test
     void posOrderWithTheStoresEmailIsNoAutomaticCandidateInAnyMode() {
+        // when / then
         for (PosReceiptMode mode : PosReceiptMode.values()) {
             Store store = storeWithReceipts(mode);
             Order order = posOrder(100);
@@ -146,20 +149,24 @@ class ReceiptEligibilityTest {
 
     @Test
     void posOrderWithCustomerEmailIsACandidateInEReceiptMode() {
+        // given
         Store store = storeWithReceipts(PosReceiptMode.E_RECEIPT);
         Order order = posOrder(100);
         order.getBillingDetails().setEmail("klient@example.com");
 
+        // when / then
         assertThat(eligibility.automaticCandidate(store, order)).isTrue();
         assertThat(eligibility.posDecisionMissing(store, order)).isFalse();
     }
 
     @Test
     void askModeNeedsTheOperatorsChoiceNotJustAnEmail() {
+        // given
         Store store = storeWithReceipts(PosReceiptMode.ASK);
         Order order = posOrder(100);
         order.getBillingDetails().setEmail("klient@example.com");
 
+        // when / then
         assertThat(eligibility.automaticCandidate(store, order)).isFalse();
         order.setPosEReceiptRequested(true);
         assertThat(eligibility.automaticCandidate(store, order)).isTrue();
@@ -167,48 +174,58 @@ class ReceiptEligibilityTest {
 
     @Test
     void cashRegisterModeNeverIssuesAnEReceiptForPos() {
+        // given
         Store store = storeWithReceipts(PosReceiptMode.CASH_REGISTER);
         Order order = posOrder(100);
         order.getBillingDetails().setEmail("klient@example.com");
         order.setPosEReceiptRequested(true);
 
+        // when / then
         assertThat(eligibility.automaticCandidate(store, order)).isFalse();
         assertThat(eligibility.posDecisionMissing(store, order)).isTrue();
     }
 
     @Test
     void aRecordedReceiptSettlesThePosDecision() {
+        // given
         Store store = storeWithReceipts(PosReceiptMode.CASH_REGISTER);
         Order order = posOrder(100);
         order.addDocument(new Document(null, "123/2026", null, DocumentType.Receipt, LocalDate.of(2026, 9, 23)));
 
+        // when / then
         assertThat(eligibility.posDecisionMissing(store, order)).isFalse();
         assertThat(eligibility.automaticCandidate(store, order)).isFalse();
     }
 
     @Test
     void storeWithoutPosModeAsksAndSoAlertsForTheStoresEmail() {
+        // given
         Store store = storeWithReceipts(null);
 
+        // when / then
         assertThat(eligibility.posDecisionMissing(store, posOrder(100))).isTrue();
     }
 
     @Test
     void noPosDecisionIsMissingWhileReceiptsAreOffOrTheOrderIsUndelivered() {
+        // given
         Store off = storeWithReceipts(PosReceiptMode.ASK);
         off.getReceiptConfiguration().disable();
         Order undelivered = posOrder(100);
         undelivered.setStatus(OrderStatus.Shipping);
 
+        // when / then
         assertThat(eligibility.posDecisionMissing(off, posOrder(100))).isFalse();
         assertThat(eligibility.posDecisionMissing(storeWithReceipts(PosReceiptMode.ASK), undelivered)).isFalse();
     }
 
     @Test
     void nonPosOrdersAreUnchanged() {
+        // given
         Store store = storeWithReceipts(PosReceiptMode.CASH_REGISTER);
         Order order = deliveredOrder(100);
 
+        // when / then
         assertThat(eligibility.automaticCandidate(store, order)).isTrue();
         assertThat(eligibility.posDecisionMissing(store, order)).isFalse();
     }

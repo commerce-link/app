@@ -50,41 +50,50 @@ class PosReceiptDecisionsTest {
 
     @Test
     void asksWhenAPosOrderGoesToDeliveredWithoutAReceipt() {
+        // when / then
         assertThat(decisions.required(storeWithReceipts(PosReceiptMode.ASK), shippingPosOrder(), OrderStatus.Delivered))
                 .contains(PosReceiptMode.ASK);
     }
 
     @Test
     void doesNotAskWhenAReceiptIsAlreadyRecorded() {
+        // given
         Order order = shippingPosOrder();
         order.addDocument(new Document(null, "7/2026", null, DocumentType.Receipt, TODAY));
 
+        // when / then
         assertThat(decisions.required(storeWithReceipts(PosReceiptMode.CASH_REGISTER), order, OrderStatus.Delivered)).isEmpty();
     }
 
     @Test
     void doesNotAskInEReceiptModeWhenTheCustomersEmailIsKnown() {
+        // given
         Order order = shippingPosOrder();
         order.getBillingDetails().setEmail("klient@example.com");
 
+        // when / then
         assertThat(decisions.required(storeWithReceipts(PosReceiptMode.E_RECEIPT), order, OrderStatus.Delivered)).isEmpty();
     }
 
     @Test
     void doesNotAskOnceAnAttemptExists() {
+        // given
         Order order = shippingPosOrder();
         when(attemptService.attemptsOf(STORE_ID, ORDER_ID)).thenReturn(List.of(new ReceiptAttempt()));
 
+        // when / then
         assertThat(decisions.required(storeWithReceipts(PosReceiptMode.ASK), order, OrderStatus.Delivered)).isEmpty();
     }
 
     @Test
     void doesNotAskForOtherChannelsOtherStatusesOrWithReceiptsOff() {
+        // given
         Order web = deliveredOrder(100);
         web.setStatus(OrderStatus.Shipping);
         Store off = storeWithReceipts(PosReceiptMode.ASK);
         off.getReceiptConfiguration().disable();
 
+        // when / then
         assertThat(decisions.required(storeWithReceipts(PosReceiptMode.ASK), web, OrderStatus.Delivered)).isEmpty();
         assertThat(decisions.required(storeWithReceipts(PosReceiptMode.ASK), shippingPosOrder(), OrderStatus.Shipping)).isEmpty();
         assertThat(decisions.required(off, shippingPosOrder(), OrderStatus.Delivered)).isEmpty();
@@ -93,11 +102,14 @@ class PosReceiptDecisionsTest {
 
     @Test
     void cashRegisterChoiceRecordsTheReceiptOnTheOrder() {
+        // given
         Order order = shippingPosOrder();
 
+        // when / then
         assertThat(decisions.apply(storeWithReceipts(PosReceiptMode.ASK), PosReceiptMode.ASK, order,
                 form(PosReceiptMode.CASH_REGISTER, " 15/2026 ", null), TODAY)).isEmpty();
 
+        // then
         assertThat(order.getDocuments()).singleElement().satisfies(d -> {
             assertThat(d.getType()).isEqualTo(DocumentType.Receipt);
             assertThat(d.getNumber()).isEqualTo("15/2026");
@@ -108,11 +120,14 @@ class PosReceiptDecisionsTest {
 
     @Test
     void eReceiptChoiceStoresTheCustomersEmailAndTheChoice() {
+        // given
         Order order = shippingPosOrder();
 
+        // when / then
         assertThat(decisions.apply(storeWithReceipts(PosReceiptMode.ASK), PosReceiptMode.ASK, order,
                 form(PosReceiptMode.E_RECEIPT, null, " klient@example.com "), TODAY)).isEmpty();
 
+        // then
         assertThat(order.getBillingDetails().getEmail()).isEqualTo("klient@example.com");
         assertThat(order.isPosEReceiptRequested()).isTrue();
         assertThat(order.getDocuments()).isEmpty();
@@ -120,8 +135,10 @@ class PosReceiptDecisionsTest {
 
     @Test
     void refusesABlankNumberAnInvalidEmailTheStoresEmailAMissingChoiceAndAChoiceTheModeForbids() {
+        // given
         Store store = storeWithReceipts(PosReceiptMode.ASK);
 
+        // when / then
         assertThat(decisions.apply(store, PosReceiptMode.ASK, shippingPosOrder(), form(PosReceiptMode.CASH_REGISTER, "   ", null), TODAY))
                 .contains("receipts.pos.decision.numberRequired");
         assertThat(decisions.apply(store, PosReceiptMode.ASK, shippingPosOrder(), form(PosReceiptMode.E_RECEIPT, null, "klient"), TODAY))

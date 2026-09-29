@@ -267,22 +267,28 @@ class ReceiptAttemptServiceTest {
 
     @Test
     void manualIssueForAPosOrderNeverAddressesTheStoresOwnEmail() {
+        // given
         order = posOrder(100.00);
         withPosMode(store, PosReceiptMode.ASK);
 
+        // when
         ReceiptAttempt attempt = service.issueManually(STORE_ID, ORDER_ID, "operator");
 
+        // then
         assertThat(attempt.getState()).isEqualTo(ReceiptAttemptState.BLOCKED);
         assertThat(attempt.getBlockedReason()).isEqualTo(ReceiptBlockReason.MISSING_EMAIL.name());
     }
 
     @Test
     void anAttemptForAPosOrderResolvesItsMissingDecisionAlert() {
+        // given
         order = posOrder(100.00);
         order.getBillingDetails().setEmail("klient@example.com");
 
+        // when
         service.issueManually(STORE_ID, ORDER_ID, "operator");
 
+        // then
         verify(alerts).resolvePosDecision(STORE_ID, ORDER_ID);
     }
 

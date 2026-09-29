@@ -227,21 +227,26 @@ class ReceiptRequestConverterTest {
 
     @Test
     void blocksAPosReceiptAddressedToTheStoresOwnEmail() {
+        // when
         ReceiptConversion conversion = converter.convert(posOrder(100.00), items(item("Mysz", 1, 100.00, 1.23)),
                 KEY, provider, NOW, STORE_EMAIL);
 
+        // then
         assertThat(conversion).isInstanceOf(ReceiptConversion.Blocked.class);
         assertThat(((ReceiptConversion.Blocked) conversion).reason()).isEqualTo(ReceiptBlockReason.MISSING_EMAIL);
     }
 
     @Test
     void sendsAPosReceiptToTheCustomersEmail() {
+        // given
         Order order = posOrder(100.00);
         order.getBillingDetails().setEmail("klient@example.com");
 
+        // when
         ReceiptConversion conversion = converter.convert(order, items(item("Mysz", 1, 100.00, 1.23)),
                 KEY, provider, NOW, STORE_EMAIL);
 
+        // then
         assertThat(((ReceiptConversion.Converted) conversion).snapshot().buyerEmail()).isEqualTo("klient@example.com");
     }
 }
