@@ -12,6 +12,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
@@ -348,13 +349,22 @@ public class OrdersController extends BaseController {
         OrderFilterForm form = new OrderFilterForm();
         form.setLabel(filter.getLabel());
         form.setSharedWithStore(shared);
-        form.setStatus(byField.getOrDefault(OrderFilterField.Status.name(), List.of()).stream().findFirst().orElse(null));
-        form.setShipmentType(byField.getOrDefault(OrderFilterField.ShipmentType.name(), List.of()).stream().findFirst().orElse(null));
-        form.setPaymentSource(byField.getOrDefault(OrderFilterField.PaymentSource.name(), List.of()).stream().findFirst().orElse(null));
-        form.setShippingDue(byField.getOrDefault(OrderFilterField.ShippingDue.name(), List.of()).stream().findFirst().orElse(null));
-        form.setSourceName(byField.getOrDefault(OrderFilterField.SourceName.name(), List.of()).stream().findFirst().orElse(null));
-        form.setShippingPostalCode(byField.getOrDefault(OrderFilterField.ShippingPostalCode.name(), List.of()).stream().findFirst().orElse(null));
+        form.setStatus(byField.get(OrderFilterField.Status.name()));
+        form.setShipmentType(byField.get(OrderFilterField.ShipmentType.name()));
+        form.setPaymentSource(byField.get(OrderFilterField.PaymentSource.name()));
+        form.setShippingDue(first(byField, OrderFilterField.ShippingDue));
+        form.setSourceName(byField.get(OrderFilterField.SourceName.name()));
+        form.setShippingPostalCode(first(byField, OrderFilterField.ShippingPostalCode));
         return form;
+    }
+
+    private static String first(Map<String, List<String>> byField, OrderFilterField field) {
+        return byField.getOrDefault(field.name(), List.of()).stream().findFirst().orElse(null);
+    }
+
+    @InitBinder("orderFilterForm")
+    void bindFilterForm(WebDataBinder binder) {
+        OrdersControllerBinding.bindFilterForm(binder);
     }
 
     /**
