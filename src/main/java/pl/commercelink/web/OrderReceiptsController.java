@@ -43,7 +43,13 @@ public class OrderReceiptsController {
 
     @GetMapping("/dashboard/orders/{orderId}/receipts/reissue")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String confirmReissue(@PathVariable String orderId, Locale locale, Model model) {
+    public String confirmReissue(@PathVariable String orderId, Locale locale, Model model,
+                                 RedirectAttributes redirectAttributes) {
+        // the page must not offer a confirmation the POST would refuse (a live attempt, an order no longer eligible)
+        String refusal = attemptService.reissueRefusal(CustomSecurityContext.getStoreId(), orderId);
+        if (refusal != null) {
+            return refuse(orderId, refusal, locale, redirectAttributes);
+        }
         String orderPath = "/dashboard/orders/" + orderId;
         model.addAttribute("confirm", new ConfirmAction(
                 messageSource.getMessage("receipts.action.reissue.confirm.title", null, locale),

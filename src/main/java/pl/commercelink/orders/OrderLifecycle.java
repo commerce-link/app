@@ -1,13 +1,16 @@
 package pl.commercelink.orders;
 
 import jakarta.annotation.Nullable;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 import pl.commercelink.documents.DocumentType;
 import pl.commercelink.inventory.deliveries.Delivery;
 import pl.commercelink.inventory.deliveries.DropshipItemLookup;
 import pl.commercelink.invoicing.InvoiceCreationEventPublisher;
 import pl.commercelink.orders.notifications.OrderNotificationsEventPublisher;
+import pl.commercelink.receipts.ReceiptAttemptService;
 import pl.commercelink.receipts.ReceiptTrigger;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.starter.security.model.CustomUser;
@@ -22,6 +25,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
+@Slf4j
 @Component
 public class OrderLifecycle {
 
@@ -43,6 +47,10 @@ public class OrderLifecycle {
     private DropshipItemLookup dropshipItemLookup;
     @Autowired
     private ReceiptTrigger receiptTrigger;
+    // lazy: the attempt service saves orders through this lifecycle
+    @Autowired
+    @Lazy
+    private ReceiptAttemptService receiptAttemptService;
 
     public void update(Order order) {
         update(order, null);
@@ -137,7 +145,13 @@ public class OrderLifecycle {
             List<OrderItem> items = getOrFetchOrderItems(order.getOrderId(), orderItems);
             // allMatch on no items is true: an order without items must not read as fully returned and be cancelled
             boolean hasAllOrderItemsReturned = !items.isEmpty() && items.stream().allMatch(OrderItem::isReturned);
-            if (hasAllOrderItemsReturned) {
+            if (hasAllOrderItemsReturned && receiptAttemptService.locksOrder(order)) {
+                // the e-receipt attempt owns the sale but its outcome is not on the order yet: cancelling now could
+                // leave a fiscalised receipt on a cancelled order, the case the manual cancel refuses. The first save
+                // after the receipt document is attached (ReceiptEffects saves through here) cancels the order.
+                log.info("Order {} of store {} has every item returned; cancelling waits for its e-receipt",
+                        order.getOrderId(), order.getStoreId());
+            } else if (hasAllOrderItemsReturned) {
                 order.setStatus(OrderStatus.Cancelled);
 
                 if (order.getReview() != null && order.getReview().getStatus() == OrderReviewStatus.ToBeCollected) {

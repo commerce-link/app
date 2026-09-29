@@ -140,8 +140,8 @@ class InvoicingServiceTest {
     }
 
     @Test
-    @DisplayName("createInvoice lets the receipts settle the alerts of blocked or failed e-receipts, since it saves outside the order lifecycle")
-    void createInvoiceSettlesTheAlertsOfDeadReceiptAttempts() {
+    @DisplayName("createInvoice lets the receipts reconcile the alerts of blocked or failed e-receipts, since it saves outside the order lifecycle")
+    void anInvoiceReconcilesTheDeadAttemptAlerts() {
         // given
         Order order = orderWithFilledBillingDetails();
         Invoice invoice = new Invoice("inv-1", "FV/1/2026", ORDER_ID, null, "https://example.com/inv/1",
@@ -159,7 +159,7 @@ class InvoicingServiceTest {
         // then
         ArgumentCaptor<Order> orderCaptor = ArgumentCaptor.forClass(Order.class);
         verify(ordersRepository).save(orderCaptor.capture());
-        verify(receiptTrigger).settleDeadAttemptAlerts(orderCaptor.getValue());
+        verify(receiptTrigger).reconcileDeadAttemptAlerts(orderCaptor.getValue());
     }
 
     @Test

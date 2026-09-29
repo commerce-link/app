@@ -247,7 +247,7 @@ class OrderReceiptsControllerTest {
         when(messageSource.getMessage(eq("order.page.title"), any(), eq(LOCALE))).thenReturn("Zamówienie order-1");
         Model model = new ExtendedModelMap();
 
-        String view = controller.confirmReissue(ORDER_ID, LOCALE, model);
+        String view = controller.confirmReissue(ORDER_ID, LOCALE, model, redirectAttributes);
 
         assertThat(view).isEqualTo("settings-confirm");
         ConfirmAction confirm = (ConfirmAction) model.getAttribute("confirm");
@@ -257,6 +257,24 @@ class OrderReceiptsControllerTest {
         assertThat(confirm.cancelPath()).isEqualTo("/dashboard/orders/" + ORDER_ID);
         // back to the order by its number, as the order page's own confirmation pages lead
         assertThat(model.getAttribute("backLabel")).isEqualTo("Zamówienie order-1");
+    }
+
+    @Test
+    void reissueConfirmationRedirectsWhileTheAttemptIsLive() {
+        // given
+        when(attemptService.reissueRefusal(STORE_ID, ORDER_ID)).thenReturn("receipts.action.reissue.live");
+        when(messageSource.getMessage(eq("receipts.action.reissue.live"), any(), eq(LOCALE)))
+                .thenReturn("Paragon jest jeszcze wystawiany.");
+        Model model = new ExtendedModelMap();
+
+        // when
+        String view = controller.confirmReissue(ORDER_ID, LOCALE, model, redirectAttributes);
+
+        // then: the page does not offer what the POST would refuse
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+        assertThat(redirectAttributes.getFlashAttributes().get("errorMessage")).isEqualTo("Paragon jest jeszcze wystawiany.");
+        assertThat(model.getAttribute("confirm")).isNull();
+        verify(attemptService, never()).reissue(any(), any(), any());
     }
 
     private static ReceiptAttempt attempt(String receiptKey, int attemptNo, ReceiptAttemptState state) {

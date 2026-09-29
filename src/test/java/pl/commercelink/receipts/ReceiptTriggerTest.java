@@ -12,6 +12,7 @@ import pl.commercelink.stores.StoresRepository;
 
 import java.time.LocalDate;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -53,7 +54,8 @@ class ReceiptTriggerTest {
 
         trigger.onOrderSaved(order);
 
-        verifyNoInteractions(stores, service);
+        verifyNoInteractions(stores);
+        verify(service, never()).startAutomatic(any(), any());
     }
 
     @Test
@@ -74,7 +76,7 @@ class ReceiptTriggerTest {
     }
 
     @Test
-    void aDeliveredOrderWithItsReceiptResolvesTheAlertsOfDeadAttempts() {
+    void orderSavedReconcilesTheDeadAttemptAlerts() {
         // given
         Order order = b2cOrder(100);
         order.addDocument(new Document(null, "KASA/1", null, DocumentType.Receipt, LocalDate.of(2026, 9, 29)));
@@ -84,50 +86,11 @@ class ReceiptTriggerTest {
         trigger.onOrderSaved(order);
 
         // then
-        verify(service).resolveDeadAttemptAlerts(STORE_ID, ORDER_ID);
+        verify(service).reconcileDeadAttemptAlerts(order);
     }
 
     @Test
-    void aCompletedOrderWithItsReceiptResolvesTheAlertsOfDeadAttempts() {
-        // given
-        Order order = b2cOrder(100);
-        order.setStatus(OrderStatus.Completed);
-        order.addDocument(new Document(null, "KASA/1", null, DocumentType.Receipt, LocalDate.of(2026, 9, 29)));
-
-        // when
-        trigger.onOrderSaved(order);
-
-        // then
-        verify(service).resolveDeadAttemptAlerts(STORE_ID, ORDER_ID);
-        verify(service, never()).startAutomatic(any(), any());
-    }
-
-    @Test
-    void anOrderWithoutAClosingDocumentLeavesTheAlertsAlone() {
-        // given
-        Order order = b2cOrder(100);
-        when(stores.findById(STORE_ID)).thenReturn(new Store());
-
-        // when
-        trigger.onOrderSaved(order);
-
-        // then
-        verify(service, never()).resolveDeadAttemptAlerts(any(), any());
-    }
-
-    @Test
-    void failingToResolveAlertsNeverBreaksTheOrderUpdate() {
-        // given
-        Order order = b2cOrder(100);
-        order.addDocument(new Document(null, "KASA/1", null, DocumentType.Receipt, LocalDate.of(2026, 9, 29)));
-        doThrow(new RuntimeException("dynamo down")).when(service).resolveDeadAttemptAlerts(STORE_ID, ORDER_ID);
-
-        // when / then
-        assertThatCode(() -> trigger.onOrderSaved(order)).doesNotThrowAnyException();
-    }
-
-    @Test
-    void anOrderRecordingItsReceiptBeforeDeliveryResolvesTheAlertsOfDeadAttempts() {
+    void anOrderNotYetDeliveredReconcilesTheAlertsWithoutStartingAnAttempt() {
         // given: a manual e-receipt blocked while the sale was still Assembled, then the cash register receipt
         Order order = b2cOrder(100);
         order.setStatus(OrderStatus.Assembled);
@@ -137,7 +100,37 @@ class ReceiptTriggerTest {
         trigger.onOrderSaved(order);
 
         // then
-        verify(service).resolveDeadAttemptAlerts(STORE_ID, ORDER_ID);
+        verify(service).reconcileDeadAttemptAlerts(order);
         verify(service, never()).startAutomatic(any(), any());
+    }
+
+    @Test
+    void failingToReconcileAlertsNeverBreaksTheOrderUpdate() {
+        // given
+        Order order = b2cOrder(100);
+        doThrow(new RuntimeException("dynamo down")).when(service).reconcileDeadAttemptAlerts(order);
+
+        // when / then
+        assertThatCode(() -> trigger.onOrderSaved(order)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void anOrderWithItsClosingDocumentSettlesDeadAttempts() {
+        // given
+        Order order = b2cOrder(100);
+        order.setStatus(OrderStatus.Completed);
+        order.addDocument(new Document(null, "KASA/1", null, DocumentType.Receipt, LocalDate.of(2026, 9, 29)));
+
+        // when / then
+        assertThat(ReceiptTrigger.settlesDeadAttempts(order)).isTrue();
+    }
+
+    @Test
+    void anOrderWithoutAClosingDocumentDoesNotSettleDeadAttempts() {
+        // given
+        Order order = b2cOrder(100);
+
+        // when / then
+        assertThat(ReceiptTrigger.settlesDeadAttempts(order)).isFalse();
     }
 }

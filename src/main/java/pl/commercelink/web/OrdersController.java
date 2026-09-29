@@ -706,8 +706,13 @@ public class OrdersController extends BaseController {
 
     @GetMapping("/dashboard/orders/{orderId}/delete")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String confirmDeleteOrder(@PathVariable String orderId, Model model, Locale locale) {
+    public String confirmDeleteOrder(@PathVariable String orderId, Model model, RedirectAttributes redirectAttributes,
+                                     Locale locale) {
         Order order = requireOrder(ordersRepository, getStoreId(), orderId);
+        // the same refusal as deleteOrder: the page must not offer a confirmation the POST would refuse
+        if (receiptAttemptService.locksOrder(order)) {
+            return refuse(redirectAttributes, orderId, DELETE_LOCKED_RECEIPT, locale);
+        }
         return confirmPage(model, order, "order.page.delete", new Object[]{order.getShortenedOrderId()},
                 OrderPageModelFactory.deleteMessage(order, messageSource, locale),
                 "/dashboard/orders/" + orderId + "/delete", true, locale);
@@ -728,6 +733,7 @@ public class OrdersController extends BaseController {
     }
 
     private static final String CANCEL_LOCKED_RECEIPT = "order.page.cancel.locked.receipt";
+    private static final String DELETE_LOCKED_RECEIPT = "order.page.delete.locked.receipt";
 
     private String orderPageTitle(Order order, Locale locale) {
         return messageSource.getMessage("order.page.title", new Object[]{order.getShortenedOrderId()}, locale);
@@ -1265,7 +1271,7 @@ public class OrdersController extends BaseController {
         Order order = requireOrder(ordersRepository, getStoreId(), orderId);
         // the attempt would go on issuing a receipt for an order that no longer exists
         if (receiptAttemptService.locksOrder(order)) {
-            return refuse(redirectAttributes, orderId, "order.page.delete.locked.receipt", locale);
+            return refuse(redirectAttributes, orderId, DELETE_LOCKED_RECEIPT, locale);
         }
         try {
             ordersManager.deleteOrder(getStoreId(), orderId);
@@ -1287,6 +1293,8 @@ public class OrdersController extends BaseController {
         }
         try {
             ordersManager.cancelOrder(getStoreId(), orderId);
+            // the cancel saves the order outside its lifecycle: the bell hears about the new status here
+            receiptAttemptService.reconcileDeadAttemptAlerts(getStoreId(), orderId);
             OrderFlash.saved(redirectAttributes, messageSource.getMessage("order.cancelled", null, locale));
         } catch (IllegalStateException e) {
             return refuse(redirectAttributes, orderId, "error.message.order.cannot.be.cancelled", locale);
@@ -2064,6 +2072,9 @@ public class OrdersController extends BaseController {
         if (link != null && OrderPageModelFactory.safeWebUrl(link) == null) {
             return refuse(redirectAttributes, orderId, "order.documents.add.error.link", locale);
         }
+        // a typed document has no id, as the dialog posts none: an e-receipt attempt's key posted here would make it
+        // pass for that attempt's own document, hidden from the card and impossible to unpin
+        document.setId(null);
         document.setNumber(document.getNumber().trim());
         document.setLink(link);
         order.addDocument(document);
@@ -2105,6 +2116,8 @@ public class OrdersController extends BaseController {
 
         // saving via OrderLifecycle would re-trigger automatic invoice generation for delivered orders
         ordersRepository.save(order);
+        // so the bell hears here that the order may have lost the document that settled its dead e-receipt attempts
+        receiptAttemptService.reconcileDeadAttemptAlerts(order);
         OrderFlash.saved(redirectAttributes, messageSource.getMessage("order.documents.unpinned", null, locale));
         return details(orderId);
     }

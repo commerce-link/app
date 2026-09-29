@@ -10,7 +10,7 @@ import pl.commercelink.stores.StoresRepository;
 
 /**
  * Called after the order lifecycle saved an order: a delivered consumer order of a store with e-receipts gets its
- * first attempt, and an order with its closing document settles the alerts of its blocked or failed attempts. Runs
+ * first attempt, and the alerts of its blocked or failed attempts follow the order page's rule. Runs
  * after the save so a failed order write never leaves an attempt for an undelivered order, and never throws — a
  * receipt problem must not break the order update.
  */
@@ -30,7 +30,7 @@ public class ReceiptTrigger {
     }
 
     public void onOrderSaved(Order order) {
-        settleDeadAttemptAlerts(order);
+        reconcileDeadAttemptAlerts(order);
         if (order.getStatus() != OrderStatus.Delivered) {
             return;
         }
@@ -46,25 +46,24 @@ public class ReceiptTrigger {
     }
 
     /**
-     * A receipt or invoice recorded after a blocked or failed e-receipt settles what that alert asked for, whatever
-     * the order's status: a manual e-receipt can be blocked before delivery. Also called by saves that bypass the
-     * order lifecycle (invoicing). Never throws.
+     * Keeps the bell alerts of the order's blocked or failed attempts in line with the order page
+     * ({@link ReceiptAttemptService#reconcileDeadAttemptAlerts(Order)}), whatever the order's status: a manual
+     * e-receipt can be blocked before delivery. Also called by saves that bypass the order lifecycle (invoicing).
+     * Never throws.
      */
-    public void settleDeadAttemptAlerts(Order order) {
-        if (!settlesDeadAttempts(order)) {
-            return;
-        }
+    public void reconcileDeadAttemptAlerts(Order order) {
         try {
-            attemptService.resolveDeadAttemptAlerts(order.getStoreId(), order.getOrderId());
+            attemptService.reconcileDeadAttemptAlerts(order);
         } catch (RuntimeException e) {
-            log.error("Receipt alerts of order {} of store {} could not be resolved",
+            log.error("Receipt alerts of order {} of store {} could not be reconciled",
                     order.getOrderId(), order.getStoreId(), e);
         }
     }
 
     /**
      * Whether the order's blocked or failed attempts no longer ask for anything: the order has its closing document
-     * and is not cancelled. The bell (above) and the order page ({@link ReceiptOrderView}) read the same rule.
+     * and is not cancelled. The bell ({@link ReceiptAttemptService#reconcileDeadAttemptAlerts(Order)}) and the order
+     * page ({@link ReceiptOrderView}) read the same rule.
      */
     static boolean settlesDeadAttempts(Order order) {
         return order.isInvoiced() && order.getStatus() != OrderStatus.Cancelled;

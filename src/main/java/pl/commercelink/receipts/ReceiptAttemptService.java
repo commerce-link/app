@@ -91,6 +91,31 @@ public class ReceiptAttemptService {
 
     public ReceiptAttempt reissue(String storeId, String orderId, String actor) {
         List<ReceiptAttempt> existing = attempts.findByOrder(storeId, orderId);
+        Reissue reissue = checkReissue(storeId, orderId, existing);
+        int next = existing.stream().mapToInt(ReceiptAttempt::getAttemptNo).max().orElse(0) + 1;
+        ReceiptAttempt created = create(reissue.store(), reissue.order(), next, actor)
+                .orElseThrow(() -> new ReceiptActionException("receipts.action.reissue.concurrent"));
+        // Every attempt in `existing` is dead (checked above) and is being superseded by `created`: its bell
+        // alert, if any, no longer needs the operator's attention. The attempt's own `attention` field is left
+        // untouched, so the order page still shows why it needed correcting.
+        existing.forEach(alerts::resolve);
+        return created;
+    }
+
+    /**
+     * Why {@link #reissue} would refuse the order now (its message key), null when it would go ahead: the
+     * confirmation page asks only what the POST would do.
+     */
+    public String reissueRefusal(String storeId, String orderId) {
+        try {
+            checkReissue(storeId, orderId, attempts.findByOrder(storeId, orderId));
+            return null;
+        } catch (ReceiptActionException e) {
+            return e.getMessageKey();
+        }
+    }
+
+    private Reissue checkReissue(String storeId, String orderId, List<ReceiptAttempt> existing) {
         if (existing.isEmpty()) {
             throw new ReceiptActionException("receipts.action.reissue.none");
         }
@@ -105,14 +130,10 @@ public class ReceiptAttemptService {
         if (!hasProvider(store)) {
             throw new ReceiptActionException("receipts.action.reissue.noProvider");
         }
-        int next = existing.stream().mapToInt(ReceiptAttempt::getAttemptNo).max().orElse(0) + 1;
-        ReceiptAttempt created = create(store, order, next, actor)
-                .orElseThrow(() -> new ReceiptActionException("receipts.action.reissue.concurrent"));
-        // Every attempt in `existing` is dead (checked above) and is being superseded by `created`: its bell
-        // alert, if any, no longer needs the operator's attention. The attempt's own `attention` field is left
-        // untouched, so the order page still shows why it needed correcting.
-        existing.forEach(alerts::resolve);
-        return created;
+        return new Reissue(store, order);
+    }
+
+    private record Reissue(Store store, Order order) {
     }
 
     /**
@@ -265,14 +286,58 @@ public class ReceiptAttemptService {
     }
 
     /**
-     * The order now has its closing document (a receipt from the shop's cash register, an invoice): the bell alerts of
-     * its dead attempts no longer ask for anything. Their stored attention stays, so the order page still shows why
-     * they stopped; live attempts keep their alerts (a fiscalised receipt whose e-mail failed still needs sending).
+     * Brings the bell in line with what the order page shows for the order's dead attempts
+     * ({@link ReceiptTrigger#settlesDeadAttempts}, the rule {@link ReceiptOrderView} reads at every render): when the
+     * order settles them, their alerts are resolved (their stored attention stays, so the page still shows why they
+     * stopped; live attempts keep theirs, a fiscalised receipt whose e-mail failed still needs sending); otherwise the
+     * newest attempt, when dead, has its alert raised again (it may have been resolved by a closing document that is
+     * gone now). Earlier, superseded attempts are left resolved: only the newest one asks for anything. Called by every write that can change the rule's
+     * inputs: an order saved through the lifecycle, a document unpinned, an invoice issued, the order cancelled,
+     * an attempt blocked while the order changed under it. Never throws: the alerts must not break the order write.
      */
-    public void resolveDeadAttemptAlerts(String storeId, String orderId) {
-        attemptsOf(storeId, orderId).stream()
-                .filter(a -> a.getState() == ReceiptAttemptState.BLOCKED || a.getState() == ReceiptAttemptState.FAILED)
-                .forEach(alerts::resolve);
+    public void reconcileDeadAttemptAlerts(Order order) {
+        try {
+            List<ReceiptAttempt> orderAttempts = attemptsOf(order.getStoreId(), order.getOrderId());
+            if (ReceiptTrigger.settlesDeadAttempts(order)) {
+                orderAttempts.stream().filter(a -> a.getState().isDead()).forEach(alerts::resolve);
+                return;
+            }
+            orderAttempts.stream()
+                    .max((a, b) -> Integer.compare(a.getAttemptNo(), b.getAttemptNo()))
+                    .filter(a -> a.getState().isDead())
+                    .ifPresent(this::raiseAgain);
+        } catch (RuntimeException e) {
+            log.error("Receipt alerts of order {} of store {} could not be reconciled",
+                    order.getOrderId(), order.getStoreId(), e);
+        }
+    }
+
+    /** {@link #reconcileDeadAttemptAlerts(Order)} for a caller without the saved order at hand: reads it afresh. */
+    public void reconcileDeadAttemptAlerts(String storeId, String orderId) {
+        try {
+            Order order = ordersRepository.findById(storeId, orderId);
+            if (order != null) {
+                reconcileDeadAttemptAlerts(order);
+            }
+        } catch (RuntimeException e) {
+            log.error("Receipt alerts of order {} of store {} could not be reconciled", orderId, storeId, e);
+        }
+    }
+
+    private void raiseAgain(ReceiptAttempt newest) {
+        ReceiptAttention attention = ReceiptAttentionEvaluator.evaluate(newest, clock.instant());
+        if (attention == null || !alerts.republish(newest, attention)) {
+            return;
+        }
+        // the stored reason was not the one raised (the processor kept the bell silent for a settled order): record
+        // it, so the next reconcile publishes into the existing record instead of replacing it
+        attempts.update(newest.getStoreId(), newest.getReceiptKey(), a -> {
+            if (attention.name().equals(a.getAttention())) {
+                return false;
+            }
+            a.setAttention(attention.name());
+            return true;
+        });
     }
 
     /**
@@ -334,6 +399,7 @@ public class ReceiptAttemptService {
     void saveThroughLifecycle(Order order) {
         if (order.getStatus() == OrderStatus.Cancelled) {
             ordersRepository.save(order);   // the lifecycle ignores cancelled orders and would not save
+            reconcileDeadAttemptAlerts(order);
         } else {
             orderLifecycle.update(order);
         }

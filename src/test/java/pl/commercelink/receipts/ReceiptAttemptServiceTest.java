@@ -3,6 +3,8 @@ package pl.commercelink.receipts;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.support.StaticMessageSource;
+import pl.commercelink.documents.Document;
+import pl.commercelink.documents.DocumentType;
 import pl.commercelink.notifications.StoreNotificationService;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItemsRepository;
@@ -16,6 +18,7 @@ import pl.commercelink.stores.StoreNotificationType;
 import pl.commercelink.stores.StoresRepository;
 
 import java.time.Duration;
+import java.time.LocalDate;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -137,19 +140,78 @@ class ReceiptAttemptServiceTest {
     }
 
     @Test
-    void resolvesTheAlertsOfBlockedAndFailedAttemptsOnly() {
-        // given
+    void reconcileResolvesDeadAttemptAlertsWhenTheOrderHasItsClosingDocument() {
+        // given: the cash register receipt was typed in after the e-receipts stopped
         ReceiptAttempt blocked = storedAttempt(1, ReceiptAttemptState.BLOCKED);
         ReceiptAttempt failed = storedAttempt(2, ReceiptAttemptState.FAILED);
         ReceiptAttempt fiscalised = storedAttempt(3, ReceiptAttemptState.FISCALISED);
+        order.addDocument(new Document(null, "KASA/1", null, DocumentType.Receipt, LocalDate.of(2026, 9, 29)));
 
         // when
-        service.resolveDeadAttemptAlerts(STORE_ID, ORDER_ID);
+        service.reconcileDeadAttemptAlerts(order);
 
-        // then
+        // then: the dead ones ask for nothing; a live attempt keeps its alert (its e-mail may still need sending)
         verify(alerts).resolve(argThat(a -> a.getReceiptKey().equals(blocked.getReceiptKey())));
         verify(alerts).resolve(argThat(a -> a.getReceiptKey().equals(failed.getReceiptKey())));
         verify(alerts, never()).resolve(argThat(a -> a.getReceiptKey().equals(fiscalised.getReceiptKey())));
+        verify(alerts, never()).republish(any(), any());
+    }
+
+    @Test
+    void reconcileRaisesTheNewestDeadAttemptAlertAgainOnceTheClosingDocumentIsGone() {
+        // given: a blocked attempt whose alert the typed receipt had closed; the receipt was unpinned since
+        ReceiptAttempt blocked = storedAttempt(1, ReceiptAttemptState.BLOCKED);
+        when(alerts.republish(any(), eq(ReceiptAttention.BLOCKED))).thenReturn(true);
+
+        // when
+        service.reconcileDeadAttemptAlerts(order);
+
+        // then: the bell asks again, as the order page does, and the reason raised is stored with the attempt
+        verify(alerts).republish(argThat(a -> a.getReceiptKey().equals(blocked.getReceiptKey())),
+                eq(ReceiptAttention.BLOCKED));
+        verify(alerts, never()).resolve(any());
+        assertThat(attempts.find(STORE_ID, blocked.getReceiptKey()).orElseThrow().getAttention())
+                .isEqualTo(ReceiptAttention.BLOCKED.name());
+    }
+
+    @Test
+    void reconcileLeavesSupersededAttemptsResolved() {
+        // given: R1 failed and was superseded by "Wystaw ponownie", whose R2 blocked in turn
+        ReceiptAttempt failed = storedAttempt(1, ReceiptAttemptState.FAILED);
+        ReceiptAttempt blocked = storedAttempt(2, ReceiptAttemptState.BLOCKED);
+
+        // when
+        service.reconcileDeadAttemptAlerts(order);
+
+        // then: only the newest attempt asks for anything
+        verify(alerts).republish(argThat(a -> a.getReceiptKey().equals(blocked.getReceiptKey())),
+                eq(ReceiptAttention.BLOCKED));
+        verify(alerts, never()).republish(argThat(a -> a.getReceiptKey().equals(failed.getReceiptKey())), any());
+    }
+
+    @Test
+    void reconcileLeavesALiveAttemptToTheProcessor() {
+        // given: R1 failed, R2 is being issued
+        storedAttempt(1, ReceiptAttemptState.FAILED);
+        storedAttempt(2, ReceiptAttemptState.ISSUING);
+
+        // when
+        service.reconcileDeadAttemptAlerts(order);
+
+        // then
+        verify(alerts, never()).republish(any(), any());
+        verify(alerts, never()).resolve(any());
+    }
+
+    @Test
+    void reconcileNeverThrows() {
+        // given
+        storedAttempt(1, ReceiptAttemptState.BLOCKED);
+        when(alerts.republish(any(), any())).thenThrow(new IllegalStateException("notifications down"));
+
+        // when / then
+        org.assertj.core.api.Assertions.assertThatCode(() -> service.reconcileDeadAttemptAlerts(order))
+                .doesNotThrowAnyException();
     }
 
     private ReceiptAttempt storedAttempt(int no, ReceiptAttemptState state) {

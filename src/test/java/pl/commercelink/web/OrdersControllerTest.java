@@ -3096,7 +3096,7 @@ class OrdersControllerTest {
             ExtendedModelMap shipment = new ExtendedModelMap();
             ExtendedModelMap unpin = new ExtendedModelMap();
             List<String> views = List.of(
-                    ordersController.confirmDeleteOrder(ORDER_ID, delete, polish),
+                    ordersController.confirmDeleteOrder(ORDER_ID, delete, new RedirectAttributesModelMap(), polish),
                     ordersController.confirmCancelOrder(ORDER_ID, cancel, new RedirectAttributesModelMap(), polish),
                     ordersController.confirmGoodsOut(ORDER_ID, goodsOut, polish),
                     ordersController.confirmCancelShipment(ORDER_ID, shipment, polish),
@@ -4650,6 +4650,75 @@ class OrdersControllerTest {
             assertThat(view).isEqualTo("settings-confirm");
             assertThat(((ConfirmAction) model.get("confirm")).message())
                     .isEqualTo("order.page.cancel.confirm.message order.page.cancel.confirm.receipt");
+        }
+
+        @Test
+        void deleteConfirmationRedirectsWhileTheEReceiptIsBeingIssued() {
+            // given
+            Order order = order(OrderStatus.Delivered);
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            when(receiptAttemptService.locksOrder(order)).thenReturn(true);
+            RedirectAttributesModelMap page = new RedirectAttributesModelMap();
+
+            // when
+            String view = ordersController.confirmDeleteOrder(ORDER_ID, new ExtendedModelMap(), page, polish);
+
+            // then: the page does not offer what the POST would refuse
+            assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+            assertThat(flash(page)).containsEntry("errorMessage", "order.page.delete.locked.receipt");
+            verifyNoInteractions(ordersManager);
+        }
+
+        @Test
+        void unpinningTheTypedReceiptRaisesTheDeadAttemptAlertAgain() {
+            // given: a POS sale whose e-receipt blocked, settled by the cash register receipt typed in
+            Order order = order(OrderStatus.Delivered);
+            order.addDocument(document(DocumentType.Receipt, "KASA/13"));
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+
+            // when
+            ordersController.removeDocument(ORDER_ID, DocumentType.Receipt, "KASA/13", new RedirectAttributesModelMap(),
+                    polish);
+
+            // then: the save bypasses the lifecycle, so the bell is reconciled with the order right after it
+            InOrder saveThenReconcile = inOrder(ordersRepository, receiptAttemptService);
+            saveThenReconcile.verify(ordersRepository).save(order);
+            saveThenReconcile.verify(receiptAttemptService).reconcileDeadAttemptAlerts(order);
+            assertThat(order.getDocuments()).isEmpty();
+        }
+
+        @Test
+        void aTypedDocumentCannotTakeAnAttemptsId() {
+            // given: a crafted post carrying the dead attempt's key as the document id
+            Order order = order(OrderStatus.Delivered);
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            Document forged = document(DocumentType.Receipt, "KASA/13");
+            forged.setId(ORDER_ID + ":R1");
+
+            // when
+            ordersController.addReceipt(ORDER_ID, forged, new RedirectAttributesModelMap(), polish);
+
+            // then: stored as an ordinary typed document the card lists and can unpin
+            assertThat(order.getDocuments()).singleElement().satisfies(d -> {
+                assertThat(d.getNumber()).isEqualTo("KASA/13");
+                assertThat(d.getId()).isNull();
+            });
+            verify(orderLifecycle).update(order);
+        }
+
+        @Test
+        void aCancelReconcilesTheDeadAttemptAlerts() {
+            // given
+            Order order = order(OrderStatus.Delivered);
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+
+            // when
+            ordersController.cancelOrder(ORDER_ID, new RedirectAttributesModelMap(), polish);
+
+            // then: the cancel saves outside the lifecycle; the bell follows the cancelled order
+            InOrder cancelThenReconcile = inOrder(ordersManager, receiptAttemptService);
+            cancelThenReconcile.verify(ordersManager).cancelOrder(STORE_ID, ORDER_ID);
+            cancelThenReconcile.verify(receiptAttemptService).reconcileDeadAttemptAlerts(STORE_ID, ORDER_ID);
         }
 
         @Test

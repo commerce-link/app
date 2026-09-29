@@ -47,6 +47,24 @@ public class ReceiptAlerts {
     }
 
     /**
+     * Raises the attempt's bell notification again although its stored reason may be unchanged: {@link #sync} would
+     * publish nothing then, yet the notification may have been resolved meanwhile (the order got its closing
+     * document, which was later unpinned). Publishing keeps an existing record as it is, read or not, so repeating
+     * this on every order save never brings a read alert back as unread; only a changed reason replaces the record,
+     * as in {@link #sync}. Returns whether the stored reason changed (the caller saves the attempt).
+     */
+    public boolean republish(ReceiptAttempt attempt, ReceiptAttention attention) {
+        boolean changed = !Objects.equals(attention.name(), attempt.getAttention());
+        if (changed) {
+            notifications.resolve(attempt.getStoreId(), StoreNotificationType.RECEIPT_ATTENTION, attempt.getReceiptKey());
+        }
+        notifications.publish(attempt.getStoreId(), new StoreNotification(StoreNotificationSeverity.WARNING,
+                StoreNotificationType.RECEIPT_ATTENTION, attempt.getReceiptKey(), message(attempt, attention)));
+        attempt.setAttention(attention.name());
+        return changed;
+    }
+
+    /**
      * Resolves this attempt's bell notification, e.g. because a later attempt of the same order fiscalised and the
      * old FAILED/BLOCKED alert no longer needs the operator's attention. The attempt's stored {@code attention} is
      * left as-is: the order page still shows why that dead attempt needed correcting.

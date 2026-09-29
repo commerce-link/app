@@ -35,7 +35,7 @@ public record ReceiptOrderView(List<Row> rows, boolean canReissue) {
                     // A dead attempt superseded by a newer one no longer needs the operator's attention: only the
                     // newest attempt of the order still shows a problem.
                     boolean superseded = a.getState().isDead() && a.getAttemptNo() < maxAttemptNo;
-                    // the bell alert of such an attempt is resolved as well (ReceiptTrigger#settleDeadAttemptAlerts)
+                    // the bell alert of such an attempt is resolved as well (ReceiptAttemptService#reconcileDeadAttemptAlerts)
                     boolean settled = a.getState().isDead() && orderSettled;
                     ReceiptPageProblem problem = attention == null || superseded || settled ? null
                             : alerts.pageProblem(a, attention, locale);

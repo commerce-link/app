@@ -39,6 +39,7 @@ class ReceiptProcessorTest {
     private final ReceiptProviderFactory factory = mock(ReceiptProviderFactory.class);
     private final ReceiptEffects effects = mock(ReceiptEffects.class);
     private final ReceiptAlerts alerts = mock(ReceiptAlerts.class);
+    private final ReceiptAttemptService attemptService = mock(ReceiptAttemptService.class);
     private final MutableClock clock = MutableClock.at("2026-09-23T13:00:00Z");
     private final FakeReceiptProvider provider = new FakeReceiptProvider();
     private ReceiptProcessor processor;
@@ -62,7 +63,7 @@ class ReceiptProcessorTest {
             return changed;
         });
         processor = new ReceiptProcessor(attempts, stores, orders, factory, new ReceiptEligibility(factory), effects,
-                alerts, clock);
+                alerts, attemptService, clock);
         ReceiptAttempt attempt = new ReceiptAttempt();
         attempt.setStoreId(STORE_ID);
         attempt.setReceiptKey(KEY);
@@ -347,6 +348,37 @@ class ReceiptProcessorTest {
         assertThat(stored().getState()).isEqualTo(ReceiptAttemptState.BLOCKED);
         assertThat(stored().getBlockedReason()).isEqualTo(ReceiptBlockReason.NOT_ELIGIBLE.name());
         assertThat(provider.issueCalls.get()).isZero();
+    }
+
+    @Test
+    void anAttemptBlockedAsNotEligibleRaisesNoAlertWhenTheOrderIsSettled() {
+        // given: "Wystaw ponownie" raced "Dodaj dokument": the cash register receipt is on the order by now
+        order.addDocument(new pl.commercelink.documents.Document(null, "KASA/13", null,
+                pl.commercelink.documents.DocumentType.Receipt, java.time.LocalDate.of(2026, 9, 23)));
+
+        // when
+        processor.process(STORE_ID, KEY);
+
+        // then: blocked, but the bell stays silent as the page does, and the alerts are reconciled with the order
+        // as it is after the block (the document may have gone meanwhile)
+        assertThat(stored().getState()).isEqualTo(ReceiptAttemptState.BLOCKED);
+        assertThat(stored().getBlockedReason()).isEqualTo(ReceiptBlockReason.NOT_ELIGIBLE.name());
+        verify(alerts, never()).sync(any(), eq(ReceiptAttention.BLOCKED));
+        verify(attemptService).reconcileDeadAttemptAlerts(STORE_ID, ORDER_ID);
+    }
+
+    @Test
+    void anAttemptBlockedAsNotEligibleRaisesItsAlertWhenTheOrderIsNotSettled() {
+        // given: nothing to fiscalise and no document either
+        order.setTotalPrice(0);
+
+        // when
+        processor.process(STORE_ID, KEY);
+
+        // then
+        assertThat(stored().getState()).isEqualTo(ReceiptAttemptState.BLOCKED);
+        verify(alerts).sync(any(), eq(ReceiptAttention.BLOCKED));
+        verify(attemptService).reconcileDeadAttemptAlerts(STORE_ID, ORDER_ID);
     }
 
     @Test

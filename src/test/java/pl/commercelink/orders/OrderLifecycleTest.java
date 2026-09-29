@@ -16,6 +16,10 @@ import pl.commercelink.inventory.deliveries.Delivery;
 import pl.commercelink.inventory.deliveries.DropshipItemLookup;
 import pl.commercelink.invoicing.InvoiceCreationEventPublisher;
 import pl.commercelink.orders.notifications.OrderNotificationsEventPublisher;
+import pl.commercelink.receipts.ReceiptAttempt;
+import pl.commercelink.receipts.ReceiptAttemptService;
+import pl.commercelink.receipts.ReceiptAttemptState;
+import pl.commercelink.receipts.ReceiptOrderState;
 import pl.commercelink.receipts.ReceiptTrigger;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
@@ -55,6 +59,7 @@ class OrderLifecycleTest {
     @Mock private GoodsOutEventPublisher goodsOutEventPublisher;
     @Mock private DropshipItemLookup dropshipItemLookup;
     @Mock private ReceiptTrigger receiptTrigger;
+    @Mock private ReceiptAttemptService receiptAttemptService;
 
     @InjectMocks
     private OrderLifecycle orderLifecycle;
@@ -152,6 +157,79 @@ class OrderLifecycleTest {
         assertEquals(OrderStatus.Cancelled, order.getStatus());
         verify(orderLifecycleEventPublisher).publish(order, OrderLifecycleEventType.OrderCancelled);
         verifyNoMoreInteractions(orderLifecycleEventPublisher);
+    }
+
+    @Test
+    void allItemsReturnedDoesNotCancelWhileTheEReceiptIsBeingIssued() {
+        // given: every item came back through RMA while the e-receipt is still being issued
+        Order order = fullyReturnedDeliveredOrder();
+        withAttempt(order, ReceiptAttemptState.ISSUING);
+        OrderItem item = returnedItem();
+
+        // when: e.g. the refund is recorded with "Dodaj wpłatę"
+        orderLifecycle.update(order, List.of(item));
+
+        // then: a cancel now could leave a fiscalised receipt on a cancelled order nobody was warned about
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.Delivered);
+        verify(ordersRepository).save(order);
+        verify(orderLifecycleEventPublisher, never()).publish(order, OrderLifecycleEventType.OrderCancelled);
+    }
+
+    @Test
+    void allItemsReturnedDoesNotCancelWhileAFiscalisedReceiptIsNotYetAttached() {
+        // given: registered in fiscal memory, its document not on the order yet
+        Order order = fullyReturnedDeliveredOrder();
+        withAttempt(order, ReceiptAttemptState.FISCALISED);
+        OrderItem item = returnedItem();
+
+        // when
+        orderLifecycle.update(order, List.of(item));
+
+        // then
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.Delivered);
+        verify(orderLifecycleEventPublisher, never()).publish(order, OrderLifecycleEventType.OrderCancelled);
+    }
+
+    @Test
+    void allItemsReturnedCancelsOnceTheFiscalisedReceiptIsAttached() {
+        // given: the receipt's document is on the order (the save that attaches it goes through here)
+        Order order = fullyReturnedDeliveredOrder();
+        ReceiptAttempt attempt = withAttempt(order, ReceiptAttemptState.FISCALISED);
+        order.addDocument(new Document(attempt.getReceiptKey(), "PAR/1/2026", null, DocumentType.Receipt,
+                LocalDate.of(2026, 9, 29)));
+        OrderItem item = returnedItem();
+
+        // when
+        orderLifecycle.update(order, List.of(item));
+
+        // then: cancelling after fiscalisation is allowed (owner decision); the receipt stays as issued
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.Cancelled);
+        verify(orderLifecycleEventPublisher).publish(order, OrderLifecycleEventType.OrderCancelled);
+    }
+
+    private static Order fullyReturnedDeliveredOrder() {
+        Order order = spy(new Order("store-1"));
+        order.setStatus(OrderStatus.Delivered);
+        doReturn(false).when(order).isAwaitingInvoiceGeneration();
+        doReturn(false).when(order).isAwaitingDocumentsGeneration(anyBoolean());
+        doReturn(false).when(order).isSettled(anyBoolean());
+        return order;
+    }
+
+    private static OrderItem returnedItem() {
+        OrderItem item = mock(OrderItem.class);
+        when(item.isReturned()).thenReturn(true);
+        return item;
+    }
+
+    /** The order's only attempt, read through the real lock rule (ReceiptOrderState#locksOrder). */
+    private ReceiptAttempt withAttempt(Order order, ReceiptAttemptState state) {
+        ReceiptAttempt attempt = new ReceiptAttempt();
+        attempt.setReceiptKey(order.getOrderId() + ":R1");
+        attempt.setState(state);
+        when(receiptAttemptService.locksOrder(order)).thenAnswer(i -> ReceiptOrderState.locksOrder(
+                ReceiptAttemptService.blocksManualReceipt(List.of(attempt)), order));
+        return attempt;
     }
 
     @Test

@@ -55,6 +55,38 @@ class ReceiptAlertsTest {
     }
 
     @Test
+    void republishPublishesEvenWhenTheStoredAttentionIsUnchanged() {
+        // given: the alert was resolved by a closing document that has been unpinned since
+        messages.addMessage("receipts.attention.BLOCKED", new Locale("pl"), "Paragon {1} wstrzymany");
+        ReceiptAttempt attempt = attempt(ReceiptAttention.BLOCKED.name());
+
+        // when
+        boolean changed = alerts.republish(attempt, ReceiptAttention.BLOCKED);
+
+        // then: published into the existing record, if any (read or not), never resolved first
+        assertThat(changed).isFalse();
+        verify(notifications).publish(eq("s1"), argThat((StoreNotification n) ->
+                "o1:R1".equals(n.getObject()) && n.getMessage().equals("Paragon o1:R1 wstrzymany")));
+        verify(notifications, never()).resolve(any(), any(), any());
+    }
+
+    @Test
+    void republishReplacesTheNotificationWhenTheStoredAttentionDiffers() {
+        // given: the processor kept the bell silent for a settled order
+        messages.addMessage("receipts.attention.BLOCKED", new Locale("pl"), "Paragon {1} wstrzymany");
+        ReceiptAttempt attempt = attempt(null);
+
+        // when
+        boolean changed = alerts.republish(attempt, ReceiptAttention.BLOCKED);
+
+        // then
+        assertThat(changed).isTrue();
+        verify(notifications).resolve("s1", StoreNotificationType.RECEIPT_ATTENTION, "o1:R1");
+        verify(notifications).publish(eq("s1"), any());
+        assertThat(attempt.getAttention()).isEqualTo("BLOCKED");
+    }
+
+    @Test
     void aSolvedProblemRemovesTheNotification() {
         ReceiptAttempt attempt = attempt("PENDING_LONG");
 
