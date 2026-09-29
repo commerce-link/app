@@ -8,8 +8,10 @@ import pl.commercelink.orders.filters.OrderFilterField;
 import pl.commercelink.orders.filters.ShippingDue;
 import pl.commercelink.orders.filters.model.OrderFilterCondition;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -91,6 +93,26 @@ public final class FilterConditionLabels {
     /** Stored values may differ in case from the option (see {@link #value}). */
     public static boolean isPicked(List<String> values, String option) {
         return values != null && values.stream().anyMatch(option::equalsIgnoreCase);
+    }
+
+    /**
+     * What a field's menu lists: the offered options, then any stored value that is no longer offered (a marketplace
+     * disconnected since, a closed status), so saving the form keeps it unless the operator unticks it on purpose.
+     */
+    public static List<String> options(List<String> offered, List<String> picked) {
+        List<String> options = new ArrayList<>(offered);
+        if (picked != null) {
+            picked.stream()
+                    .filter(Objects::nonNull)
+                    .filter(value -> options.stream().noneMatch(value::equalsIgnoreCase))
+                    .forEach(options::add);
+        }
+        return options;
+    }
+
+    /** A menu option's label; a stored value that is no known constant of the field shows as stored. */
+    public static String optionLabel(String fieldName, String option, Messages messages) {
+        return value(OrderFilterCondition.of(OrderFilterField.valueOf(fieldName), option), messages::msg);
     }
 
     private static String labels(OrderFilterField field, List<String> values, BiFunction<String, Object[], String> lookup) {

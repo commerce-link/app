@@ -311,6 +311,17 @@ class OrderFilterTest {
     class ByField {
 
         @Test
+        @DisplayName("a filter whose conditions were never stored groups to nothing instead of failing")
+        void filterWithoutConditionsHasNoValuesPerField() {
+            // given
+            OrderFilter stored = filter(condition(OrderFilterField.Status, "New"));
+            stored.setConditions(null);
+
+            // when / then
+            assertThat(stored.getConditionsByField()).isEmpty();
+        }
+
+        @Test
         @DisplayName("several values of one field are all kept, only an exact repeat collapses")
         void severalValuesOfOneFieldAreKept() {
             // when

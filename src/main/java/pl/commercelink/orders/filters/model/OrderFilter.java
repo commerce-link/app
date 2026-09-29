@@ -119,6 +119,9 @@ public class OrderFilter {
     @DynamoDBIgnore
     public Map<String, List<String>> getConditionsByField() {
         Map<String, List<String>> byField = new LinkedHashMap<>();
+        if (conditions == null) {
+            return byField;
+        }
         conditions.stream()
                 .filter(condition -> Objects.nonNull(condition.getField()))
                 .forEach(condition -> byField.computeIfAbsent(condition.getField().name(), field -> new ArrayList<>())

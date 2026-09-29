@@ -4523,6 +4523,8 @@ a.cl-link-button:hover {
     right: 0;
     min-width: 0;
     max-width: none;
+    max-height: min(48vh, 360px);
+    overflow-y: auto;
 }
 
 @media screen and (max-width: 1023px) {

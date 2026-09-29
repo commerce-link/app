@@ -20,9 +20,11 @@ class OrderFiltersTemplateTest {
         String html = read("src/main/resources/templates/orders/filters.html");
 
         // when / then
-        assertThat(html).contains("th:fragment=\"multiValueField(fieldId, inputName, field, labelKey, optionValues, labelPrefix, picked)\"")
+        assertThat(html).contains("th:fragment=\"multiValueField(fieldId, inputName, field, labelKey, optionValues, picked)\"")
                 .contains("details class=\"cl-filter-menu is-field\" data-cl-filter-field")
                 .contains("FilterConditionLabels).summary(field, picked, #messages)")
+                .contains("FilterConditionLabels).options(optionValues, picked)")
+                .contains("FilterConditionLabels).optionLabel(field, option, #messages)")
                 .contains("FilterConditionLabels).isPicked(picked, option)")
                 .contains("multiValueField('filter-status', 'status', 'Status'")
                 .contains("multiValueField('filter-shipment-type', 'shipmentType', 'ShipmentType'")

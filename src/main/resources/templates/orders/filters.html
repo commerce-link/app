@@ -6,8 +6,8 @@
 
 <!--/* A field that takes several values (Status, delivery, payment, marketplace): a filter menu dressed as the form's
        select, so it opens without JavaScript; the checkboxes post like any field of the form (no inner form, no
-       "Zastosuj"). labelPrefix null shows the value itself (marketplace names). */-->
-<div th:fragment="multiValueField(fieldId, inputName, field, labelKey, optionValues, labelPrefix, picked)" class="cl-field cl-span-3">
+       "Zastosuj"). A stored value no longer offered is listed ticked after the options, so saving does not drop it. */-->
+<div th:fragment="multiValueField(fieldId, inputName, field, labelKey, optionValues, picked)" class="cl-field cl-span-3">
     <span class="cl-label" th:id="${fieldId + '-label'}" th:text="#{${labelKey}}"></span>
     <details class="cl-filter-menu is-field" data-cl-filter-field
              th:attr="data-cl-any=#{orders.filters.any.value},data-cl-selected=#{orders.filters.selected}">
@@ -17,10 +17,10 @@
                   th:text="${T(pl.commercelink.web.orders.FilterConditionLabels).summary(field, picked, #messages)}"></span>
         </summary>
         <div class="cl-filter-menu-panel" role="group" th:attr="aria-labelledby=${fieldId + '-label'}">
-            <label class="cl-filter-menu-check" th:each="option : ${optionValues}">
+            <label class="cl-filter-menu-check" th:each="option : ${T(pl.commercelink.web.orders.FilterConditionLabels).options(optionValues, picked)}">
                 <input type="checkbox" th:name="${inputName}" th:value="${option}"
                        th:checked="${T(pl.commercelink.web.orders.FilterConditionLabels).isPicked(picked, option)}"/>
-                <span class="cl-filter-menu-text" th:text="${labelPrefix == null} ? ${option} : #{${labelPrefix + option}}"></span>
+                <span class="cl-filter-menu-text" th:text="${T(pl.commercelink.web.orders.FilterConditionLabels).optionLabel(field, option, #messages)}"></span>
             </label>
         </div>
     </details>
@@ -33,25 +33,25 @@
         <input class="cl-input" type="text" id="filter-label" name="label" th:value="${filterForm?.label}" required/>
     </div>
     <div th:replace="~{orders/filters :: multiValueField('filter-status', 'status', 'Status', 'orders.filters.field.status',
-            ${statuses.![name()]}, 'OrderStatus.', ${filterForm?.status})}"></div>
+            ${statuses.![name()]}, ${filterForm?.status})}"></div>
     <div class="cl-field cl-span-3">
         <label class="cl-label" for="filter-shipping-due" th:text="#{orders.filters.field.shipping.due}"></label>
         <select class="cl-select" id="filter-shipping-due" name="shippingDue">
-            <option value="" th:text="#{orders.filters.any}"></option>
+            <option value="" th:text="#{orders.filters.any.value}"></option>
             <option th:each="due : ${shippingDueOptions}" th:value="${due.name()}" th:text="#{${'ShippingDue.' + due.name()}}"
                     th:selected="${filterForm != null and #strings.equalsIgnoreCase(filterForm.shippingDue, due.name())}"></option>
         </select>
     </div>
     <div th:replace="~{orders/filters :: multiValueField('filter-shipment-type', 'shipmentType', 'ShipmentType', 'orders.filters.field.shipment.type',
-            ${shipmentTypes.![name()]}, 'ShipmentType.', ${filterForm?.shipmentType})}"></div>
+            ${shipmentTypes.![name()]}, ${filterForm?.shipmentType})}"></div>
     <div th:replace="~{orders/filters :: multiValueField('filter-payment-source', 'paymentSource', 'PaymentSource', 'orders.filters.field.payment.source',
-            ${paymentSources.![name()]}, 'PaymentSource.', ${filterForm?.paymentSource})}"></div>
+            ${paymentSources.![name()]}, ${filterForm?.paymentSource})}"></div>
     <!--/* th:replace runs before th:unless on the same tag, so the condition sits on a block around it */-->
-    <th:block th:unless="${marketplaces.isEmpty()}">
+    <th:block th:unless="${marketplaces.isEmpty() and #lists.isEmpty(filterForm?.sourceName)}">
         <div th:replace="~{orders/filters :: multiValueField('filter-source-name', 'sourceName', 'SourceName', 'orders.filters.field.marketplace',
-                ${marketplaces}, null, ${filterForm?.sourceName})}"></div>
+                ${marketplaces}, ${filterForm?.sourceName})}"></div>
     </th:block>
-    <div class="cl-field cl-span-3" th:if="${marketplaces.isEmpty()}">
+    <div class="cl-field cl-span-3" th:if="${marketplaces.isEmpty() and #lists.isEmpty(filterForm?.sourceName)}">
         <span class="cl-label" th:text="#{orders.filters.field.marketplace}"></span>
         <p class="cl-help" th:text="#{orders.filters.marketplaces.empty}"></p>
     </div>

@@ -55,4 +55,26 @@ class FilterConditionLabelsTest {
         assertThat(FilterConditionLabels.isPicked(List.of("Courier"), "PickupPoint")).isFalse();
         assertThat(FilterConditionLabels.isPicked(null, "Courier")).isFalse();
     }
+
+    @Test
+    void theMenuListsTheOfferedOptionsThenTheStoredOnesNoLongerOffered() {
+        // when / then
+        assertThat(FilterConditionLabels.options(List.of("Allegro", "Ceneo"), List.of("Morele", "Allegro")))
+                .containsExactly("Allegro", "Ceneo", "Morele");
+    }
+
+    @Test
+    void aStoredValueDifferingOnlyInCaseIsNotListedTwice() {
+        // when / then
+        assertThat(FilterConditionLabels.options(List.of("Courier", "PickupPoint"), List.of("courier")))
+                .containsExactly("Courier", "PickupPoint");
+    }
+
+    @Test
+    void theMenuOffersWhatWasStoredWhenNothingIsOfferedAndNothingWhenBothAreEmpty() {
+        // when / then
+        assertThat(FilterConditionLabels.options(List.of(), List.of("Allegro"))).containsExactly("Allegro");
+        assertThat(FilterConditionLabels.options(List.of("Allegro"), null)).containsExactly("Allegro");
+        assertThat(FilterConditionLabels.options(List.of(), null)).isEmpty();
+    }
 }

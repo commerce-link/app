@@ -174,6 +174,9 @@ public class OrderListService {
 
     /** The open statuses a filter's Status conditions name; closed ones (saved before the list dropped history) are ignored. */
     public static List<OrderStatus> filterStatuses(OrderFilter filter) {
+        if (filter.getConditions() == null) {
+            return List.of();
+        }
         Set<String> named = filter.getConditions().stream()
                 .filter(c -> c.getField() == OrderFilterField.Status)
                 .map(c -> c.getField().normalize(c.getValue()))
