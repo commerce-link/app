@@ -97,6 +97,8 @@ public class Order {
     @DynamoDBAttribute(attributeName = "fulfilmentType")
     @DynamoDBTypeConvertedEnum
     private FulfilmentType fulfilmentType;
+    @DynamoDBAttribute(attributeName = "posEReceiptRequested")
+    private boolean posEReceiptRequested;
     @DynamoDBVersionAttribute
     private Long version;
 
@@ -529,6 +531,21 @@ public class Order {
 
     public void setSource(OrderSource source) {
         this.source = source;
+    }
+
+    /** A sale at the shop's counter, created from the dashboard's point of sale. */
+    @DynamoDBIgnore
+    public boolean isPointOfSale() {
+        return source != null && source.getType() == OrderSourceType.PointOfSale;
+    }
+
+    /** The operator chose an e-receipt for this point-of-sale order when closing the sale. */
+    public boolean isPosEReceiptRequested() {
+        return posEReceiptRequested;
+    }
+
+    public void setPosEReceiptRequested(boolean posEReceiptRequested) {
+        this.posEReceiptRequested = posEReceiptRequested;
     }
 
     public OrderReview getReview() {
