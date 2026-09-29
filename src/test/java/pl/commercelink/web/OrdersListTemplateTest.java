@@ -40,7 +40,8 @@ class OrdersListTemplateTest {
                 .contains("name=\"status\"").contains("cl-filter-menu-check").contains("cl-filter-menu-group").contains("page.statusSummary()")
                 .contains("data-cl-autosubmit-hide").contains("q.withStatus(null).href()")
                 .contains("details class=\"cl-filter-menu\" data-cl-filter-menu=\"filter\"").contains("cl-filter-menu-item")
-                .contains("th:href=\"@{${o.href()}}\"").contains("q.withFilterId(null).href()")   // a filter's link ticks its status
+                .contains("th:href=\"@{${o.href()}}\"")   // a filter's link ticks its status
+                .doesNotContain("q.withFilterId(null).href()").doesNotContain("orders.list.filter.off")   // cleared by "Wyczyść filtry", not in the menu
                 .contains("@{/dashboard/orders/filters(returnTo=${returnTo})}")
                 .doesNotContain("save-view").doesNotContain("saveView").doesNotContain("data-cl-dialog-open").doesNotContain("name=\"focus\"")
                 .contains("cl-search-form").contains("name=\"q\"").contains("cl-search-clear").contains("cl-button is-primary cl-search-submit").contains("q.withQ(null).href()")
@@ -54,6 +55,39 @@ class OrdersListTemplateTest {
                 .contains("fragments/pagination :: pages(${page.pagination()})")
                 .contains("data-cl-orders-results").contains("data-cl-orders-nav")
                 .contains("cl-list-empty").contains("orders.new.pos.button");
+    }
+
+    /** One way to clear every narrowing at once, right after the filter menu in the toolbar, only when something narrows. */
+    @Test
+    void clearFiltersSitsNextToTheFilterMenu() throws Exception {
+        // given
+        String html = page();
+
+        // when
+        int filterMenu = html.indexOf("data-cl-filter-menu=\"filter\"");
+        int clear = html.indexOf("q.cleared().href()");
+
+        // then
+        assertThat(clear).isGreaterThan(filterMenu).isLessThan(html.indexOf("class=\"cl-search-form\""));
+        assertThat(html).contains("class=\"cl-link-button cl-toolbar-clear\"").contains("#{general.clear.filters}")
+                .doesNotContain("cl-filter-chips-clear");
+        assertThat(html.substring(html.lastIndexOf("<a", clear), clear)).contains("th:if=\"${!page.chips().isEmpty()}\"");
+    }
+
+    /** The four tiles narrow the list: the same cl-stat, as a link, pressed state for the one narrowing now. */
+    @Test
+    void tilesAreLinksThatNarrowTheList() throws Exception {
+        // given
+        String html = page();
+
+        // when
+        int grid = html.indexOf("cl-stat-grid is-orders");
+        String tiles = html.substring(grid, html.indexOf("</ul>", grid));
+
+        // then
+        assertThat(tiles).contains("<a class=\"cl-stat is-link\"").contains("th:href=\"@{${tile.href()}}\"")
+                .contains("aria-current=${tile.active()} ? 'true' : null").contains("data-cl-orders-nav")
+                .contains("#{orders.list.attention.active}").contains("cl-visually-hidden");
     }
 
     /** WZ · FV/PAR · review under the status pill (spec §25): a labelled list, state as a class, text for screen readers. */
@@ -120,6 +154,6 @@ class OrdersListTemplateTest {
     void rejectedFilterFormsKeepWhatTheUserSubmitted() throws Exception {
         String html = filters();
         assertThat(html).contains("th:value=\"${filterForm?.label}\"")
-                .contains("th:selected=\"${filterForm != null and #strings.equalsIgnoreCase(filterForm.status, status.name())}\"");
+                .contains("${statuses.![name()]}, ${filterForm?.status})");
     }
 }

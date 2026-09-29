@@ -3742,6 +3742,12 @@ a.cl-link-button:hover {
     gap: var(--cl-gap-related);
 }
 
+/* "Wyczyść filtry" right after the filter menus: a text action, so it never reads as a third menu. */
+.cl-page .cl-toolbar-clear {
+    margin-left: 4px;
+    white-space: nowrap;
+}
+
 .cl-page .cl-table-toolbar .cl-select.is-compact {
     min-width: 180px;
 }
@@ -4451,6 +4457,43 @@ a.cl-link-button:hover {
     margin: 0;
 }
 
+/* Orders tiles narrow the list below: at rest the same cl-stat; the pointer, an accent border and a light accent wash
+   on hover say it can be clicked, and the pressed tile keeps that wash so the narrowing stays visible. */
+.cl-page .cl-stat-grid.is-orders > li {
+    display: flex;
+    margin: 0;
+}
+
+.cl-page .cl-stat.is-link {
+    flex: 1 1 auto;
+    color: inherit;
+    text-decoration: none;
+    cursor: pointer;
+    transition: border-color .15s ease, background-color .15s ease, box-shadow .15s ease;
+}
+
+.cl-page .cl-stat.is-link:hover {
+    border-color: var(--cl-accent);
+    background: color-mix(in srgb, var(--cl-accent-soft) 55%, var(--cl-surface));
+    box-shadow: var(--cl-shadow-card), var(--cl-shadow);
+}
+
+.cl-page .cl-stat.is-link[aria-current="true"] {
+    border-color: var(--cl-accent);
+    background: var(--cl-accent-soft);
+}
+
+.cl-page .cl-stat.is-link:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cl-page .cl-stat.is-link {
+        transition: none;
+    }
+}
+
 /* Links of the phone sort bar (.cl-table-sortbar, below 720 px): an underlined tab row, the current sort in ink with
    an accent underline. The class outlived the status tabs it was made for (design system §5 "Zakładki statusów"). */
 .cl-page .cl-tab {
@@ -4688,6 +4731,37 @@ a.cl-link-button:hover {
     margin-top: var(--cl-gap-related);
     padding: var(--cl-gap-related) 16px 0;
     border-top: 1px solid var(--cl-line);
+}
+
+/* The filter menu standing in for a form's select (custom order filter: Status, delivery, payment, marketplace):
+   the field's full width, height and text size, so it lines up with the selects and inputs of the same grid; the
+   popover takes the field's width, as a select's list would. */
+.cl-page .cl-filter-menu.is-field .cl-filter-menu-trigger {
+    width: 100%;
+    max-width: none;
+    height: 40px;
+    font-size: 15px;
+}
+
+.cl-page .cl-filter-menu.is-field .cl-filter-menu-panel {
+    right: 0;
+    min-width: 0;
+    max-width: none;
+    max-height: min(48vh, 360px);
+    overflow-y: auto;
+}
+
+@media screen and (max-width: 1023px) {
+    .cl-page .cl-filter-menu.is-field .cl-filter-menu-trigger {
+        height: 44px;
+    }
+}
+
+/* Safari on iOS zooms the page when a field it focuses has text smaller than 16px. */
+@media screen and (max-width: 719px) {
+    .cl-page .cl-filter-menu.is-field .cl-filter-menu-trigger {
+        font-size: 16px;
+    }
 }
 
 /* Search: the icon sits in the field, a clear "×" appears once something is searched (it is a link, so it works

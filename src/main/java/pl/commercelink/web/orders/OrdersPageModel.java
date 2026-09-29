@@ -21,8 +21,12 @@ public record OrdersPageModel(
         Pagination pagination,
         EmptyState emptyState) {
 
-    /** A read-only figure above the list: label, number, one short hint (the Asortyment cl-stat, spec §17). */
-    public record Tile(String label, long count, String hint) {
+    /**
+     * A figure above the list: label, number of the whole store's open orders, one short hint (the Asortyment cl-stat,
+     * spec §17). A click narrows the list to those orders (href); active marks the tile narrowing it now, whose href
+     * lets it go.
+     */
+    public record Tile(String label, long count, String hint, String href, boolean active) {
     }
 
     /** One row of the Status menu: the status, its count within the custom filter and the search, and whether it is ticked. */

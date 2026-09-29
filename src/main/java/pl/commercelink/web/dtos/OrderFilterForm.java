@@ -11,23 +11,28 @@ public class OrderFilterForm {
     private String label;
     private boolean sharedWithStore;
     private boolean openByDefault;
-    private String status;
-    private String shipmentType;
-    private String paymentSource;
+    private List<String> status = List.of();
+    private List<String> shipmentType = List.of();
+    private List<String> paymentSource = List.of();
     private String shippingDue;
-    private String sourceName;
+    private List<String> sourceName = List.of();
     private String shippingPostalCode;
     private String returnTo;
 
     public List<OrderFilterCondition> toConditions() {
         List<OrderFilterCondition> conditions = new LinkedList<>();
-        add(conditions, OrderFilterField.Status, status);
-        add(conditions, OrderFilterField.ShipmentType, shipmentType);
-        add(conditions, OrderFilterField.PaymentSource, paymentSource);
+        status.forEach(value -> add(conditions, OrderFilterField.Status, value));
+        shipmentType.forEach(value -> add(conditions, OrderFilterField.ShipmentType, value));
+        paymentSource.forEach(value -> add(conditions, OrderFilterField.PaymentSource, value));
         add(conditions, OrderFilterField.ShippingDue, shippingDue);
-        add(conditions, OrderFilterField.SourceName, sourceName);
+        sourceName.forEach(value -> add(conditions, OrderFilterField.SourceName, value));
         add(conditions, OrderFilterField.ShippingPostalCode, shippingPostalCode);
         return conditions;
+    }
+
+    // an unticked field is simply absent from the POST, so the binder leaves it untouched or sets null
+    private static List<String> listOf(List<String> values) {
+        return values == null ? List.of() : values.stream().filter(java.util.Objects::nonNull).toList();
     }
 
     private static void add(List<OrderFilterCondition> conditions, OrderFilterField field, String rawValue) {
@@ -60,28 +65,28 @@ public class OrderFilterForm {
         this.openByDefault = openByDefault;
     }
 
-    public String getStatus() {
+    public List<String> getStatus() {
         return status;
     }
 
-    public void setStatus(String status) {
-        this.status = status;
+    public void setStatus(List<String> status) {
+        this.status = listOf(status);
     }
 
-    public String getShipmentType() {
+    public List<String> getShipmentType() {
         return shipmentType;
     }
 
-    public void setShipmentType(String shipmentType) {
-        this.shipmentType = shipmentType;
+    public void setShipmentType(List<String> shipmentType) {
+        this.shipmentType = listOf(shipmentType);
     }
 
-    public String getPaymentSource() {
+    public List<String> getPaymentSource() {
         return paymentSource;
     }
 
-    public void setPaymentSource(String paymentSource) {
-        this.paymentSource = paymentSource;
+    public void setPaymentSource(List<String> paymentSource) {
+        this.paymentSource = listOf(paymentSource);
     }
 
     public String getShippingDue() {
@@ -92,12 +97,12 @@ public class OrderFilterForm {
         this.shippingDue = shippingDue;
     }
 
-    public String getSourceName() {
+    public List<String> getSourceName() {
         return sourceName;
     }
 
-    public void setSourceName(String sourceName) {
-        this.sourceName = sourceName;
+    public void setSourceName(List<String> sourceName) {
+        this.sourceName = listOf(sourceName);
     }
 
     public String getShippingPostalCode() {
