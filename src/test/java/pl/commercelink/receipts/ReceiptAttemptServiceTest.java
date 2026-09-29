@@ -277,6 +277,16 @@ class ReceiptAttemptServiceTest {
     }
 
     @Test
+    void anAttemptForAPosOrderResolvesItsMissingDecisionAlert() {
+        order = posOrder(100.00);
+        order.getBillingDetails().setEmail("klient@example.com");
+
+        service.issueManually(STORE_ID, ORDER_ID, "operator");
+
+        verify(alerts).resolvePosDecision(STORE_ID, ORDER_ID);
+    }
+
+    @Test
     void manualIssueIsRefusedOnceTheOrderHasAnAttempt() {
         service.startAutomatic(store, order);
         attempts.update(STORE_ID, ORDER_ID + ":R1", a -> {

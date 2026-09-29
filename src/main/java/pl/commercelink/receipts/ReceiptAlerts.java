@@ -51,6 +51,21 @@ public class ReceiptAlerts {
         notifications.resolve(attempt.getStoreId(), StoreNotificationType.RECEIPT_ATTENTION, attempt.getReceiptKey());
     }
 
+    /**
+     * A delivered point-of-sale order without a recorded receipt or a chosen e-receipt. The object is the order's key
+     * part (no ":R"), so the bell links to the order and the alert never collides with an attempt's.
+     */
+    public void raisePosDecision(String storeId, String orderId) {
+        String message = messageSource.getMessage("receipts.pos.decision.missing", new Object[]{orderId},
+                "receipts.pos.decision.missing", OPERATOR_LOCALE);
+        notifications.publish(storeId, new StoreNotification(StoreNotificationSeverity.WARNING,
+                StoreNotificationType.RECEIPT_ATTENTION, ReceiptAttemptKeys.orderPart(orderId), message));
+    }
+
+    public void resolvePosDecision(String storeId, String orderId) {
+        notifications.resolve(storeId, StoreNotificationType.RECEIPT_ATTENTION, ReceiptAttemptKeys.orderPart(orderId));
+    }
+
     /** Bell notifications always read in the fixed operator locale, whatever the caller's own request locale is. */
     public String message(ReceiptAttempt attempt, ReceiptAttention attention) {
         return message(attempt, attention, OPERATOR_LOCALE);

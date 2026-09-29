@@ -91,6 +91,20 @@ class NotificationViewFactoryTest {
     }
 
     @Test
+    void aPointOfSaleReceiptAlertKeyedByTheOrderAloneLinksToTheOrder() {
+        // given
+        String orderId = "8f14e45f-ceea-467e-bd6f-1a5e0b8e5c2a";
+        StoreNotificationRecord attention = record(StoreNotificationSeverity.WARNING,
+                StoreNotificationType.RECEIPT_ATTENTION, orderId, "POS sale without a receipt");
+
+        // when
+        NotificationView admin = factory.toView(attention, UserRole.ADMIN);
+
+        // then
+        assertThat(admin.actionHref()).isEqualTo("/dashboard/orders/" + orderId);
+    }
+
+    @Test
     void linksAReceiptAttentionAlertToItsOrderForTheStoreAdminOnly() {
         // given
         String orderId = "8f14e45f-ceea-467e-bd6f-1a5e0b8e5c2a";

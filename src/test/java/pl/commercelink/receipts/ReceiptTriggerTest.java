@@ -2,10 +2,13 @@ package pl.commercelink.receipts;
 
 import org.junit.jupiter.api.Test;
 import pl.commercelink.orders.Order;
+import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.PaymentSource;
 import pl.commercelink.stores.IntegrationType;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
+
+import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -16,7 +19,8 @@ class ReceiptTriggerTest {
     private final StoresRepository stores = mock(StoresRepository.class);
     private final ReceiptEligibility eligibility = mock(ReceiptEligibility.class);
     private final ReceiptAttemptService service = mock(ReceiptAttemptService.class);
-    private final ReceiptTrigger trigger = new ReceiptTrigger(stores, eligibility, service);
+    private final ReceiptAlerts alerts = mock(ReceiptAlerts.class);
+    private final ReceiptTrigger trigger = new ReceiptTrigger(stores, eligibility, service, alerts);
 
     @Test
     void startsAnAttemptForACandidate() {
@@ -58,12 +62,67 @@ class ReceiptTriggerTest {
         store.getReceiptConfiguration().enable(DELIVERED_AT.minusDays(1));
         ReceiptProviderFactory factory = mock(ReceiptProviderFactory.class);
         when(factory.getDescriptor(FakeReceiptProviderDescriptor.NAME)).thenReturn(new FakeReceiptProviderDescriptor());
-        ReceiptTrigger realTrigger = new ReceiptTrigger(stores, new ReceiptEligibility(factory), service);
+        ReceiptTrigger realTrigger = new ReceiptTrigger(stores, new ReceiptEligibility(factory), service, alerts);
         when(stores.findById(STORE_ID)).thenReturn(store);
         Order order = order(100.0, payment(PaymentSource.CashOnDelivery, 0.0));
 
         realTrigger.onOrderSaved(order);
 
         verify(service).startAutomatic(store, order);
+    }
+
+    @Test
+    void raisesAnAlertInsteadOfAnAttemptForAPosOrderWithoutDecision() {
+        Store store = new Store();
+        store.setStoreId(STORE_ID);
+        Order order = posOrder(100);
+        when(stores.findById(STORE_ID)).thenReturn(store);
+        when(eligibility.posDecisionMissing(store, order)).thenReturn(true);
+        when(service.attemptsOf(STORE_ID, ORDER_ID)).thenReturn(List.of());
+
+        trigger.onOrderSaved(order);
+
+        verify(alerts).raisePosDecision(STORE_ID, ORDER_ID);
+        verify(service, never()).startAutomatic(any(), any());
+    }
+
+    @Test
+    void resolvesThePosAlertOnceTheOrderHasAReceiptOrIsCancelled() {
+        Store store = new Store();
+        store.setStoreId(STORE_ID);
+        when(stores.findById(STORE_ID)).thenReturn(store);
+        Order withReceipt = posOrder(100);
+        Order cancelled = posOrder(100);
+        cancelled.setStatus(OrderStatus.Cancelled);
+
+        trigger.onOrderSaved(withReceipt);
+        trigger.onOrderSaved(cancelled);
+
+        verify(alerts, times(2)).resolvePosDecision(STORE_ID, ORDER_ID);
+        verify(alerts, never()).raisePosDecision(any(), any());
+    }
+
+    @Test
+    void noAlertWhenAnAttemptAlreadyExists() {
+        Store store = new Store();
+        store.setStoreId(STORE_ID);
+        Order order = posOrder(100);
+        when(stores.findById(STORE_ID)).thenReturn(store);
+        when(eligibility.posDecisionMissing(store, order)).thenReturn(true);
+        when(service.attemptsOf(STORE_ID, ORDER_ID)).thenReturn(List.of(new ReceiptAttempt()));
+
+        trigger.onOrderSaved(order);
+
+        verify(alerts, never()).raisePosDecision(any(), any());
+    }
+
+    @Test
+    void ignoresPosOrdersStillInProgress() {
+        Order order = posOrder(100);
+        order.setStatus(OrderStatus.New);
+
+        trigger.onOrderSaved(order);
+
+        verifyNoInteractions(stores, alerts);
     }
 }

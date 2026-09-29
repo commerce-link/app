@@ -60,4 +60,17 @@ class ReceiptAlertsTest {
         verify(notifications, never()).publish(any(), any());
         assertThat(attempt.getAttention()).isNull();
     }
+
+    @Test
+    void aPointOfSaleDecisionAlertIsKeyedByTheOrderAndResolvedTheSameWay() {
+        messages.addMessage("receipts.pos.decision.missing", new Locale("pl"), "Sprzedaż POS {0} bez paragonu");
+
+        alerts.raisePosDecision("s1", "o1");
+        alerts.resolvePosDecision("s1", "o1");
+
+        verify(notifications).publish(eq("s1"), argThat((StoreNotification n) ->
+                n.getType() == StoreNotificationType.RECEIPT_ATTENTION && "o1".equals(n.getObject())
+                        && n.getMessage().equals("Sprzedaż POS o1 bez paragonu")));
+        verify(notifications).resolve("s1", StoreNotificationType.RECEIPT_ATTENTION, "o1");
+    }
 }

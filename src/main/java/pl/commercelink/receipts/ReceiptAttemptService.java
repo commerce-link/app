@@ -311,6 +311,10 @@ public class ReceiptAttemptService {
         if (!attempts.create(attempt)) {
             return Optional.empty();
         }
+        if (order.isPointOfSale()) {
+            // the attempt now owns this sale's receipt, so the "decide the receipt" alert is settled
+            alerts.resolvePosDecision(store.getStoreId(), order.getOrderId());
+        }
         try {
             publisher.publishDue(attempt);
         } catch (RuntimeException e) {
