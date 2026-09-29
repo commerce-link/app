@@ -217,7 +217,7 @@
                                 <div class="field" id="pos-receipt-decision" th:if="${posReceiptMode != null}" hidden>
                                     <label class="label" th:text="#{receipts.pos.decision.title}"></label>
                                     <p class="help" th:text="#{receipts.pos.decision.help}"></p>
-                                    <div class="control" th:if="${posReceiptMode.name() == 'ASK'}">
+                                    <div class="control mb-3" th:if="${posReceiptMode.name() == 'ASK'}">
                                         <label class="radio"><input type="radio" name="choice" value="CASH_REGISTER" checked>
                                             <span th:text="#{receipts.pos.decision.cashRegister}"></span></label>
                                         <label class="radio"><input type="radio" name="choice" value="E_RECEIPT">

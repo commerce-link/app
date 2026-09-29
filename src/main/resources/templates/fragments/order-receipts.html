@@ -7,8 +7,9 @@
        the fragment carries its own `.cl-page` wrapper purely for that CSS scoping (`.cl-status` itself is unscoped
        and would work either way). `.cl-page` only adds bottom padding; it does not pull in the sidebar chrome. */-->
 <!--/* A delivered point-of-sale sale with neither a recorded receipt nor a chosen e-receipt: the automation raised a
-       bell alert instead of guessing, and this repeats it where the operator acts. Same .cl-page scoping as below. */-->
-<div th:fragment="posDecisionMissing(orderId)" class="cl-page">
+       bell alert instead of guessing, and this repeats it where the operator acts. Same .cl-page scoping as below, minus
+       its bottom padding, which would leave a gap between the warning and the documents. */-->
+<div th:fragment="posDecisionMissing(orderId)" class="cl-page pb-0">
     <div class="cl-alert is-warn" role="status">
         <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
         <span th:text="#{receipts.pos.decision.missing(${orderId})}"></span>
