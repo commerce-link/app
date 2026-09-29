@@ -51,7 +51,7 @@ public class ReceiptTrigger {
      * order lifecycle (invoicing). Never throws.
      */
     public void settleDeadAttemptAlerts(Order order) {
-        if (!order.isInvoiced() || order.getStatus() == OrderStatus.Cancelled) {
+        if (!settlesDeadAttempts(order)) {
             return;
         }
         try {
@@ -60,5 +60,13 @@ public class ReceiptTrigger {
             log.error("Receipt alerts of order {} of store {} could not be resolved",
                     order.getOrderId(), order.getStoreId(), e);
         }
+    }
+
+    /**
+     * Whether the order's blocked or failed attempts no longer ask for anything: the order has its closing document
+     * and is not cancelled. The bell (above) and the order page ({@link ReceiptOrderView}) read the same rule.
+     */
+    static boolean settlesDeadAttempts(Order order) {
+        return order.isInvoiced() && order.getStatus() != OrderStatus.Cancelled;
     }
 }

@@ -465,7 +465,8 @@ public class OrderPageModelFactory {
                 safeWebUrl(newest.documentUrl()), newest.statusKey(), newest.statusTone(), dateKey, date, emailKey,
                 newest.problem(), act && newest.canCheck(), act && newest.canResendEmail(), act && newest.canClose(),
                 // a new attempt changes the order's documents, which a read-only page never does
-                !readOnly && receipts.view().canReissue(), close.dialogId(), act ? close.pageHref() : null, earlier);
+                !readOnly && receipts.view().canReissue(), close.dialogId(), act ? close.pageHref() : null, earlier,
+                newest.settled(), newest.settled() ? newest.outcome() : null);
     }
 
     /** One "Zamknij ręcznie" dialog per attempt that offers it; none for a super admin. */

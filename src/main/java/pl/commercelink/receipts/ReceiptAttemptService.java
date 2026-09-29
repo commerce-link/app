@@ -314,7 +314,8 @@ public class ReceiptAttemptService {
     }
 
     private ReceiptOrderView orderView(Order order, List<ReceiptAttempt> orderAttempts, ReceiptAlerts alerts, Locale locale) {
-        return ReceiptOrderView.of(orderAttempts, eligibility.orderQualifies(order), alerts, clock.instant(), locale);
+        return ReceiptOrderView.of(orderAttempts, eligibility.orderQualifies(order),
+                ReceiptTrigger.settlesDeadAttempts(order), alerts, clock.instant(), locale);
     }
 
     /**

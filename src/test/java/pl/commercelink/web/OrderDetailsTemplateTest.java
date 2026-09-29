@@ -2155,7 +2155,7 @@ class OrderDetailsTemplateTest {
                 "receipts.state." + state.name(), tone, url, problem, canResend ? null : java.time.Instant.parse("2026-09-28T10:00:00Z"),
                 null, canCheck, canClose, canResend, attemptNo, number,
                 state == pl.commercelink.receipts.ReceiptAttemptState.FISCALISED ? java.time.Instant.parse("2026-09-28T10:00:00Z") : null,
-                outcome);
+                outcome, false);
     }
 
     private static String renderWithReceipts(Order order, OrderPageModelFactory.Viewer viewer, ReceiptOrderState receipts) {
@@ -2403,5 +2403,28 @@ class OrderDetailsTemplateTest {
         assertThat(without).contains("href=\"/dashboard/orders/" + ORDER_ID + "/cancel\"")
                 .contains("data-cl-confirm-message=\"Zamówienie przejdzie w status Anulowane, a ceny usług zostaną wyzerowane.\"")
                 .doesNotContain("zafiskalizowany e-paragon");
+    }
+
+    @Test
+    void aSettledEReceiptRowSaysNothingIsNeeded() {
+        // given
+        Order order = order(OrderStatus.Delivered);
+        order.addDocument(new pl.commercelink.documents.Document("typed", "PAR/KASA/1", null,
+                pl.commercelink.documents.DocumentType.Receipt));
+        ReceiptOrderState settled = new ReceiptOrderState(
+                List.of(attempt(1, pl.commercelink.receipts.ReceiptAttemptState.BLOCKED)),
+                new pl.commercelink.receipts.ReceiptOrderView(List.of(new pl.commercelink.receipts.ReceiptOrderView.Row(
+                        ORDER_ID + ":R1", pl.commercelink.receipts.ReceiptAttemptState.BLOCKED,
+                        "receipts.state.BLOCKED", "is-neutral", null, null, null, null, false, false, false, 1, null,
+                        null, "sprzedaż POS bez e-maila klienta", true)), false), false, false);
+
+        // when
+        String html = renderWithReceipts(order, ADMIN, settled);
+
+        // then
+        assertThat(html).containsPattern("<span class=\"cl-status is-neutral\">Zablokowany</span>")
+                .contains("<p class=\"cl-list-desc\" id=\"e-paragon-settled-1\">Nie wystawiono (sprzedaż POS bez e-maila "
+                        + "klienta). Nie trzeba nic robić — zamówienie ma już paragon albo fakturę.</p>")
+                .doesNotContain("e-paragon-problem-1").doesNotContain("Wystaw ponownie");
     }
 }

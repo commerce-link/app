@@ -94,7 +94,7 @@ public class ReceiptAlerts {
                 attempt.getIssueCalls(),
                 attempt.getReceiptKey()
         };
-        String base = "receipts.page." + attention.name() + ".";
+        String base = "receipts.page." + pageKey(attempt, attention) + ".";
         String cause = pageText(base + "cause", attempt.getProvider(), args, locale);
         String action = pageText(base + "action", attempt.getProvider(), args, locale);
         String details = pageText(base + "details", attempt.getProvider(), args, locale);
@@ -156,10 +156,16 @@ public class ReceiptAlerts {
 
     /** A point-of-sale sale blocked for want of the customer's e-mail needs the cash register advice, not "Reissue". */
     private static String messageKey(ReceiptAttempt attempt, ReceiptAttention attention) {
-        if (attention == ReceiptAttention.BLOCKED
-                && ReceiptBlockReason.POS_NO_CUSTOMER_EMAIL.name().equals(attempt.getBlockedReason())) {
-            return "receipts.attention.BLOCKED_POS";
-        }
-        return attention.messageKey();
+        return isPosWithoutCustomerEmail(attempt, attention) ? "receipts.attention.BLOCKED_POS" : attention.messageKey();
+    }
+
+    /** The order page's texts follow the bell: the point-of-sale block has its own cause and advice. */
+    private static String pageKey(ReceiptAttempt attempt, ReceiptAttention attention) {
+        return isPosWithoutCustomerEmail(attempt, attention) ? "BLOCKED_POS" : attention.name();
+    }
+
+    private static boolean isPosWithoutCustomerEmail(ReceiptAttempt attempt, ReceiptAttention attention) {
+        return attention == ReceiptAttention.BLOCKED
+                && ReceiptBlockReason.POS_NO_CUSTOMER_EMAIL.name().equals(attempt.getBlockedReason());
     }
 }

@@ -309,4 +309,26 @@ class ReceiptAlertsTest {
         // then
         assertThat(message).isEqualTo("Zablokowany o1");
     }
+
+    @Test
+    void aPosSaleWithoutTheCustomersEmailGetsTheCashRegisterAdviceOnThePageToo() {
+        // given
+        ReceiptAlerts page = pageAlerts();
+        ReceiptAttempt pos = troubled("fakturownia");
+        pos.setBlockedReason(ReceiptBlockReason.POS_NO_CUSTOMER_EMAIL.name());
+        Locale pl = Locale.forLanguageTag("pl");
+
+        // when
+        ReceiptPageProblem problem = page.pageProblem(pos, ReceiptAttention.BLOCKED, pl);
+        ReceiptPageProblem english = page.pageProblem(pos, ReceiptAttention.BLOCKED, Locale.ENGLISH);
+
+        // then: the buttons of the new page, and never both
+        assertThat(problem.cause()).isEqualTo("E-paragonu nie wysłano: sprzedaż POS nie ma e-maila klienta, "
+                + "a paragon mogła już wydrukować kasa sklepu.");
+        assertThat(problem.action()).contains("„Dodaj dokument” → Paragon").contains("danych rozliczeniowych")
+                .contains("„Wystaw ponownie”").endsWith("Nie rób obu — to byłyby dwie sprzedaże.")
+                .doesNotContain(ORDER_ID);
+        assertThat(english.cause()).contains("shop's cash register");
+        assertThat(english.action()).contains("\"Add document\"").endsWith("Never both: that would be two sales.");
+    }
 }

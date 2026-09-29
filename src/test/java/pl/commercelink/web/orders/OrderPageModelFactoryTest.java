@@ -912,7 +912,7 @@ class OrderPageModelFactoryTest {
                                             String number, java.time.Instant fiscalisedAt, ReceiptPageProblem problem,
                                             boolean canCheck, boolean canClose, boolean canResendEmail, String outcome) {
         return new ReceiptOrderView.Row(key, state, "receipts.state." + state.name(), "is-info", url, problem, null,
-                null, canCheck, canClose, canResendEmail, attemptNo, number, fiscalisedAt, outcome);
+                null, canCheck, canClose, canResendEmail, attemptNo, number, fiscalisedAt, outcome, false);
     }
 
     private void receipts(ReceiptOrderState state) {
@@ -1241,5 +1241,27 @@ class OrderPageModelFactoryTest {
         assertThat(new ReceiptOrderState(List.of(attempt(KEY_1, 1, ReceiptAttemptState.FAILED)),
                 new ReceiptOrderView(List.of(), true), false, false).hasFiscalisedReceipt(order)).isFalse();
         assertThat(ReceiptOrderState.NONE.hasFiscalisedReceipt(order)).isFalse();
+    }
+
+    @Test
+    void aSettledAttemptSaysNothingIsNeededWithWhyItStopped() {
+        // given: the POS sale's attempt blocked, the cash register's receipt typed in since
+        Order order = order(OrderStatus.Delivered);
+        order.addDocument(new Document("typed", "PAR/KASA/1", null, DocumentType.Receipt));
+        receipts(new ReceiptOrderState(List.of(attempt(KEY_1, 1, ReceiptAttemptState.BLOCKED)),
+                new ReceiptOrderView(List.of(new ReceiptOrderView.Row(KEY_1, ReceiptAttemptState.BLOCKED,
+                        "receipts.state.BLOCKED", "is-neutral", null, null, null, null, false, false, false, 1, null, null,
+                        "sprzedaż POS bez e-maila klienta", true)), false), false, false));
+
+        // when
+        OrderPageModel.DocumentsCard documents = factory.build(order, List.of(), ADMIN, PL).documents();
+
+        // then: the typed-in receipt stays its own row
+        assertThat(documents.rows()).extracting(OrderPageModel.DocumentRow::number).containsExactly("PAR/KASA/1");
+        OrderPageModel.ReceiptRow receipt = documents.receipt();
+        assertThat(receipt.settled()).isTrue();
+        assertThat(receipt.settledOutcome()).isEqualTo("sprzedaż POS bez e-maila klienta");
+        assertThat(receipt.problem()).isNull();
+        assertThat(receipt.hasActions()).isFalse();
     }
 }

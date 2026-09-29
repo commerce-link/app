@@ -715,4 +715,25 @@ class ReceiptAttemptServiceTest {
                 .extracting(e -> ((ReceiptActionException) e).getMessageKey())
                 .isEqualTo("receipts.action.notFound");
     }
+
+    @Test
+    void aBlockedPosSaleNeedsNothingOnThePageOnceTheCashRegistersReceiptIsTypedIn() {
+        // given
+        withStoreEmail(store);
+        order = posOrder(100.00);
+        service.startAutomatic(store, order);
+        ReceiptOrderView.Row before = service.orderState(store, order, alerts, java.util.Locale.ENGLISH).view().rows().get(0);
+
+        // when
+        order.addDocument(new pl.commercelink.documents.Document("typed", "PAR/KASA/1", null,
+                pl.commercelink.documents.DocumentType.Receipt));
+        ReceiptOrderView.Row after = service.orderState(store, order, alerts, java.util.Locale.ENGLISH).view().rows().get(0);
+
+        // then
+        assertThat(before.settled()).isFalse();
+        assertThat(before.statusTone()).isEqualTo("is-bad");
+        assertThat(after.settled()).isTrue();
+        assertThat(after.problem()).isNull();
+        assertThat(after.statusTone()).isEqualTo("is-neutral");
+    }
 }
