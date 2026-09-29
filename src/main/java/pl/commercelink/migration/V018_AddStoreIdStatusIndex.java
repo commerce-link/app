@@ -23,14 +23,14 @@ import io.mongock.api.annotations.RollbackExecution;
  * already has, so DynamoDB backfills existing orders itself and keeps the index current on every status change; the
  * list falls back to reading the store's partition while the index is still being built (OrdersRepository).
  */
-@ChangeUnit(id = "V016-add-store-id-status-index", order = "016", author = "commercelink")
-public class V016_AddStoreIdStatusIndex {
+@ChangeUnit(id = "V018-add-store-id-status-index", order = "018", author = "commercelink")
+public class V018_AddStoreIdStatusIndex {
 
     public static final String INDEX = "StoreIdStatusIndex";
 
     private final AmazonDynamoDB dynamoDB;
 
-    public V016_AddStoreIdStatusIndex(AmazonDynamoDB dynamoDB) {
+    public V018_AddStoreIdStatusIndex(AmazonDynamoDB dynamoDB) {
         this.dynamoDB = dynamoDB;
     }
 

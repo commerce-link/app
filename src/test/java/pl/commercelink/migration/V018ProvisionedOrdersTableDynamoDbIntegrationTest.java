@@ -19,11 +19,11 @@ import pl.commercelink.orders.Order;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * V016 on an Orders table with provisioned capacity (a table created by hand may be one): the new index takes the
+ * V018 on an Orders table with provisioned capacity (a table created by hand may be one): the new index takes the
  * table's throughput instead of being rejected, which would stop the application from starting.
  */
 @Testcontainers(disabledWithoutDocker = true)
-class V016ProvisionedOrdersTableDynamoDbIntegrationTest {
+class V018ProvisionedOrdersTableDynamoDbIntegrationTest {
 
     @Container
     static final GenericContainer<?> DYNAMODB =
@@ -42,10 +42,10 @@ class V016ProvisionedOrdersTableDynamoDbIntegrationTest {
         request.getGlobalSecondaryIndexes().forEach(index -> index.withProvisionedThroughput(throughput));
         client.createTable(request);
 
-        new V016_AddStoreIdStatusIndex(client).execute();
+        new V018_AddStoreIdStatusIndex(client).execute();
 
         GlobalSecondaryIndexDescription index = client.describeTable("Orders").getTable().getGlobalSecondaryIndexes().stream()
-                .filter(i -> V016_AddStoreIdStatusIndex.INDEX.equals(i.getIndexName())).findFirst().orElseThrow();
+                .filter(i -> V018_AddStoreIdStatusIndex.INDEX.equals(i.getIndexName())).findFirst().orElseThrow();
         assertThat(index.getProvisionedThroughput().getReadCapacityUnits()).isEqualTo(7L);
         assertThat(index.getProvisionedThroughput().getWriteCapacityUnits()).isEqualTo(3L);
     }
