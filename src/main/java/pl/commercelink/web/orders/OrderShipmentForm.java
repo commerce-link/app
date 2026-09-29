@@ -1,6 +1,7 @@
 package pl.commercelink.web.orders;
 
 import org.apache.commons.lang3.StringUtils;
+import pl.commercelink.orders.Order;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShipmentType;
 
@@ -28,8 +29,8 @@ import java.util.stream.Stream;
  * alone. A blank date clears the moment. Both are facts that already happened, so neither may be after today, and
  * the delivery not before the shipping; "today" is the operator's day, in Warsaw, whatever the server's zone.
  * <p>
- * courierOrder: the shipment has a courier order (a paid label whose number the carrier gave), so its carrier and
- * tracking number are shown read-only and a change of either is refused; "Cancel courier order" is the way to change
+ * courierOrder: the shipment has a courier order (a paid label whose number the carrier gave), so its type, carrier
+ * and tracking number are shown read-only and a change of any is refused; "Cancel courier order" is the way to change
  * them.
  */
 public record OrderShipmentForm(String orderId, Integer index, String version, ShipmentType type, String carrier,
@@ -66,6 +67,17 @@ public record OrderShipmentForm(String orderId, Integer index, String version, S
                 shipment.getTrackingNo(), shipment.getCollectionPointCode(), shipment.getTrackingUrl(),
                 date(shipment.getShippedAt()), date(shipment.getDeliveredAt()), carriers, Map.of(), null,
                 shipment.getExternalId() != null, null);
+    }
+
+    /**
+     * The form of "Add shipment". While the order's only shipment is a placeholder (Order.onlyPlaceholder) the new
+     * shipment fills it, so the form starts from the customer's choice kept there: type, carrier, pickup point.
+     */
+    public static OrderShipmentForm blank(Order order, List<String> carriers) {
+        return order.onlyPlaceholder()
+                .map(p -> new OrderShipmentForm(order.getOrderId(), null, null, p.getType(), p.getCarrier(), null,
+                        p.getCollectionPointCode(), null, null, null, carriers, Map.of(), null))
+                .orElseGet(() -> of(order.getOrderId(), null, null, carriers));
     }
 
     /** The same form telling "today" by clock. */
@@ -139,7 +151,7 @@ public record OrderShipmentForm(String orderId, Integer index, String version, S
 
     /**
      * Field id to message key, in the order of the form. saved is the shipment the form edits (null for a new one): one
-     * with a courier order keeps its carrier and tracking number.
+     * with a courier order keeps its type, carrier and tracking number.
      */
     public Map<String, String> validate(Shipment saved) {
         Map<String, String> found = new LinkedHashMap<>();
@@ -150,6 +162,9 @@ public record OrderShipmentForm(String orderId, Integer index, String version, S
             found.put(field("trackingNo"), "order.shipments.error.empty");
         }
         if (saved != null && saved.getExternalId() != null) {
+            if (type != saved.getType()) {
+                found.put(field("type"), "order.shipments.error.courierLocked");
+            }
             if (!Objects.equals(StringUtils.trimToNull(carrier), StringUtils.trimToNull(saved.getCarrier()))) {
                 found.put(field("carrier"), "order.shipments.error.courierLocked");
             }

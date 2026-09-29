@@ -185,7 +185,11 @@ class OrderShipmentFormTest {
                 Map.entry("shipment-0-carrier", "order.shipments.error.courierLocked"));
         assertThat(numberCleared.validate(saved)).containsOnly(
                 Map.entry("shipment-0-trackingNo", "order.shipments.error.courierLocked"));
+        OrderShipmentForm typeChanged = new OrderShipmentForm("o-1", 0, "v", ShipmentType.PersonalCollection, "DPD",
+                "T-1", null, null, null, null, List.of(), null, null);
         assertThat(urlAdded.validate(saved)).isEmpty();
+        assertThat(typeChanged.validate(saved)).containsOnly(
+                Map.entry("shipment-0-type", "order.shipments.error.courierLocked"));
         assertThat(OrderShipmentForm.of("o-1", 0, saved, List.of()).courierOrder()).isTrue();
     }
 

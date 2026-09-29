@@ -3,8 +3,6 @@ package pl.commercelink.web;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.apache.commons.lang3.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.apache.logging.log4j.util.Strings;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.MessageSource;
@@ -115,8 +113,6 @@ import java.util.function.Supplier;
 
 @Controller
 public class OrdersController extends BaseController {
-
-    private static final Logger log = LoggerFactory.getLogger(OrdersController.class);
 
     @Autowired
     private Inventory inventory;
@@ -1815,8 +1811,8 @@ public class OrdersController extends BaseController {
         if (order.isClosed()) {
             return refuse(redirectAttributes, orderId, "order.shipments.error.closed", locale);
         }
-        OrderShipmentForm form = OrderShipmentForm.of(orderId, index, index == null ? null : order.getShipments().get(index),
-                shipmentCarriers(order));
+        OrderShipmentForm form = index == null ? OrderShipmentForm.blank(order, shipmentCarriers(order))
+                : OrderShipmentForm.of(orderId, index, order.getShipments().get(index), shipmentCarriers(order));
         return shipmentPage(order, form, model);
     }
 
@@ -1873,8 +1869,13 @@ public class OrdersController extends BaseController {
         }
 
         List<Shipment> shipments = new ArrayList<>(current);
+        // a new shipment fills the only placeholder (the customer's choice kept in place of a removed shipment, or the
+        // one every order is created with) instead of standing next to it and holding the order back from Shipping
+        boolean fillsPlaceholder = index == null && existingOrder.onlyPlaceholder().isPresent();
         Shipment saved = posted.toShipment(before);
-        if (index == null) {
+        if (fillsPlaceholder) {
+            shipments.set(0, saved);
+        } else if (index == null) {
             shipments.add(saved);
         } else {
             shipments.set(index, saved);
@@ -1987,7 +1988,6 @@ public class OrdersController extends BaseController {
         boolean changed = saved != null && (before == null || !isAnnounceable(before)
                 || !shipmentData(saved).equals(shipmentData(before)));
         if (notifiable && changed) {
-            log.info("Order {}: shipment {} announced", existingOrder.getOrderId(), saved.getTrackingNo());
             orderLifecycleEventPublisher.publish(existingOrder, OrderLifecycleEventType.ShipmentCreated);
         }
     }

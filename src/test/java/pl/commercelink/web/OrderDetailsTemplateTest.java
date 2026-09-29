@@ -595,7 +595,9 @@ class OrderDetailsTemplateTest {
         assertThat(dialog).doesNotContain("shipment-0-carrierSelect")
                 .containsPattern("id=\"shipment-0-carrier\"[^>]*aria-describedby=\"shipment-0-courierLocked\"[^>]*readonly")
                 .containsPattern("id=\"shipment-0-trackingNo\"[^>]*value=\"T-1\"[^>]*aria-describedby=\"shipment-0-courierLocked\"[^>]*readonly")
-                .contains("id=\"shipment-0-courierLocked\">Numer nadał przewoźnik — anuluj zamówienie kuriera, żeby go zmienić.</p>")
+                .contains("id=\"shipment-0-courierLocked\">Numer nadał przewoźnik — typ, przewoźnika i numer zmienisz, anulując zamówienie kuriera.</p>")
+                .containsPattern("<select[^>]*id=\"shipment-0-type\"[^>]*aria-describedby=\"shipment-0-courierLocked\"[^>]*disabled")
+                .contains("<input type=\"hidden\" name=\"type\" value=\"Courier\">")
                 .doesNotContainPattern("id=\"shipment-0-collectionPointCode\"[^>]*readonly")
                 .containsPattern("id=\"shipment-0-shippedDate\"[^>]*max=\"" + today + "\"")
                 .containsPattern("id=\"shipment-0-deliveredDate\"[^>]*max=\"" + today + "\"");

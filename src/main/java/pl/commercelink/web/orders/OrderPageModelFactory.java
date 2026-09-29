@@ -357,7 +357,10 @@ public class OrderPageModelFactory {
                     form.dialogId(), readOnly ? null : base + i,
                     readOnly || removeLockedKey(order, i) != null || isBarePlaceholder(order, i) ? null
                             : base + i + "/remove?version=" + form.version(),
-                    readOnly ? null : removeReasonKey(order, i, s == courierCancellable), removeShipmentMessageKey(order, i),
+                    // every parcel of one courier order carries its externalId, and cancelling it cancels them all
+                    readOnly ? null : removeReasonKey(order, i, courierCancellable != null
+                            && Objects.equals(s.getExternalId(), courierCancellable.getExternalId())),
+                    removeShipmentMessageKey(order, i),
                     removeShipmentActionKey(order, i)));
             if (!readOnly) {
                 forms.add(form);
@@ -367,14 +370,14 @@ public class OrderPageModelFactory {
                 : order.getFulfilmentType() == FulfilmentType.DirectToConsumer ? "order.shipments.empty.dropship"
                 : "order.shipments.empty";
         return new OrderPageModel.ShipmentsCard(rows, emptyKey, !readOnly && courierCancellable != null, forms,
-                readOnly ? null : OrderShipmentForm.of(order.getOrderId(), null, null, carriers));
+                readOnly ? null : OrderShipmentForm.blank(order, carriers));
     }
 
     /**
      * The short reason next to a greyed "Remove" in the row; the refusal of a forced removal says it in full. A
-     * shipment with a courier order points to "Cancel courier order" only when the card offers it for that shipment:
-     * before the order is ready to ship the button is not there yet, and it only ever cancels the first shipment that
-     * went out.
+     * shipment with a courier order points to "Cancel courier order" only when the card offers it for that shipment's
+     * courier order (which covers every parcel of it): before the order is ready to ship the button is not there yet,
+     * and it only ever cancels the courier order of the first shipment that went out.
      */
     private static String removeReasonKey(Order order, int index, boolean courierCancellable) {
         String locked = removeLockedKey(order, index);
@@ -389,8 +392,9 @@ public class OrderPageModelFactory {
     }
 
     /**
-     * Why the shipment at index cannot be removed, or null. The only shipment can go: without shipments the order
-     * simply waits for one (OrderLifecycle does not deliver an order that has none). A delivered order keeps its
+     * Why the shipment at index cannot be removed, or null. The only shipment can go: OrdersController keeps a
+     * placeholder with the customer's delivery choice in its place, and the order waits for it to be sent (OrderLifecycle
+     * neither delivers nor completes an order before its shipments are delivered). A delivered order keeps its
      * shipments, they are the record of the delivery; so does a shipment with a delivery date. One with a courier order
      * is cancelled with "Cancel courier order", which also cancels the paid label at the carrier, never by dropping
      * the record.
@@ -603,7 +607,7 @@ public class OrderPageModelFactory {
      * (OrdersController keeps one in place of the only shipment), so the row offers no "Remove" and needs no reason.
      */
     private static boolean isBarePlaceholder(Order order, int index) {
-        return order.getShipments().size() == 1 && order.getShipments().get(index).isPlaceholder();
+        return order.onlyPlaceholder().isPresent();
     }
 
     /**

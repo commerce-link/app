@@ -716,6 +716,32 @@ class OrdersControllerTest {
         }
 
         @Test
+        void aNewShipmentFillsTheOnlyPlaceholderInsteadOfStandingNextToIt() {
+            // given: what "Remove" of the only shipment left (or what every order is created with)
+            Shipment placeholder = new Shipment(ShipmentType.PickupPoint);
+            placeholder.setCarrier("InPost");
+            placeholder.setCollectionPointCode("KRA01M");
+            Order order = orderWith(placeholder);
+            order.setStatus(OrderStatus.Realization);
+            Shipment sent = new Shipment(ShipmentType.PickupPoint);
+            sent.setCarrier("InPost");
+            sent.setCollectionPointCode("KRA01M");
+            sent.setTrackingNo("TRACK-9");
+            sent.setShippedAt(LocalDateTime.of(2026, 9, 2, 0, 0));
+
+            // when
+            save(null, null, sent);
+
+            // then: one shipment, the sent one, so the order can move on to Shipping and Delivered
+            assertThat(order.getShipments()).singleElement().satisfies(s -> {
+                assertThat(s.getTrackingNo()).isEqualTo("TRACK-9");
+                assertThat(s.getCollectionPointCode()).isEqualTo("KRA01M");
+            });
+            assertThat(order.hasBeenShippedOrIsReadyForCollection()).isTrue();
+            verify(orderLifecycleEventPublisher).publish(order, OrderLifecycleEventType.ShipmentCreated);
+        }
+
+        @Test
         void theCourierPlaceholderKeepsOnlyTheType() {
             // given: a courier carrier is not part of the customer's choice, a pickup point's carrier is
             Shipment only = courier("TRACK-1", null);

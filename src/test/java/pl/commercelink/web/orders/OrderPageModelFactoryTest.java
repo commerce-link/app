@@ -431,9 +431,17 @@ class OrderPageModelFactoryTest {
         labelled(second, "T-2", "PKG-2");
         twoCouriers.getShipments().add(second);
 
+        // one courier order of two parcels: they share its externalId and "Cancel courier order" cancels both
+        Order twoParcels = order(OrderStatus.Shipping);
+        labelled(twoParcels.getShipments().get(0), "T-1", "PKG-1");
+        Shipment parcel = new Shipment(ShipmentType.Courier);
+        labelled(parcel, "T-1B", "PKG-1");
+        twoParcels.getShipments().add(parcel);
+
         // when
         OrderPageModel.ShipmentsCard early = factory.build(assembling, List.of(), ADMIN, PL).shipments();
         OrderPageModel.ShipmentsCard shipping = factory.build(twoCouriers, List.of(), ADMIN, PL).shipments();
+        OrderPageModel.ShipmentsCard parcels = factory.build(twoParcels, List.of(), ADMIN, PL).shipments();
 
         // then: the reason never points to a button the page does not show
         assertThat(early.canCancelCourier()).isFalse();
@@ -442,6 +450,9 @@ class OrderPageModelFactoryTest {
         assertThat(shipping.canCancelCourier()).isTrue();
         assertThat(shipping.rows().get(0).removeReasonKey()).isEqualTo("order.shipments.remove.locked.courier");
         assertThat(shipping.rows().get(1).removeReasonKey()).isEqualTo("order.shipments.remove.locked.courierNotFirst");
+        assertThat(parcels.canCancelCourier()).isTrue();
+        assertThat(parcels.rows()).extracting(OrderPageModel.ShipmentRow::removeReasonKey)
+                .containsExactly("order.shipments.remove.locked.courier", "order.shipments.remove.locked.courier");
     }
 
     @Test
@@ -484,6 +495,30 @@ class OrderPageModelFactoryTest {
         assertThat(row.removeHref()).isNotNull();
         assertThat(row.removeMessageKey()).isEqualTo("order.shipments.remove.confirm.delivers");
         assertThat(row.removeActionKey()).isEqualTo("order.shipments.remove.confirm.action.delivers");
+    }
+
+    @Test
+    void addShipmentStartsFromTheCustomersChoiceKeptInTheOnlyPlaceholder() {
+        // given: the only shipment holds nothing but the customer's pickup point
+        Order order = order(OrderStatus.Realization);
+        Shipment placeholder = order.getShipments().get(0);
+        placeholder.setType(ShipmentType.PickupPoint);
+        placeholder.setCarrier("InPost");
+        placeholder.setCollectionPointCode("KRA01M");
+        Order withData = order(OrderStatus.Realization);
+        withData.getShipments().get(0).setTrackingNo("T-1");
+
+        // when
+        OrderShipmentForm blank = factory.build(order, List.of(), ADMIN, PL).shipments().blank();
+        OrderShipmentForm plain = factory.build(withData, List.of(), ADMIN, PL).shipments().blank();
+
+        // then: "Add shipment" fills the placeholder, so its form starts from what the placeholder keeps
+        assertThat(blank.isNew()).isTrue();
+        assertThat(blank.type()).isEqualTo(ShipmentType.PickupPoint);
+        assertThat(blank.carrier()).isEqualTo("InPost");
+        assertThat(blank.collectionPointCode()).isEqualTo("KRA01M");
+        assertThat(plain.type()).isEqualTo(ShipmentType.Courier);
+        assertThat(plain.collectionPointCode()).isNull();
     }
 
     private static void labelled(Shipment shipment, String trackingNo, String packageId) {

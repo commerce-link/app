@@ -92,8 +92,8 @@
        saved shipment and the notice stored for it. The carrier is picked from the store's carriers, or typed after
        "Inny…": the select only fills the named text field (order-shipments.js), so without JavaScript the text field
        alone is posted. The shipped and delivered moments are dates only (OrderShipmentForm keeps a saved time on the
-       same day) and offer nothing after the operator's today (max). A shipment with a courier order shows its carrier and
-       tracking number read-only (posted, the server refuses a change) with the reason under them. */-->
+       same day) and offer nothing after the operator's today (max). A shipment with a courier order shows its type, carrier
+       and tracking number read-only (posted, the server refuses a change) with the reason under them. */-->
 <form th:fragment="shipmentForm(shipment, inDialog)" th:id="|${shipment.dialogId()}-form|" class="cl-form" method="post"
       novalidate data-cl-async data-cl-shipment-form
       th:action="@{/dashboard/orders/{o}/shipments(o=${shipment.orderId()})}"
@@ -117,10 +117,17 @@
         <div class="cl-form-grid cl-card-grid">
             <div class="cl-span-3 cl-field">
                 <label class="cl-label" th:for="${shipment.field('type')}" th:text="#{order.shipments.dialog.type}"></label>
-                <select class="cl-select" th:id="${shipment.field('type')}" name="type">
+                <!--/* a select cannot be read-only: with a courier order it is disabled and the type is posted hidden */-->
+                <select class="cl-select" th:id="${shipment.field('type')}" th:name="${shipment.courierOrder()} ? null : 'type'"
+                        th:disabled="${shipment.courierOrder()}" th:attr="aria-describedby=${lockedHelp}">
                     <option th:each="t : ${shipment.types()}"
                             th:value="${t.value().name()}" th:selected="${t.value() == shipment.type()}" th:text="#{${t.labelKey()}}"></option>
                 </select>
+                <input th:if="${shipment.courierOrder()}" type="hidden" name="type" th:value="${shipment.type().name()}">
+                <p th:if="${shipment.error('type') != null}" class="cl-field-error" th:id="${shipment.field('type')} + '-error'">
+                    <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                    <span th:text="#{${shipment.error('type')}}"></span>
+                </p>
             </div>
             <div class="cl-span-3 cl-field">
                 <label class="cl-label" th:for="${shipment.field(picker ? 'carrierSelect' : 'carrier')}" th:text="#{order.shipments.dialog.carrier}"></label>

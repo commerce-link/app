@@ -155,7 +155,7 @@ public class Order {
 
     @DynamoDBIgnore
     public boolean isDelivered() {
-        // allMatch is true for no shipments: an order whose only shipment was removed has delivered nothing
+        // allMatch is true for no shipments: an order without any (legacy data) has delivered nothing
         return !shipments.isEmpty() && shipments.stream().allMatch(shipment -> shipment.getDeliveredAt() != null);
     }
 
@@ -590,6 +590,16 @@ public class Order {
         firstShipment().ifPresent(previous ->
                 replacements.forEach(replacement -> replacement.inheritDeliveryChoiceFrom(previous)));
         this.shipments = replacements;
+    }
+
+    /**
+     * The order's only shipment when it holds nothing but the customer's choice of delivery (every order is created
+     * with one, and removing the only shipment leaves one): a new shipment fills it instead of standing next to it,
+     * where the placeholder, never sent nor delivered, would hold the order back from Shipping and Delivered.
+     */
+    @DynamoDBIgnore
+    public Optional<Shipment> onlyPlaceholder() {
+        return shipments.size() == 1 && shipments.get(0).isPlaceholder() ? Optional.of(shipments.get(0)) : Optional.empty();
     }
 
     @DynamoDBIgnore
