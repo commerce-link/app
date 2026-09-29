@@ -1461,6 +1461,64 @@ class OrdersControllerTest {
         }
 
         @Test
+        void editingTheChosenFilterReturnsToTheListWithItsNewStatuses() {
+            // given
+            var updated = pl.commercelink.orders.filters.model.OrderFilter.of("Czekające", List.of(
+                    pl.commercelink.orders.filters.model.OrderFilterCondition.of(pl.commercelink.orders.filters.OrderFilterField.Status, "Blocked"),
+                    pl.commercelink.orders.filters.model.OrderFilterCondition.of(pl.commercelink.orders.filters.OrderFilterField.Status, "Assembly")));
+            updated.setId("f1");
+            when(orderFilters.update(any(), any(), anyBoolean(), any(), any())).thenReturn(updated);
+            var form = new pl.commercelink.web.dtos.OrderFilterForm();
+            form.setLabel("Czekające");
+            form.setStatus(List.of("Blocked", "Assembly"));
+            form.setReturnTo(OrdersController.filtersPage("/dashboard/orders?status=New&filterId=f1&q=kowalski"));
+
+            // when
+            String view = ordersController.updateOrderFilter("f1", form, new RedirectAttributesModelMap(), new ExtendedModelMap(),
+                    Locale.forLanguageTag("pl"), new org.springframework.mock.web.MockHttpServletResponse());
+
+            // then
+            assertThat(view).isEqualTo("redirect:" + OrdersController.filtersPage(
+                    "/dashboard/orders?status=Blocked&status=Assembly&filterId=f1&q=kowalski"));
+        }
+
+        @Test
+        void editingTheChosenFilterWithoutStatusesReturnsToAllOpenOrders() {
+            // given
+            var updated = pl.commercelink.orders.filters.model.OrderFilter.of("Allegro", List.of(
+                    pl.commercelink.orders.filters.model.OrderFilterCondition.of(pl.commercelink.orders.filters.OrderFilterField.SourceName, "Allegro")));
+            updated.setId("f1");
+            when(orderFilters.update(any(), any(), anyBoolean(), any(), any())).thenReturn(updated);
+            var form = new pl.commercelink.web.dtos.OrderFilterForm();
+            form.setLabel("Allegro");
+            form.setSourceName(List.of("Allegro"));
+            form.setReturnTo(OrdersController.filtersPage("/dashboard/orders?status=New&filterId=f1"));
+
+            // when
+            String view = ordersController.updateOrderFilter("f1", form, new RedirectAttributesModelMap(), new ExtendedModelMap(),
+                    Locale.forLanguageTag("pl"), new org.springframework.mock.web.MockHttpServletResponse());
+
+            // then
+            assertThat(view).isEqualTo("redirect:" + OrdersController.filtersPage("/dashboard/orders?filterId=f1"));
+        }
+
+        @Test
+        void editingAnotherFilterLeavesTheListAddressAlone() {
+            // given
+            var form = new pl.commercelink.web.dtos.OrderFilterForm();
+            form.setLabel("Inny");
+            form.setStatus(List.of("Blocked"));
+            form.setReturnTo(OrdersController.filtersPage("/dashboard/orders?status=New&filterId=f2"));
+
+            // when
+            String view = ordersController.updateOrderFilter("f1", form, new RedirectAttributesModelMap(), new ExtendedModelMap(),
+                    Locale.forLanguageTag("pl"), new org.springframework.mock.web.MockHttpServletResponse());
+
+            // then
+            assertThat(view).isEqualTo("redirect:" + OrdersController.filtersPage("/dashboard/orders?status=New&filterId=f2"));
+        }
+
+        @Test
         void legacyParametersRedirect() {
             assertThat(ordersController.orders(params("statuses", "Blocked", "showAll", "false"), Locale.forLanguageTag("pl"), new ExtendedModelMap()))
                     .isEqualTo("redirect:/dashboard/orders?status=Blocked");

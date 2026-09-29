@@ -225,13 +225,20 @@ public class OrdersController extends BaseController {
     public String updateOrderFilter(@RequestParam String filterId, OrderFilterForm form, RedirectAttributes redirectAttributes,
                                     Model model, Locale locale, HttpServletResponse response) {
         return filterAction(form.getReturnTo(), redirectAttributes, model, locale, response, form, filterId, () -> {
-            orderFilters.update(actor(), filterId, form.isSharedWithStore(), form.getLabel(), form.toConditions());
+            OrderFilter updated = orderFilters.update(actor(), filterId, form.isSharedWithStore(), form.getLabel(), form.toConditions());
             if (form.isOpenByDefault()) {
                 orderFilters.setDefault(actor(), filterId);
             } else {
                 orderFilters.clearDefault(actor(), filterId);
             }
-            return safeReturnTo(form.getReturnTo());
+            String target = safeReturnTo(form.getReturnTo());
+            OrderListQuery list = parseReturnTo(listOf(target));
+            if (!filterId.equals(list.filterId())) {
+                return target;
+            }
+            // the list carries the statuses the filter ticked when it was chosen; after an edit they would be stale
+            String listBack = list.withStatuses(OrderListService.filterStatuses(updated)).href();
+            return target.startsWith(FILTERS_PATH) ? filtersPage(listBack) : listBack;
         });
     }
 
