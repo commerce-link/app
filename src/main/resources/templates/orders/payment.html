@@ -1,0 +1,18 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout" layout:decorate="~{layout}">
+<body>
+<!--/* A payment's dialog of the payments card as its own page, for a browser without JavaScript. */-->
+<div layout:fragment="content">
+    <section class="cl-page">
+        <div class="cl-page-body is-form">
+            <div th:replace="~{fragments/settings-header :: subpage(|/dashboard/orders/${payment.orderId()}|, #{order.page.title(${shortId})}, #{order.payments.page.title(${payment.number()}, ${shortId})})}"></div>
+            <section class="cl-card" aria-labelledby="payment-page-title">
+                <h2 class="cl-visually-hidden" id="payment-page-title"
+                    th:text="#{order.payments.dialog.title(${payment.number()})}"></h2>
+                <form th:replace="~{orders/details/payments :: pageForm}"></form>
+            </section>
+        </div>
+    </section>
+</div>
+</body>
+</html>

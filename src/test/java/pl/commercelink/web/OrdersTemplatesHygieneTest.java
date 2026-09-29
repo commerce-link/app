@@ -21,7 +21,7 @@ class OrdersTemplatesHygieneTest {
     static final List<String> SINGLE_FILES = List.of("orders/details.html", "orders/status.html", "orders/settings.html",
             "orders/address.html", "orders/parts.html", "orders/bulk-confirm.html",
             "orders/card.html", "orders/collection.html",
-            "orders/item.html");
+            "orders/item.html", "orders/shipment.html", "orders/payment.html");
     static final Pattern INLINE_SCRIPT = Pattern.compile("<script(?![^>]*\\bsrc=)([^>]*)>(.*?)</script>", Pattern.DOTALL);
 
     static List<Path> templates() throws IOException {

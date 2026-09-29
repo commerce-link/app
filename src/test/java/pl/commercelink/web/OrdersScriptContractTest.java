@@ -208,13 +208,13 @@ class OrdersScriptContractTest {
     }
 
     @Test
-    void removingAPaymentRowClearsWhatMakesItCompleteAndHidesIt() throws Exception {
+    void paymentsNeedNoScriptOfTheirOwn() throws Exception {
         // given
-        String script = read("src/main/resources/static/js/order-payments.js");
+        String page = read("src/main/resources/templates/orders/details.html");
 
-        // then (Payment.isComplete: a reference, a non-zero amount or a fee keeps the row)
-        assertThat(script).contains("data-cl-payment-remove").contains(".amount").contains(".fee").contains(".referenceNo")
-                .contains("hidden").contains("'use strict'").doesNotContain("innerHTML");
+        // then: each payment is its own async form (async-form.js); the whole-list dialog and its script are gone
+        assertThat(Files.exists(Path.of("src/main/resources/static/js/order-payments.js"))).isFalse();
+        assertThat(page).doesNotContain("order-payments.js").contains("/js/async-form.js");
     }
 
     /**

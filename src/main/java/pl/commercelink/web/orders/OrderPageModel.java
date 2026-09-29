@@ -103,15 +103,27 @@ public record OrderPageModel(String orderId, String shortId, String backHref, bo
                               boolean removable, String removeHref) {
     }
 
-    /** unpaid never goes below zero: an order paid above its total shows overpaidAmount instead. */
+    /**
+     * unpaid never goes below zero: an order paid above its total shows overpaidAmount instead. forms: one edit form per
+     * payment, in the order of rows, empty on a read-only page. expected, pending and sources feed the shared
+     * "Dodaj wpłatę" dialog.
+     */
     public record PaymentsCard(List<PaymentRow> rows, String paid, String unpaid, boolean unpaidDue, boolean overpaid,
-                               String overpaidAmount, boolean canEdit, double expected, Payment pending,
-                               List<OrderLabels.Option<PaymentSource>> sources, List<Payment> editable) {
+                               String overpaidAmount, double expected, Payment pending,
+                               List<OrderLabels.Option<PaymentSource>> sources, List<OrderPaymentForm> forms) {
     }
 
-    /** pending: a payment recorded with no amount yet (the method is known, the money has not arrived). */
-    public record PaymentRow(String amount, boolean refund, boolean pending, String sourceKey, String name,
-                             String referenceNo, String bankTransactionNo, String bankTransactionDate, String fee) {
+    /**
+     * pending: a payment recorded with no amount yet (the method is known, the money has not arrived). number counts
+     * from 1. editHref leads to the payment page (its dialog, dialogId, intercepts it) and removeHref to the removal
+     * confirmation; both null on a read-only page. removeMessageKey is the confirmation's text: removing the only
+     * payment says that a pending one with the same method stays. The pending payment has no removeHref and
+     * removeReasonKey says why, so "Remove" shows greyed with that reason.
+     */
+    public record PaymentRow(int number, String amount, boolean refund, boolean pending, String sourceKey, String name,
+                             String referenceNo, String bankTransactionNo, String bankTransactionDate, String fee,
+                             String dialogId, String editHref, String removeHref, String removeMessageKey,
+                             String removeReasonKey) {
     }
 
     public record HistoryCard(List<EventRow> events, OrderReview review, String reviewStatusKey, String reviewRequestedAt,

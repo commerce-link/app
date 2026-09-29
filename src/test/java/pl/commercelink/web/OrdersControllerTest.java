@@ -53,6 +53,9 @@ import pl.commercelink.products.StoreCategories;
 import pl.commercelink.web.dtos.OrderItemsForm;
 import pl.commercelink.web.dtos.SplitGroupForm;
 import pl.commercelink.orders.OrdersRepository;
+import pl.commercelink.orders.Payment;
+import pl.commercelink.orders.PaymentDirection;
+import pl.commercelink.orders.PaymentSource;
 import pl.commercelink.orders.PositionGroup;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShipmentTrackingStatus;
@@ -88,9 +91,11 @@ import pl.commercelink.web.orders.OrderNotice;
 import pl.commercelink.web.orders.OrderPageModel;
 import pl.commercelink.web.orders.OrderPageModelFactory;
 import pl.commercelink.web.orders.OrderSettingsView;
+import pl.commercelink.web.orders.OrderPaymentForm;
 import pl.commercelink.web.orders.OrderShipmentForm;
 import pl.commercelink.web.settings.ConfirmAction;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -110,6 +115,7 @@ import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -702,6 +708,358 @@ class OrdersControllerTest {
             // when / then
             assertThatThrownBy(() -> ordersController.showShipment(ORDER_ID, "3", new ExtendedModelMap(), redirect,
                     Locale.ENGLISH)).isInstanceOf(ResponseStatusException.class);
+        }
+    }
+
+    /** One payment saved or removed at a time from its own dialog of the payments card. */
+    @Nested
+    class Payments {
+
+        private final RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        @BeforeEach
+        void messagesEchoTheirKeys() {
+            when(messageSource.getMessage(any(String.class), any(), any(Locale.class)))
+                    .thenAnswer(invocation -> invocation.getArgument(0));
+        }
+
+        private Order orderWith(Payment... payments) {
+            Order order = orderBase();
+            order.setPayments(new ArrayList<>(List.of(payments)));
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            return order;
+        }
+
+        private String save(int index, String version, PaymentSource source, String amount, String fee, String date,
+                            String requestedWith, MockHttpServletResponse response, ExtendedModelMap model) {
+            return ordersController.savePayment(ORDER_ID, index, version, source, "Jan Kowalski", amount, fee, "REF-9",
+                    "OP-9", date, requestedWith, new MockHttpServletRequest(), response, model, redirect, Locale.ENGLISH);
+        }
+
+        private String save(int index, String version, String amount) {
+            return save(index, version, PaymentSource.BankTransfer, amount, "", null, null,
+                    new MockHttpServletResponse(), new ExtendedModelMap());
+        }
+
+        private Object errorMessage() {
+            return redirect.getFlashAttributes().get("errorMessage");
+        }
+
+        @Test
+        void editingOnePaymentReplacesItAloneAndGoesThroughTheLifecycle() {
+            // given
+            Payment first = Payment.bankTransfer("REF-1", "Jan", 100);
+            Payment second = Payment.bankTransfer("REF-2", "Jan", 200);
+            Order order = orderWith(first, second);
+
+            // when
+            String view = save(1, OrderPaymentForm.version(second), PaymentSource.Card, "250,50", "1.5", "2026-09-20",
+                    null, new MockHttpServletResponse(), new ExtendedModelMap());
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+            assertThat(order.getPayments().get(0)).isSameAs(first);
+            Payment saved = order.getPayments().get(1);
+            assertThat(saved.getSource()).isEqualTo(PaymentSource.Card);
+            assertThat(saved.getAmount()).isEqualTo(250.5);
+            assertThat(saved.getFee()).isEqualTo(1.5);
+            assertThat(saved.getReferenceNo()).isEqualTo("REF-9");
+            assertThat(saved.getBankTransactionDate()).isEqualTo(LocalDate.of(2026, 9, 20));
+            verify(orderLifecycle).update(order);
+        }
+
+        @Test
+        void aRefundKeepsItsDirectionAndTheSignItWasTypedWith() {
+            // given: the add dialog asks for a minus, supplier payouts are stored positive; neither is "fixed"
+            Payment typedNegative = new Payment("ZW/1", "Jan", PaymentSource.BankTransfer, PaymentDirection.Outgoing,
+                    -100, 0, null, null);
+            Payment storedPositive = new Payment("ZW/2", "Jan", PaymentSource.BankTransfer, PaymentDirection.Outgoing,
+                    100, 0, null, null);
+            Order order = orderWith(typedNegative, storedPositive);
+
+            // when
+            save(0, OrderPaymentForm.version(typedNegative), "-120");
+            save(1, OrderPaymentForm.version(storedPositive), "120");
+
+            // then
+            assertThat(order.getPayments()).extracting(Payment::getDirection)
+                    .containsExactly(PaymentDirection.Outgoing, PaymentDirection.Outgoing);
+            assertThat(order.getPayments()).extracting(Payment::getAmount).containsExactly(-120.0, 120.0);
+        }
+
+        @Test
+        void thePendingPaymentMayKeepTheAmountZeroAndChangeItsMethod() {
+            // given
+            Order order = orderWith(new Payment(PaymentSource.BankTransfer));
+
+            // when
+            save(0, OrderPaymentForm.version(order.getPayments().get(0)), PaymentSource.CashOnDelivery, "0", "", null,
+                    null, new MockHttpServletResponse(), new ExtendedModelMap());
+
+            // then
+            assertThat(order.getPayments().get(0).getSource()).isEqualTo(PaymentSource.CashOnDelivery);
+            assertThat(order.getPayments().get(0).isUnsettled()).isTrue();
+            verify(orderLifecycle).update(order);
+        }
+
+        @Test
+        void aSettledPaymentSetToZeroComesBackToTheDialogWith422() {
+            // given
+            Payment paid = Payment.bankTransfer("REF-1", "Jan", 100);
+            orderWith(paid);
+            MockHttpServletResponse response = new MockHttpServletResponse();
+            ExtendedModelMap model = new ExtendedModelMap();
+
+            // when
+            String view = save(0, OrderPaymentForm.version(paid), PaymentSource.BankTransfer, "0", "-1", "20.09.2026",
+                    "fetch", response, model);
+
+            // then
+            assertThat(view).isEqualTo("orders/details/payments :: dialogForm");
+            assertThat(response.getStatus()).isEqualTo(422);
+            assertThat(((OrderPaymentForm) model.getAttribute("payment")).errors())
+                    .containsEntry("payment-0-amount", "order.payments.error.amount.zero")
+                    .containsEntry("payment-0-fee", "order.payments.error.fee")
+                    .containsEntry("payment-0-bankTransactionDate", "order.payments.error.date");
+            assertThat(paid.getAmount()).isEqualTo(100);
+            verifyNoInteractions(orderLifecycle);
+        }
+
+        @Test
+        void aSavedPaymentAnswersTheDialogAndLeavesTheNoticeForTheReloadedPage() {
+            // given
+            Payment paid = Payment.bankTransfer("REF-1", "Jan", 100);
+            orderWith(paid);
+            MockHttpServletRequest request = new MockHttpServletRequest();
+            FlashMap flashMap = new FlashMap();
+            request.setAttribute(DispatcherServlet.OUTPUT_FLASH_MAP_ATTRIBUTE, flashMap);
+            request.setAttribute(DispatcherServlet.FLASH_MAP_MANAGER_ATTRIBUTE, new SessionFlashMapManager());
+            MockHttpServletResponse response = new MockHttpServletResponse();
+
+            // when
+            String view = ordersController.savePayment(ORDER_ID, 0, OrderPaymentForm.version(paid), PaymentSource.BankTransfer,
+                    "Jan", "90", "", "REF-1", null, null, "fetch", request, response, new ExtendedModelMap(), redirect,
+                    Locale.ENGLISH);
+
+            // then: 200 with the form lets the dialog close and reload; the notice waits for the order page
+            assertThat(view).isEqualTo("orders/details/payments :: dialogForm");
+            assertThat(response.getStatus()).isEqualTo(200);
+            assertThat(flashMap.getTargetRequestPath()).isEqualTo("/dashboard/orders/" + ORDER_ID);
+            assertThat(((OrderNotice) flashMap.get(OrderFlash.ATTRIBUTE)).text()).isEqualTo("order.payments.saved");
+        }
+
+        @Test
+        void aPaymentChangedSinceTheFormWasShownIsNotOverwritten() {
+            // given
+            Payment rendered = Payment.bankTransfer("REF-1", "Jan", 100);
+            String version = OrderPaymentForm.version(rendered);
+            rendered.setFee(2);
+            orderWith(rendered);
+            MockHttpServletResponse response = new MockHttpServletResponse();
+            ExtendedModelMap model = new ExtendedModelMap();
+
+            // when
+            String view = save(0, version, "150");
+            save(0, version, PaymentSource.BankTransfer, "150", "", null, "fetch", response, model);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+            assertThat(errorMessage()).isEqualTo("order.payments.error.stale");
+            assertThat(response.getStatus()).isEqualTo(422);
+            assertThat(((OrderPaymentForm) model.getAttribute("payment")).refusal()).isEqualTo("order.payments.error.stale");
+            assertThat(rendered.getAmount()).isEqualTo(100);
+            verifyNoInteractions(orderLifecycle);
+        }
+
+        @Test
+        void anIndexPastTheListIsRefusedAsStale() {
+            // given
+            orderWith(Payment.bankTransfer("REF-1", "Jan", 100));
+
+            // when
+            save(3, "any", "150");
+
+            // then
+            assertThat(errorMessage()).isEqualTo("order.payments.error.stale");
+            verifyNoInteractions(orderLifecycle);
+        }
+
+        @Test
+        void aPaymentOfACompletedOrderCanStillBeSavedAndRemovedLikeWithAddPayment() {
+            // given: a refund or a correction on a completed order is legitimate (decision of 2026-09-27)
+            Payment paid = Payment.bankTransfer("REF-1", "Jan", 100);
+            Payment second = Payment.bankTransfer("REF-2", "Jan", 50);
+            Order order = orderWith(paid, second);
+            order.setStatus(OrderStatus.Completed);
+            RedirectAttributesModelMap removal = new RedirectAttributesModelMap();
+
+            // when
+            String view = save(0, OrderPaymentForm.version(paid), "150");
+            ordersController.removePayment(ORDER_ID, 1, OrderPaymentForm.version(second), removal, Locale.ENGLISH);
+            String page = ordersController.showPayment(ORDER_ID, "0", new ExtendedModelMap(), redirect, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+            assertThat(errorMessage()).isNull();
+            assertThat(removal.getFlashAttributes()).doesNotContainKey("errorMessage");
+            assertThat(order.getPayments()).hasSize(1);
+            assertThat(order.getPayments().get(0).getAmount()).isEqualTo(150);
+            assertThat(page).isEqualTo("orders/payment");
+            verify(orderLifecycle, times(2)).update(order);
+        }
+
+        @Test
+        void aPaymentOfACancelledOrderIsRefusedBecauseTheSaveWouldBeDropped() {
+            // given: OrderLifecycle.update returns before saving a cancelled order, so a "saved" notice would be a lie
+            Payment paid = Payment.bankTransfer("REF-1", "Jan", 100);
+            Payment second = Payment.bankTransfer("REF-2", "Jan", 50);
+            Order order = orderWith(paid, second);
+            order.setStatus(OrderStatus.Cancelled);
+            RedirectAttributesModelMap removal = new RedirectAttributesModelMap();
+            RedirectAttributesModelMap confirmation = new RedirectAttributesModelMap();
+            RedirectAttributesModelMap page = new RedirectAttributesModelMap();
+            MockHttpServletResponse response = new MockHttpServletResponse();
+            ExtendedModelMap model = new ExtendedModelMap();
+
+            // when
+            String view = save(0, OrderPaymentForm.version(paid), "150");
+            String asyncView = save(0, OrderPaymentForm.version(paid), PaymentSource.BankTransfer, "150", "", null,
+                    "fetch", response, model);
+            String removeView = ordersController.removePayment(ORDER_ID, 1, OrderPaymentForm.version(second), removal,
+                    Locale.ENGLISH);
+            String confirmView = ordersController.confirmRemovePayment(ORDER_ID, 1, OrderPaymentForm.version(second),
+                    new ExtendedModelMap(), confirmation, Locale.ENGLISH);
+            String pageView = ordersController.showPayment(ORDER_ID, "0", new ExtendedModelMap(), page, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+            assertThat(errorMessage()).isEqualTo("order.payments.error.cancelled");
+            assertThat(asyncView).isEqualTo("orders/details/payments :: dialogForm");
+            assertThat(response.getStatus()).isEqualTo(422);
+            assertThat(((OrderPaymentForm) model.getAttribute("payment")).refusal()).isEqualTo("order.payments.error.cancelled");
+            for (RedirectAttributesModelMap flash : List.of(removal, confirmation, page)) {
+                assertThat(flash.getFlashAttributes().get("errorMessage")).isEqualTo("order.payments.error.cancelled");
+            }
+            assertThat(removeView).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+            assertThat(confirmView).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+            assertThat(pageView).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+            for (RedirectAttributesModelMap flash : List.of(redirect, removal, confirmation, page)) {
+                assertThat(flash.getFlashAttributes()).doesNotContainKey(OrderFlash.ATTRIBUTE);
+            }
+            assertThat(order.getPayments()).containsExactly(paid, second);
+            assertThat(paid.getAmount()).isEqualTo(100);
+            verifyNoInteractions(orderLifecycle);
+            verify(ordersRepository, never()).save(any());
+        }
+
+        @Test
+        void removingAPaymentKeepsTheOthersAsTheSameObjects() {
+            // given
+            Payment first = Payment.bankTransfer("REF-1", "Jan", 100);
+            Payment second = Payment.bankTransfer("REF-2", "Jan", 200);
+            Payment third = Payment.bankTransfer("REF-3", "Jan", 300);
+            Order order = orderWith(first, second, third);
+
+            // when
+            String view = ordersController.removePayment(ORDER_ID, 1, OrderPaymentForm.version(second), redirect, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+            assertThat(order.getPayments()).containsExactly(first, third);
+            assertThat(redirect.getFlashAttributes()).doesNotContainKey("errorMessage");
+            verify(orderLifecycle).update(order);
+        }
+
+        @Test
+        void removingTheOnlyPaymentLeavesAPendingOneWithTheSameMethod() {
+            // given: the order never loses how the customer pays
+            Payment card = new Payment("REF-1", "Jan", PaymentSource.Card, 100, 0);
+            Order order = orderWith(card);
+
+            // when
+            ordersController.removePayment(ORDER_ID, 0, OrderPaymentForm.version(card), redirect, Locale.ENGLISH);
+
+            // then
+            assertThat(order.getPayments()).hasSize(1);
+            Payment placeholder = order.getPayments().get(0);
+            assertThat(placeholder.isUnsettled()).isTrue();
+            assertThat(placeholder.getSource()).isEqualTo(PaymentSource.Card);
+            assertThat(placeholder.getReferenceNo()).isNull();
+            verify(orderLifecycle).update(order);
+        }
+
+        @Test
+        void thePendingPaymentIsNotRemoved() {
+            // given
+            Payment pending = new Payment(PaymentSource.BankTransfer);
+            Order order = orderWith(Payment.bankTransfer("REF-1", "Jan", 50), pending);
+
+            // when
+            ordersController.removePayment(ORDER_ID, 1, OrderPaymentForm.version(pending), redirect, Locale.ENGLISH);
+
+            // then
+            assertThat(errorMessage()).isEqualTo("order.payments.remove.error.pending");
+            assertThat(order.getPayments()).hasSize(2);
+            verifyNoInteractions(orderLifecycle);
+        }
+
+        @Test
+        void aRemovalOfAPaymentChangedMeanwhileIsRefused() {
+            // given
+            Order order = orderWith(Payment.bankTransfer("REF-1", "Jan", 100), Payment.bankTransfer("REF-2", "Jan", 50));
+
+            // when
+            ordersController.removePayment(ORDER_ID, 0, "stale", redirect, Locale.ENGLISH);
+
+            // then
+            assertThat(errorMessage()).isEqualTo("order.payments.error.stale");
+            assertThat(order.getPayments()).hasSize(2);
+            verifyNoInteractions(orderLifecycle);
+        }
+
+        @Test
+        void theRemovalConfirmationOfTheOnlyPaymentSaysAPendingOneStays() {
+            // given
+            Payment only = Payment.bankTransfer("REF-1", "Jan", 100);
+            orderWith(only);
+            ExtendedModelMap model = new ExtendedModelMap();
+
+            // when
+            ordersController.confirmRemovePayment(ORDER_ID, 0, OrderPaymentForm.version(only), model, redirect, Locale.ENGLISH);
+
+            // then
+            ConfirmAction confirm = (ConfirmAction) model.getAttribute("confirm");
+            assertThat(confirm.message()).isEqualTo("order.payments.remove.confirm.message.last");
+            assertThat(confirm.actionPath()).endsWith("/payments/0/remove?version=" + OrderPaymentForm.version(only));
+        }
+
+        @Test
+        void thePaymentPageOfAnUnknownIndexIsNotFound() {
+            // given
+            orderWith(Payment.bankTransfer("REF-1", "Jan", 100));
+
+            // when / then
+            assertThatThrownBy(() -> ordersController.showPayment(ORDER_ID, "3", new ExtendedModelMap(), redirect,
+                    Locale.ENGLISH)).isInstanceOf(ResponseStatusException.class);
+            assertThatThrownBy(() -> ordersController.showPayment(ORDER_ID, "new", new ExtendedModelMap(), redirect,
+                    Locale.ENGLISH)).isInstanceOf(ResponseStatusException.class);
+        }
+
+        @Test
+        void thePaymentPageShowsTheFormOfThePayment() {
+            // given
+            Payment paid = Payment.bankTransfer("REF-1", "Jan", 100);
+            orderWith(Payment.bankTransfer("REF-0", "Jan", 50), paid);
+            ExtendedModelMap model = new ExtendedModelMap();
+
+            // when
+            String view = ordersController.showPayment(ORDER_ID, "1", model, redirect, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo("orders/payment");
+            OrderPaymentForm form = (OrderPaymentForm) model.getAttribute("payment");
+            assertThat(form.index()).isEqualTo(1);
+            assertThat(form.version()).isEqualTo(OrderPaymentForm.version(paid));
         }
     }
 
@@ -2855,21 +3213,6 @@ class OrdersControllerTest {
             verifyNoInteractions(shipmentCancelService);
             assertThat(flash(noDataRedirect)).containsEntry("errorMessage", "order.shipments.cancel.error.no.data");
             assertThat(flash(noPackageRedirect)).containsEntry("errorMessage", "order.shipments.cancel.error.no.package");
-        }
-
-        @Test
-        void updatePaymentsRefusesAnEmptyPost() {
-            // given
-            Order order = order(OrderStatus.New);
-            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
-            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
-
-            // when
-            ordersController.updatePayments(ORDER_ID, new Order(STORE_ID), redirect, polish);
-
-            // then
-            assertThat(flash(redirect)).containsEntry("errorMessage", "order.payments.edit.empty");
-            verifyNoInteractions(orderLifecycle);
         }
 
         @Test

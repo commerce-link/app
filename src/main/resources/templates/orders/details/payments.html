@@ -1,14 +1,15 @@
 <!DOCTYPE HTML>
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
-<!--/* Payment rows, paid/unpaid summary and the payment dialog triggers. */-->
+<!--/* Payment rows with their own "Edytuj" and "Usuń", the paid/unpaid summary and "Dodaj wpłatę" in the head.
+       "Edytuj" opens the payment's dialog (one per payment); without JavaScript it leads to the payment page. "Usuń"
+       goes through the confirmation dialog, or its page without JavaScript. "Dodaj wpłatę" is the shared add-payment
+       dialog (fragments/add-payment-modal), which fills the pending payment first. */-->
 <section th:fragment="card" class="cl-card" id="platnosci" aria-labelledby="payments-title"
          th:with="payments=${page.payments()}">
     <div class="cl-card-head">
         <h2 class="cl-card-title" id="payments-title" th:text="#{order.card.payments}"></h2>
         <div class="cl-card-actions" th:unless="${page.readOnly()}">
-            <button th:if="${payments.canEdit()}" type="button" class="cl-link-button" data-cl-dialog-open="payments-edit-dialog"
-                    th:text="#{order.payments.edit}"></button>
             <button type="button" class="cl-button" data-cl-dialog-open="addPaymentModal" data-mode="order">
                 <span class="icon is-small" aria-hidden="true"><i class="fas fa-plus"></i></span>
                 <span th:text="#{order.payments.add}"></span>
@@ -36,6 +37,23 @@
                     <span th:if="${p.fee() != null}"
                           th:text="' · ' + #{order.payments.fee(${#messages.msg('general.currency.amount', p.fee())})}"></span>
                 </p>
+                <p th:if="${p.removeReasonKey() != null}" class="cl-list-desc" th:id="|payment-${p.number()}-remove-reason|"
+                   th:text="#{${p.removeReasonKey()}}"></p>
+            </div>
+            <div class="cl-list-actions" th:if="${p.editHref() != null}">
+                <a class="cl-link-button" th:href="@{${p.editHref()}}" th:attr="data-cl-dialog-open=${p.dialogId()},
+                   aria-label=#{order.payments.edit.for(${p.number()})}" th:text="#{general.edit}"></a>
+                <a th:if="${p.removeHref() != null}" class="cl-link-button is-danger" data-cl-confirm th:href="@{${p.removeHref()}}"
+                   th:attr="aria-label=#{order.payments.remove.for(${p.number()})},
+                            data-cl-confirm-title=#{order.payments.remove.confirm.title(${p.number()})},
+                            data-cl-confirm-message=#{${p.removeMessageKey()}},
+                            data-cl-confirm-action=#{order.payments.remove.confirm.action}"
+                   th:text="#{general.delete}"></a>
+                <!--/* greyed, still focusable, its reason in the text of the row (design system: link action that cannot run) */-->
+                <button th:if="${p.removeReasonKey() != null}" type="button" class="cl-link-button" aria-disabled="true"
+                        th:attr="aria-label=#{order.payments.remove.for(${p.number()})},
+                                 aria-describedby=|payment-${p.number()}-remove-reason|"
+                        th:text="#{general.delete}"></button>
             </div>
         </li>
     </ul>
@@ -49,72 +67,84 @@
     </p>
 </section>
 
-<!--/* "Edit payments": one row per raw Payment (not the rows/() summary), Delete just clears the row (order-payments.js). */-->
-<dialog th:fragment="editDialog" class="cl-dialog is-form is-wide" id="payments-edit-dialog" aria-labelledby="payments-edit-title"
-        th:with="payments=${page.payments()}">
-    <form method="post" th:action="@{/dashboard/orders/{o}/updatePayments(o=${page.orderId()})}" data-cl-payments-form>
-        <h2 class="cl-dialog-title" id="payments-edit-title" th:text="#{order.payments.edit}"></h2>
-        <div class="cl-dialog-body">
-            <table class="cl-table is-compact is-editable">
-                <caption class="cl-visually-hidden" th:text="#{order.payments.edit}"></caption>
-                <thead><tr>
-                    <th scope="col" th:text="#{order.payment.source}"></th>
-                    <th scope="col" th:text="#{payments.source.name}"></th>
-                    <th scope="col" class="is-numeric" th:text="#{order.payment.amount}"></th>
-                    <th scope="col" class="is-numeric" th:text="#{order.payment.processing.fee}"></th>
-                    <th scope="col" th:text="#{order.payment.reference.no}"></th>
-                    <th scope="col" th:text="#{order.payment.bank.transaction.no}"></th>
-                    <th scope="col" th:text="#{order.payment.bank.transaction.date}"></th>
-                    <th scope="col"><span class="cl-visually-hidden" th:text="#{order.items.column.actions}"></span></th>
-                </tr></thead>
-                <tbody>
-                <tr th:each="p, i : ${payments.editable()}">
-                    <td th:attr="data-label=#{order.payment.source}">
-                        <input type="hidden" th:name="|payments[${i.index}].direction|" th:value="${p.direction != null ? p.direction.name() : 'Incoming'}">
-                        <select class="cl-select" th:name="|payments[${i.index}].source|"
-                                th:attr="aria-label=#{order.payments.edit.row.source(${i.count})}">
-                            <option th:each="src : ${payments.sources()}" th:value="${src.value().name()}" th:selected="${src.value() == p.source}"
-                                    th:text="#{${src.labelKey()}}"></option>
-                        </select>
-                    </td>
-                    <td th:attr="data-label=#{payments.source.name}">
-                        <input class="cl-input" type="text" th:name="|payments[${i.index}].name|" th:value="${p.name}"
-                               th:attr="aria-label=#{order.payments.edit.row.name(${i.count})}">
-                    </td>
-                    <td th:attr="data-label=#{order.payment.amount}">
-                        <input class="cl-input" type="number" step="0.01" inputmode="decimal" th:name="|payments[${i.index}].amount|"
-                               th:value="${p.amount}" th:attr="aria-label=#{order.payments.edit.row.amount(${i.count})}">
-                    </td>
-                    <td th:attr="data-label=#{order.payment.processing.fee}">
-                        <input class="cl-input" type="number" step="0.01" min="0" inputmode="decimal" th:name="|payments[${i.index}].fee|"
-                               th:value="${p.fee}" th:attr="aria-label=#{order.payments.edit.row.fee(${i.count})}">
-                    </td>
-                    <td th:attr="data-label=#{order.payment.reference.no}">
-                        <input class="cl-input" type="text" th:name="|payments[${i.index}].referenceNo|" th:value="${p.referenceNo}"
-                               th:attr="aria-label=#{order.payments.edit.row.reference(${i.count})}">
-                    </td>
-                    <td th:attr="data-label=#{order.payment.bank.transaction.no}">
-                        <input class="cl-input" type="text" th:name="|payments[${i.index}].bankTransactionNo|" th:value="${p.bankTransactionNo}"
-                               th:attr="aria-label=#{order.payments.edit.row.bank.no(${i.count})}">
-                    </td>
-                    <td th:attr="data-label=#{order.payment.bank.transaction.date}">
-                        <input class="cl-input" type="date" th:name="|payments[${i.index}].bankTransactionDate|" th:value="${p.bankTransactionDate}"
-                               th:attr="aria-label=#{order.payments.edit.row.bank.date(${i.count})}">
-                    </td>
-                    <td class="cl-table-actions">
-                        <button type="button" class="cl-link-button is-danger" data-cl-payment-remove
-                                th:attr="aria-label=#{order.payments.edit.row.remove(${i.count})}" th:text="#{general.delete}"></button>
-                    </td>
-                </tr>
-                </tbody>
-            </table>
-            <p class="cl-dialog-effect" th:text="#{order.payments.edit.effect}"></p>
-        </div>
-        <div class="cl-dialog-actions">
-            <button type="submit" class="cl-button is-primary" th:text="#{order.payments.edit.save}"></button>
-            <button type="button" class="cl-button" data-cl-dialog-close th:text="#{general.cancel}"></button>
-        </div>
-    </form>
+<!--/* One dialog per payment; none on a read-only page. Adding is the shared "Dodaj wpłatę" dialog. */-->
+<th:block th:fragment="dialogs" th:with="payments=${page.payments()}">
+    <!--/* th:replace runs before th:each on one element, so it sits on its own block. */-->
+    <th:block th:each="form : ${payments.forms()}"><dialog th:replace="~{orders/details/payments :: paymentDialog(${form})}"></dialog></th:block>
+</th:block>
+
+<dialog th:fragment="paymentDialog(payment)" class="cl-dialog is-form" th:id="${payment.dialogId()}"
+        th:attr="aria-labelledby=|${payment.dialogId()}-title|">
+    <form th:replace="~{orders/details/payments :: paymentForm(${payment}, true)}"></form>
 </dialog>
+
+<form th:fragment="dialogForm" th:replace="~{orders/details/payments :: paymentForm(${payment}, true)}"></form>
+<form th:fragment="pageForm" th:replace="~{orders/details/payments :: paymentForm(${payment}, false)}"></form>
+
+<!--/* The fields of one payment (web.orders.OrderPaymentForm). Saved without reloading in the dialog: 422 comes back
+       with the errors next to the fields and the dialog stays open; 200 closes it and reloads the page, which shows the
+       saved payment and the notice stored for it. The direction is not a field: a refund stays a refund. */-->
+<form th:fragment="paymentForm(payment, inDialog)" th:id="|${payment.dialogId()}-form|" class="cl-form" method="post"
+      novalidate data-cl-async
+      th:action="@{/dashboard/orders/{o}/payments(o=${payment.orderId()})}"
+      th:attr="data-error-message=#{form.save.failed}, data-cl-dialog-close-on-success=${inDialog} ? 'true' : null">
+    <h2 th:if="${inDialog}" class="cl-dialog-title" th:id="|${payment.dialogId()}-title|"
+        th:text="#{order.payments.dialog.title(${payment.number()})}"></h2>
+    <input type="hidden" name="index" th:value="${payment.index()}">
+    <input type="hidden" name="version" th:value="${payment.version()}">
+    <div th:class="${inDialog} ? 'cl-dialog-body' : 'cl-card-inset'">
+        <!--/* a refusal (cancelled order, payment changed meanwhile) is not fixed in the form: the page must be reloaded */-->
+        <div th:if="${payment.refusal() != null}" class="cl-alert is-bad" tabindex="-1" data-cl-error-summary>
+            <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
+            <div>
+                <p class="cl-alert-title" th:text="${payment.refusal()}"></p>
+                <p><a th:href="@{/dashboard/orders/{o}(o=${payment.orderId()})}" th:text="#{order.payments.reload}"></a></p>
+            </div>
+        </div>
+        <div th:replace="~{fragments/settings-form :: errorSummary(|${payment.dialogId()}-errors|, ${payment.errors()}, null)}"></div>
+        <div class="cl-form-grid cl-card-grid">
+            <div class="cl-span-3 cl-field" th:with="id=${payment.field('source')}, error=${payment.error('source')}">
+                <label class="cl-label" th:for="${id}" th:text="#{order.payment.source}"></label>
+                <select class="cl-select" th:id="${id}" name="source" th:classappend="${error != null} ? 'is-invalid'"
+                        th:attr="aria-invalid=${error != null ? 'true' : null}, aria-describedby=${error != null ? id + '-error' : null}">
+                    <option th:each="src : ${payment.sources()}" th:value="${src.value().name()}"
+                            th:selected="${src.value() == payment.source()}" th:text="#{${src.labelKey()}}"></option>
+                </select>
+                <p th:if="${error != null}" class="cl-field-error" th:id="${id} + '-error'">
+                    <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                    <span th:text="#{${error}}"></span>
+                </p>
+            </div>
+            <div class="cl-span-3" th:insert="~{orders/details/payments :: field(${payment}, 'name', 'payments.source.name', 'text', ${payment.name()})}"></div>
+            <div class="cl-span-3" th:insert="~{orders/details/payments :: field(${payment}, 'amount', 'order.payment.amount', 'number', ${payment.amount()})}"></div>
+            <div class="cl-span-3" th:insert="~{orders/details/payments :: field(${payment}, 'fee', 'order.payment.processing.fee', 'number', ${payment.fee()})}"></div>
+            <div class="cl-span-3" th:insert="~{orders/details/payments :: field(${payment}, 'referenceNo', 'order.payment.reference.no', 'text', ${payment.referenceNo()})}"></div>
+            <div class="cl-span-3" th:insert="~{orders/details/payments :: field(${payment}, 'bankTransactionNo', 'order.payment.bank.transaction.no', 'text', ${payment.bankTransactionNo()})}"></div>
+            <div class="cl-span-3" th:insert="~{orders/details/payments :: field(${payment}, 'bankTransactionDate', 'order.payment.bank.transaction.date', 'date', ${payment.bankTransactionDate()})}"></div>
+        </div>
+        <p th:if="${payment.pending()}" class="cl-help" th:text="#{order.payments.dialog.pending}"></p>
+        <p th:class="${inDialog} ? 'cl-dialog-effect' : 'cl-help'" th:text="#{order.payments.edit.effect}"></p>
+    </div>
+    <div th:class="${inDialog} ? 'cl-dialog-actions' : 'cl-card-footer'">
+        <button type="submit" class="cl-button is-primary" th:text="#{order.payments.dialog.save}"></button>
+        <button th:if="${inDialog}" type="button" class="cl-button" data-cl-dialog-close th:text="#{general.cancel}"></button>
+        <a th:unless="${inDialog}" class="cl-button" th:href="@{/dashboard/orders/{o}(o=${payment.orderId()})}" th:text="#{general.cancel}"></a>
+    </div>
+</form>
+
+<!--/* A labelled field of the payment form: the id carries the form's key (several dialogs on one page), the posted
+       name is the property alone. An amount is a number field with two decimals, typed with either a comma or a dot. */-->
+<div th:fragment="field(payment, property, labelKey, type, value)" class="cl-field"
+     th:with="id=${payment.field(property)}, error=${payment.error(property)}, amount=${type == 'number'}">
+    <label class="cl-label" th:for="${id}" th:text="#{${labelKey}}"></label>
+    <input class="cl-input" autocomplete="off" th:type="${type}" th:id="${id}" th:name="${property}"
+           th:value="${value}" th:classappend="${error != null} ? 'is-invalid'"
+           th:attr="step=${amount ? '0.01' : null}, inputmode=${amount ? 'decimal' : null},
+                    aria-invalid=${error != null ? 'true' : null}, aria-describedby=${error != null ? id + '-error' : null}">
+    <p th:if="${error != null}" class="cl-field-error" th:id="${id} + '-error'">
+        <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+        <span th:text="#{${error}}"></span>
+    </p>
+</div>
 </body>
 </html>

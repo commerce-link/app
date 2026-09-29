@@ -405,25 +405,53 @@ public class OrderPageModelFactory {
     private OrderPageModel.PaymentsCard payments(Order order, boolean readOnly) {
         // every payment is listed, complete or not: an incomplete one is still money recorded against the order
         List<Payment> payments = order.getPayments() == null ? List.of() : order.getPayments();
-        List<OrderPageModel.PaymentRow> rows = payments.stream()
-                .map(p -> {
-                    boolean refund = p.getDirection() == PaymentDirection.Outgoing;
-                    // a refund is typed with either sign (the dialog asks for a minus, supplier payouts are stored
-                    // positive); the page shows one minus whichever way it was saved
-                    double shown = refund ? -Math.abs(p.getAmount()) : p.getAmount();
-                    return new OrderPageModel.PaymentRow(Money.format(shown), refund, p.isUnsettled(),
-                            OrderLabels.paymentSource(p.getSource()), p.getName(), p.getReferenceNo(),
-                            p.getBankTransactionNo(), OrderFormats.date(p.getBankTransactionDate()),
-                            p.getFee() > 0 ? Money.format(p.getFee()) : null);
-                })
-                .toList();
+        String base = "/dashboard/orders/" + order.getOrderId() + "/payments/";
+        List<OrderPageModel.PaymentRow> rows = new ArrayList<>();
+        List<OrderPaymentForm> forms = new ArrayList<>();
+        for (int i = 0; i < payments.size(); i++) {
+            Payment p = payments.get(i);
+            OrderPaymentForm form = OrderPaymentForm.of(order.getOrderId(), i, p);
+            boolean refund = p.getDirection() == PaymentDirection.Outgoing;
+            // a refund is typed with either sign (the dialog asks for a minus, supplier payouts are stored
+            // positive); the page shows one minus whichever way it was saved
+            double shown = refund ? -Math.abs(p.getAmount()) : p.getAmount();
+            String locked = removePaymentLockedKey(order, i);
+            rows.add(new OrderPageModel.PaymentRow(i + 1, Money.format(shown), refund, p.isUnsettled(),
+                    OrderLabels.paymentSource(p.getSource()), p.getName(), p.getReferenceNo(),
+                    p.getBankTransactionNo(), OrderFormats.date(p.getBankTransactionDate()),
+                    p.getFee() > 0 ? Money.format(p.getFee()) : null,
+                    form.dialogId(), readOnly ? null : base + i,
+                    readOnly || locked != null ? null : base + i + "/remove?version=" + form.version(),
+                    removePaymentMessageKey(order),
+                    readOnly || locked == null ? null : locked.replace(".remove.error.", ".remove.locked.")));
+            if (!readOnly) {
+                forms.add(form);
+            }
+        }
         double unpaid = order.getUnpaidAmount();
         boolean overpaid = unpaid < -0.005;
         return new OrderPageModel.PaymentsCard(rows, Money.format(order.getPaidAmount()), Money.format(Math.max(0, unpaid)),
-                unpaid > 0.005, overpaid, overpaid ? Money.format(-unpaid) : null, !readOnly && !payments.isEmpty(),
+                unpaid > 0.005, overpaid, overpaid ? Money.format(-unpaid) : null,
                 Math.max(0, unpaid),
                 order.getPendingPayment(), OrderLabels.Option.of(PaymentSource.values(), OrderLabels::paymentSource),
-                payments);
+                forms);
+    }
+
+    /**
+     * Why the payment at index cannot be removed, or null. The pending payment (amount 0) is not money but the method
+     * the customer chose: "Dodaj wpłatę" fills it, so removing it would only lose the method.
+     */
+    public static String removePaymentLockedKey(Order order, int index) {
+        return order.getPayments().get(index).isUnsettled() ? "order.payments.remove.error.pending" : null;
+    }
+
+    /**
+     * The confirmation's text. Removing the only payment leaves a pending one with the same method (the order never
+     * loses how the customer pays), which the operator is told before confirming.
+     */
+    public static String removePaymentMessageKey(Order order) {
+        return order.getPayments().size() == 1 ? "order.payments.remove.confirm.message.last"
+                : "order.payments.remove.confirm.message";
     }
 
     private OrderPageModel.HistoryCard history(Order order, boolean readOnly) {

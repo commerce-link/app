@@ -38,6 +38,7 @@ import pl.commercelink.web.orders.OrderPageModelFactory;
 import pl.commercelink.web.orders.OrderAddressForm;
 import pl.commercelink.web.orders.OrderLabels;
 import pl.commercelink.web.orders.OrderSettingsView;
+import pl.commercelink.web.orders.OrderPaymentForm;
 import pl.commercelink.web.orders.OrderShipmentForm;
 import pl.commercelink.web.settings.SettingsTemplateRenderer;
 
@@ -1034,7 +1035,7 @@ class OrderDetailsTemplateTest {
     }
 
     @Test
-    void thePaymentDialogsPostToTheOrderAndTheEditRowsCanBeRemoved() {
+    void theAddPaymentDialogPostsToTheOrderAndTheWholeListDialogIsGone() {
         // given
         Order order = order(OrderStatus.Realization);
         order.addPayment(new Payment("REF-1", "Jan Kowalski", PaymentSource.BankTransfer, 500, 2));
@@ -1045,9 +1046,160 @@ class OrderDetailsTemplateTest {
         // then
         assertThat(html).contains("id=\"addPaymentModal\"")
                 .contains("action=\"/dashboard/orders/3e373abc-1111-2222-3333-444455556666/addPayment\"")
-                .contains("id=\"payments-edit-dialog\"").contains("name=\"payments[0].amount\"")
-                .contains("name=\"payments[0].direction\"").contains("data-cl-payment-remove")
-                .contains(">Przelew bankowy</option>").doesNotContain("addEmptyPaymentRow");
+                .contains(">Przelew bankowy</option>").doesNotContain("addEmptyPaymentRow")
+                .doesNotContain("payments-edit-dialog").doesNotContain("updatePayments").doesNotContain("payments[0]")
+                .doesNotContain("Edytuj płatności").doesNotContain("order-payments.js");
+    }
+
+    @Test
+    void eachPaymentHasEditAndRemoveAndTheCardHeadAddsOne() {
+        // given
+        Order order = order(OrderStatus.Realization);
+        Payment first = new Payment("REF-1", "Jan Kowalski", PaymentSource.BankTransfer, 500, 2);
+        order.addPayment(first);
+        order.addPayment(new Payment("REF-2", "Jan Kowalski", PaymentSource.Card, 100, 0));
+        String prefix = "/dashboard/orders/" + order.getOrderId() + "/payments/";
+
+        // when
+        String card = card(page(render(order, ADMIN)), "platnosci");
+
+        // then
+        assertThat(card).contains("data-cl-dialog-open=\"addPaymentModal\"").contains(">Dodaj wpłatę<")
+                .contains("href=\"" + prefix + "0\"").contains("data-cl-dialog-open=\"payment-dialog-0\"")
+                .contains("aria-label=\"Edytuj płatność 1\"").contains("aria-label=\"Edytuj płatność 2\"")
+                .contains(prefix + "0/remove?version=" + OrderPaymentForm.version(first))
+                .contains("aria-label=\"Usuń płatność 2\"").contains("data-cl-confirm-title=\"Usunąć płatność 2?\"")
+                .contains("data-cl-confirm-message=\"Płatność zniknie z zamówienia, a kwota do zapłaty przeliczy się od nowa.\"")
+                .doesNotContain("aria-disabled").doesNotContain("remove-reason")
+                .contains("Wpłacono:");
+    }
+
+    @Test
+    void thePendingPaymentIsEditedButItsRemoveIsGreyedWithTheReason() {
+        // given
+        Order order = order(OrderStatus.New);
+        order.addPayment(new Payment(PaymentSource.BankTransfer));
+
+        // when
+        String card = card(page(render(order, ADMIN)), "platnosci");
+
+        // then
+        assertThat(card).contains("aria-label=\"Edytuj płatność 1\"").doesNotContain("/remove")
+                .containsPattern("<button type=\"button\" class=\"cl-link-button\" aria-disabled=\"true\"[^>]*aria-label=\"Usuń płatność 1\"[^>]*aria-describedby=\"payment-1-remove-reason\"")
+                .contains("id=\"payment-1-remove-reason\">Oczekiwana płatność zniknie sama po dodaniu wpłaty.</p>");
+    }
+
+    @Test
+    void removingTheOnlySettledPaymentIsConfirmedWithThePendingOneThatStays() {
+        // given
+        Order order = order(OrderStatus.Realization);
+        order.addPayment(Payment.bankTransfer("REF-1", "Jan", 100));
+
+        // when
+        String card = card(page(render(order, ADMIN)), "platnosci");
+
+        // then
+        assertThat(card).contains("Zostanie oczekiwana płatność tą samą metodą.");
+    }
+
+    @Test
+    void aPaymentDialogHoldsOnePaymentWithLabelledFieldsOfItsOwn() {
+        // given
+        Order order = order(OrderStatus.Realization);
+        order.addPayment(Payment.bankTransfer("REF-0", "Jan", 50));
+        Payment payment = new Payment("REF-1", "Jan Kowalski", PaymentSource.Card, 500, 2.5);
+        payment.setBankTransactionNo("OP-1");
+        payment.setBankTransactionDate(LocalDate.of(2026, 9, 20));
+        order.addPayment(payment);
+
+        // when
+        String dialog = dialog(page(render(order, ADMIN)), "payment-dialog-1");
+
+        // then
+        assertThat(dialog).startsWith("id=\"payment-dialog-1\"").doesNotContain("<table").doesNotContain("is-wide")
+                .contains(">Płatność 2<").contains("name=\"index\" value=\"1\"")
+                .contains("name=\"version\" value=\"" + OrderPaymentForm.version(payment) + "\"")
+                .contains("action=\"/dashboard/orders/3e373abc-1111-2222-3333-444455556666/payments\"")
+                .contains("data-cl-async").contains("data-cl-dialog-close-on-success=\"true\"")
+                .containsPattern("<option[^>]*value=\"Card\"[^>]*selected[^>]*>")
+                .containsPattern("type=\"number\" id=\"payment-1-amount\" name=\"amount\"\\s+value=\"500.00\"")
+                .containsPattern("id=\"payment-1-fee\" name=\"fee\"\\s+value=\"2.50\"")
+                .containsPattern("type=\"date\" id=\"payment-1-bankTransactionDate\" name=\"bankTransactionDate\"\\s+value=\"2026-09-20\"")
+                .contains("inputmode=\"decimal\"").contains(">Zapisz płatność<")
+                .contains("Zmiana kwoty przelicza „Do zapłaty”").doesNotContain("name=\"direction\"")
+                .doesNotContain("Przy kwocie 0");
+        for (String field : List.of("source", "name", "amount", "fee", "referenceNo", "bankTransactionNo", "bankTransactionDate")) {
+            assertThat(dialog).contains("for=\"payment-1-" + field + "\"").contains("id=\"payment-1-" + field + "\"");
+        }
+        assertThat(dialog).containsPattern("class=\"cl-span-3[^\"]*\"");
+    }
+
+    @Test
+    void thePendingPaymentDialogSaysZeroKeepsItPending() {
+        // given
+        Order order = order(OrderStatus.New);
+        order.addPayment(new Payment(PaymentSource.CashOnDelivery));
+
+        // when
+        String dialog = dialog(page(render(order, ADMIN)), "payment-dialog-0");
+
+        // then
+        assertThat(dialog).contains("Przy kwocie 0 płatność zostaje oczekiwana")
+                .containsPattern("<option[^>]*value=\"CashOnDelivery\"[^>]*selected");
+    }
+
+    @Test
+    void aReadOnlyPageHasNeitherPaymentActionsNorDialogs() {
+        // given
+        Order order = order(OrderStatus.Completed);
+        order.addPayment(Payment.bankTransfer("REF-1", "Jan", 100));
+
+        // when
+        String html = page(render(order, ADMIN));
+        String superAdmin = page(render(order(OrderStatus.Realization), SUPER_ADMIN));
+
+        // then
+        assertThat(card(html, "platnosci")).contains("REF-1").doesNotContain("Edytuj płatność")
+                .doesNotContain("Usuń płatność").doesNotContain("Dodaj wpłatę");
+        assertThat(html).doesNotContain("payment-dialog-");
+        assertThat(superAdmin).doesNotContain("payment-dialog-").doesNotContain("Edytuj płatność");
+    }
+
+    @Test
+    void thePaymentPageWithoutJavascriptPostsTheSameFormAndCancelsBackToTheOrder() {
+        // given
+        Order order = order(OrderStatus.Realization);
+        order.addPayment(Payment.bankTransfer("REF-1", "Jan", 100));
+        Map<String, Object> variables = subpageVariables(order);
+        variables.put("payment", OrderPaymentForm.of(order.getOrderId(), 0, order.getPayments().get(0)));
+
+        // when
+        String html = SettingsTemplateRenderer.render("orders/payment", variables);
+
+        // then
+        assertThat(html).contains("Płatność 1 zamówienia 3e373abc")
+                .contains("action=\"/dashboard/orders/3e373abc-1111-2222-3333-444455556666/payments\"")
+                .contains("href=\"/dashboard/orders/3e373abc-1111-2222-3333-444455556666\"")
+                .contains("id=\"payment-0-amount\"").contains(">Zapisz płatność<")
+                .doesNotContain("data-cl-dialog-close-on-success").doesNotContain("data-cl-dialog-close")
+                .doesNotContain("??");
+    }
+
+    @Test
+    void aRefusedPaymentFormOffersToReloadThePage() {
+        // given
+        Order order = order(OrderStatus.Realization);
+        order.addPayment(Payment.bankTransfer("REF-1", "Jan", 100));
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("payment", OrderPaymentForm.of(order.getOrderId(), 0, order.getPayments().get(0))
+                .withRefusal("Płatność zmieniła się w międzyczasie."));
+
+        // when
+        String html = SettingsTemplateRenderer.render("<div th:replace=\"~{orders/details/payments :: dialogForm}\"></div>", variables);
+
+        // then
+        assertThat(html).startsWith("<form").contains("Płatność zmieniła się w międzyczasie.")
+                .contains(">Odśwież stronę</a>").contains("data-cl-dialog-close-on-success=\"true\"");
     }
 
     static OrderItem inDelivery(Order order, String deliveryId, FulfilmentStatus status) {

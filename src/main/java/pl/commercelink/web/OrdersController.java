@@ -73,6 +73,7 @@ import pl.commercelink.web.orders.OrderBackLink;
 import pl.commercelink.web.orders.OrderConfirmPages;
 import pl.commercelink.web.orders.OrderFlash;
 import pl.commercelink.web.orders.OrderLabels;
+import pl.commercelink.web.orders.OrderPaymentForm;
 import pl.commercelink.web.orders.OrderShipmentForm;
 import pl.commercelink.web.orders.OrderLinks;
 import pl.commercelink.web.orders.OrderPrintView;
@@ -103,7 +104,6 @@ import pl.commercelink.inventory.supplier.SupplierLabels;
 import java.util.*;
 import java.util.function.Function;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 
 @Controller
 public class OrdersController extends BaseController {
@@ -1455,26 +1455,6 @@ public class OrdersController extends BaseController {
         return details(orderId);
     }
 
-    @PostMapping("/dashboard/orders/{orderId}/updatePayments")
-    @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String updatePayments(@PathVariable String orderId, @ModelAttribute("order") Order updatedOrder,
-                                 RedirectAttributes redirectAttributes, Locale locale) {
-        Order existingOrder = requireOrder(ordersRepository, getStoreId(), orderId);
-        List<Payment> posted = updatedOrder.getPayments() == null ? List.of() : updatedOrder.getPayments();
-        if (posted.isEmpty()) {
-            return refuse(redirectAttributes, orderId, "order.payments.edit.empty", locale);
-        }
-        List<Payment> payments = posted.stream().filter(Payment::isComplete).collect(Collectors.toList());
-        if (payments.isEmpty()) {
-            // every row was cleared: the order keeps one placeholder payment carrying the chosen method
-            payments.add(posted.get(0));
-        }
-        existingOrder.setPayments(payments);
-        orderLifecycle.update(existingOrder);
-        OrderFlash.saved(redirectAttributes, messageSource.getMessage("order.payments.saved", null, locale));
-        return details(orderId);
-    }
-
     @PostMapping("/dashboard/orders/{orderId}/addPayment")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String addPayment(@PathVariable String orderId,
@@ -1516,6 +1496,156 @@ public class OrdersController extends BaseController {
         orderLifecycle.update(existingOrder);
         OrderFlash.saved(redirectAttributes, messageSource.getMessage("order.payments.added", null, locale));
         return details(orderId);
+    }
+
+    /** A payment's dialog as its own page, for a browser without JavaScript. */
+    @GetMapping("/dashboard/orders/{orderId}/payments/{key}")
+    @PreAuthorize("!hasRole('SUPER_ADMIN')")
+    public String showPayment(@PathVariable String orderId, @PathVariable String key, Model model,
+                              RedirectAttributes redirectAttributes, Locale locale) {
+        Order order = requireOrder(ordersRepository, getStoreId(), orderId);
+        int index = paymentIndex(order, key);
+        if (order.getStatus() == OrderStatus.Cancelled) {
+            return refuse(redirectAttributes, orderId, "order.payments.error.cancelled", locale);
+        }
+        return paymentPage(order, OrderPaymentForm.of(orderId, index, order.getPayments().get(index)), model);
+    }
+
+    /**
+     * Saves one payment from its dialog (async: 422 with the errors next to the fields, 200 once saved, the dialog then
+     * reloads the page) or from the payment page without JavaScript. version is the fingerprint of the payment the form
+     * showed, so a payment changed meanwhile is not overwritten. Only the payment at index is replaced; the others stay
+     * the objects they were. Saved through the lifecycle, as the whole-list save was: a changed amount may settle the
+     * order or take it back to unpaid.
+     */
+    @PostMapping("/dashboard/orders/{orderId}/payments")
+    @PreAuthorize("!hasRole('SUPER_ADMIN')")
+    public String savePayment(@PathVariable String orderId, @RequestParam int index,
+                              @RequestParam(required = false) String version,
+                              @RequestParam(required = false) PaymentSource source,
+                              @RequestParam(required = false) String name, @RequestParam(required = false) String amount,
+                              @RequestParam(required = false) String fee,
+                              @RequestParam(required = false) String referenceNo,
+                              @RequestParam(required = false) String bankTransactionNo,
+                              @RequestParam(required = false) String bankTransactionDate,
+                              @RequestHeader(value = SettingsPaths.ASYNC_HEADER, required = false) String requestedWith,
+                              HttpServletRequest request, HttpServletResponse response, Model model,
+                              RedirectAttributes redirectAttributes, Locale locale) {
+        Order existingOrder = requireOrder(ordersRepository, getStoreId(), orderId);
+        boolean async = SettingsPaths.isAsync(requestedWith);
+        List<Payment> current = existingOrder.getPayments() == null ? List.of() : existingOrder.getPayments();
+        boolean known = index >= 0 && index < current.size();
+        OrderPaymentForm posted = new OrderPaymentForm(orderId, index, version, known && current.get(index).isUnsettled(),
+                source, name, amount, fee, referenceNo, bankTransactionNo, bankTransactionDate, null, null);
+        // a completed order takes the save, like addPayment (decision of 2026-09-27: a refund or a correction on it is
+        // legitimate); a cancelled one is refused, because OrderLifecycle.update would drop the save without a word
+        String refusal = existingOrder.getStatus() == OrderStatus.Cancelled ? "order.payments.error.cancelled"
+                : !known || !OrderPaymentForm.version(current.get(index)).equals(version) ? "order.payments.error.stale"
+                : null;
+        if (refusal != null) {
+            if (async) {
+                response.setStatus(HttpStatus.UNPROCESSABLE_ENTITY.value());
+                model.addAttribute("payment", posted.withRefusal(messageSource.getMessage(refusal, null, locale)));
+                return "orders/details/payments :: dialogForm";
+            }
+            return refuse(redirectAttributes, orderId, refusal, locale);
+        }
+        Map<String, String> errors = posted.validate();
+        if (!errors.isEmpty()) {
+            if (async) {
+                response.setStatus(HttpStatus.UNPROCESSABLE_ENTITY.value());
+                model.addAttribute("payment", posted.withErrors(errors));
+                return "orders/details/payments :: dialogForm";
+            }
+            return paymentPage(existingOrder, posted.withErrors(errors), model);
+        }
+
+        List<Payment> payments = new ArrayList<>(current);
+        payments.set(index, posted.toPayment(current.get(index)));
+        existingOrder.setPayments(payments);
+        orderLifecycle.update(existingOrder);
+
+        String notice = messageSource.getMessage("order.payments.saved", new Object[]{index + 1}, locale);
+        if (async) {
+            // the dialog reloads the page it is on (keeping its returnTo), which takes this notice
+            OrderFlash.forNextPage(request, response, "/dashboard/orders/" + orderId,
+                    new OrderNotice(OrderLabels.OK, notice, null, null));
+            model.addAttribute("payment", posted);
+            return "orders/details/payments :: dialogForm";
+        }
+        OrderFlash.saved(redirectAttributes, notice);
+        return details(orderId);
+    }
+
+    @GetMapping("/dashboard/orders/{orderId}/payments/{index}/remove")
+    @PreAuthorize("!hasRole('SUPER_ADMIN')")
+    public String confirmRemovePayment(@PathVariable String orderId, @PathVariable int index,
+                                       @RequestParam(required = false) String version, Model model,
+                                       RedirectAttributes redirectAttributes, Locale locale) {
+        Order order = requireOrder(ordersRepository, getStoreId(), orderId);
+        String refusal = removePaymentRefusal(order, index, version);
+        if (refusal != null) {
+            return refuse(redirectAttributes, orderId, refusal, locale);
+        }
+        return confirmPage(model, order, "order.payments.remove", new Object[]{index + 1},
+                messageSource.getMessage(OrderPageModelFactory.removePaymentMessageKey(order), null, locale),
+                "/dashboard/orders/" + orderId + "/payments/" + index + "/remove?version=" + version, true, locale);
+    }
+
+    /**
+     * Removes one payment. Removing the only one leaves a pending payment with its method, as the whole-list save did
+     * when every row was cleared: the order never loses how the customer pays, and "Dodaj wpłatę" fills it again.
+     */
+    @PostMapping("/dashboard/orders/{orderId}/payments/{index}/remove")
+    @PreAuthorize("!hasRole('SUPER_ADMIN')")
+    public String removePayment(@PathVariable String orderId, @PathVariable int index,
+                                @RequestParam(required = false) String version,
+                                RedirectAttributes redirectAttributes, Locale locale) {
+        Order existingOrder = requireOrder(ordersRepository, getStoreId(), orderId);
+        String refusal = removePaymentRefusal(existingOrder, index, version);
+        if (refusal != null) {
+            return refuse(redirectAttributes, orderId, refusal, locale);
+        }
+        List<Payment> payments = new ArrayList<>(existingOrder.getPayments());
+        Payment removed = payments.remove(index);
+        if (payments.isEmpty()) {
+            payments.add(new Payment(removed.getSource()));
+        }
+        existingOrder.setPayments(payments);
+        orderLifecycle.update(existingOrder);
+        OrderFlash.saved(redirectAttributes, messageSource.getMessage("order.payments.removed", new Object[]{index + 1}, locale));
+        return details(orderId);
+    }
+
+    /** The index of one of the order's payments, or 404. */
+    private static int paymentIndex(Order order, String key) {
+        try {
+            int index = Integer.parseInt(key);
+            if (order.getPayments() != null && index >= 0 && index < order.getPayments().size()) {
+                return index;
+            }
+        } catch (NumberFormatException ignored) {
+            // falls through to 404
+        }
+        throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+    }
+
+    /** A completed order takes the removal, a cancelled one would drop it: see savePayment. */
+    private static String removePaymentRefusal(Order order, int index, String version) {
+        if (order.getStatus() == OrderStatus.Cancelled) {
+            return "order.payments.error.cancelled";
+        }
+        List<Payment> payments = order.getPayments() == null ? List.of() : order.getPayments();
+        if (index < 0 || index >= payments.size() || !OrderPaymentForm.version(payments.get(index)).equals(version)) {
+            return "order.payments.error.stale";
+        }
+        return OrderPageModelFactory.removePaymentLockedKey(order, index);
+    }
+
+    private String paymentPage(Order order, OrderPaymentForm form, Model model) {
+        model.addAttribute("payment", form);
+        model.addAttribute("shortId", order.getShortenedOrderId());
+        return "orders/payment";
     }
 
     /** A shipment's dialog as its own page, for a browser without JavaScript: "new" or the shipment's index. */

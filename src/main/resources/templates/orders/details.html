@@ -51,7 +51,7 @@
                             pendingPayment=${page.payments().pending()},
                             paymentSources=${page.payments().sources()},
                             loadMoneyJs=false)}"></div>
-                    <th:block th:if="${page.payments().canEdit()}"><dialog th:replace="~{orders/details/payments :: editDialog}"></dialog></th:block>
+                    <th:block th:replace="~{orders/details/payments :: dialogs}"></th:block>
                 </th:block>
             </th:block>
         </div>
@@ -69,7 +69,6 @@
     <script th:src="@{/js/order-item-dialogs.js}" defer></script>
     <script th:src="@{/js/order-shipments.js}" defer></script>
     <script th:src="@{/js/order-documents.js}" defer></script>
-    <script th:src="@{/js/order-payments.js}" defer></script>
 </div>
 </body>
 </html>
