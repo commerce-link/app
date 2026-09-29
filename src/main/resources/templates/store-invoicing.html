@@ -53,9 +53,9 @@
                             <div class="cl-form-grid">
                                 <div class="cl-span-3" th:insert="~{fragments/settings-form :: textField('paymentTerms', 'store.invoicing.paymentTerms.label', *{paymentTerms}, 'number', 'off', true, ${invoicesErrors['paymentTerms']}, #{store.invoicing.paymentTerms.help})}"></div>
                             </div>
-                            <div th:replace="~{fragments/settings-form :: check('sendInvoicesAsAttachment', 'store.invoicing.attachment.label', *{sendInvoicesAsAttachment}, 'store.invoicing.attachment.description', null)}"></div>
-                            <div th:replace="~{fragments/settings-form :: check('splitPaymentsEnabled', 'store.invoicing.splitPayments.label', *{splitPaymentsEnabled}, 'store.invoicing.splitPayments.description', null)}"></div>
-                            <div th:replace="~{fragments/settings-form :: check('positionsConsolidation', 'store.invoicing.consolidation.label', *{positionsConsolidation}, 'store.invoicing.consolidation.description', 'invoicing-consolidation-prefix')}"></div>
+                            <div th:replace="~{fragments/settings-form :: check('sendInvoicesAsAttachment', 'store.invoicing.attachment.label', *{sendInvoicesAsAttachment}, 'store.invoicing.attachment.description', null, null)}"></div>
+                            <div th:replace="~{fragments/settings-form :: check('splitPaymentsEnabled', 'store.invoicing.splitPayments.label', *{splitPaymentsEnabled}, 'store.invoicing.splitPayments.description', null, null)}"></div>
+                            <div th:replace="~{fragments/settings-form :: check('positionsConsolidation', 'store.invoicing.consolidation.label', *{positionsConsolidation}, 'store.invoicing.consolidation.description', 'invoicing-consolidation-prefix', null)}"></div>
                             <div id="invoicing-consolidation-prefix" class="cl-reveal">
                                 <div class="cl-form-grid">
                                     <div class="cl-span-3" th:insert="~{fragments/settings-form :: textField('positionsConsolidationPrefix', 'store.invoicing.consolidationPrefix.label', *{positionsConsolidationPrefix}, 'text', 'off', true, ${invoicesErrors['positionsConsolidationPrefix']}, #{store.invoicing.consolidationPrefix.help})}"></div>

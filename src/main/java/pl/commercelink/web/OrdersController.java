@@ -45,6 +45,8 @@ import pl.commercelink.pricelist.PricelistFinder;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.StoreCategories;
+import pl.commercelink.receipts.ReceiptAlerts;
+import pl.commercelink.receipts.ReceiptAttemptService;
 import pl.commercelink.rest.client.HttpClientException;
 import pl.commercelink.shipping.ShipmentCancelService;
 import pl.commercelink.shipping.ShipmentTrackingSubscriber;
@@ -165,6 +167,12 @@ public class OrdersController extends BaseController {
 
     @Autowired
     private OrderListService orderListService;
+
+    @Autowired
+    private ReceiptAttemptService receiptAttemptService;
+
+    @Autowired
+    private ReceiptAlerts receiptAlerts;
 
     @GetMapping("/dashboard/orders")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
@@ -468,16 +476,16 @@ public class OrdersController extends BaseController {
 
     @GetMapping("/dashboard/orders/{orderId}")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String getOrderDetails(@PathVariable("orderId") String orderId, Model model) {
+    public String getOrderDetails(@PathVariable("orderId") String orderId, Model model, Locale locale) {
         Order existingOrder = ordersRepository.findById(getStoreId(), orderId);
-        return showOrderDetails(existingOrder, model);
+        return showOrderDetails(existingOrder, model, locale);
     }
 
     @GetMapping("/dashboard/store/{storeId}/orders/{orderId}")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public String getOrderDetailsForSuperAdmin(@PathVariable("storeId") String storeId, @PathVariable("orderId") String orderId, Model model) {
+    public String getOrderDetailsForSuperAdmin(@PathVariable("storeId") String storeId, @PathVariable("orderId") String orderId, Model model, Locale locale) {
         Order existingOrder = ordersRepository.findById(storeId, orderId);
-        return showOrderDetails(existingOrder, model);
+        return showOrderDetails(existingOrder, model, locale);
     }
 
     @PostMapping("/dashboard/orders/{orderId}/add-items")
@@ -503,8 +511,8 @@ public class OrdersController extends BaseController {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
     }
 
-    private String showOrderDetails(Order order, Model model) {
-        return showOrderDetails(order, orderItemsRepository.findByOrderId(order.getOrderId()), model);
+    private String showOrderDetails(Order order, Model model, Locale locale) {
+        return showOrderDetails(order, orderItemsRepository.findByOrderId(order.getOrderId()), model, locale);
     }
 
     private String resolveTaxonomyName(String mfn) {
@@ -512,7 +520,7 @@ public class OrdersController extends BaseController {
         return taxonomy != null && taxonomy.name() != null ? taxonomy.name() : "";
     }
 
-    private String showOrderDetails(Order order, List<OrderItem> orderItems, Model model) {
+    private String showOrderDetails(Order order, List<OrderItem> orderItems, Model model, Locale locale) {
         List<ProductCatalog> catalogs = productCatalogRepository.findAll(order.getStoreId());
 
         Store store = storesRepository.findById(order.getStoreId());
@@ -520,6 +528,11 @@ public class OrdersController extends BaseController {
         List<DocumentType> manualDocumentTypes = order.isB2B()
                 ? Arrays.asList(DocumentType.InvoiceVat, DocumentType.InvoiceAdvance, DocumentType.InvoiceFinal)
                 : Arrays.asList(DocumentType.Receipt, DocumentType.InvoicePersonal);
+        boolean liveReceipt = receiptAttemptService.blocksManualReceipt(order.getStoreId(), order.getOrderId());
+        if (liveReceipt) {
+            // the automatic e-receipt is issuing, fiscalised or closed manually: manual "add Receipt" would double it
+            manualDocumentTypes = manualDocumentTypes.stream().filter(t -> t != DocumentType.Receipt).toList();
+        }
 
         List<OrderItem> serialUpdateItems = orderItems.stream()
                 .filter(i -> i.hasOneOfTheStatuses(FulfilmentStatus.Delivered))
@@ -546,6 +559,7 @@ public class OrdersController extends BaseController {
                 .collect(Collectors.toList()));
         model.addAttribute("orderReviewStatuses", OrderReviewStatus.values());
         model.addAttribute("receiptTypes", manualDocumentTypes);
+        model.addAttribute("receiptView", receiptAttemptService.orderView(order, receiptAlerts, locale));
         model.addAttribute("paymentSources", PaymentSource.values());
         model.addAttribute("pendingPayment", order.getPayments().stream()
                 .filter(Payment::isUnsettled)
@@ -583,6 +597,7 @@ public class OrdersController extends BaseController {
         model.addAttribute("today", LocalDate.now());
         model.addAttribute("canAddDocumentManually", manualDocumentTypes.contains(nextDocumentToIssue));
         model.addAttribute("issuableDocumentTypes", order.getIssuableDocumentTypes());
+        model.addAttribute("canIssueReceipt", receiptAttemptService.canIssueManually(store, order));
 
         SupplierLabelMap labels = supplierLabels.forStore(store);
         model.addAttribute("supplierLabels", labels);
@@ -1176,7 +1191,14 @@ public class OrdersController extends BaseController {
 
     @PostMapping("/dashboard/orders/{orderId}/addReceipt")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
-    public String addReceipt(@PathVariable String orderId, @ModelAttribute Document document) {
+    public String addReceipt(@PathVariable String orderId, @ModelAttribute Document document, Locale locale,
+                             RedirectAttributes redirectAttributes) {
+        if (document.getType() == DocumentType.Receipt
+                && receiptAttemptService.blocksManualReceipt(getStoreId(), orderId)) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage("receipts.document.add.live", null, locale));
+            return "redirect:/dashboard/orders/" + orderId;
+        }
         Order order = ordersRepository.findById(getStoreId(), orderId);
         order.addDocument(document);
         return save(order);
@@ -1188,6 +1210,18 @@ public class OrdersController extends BaseController {
                                  @RequestParam(required = false) String number,
                                  RedirectAttributes redirectAttributes, Locale locale) {
         Order order = ordersRepository.findById(getStoreId(), orderId);
+
+        // an automatically issued receipt's document id is the attempt's own key; removing it here would strand the
+        // order's document without ever touching the attempt, so the attempt would still poll or hold its result
+        boolean automatic = type == DocumentType.Receipt && order.getDocuments().stream()
+                .anyMatch(d -> d.getType() == DocumentType.Receipt && Objects.equals(d.getNumber(), number)
+                        && receiptAttemptService.attemptsOf(getStoreId(), orderId).stream()
+                                .anyMatch(a -> a.getReceiptKey().equals(d.getId())));
+        if (automatic) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage("receipts.document.remove.automatic", null, locale));
+            return "redirect:/dashboard/orders/" + orderId;
+        }
 
         if (order.hasOneOfStatuses(OrderStatus.Completed, OrderStatus.Cancelled) || !order.removeDocument(type, number)) {
             redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage("error.message.document.cannot.be.removed", null, locale));
