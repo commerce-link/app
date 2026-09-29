@@ -5,7 +5,6 @@ import org.springframework.stereotype.Service;
 import pl.commercelink.orders.filters.FilterActor;
 import pl.commercelink.orders.filters.OrderFilterField;
 import pl.commercelink.orders.filters.model.OrderFilter;
-import pl.commercelink.orders.filters.model.OrderFilterCondition;
 import pl.commercelink.orders.filters.services.ListOrderFiltersView;
 import pl.commercelink.orders.filters.services.OrderFiltersService;
 import pl.commercelink.stores.Store;
@@ -33,6 +32,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -66,7 +67,7 @@ public class OrderListService {
         Optional<OrderFilter> activeFilter = query.hasFilter() ? filters.byId(query.filterId()) : Optional.empty();
 
         List<Order> filtered = open.stream()
-                .filter(order -> activeFilter.map(f -> matchesIgnoringStatus(f, order, today)).orElse(true))
+                .filter(order -> activeFilter.map(f -> f.matchesIgnoring(OrderFilterField.Status, order, today)).orElse(true))
                 .filter(order -> OrderSearch.matches(order, query.q()))
                 .toList();
         List<Order> inStatus = filtered.stream()
@@ -93,16 +94,6 @@ public class OrderListService {
                 rows,
                 pagination,
                 rows.isEmpty() ? emptyState(query, activeFilter, locale) : null);
-    }
-
-    /**
-     * A custom filter's Status condition ticks the Status menu when the filter is chosen ({@link #filterStatus}); from
-     * then on the menu decides the status, and the list applies the filter's other conditions (spec §7.5, D3).
-     */
-    static boolean matchesIgnoringStatus(OrderFilter filter, Order order, LocalDate today) {
-        List<OrderFilterCondition> others = filter.getConditions().stream()
-                .filter(c -> c.getField() != OrderFilterField.Status).toList();
-        return others.stream().allMatch(c -> c.matches(order, today));
     }
 
     private static Comparator<Order> comparator(Sort sort, Direction dir) {
@@ -171,19 +162,23 @@ public class OrderListService {
         return orderFilters.list(actor).defaultFilter().map(filter -> chosen(filter, untouched).href());
     }
 
-    /** The list with this filter chosen; choosing a filter also ticks its own Status condition. */
+    /**
+     * The list with this filter chosen; choosing a filter also ticks its own statuses in the Status menu, which from
+     * then on decides the status while the list applies the filter's other conditions (spec §7.5, D3).
+     */
     private static OrderListQuery chosen(OrderFilter filter, OrderListQuery query) {
         OrderListQuery chosen = query.withFilterId(filter.getId());
-        return filterStatus(filter).map(chosen::withStatus).orElse(chosen);
+        List<OrderStatus> statuses = filterStatuses(filter);
+        return statuses.isEmpty() ? chosen : chosen.withStatuses(statuses);
     }
 
-    /** The open status a filter's Status condition names; a closed one (saved before the list dropped history) is ignored. */
-    public static Optional<OrderStatus> filterStatus(OrderFilter filter) {
-        return filter.getConditions().stream()
+    /** The open statuses a filter's Status conditions name; closed ones (saved before the list dropped history) are ignored. */
+    public static List<OrderStatus> filterStatuses(OrderFilter filter) {
+        Set<String> named = filter.getConditions().stream()
                 .filter(c -> c.getField() == OrderFilterField.Status)
                 .map(c -> c.getField().normalize(c.getValue()))
-                .flatMap(value -> OPEN.stream().filter(s -> s.name().equalsIgnoreCase(value)))
-                .findFirst();
+                .collect(Collectors.toSet());
+        return OPEN.stream().filter(s -> named.contains(s.name().toUpperCase())).toList();
     }
 
     private List<Chip> chips(OrderListQuery query, Optional<OrderFilter> activeFilter, Locale locale) {

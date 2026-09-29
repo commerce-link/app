@@ -335,6 +335,75 @@ class OrderListServiceTest {
         assertThat(page(query("status", "Shipping", "status", "Delivered")).emptyState().text()).isEqualTo("Brak zamówień w wybranych statusach.");
     }
 
+    @Test
+    void choosingAFilterWithSeveralStatusesTicksAllOfItsOpenOnes() {
+        // given
+        OrderFilter waiting = OrderFilter.of("Czekające", List.of(
+                OrderFilterCondition.of(OrderFilterField.Status, "Blocked"),
+                OrderFilterCondition.of(OrderFilterField.Status, "Completed"),
+                OrderFilterCondition.of(OrderFilterField.Status, "New")));
+        when(orderFilters.list(ACTOR)).thenReturn(new ListOrderFiltersView(List.of(), List.of(waiting)));
+
+        // when
+        OrdersPageModel model = page(query());
+
+        // then
+        // the closed status saved before the list dropped history cannot be ticked, the open ones all are
+        assertThat(model.filterOptions()).extracting(o -> o.href()).containsExactly(
+                "/dashboard/orders?status=New&status=Blocked&filterId=" + waiting.getId());
+    }
+
+    @Test
+    void theDefaultFilterOpensWithAllOfItsStatuses() {
+        // given
+        OrderFilter waiting = OrderFilter.of("Czekające", List.of(
+                OrderFilterCondition.of(OrderFilterField.Status, "New"),
+                OrderFilterCondition.of(OrderFilterField.Status, "Blocked")));
+        when(orderFilters.list(ACTOR)).thenReturn(new ListOrderFiltersView(List.of(), List.of(waiting), waiting.getId()));
+
+        // when
+        Optional<String> start = service.defaultFilterHref(ACTOR);
+        OrdersPageModel model = page(query());
+
+        // then
+        assertThat(start).contains("/dashboard/orders?status=New&status=Blocked&filterId=" + waiting.getId());
+    }
+
+    @Test
+    void aFilterWithSeveralMarketplacesListsOrdersFromEachOfThem() {
+        // given
+        add("a", OrderStatus.New, null, 10, 10, "Allegro");
+        add("c", OrderStatus.New, null, 10, 10, "Ceneo");
+        add("m", OrderStatus.New, null, 10, 10, "Morele");
+        OrderFilter allegroOrCeneo = OrderFilter.of("Allegro lub Ceneo", List.of(
+                OrderFilterCondition.of(OrderFilterField.SourceName, "Allegro"),
+                OrderFilterCondition.of(OrderFilterField.SourceName, "Ceneo")));
+        when(orderFilters.list(ACTOR)).thenReturn(new ListOrderFiltersView(List.of(), List.of(allegroOrCeneo)));
+
+        // when
+        OrdersPageModel model = page(query("filterId", allegroOrCeneo.getId()));
+
+        // then
+        assertThat(model.rows()).extracting(r -> r.href()).containsExactlyInAnyOrder("/dashboard/orders/a", "/dashboard/orders/c");
+    }
+
+    @Test
+    void aStatusOnlyFilterLetsTheStatusMenuDecide() {
+        // given
+        add("n", OrderStatus.New, null, 10, 10, null);
+        add("s", OrderStatus.Assembled, null, 10, 10, null);
+        OrderFilter newOrBlocked = OrderFilter.of("Nowe lub zablokowane", List.of(
+                OrderFilterCondition.of(OrderFilterField.Status, "New"),
+                OrderFilterCondition.of(OrderFilterField.Status, "Blocked")));
+        when(orderFilters.list(ACTOR)).thenReturn(new ListOrderFiltersView(List.of(), List.of(newOrBlocked)));
+
+        // when
+        OrdersPageModel model = page(query("status", "Assembled", "filterId", newOrBlocked.getId()));
+
+        // then
+        assertThat(model.rows()).extracting(r -> r.href()).containsExactly("/dashboard/orders/s");
+    }
+
     private static OrdersPageModel.StatusOption option(OrdersPageModel model, String label) {
         return model.openStatuses().stream().filter(s -> s.label().equals(label)).findFirst().orElseThrow();
     }
