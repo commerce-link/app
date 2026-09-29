@@ -125,4 +125,19 @@ class ReceiptTriggerTest {
         // when / then
         assertThatCode(() -> trigger.onOrderSaved(order)).doesNotThrowAnyException();
     }
+
+    @Test
+    void anOrderRecordingItsReceiptBeforeDeliveryResolvesTheAlertsOfDeadAttempts() {
+        // given: a manual e-receipt blocked while the sale was still Assembled, then the cash register receipt
+        Order order = b2cOrder(100);
+        order.setStatus(OrderStatus.Assembled);
+        order.addDocument(new Document(null, "KASA/1", null, DocumentType.Receipt, LocalDate.of(2026, 9, 29)));
+
+        // when
+        trigger.onOrderSaved(order);
+
+        // then
+        verify(service).resolveDeadAttemptAlerts(STORE_ID, ORDER_ID);
+        verify(service, never()).startAutomatic(any(), any());
+    }
 }

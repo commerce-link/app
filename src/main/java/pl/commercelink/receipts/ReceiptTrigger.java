@@ -30,24 +30,34 @@ public class ReceiptTrigger {
     }
 
     public void onOrderSaved(Order order) {
-        boolean delivered = order.getStatus() == OrderStatus.Delivered;
-        if (!delivered && order.getStatus() != OrderStatus.Completed) {
+        settleDeadAttemptAlerts(order);
+        if (order.getStatus() != OrderStatus.Delivered) {
             return;
         }
         try {
-            if (order.isInvoiced()) {
-                // a receipt or invoice recorded after a blocked or failed e-receipt settles what that alert asked for
-                attemptService.resolveDeadAttemptAlerts(order.getStoreId(), order.getOrderId());
-            }
-            if (!delivered) {
-                return;
-            }
             Store store = storesRepository.findById(order.getStoreId());
             if (store != null && eligibility.automaticCandidate(store, order)) {
                 attemptService.startAutomatic(store, order);
             }
         } catch (RuntimeException e) {
             log.error("Automatic receipt for order {} of store {} could not be started",
+                    order.getOrderId(), order.getStoreId(), e);
+        }
+    }
+
+    /**
+     * A receipt or invoice recorded after a blocked or failed e-receipt settles what that alert asked for, whatever
+     * the order's status: a manual e-receipt can be blocked before delivery. Also called by saves that bypass the
+     * order lifecycle (invoicing). Never throws.
+     */
+    public void settleDeadAttemptAlerts(Order order) {
+        if (!order.isInvoiced() || order.getStatus() == OrderStatus.Cancelled) {
+            return;
+        }
+        try {
+            attemptService.resolveDeadAttemptAlerts(order.getStoreId(), order.getOrderId());
+        } catch (RuntimeException e) {
+            log.error("Receipt alerts of order {} of store {} could not be resolved",
                     order.getOrderId(), order.getStoreId(), e);
         }
     }
