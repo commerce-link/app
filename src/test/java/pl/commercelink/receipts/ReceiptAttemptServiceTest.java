@@ -25,6 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static pl.commercelink.receipts.ReceiptFixtures.*;
@@ -104,6 +105,62 @@ class ReceiptAttemptServiceTest {
         assertThat(attempt.getState()).isEqualTo(ReceiptAttemptState.BLOCKED);
         assertThat(attempt.getBlockedReason()).isEqualTo(ReceiptBlockReason.MISSING_EMAIL.name());
         assertThat(attempt.isScheduled()).isTrue();
+    }
+
+    @Test
+    void automaticStartOfAPosSaleWithTheStoresEmailBlocksInsteadOfMailingTheStore() {
+        // given
+        withStoreEmail(store);
+        order = posOrder(100.00);
+
+        // when
+        ReceiptAttempt attempt = service.startAutomatic(store, order).orElseThrow();
+
+        // then
+        assertThat(attempt.getState()).isEqualTo(ReceiptAttemptState.BLOCKED);
+        assertThat(attempt.getBlockedReason()).isEqualTo(ReceiptBlockReason.POS_NO_CUSTOMER_EMAIL.name());
+    }
+
+    @Test
+    void manualEReceiptOfAPosSaleWithTheStoresEmailBlocksInsteadOfMailingTheStore() {
+        // given
+        withStoreEmail(store);
+        order = posOrder(100.00);
+
+        // when
+        ReceiptAttempt attempt = service.issueManually(STORE_ID, ORDER_ID, "operator");
+
+        // then
+        assertThat(attempt.getState()).isEqualTo(ReceiptAttemptState.BLOCKED);
+        assertThat(attempt.getBlockedReason()).isEqualTo(ReceiptBlockReason.POS_NO_CUSTOMER_EMAIL.name());
+        assertThat(provider.issueCalls.get()).isZero();
+    }
+
+    @Test
+    void resolvesTheAlertsOfBlockedAndFailedAttemptsOnly() {
+        // given
+        ReceiptAttempt blocked = storedAttempt(1, ReceiptAttemptState.BLOCKED);
+        ReceiptAttempt failed = storedAttempt(2, ReceiptAttemptState.FAILED);
+        ReceiptAttempt fiscalised = storedAttempt(3, ReceiptAttemptState.FISCALISED);
+
+        // when
+        service.resolveDeadAttemptAlerts(STORE_ID, ORDER_ID);
+
+        // then
+        verify(alerts).resolve(argThat(a -> a.getReceiptKey().equals(blocked.getReceiptKey())));
+        verify(alerts).resolve(argThat(a -> a.getReceiptKey().equals(failed.getReceiptKey())));
+        verify(alerts, never()).resolve(argThat(a -> a.getReceiptKey().equals(fiscalised.getReceiptKey())));
+    }
+
+    private ReceiptAttempt storedAttempt(int no, ReceiptAttemptState state) {
+        ReceiptAttempt attempt = new ReceiptAttempt();
+        attempt.setStoreId(STORE_ID);
+        attempt.setOrderId(ORDER_ID);
+        attempt.setReceiptKey(ORDER_ID + ":R" + no);
+        attempt.setAttemptNo(no);
+        attempt.setState(state);
+        attempts.create(attempt);
+        return attempt;
     }
 
     @Test

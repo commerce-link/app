@@ -131,6 +131,12 @@ public class Order {
         return getUnpaidAmount() == 0;
     }
 
+    /** A sale at the shop's counter, created from the dashboard's point of sale. */
+    @DynamoDBIgnore
+    public boolean isPointOfSale() {
+        return source != null && source.getType() == OrderSourceType.PointOfSale;
+    }
+
     @DynamoDBIgnore
     public boolean isInvoiced() {
         return isRMAReplacementOrder() || getClosingDocument().isPresent();

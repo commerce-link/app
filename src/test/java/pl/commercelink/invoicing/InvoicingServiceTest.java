@@ -25,6 +25,7 @@ import pl.commercelink.orders.OrderLifecycleEventType;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.Payment;
 import pl.commercelink.orders.event.OrderEventsRepository;
+import pl.commercelink.receipts.ReceiptTrigger;
 import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.starter.email.EmailClient;
 import pl.commercelink.stores.InvoicingConfiguration;
@@ -73,6 +74,8 @@ class InvoicingServiceTest {
     private InvoicingConfiguration invoicingConfiguration;
     @Mock
     private InvoicingProvider invoicingProvider;
+    @Mock
+    private ReceiptTrigger receiptTrigger;
 
     @InjectMocks
     private InvoicingService invoicingService;
@@ -134,6 +137,29 @@ class InvoicingServiceTest {
                 .extracting("id").contains("inv-1");
 
         verify(orderLifecycleEventPublisher).publish(orderCaptor.getValue(), OrderLifecycleEventType.InvoiceCreated);
+    }
+
+    @Test
+    @DisplayName("createInvoice lets the receipts settle the alerts of blocked or failed e-receipts, since it saves outside the order lifecycle")
+    void createInvoiceSettlesTheAlertsOfDeadReceiptAttempts() {
+        // given
+        Order order = orderWithFilledBillingDetails();
+        Invoice invoice = new Invoice("inv-1", "FV/1/2026", ORDER_ID, null, "https://example.com/inv/1",
+                "PLN", 1.0, false, null, Collections.emptyList(), null, null);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(store.getInvoicingConfiguration()).thenReturn(invoicingConfiguration);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(Collections.emptyList());
+        when(invoicingProviderFactory.get(store)).thenReturn(invoicingProvider);
+        when(invoicingProvider.createInvoice(any(InvoiceRequest.class))).thenReturn(invoice);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+
+        // when
+        invoicingService.createInvoice(order, DocumentType.InvoicePersonal, false);
+
+        // then
+        ArgumentCaptor<Order> orderCaptor = ArgumentCaptor.forClass(Order.class);
+        verify(ordersRepository).save(orderCaptor.capture());
+        verify(receiptTrigger).settleDeadAttemptAlerts(orderCaptor.getValue());
     }
 
     @Test

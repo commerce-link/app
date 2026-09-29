@@ -9,6 +9,7 @@ import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.Payment;
 import pl.commercelink.orders.PaymentSource;
 import pl.commercelink.orders.Shipment;
+import pl.commercelink.stores.Store;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -18,6 +19,7 @@ public final class ReceiptFixtures {
     public static final String STORE_ID = "store-1";
     public static final String ORDER_ID = "0f3c2a8e-1b2c-4d5e-8f90-123456789abc";
     public static final LocalDateTime DELIVERED_AT = LocalDateTime.of(2026, 9, 23, 12, 0);
+    public static final String STORE_EMAIL = "sklep@example.com";
 
     private ReceiptFixtures() {
     }
@@ -52,6 +54,22 @@ public final class ReceiptFixtures {
     /** A delivered consumer order with no payment yet, as it exists before the gateway settles it. */
     public static Order deliveredOrder(double totalPrice) {
         return order(totalPrice);
+    }
+
+    /** A delivered point-of-sale order whose walk-in buyer carries the store's e-mail, as PosOrderCreator makes it. */
+    public static Order posOrder(double totalPrice) {
+        Order order = b2cOrder(totalPrice);
+        order.setSource(new OrderSource("operator", OrderSourceType.PointOfSale));
+        order.getBillingDetails().setEmail(STORE_EMAIL);
+        return order;
+    }
+
+    /** Gives the store the billing e-mail its point-of-sale orders copy. */
+    public static Store withStoreEmail(Store store) {
+        BillingDetails billing = new BillingDetails();
+        billing.setEmail(STORE_EMAIL);
+        store.setBillingDetails(billing);
+        return store;
     }
 
     /** An incoming payment of the given form and amount, unnamed (0 marks it unsettled). */

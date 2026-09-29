@@ -25,15 +25,89 @@ class ReceiptRequestConverterTest {
     private final FakeReceiptProvider provider = new FakeReceiptProvider();
 
     private ReceiptRequestSnapshot converted(Order order, java.util.List<pl.commercelink.orders.OrderItem> items) {
-        ReceiptConversion conversion = converter.convert(order, items, KEY, provider, NOW);
+        ReceiptConversion conversion = converter.convert(order, items, KEY, provider, NOW, STORE_EMAIL);
         assertThat(conversion).isInstanceOf(ReceiptConversion.Converted.class);
         return ((ReceiptConversion.Converted) conversion).snapshot();
     }
 
     private ReceiptConversion.Blocked blocked(Order order, java.util.List<pl.commercelink.orders.OrderItem> items) {
-        ReceiptConversion conversion = converter.convert(order, items, KEY, provider, NOW);
+        ReceiptConversion conversion = converter.convert(order, items, KEY, provider, NOW, STORE_EMAIL);
         assertThat(conversion).isInstanceOf(ReceiptConversion.Blocked.class);
         return (ReceiptConversion.Blocked) conversion;
+    }
+
+    private ReceiptConversion convertWithStoreEmail(Order order) {
+        return converter.convert(order, items(item("Mysz", 1, 100.00, 1.23)), KEY, provider, NOW, STORE_EMAIL);
+    }
+
+    @Test
+    void posOrderWithTheStoresEmailIsBlockedForTheCashRegisterReceipt() {
+        // given
+        Order order = posOrder(100.00);
+
+        // when
+        ReceiptConversion conversion = convertWithStoreEmail(order);
+
+        // then
+        assertThat(conversion).isInstanceOf(ReceiptConversion.Blocked.class);
+        assertThat(((ReceiptConversion.Blocked) conversion).reason()).isEqualTo(ReceiptBlockReason.POS_NO_CUSTOMER_EMAIL);
+    }
+
+    @Test
+    void posOrderWithoutCustomerEmailIsBlockedEvenWhenTheProviderNeedsNoEmail() {
+        // given
+        provider.requiresEmail = false;
+        Order order = posOrder(100.00);
+
+        // when
+        ReceiptConversion conversion = convertWithStoreEmail(order);
+
+        // then
+        assertThat(((ReceiptConversion.Blocked) conversion).reason()).isEqualTo(ReceiptBlockReason.POS_NO_CUSTOMER_EMAIL);
+    }
+
+    @Test
+    void posOrderWithoutBillingDetailsIsBlockedNotBroken() {
+        // given
+        Order order = new Order(STORE_ID);
+        order.setOrderId(ORDER_ID);
+        order.setTotalPrice(100.00);
+        order.setSource(new pl.commercelink.orders.OrderSource("operator", pl.commercelink.orders.OrderSourceType.PointOfSale));
+
+        // when
+        ReceiptConversion conversion = convertWithStoreEmail(order);
+
+        // then
+        assertThat(((ReceiptConversion.Blocked) conversion).reason()).isEqualTo(ReceiptBlockReason.POS_NO_CUSTOMER_EMAIL);
+    }
+
+    @Test
+    void posOrderWithTheCustomersEmailGoesToThatEmail() {
+        // given
+        Order order = posOrder(100.00);
+        order.getBillingDetails().setEmail("klient@example.com");
+
+        // when
+        ReceiptConversion conversion = convertWithStoreEmail(order);
+
+        // then
+        assertThat(((ReceiptConversion.Converted) conversion).snapshot().toRequest(KEY).buyer().email())
+                .isEqualTo("klient@example.com");
+    }
+
+    @Test
+    void webStoreOrderWithoutEmailStillConvertsWhenTheProviderNeedsNoEmail() {
+        // given
+        provider.requiresEmail = false;
+        Order order = b2cOrder(100.00);
+        order.getBillingDetails().setEmail(null);
+        order.setEmail(null);
+
+        // when
+        ReceiptConversion conversion = convertWithStoreEmail(order);
+
+        // then
+        assertThat(conversion).isInstanceOf(ReceiptConversion.Converted.class);
     }
 
     @Test
@@ -166,7 +240,7 @@ class ReceiptRequestConverterTest {
         };
 
         assertThat(((ReceiptConversion.Blocked) converter.convert(b2cOrder(100.00),
-                items(item("Mysz", 1, 100.00, 1.23)), KEY, paperOnly, NOW)).reason())
+                items(item("Mysz", 1, 100.00, 1.23)), KEY, paperOnly, NOW, STORE_EMAIL)).reason())
                 .isEqualTo(ReceiptBlockReason.MEDIUM_UNSUPPORTED);
     }
 

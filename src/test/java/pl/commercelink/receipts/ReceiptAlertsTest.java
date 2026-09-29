@@ -60,4 +60,34 @@ class ReceiptAlertsTest {
         verify(notifications, never()).publish(any(), any());
         assertThat(attempt.getAttention()).isNull();
     }
+
+    @Test
+    void aPosSaleWithoutTheCustomersEmailGetsTheCashRegisterInstructions() {
+        // given
+        messages.addMessage("receipts.attention.BLOCKED_POS", new Locale("pl"), "POS {0}: wpisz numer z kasy albo e-mail");
+        messages.addMessage("receipts.attention.BLOCKED", new Locale("pl"), "Zablokowany {0}");
+        ReceiptAttempt attempt = attempt(null);
+        attempt.setBlockedReason(ReceiptBlockReason.POS_NO_CUSTOMER_EMAIL.name());
+
+        // when
+        String message = alerts.message(attempt, ReceiptAttention.BLOCKED);
+
+        // then
+        assertThat(message).isEqualTo("POS o1: wpisz numer z kasy albo e-mail");
+    }
+
+    @Test
+    void otherBlockedReasonsKeepTheGeneralMessage() {
+        // given
+        messages.addMessage("receipts.attention.BLOCKED_POS", new Locale("pl"), "POS {0}");
+        messages.addMessage("receipts.attention.BLOCKED", new Locale("pl"), "Zablokowany {0}");
+        ReceiptAttempt attempt = attempt(null);
+        attempt.setBlockedReason(ReceiptBlockReason.MISSING_EMAIL.name());
+
+        // when
+        String message = alerts.message(attempt, ReceiptAttention.BLOCKED);
+
+        // then
+        assertThat(message).isEqualTo("Zablokowany o1");
+    }
 }

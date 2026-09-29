@@ -37,8 +37,9 @@ public class ReceiptRequestConverter {
     private static final Pattern LEADING_SHIPPING_WORD = Pattern.compile("^(?i)dostawa\\s*[-–—:]*\\s*");
     private static final long ONE_GROSZ = 1;
 
+    /** {@code storeEmail} is the store's own e-mail, never a point-of-sale buyer's (see {@link BuyerEmail}). */
     public ReceiptConversion convert(Order order, List<OrderItem> items, String receiptKey, ReceiptProvider provider,
-                                     LocalDateTime fallbackSaleDate) {
+                                     LocalDateTime fallbackSaleDate, String storeEmail) {
         if (!provider.supportedMedia().contains(ReceiptMedium.ELECTRONIC)) {
             return new ReceiptConversion.Blocked(ReceiptBlockReason.MEDIUM_UNSUPPORTED, null);
         }
@@ -79,7 +80,12 @@ public class ReceiptRequestConverter {
             return new ReceiptConversion.Blocked(ReceiptBlockReason.TOTAL_MISMATCH,
                     Money.ofGrosze(linesTotal).toBigDecimal() + " ≠ " + Money.ofGrosze(orderTotal).toBigDecimal());
         }
-        String email = buyerEmail(order);
+        String email = BuyerEmail.of(order, storeEmail);
+        // a sale at the counter without the customer's own e-mail may already have its receipt from the shop's cash
+        // register: whatever the provider accepts, issuing now could register the sale twice
+        if (order.isPointOfSale() && email == null) {
+            return new ReceiptConversion.Blocked(ReceiptBlockReason.POS_NO_CUSTOMER_EMAIL, null);
+        }
         if (provider.requiresBuyerEmail() && email == null) {
             return new ReceiptConversion.Blocked(ReceiptBlockReason.MISSING_EMAIL, null);
         }
@@ -118,16 +124,6 @@ public class ReceiptRequestConverter {
             case VAT_0 -> "0";
             case EXEMPT -> "zw";
         };
-    }
-
-    /**
-     * {@code Order.getEmail()} always mirrors {@code getBillingDetails().getEmail()} live (it is a
-     * write-only projection field used for persistence, never read back by the getter), so the billing address is
-     * the only real source of the buyer's e-mail; there is no independent order-level value to fall back to.
-     */
-    private static String buyerEmail(Order order) {
-        String billing = order.getBillingDetails() == null ? null : order.getBillingDetails().getEmail();
-        return StringUtils.isNotBlank(billing) ? billing.strip() : null;
     }
 
     /**
