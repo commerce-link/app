@@ -2462,4 +2462,25 @@ class OrderDetailsTemplateTest {
                         + "klienta). Nie trzeba nic robić — zamówienie ma już paragon albo fakturę.</p>")
                 .doesNotContain("e-paragon-problem-1").doesNotContain("Wystaw ponownie");
     }
+
+    @Test
+    void aDeadEReceiptOfACancelledOrderSaysNothingIsNeeded() {
+        // given
+        Order order = order(OrderStatus.Cancelled);
+        ReceiptOrderState settled = new ReceiptOrderState(
+                List.of(attempt(1, pl.commercelink.receipts.ReceiptAttemptState.FAILED)),
+                new pl.commercelink.receipts.ReceiptOrderView(List.of(new pl.commercelink.receipts.ReceiptOrderView.Row(
+                        ORDER_ID + ":R1", pl.commercelink.receipts.ReceiptAttemptState.FAILED,
+                        "receipts.state.FAILED", "is-neutral", null, null, null, null, false, false, false, 1, null,
+                        null, "zła stawka VAT", true)), false), false, false);
+
+        // when
+        String html = renderWithReceipts(order, ADMIN, settled);
+
+        // then
+        assertThat(html).containsPattern("<span class=\"cl-status is-neutral\">[^<]+</span>")
+                .contains("<p class=\"cl-list-desc\" id=\"e-paragon-settled-1\">Nie wystawiono (zła stawka VAT). "
+                        + "Zamówienie jest anulowane — nie trzeba nic robić.</p>")
+                .doesNotContain("e-paragon-problem-1").doesNotContain("Wystaw ponownie");
+    }
 }

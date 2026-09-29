@@ -158,6 +158,33 @@ class ReceiptAttemptServiceTest {
     }
 
     @Test
+    void reconcileResolvesDeadAttemptAlertsOfACancelledOrder() {
+        // given: nothing fiscalised, and the order was cancelled since
+        ReceiptAttempt failed = storedAttempt(1, ReceiptAttemptState.FAILED);
+        order.setStatus(pl.commercelink.orders.OrderStatus.Cancelled);
+
+        // when
+        service.reconcileDeadAttemptAlerts(order);
+
+        // then
+        verify(alerts).resolve(argThat(a -> a.getReceiptKey().equals(failed.getReceiptKey())));
+        verify(alerts, never()).republish(any(), any());
+    }
+
+    @Test
+    void reconcileKeepsTheAlertOfAFiscalisedReceiptOnACancelledOrder() {
+        // given: fiscalised, its document not attached yet; the order cancelled
+        ReceiptAttempt fiscalised = storedAttempt(1, ReceiptAttemptState.FISCALISED);
+        order.setStatus(pl.commercelink.orders.OrderStatus.Cancelled);
+
+        // when
+        service.reconcileDeadAttemptAlerts(order);
+
+        // then: a registered sale still needs its document and e-mail; only dead attempts are settled
+        verify(alerts, never()).resolve(argThat(a -> a.getReceiptKey().equals(fiscalised.getReceiptKey())));
+    }
+
+    @Test
     void reconcileRaisesTheNewestDeadAttemptAlertAgainOnceTheClosingDocumentIsGone() {
         // given: a blocked attempt whose alert the typed receipt had closed; the receipt was unpinned since
         ReceiptAttempt blocked = storedAttempt(1, ReceiptAttemptState.BLOCKED);

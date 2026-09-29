@@ -156,4 +156,26 @@ class ReceiptOrderViewTest {
             assertThat(row.canResendEmail()).isTrue();
         });
     }
+
+    @Test
+    void aDeadAttemptOfACancelledOrderIsSettled() {
+        // given: the e-receipt failed, then the order was cancelled; "Wystaw ponownie" is gone with the sale
+        ReceiptAttempt failed = deadAttempt("order-1:R1", ReceiptAttemptState.FAILED, 1);
+        when(alerts.outcome(failed, Locale.ENGLISH)).thenReturn("invalid VAT rate");
+        pl.commercelink.orders.Order cancelled = ReceiptFixtures.b2cOrder(100);
+        cancelled.setStatus(pl.commercelink.orders.OrderStatus.Cancelled);
+
+        // when
+        ReceiptOrderView view = ReceiptOrderView.of(List.of(failed), false,
+                ReceiptTrigger.settlesDeadAttempts(cancelled), alerts, NOW, Locale.ENGLISH);
+
+        // then: no advice pointing at a button the cancelled page does not have, no alarm colour
+        assertThat(view.canReissue()).isFalse();
+        assertThat(view.rows()).singleElement().satisfies(row -> {
+            assertThat(row.settled()).isTrue();
+            assertThat(row.problem()).isNull();
+            assertThat(row.statusTone()).isEqualTo("is-neutral");
+            assertThat(row.outcome()).isEqualTo("invalid VAT rate");
+        });
+    }
 }

@@ -1373,4 +1373,23 @@ class OrderPageModelFactoryTest {
         assertThat(receipt.problem()).isNull();
         assertThat(receipt.hasActions()).isFalse();
     }
+
+    @Test
+    void aDeadAttemptOfACancelledOrderSaysTheOrderIsCancelled() {
+        // given
+        Order order = order(OrderStatus.Cancelled);
+        receipts(new ReceiptOrderState(List.of(attempt(KEY_1, 1, ReceiptAttemptState.FAILED)),
+                new ReceiptOrderView(List.of(new ReceiptOrderView.Row(KEY_1, ReceiptAttemptState.FAILED,
+                        "receipts.state.FAILED", "is-neutral", null, null, null, null, false, false, false, 1, null, null,
+                        "zła stawka VAT", true)), false), false, false));
+
+        // when
+        OrderPageModel.ReceiptRow receipt = factory.build(order, List.of(), ADMIN, PL).documents().receipt();
+
+        // then
+        assertThat(receipt.settled()).isTrue();
+        assertThat(receipt.settledKey()).isEqualTo("receipts.row.settled.cancelled");
+        assertThat(receipt.settledOutcome()).isEqualTo("zła stawka VAT");
+        assertThat(receipt.canReissue()).isFalse();
+    }
 }

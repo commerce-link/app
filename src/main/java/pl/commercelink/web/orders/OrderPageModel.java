@@ -125,13 +125,15 @@ public record OrderPageModel(String orderId, String shortId, String backHref, bo
      * wrong (warning tone), what the operator should do and the provider's technical hints, null without a problem.
      * The actions are false on a super admin's page; closeHref is the "Zamknij ręcznie" page without JavaScript,
      * closeDialogId its dialog. settled: the attempt fiscalised nothing but the order got its sale document another way
-     * (a receipt from the shop's cash register, an invoice), so the row says nothing is needed, with settledOutcome
-     * (why the attempt stopped) when known.
+     * (a receipt from the shop's cash register, an invoice) or was cancelled, so the row says nothing is needed, with
+     * settledOutcome (why the attempt stopped) when known; settledKey is that sentence's message key, null when not
+     * settled.
      */
     public record ReceiptRow(String key, int attemptNo, String number, String href, String statusKey, String statusTone,
                              String dateKey, String date, String emailKey, ReceiptPageProblem problem, boolean canCheck,
                              boolean canResendEmail, boolean canClose, boolean canReissue, String closeDialogId,
-                             String closeHref, List<ReceiptEarlierRow> earlier, boolean settled, String settledOutcome) {
+                             String closeHref, List<ReceiptEarlierRow> earlier, boolean settled, String settledOutcome,
+                             String settledKey) {
 
         /** Whether the row offers any action at all (the actions column is left out otherwise). */
         public boolean hasActions() {

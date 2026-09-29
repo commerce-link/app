@@ -106,9 +106,9 @@
                 <p class="cl-list-desc" th:text="${r.problem().details()}"></p>
             </details>
         </th:block>
-        <!--/* A dead attempt on an order that got its receipt or invoice another way: nothing left to do. */-->
+        <!--/* A dead attempt on an order that got its receipt or invoice another way, or was cancelled: nothing left to do. */-->
         <p class="cl-list-desc" th:if="${r.settled()}" th:id="|e-paragon-settled-${r.attemptNo()}|"
-           th:text="${r.settledOutcome() != null} ? #{receipts.row.settled.outcome(${r.settledOutcome()})} : #{receipts.row.settled}"></p>
+           th:text="#{${r.settledKey()}(${r.settledOutcome()})}"></p>
         <!--/* native details/summary: keyboard-operable and open without JavaScript */-->
         <details class="cl-row-disclosure" th:if="${!r.earlier().isEmpty()}">
             <summary th:text="#{receipts.row.earlier(${r.earlier().size()})}"></summary>

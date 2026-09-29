@@ -483,7 +483,16 @@ public class OrderPageModelFactory {
                 newest.problem(), act && newest.canCheck(), act && newest.canResendEmail(), act && newest.canClose(),
                 // a new attempt changes the order's documents, which a read-only page never does
                 !readOnly && receipts.view().canReissue(), close.dialogId(), act ? close.pageHref() : null, earlier,
-                newest.settled(), newest.settled() ? newest.outcome() : null);
+                newest.settled(), newest.settled() ? newest.outcome() : null,
+                newest.settled() ? settledKey(order, newest.outcome()) : null);
+    }
+
+    /** A cancelled order needs no sale document at all; any other settled order already has its receipt or invoice. */
+    private static String settledKey(Order order, String outcome) {
+        if (order.getStatus() == OrderStatus.Cancelled) {
+            return outcome != null ? "receipts.row.settled.cancelled" : "receipts.row.settled.cancelled.noOutcome";
+        }
+        return outcome != null ? "receipts.row.settled.outcome" : "receipts.row.settled";
     }
 
     /** One "Zamknij ręcznie" dialog per attempt that offers it; none for a super admin. */

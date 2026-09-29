@@ -133,4 +133,19 @@ class ReceiptTriggerTest {
         // when / then
         assertThat(ReceiptTrigger.settlesDeadAttempts(order)).isFalse();
     }
+
+    @Test
+    void cancellingResolvesTheDeadAttemptAlerts() {
+        // given: the lifecycle cancelled a fully returned order and saved it
+        Order order = b2cOrder(100);
+        order.setStatus(OrderStatus.Cancelled);
+
+        // when
+        trigger.onOrderSaved(order);
+
+        // then: a cancelled order settles its dead attempts, so the reconcile resolves their alerts
+        assertThat(ReceiptTrigger.settlesDeadAttempts(order)).isTrue();
+        verify(service).reconcileDeadAttemptAlerts(order);
+        verify(service, never()).startAutomatic(any(), any());
+    }
 }

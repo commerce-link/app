@@ -62,10 +62,13 @@ public class ReceiptTrigger {
 
     /**
      * Whether the order's blocked or failed attempts no longer ask for anything: the order has its closing document
-     * and is not cancelled. The bell ({@link ReceiptAttemptService#reconcileDeadAttemptAlerts(Order)}) and the order
-     * page ({@link ReceiptOrderView}) read the same rule.
+     * (a receipt from the shop's cash register, an invoice), or it is cancelled, so there is no sale left to receipt
+     * and "Wystaw ponownie" is not offered (product owner's decision). Only dead attempts read it: they fiscalised
+     * nothing, so neither reason hides a registered sale; a live or fiscalised attempt keeps its own problem. The bell
+     * ({@link ReceiptAttemptService#reconcileDeadAttemptAlerts(Order)}) and the order page ({@link ReceiptOrderView})
+     * read the same rule.
      */
     static boolean settlesDeadAttempts(Order order) {
-        return order.isInvoiced() && order.getStatus() != OrderStatus.Cancelled;
+        return order.getStatus() == OrderStatus.Cancelled || order.isInvoiced();
     }
 }
