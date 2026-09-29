@@ -121,6 +121,6 @@ class OrdersListTemplateTest {
     void rejectedFilterFormsKeepWhatTheUserSubmitted() throws Exception {
         String html = filters();
         assertThat(html).contains("th:value=\"${filterForm?.label}\"")
-                .contains("th:selected=\"${filterForm != null and #strings.equalsIgnoreCase(filterForm.status, status.name())}\"");
+                .contains("${statuses.![name()]}, 'OrderStatus.', ${filterForm?.status})");
     }
 }

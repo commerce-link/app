@@ -4509,6 +4509,35 @@ a.cl-link-button:hover {
     border-top: 1px solid var(--cl-line);
 }
 
+/* The filter menu standing in for a form's select (custom order filter: Status, delivery, payment, marketplace):
+   the field's full width, height and text size, so it lines up with the selects and inputs of the same grid; the
+   popover takes the field's width, as a select's list would. */
+.cl-page .cl-filter-menu.is-field .cl-filter-menu-trigger {
+    width: 100%;
+    max-width: none;
+    height: 40px;
+    font-size: 15px;
+}
+
+.cl-page .cl-filter-menu.is-field .cl-filter-menu-panel {
+    right: 0;
+    min-width: 0;
+    max-width: none;
+}
+
+@media screen and (max-width: 1023px) {
+    .cl-page .cl-filter-menu.is-field .cl-filter-menu-trigger {
+        height: 44px;
+    }
+}
+
+/* Safari on iOS zooms the page when a field it focuses has text smaller than 16px. */
+@media screen and (max-width: 719px) {
+    .cl-page .cl-filter-menu.is-field .cl-filter-menu-trigger {
+        font-size: 16px;
+    }
+}
+
 /* Search: the icon sits in the field, a clear "×" appears once something is searched (it is a link, so it works
    without JavaScript; with it, orders-list.js also refreshes the list when the field is emptied). */
 .cl-page .cl-search-form {
