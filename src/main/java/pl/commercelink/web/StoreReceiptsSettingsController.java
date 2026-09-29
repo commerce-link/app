@@ -3,6 +3,7 @@ package pl.commercelink.web;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.MessageSource;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -15,8 +16,10 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.starter.security.CustomSecurityContext;
+import pl.commercelink.stores.PosReceiptMode;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
+import pl.commercelink.web.dtos.PickerOption;
 import pl.commercelink.web.dtos.ReceiptSettingsForm;
 import pl.commercelink.web.settings.SettingsFlash;
 import pl.commercelink.web.settings.SettingsPaths;
@@ -25,6 +28,7 @@ import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.stream.Stream;
 
 /**
  * Settings › E-receipts: the status of the e-receipt system and the automatic-receipts form. The page carries one
@@ -115,6 +119,11 @@ public class StoreReceiptsSettingsController {
         model.addAttribute("receiptsForm", receipts);
         model.addAttribute("receiptsErrors", receiptsErrors);
         model.addAttribute("receiptsAction", SettingsPaths.store(storeId, "/receipts"));
+        Locale locale = LocaleContextHolder.getLocale();
+        model.addAttribute("posReceiptModes", Stream.of(PosReceiptMode.ASK, PosReceiptMode.CASH_REGISTER, PosReceiptMode.E_RECEIPT)
+                .map(mode -> new PickerOption(mode.name(),
+                        messageSource.getMessage("store.receipts.pos." + mode.name(), null, locale)))
+                .toList());
     }
 
     private Store requireStore(String storeId) {

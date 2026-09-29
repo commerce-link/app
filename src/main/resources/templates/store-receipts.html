@@ -58,6 +58,10 @@
                                 <span th:text="#{${receiptsErrors['enabled']}}"></span>
                             </p>
                         </fieldset>
+                        <fieldset class="cl-fieldset">
+                            <legend class="cl-fieldset-title" th:text="#{store.receipts.pos.title}"></legend>
+                            <div th:replace="~{fragments/settings-form :: selectField('posReceiptMode', 'store.receipts.pos.label', *{posReceiptMode?.name()}, ${posReceiptModes}, 'off', true, null, #{store.receipts.pos.help})}"></div>
+                        </fieldset>
                         <div class="cl-card-footer">
                             <button class="cl-button is-primary" type="submit" th:text="#{form.save.changes}"></button>
                         </div>

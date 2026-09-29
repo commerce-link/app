@@ -2,6 +2,8 @@ package pl.commercelink.web.dtos;
 
 import org.junit.jupiter.api.Test;
 import pl.commercelink.orders.notifications.EmailNotificationType;
+import pl.commercelink.stores.PosReceiptMode;
+import pl.commercelink.stores.ReceiptConfiguration;
 import pl.commercelink.stores.Store;
 
 import java.time.LocalDateTime;
@@ -50,5 +52,35 @@ class ReceiptSettingsFormTest {
         form.applyTo(store, NOW.plusDays(1));
 
         assertThat(store.getReceiptConfiguration().isEnabled()).isFalse();
+    }
+
+    @Test
+    void defaultsPosReceiptModeToAskForAStoreThatNeverChoseOne() {
+        ReceiptSettingsForm form = ReceiptSettingsForm.from(new ReceiptConfiguration());
+
+        assertThat(form.getPosReceiptMode()).isEqualTo(PosReceiptMode.ASK);
+    }
+
+    @Test
+    void appliesThePosReceiptModeEvenWhenAutomaticReceiptsStayOff() {
+        Store store = new Store();
+        ReceiptSettingsForm form = new ReceiptSettingsForm();
+        form.setEnabled(false);
+        form.setPosReceiptMode(PosReceiptMode.CASH_REGISTER);
+
+        form.applyTo(store, NOW);
+
+        assertThat(store.getReceiptConfiguration().getPosReceiptMode()).isEqualTo(PosReceiptMode.CASH_REGISTER);
+    }
+
+    @Test
+    void keepsTheStoredModeWhenTheFieldIsMissingFromTheRequest() {
+        Store store = new Store();
+        store.getReceiptConfiguration().setPosReceiptMode(PosReceiptMode.E_RECEIPT);
+        ReceiptSettingsForm form = new ReceiptSettingsForm();
+
+        form.applyTo(store, NOW);
+
+        assertThat(store.getReceiptConfiguration().getPosReceiptMode()).isEqualTo(PosReceiptMode.E_RECEIPT);
     }
 }

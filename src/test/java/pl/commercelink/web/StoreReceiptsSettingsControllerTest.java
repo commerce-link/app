@@ -20,8 +20,10 @@ import pl.commercelink.receipts.ReceiptAttemptStore;
 import pl.commercelink.receipts.ReceiptProviderFactory;
 import pl.commercelink.starter.security.model.CustomUser;
 import pl.commercelink.stores.IntegrationType;
+import pl.commercelink.stores.PosReceiptMode;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
+import pl.commercelink.web.dtos.PickerOption;
 import pl.commercelink.web.dtos.ReceiptSettingsForm;
 import pl.commercelink.web.settings.IntegrationStatus;
 
@@ -143,6 +145,41 @@ class StoreReceiptsSettingsControllerTest {
         assertThat(store.getReceiptConfiguration().isEnabled()).isTrue();
         assertThat(store.getReceiptConfiguration().getEnabledAt()).isNotNull();
         assertThat(view).isEqualTo("redirect:/dashboard/store/receipts");
+    }
+
+    @Test
+    void savesThePointOfSaleReceiptMode() {
+        // given
+        Store store = store("store-1");
+        store.setConfigurationValue(IntegrationType.RECEIPT_PROVIDER, SYSTEM);
+        when(receiptProviderFactory.loadConfigurationForUI(store)).thenReturn(Map.of("token", ""));
+        ReceiptSettingsForm form = receipts(true);
+        form.setPosReceiptMode(PosReceiptMode.E_RECEIPT);
+
+        // when
+        controller.saveReceipts(form, null, new ExtendedModelMap(), PL, new RedirectAttributesModelMap(),
+                new MockHttpServletResponse());
+
+        // then
+        verify(storesRepository).save(store);
+        assertThat(store.getReceiptConfiguration().getPosReceiptMode()).isEqualTo(PosReceiptMode.E_RECEIPT);
+    }
+
+    @Test
+    void offersThePointOfSaleModesWithAskFirst() {
+        // given
+        store("store-1");
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        controller.receipts(model);
+
+        // then
+        @SuppressWarnings("unchecked")
+        List<PickerOption> modes = (List<PickerOption>) model.getAttribute("posReceiptModes");
+        assertThat(modes).extracting(PickerOption::value).containsExactly("ASK", "CASH_REGISTER", "E_RECEIPT");
+        assertThat(modes).extracting(PickerOption::label)
+                .containsExactly("store.receipts.pos.ASK", "store.receipts.pos.CASH_REGISTER", "store.receipts.pos.E_RECEIPT");
     }
 
     @Test
