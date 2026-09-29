@@ -1,12 +1,18 @@
 package pl.commercelink.receipts;
 
 import org.junit.jupiter.api.Test;
+import pl.commercelink.documents.Document;
+import pl.commercelink.documents.DocumentType;
 import pl.commercelink.orders.Order;
+import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.PaymentSource;
 import pl.commercelink.stores.IntegrationType;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 
+import java.time.LocalDate;
+
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 import static pl.commercelink.receipts.ReceiptFixtures.*;
@@ -65,5 +71,58 @@ class ReceiptTriggerTest {
         realTrigger.onOrderSaved(order);
 
         verify(service).startAutomatic(store, order);
+    }
+
+    @Test
+    void aDeliveredOrderWithItsReceiptResolvesTheAlertsOfDeadAttempts() {
+        // given
+        Order order = b2cOrder(100);
+        order.addDocument(new Document(null, "KASA/1", null, DocumentType.Receipt, LocalDate.of(2026, 9, 29)));
+        when(stores.findById(STORE_ID)).thenReturn(new Store());
+
+        // when
+        trigger.onOrderSaved(order);
+
+        // then
+        verify(service).resolveDeadAttemptAlerts(STORE_ID, ORDER_ID);
+    }
+
+    @Test
+    void aCompletedOrderWithItsReceiptResolvesTheAlertsOfDeadAttempts() {
+        // given
+        Order order = b2cOrder(100);
+        order.setStatus(OrderStatus.Completed);
+        order.addDocument(new Document(null, "KASA/1", null, DocumentType.Receipt, LocalDate.of(2026, 9, 29)));
+
+        // when
+        trigger.onOrderSaved(order);
+
+        // then
+        verify(service).resolveDeadAttemptAlerts(STORE_ID, ORDER_ID);
+        verify(service, never()).startAutomatic(any(), any());
+    }
+
+    @Test
+    void anOrderWithoutAClosingDocumentLeavesTheAlertsAlone() {
+        // given
+        Order order = b2cOrder(100);
+        when(stores.findById(STORE_ID)).thenReturn(new Store());
+
+        // when
+        trigger.onOrderSaved(order);
+
+        // then
+        verify(service, never()).resolveDeadAttemptAlerts(any(), any());
+    }
+
+    @Test
+    void failingToResolveAlertsNeverBreaksTheOrderUpdate() {
+        // given
+        Order order = b2cOrder(100);
+        order.addDocument(new Document(null, "KASA/1", null, DocumentType.Receipt, LocalDate.of(2026, 9, 29)));
+        doThrow(new RuntimeException("dynamo down")).when(service).resolveDeadAttemptAlerts(STORE_ID, ORDER_ID);
+
+        // when / then
+        assertThatCode(() -> trigger.onOrderSaved(order)).doesNotThrowAnyException();
     }
 }

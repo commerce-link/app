@@ -10,8 +10,9 @@ import pl.commercelink.stores.StoresRepository;
 
 /**
  * Called after the order lifecycle saved an order: a delivered consumer order of a store with e-receipts gets its
- * first attempt. Runs after the save so a failed order write never leaves an attempt for an undelivered order, and
- * never throws — a receipt problem must not break the order update.
+ * first attempt, and an order with its closing document settles the alerts of its blocked or failed attempts. Runs
+ * after the save so a failed order write never leaves an attempt for an undelivered order, and never throws — a
+ * receipt problem must not break the order update.
  */
 @Slf4j
 @Component
@@ -29,10 +30,18 @@ public class ReceiptTrigger {
     }
 
     public void onOrderSaved(Order order) {
-        if (order.getStatus() != OrderStatus.Delivered) {
+        boolean delivered = order.getStatus() == OrderStatus.Delivered;
+        if (!delivered && order.getStatus() != OrderStatus.Completed) {
             return;
         }
         try {
+            if (order.isInvoiced()) {
+                // a receipt or invoice recorded after a blocked or failed e-receipt settles what that alert asked for
+                attemptService.resolveDeadAttemptAlerts(order.getStoreId(), order.getOrderId());
+            }
+            if (!delivered) {
+                return;
+            }
             Store store = storesRepository.findById(order.getStoreId());
             if (store != null && eligibility.automaticCandidate(store, order)) {
                 attemptService.startAutomatic(store, order);
