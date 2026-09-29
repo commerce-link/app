@@ -17,6 +17,7 @@ import pl.commercelink.orders.filters.exceptions.OrderFilterInvalidException;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -224,6 +225,139 @@ class OrderFilterTest {
             broken.setConditions(List.of());
 
             assertThat(broken.matches(order(), TODAY)).isFalse();
+        }
+
+        @Test
+        @DisplayName("values of one field are alternatives, different fields all have to hold")
+        void valuesOfOneFieldAreAlternatives() {
+            // given
+            Order allegroCourier = order();
+            allegroCourier.setSource(new OrderSource("Allegro", OrderSourceType.Marketplace));
+            allegroCourier.addShipment(new Shipment(ShipmentType.Courier));
+            Order ceneoCourier = order();
+            ceneoCourier.setSource(new OrderSource("Ceneo", OrderSourceType.Marketplace));
+            ceneoCourier.addShipment(new Shipment(ShipmentType.Courier));
+            Order ceneoPickup = order();
+            ceneoPickup.setSource(new OrderSource("Ceneo", OrderSourceType.Marketplace));
+            ceneoPickup.addShipment(new Shipment(ShipmentType.PickupPoint));
+            Order moreleCourier = order();
+            moreleCourier.setSource(new OrderSource("Morele", OrderSourceType.Marketplace));
+            moreleCourier.addShipment(new Shipment(ShipmentType.Courier));
+            OrderFilter allegroOrCeneoByCourier = filter(
+                    condition(OrderFilterField.SourceName, "Allegro"),
+                    condition(OrderFilterField.SourceName, "Ceneo"),
+                    condition(OrderFilterField.ShipmentType, "Courier"));
+
+            // when / then
+            assertThat(allegroOrCeneoByCourier.matches(allegroCourier, TODAY)).isTrue();
+            assertThat(allegroOrCeneoByCourier.matches(ceneoCourier, TODAY)).isTrue();
+            assertThat(allegroOrCeneoByCourier.matches(ceneoPickup, TODAY)).isFalse();
+            assertThat(allegroOrCeneoByCourier.matches(moreleCourier, TODAY)).isFalse();
+        }
+
+        @Test
+        @DisplayName("several statuses match an order in any of them")
+        void severalStatusesMatchAnyOfThem() {
+            // given
+            Order blocked = order();
+            blocked.setStatus(OrderStatus.Blocked);
+            Order assembled = order();
+            assembled.setStatus(OrderStatus.Assembled);
+            OrderFilter newOrBlocked = filter(
+                    condition(OrderFilterField.Status, "New"),
+                    condition(OrderFilterField.Status, "Blocked"));
+
+            // when / then
+            assertThat(newOrBlocked.matches(blocked, TODAY)).isTrue();
+            assertThat(newOrBlocked.matches(assembled, TODAY)).isFalse();
+        }
+
+        @Test
+        @DisplayName("ignoring a field drops all of its values, the other fields still have to hold")
+        void ignoringAFieldDropsAllItsValues() {
+            // given
+            Order assembledFromAllegro = order();
+            assembledFromAllegro.setStatus(OrderStatus.Assembled);
+            assembledFromAllegro.setSource(new OrderSource("Allegro", OrderSourceType.Marketplace));
+            Order assembledFromMorele = order();
+            assembledFromMorele.setStatus(OrderStatus.Assembled);
+            assembledFromMorele.setSource(new OrderSource("Morele", OrderSourceType.Marketplace));
+            OrderFilter newOrBlockedFromAllegro = filter(
+                    condition(OrderFilterField.Status, "New"),
+                    condition(OrderFilterField.Status, "Blocked"),
+                    condition(OrderFilterField.SourceName, "Allegro"));
+
+            // when / then
+            assertThat(newOrBlockedFromAllegro.matchesIgnoring(OrderFilterField.Status, assembledFromAllegro, TODAY)).isTrue();
+            assertThat(newOrBlockedFromAllegro.matchesIgnoring(OrderFilterField.Status, assembledFromMorele, TODAY)).isFalse();
+        }
+
+        @Test
+        @DisplayName("a filter of statuses only lets every order through once the status is ignored")
+        void statusOnlyFilterIgnoringStatusMatchesEverything() {
+            // given
+            Order assembled = order();
+            assembled.setStatus(OrderStatus.Assembled);
+            OrderFilter newOrBlocked = filter(
+                    condition(OrderFilterField.Status, "New"),
+                    condition(OrderFilterField.Status, "Blocked"));
+
+            // when / then
+            assertThat(newOrBlocked.matchesIgnoring(OrderFilterField.Status, assembled, TODAY)).isTrue();
+        }
+    }
+
+    @Nested
+    class ByField {
+
+        @Test
+        @DisplayName("several values of one field are all kept, only an exact repeat collapses")
+        void severalValuesOfOneFieldAreKept() {
+            // when
+            OrderFilter filter = filter(
+                    condition(OrderFilterField.SourceName, "Allegro"),
+                    condition(OrderFilterField.SourceName, "Ceneo"),
+                    condition(OrderFilterField.SourceName, "Allegro"));
+
+            // then
+            assertThat(filter.getConditions()).containsExactly(
+                    condition(OrderFilterField.SourceName, "Allegro"),
+                    condition(OrderFilterField.SourceName, "Ceneo"));
+        }
+
+        @Test
+        @DisplayName("the form gets every value of a field, in the order they were saved")
+        void everyValueOfAFieldInSavedOrder() {
+            // given
+            OrderFilter filter = filter(
+                    condition(OrderFilterField.SourceName, "Ceneo"),
+                    condition(OrderFilterField.Status, "New"),
+                    condition(OrderFilterField.SourceName, "Allegro"));
+
+            // when
+            Map<String, List<String>> byField = filter.getConditionsByField();
+
+            // then
+            assertThat(byField).containsExactly(
+                    Map.entry("SourceName", List.of("Ceneo", "Allegro")),
+                    Map.entry("Status", List.of("New")));
+        }
+
+        @Test
+        @DisplayName("a filter saved with one value per field reads back as before")
+        void oneValuePerFieldReadsBackAsBefore() {
+            // given
+            OrderFilter filter = filter(
+                    condition(OrderFilterField.Status, "Assembled"),
+                    condition(OrderFilterField.ShippingPostalCode, "00-9"));
+
+            // when
+            Map<String, List<String>> byField = filter.getConditionsByField();
+
+            // then
+            assertThat(byField).containsExactly(
+                    Map.entry("Status", List.of("Assembled")),
+                    Map.entry("ShippingPostalCode", List.of("00-9")));
         }
     }
 }

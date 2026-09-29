@@ -344,16 +344,16 @@ public class OrdersController extends BaseController {
     }
 
     private static OrderFilterForm formOf(OrderFilter filter, boolean shared) {
-        Map<String, String> byField = filter.getConditionsByField();
+        Map<String, List<String>> byField = filter.getConditionsByField();
         OrderFilterForm form = new OrderFilterForm();
         form.setLabel(filter.getLabel());
         form.setSharedWithStore(shared);
-        form.setStatus(byField.get(OrderFilterField.Status.name()));
-        form.setShipmentType(byField.get(OrderFilterField.ShipmentType.name()));
-        form.setPaymentSource(byField.get(OrderFilterField.PaymentSource.name()));
-        form.setShippingDue(byField.get(OrderFilterField.ShippingDue.name()));
-        form.setSourceName(byField.get(OrderFilterField.SourceName.name()));
-        form.setShippingPostalCode(byField.get(OrderFilterField.ShippingPostalCode.name()));
+        form.setStatus(byField.getOrDefault(OrderFilterField.Status.name(), List.of()).stream().findFirst().orElse(null));
+        form.setShipmentType(byField.getOrDefault(OrderFilterField.ShipmentType.name(), List.of()).stream().findFirst().orElse(null));
+        form.setPaymentSource(byField.getOrDefault(OrderFilterField.PaymentSource.name(), List.of()).stream().findFirst().orElse(null));
+        form.setShippingDue(byField.getOrDefault(OrderFilterField.ShippingDue.name(), List.of()).stream().findFirst().orElse(null));
+        form.setSourceName(byField.getOrDefault(OrderFilterField.SourceName.name(), List.of()).stream().findFirst().orElse(null));
+        form.setShippingPostalCode(byField.getOrDefault(OrderFilterField.ShippingPostalCode.name(), List.of()).stream().findFirst().orElse(null));
         return form;
     }
 

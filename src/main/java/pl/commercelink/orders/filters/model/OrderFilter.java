@@ -4,15 +4,18 @@ import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBAttribute;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBDocument;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBIgnore;
 import pl.commercelink.orders.Order;
+import pl.commercelink.orders.filters.OrderFilterField;
 import pl.commercelink.orders.filters.exceptions.OrderFilterInvalidException;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @DynamoDBDocument
 public class OrderFilter {
@@ -50,7 +53,24 @@ public class OrderFilter {
     public boolean matches(Order order, LocalDate today) {
         return conditions != null
                 && !conditions.isEmpty()
-                && conditions.stream().allMatch(condition -> condition.matches(order, today));
+                && matchesIgnoring(null, order, today);
+    }
+
+    /**
+     * Values of one field are alternatives, different fields all have to hold: "(Allegro or Ceneo) and Courier".
+     * The orders list passes Status here, because once a filter is chosen the Status menu decides the status.
+     */
+    public boolean matchesIgnoring(OrderFilterField ignored, Order order, LocalDate today) {
+        List<OrderFilterCondition> all = conditions == null ? List.of() : conditions;
+        // a condition whose field did not survive storage matched nothing before; it keeps failing the filter
+        if (all.stream().anyMatch(condition -> condition.getField() == null)) {
+            return false;
+        }
+        return all.stream()
+                .filter(condition -> condition.getField() != ignored)
+                .collect(Collectors.groupingBy(OrderFilterCondition::getField, LinkedHashMap::new, Collectors.toList()))
+                .values().stream()
+                .allMatch(alternatives -> alternatives.stream().anyMatch(condition -> condition.matches(order, today)));
     }
 
     private static String validLabel(String label) {
@@ -95,13 +115,14 @@ public class OrderFilter {
         this.conditions = conditions;
     }
 
-    /** The filter's conditions as field.name() -> value, for the "Edytuj" button to prefill the form (spec §7.4). */
+    /** The filter's values per field (field.name() -> values in saved order), for the edit form and the condition pills. */
     @DynamoDBIgnore
-    public Map<String, String> getConditionsByField() {
-        Map<String, String> byField = new LinkedHashMap<>();
+    public Map<String, List<String>> getConditionsByField() {
+        Map<String, List<String>> byField = new LinkedHashMap<>();
         conditions.stream()
                 .filter(condition -> Objects.nonNull(condition.getField()))
-                .forEach(condition -> byField.put(condition.getField().name(), condition.getValue()));
+                .forEach(condition -> byField.computeIfAbsent(condition.getField().name(), field -> new ArrayList<>())
+                        .add(condition.getValue()));
         return byField;
     }
 }
