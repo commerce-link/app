@@ -54,6 +54,7 @@ import pl.commercelink.receipts.PosReceiptDecisions;
 import pl.commercelink.receipts.ReceiptAlerts;
 import pl.commercelink.receipts.ReceiptAttempt;
 import pl.commercelink.receipts.ReceiptAttemptService;
+import pl.commercelink.receipts.ReceiptEligibility;
 import pl.commercelink.web.dtos.OrderItemsForm;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.PositionGroup;
@@ -148,6 +149,8 @@ class OrdersControllerTest {
     private ReceiptAlerts receiptAlerts;
     @Mock
     private PosReceiptDecisions posReceiptDecisions;
+    @Mock
+    private ReceiptEligibility receiptEligibility;
 
     // Real resolver over the test classpath registry (`Stub` is a registered supplier type).
     @Spy
@@ -1318,6 +1321,30 @@ class OrdersControllerTest {
 
         // then
         assertThat(model.getAttribute("posReceiptMode")).isEqualTo(PosReceiptMode.CASH_REGISTER);
+    }
+
+    @Test
+    @DisplayName("order details model flags a delivered POS sale that still needs its receipt, until an attempt exists")
+    void orderDetailsFlagsAPosSaleWithoutReceiptDecision() {
+        // given
+        Order order = orderBase();
+        Store store = new Store();
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(dropshipItemLookup.itemIdsInDropshipDeliveries(eq(STORE_ID), any())).thenReturn(Set.of());
+        when(receiptEligibility.posDecisionMissing(store, order)).thenReturn(true);
+        ExtendedModelMap missing = new ExtendedModelMap();
+        ExtendedModelMap withAttempt = new ExtendedModelMap();
+
+        // when
+        ordersController.getOrderDetails(ORDER_ID, missing, Locale.ENGLISH);
+        when(receiptAttemptService.attemptsOf(STORE_ID, ORDER_ID)).thenReturn(List.of(new ReceiptAttempt()));
+        ordersController.getOrderDetails(ORDER_ID, withAttempt, Locale.ENGLISH);
+
+        // then
+        assertThat(missing.getAttribute("posReceiptDecisionMissing")).isEqualTo(true);
+        assertThat(withAttempt.getAttribute("posReceiptDecisionMissing")).isEqualTo(false);
     }
 
     /** A shipping order whose personal collection is ready, so Delivered passes the status form's own guard. */

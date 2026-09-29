@@ -49,6 +49,7 @@ import pl.commercelink.receipts.PosReceiptDecisionForm;
 import pl.commercelink.receipts.PosReceiptDecisions;
 import pl.commercelink.receipts.ReceiptAlerts;
 import pl.commercelink.receipts.ReceiptAttemptService;
+import pl.commercelink.receipts.ReceiptEligibility;
 import pl.commercelink.rest.client.HttpClientException;
 import pl.commercelink.shipping.ShipmentCancelService;
 import pl.commercelink.shipping.ShipmentTrackingSubscriber;
@@ -179,6 +180,9 @@ public class OrdersController extends BaseController {
 
     @Autowired
     private PosReceiptDecisions posReceiptDecisions;
+
+    @Autowired
+    private ReceiptEligibility receiptEligibility;
 
     @GetMapping("/dashboard/orders")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
@@ -645,6 +649,8 @@ public class OrdersController extends BaseController {
         model.addAttribute("issuableDocumentTypes", order.getIssuableDocumentTypes());
         model.addAttribute("canIssueReceipt", receiptAttemptService.canIssueManually(store, order));
         model.addAttribute("posReceiptMode", posReceiptDecisions.required(store, order, OrderStatus.Delivered).orElse(null));
+        model.addAttribute("posReceiptDecisionMissing", store != null && receiptEligibility.posDecisionMissing(store, order)
+                && receiptAttemptService.attemptsOf(order.getStoreId(), order.getOrderId()).isEmpty());
 
         SupplierLabelMap labels = supplierLabels.forStore(store);
         model.addAttribute("supplierLabels", labels);

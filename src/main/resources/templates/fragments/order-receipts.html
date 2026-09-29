@@ -6,6 +6,15 @@
        .cl-card/.cl-list/.cl-disclosure and friends are all styled as "`.cl-page` descendant" in commercelink.css, so
        the fragment carries its own `.cl-page` wrapper purely for that CSS scoping (`.cl-status` itself is unscoped
        and would work either way). `.cl-page` only adds bottom padding; it does not pull in the sidebar chrome. */-->
+<!--/* A delivered point-of-sale sale with neither a recorded receipt nor a chosen e-receipt: the automation raised a
+       bell alert instead of guessing, and this repeats it where the operator acts. Same .cl-page scoping as below. */-->
+<div th:fragment="posDecisionMissing(orderId)" class="cl-page">
+    <div class="cl-alert is-warn" role="status">
+        <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+        <span th:text="#{receipts.pos.decision.missing(${orderId})}"></span>
+    </div>
+</div>
+
 <div th:fragment="section(view, orderId)" th:unless="${view.isEmpty()}" class="cl-page">
     <section class="cl-card" aria-labelledby="order-receipts-title">
         <div class="cl-card-head">
