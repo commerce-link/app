@@ -70,7 +70,7 @@ public class OrdersRepository extends DynamoDbRepository<Order> {
      * followed) for the keys, then a batch load of the orders themselves — so a store's growing history of Completed
      * and Cancelled orders is never read when only open ones are asked for. The index is eventually consistent, so an
      * order whose status changed a moment ago is dropped when its loaded status is no longer asked for. Until the index
-     * exists and is active (it is built in the background after V016 runs) the store's partition is read instead.
+     * exists and is active (it is built in the background after V018 runs) the store's partition is read instead.
      */
     public List<Order> findByStoreAndStatuses(String storeId, Collection<OrderStatus> statuses) {
         Set<OrderStatus> wanted = statuses.isEmpty() ? EnumSet.noneOf(OrderStatus.class) : EnumSet.copyOf(statuses);
@@ -113,7 +113,7 @@ public class OrdersRepository extends DynamoDbRepository<Order> {
 
     /**
      * A missing index ("The table does not have the specified index: StoreIdStatusIndex") or one still being built after
-     * V016 ("Cannot read from backfilling global secondary index: StoreIdStatusIndex") answers with an error naming it;
+     * V018 ("Cannot read from backfilling global secondary index: StoreIdStatusIndex") answers with an error naming it;
      * every other error is a real failure and is not hidden behind the fallback.
      */
     private static boolean indexUnavailable(AmazonDynamoDBException e) {

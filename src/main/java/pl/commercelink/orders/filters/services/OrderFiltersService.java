@@ -14,6 +14,7 @@ import pl.commercelink.orders.filters.model.OwnedOrderFilters;
 import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -23,9 +24,43 @@ public class OrderFiltersService {
     private final OptimisticLockingExecutor optimisticLockingExecutor;
 
     public ListOrderFiltersView list(FilterActor actor) {
+        Optional<OwnedOrderFilters> own = orderFiltersRepository.findByOwner(actor.storeId(), actor.userId());
         return new ListOrderFiltersView(
                 filtersOf(actor.storeId(), OwnedOrderFilters.STORE_FILTER),
-                filtersOf(actor.storeId(), actor.userId()));
+                own.map(OwnedOrderFilters::getFilters).orElseGet(List::of),
+                own.map(OwnedOrderFilters::getDefaultFilterId).orElse(null));
+    }
+
+    /** Makes the actor's orders list open with this filter; any filter they can see, their own or the store's, will do. */
+    public void setDefault(FilterActor actor, String filterId) {
+        if (list(actor).byId(filterId).isEmpty()) {
+            throw new OrderFilterInvalidException("orders.filters.error.not.found");
+        }
+        optimisticLockingExecutor.modifyAndSave(
+                () -> ownRow(actor),
+                own -> own.setDefaultFilterId(filterId),
+                orderFiltersRepository::save);
+    }
+
+    /**
+     * Stops the actor's orders list opening with this filter. Only this one: a page left open from before the user
+     * chose another default must not clear the newer choice.
+     */
+    public void clearDefault(FilterActor actor, String filterId) {
+        boolean isDefault = orderFiltersRepository.findByOwner(actor.storeId(), actor.userId())
+                .filter(own -> own.isDefault(filterId))
+                .isPresent();
+        if (!isDefault) {
+            return;
+        }
+        optimisticLockingExecutor.modifyAndSave(
+                () -> ownRow(actor),
+                own -> {
+                    if (own.isDefault(filterId)) {
+                        own.setDefaultFilterId(null);
+                    }
+                },
+                orderFiltersRepository::save);
     }
 
     public OrderFilter create(FilterActor actor, boolean sharedWithStore, String label,
@@ -67,7 +102,14 @@ public class OrderFiltersService {
 
         optimisticLockingExecutor.modifyAndSave(
                 () -> checkWritePermissionsAndReturnByFilterId(actor, filterId),
-                ownersFilters -> ownersFilters.remove(filterId),
+                ownersFilters -> {
+                    ownersFilters.remove(filterId);
+                    // the user's own filter was their default: it goes with it. A deleted store filter that other
+                    // users chose stays named in their rows and reads as no default (ListOrderFiltersView).
+                    if (ownersFilters.isDefault(filterId)) {
+                        ownersFilters.setDefaultFilterId(null);
+                    }
+                },
                 orderFiltersRepository::save);
     }
 
@@ -95,6 +137,11 @@ public class OrderFiltersService {
         return orderFiltersRepository.findByOwner(storeId, userId)
                 .map(OwnedOrderFilters::getFilters)
                 .orElseGet(List::of);
+    }
+
+    private OwnedOrderFilters ownRow(FilterActor actor) {
+        return orderFiltersRepository.findByOwner(actor.storeId(), actor.userId())
+                .orElseGet(() -> OwnedOrderFilters.emptyFor(actor.storeId(), actor.userId()));
     }
 
     private OwnedOrderFilters checkWritePermissionsAndReturn(FilterActor actor, boolean sharedWithStore) {

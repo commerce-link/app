@@ -139,8 +139,8 @@
                             </table>
                             <fieldset class="cl-fieldset">
                                 <legend class="cl-fieldset-title" th:text="#{shipping.delivery.options}"></legend>
-                                <div th:replace="~{fragments/settings-form :: check('saturdayDelivery', 'shipping.saturday', ${f.saturdayDelivery}, null, null)}"></div>
-                                <div th:replace="~{fragments/settings-form :: check('cashOnDelivery', 'shipping.cash.on.delivery', ${f.cashOnDelivery}, null, 'shipping-cod')}"></div>
+                                <div th:replace="~{fragments/settings-form :: check('saturdayDelivery', 'shipping.saturday', ${f.saturdayDelivery}, null, null, null)}"></div>
+                                <div th:replace="~{fragments/settings-form :: check('cashOnDelivery', 'shipping.cash.on.delivery', ${f.cashOnDelivery}, null, 'shipping-cod', null)}"></div>
                                 <div class="cl-reveal" id="shipping-cod">
                                     <div class="cl-field">
                                         <label class="cl-label" for="cashOnDeliveryAmount" th:text="#{shipping.cod.amount}"></label>

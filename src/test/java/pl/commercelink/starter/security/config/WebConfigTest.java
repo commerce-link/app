@@ -64,6 +64,30 @@ class WebConfigTest {
         assertThat(storeAccessGuards(get("/dashboard/store/fulfilment"))).isFalse();
     }
 
+    @Test
+    void storeAccessInterceptorDoesNotGuardTheAdminStoreReceiptsPage() {
+        // given / when / then
+        assertThat(storeAccessGuards(get("/dashboard/store/receipts"))).isFalse();
+    }
+
+    @Test
+    void storeAccessInterceptorDoesNotGuardTheAdminStoreReceiptSystemPage() {
+        // given / when / then
+        assertThat(storeAccessGuards(get("/dashboard/store/receipts/system"))).isFalse();
+    }
+
+    @Test
+    void storeAccessInterceptorDoesNotGuardTheAdminStoreReceiptSystemDisconnect() {
+        // given / when / then
+        assertThat(storeAccessGuards(get("/dashboard/store/receipts/system/disconnect"))).isFalse();
+    }
+
+    @Test
+    void storeAccessInterceptorStillGuardsTheSuperAdminStoreReceiptsPage() {
+        // given / when / then
+        assertThat(storeAccessGuards(get("/dashboard/store/other-store/receipts"))).isTrue();
+    }
+
     private boolean storeAccessGuards(HttpServletRequest request) {
         ServletRequestPathUtils.parseAndCache(request);
         return mappedStoreAccessInterceptors().stream().anyMatch(i -> i.matches(request));

@@ -303,6 +303,7 @@ public class ProductForm {
                 .collect(Collectors.toCollection(LinkedList::new)));
         product.setCustomAttributes(customAttributes.stream().filter(ProductCustomAttribute::isComplete)
                 .collect(Collectors.toCollection(LinkedList::new)));
+        customAttributesFilters.forEach(filter -> filter.setCategory(StringUtils.trim(filter.getCategory())));
         product.setCustomAttributesFilters(customAttributesFilters.stream().filter(ProductCustomAttributeFilter::isComplete)
                 .collect(Collectors.toCollection(LinkedList::new)));
         product.setMetadata(metadata.stream().filter(Metadata::isComplete)
@@ -369,10 +370,12 @@ public class ProductForm {
 
     /**
      * The field of an unfinished filter the summary should lead to: the first one left to fill, in the order of the
-     * page (RF-29). The PIM category is a picker without a field id of its own, so a filter lacking only that one
-     * points at its name, next to it.
+     * page (RF-29).
      */
     private static String missingField(ProductCustomAttributeFilter filter) {
+        if (StringUtils.isBlank(filter.getCategory())) {
+            return "category";
+        }
         if (StringUtils.isBlank(filter.getName())) {
             return "name";
         }

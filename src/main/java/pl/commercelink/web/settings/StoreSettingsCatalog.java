@@ -25,6 +25,8 @@ public final class StoreSettingsCatalog {
             new SettingsSection("store.settings.group.finance", List.of(
                     new SettingsTile("invoicing", "store.invoicing", "store.invoicing.description",
                             "fa-calculator", "/invoicing", STORE_ADMINS),
+                    new SettingsTile("receipts", "store.receipts", "store.receipts.description",
+                            "fa-file-alt", "/receipts", STORE_ADMINS),
                     new SettingsTile("payments", "store.payments", "store.payments.description",
                             "fa-credit-card", "/payments", STORE_ADMINS))),
             new SettingsSection("store.settings.group.sales", List.of(

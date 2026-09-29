@@ -42,6 +42,9 @@ import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.pricelist.AvailabilityAndPrice;
 import pl.commercelink.pricelist.PricelistFinder;
 import pl.commercelink.products.StoreCategories;
+import pl.commercelink.receipts.ReceiptAlerts;
+import pl.commercelink.receipts.ReceiptAttempt;
+import pl.commercelink.receipts.ReceiptAttemptService;
 import pl.commercelink.rest.client.HttpClientException;
 import pl.commercelink.shipping.ShipmentCancelService;
 import pl.commercelink.shipping.ShipmentTrackingSubscriber;
@@ -190,12 +193,24 @@ public class OrdersController extends BaseController {
     @Autowired
     private OrderReferenceResolver orderReferenceResolver;
 
+    @Autowired
+    private ReceiptAttemptService receiptAttemptService;
+
+    @Autowired
+    private ReceiptAlerts receiptAlerts;
+
     @GetMapping("/dashboard/orders")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String orders(@RequestParam MultiValueMap<String, String> params, Locale locale, Model model) {
         Optional<String> legacy = OrderListQuery.legacyRedirect(params);
         if (legacy.isPresent()) {
             return "redirect:" + legacy.get();
+        }
+        if (OrderListQuery.isEntry(params)) {
+            Optional<String> start = orderListService.defaultFilterHref(actor());
+            if (start.isPresent()) {
+                return "redirect:" + start.get();
+            }
         }
         OrderListQuery query = OrderListQuery.parse(params);
         addListAttributes(model, query, locale);
@@ -221,7 +236,10 @@ public class OrdersController extends BaseController {
     public String createOrderFilter(OrderFilterForm form, RedirectAttributes redirectAttributes, Model model, Locale locale,
                                     HttpServletResponse response) {
         return filterAction(form.getReturnTo(), redirectAttributes, model, locale, response, form, null, () -> {
-            orderFilters.create(actor(), form.isSharedWithStore(), form.getLabel(), form.toConditions());
+            OrderFilter created = orderFilters.create(actor(), form.isSharedWithStore(), form.getLabel(), form.toConditions());
+            if (form.isOpenByDefault()) {
+                orderFilters.setDefault(actor(), created.getId());
+            }
             return safeReturnTo(form.getReturnTo());
         });
     }
@@ -232,7 +250,36 @@ public class OrdersController extends BaseController {
                                     Model model, Locale locale, HttpServletResponse response) {
         return filterAction(form.getReturnTo(), redirectAttributes, model, locale, response, form, filterId, () -> {
             orderFilters.update(actor(), filterId, form.isSharedWithStore(), form.getLabel(), form.toConditions());
+            if (form.isOpenByDefault()) {
+                orderFilters.setDefault(actor(), filterId);
+            } else {
+                orderFilters.clearDefault(actor(), filterId);
+            }
             return safeReturnTo(form.getReturnTo());
+        });
+    }
+
+    /** "Ustaw jako domyślny" on the management page: the user's orders list opens with this filter from now on. */
+    @PostMapping(FILTERS_PATH + "/default")
+    @PreAuthorize("!hasRole('SUPER_ADMIN')")
+    public String setDefaultOrderFilter(@RequestParam String filterId, @RequestParam(required = false) String returnTo,
+                                        RedirectAttributes redirectAttributes, Model model, Locale locale,
+                                        HttpServletResponse response) {
+        return filterAction(returnTo, redirectAttributes, model, locale, response, null, null, () -> {
+            orderFilters.setDefault(actor(), filterId);
+            return safeReturnTo(returnTo);
+        });
+    }
+
+    /** "Nie otwieraj domyślnie": the user's orders list opens unfiltered again. */
+    @PostMapping(FILTERS_PATH + "/default/clear")
+    @PreAuthorize("!hasRole('SUPER_ADMIN')")
+    public String clearDefaultOrderFilter(@RequestParam String filterId, @RequestParam(required = false) String returnTo,
+                                          RedirectAttributes redirectAttributes, Model model, Locale locale,
+                                          HttpServletResponse response) {
+        return filterAction(returnTo, redirectAttributes, model, locale, response, null, null, () -> {
+            orderFilters.clearDefault(actor(), filterId);
+            return safeReturnTo(returnTo);
         });
     }
 
@@ -304,7 +351,9 @@ public class OrdersController extends BaseController {
         if (shared && !isAdmin()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
-        addFilterEditAttributes(model, safeListReturnTo(returnTo), filterId, formOf(filter, shared), locale);
+        OrderFilterForm form = formOf(filter, shared);
+        form.setOpenByDefault(filters.isDefault(filterId));
+        addFilterEditAttributes(model, safeListReturnTo(returnTo), filterId, form, locale);
         return "orders/filter-edit";
     }
 
@@ -1827,6 +1876,17 @@ public class OrdersController extends BaseController {
      * What a customer is told about a shipment. The form keeps the saved shippedAt on the same day; sub-minute digits
      * still do not count as a change, for shipments saved before the form edited dates only.
      */
+    /** The receipt row was written by an e-receipt attempt (its document id is the attempt's key), not typed in. */
+    private boolean isAutomaticReceipt(Order order, DocumentType type, String number) {
+        if (type != DocumentType.Receipt) {
+            return false;
+        }
+        List<ReceiptAttempt> attempts = receiptAttemptService.attemptsOf(order.getStoreId(), order.getOrderId());
+        return order.getDocuments().stream()
+                .filter(d -> d.getType() == DocumentType.Receipt && Objects.equals(d.getNumber(), number))
+                .anyMatch(d -> attempts.stream().anyMatch(a -> a.getReceiptKey().equals(d.getId())));
+    }
+
     private static String shipmentData(Shipment s) {
         return String.join("|",
                 String.valueOf(s.getType()),
@@ -1841,6 +1901,11 @@ public class OrdersController extends BaseController {
     public String addReceipt(@PathVariable String orderId, @ModelAttribute Document document,
                              RedirectAttributes redirectAttributes, Locale locale) {
         Order order = requireOrder(ordersRepository, getStoreId(), orderId);
+        // an attempt that is issuing, fiscalised or closed by hand already owns the order's receipt: a typed one would
+        // be a second receipt for the same sale
+        if (document.getType() == DocumentType.Receipt && receiptAttemptService.blocksManualReceipt(getStoreId(), orderId)) {
+            return refuse(redirectAttributes, orderId, "receipts.document.add.live", locale);
+        }
         String locked = OrderPageModelFactory.addDocumentLockedKey(order, document.getType());
         if (locked != null) {
             return refuse(redirectAttributes, orderId, locked, locale);
@@ -1869,7 +1934,7 @@ public class OrdersController extends BaseController {
         Order order = requireOrder(ordersRepository, getStoreId(), orderId);
         boolean present = order.getDocuments().stream()
                 .anyMatch(d -> d.getType() == type && Objects.equals(d.getNumber(), number));
-        if (!present) {
+        if (!present || isAutomaticReceipt(order, type, number)) {
             return details(orderId);
         }
         return confirmPage(model, order, "order.documents.unpin", new Object[]{number}, null,
@@ -1882,6 +1947,12 @@ public class OrdersController extends BaseController {
                                  @RequestParam(required = false) String number,
                                  RedirectAttributes redirectAttributes, Locale locale) {
         Order order = requireOrder(ordersRepository, getStoreId(), orderId);
+
+        // an automatically issued receipt's document id is the attempt's own key; removing it here would strand the
+        // order's document without ever touching the attempt, so the attempt would still poll or hold its result
+        if (isAutomaticReceipt(order, type, number)) {
+            return refuse(redirectAttributes, orderId, "receipts.document.remove.automatic", locale);
+        }
 
         if (order.isClosed() || !order.removeDocument(type, number)) {
             return refuse(redirectAttributes, orderId, "error.message.document.cannot.be.removed", locale);

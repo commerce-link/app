@@ -31,6 +31,8 @@ public class Store {
     private Branding branding;
     @DynamoDBAttribute(attributeName = "invoicing")
     private InvoicingConfiguration invoicingConfiguration;
+    @DynamoDBAttribute(attributeName = "receipts")
+    private ReceiptConfiguration receiptConfiguration;
     @DynamoDBAttribute(attributeName = "marketplaces")
     private List<MarketplaceIntegration> marketplaces = new LinkedList<>();
     @DynamoDBAttribute(attributeName = "payments")
@@ -374,6 +376,17 @@ public class Store {
         this.invoicingConfiguration = invoicingConfiguration;
     }
 
+    public ReceiptConfiguration getReceiptConfiguration() {
+        if (receiptConfiguration == null) {
+            receiptConfiguration = new ReceiptConfiguration();
+        }
+        return receiptConfiguration;
+    }
+
+    public void setReceiptConfiguration(ReceiptConfiguration receiptConfiguration) {
+        this.receiptConfiguration = receiptConfiguration;
+    }
+
     public ClientNotificationsConfiguration getClientNotificationsConfiguration() {
         return clientNotificationsConfiguration;
     }
@@ -510,6 +523,22 @@ public class Store {
     @DynamoDBIgnore
     public boolean supportsNotification(EmailNotificationType type) {
         return clientNotificationsConfiguration != null && clientNotificationsConfiguration.supports(type);
+    }
+
+    /**
+     * Turns on the {@code ORDER_RECEIPT} e-mail, creating the client notifications configuration if the store has
+     * none yet. Called whenever e-receipts are enabled for the first time (the settings form and the demo seeder
+     * alike), so a store never starts raising a permanent {@code EMAIL_NOT_SENT} alert on its first fiscalised
+     * receipt for lack of an e-mail type to send. Idempotent: a store that already supports the type is untouched.
+     */
+    public void enableOrderReceiptEmailNotification() {
+        if (clientNotificationsConfiguration == null) {
+            clientNotificationsConfiguration = new ClientNotificationsConfiguration();
+        }
+        if (!clientNotificationsConfiguration.supports(EmailNotificationType.ORDER_RECEIPT)) {
+            clientNotificationsConfiguration.enableNotification(EmailNotificationType.ORDER_RECEIPT,
+                    EmailNotificationType.ORDER_RECEIPT.getTemplateName());
+        }
     }
 
     public void enableClientShippingAddressChangeNotifications() {

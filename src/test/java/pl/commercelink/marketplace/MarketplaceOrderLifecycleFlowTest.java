@@ -25,6 +25,7 @@ import pl.commercelink.orders.OrderSourceType;
 import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.notifications.OrderNotificationsEventPublisher;
+import pl.commercelink.receipts.ReceiptTrigger;
 import pl.commercelink.stores.MarketplaceIntegration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
@@ -63,6 +64,7 @@ class MarketplaceOrderLifecycleFlowTest {
     @Mock private GoodsOutEventPublisher goodsOutEventPublisher;
     @Mock private DropshipItemLookup dropshipItemLookup;
     @Mock private MarketplaceProviderFactory providerFactory;
+    @Mock private ReceiptTrigger receiptTrigger;
 
     @Mock private Store store;
     @Mock private MarketplaceProvider provider;

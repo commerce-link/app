@@ -50,6 +50,9 @@ import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrdersManager;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.StoreCategories;
+import pl.commercelink.receipts.ReceiptAlerts;
+import pl.commercelink.receipts.ReceiptAttempt;
+import pl.commercelink.receipts.ReceiptAttemptService;
 import pl.commercelink.web.dtos.OrderItemsForm;
 import pl.commercelink.web.dtos.SplitGroupForm;
 import pl.commercelink.orders.OrdersRepository;
@@ -116,6 +119,7 @@ import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -178,6 +182,10 @@ class OrdersControllerTest {
     private ShipmentCancelService shipmentCancelService;
     @Mock
     private pl.commercelink.invoicing.InvoiceCreationEventPublisher invoiceCreationEventPublisher;
+    @Mock
+    private ReceiptAttemptService receiptAttemptService;
+    @Mock
+    private ReceiptAlerts receiptAlerts;
 
     // Real resolver over the test classpath registry (`Stub` is a registered supplier type).
     @Spy
@@ -1415,6 +1423,53 @@ class OrdersControllerTest {
     }
 
     @Test
+    @DisplayName("removeDocument refuses to remove a document an e-receipt attempt issued automatically")
+    void removeDocumentRefusesAnAutomaticReceipt() {
+        // given
+        String receiptKey = ORDER_ID + ":R1";
+        Order existingOrder = orderBase();
+        existingOrder.addDocument(new pl.commercelink.documents.Document(
+                receiptKey, receiptKey, null, pl.commercelink.documents.DocumentType.Receipt));
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(existingOrder);
+        ReceiptAttempt attempt = new ReceiptAttempt();
+        attempt.setReceiptKey(receiptKey);
+        when(receiptAttemptService.attemptsOf(STORE_ID, ORDER_ID)).thenReturn(List.of(attempt));
+        when(messageSource.getMessage(eq("receipts.document.remove.automatic"), any(), eq(Locale.ENGLISH)))
+                .thenReturn("Cannot remove automatic receipt");
+
+        // when
+        String view = ordersController.removeDocument(ORDER_ID, pl.commercelink.documents.DocumentType.Receipt,
+                receiptKey, redirectAttributes, Locale.ENGLISH);
+
+        // then
+        assertThat(existingOrder.getDocuments()).hasSize(1);
+        verify(ordersRepository, never()).save(any());
+        verify(redirectAttributes).addFlashAttribute(eq("errorMessage"), eq("Cannot remove automatic receipt"));
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+    }
+
+    @Test
+    @DisplayName("addReceipt refuses to add a manual Receipt document while an e-receipt attempt is live")
+    void addReceiptRefusesAManualReceiptWhileAnAttemptIsLive() {
+        // given
+        when(receiptAttemptService.blocksManualReceipt(STORE_ID, ORDER_ID)).thenReturn(true);
+        when(messageSource.getMessage(eq("receipts.document.add.live"), any(), eq(Locale.ENGLISH)))
+                .thenReturn("An automatic receipt is already being issued");
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(orderBase());
+        pl.commercelink.documents.Document document = new pl.commercelink.documents.Document(
+                null, "PAR/1", null, pl.commercelink.documents.DocumentType.Receipt);
+
+        // when
+        String view = ordersController.addReceipt(ORDER_ID, document, redirectAttributes, Locale.ENGLISH);
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+        verify(redirectAttributes).addFlashAttribute(eq("errorMessage"), eq("An automatic receipt is already being issued"));
+        verify(ordersRepository, never()).save(any());
+        verifyNoInteractions(orderLifecycle);
+    }
+
+    @Test
     void clearSupplierReleasesAnAllocatedItem() {
         // given
         OrderItem item = existingOrderItem("Laptopy", false);
@@ -2062,16 +2117,121 @@ class OrdersControllerTest {
         }
 
         @Test
-        void entryWithoutParametersOpensTheOpenList() {
-            var saved = pl.commercelink.orders.filters.model.OrderFilter.of("Do wysłania", List.of(
-                    pl.commercelink.orders.filters.model.OrderFilterCondition.of(pl.commercelink.orders.filters.OrderFilterField.Status, "Assembled")));
-            when(orderFilters.list(ACTOR)).thenReturn(new pl.commercelink.orders.filters.services.ListOrderFiltersView(List.of(), List.of(saved)));
-            // no start filter any more: a saved filter never opens by itself
+        void entryWithoutADefaultFilterOpensTheOpenList() {
+            // given
+            when(orderListService.defaultFilterHref(ACTOR)).thenReturn(Optional.empty());
             ExtendedModelMap model = new ExtendedModelMap();
-            assertThat(ordersController.orders(params(), Locale.forLanguageTag("pl"), model)).isEqualTo("orders/list");
+
+            // when
+            String view = ordersController.orders(params(), Locale.forLanguageTag("pl"), model);
+
+            // then
+            assertThat(view).isEqualTo("orders/list");
             var query = ((pl.commercelink.web.orders.OrdersPageModel) model.get("page")).query();
             assertThat(query.isOpen()).isTrue();
             assertThat(query.hasFilter()).isFalse();
+        }
+
+        @Test
+        void entryOpensTheUsersDefaultFilter() {
+            // given
+            when(orderListService.defaultFilterHref(ACTOR)).thenReturn(Optional.of("/dashboard/orders?status=Assembled&filterId=f1"));
+
+            // when
+            String view = ordersController.orders(params("lang", "pl"), Locale.forLanguageTag("pl"), new ExtendedModelMap());
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/orders?status=Assembled&filterId=f1");
+        }
+
+        @Test
+        void listWithItsStateNeverJumpsToTheDefaultFilter() {
+            // given
+            lenient().when(orderListService.defaultFilterHref(ACTOR)).thenReturn(Optional.of("/dashboard/orders?filterId=f1"));
+            ExtendedModelMap model = new ExtendedModelMap();
+
+            // when
+            String view = ordersController.orders(params("filterId", ""), Locale.forLanguageTag("pl"), model);
+
+            // then
+            assertThat(view).isEqualTo("orders/list");
+            assertThat(((pl.commercelink.web.orders.OrdersPageModel) model.get("page")).query().hasFilter()).isFalse();
+            verify(orderListService, never()).defaultFilterHref(any());
+        }
+
+        @Test
+        void settingAndClearingTheDefaultReturnToTheManagementPage() {
+            // given
+            String manage = OrdersController.filtersPage("/dashboard/orders?status=New");
+
+            // when
+            String set = ordersController.setDefaultOrderFilter("f1", manage, new RedirectAttributesModelMap(), new ExtendedModelMap(),
+                    Locale.forLanguageTag("pl"), new org.springframework.mock.web.MockHttpServletResponse());
+            String cleared = ordersController.clearDefaultOrderFilter("f1", manage, new RedirectAttributesModelMap(), new ExtendedModelMap(),
+                    Locale.forLanguageTag("pl"), new org.springframework.mock.web.MockHttpServletResponse());
+
+            // then
+            assertThat(set).isEqualTo("redirect:" + manage);
+            assertThat(cleared).isEqualTo("redirect:" + manage);
+            verify(orderFilters).setDefault(ACTOR, "f1");
+            verify(orderFilters).clearDefault(ACTOR, "f1");
+        }
+
+        @Test
+        void rejectedDefaultBecomesAFlashForTheManagementPage() {
+            // given
+            String manage = OrdersController.filtersPage("/dashboard/orders");
+            org.mockito.Mockito.doThrow(new pl.commercelink.orders.filters.exceptions.OrderFilterInvalidException("orders.filters.error.not.found"))
+                    .when(orderFilters).setDefault(any(), any());
+            when(messageSource.getMessage(eq("orders.filters.error.not.found"), any(), any(Locale.class))).thenReturn("Nie ma takiego filtra.");
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            String view = ordersController.setDefaultOrderFilter("gone", manage, redirect, new ExtendedModelMap(),
+                    Locale.forLanguageTag("pl"), new org.springframework.mock.web.MockHttpServletResponse());
+
+            // then
+            assertThat(view).isEqualTo("redirect:" + manage);
+            assertThat(redirect.getFlashAttributes().get("filterError")).isEqualTo("Nie ma takiego filtra.");
+        }
+
+        @Test
+        void creatingAFilterWithOpenByDefaultMakesItTheDefault() {
+            // given
+            var created = pl.commercelink.orders.filters.model.OrderFilter.of("Do wysłania", List.of(
+                    pl.commercelink.orders.filters.model.OrderFilterCondition.of(pl.commercelink.orders.filters.OrderFilterField.Status, "Assembled")));
+            when(orderFilters.create(any(), anyBoolean(), any(), any())).thenReturn(created);
+            var form = new pl.commercelink.web.dtos.OrderFilterForm();
+            form.setLabel("Do wysłania");
+            form.setStatus("Assembled");
+            form.setOpenByDefault(true);
+            form.setReturnTo(OrdersController.filtersPage("/dashboard/orders"));
+
+            // when
+            ordersController.createOrderFilter(form, new RedirectAttributesModelMap(), new ExtendedModelMap(),
+                    Locale.forLanguageTag("pl"), new org.springframework.mock.web.MockHttpServletResponse());
+
+            // then
+            verify(orderFilters).setDefault(ACTOR, created.getId());
+        }
+
+        @Test
+        void updatingAFilterSetsOrClearsItsDefaultFromTheCheckbox() {
+            // given
+            var form = new pl.commercelink.web.dtos.OrderFilterForm();
+            form.setLabel("Do wysłania");
+            form.setReturnTo(OrdersController.filtersPage("/dashboard/orders"));
+
+            // when
+            ordersController.updateOrderFilter("f1", form, new RedirectAttributesModelMap(), new ExtendedModelMap(),
+                    Locale.forLanguageTag("pl"), new org.springframework.mock.web.MockHttpServletResponse());
+            form.setOpenByDefault(true);
+            ordersController.updateOrderFilter("f1", form, new RedirectAttributesModelMap(), new ExtendedModelMap(),
+                    Locale.forLanguageTag("pl"), new org.springframework.mock.web.MockHttpServletResponse());
+
+            // then
+            verify(orderFilters).clearDefault(ACTOR, "f1");
+            verify(orderFilters).setDefault(ACTOR, "f1");
         }
 
         @Test
@@ -2079,7 +2239,7 @@ class OrdersControllerTest {
             assertThat(ordersController.orders(params("statuses", "Blocked", "showAll", "false"), Locale.forLanguageTag("pl"), new ExtendedModelMap()))
                     .isEqualTo("redirect:/dashboard/orders?status=Blocked");
             assertThat(ordersController.orders(params("showAll", "true"), Locale.forLanguageTag("pl"), new ExtendedModelMap()))
-                    .isEqualTo("redirect:/dashboard/orders");
+                    .isEqualTo("redirect:/dashboard/orders?filterId=");
         }
 
         @Test
@@ -2094,9 +2254,9 @@ class OrdersControllerTest {
         void returnToOutsideTheListIsIgnored() {
             RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
             assertThat(ordersController.deleteOrderFilter("f1", "https://evil.example/x", redirect, new ExtendedModelMap(), Locale.forLanguageTag("pl"), new org.springframework.mock.web.MockHttpServletResponse()))
-                    .isEqualTo("redirect:/dashboard/orders");
+                    .isEqualTo("redirect:/dashboard/orders?filterId=");
             assertThat(ordersController.deleteOrderFilter("f1", "/dashboard/store/x", redirect, new ExtendedModelMap(), Locale.forLanguageTag("pl"), new org.springframework.mock.web.MockHttpServletResponse()))
-                    .isEqualTo("redirect:/dashboard/orders");
+                    .isEqualTo("redirect:/dashboard/orders?filterId=");
         }
 
         @Test
@@ -2166,6 +2326,7 @@ class OrdersControllerTest {
             assertThat(form.getStatus()).isEqualTo("New");
             assertThat(form.getSourceName()).isEqualTo("Allegro");
             assertThat(form.isSharedWithStore()).isFalse();
+            assertThat(form.isOpenByDefault()).isFalse();
             assertThat(model.get("filterId")).isEqualTo(own.getId());
             assertThat(model.get("formAction")).isEqualTo("/dashboard/orders/filters/update");
             assertThat(model.get("returnTo")).isEqualTo(OrdersController.filtersPage("/dashboard/orders"));
@@ -2249,7 +2410,7 @@ class OrdersControllerTest {
             String view = ordersController.deleteOrderFilter("f1", "/dashboard/orders?x=%",
                     new RedirectAttributesModelMap(), new ExtendedModelMap(), Locale.forLanguageTag("pl"),
                     new org.springframework.mock.web.MockHttpServletResponse());
-            assertThat(view).isEqualTo("redirect:/dashboard/orders");
+            assertThat(view).isEqualTo("redirect:/dashboard/orders?filterId=");
             verify(orderFilters).delete(ACTOR, "f1");
         }
 

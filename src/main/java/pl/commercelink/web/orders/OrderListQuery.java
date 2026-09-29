@@ -16,14 +16,20 @@ import java.util.Set;
 /**
  * The state of the orders list, read from and written back to the address (spec §2). Every link on the page is
  * built here, so changing one parameter never loses the others. statuses is empty for "all open" and otherwise the
- * statuses ticked in the Status menu (?status=New&status=Blocked, in enum order); an empty filterId (an
- * older "clear the filter" link) is read as no filter. Parameters the list no longer has (focus from the
- * clickable tiles, sort=ordered from the history) are ignored, so old bookmarks still open the list.
+ * statuses ticked in the Status menu (?status=New&status=Blocked, in enum order); an empty filterId is an explicit
+ * "no filter", which the bare address is not (see {@link #UNFILTERED}). Parameters the list no longer has (focus from
+ * the clickable tiles, sort=ordered from the history) are ignored, so old bookmarks still open the list.
  */
 public record OrderListQuery(List<OrderStatus> statuses, String filterId, String q,
                              Sort sort, Direction dir, int page) {
 
     public static final String PATH = "/dashboard/orders";
+    /**
+     * The list with nothing chosen, as the list itself links to it. The bare {@link #PATH} is how the list is entered
+     * (the sidebar, a bookmark) and opens with the user's default filter; every address the list builds names its state,
+     * so clearing the filter keeps the list unfiltered instead of bringing the default back.
+     */
+    public static final String UNFILTERED = PATH + "?filterId=";
     public static final int PAGE_SIZE = 50;
     public static final int MAX_Q = 100;
     static final int MAX_RETURN_TO = 300;
@@ -78,6 +84,14 @@ public record OrderListQuery(List<OrderStatus> statuses, String filterId, String
                 Sort.parse(params.getFirst("sort")).orElse(null),
                 Direction.parse(params.getFirst("dir")).orElse(null),
                 parsePage(params.getFirst("page")));
+    }
+
+    /**
+     * Whether the address is the list entered from outside (the sidebar, a bookmark, a breadcrumb): no list state at
+     * all, the language switch aside. Only then does the user's default filter apply.
+     */
+    public static boolean isEntry(MultiValueMap<String, String> params) {
+        return params.keySet().stream().allMatch("lang"::equals);
     }
 
     /** ?statuses=A&statuses=B and ?showAll=true from before the redesign: bookmarks keep working (spec §2). */
@@ -208,7 +222,7 @@ public record OrderListQuery(List<OrderStatus> statuses, String filterId, String
         if (page > 1) {
             parts.add("page=" + page);
         }
-        return parts.isEmpty() ? PATH : PATH + "?" + String.join("&", parts);
+        return parts.isEmpty() ? UNFILTERED : PATH + "?" + String.join("&", parts);
     }
 
     /** Where the filter pages return to; a runaway address falls back to the bare list (spec §8.1). */

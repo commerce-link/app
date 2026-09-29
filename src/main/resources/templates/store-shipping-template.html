@@ -22,7 +22,7 @@
                             <th:block th:unless="${firstTemplate}">
                                 <p th:if="${alreadyDefault}" class="cl-help" th:text="#{store.shipping.template.isDefault}"></p>
                                 <th:block th:unless="${alreadyDefault}">
-                                    <div th:replace="~{fragments/settings-form :: check('makeDefault', 'store.shipping.template.makeDefault', *{makeDefault}, 'store.shipping.template.makeDefault.description', null)}"></div>
+                                    <div th:replace="~{fragments/settings-form :: check('makeDefault', 'store.shipping.template.makeDefault', *{makeDefault}, 'store.shipping.template.makeDefault.description', null, null)}"></div>
                                 </th:block>
                             </th:block>
                         </div>

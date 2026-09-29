@@ -31,7 +31,7 @@
                             <div class="cl-span-3" th:insert="~{fragments/settings-form :: textField('phone', 'order.address.phone', *{phone}, 'tel', 'tel', false, ${errors['phone']}, null)}"></div>
                             <p th:if="${alreadyDefault}" class="cl-help" th:text="#{store.warehouse.address.isDefault}"></p>
                             <th:block th:unless="${alreadyDefault}">
-                                <div th:replace="~{fragments/settings-form :: check('makeDefault', 'store.warehouse.address.makeDefault', *{makeDefault}, 'store.warehouse.address.makeDefault.description', null)}"></div>
+                                <div th:replace="~{fragments/settings-form :: check('makeDefault', 'store.warehouse.address.makeDefault', *{makeDefault}, 'store.warehouse.address.makeDefault.description', null, null)}"></div>
                             </th:block>
                         </div>
                     </fieldset>

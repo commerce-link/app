@@ -152,15 +152,29 @@ public class OrderListService {
 
     private List<FilterOption> filterOptions(ListOrderFiltersView filters, OrderListQuery query) {
         return Stream.concat(
-                        filters.sharedWithStore().stream().map(f -> option(f, true, query)),
-                        filters.own().stream().map(f -> option(f, false, query)))
+                        filters.sharedWithStore().stream().map(f -> option(f, true, filters.isDefault(f.getId()), query)),
+                        filters.own().stream().map(f -> option(f, false, filters.isDefault(f.getId()), query)))
                 .toList();
     }
 
-    private static FilterOption option(OrderFilter filter, boolean shared, OrderListQuery query) {
+    private static FilterOption option(OrderFilter filter, boolean shared, boolean isDefault, OrderListQuery query) {
+        return new FilterOption(filter.getId(), filter.getLabel(), shared, filter.getId().equals(query.filterId()),
+                isDefault, chosen(filter, query).href());
+    }
+
+    /**
+     * Where the list opens for a user who chose a default filter: the list with that filter chosen, as picking it from
+     * the menu of an untouched list would give.
+     */
+    public Optional<String> defaultFilterHref(FilterActor actor) {
+        OrderListQuery untouched = new OrderListQuery(List.of(), null, null, null, null, 1);
+        return orderFilters.list(actor).defaultFilter().map(filter -> chosen(filter, untouched).href());
+    }
+
+    /** The list with this filter chosen; choosing a filter also ticks its own Status condition. */
+    private static OrderListQuery chosen(OrderFilter filter, OrderListQuery query) {
         OrderListQuery chosen = query.withFilterId(filter.getId());
-        String href = filterStatus(filter).map(chosen::withStatus).orElse(chosen).href();
-        return new FilterOption(filter.getId(), filter.getLabel(), shared, filter.getId().equals(query.filterId()), href);
+        return filterStatus(filter).map(chosen::withStatus).orElse(chosen);
     }
 
     /** The open status a filter's Status condition names; a closed one (saved before the list dropped history) is ignored. */

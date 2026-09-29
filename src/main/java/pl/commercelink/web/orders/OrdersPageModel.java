@@ -29,8 +29,11 @@ public record OrdersPageModel(
     public record StatusOption(String status, String label, long count, boolean selected) {
     }
 
-    /** A saved filter in the Filter menu; href also ticks the filter's own Status condition, if it has one. */
-    public record FilterOption(String id, String label, boolean shared, boolean selected, String href) {
+    /**
+     * A saved filter in the Filter menu; href also ticks the filter's own Status condition, if it has one, and
+     * {@code isDefault} marks the one the user's list opens with.
+     */
+    public record FilterOption(String id, String label, boolean shared, boolean selected, boolean isDefault, String href) {
     }
 
     public record Chip(String label, String clearHref, String clearLabel) {

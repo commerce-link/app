@@ -17,16 +17,16 @@ import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
-import pl.commercelink.migration.V016_AddStoreIdStatusIndex;
+import pl.commercelink.migration.V018_AddStoreIdStatusIndex;
 
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * The orders list reads only open orders through StoreIdStatusIndex, against DynamoDB Local: before V016 has added
+ * The orders list reads only open orders through StoreIdStatusIndex, against DynamoDB Local: before V018 has added
  * the index the store's partition is read instead (the list keeps working while the index is built after a deploy);
- * after it, only the asked-for statuses of the one store come back, and running V016 again changes nothing.
+ * after it, only the asked-for statuses of the one store come back, and running V018 again changes nothing.
  */
 @Testcontainers(disabledWithoutDocker = true)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
@@ -79,10 +79,10 @@ class OrdersStatusIndexDynamoDbIntegrationTest {
 
     @Test
     @Order(2)
-    void afterV016OnlyTheAskedForStatusesOfTheStoreAreRead() {
-        new V016_AddStoreIdStatusIndex(client).execute();
+    void afterV018OnlyTheAskedForStatusesOfTheStoreAreRead() {
+        new V018_AddStoreIdStatusIndex(client).execute();
         assertThat(client.describeTable("Orders").getTable().getGlobalSecondaryIndexes())
-                .anyMatch(index -> V016_AddStoreIdStatusIndex.INDEX.equals(index.getIndexName()));
+                .anyMatch(index -> V018_AddStoreIdStatusIndex.INDEX.equals(index.getIndexName()));
 
         assertThat(orders.findByStoreAndStatuses("store-a", OPEN)).extracting(pl.commercelink.orders.Order::getStatus)
                 .containsExactlyInAnyOrder(OrderStatus.New, OrderStatus.New, OrderStatus.Assembled);
@@ -94,8 +94,8 @@ class OrdersStatusIndexDynamoDbIntegrationTest {
 
     @Test
     @Order(3)
-    void runningV016AgainChangesNothingAndAStatusChangeMovesTheOrderInTheIndex() {
-        new V016_AddStoreIdStatusIndex(client).execute();
+    void runningV018AgainChangesNothingAndAStatusChangeMovesTheOrderInTheIndex() {
+        new V018_AddStoreIdStatusIndex(client).execute();
 
         pl.commercelink.orders.Order assembled = orders.findByStoreAndStatuses("store-a", List.of(OrderStatus.Assembled)).get(0);
         assembled.setStatus(OrderStatus.Completed);

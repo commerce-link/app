@@ -57,6 +57,7 @@ public class WebConfig {
                                 "/dashboard/store/branding/**",
                                 "/dashboard/store/categories/**",
                                 "/dashboard/store/invoicing/**",
+                                "/dashboard/store/receipts/**",
                                 "/dashboard/store/warehouse/**",
                                 "/dashboard/store/shipping/**",
                                 "/dashboard/store/notification/**",
