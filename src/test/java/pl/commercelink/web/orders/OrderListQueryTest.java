@@ -132,4 +132,18 @@ class OrderListQueryTest {
         assertThat(query.toggleStatus(OrderStatus.Assembly).statuses()).containsExactly(OrderStatus.New, OrderStatus.Blocked, OrderStatus.Assembly);
         assertThat(query.withStatus(OrderStatus.Assembled).single()).contains(OrderStatus.Assembled);
     }
+
+    @Test
+    void clearingDropsEveryNarrowingButKeepsTheSort() {
+        // given
+        OrderListQuery query = OrderListQuery.parse(params("status", "New", "status", "Blocked", "filterId", "f1", "q", "kowalski",
+                "sort", "amount", "dir", "desc", "page", "3"));
+
+        // when
+        OrderListQuery cleared = query.cleared();
+
+        // then
+        assertThat(cleared.href()).isEqualTo("/dashboard/orders?sort=amount&dir=desc");
+        assertThat(OrderListQuery.parse(params("status", "New", "filterId", "f1")).cleared().href()).isEqualTo("/dashboard/orders?filterId=");
+    }
 }

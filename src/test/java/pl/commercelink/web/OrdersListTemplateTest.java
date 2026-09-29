@@ -40,7 +40,8 @@ class OrdersListTemplateTest {
                 .contains("name=\"status\"").contains("cl-filter-menu-check").contains("cl-filter-menu-group").contains("page.statusSummary()")
                 .contains("data-cl-autosubmit-hide").contains("q.withStatus(null).href()")
                 .contains("details class=\"cl-filter-menu\" data-cl-filter-menu=\"filter\"").contains("cl-filter-menu-item")
-                .contains("th:href=\"@{${o.href()}}\"").contains("q.withFilterId(null).href()")   // a filter's link ticks its status
+                .contains("th:href=\"@{${o.href()}}\"")   // a filter's link ticks its status
+                .doesNotContain("q.withFilterId(null).href()").doesNotContain("orders.list.filter.off")   // cleared by "Wyczyść filtry", not in the menu
                 .contains("@{/dashboard/orders/filters(returnTo=${returnTo})}")
                 .doesNotContain("save-view").doesNotContain("saveView").doesNotContain("data-cl-dialog-open").doesNotContain("name=\"focus\"")
                 .contains("cl-search-form").contains("name=\"q\"").contains("cl-search-clear").contains("cl-button is-primary cl-search-submit").contains("q.withQ(null).href()")
@@ -54,6 +55,21 @@ class OrdersListTemplateTest {
                 .contains("fragments/pagination :: pages(${page.pagination()})")
                 .contains("data-cl-orders-results").contains("data-cl-orders-nav")
                 .contains("cl-list-empty").contains("orders.new.pos.button");
+    }
+
+    /** One way to clear every narrowing at once, at the end of the chip row (not inside the filter menu). */
+    @Test
+    void clearFiltersSitsAfterTheChips() throws Exception {
+        // given
+        String html = page();
+
+        // when
+        int chips = html.indexOf("class=\"cl-filter-chips\"");
+        int clear = html.indexOf("q.cleared().href()");
+
+        // then
+        assertThat(clear).isGreaterThan(chips).isLessThan(html.indexOf("class=\"cl-table-results\""));
+        assertThat(html).contains("class=\"cl-link-button cl-filter-chips-clear\"").contains("#{general.clear.filters}");
     }
 
     /** WZ · FV/PAR · review under the status pill (spec §25): a labelled list, state as a class, text for screen readers. */

@@ -4629,6 +4629,12 @@ a.cl-link-button:hover {
     gap: 8px;
 }
 
+/* "Wyczyść filtry" closes the chip row as a text action, centred on the chips' line. */
+.cl-page .cl-filter-chips-clear {
+    align-self: center;
+    margin-left: 4px;
+}
+
 .cl-page .cl-filter-chip {
     display: inline-flex;
     align-items: center;

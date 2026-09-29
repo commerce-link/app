@@ -185,6 +185,11 @@ public record OrderListQuery(List<OrderStatus> statuses, String filterId, String
         return withStatuses(next);
     }
 
+    /** "Wyczyść filtry": no status, filter or search left; the sort is how the list is read, not a narrowing. */
+    public OrderListQuery cleared() {
+        return new OrderListQuery(List.of(), null, null, sort, dir, 1);
+    }
+
     public OrderListQuery withFilterId(String newFilterId) {
         return new OrderListQuery(statuses, newFilterId, q, sort, dir, 1);
     }

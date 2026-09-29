@@ -96,9 +96,6 @@
                                                   th:text="${o.isDefault()} ? #{orders.list.filter.scopeDefault(${scope})} : ${scope}"></span>
                                         </a>
                                     </li>
-                                    <li th:if="${active.isPresent()}">
-                                        <a class="cl-filter-menu-item" th:href="@{${q.withFilterId(null).href()}}" th:text="#{orders.list.filter.off}" data-cl-orders-nav></a>
-                                    </li>
                                 </ul>
                                 <ul class="cl-filter-menu-footer">
                                     <li>
@@ -144,6 +141,10 @@
                             <a class="cl-filter-chip-clear" th:href="@{${chip.clearHref()}}" th:attr="aria-label=${chip.clearLabel()}"
                                data-cl-orders-nav><span aria-hidden="true">×</span></a>
                         </span>
+                        <!--/* Clears every narrowing at once — the chips' "×" drops one; switching a filter off alone would
+                               leave the statuses it ticked. */-->
+                        <a class="cl-link-button cl-filter-chips-clear" th:href="@{${q.cleared().href()}}"
+                           th:text="#{general.clear.filters}" data-cl-orders-nav></a>
                     </div>
                     <p class="cl-table-results" role="status" th:classappend="${page.chips().isEmpty()} ? 'cl-visually-hidden' : ''"
                        th:text="${page.resultsLine()}"></p>

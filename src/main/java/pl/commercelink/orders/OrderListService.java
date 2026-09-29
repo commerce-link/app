@@ -226,7 +226,7 @@ public class OrderListService {
         }
         if (activeFilter.isPresent()) {
             return new EmptyState(text("orders.list.empty.filter", locale),
-                    text("orders.list.empty.filter.clear", locale), query.withFilterId(null).href());
+                    text("general.clear.filters", locale), query.cleared().href());
         }
         if (!query.isOpen()) {
             String message = query.single().map(s -> text("orders.list.empty.status", locale, text("OrderStatus." + s.name(), locale)))

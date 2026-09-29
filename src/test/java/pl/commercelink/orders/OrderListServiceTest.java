@@ -294,6 +294,9 @@ class OrderListServiceTest {
         when(orderFilters.list(ACTOR)).thenReturn(new ListOrderFiltersView(List.of(), List.of(f)));
         assertThat(page(query("filterId", f.getId())).emptyState().text()).isEqualTo("Ten filtr nie ma dziś zamówień.");
         assertThat(page(query("filterId", f.getId())).emptyState().actionHref()).isEqualTo("/dashboard/orders?filterId=");
+        // the filter's own statuses go too, as with "Wyczyść filtry" above the list
+        assertThat(page(query("status", "New", "filterId", f.getId(), "sort", "amount")).emptyState().actionLabel()).isEqualTo("Wyczyść filtry");
+        assertThat(page(query("status", "New", "filterId", f.getId(), "sort", "amount")).emptyState().actionHref()).isEqualTo("/dashboard/orders?sort=amount");
         assertThat(page(query()).emptyState()).isNull();
     }
 
