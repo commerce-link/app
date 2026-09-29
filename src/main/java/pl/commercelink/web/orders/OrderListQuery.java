@@ -1,6 +1,7 @@
 package pl.commercelink.web.orders;
 
 import org.springframework.util.MultiValueMap;
+import pl.commercelink.orders.OrderAttention;
 import pl.commercelink.orders.OrderStatus;
 
 import java.net.URLEncoder;
@@ -17,10 +18,11 @@ import java.util.Set;
  * The state of the orders list, read from and written back to the address (spec §2). Every link on the page is
  * built here, so changing one parameter never loses the others. statuses is empty for "all open" and otherwise the
  * statuses ticked in the Status menu (?status=New&status=Blocked, in enum order); an empty filterId is an explicit
- * "no filter", which the bare address is not (see {@link #UNFILTERED}). Parameters the list no longer has (focus from
- * the clickable tiles, sort=ordered from the history) are ignored, so old bookmarks still open the list.
+ * "no filter", which the bare address is not (see {@link #UNFILTERED}). focus is the tile above the list that narrows it
+ * (?focus=overdue). Parameters the list no longer has (an unknown focus, sort=ordered from the history) are ignored, so
+ * old bookmarks still open the list.
  */
-public record OrderListQuery(List<OrderStatus> statuses, String filterId, String q,
+public record OrderListQuery(List<OrderStatus> statuses, String filterId, OrderAttention focus, String q,
                              Sort sort, Direction dir, int page) {
 
     public static final String PATH = "/dashboard/orders";
@@ -80,6 +82,7 @@ public record OrderListQuery(List<OrderStatus> statuses, String filterId, String
         return new OrderListQuery(
                 parseStatuses(params.get("status")),
                 rawFilter == null || rawFilter.isBlank() ? null : rawFilter.trim(),
+                parseFocus(params.getFirst("focus")),
                 normalizeQ(params.getFirst("q")),
                 Sort.parse(params.getFirst("sort")).orElse(null),
                 Direction.parse(params.getFirst("dir")).orElse(null),
@@ -103,7 +106,7 @@ public record OrderListQuery(List<OrderStatus> statuses, String filterId, String
         }
         String filterId = params.getFirst("filterId");
         OrderListQuery target = new OrderListQuery(parseStatuses(statuses), filterId == null || filterId.isBlank() ? null : filterId.trim(),
-                null, null, null, 1);
+                null, null, null, null, 1);
         return Optional.of(target.href());
     }
 
@@ -125,6 +128,11 @@ public record OrderListQuery(List<OrderStatus> statuses, String filterId, String
             return null;
         }
         return Arrays.stream(OrderStatus.values()).filter(s -> s.name().equalsIgnoreCase(value.trim())).findFirst().orElse(null);
+    }
+
+    private static OrderAttention parseFocus(String value) {
+        return value == null ? null : Arrays.stream(OrderAttention.values())
+                .filter(kind -> kind.param().equalsIgnoreCase(value.trim())).findFirst().orElse(null);
     }
 
     private static String normalizeQ(String value) {
@@ -174,7 +182,7 @@ public record OrderListQuery(List<OrderStatus> statuses, String filterId, String
     }
 
     public OrderListQuery withStatuses(Collection<OrderStatus> newStatuses) {
-        return new OrderListQuery(List.copyOf(newStatuses), filterId, q, sort, dir, 1);
+        return new OrderListQuery(List.copyOf(newStatuses), filterId, focus, q, sort, dir, 1);
     }
 
     public OrderListQuery toggleStatus(OrderStatus status) {
@@ -185,21 +193,39 @@ public record OrderListQuery(List<OrderStatus> statuses, String filterId, String
         return withStatuses(next);
     }
 
+    /** "Wyczyść filtry": no status, filter, tile or search left; the sort is how the list is read, not a narrowing. */
+    public OrderListQuery cleared() {
+        return new OrderListQuery(List.of(), null, null, null, sort, dir, 1);
+    }
+
+    /**
+     * A tile clicked: the list shows exactly the orders the tile counts, so everything else that narrowed it goes. The
+     * tiles count the whole store; keeping a filter would make the table disagree with the number just clicked.
+     */
+    public OrderListQuery withFocus(OrderAttention newFocus) {
+        return new OrderListQuery(List.of(), null, newFocus, null, sort, dir, 1);
+    }
+
+    /** The pressed tile clicked again, or its chip's "×": the tile goes, whatever was added after it stays. */
+    public OrderListQuery withoutFocus() {
+        return new OrderListQuery(statuses, filterId, null, q, sort, dir, 1);
+    }
+
     public OrderListQuery withFilterId(String newFilterId) {
-        return new OrderListQuery(statuses, newFilterId, q, sort, dir, 1);
+        return new OrderListQuery(statuses, newFilterId, focus, q, sort, dir, 1);
     }
 
     public OrderListQuery withQ(String newQ) {
-        return new OrderListQuery(statuses, filterId, normalizeQ(newQ), sort, dir, 1);
+        return new OrderListQuery(statuses, filterId, focus, normalizeQ(newQ), sort, dir, 1);
     }
 
     public OrderListQuery toggleSort(Sort column) {
         Direction next = effectiveSort() == column ? effectiveDir().flipped() : Direction.ASC;
-        return new OrderListQuery(statuses, filterId, q, column, next, 1);
+        return new OrderListQuery(statuses, filterId, focus, q, column, next, 1);
     }
 
     public OrderListQuery withPage(int newPage) {
-        return new OrderListQuery(statuses, filterId, q, sort, dir, Math.max(1, newPage));
+        return new OrderListQuery(statuses, filterId, focus, q, sort, dir, Math.max(1, newPage));
     }
 
     public String href() {
@@ -209,6 +235,9 @@ public record OrderListQuery(List<OrderStatus> statuses, String filterId, String
         }
         if (filterId != null) {
             parts.add("filterId=" + encode(filterId));
+        }
+        if (focus != null) {
+            parts.add("focus=" + focus.param());
         }
         if (q != null) {
             parts.add("q=" + encode(q));

@@ -208,17 +208,64 @@ class OrderListServiceTest {
     }
 
     @Test
-    void anOldFocusBookmarkOpensTheUnnarrowedList() {
-        add("a", OrderStatus.New, TODAY.minusDays(1), 100, 100, null);
-        add("b", OrderStatus.Blocked, null, 100, 100, null);
+    void aTileShowsExactlyTheOrdersItCounts() {
+        // given
+        add("late", OrderStatus.New, TODAY.minusDays(1), 100, 100, "Allegro");
+        add("lateBlocked", OrderStatus.Blocked, TODAY.minusDays(3), 100, 100, null);
+        add("onTime", OrderStatus.New, TODAY.plusDays(2), 100, 100, "Allegro");
+        add("shipped", OrderStatus.Shipping, TODAY.minusDays(1), 100, 100, null);
 
-        // ?focus= came from the clickable tiles, which are read-only now; no value may break the page (newToday used to)
-        for (String focus : List.of("overdue", "today", "decide", "unpaid", "newToday")) {
-            OrdersPageModel model = page(query("focus", focus, "status", "Blocked"));
-            assertThat(model.rows()).extracting(r -> r.href()).containsExactly("/dashboard/orders/b");
-            assertThat(model.chips()).extracting(c -> c.label()).containsExactly("Status: Zablokowane");
-            assertThat(model.chips().get(0).clearHref()).isEqualTo("/dashboard/orders?filterId=");
-        }
+        // when
+        OrdersPageModel all = page(query("status", "New", "q", "kowalski"));
+        OrdersPageModel overdue = page(query("focus", "overdue"));
+
+        // then
+        // the tile link starts from the tile alone, whatever else narrowed the list
+        assertThat(all.tiles().get(0).href()).isEqualTo("/dashboard/orders?focus=overdue");
+        assertThat(all.tiles().get(0).active()).isFalse();
+        assertThat(overdue.rows()).extracting(r -> r.href()).containsExactly("/dashboard/orders/lateBlocked", "/dashboard/orders/late");
+        assertThat(overdue.rows()).hasSize((int) overdue.tiles().get(0).count());
+        assertThat(overdue.tiles().get(0).active()).isTrue();
+        // a second click on the pressed tile lets it go
+        assertThat(overdue.tiles().get(0).href()).isEqualTo("/dashboard/orders?filterId=");
+        assertThat(overdue.tiles().get(1).href()).isEqualTo("/dashboard/orders?focus=today");
+        assertThat(overdue.chips()).extracting(c -> c.label()).containsExactly("Po terminie");
+        assertThat(overdue.chips().get(0).clearHref()).isEqualTo("/dashboard/orders?filterId=");
+    }
+
+    @Test
+    void aTileCombinesWithWhatIsAddedAfterItAndStatusCountsStayWithinIt() {
+        // given
+        add("late", OrderStatus.New, TODAY.minusDays(1), 100, 100, "Allegro");
+        add("lateBlocked", OrderStatus.Blocked, TODAY.minusDays(3), 100, 100, null);
+        add("onTime", OrderStatus.Blocked, TODAY.plusDays(2), 100, 100, null);
+
+        // when
+        OrdersPageModel model = page(query("focus", "overdue", "status", "Blocked"));
+
+        // then
+        assertThat(model.rows()).extracting(r -> r.href()).containsExactly("/dashboard/orders/lateBlocked");
+        assertThat(option(model, "Nowe").count()).isEqualTo(1);
+        assertThat(option(model, "Zablokowane").count()).isEqualTo(1);
+        assertThat(model.chips()).extracting(c -> c.label()).containsExactly("Po terminie", "Status: Zablokowane");
+        // dropping the tile keeps the status the user added
+        assertThat(model.chips().get(0).clearHref()).isEqualTo("/dashboard/orders?status=Blocked");
+        assertThat(model.tiles().get(0).href()).isEqualTo("/dashboard/orders?status=Blocked");
+    }
+
+    @Test
+    void anEmptyTileSaysSoAndOffersToClearEverything() {
+        // given
+        add("onTime", OrderStatus.New, TODAY.plusDays(2), 100, 100, null);
+
+        // when
+        OrdersPageModel model = page(query("focus", "overdue", "sort", "amount"));
+
+        // then
+        assertThat(model.rows()).isEmpty();
+        assertThat(model.emptyState().text()).isEqualTo("Brak zamówień „Po terminie”.");
+        assertThat(model.emptyState().actionLabel()).isEqualTo("Wyczyść filtry");
+        assertThat(model.emptyState().actionHref()).isEqualTo("/dashboard/orders?sort=amount");
     }
 
     @Test
@@ -294,6 +341,9 @@ class OrderListServiceTest {
         when(orderFilters.list(ACTOR)).thenReturn(new ListOrderFiltersView(List.of(), List.of(f)));
         assertThat(page(query("filterId", f.getId())).emptyState().text()).isEqualTo("Ten filtr nie ma dziś zamówień.");
         assertThat(page(query("filterId", f.getId())).emptyState().actionHref()).isEqualTo("/dashboard/orders?filterId=");
+        // the filter's own statuses go too, as with "Wyczyść filtry" above the list
+        assertThat(page(query("status", "New", "filterId", f.getId(), "sort", "amount")).emptyState().actionLabel()).isEqualTo("Wyczyść filtry");
+        assertThat(page(query("status", "New", "filterId", f.getId(), "sort", "amount")).emptyState().actionHref()).isEqualTo("/dashboard/orders?sort=amount");
         assertThat(page(query()).emptyState()).isNull();
     }
 
@@ -333,6 +383,75 @@ class OrderListServiceTest {
         assertThat(page(query("status", "New")).chips().get(0).clearHref()).isEqualTo("/dashboard/orders?filterId=");
         assertThat(page(query("status", "New")).statusSummary()).isEqualTo("Nowe");
         assertThat(page(query("status", "Shipping", "status", "Delivered")).emptyState().text()).isEqualTo("Brak zamówień w wybranych statusach.");
+    }
+
+    @Test
+    void choosingAFilterWithSeveralStatusesTicksAllOfItsOpenOnes() {
+        // given
+        OrderFilter waiting = OrderFilter.of("Czekające", List.of(
+                OrderFilterCondition.of(OrderFilterField.Status, "Blocked"),
+                OrderFilterCondition.of(OrderFilterField.Status, "Completed"),
+                OrderFilterCondition.of(OrderFilterField.Status, "New")));
+        when(orderFilters.list(ACTOR)).thenReturn(new ListOrderFiltersView(List.of(), List.of(waiting)));
+
+        // when
+        OrdersPageModel model = page(query());
+
+        // then
+        // the closed status saved before the list dropped history cannot be ticked, the open ones all are
+        assertThat(model.filterOptions()).extracting(o -> o.href()).containsExactly(
+                "/dashboard/orders?status=New&status=Blocked&filterId=" + waiting.getId());
+    }
+
+    @Test
+    void theDefaultFilterOpensWithAllOfItsStatuses() {
+        // given
+        OrderFilter waiting = OrderFilter.of("Czekające", List.of(
+                OrderFilterCondition.of(OrderFilterField.Status, "New"),
+                OrderFilterCondition.of(OrderFilterField.Status, "Blocked")));
+        when(orderFilters.list(ACTOR)).thenReturn(new ListOrderFiltersView(List.of(), List.of(waiting), waiting.getId()));
+
+        // when
+        Optional<String> start = service.defaultFilterHref(ACTOR);
+        OrdersPageModel model = page(query());
+
+        // then
+        assertThat(start).contains("/dashboard/orders?status=New&status=Blocked&filterId=" + waiting.getId());
+    }
+
+    @Test
+    void aFilterWithSeveralMarketplacesListsOrdersFromEachOfThem() {
+        // given
+        add("a", OrderStatus.New, null, 10, 10, "Allegro");
+        add("c", OrderStatus.New, null, 10, 10, "Ceneo");
+        add("m", OrderStatus.New, null, 10, 10, "Morele");
+        OrderFilter allegroOrCeneo = OrderFilter.of("Allegro lub Ceneo", List.of(
+                OrderFilterCondition.of(OrderFilterField.SourceName, "Allegro"),
+                OrderFilterCondition.of(OrderFilterField.SourceName, "Ceneo")));
+        when(orderFilters.list(ACTOR)).thenReturn(new ListOrderFiltersView(List.of(), List.of(allegroOrCeneo)));
+
+        // when
+        OrdersPageModel model = page(query("filterId", allegroOrCeneo.getId()));
+
+        // then
+        assertThat(model.rows()).extracting(r -> r.href()).containsExactlyInAnyOrder("/dashboard/orders/a", "/dashboard/orders/c");
+    }
+
+    @Test
+    void aStatusOnlyFilterLetsTheStatusMenuDecide() {
+        // given
+        add("n", OrderStatus.New, null, 10, 10, null);
+        add("s", OrderStatus.Assembled, null, 10, 10, null);
+        OrderFilter newOrBlocked = OrderFilter.of("Nowe lub zablokowane", List.of(
+                OrderFilterCondition.of(OrderFilterField.Status, "New"),
+                OrderFilterCondition.of(OrderFilterField.Status, "Blocked")));
+        when(orderFilters.list(ACTOR)).thenReturn(new ListOrderFiltersView(List.of(), List.of(newOrBlocked)));
+
+        // when
+        OrdersPageModel model = page(query("status", "Assembled", "filterId", newOrBlocked.getId()));
+
+        // then
+        assertThat(model.rows()).extracting(r -> r.href()).containsExactly("/dashboard/orders/s");
     }
 
     private static OrdersPageModel.StatusOption option(OrdersPageModel model, String label) {

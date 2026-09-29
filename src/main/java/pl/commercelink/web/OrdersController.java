@@ -12,6 +12,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
@@ -224,13 +225,20 @@ public class OrdersController extends BaseController {
     public String updateOrderFilter(@RequestParam String filterId, OrderFilterForm form, RedirectAttributes redirectAttributes,
                                     Model model, Locale locale, HttpServletResponse response) {
         return filterAction(form.getReturnTo(), redirectAttributes, model, locale, response, form, filterId, () -> {
-            orderFilters.update(actor(), filterId, form.isSharedWithStore(), form.getLabel(), form.toConditions());
+            OrderFilter updated = orderFilters.update(actor(), filterId, form.isSharedWithStore(), form.getLabel(), form.toConditions());
             if (form.isOpenByDefault()) {
                 orderFilters.setDefault(actor(), filterId);
             } else {
                 orderFilters.clearDefault(actor(), filterId);
             }
-            return safeReturnTo(form.getReturnTo());
+            String target = safeReturnTo(form.getReturnTo());
+            OrderListQuery list = parseReturnTo(listOf(target));
+            if (!filterId.equals(list.filterId())) {
+                return target;
+            }
+            // the list carries the statuses the filter ticked when it was chosen; after an edit they would be stale
+            String listBack = list.withStatuses(OrderListService.filterStatuses(updated)).href();
+            return target.startsWith(FILTERS_PATH) ? filtersPage(listBack) : listBack;
         });
     }
 
@@ -344,17 +352,26 @@ public class OrdersController extends BaseController {
     }
 
     private static OrderFilterForm formOf(OrderFilter filter, boolean shared) {
-        Map<String, String> byField = filter.getConditionsByField();
+        Map<String, List<String>> byField = filter.getConditionsByField();
         OrderFilterForm form = new OrderFilterForm();
         form.setLabel(filter.getLabel());
         form.setSharedWithStore(shared);
         form.setStatus(byField.get(OrderFilterField.Status.name()));
         form.setShipmentType(byField.get(OrderFilterField.ShipmentType.name()));
         form.setPaymentSource(byField.get(OrderFilterField.PaymentSource.name()));
-        form.setShippingDue(byField.get(OrderFilterField.ShippingDue.name()));
+        form.setShippingDue(first(byField, OrderFilterField.ShippingDue));
         form.setSourceName(byField.get(OrderFilterField.SourceName.name()));
-        form.setShippingPostalCode(byField.get(OrderFilterField.ShippingPostalCode.name()));
+        form.setShippingPostalCode(first(byField, OrderFilterField.ShippingPostalCode));
         return form;
+    }
+
+    private static String first(Map<String, List<String>> byField, OrderFilterField field) {
+        return byField.getOrDefault(field.name(), List.of()).stream().findFirst().orElse(null);
+    }
+
+    @InitBinder("orderFilterForm")
+    void bindFilterForm(WebDataBinder binder) {
+        OrdersControllerBinding.bindFilterForm(binder);
     }
 
     /**
