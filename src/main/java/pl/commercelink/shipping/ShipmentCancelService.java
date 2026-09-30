@@ -44,12 +44,9 @@ public class ShipmentCancelService {
         Store store = storesRepository.findById(storeId);
         Order order = ordersRepository.findById(storeId, orderId);
 
-        Shipment shipment = order.firstShipmentWithShippingData()
-                .orElseThrow(() -> new ShippingException("No valid shipment data to cancel"));
-
-        if (shipment.getExternalId() == null) {
-            throw new ShippingException("Shipment has no external package ID");
-        }
+        // by the courier order, not by the shipped date: the paid label is there whatever the dates say
+        Shipment shipment = order.courierShipmentToCancel()
+                .orElseThrow(() -> new ShippingException("No courier order to cancel"));
 
         ShippingProvider shippingProvider = shippingProviderFactory.get(store);
         shippingProvider.cancelShipment(shipment.getExternalId());

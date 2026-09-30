@@ -1166,6 +1166,49 @@ class OrdersControllerTest {
         }
 
         @Test
+        void clearingTheShippedDateOfACourierShipmentIsRefusedAndKeepsTheOrderShipping() {
+            // given: a booked courier (paid label) that has not come yet; the operator takes the date away
+            Shipment labelled = courier("TRACK-1", LocalDateTime.of(2026, 9, 1, 9, 0));
+            labelled.setExternalId("EXT-1");
+            Order order = orderWith(labelled);
+            order.setStatus(OrderStatus.Shipping);
+            MockHttpServletResponse response = new MockHttpServletResponse();
+            ExtendedModelMap model = new ExtendedModelMap();
+
+            // when
+            save(0, OrderShipmentForm.version(labelled), courier("TRACK-1", null), "fetch", response, model);
+
+            // then: nothing stored, so "Cancel courier order" stays and "Book courier" does not come back
+            assertThat(response.getStatus()).isEqualTo(422);
+            OrderShipmentForm form = (OrderShipmentForm) model.getAttribute("shipment");
+            assertThat(form.errors()).containsOnly(
+                    Map.entry("shipment-0-shippedDate", "order.shipments.error.courierShippedDate"));
+            assertThat(order.getShipments().get(0)).isSameAs(labelled);
+            assertThat(order.getStatus()).isEqualTo(OrderStatus.Shipping);
+            assertThat(order.courierShipmentToCancel()).contains(labelled);
+            assertThat(order.hasShipmentToBook()).isFalse();
+            verifyNoInteractions(orderLifecycle, orderLifecycleEventPublisher, orderEventsRepository);
+        }
+
+        @Test
+        void theShippedDateOfACourierShipmentStillMovesToAnotherPastDay() {
+            // given
+            Shipment labelled = courier("TRACK-1", LocalDateTime.of(2026, 9, 1, 9, 0));
+            labelled.setExternalId("EXT-1");
+            Order order = orderWith(labelled);
+            order.setStatus(OrderStatus.Shipping);
+
+            // when
+            save(0, OrderShipmentForm.version(labelled), courier("TRACK-1", LocalDateTime.of(2026, 9, 2, 0, 0)));
+
+            // then
+            assertThat(errorMessage()).isNull();
+            assertThat(order.getShipments().get(0).getShippedAt()).isEqualTo(LocalDateTime.of(2026, 9, 2, 0, 0));
+            assertThat(order.getShipments().get(0).getExternalId()).isEqualTo("EXT-1");
+            assertThat(order.getStatus()).isEqualTo(OrderStatus.Shipping);
+        }
+
+        @Test
         void theShipmentPageOfAnUnknownIndexIsNotFound() {
             // given
             orderWith(courier("TRACK-1", LocalDateTime.of(2026, 9, 1, 9, 0)));
@@ -4202,6 +4245,26 @@ class OrdersControllerTest {
             verifyNoInteractions(shipmentCancelService);
             assertThat(flash(noDataRedirect)).containsEntry("errorMessage", "order.shipments.cancel.error.no.data");
             assertThat(flash(noPackageRedirect)).containsEntry("errorMessage", "order.shipments.cancel.error.no.package");
+        }
+
+        @Test
+        void aCourierOrderWithoutAShippedDateIsStillCancelled() {
+            // given: legacy data or a date cleared before the guard; the paid label is there whatever the dates say
+            Order order = order(OrderStatus.Shipping);
+            Shipment labelled = new Shipment(ShipmentType.Courier);
+            labelled.setCarrier("DPD");
+            labelled.setTrackingNo("TRACK-1");
+            labelled.setExternalId("PKG-1");
+            order.setShipments(new ArrayList<>(List.of(labelled)));
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            ordersController.cancelShipment(ORDER_ID, redirect, polish);
+
+            // then
+            verify(shipmentCancelService).cancelShipping(ORDER_ID, STORE_ID);
+            assertThat(flash(redirect)).doesNotContainKey("errorMessage");
         }
 
         @Test

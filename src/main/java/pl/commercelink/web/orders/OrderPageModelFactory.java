@@ -385,9 +385,9 @@ public class OrderPageModelFactory {
         String base = "/dashboard/orders/" + order.getOrderId() + "/shipments/";
         List<OrderPageModel.ShipmentRow> rows = new ArrayList<>();
         List<OrderShipmentForm> forms = new ArrayList<>();
-        // the courier order can be cancelled only while its labelled parcel is still on the way
-        Shipment courierCancellable = order.canOrderShipment() ? order.firstShipmentWithShippingData()
-                .filter(s -> s.getExternalId() != null && s.getDeliveredAt() == null).orElse(null) : null;
+        // the courier order can be cancelled only while its labelled parcel is still on the way; the same shipment
+        // ShipmentCancelService cancels, found by its courier order whatever its shipped date says
+        Shipment courierCancellable = order.canOrderShipment() ? order.courierShipmentToCancel().orElse(null) : null;
         boolean placeholder = order.onlyPlaceholder().isPresent();
         for (int i = 0; i < shipments.size(); i++) {
             Shipment s = shipments.get(i);
@@ -423,7 +423,7 @@ public class OrderPageModelFactory {
      * The short reason next to a greyed "Remove" in the row; the refusal of a forced removal says it in full. A
      * shipment with a courier order points to "Cancel courier order" only when the card offers it for that shipment's
      * courier order (which covers every parcel of it): before the order is ready to ship the button is not there yet,
-     * and it only ever cancels the courier order of the first shipment that went out.
+     * and it only ever cancels the first courier order on the list whose parcel is not delivered.
      */
     private static String removeReasonKey(Order order, int index, boolean courierCancellable) {
         String locked = removeLockedKey(order, index);

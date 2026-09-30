@@ -428,11 +428,27 @@ class OrderPageModelFactoryTest {
     }
 
     @Test
+    void aCourierOrderWithoutItsShippedDateIsNotBookedAgainAndStaysCancellable() {
+        // given: legacy data (the dialog no longer lets the date go); the paid label is there whatever the dates say
+        Order order = order(OrderStatus.Realization);
+        labelled(order.getShipments().get(0), "T-1", "PKG-1");
+        order.getShipments().get(0).setShippedAt(null);
+
+        // when
+        OrderPageModel page = factory.build(order, List.of(), ADMIN, PL);
+
+        // then
+        assertThat(page.header().primaryAction()).isNull();
+        assertThat(page.shipments().canCancelCourier()).isTrue();
+        assertThat(page.shipments().rows().get(0).removeReasonKey()).isEqualTo("order.shipments.remove.locked.courier");
+    }
+
+    @Test
     void aCourierShipmentOfAnOrderNotYetShippingSaysWhenItCanBeCancelled() {
         // given: a courier ordered while the order is still being assembled; "Cancel courier order" is not offered yet
         Order assembling = order(OrderStatus.Assembly);
         labelled(assembling.getShipments().get(0), "T-1", "PKG-1");
-        // two couriers: the button only ever cancels the first shipment that went out
+        // two couriers: the button only ever cancels the first courier order on the list
         Order twoCouriers = order(OrderStatus.Shipping);
         labelled(twoCouriers.getShipments().get(0), "T-1", "PKG-1");
         Shipment second = new Shipment(ShipmentType.Courier);

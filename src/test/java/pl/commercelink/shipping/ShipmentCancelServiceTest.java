@@ -65,7 +65,7 @@ class ShipmentCancelServiceTest {
     }
 
     @Test
-    @DisplayName("cancelShipping throws ShippingException when no shipment carries valid shipping data")
+    @DisplayName("cancelShipping throws ShippingException when no shipment has a courier order")
     void cancelShippingThrowsShippingExceptionWhenNoShipmentHasShippingData() {
         // given
         Order order = orderWithShipments(new Shipment(ShipmentType.PersonalCollection));
@@ -75,7 +75,7 @@ class ShipmentCancelServiceTest {
         // when / then
         assertThatThrownBy(() -> shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID))
                 .isInstanceOf(ShippingException.class)
-                .hasMessageContaining("No valid shipment data");
+                .hasMessageContaining("No courier order to cancel");
 
         verify(shippingProviderFactory, never()).get(any());
         verify(ordersRepository, never()).save(any());
@@ -94,7 +94,7 @@ class ShipmentCancelServiceTest {
         // when / then
         assertThatThrownBy(() -> shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID))
                 .isInstanceOf(ShippingException.class)
-                .hasMessageContaining("no external package ID");
+                .hasMessageContaining("No courier order to cancel");
 
         verify(shippingProvider, never()).cancelShipment(any());
         verify(ordersRepository, never()).save(any());
@@ -164,6 +164,24 @@ class ShipmentCancelServiceTest {
         assertThat(back).isFalse();
         assertThat(order.getStatus()).isEqualTo(OrderStatus.Assembled);
         verify(orderEventsRepository, never()).save(any());
+    }
+
+    @Test
+    void theCourierOrderIsFoundByItsIdWhenItsShipmentLostTheShippedDate() {
+        // given: a hand-typed shipment that went out first, then the booked courier without its date
+        Shipment typed = courierShipment(null);
+        Shipment booked = courierShipment(EXTERNAL_ID);
+        booked.setShippedAt(null);
+        Order order = orderWithShipments(typed, booked);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(shippingProviderFactory.get(store)).thenReturn(shippingProvider);
+
+        // when
+        shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID);
+
+        // then
+        verify(shippingProvider).cancelShipment(EXTERNAL_ID);
     }
 
     private Order orderWithShipments(Shipment... shipments) {

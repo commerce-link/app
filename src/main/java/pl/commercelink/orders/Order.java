@@ -657,11 +657,14 @@ public class Order {
 
     /**
      * Something is left to book a courier for: a shipment without its shipping data, or no shipment at all (the only
-     * one removed; the courier booking then creates it). An order whose every shipment is sent has nothing to book.
+     * one removed; the courier booking then creates it). An order whose every shipment is sent has nothing to book. A
+     * shipment with a courier order (externalId) is booked whatever its dates say: booking again would pay for a second
+     * label next to the first one, which the booking's replaced list would no longer let anyone cancel.
      */
     @DynamoDBIgnore
     public boolean hasShipmentToBook() {
-        return shipments.isEmpty() || shipments.stream().anyMatch(shipment -> !shipment.hasShippingData());
+        return shipments.isEmpty() || shipments.stream()
+                .anyMatch(shipment -> shipment.getExternalId() == null && !shipment.hasShippingData());
     }
 
     @DynamoDBIgnore
@@ -669,7 +672,17 @@ public class Order {
         return shipments.stream().anyMatch(Shipment::hasLabel);
     }
 
-    /** The shipment a courier cancellation acts on (ShipmentCancelService): the first one that was handed to a carrier. */
+    /**
+     * The shipment whose courier order "Cancel courier order" cancels (ShipmentCancelService): the first one booked with
+     * a courier (externalId) whose parcel is not delivered yet. Found by the courier order, never by the shipped date,
+     * which the operator may have changed.
+     */
+    @DynamoDBIgnore
+    public Optional<Shipment> courierShipmentToCancel() {
+        return shipments.stream().filter(s -> s.getExternalId() != null && s.getDeliveredAt() == null).findFirst();
+    }
+
+    /** The first shipment handed to a carrier (its carrier, tracking number and shipped date), if any. */
     @DynamoDBIgnore
     public Optional<Shipment> firstShipmentWithShippingData() {
         return shipments.stream().filter(Shipment::hasShippingData).findFirst();

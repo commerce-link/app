@@ -2219,10 +2219,10 @@ public class OrdersController extends BaseController {
     public String cancelShipment(@PathVariable String orderId,
                                  RedirectAttributes redirectAttributes, Locale locale) {
         Order order = requireOrder(ordersRepository, getStoreId(), orderId);
-        Optional<Shipment> sent = order.firstShipmentWithShippingData();
         // the same shipment ShipmentCancelService picks; its English errors never reach the operator
-        String refusal = sent.isEmpty() ? "order.shipments.cancel.error.no.data"
-                : sent.get().getExternalId() == null ? "order.shipments.cancel.error.no.package" : null;
+        String refusal = order.courierShipmentToCancel().isPresent() ? null
+                : order.firstShipmentWithShippingData().isEmpty() ? "order.shipments.cancel.error.no.data"
+                : "order.shipments.cancel.error.no.package";
         if (refusal != null) {
             return refuse(redirectAttributes, orderId, refusal, locale);
         }
