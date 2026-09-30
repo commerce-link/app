@@ -150,12 +150,6 @@ public class OrderPageModelFactory {
             // the shipping data into the shipment, so the page would only end on its refusal
             primary = new OrderPageModel.PrimaryAction("order.page.action.courier", links.details() + "/shipping", "fa-truck");
         }
-        // the header link names one physical item; with several serial numbers the rows link each of theirs
-        List<String> serials = items.stream().map(OrderItem::getSerialNo).filter(Objects::nonNull)
-                .flatMap(sn -> Arrays.stream(sn.split(","))).map(String::trim).filter(sn -> !sn.isEmpty())
-                .distinct().toList();
-        String itemHistory = viewer.superAdmin() || serials.size() != 1 ? null
-                : "/dashboard/item/history?serialNo=" + URLEncoder.encode(serials.get(0), StandardCharsets.UTF_8);
         String splitFrom = order.getSplitFromOrderId();
         boolean clientPage = store != null && store.isClientOrderPageEnabled() && !order.hasStatus(OrderStatus.Completed);
         String sourceName = order.getSource() == null ? null : StringUtils.trimToNull(order.getSource().getName());
@@ -180,7 +174,7 @@ public class OrderPageModelFactory {
                         ? "/dashboard/store/" + order.getStoreId() + "/orders/" + splitFrom : "/dashboard/orders/" + splitFrom),
                 // the link is public and changes nothing, so a super admin (support) may copy it too
                 clientPage ? order.createClientOrderUrl(appDomain) : null,
-                primary, links.card(), links.collection(), itemHistory,
+                primary, links.card(), links.collection(),
                 // a completed order can still be cancelled after a full return, so this follows the viewer, not readOnly;
                 // while an e-receipt is being issued OrdersController#cancelOrder refuses it, so it is greyed with that
                 // reason (only when the order could otherwise be cancelled: the general reason says more otherwise)
@@ -258,9 +252,8 @@ public class OrderPageModelFactory {
         SupplierLabelMap labels = labels(store, locale);
         OrderItemRow.Context context = new OrderItemRow.Context(order, readOnly, viewer.superAdmin(), labels,
                 item -> deliveryHref(order, item, viewer, links, dropship),
-                serial -> viewer.superAdmin() ? null
-                        : "/dashboard/item/history?serialNo=" + URLEncoder.encode(serial, StandardCharsets.UTF_8),
-                receiptLock);
+                serial -> viewer.superAdmin() ? null : OrderLinks.itemHistory(serial),
+                receiptLock, hasDropshipItems);
         List<OrderItem> sorted = items.stream().sorted(Comparator.comparingInt(OrderItem::getPosition)).toList();
         List<OrderItemRow> products = new ArrayList<>();
         List<OrderItemRow> services = new ArrayList<>();
@@ -282,7 +275,7 @@ public class OrderPageModelFactory {
                 .map(i -> serialItemRow(i, labels)).toList();
         List<OrderPageModel.BulkActionButton> bulk = new ArrayList<>();
         for (BulkAction action : BulkAction.values()) {
-            if (action == BulkAction.REMOVE && order.isInvoiced()) {
+            if (!action.inSelectionRow() || action == BulkAction.REMOVE && order.isInvoiced()) {
                 continue;
             }
             BulkReason reason = bulkReason(action, canSplitOrder, hasDropshipItems, receiptLock);

@@ -1237,6 +1237,8 @@ public class OrdersController extends BaseController {
         model.addAttribute("consolidationLockedKey", !consolidationLocked ? null
                 : order.isInvoiced() ? "order.item.consolidation.locked"
                 : receiptLock.key("order.item.consolidation.locked.receipt"));
+        // the item's history, by serial number, lives on the item page (the order's "Więcej" menu no longer names one item)
+        model.addAttribute("serialHistory", OrderLinks.serialHistory(orderItem.getSerialNo()));
         model.addAttribute("statusKey", OrderLabels.itemStatus(orderItem.getStatus()));
         model.addAttribute("statusTone", OrderLabels.tone(orderItem.getStatus()));
 

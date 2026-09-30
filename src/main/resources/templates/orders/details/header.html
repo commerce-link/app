@@ -72,9 +72,6 @@
                        the link opens the sheet and the browser prints it */-->
                 <li><a class="cl-menu-item" th:href="@{${h.cardHref()}}" data-cl-print-frame th:text="#{order.page.print.card}"></a></li>
                 <li><a class="cl-menu-item" th:href="@{${h.collectionHref()}}" data-cl-print-frame th:text="#{order.page.print.collection}"></a></li>
-                <li th:if="${h.itemHistoryHref() != null}">
-                    <a class="cl-menu-item" th:href="@{${h.itemHistoryHref()}}" th:text="#{item.history}"></a>
-                </li>
                 <!--/* a closed order keeps an available cancel (a completed order can still be cancelled after a full
                        return), but not the greyed-out placeholders: there is nothing left to explain */-->
                 <th:block th:unless="${page.superAdmin()}">

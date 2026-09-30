@@ -7,7 +7,8 @@
     <section class="cl-page" th:with="item=${orderItem}, fullEdit=${orderItem.isNew()}">
         <div class="cl-page-body is-form">
             <div th:replace="~{fragments/settings-header :: subpageWithActions(|/dashboard/orders/${orderId}|, #{order.page.title(${shortId})},
-                    ${#strings.isEmpty(orderItem.name)} ? #{order.item.page.form} : ${orderItem.name}, ~{::itemLead}, null)}">
+                    ${#strings.isEmpty(orderItem.name)} ? #{order.item.page.form} : ${orderItem.name}, ~{::itemLead},
+                    ${serialHistory == null or serialHistory.isEmpty()} ? null : ~{::itemHistory})}">
                 <th:block th:fragment="itemLead">
                     <span th:if="${statusKey != null}" class="cl-status is-leading" th:classappend="${statusTone}" th:text="#{${statusKey}}"></span>
                     <!--/* as the item's row in the items table: a supplier label, or a supplier delivery's short id with its link */-->
@@ -17,6 +18,28 @@
                         <a th:if="${delivery.href() != null}" th:href="@{${delivery.href()}}" th:text="${delivery.label()}"></a>
                         <span th:unless="${delivery.href() != null}" th:text="${delivery.label()}"></span>
                     </th:block>
+                </th:block>
+                <!--/* the history of the physical item, by its serial number: one link, or a menu of the item's serial
+                       numbers when it has several (qty > 1); a native details, so it opens without JavaScript too */-->
+                <th:block th:fragment="itemHistory">
+                    <a th:if="${serialHistory.size() == 1}" class="cl-button" id="item-history-link"
+                       th:href="@{${serialHistory[0].href()}}">
+                        <span class="icon is-small" aria-hidden="true"><i class="fas fa-history"></i></span>
+                        <span th:text="#{item.history}"></span>
+                    </a>
+                    <details th:if="${serialHistory.size() > 1}" class="cl-menu" id="item-history-menu">
+                        <summary class="cl-button">
+                            <span class="icon is-small" aria-hidden="true"><i class="fas fa-history"></i></span>
+                            <span th:text="#{item.history}"></span>
+                            <span class="icon is-small" aria-hidden="true"><i class="fas fa-chevron-down"></i></span>
+                        </summary>
+                        <ul class="cl-menu-list">
+                            <li th:each="h : ${serialHistory}">
+                                <a class="cl-menu-item" th:href="@{${h.href()}}"
+                                   th:text="#{order.item.page.history.serial(${h.serialNo()})}"></a>
+                            </li>
+                        </ul>
+                    </details>
                 </th:block>
             </div>
 

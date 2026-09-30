@@ -930,26 +930,6 @@ class OrderPageModelFactoryTest {
         assertThat(MoveTargetView.of(business, 1, "Nowe", "1,00 PLN", null).clientName()).isEqualTo("Firma Sp. z o.o.");
     }
 
-    private String itemHistory(String... serials) {
-        List<OrderItem> items = java.util.Arrays.stream(serials).map(sn -> {
-            OrderItem item = item(FulfilmentStatus.Delivered);
-            item.setSerialNo(sn);
-            return item;
-        }).toList();
-        return factory.build(order(OrderStatus.Delivered), items, ADMIN, PL).header().itemHistoryHref();
-    }
-
-    @Test
-    void theItemHistoryLinkNeedsExactlyOneSerialNumber() {
-        // when / then
-        assertThat(itemHistory()).isNull();
-        assertThat(itemHistory(new String[]{null})).isNull();
-        assertThat(itemHistory("SN-1")).isEqualTo("/dashboard/item/history?serialNo=SN-1");
-        assertThat(itemHistory("A, B")).isNull();
-        assertThat(itemHistory("A", "B")).isNull();
-        assertThat(itemHistory("SN-1", " SN-1 ")).isEqualTo("/dashboard/item/history?serialNo=SN-1");
-    }
-
     @Test
     void aMarketplaceSourceShowsItsNameOnly() {
         // given
@@ -981,7 +961,7 @@ class OrderPageModelFactoryTest {
     }
 
     @Test
-    void theSelectionRowGroupsTheActionsIntoRouteAndMoveMenusEachCarryingItsOwnReason() {
+    void theSelectionRowHasOneMoveMenuWithTheWarehouseEntriesAndNoAllocation() {
         // given
         Order order = order(OrderStatus.New);
         order.addPayment(Payment.bankTransfer("R/1", "Jan", 10));
@@ -992,19 +972,67 @@ class OrderPageModelFactoryTest {
         OrderPageModel.ItemsCard items = factory.build(order, List.of(item), ADMIN, PL).items();
 
         // then
-        assertThat(items.bulkMenus()).extracting(OrderPageModel.BulkMenu::menu)
-                .containsExactly(BulkAction.Menu.ROUTE, BulkAction.Menu.MOVE);
+        assertThat(items.bulkActions()).extracting(OrderPageModel.BulkActionButton::action)
+                .doesNotContain(BulkAction.ALLOCATE);
+        assertThat(items.bulkMenus()).extracting(OrderPageModel.BulkMenu::menu).containsExactly(BulkAction.Menu.MOVE);
         assertThat(items.bulkMenus().get(0).actions()).extracting(OrderPageModel.BulkActionButton::action)
-                .containsExactly(BulkAction.ALLOCATE, BulkAction.TO_WAREHOUSE, BulkAction.TO_WAREHOUSE_RMA);
+                .containsExactly(BulkAction.SPLIT, BulkAction.MOVE, BulkAction.TO_WAREHOUSE, BulkAction.TO_WAREHOUSE_RMA);
         assertThat(items.bulkMenus().get(0).actions()).extracting(OrderPageModel.BulkActionButton::reasonKey)
-                .containsOnly("order.items.action.dropship.locked");
-        assertThat(items.bulkMenus().get(1).actions()).extracting(OrderPageModel.BulkActionButton::action)
-                .containsExactly(BulkAction.SPLIT, BulkAction.MOVE);
-        assertThat(items.bulkMenus().get(1).actions()).extracting(OrderPageModel.BulkActionButton::reasonKey)
-                .containsOnly("order.bulk.unavailable.split");
+                .containsExactly("order.bulk.unavailable.split", "order.bulk.unavailable.split",
+                        "order.items.action.dropship.locked", "order.items.action.dropship.locked");
         assertThat(items.bulkStandalone().action()).isEqualTo(BulkAction.REMOVE);
         assertThat(items.bulkStandalone().reasonKey()).isEqualTo("order.items.action.dropship.locked");
         assertThat(items.bulkStandalone().shortReasonKey()).isEqualTo("order.items.action.dropship.locked.short");
+    }
+
+    @Test
+    void theItemMenuOffersAllocationWithTheReasonWhenItWouldChangeNothing() {
+        // given
+        Order order = order(OrderStatus.New);
+        OrderItem ready = item(FulfilmentStatus.New);
+        ready.setEan("5900000000001");
+        ready.setManufacturerCode("MFN-1");
+        ready.setDeliveryId("Acme");
+        OrderItem noSupplier = item(FulfilmentStatus.New);
+        noSupplier.setEan("5900000000001");
+        noSupplier.setManufacturerCode("MFN-1");
+        noSupplier.setDeliveryId(null);
+        OrderItem noCodes = item(FulfilmentStatus.New);
+        noCodes.setEan(null);
+        noCodes.setDeliveryId("Acme");
+        OrderItem ordered = item(FulfilmentStatus.Ordered);
+
+        // when
+        OrderPageModel.ItemsCard items = factory.build(order, List.of(ready, noSupplier, noCodes, ordered), ADMIN, PL).items();
+
+        // then
+        assertThat(items.products()).extracting(row -> allocate(row).reasonKey())
+                .containsExactly(null, "order.item.unavailable.allocation.supplier",
+                        "order.item.unavailable.allocation.codes", "order.item.unavailable.not.new");
+        assertThat(allocate(items.products().get(0)).available()).isTrue();
+        assertThat(allocate(items.products().get(0)).labelKey()).isEqualTo("order.item.menu.allocate");
+    }
+
+    @Test
+    void theItemMenuGreysAllocationWhileTheOrderHasDropshipItems() {
+        // given
+        Order order = order(OrderStatus.New);
+        OrderItem ready = item(FulfilmentStatus.New);
+        ready.setEan("5900000000001");
+        ready.setManufacturerCode("MFN-1");
+        ready.setDeliveryId("Acme");
+        when(dropshipItemLookup.itemIdsInDropshipDeliveries(anyString(), any())).thenReturn(Set.of("other-item"));
+
+        // when
+        OrderItemRow row = factory.build(order, List.of(ready), ADMIN, PL).items().products().get(0);
+
+        // then
+        assertThat(allocate(row).available()).isFalse();
+        assertThat(allocate(row).reasonKey()).isEqualTo("order.item.unavailable.dropship");
+    }
+
+    private static ItemAction.State allocate(OrderItemRow row) {
+        return row.actions().stream().filter(state -> state.action() == ItemAction.ALLOCATE).findFirst().orElseThrow();
     }
 
     @Test
@@ -1057,7 +1085,7 @@ class OrderPageModelFactoryTest {
 
         // then
         assertThat(items.bulkStandalone()).isNull();
-        assertThat(items.bulkMenus()).hasSize(2);
+        assertThat(items.bulkMenus()).hasSize(1);
     }
 
     @Test
@@ -1322,9 +1350,12 @@ class OrderPageModelFactoryTest {
         assertThat(page.items().bulkStandalone().action()).isEqualTo(BulkAction.REMOVE);
         assertThat(page.items().bulkStandalone().reasonKey()).isEqualTo("order.bulk.unavailable.receipt");
         assertThat(page.items().bulkStandalone().shortReasonKey()).isEqualTo("order.bulk.unavailable.receipt.short");
-        assertThat(page.items().bulkMenus().get(1).actions()).extracting(OrderPageModel.BulkActionButton::reasonKey)
-                .containsOnly("order.bulk.unavailable.receipt");
-        assertThat(page.items().bulkMenus().get(0).actions()).allMatch(OrderPageModel.BulkActionButton::available);
+        assertThat(page.items().bulkMenus().get(0).actions())
+                .filteredOn(b -> b.action() == BulkAction.SPLIT || b.action() == BulkAction.MOVE)
+                .extracting(OrderPageModel.BulkActionButton::reasonKey).containsOnly("order.bulk.unavailable.receipt");
+        assertThat(page.items().bulkMenus().get(0).actions())
+                .filteredOn(b -> b.action() == BulkAction.TO_WAREHOUSE || b.action() == BulkAction.TO_WAREHOUSE_RMA)
+                .hasSize(2).allMatch(OrderPageModel.BulkActionButton::available);
         // merge on invoice
         assertThat(page.items().products().get(0).actions()).filteredOn(a -> a.action() == ItemAction.CONSOLIDATE)
                 .singleElement().satisfies(a -> {

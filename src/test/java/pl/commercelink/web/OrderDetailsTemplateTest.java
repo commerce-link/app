@@ -297,6 +297,47 @@ class OrderDetailsTemplateTest {
                 .containsPattern("<span>Przypisz dostawcę</span>\\s*<span class=\"cl-menu-reason\">Najpierw usuń obecnego dostawcę</span>");
     }
 
+    @Test
+    void theItemMenuSendsOneItemToAllocationThroughItsOwnFormOrSaysWhyNot() {
+        // given
+        Order order = order(OrderStatus.New);
+        OrderItem ready = items(order).get(0);
+        ready.setItemId("item-ready");
+        ready.setEan("5900000000001");
+        ready.setDeliveryId("Acme");
+
+        // when
+        String withoutSupplier = page(render(order, ADMIN));
+        String html = page(render(order, List.of(ready), ADMIN, Set.of()));
+
+        // then: the entry posts the item as the one selected item of the bulk endpoint, without JavaScript too
+        assertThat(html).containsPattern("<form id=\"allocate-item-form\" method=\"post\"\\s+action=\"/dashboard/orders/"
+                        + "3e373abc-1111-2222-3333-444455556666/moveSelectedItemsToAllocation\">\\s*"
+                        + "(<input type=\"hidden\" name=\"_csrf\"[^>]*>\\s*)?"
+                        + "<input type=\"hidden\" name=\"orderItems\\[0\\].selected\" value=\"true\">")
+                .containsPattern("<button type=\"submit\" class=\"cl-menu-item\" form=\"allocate-item-form\" "
+                        + "name=\"orderItems\\[0\\].itemId\"\\s+value=\"item-ready\">Do alokacji</button>");
+        assertThat(withoutSupplier).containsPattern("aria-disabled=\"true\">\\s*<span>Do alokacji</span>\\s*"
+                + "<span class=\"cl-menu-reason\">Najpierw przypisz dostawcę</span>");
+    }
+
+    @Test
+    void theMoreMenuNoLongerNamesTheItemHistory() {
+        // given
+        Order order = order(OrderStatus.Delivered);
+        List<OrderItem> items = items(order);
+        items.get(0).setSerialNo("SN-1");
+
+        // when
+        String html = page(render(order, items, ADMIN, Set.of()));
+        String more = html.substring(html.indexOf("id=\"order-more-menu\""));
+        more = more.substring(0, more.indexOf("</ul>"));
+
+        // then: the serial number in the item's row still leads to its history
+        assertThat(more).doesNotContain("Historia przedmiotu").doesNotContain("/dashboard/item/history");
+        assertThat(html).contains("href=\"/dashboard/item/history?serialNo=SN-1\"");
+    }
+
     /**
      * Without JavaScript a button toggling a hidden list opens nothing, so prints, the item history, cancelling,
      * the row actions and issuing documents were unreachable. A native details opens by itself; a dialog opener
@@ -1067,7 +1108,7 @@ class OrderDetailsTemplateTest {
 
         // then
         assertThat(html).contains("data-cl-scope-template=\"{label} ({n} z {m})\"").contains("/js/order-items.js")
-                .contains("data-cl-bulk-confirm-message=\"Do alokacji trafią zaznaczone pozycje: {n}.");
+                .contains("data-cl-bulk-confirm-message=\"Zamówione i przyjęte pozycje wrócą na stan magazynu");
     }
 
     @Test
@@ -1373,7 +1414,8 @@ class OrderDetailsTemplateTest {
         // then: the bulk actions are greyed through aria-disabled (menu entries and "Remove" stay focusable with
         // their reason); so is the add-items button, which opens nothing
         assertThat(html).containsPattern("data-cl-bulk-action=\"[^\"]*moveSelectedItemsToTheWarehouse\"[^>]*aria-disabled=\"true\"")
-                .containsPattern("data-cl-bulk-action=\"[^\"]*moveSelectedItemsToAllocation\"[^>]*aria-disabled=\"true\"")
+                // "Do alokacji" is the item's own entry now, greyed with the order's dropship reason
+                .containsPattern("<span>Do alokacji</span>\\s*<span class=\"cl-menu-reason\">Zamówienie ma pozycje w dostawie dropship</span>")
                 // the dropship lock disables every bulk action, not only the two above
                 .containsPattern("data-cl-bulk-action=\"[^\"]*moveSelectedItemsToTheWarehouseForRMA\"[^>]*aria-disabled=\"true\"")
                 .containsPattern("data-cl-bulk-action=\"[^\"]*removeSelectedItemsFromOrder\"[^>]*aria-disabled=\"true\"")
@@ -1427,7 +1469,8 @@ class OrderDetailsTemplateTest {
         String fallback = html.substring(html.indexOf("<noscript>"), html.indexOf("</noscript>"));
 
         // then: nothing but "move" posts straight to the action, so removing items is never one click away
-        assertThat(fallback).contains("formaction=\"/dashboard/orders/3e373abc-1111-2222-3333-444455556666/bulk-confirm?action=ALLOCATE\"")
+        assertThat(fallback).contains("formaction=\"/dashboard/orders/3e373abc-1111-2222-3333-444455556666/bulk-confirm?action=TO_WAREHOUSE\"")
+                .doesNotContain("action=ALLOCATE")
                 .contains("formaction=\"/dashboard/orders/3e373abc-1111-2222-3333-444455556666/bulk-confirm?action=REMOVE\"")
                 .doesNotContain("/moveSelectedItemsToAllocation\"").doesNotContain("/removeSelectedItemsFromOrder\"")
                 .containsPattern("class=\"cl-button is-danger\"\\s+formaction=\"[^\"]+action=REMOVE\"");
@@ -2121,15 +2164,15 @@ class OrderDetailsTemplateTest {
         // then: every greyed entry names its reason as text inside it, as the row menu does; "Remove" points to a short
         // form of the same reason right before it, which fits the row's one line
         String shortReason = ResourceBundle.getBundle("messages", PL).getString("order.items.action.dropship.locked.short");
-        assertThat(row).containsPattern("data-cl-bulk-action=\"[^\"]*moveSelectedItemsToAllocation\"[^>]*aria-disabled=\"true\"[^>]*>"
-                        + "\\s*<span data-cl-bulk-label>Do alokacji</span>\\s*<span class=\"cl-menu-reason\" data-cl-bulk-reason>"
+        assertThat(row).containsPattern("data-cl-bulk-action=\"[^\"]*moveSelectedItemsToTheWarehouse\"[^>]*aria-disabled=\"true\"[^>]*>"
+                        + "\\s*<span data-cl-bulk-label>Do magazynu</span>\\s*<span class=\"cl-menu-reason\" data-cl-bulk-reason>"
                         + Pattern.quote(reason) + "</span>")
                 .containsPattern("<span class=\"cl-help cl-selection-reason\" id=\"bulk-remove-reason\">"
                         + Pattern.quote(shortReason) + "</span>\\s*<button[^>]*class=\"cl-link-button is-danger cl-selection-remove\"")
                 .containsPattern("data-cl-bulk-action=\"[^\"]*removeSelectedItemsFromOrder\"[^>]*aria-describedby=\"bulk-remove-reason\"")
                 .doesNotContainPattern("\\stitle=").doesNotContain("cl-visually-hidden").doesNotContain("cl-help is-note");
-        // the three routing entries
-        assertThat(occurrences(row, reason)).isEqualTo(3);
+        // the two warehouse entries
+        assertThat(occurrences(row, reason)).isEqualTo(2);
     }
 
     @Test
@@ -2138,23 +2181,23 @@ class OrderDetailsTemplateTest {
         String html = page(render(order(OrderStatus.New), ADMIN));
 
         // then
-        assertThat(html).containsPattern("data-cl-bulk-action=\"[^\"]*moveSelectedItemsToAllocation\"[^>]*"
-                        + "data-skipped=\"Pominięte pozycje nie mają kompletu danych alokacji albo nie są nowe.\"")
+        assertThat(html).containsPattern("data-cl-bulk-action=\"[^\"]*moveSelectedItemsToTheWarehouse\"[^>]*"
+                        + "data-skipped=\"Pominięte pozycje nie są zamówione ani przyjęte na stan.\"")
                 .containsPattern("<span class=\"cl-menu-reason\" data-cl-bulk-reason hidden=\"hidden\"></span>")
                 .contains("<span class=\"cl-help cl-selection-reason\" id=\"bulk-remove-reason\" hidden=\"hidden\"></span>")
                 .containsPattern("removeSelectedItemsFromOrder\"[^>]*data-skipped=\"Tylko nowe i usługi\"")
                 // the hidden reason describes nothing; order-items.js links it while it shows
                 .doesNotContainPattern("removeSelectedItemsFromOrder\"[^>]*aria-describedby")
-                .doesNotContainPattern("data-cl-bulk-action=\"[^\"]*moveSelectedItemsToAllocation\"[^>]*aria-disabled");
+                .doesNotContainPattern("data-cl-bulk-action=\"[^\"]*moveSelectedItemsToTheWarehouse\"[^>]*aria-disabled");
     }
 
     @Test
-    void theSelectionRowStandsInForTheHeaderWithItsOwnSelectAllTheCountTwoMenusAndRemove() {
+    void theSelectionRowStandsInForTheHeaderWithItsOwnSelectAllTheCountTheMoveMenuAndRemove() {
         // when
         String html = page(render(order(OrderStatus.New), ADMIN));
         String row = html.substring(html.indexOf("<div class=\"cl-selection-row\""), html.indexOf("<table"));
 
-        // then: left to right, which is also the tab order — select-all, "k of n", "Route to", "Move", "Remove"; the
+        // then: left to right, which is also the tab order — select-all, "k of n", "Move", "Remove"; the
         // select-all box itself clears the selection, so there is no separate "Clear"
         assertThat(html).contains("<div class=\"cl-selection-row\" data-cl-selection-bar hidden>");
         assertThat(row).containsPattern("<label class=\"cl-check-target\"><input class=\"cl-check-input\" type=\"checkbox\" "
@@ -2163,16 +2206,17 @@ class OrderDetailsTemplateTest {
                 .contains("data-template=\"Zaznaczono {k} z {n}\"");
         assertThat(row).doesNotContain("data-cl-select-clear").doesNotContain("cl-selection-clear");
         List<String> sequence = List.of("data-cl-select-all", "data-cl-selection-count",
-                "<span>Skieruj</span>", "Do alokacji", "Do magazynu", "Do magazynu (RMA)", "<span>Przenieś</span>",
-                "Do nowego zamówienia", "Do istniejącego…", "cl-link-button is-danger cl-selection-remove");
+                "<span>Przenieś</span>", "Do nowego zamówienia", "Do istniejącego…", "Do magazynu", "Do magazynu (RMA)",
+                "cl-link-button is-danger cl-selection-remove");
         int at = -1;
         for (String part : sequence) {
             int next = row.indexOf(part, at + 1);
             assertThat(next).as(part).isGreaterThan(at);
             at = next;
         }
-        assertThat(occurrences(row, "<details class=\"cl-menu\">")).isEqualTo(2);
-        assertThat(occurrences(row, "<summary class=\"cl-button\">")).isEqualTo(2);
+        assertThat(occurrences(row, "<details class=\"cl-menu\">")).isEqualTo(1);
+        assertThat(occurrences(row, "<summary class=\"cl-button\">")).isEqualTo(1);
+        assertThat(row).doesNotContain("Skieruj").doesNotContain("Do alokacji").doesNotContain("moveSelectedItemsToAllocation");
         assertThat(row).containsPattern("<button type=\"button\" class=\"cl-menu-item\"\\s+data-cl-dialog-open=\"move-dialog\"")
                 .doesNotContain("disabled=\"disabled\"").doesNotContain("class=\"cl-selection-bar").doesNotContain("is-primary");
     }
@@ -2189,7 +2233,7 @@ class OrderDetailsTemplateTest {
 
         // then
         assertThat(row).doesNotContain("removeSelectedItemsFromOrder").doesNotContain("bulk-remove-reason")
-                .contains("<span>Skieruj</span>").contains("data-cl-select-all");
+                .contains("<span>Przenieś</span>").contains("data-cl-select-all");
     }
 
     @Test

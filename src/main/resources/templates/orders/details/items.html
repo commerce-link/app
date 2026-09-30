@@ -150,6 +150,12 @@
     </form>
     <form th:unless="${page.readOnly()}" id="consolidate-form" method="post"
           th:action="@{/dashboard/orders/{o}/toggle-consolidation(o=${page.orderId()})}"></form>
+    <!--/* "Do alokacji" of one item: the menu entry submits this form with the item's id as the one selected item of
+           the bulk endpoint (forms cannot nest in #order-items-form); it works without JavaScript too */-->
+    <form th:unless="${page.readOnly()}" id="allocate-item-form" method="post"
+          th:action="@{/dashboard/orders/{o}/moveSelectedItemsToAllocation(o=${page.orderId()})}">
+        <input type="hidden" name="orderItems[0].selected" value="true">
+    </form>
 </section>
 
 <tr th:fragment="row(row)" th:with="menus=${!page.readOnly()}"
@@ -240,6 +246,10 @@
                                     data-cl-confirm-message=#{order.item.clear.confirm.message},
                                     data-cl-confirm-action=#{order.item.clear.confirm.action}"
                            th:text="#{${state.labelKey()}}"></a>
+                    </li>
+                    <li th:if="${state.available() and state.action().name() == 'ALLOCATE'}">
+                        <button type="submit" class="cl-menu-item" form="allocate-item-form" name="orderItems[0].itemId"
+                                th:value="${row.itemId()}" th:text="#{${state.labelKey()}}"></button>
                     </li>
                     <li th:if="${state.available() and state.action().name() == 'CONSOLIDATE'}">
                         <!--/* forms cannot nest: the button submits the separate form#consolidate-form, its value is the itemId */-->

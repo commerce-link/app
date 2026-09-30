@@ -26,13 +26,20 @@ public record OrderItemRow(String itemId, int index, String name, String categor
 
     /**
      * {@code superAdmin} matters on its own besides {@code readOnly}: a closed order is read-only too, but only the
-     * store's own users have a route to the item page.
+     * store's own users have a route to the item page. dropshipLocked: the order has items in a dropship delivery, which
+     * greys "Do alokacji" as it greyed the selection row's entry before it moved into the item menu.
      */
     public record Context(Order order, boolean readOnly, boolean superAdmin, SupplierLabelMap labels,
                           Function<OrderItem, String> deliveryHref, Function<String, String> serialHref,
-                          ReceiptLock receiptLock) {
+                          ReceiptLock receiptLock, boolean dropshipLocked) {
 
         /** receiptLock: why the order's e-receipt locks it, if it does (ReceiptOrderState#receiptLock). */
+        public Context(Order order, boolean readOnly, boolean superAdmin, SupplierLabelMap labels,
+                       Function<OrderItem, String> deliveryHref, Function<String, String> serialHref,
+                       ReceiptLock receiptLock) {
+            this(order, readOnly, superAdmin, labels, deliveryHref, serialHref, receiptLock, false);
+        }
+
         public Context(Order order, boolean readOnly, boolean superAdmin, SupplierLabelMap labels,
                        Function<OrderItem, String> deliveryHref, Function<String, String> serialHref) {
             this(order, readOnly, superAdmin, labels, deliveryHref, serialHref, ReceiptLock.NONE);
@@ -57,7 +64,7 @@ public record OrderItemRow(String itemId, int index, String name, String categor
                 deliveryLabel, deliveryId == null ? null : context.deliveryHref().apply(item),
                 item.isReadyForAllocation(), item.isProduct() && item.isAllocated(), item.isProduct() && item.isDelivered(),
                 item.canBeMovedToAnotherOrder(), item.isNew() || item.isService(),
-                context.readOnly() ? List.of() : actions(item, context.order(), context.receiptLock()),
+                context.readOnly() ? List.of() : actions(item, context.order(), context.receiptLock(), context.dropshipLocked()),
                 context.readOnly() ? null : itemHref,
                 item.getPrice(), item.getTax(), item.isGroup(),
                 // without the item menu a closed order would have no way to its item page (EAN, VAT, delivery dates)
@@ -113,6 +120,15 @@ public record OrderItemRow(String itemId, int index, String name, String categor
 
     /** The same, worded after why the e-receipt locks the order (still issuing, or fiscalised and being attached). */
     public static List<ItemAction.State> actions(OrderItem item, Order order, ReceiptLock receiptLock) {
+        return actions(item, order, receiptLock, false);
+    }
+
+    /**
+     * dropshipLocked: the order has items in a dropship delivery. "Do alokacji" posts this one item to the bulk
+     * endpoint (OrdersManager#moveItemsToAllocation), which moves only a New item with its allocation data (supplier,
+     * EAN, manufacturer code): the entry is greyed with the reason whenever the post would change nothing.
+     */
+    public static List<ItemAction.State> actions(OrderItem item, Order order, ReceiptLock receiptLock, boolean dropshipLocked) {
         List<ItemAction.State> states = new ArrayList<>();
         // an item that already has a supplier (Allocation) is released first, then reassigned
         String assignReason = item.isGroup() ? "order.item.unavailable.group"
@@ -125,6 +141,7 @@ public record OrderItemRow(String itemId, int index, String name, String categor
         String warehouseReason = assignReason != null ? assignReason
                 : order.isBoundToExternalSupplier() ? "order.item.unavailable.routed" : null;
         states.add(ItemAction.State.of(ItemAction.ASSIGN_WAREHOUSE, warehouseReason, null));
+        states.add(ItemAction.State.of(ItemAction.ALLOCATE, allocateReason(item, dropshipLocked), null));
         String clearReason = item.isGroup() ? "order.item.unavailable.group"
                 : item.isClaimed() ? "order.item.unavailable.claimed"
                 : StringUtils.isBlank(item.getDeliveryId()) ? "order.item.unavailable.no.supplier"
@@ -148,5 +165,19 @@ public record OrderItemRow(String itemId, int index, String name, String categor
                 consolidateReason == null, consolidateReason, null));
         states.add(ItemAction.State.of(ItemAction.EDIT, null, null));
         return states;
+    }
+
+    /** Why "Do alokacji" would change nothing for the item (Item#isReadyForAllocation), or null. */
+    private static String allocateReason(OrderItem item, boolean dropshipLocked) {
+        if (dropshipLocked) {
+            return "order.item.unavailable.dropship";
+        }
+        if (!item.isNew()) {
+            return "order.item.unavailable.not.new";
+        }
+        if (StringUtils.isBlank(item.getDeliveryId())) {
+            return "order.item.unavailable.allocation.supplier";
+        }
+        return item.isReadyForAllocation() ? null : "order.item.unavailable.allocation.codes";
     }
 }

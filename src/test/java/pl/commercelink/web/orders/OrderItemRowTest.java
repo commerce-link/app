@@ -165,9 +165,9 @@ class OrderItemRowTest {
 
         // then
         assertThat(hasAction(plainRow, ItemAction.SPLIT_GROUP)).isFalse();
-        assertThat(plainRow.actions()).hasSize(6);
+        assertThat(plainRow.actions()).hasSize(7);
         assertThat(hasAction(bundleRow, ItemAction.SPLIT_GROUP)).isTrue();
-        assertThat(bundleRow.actions()).hasSize(7);
+        assertThat(bundleRow.actions()).hasSize(8);
     }
 
     @Test

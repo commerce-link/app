@@ -2284,6 +2284,23 @@ class OrdersControllerTest {
     }
 
     @Test
+    void theItemPageCarriesTheHistoryLinkOfEachSerialNumber() {
+        // given
+        OrderItem item = existingOrderItem("Laptopy", false);
+        item.setSerialNo("SN 1, SN-2, SN-2");
+        when(orderItemsRepository.findById(ORDER_ID, item.getItemId())).thenReturn(item);
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        ordersController.getOrderItem(ORDER_ID, item.getItemId(), model);
+
+        // then
+        assertThat(model.getAttribute("serialHistory")).isEqualTo(List.of(
+                new pl.commercelink.web.orders.OrderLinks.SerialHistory("SN 1", "/dashboard/item/history?serialNo=SN+1"),
+                new pl.commercelink.web.orders.OrderLinks.SerialHistory("SN-2", "/dashboard/item/history?serialNo=SN-2")));
+    }
+
+    @Test
     void theItemPageOfAnItemWithoutDeliveryOffersNoSupplierAndLooksNothingUp() {
         // given
         OrderItem item = existingOrderItem("Laptopy", false);

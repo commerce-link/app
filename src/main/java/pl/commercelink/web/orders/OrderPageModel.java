@@ -36,7 +36,7 @@ public record OrderPageModel(String orderId, String shortId, String backHref, bo
                          String clientName, String sourceName, String sourceTypeKey, String orderedAt, String total,
                          String fulfilmentTypeShortKey, String fulfilmentTypeIcon, String externalOrderId, RoutedSupplierView routedSupplier,
                          String splitFromShortId, String splitFromHref, String clientOrderUrl, PrimaryAction primaryAction,
-                         String cardHref, String collectionHref, String itemHistoryHref, boolean canCancel,
+                         String cardHref, String collectionHref, boolean canCancel,
                          String cancelLockedKey, String cancelUnavailableKey, String cancelMessage, boolean canDelete,
                          String deleteMessage) {
     }
