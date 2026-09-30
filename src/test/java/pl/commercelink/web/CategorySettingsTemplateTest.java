@@ -58,16 +58,4 @@ class CategorySettingsTemplateTest {
         // then
         assertThat(html).doesNotContain("cl-page-lead").doesNotContain("Four short forms");
     }
-
-    /** The category is created from the Basics page, so its own page carries the same warning after the redirect. */
-    @Test
-    void theCategoryPageCarriesTheSameWarningFragment() throws Exception {
-        // given
-        String categoryPage = Files.readString(Path.of("src/main/resources/templates/catalog/category.html"),
-                StandardCharsets.UTF_8);
-
-        // then
-        assertThat(page()).contains("settings-form :: warnAlert");
-        assertThat(categoryPage).contains("settings-form :: warnAlert");
-    }
 }

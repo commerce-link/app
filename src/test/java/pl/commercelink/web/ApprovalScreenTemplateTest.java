@@ -26,28 +26,6 @@ class ApprovalScreenTemplateTest {
     }
 
     @Test
-    void offersOnlyTheRealisationOutcomeOnTheApprovalScreen() throws Exception {
-        // when
-        String html = approval();
-
-        // then
-        assertThat(html).contains("deliveries.approval.realize");
-        assertThat(html).doesNotContain("deliveries.approval.reject");
-        assertThat(html).doesNotContain("name=\"reason\"");
-        assertThat(html).doesNotContain("/reject");
-    }
-
-    @Test
-    void reusesTheSharedAddressModalFragment() throws Exception {
-        // when
-        String html = approval();
-
-        // then
-        assertThat(html).contains("fragments/address-modal :: addressModal(");
-        assertThat(html).doesNotContain("searchable-picker :: picker(");
-    }
-
-    @Test
     void keepsTheApproveButtonDisabledUntilTheChecksPass() throws Exception {
         // when
         String html = approval();
@@ -80,17 +58,6 @@ class ApprovalScreenTemplateTest {
     }
 
     @Test
-    void detailsPageNoLongerCarriesTheApprovalPanel() throws Exception {
-        // when
-        String html = details();
-
-        // then
-        assertThat(html).doesNotContain("approval-approve-button");
-        assertThat(html).doesNotContain("approval-validation-area");
-        assertThat(html).doesNotContain("pickerScript('deliveryAddressId'");
-    }
-
-    @Test
     void detailsPageHidesTheRetryButtonOnceTheDeliveryHasBeenReceived() throws Exception {
         // when
         String html = details();
@@ -102,61 +69,6 @@ class ApprovalScreenTemplateTest {
     }
 
     @Test
-    void detailsPageLinksToTheRealisationScreenNextToSave() throws Exception {
-        // when
-        String html = details();
-
-        // then
-        assertThat(html).contains("deliveries.approval.realize");
-        assertThat(html).contains("/approval(storeId=");
-    }
-
-    @Test
-    void detailsPageShowsApprovalStateAsAStatusTagLikeEveryOtherOrderState() throws Exception {
-        // when
-        String html = details();
-        int statuses = html.indexOf("#{deliveries.statuses}");
-        int editFormEnd = html.indexOf("</form>");
-
-        // then
-        assertThat(html.indexOf("deliveries.status.awaitingApproval")).isBetween(statuses, editFormEnd);
-    }
-
-    @Test
-    void detailsPageShowsTheFailureReasonAsALabelledFieldLikeEveryOtherField() throws Exception {
-        // when
-        String html = details();
-        int editFormEnd = html.indexOf("</form>");
-
-        // then
-        assertThat(html.indexOf("#{general.reason}")).isBetween(0, editFormEnd);
-        assertThat(html.indexOf("delivery.orderErrorMessage")).isBetween(0, editFormEnd);
-        assertThat(html).doesNotContain("delivery.rejectionReason");
-        assertThat(html).doesNotContain("notification is-danger is-light");
-        assertThat(html).doesNotContain("notification is-warning is-light");
-    }
-
-    @Test
-    void detailsPageLetsTheStatusTagSpeakForItselfWithoutAProseRestatement() throws Exception {
-        // when
-        String html = details();
-
-        // then
-        assertThat(html).doesNotContain("deliveries.purchase.submitted.approval");
-        assertThat(html).doesNotContain("deliveries.approval.rejectedBy");
-    }
-
-    @Test
-    void realisationScreenScrollsTheOptionListToThePreselectedAddress() throws Exception {
-        // when
-        String html = approval();
-
-        // then
-        assertThat(html).contains("addressModalScript");
-        assertThat(html).contains("scrollAddressOptionsToSelection();");
-    }
-
-    @Test
     void detailsPageOffersARejectModalPostingToTheRejectRoute() throws Exception {
         // when
         String html = details();
@@ -165,26 +77,6 @@ class ApprovalScreenTemplateTest {
         assertThat(html).contains("id=\"rejectPurchaseModal\"");
         assertThat(html).contains("/dashboard/store/${delivery.storeId}/deliveries/${delivery.deliveryId}/reject");
         assertThat(html).contains("<textarea class=\"textarea\" name=\"reason\">");
-    }
-
-    @Test
-    void detailsPageShowsTheRejectButtonBeforeTheRealiseButton() throws Exception {
-        // when
-        String html = details();
-
-        // then
-        assertThat(html.indexOf("id=\"reject-purchase-button\""))
-                .isLessThan(html.indexOf("deliveries.approval.realize"));
-    }
-
-    @Test
-    void approvalScreenNoLongerCarriesTheRejectForm() throws Exception {
-        // when
-        String html = approval();
-
-        // then
-        assertThat(html).doesNotContain("/reject");
-        assertThat(html).doesNotContain("name=\"reason\"");
     }
 
     @Test

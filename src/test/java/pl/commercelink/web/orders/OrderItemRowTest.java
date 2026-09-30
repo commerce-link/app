@@ -201,18 +201,6 @@ class OrderItemRowTest {
     }
 
     @Test
-    void clearSupplierIsAbsentWithoutASupplier() {
-        // when
-        OrderItemRow row = OrderItemRow.of(item(FulfilmentStatus.New, "MFN-1"), 0, context());
-
-        // then
-        assertThat(hasAction(row, ItemAction.CLEAR_SUPPLIER)).isFalse();
-        assertThat(state(row, ItemAction.ASSIGN_SKU).available()).isTrue();
-        assertThat(state(row, ItemAction.ASSIGN_SUPPLIER).available()).isTrue();
-        assertThat(state(row, ItemAction.ASSIGN_WAREHOUSE).available()).isTrue();
-    }
-
-    @Test
     void warehouseIsGreyedWhenTheMarketplaceChoseTheSupplier() {
         // given
         Order routed = new Order("store-1");

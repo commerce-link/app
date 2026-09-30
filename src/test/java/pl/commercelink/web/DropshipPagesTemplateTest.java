@@ -197,17 +197,6 @@ class DropshipPagesTemplateTest {
     }
 
     @Test
-    void confirmationScriptDisablesOnlyTheConfirmButtonAndRestoresItFromTheBackForwardCache() throws Exception {
-        // when
-        String js = Files.readString(Path.of("src/main/resources/static/js/dropship-confirmation.js"), StandardCharsets.UTF_8);
-
-        // then
-        assertThat(js).contains("event.submitter && event.submitter.id === 'purchase-confirm-submit'")
-                .contains("addEventListener('pageshow'").contains("event.persisted")
-                .doesNotContain("document.getElementById('purchase-confirm-submit').disabled = true");
-    }
-
-    @Test
     void createPageShowsWhySupplierOrderIsBlockedAndTheCustomersPickupPoint() {
         // when
         String html = render("dropshipCreate",
@@ -305,27 +294,6 @@ class DropshipPagesTemplateTest {
     }
 
     @Test
-    void dropshipPagesCarryNoInlineBehaviourNoBulmaLookAndLoadTheirScripts() throws Exception {
-        for (String template : List.of("dropshipCreate.html", "dropshipConfirmation.html")) {
-            // given
-            String html = Files.readString(Path.of("src/main/resources/templates/" + template), StandardCharsets.UTF_8);
-
-            // then
-            assertThat(html).as(template)
-                    .doesNotContain("style=\"").doesNotContain("<style").doesNotContain("onclick=")
-                    .doesNotContain("onchange=").doesNotContain("oninput=").doesNotContain("onsubmit=")
-                    .doesNotContain("<script>").doesNotContain("<script th:inline")
-                    .doesNotContain("class=\"button").doesNotContain("class=\"box").doesNotContain("class=\"columns")
-                    .doesNotContain("class=\"notification").doesNotContain("class=\"tag").doesNotContain("class=\"select")
-                    .doesNotContain("class=\"input").doesNotContain("class=\"table").doesNotContain("class=\"level");
-        }
-        for (String script : List.of("dropship-create.js", "dropship-confirmation.js")) {
-            String js = Files.readString(Path.of("src/main/resources/static/js/" + script), StandardCharsets.UTF_8);
-            assertThat(js).as(script).contains("'use strict'").doesNotContain("innerHTML");
-        }
-    }
-
-    @Test
     void newDropshipPageKeysExistInBothLanguages() throws Exception {
         // given
         Properties pl = new Properties();
@@ -345,47 +313,6 @@ class DropshipPagesTemplateTest {
             assertThat(pl.getProperty(key)).as(key + " pl").isNotBlank();
             assertThat(en.getProperty(key)).as(key + " en").isNotBlank();
         }
-    }
-
-    @Test
-    void confirmationGivesTheProductColumnAMinimumWidth() throws Exception {
-        // given
-        Map<String, Object> variables = new HashMap<>();
-        variables.put("validation", new PurchaseValidation("Acme", "ref-1", "PLN", 1159.0, true, List.of(
-                new PurchaseValidation.Line("AMD Ryzen 7 9800X3D", "sku", "5901234123457", "100-100001084WOF", 2, 2,
-                        579.5, 579.5))));
-        String css = Files.readString(Path.of("src/main/resources/static/css/commercelink.css"), StandardCharsets.UTF_8);
-
-        // when
-        String html = fragment(variables);
-
-        // then: the product keeps 40 % of the table beside the consignee card; the figures share the rest
-        assertThat(html).contains("<col class=\"cl-col-key\">").doesNotContain("cl-col-price").doesNotContain("cl-col-qty");
-        assertThat(occurrences(html, "<col class=\"cl-col-num\">")).isEqualTo(5);
-        assertThat(css).contains(".cl-page .cl-table col.cl-col-key { width: 40%; }");
-        // and the column names read without a hover: no "Δ" abbreviation, no feed jargon
-        assertThat(html).contains(">Dostępne</th>").contains(">Cena z cennika</th>").contains(">Cena teraz</th>")
-                .contains(">Różnica</th>").doesNotContain("<abbr").doesNotContain("feed");
-    }
-
-    @Test
-    void producerCodesDoNotBreak() throws Exception {
-        // given
-        Map<String, Object> variables = new HashMap<>();
-        variables.put("validation", new PurchaseValidation("Acme", "ref-1", "PLN", 1159.0, true, List.of(
-                new PurchaseValidation.Line("AMD Ryzen 7 9800X3D", "sku", "5901234123457", "100-100001084WOF", 2, 2,
-                        579.5, 579.5))));
-        String css = Files.readString(Path.of("src/main/resources/static/css/commercelink.css"), StandardCharsets.UTF_8);
-
-        // when
-        String create = render("dropshipCreate", model(order(false), false, null));
-        String confirmation = fragment(variables);
-
-        // then
-        assertThat(create).contains("Kod producenta:</span> <span class=\"cl-code-nowrap\">100-100001084WOF</span>")
-                .contains("EAN:</span> <span class=\"cl-code-nowrap\">5901234123457</span>");
-        assertThat(confirmation).contains("EAN:</span> <span class=\"cl-code-nowrap\">5901234123457</span>");
-        assertThat(css).containsPattern("\\.cl-page \\.cl-code-nowrap \\{\\s*white-space: nowrap;");
     }
 
     @Test

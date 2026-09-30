@@ -1,8 +1,12 @@
 package pl.commercelink.scheduling;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.util.List;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -15,44 +19,27 @@ class PollingScheduleDescriptionTest {
         assertThat(PollingScheduleDescription.of("  ").code()).isEqualTo(PollingScheduleDescription.DEFAULT);
     }
 
-    @Test
-    void describesAnEveryMinutesSchedule() {
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("describedSchedules")
+    void describesTheScheduleAsACodeWithArguments(String expression, String code, List<Object> args) {
         // when
-        PollingScheduleDescription description = PollingScheduleDescription.of("0/30 * * * ? *");
+        PollingScheduleDescription description = PollingScheduleDescription.of(expression);
 
         // then
-        assertThat(description.code()).isEqualTo(PollingScheduleDescription.EVERY_MINUTES);
-        assertThat(description.args()).isEqualTo(List.of(30));
+        assertThat(description.code()).isEqualTo(code);
+        assertThat(description.args()).isEqualTo(args);
+        // the flat Object[] is what Thymeleaf and getMessage need; wrapping it would render "[30]"
+        assertThat(description.messageArgs()).containsExactlyElementsOf(args);
     }
 
-    @Test
-    void describesTheHourlyScheduleWrittenWithAStar() {
-        // when
-        PollingScheduleDescription description = PollingScheduleDescription.of("0 * * * ? *");
-
-        // then
-        assertThat(description.code()).isEqualTo(PollingScheduleDescription.EVERY_HOURS);
-        assertThat(description.args()).isEqualTo(List.of(1));
-    }
-
-    @Test
-    void describesAnEveryHoursSchedule() {
-        // when
-        PollingScheduleDescription description = PollingScheduleDescription.of("0 0/6 * * ? *");
-
-        // then
-        assertThat(description.code()).isEqualTo(PollingScheduleDescription.EVERY_HOURS);
-        assertThat(description.args()).isEqualTo(List.of(6));
-    }
-
-    @Test
-    void describesAnEveryDaysSchedule() {
-        // when
-        PollingScheduleDescription description = PollingScheduleDescription.of("0 0 1/3 * ? *");
-
-        // then
-        assertThat(description.code()).isEqualTo(PollingScheduleDescription.EVERY_DAYS);
-        assertThat(description.args()).isEqualTo(List.of(3));
+    static Stream<Arguments> describedSchedules() {
+        return Stream.of(
+                Arguments.of("0/30 * * * ? *", PollingScheduleDescription.EVERY_MINUTES, List.of(30)),
+                Arguments.of("0 * * * ? *", PollingScheduleDescription.EVERY_HOURS, List.of(1)),
+                Arguments.of("0 0/6 * * ? *", PollingScheduleDescription.EVERY_HOURS, List.of(6)),
+                Arguments.of("0 0 1/3 * ? *", PollingScheduleDescription.EVERY_DAYS, List.of(3)),
+                Arguments.of("0 6 ? * MON-FRI *", PollingScheduleDescription.AT + ".MON-FRI", List.of("06:00")),
+                Arguments.of("  0   6 ? * mon *  ", PollingScheduleDescription.AT + ".MON", List.of("06:00")));
     }
 
     @Test
@@ -63,26 +50,6 @@ class PollingScheduleDescriptionTest {
         // then
         assertThat(description.code()).isEqualTo(PollingScheduleDescription.AT);
         assertThat(description.args()).isEqualTo(List.of("05:30, 17:30"));
-    }
-
-    @Test
-    void namesTheDayOfWeekOfARestrictedSchedule() {
-        // when
-        PollingScheduleDescription description = PollingScheduleDescription.of("0 6 ? * MON-FRI *");
-
-        // then
-        assertThat(description.code()).isEqualTo(PollingScheduleDescription.AT + ".MON-FRI");
-        assertThat(description.args()).isEqualTo(List.of("06:00"));
-    }
-
-    @Test
-    void normalizesBeforeDescribing() {
-        // when
-        PollingScheduleDescription description = PollingScheduleDescription.of("  0   6 ? * mon *  ");
-
-        // then
-        assertThat(description.code()).isEqualTo(PollingScheduleDescription.AT + ".MON");
-        assertThat(description.args()).isEqualTo(List.of("06:00"));
     }
 
     @Test
@@ -119,14 +86,5 @@ class PollingScheduleDescriptionTest {
         beyondTheBuilder.forEach(expression -> assertThat(PollingScheduleDescription.of(expression).code())
                 .as(expression)
                 .isEqualTo(PollingScheduleDescription.CUSTOM));
-    }
-
-    @Test
-    void exposesArgumentsInTheShapeThymeleafNeeds() {
-        // when
-        Object[] args = PollingScheduleDescription.of("0/30 * * * ? *").messageArgs();
-
-        // then
-        assertThat(args).containsExactly(30);
     }
 }

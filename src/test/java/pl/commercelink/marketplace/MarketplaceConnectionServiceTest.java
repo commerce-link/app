@@ -434,11 +434,13 @@ class MarketplaceConnectionServiceTest {
     }
 
     @Test
-    void theReturnsDefaultIntervalComesFromItsScheduler() {
-        // given
+    void eachDefaultIntervalComesFromItsOwnScheduler() {
+        // given: distinct values, so reading the wrong scheduler's interval fails
+        when(ordersImportScheduler.defaultIntervalMinutes()).thenReturn(10);
         when(returnsImportScheduler.defaultIntervalMinutes()).thenReturn(60);
 
         // when / then
+        assertThat(service.defaultIntervalMinutes()).isEqualTo(10);
         assertThat(service.returnsDefaultIntervalMinutes()).isEqualTo(60);
     }
 
@@ -512,16 +514,6 @@ class MarketplaceConnectionServiceTest {
         // then
         assertThat(result.hasErrors()).isFalse();
         verify(configurationManager, never()).restore(any(), anyString(), any());
-    }
-
-
-    @Test
-    void theDefaultIntervalComesFromTheScheduler() {
-        // given
-        when(ordersImportScheduler.defaultIntervalMinutes()).thenReturn(10);
-
-        // when / then
-        assertThat(service.defaultIntervalMinutes()).isEqualTo(10);
     }
 
     private static MarketplaceProviderDescriptor descriptor(String name, String displayName, boolean supportsReturns,

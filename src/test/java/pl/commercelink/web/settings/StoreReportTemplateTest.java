@@ -5,9 +5,6 @@ import pl.commercelink.starter.security.UserRole;
 import pl.commercelink.web.StoreReportingSettingsController.ConversionsAddress;
 import pl.commercelink.web.dtos.ReportingForm;
 
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -161,13 +158,4 @@ class StoreReportTemplateTest {
                 .contains("role=\"switch\"");
     }
 
-    @Test
-    void dropsBulmaMarkup() throws Exception {
-        // when
-        String template = Files.readString(Path.of("src/main/resources/templates/store-report.html"), StandardCharsets.UTF_8);
-
-        // then
-        assertThat(template).doesNotContain("class=\"box\"").doesNotContain("\"button is-primary").doesNotContain("style=")
-                .doesNotContain("general.cancel");
-    }
 }

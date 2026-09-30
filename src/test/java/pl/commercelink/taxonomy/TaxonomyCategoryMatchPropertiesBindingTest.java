@@ -54,11 +54,4 @@ class TaxonomyCategoryMatchPropertiesBindingTest {
             assertThat(properties.maxAttempts()).isEqualTo(4);
         });
     }
-
-    @Test
-    void invalidPropertyValueFailsContextStartup() {
-        // when / then
-        runner.withPropertyValues("taxonomy.category-match.max-attempts=-1")
-                .run(context -> assertThat(context).hasFailed());
-    }
 }

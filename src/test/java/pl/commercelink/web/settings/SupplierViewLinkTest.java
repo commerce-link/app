@@ -1,6 +1,8 @@
 package pl.commercelink.web.settings;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import pl.commercelink.inventory.supplier.SupplierConnectionView;
 import pl.commercelink.stores.ConnectionMode;
 
@@ -20,26 +22,17 @@ class SupplierViewLinkTest {
                 true, true, true, null, null, null, null, true);
     }
 
-    @Test
-    void escapesASpaceInALegacyPriceListIdentity() {
-        SupplierView view = SupplierView.of(priceList("manual:Cennik hurtowy"), false, PATH);
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(delimiter = '|', value = {
+            "manual:Cennik hurtowy | manual:Cennik%20hurtowy",
+            "manual:Cennik #2      | manual:Cennik%20%232",
+            "manual:Żywność        | manual:%C5%BBywno%C5%9B%C4%87"
+    })
+    void escapesALegacyPriceListIdentityInTheLinks(String identity, String escaped) {
+        SupplierView view = SupplierView.of(priceList(identity), false, PATH);
 
-        assertThat(view.editHref()).isEqualTo(PATH + "/manual:Cennik%20hurtowy");
-        assertThat(view.removeHref()).isEqualTo(PATH + "/manual:Cennik%20hurtowy/delete");
-    }
-
-    @Test
-    void escapesAHashThatWouldOtherwiseCutTheLinkShort() {
-        SupplierView view = SupplierView.of(priceList("manual:Cennik #2"), false, PATH);
-
-        assertThat(view.editHref()).isEqualTo(PATH + "/manual:Cennik%20%232");
-    }
-
-    @Test
-    void escapesPolishLettersAsUtf8() {
-        SupplierView view = SupplierView.of(priceList("manual:Żywność"), false, PATH);
-
-        assertThat(view.editHref()).isEqualTo(PATH + "/manual:%C5%BBywno%C5%9B%C4%87");
+        assertThat(view.editHref()).isEqualTo(PATH + "/" + escaped);
+        assertThat(view.removeHref()).isEqualTo(PATH + "/" + escaped + "/delete");
     }
 
     @Test

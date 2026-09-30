@@ -2,8 +2,12 @@ package pl.commercelink.web;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Named;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -34,6 +38,8 @@ import pl.commercelink.web.dtos.DeliveryAllocationsForm;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
+import java.util.function.Consumer;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -205,41 +211,22 @@ class DeliveriesControllerDropshipShipmentTest {
         verifyNoInteractions(dropshipDeliveryCompletion);
     }
 
-    @Test
-    void supplierOrderInFlightIsRejected() {
-        // given
-        Delivery delivery = dropshipDelivery();
-        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING);
-        when(deliveriesRepository.findById(STORE_ID, delivery.getDeliveryId())).thenReturn(delivery);
-
-        // when
-        controller.confirmDropshipShipment(formFor(delivery, true), redirectAttributes, Locale.ENGLISH);
-
-        // then
-        verify(redirectAttributes).addFlashAttribute("errorMessage", "deliveries.dropship.confirm.unavailable");
-        verifyNoInteractions(dropshipDeliveryCompletion);
+    static Stream<Arguments> dropshipDeliveryStatesThatCannotBeConfirmed() {
+        return Stream.of(
+                Arguments.of(Named.of("supplier order in flight",
+                        (Consumer<Delivery>) d -> d.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING))),
+                Arguments.of(Named.of("failed supplier order, until completed manually",
+                        (Consumer<Delivery>) d -> d.setOrderStatus(DeliveryOrderStatus.FAILED))),
+                Arguments.of(Named.of("already received",
+                        (Consumer<Delivery>) Delivery::markAsReceived)));
     }
 
-    @Test
-    void failedSupplierOrderIsRejectedUntilCompletedManually() {
+    @ParameterizedTest
+    @MethodSource("dropshipDeliveryStatesThatCannotBeConfirmed")
+    void confirmationIsRejectedWhenTheDeliveryIsNotInAConfirmableState(Consumer<Delivery> putInState) {
         // given
         Delivery delivery = dropshipDelivery();
-        delivery.setOrderStatus(DeliveryOrderStatus.FAILED);
-        when(deliveriesRepository.findById(STORE_ID, delivery.getDeliveryId())).thenReturn(delivery);
-
-        // when
-        controller.confirmDropshipShipment(formFor(delivery, true), redirectAttributes, Locale.ENGLISH);
-
-        // then
-        verify(redirectAttributes).addFlashAttribute("errorMessage", "deliveries.dropship.confirm.unavailable");
-        verifyNoInteractions(dropshipDeliveryCompletion);
-    }
-
-    @Test
-    void alreadyReceivedDeliveryIsRejected() {
-        // given
-        Delivery delivery = dropshipDelivery();
-        delivery.markAsReceived();
+        putInState.accept(delivery);
         when(deliveriesRepository.findById(STORE_ID, delivery.getDeliveryId())).thenReturn(delivery);
 
         // when

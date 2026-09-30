@@ -24,7 +24,6 @@ import jakarta.xml.bind.annotation.XmlAccessType;
 import jakarta.xml.bind.annotation.XmlAccessorType;
 import jakarta.xml.bind.annotation.XmlRootElement;
 import java.io.FileNotFoundException;
-import java.io.Reader;
 import java.io.StringReader;
 import java.util.List;
 import java.util.Optional;
@@ -101,21 +100,6 @@ class StoreScopedFeedLoaderTest {
     }
 
     @Test
-    void csvStoreOverloadReadsStoreScopedKey() throws Exception {
-        // given
-        when(storeFeedRepository.canRead("store-1", "Action", "csv")).thenReturn(true);
-        Reader reader = new StringReader("");
-        when(storeFeedRepository.read("store-1", "Action", "csv")).thenReturn(reader);
-        when(dataCleanup.run(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
-
-        // when
-        loader.fetch(mock(CsvRowParser.class), ';', "store-1", "Action", 0);
-
-        // then
-        verify(storeFeedRepository).read("store-1", "Action", "csv");
-    }
-
-    @Test
     void csvStoreOverloadPassesTaxonomyPenaltyToProcessor() throws Exception {
         // given
         when(storeFeedRepository.canRead("store-1", "Action", "csv")).thenReturn(true);
@@ -146,19 +130,6 @@ class StoreScopedFeedLoaderTest {
 
         // then
         assertTrue(result.isEmpty());
-        verify(storeFeedRepository).read("store-1", "Action", "xml");
-    }
-
-    @Test
-    void xmlStoreOverloadReadsStoreScopedKey() throws Exception {
-        // given
-        when(storeFeedRepository.read("store-1", "Action", "xml")).thenReturn(new StringReader("<feed></feed>"));
-        when(dataCleanup.run(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
-
-        // when
-        xmlLoader.load(TestXmlItem.class, "Item", supplierInfo("Action"), "store-1", 0);
-
-        // then
         verify(storeFeedRepository).read("store-1", "Action", "xml");
     }
 

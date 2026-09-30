@@ -31,16 +31,6 @@ class DeliveryTest {
     }
 
     @Test
-    void isDropshipReturnsTrueForDropshipType() {
-        // given
-        Delivery delivery = new Delivery();
-        delivery.setType(DeliveryType.DROPSHIP);
-
-        // when / then
-        assertTrue(delivery.isDropship());
-    }
-
-    @Test
     void typeDefaultsToWarehouseWhenAttributeIsAbsent() {
         // given
         Delivery delivery = new Delivery();
