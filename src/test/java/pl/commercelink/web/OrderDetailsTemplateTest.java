@@ -219,7 +219,7 @@ class OrderDetailsTemplateTest {
     }
 
     @Test
-    void theFulfilmentTypeShowsAsAnIconAndAShortLabelInTheHeaderAndTheSettingsCard() {
+    void theFulfilmentTypeShowsAsAnIconAndAShortLabelInTheHeaderOnly() {
         // given: WarehouseFulfilment is order()'s default
         Order warehouse = order(OrderStatus.Assembly);
         Order dropship = order(OrderStatus.Assembly);
@@ -233,14 +233,15 @@ class OrderDetailsTemplateTest {
         String dropshipHeader = header(dropshipFullHtml);
         String dropshipSettings = card(dropshipFullHtml, "settings-title");
 
-        // then: decorative icon + short text in both read-only places, not the long store-settings label
-        for (String html : List.of(warehouseHeader, warehouseSettings)) {
-            assertThat(html).contains("cl-icon-text").contains("fas fa-warehouse\" aria-hidden=\"true\"")
-                    .contains("Magazyn sklepu").doesNotContain("Przez magazyn sklepu");
-        }
-        for (String html : List.of(dropshipHeader, dropshipSettings)) {
-            assertThat(html).contains("cl-icon-text").contains("fas fa-truck\" aria-hidden=\"true\"")
-                    .contains("Dropshipping").doesNotContain("Wysyłką od dostawcy do klienta");
+        // then: decorative icon + short text in the header, not the long store-settings label; the settings card no
+        // longer repeats it
+        assertThat(warehouseHeader).contains("cl-icon-text").contains("fas fa-warehouse\" aria-hidden=\"true\"")
+                .contains("Magazyn sklepu").doesNotContain("Przez magazyn sklepu");
+        assertThat(dropshipHeader).contains("cl-icon-text").contains("fas fa-truck\" aria-hidden=\"true\"")
+                .contains("Dropshipping").doesNotContain("Wysyłką od dostawcy do klienta");
+        for (String html : List.of(warehouseSettings, dropshipSettings)) {
+            assertThat(html).doesNotContain("Typ realizacji").doesNotContain("cl-icon-text")
+                    .doesNotContain("Magazyn sklepu").doesNotContain("Dropshipping");
         }
         // then: the settings dialog/no-JS form still offers the full labels to choose from
         assertThat(warehouseFullHtml).contains("Przez magazyn sklepu").contains("Wysyłką od dostawcy do klienta");
@@ -337,6 +338,20 @@ class OrderDetailsTemplateTest {
         assertThat(ResourceBundle.getBundle("messages", Locale.ENGLISH).getString("FulfilmentStatus.Delivered"))
                 .isEqualTo("Assembled");
         assertThat(ResourceBundle.getBundle("messages", PL).getString("OrderStatus.Delivered")).isEqualTo("Dostarczone");
+    }
+
+    @Test
+    void theDeliveryStandsOnTheLineOfTheItemStatePill() {
+        // given
+        Order order = order(OrderStatus.Assembly);
+        OrderItem ordered = inDelivery(order, "delivery-9", FulfilmentStatus.Ordered);
+
+        // when
+        String html = page(render(order, List.of(ordered), ADMIN, Set.of()));
+
+        // then: one flex line holds the pill and the delivery, which wraps under the pill only when out of room (CSS)
+        assertThat(html).containsPattern("<td class=\"cl-table-fulfilment\" data-label=\"Stan\">\\s*<div class=\"cl-table-state\">"
+                + "\\s*<span class=\"cl-status[^\"]*\">Zamówiony</span>\\s*<span class=\"cl-table-sub\">");
     }
 
     @Test
@@ -1803,7 +1818,7 @@ class OrderDetailsTemplateTest {
 
     static OrderSettingsView lockedSettings(FulfilmentType type) {
         return new OrderSettingsView("2026-09-20", "2026-09-22", null, "20.09.2026", "22.09.2026", null,
-                type, OrderLabels.fulfilmentTypeShort(type), OrderLabels.fulfilmentTypeIcon(type), true, false, null,
+                type, true, false, null,
                 null, null, true, OrderLabels.Option.of(FulfilmentType.values(), OrderLabels::fulfilmentType));
     }
 
@@ -2286,6 +2301,25 @@ class OrderDetailsTemplateTest {
 
         // then
         assertThat(html).contains("data-cl-scope-count-template=\"{k} z {n}\"");
+    }
+
+    @Test
+    void theSettingsCardLeavesTheAffiliateIdAndTheGclidToTheDialog() {
+        // given
+        Order order = order(OrderStatus.New);
+        order.setAffiliateId("AFF-17");
+        order.setGclid("GCL-42");
+        order.setComment("Zadzwonić przed wysyłką");
+
+        // when
+        String html = page(render(order, ADMIN));
+        String card = card(html, "settings-title");
+        String dialog = dialog(html, "settings-dialog");
+
+        // then: the card is dates, notifications and the comment; the tracking ids are edited in the dialog
+        assertThat(card).doesNotContain("ID afiliacji").doesNotContain("AFF-17").doesNotContain("GCLID")
+                .doesNotContain("GCL-42").doesNotContain("Typ realizacji").contains("Zadzwonić przed wysyłką");
+        assertThat(dialog).contains("value=\"AFF-17\"").contains("value=\"GCL-42\"").contains("id=\"fulfilmentType\"");
     }
 
     @Test
