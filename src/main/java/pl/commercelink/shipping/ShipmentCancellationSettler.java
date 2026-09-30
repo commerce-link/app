@@ -78,12 +78,19 @@ public class ShipmentCancellationSettler {
         return new Success(cleared, cleared && backToRealization.get());
     }
 
+    /** The provider refused the command. The reason is not stored on the shipment: this log is where it is kept. */
     public boolean fail(ShipmentCancellationCheckRequest request, String error) {
-        return modify(request, (order, shipment) -> shipment.markCancellationFailed(error));
+        boolean failed = modify(request,
+                (order, shipment) -> shipment.setCancellation(shipment.getCancellation().failed()));
+        if (failed) {
+            log.warn("Shipment cancellation failed store={} order={} externalId={} commandId={}: {}",
+                    request.getStoreId(), request.getOrderId(), request.getExternalId(), request.getCommandId(), error);
+        }
+        return failed;
     }
 
     public boolean unconfirmed(ShipmentCancellationCheckRequest request) {
-        return modify(request, (order, shipment) -> shipment.markCancellationUnconfirmed());
+        return modify(request, (order, shipment) -> shipment.setCancellation(shipment.getCancellation().unconfirmed()));
     }
 
     void reportOtherCancelledPackages(ShipmentCancellationCheckRequest request, ShipmentCancellation result) {
@@ -121,8 +128,7 @@ public class ShipmentCancellationSettler {
         }
         return order.getShipments().stream()
                 .filter(s -> request.getExternalId().equals(s.getExternalId())
-                        && s.isCancellationPending()
-                        && s.hasCancellationCommand(request.getCommandId()))
+                        && s.isCancellationPendingFor(request.getCommandId()))
                 .findFirst()
                 .orElse(null);
     }

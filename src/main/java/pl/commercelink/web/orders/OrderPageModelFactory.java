@@ -116,7 +116,7 @@ public class OrderPageModelFactory {
                 header(order, items, store, viewer, readOnly, links, locale, dropship, receipts, receiptLock),
                 items(order, items, store, viewer, readOnly, links, hasDropshipItems, hasWarehouseDocument, dropship,
                         receiptLock, locale),
-                shipments(order, store, readOnly, locale),
+                shipments(order, store, readOnly),
                 documents(order, store, viewer, closed, readOnly,
                         documentsEnabled && hasWarehouseItems && !hasWarehouseDocument, receipts, receiptLock),
                 payments(order, readOnly, receiptLock),
@@ -380,7 +380,7 @@ public class OrderPageModelFactory {
         return taxonomy != null && taxonomy.name() != null ? taxonomy.name() : "";
     }
 
-    private OrderPageModel.ShipmentsCard shipments(Order order, Store store, boolean readOnly, Locale locale) {
+    private OrderPageModel.ShipmentsCard shipments(Order order, Store store, boolean readOnly) {
         List<Shipment> shipments = order.getShipments();
         LocalDateTime now = LocalDateTime.now();
         List<String> carriers = readOnly || store == null ? List.of() : shipmentCarrierOptions.forOrder(order, store);
@@ -403,7 +403,6 @@ public class OrderPageModelFactory {
                     !readOnly && s.getTrackingSubscriptionStatus() == ShipmentTrackingStatus.FAILED
                             ? "order.shipment.tracking.failed.help" : null,
                     OrderLabels.cancellation(s, now), OrderLabels.cancellationTone(s, now),
-                    cancellationReason(s, now, locale),
                     form.dialogId(), readOnly ? null : base + i,
                     readOnly || removeLockedKey(order, i) != null ? null
                             : base + i + "/remove?version=" + form.version(),
@@ -428,15 +427,6 @@ public class OrderPageModelFactory {
                 ? "/dashboard/orders/" + order.getOrderId() + "/shipments/cancellation-state" : null;
         return new OrderPageModel.ShipmentsCard(rows, emptyKey, canCancelCourier, cancelCourierLockedKey, pollHref, forms,
                 readOnly ? null : OrderShipmentForm.blank(order, carriers));
-    }
-
-    /** The reason of a failed cancellation in the operator's language: the adapter's English text is translated. */
-    private String cancellationReason(Shipment shipment, LocalDateTime now, Locale locale) {
-        if (!"shipment.cancellation.failed".equals(OrderLabels.cancellation(shipment, now))) {
-            return null;
-        }
-        String key = OrderLabels.cancellationReasonKey(shipment.getCancellationError());
-        return key != null ? messageSource.getMessage(key, null, locale) : Objects.toString(shipment.getCancellationError(), "");
     }
 
     private static final String PLACEHOLDER_LOCKED = "order.shipments.remove.error.placeholder";

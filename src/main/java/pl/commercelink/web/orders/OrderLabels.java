@@ -164,11 +164,11 @@ public final class OrderLabels {
 
     /**
      * The pill of a shipment's courier cancellation, or null when there is none (a confirmed one clears the shipment).
-     * A PENDING one past Shipment.STALE_CANCELLATION reads as unconfirmed: nothing answers it any more, and "Cancel
+     * A PENDING one past ShipmentCancellation.STALE reads as unconfirmed: nothing answers it any more, and "Cancel
      * courier order" then re-checks it like an unconfirmed one.
      */
     public static String cancellation(Shipment shipment, LocalDateTime now) {
-        if (shipment.getCancellationStatus() == null) {
+        if (shipment.getCancellation() == null) {
             return null;
         }
         if (shipment.isCancellationInProgress(now)) {
@@ -178,7 +178,7 @@ public final class OrderLabels {
     }
 
     public static String cancellationTone(Shipment shipment, LocalDateTime now) {
-        if (shipment.getCancellationStatus() == null) {
+        if (shipment.getCancellation() == null) {
             return null;
         }
         if (shipment.isCancellationInProgress(now)) {
@@ -188,8 +188,9 @@ public final class OrderLabels {
     }
 
     /**
-     * The message key of a failed cancellation's reason when it is the adapter's own English text, or null: every
-     * other reason is Furgonetka's answer, already in Polish, and is shown as it came.
+     * The message key of an immediate cancellation failure's reason (the flash after the click) when it is the
+     * adapter's own English text, or null: every other reason is Furgonetka's answer, already in Polish, and is shown
+     * as it came.
      */
     public static String cancellationReasonKey(String error) {
         return CANCEL_NOT_RECEIVED.equals(error) ? "shipment.cancellation.reason.notReceived" : null;

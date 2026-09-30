@@ -17,6 +17,7 @@ import pl.commercelink.orders.event.EventType;
 import pl.commercelink.orders.event.OrderEvent;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.Shipment;
+import pl.commercelink.orders.ShipmentCancellation;
 import pl.commercelink.orders.ShipmentCancellationStatus;
 import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.event.OrderEventsRepository;
@@ -74,7 +75,7 @@ class ShipmentCancellationSettlerTest {
         shipment.setTrackingNo("TRK-1");
         shipment.setShippedAt(LocalDateTime.of(2026, 9, 30, 9, 0));
         shipment.setExternalId(EXTERNAL_ID);
-        shipment.markCancellationPending(commandId, LocalDateTime.now());
+        shipment.setCancellation(ShipmentCancellation.pending(commandId, LocalDateTime.now()));
         return shipment;
     }
 
@@ -101,27 +102,52 @@ class ShipmentCancellationSettlerTest {
         assertThat(order.getShipments().get(0).getType()).isEqualTo(ShipmentType.Courier);
         assertThat(order.getShipments().get(0).getExternalId()).isNull();
         assertThat(order.getShipments().get(0).getTrackingNo()).isNull();
-        assertThat(order.getShipments().get(0).getCancellationStatus()).isNull();
+        assertThat(order.getShipments().get(0).getCancellation()).isNull();
         verify(orderEventsRepository).deleteByOrderIdAndName(ORDER_ID, EmailNotificationType.ORDER_SHIPPING.name());
     }
 
     @Test
-    void failKeepsTheShipmentWithTheReason() {
+    void failKeepsTheShipmentAndLogsTheReason() {
         // given
         Order order = orderWith(pendingShipment(COMMAND_ID));
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
 
         // when
-        boolean saved = settler.fail(REQUEST, "Przesyłka została już odebrana");
+        boolean saved;
+        List<String> warnings;
+        try (CapturedLogs logs = CapturedLogs.of(ShipmentCancellationSettler.class)) {
+            saved = settler.fail(REQUEST, "Przesyłka została już odebrana");
+            warnings = logs.warnings();
+        }
 
-        // then
+        // then: the reason is not stored on the shipment, the log keeps it with what identifies the command
         assertThat(saved).isTrue();
         Shipment shipment = order.getShipments().get(0);
         assertThat(shipment.getExternalId()).isEqualTo(EXTERNAL_ID);
-        assertThat(shipment.getCancellationStatus()).isEqualTo(ShipmentCancellationStatus.FAILED);
-        assertThat(shipment.getCancellationError()).isEqualTo("Przesyłka została już odebrana");
+        assertThat(shipment.getCancellation().getStatus()).isEqualTo(ShipmentCancellationStatus.FAILED);
+        assertThat(shipment.getCancellation().hasCommand(COMMAND_ID)).isTrue();
+        assertThat(warnings).singleElement().satisfies(message -> assertThat(message)
+                .contains("store=" + STORE_ID, "order=" + ORDER_ID, "externalId=" + EXTERNAL_ID,
+                        "commandId=" + COMMAND_ID, "Przesyłka została już odebrana"));
         verify(ordersRepository).save(order);
         verify(orderEventsRepository, never()).deleteByOrderIdAndName(any(), any());
+    }
+
+    @Test
+    void failOfAShipmentNoLongerWaitingLogsNothing() {
+        // given
+        Order order = orderWith(pendingShipment("cmd-2"));
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+
+        // when
+        List<String> warnings;
+        try (CapturedLogs logs = CapturedLogs.of(ShipmentCancellationSettler.class)) {
+            settler.fail(REQUEST, "reason");
+            warnings = logs.warnings();
+        }
+
+        // then
+        assertThat(warnings).isEmpty();
     }
 
     @Test
@@ -135,7 +161,7 @@ class ShipmentCancellationSettlerTest {
 
         // then
         assertThat(saved).isTrue();
-        assertThat(order.getShipments().get(0).getCancellationStatus()).isEqualTo(ShipmentCancellationStatus.UNCONFIRMED);
+        assertThat(order.getShipments().get(0).getCancellation().getStatus()).isEqualTo(ShipmentCancellationStatus.UNCONFIRMED);
         verify(ordersRepository).save(order);
     }
 
@@ -154,7 +180,7 @@ class ShipmentCancellationSettlerTest {
         assertThat(succeeded).isFalse();
         assertThat(failed).isFalse();
         assertThat(unconfirmed).isFalse();
-        assertThat(order.getShipments().get(0).isCancellationPending()).isTrue();
+        assertThat(order.getShipments().get(0).getCancellation().isPending()).isTrue();
         verify(ordersRepository, never()).save(any());
         verify(orderEventsRepository, never()).deleteByOrderIdAndName(any(), any());
     }
@@ -163,7 +189,7 @@ class ShipmentCancellationSettlerTest {
     void aShipmentNoLongerPendingIsLeftAlone() {
         // given: the same command already settled as FAILED
         Shipment shipment = pendingShipment(COMMAND_ID);
-        shipment.markCancellationFailed("earlier reason");
+        shipment.setCancellation(shipment.getCancellation().failed());
         Order order = orderWith(shipment);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
 

@@ -2,6 +2,7 @@ package pl.commercelink.web.orders;
 
 import org.junit.jupiter.api.Test;
 import pl.commercelink.orders.Shipment;
+import pl.commercelink.orders.ShipmentCancellation;
 import pl.commercelink.orders.ShipmentType;
 
 import java.time.Clock;
@@ -173,7 +174,7 @@ class OrderShipmentFormTest {
     void editKeepsThePendingCancellationOfTheCourierOrder() {
         // given: the operator edits the shipment while Furgonetka is still cancelling its courier order
         Shipment saved = courierOrder();
-        saved.markCancellationPending("cmd-1", NOW.minusSeconds(20));
+        saved.setCancellation(ShipmentCancellation.pending("cmd-1", NOW.minusSeconds(20)));
         OrderShipmentForm form = new OrderShipmentForm("o-1", 0, "v", ShipmentType.Courier, "DPD", "T-1", null, null,
                 null, null, List.of(), null, null);
 
@@ -182,8 +183,8 @@ class OrderShipmentFormTest {
 
         // then: the cancellation check must still find the shipment
         assertThat(shipment.getExternalId()).isEqualTo("EXT-1");
-        assertThat(shipment.isCancellationPending()).isTrue();
-        assertThat(shipment.hasCancellationCommand("cmd-1")).isTrue();
+        assertThat(shipment.getCancellation().isPending()).isTrue();
+        assertThat(shipment.getCancellation().hasCommand("cmd-1")).isTrue();
     }
 
     @Test

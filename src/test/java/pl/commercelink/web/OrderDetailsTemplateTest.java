@@ -22,6 +22,7 @@ import pl.commercelink.orders.Payment;
 import pl.commercelink.orders.PaymentSource;
 import pl.commercelink.orders.PositionGroup;
 import pl.commercelink.orders.Shipment;
+import pl.commercelink.orders.ShipmentCancellation;
 import pl.commercelink.orders.ShipmentCarrierOptions;
 import pl.commercelink.orders.ShipmentTrackingStatus;
 import pl.commercelink.orders.ShipmentType;
@@ -585,7 +586,7 @@ class OrderDetailsTemplateTest {
         sent.setTrackingNo("T-1");
         sent.setShippedAt(java.time.LocalDateTime.now().minusHours(1));
         sent.setExternalId("EXT-1");
-        sent.markCancellationPending("cmd-1", java.time.LocalDateTime.now());
+        sent.setCancellation(ShipmentCancellation.pending("cmd-1", java.time.LocalDateTime.now()));
 
         // when
         String html = render(order, ADMIN);
@@ -603,7 +604,7 @@ class OrderDetailsTemplateTest {
     }
 
     @Test
-    void aFailedCancellationShowsItsReasonAndItsRemovalWarnsAboutTheLabel() {
+    void aFailedCancellationSendsTheOperatorToFurgonetkaAndItsRemovalWarnsAboutTheLabel() {
         // given
         Order order = order(OrderStatus.Shipping);
         Shipment sent = order.getShipments().get(0);
@@ -611,15 +612,15 @@ class OrderDetailsTemplateTest {
         sent.setTrackingNo("T-1");
         sent.setShippedAt(java.time.LocalDateTime.now().minusHours(1));
         sent.setExternalId("EXT-1");
-        sent.markCancellationPending("cmd-1", java.time.LocalDateTime.now().minusMinutes(1));
-        sent.markCancellationFailed("Furgonetka did not receive the cancel command");
+        sent.setCancellation(ShipmentCancellation.pending("cmd-1", java.time.LocalDateTime.now().minusMinutes(1)));
+        sent.setCancellation(sent.getCancellation().failed());
 
         // when
         String card = card(page(render(order, ADMIN)), "przesylki");
 
         // then
         assertThat(card).doesNotContain("data-cl-cancellation-poll")
-                .contains("<span class=\"cl-status is-bad\">Anulowanie nieudane: Furgonetka nie otrzymała zlecenia anulowania</span>")
+                .contains("<span class=\"cl-status is-bad\">Anulowanie nieudane — sprawdź w panelu Furgonetki</span>")
                 .contains("/cancelShipment\"")
                 .contains("data-cl-confirm-message=\"Anulowanie w Furgonetce nie zostało potwierdzone. Usuń przesyłkę tylko "
                         + "wtedy, gdy etykieta jest anulowana w panelu Furgonetki — inaczej kurier może ją nadal odebrać.\"")

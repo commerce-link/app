@@ -133,7 +133,7 @@ class ShipmentCancelServiceTest {
         when(shippingProviderFactory.get(store)).thenReturn(shippingProvider);
         List<Boolean> pendingWhenSent = new ArrayList<>();
         when(shippingProvider.cancelShipment(eq(EXTERNAL_ID), anyString())).thenAnswer(invocation -> {
-            pendingWhenSent.add(order.getShipments().get(0).hasCancellationCommand(invocation.getArgument(1)));
+            pendingWhenSent.add(order.getShipments().get(0).getCancellation().hasCommand(invocation.getArgument(1)));
             return ShipmentCancellation.pending(invocation.getArgument(1));
         });
 
@@ -151,8 +151,8 @@ class ShipmentCancelServiceTest {
         assertThat(commandId.getValue()).isNotBlank();
         assertThat(pendingWhenSent).containsExactly(true);
         Shipment shipment = order.getShipments().get(0);
-        assertThat(shipment.isCancellationPending()).isTrue();
-        assertThat(shipment.hasCancellationCommand(commandId.getValue())).isTrue();
+        assertThat(shipment.getCancellation().isPending()).isTrue();
+        assertThat(shipment.getCancellation().hasCommand(commandId.getValue())).isTrue();
         verify(ordersRepository, times(1)).save(any());
         verify(orderEventsRepository, never()).deleteByOrderIdAndName(any(), any());
     }
@@ -162,7 +162,7 @@ class ShipmentCancelServiceTest {
         // given: the first read shows no cancellation, the fresh read inside the executor a PENDING one 20 s old
         Order order = orderWithShipments(courierShipment(EXTERNAL_ID));
         Shipment marked = courierShipment(EXTERNAL_ID);
-        marked.markCancellationPending("cmd-other", LocalDateTime.now().minusSeconds(20));
+        marked.setCancellation(markedPending("cmd-other", LocalDateTime.now().minusSeconds(20)));
         Order fresh = orderWithShipments(marked);
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order, fresh);
@@ -176,14 +176,14 @@ class ShipmentCancelServiceTest {
         verify(shippingProvider, never()).cancelShipment(any(), any());
         verify(publisher, never()).publish(any());
         verify(ordersRepository, never()).save(any());
-        assertThat(fresh.getShipments().get(0).hasCancellationCommand("cmd-other")).isTrue();
+        assertThat(fresh.getShipments().get(0).getCancellation().hasCommand("cmd-other")).isTrue();
     }
 
     @Test
     void cancelShippingRefusesWhileACancellationIsInProgress() {
         // given
         Shipment shipment = courierShipment(EXTERNAL_ID);
-        shipment.markCancellationPending("cmd-1", LocalDateTime.now().minusSeconds(20));
+        shipment.setCancellation(markedPending("cmd-1", LocalDateTime.now().minusSeconds(20)));
         Order order = orderWithShipments(shipment);
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
@@ -211,7 +211,7 @@ class ShipmentCancelServiceTest {
                 .isExactlyInstanceOf(ShippingUnavailableException.class);
         verify(ordersRepository, never()).save(any());
         verify(publisher, never()).publish(any());
-        assertThat(order.getShipments().get(0).getCancellationStatus()).isNull();
+        assertThat(order.getShipments().get(0).getCancellation()).isNull();
     }
 
     @Test
@@ -227,10 +227,7 @@ class ShipmentCancelServiceTest {
         // when / then
         assertThatThrownBy(() -> shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID)).isSameAs(refused);
         Shipment shipment = order.getShipments().get(0);
-        assertThat(shipment.getCancellationStatus()).isNull();
-        assertThat(shipment.getCancellationCommandId()).isNull();
-        assertThat(shipment.getCancellationError()).isNull();
-        assertThat(shipment.getCancellationRequestedAt()).isNull();
+        assertThat(shipment.getCancellation()).isNull();
         verify(ordersRepository, times(2)).save(order);
         verify(publisher, never()).publish(any());
     }
@@ -240,8 +237,9 @@ class ShipmentCancelServiceTest {
         // given
         LocalDateTime requestedAt = LocalDateTime.now().minusMinutes(2);
         Shipment shipment = courierShipment(EXTERNAL_ID);
-        shipment.markCancellationPending("cmd-1", requestedAt);
-        shipment.markCancellationFailed("temporary carrier error");
+        shipment.setCancellation(markedPending("cmd-1", requestedAt));
+        shipment.setCancellation(shipment.getCancellation().failed());
+        pl.commercelink.orders.ShipmentCancellation previous = shipment.getCancellation();
         Order order = orderWithShipments(shipment);
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
@@ -252,10 +250,10 @@ class ShipmentCancelServiceTest {
         // when / then
         assertThatThrownBy(() -> shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID)).isSameAs(refused);
         Shipment restored = order.getShipments().get(0);
-        assertThat(restored.getCancellationStatus()).isEqualTo(ShipmentCancellationStatus.FAILED);
-        assertThat(restored.hasCancellationCommand("cmd-1")).isTrue();
-        assertThat(restored.getCancellationError()).isEqualTo("temporary carrier error");
-        assertThat(restored.getCancellationRequestedAt()).isEqualTo(requestedAt);
+        assertThat(restored.getCancellation().getStatus()).isEqualTo(ShipmentCancellationStatus.FAILED);
+        assertThat(restored.getCancellation().hasCommand("cmd-1")).isTrue();
+        assertThat(restored.getCancellation()).isEqualTo(previous);
+        assertThat(restored.getCancellation().getRequestedAt()).isEqualTo(requestedAt);
         verify(ordersRepository, times(2)).save(order);
         verify(publisher, never()).publish(any());
     }
@@ -283,8 +281,8 @@ class ShipmentCancelServiceTest {
         // given
         LocalDateTime requestedAt = LocalDateTime.now().minusMinutes(2);
         Shipment shipment = courierShipment(EXTERNAL_ID);
-        shipment.markCancellationPending("cmd-1", requestedAt);
-        shipment.markCancellationUnconfirmed();
+        shipment.setCancellation(markedPending("cmd-1", requestedAt));
+        shipment.setCancellation(shipment.getCancellation().unconfirmed());
         Order order = orderWithShipments(shipment);
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
@@ -297,9 +295,9 @@ class ShipmentCancelServiceTest {
         assertThat(result.outcome()).isEqualTo(ShipmentCancelOutcome.RECHECKING);
         verify(shippingProvider, never()).cancelShipment(any(), any());
         Shipment remarked = order.getShipments().get(0);
-        assertThat(remarked.isCancellationPending()).isTrue();
-        assertThat(remarked.hasCancellationCommand("cmd-1")).isTrue();
-        assertThat(remarked.getCancellationRequestedAt()).isAfter(requestedAt);
+        assertThat(remarked.getCancellation().isPending()).isTrue();
+        assertThat(remarked.getCancellation().hasCommand("cmd-1")).isTrue();
+        assertThat(remarked.getCancellation().getRequestedAt()).isAfter(requestedAt);
         verify(ordersRepository).save(order);
         verify(publisher).publish(ShipmentCancellationCheckRequest.first(STORE_ID, ORDER_ID, EXTERNAL_ID, "cmd-1"));
     }
@@ -309,7 +307,7 @@ class ShipmentCancelServiceTest {
         // given
         LocalDateTime requestedAt = LocalDateTime.now().minusMinutes(6);
         Shipment shipment = courierShipment(EXTERNAL_ID);
-        shipment.markCancellationPending("cmd-1", requestedAt);
+        shipment.setCancellation(markedPending("cmd-1", requestedAt));
         Order order = orderWithShipments(shipment);
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
@@ -322,9 +320,9 @@ class ShipmentCancelServiceTest {
         assertThat(result.outcome()).isEqualTo(ShipmentCancelOutcome.RECHECKING);
         verify(shippingProvider, never()).cancelShipment(any(), any());
         Shipment remarked = order.getShipments().get(0);
-        assertThat(remarked.isCancellationPending()).isTrue();
-        assertThat(remarked.hasCancellationCommand("cmd-1")).isTrue();
-        assertThat(remarked.getCancellationRequestedAt()).isAfter(requestedAt);
+        assertThat(remarked.getCancellation().isPending()).isTrue();
+        assertThat(remarked.getCancellation().hasCommand("cmd-1")).isTrue();
+        assertThat(remarked.getCancellation().getRequestedAt()).isAfter(requestedAt);
         verify(publisher).publish(ShipmentCancellationCheckRequest.first(STORE_ID, ORDER_ID, EXTERNAL_ID, "cmd-1"));
     }
 
@@ -332,8 +330,8 @@ class ShipmentCancelServiceTest {
     void cancelShippingSendsANewCommandAfterAFailure() {
         // given
         Shipment shipment = courierShipment(EXTERNAL_ID);
-        shipment.markCancellationPending("cmd-1", LocalDateTime.now().minusMinutes(2));
-        shipment.markCancellationFailed("temporary carrier error");
+        shipment.setCancellation(markedPending("cmd-1", LocalDateTime.now().minusMinutes(2)));
+        shipment.setCancellation(shipment.getCancellation().failed());
         Order order = orderWithShipments(shipment);
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
@@ -349,8 +347,8 @@ class ShipmentCancelServiceTest {
         verify(shippingProvider).cancelShipment(eq(EXTERNAL_ID), commandId.capture());
         assertThat(commandId.getValue()).isNotEqualTo("cmd-1");
         Shipment saved = order.getShipments().get(0);
-        assertThat(saved.hasCancellationCommand(commandId.getValue())).isTrue();
-        assertThat(saved.getCancellationError()).isNull();
+        assertThat(saved.getCancellation().hasCommand(commandId.getValue())).isTrue();
+        assertThat(saved.getCancellation().getStatus()).isEqualTo(ShipmentCancellationStatus.PENDING);
         verify(publisher).publish(
                 ShipmentCancellationCheckRequest.first(STORE_ID, ORDER_ID, EXTERNAL_ID, commandId.getValue()));
     }
@@ -395,7 +393,7 @@ class ShipmentCancelServiceTest {
         // then
         ArgumentCaptor<String> commandId = ArgumentCaptor.forClass(String.class);
         verify(shippingProvider, times(1)).cancelShipment(eq(EXTERNAL_ID), commandId.capture());
-        assertThat(secondAttempt.getShipments().get(0).hasCancellationCommand(commandId.getValue())).isTrue();
+        assertThat(secondAttempt.getShipments().get(0).getCancellation().hasCommand(commandId.getValue())).isTrue();
         verify(ordersRepository).save(firstAttempt);
         verify(ordersRepository).save(secondAttempt);
         verify(publisher).publish(
@@ -422,7 +420,7 @@ class ShipmentCancelServiceTest {
         assertThat(placeholder.getType()).isEqualTo(ShipmentType.Courier);
         assertThat(placeholder.getExternalId()).isNull();
         assertThat(placeholder.getTrackingNo()).isNull();
-        assertThat(placeholder.getCancellationStatus()).isNull();
+        assertThat(placeholder.getCancellation()).isNull();
         verify(ordersRepository, times(2)).save(order);
         verify(orderEventsRepository).deleteByOrderIdAndName(ORDER_ID, EmailNotificationType.ORDER_SHIPPING.name());
         verify(publisher, never()).publish(any());
@@ -439,15 +437,20 @@ class ShipmentCancelServiceTest {
                 ShipmentCancellation.failed(invocation.getArgument(1), "Przesyłka została już odebrana", List.of()));
 
         // when
-        ShipmentCancelResult result = shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID);
+        ShipmentCancelResult result;
+        List<String> warnings;
+        try (CapturedLogs logs = CapturedLogs.of(ShipmentCancellationSettler.class)) {
+            result = shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID);
+            warnings = logs.warnings();
+        }
 
-        // then
+        // then: the flash gets the reason from the result, the shipment keeps only the state, the log the reason
         assertThat(result.outcome()).isEqualTo(ShipmentCancelOutcome.FAILED);
         assertThat(result.error()).isEqualTo("Przesyłka została już odebrana");
         Shipment shipment = order.getShipments().get(0);
         assertThat(shipment.getExternalId()).isEqualTo(EXTERNAL_ID);
-        assertThat(shipment.getCancellationStatus()).isEqualTo(ShipmentCancellationStatus.FAILED);
-        assertThat(shipment.getCancellationError()).isEqualTo("Przesyłka została już odebrana");
+        assertThat(shipment.getCancellation().getStatus()).isEqualTo(ShipmentCancellationStatus.FAILED);
+        assertThat(warnings).singleElement().asString().contains("Przesyłka została już odebrana");
         verify(ordersRepository, times(2)).save(order);
         verify(orderEventsRepository, never()).deleteByOrderIdAndName(any(), any());
         verify(publisher, never()).publish(any());
@@ -458,8 +461,8 @@ class ShipmentCancelServiceTest {
         // given: the first read chooses a new command, the fresh read already asks for a re-check
         Order order = orderWithShipments(courierShipment(EXTERNAL_ID));
         Shipment unconfirmed = courierShipment(EXTERNAL_ID);
-        unconfirmed.markCancellationPending("cmd-other", LocalDateTime.now().minusMinutes(2));
-        unconfirmed.markCancellationUnconfirmed();
+        unconfirmed.setCancellation(markedPending("cmd-other", LocalDateTime.now().minusMinutes(2)));
+        unconfirmed.setCancellation(unconfirmed.getCancellation().unconfirmed());
         Order fresh = orderWithShipments(unconfirmed);
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order, fresh);
@@ -471,19 +474,19 @@ class ShipmentCancelServiceTest {
         verify(shippingProvider, never()).cancelShipment(any(), any());
         verify(publisher, never()).publish(any());
         verify(ordersRepository, never()).save(any());
-        assertThat(fresh.getShipments().get(0).getCancellationStatus()).isEqualTo(ShipmentCancellationStatus.UNCONFIRMED);
+        assertThat(fresh.getShipments().get(0).getCancellation().getStatus()).isEqualTo(ShipmentCancellationStatus.UNCONFIRMED);
     }
 
     @Test
     void cancelShippingRefusesWhenTheFreshReadNoLongerNeedsTheRecheckChosenOnTheFirstRead() {
         // given: the first read sees an unconfirmed command, the fresh read a failed one
         Shipment unconfirmed = courierShipment(EXTERNAL_ID);
-        unconfirmed.markCancellationPending("cmd-1", LocalDateTime.now().minusMinutes(2));
-        unconfirmed.markCancellationUnconfirmed();
+        unconfirmed.setCancellation(markedPending("cmd-1", LocalDateTime.now().minusMinutes(2)));
+        unconfirmed.setCancellation(unconfirmed.getCancellation().unconfirmed());
         Order order = orderWithShipments(unconfirmed);
         Shipment failed = courierShipment(EXTERNAL_ID);
-        failed.markCancellationPending("cmd-1", LocalDateTime.now().minusMinutes(2));
-        failed.markCancellationFailed("reason");
+        failed.setCancellation(markedPending("cmd-1", LocalDateTime.now().minusMinutes(2)));
+        failed.setCancellation(failed.getCancellation().failed());
         Order fresh = orderWithShipments(failed);
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order, fresh);
@@ -495,18 +498,18 @@ class ShipmentCancelServiceTest {
         verify(shippingProvider, never()).cancelShipment(any(), any());
         verify(publisher, never()).publish(any());
         verify(ordersRepository, never()).save(any());
-        assertThat(fresh.getShipments().get(0).getCancellationStatus()).isEqualTo(ShipmentCancellationStatus.FAILED);
+        assertThat(fresh.getShipments().get(0).getCancellation().getStatus()).isEqualTo(ShipmentCancellationStatus.FAILED);
     }
 
     @Test
     void cancelShippingRefusesARecheckWhenTheFreshReadCarriesAnotherCommand() {
         // given: both reads need a re-check, but of different commands
         Shipment first = courierShipment(EXTERNAL_ID);
-        first.markCancellationPending("cmd-1", LocalDateTime.now().minusMinutes(2));
-        first.markCancellationUnconfirmed();
+        first.setCancellation(markedPending("cmd-1", LocalDateTime.now().minusMinutes(2)));
+        first.setCancellation(first.getCancellation().unconfirmed());
         Shipment other = courierShipment(EXTERNAL_ID);
-        other.markCancellationPending("cmd-2", LocalDateTime.now().minusMinutes(2));
-        other.markCancellationUnconfirmed();
+        other.setCancellation(markedPending("cmd-2", LocalDateTime.now().minusMinutes(2)));
+        other.setCancellation(other.getCancellation().unconfirmed());
         Order order = orderWithShipments(first);
         Order fresh = orderWithShipments(other);
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
@@ -518,7 +521,7 @@ class ShipmentCancelServiceTest {
                 .isInstanceOf(ShipmentCancellationInProgressException.class);
         verify(publisher, never()).publish(any());
         verify(ordersRepository, never()).save(any());
-        assertThat(fresh.getShipments().get(0).hasCancellationCommand("cmd-2")).isTrue();
+        assertThat(fresh.getShipments().get(0).getCancellation().hasCommand("cmd-2")).isTrue();
     }
 
     @Test
@@ -560,8 +563,8 @@ class ShipmentCancelServiceTest {
         ArgumentCaptor<String> commandId = ArgumentCaptor.forClass(String.class);
         verify(shippingProvider).cancelShipment(eq(EXTERNAL_ID), commandId.capture());
         Shipment shipment = order.getShipments().get(0);
-        assertThat(shipment.isCancellationPending()).isTrue();
-        assertThat(shipment.hasCancellationCommand(commandId.getValue())).isTrue();
+        assertThat(shipment.getCancellation().isPending()).isTrue();
+        assertThat(shipment.getCancellation().hasCommand(commandId.getValue())).isTrue();
         verify(ordersRepository, times(1)).save(order);
         verify(publisher).publish(
                 ShipmentCancellationCheckRequest.first(STORE_ID, ORDER_ID, EXTERNAL_ID, commandId.getValue()));
@@ -584,8 +587,8 @@ class ShipmentCancelServiceTest {
         assertThat(result.outcome()).isEqualTo(ShipmentCancelOutcome.REQUESTED);
         ArgumentCaptor<String> commandId = ArgumentCaptor.forClass(String.class);
         verify(shippingProvider).cancelShipment(eq(EXTERNAL_ID), commandId.capture());
-        assertThat(order.getShipments().get(0).hasCancellationCommand(commandId.getValue())).isTrue();
-        assertThat(order.getShipments().get(0).isCancellationPending()).isTrue();
+        assertThat(order.getShipments().get(0).getCancellation().hasCommand(commandId.getValue())).isTrue();
+        assertThat(order.getShipments().get(0).getCancellation().isPending()).isTrue();
         verify(publisher).publish(
                 ShipmentCancellationCheckRequest.first(STORE_ID, ORDER_ID, EXTERNAL_ID, commandId.getValue()));
     }
@@ -604,8 +607,7 @@ class ShipmentCancelServiceTest {
         // when / then
         assertThatThrownBy(() -> shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID)).isSameAs(refused);
         Shipment shipment = order.getShipments().get(0);
-        assertThat(shipment.getCancellationStatus()).isNull();
-        assertThat(shipment.getCancellationCommandId()).isNull();
+        assertThat(shipment.getCancellation()).isNull();
         verify(ordersRepository, times(2)).save(order);
         verify(publisher, never()).publish(any());
     }
@@ -701,7 +703,7 @@ class ShipmentCancelServiceTest {
 
         // then
         verify(shippingProvider).cancelShipment(eq(EXTERNAL_ID), anyString());
-        assertThat(booked.isCancellationPending()).isTrue();
+        assertThat(booked.getCancellation().isPending()).isTrue();
     }
 
     @Test
@@ -768,7 +770,7 @@ class ShipmentCancelServiceTest {
         assertThatThrownBy(() -> shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID))
                 .isInstanceOf(ShippingUnavailableException.class);
         assertThat(order.getShipments()).containsExactly(booked);
-        assertThat(booked.getCancellationStatus()).isNull();
+        assertThat(booked.getCancellation()).isNull();
         assertThat(order.getStatus()).isEqualTo(OrderStatus.Shipping);
         verify(ordersRepository, never()).save(any());
         verify(publisher, never()).publish(any());
@@ -789,5 +791,10 @@ class ShipmentCancelServiceTest {
         shipment.setShippedAt(LocalDateTime.now().minusHours(1));
         shipment.setExternalId(externalId);
         return shipment;
+    }
+
+    // the shipment's own cancellation state; the name ShipmentCancellation here is the provider's answer
+    private static pl.commercelink.orders.ShipmentCancellation markedPending(String commandId, LocalDateTime requestedAt) {
+        return pl.commercelink.orders.ShipmentCancellation.pending(commandId, requestedAt);
     }
 }

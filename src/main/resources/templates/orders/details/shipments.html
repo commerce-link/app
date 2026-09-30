@@ -62,8 +62,7 @@
                           th:text="#{${s.trackingKey()}}"></span>
                     <!--/* the courier cancellation: the text carries the state, the tone only repeats it */-->
                     <span th:if="${s.cancellationKey() != null}" class="cl-status" th:classappend="${s.cancellationTone()}"
-                          th:text="${s.cancellationReason() != null} ? #{${s.cancellationKey()}(${s.cancellationReason()})}
-                                   : #{${s.cancellationKey()}}"></span>
+                          th:text="#{${s.cancellationKey()}}"></span>
                 </p>
                 <!--/* each part starts lower case after a separator; the first one of the line takes a capital */-->
                 <p class="cl-list-desc" th:with="lead=${s.trackingNo() == null and s.pickupPoint() == null}">

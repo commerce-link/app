@@ -6,6 +6,7 @@ import java.time.LocalDateTime;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ShipmentTest {
@@ -50,13 +51,13 @@ class ShipmentTest {
         // given
         Shipment none = dispatched(ShipmentType.Courier);
         Shipment pending = dispatched(ShipmentType.Courier);
-        pending.markCancellationPending("cmd-1", LocalDateTime.now());
+        pending.setCancellation(ShipmentCancellation.pending("cmd-1", LocalDateTime.now()));
         Shipment failed = dispatched(ShipmentType.Courier);
-        failed.markCancellationPending("cmd-1", LocalDateTime.now());
-        failed.markCancellationFailed("refused");
+        failed.setCancellation(ShipmentCancellation.pending("cmd-1", LocalDateTime.now()));
+        failed.setCancellation(failed.getCancellation().failed());
         Shipment unconfirmed = dispatched(ShipmentType.Courier);
-        unconfirmed.markCancellationPending("cmd-1", LocalDateTime.now());
-        unconfirmed.markCancellationUnconfirmed();
+        unconfirmed.setCancellation(ShipmentCancellation.pending("cmd-1", LocalDateTime.now()));
+        unconfirmed.setCancellation(unconfirmed.getCancellation().unconfirmed());
 
         // then
         assertFalse(none.isCancellationUnresolved());
@@ -66,19 +67,68 @@ class ShipmentTest {
     }
 
     @Test
-    void restoreCancellationPutsBackEveryField() {
+    void settingTheRememberedCancellationBackPutsBackEveryField() {
         // given
         LocalDateTime requestedAt = LocalDateTime.now().minusMinutes(3);
         Shipment shipment = dispatched(ShipmentType.Courier);
-        shipment.markCancellationPending("cmd-2", LocalDateTime.now());
+        shipment.setCancellation(ShipmentCancellation.pending("cmd-1", requestedAt).failed());
+        ShipmentCancellation previous = shipment.getCancellation();
+        shipment.setCancellation(ShipmentCancellation.pending("cmd-2", LocalDateTime.now()));
 
         // when
-        shipment.restoreCancellation(ShipmentCancellationStatus.FAILED, "cmd-1", "refused", requestedAt);
+        shipment.setCancellation(previous);
 
         // then
-        assertEquals(ShipmentCancellationStatus.FAILED, shipment.getCancellationStatus());
-        assertTrue(shipment.hasCancellationCommand("cmd-1"));
-        assertEquals("refused", shipment.getCancellationError());
-        assertEquals(requestedAt, shipment.getCancellationRequestedAt());
+        assertEquals(ShipmentCancellationStatus.FAILED, shipment.getCancellation().getStatus());
+        assertTrue(shipment.getCancellation().hasCommand("cmd-1"));
+        assertEquals(requestedAt, shipment.getCancellation().getRequestedAt());
+    }
+
+    @Test
+    void newShipmentHasNoCancellation() {
+        // given
+        Shipment shipment = new Shipment(ShipmentType.Courier);
+        LocalDateTime now = LocalDateTime.now();
+
+        // then
+        assertNull(shipment.getCancellation());
+        assertFalse(shipment.isCancellationInProgress(now));
+        assertFalse(shipment.needsCancellationRecheck(now));
+        assertFalse(shipment.isCancellationUnresolved());
+        assertFalse(shipment.isCancellationPendingFor("cmd-1"));
+    }
+
+    @Test
+    void isCancellationPendingForOnlyWhilePendingForThatCommand() {
+        // given
+        LocalDateTime now = LocalDateTime.now();
+        Shipment pending = dispatched(ShipmentType.Courier);
+        pending.setCancellation(ShipmentCancellation.pending("cmd-1", now));
+        Shipment failed = dispatched(ShipmentType.Courier);
+        failed.setCancellation(ShipmentCancellation.pending("cmd-1", now).failed());
+
+        // then
+        assertTrue(pending.isCancellationPendingFor("cmd-1"));
+        assertFalse(pending.isCancellationPendingFor("cmd-2"));
+        assertFalse(failed.isCancellationPendingFor("cmd-1"));
+    }
+
+    @Test
+    void cancellationStaysWithTheCourierOrderOnEdit() {
+        // given
+        LocalDateTime requested = LocalDateTime.now();
+        Shipment saved = new Shipment(ShipmentType.Courier);
+        saved.setExternalId("21353832");
+        saved.setCancellation(ShipmentCancellation.pending("cmd-1", requested));
+        Shipment edited = new Shipment(ShipmentType.Courier);
+
+        // when
+        edited.inheritCourierOrderFrom(saved);
+
+        // then
+        assertEquals("21353832", edited.getExternalId());
+        assertTrue(edited.getCancellation().isPending());
+        assertTrue(edited.getCancellation().hasCommand("cmd-1"));
+        assertEquals(requested, edited.getCancellation().getRequestedAt());
     }
 }

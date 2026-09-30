@@ -5,7 +5,6 @@ import org.springframework.stereotype.Service;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.Shipment;
-import pl.commercelink.orders.ShipmentCancellationStatus;
 import pl.commercelink.rest.client.HttpClientException;
 import pl.commercelink.shipping.api.ShipmentCancellation;
 import pl.commercelink.shipping.api.ShippingException;
@@ -26,7 +25,8 @@ import java.util.concurrent.atomic.AtomicReference;
 /**
  * Asks the shipping provider to cancel the first courier order on the list whose parcel is not delivered. The shipment is marked
  * PENDING first; a result the provider gives right away is settled here by {@link ShipmentCancellationSettler},
- * otherwise {@link ShipmentCancellationChecker} clears the shipment once the provider confirms, or records why not.
+ * otherwise {@link ShipmentCancellationChecker} clears the shipment once the provider confirms, or marks it failed or
+ * unconfirmed.
  */
 @Slf4j
 @Service
@@ -73,13 +73,14 @@ public class ShipmentCancelService {
         // a new one fail and mark a cancelled package as not cancelled
         LocalDateTime now = LocalDateTime.now();
         boolean recheck = shipment.needsCancellationRecheck(now);
-        String commandId = recheck ? shipment.getCancellationCommandId() : UUID.randomUUID().toString();
+        String commandId = recheck ? shipment.getCancellation().getCommandId() : UUID.randomUUID().toString();
 
         // the command is recorded before it is sent: a concurrent request then finds it in progress on its fresh read
         // and never sends a second command that would overwrite this one and fail on the already cancelled package
         AtomicBoolean marked = new AtomicBoolean();
         AtomicBoolean inProgress = new AtomicBoolean();
-        AtomicReference<CancellationState> previous = new AtomicReference<>();
+        // the cancellation before the mark (null when there was none), put back when the provider refuses the command
+        AtomicReference<pl.commercelink.orders.ShipmentCancellation> previous = new AtomicReference<>();
         optimisticLockingExecutor.modifyAndSave(
                 () -> ordersRepository.findById(storeId, orderId),
                 fresh -> {
@@ -92,12 +93,12 @@ public class ShipmentCancelService {
                         // otherwise another request changed the cancellation in between
                         if (s.isCancellationInProgress(now)
                                 || s.needsCancellationRecheck(now) != recheck
-                                || (recheck && !s.hasCancellationCommand(commandId))) {
+                                || (recheck && !s.getCancellation().hasCommand(commandId))) {
                             inProgress.set(true);
                             return;
                         }
-                        previous.set(CancellationState.of(s));
-                        s.markCancellationPending(commandId, now);
+                        previous.set(s.getCancellation());
+                        s.setCancellation(pl.commercelink.orders.ShipmentCancellation.pending(commandId, now));
                         marked.set(true);
                     });
                 },
@@ -173,7 +174,7 @@ public class ShipmentCancelService {
 
     /** The provider refused the command, so nothing is being cancelled: the shipment gets back its earlier state. */
     private void restore(String storeId, String orderId, String externalId, String commandId,
-                         CancellationState previous) {
+                         pl.commercelink.orders.ShipmentCancellation previous) {
         try {
             AtomicBoolean restored = new AtomicBoolean();
             optimisticLockingExecutor.modifyAndSave(
@@ -181,9 +182,9 @@ public class ShipmentCancelService {
                     fresh -> {
                         restored.set(false);
                         findShipment(fresh, externalId)
-                                .filter(s -> s.hasCancellationCommand(commandId) && s.isCancellationPending())
+                                .filter(s -> s.isCancellationPendingFor(commandId))
                                 .ifPresent(s -> {
-                                    previous.applyTo(s);
+                                    s.setCancellation(previous);
                                     restored.set(true);
                                 });
                     },
@@ -206,18 +207,5 @@ public class ShipmentCancelService {
         return order.getShipments().stream()
                 .filter(s -> externalId.equals(s.getExternalId()))
                 .findFirst();
-    }
-
-    private record CancellationState(ShipmentCancellationStatus status, String commandId, String error,
-                                     LocalDateTime requestedAt) {
-
-        static CancellationState of(Shipment shipment) {
-            return new CancellationState(shipment.getCancellationStatus(), shipment.getCancellationCommandId(),
-                    shipment.getCancellationError(), shipment.getCancellationRequestedAt());
-        }
-
-        void applyTo(Shipment shipment) {
-            shipment.restoreCancellation(status, commandId, error, requestedAt);
-        }
     }
 }

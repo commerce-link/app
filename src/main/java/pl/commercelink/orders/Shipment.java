@@ -3,7 +3,6 @@ package pl.commercelink.orders;
 import com.amazonaws.services.dynamodbv2.datamodeling.*;
 import pl.commercelink.starter.dynamodb.DynamoDbLocalDateTimeConverter;
 
-import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Locale;
 
@@ -12,8 +11,6 @@ import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 @DynamoDBDocument
 public class Shipment {
-
-    public static final Duration STALE_CANCELLATION = Duration.ofMinutes(5);
 
     @DynamoDBAttribute(attributeName = "type")
     @DynamoDBTypeConvertedEnum
@@ -41,16 +38,9 @@ public class Shipment {
     private String trackingSubscriptionId;
     @DynamoDBAttribute(attributeName = "trackingExternalId")
     private String trackingExternalId;
-    @DynamoDBAttribute(attributeName = "cancellationStatus")
-    @DynamoDBTypeConvertedEnum
-    private ShipmentCancellationStatus cancellationStatus;
-    @DynamoDBAttribute(attributeName = "cancellationCommandId")
-    private String cancellationCommandId;
-    @DynamoDBAttribute(attributeName = "cancellationError")
-    private String cancellationError;
-    @DynamoDBAttribute(attributeName = "cancellationRequestedAt")
-    @DynamoDBTypeConverted(converter = DynamoDbLocalDateTimeConverter.class)
-    private LocalDateTime cancellationRequestedAt;
+    /** The last cancel command of the courier order; null when none was sent. */
+    @DynamoDBAttribute(attributeName = "cancellation")
+    private ShipmentCancellation cancellation;
 
     public Shipment() {
     }
@@ -202,36 +192,12 @@ public class Shipment {
         this.trackingExternalId = trackingExternalId;
     }
 
-    public ShipmentCancellationStatus getCancellationStatus() {
-        return cancellationStatus;
+    public ShipmentCancellation getCancellation() {
+        return cancellation;
     }
 
-    public void setCancellationStatus(ShipmentCancellationStatus cancellationStatus) {
-        this.cancellationStatus = cancellationStatus;
-    }
-
-    public String getCancellationCommandId() {
-        return cancellationCommandId;
-    }
-
-    public void setCancellationCommandId(String cancellationCommandId) {
-        this.cancellationCommandId = cancellationCommandId;
-    }
-
-    public String getCancellationError() {
-        return cancellationError;
-    }
-
-    public void setCancellationError(String cancellationError) {
-        this.cancellationError = cancellationError;
-    }
-
-    public LocalDateTime getCancellationRequestedAt() {
-        return cancellationRequestedAt;
-    }
-
-    public void setCancellationRequestedAt(LocalDateTime cancellationRequestedAt) {
-        this.cancellationRequestedAt = cancellationRequestedAt;
+    public void setCancellation(ShipmentCancellation cancellation) {
+        this.cancellation = cancellation;
     }
 
     @DynamoDBIgnore
@@ -258,68 +224,28 @@ public class Shipment {
         this.trackingSubscriptionStatus = ShipmentTrackingStatus.FAILED;
     }
 
-    public void markCancellationPending(String commandId, LocalDateTime now) {
-        this.cancellationStatus = ShipmentCancellationStatus.PENDING;
-        this.cancellationCommandId = commandId;
-        this.cancellationError = null;
-        this.cancellationRequestedAt = now;
-    }
-
-    public void markCancellationFailed(String error) {
-        this.cancellationStatus = ShipmentCancellationStatus.FAILED;
-        this.cancellationError = error;
-    }
-
-    public void markCancellationUnconfirmed() {
-        this.cancellationStatus = ShipmentCancellationStatus.UNCONFIRMED;
-    }
-
-    /**
-     * Puts back the cancellation state the shipment had before a cancel command that was marked but never reached the
-     * provider, so a refused request leaves no trace of itself.
-     */
-    public void restoreCancellation(ShipmentCancellationStatus status, String commandId, String error,
-                                    LocalDateTime requestedAt) {
-        this.cancellationStatus = status;
-        this.cancellationCommandId = commandId;
-        this.cancellationError = error;
-        this.cancellationRequestedAt = requestedAt;
-    }
-
-    @DynamoDBIgnore
-    public boolean isCancellationPending() {
-        return cancellationStatus == ShipmentCancellationStatus.PENDING;
-    }
-
-    /** A PENDING cancellation younger than STALE_CANCELLATION: a new request must wait for its result. */
+    /** A cancel command younger than ShipmentCancellation.STALE waits for its result: a new request must wait too. */
     @DynamoDBIgnore
     public boolean isCancellationInProgress(LocalDateTime now) {
-        return isCancellationPending() && !isStale(now);
+        return cancellation != null && cancellation.isInProgress(now);
     }
 
-    /**
-     * The result of the last cancel command is unknown: the checks ran out, or a PENDING one is so old its check
-     * message must have been lost. Asking again reads that command instead of sending a new one.
-     */
+    /** The result of the last cancel command is unknown: asking again reads that command, not a new one. */
     @DynamoDBIgnore
     public boolean needsCancellationRecheck(LocalDateTime now) {
-        return cancellationStatus == ShipmentCancellationStatus.UNCONFIRMED || (isCancellationPending() && isStale(now));
+        return cancellation != null && cancellation.needsRecheck(now);
     }
 
     /** The last cancellation failed or its result is unknown: the label may or may not still be paid at the carrier. */
     @DynamoDBIgnore
     public boolean isCancellationUnresolved() {
-        return cancellationStatus == ShipmentCancellationStatus.FAILED
-                || cancellationStatus == ShipmentCancellationStatus.UNCONFIRMED;
+        return cancellation != null && cancellation.isUnresolved();
     }
 
+    /** The shipment still waits for the result of that very cancel command. */
     @DynamoDBIgnore
-    public boolean hasCancellationCommand(String commandId) {
-        return cancellationCommandId != null && cancellationCommandId.equals(commandId);
-    }
-
-    private boolean isStale(LocalDateTime now) {
-        return cancellationRequestedAt == null || cancellationRequestedAt.plus(STALE_CANCELLATION).isBefore(now);
+    public boolean isCancellationPendingFor(String commandId) {
+        return cancellation != null && cancellation.isPending() && cancellation.hasCommand(commandId);
     }
 
     /** The tracking subscription follows the tracking number: a changed number is tracked anew. */
@@ -340,10 +266,7 @@ public class Shipment {
     public void inheritCourierOrderFrom(Shipment previous) {
         if (previous != null && previous.externalId != null) {
             this.externalId = previous.externalId;
-            this.cancellationStatus = previous.cancellationStatus;
-            this.cancellationCommandId = previous.cancellationCommandId;
-            this.cancellationError = previous.cancellationError;
-            this.cancellationRequestedAt = previous.cancellationRequestedAt;
+            this.cancellation = previous.cancellation;
         }
     }
 

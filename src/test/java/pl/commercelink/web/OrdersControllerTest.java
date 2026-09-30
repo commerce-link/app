@@ -62,6 +62,7 @@ import pl.commercelink.orders.PaymentDirection;
 import pl.commercelink.orders.PaymentSource;
 import pl.commercelink.orders.PositionGroup;
 import pl.commercelink.orders.Shipment;
+import pl.commercelink.orders.ShipmentCancellation;
 import pl.commercelink.orders.notifications.EmailNotificationType;
 import pl.commercelink.orders.ShipmentTrackingStatus;
 import pl.commercelink.orders.ShipmentType;
@@ -4282,7 +4283,7 @@ class OrdersControllerTest {
             sent.setTrackingNo("TRACK-1");
             sent.setShippedAt(LocalDateTime.now());
             sent.setExternalId("21353832");
-            sent.markCancellationPending("cmd-1", LocalDateTime.now());
+            sent.setCancellation(ShipmentCancellation.pending("cmd-1", LocalDateTime.now()));
             order.setShipments(new ArrayList<>(List.of(sent)));
             when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
             RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
@@ -4429,13 +4430,13 @@ class OrdersControllerTest {
             Order pending = order(OrderStatus.Shipping);
             Shipment sent = new Shipment(ShipmentType.Courier);
             sent.setExternalId("21353832");
-            sent.markCancellationPending("cmd-1", LocalDateTime.now());
+            sent.setCancellation(ShipmentCancellation.pending("cmd-1", LocalDateTime.now()));
             pending.setShipments(new ArrayList<>(List.of(sent)));
             Order settled = order(OrderStatus.Shipping);
             Shipment failed = new Shipment(ShipmentType.Courier);
             failed.setExternalId("21353832");
-            failed.markCancellationPending("cmd-1", LocalDateTime.now());
-            failed.markCancellationFailed("Przesyłka została już odebrana");
+            failed.setCancellation(ShipmentCancellation.pending("cmd-1", LocalDateTime.now()));
+            failed.setCancellation(failed.getCancellation().failed());
             settled.setShipments(new ArrayList<>(List.of(failed)));
 
             // when

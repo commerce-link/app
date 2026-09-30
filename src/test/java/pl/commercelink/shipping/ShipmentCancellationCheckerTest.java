@@ -81,7 +81,7 @@ class ShipmentCancellationCheckerTest {
         shipment.setTrackingNo("TRK-1");
         shipment.setShippedAt(LocalDateTime.of(2026, 9, 30, 9, 0));
         shipment.setExternalId(EXTERNAL_ID);
-        shipment.markCancellationPending(commandId, LocalDateTime.now());
+        shipment.setCancellation(markedPending(commandId, LocalDateTime.now()));
         return shipment;
     }
 
@@ -123,7 +123,7 @@ class ShipmentCancellationCheckerTest {
         // then
         verify(publisher, never()).publish(any());
         verify(ordersRepository).save(order);
-        assertThat(order.getShipments().get(0).getCancellationStatus()).isEqualTo(ShipmentCancellationStatus.UNCONFIRMED);
+        assertThat(order.getShipments().get(0).getCancellation().getStatus()).isEqualTo(ShipmentCancellationStatus.UNCONFIRMED);
     }
 
     @Test
@@ -136,7 +136,7 @@ class ShipmentCancellationCheckerTest {
         checker.check(attempt(ShipmentCancellationChecker.MAX_ATTEMPTS));
 
         // then
-        assertThat(order.getShipments().get(0).getCancellationStatus()).isEqualTo(ShipmentCancellationStatus.UNCONFIRMED);
+        assertThat(order.getShipments().get(0).getCancellation().getStatus()).isEqualTo(ShipmentCancellationStatus.UNCONFIRMED);
     }
 
     @Test
@@ -167,26 +167,30 @@ class ShipmentCancellationCheckerTest {
         assertThat(order.getShipments()).hasSize(1);
         assertThat(order.getShipments().get(0).getExternalId()).isNull();
         assertThat(order.getShipments().get(0).getTrackingNo()).isNull();
-        assertThat(order.getShipments().get(0).getCancellationStatus()).isNull();
+        assertThat(order.getShipments().get(0).getCancellation()).isNull();
         verify(orderEventsRepository).deleteByOrderIdAndName(ORDER_ID, EmailNotificationType.ORDER_SHIPPING.name());
         verify(publisher, never()).publish(any());
     }
 
     @Test
-    void failedKeepsTheShipmentWithTheReason() {
+    void failedKeepsTheShipmentAndLogsTheReason() {
         // given
         Order order = orderWith(pendingShipment(COMMAND_ID));
         when(provider.checkShipmentCancellation(COMMAND_ID, EXTERNAL_ID))
                 .thenReturn(ShipmentCancellation.failed(COMMAND_ID, "Przesyłka została już odebrana", List.of()));
 
         // when
-        checker.check(attempt(1));
+        List<String> warnings;
+        try (CapturedLogs logs = CapturedLogs.of(ShipmentCancellationSettler.class)) {
+            checker.check(attempt(1));
+            warnings = logs.warnings();
+        }
 
-        // then
+        // then: the reason is logged, not stored
         Shipment shipment = order.getShipments().get(0);
         assertThat(shipment.getExternalId()).isEqualTo(EXTERNAL_ID);
-        assertThat(shipment.getCancellationStatus()).isEqualTo(ShipmentCancellationStatus.FAILED);
-        assertThat(shipment.getCancellationError()).isEqualTo("Przesyłka została już odebrana");
+        assertThat(shipment.getCancellation().getStatus()).isEqualTo(ShipmentCancellationStatus.FAILED);
+        assertThat(warnings).singleElement().asString().contains("Przesyłka została już odebrana");
         verify(orderEventsRepository, never()).deleteByOrderIdAndName(any(), any());
     }
 
@@ -244,7 +248,12 @@ class ShipmentCancellationCheckerTest {
         checker.check(attempt(1));
 
         // then
-        assertThat(order.getShipments().get(0).getCancellationStatus()).isEqualTo(ShipmentCancellationStatus.UNCONFIRMED);
+        assertThat(order.getShipments().get(0).getCancellation().getStatus()).isEqualTo(ShipmentCancellationStatus.UNCONFIRMED);
         verify(publisher, never()).publish(any());
+    }
+
+    // the shipment's own cancellation state; the name ShipmentCancellation here is the provider's answer
+    private static pl.commercelink.orders.ShipmentCancellation markedPending(String commandId, LocalDateTime requestedAt) {
+        return pl.commercelink.orders.ShipmentCancellation.pending(commandId, requestedAt);
     }
 }

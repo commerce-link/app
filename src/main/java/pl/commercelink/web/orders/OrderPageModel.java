@@ -109,13 +109,12 @@ public record OrderPageModel(String orderId, String shortId, String backHref, bo
      * removeActionKey are the confirmation's text and button, which say when the removal delivers the order or moves it
      * back to Realization. placeholder: the order's only shipment holds nothing but the customer's delivery choice, so the
      * row reads as "no shipment yet" with "Uzupełnij" instead of a shipment waiting to go out.
-     * cancellationKey and cancellationTone: the pill of the courier cancellation, null without one; cancellationReason
-     * is the argument of a failed one, already in the operator's language.
+     * cancellationKey and cancellationTone: the pill of the courier cancellation, null without one.
      */
     public record ShipmentRow(int number, String typeKey, String carrier, String trackingNo, String trackingUrl,
                               String pickupPoint, String shippedAt, String deliveredAt, String trackingKey,
                               String trackingTone, String trackingHelpKey, String cancellationKey,
-                              String cancellationTone, String cancellationReason, String dialogId, String editHref,
+                              String cancellationTone, String dialogId, String editHref,
                               String removeHref, String removeReasonKey, String removeMessageKey,
                               String removeActionKey, boolean placeholder) {
     }
