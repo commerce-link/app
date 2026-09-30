@@ -1,0 +1,194 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+
+<div layout:fragment="content">
+<section class="cl-page">
+    <div class="cl-page-body is-wide">
+
+        <header class="cl-page-header">
+            <a class="cl-back" th:href="@{${page.backHref()}}"><span aria-hidden="true">‹</span> <span th:text="#{deliveries.pending.back}"></span></a>
+            <div class="cl-page-header-row">
+                <h1 class="cl-page-title" th:text="#{deliveries.pending.title}"></h1>
+            </div>
+            <p class="cl-page-lead" th:text="#{deliveries.pending.lead}"></p>
+        </header>
+
+        <div data-cl-list-results th:fragment="results" th:with="q=${page.query()}"
+             th:attr="data-cl-list-path=${page.listPath()},data-cl-list-fragment=${page.fragmentPath()}">
+            <!--/* Overdue and today narrow the page to what they count; approval and cost only count (spec §3.1). */-->
+            <ul class="cl-stat-grid is-orders" th:attr="aria-label=#{deliveries.pending.tiles.label}">
+                <li th:each="tile : ${page.tiles()}">
+                    <a th:if="${tile.href() != null}" class="cl-stat is-link" th:href="@{${tile.href()}}"
+                       th:attr="aria-current=${tile.active()} ? 'true' : null" data-cl-list-nav>
+                        <span class="cl-eyebrow" th:text="${tile.label()}"></span>
+                        <span class="cl-stat-value" th:text="${tile.value()}"></span>
+                        <span class="cl-stat-hint" th:text="${tile.hint()}"></span>
+                        <span class="cl-visually-hidden" th:if="${tile.active()}" th:text="#{deliveries.pending.tiles.active}"></span>
+                    </a>
+                    <div th:if="${tile.href() == null}" class="cl-stat is-static">
+                        <span class="cl-eyebrow" th:text="${tile.label()}"></span>
+                        <span class="cl-stat-value" th:text="${tile.value()}"></span>
+                        <span class="cl-stat-hint" th:text="${tile.hint()}"></span>
+                    </div>
+                </li>
+            </ul>
+
+            <section class="cl-card" aria-labelledby="pending-title">
+                <h2 class="cl-visually-hidden" id="pending-title" th:text="${page.nothingPending()} ? #{deliveries.pending.title} : ${page.activeTabLabel()}"></h2>
+
+                <div class="cl-list-empty" th:if="${page.nothingPending()}" th:with="es=${page.emptyState()}">
+                    <span th:text="${es.text()}"></span>
+                    <a class="cl-link-button" th:href="@{${es.actionHref()}}" th:text="${es.actionLabel()}"></a>
+                </div>
+
+                <th:block th:unless="${page.nothingPending()}">
+                    <div class="cl-table-toolbar is-stacked">
+                        <div class="cl-toolbar-row">
+                            <nav class="cl-segmented" th:attr="aria-label=#{deliveries.pending.kind.label}">
+                                <a class="cl-segment" th:each="tab : ${page.tabs()}" th:href="@{${tab.href()}}"
+                                   th:attr="aria-current=${tab.active()} ? 'page' : null, data-count=${tab.count()}" data-cl-list-nav>
+                                    <span th:text="${tab.label()}"></span><span class="cl-segment-sep">: </span><span class="cl-segment-count" th:text="${tab.count()}"></span>
+                                </a>
+                            </nav>
+                            <div class="cl-toolbar-search">
+                                <form method="get" th:action="@{${page.listPath()}}" class="cl-search-form" role="search" data-cl-list-form>
+                                    <th:block th:replace="~{fragments/deliveries-pending :: hidden('search')}"></th:block>
+                                    <label class="cl-visually-hidden" for="pending-search" th:text="#{deliveries.pending.search.label}"></label>
+                                    <div class="cl-search-field">
+                                        <span class="cl-search-icon icon is-small" aria-hidden="true"><i class="fas fa-search"></i></span>
+                                        <input class="cl-input cl-table-search" type="search" id="pending-search" name="q" autocomplete="off"
+                                               th:value="${q.q()}" th:attr="placeholder=#{deliveries.pending.search.placeholder}, data-cl-search-had=${q.q() != null}"/>
+                                        <a th:if="${q.q() != null}" class="cl-search-clear" th:href="@{${page.searchClearHref()}}"
+                                           th:attr="aria-label=#{deliveries.pending.search.clear}" data-cl-list-nav>
+                                            <i class="fas fa-times" aria-hidden="true"></i>
+                                        </a>
+                                    </div>
+                                    <button type="submit" class="cl-button is-primary cl-search-submit" th:attr="aria-label=#{general.search}">
+                                        <span class="icon is-small cl-search-submit-icon" aria-hidden="true"><i class="fas fa-search"></i></span>
+                                        <span class="cl-search-submit-text" th:text="#{general.search}"></span>
+                                    </button>
+                                </form>
+                                <button type="button" class="cl-button cl-toolbar-toggle" data-cl-toolbar-toggle aria-controls="pending-filters" aria-expanded="true">
+                                    <i class="fas fa-sliders-h" aria-hidden="true"></i>
+                                    <span class="cl-toolbar-toggle-label"><span th:text="#{deliveries.pending.filters}"></span><th:block th:if="${page.activeFilterCount() > 0}"><span>: </span><span class="cl-toolbar-toggle-count" th:text="${page.activeFilterCount()}"></span></th:block></span>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="cl-toolbar-filters" id="pending-filters">
+                            <details class="cl-filter-menu" data-cl-filter-menu="provider">
+                                <summary class="cl-filter-menu-trigger">
+                                    <span class="cl-filter-menu-key" th:text="#{deliveries.pending.provider.menu}"></span>
+                                    <span class="cl-filter-menu-value" th:text="${page.providerSummary()}"></span>
+                                </summary>
+                                <form method="get" th:action="@{${page.listPath()}}" class="cl-filter-menu-panel" data-cl-list-form data-cl-autosubmit>
+                                    <th:block th:replace="~{fragments/deliveries-pending :: hidden('provider')}"></th:block>
+                                    <th:block th:replace="~{fragments/deliveries-list :: checks('provider', null, ${page.providerOptions()})}"></th:block>
+                                    <div class="cl-filter-menu-actions">
+                                        <button type="submit" class="cl-button is-primary" data-cl-autosubmit-hide th:text="#{deliveries.pending.menu.apply}"></button>
+                                    </div>
+                                </form>
+                            </details>
+                            <a th:if="${!page.chips().isEmpty()}" class="cl-link-button cl-toolbar-clear" th:href="@{${page.clearHref()}}"
+                               th:text="#{general.clear.filters}" data-cl-list-nav></a>
+                        </div>
+                    </div>
+
+                    <div class="cl-list-meta" th:classappend="${page.chips().isEmpty()} ? 'is-count-only' : ''">
+                        <div class="cl-filter-chips" th:if="${!page.chips().isEmpty()}">
+                            <span class="cl-filter-chip" th:each="chip : ${page.chips()}">
+                                <span th:text="${chip.label()}"></span>
+                                <a class="cl-filter-chip-clear" th:href="@{${chip.clearHref()}}" th:attr="aria-label=${chip.clearLabel()}"
+                                   data-cl-list-nav><span aria-hidden="true">×</span></a>
+                            </span>
+                        </div>
+                        <p class="cl-table-results" role="status" th:classappend="${page.chips().isEmpty()} ? 'cl-visually-hidden' : ''"
+                           th:text="${page.resultsLine()}"></p>
+                    </div>
+
+                    <p class="cl-tab-desc" th:text="${page.tabDescription()}"></p>
+
+                    <table class="cl-table is-pending" th:if="${!page.rows().isEmpty() and !page.dropship()}">
+                        <thead>
+                        <tr>
+                            <th scope="col" th:text="#{deliveries.pending.column.supplier}"></th>
+                            <th scope="col" th:text="#{deliveries.pending.column.items}"></th>
+                            <th scope="col" class="is-secondary-column" th:text="#{deliveries.pending.column.source}"></th>
+                            <th scope="col" th:text="#{deliveries.pending.column.due}"></th>
+                            <th scope="col" class="is-secondary-column" th:text="#{deliveries.pending.column.mode}"></th>
+                            <th scope="col" class="is-numeric" th:text="#{deliveries.pending.column.cost}"></th>
+                            <th scope="col"><span class="cl-visually-hidden" th:text="#{deliveries.pending.column.action}"></span></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <th:block th:each="row : ${page.rows()}">
+                            <tr class="cl-row-main">
+                                <th scope="row" class="cl-table-key">
+                                    <span class="cl-card-key"><th:block th:text="${row.providerLabel()}"></th:block><span th:if="${row.forwardToCustomer()}" class="cl-status is-warn" th:text="#{deliveries.directToConsumer.viaWarehouse.badge}"></span></span>
+                                    <span class="cl-table-sub cl-card-sub cl-narrow-only" th:text="${row.sourceText()}"></span>
+                                    <span class="cl-table-sub cl-narrow-only cl-card-hide" th:text="${row.modeText()}"></span>
+                                </th>
+                                <td><th:block th:replace="~{fragments/deliveries-pending :: toggle(${row})}"></th:block></td>
+                                <td class="is-secondary-column cl-card-hide" th:text="${row.sourceText()}"></td>
+                                <td><th:block th:replace="~{fragments/deliveries-pending :: due(${row})}"></th:block></td>
+                                <td class="is-secondary-column cl-card-hide"><th:block th:replace="~{fragments/deliveries-pending :: mode(${row})}"></th:block></td>
+                                <td class="is-numeric"><span class="cl-card-cost" th:text="${row.costText()}"></span></td>
+                                <td class="cl-cell-action"><th:block th:replace="~{fragments/deliveries-pending :: action(${row})}"></th:block></td>
+                            </tr>
+                            <tr th:replace="~{fragments/deliveries-pending :: detail(${row}, true)}"></tr>
+                        </th:block>
+                        </tbody>
+                    </table>
+
+                    <table class="cl-table is-pending is-dropship" th:if="${!page.rows().isEmpty() and page.dropship()}">
+                        <thead>
+                        <tr>
+                            <th scope="col" th:text="#{deliveries.pending.column.order}"></th>
+                            <th scope="col" class="is-secondary-column" th:text="#{deliveries.pending.column.supplier}"></th>
+                            <th scope="col" th:text="#{deliveries.pending.column.items}"></th>
+                            <th scope="col" th:text="#{deliveries.pending.column.due}"></th>
+                            <th scope="col" class="is-secondary-column" th:text="#{deliveries.pending.column.mode}"></th>
+                            <th scope="col" class="is-numeric" th:text="#{deliveries.pending.column.cost}"></th>
+                            <th scope="col"><span class="cl-visually-hidden" th:text="#{deliveries.pending.column.action}"></span></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <th:block th:each="row : ${page.rows()}">
+                            <tr class="cl-row-main">
+                                <th scope="row" class="cl-table-key">
+                                    <a class="cl-row-number cl-card-key" th:href="@{${row.keyHref()}}" th:text="${row.key()}"></a>
+                                    <span class="cl-table-sub cl-card-sub"><th:block th:if="${row.customer() != null}" th:text="${row.customer()}"></th:block><span class="cl-narrow-only" th:text="' · ' + ${row.providerLabel()}"></span></span>
+                                    <span class="cl-table-sub cl-narrow-only cl-card-hide" th:text="${row.modeText()}"></span>
+                                </th>
+                                <td class="is-secondary-column cl-card-hide" th:text="${row.providerLabel()}"></td>
+                                <td><th:block th:replace="~{fragments/deliveries-pending :: toggle(${row})}"></th:block></td>
+                                <td><th:block th:replace="~{fragments/deliveries-pending :: due(${row})}"></th:block></td>
+                                <td class="is-secondary-column cl-card-hide"><th:block th:replace="~{fragments/deliveries-pending :: mode(${row})}"></th:block></td>
+                                <td class="is-numeric"><span class="cl-card-cost" th:text="${row.costText()}"></span></td>
+                                <td class="cl-cell-action"><th:block th:replace="~{fragments/deliveries-pending :: action(${row})}"></th:block></td>
+                            </tr>
+                            <tr th:replace="~{fragments/deliveries-pending :: detail(${row}, false)}"></tr>
+                        </th:block>
+                        </tbody>
+                    </table>
+
+                    <th:block th:if="${page.emptyState() != null}" th:with="es=${page.emptyState()}">
+                        <p class="cl-table-section-empty" th:if="${es.inline()}" th:text="${es.text()}"></p>
+                        <div class="cl-list-empty" th:unless="${es.inline()}">
+                            <span th:text="${es.text()}"></span>
+                            <a th:if="${es.actionHref() != null}" class="cl-link-button" th:href="@{${es.actionHref()}}"
+                               th:text="${es.actionLabel()}" data-cl-list-nav></a>
+                        </div>
+                    </th:block>
+                </th:block>
+            </section>
+        </div>
+    </div>
+</section>
+<script th:src="@{/js/list-page.js}" defer></script>
+<script th:src="@{/js/row-toggle.js}" defer></script>
+</div>
+</body>
+</html>
