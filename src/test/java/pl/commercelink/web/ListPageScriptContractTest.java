@@ -46,7 +46,7 @@ class ListPageScriptContractTest {
     }
 
     @Test
-    void scriptKeepsTheBehavioursTheOrdersListRelyesOn() throws Exception {
+    void scriptKeepsTheBehavioursTheOrdersListRelyOn() throws Exception {
         // given
         String script = read("src/main/resources/static/js/list-page.js");
 
