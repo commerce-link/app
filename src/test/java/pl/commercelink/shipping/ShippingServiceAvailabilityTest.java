@@ -64,4 +64,14 @@ class ShippingServiceAvailabilityTest {
         assertThatThrownBy(() -> shippingService.createShipping(form, store, target))
                 .isInstanceOf(ShippingUnavailableException.class);
     }
+
+    @Test
+    void aProviderWhoseAuthorisationWasLostIsNotAvailable() {
+        // given: ShippingProviderFactory#onAuthorizationLost keeps the integration with no name
+        Store store = store("furgonetka");
+        store.setConfigurationValue(IntegrationType.SHIPPING_PROVIDER, null);
+
+        // when / then
+        assertThat(shippingService.isAvailable(store)).isFalse();
+    }
 }

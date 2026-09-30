@@ -1,6 +1,7 @@
 package pl.commercelink.web.orders;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.context.support.ResourceBundleMessageSource;
 import pl.commercelink.documents.Document;
 import pl.commercelink.documents.DocumentType;
 import pl.commercelink.inventory.supplier.SupplierLabelMap;
@@ -19,6 +20,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -151,13 +153,12 @@ class OrderPrintViewTest {
     @Test
     void warehouseDeliveryReadsAsTheStoresWarehouse() {
         // given: the labels as OrdersController hands them to both printouts
-        org.springframework.context.support.ResourceBundleMessageSource messages =
-                new org.springframework.context.support.ResourceBundleMessageSource();
+        ResourceBundleMessageSource messages = new ResourceBundleMessageSource();
         messages.setBasename("messages");
         messages.setDefaultEncoding("UTF-8");
         messages.setFallbackToSystemLocale(false);
         SupplierLabelMap labels = labels().withWarehouse(
-                OrderPageModelFactory.warehouseLabel(messages, java.util.Locale.forLanguageTag("pl")));
+                OrderPageModelFactory.warehouseLabel(messages, Locale.forLanguageTag("pl")));
         OrderItem fromWarehouse = item("Pamięć", false);
         fromWarehouse.setDeliveryId(OrderItem.GENERIC_WAREHOUSE_ORDER_NO);
         OrderItem fromConnection = item("AMD Ryzen 7", false);

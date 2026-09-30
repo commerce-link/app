@@ -101,7 +101,7 @@
                                         <span th:text="${item.name}"></span>
                                         <!--/* codes are copied by hand, so neither breaks inside itself (the line wraps only between them) */-->
                                         <span class="cl-table-sub"><span th:text="#{general.ean} + ':'"></span> <span class="cl-code-nowrap" th:text="${item.ean}"></span>
-                                            · <span th:text="#{general.manufacturer.code} + ':'"></span> <span class="cl-code-nowrap" th:text="${item.mfn}"></span></span>
+                                            · <span th:text="#{orders.dropship.page.mfn} + ':'"></span> <span class="cl-code-nowrap" th:text="${item.mfn}"></span></span>
                                         <input type="hidden" th:field="*{items[__${itemStat.index}__].name}"/>
                                         <input type="hidden" th:field="*{items[__${itemStat.index}__].ean}"/>
                                         <input type="hidden" th:field="*{items[__${itemStat.index}__].mfn}"/>

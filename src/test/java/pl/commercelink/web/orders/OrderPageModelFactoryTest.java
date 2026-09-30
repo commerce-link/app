@@ -42,8 +42,11 @@ import pl.commercelink.receipts.ReceiptOrderView;
 import pl.commercelink.receipts.ReceiptAttemptService;
 import pl.commercelink.receipts.ReceiptOrderState;
 import pl.commercelink.receipts.ReceiptPageProblem;
+import pl.commercelink.shipping.CarrierDictionary;
+import pl.commercelink.shipping.ShippingProviderFactory;
 import pl.commercelink.shipping.ShippingService;
 import pl.commercelink.stores.FulfilmentConfiguration;
+import pl.commercelink.stores.IntegrationType;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.taxonomy.TaxonomyCache;
@@ -651,6 +654,31 @@ class OrderPageModelFactoryTest {
         // then
         assertThat(page.header().primaryAction().labelKey()).isEqualTo("order.page.action.courier");
         assertThat(page.header().primaryAction().href()).endsWith("/shipping");
+    }
+
+    @Test
+    void anOrderOfAStoreWhoseCourierAuthorisationWasLostRendersWithoutTheCourierAction() {
+        // given: the real availability rule and carrier options over a store whose courier account lost its token
+        // (ShippingProviderFactory#onAuthorizationLost stores the integration without a name)
+        Store store = new Store();
+        store.setStoreId("store-1");
+        store.setConfigurationValue(IntegrationType.SHIPPING_PROVIDER, "furgonetka");
+        store.setConfigurationValue(IntegrationType.SHIPPING_PROVIDER, null);
+        when(storesRepository.findById("store-1")).thenReturn(store);
+        ShippingService realShipping = new ShippingService();
+        ReflectionTestUtils.setField(realShipping, "shippingProviderFactory", mock(ShippingProviderFactory.class));
+        OrderPageModelFactory withRealShipping = new OrderPageModelFactory(storesRepository, orderEventsRepository,
+                dropshipItemLookup, deliveryRedirectResolver, dropshipEligibility, supplierLabels,
+                new ShipmentCarrierOptions(new CarrierDictionary()), productCatalogRepository, taxonomyCache,
+                messageSource, receiptAttemptService, receiptAlerts, realShipping);
+        ReflectionTestUtils.setField(withRealShipping, "appDomain", "https://app.example");
+
+        // when
+        OrderPageModel page = withRealShipping.build(assembledOrderWithOneEmptyShipment(), List.of(), viewer(), PL);
+
+        // then: the page renders and does not lead to a courier page that cannot book
+        assertThat(page.header().primaryAction()).isNull();
+        assertThat(page.shipments()).isNotNull();
     }
 
     @Test

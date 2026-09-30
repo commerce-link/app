@@ -38,6 +38,7 @@ import pl.commercelink.receipts.ReceiptAttemptService;
 import pl.commercelink.receipts.ReceiptOrderState;
 import pl.commercelink.receipts.ReceiptOrderView;
 import pl.commercelink.receipts.ReceiptAttemptState;
+import pl.commercelink.shipping.ShippingService;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.taxonomy.TaxonomyCache;
@@ -122,8 +123,8 @@ class OrderDetailsTemplateTest {
     }
 
     /** A store with a courier account: the page offers "Zamów kuriera" where a shipment waits for it. */
-    static pl.commercelink.shipping.ShippingService courierAvailable() {
-        pl.commercelink.shipping.ShippingService shipping = mock(pl.commercelink.shipping.ShippingService.class);
+    static ShippingService courierAvailable() {
+        ShippingService shipping = mock(ShippingService.class);
         when(shipping.isAvailable(any())).thenReturn(true);
         return shipping;
     }

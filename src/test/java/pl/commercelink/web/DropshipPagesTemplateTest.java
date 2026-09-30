@@ -149,7 +149,8 @@ class DropshipPagesTemplateTest {
                 .contains("Zamów u Acme").contains("cl-status is-info is-leading").contains("Dropshipping")
                 .contains("action=\"/dashboard/orders/" + ORDER_ID + "/dropship/create\"")
                 .contains("formaction=\"/dashboard/orders/" + ORDER_ID + "/dropship/purchase\"")
-                .contains("AMD Ryzen 7 9800X3D").contains("<span class=\"cl-code-nowrap\">5901234123457</span>").contains("<span class=\"cl-code-nowrap\">100-100001084WOF</span>")
+                .contains("AMD Ryzen 7 9800X3D").contains("<span class=\"cl-code-nowrap\">5901234123457</span>")
+                .contains("<span class=\"cl-code-nowrap\">100-100001084WOF</span>")
                 .contains("jan.kowalski · 2 szt.").contains("Dane adresowe klienta").contains("ul. Polna 1")
                 .contains("href=\"tel:+48601234567\"").contains("1 159,00")
                 .doesNotContain("??");
@@ -336,7 +337,10 @@ class DropshipPagesTemplateTest {
         for (String key : List.of("orders.dropship.page.create.title", "orders.dropship.page.card.delivery",
                 "orders.dropship.page.card.items", "orders.dropship.page.card.availability",
                 "orders.dropship.page.paymentTerms.help", "orders.dropship.page.tax.help",
-                "orders.dropship.page.available", "orders.dropship.page.feedPrice", "orders.dropship.page.livePrice", "orders.dropship.page.tax", "orders.dropship.page.unitCost", "orders.dropship.page.allocation", "orders.dropship.page.unitCost.label",
+                "orders.dropship.page.available",
+                "orders.dropship.page.feedPrice", "orders.dropship.page.livePrice", "orders.dropship.page.tax",
+                "orders.dropship.page.unitCost", "orders.dropship.page.mfn", "orders.dropship.page.allocation",
+                "orders.dropship.page.unitCost.label",
                 "orders.dropship.page.priceDelta")) {
             assertThat(pl.getProperty(key)).as(key + " pl").isNotBlank();
             assertThat(en.getProperty(key)).as(key + " en").isNotBlank();

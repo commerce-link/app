@@ -86,7 +86,9 @@ public abstract class AbstractShippingController {
 
     @PostMapping("/create")
     public String createShipping(@ModelAttribute ShippingForm form, RedirectAttributes redirectAttributes, Locale locale) {
-        // a double click or a tab left open must not book (and pay for) a second label
+        // a tab left open, a page restored from the back/forward cache or a re-sent form must not book (and pay for) a
+        // second label once the first booking is saved; the check is not atomic, so two requests in flight at the same
+        // time are only kept apart by the button being disabled on submit (shipping-booking.js)
         String refusal = refuseBooking(form);
         if (refusal != null) {
             redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage(refusal, null, locale));

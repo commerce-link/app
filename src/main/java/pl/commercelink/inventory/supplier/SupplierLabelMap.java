@@ -1,5 +1,6 @@
 package pl.commercelink.inventory.supplier;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -52,7 +53,7 @@ public final class SupplierLabelMap {
         if (label == null) {
             return this;
         }
-        Map<String, String> copy = new java.util.LinkedHashMap<>(byKey);
+        Map<String, String> copy = new LinkedHashMap<>(byKey);
         copy.put(key(defaultStoreId, SupplierRegistry.WAREHOUSE), label);
         return new SupplierLabelMap(defaultStoreId, copy, options);
     }

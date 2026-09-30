@@ -116,4 +116,18 @@ class StoreTest {
         // then
         assertThat(store.getMarketplaceIntegration("Allegro").isLoggedIn()).isTrue();
     }
+
+    @Test
+    void anIntegrationStoredWithoutANameReadsAsNotConfigured() {
+        // given: what ShippingProviderFactory#onAuthorizationLost stores when the courier account loses its token
+        Store store = new Store();
+        store.setConfigurationValue(IntegrationType.SHIPPING_PROVIDER, "furgonetka");
+        store.setConfigurationValue(IntegrationType.SHIPPING_PROVIDER, null);
+
+        // when
+        String provider = store.getConfigurationValue(IntegrationType.SHIPPING_PROVIDER);
+
+        // then
+        assertThat(provider).isNull();
+    }
 }

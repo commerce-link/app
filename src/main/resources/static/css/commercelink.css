@@ -7271,18 +7271,20 @@ a.cl-link-button:hover {
     }
 }
 
-/* The key column of such a table keeps 40 % of it, and .cl-col-num columns share the rest equally: a narrow card (the
-   dropship confirmation beside the consignee card) still leaves the product name room to wrap between words. Their
-   column names may take two lines, and a figure with its pill ("1 Brakuje: 1") wraps between the two. */
+/* The key column of such a table keeps 40 % of it, and five .cl-col-num columns share the rest (12 % each): a narrow
+   card (the dropship confirmation beside the consignee card) still leaves the product name room to wrap between words.
+   Only in a table laid out this way may the column names take two lines, and a figure with its pill ("1 Brakuje: 1")
+   wrap between the two; the other key-wrap table (dropship create) keeps its one-line headers. */
 .cl-page .cl-table col.cl-col-key { width: 40%; }
+.cl-page .cl-table col.cl-col-num { width: 12%; }
 
-.cl-page .cl-table.is-key-wrap thead th {
+.cl-page .cl-table.is-key-wrap:has(col.cl-col-key) thead th {
     white-space: normal;
     vertical-align: bottom;
 }
 
 @media screen and (min-width: 720px) {
-    .cl-page .cl-table.is-key-wrap td.is-numeric:has(.cl-status) {
+    .cl-page .cl-table.is-key-wrap:has(col.cl-col-key) td.is-numeric:has(.cl-status) {
         white-space: normal;
     }
 }

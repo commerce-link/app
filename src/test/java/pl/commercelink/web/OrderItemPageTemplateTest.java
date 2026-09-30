@@ -5,7 +5,9 @@ import pl.commercelink.inventory.deliveries.DeliveryRedirectResolver;
 import pl.commercelink.inventory.supplier.SupplierLabelMap;
 import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.orders.FulfilmentStatus;
+import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
+import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.products.StoreCategories;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
@@ -15,12 +17,14 @@ import pl.commercelink.stores.StoreSupplierConnection;
 import pl.commercelink.web.orders.ItemSaleLock;
 import pl.commercelink.web.orders.OrderItemRow;
 import pl.commercelink.web.orders.OrderLabels;
+import pl.commercelink.web.orders.OrderPageModelFactory;
 import pl.commercelink.web.settings.SettingsTemplateRenderer;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -357,13 +361,13 @@ class OrderItemPageTemplateTest {
     @Test
     void theStoresWarehouseReadsInPolishInTheHeader() {
         // given
-        pl.commercelink.orders.Order order = OrderDetailsTemplateTest.order(pl.commercelink.orders.OrderStatus.Realization);
+        Order order = OrderDetailsTemplateTest.order(OrderStatus.Realization);
         OrderItem item = item(FulfilmentStatus.Delivered);
         item.setDeliveryId(OrderItem.GENERIC_WAREHOUSE_ORDER_NO);
-        pl.commercelink.web.orders.OrderPageModelFactory factory = OrderDetailsTemplateTest.factory(java.util.Set.of());
+        OrderPageModelFactory factory = OrderDetailsTemplateTest.factory(Set.of());
         Map<String, Object> variables = variables(item, false);
         variables.put("delivery", factory.delivery(order, item, List.of(item),
-                new pl.commercelink.web.orders.OrderPageModelFactory.Viewer(false, true, null), OrderDetailsTemplateTest.PL));
+                new OrderPageModelFactory.Viewer(false, true, null), OrderDetailsTemplateTest.PL));
 
         // when
         String html = render(variables);

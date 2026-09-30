@@ -8,6 +8,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.MessageSource;
 import org.springframework.ui.ExtendedModelMap;
 import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.orders.Order;
@@ -22,6 +23,8 @@ import pl.commercelink.web.orders.OrderPrintView;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
@@ -42,7 +45,7 @@ class OrdersControllerPrintTest {
     @Mock
     private SupplierLabels supplierLabels;
     @Mock
-    private org.springframework.context.MessageSource messageSource;
+    private MessageSource messageSource;
 
     @InjectMocks
     private OrdersController ordersController;
@@ -135,5 +138,24 @@ class OrdersControllerPrintTest {
         assertThat(collection.store()).isEqualTo("store-1 (Demo)");
         assertThat(collection.location()).isEqualTo("Kraków, PL");
         assertThat(collection.items()).extracting(OrderPrintView.ItemRow::name).containsExactly("Ryzen");
+    }
+
+    @Test
+    void theCardNamesTheStoresWarehouseInTheRequestsLanguage() {
+        // given
+        order();
+        OrderItem fromWarehouse = item("Pamięć", false);
+        fromWarehouse.setDeliveryId(OrderItem.GENERIC_WAREHOUSE_ORDER_NO);
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(fromWarehouse));
+        when(supplierLabels.forStoreId(STORE_ID)).thenReturn(new SupplierLabels(mock(StoresRepository.class)).forStore(null));
+        when(messageSource.getMessage(eq("order.item.delivery.warehouse"), any(), any())).thenReturn("Magazyn sklepu");
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        ordersController.getOrderCard(ORDER_ID, model);
+
+        // then
+        assertThat(((OrderPrintView.Card) model.get("print")).items()).extracting(OrderPrintView.ItemRow::delivery)
+                .containsExactly("Magazyn sklepu");
     }
 }
