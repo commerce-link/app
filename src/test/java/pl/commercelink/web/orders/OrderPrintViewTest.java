@@ -144,7 +144,7 @@ class OrderPrintViewTest {
         // then
         assertThat(collection.items()).extracting(OrderPrintView.ItemRow::name).containsExactly("AMD Ryzen 7");
         assertThat(collection.items().get(0).serialNo()).isEqualTo("SN-1, SN-2");
-        assertThat(collection.store()).isEqualTo("store-1 (Demo)");
+        assertThat(collection.store()).isEqualTo("Demo");
         assertThat(collection.date()).isEqualTo("28.09.2026");
         assertThat(collection.location()).isEqualTo("Kraków, PL");
         assertThat(collection.detailsHref()).isEqualTo("/dashboard/orders/" + ORDER_ID);

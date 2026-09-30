@@ -23,6 +23,7 @@ public final class OrderPrintView {
                        String comment, List<ItemRow> items, List<DocumentRow> documents, List<ShipmentRow> shipments) {
     }
 
+    /** store is the store's name: the protocol goes to the customer, who knows the store by name, not by its id. */
     public record Collection(String orderId, String shortId, String detailsHref, String store, String date,
                              String location, List<ItemRow> items) {
     }
@@ -50,7 +51,7 @@ public final class OrderPrintView {
     public static Collection collection(Order order, List<OrderItem> items, Store store, LocalDate date,
                                         String location, OrderLinks links, SupplierLabelMap labels) {
         return new Collection(order.getOrderId(), order.getShortenedOrderId(), links.details(),
-                store.getStoreId() + " (" + store.getName() + ")", OrderFormats.date(date), location,
+                StringUtils.defaultIfBlank(store.getName(), null), OrderFormats.date(date), location,
                 items.stream().filter(item -> !item.isService()).map(item -> row(item, labels)).toList());
     }
 

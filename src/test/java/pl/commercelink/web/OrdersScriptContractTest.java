@@ -517,7 +517,7 @@ class OrdersScriptContractTest {
         assertThat(print).contains("'use strict'").contains("a[data-cl-print-frame]").contains("event.preventDefault()")
                 .contains("event.ctrlKey").contains("event.metaKey").contains("createElement('iframe')")
                 .contains("view.focus()").contains("view.print()").contains("'afterprint'")
-                .contains("FALLBACK_MS").contains(".cl-print-sheet").contains("window.location.assign(href)")
+                .contains(".cl-print-sheet").contains("window.location.assign(href)")
                 .contains("menu.open = false")
                 .doesNotContain("innerHTML").doesNotContain("style.").doesNotContain("window.open");
         // the old preview page's button is gone
@@ -525,5 +525,22 @@ class OrdersScriptContractTest {
         // off screen, not display: none or visibility: hidden, which some browsers print as a blank page
         assertThat(rule(css, ".cl-print-frame")).contains("position: fixed").contains("left: -10000px")
                 .contains("width: 210mm").doesNotContain("display: none").doesNotContain("visibility");
+    }
+
+    @Test
+    void printFrameIsRemovedOnlyOnAfterprintPagehideOrTheNextPrint() throws Exception {
+        // given
+        String print = read("src/main/resources/static/js/print.js");
+
+        // then: no timer takes the sheet away (Firefox may still show its preview), and the keyboard goes back to
+        // the menu's summary once the frame that held the focus is gone
+        assertThat(print).doesNotContain("FALLBACK_MS").doesNotContain("60000")
+                .contains("'afterprint'").contains("'pagehide'")
+                .contains("if (current) {\n            remove(current);")
+                .contains(":scope > summary").contains("returnFocus").contains("document.activeElement")
+                .contains("target.focus()");
+        // the only timer left defers the removal until the print call that fired afterprint has returned
+        assertThat(print.split("setTimeout", -1)).hasSize(2);
+        assertThat(print).contains("}, 0);");
     }
 }
