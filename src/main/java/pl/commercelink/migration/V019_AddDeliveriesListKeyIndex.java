@@ -15,9 +15,10 @@ import java.util.Map;
 /**
  * Deliveries by store and list key (spec §7): the deliveries list reads the deliveries on their way, the settlement
  * backlog and a window of the history as key ranges, however long the store's history grows. The key is new, so the
- * existing deliveries get it here once; every later save recomputes it (Delivery.getListKey). Only listKey is written,
+ * existing deliveries get it here once, before the index is created; every later save recomputes it (Delivery.getListKey). Only listKey is written,
  * without touching version, so an operator saving a delivery meanwhile is not refused by optimistic locking. The list
- * reads the store's partition until the index is active (DeliveriesRepository).
+ * reads the store's partition until the index is active (DeliveriesRepository). The backfill runs before the index
+ * is created, so the index build never sees an unkeyed delivery and the fallback covers the whole build.
  */
 @ChangeUnit(id = "V019-add-deliveries-list-key-index", order = "019", author = "commercelink")
 public class V019_AddDeliveriesListKeyIndex {
@@ -35,8 +36,10 @@ public class V019_AddDeliveriesListKeyIndex {
 
     @Execution
     public void execute() {
-        createIndexIfAbsent();
+        // keys first: the index then builds over fully keyed items, and until it is active the repository fallback
+        // (DeliveriesRepository) already reads correct keys for the whole build
         backfillListKeys();
+        createIndexIfAbsent();
     }
 
     private void createIndexIfAbsent() {
