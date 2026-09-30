@@ -164,7 +164,7 @@ public final class OrderLabels {
 
     /**
      * The pill of a shipment's courier cancellation, or null when there is none (a confirmed one clears the shipment).
-     * A PENDING one past ShipmentCancellation.STALE reads as unconfirmed: nothing answers it any more, and "Cancel
+     * A PENDING one past CourierCancellation.STALE reads as unconfirmed: nothing answers it any more, and "Cancel
      * courier order" then re-checks it like an unconfirmed one.
      */
     public static String cancellation(Shipment shipment, LocalDateTime now) {

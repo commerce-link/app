@@ -51,12 +51,12 @@ class ShipmentTest {
         // given
         Shipment none = dispatched(ShipmentType.Courier);
         Shipment pending = dispatched(ShipmentType.Courier);
-        pending.setCancellation(ShipmentCancellation.pending("cmd-1", LocalDateTime.now()));
+        pending.setCancellation(CourierCancellation.pending("cmd-1", LocalDateTime.now()));
         Shipment failed = dispatched(ShipmentType.Courier);
-        failed.setCancellation(ShipmentCancellation.pending("cmd-1", LocalDateTime.now()));
+        failed.setCancellation(CourierCancellation.pending("cmd-1", LocalDateTime.now()));
         failed.setCancellation(failed.getCancellation().failed());
         Shipment unconfirmed = dispatched(ShipmentType.Courier);
-        unconfirmed.setCancellation(ShipmentCancellation.pending("cmd-1", LocalDateTime.now()));
+        unconfirmed.setCancellation(CourierCancellation.pending("cmd-1", LocalDateTime.now()));
         unconfirmed.setCancellation(unconfirmed.getCancellation().unconfirmed());
 
         // then
@@ -71,9 +71,9 @@ class ShipmentTest {
         // given
         LocalDateTime requestedAt = LocalDateTime.now().minusMinutes(3);
         Shipment shipment = dispatched(ShipmentType.Courier);
-        shipment.setCancellation(ShipmentCancellation.pending("cmd-1", requestedAt).failed());
-        ShipmentCancellation previous = shipment.getCancellation();
-        shipment.setCancellation(ShipmentCancellation.pending("cmd-2", LocalDateTime.now()));
+        shipment.setCancellation(CourierCancellation.pending("cmd-1", requestedAt).failed());
+        CourierCancellation previous = shipment.getCancellation();
+        shipment.setCancellation(CourierCancellation.pending("cmd-2", LocalDateTime.now()));
 
         // when
         shipment.setCancellation(previous);
@@ -103,9 +103,9 @@ class ShipmentTest {
         // given
         LocalDateTime now = LocalDateTime.now();
         Shipment pending = dispatched(ShipmentType.Courier);
-        pending.setCancellation(ShipmentCancellation.pending("cmd-1", now));
+        pending.setCancellation(CourierCancellation.pending("cmd-1", now));
         Shipment failed = dispatched(ShipmentType.Courier);
-        failed.setCancellation(ShipmentCancellation.pending("cmd-1", now).failed());
+        failed.setCancellation(CourierCancellation.pending("cmd-1", now).failed());
 
         // then
         assertTrue(pending.isCancellationPendingFor("cmd-1"));
@@ -119,7 +119,7 @@ class ShipmentTest {
         LocalDateTime requested = LocalDateTime.now();
         Shipment saved = new Shipment(ShipmentType.Courier);
         saved.setExternalId("21353832");
-        saved.setCancellation(ShipmentCancellation.pending("cmd-1", requested));
+        saved.setCancellation(CourierCancellation.pending("cmd-1", requested));
         Shipment edited = new Shipment(ShipmentType.Courier);
 
         // when

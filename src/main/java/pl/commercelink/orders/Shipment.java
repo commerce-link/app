@@ -40,7 +40,7 @@ public class Shipment {
     private String trackingExternalId;
     /** The last cancel command of the courier order; null when none was sent. */
     @DynamoDBAttribute(attributeName = "cancellation")
-    private ShipmentCancellation cancellation;
+    private CourierCancellation cancellation;
 
     public Shipment() {
     }
@@ -192,11 +192,11 @@ public class Shipment {
         this.trackingExternalId = trackingExternalId;
     }
 
-    public ShipmentCancellation getCancellation() {
+    public CourierCancellation getCancellation() {
         return cancellation;
     }
 
-    public void setCancellation(ShipmentCancellation cancellation) {
+    public void setCancellation(CourierCancellation cancellation) {
         this.cancellation = cancellation;
     }
 
@@ -224,7 +224,7 @@ public class Shipment {
         this.trackingSubscriptionStatus = ShipmentTrackingStatus.FAILED;
     }
 
-    /** A cancel command younger than ShipmentCancellation.STALE waits for its result: a new request must wait too. */
+    /** A cancel command younger than CourierCancellation.STALE waits for its result: a new request must wait too. */
     @DynamoDBIgnore
     public boolean isCancellationInProgress(LocalDateTime now) {
         return cancellation != null && cancellation.isInProgress(now);

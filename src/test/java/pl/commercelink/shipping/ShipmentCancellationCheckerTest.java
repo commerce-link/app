@@ -7,6 +7,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import pl.commercelink.orders.CourierCancellation;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderRealizationStepBack;
 import pl.commercelink.orders.OrdersRepository;
@@ -81,7 +82,7 @@ class ShipmentCancellationCheckerTest {
         shipment.setTrackingNo("TRK-1");
         shipment.setShippedAt(LocalDateTime.of(2026, 9, 30, 9, 0));
         shipment.setExternalId(EXTERNAL_ID);
-        shipment.setCancellation(markedPending(commandId, LocalDateTime.now()));
+        shipment.setCancellation(CourierCancellation.pending(commandId, LocalDateTime.now()));
         return shipment;
     }
 
@@ -250,10 +251,5 @@ class ShipmentCancellationCheckerTest {
         // then
         assertThat(order.getShipments().get(0).getCancellation().getStatus()).isEqualTo(ShipmentCancellationStatus.UNCONFIRMED);
         verify(publisher, never()).publish(any());
-    }
-
-    // the shipment's own cancellation state; the name ShipmentCancellation here is the provider's answer
-    private static pl.commercelink.orders.ShipmentCancellation markedPending(String commandId, LocalDateTime requestedAt) {
-        return pl.commercelink.orders.ShipmentCancellation.pending(commandId, requestedAt);
     }
 }

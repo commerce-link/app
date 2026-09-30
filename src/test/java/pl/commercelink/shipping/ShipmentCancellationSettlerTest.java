@@ -10,6 +10,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import pl.commercelink.orders.CourierCancellation;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderRealizationStepBack;
 import pl.commercelink.orders.OrderStatus;
@@ -17,7 +18,6 @@ import pl.commercelink.orders.event.EventType;
 import pl.commercelink.orders.event.OrderEvent;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.Shipment;
-import pl.commercelink.orders.ShipmentCancellation;
 import pl.commercelink.orders.ShipmentCancellationStatus;
 import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.event.OrderEventsRepository;
@@ -75,7 +75,7 @@ class ShipmentCancellationSettlerTest {
         shipment.setTrackingNo("TRK-1");
         shipment.setShippedAt(LocalDateTime.of(2026, 9, 30, 9, 0));
         shipment.setExternalId(EXTERNAL_ID);
-        shipment.setCancellation(ShipmentCancellation.pending(commandId, LocalDateTime.now()));
+        shipment.setCancellation(CourierCancellation.pending(commandId, LocalDateTime.now()));
         return shipment;
     }
 

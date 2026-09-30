@@ -6,21 +6,21 @@ import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class ShipmentCancellationTest {
+class CourierCancellationTest {
 
     private static final LocalDateTime REQUESTED = LocalDateTime.of(2026, 9, 30, 10, 0);
 
     @Test
     void pendingIsInProgressUntilFiveMinutesPass() {
         // when
-        ShipmentCancellation cancellation = ShipmentCancellation.pending("cmd-1", REQUESTED);
+        CourierCancellation cancellation = CourierCancellation.pending("cmd-1", REQUESTED);
 
         // then
         assertThat(cancellation.getStatus()).isEqualTo(ShipmentCancellationStatus.PENDING);
         assertThat(cancellation.isPending()).isTrue();
         assertThat(cancellation.getRequestedAt()).isEqualTo(REQUESTED);
-        assertThat(cancellation.isInProgress(REQUESTED.plus(ShipmentCancellation.STALE))).isTrue();
-        assertThat(cancellation.needsRecheck(REQUESTED.plus(ShipmentCancellation.STALE))).isFalse();
+        assertThat(cancellation.isInProgress(REQUESTED.plus(CourierCancellation.STALE))).isTrue();
+        assertThat(cancellation.needsRecheck(REQUESTED.plus(CourierCancellation.STALE))).isFalse();
         assertThat(cancellation.isInProgress(REQUESTED.plusMinutes(5).plusSeconds(1))).isFalse();
         assertThat(cancellation.needsRecheck(REQUESTED.plusMinutes(5).plusSeconds(1))).isTrue();
         assertThat(cancellation.isUnresolved()).isFalse();
@@ -29,7 +29,7 @@ class ShipmentCancellationTest {
     @Test
     void aPendingOneWithoutARequestTimeIsStale() {
         // given
-        ShipmentCancellation cancellation = ShipmentCancellation.pending("cmd-1", null);
+        CourierCancellation cancellation = CourierCancellation.pending("cmd-1", null);
 
         // then
         assertThat(cancellation.isInProgress(REQUESTED)).isFalse();
@@ -39,22 +39,22 @@ class ShipmentCancellationTest {
     @Test
     void hasCommandMatchesOnlyItsOwnCommand() {
         // given
-        ShipmentCancellation cancellation = ShipmentCancellation.pending("cmd-1", REQUESTED);
+        CourierCancellation cancellation = CourierCancellation.pending("cmd-1", REQUESTED);
 
         // then
         assertThat(cancellation.hasCommand("cmd-1")).isTrue();
         assertThat(cancellation.hasCommand("cmd-2")).isFalse();
         assertThat(cancellation.hasCommand(null)).isFalse();
-        assertThat(new ShipmentCancellation().hasCommand(null)).isFalse();
+        assertThat(new CourierCancellation().hasCommand(null)).isFalse();
     }
 
     @Test
     void failedKeepsTheCommandAndLeavesTheEarlierStateAsItWas() {
         // given
-        ShipmentCancellation pending = ShipmentCancellation.pending("cmd-1", REQUESTED);
+        CourierCancellation pending = CourierCancellation.pending("cmd-1", REQUESTED);
 
         // when
-        ShipmentCancellation failed = pending.failed();
+        CourierCancellation failed = pending.failed();
 
         // then
         assertThat(failed.getStatus()).isEqualTo(ShipmentCancellationStatus.FAILED);
@@ -69,10 +69,10 @@ class ShipmentCancellationTest {
     @Test
     void aNewCommandAfterAFailureStartsFromScratch() {
         // given
-        ShipmentCancellation failed = ShipmentCancellation.pending("cmd-1", REQUESTED).failed();
+        CourierCancellation failed = CourierCancellation.pending("cmd-1", REQUESTED).failed();
 
         // when
-        ShipmentCancellation again = ShipmentCancellation.pending("cmd-2", REQUESTED.plusMinutes(1));
+        CourierCancellation again = CourierCancellation.pending("cmd-2", REQUESTED.plusMinutes(1));
 
         // then
         assertThat(again.getStatus()).isEqualTo(ShipmentCancellationStatus.PENDING);
@@ -83,10 +83,10 @@ class ShipmentCancellationTest {
     @Test
     void unconfirmedNeedsRecheck() {
         // given
-        ShipmentCancellation pending = ShipmentCancellation.pending("cmd-1", REQUESTED);
+        CourierCancellation pending = CourierCancellation.pending("cmd-1", REQUESTED);
 
         // when
-        ShipmentCancellation unconfirmed = pending.unconfirmed();
+        CourierCancellation unconfirmed = pending.unconfirmed();
 
         // then
         assertThat(unconfirmed.getStatus()).isEqualTo(ShipmentCancellationStatus.UNCONFIRMED);

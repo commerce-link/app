@@ -11,6 +11,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import pl.commercelink.orders.CourierCancellation;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderRealizationStepBack;
 import pl.commercelink.orders.OrderStatus;
@@ -162,7 +163,7 @@ class ShipmentCancelServiceTest {
         // given: the first read shows no cancellation, the fresh read inside the executor a PENDING one 20 s old
         Order order = orderWithShipments(courierShipment(EXTERNAL_ID));
         Shipment marked = courierShipment(EXTERNAL_ID);
-        marked.setCancellation(markedPending("cmd-other", LocalDateTime.now().minusSeconds(20)));
+        marked.setCancellation(CourierCancellation.pending("cmd-other", LocalDateTime.now().minusSeconds(20)));
         Order fresh = orderWithShipments(marked);
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order, fresh);
@@ -183,7 +184,7 @@ class ShipmentCancelServiceTest {
     void cancelShippingRefusesWhileACancellationIsInProgress() {
         // given
         Shipment shipment = courierShipment(EXTERNAL_ID);
-        shipment.setCancellation(markedPending("cmd-1", LocalDateTime.now().minusSeconds(20)));
+        shipment.setCancellation(CourierCancellation.pending("cmd-1", LocalDateTime.now().minusSeconds(20)));
         Order order = orderWithShipments(shipment);
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
@@ -237,9 +238,9 @@ class ShipmentCancelServiceTest {
         // given
         LocalDateTime requestedAt = LocalDateTime.now().minusMinutes(2);
         Shipment shipment = courierShipment(EXTERNAL_ID);
-        shipment.setCancellation(markedPending("cmd-1", requestedAt));
+        shipment.setCancellation(CourierCancellation.pending("cmd-1", requestedAt));
         shipment.setCancellation(shipment.getCancellation().failed());
-        pl.commercelink.orders.ShipmentCancellation previous = shipment.getCancellation();
+        CourierCancellation previous = shipment.getCancellation();
         Order order = orderWithShipments(shipment);
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
@@ -281,7 +282,7 @@ class ShipmentCancelServiceTest {
         // given
         LocalDateTime requestedAt = LocalDateTime.now().minusMinutes(2);
         Shipment shipment = courierShipment(EXTERNAL_ID);
-        shipment.setCancellation(markedPending("cmd-1", requestedAt));
+        shipment.setCancellation(CourierCancellation.pending("cmd-1", requestedAt));
         shipment.setCancellation(shipment.getCancellation().unconfirmed());
         Order order = orderWithShipments(shipment);
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
@@ -307,7 +308,7 @@ class ShipmentCancelServiceTest {
         // given
         LocalDateTime requestedAt = LocalDateTime.now().minusMinutes(6);
         Shipment shipment = courierShipment(EXTERNAL_ID);
-        shipment.setCancellation(markedPending("cmd-1", requestedAt));
+        shipment.setCancellation(CourierCancellation.pending("cmd-1", requestedAt));
         Order order = orderWithShipments(shipment);
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
@@ -330,7 +331,7 @@ class ShipmentCancelServiceTest {
     void cancelShippingSendsANewCommandAfterAFailure() {
         // given
         Shipment shipment = courierShipment(EXTERNAL_ID);
-        shipment.setCancellation(markedPending("cmd-1", LocalDateTime.now().minusMinutes(2)));
+        shipment.setCancellation(CourierCancellation.pending("cmd-1", LocalDateTime.now().minusMinutes(2)));
         shipment.setCancellation(shipment.getCancellation().failed());
         Order order = orderWithShipments(shipment);
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
@@ -461,7 +462,7 @@ class ShipmentCancelServiceTest {
         // given: the first read chooses a new command, the fresh read already asks for a re-check
         Order order = orderWithShipments(courierShipment(EXTERNAL_ID));
         Shipment unconfirmed = courierShipment(EXTERNAL_ID);
-        unconfirmed.setCancellation(markedPending("cmd-other", LocalDateTime.now().minusMinutes(2)));
+        unconfirmed.setCancellation(CourierCancellation.pending("cmd-other", LocalDateTime.now().minusMinutes(2)));
         unconfirmed.setCancellation(unconfirmed.getCancellation().unconfirmed());
         Order fresh = orderWithShipments(unconfirmed);
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
@@ -481,11 +482,11 @@ class ShipmentCancelServiceTest {
     void cancelShippingRefusesWhenTheFreshReadNoLongerNeedsTheRecheckChosenOnTheFirstRead() {
         // given: the first read sees an unconfirmed command, the fresh read a failed one
         Shipment unconfirmed = courierShipment(EXTERNAL_ID);
-        unconfirmed.setCancellation(markedPending("cmd-1", LocalDateTime.now().minusMinutes(2)));
+        unconfirmed.setCancellation(CourierCancellation.pending("cmd-1", LocalDateTime.now().minusMinutes(2)));
         unconfirmed.setCancellation(unconfirmed.getCancellation().unconfirmed());
         Order order = orderWithShipments(unconfirmed);
         Shipment failed = courierShipment(EXTERNAL_ID);
-        failed.setCancellation(markedPending("cmd-1", LocalDateTime.now().minusMinutes(2)));
+        failed.setCancellation(CourierCancellation.pending("cmd-1", LocalDateTime.now().minusMinutes(2)));
         failed.setCancellation(failed.getCancellation().failed());
         Order fresh = orderWithShipments(failed);
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
@@ -505,10 +506,10 @@ class ShipmentCancelServiceTest {
     void cancelShippingRefusesARecheckWhenTheFreshReadCarriesAnotherCommand() {
         // given: both reads need a re-check, but of different commands
         Shipment first = courierShipment(EXTERNAL_ID);
-        first.setCancellation(markedPending("cmd-1", LocalDateTime.now().minusMinutes(2)));
+        first.setCancellation(CourierCancellation.pending("cmd-1", LocalDateTime.now().minusMinutes(2)));
         first.setCancellation(first.getCancellation().unconfirmed());
         Shipment other = courierShipment(EXTERNAL_ID);
-        other.setCancellation(markedPending("cmd-2", LocalDateTime.now().minusMinutes(2)));
+        other.setCancellation(CourierCancellation.pending("cmd-2", LocalDateTime.now().minusMinutes(2)));
         other.setCancellation(other.getCancellation().unconfirmed());
         Order order = orderWithShipments(first);
         Order fresh = orderWithShipments(other);
@@ -791,10 +792,5 @@ class ShipmentCancelServiceTest {
         shipment.setShippedAt(LocalDateTime.now().minusHours(1));
         shipment.setExternalId(externalId);
         return shipment;
-    }
-
-    // the shipment's own cancellation state; the name ShipmentCancellation here is the provider's answer
-    private static pl.commercelink.orders.ShipmentCancellation markedPending(String commandId, LocalDateTime requestedAt) {
-        return pl.commercelink.orders.ShipmentCancellation.pending(commandId, requestedAt);
     }
 }

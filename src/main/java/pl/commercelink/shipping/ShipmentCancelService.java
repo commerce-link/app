@@ -2,6 +2,7 @@ package pl.commercelink.shipping;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import pl.commercelink.orders.CourierCancellation;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.Shipment;
@@ -80,7 +81,7 @@ public class ShipmentCancelService {
         AtomicBoolean marked = new AtomicBoolean();
         AtomicBoolean inProgress = new AtomicBoolean();
         // the cancellation before the mark (null when there was none), put back when the provider refuses the command
-        AtomicReference<pl.commercelink.orders.ShipmentCancellation> previous = new AtomicReference<>();
+        AtomicReference<CourierCancellation> previous = new AtomicReference<>();
         optimisticLockingExecutor.modifyAndSave(
                 () -> ordersRepository.findById(storeId, orderId),
                 fresh -> {
@@ -98,7 +99,7 @@ public class ShipmentCancelService {
                             return;
                         }
                         previous.set(s.getCancellation());
-                        s.setCancellation(pl.commercelink.orders.ShipmentCancellation.pending(commandId, now));
+                        s.setCancellation(CourierCancellation.pending(commandId, now));
                         marked.set(true);
                     });
                 },
@@ -174,7 +175,7 @@ public class ShipmentCancelService {
 
     /** The provider refused the command, so nothing is being cancelled: the shipment gets back its earlier state. */
     private void restore(String storeId, String orderId, String externalId, String commandId,
-                         pl.commercelink.orders.ShipmentCancellation previous) {
+                         CourierCancellation previous) {
         try {
             AtomicBoolean restored = new AtomicBoolean();
             optimisticLockingExecutor.modifyAndSave(

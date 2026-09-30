@@ -20,6 +20,7 @@ import pl.commercelink.inventory.deliveries.DropshipRejection;
 import pl.commercelink.inventory.deliveries.DropshipItemLookup;
 import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.orders.BillingDetails;
+import pl.commercelink.orders.CourierCancellation;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
@@ -27,7 +28,6 @@ import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.Payment;
 import pl.commercelink.orders.PaymentSource;
 import pl.commercelink.orders.Shipment;
-import pl.commercelink.orders.ShipmentCancellation;
 import pl.commercelink.orders.ShipmentCarrierOptions;
 import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.event.EventType;
@@ -485,11 +485,11 @@ class OrderPageModelFactoryTest {
         // given: the operator settles the label in the provider's panel and drops the record
         Order failed = order(OrderStatus.Shipping);
         labelled(failed.getShipments().get(0), "T-1", "PKG-1");
-        failed.getShipments().get(0).setCancellation(ShipmentCancellation.pending("cmd-1", LocalDateTime.now().minusMinutes(2)));
+        failed.getShipments().get(0).setCancellation(CourierCancellation.pending("cmd-1", LocalDateTime.now().minusMinutes(2)));
         failed.getShipments().get(0).setCancellation(failed.getShipments().get(0).getCancellation().failed());
         Order unconfirmed = order(OrderStatus.Shipping);
         labelled(unconfirmed.getShipments().get(0), "T-1", "PKG-1");
-        unconfirmed.getShipments().get(0).setCancellation(ShipmentCancellation.pending("cmd-1", LocalDateTime.now().minusMinutes(2)));
+        unconfirmed.getShipments().get(0).setCancellation(CourierCancellation.pending("cmd-1", LocalDateTime.now().minusMinutes(2)));
         unconfirmed.getShipments().get(0).setCancellation(unconfirmed.getShipments().get(0).getCancellation().unconfirmed());
 
         // when
@@ -507,7 +507,7 @@ class OrderPageModelFactoryTest {
         // given
         Order order = order(OrderStatus.Shipping);
         labelled(order.getShipments().get(0), "T-1", "PKG-1");
-        order.getShipments().get(0).setCancellation(ShipmentCancellation.pending("cmd-1", LocalDateTime.now()));
+        order.getShipments().get(0).setCancellation(CourierCancellation.pending("cmd-1", LocalDateTime.now()));
 
         // when
         String locked = OrderPageModelFactory.removeLockedKey(order, 0);
@@ -521,7 +521,7 @@ class OrderPageModelFactoryTest {
         // given
         Order order = order(OrderStatus.Shipping);
         labelled(order.getShipments().get(0), "T-1", "PKG-1");
-        order.getShipments().get(0).setCancellation(ShipmentCancellation.pending("cmd-1", LocalDateTime.now().minusSeconds(10)));
+        order.getShipments().get(0).setCancellation(CourierCancellation.pending("cmd-1", LocalDateTime.now().minusSeconds(10)));
 
         // when
         OrderPageModel.ShipmentsCard card = factory.build(order, List.of(), ADMIN, PL).shipments();
@@ -539,10 +539,10 @@ class OrderPageModelFactoryTest {
 
     @Test
     void aStalePendingCancellationReadsAsUnconfirmedAndTheCancelActionRechecksIt() {
-        // given: no answer for longer than ShipmentCancellation.STALE
+        // given: no answer for longer than CourierCancellation.STALE
         Order order = order(OrderStatus.Shipping);
         labelled(order.getShipments().get(0), "T-1", "PKG-1");
-        order.getShipments().get(0).setCancellation(ShipmentCancellation.pending("cmd-1", LocalDateTime.now().minusMinutes(6)));
+        order.getShipments().get(0).setCancellation(CourierCancellation.pending("cmd-1", LocalDateTime.now().minusMinutes(6)));
 
         // when
         OrderPageModel.ShipmentsCard card = factory.build(order, List.of(), ADMIN, PL).shipments();
@@ -559,7 +559,7 @@ class OrderPageModelFactoryTest {
         // given
         Order order = order(OrderStatus.Shipping);
         labelled(order.getShipments().get(0), "T-1", "PKG-1");
-        order.getShipments().get(0).setCancellation(ShipmentCancellation.pending("cmd-1", LocalDateTime.now().minusMinutes(2)));
+        order.getShipments().get(0).setCancellation(CourierCancellation.pending("cmd-1", LocalDateTime.now().minusMinutes(2)));
         order.getShipments().get(0).setCancellation(order.getShipments().get(0).getCancellation().unconfirmed());
 
         // when
@@ -583,7 +583,7 @@ class OrderPageModelFactoryTest {
         // given
         Order order = order(OrderStatus.Shipping);
         labelled(order.getShipments().get(0), "T-1", "PKG-1");
-        order.getShipments().get(0).setCancellation(ShipmentCancellation.pending("cmd-1", LocalDateTime.now().minusMinutes(2)));
+        order.getShipments().get(0).setCancellation(CourierCancellation.pending("cmd-1", LocalDateTime.now().minusMinutes(2)));
         order.getShipments().get(0).setCancellation(order.getShipments().get(0).getCancellation().failed());
 
         // when
@@ -619,7 +619,7 @@ class OrderPageModelFactoryTest {
         // given: the super admin page has no route to the store's polling endpoint
         Order order = order(OrderStatus.Shipping);
         labelled(order.getShipments().get(0), "T-1", "PKG-1");
-        order.getShipments().get(0).setCancellation(ShipmentCancellation.pending("cmd-1", LocalDateTime.now()));
+        order.getShipments().get(0).setCancellation(CourierCancellation.pending("cmd-1", LocalDateTime.now()));
 
         // when
         OrderPageModel.ShipmentsCard card = factory.build(order, List.of(),
@@ -636,7 +636,7 @@ class OrderPageModelFactoryTest {
         Order order = order(OrderStatus.Shipping);
         Shipment shipment = order.getShipments().get(0);
         labelled(shipment, "T-1", "PKG-1");
-        shipment.setCancellation(ShipmentCancellation.pending("cmd-1", LocalDateTime.now().minusMinutes(2)));
+        shipment.setCancellation(CourierCancellation.pending("cmd-1", LocalDateTime.now().minusMinutes(2)));
         shipment.setCancellation(shipment.getCancellation().failed());
         shipment.setDeliveredAt(LocalDateTime.now());
 

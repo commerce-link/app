@@ -15,9 +15,10 @@ import java.util.Objects;
  * The last cancel command sent for a shipment's courier order and where it stands. A shipment without one has none;
  * a confirmed cancellation clears the shipment, so there is no "succeeded" state. The failure reason is not kept: it
  * is logged where the failure is written.
+ * <p>Treat it as immutable: transitions return new objects; the setters exist only for the DynamoDB mapper.
  */
 @DynamoDBDocument
-public class ShipmentCancellation {
+public class CourierCancellation {
 
     /** A PENDING command older than this has lost its check message: nothing will answer it any more. */
     public static final Duration STALE = Duration.ofMinutes(5);
@@ -32,27 +33,27 @@ public class ShipmentCancellation {
     private LocalDateTime requestedAt;
 
     // required by dynamodb
-    public ShipmentCancellation() {
+    public CourierCancellation() {
     }
 
-    private ShipmentCancellation(ShipmentCancellationStatus status, String commandId, LocalDateTime requestedAt) {
+    private CourierCancellation(ShipmentCancellationStatus status, String commandId, LocalDateTime requestedAt) {
         this.status = status;
         this.commandId = commandId;
         this.requestedAt = requestedAt;
     }
 
-    public static ShipmentCancellation pending(String commandId, LocalDateTime now) {
-        return new ShipmentCancellation(ShipmentCancellationStatus.PENDING, commandId, now);
+    public static CourierCancellation pending(String commandId, LocalDateTime now) {
+        return new CourierCancellation(ShipmentCancellationStatus.PENDING, commandId, now);
     }
 
     /** The same command, refused by the provider. A copy, so a remembered earlier state stays as it was. */
-    public ShipmentCancellation failed() {
-        return new ShipmentCancellation(ShipmentCancellationStatus.FAILED, commandId, requestedAt);
+    public CourierCancellation failed() {
+        return new CourierCancellation(ShipmentCancellationStatus.FAILED, commandId, requestedAt);
     }
 
     /** The same command, its result unknown after the checks ran out. A copy, like failed(). */
-    public ShipmentCancellation unconfirmed() {
-        return new ShipmentCancellation(ShipmentCancellationStatus.UNCONFIRMED, commandId, requestedAt);
+    public CourierCancellation unconfirmed() {
+        return new CourierCancellation(ShipmentCancellationStatus.UNCONFIRMED, commandId, requestedAt);
     }
 
     public ShipmentCancellationStatus getStatus() {
@@ -119,7 +120,7 @@ public class ShipmentCancellation {
         if (this == o) {
             return true;
         }
-        if (!(o instanceof ShipmentCancellation other)) {
+        if (!(o instanceof CourierCancellation other)) {
             return false;
         }
         return status == other.status && Objects.equals(commandId, other.commandId)
@@ -133,6 +134,6 @@ public class ShipmentCancellation {
 
     @Override
     public String toString() {
-        return "ShipmentCancellation{status=" + status + ", commandId=" + commandId + ", requestedAt=" + requestedAt + "}";
+        return "CourierCancellation{status=" + status + ", commandId=" + commandId + ", requestedAt=" + requestedAt + "}";
     }
 }

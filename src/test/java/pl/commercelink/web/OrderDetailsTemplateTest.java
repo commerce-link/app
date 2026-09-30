@@ -10,6 +10,7 @@ import pl.commercelink.inventory.deliveries.DropshipItemLookup;
 import pl.commercelink.inventory.supplier.SupplierChoice;
 import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.orders.BillingDetails;
+import pl.commercelink.orders.CourierCancellation;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
@@ -22,7 +23,6 @@ import pl.commercelink.orders.Payment;
 import pl.commercelink.orders.PaymentSource;
 import pl.commercelink.orders.PositionGroup;
 import pl.commercelink.orders.Shipment;
-import pl.commercelink.orders.ShipmentCancellation;
 import pl.commercelink.orders.ShipmentCarrierOptions;
 import pl.commercelink.orders.ShipmentTrackingStatus;
 import pl.commercelink.orders.ShipmentType;
@@ -586,7 +586,7 @@ class OrderDetailsTemplateTest {
         sent.setTrackingNo("T-1");
         sent.setShippedAt(java.time.LocalDateTime.now().minusHours(1));
         sent.setExternalId("EXT-1");
-        sent.setCancellation(ShipmentCancellation.pending("cmd-1", java.time.LocalDateTime.now()));
+        sent.setCancellation(CourierCancellation.pending("cmd-1", java.time.LocalDateTime.now()));
 
         // when
         String html = render(order, ADMIN);
@@ -612,7 +612,7 @@ class OrderDetailsTemplateTest {
         sent.setTrackingNo("T-1");
         sent.setShippedAt(java.time.LocalDateTime.now().minusHours(1));
         sent.setExternalId("EXT-1");
-        sent.setCancellation(ShipmentCancellation.pending("cmd-1", java.time.LocalDateTime.now().minusMinutes(1)));
+        sent.setCancellation(CourierCancellation.pending("cmd-1", java.time.LocalDateTime.now().minusMinutes(1)));
         sent.setCancellation(sent.getCancellation().failed());
 
         // when
