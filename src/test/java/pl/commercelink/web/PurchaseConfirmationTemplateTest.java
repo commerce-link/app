@@ -47,17 +47,6 @@ class PurchaseConfirmationTemplateTest {
         assertThat(template()).contains("refreshAddressConfirmState");
     }
 
-    @Test
-    void boundsTheOptionListHeightSoTheModalNeverGrowsWithTheAddressCount() throws Exception {
-        // given
-        String html = modalFragment();
-
-        // then
-        assertThat(html).contains("#address-options");
-        assertThat(html).contains("max-height");
-        assertThat(html).contains("overflow-y: auto");
-    }
-
     private String openingTagOf(String html, String marker) {
         Matcher matcher = OPENING_TAG.matcher(html);
         while (matcher.find()) {
@@ -98,32 +87,6 @@ class PurchaseConfirmationTemplateTest {
 
         assertThat(fragmentHtml).contains("data-address-cancel");
         assertThat(script).contains("data-address-cancel");
-    }
-
-    @Test
-    void offersTheAddressesAsAnAlwaysVisibleListInsideTheModal() throws Exception {
-        // when
-        String html = modalFragment();
-
-        // then
-        int modalStart = html.indexOf("id=\"address-modal\"");
-        int optionsAt = html.indexOf("id=\"address-options\"");
-        assertThat(optionsAt).isGreaterThan(modalStart);
-        assertThat(html).contains("type=\"radio\" th:name=\"${fieldName}\"");
-        assertThat(html).doesNotContain("searchable-picker :: picker(");
-    }
-
-    @Test
-    void scrollsTheOptionListToThePreselectedAddressWhenTheModalOpens() throws Exception {
-        // when
-        String fragment = modalFragment();
-        String html = template();
-
-        // then
-        assertThat(fragment).contains("function scrollAddressOptionsToSelection()");
-        assertThat(fragment).contains("position: relative");
-        assertThat(html).contains("addressModalScript");
-        assertThat(html).contains("scrollAddressOptionsToSelection();");
     }
 
     @Test

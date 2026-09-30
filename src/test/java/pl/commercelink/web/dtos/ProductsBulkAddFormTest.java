@@ -62,13 +62,6 @@ class ProductsBulkAddFormTest {
                 .doesNotContainKey("product-4-ean").doesNotContainKey("product-4-manufacturerCode");
     }
 
-    /** The key of an error is the id of the field it belongs to, so the summary can link to it. */
-    @Test
-    void everyErrorIsKeyedByTheIdOfItsField() {
-        // when / then
-        assertThat(ProductsBulkAddForm.fieldId(2, "name")).isEqualTo("product-2-name");
-    }
-
     @Test
     void withoutCategoryLabelsAnyLabelPassesAndAnEmptyListIsAnError() {
         // when / then

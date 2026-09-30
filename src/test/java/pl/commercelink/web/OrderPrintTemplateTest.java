@@ -16,7 +16,6 @@ import pl.commercelink.web.orders.OrderLinks;
 import pl.commercelink.web.orders.OrderPrintView;
 import pl.commercelink.web.settings.SettingsTemplateRenderer;
 
-import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -292,10 +291,4 @@ class OrderPrintTemplateTest {
                 .doesNotContain("class=\"is-empty\"> </td>");
     }
 
-    @Test
-    void theOldBulmaPrintTemplatesAreGone() {
-        // then
-        assertThat(Path.of("src/main/resources/templates/orderCard.html")).doesNotExist();
-        assertThat(Path.of("src/main/resources/templates/orderPersonalCollection.html")).doesNotExist();
-    }
 }

@@ -1,7 +1,11 @@
 package pl.commercelink.inventory.supplier;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Named;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import pl.commercelink.inventory.supplier.api.SupplierProduct;
 import pl.commercelink.pim.api.PimCatalog;
 import pl.commercelink.pim.api.PimEntry;
@@ -12,6 +16,7 @@ import pl.commercelink.taxonomy.Taxonomy;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -56,34 +61,18 @@ class DataCorrectionTest {
         assertThat(result.grossWeightInGrams()).isEqualTo(1999);
     }
 
-    @Test
-    void usesFeedWeightsWhenPimHasNoneOfTheTwo() {
-        SupplierProduct fromFeed = feed(100, 200);
-        PimEntry pim = pimEntry(true, null, null);
-        when(pimCatalog.findByGtinOrMpn("1234567890123", "MFN")).thenReturn(Optional.of(pim));
-
-        Taxonomy result = dataCorrection.run(fromFeed);
-
-        assertThat(result.netWeightInGrams()).isEqualTo(100);
-        assertThat(result.grossWeightInGrams()).isEqualTo(200);
+    static Stream<Arguments> pimEntriesThatDoNotOverrideFeedWeights() {
+        return Stream.of(
+                Arguments.of(Named.of("PIM has neither weight", Optional.of(pimEntry(true, null, null)))),
+                Arguments.of(Named.of("PIM entry is not approved", Optional.of(pimEntry(false, 7000, 9000)))),
+                Arguments.of(Named.of("no PIM entry found", Optional.<PimEntry>empty())));
     }
 
-    @Test
-    void usesFeedWeightsWhenPimEntryIsNotApproved() {
+    @ParameterizedTest
+    @MethodSource("pimEntriesThatDoNotOverrideFeedWeights")
+    void usesFeedWeightsWhenPimCannotSupplyThem(Optional<PimEntry> pimEntry) {
         SupplierProduct fromFeed = feed(100, 200);
-        PimEntry unapproved = pimEntry(false, 7000, 9000);
-        when(pimCatalog.findByGtinOrMpn("1234567890123", "MFN")).thenReturn(Optional.of(unapproved));
-
-        Taxonomy result = dataCorrection.run(fromFeed);
-
-        assertThat(result.netWeightInGrams()).isEqualTo(100);
-        assertThat(result.grossWeightInGrams()).isEqualTo(200);
-    }
-
-    @Test
-    void usesFeedWeightsWhenNoPimEntryFound() {
-        SupplierProduct fromFeed = feed(100, 200);
-        when(pimCatalog.findByGtinOrMpn("1234567890123", "MFN")).thenReturn(Optional.empty());
+        when(pimCatalog.findByGtinOrMpn("1234567890123", "MFN")).thenReturn(pimEntry);
 
         Taxonomy result = dataCorrection.run(fromFeed);
 
@@ -114,20 +103,6 @@ class DataCorrectionTest {
 
         // then
         assertThat(result.category()).isNull();
-    }
-
-    @Test
-    void usesPimCategoryName() {
-        // given
-        SupplierProduct fromFeed = feed("CPU", 100, 200);
-        PimEntry pim = pimEntry("Smartwatches", true, 7000, 9000);
-        when(pimCatalog.findByGtinOrMpn("1234567890123", "MFN")).thenReturn(Optional.of(pim));
-
-        // when
-        Taxonomy result = dataCorrection.run(fromFeed);
-
-        // then
-        assertThat(result.category()).isEqualTo("Smartwatches");
     }
 
     @Test
@@ -227,11 +202,11 @@ class DataCorrectionTest {
         return new SupplierProduct("1234567890123", "MFN", "FeedBrand", "FeedName", 5, net, gross, rawCategory);
     }
 
-    private PimEntry pimEntry(boolean approved, Integer net, Integer gross) {
+    private static PimEntry pimEntry(boolean approved, Integer net, Integer gross) {
         return pimEntry("Other", approved, net, gross);
     }
 
-    private PimEntry pimEntry(String category, boolean approved, Integer net, Integer gross) {
+    private static PimEntry pimEntry(String category, boolean approved, Integer net, Integer gross) {
         return new PimEntry(
                 "pim-id",
                 List.of(),

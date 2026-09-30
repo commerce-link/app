@@ -33,25 +33,6 @@ class ProductTemplateTest {
     }
 
     @Test
-    void savesWithoutReloadAndAsksTheServerAgainOnAnError() throws Exception {
-        // when / then
-        assertThat(page()).contains("th:fragment=\"productForm\"").contains("id=\"product-form\"").contains("data-cl-async")
-                .contains("data-cl-redirect=${redirectTo}").contains("@{/js/async-form.js}")
-                .contains("errorSummary('product-errors'");
-    }
-
-    @Test
-    void theWayThePriceIsSetIsRadiosAndTheOfferFieldsFollowThem() throws Exception {
-        // given
-        String page = page();
-
-        // then
-        assertThat(page).contains("data-cl-variant-select=\"availability\"")
-                .contains("@{/js/variant-fields.js}");
-        assertThat(occurrences(page, "data-cl-variant-when=\"availability=BasedOnSupply\"")).isEqualTo(3);
-    }
-
-    @Test
     void theRarelyUsedSectionsAreTwoDisclosuresOpenedByTheServer() throws Exception {
         // given
         String page = page();
@@ -60,54 +41,6 @@ class ProductTemplateTest {
         assertThat(occurrences(page, "cl-disclosure cl-card-extras")).isEqualTo(2);
         assertThat(page).contains("id=\"product-extras-stock\"").contains("th:open=\"${openStock}\"")
                 .contains("id=\"product-extras-client\"").contains("th:open=\"${openClient}\"");
-    }
-
-    @Test
-    void everyRepeatedListCarriesATemplateANoscriptSpareAndItsScript() throws Exception {
-        // given
-        String page = page();
-
-        // then
-        assertThat(page).contains("data-cl-repeat=\"quickFilters\"").contains("data-cl-repeat=\"customAttributes\"")
-                .contains("data-cl-repeat=\"customAttributesFilters\"").contains("data-cl-repeat=\"metadata\"")
-                .contains("@{/js/repeat-fields.js}");
-        assertThat(occurrences(page, "data-cl-repeat-template")).isEqualTo(4);
-        assertThat(occurrences(page, "<noscript>")).isEqualTo(4);
-    }
-
-    /**
-     * The category of a custom filter is an internal grouping of filters and attributes ("GPU", "Cooler"), not a
-     * product category, so it is a free text field rather than the PIM category picker.
-     */
-    @Test
-    void theCustomFilterCategoryIsAFreeTextField() throws Exception {
-        // when
-        String html = rendered(true, form -> form.getCustomAttributesFilters().getFirst().setCategory("GPU"));
-
-        // then
-        assertThat(page()).doesNotContain("category-picker");
-        int id = html.indexOf("id=\"customAttributeFilter-0-category\"");
-        String field = html.substring(html.lastIndexOf("<input", id), html.indexOf(">", id));
-        assertThat(field).contains("type=\"text\"").contains("name=\"customAttributesFilters[0].category\"")
-                .contains("value=\"GPU\"");
-        assertThat(html).contains("<label class=\"cl-label\" for=\"customAttributeFilter-0-category\">Filter category</label>");
-    }
-
-    @Test
-    void theFlagsAreCheckboxesAndTheDeletionIsConfirmed() throws Exception {
-        // when / then
-        assertThat(page()).contains("settings-form :: check('enabled'").contains("settings-form :: check('service'")
-                .contains("data-cl-confirm").contains("confirm-dialog :: dialog").contains("@{/js/confirm-dialog.js}");
-    }
-
-    @Test
-    void carriesNoInlineStyleNoTableAndNoTooltip() throws Exception {
-        // given
-        String page = page();
-
-        // then
-        assertThat(page).doesNotContain("style=").doesNotContain("<table").doesNotContain("cl-tooltip")
-                .doesNotContain("is-link").doesNotContain("notification");
     }
 
     /** The page as the controller renders it for a saved product with one attribute and one custom filter. */

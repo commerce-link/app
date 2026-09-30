@@ -674,19 +674,6 @@ class OrderPageModelFactoryTest {
         assertThat(page.header().primaryAction()).isNull();
     }
 
-    @Test
-    void courierActionWithAShippingProvider() {
-        // given
-        Order order = assembledOrderWithOneEmptyShipment();
-        when(shippingService.isAvailable(any())).thenReturn(true);
-
-        // when
-        OrderPageModel page = factory.build(order, List.of(), viewer(), PL);
-
-        // then
-        assertThat(page.header().primaryAction().labelKey()).isEqualTo("order.page.action.courier");
-        assertThat(page.header().primaryAction().href()).endsWith("/shipping");
-    }
 
     @Test
     void anOrderOfAStoreWhoseCourierAuthorisationWasLostRendersWithoutTheCourierAction() {

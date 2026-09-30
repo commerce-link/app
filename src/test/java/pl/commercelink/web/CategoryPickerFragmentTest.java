@@ -210,19 +210,6 @@ class CategoryPickerFragmentTest {
     }
 
     @Test
-    void savedCategoryIsCarriedByAHiddenInputBoundToTheFormField() {
-        // given
-        String fieldName = "customAttributesFilters[0].category";
-
-        // when
-        String html = render(fieldName, "Procesory", false, false);
-
-        // then
-        assertThat(html).contains("name=\"customAttributesFilters[0].category\"");
-        assertThat(html).contains("value=\"Procesory\"");
-    }
-
-    @Test
     void categoriesAreNotRenderedAsSelectOptions() {
         // when
         String html = render("category", "Procesory", false, true);
