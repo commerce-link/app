@@ -95,7 +95,7 @@ class PendingDeliveriesRenderingTest {
         String html = fragment(model(Kind.DROPSHIP, List.of(approval), null, false, List.of()));
 
         // then
-        assertThat(html).containsPattern(">1de57483</a><span class=\"cl-status is-info\">Z akceptacją</span>");
+        assertThat(html).containsPattern("<span class=\"cl-card-key\"><a class=\"cl-row-number\"[^>]*>1de57483</a><span class=\"cl-status is-info\">Z akceptacją</span></span>");
     }
 
     @Test
