@@ -346,7 +346,7 @@ class OrderDetailsTemplateTest {
     }
 
     @Test
-    void theDeliveryStandsOnTheLineOfTheItemStatePill() {
+    void theDeliveryStandsUnderTheItemStatePill() {
         // given
         Order order = order(OrderStatus.Assembly);
         OrderItem ordered = inDelivery(order, "delivery-9", FulfilmentStatus.Ordered);
@@ -354,9 +354,11 @@ class OrderDetailsTemplateTest {
         // when
         String html = page(render(order, List.of(ordered), ADMIN, Set.of()));
 
-        // then: one flex line holds the pill and the delivery, which wraps under the pill only when out of room (CSS)
-        assertThat(html).containsPattern("<td class=\"cl-table-fulfilment\" data-label=\"Stan\">\\s*<div class=\"cl-table-state\">"
-                + "\\s*<span class=\"cl-status[^\"]*\">Zamówiony</span>\\s*<span class=\"cl-table-sub\">");
+        // then: the delivery is the cell's second line, under the pill (client request 2026-09-30: the number beside the
+        // pill read worse than under it)
+        assertThat(html).containsPattern("<td class=\"cl-table-fulfilment\" data-label=\"Stan\">"
+                + "\\s*<span class=\"cl-status[^\"]*\">Zamówiony</span>\\s*<span class=\"cl-table-sub\">")
+                .doesNotContain("cl-table-state");
     }
 
     @Test

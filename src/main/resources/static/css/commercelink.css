@@ -6042,8 +6042,8 @@ a.cl-link-button:hover {
 /* Column widths of the order items table (fixed layout) */
 .cl-page .cl-table col.cl-col-check { width: 44px; }
 .cl-page .cl-table col.cl-col-price { width: 128px; }
-/* the state pill with the delivery beside it ("Skompletowany b58e2f14") */
-.cl-page .cl-table col.cl-col-state { width: 208px; }
+/* fits the longest usual state pill ("Skompletowany", "Zarezerwowany": 124 px) plus the cell's 2 x 10 px padding */
+.cl-page .cl-table col.cl-col-state { width: 148px; }
 .cl-page .cl-table col.cl-col-menu { width: 56px; }
 /* A narrow yes/no column (a check mark or nothing), centred; its header may take two lines. As the last column
    (no menu: read-only order) it also carries the card's 20 px right edge. */
@@ -6053,7 +6053,7 @@ a.cl-link-button:hover {
 .cl-page .cl-table thead th.cl-table-flag { white-space: normal; line-height: 1.25; }
 .cl-page .cl-table .cl-table-flag-mark { color: var(--cl-ok); font-weight: 600; }
 
-/* The fulfilment-status pill in the 130 px state column: every normal label ("Nowy", "W alokacji", "Zamówiony"...)
+/* The fulfilment-status pill in the 148 px state column: every normal label ("Nowy", "W alokacji", "Zamówiony"...)
    still fits on one line; only the rare longest one ("W serwisie zewnętrznym") wraps inside the pill instead of
    overflowing the cell. align-items switches to flex-start so the dot stays pinned to the first line instead of
    drifting to the vertical centre of both lines, with a matching top offset so it still reads level with that line. */
@@ -6064,22 +6064,6 @@ a.cl-link-button:hover {
 
 .cl-page .cl-table .cl-table-fulfilment .cl-status::before {
     margin-top: 6px;
-}
-
-/* The delivery stands on the pill's line and wraps under it only when the two do not fit (a narrow window, a long
-   supplier name). Scoped to td.cl-table-fulfilment to outweigh the phone card rule that indents .cl-table-sub. */
-.cl-page .cl-table td.cl-table-fulfilment .cl-table-state {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 2px var(--cl-gap-related);
-    min-width: 0;
-}
-
-.cl-page .cl-table td.cl-table-fulfilment .cl-table-state > .cl-table-sub {
-    display: inline;
-    margin: 0;
-    min-width: 0;
 }
 
 /* .cl-page .cl-table .cl-table-sub .cl-status and .cl-page .cl-table .cl-table-pills already style every .cl-table
