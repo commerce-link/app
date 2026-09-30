@@ -551,8 +551,9 @@ class CatalogScriptContractTest {
                 + ".cl-page .cl-card > .cl-visually-hidden:first-child + [data-cl-table-filter] > .cl-table-toolbar:first-child"))
                 .contains("padding-top: 14px;");
         assertThat(rule(css, ".cl-page .cl-table td.cl-table-actions .cl-link-button")).contains("margin-block: -12px;");
-        // a read-only field of a catalog form (the codes of a product the PIM knows, its brand) looks read-only
-        assertThat(rule(css, ".cl-page .cl-form .cl-input[readonly]")).contains("background: var(--cl-surface-2);")
+        // a read-only field (the codes of a product the PIM knows, its brand, the expected amount of "Dodaj wpłatę",
+        // whose form is not a .cl-form) looks read-only
+        assertThat(rule(css, ".cl-page .cl-input[readonly]")).contains("background: var(--cl-surface-2);")
                 .contains("color: var(--cl-ink-2);");
         // a pill that opens the line under a page title starts where the title does
         assertThat(rule(css, ".cl-page .cl-page-lead .cl-status.is-leading")).contains("margin-left: 0;");

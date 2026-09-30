@@ -1632,17 +1632,21 @@ public class OrdersController extends BaseController {
                              Locale locale) {
         Order existingOrder = requireOrder(ordersRepository, getStoreId(), orderId);
 
-        if (form.getBankAmount() == 0) {
-            return refuse(redirectAttributes, orderId, "error.message.payment.amount.invalid", locale);
+        String invalid = form.validate();
+        if (invalid != null) {
+            return refuse(redirectAttributes, orderId, invalid, locale);
         }
-
-        if (form.getProcessingFee() < 0) {
-            return refuse(redirectAttributes, orderId, "error.message.payment.fee.invalid", locale);
+        PaymentDirection direction = form.getDirection() != null ? form.getDirection() : PaymentDirection.Incoming;
+        // the sign follows the direction, as in a payment's own dialog: a refund is stored negative however it was
+        // typed, and money that came in cannot be negative
+        if (direction == PaymentDirection.Incoming && form.amount() < 0) {
+            return refuse(redirectAttributes, orderId, "order.payments.error.negative", locale);
         }
+        double bankAmount = direction == PaymentDirection.Outgoing ? -Math.abs(form.amount()) : form.amount();
 
         double amount = form.isFeeIncluded()
-                ? form.getBankAmount()
-                : form.getBankAmount() + form.getProcessingFee();
+                ? bankAmount
+                : bankAmount + form.fee();
 
         Payment target = existingOrder.getPayments().stream()
                 .filter(Payment::isUnsettled)
@@ -1654,11 +1658,11 @@ public class OrdersController extends BaseController {
                 });
 
         target.setSource(form.getSource());
-        target.setDirection(form.getDirection() != null ? form.getDirection() : PaymentDirection.Incoming);
+        target.setDirection(direction);
         target.setReferenceNo(form.getReferenceNo());
         target.setName(form.getName());
         target.setAmount(amount);
-        target.setFee(form.getProcessingFee());
+        target.setFee(form.fee());
         target.setBankTransactionNo(form.getBankTransactionNo());
         target.setBankTransactionDate(form.getBankTransactionDate());
 
@@ -1674,8 +1678,9 @@ public class OrdersController extends BaseController {
                               RedirectAttributes redirectAttributes, Locale locale) {
         Order order = requireOrder(ordersRepository, getStoreId(), orderId);
         int index = paymentIndex(order, key);
-        if (order.getStatus() == OrderStatus.Cancelled) {
-            return refuse(redirectAttributes, orderId, "order.payments.error.cancelled", locale);
+        // the card offers no "Edit" on a closed order
+        if (order.isClosed()) {
+            return refuse(redirectAttributes, orderId, closedPaymentsKey(order), locale);
         }
         return paymentPage(order, OrderPaymentForm.of(orderId, index, order.getPayments().get(index)), model);
     }
@@ -1705,10 +1710,9 @@ public class OrdersController extends BaseController {
         List<Payment> current = existingOrder.getPayments() == null ? List.of() : existingOrder.getPayments();
         boolean known = index >= 0 && index < current.size();
         OrderPaymentForm posted = new OrderPaymentForm(orderId, index, version, known && current.get(index).isUnsettled(),
-                source, name, amount, fee, referenceNo, bankTransactionNo, bankTransactionDate, null, null);
-        // a completed order takes the save, like addPayment (decision of 2026-09-27: a refund or a correction on it is
-        // legitimate); a cancelled one is refused, because OrderLifecycle.update would drop the save without a word
-        String refusal = existingOrder.getStatus() == OrderStatus.Cancelled ? "order.payments.error.cancelled"
+                known && OrderPaymentForm.isRefund(current.get(index)), source, name, amount, fee, referenceNo,
+                bankTransactionNo, bankTransactionDate, null, null);
+        String refusal = existingOrder.isClosed() ? closedPaymentsKey(existingOrder)
                 : !known || !OrderPaymentForm.version(current.get(index)).equals(version) ? "order.payments.error.stale"
                 : null;
         if (refusal != null) {
@@ -1799,10 +1803,21 @@ public class OrdersController extends BaseController {
         throw new ResponseStatusException(HttpStatus.NOT_FOUND);
     }
 
-    /** A completed order takes the removal, a cancelled one would drop it: see savePayment. */
+    /**
+     * Payments of a closed order are not edited or removed, as its shipments are not: the card offers neither action,
+     * and a cancelled order would lose the save anyway (OrderLifecycle.update does not persist it). This replaces the
+     * decision of 2026-09-27 that let a completed order take the change (review 2, R-27); "Dodaj wpłatę" is not
+     * refused here.
+     */
+    private static String closedPaymentsKey(Order order) {
+        return order.getStatus() == OrderStatus.Cancelled ? "order.payments.error.cancelled"
+                : "order.payments.error.closed";
+    }
+
+    /** A closed order refuses the removal (see closedPaymentsKey), and so does a payment changed meanwhile. */
     private static String removePaymentRefusal(Order order, int index, String version) {
-        if (order.getStatus() == OrderStatus.Cancelled) {
-            return "order.payments.error.cancelled";
+        if (order.isClosed()) {
+            return closedPaymentsKey(order);
         }
         List<Payment> payments = order.getPayments() == null ? List.of() : order.getPayments();
         if (index < 0 || index >= payments.size() || !OrderPaymentForm.version(payments.get(index)).equals(version)) {

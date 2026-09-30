@@ -21,7 +21,6 @@ import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrderReviewStatus;
 import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.Payment;
-import pl.commercelink.orders.PaymentDirection;
 import pl.commercelink.orders.PaymentSource;
 import pl.commercelink.orders.PositionGroup;
 import pl.commercelink.orders.Shipment;
@@ -609,10 +608,10 @@ public class OrderPageModelFactory {
         for (int i = 0; i < payments.size(); i++) {
             Payment p = payments.get(i);
             OrderPaymentForm form = OrderPaymentForm.of(order.getOrderId(), i, p);
-            boolean refund = p.getDirection() == PaymentDirection.Outgoing;
-            // a refund is typed with either sign (the dialog asks for a minus, supplier payouts are stored
-            // positive); the page shows one minus whichever way it was saved
-            double shown = refund ? -Math.abs(p.getAmount()) : p.getAmount();
+            boolean refund = OrderPaymentForm.isRefund(p);
+            // the row shows what "Wpłacono" counts: a refund saved positive by older code shows as the payment it is
+            // counted as, not with a minus the totals do not have
+            double shown = p.getAppliedAmount();
             String locked = removePaymentLockedKey(order, i);
             rows.add(new OrderPageModel.PaymentRow(i + 1, Money.format(shown), refund, p.isUnsettled(),
                     OrderLabels.paymentSource(p.getSource()), p.getName(), p.getReferenceNo(),

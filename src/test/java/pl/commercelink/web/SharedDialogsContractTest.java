@@ -81,6 +81,22 @@ class SharedDialogsContractTest {
     }
 
     @Test
+    void theAddPaymentAmountsAreTextTheFocusStartsOnTheAmountAndTheHelpFollowsTheMode() {
+        // when
+        String html = SettingsTemplateRenderer.render(
+                "<div th:replace=\"~{fragments/add-payment-modal :: addPaymentModal('', 0, ${null}, ${paymentSources}, true)}\"></div>",
+                paymentVariables());
+
+        // then: a number field let WebKit with en-US read "149,99" as 14999
+        assertThat(html).containsPattern("<input class=\"cl-input\" type=\"text\" inputmode=\"decimal\" autocomplete=\"off\" required autofocus\\s+id=\"addPaymentBankAmount\"")
+                .containsPattern("type=\"text\" inputmode=\"decimal\" autocomplete=\"off\" id=\"addPaymentProcessingFee\"")
+                .containsPattern("type=\"text\" readonly id=\"addPaymentExpected\"")
+                .doesNotContain("type=\"number\"").doesNotContain("step=")
+                .contains("data-help-order=\"Przychodząca = wpłata od klienta. Wychodząca = zwrot do klienta. Kwotę wpisz bez znaku.\"")
+                .contains("data-help-delivery=\"Przychodząca = wpłata od klienta / od dystrybutora.");
+    }
+
+    @Test
     void theAddPaymentDialogSkipsMoneyJsOnlyWhenToldTo() {
         // given: the order details page includes this fragment next to fragments/item-add-modal.html,
         // which already loads money.js -- loading it twice would run its IIFE twice, so that one caller passes

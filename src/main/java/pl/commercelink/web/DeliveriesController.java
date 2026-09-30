@@ -232,15 +232,10 @@ public class DeliveriesController {
             return redirectTarget;
         }
 
-        if (form.getBankAmount() == 0) {
-            redirectAttributes.addFlashAttribute("errorMessage",
-                    messageSource.getMessage("error.message.payment.amount.invalid", null, locale));
-            return redirectTarget;
-        }
-
-        if (form.getProcessingFee() < 0) {
-            redirectAttributes.addFlashAttribute("errorMessage",
-                    messageSource.getMessage("error.message.payment.fee.invalid", null, locale));
+        // a delivery keeps its sign as typed: a payout to the supplier is stored positive
+        String invalid = form.validate();
+        if (invalid != null) {
+            redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage(invalid, null, locale));
             return redirectTarget;
         }
 
@@ -257,8 +252,8 @@ public class DeliveriesController {
         target.setDirection(form.getDirection() != null ? form.getDirection() : PaymentDirection.Outgoing);
         target.setReferenceNo(form.getReferenceNo());
         target.setName(form.getName());
-        target.setAmount(form.getBankAmount());
-        target.setFee(form.getProcessingFee());
+        target.setAmount(form.amount());
+        target.setFee(form.fee());
         target.setBankTransactionNo(form.getBankTransactionNo());
         target.setBankTransactionDate(form.getBankTransactionDate());
 

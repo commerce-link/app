@@ -116,8 +116,8 @@
                 </p>
             </div>
             <div class="cl-span-3" th:insert="~{orders/details/payments :: field(${payment}, 'name', 'payments.source.name', 'text', ${payment.name()})}"></div>
-            <div class="cl-span-3" th:insert="~{orders/details/payments :: field(${payment}, 'amount', 'order.payment.amount', 'number', ${payment.amount()})}"></div>
-            <div class="cl-span-3" th:insert="~{orders/details/payments :: field(${payment}, 'fee', 'order.payment.processing.fee', 'number', ${payment.fee()})}"></div>
+            <div class="cl-span-3" th:insert="~{orders/details/payments :: field(${payment}, 'amount', ${payment.amountLabelKey()}, 'amount', ${payment.amount()})}"></div>
+            <div class="cl-span-3" th:insert="~{orders/details/payments :: field(${payment}, 'fee', 'order.payment.processing.fee', 'amount', ${payment.fee()})}"></div>
             <div class="cl-span-3" th:insert="~{orders/details/payments :: field(${payment}, 'referenceNo', 'order.payment.reference.no', 'text', ${payment.referenceNo()})}"></div>
             <div class="cl-span-3" th:insert="~{orders/details/payments :: field(${payment}, 'bankTransactionNo', 'order.payment.bank.transaction.no', 'text', ${payment.bankTransactionNo()})}"></div>
             <div class="cl-span-3" th:insert="~{orders/details/payments :: field(${payment}, 'bankTransactionDate', 'order.payment.bank.transaction.date', 'date', ${payment.bankTransactionDate()})}"></div>
@@ -133,13 +133,14 @@
 </form>
 
 <!--/* A labelled field of the payment form: the id carries the form's key (several dialogs on one page), the posted
-       name is the property alone. An amount is a number field with two decimals, typed with either a comma or a dot. */-->
+       name is the property alone. An amount (type 'amount') is a text field with the decimal keypad, read on the server
+       (AmountParser) with either a comma or a dot: a number field let WebKit with en-US read "149,99" as 14999. */-->
 <div th:fragment="field(payment, property, labelKey, type, value)" class="cl-field"
-     th:with="id=${payment.field(property)}, error=${payment.error(property)}, amount=${type == 'number'}">
+     th:with="id=${payment.field(property)}, error=${payment.error(property)}, amount=${type == 'amount'}">
     <label class="cl-label" th:for="${id}" th:text="#{${labelKey}}"></label>
-    <input class="cl-input" autocomplete="off" th:type="${type}" th:id="${id}" th:name="${property}"
+    <input class="cl-input" autocomplete="off" th:type="${amount ? 'text' : type}" th:id="${id}" th:name="${property}"
            th:value="${value}" th:classappend="${error != null} ? 'is-invalid'"
-           th:attr="step=${amount ? '0.01' : null}, inputmode=${amount ? 'decimal' : null},
+           th:attr="inputmode=${amount ? 'decimal' : null},
                     aria-invalid=${error != null ? 'true' : null}, aria-describedby=${error != null ? id + '-error' : null}">
     <p th:if="${error != null}" class="cl-field-error" th:id="${id} + '-error'">
         <i class="fas fa-exclamation-circle" aria-hidden="true"></i>

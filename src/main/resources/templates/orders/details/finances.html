@@ -10,8 +10,9 @@
         <dl class="cl-kv is-column">
             <div class="cl-kv-total"><dt th:text="#{order.finances.total}"></dt><dd class="is-numeric" th:text="#{general.currency.amount(${f.total()})}"></dd></div>
             <div><dt th:text="#{order.finances.paid}"></dt><dd class="is-numeric" th:text="#{general.currency.amount(${f.paid()})}"></dd></div>
-            <div><dt th:text="#{order.finances.unpaid}"></dt><dd class="is-numeric" th:classappend="${f.unpaidDue()} ? 'is-bad' : ''"
-                                                              th:text="#{general.currency.amount(${f.unpaid()})}"></dd></div>
+            <div><dt th:text="${f.overpaid()} ? #{order.finances.overpaid} : #{order.finances.unpaid}"></dt>
+                <dd class="is-numeric" th:classappend="${f.unpaidDue()} ? 'is-bad' : ''"
+                    th:text="#{general.currency.amount(${f.unpaid()})}"></dd></div>
         </dl>
         <details class="cl-disclosure" id="finances-costs">
             <summary th:text="#{order.finances.costs}"></summary>

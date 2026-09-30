@@ -22,28 +22,42 @@ import java.util.Objects;
  * add-payment dialog) fills the pending payment first, which this form cannot do.
  * <p>
  * pending tells whether the stored payment is the one the order waits for (Payment.isUnsettled, amount 0): it may keep
- * the amount 0 and stay pending, while a settled payment needs an amount other than 0. The amounts are posted as typed,
- * so "149,99" is read as well as "149.99". The sign is stored as typed too: a refund is typed with a minus in "Dodaj
- * wpłatę", supplier payouts are stored positive, and the page shows one minus either way. The direction is not a field:
- * a refund stays a refund.
+ * the amount 0 and stay pending, while a settled payment needs an amount other than 0. The amounts are text fields read
+ * by {@link AmountParser}, so "149,99" is read as well as "149.99" whatever the browser's language.
+ * <p>
+ * refund tells whether the stored payment goes out to the customer (PaymentDirection.Outgoing). The direction is not a
+ * field: a refund stays a refund. The amount field never carries the sign: a refund shows its amount without the minus
+ * and is stored negative whichever way it was typed, so the order counts it (Payment#getAppliedAmount) as money that
+ * went back; a payment that came in cannot be negative. A refund stored positive by older code is shown without a sign
+ * too and is stored negative once its dialog is saved.
  */
-public record OrderPaymentForm(String orderId, int index, String version, boolean pending, PaymentSource source,
-                               String name, String amount, String fee, String referenceNo, String bankTransactionNo,
-                               String bankTransactionDate, Map<String, String> errors, String refusal) {
-
-    private static final BigDecimal ZERO = BigDecimal.ZERO.setScale(2);
-    private static final BigDecimal LIMIT = BigDecimal.valueOf(10_000_000);
+public record OrderPaymentForm(String orderId, int index, String version, boolean pending, boolean refund,
+                               PaymentSource source, String name, String amount, String fee, String referenceNo,
+                               String bankTransactionNo, String bankTransactionDate, Map<String, String> errors,
+                               String refusal) {
 
     public OrderPaymentForm {
         errors = errors != null ? errors : Map.of();
     }
 
     public static OrderPaymentForm of(String orderId, int index, Payment payment) {
-        return new OrderPaymentForm(orderId, index, version(payment), payment.isUnsettled(), payment.getSource(),
-                payment.getName(), plain(payment.getAmount()), payment.getFee() == 0 ? null : plain(payment.getFee()),
+        boolean refund = isRefund(payment);
+        return new OrderPaymentForm(orderId, index, version(payment), payment.isUnsettled(), refund, payment.getSource(),
+                payment.getName(), plain(refund ? Math.abs(payment.getAmount()) : payment.getAmount()),
+                payment.getFee() == 0 ? null : plain(payment.getFee()),
                 payment.getReferenceNo(), payment.getBankTransactionNo(),
                 payment.getBankTransactionDate() == null ? null : payment.getBankTransactionDate().toString(),
                 Map.of(), null);
+    }
+
+    /** Whether the payment went back to the customer: its amount field carries no sign and it is stored negative. */
+    public static boolean isRefund(Payment payment) {
+        return payment.getDirection() == PaymentDirection.Outgoing;
+    }
+
+    /** The label of the amount field: a refund's amount says it is a refund, as the field has no minus. */
+    public String amountLabelKey() {
+        return refund ? "order.payments.refund.amount" : "order.payment.amount";
     }
 
     /** What an edit is checked against: every field the form shows. A blank text and no text are the same. */
@@ -92,19 +106,22 @@ public record OrderPaymentForm(String orderId, int index, String version, boolea
         if (source == null) {
             found.put(field("source"), "order.payments.error.source");
         }
-        BigDecimal typedAmount = parseAmount(amount);
+        BigDecimal typedAmount = AmountParser.parse(amount);
         if (typedAmount == null) {
             found.put(field("amount"), "order.payments.error.amount");
-        } else if (!inRange(typedAmount)) {
+        } else if (!AmountParser.inRange(typedAmount)) {
             found.put(field("amount"), "order.payments.error.range");
+        } else if (typedAmount.signum() < 0 && !refund) {
+            // a negative payment would count as a refund without saying so; a refund is added as one
+            found.put(field("amount"), "order.payments.error.negative");
         } else if (typedAmount.signum() == 0 && !pending) {
             // the rule of "Dodaj wpłatę": money that arrived is never 0; a payment entered by mistake is removed instead
             found.put(field("amount"), "order.payments.error.amount.zero");
         }
-        BigDecimal typedFee = parseAmount(fee);
+        BigDecimal typedFee = AmountParser.parse(fee);
         if (typedFee == null || typedFee.signum() < 0) {
             found.put(field("fee"), "order.payments.error.fee");
-        } else if (!inRange(typedFee)) {
+        } else if (!AmountParser.inRange(typedFee)) {
             found.put(field("fee"), "order.payments.error.range");
         }
         if (StringUtils.isNotBlank(bankTransactionDate) && parseDate(bankTransactionDate) == null) {
@@ -114,61 +131,28 @@ public record OrderPaymentForm(String orderId, int index, String version, boolea
     }
 
     /**
-     * The payment to store in place of saved: the posted fields over saved's direction. Call only after
-     * {@link #validate()} found nothing.
+     * The payment to store in place of saved: the posted fields over saved's direction, a refund's amount negative.
+     * Call only after {@link #validate()} found nothing.
      */
     public Payment toPayment(Payment saved) {
         PaymentDirection direction = saved.getDirection() != null ? saved.getDirection() : PaymentDirection.Incoming;
+        BigDecimal typedAmount = AmountParser.parse(amount);
+        double stored = direction == PaymentDirection.Outgoing ? typedAmount.abs().negate().doubleValue()
+                : typedAmount.doubleValue();
         return new Payment(StringUtils.trimToNull(referenceNo), StringUtils.trimToNull(name), source, direction,
-                parseAmount(amount).doubleValue(), parseAmount(fee).doubleValue(),
+                stored, AmountParser.parse(fee).doubleValue(),
                 StringUtils.trimToNull(bankTransactionNo), parseDate(bankTransactionDate));
     }
 
     public OrderPaymentForm withErrors(Map<String, String> found) {
-        return new OrderPaymentForm(orderId, index, version, pending, source, name, amount, fee, referenceNo,
+        return new OrderPaymentForm(orderId, index, version, pending, refund, source, name, amount, fee, referenceNo,
                 bankTransactionNo, bankTransactionDate, found, refusal);
     }
 
     /** A reason the whole form was refused (a cancelled order, a payment changed meanwhile), already translated. */
     public OrderPaymentForm withRefusal(String text) {
-        return new OrderPaymentForm(orderId, index, version, pending, source, name, amount, fee, referenceNo,
+        return new OrderPaymentForm(orderId, index, version, pending, refund, source, name, amount, fee, referenceNo,
                 bankTransactionNo, bankTransactionDate, errors, text);
-    }
-
-    /**
-     * The amount as it will be stored, to the grosz: "149,99", "149.99", "1 499,99", "-100"; a blank field is 0 (a
-     * cleared fee, the pending payment's amount); null for anything that is not a number. Validation checks this
-     * rounded value, so "0.001" counts as 0. A value far outside the range is returned unrounded: rounding
-     * "1e-999999999" or "1e999999999" to two decimals would build a number of a billion digits, and
-     * {@link #inRange} refuses the large one anyway.
-     */
-    static BigDecimal parseAmount(String value) {
-        if (StringUtils.isBlank(value)) {
-            return ZERO;
-        }
-        String typed = value.replaceAll("[\\s\\u00a0\\u202f]", "").replace(',', '.');
-        BigDecimal exact;
-        try {
-            exact = new BigDecimal(typed);
-        } catch (NumberFormatException e) {
-            return null;
-        }
-        if (exact.signum() == 0) {
-            return ZERO;
-        }
-        long exponent = (long) exact.precision() - exact.scale() - 1;
-        if (exponent < -3) {
-            return ZERO;
-        }
-        if (exponent > 8) {
-            return exact;
-        }
-        return exact.setScale(2, RoundingMode.HALF_UP);
-    }
-
-    /** Below 10 000 000 either way, and a finite double once stored. */
-    static boolean inRange(BigDecimal value) {
-        return value.abs().compareTo(LIMIT) < 0 && Double.isFinite(value.doubleValue());
     }
 
     private static LocalDate parseDate(String value) {
@@ -182,10 +166,7 @@ public record OrderPaymentForm(String orderId, int index, String version, boolea
         }
     }
 
-    /**
-     * The value of a number field: a dot and two decimals, whatever the page's language — the precision a save
-     * stores.
-     */
+    /** The value of an amount field: a dot and two decimals, whatever the page's language — the precision a save stores. */
     private static String plain(double value) {
         return BigDecimal.valueOf(value).setScale(2, RoundingMode.HALF_UP).toPlainString();
     }

@@ -18,18 +18,20 @@
                 <div class="cl-form-grid">
                     <div class="cl-span-3 cl-field">
                         <label class="cl-label" for="addPaymentExpected" th:text="#{order.payment.expected.amount}"></label>
+                        <!--/* shown, not typed: the read-only look (commercelink.css), the focus starts on the amount */-->
                         <input class="cl-input" type="text" readonly id="addPaymentExpected"
                                th:attr="data-value=${expectedAmount}" th:value="${#numbers.formatDecimal(expectedAmount, 1, 2)}">
                     </div>
                     <div class="cl-span-3 cl-field">
                         <label class="cl-label" for="addPaymentBankAmount" th:text="#{order.payment.bank.amount}"></label>
-                        <input class="cl-input" type="number" step="0.01" required id="addPaymentBankAmount" name="bankAmount"
-                               inputmode="decimal">
+                        <!--/* amounts are text read on the server (AmountParser), whatever the browser's language */-->
+                        <input class="cl-input" type="text" inputmode="decimal" autocomplete="off" required autofocus
+                               id="addPaymentBankAmount" name="bankAmount">
                     </div>
                     <div class="cl-span-3 cl-field">
                         <label class="cl-label" for="addPaymentProcessingFee" th:text="#{order.payment.processing.fee}"></label>
-                        <input class="cl-input" type="number" step="0.01" min="0" id="addPaymentProcessingFee" name="processingFee"
-                               inputmode="decimal"
+                        <input class="cl-input" type="text" inputmode="decimal" autocomplete="off" id="addPaymentProcessingFee"
+                               name="processingFee"
                                th:value="${pendingPayment != null and pendingPayment.fee > 0} ? ${pendingPayment.fee} : '0'">
                     </div>
                     <div class="cl-span-3 cl-field">
@@ -39,7 +41,9 @@
                             <option value="Outgoing" th:text="#{PaymentDirection.Outgoing}"></option>
                         </select>
                     </div>
-                    <p class="cl-span-6 cl-help" id="addPaymentDirectionHelp" th:text="#{order.payment.direction.help}"></p>
+                    <!--/* an order's refund is typed without a sign, a delivery keeps the sign as typed: the script swaps the text with the mode */-->
+                    <p class="cl-span-6 cl-help" id="addPaymentDirectionHelp" th:text="#{order.payment.direction.help}"
+                       th:attr="data-help-order=#{order.payment.direction.help}, data-help-delivery=#{delivery.payment.direction.help}"></p>
 
                     <div class="cl-span-6 cl-field" data-payment-mode="order">
                         <label class="cl-check">

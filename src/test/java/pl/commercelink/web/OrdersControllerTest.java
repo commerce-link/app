@@ -96,6 +96,7 @@ import pl.commercelink.web.orders.OrderNotice;
 import pl.commercelink.web.orders.OrderPageModel;
 import pl.commercelink.web.orders.OrderPageModelFactory;
 import pl.commercelink.web.orders.OrderSettingsView;
+import pl.commercelink.web.dtos.AddPaymentForm;
 import pl.commercelink.web.orders.OrderPaymentForm;
 import pl.commercelink.web.orders.OrderShipmentForm;
 import pl.commercelink.web.settings.ConfirmAction;
@@ -1038,8 +1039,8 @@ class OrdersControllerTest {
         }
 
         @Test
-        void aRefundKeepsItsDirectionAndTheSignItWasTypedWith() {
-            // given: the add dialog asks for a minus, supplier payouts are stored positive; neither is "fixed"
+        void aRefundKeepsItsDirectionAndIsStoredNegativeWhicheverSignWasTyped() {
+            // given: the field has no sign; a refund saved positive by older code is set right by its next save
             Payment typedNegative = new Payment("ZW/1", "Jan", PaymentSource.BankTransfer, PaymentDirection.Outgoing,
                     -100, 0, null, null);
             Payment storedPositive = new Payment("ZW/2", "Jan", PaymentSource.BankTransfer, PaymentDirection.Outgoing,
@@ -1053,7 +1054,75 @@ class OrdersControllerTest {
             // then
             assertThat(order.getPayments()).extracting(Payment::getDirection)
                     .containsExactly(PaymentDirection.Outgoing, PaymentDirection.Outgoing);
-            assertThat(order.getPayments()).extracting(Payment::getAmount).containsExactly(-120.0, 120.0);
+            assertThat(order.getPayments()).extracting(Payment::getAmount).containsExactly(-120.0, -120.0);
+        }
+
+        @Test
+        void aNegativeIncomingPaymentComesBackToTheDialogWith422() {
+            // given
+            Payment paid = Payment.bankTransfer("REF-1", "Jan", 100);
+            orderWith(paid);
+            MockHttpServletResponse response = new MockHttpServletResponse();
+            ExtendedModelMap model = new ExtendedModelMap();
+
+            // when
+            save(0, OrderPaymentForm.version(paid), PaymentSource.BankTransfer, "-10", "", null, "fetch", response, model);
+
+            // then
+            assertThat(response.getStatus()).isEqualTo(422);
+            assertThat(((OrderPaymentForm) model.getAttribute("payment")).errors())
+                    .containsEntry("payment-0-amount", "order.payments.error.negative");
+            assertThat(paid.getAmount()).isEqualTo(100);
+            verifyNoInteractions(orderLifecycle);
+        }
+
+        private AddPaymentForm addForm(String amount, String fee, PaymentDirection direction) {
+            AddPaymentForm form = new AddPaymentForm();
+            form.setBankAmount(amount);
+            form.setProcessingFee(fee);
+            form.setFeeIncluded(true);
+            form.setSource(PaymentSource.BankTransfer);
+            form.setDirection(direction);
+            return form;
+        }
+
+        @Test
+        void addPaymentReadsACommaAmount() {
+            // given
+            Order order = orderWith(new Payment(PaymentSource.BankTransfer));
+
+            // when
+            String view = ordersController.addPayment(ORDER_ID, addForm("1 499,99", "1,50", PaymentDirection.Incoming),
+                    redirect, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+            assertThat(errorMessage()).isNull();
+            assertThat(order.getPayments()).hasSize(1);
+            assertThat(order.getPayments().get(0).getAmount()).isEqualTo(1499.99);
+            assertThat(order.getPayments().get(0).getFee()).isEqualTo(1.5);
+            verify(orderLifecycle).update(order);
+        }
+
+        @Test
+        void addPaymentStoresARefundNegativeAndRefusesANegativeIncomingPaymentOrAThousandsDot() {
+            // given
+            Order order = orderWith(Payment.bankTransfer("REF-1", "Jan", 300));
+            RedirectAttributesModelMap negative = new RedirectAttributesModelMap();
+            RedirectAttributesModelMap thousands = new RedirectAttributesModelMap();
+
+            // when
+            ordersController.addPayment(ORDER_ID, addForm("50", "", PaymentDirection.Outgoing), redirect, Locale.ENGLISH);
+            ordersController.addPayment(ORDER_ID, addForm("-10", "", PaymentDirection.Incoming), negative, Locale.ENGLISH);
+            ordersController.addPayment(ORDER_ID, addForm("1.000,50", "", PaymentDirection.Incoming), thousands,
+                    Locale.ENGLISH);
+
+            // then
+            assertThat(order.getPayments()).extracting(Payment::getAmount).containsExactly(300.0, -50.0);
+            assertThat(order.getPaidAmount()).isEqualTo(250.0);
+            assertThat(negative.getFlashAttributes().get("errorMessage")).isEqualTo("order.payments.error.negative");
+            assertThat(thousands.getFlashAttributes().get("errorMessage")).isEqualTo("error.message.payment.amount.format");
+            verify(orderLifecycle, times(1)).update(order);
         }
 
         @Test
@@ -1154,8 +1223,57 @@ class OrdersControllerTest {
         }
 
         @Test
-        void aPaymentOfACompletedOrderCanStillBeSavedAndRemovedLikeWithAddPayment() {
-            // given: a refund or a correction on a completed order is legitimate (decision of 2026-09-27)
+        void editingAPaymentOfACompletedOrderIsRefused() {
+            // given: the card offers no "Edit" on a closed order, like the shipments card (review 2, R-27)
+            Payment paid = Payment.bankTransfer("REF-1", "Jan", 100);
+            Order order = orderWith(paid);
+            order.setStatus(OrderStatus.Completed);
+            MockHttpServletResponse response = new MockHttpServletResponse();
+            ExtendedModelMap model = new ExtendedModelMap();
+
+            // when
+            String view = save(0, OrderPaymentForm.version(paid), "150");
+            String asyncView = save(0, OrderPaymentForm.version(paid), PaymentSource.BankTransfer, "150", "", null,
+                    "fetch", response, model);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+            assertThat(errorMessage()).isEqualTo("order.payments.error.closed");
+            assertThat(asyncView).isEqualTo("orders/details/payments :: dialogForm");
+            assertThat(response.getStatus()).isEqualTo(422);
+            assertThat(((OrderPaymentForm) model.getAttribute("payment")).refusal()).isEqualTo("order.payments.error.closed");
+            assertThat(order.getPayments()).containsExactly(paid);
+            assertThat(paid.getAmount()).isEqualTo(100);
+            verifyNoInteractions(orderLifecycle);
+        }
+
+        @Test
+        void removingAPaymentOfACancelledOrderIsRefused() {
+            // given
+            Payment paid = Payment.bankTransfer("REF-1", "Jan", 100);
+            Payment second = Payment.bankTransfer("REF-2", "Jan", 50);
+            Order order = orderWith(paid, second);
+            order.setStatus(OrderStatus.Cancelled);
+            RedirectAttributesModelMap confirmation = new RedirectAttributesModelMap();
+
+            // when
+            String view = ordersController.removePayment(ORDER_ID, 1, OrderPaymentForm.version(second), redirect,
+                    Locale.ENGLISH);
+            String confirmView = ordersController.confirmRemovePayment(ORDER_ID, 1, OrderPaymentForm.version(second),
+                    new ExtendedModelMap(), confirmation, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+            assertThat(confirmView).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+            assertThat(errorMessage()).isEqualTo("order.payments.error.cancelled");
+            assertThat(confirmation.getFlashAttributes().get("errorMessage")).isEqualTo("order.payments.error.cancelled");
+            assertThat(order.getPayments()).containsExactly(paid, second);
+            verifyNoInteractions(orderLifecycle);
+        }
+
+        @Test
+        void thePaymentPageOfACompletedOrderRedirectsWithTheReason() {
+            // given
             Payment paid = Payment.bankTransfer("REF-1", "Jan", 100);
             Payment second = Payment.bankTransfer("REF-2", "Jan", 50);
             Order order = orderWith(paid, second);
@@ -1163,18 +1281,15 @@ class OrdersControllerTest {
             RedirectAttributesModelMap removal = new RedirectAttributesModelMap();
 
             // when
-            String view = save(0, OrderPaymentForm.version(paid), "150");
-            ordersController.removePayment(ORDER_ID, 1, OrderPaymentForm.version(second), removal, Locale.ENGLISH);
             String page = ordersController.showPayment(ORDER_ID, "0", new ExtendedModelMap(), redirect, Locale.ENGLISH);
+            ordersController.removePayment(ORDER_ID, 1, OrderPaymentForm.version(second), removal, Locale.ENGLISH);
 
             // then
-            assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
-            assertThat(errorMessage()).isNull();
-            assertThat(removal.getFlashAttributes()).doesNotContainKey("errorMessage");
-            assertThat(order.getPayments()).hasSize(1);
-            assertThat(order.getPayments().get(0).getAmount()).isEqualTo(150);
-            assertThat(page).isEqualTo("orders/payment");
-            verify(orderLifecycle, times(2)).update(order);
+            assertThat(page).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+            assertThat(errorMessage()).isEqualTo("order.payments.error.closed");
+            assertThat(removal.getFlashAttributes().get("errorMessage")).isEqualTo("order.payments.error.closed");
+            assertThat(order.getPayments()).containsExactly(paid, second);
+            verifyNoInteractions(orderLifecycle);
         }
 
         @Test

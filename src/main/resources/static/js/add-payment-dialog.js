@@ -4,7 +4,10 @@
 // includes the fee) or "delivery" (the surplus is the fee) and the default direction. The hint under the amounts says
 // what will be booked and whether it is a full, short or over payment; its words come from the dialog's data-hint-*.
 // Every amount goes through window.CL_formatMoney (money.js), which takes the unit from general.currency.amount, so
-// neither this script nor the order.payment.hint.* keys spell the currency.
+// neither this script nor the order.payment.hint.* keys spell the currency. The amount fields are text (the server
+// reads them with AmountParser), so amountOf reads "149,99" and "1 499,99" here the same way. An order's refund is
+// typed without a sign and the server stores it negative: the hint, which speaks of money that came in, stays empty
+// for it.
 (function () {
     'use strict';
 
@@ -22,6 +25,7 @@
     var directionEl = document.getElementById('addPaymentDirection');
     var sourceEl = document.getElementById('addPaymentSource');
     var hintEl = document.getElementById('addPaymentComputed');
+    var directionHelpEl = document.getElementById('addPaymentDirectionHelp');
     var TEXT_FIELDS = ['name', 'referenceNo', 'bankTransactionNo', 'bankTransactionDate'];
 
     function words(name, values) {
@@ -30,6 +34,12 @@
             text = text.replace('{' + index + '}', value);
         });
         return text;
+    }
+
+    function amountOf(field) {
+        var typed = (field.value || '').replace(/[\s\u00a0\u202f]/g, '').replace(',', '.');
+        var value = Number(typed);
+        return typed === '' || isNaN(value) ? 0 : value;
     }
 
     function toggleAddPaymentModal(show) {
@@ -58,6 +68,9 @@
             surplusEl.checked = false;
         }
         directionEl.value = mode === 'delivery' ? 'Outgoing' : 'Incoming';
+        if (directionHelpEl) {
+            directionHelpEl.textContent = directionHelpEl.getAttribute('data-help-' + mode) || directionHelpEl.textContent;
+        }
     }
 
     function isDeliveryMode() {
@@ -69,17 +82,17 @@
     }
 
     function applyFeeAutofill() {
-        feeEl.value = Math.max(0, expected() - (parseFloat(bankEl.value) || 0)).toFixed(2);
+        feeEl.value = Math.max(0, expected() - amountOf(bankEl)).toFixed(2);
     }
 
     function applyFeeFromSurplus() {
-        feeEl.value = Math.max(0, (parseFloat(bankEl.value) || 0) - expected()).toFixed(2);
+        feeEl.value = Math.max(0, amountOf(bankEl) - expected()).toFixed(2);
     }
 
     function renderHint() {
-        var bank = parseFloat(bankEl.value) || 0;
-        var fee = parseFloat(feeEl.value) || 0;
-        if (bank <= 0) {
+        var bank = amountOf(bankEl);
+        var fee = amountOf(feeEl);
+        if (bank <= 0 || (!isDeliveryMode() && directionEl.value === 'Outgoing')) {
             hintEl.textContent = '';
             return;
         }
@@ -197,6 +210,7 @@
         renderHint();
     });
     includedEl.addEventListener('change', renderHint);
+    directionEl.addEventListener('change', renderHint);
     if (surplusEl) {
         surplusEl.addEventListener('change', function () {
             if (surplusEl.checked) {

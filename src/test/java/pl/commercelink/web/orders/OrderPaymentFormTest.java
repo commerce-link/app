@@ -5,27 +5,69 @@ import pl.commercelink.orders.Payment;
 import pl.commercelink.orders.PaymentDirection;
 import pl.commercelink.orders.PaymentSource;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class OrderPaymentFormTest {
 
     private static OrderPaymentForm posted(boolean pending, String amount, String fee, String date) {
-        return new OrderPaymentForm("o-1", 1, "v", pending, PaymentSource.BankTransfer, " Jan ", amount, fee, "",
+        return posted(pending, false, amount, fee, date);
+    }
+
+    private static OrderPaymentForm posted(boolean pending, boolean refund, String amount, String fee, String date) {
+        return new OrderPaymentForm("o-1", 1, "v", pending, refund, PaymentSource.BankTransfer, " Jan ", amount, fee, "",
                 " OP-1 ", date, null, null);
     }
 
+    private static Payment refund(double amount) {
+        return new Payment("ZW/1", "Jan", PaymentSource.BankTransfer, PaymentDirection.Outgoing, amount, 0, null, null);
+    }
+
     @Test
-    void anAmountIsTypedWithACommaOrADotAndSpaces() {
+    void aNegativeIncomingPaymentIsAFieldError() {
+        // when
+        Map<String, String> found = posted(false, "-20", null, null).validate();
+
         // then
-        assertThat(OrderPaymentForm.parseAmount("149,99")).isEqualByComparingTo("149.99");
-        assertThat(OrderPaymentForm.parseAmount(" 1 499.50 ")).isEqualByComparingTo("1499.50");
-        assertThat(OrderPaymentForm.parseAmount("-100")).isEqualByComparingTo("-100");
-        assertThat(OrderPaymentForm.parseAmount("")).isEqualByComparingTo(BigDecimal.ZERO);
-        assertThat(OrderPaymentForm.parseAmount("sto")).isNull();
-        assertThat(OrderPaymentForm.parseAmount("1,2,3")).isNull();
+        assertThat(found).containsEntry("payment-1-amount", "order.payments.error.negative");
+        assertThat(posted(false, true, "-20", null, null).validate()).isEmpty();
+    }
+
+    @Test
+    void aRefundTypedWithoutASignIsStoredNegative() {
+        // given
+        Payment saved = refund(-100);
+        OrderPaymentForm unsigned = posted(false, true, "50", null, null);
+        OrderPaymentForm signed = posted(false, true, "-50", null, null);
+
+        // when
+        Payment fromUnsigned = unsigned.toPayment(saved);
+        Payment fromSigned = signed.toPayment(saved);
+
+        // then
+        assertThat(unsigned.validate()).isEmpty();
+        assertThat(fromUnsigned.getAmount()).isEqualTo(-50.0);
+        assertThat(fromSigned.getAmount()).isEqualTo(-50.0);
+        assertThat(fromUnsigned.getAppliedAmount()).isEqualTo(-50.0);
+        assertThat(fromUnsigned.getDirection()).isEqualTo(PaymentDirection.Outgoing);
+    }
+
+    @Test
+    void aRefundIsShownWithoutASignInTheField() {
+        // when
+        OrderPaymentForm typedNegative = OrderPaymentForm.of("o-1", 0, refund(-50));
+        OrderPaymentForm storedPositive = OrderPaymentForm.of("o-1", 0, refund(50));
+        OrderPaymentForm incoming = OrderPaymentForm.of("o-1", 0, Payment.bankTransfer("R", "J", 50));
+
+        // then
+        assertThat(typedNegative.amount()).isEqualTo("50.00");
+        assertThat(storedPositive.amount()).isEqualTo("50.00");
+        assertThat(typedNegative.refund()).isTrue();
+        assertThat(typedNegative.amountLabelKey()).isEqualTo("order.payments.refund.amount");
+        assertThat(incoming.refund()).isFalse();
+        assertThat(incoming.amountLabelKey()).isEqualTo("order.payment.amount");
     }
 
     @Test
@@ -38,7 +80,6 @@ class OrderPaymentFormTest {
         assertThat(posted(false, "abc", null, null).validate())
                 .containsEntry("payment-1-amount", "order.payments.error.amount");
         assertThat(posted(true, "0", null, null).validate()).isEmpty();
-        assertThat(posted(false, "-20", null, null).validate()).isEmpty();
     }
 
     @Test
@@ -54,8 +95,8 @@ class OrderPaymentFormTest {
     @Test
     void aPaymentWithoutAMethodIsRefused() {
         // given
-        OrderPaymentForm form = new OrderPaymentForm("o-1", 0, "v", true, null, null, "0", null, null, null, null,
-                null, null);
+        OrderPaymentForm form = new OrderPaymentForm("o-1", 0, "v", true, false, null, null, "0", null, null, null,
+                null, null, null);
 
         // then
         assertThat(form.validate()).containsEntry("payment-0-source", "order.payments.error.source");
@@ -64,10 +105,10 @@ class OrderPaymentFormTest {
     @Test
     void thePostedPaymentKeepsTheSavedDirectionAndStoresBlankTextAsNothing() {
         // given
-        Payment saved = new Payment("ZW/1", "Jan", PaymentSource.BankTransfer, PaymentDirection.Outgoing, -100, 0, null, null);
+        Payment saved = refund(-100);
 
         // when
-        Payment payment = posted(false, "-120,5", "1.25", "2026-09-20").toPayment(saved);
+        Payment payment = posted(false, true, "120,5", "1.25", "2026-09-20").toPayment(saved);
 
         // then
         assertThat(payment.getDirection()).isEqualTo(PaymentDirection.Outgoing);

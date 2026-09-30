@@ -690,21 +690,24 @@ class OrderPageModelFactoryTest {
     }
 
     @Test
-    void aRefundIsShownWithOneMinusWhateverItsSign() {
-        // given
+    void aRefundRowShowsTheAmountThePaidTotalCounts() {
+        // given: a refund saved positive by older code counts as money that came in, so its row says so
         Order typedNegative = order(OrderStatus.New);
         typedNegative.addPayment(refund(-100));
         Order storedPositive = order(OrderStatus.New);
         storedPositive.addPayment(refund(100));
 
         // when
-        OrderPageModel.PaymentRow negative = factory.build(typedNegative, List.of(), ADMIN, PL).payments().rows().get(0);
-        OrderPageModel.PaymentRow positive = factory.build(storedPositive, List.of(), ADMIN, PL).payments().rows().get(0);
+        OrderPageModel.PaymentsCard negative = factory.build(typedNegative, List.of(), ADMIN, PL).payments();
+        OrderPageModel.PaymentsCard positive = factory.build(storedPositive, List.of(), ADMIN, PL).payments();
 
         // then
-        assertThat(negative.amount()).isEqualTo("−100,00");
-        assertThat(positive.amount()).isEqualTo("−100,00");
-        assertThat(negative.refund()).isTrue();
+        assertThat(negative.rows().get(0).amount()).isEqualTo("−100,00");
+        assertThat(negative.paid()).isEqualTo("−100,00");
+        assertThat(positive.rows().get(0).amount()).isEqualTo("100,00");
+        assertThat(positive.paid()).isEqualTo("100,00");
+        assertThat(negative.rows().get(0).refund()).isTrue();
+        assertThat(positive.rows().get(0).refund()).isTrue();
     }
 
     @Test

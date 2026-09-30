@@ -1238,7 +1238,8 @@ class OrderDetailsTemplateTest {
                 .contains("action=\"/dashboard/orders/3e373abc-1111-2222-3333-444455556666/payments\"")
                 .contains("data-cl-async").contains("data-cl-dialog-close-on-success=\"true\"")
                 .containsPattern("<option[^>]*value=\"Card\"[^>]*selected[^>]*>")
-                .containsPattern("type=\"number\" id=\"payment-1-amount\" name=\"amount\"\\s+value=\"500.00\"")
+                .containsPattern("type=\"text\" id=\"payment-1-amount\" name=\"amount\"\\s+value=\"500.00\"")
+                .doesNotContain("step=").doesNotContain("type=\"number\"").contains(">Kwota<")
                 .containsPattern("id=\"payment-1-fee\" name=\"fee\"\\s+value=\"2.50\"")
                 .containsPattern("type=\"date\" id=\"payment-1-bankTransactionDate\" name=\"bankTransactionDate\"\\s+value=\"2026-09-20\"")
                 .contains("inputmode=\"decimal\"").contains(">Zapisz płatność<")
@@ -1671,8 +1672,8 @@ class OrderDetailsTemplateTest {
     }
 
     @Test
-    void aRefundShowsOneMinus() {
-        // given: the dialog asks for a minus, supplier payouts are stored positive
+    void aRefundRowShowsWhatThePaidTotalCountsWithOneMinus() {
+        // given: a refund saved positive by older code counts as money that came in, so its row shows no minus
         Order typedNegative = order(OrderStatus.Realization);
         typedNegative.addPayment(refund(-100));
         Order storedPositive = order(OrderStatus.Realization);
@@ -1683,11 +1684,39 @@ class OrderDetailsTemplateTest {
         String positive = card(page(render(storedPositive, ADMIN)), "platnosci");
 
         // then
-        for (String html : List.of(negative, positive)) {
-            String list = html.substring(html.indexOf("<ul class=\"cl-list\""), html.indexOf("</ul>"));
-            assertThat(list).doesNotContain("−−").contains("−100,00 PLN").contains(">Zwrot<");
-            assertThat(occurrences(list, "−")).as(list).isEqualTo(1);
-        }
+        String negativeList = negative.substring(negative.indexOf("<ul class=\"cl-list\""), negative.indexOf("</ul>"));
+        assertThat(negativeList).doesNotContain("−−").contains("−100,00 PLN").contains(">Zwrot<");
+        assertThat(occurrences(negativeList, "−")).as(negativeList).isEqualTo(1);
+        String positiveList = positive.substring(positive.indexOf("<ul class=\"cl-list\""), positive.indexOf("</ul>"));
+        assertThat(positiveList).contains(">100,00 PLN<").contains(">Zwrot<").doesNotContain("−");
+    }
+
+    @Test
+    void aRefundDialogAsksForTheRefundAmountWithoutASign() {
+        // given
+        Order order = order(OrderStatus.Realization);
+        order.addPayment(refund(-100));
+
+        // when
+        String dialog = dialog(page(render(order, ADMIN)), "payment-dialog-0");
+
+        // then
+        assertThat(dialog).contains(">Kwota zwrotu<").containsPattern("id=\"payment-0-amount\" name=\"amount\"\\s+value=\"100.00\"");
+    }
+
+    @Test
+    void anOverpaidOrderSaysOverpaymentInTheFinancesCard() {
+        // given
+        Order order = order(OrderStatus.Realization);
+        order.setTotalPrice(199);
+        order.addPayment(Payment.bankTransfer("REF-1", "Jan", 1000));
+
+        // when
+        String html = page(render(order, ADMIN));
+
+        // then
+        String finances = html.substring(html.indexOf("id=\"finances-title\""), html.indexOf("id=\"finances-costs\""));
+        assertThat(finances).contains(">Nadpłata<").contains("801,00 PLN").doesNotContain("−801").doesNotContain(">Do zapłaty<");
     }
 
     @Test

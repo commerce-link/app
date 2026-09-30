@@ -38,6 +38,8 @@ import pl.commercelink.inventory.supplier.api.SupplierOrderOptionsContext;
 import pl.commercelink.inventory.supplier.api.SupplierType;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrdersRepository;
+import pl.commercelink.orders.PaymentDirection;
+import pl.commercelink.orders.PaymentSource;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
@@ -49,6 +51,7 @@ import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.stores.StoreSupplierConnection;
 import pl.commercelink.warehouse.RestockSuggestionService;
+import pl.commercelink.web.dtos.AddPaymentForm;
 import pl.commercelink.web.dtos.DeliveryAllocationsForm;
 import pl.commercelink.web.dtos.DeliveryCreationForm;
 import pl.commercelink.web.dtos.PickerOption;
@@ -2053,5 +2056,32 @@ class DeliveriesControllerApprovalTest {
 
         // then
         assertThat((List<?>) model.getAttribute("routedOrders")).isEmpty();
+    }
+
+    @Test
+    void addPaymentToADeliveryReadsACommaAmount() {
+        // given: the dialog's amounts are text, read on the server whatever the browser's language
+        Delivery delivery = new Delivery();
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        AddPaymentForm form = new AddPaymentForm();
+        form.setBankAmount("1 499,99");
+        form.setProcessingFee("2,50");
+        form.setSource(PaymentSource.BankTransfer);
+
+        // when
+        String view;
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            view = deliveriesController.addPayment(DELIVERY_ID, form, false, redirectAttributes, Locale.ENGLISH);
+        }
+
+        // then: a payout to the supplier keeps its sign
+        assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID);
+        assertThat(delivery.getPayments()).hasSize(1);
+        assertThat(delivery.getPayments().get(0).getAmount()).isEqualTo(1499.99);
+        assertThat(delivery.getPayments().get(0).getFee()).isEqualTo(2.5);
+        assertThat(delivery.getPayments().get(0).getDirection()).isEqualTo(PaymentDirection.Outgoing);
+        verify(deliveriesRepository).save(delivery);
+        verify(redirectAttributes, never()).addFlashAttribute(eq("errorMessage"), any());
     }
 }

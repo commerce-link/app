@@ -4250,8 +4250,9 @@ a.cl-link-button:hover {
 
 /* A read-only field of a catalog form -- the EAN and code of a product the PIM knows, its brand, the name of the Default
    pricing group -- looked like one to type in: the tinted ground and the darker grey (--cl-ink-2 on a tint, §2) say it
-   is shown, not edited. The order item page uses it too, for the name, quantity and VAT rate a sale document fixed. */
-.cl-page .cl-form .cl-input[readonly] {
+   is shown, not edited. The order item page uses it too, for the name, quantity and VAT rate a sale document fixed, and
+   so does the expected amount of "Dodaj wpłatę", whose dialog form is not a .cl-form. */
+.cl-page .cl-input[readonly] {
     background: var(--cl-surface-2);
     color: var(--cl-ink-2);
 }
