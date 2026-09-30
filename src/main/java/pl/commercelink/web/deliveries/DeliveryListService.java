@@ -50,7 +50,9 @@ public class DeliveryListService {
                 ? stores.findAll().stream().map(Store::getStoreId).toList()
                 : List.of(actor.storeId());
         List<Delivery> transit = read(storeIds, deliveries::findInTransit, actor);
-        List<Delivery> toSettle = actor.superAdmin() ? List.of() : read(storeIds, deliveries::findToSettle, actor);
+        // the backlog is read only when its list is opened; the tile counts it with a cheap COUNT
+        boolean invoiceFocus = query.focus() == DeliveryAttention.INVOICE && !actor.superAdmin();
+        List<Delivery> toSettle = invoiceFocus ? read(storeIds, deliveries::findToSettle, actor) : List.of();
         List<Delivery> history = List.of();
         if (query.scope().includesHistory()) {
             history = query.focus() == DeliveryAttention.INVOICE ? toSettle
@@ -117,13 +119,25 @@ public class DeliveryListService {
                              LocalDate today, Locale locale) {
         List<DeliveryAttention> kinds = actor.superAdmin() ? DeliveryAttention.forSuperAdmin() : DeliveryAttention.forStore();
         return kinds.stream().map(kind -> {
-            List<Delivery> counted = kind == DeliveryAttention.INVOICE ? toSettle : transit;
-            long count = counted.stream().filter(d -> kind.matches(d, DeliveryListState.of(d), today)).count();
+            long count = kind == DeliveryAttention.INVOICE ? toSettleCount(actor, query, toSettle)
+                    : transit.stream().filter(d -> kind.matches(d, DeliveryListState.of(d), today)).count();
             boolean active = kind == query.focus();
             String key = "deliveries.list.attention." + kind.param();
             return new Tile(text(locale, key), count, text(locale, key + ".hint"),
                     active ? query.withoutFocus().href() : query.withFocus(kind).href(), active);
         }).toList();
+    }
+
+    /**
+     * The COUNT can include a stale index entry that the full read (recomputed keys) would drop, so the tile may
+     * briefly show one more than the list; that is accepted to keep the backlog out of every page view. When the
+     * backlog is already loaded for its own list, its size is exact and is used instead.
+     */
+    private long toSettleCount(ListActor actor, DeliveryListQuery query, List<Delivery> loaded) {
+        if (query.focus() == DeliveryAttention.INVOICE) {
+            return loaded.size();
+        }
+        return deliveries.countToSettle(actor.storeId());
     }
 
     private List<ScopeOption> scopes(DeliveryListQuery query, int transitCount, Locale locale) {
@@ -141,8 +155,9 @@ public class DeliveryListService {
 
     private static boolean matchesSettle(Delivery d, List<Settle> settle) {
         return settle.stream().allMatch(s -> switch (s) {
-            case NO_INVOICE -> !d.isInvoiced();
-            case NO_SYNC -> d.isInvoiced() && !d.isSynced();
+            // the own warehouse never gets a purchase invoice (DeliveryListKey), so it is neither missing one nor unsynced
+            case NO_INVOICE -> !d.isInvoiced() && !SupplierRegistry.WAREHOUSE.equals(d.getProvider());
+            case NO_SYNC -> d.isInvoiced() && !d.isSynced() && !SupplierRegistry.WAREHOUSE.equals(d.getProvider());
             case UNPAID -> !d.isPaid();
         });
     }

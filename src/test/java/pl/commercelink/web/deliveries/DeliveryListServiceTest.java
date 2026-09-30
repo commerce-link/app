@@ -11,6 +11,7 @@ import org.springframework.context.support.ResourceBundleMessageSource;
 import org.springframework.util.LinkedMultiValueMap;
 import pl.commercelink.inventory.deliveries.*;
 import pl.commercelink.inventory.supplier.SupplierLabelMap;
+import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.Store;
@@ -51,6 +52,7 @@ class DeliveryListServiceTest {
         service = new DeliveryListService(repository, supplierLabels, stores, messages);
         when(repository.findInTransit(anyString())).thenAnswer(inv -> transit.stream().filter(d -> d.getStoreId().equals(inv.getArgument(0))).toList());
         when(repository.findToSettle(anyString())).thenAnswer(inv -> toSettle.stream().filter(d -> d.getStoreId().equals(inv.getArgument(0))).toList());
+        when(repository.countToSettle(anyString())).thenAnswer(inv -> toSettle.stream().filter(d -> d.getStoreId().equals(inv.getArgument(0))).count());
         when(repository.findReceivedBetween(anyString(), any(), any())).thenAnswer(inv -> history.stream()
                 .filter(d -> d.getStoreId().equals(inv.getArgument(0)))
                 .filter(d -> inv.getArgument(1) == null || !d.getReceivedAt().toLocalDate().isBefore(inv.getArgument(1)))
@@ -418,5 +420,47 @@ class DeliveryListServiceTest {
 
         // then
         verify(repository, never()).findToSettle(any());
+    }
+
+    @Test
+    void invoiceTileCountsTheBacklogWithoutReadingItUnlessItsListIsOpen() {
+        // given
+        toSettle.add(receivedOn("store-1", "bbbb0001", LocalDate.of(2026, 3, 1), false));
+        toSettle.add(receivedOn("store-1", "bbbb0002", LocalDate.of(2026, 4, 1), false));
+
+        // when
+        DeliveriesPageModel page = page();
+
+        // then
+        assertThat(page.tiles()).extracting(DeliveriesPageModel.Tile::count).containsExactly(0L, 0L, 0L, 2L);
+        verify(repository, never()).findToSettle(any());
+        verify(repository).countToSettle("store-1");
+    }
+
+    @Test
+    void openingTheInvoiceTileReadsTheBacklogForItsList() {
+        // given
+        toSettle.add(receivedOn("store-1", "bbbb0001", LocalDate.of(2026, 3, 1), false));
+
+        // when
+        DeliveriesPageModel page = page("focus", "invoice");
+
+        // then
+        assertThat(page.rows()).extracting(DeliveryRow::number).containsExactly("bbbb0001");
+        assertThat(page.tiles()).extracting(DeliveriesPageModel.Tile::count).containsExactly(0L, 0L, 0L, 1L);
+        verify(repository).findToSettle("store-1");
+    }
+
+    @Test
+    void ownWarehouseIsNeitherMissingAnInvoiceNorUnsynced() {
+        // given
+        receivedBy("aaaa0001", "Acme", false, false);
+        receivedBy("aaaa0002", SupplierRegistry.WAREHOUSE, false, false);
+        receivedBy("aaaa0003", "Acme", true, false);
+        receivedBy("aaaa0004", SupplierRegistry.WAREHOUSE, true, false);
+
+        // when / then
+        assertThat(page("scope", "received", "settle", "noInvoice").rows()).extracting(DeliveryRow::number).containsExactly("aaaa0001");
+        assertThat(page("scope", "received", "settle", "noSync").rows()).extracting(DeliveryRow::number).containsExactly("aaaa0003");
     }
 }
