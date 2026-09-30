@@ -56,8 +56,16 @@ public final class OrderLabels {
         };
     }
 
+    /**
+     * The state of an order item. Delivered has its own label ("Skompletowany": the goods are in the store's hands),
+     * since FulfilmentStatus.Delivered is also the warehouse stock state, which the warehouse screens localise through
+     * the enum's own key ("Dostarczony": in stock).
+     */
     public static String itemStatus(FulfilmentStatus status) {
-        return status == null ? null : "FulfilmentStatus." + status.name();
+        if (status == null) {
+            return null;
+        }
+        return status == FulfilmentStatus.Delivered ? "order.item.status.Delivered" : "FulfilmentStatus." + status.name();
     }
 
     public static String tone(FulfilmentStatus status) {

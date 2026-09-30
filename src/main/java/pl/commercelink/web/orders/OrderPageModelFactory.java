@@ -22,6 +22,7 @@ import pl.commercelink.orders.OrderReviewStatus;
 import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.Payment;
 import pl.commercelink.orders.PaymentSource;
+import pl.commercelink.orders.OrderRealizationStepBack;
 import pl.commercelink.orders.PositionGroup;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShipmentCarrierOptions;
@@ -67,7 +68,8 @@ import java.util.stream.Stream;
 @RequiredArgsConstructor
 public class OrderPageModelFactory {
 
-    private static final Set<String> KNOWN_ACTIONS = Set.of("SHIPMENT_COLLECTED", "SHIPMENT_DELIVERED", "SHIPMENT_TRACKING_FAILED");
+    private static final Set<String> KNOWN_ACTIONS = Set.of("SHIPMENT_COLLECTED", "SHIPMENT_DELIVERED", "SHIPMENT_TRACKING_FAILED",
+            OrderRealizationStepBack.EVENT);
 
     private final StoresRepository storesRepository;
     private final OrderEventsRepository orderEventsRepository;
@@ -144,7 +146,7 @@ public class OrderPageModelFactory {
         if (firstDropship != null) {
             primary = new OrderPageModel.PrimaryAction("order.page.action.dropship", links.details() + "/dropship?provider="
                     + URLEncoder.encode(firstDropship.getDeliveryId(), StandardCharsets.UTF_8), "fa-truck");
-        } else if (!readOnly && canOrderShipment && order.hasShipmentWithoutShippingData()
+        } else if (!readOnly && canOrderShipment && order.hasShipmentToBook()
                 && shippingService.isAvailable(store)) {
             // the courier page's own rule (OrdersShippingController#initiate): a store without a courier account types
             // the shipping data into the shipment, so the page would only end on its refusal
@@ -386,9 +388,6 @@ public class OrderPageModelFactory {
         // the courier order can be cancelled only while its labelled parcel is still on the way
         Shipment courierCancellable = order.canOrderShipment() ? order.firstShipmentWithShippingData()
                 .filter(s -> s.getExternalId() != null && s.getDeliveredAt() == null).orElse(null) : null;
-        // only a Shipping order can go back to Realization, so only its page asks the history for the e-mail
-        boolean realizationEmail = !readOnly && order.getStatus() == OrderStatus.Shipping
-                && sendsRealizationEmail(order, realizationEmailSent(order));
         boolean placeholder = order.onlyPlaceholder().isPresent();
         for (int i = 0; i < shipments.size(); i++) {
             Shipment s = shipments.get(i);
@@ -407,7 +406,7 @@ public class OrderPageModelFactory {
                     // every parcel of one courier order carries its externalId, and cancelling it cancels them all
                     readOnly ? null : removeReasonKey(order, i, courierCancellable != null
                             && Objects.equals(s.getExternalId(), courierCancellable.getExternalId())),
-                    removeShipmentMessageKey(order, i, realizationEmail),
+                    removeShipmentMessageKey(order, i),
                     removeShipmentActionKey(order, i), placeholder));
             if (!readOnly) {
                 forms.add(form);
@@ -693,18 +692,17 @@ public class OrderPageModelFactory {
      * others are delivered moves the order to Delivered in the same save (OrderLifecycle), with what follows from it: the
      * goods issue note, the e-receipt for the customer, the notice to the marketplace. Removing the only shipment
      * removes how the customer asked to receive the order (type, pickup point) with it. Removing the last shipment that
-     * went out of a Shipping order moves it back to Realization
-     * (Order#returnToRealizationWhenNothingShipped); realizationEmail: the customer may get the Realization e-mail then
-     * (sendsRealizationEmail), which the text says instead of "the customer is not notified".
+     * went out of a Shipping order moves it back to Realization (OrderRealizationStepBack), without an e-mail to the
+     * customer.
      */
-    public static String removeShipmentMessageKey(Order order, int index, boolean realizationEmail) {
+    public static String removeShipmentMessageKey(Order order, int index) {
         if (removalDelivers(order, index)) {
             return "order.shipments.remove.confirm.delivers";
         }
         String key = order.getShipments().size() == 1 ? "order.shipments.remove.confirm.message.last"
                 : "order.shipments.remove.confirm.message";
         if (removalReturnsToRealization(order, index)) {
-            return key + (realizationEmail ? ".realization.email" : ".realization");
+            return key + ".realization";
         }
         return key;
     }
@@ -717,20 +715,6 @@ public class OrderPageModelFactory {
         List<Shipment> rest = new ArrayList<>(order.getShipments());
         rest.remove(index);
         return rest.stream().noneMatch(Shipment::hasGoneOut);
-    }
-
-    /**
-     * Whether an order going back to Realization may send the customer the Realization e-mail
-     * (OrderNotificationsService sends it once, with the estimated shipping date, while notifications are on).
-     * realizationEmailSent: the order's history has that e-mail already.
-     */
-    public static boolean sendsRealizationEmail(Order order, boolean realizationEmailSent) {
-        return order.isEmailNotificationsEnabled() && order.getEstimatedShippingAt() != null && !realizationEmailSent;
-    }
-
-    /** Whether the order's history has the Realization e-mail already. */
-    public boolean realizationEmailSent(Order order) {
-        return orderEventsRepository.hasEvent(order.getOrderId(), EventType.email, EmailNotificationType.ORDER_REALIZATION.name());
     }
 
     /** The confirmation's button: it names the delivery when the removal delivers the order. */

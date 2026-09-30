@@ -631,6 +631,16 @@ class OrderPageModelFactoryTest {
     }
 
     @Test
+    void anOrderWithoutShipmentsStillOffersTheCourier() {
+        // given: the only shipment removed (2026-09-30)
+        Order order = assembledOrderWithOneEmptyShipment();
+        order.setShipments(new java.util.ArrayList<>());
+
+        // when / then
+        assertThat(factory.build(order, List.of(), viewer(), PL).header().primaryAction().labelKey()).isEqualTo("order.page.action.courier");
+    }
+
+    @Test
     void noCourierActionWithoutAShippingProvider() {
         // given: a store that types its shipping data in by hand (no courier account connected)
         Order order = assembledOrderWithOneEmptyShipment();

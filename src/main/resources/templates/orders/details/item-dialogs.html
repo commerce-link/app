@@ -86,7 +86,7 @@
                            th:placeholder="#{order.item.assign.sku.search.placeholder}">
                 </div>
                 <table class="cl-table is-compact"
-                       th:attr="data-status-ordered=#{FulfilmentStatus.Ordered}, data-status-delivered=#{order.item.assign.warehouse.status.delivered},
+                       th:attr="data-status-ordered=#{FulfilmentStatus.Ordered}, data-status-delivered=#{FulfilmentStatus.Delivered},
                                 data-condition-openbox=#{ItemCondition.OpenBox}, data-condition-damaged=#{ItemCondition.Damaged}">
                     <caption class="cl-visually-hidden" th:text="#{order.item.menu.assign.warehouse}"></caption>
                     <thead><tr>

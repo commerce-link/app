@@ -166,6 +166,8 @@ public class OrdersController extends BaseController {
 
     @Autowired
     private ShipmentCancelService shipmentCancelService;
+    @Autowired
+    private OrderRealizationStepBack realizationStepBack;
 
     @Autowired
     private OrderEventsRepository orderEventsRepository;
@@ -1922,8 +1924,8 @@ public class OrdersController extends BaseController {
         }
 
         List<Shipment> shipments = new ArrayList<>(current);
-        // a new shipment fills the only placeholder (the customer's choice kept in place of a removed shipment, or the
-        // one every order is created with) instead of standing next to it and holding the order back from Shipping
+        // a new shipment fills the only placeholder (the one every order is created with, or one whose date was
+        // cleared) instead of standing next to it and holding the order back from Shipping
         boolean fillsPlaceholder = index == null && existingOrder.onlyPlaceholder().isPresent();
         Shipment saved = posted.toShipment(before);
         if (fillsPlaceholder) {
@@ -1935,13 +1937,15 @@ public class OrdersController extends BaseController {
         }
         // clearing the shipped date of the last shipment that went out takes a Shipping order back to Realization
         boolean unshipped = before != null && before.hasGoneOut() && !saved.hasGoneOut();
-        boolean realizationEmail = realizationEmail(existingOrder);
         boolean backToRealization = storeShipments(existingOrder, shipments, saved, before, unshipped);
+        if (unshipped) {
+            forgetShipmentEmails(existingOrder, before);
+        }
 
         String notice = index == null ? messageSource.getMessage("order.shipments.added", null, locale)
                 : messageSource.getMessage("order.shipments.saved", new Object[]{index + 1}, locale);
         if (backToRealization) {
-            notice += " " + backToRealizationNotice(realizationEmail, locale);
+            notice += " " + backToRealizationNotice(locale);
         }
         if (async) {
             // the dialog reloads the page it is on (keeping its returnTo), which takes this notice
@@ -1967,8 +1971,7 @@ public class OrdersController extends BaseController {
         // the same text and button as the card's confirmation dialog: they say when the removal delivers the order
         return OrderConfirmPages.render(model, new ConfirmAction(
                 messageSource.getMessage("order.shipments.remove.confirm.title", new Object[]{index + 1}, locale),
-                messageSource.getMessage(OrderPageModelFactory.removeShipmentMessageKey(order, index,
-                        OrderPageModelFactory.removalReturnsToRealization(order, index) && realizationEmail(order)), null, locale),
+                messageSource.getMessage(OrderPageModelFactory.removeShipmentMessageKey(order, index), null, locale),
                 messageSource.getMessage(OrderPageModelFactory.removeShipmentActionKey(order, index), null, locale),
                 "/dashboard/orders/" + orderId + "/shipments/" + index + "/remove?version=" + version,
                 "/dashboard/orders/" + orderId, true), orderPageTitle(order, locale));
@@ -1998,14 +2001,11 @@ public class OrdersController extends BaseController {
         }
         List<Shipment> shipments = new ArrayList<>(existingOrder.getShipments());
         Shipment removed = shipments.remove(index);
-        boolean realizationEmail = realizationEmail(existingOrder);
         boolean backToRealization = storeShipments(existingOrder, shipments, null, null, true);
-        if (removed.hasShippingData() && existingOrder.firstShipmentWithShippingData().isEmpty()) {
-            orderEventsRepository.deleteByOrderIdAndName(orderId, EmailNotificationType.ORDER_SHIPPING.name());
-        }
+        forgetShipmentEmails(existingOrder, removed);
         String notice = messageSource.getMessage("order.shipments.removed", new Object[]{index + 1}, locale);
         if (backToRealization) {
-            notice += " " + backToRealizationNotice(realizationEmail, locale);
+            notice += " " + backToRealizationNotice(locale);
         }
         OrderFlash.saved(redirectAttributes, notice);
         return details(orderId);
@@ -2046,12 +2046,13 @@ public class OrdersController extends BaseController {
      * announced that merely sits next to it, nor a corrected date of one already announced. unshipping: the change
      * takes a shipment back from having gone out (a removal, a cleared date); when that leaves a Shipping order with
      * nothing gone out, the order goes back to Realization before the lifecycle sees it (the user's decision of
-     * 2026-09-30, see Order#returnToRealizationWhenNothingShipped). Returns whether it went back.
+     * 2026-09-30, OrderRealizationStepBack, which also keeps the "in realization" e-mail from the customer). Returns
+     * whether it went back.
      */
     private boolean storeShipments(Order existingOrder, List<Shipment> shipments, Shipment saved, Shipment before,
                                    boolean unshipping) {
         existingOrder.setShipments(shipments);
-        boolean backToRealization = unshipping && existingOrder.returnToRealizationWhenNothingShipped();
+        boolean backToRealization = unshipping && realizationStepBack.apply(existingOrder);
         shipmentTrackingSubscriber.subscribe(getStoreId(), existingOrder);
         orderLifecycle.update(existingOrder);
         boolean notifiable = saved != null && isAnnounceable(saved);
@@ -2063,18 +2064,24 @@ public class OrdersController extends BaseController {
         return backToRealization;
     }
 
-    /** Whether the order, going back to Realization now, may send the customer the Realization e-mail. */
-    private boolean realizationEmail(Order order) {
-        return order.getStatus() == OrderStatus.Shipping
-                && OrderPageModelFactory.sendsRealizationEmail(order, pageModelFactory.realizationEmailSent(order));
-    }
-
-    private String backToRealizationNotice(boolean realizationEmail, Locale locale) {
+    private String backToRealizationNotice(Locale locale) {
         String status = messageSource.getMessage(OrderLabels.status(OrderStatus.Realization), null, locale);
-        return messageSource.getMessage(realizationEmail ? "order.shipments.backToRealization.email"
-                : "order.shipments.backToRealization", new Object[]{status}, locale);
+        return messageSource.getMessage("order.shipments.backToRealization", new Object[]{status}, locale);
     }
 
+    /**
+     * A shipment taken back (removed, or its shipped date cleared) that the customer was told about: once no other
+     * shipment of the order carries that news, its e-mail event is forgotten (as "Cancel courier order" does), so the
+     * shipment entered next announces itself again instead of the customer keeping the old number or pickup notice.
+     */
+    private void forgetShipmentEmails(Order order, Shipment takenBack) {
+        if (takenBack.hasShippingData() && order.firstShipmentWithShippingData().isEmpty()) {
+            orderEventsRepository.deleteByOrderIdAndName(order.getOrderId(), EmailNotificationType.ORDER_SHIPPING.name());
+        }
+        if (takenBack.hasCollectionData() && order.getShipments().stream().noneMatch(Shipment::hasCollectionData)) {
+            orderEventsRepository.deleteByOrderIdAndName(order.getOrderId(), EmailNotificationType.ORDER_PICKUP.name());
+        }
+    }
 
     private List<String> shipmentCarriers(Order order) {
         Store store = storesRepository.findById(getStoreId());
@@ -2220,8 +2227,9 @@ public class OrdersController extends BaseController {
             return refuse(redirectAttributes, orderId, refusal, locale);
         }
         try {
-            shipmentCancelService.cancelShipping(orderId, getStoreId());
-            OrderFlash.saved(redirectAttributes, messageSource.getMessage("shipment.cancel.success", null, locale));
+            boolean backToRealization = shipmentCancelService.cancelShipping(orderId, getStoreId());
+            String notice = messageSource.getMessage("shipment.cancel.success", null, locale);
+            OrderFlash.saved(redirectAttributes, backToRealization ? notice + " " + backToRealizationNotice(locale) : notice);
         } catch (HttpClientException ex) {
             return handleHttpClientException(ex, orderId, redirectAttributes);
         } catch (ShippingException e) {

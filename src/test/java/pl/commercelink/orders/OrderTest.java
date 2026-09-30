@@ -347,7 +347,7 @@ class OrderTest {
     }
 
     @Test
-    void hasShipmentWithoutShippingDataIsTrueOnlyWhenSomeShipmentLacksLabelData() {
+    void hasShipmentToBookWhenSomeShipmentLacksLabelDataOrThereIsNone() {
         // given
         Order order = new Order("store-1");
         Shipment withData = new Shipment(ShipmentType.Courier);
@@ -357,11 +357,12 @@ class OrderTest {
         Shipment empty = new Shipment(ShipmentType.Courier);
         // when / then
         order.setShipments(List.of(withData));
-        assertThat(order.hasShipmentWithoutShippingData()).isFalse();
+        assertThat(order.hasShipmentToBook()).isFalse();
         order.setShipments(List.of(withData, empty));
-        assertThat(order.hasShipmentWithoutShippingData()).isTrue();
+        assertThat(order.hasShipmentToBook()).isTrue();
+        // the only shipment removed (2026-09-30): the courier booking creates the shipment, so there is one to book
         order.setShipments(List.of());
-        assertThat(order.hasShipmentWithoutShippingData()).isFalse();
+        assertThat(order.hasShipmentToBook()).isTrue();
     }
 
     @Test

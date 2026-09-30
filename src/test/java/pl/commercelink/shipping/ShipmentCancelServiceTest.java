@@ -1,15 +1,19 @@
 package pl.commercelink.shipping;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import pl.commercelink.orders.Order;
+import pl.commercelink.orders.OrderRealizationStepBack;
+import pl.commercelink.orders.OrderStatus;
+import pl.commercelink.orders.event.EventType;
+import pl.commercelink.orders.event.OrderEvent;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShipmentType;
@@ -51,8 +55,14 @@ class ShipmentCancelServiceTest {
     @Mock
     private ShippingProvider shippingProvider;
 
-    @InjectMocks
     private ShipmentCancelService shipmentCancelService;
+
+    @BeforeEach
+    void realStepBack() {
+        // the step back is the rule under test next to the cancellation, so it runs for real over the mocked events
+        shipmentCancelService = new ShipmentCancelService(storesRepository, ordersRepository, orderEventsRepository,
+                shippingProviderFactory, new OrderRealizationStepBack(orderEventsRepository));
+    }
 
     @Test
     @DisplayName("cancelShipping throws ShippingException when no shipment carries valid shipping data")
@@ -113,6 +123,47 @@ class ShipmentCancelServiceTest {
         assertThat(savedShipments.get(0).getExternalId()).isNull();
         assertThat(savedShipments.get(0).getTrackingNo()).isNull();
         verify(orderEventsRepository).deleteByOrderIdAndName(ORDER_ID, EmailNotificationType.ORDER_SHIPPING.name());
+    }
+
+    @Test
+    void cancellingTheOnlyShippedCourierOrderOfAShippingOrderTakesItBackToRealizationWithoutAnEmail() {
+        // given
+        Order order = orderWithShipments(courierShipment(EXTERNAL_ID));
+        order.setStatus(OrderStatus.Shipping);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(shippingProviderFactory.get(store)).thenReturn(shippingProvider);
+
+        // when
+        boolean back = shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID);
+
+        // then: the step back is recorded before the save, so the notifications skip "Zamówienie w realizacji"
+        assertThat(back).isTrue();
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.Realization);
+        ArgumentCaptor<OrderEvent> event = ArgumentCaptor.forClass(OrderEvent.class);
+        org.mockito.InOrder inOrder = org.mockito.Mockito.inOrder(orderEventsRepository, ordersRepository);
+        inOrder.verify(orderEventsRepository).save(event.capture());
+        inOrder.verify(ordersRepository).save(order);
+        assertThat(event.getValue().getType()).isEqualTo(EventType.action);
+        assertThat(event.getValue().getName()).isEqualTo(OrderRealizationStepBack.EVENT);
+    }
+
+    @Test
+    void cancellingACourierOrderBeforeShippingKeepsTheStatus() {
+        // given
+        Order order = orderWithShipments(courierShipment(EXTERNAL_ID));
+        order.setStatus(OrderStatus.Assembled);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(shippingProviderFactory.get(store)).thenReturn(shippingProvider);
+
+        // when
+        boolean back = shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID);
+
+        // then
+        assertThat(back).isFalse();
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.Assembled);
+        verify(orderEventsRepository, never()).save(any());
     }
 
     private Order orderWithShipments(Shipment... shipments) {

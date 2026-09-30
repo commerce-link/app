@@ -335,8 +335,11 @@ class OrderDetailsTemplateTest {
         assertThat(html).containsPattern("<span class=\"cl-status[^\"]*\">Skompletowany</span>")
                 .doesNotContainPattern("<span class=\"cl-status[^\"]*\">Dostarczony</span>")
                 .contains("data-status-delivered=\"Dostarczony\"");
-        assertThat(ResourceBundle.getBundle("messages", Locale.ENGLISH).getString("FulfilmentStatus.Delivered"))
+        assertThat(ResourceBundle.getBundle("messages", Locale.ENGLISH).getString("order.item.status.Delivered"))
                 .isEqualTo("Assembled");
+        // the warehouse screens localise the stock state through the enum's own key (EnumLocalizer): unchanged
+        assertThat(ResourceBundle.getBundle("messages", PL).getString("FulfilmentStatus.Delivered")).isEqualTo("Dostarczony");
+        assertThat(ResourceBundle.getBundle("messages", Locale.ENGLISH).getString("FulfilmentStatus.Delivered")).isEqualTo("Delivered");
         assertThat(ResourceBundle.getBundle("messages", PL).getString("OrderStatus.Delivered")).isEqualTo("Dostarczone");
     }
 

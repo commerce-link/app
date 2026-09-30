@@ -108,6 +108,15 @@ class OrderLabelsTest {
     }
 
     @Test
+    void anOrderItemInHandHasItsOwnLabelWhileTheOtherStatesKeepTheEnumKey() {
+        // when / then: FulfilmentStatus.Delivered stays the warehouse stock label ("Dostarczony")
+        assertThat(OrderLabels.itemStatus(FulfilmentStatus.Delivered)).isEqualTo("order.item.status.Delivered");
+        assertThat(OrderLabels.itemStatus(FulfilmentStatus.Ordered)).isEqualTo("FulfilmentStatus.Ordered");
+        assertThat(PL.getString("order.item.status.Delivered")).isEqualTo("Skompletowany");
+        assertThat(PL.getString("FulfilmentStatus.Delivered")).isEqualTo("Dostarczony");
+    }
+
+    @Test
     void fulfilmentTypeIconMatchesEachType() {
         // when / then: a decorative icon paired with the short label, the text carries the meaning
         assertThat(OrderLabels.fulfilmentTypeIcon(FulfilmentType.WarehouseFulfilment)).isEqualTo("fa-warehouse");

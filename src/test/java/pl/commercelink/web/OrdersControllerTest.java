@@ -108,6 +108,8 @@ import pl.commercelink.orders.notifications.OrderNotificationsEventPublisher;
 import pl.commercelink.warehouse.GoodsOutEventPublisher;
 import pl.commercelink.receipts.ReceiptTrigger;
 
+import pl.commercelink.orders.OrderRealizationStepBack;
+import pl.commercelink.orders.event.EventType;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -120,6 +122,7 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.doAnswer;
@@ -215,6 +218,12 @@ class OrdersControllerTest {
     void setupStoreId() {
         securityStub = mockStatic(CustomSecurityContext.class);
         securityStub.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+    }
+
+    @BeforeEach
+    void realStepBack() {
+        // the step back to Realization runs for real over the mocked order events (its event is part of the rule)
+        ReflectionTestUtils.setField(ordersController, "realizationStepBack", new OrderRealizationStepBack(orderEventsRepository));
     }
 
     @BeforeEach
@@ -722,7 +731,7 @@ class OrdersControllerTest {
 
         @Test
         void aNewShipmentFillsTheOnlyPlaceholderInsteadOfStandingNextToIt() {
-            // given: what "Remove" of the only shipment left (or what every order is created with)
+            // given: the shipment every order is created with, holding only the customer's delivery choice
             Shipment placeholder = new Shipment(ShipmentType.PickupPoint);
             placeholder.setCarrier("InPost");
             placeholder.setCollectionPointCode("KRA01M");
@@ -763,13 +772,13 @@ class OrdersControllerTest {
             ConfirmAction confirm = (ConfirmAction) model.getAttribute("confirm");
             assertThat(confirm.message()).isEqualTo("order.shipments.remove.confirm.delivers");
             assertThat(confirm.confirmLabel()).isEqualTo("order.shipments.remove.confirm.action.delivers");
-            assertThat(OrderPageModelFactory.removeShipmentMessageKey(order, 1, false)).isEqualTo("order.shipments.remove.confirm.delivers");
+            assertThat(OrderPageModelFactory.removeShipmentMessageKey(order, 1)).isEqualTo("order.shipments.remove.confirm.delivers");
             // removing an undelivered one next to another undelivered one delivers nothing
             Order twoOnTheWay = orderBase();
             twoOnTheWay.setStatus(OrderStatus.Shipping);
             twoOnTheWay.setShipments(new ArrayList<>(List.of(courier("TRACK-1", LocalDateTime.of(2026, 9, 1, 9, 0)),
                     courier("TRACK-2", LocalDateTime.of(2026, 9, 1, 9, 0)))));
-            assertThat(OrderPageModelFactory.removeShipmentMessageKey(twoOnTheWay, 1, false)).isEqualTo("order.shipments.remove.confirm.message");
+            assertThat(OrderPageModelFactory.removeShipmentMessageKey(twoOnTheWay, 1)).isEqualTo("order.shipments.remove.confirm.message");
             assertThat(OrderPageModelFactory.removeShipmentActionKey(twoOnTheWay, 1)).isEqualTo("order.shipments.remove.confirm.action");
         }
 
@@ -790,37 +799,28 @@ class OrdersControllerTest {
         }
 
         @Test
-        void theRemovalConfirmationSaysWhenTheOrderGoesBackToRealizationAndWhetherTheCustomerHearsOfIt() {
+        void theRemovalConfirmationSaysWhenTheOrderGoesBackToRealization() {
             // given: a Shipping order whose only shipped shipment is the one removed
             Shipment only = courier("TRACK-1", LocalDateTime.of(2026, 9, 1, 9, 0));
             Order order = orderWith(only);
             order.setStatus(OrderStatus.Shipping);
-            order.setEstimatedShippingAt(LocalDate.of(2026, 9, 3));
-            order.setEmailNotificationsEnabled(true);
             Shipment shipped = courier("TRACK-2", LocalDateTime.of(2026, 9, 1, 9, 0));
             Shipment waiting = courier(null, null);
             Order twoOfThem = orderBase();
             twoOfThem.setStatus(OrderStatus.Shipping);
             twoOfThem.setShipments(new ArrayList<>(List.of(waiting, shipped)));
             ExtendedModelMap model = new ExtendedModelMap();
-            when(pageModelFactory.realizationEmailSent(order)).thenReturn(false);
 
             // when
             ordersController.confirmRemoveShipment(ORDER_ID, 0, OrderShipmentForm.version(only), model, redirect, Locale.ENGLISH);
 
-            // then: the no-JS page says it as the dialog does, here with the Realization e-mail still to go out
+            // then: the no-JS page says it as the dialog does; the customer gets no e-mail for the step back
             ConfirmAction confirm = (ConfirmAction) model.getAttribute("confirm");
-            assertThat(confirm.message()).isEqualTo("order.shipments.remove.confirm.message.last.realization.email");
-            assertThat(OrderPageModelFactory.removeShipmentMessageKey(order, 0, false))
-                    .isEqualTo("order.shipments.remove.confirm.message.last.realization");
-            assertThat(OrderPageModelFactory.removeShipmentMessageKey(twoOfThem, 1, false))
+            assertThat(confirm.message()).isEqualTo("order.shipments.remove.confirm.message.last.realization");
+            assertThat(OrderPageModelFactory.removeShipmentMessageKey(twoOfThem, 1))
                     .isEqualTo("order.shipments.remove.confirm.message.realization");
-            assertThat(OrderPageModelFactory.removeShipmentMessageKey(twoOfThem, 0, false))
+            assertThat(OrderPageModelFactory.removeShipmentMessageKey(twoOfThem, 0))
                     .isEqualTo("order.shipments.remove.confirm.message");
-            // the e-mail goes once, with the estimated shipping date, while notifications are on
-            assertThat(OrderPageModelFactory.sendsRealizationEmail(order, true)).isFalse();
-            order.setEstimatedShippingAt(null);
-            assertThat(OrderPageModelFactory.sendsRealizationEmail(order, false)).isFalse();
         }
 
         /**
@@ -869,9 +869,12 @@ class OrdersControllerTest {
             // when
             ordersController.removeShipment(ORDER_ID, 0, OrderShipmentForm.version(only), redirect, Locale.ENGLISH);
 
-            // then: nothing is left to stamp or regrow; the order waits in Realization for the next shipment
+            // then: nothing is left to stamp or regrow; the order waits in Realization for the next shipment, the step
+            // back recorded so the customer gets no "in realization" e-mail for it
             assertThat(order.getStatus()).isEqualTo(OrderStatus.Realization);
             assertThat(order.getShipments()).isEmpty();
+            verify(orderEventsRepository).save(argThat(e -> e.getType() == EventType.action
+                    && OrderRealizationStepBack.EVENT.equals(e.getName())));
             verify(ordersRepository).save(order);
             assertThat(notice(redirect).text()).isEqualTo("order.shipments.removed order.shipments.backToRealization");
         }
@@ -933,6 +936,50 @@ class OrdersControllerTest {
             assertThat(order.getStatus()).isEqualTo(OrderStatus.Shipping);
             assertThat(order.getShipments().get(1).getShippedAt()).isNull();
             assertThat(notice(redirect).text()).isEqualTo("order.shipments.saved");
+        }
+
+        @Test
+        void clearingTheShippedDateForgetsTheShippingEmailOnceNoOtherShipmentCarriesIt() {
+            // given
+            Shipment only = courier("TRACK-1", LocalDateTime.of(2026, 9, 1, 9, 0));
+            orderWith(only).setStatus(OrderStatus.Shipping);
+            Shipment cleared = courier("TRACK-1", null);
+
+            // when
+            save(0, OrderShipmentForm.version(only), cleared);
+
+            // then: a later number sends the shipping e-mail again
+            verify(orderEventsRepository).deleteByOrderIdAndName(ORDER_ID, EmailNotificationType.ORDER_SHIPPING.name());
+        }
+
+        @Test
+        void clearingTheOnlyReadyCollectionForgetsThePickupEmail() {
+            // given
+            Shipment ready = new Shipment(ShipmentType.PersonalCollection);
+            ready.setShippedAt(LocalDateTime.of(2026, 9, 1, 9, 0));
+            Order order = orderWith(ready);
+            order.setStatus(OrderStatus.Shipping);
+
+            // when
+            save(0, OrderShipmentForm.version(ready), new Shipment(ShipmentType.PersonalCollection));
+
+            // then
+            verify(orderEventsRepository).deleteByOrderIdAndName(ORDER_ID, EmailNotificationType.ORDER_PICKUP.name());
+            verify(orderEventsRepository, never()).deleteByOrderIdAndName(ORDER_ID, EmailNotificationType.ORDER_SHIPPING.name());
+        }
+
+        @Test
+        void clearingOneOfTwoShippedDatesKeepsTheShippingEmail() {
+            // given
+            Shipment first = courier("TRACK-1", LocalDateTime.of(2026, 9, 1, 9, 0));
+            Shipment second = courier("TRACK-2", LocalDateTime.of(2026, 9, 1, 9, 0));
+            orderWith(first, second).setStatus(OrderStatus.Shipping);
+
+            // when
+            save(1, OrderShipmentForm.version(second), courier("TRACK-2", null));
+
+            // then
+            verify(orderEventsRepository, never()).deleteByOrderIdAndName(any(), any());
         }
 
         @Test
@@ -4155,6 +4202,27 @@ class OrdersControllerTest {
             verifyNoInteractions(shipmentCancelService);
             assertThat(flash(noDataRedirect)).containsEntry("errorMessage", "order.shipments.cancel.error.no.data");
             assertThat(flash(noPackageRedirect)).containsEntry("errorMessage", "order.shipments.cancel.error.no.package");
+        }
+
+        @Test
+        void cancellingTheCourierOrderThatTakesTheOrderBackToRealizationSaysSo() {
+            // given
+            Order order = order(OrderStatus.Shipping);
+            Shipment labelled = new Shipment(ShipmentType.Courier);
+            labelled.setCarrier("DPD");
+            labelled.setTrackingNo("TRACK-1");
+            labelled.setShippedAt(LocalDateTime.now());
+            labelled.setExternalId("PKG-1");
+            order.setShipments(new ArrayList<>(List.of(labelled)));
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            when(shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID)).thenReturn(true);
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            ordersController.cancelShipment(ORDER_ID, redirect, polish);
+
+            // then
+            assertThat(notice(redirect).text()).startsWith("shipment.cancel.success").contains("order.shipments.backToRealization");
         }
 
         @Test

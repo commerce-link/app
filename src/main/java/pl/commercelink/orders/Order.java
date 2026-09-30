@@ -161,9 +161,8 @@ public class Order {
 
     /**
      * Nothing is left to deliver before the order can settle: every shipment is delivered. An order without shipments
-     * waits in every status before Delivered: every order is created with a shipment waiting to go out and removing
-     * the only one leaves such a placeholder, so an empty list before delivery means the shipments were lost, never
-     * that the goods reached the customer; settling it on payment and invoice alone would complete an order that never
+     * waits in every status before Delivered: every order is created with a shipment waiting to go out, and an empty
+     * list before delivery means the only shipment was removed (or lost), never that the goods reached the customer; settling it on payment and invoice alone would complete an order that never
      * shipped. Only a legacy order already Delivered (or Completed) without shipments settles.
      */
     @DynamoDBIgnore
@@ -656,10 +655,13 @@ public class Order {
         return shipments.stream().anyMatch(Shipment::hasTrackingSubscription);
     }
 
-    /** A shipment the courier has not been ordered for yet; an order whose every shipment is sent has nothing to book. */
+    /**
+     * Something is left to book a courier for: a shipment without its shipping data, or no shipment at all (the only
+     * one removed; the courier booking then creates it). An order whose every shipment is sent has nothing to book.
+     */
     @DynamoDBIgnore
-    public boolean hasShipmentWithoutShippingData() {
-        return shipments.stream().anyMatch(shipment -> !shipment.hasShippingData());
+    public boolean hasShipmentToBook() {
+        return shipments.isEmpty() || shipments.stream().anyMatch(shipment -> !shipment.hasShippingData());
     }
 
     @DynamoDBIgnore
