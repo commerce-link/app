@@ -6,7 +6,8 @@
 // a screen reader hears the new number. A tick keeps its menu open on the fresh block (with focus on the same
 // box) so several values can be picked in a row; its "Zastosuj" button is hidden because every tick applies at
 // once. Emptying the search field refreshes the list too, and an open menu (a native <details>) closes on a click
-// outside or Escape. Anything unexpected falls back to a plain navigation.
+// outside or Escape. After each swap the fresh block dispatches `cl-list:swapped` (bubbles), so other scripts can set
+// it up again. Anything unexpected falls back to a plain navigation.
 (function () {
     'use strict';
 
@@ -52,6 +53,8 @@
                 if (!fresh) { throw new Error('no results block'); }
                 root.replaceWith(fresh);
                 root = fresh;
+                // scripts that decorate the results (row-toggle.js) set up the fresh block again
+                root.dispatchEvent(new CustomEvent('cl-list:swapped', { bubbles: true }));
                 applyFold();
                 hideAutosubmitButtons();
                 if (push) { history.pushState({ listPage: true }, '', target.pathname + target.search); }
