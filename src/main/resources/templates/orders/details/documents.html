@@ -67,7 +67,7 @@
         <li class="cl-list-item" th:each="d : ${documents.rows()}">
             <div>
                 <p class="cl-list-title">
-                    <span th:text="#{${d.typeKey()}}"></span>
+                    <span th:text="#{${d.prefixKey()}}"></span>
                     <!--/* the new-tab icon is part of the link, joined to the number (&#8288;) so it never wraps alone */-->
                     <a th:if="${d.href() != null}" th:href="@{${d.href()}}" th:attr="target=${d.external()} ? '_blank' : null,
                        rel=${d.external()} ? 'noopener' : null"><span th:text="${d.number()}"></span><th:block

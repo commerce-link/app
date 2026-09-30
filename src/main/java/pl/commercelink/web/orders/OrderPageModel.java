@@ -163,7 +163,8 @@ public record OrderPageModel(String orderId, String shortId, String backHref, bo
     public record ReceiptEarlierRow(int attemptNo, String statusKey, String statusTone, String outcome) {
     }
 
-    public record DocumentRow(String typeKey, String number, String href, boolean external, String issuedAt,
+    /** prefixKey: the word before the number (OrderLabels#documentPrefix). */
+    public record DocumentRow(String prefixKey, String number, String href, boolean external, String issuedAt,
                               boolean removable, String removeHref) {
     }
 

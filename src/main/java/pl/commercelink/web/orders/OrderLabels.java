@@ -106,6 +106,22 @@ public final class OrderLabels {
         return type == null ? null : "DocumentType." + type.name();
     }
 
+    /**
+     * The word before a document's number in the documents card, which the number itself already qualifies
+     * ("FV/2026/09/118", "WZ/MAG/2026/000001"): every invoice is "Faktura", the receipt "Paragon", a warehouse
+     * document "Dokument". A pro forma and an order confirmation keep their own names: neither is an invoice.
+     */
+    public static String documentPrefix(DocumentType type) {
+        if (type == null || type.isWarehouseDocument()) {
+            return "order.documents.prefix.document";
+        }
+        return switch (type) {
+            case Receipt -> "order.documents.prefix.receipt";
+            case InvoiceVat, InvoiceAdvance, InvoiceFinal, InvoicePersonal -> "order.documents.prefix.invoice";
+            default -> documentType(type);
+        };
+    }
+
     public static String paymentSource(PaymentSource source) {
         return source == null ? null : "PaymentSource." + source.name();
     }

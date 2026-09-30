@@ -271,7 +271,7 @@ class OrderItemPageTemplateTest {
                 .contains("5901234123457").contains("LP14-2026").contains("SN-1, SN-2").contains("Klient prosi o fakturę na firmę")
                 .contains("4 999,00 PLN").contains("3 500,00 PLN").contains("23%").contains("<dt>Dostawa</dt>")
                 .contains("<a href=\"/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID + "\">b58e2f14</a>")
-                .contains("Wróć do zamówienia").contains("Dostarczony");
+                .contains("Wróć do zamówienia").contains(">Skompletowany</span>");
     }
 
     @Test

@@ -322,6 +322,24 @@ class OrderDetailsTemplateTest {
     }
 
     @Test
+    void anItemInHandReadsAssembledWhileTheWarehouseDialogKeepsItsOwnWord() {
+        // given
+        Order order = order(OrderStatus.Assembly);
+
+        // when
+        String html = page(render(order, ADMIN));
+
+        // then: the item state pill of the delivered service says "Skompletowany"; the order status keeps "Dostarczone"
+        // and the warehouse stock in the "Przypisz z magazynu" dialog is still "Dostarczony" (in stock)
+        assertThat(html).containsPattern("<span class=\"cl-status[^\"]*\">Skompletowany</span>")
+                .doesNotContainPattern("<span class=\"cl-status[^\"]*\">Dostarczony</span>")
+                .contains("data-status-delivered=\"Dostarczony\"");
+        assertThat(ResourceBundle.getBundle("messages", Locale.ENGLISH).getString("FulfilmentStatus.Delivered"))
+                .isEqualTo("Assembled");
+        assertThat(ResourceBundle.getBundle("messages", PL).getString("OrderStatus.Delivered")).isEqualTo("Dostarczone");
+    }
+
+    @Test
     void theMoreMenuNoLongerNamesTheItemHistory() {
         // given
         Order order = order(OrderStatus.Delivered);
@@ -1590,6 +1608,31 @@ class OrderDetailsTemplateTest {
         // then
         assertThat(html).doesNotContain("href=\"javascript:");
         assertThat(html).contains("<span>PAR/1</span>");
+    }
+
+    @Test
+    void eachDocumentRowNamesItsKindInOneWordBeforeTheNumber() {
+        // given
+        Order order = order(OrderStatus.Delivered);
+        order.addDocument(new Document("pf", "PF/1", null, DocumentType.Proforma));
+        order.addDocument(new Document("fz", "FZ/1", null, DocumentType.InvoiceAdvance));
+        order.addDocument(new Document("fv", "FV/1", null, DocumentType.InvoiceVat));
+        order.addDocument(new Document("fi", "FI/1", null, DocumentType.InvoicePersonal));
+        order.addDocument(new Document("par", "PAR/1", null, DocumentType.Receipt));
+        order.addDocument(new Document("wz", "WZ/MAG/2026/000001", null, DocumentType.GoodsIssue));
+
+        // when
+        String html = page(render(order, ADMIN));
+        String documents = html.substring(html.indexOf("id=\"dokumenty\""), html.indexOf("id=\"platnosci\""));
+
+        // then: "Faktura" for every invoice, "Paragon", "Dokument" for the warehouse note; a pro forma keeps its name
+        assertThat(documents).containsPattern("<span>Proforma</span>\\s*<span>PF/1</span>")
+                .containsPattern("<span>Faktura</span>\\s*<span>FZ/1</span>")
+                .containsPattern("<span>Faktura</span>\\s*<span>FV/1</span>")
+                .containsPattern("<span>Faktura</span>\\s*<span>FI/1</span>")
+                .containsPattern("<span>Paragon</span>\\s*<span>PAR/1</span>")
+                .containsPattern("<span>Dokument</span>\\s*(<a [^>]*>)?<span>WZ/MAG/2026/000001</span>")
+                .doesNotContain("<span>WZ</span>").doesNotContain("<span>Faktura VAT</span>");
     }
 
     @Test

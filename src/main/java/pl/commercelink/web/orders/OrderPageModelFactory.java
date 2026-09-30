@@ -626,7 +626,7 @@ public class OrderPageModelFactory {
         }
         String removeHref = !removable ? null
                 : OrderLinks.removeDocumentPath(order.getOrderId(), document.getType(), document.getNumber());
-        return new OrderPageModel.DocumentRow(OrderLabels.documentType(document.getType()), document.getNumber(), href,
+        return new OrderPageModel.DocumentRow(OrderLabels.documentPrefix(document.getType()), document.getNumber(), href,
                 document.isExternal(), OrderFormats.date(document.getIssuedAt()), removable, removeHref);
     }
 
