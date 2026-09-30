@@ -4845,7 +4845,7 @@ a.cl-link-button:hover {
 }
 
 /* Search: the icon sits in the field, a clear "×" appears once something is searched (it is a link, so it works
-   without JavaScript; with it, orders-list.js also refreshes the list when the field is emptied). */
+   without JavaScript; with it, list-page.js also refreshes the list when the field is emptied). */
 .cl-page .cl-search-form {
     display: flex;
     align-items: center;
@@ -7440,6 +7440,7 @@ a.cl-link-button:hover {
 .cl-page .cl-list-summary > p {
     margin: 0;
 }
+
 /* Receipt-like document page without the app frame (dev e-receipt preview): a narrow printable card, monospace
    figures, a tone banner on top. Generic so a real receipt or document preview can reuse it. */
 .cl-receipt-page {
@@ -7581,4 +7582,146 @@ a.cl-link-button:hover {
     .cl-receipt-back {
         display: none;
     }
+}
+
+/* --- Deliveries list (spec docs/active/dostawy-redesign/2026-09-30-deliveries-list-design.md §8):
+   scope switch, date-range menu, wrapping status pills, secondary column visibility, phone filters. --- */
+
+/* cl-icon-text comes from the order details (app#240); in the key cell it must not wrap. */
+.cl-page .cl-table-key .cl-icon-text {
+    white-space: nowrap;
+}
+
+/* The scope switch changes the list's address, so its segments are links; the chosen one looks pressed. */
+.cl-page .cl-segmented a.cl-segment {
+    display: inline-flex;
+    align-items: center;
+    text-decoration: none;
+}
+
+.cl-page .cl-segmented a.cl-segment[aria-current="page"] {
+    background: var(--cl-surface);
+    color: var(--cl-accent-ink);
+    box-shadow: 0 1px 2px rgba(14, 23, 33, .12), inset 0 0 0 1px var(--cl-accent);
+    font-weight: 600;
+}
+
+.cl-page .cl-segmented a.cl-segment[aria-current="page"] .cl-segment-count {
+    color: inherit;
+}
+
+/* The date menu is the last one in its row: its panel opens towards the left so it stays inside. */
+.cl-page .cl-filter-menu.is-end .cl-filter-menu-panel {
+    left: auto;
+    right: 0;
+}
+
+/* One field under the other at every width: a native date input will not shrink below ~170 px, so two of them side by
+   side overflow the 260-360 px panel and overlap. Side padding matches the other menus' rows (16 px). */
+.cl-page .cl-filter-menu-dates {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--cl-gap-fields);
+    padding: 8px 16px 4px;
+}
+
+.cl-page .cl-filter-menu-dates .cl-input {
+    width: 100%;
+    min-width: 0;
+}
+
+.cl-page .cl-filter-menu-dates label {
+    display: grid;
+    gap: var(--cl-gap-attached);
+    font-size: 13.5px;
+    color: var(--cl-ink-2);
+}
+
+/* "Anulowana przez dostawcę" in one line pushed the table past the card at 1024 px: wrap by words. */
+.cl-page .cl-table.is-deliveries .cl-status {
+    white-space: normal;
+}
+
+.cl-page .cl-toolbar-search {
+    display: flex;
+    gap: var(--cl-gap-related);
+    align-items: center;
+}
+
+.cl-page .cl-toolbar-toggle {
+    display: none;
+}
+
+@media screen and (min-width: 720px) {
+    .cl-page .cl-table.is-deliveries td[data-label]:has(.cl-status) {
+        min-width: 11ch;
+    }
+}
+
+/* From 1024 px the card is wide enough for the longer status texts to keep two lines at most. */
+@media screen and (min-width: 1024px) {
+    .cl-page .cl-table.is-deliveries td[data-label]:has(.cl-status) {
+        min-width: 15ch;
+    }
+}
+
+/* With the rail (720–1215 px) the card is ~790 px wide: order date gives way to columns that matter. */
+@media screen and (min-width: 720px) and (max-width: 1215px) {
+    .cl-page .cl-table.is-deliveries .is-secondary-column {
+        display: none;
+    }
+}
+
+@media screen and (max-width: 719px) {
+    .cl-page .cl-table-toolbar .cl-segmented {
+        width: 100%;
+    }
+
+    .cl-page .cl-segmented a.cl-segment {
+        flex: 1;
+        justify-content: center;
+        min-height: 44px;
+    }
+
+    /* At 320 px the search field beside "Filtry: n" shrank to a "Nr" placeholder: the field keeps 200 px and the button
+       drops to its own row when the two do not fit. */
+    .cl-page .cl-toolbar-search {
+        width: 100%;
+        flex-wrap: wrap;
+    }
+
+    .cl-page .cl-toolbar-search .cl-search-form {
+        flex: 1 1 200px;
+        min-width: 0;
+    }
+
+    /* The sort bar scrolls sideways in the orders list; here "Dostawca" sat clipped at the edge of a 320 px screen. */
+    .cl-page .cl-table-sortbar.is-wrap {
+        flex-wrap: wrap;
+        overflow-x: visible;
+    }
+
+    .cl-page .cl-toolbar-toggle {
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+    }
+
+    .cl-page .cl-toolbar-toggle[aria-expanded="true"] {
+        border-color: var(--cl-accent);
+        color: var(--cl-accent-ink);
+    }
+
+    .cl-page .cl-table-toolbar.is-collapsed .cl-toolbar-filters {
+        display: none;
+    }
+
+    /* The date panel spans the filter row like the other panels; its right-aligned desktop position pushed it off the
+       left edge of a 320 px screen. */
+    .cl-page .cl-filter-menu.is-end .cl-filter-menu-panel {
+        left: 0;
+        right: 0;
+        min-width: 0;
+    }
+
 }
