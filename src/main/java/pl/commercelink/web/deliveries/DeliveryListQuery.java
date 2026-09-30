@@ -28,7 +28,7 @@ public record DeliveryListQuery(Scope scope, DeliveryAttention focus, List<Deliv
         // a tile decides the scope it counts in (?focus=invoice alone opens the received deliveries)
         scope = focus != null ? focus.scope() : scope == null ? Scope.TRANSIT : scope;
         states = states == null || states.isEmpty() ? List.of() : List.copyOf(EnumSet.copyOf(states));
-        providers = providers == null ? List.of() : providers.stream().distinct().toList();
+        providers = providers == null ? List.of() : providers.stream().filter(StringUtils::isNotBlank).distinct().toList();
         settle = settle == null || settle.isEmpty() ? List.of() : List.copyOf(EnumSet.copyOf(settle));
         page = Math.max(1, page);
     }
@@ -100,9 +100,10 @@ public record DeliveryListQuery(Scope scope, DeliveryAttention focus, List<Deliv
         String q = firstNonBlank(params.getFirst("deliveryId"), params.getFirst("externalDeliveryId"), params.getFirst("counterpartyShortcut"));
         // a number or counterparty searched in the old form could be anywhere in the history
         Scope scope = archived || q != null ? Scope.ALL : Scope.TRANSIT;
+        boolean allHistory = archived || q != null;
         DeliveryListQuery target = new DeliveryListQuery(scope, null, states,
                 provider == null || provider.isEmpty() ? List.of() : List.of(provider), settle,
-                date(params.getFirst("orderedAtStart")), date(params.getFirst("orderedAtEnd")), false,
+                date(params.getFirst("orderedAtStart")), date(params.getFirst("orderedAtEnd")), allHistory,
                 normalizeQ(q), null, null, 1);
         return Optional.of(target.href());
     }
@@ -110,6 +111,7 @@ public record DeliveryListQuery(Scope scope, DeliveryAttention focus, List<Deliv
     /** The first day of the history read for this query: the typed "from", else 90 days back; null = from the start. */
     public LocalDate historyFrom(LocalDate today) {
         if (from != null) return from;
+        if (to != null) return null;
         if (allHistory || focus == DeliveryAttention.INVOICE) return null;
         return today.minusDays(HISTORY_DAYS);
     }

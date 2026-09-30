@@ -74,9 +74,9 @@ class DeliveryListQueryTest {
     @Test
     void legacyParametersRedirectToTheNewAddress() {
         assertThat(DeliveryListQuery.legacyRedirect(params("showArchived", "true", "showWithoutInvoice", "true")))
-                .contains("/dashboard/deliveries?scope=all&settle=noInvoice");
+                .contains("/dashboard/deliveries?scope=all&settle=noInvoice&period=all");
         assertThat(DeliveryListQuery.legacyRedirect(params("deliveryId", "7a31c0e2-1111-2222-3333-444455556666")))
-                .contains("/dashboard/deliveries?scope=all&q=7a31c0e2-1111-2222-3333-444455556666");
+                .contains("/dashboard/deliveries?scope=all&period=all&q=7a31c0e2-1111-2222-3333-444455556666");
         assertThat(DeliveryListQuery.legacyRedirect(params("provider", "__custom__", "providerCustom", " Kowalski ",
                 "orderedAtStart", "2026-09-01", "showAwaitingApproval", "true", "showWithoutSync", "false")))
                 .contains("/dashboard/deliveries?state=awaitingApproval&provider=Kowalski&from=2026-09-01");
@@ -96,6 +96,8 @@ class DeliveryListQueryTest {
                 .isEqualTo(LocalDate.of(2026, 1, 1));
         assertThat(DeliveryListQuery.parse(params("scope", "received")).withFocus(DeliveryAttention.INVOICE).historyFrom(today))
                 .isNull();
+        assertThat(DeliveryListQuery.parse(params("scope", "received", "to", "2026-09-30")).historyFrom(today))
+                .isNull();
     }
 
     @Test
@@ -106,5 +108,15 @@ class DeliveryListQueryTest {
         // then
         assertThat(query.toggleSort(DeliveryListQuery.Sort.DUE).href()).isEqualTo("/dashboard/deliveries?sort=due&dir=desc");
         assertThat(query.toggleSort(DeliveryListQuery.Sort.COST).href()).isEqualTo("/dashboard/deliveries?sort=cost&dir=asc");
+    }
+
+    @Test
+    void withScopeDropsAFocusWhoseScopeDiffers() {
+        // when
+        DeliveryListQuery query = DeliveryListQuery.parse(params()).withFocus(DeliveryAttention.INVOICE).withScope(DeliveryListQuery.Scope.TRANSIT);
+
+        // then
+        assertThat(query.focus()).isNull();
+        assertThat(query.href()).isEqualTo("/dashboard/deliveries");
     }
 }
