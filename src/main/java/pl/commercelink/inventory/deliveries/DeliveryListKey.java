@@ -33,6 +33,6 @@ public final class DeliveryListKey {
 
     /** A bound of a reception window on the key: the upper one reaches past every time of that day. */
     public static String receivedBound(String prefix, LocalDate day, boolean upper) {
-        return prefix + day + (upper ? "￿" : "");
+        return prefix + day + (upper ? "\uffff" : "");
     }
 }
