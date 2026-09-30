@@ -16,6 +16,7 @@ import pl.commercelink.stores.StoresRepository;
 
 import java.util.Collections;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 /**
@@ -54,7 +55,7 @@ public class ShipmentCancellationChecker {
             result = provider.checkShipmentCancellation(request.getCommandId(), request.getExternalId());
         } catch (RuntimeException e) {
             log.warn("Cancellation check failed store={} order={} command={} attempt={}: {}",
-                    request.getStoreId(), request.getOrderId(), request.getCommandId(), request.getAttempt(), e.getMessage());
+                    request.getStoreId(), request.getOrderId(), request.getCommandId(), request.getAttempt(), e.getMessage(), e);
             result = ShipmentCancellation.pending(request.getCommandId());
         }
         if (!result.otherCancelledPackageIds().isEmpty()) {
@@ -93,7 +94,7 @@ public class ShipmentCancellationChecker {
 
     // the order may have changed while the check was queued: apply to the freshly loaded one, and only while its
     // shipment still waits for this command; returns whether anything was saved
-    private boolean modify(ShipmentCancellationCheckRequest request, java.util.function.BiConsumer<Order, Shipment> change) {
+    private boolean modify(ShipmentCancellationCheckRequest request, BiConsumer<Order, Shipment> change) {
         AtomicBoolean changed = new AtomicBoolean();
         optimisticLockingExecutor.modifyAndSave(
                 () -> ordersRepository.findById(request.getStoreId(), request.getOrderId()),

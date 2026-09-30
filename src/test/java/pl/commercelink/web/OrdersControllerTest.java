@@ -87,6 +87,7 @@ import pl.commercelink.documents.Document;
 import pl.commercelink.documents.DocumentType;
 import pl.commercelink.orders.OrderReferenceResolver;
 import pl.commercelink.shipping.ShipmentCancelService;
+import pl.commercelink.shipping.ShipmentCancellationInProgressException;
 import pl.commercelink.web.dtos.AssignSupplierForm;
 import pl.commercelink.web.orders.BulkAction;
 import pl.commercelink.web.orders.MoveTargetView;
@@ -116,6 +117,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.inOrder;
@@ -3991,6 +3993,28 @@ class OrdersControllerTest {
 
             // then
             verifyNoInteractions(shipmentCancelService);
+            assertThat(flash(redirect)).containsEntry("errorMessage", "order.shipments.cancel.error.pending");
+        }
+
+        @Test
+        void cancelShipmentRefusesWhenAConcurrentRequestMarkedTheCancellationFirst() {
+            // given: the order read here shows no cancellation, the service's fresh read finds one in progress
+            Order order = order(OrderStatus.Shipping);
+            Shipment sent = new Shipment(ShipmentType.Courier);
+            sent.setCarrier("DPD");
+            sent.setTrackingNo("TRACK-1");
+            sent.setShippedAt(LocalDateTime.now());
+            sent.setExternalId("21353832");
+            order.setShipments(new ArrayList<>(List.of(sent)));
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            doThrow(new ShipmentCancellationInProgressException())
+                    .when(shipmentCancelService).cancelShipping(ORDER_ID, STORE_ID);
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            ordersController.cancelShipment(ORDER_ID, redirect, polish);
+
+            // then
             assertThat(flash(redirect)).containsEntry("errorMessage", "order.shipments.cancel.error.pending");
         }
 

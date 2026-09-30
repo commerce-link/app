@@ -50,6 +50,7 @@ import pl.commercelink.receipts.ReceiptAttemptService;
 import pl.commercelink.receipts.ReceiptLock;
 import pl.commercelink.rest.client.HttpClientException;
 import pl.commercelink.shipping.ShipmentCancelService;
+import pl.commercelink.shipping.ShipmentCancellationInProgressException;
 import pl.commercelink.shipping.ShipmentTrackingSubscriber;
 import pl.commercelink.shipping.api.ShippingException;
 import pl.commercelink.starter.dynamodb.OptimisticLockingExhaustedException;
@@ -2186,6 +2187,9 @@ public class OrdersController extends BaseController {
         try {
             shipmentCancelService.cancelShipping(orderId, getStoreId());
             OrderFlash.saved(redirectAttributes, messageSource.getMessage("shipment.cancel.requested", null, locale));
+        } catch (ShipmentCancellationInProgressException e) {
+            // a concurrent request marked the cancellation between the check above and the service's fresh read
+            return refuse(redirectAttributes, orderId, "order.shipments.cancel.error.pending", locale);
         } catch (HttpClientException ex) {
             return handleHttpClientException(ex, orderId, redirectAttributes);
         } catch (ShippingException e) {

@@ -268,6 +268,18 @@ public class Shipment {
         this.cancellationStatus = ShipmentCancellationStatus.UNCONFIRMED;
     }
 
+    /**
+     * Puts back the cancellation state the shipment had before a cancel command that was marked but never reached the
+     * provider, so a refused request leaves no trace of itself.
+     */
+    public void restoreCancellation(ShipmentCancellationStatus status, String commandId, String error,
+                                    LocalDateTime requestedAt) {
+        this.cancellationStatus = status;
+        this.cancellationCommandId = commandId;
+        this.cancellationError = error;
+        this.cancellationRequestedAt = requestedAt;
+    }
+
     @DynamoDBIgnore
     public boolean isCancellationPending() {
         return cancellationStatus == ShipmentCancellationStatus.PENDING;
@@ -286,6 +298,13 @@ public class Shipment {
     @DynamoDBIgnore
     public boolean needsCancellationRecheck(LocalDateTime now) {
         return cancellationStatus == ShipmentCancellationStatus.UNCONFIRMED || (isCancellationPending() && isStale(now));
+    }
+
+    /** The last cancellation failed or its result is unknown: the label may or may not still be paid at the carrier. */
+    @DynamoDBIgnore
+    public boolean isCancellationUnresolved() {
+        return cancellationStatus == ShipmentCancellationStatus.FAILED
+                || cancellationStatus == ShipmentCancellationStatus.UNCONFIRMED;
     }
 
     @DynamoDBIgnore

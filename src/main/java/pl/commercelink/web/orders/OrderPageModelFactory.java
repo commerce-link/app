@@ -424,7 +424,8 @@ public class OrderPageModelFactory {
      * neither delivers nor completes an order before its shipments are delivered). A delivered order keeps its
      * shipments, they are the record of the delivery; so does a shipment with a delivery date. One with a courier order
      * is cancelled with "Cancel courier order", which also cancels the paid label at the carrier, never by dropping
-     * the record.
+     * the record. After a failed or unconfirmed cancellation the operator settles the label in the provider's panel
+     * and may drop the record.
      */
     public static String removeLockedKey(Order order, int index) {
         if (order.getStatus() == OrderStatus.Delivered) {
@@ -434,7 +435,8 @@ public class OrderPageModelFactory {
         if (shipment.getDeliveredAt() != null) {
             return "order.shipments.remove.error.shipmentDelivered";
         }
-        return shipment.getExternalId() != null ? "order.shipments.remove.error.courier" : null;
+        return shipment.getExternalId() != null && !shipment.isCancellationUnresolved()
+                ? "order.shipments.remove.error.courier" : null;
     }
 
     private OrderPageModel.DocumentsCard documents(Order order, Store store, Viewer viewer, boolean closed,

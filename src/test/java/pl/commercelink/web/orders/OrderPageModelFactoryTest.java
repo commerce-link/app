@@ -463,6 +463,59 @@ class OrderPageModelFactoryTest {
     }
 
     @Test
+    void aCourierShipmentWhoseCancellationFailedOrIsUnconfirmedCanBeRemoved() {
+        // given: the operator settles the label in the provider's panel and drops the record
+        Order failed = order(OrderStatus.Shipping);
+        labelled(failed.getShipments().get(0), "T-1", "PKG-1");
+        failed.getShipments().get(0).markCancellationPending("cmd-1", LocalDateTime.now().minusMinutes(2));
+        failed.getShipments().get(0).markCancellationFailed("already cancelled");
+        Order unconfirmed = order(OrderStatus.Shipping);
+        labelled(unconfirmed.getShipments().get(0), "T-1", "PKG-1");
+        unconfirmed.getShipments().get(0).markCancellationPending("cmd-1", LocalDateTime.now().minusMinutes(2));
+        unconfirmed.getShipments().get(0).markCancellationUnconfirmed();
+
+        // when
+        OrderPageModel.ShipmentRow failedRow = factory.build(failed, List.of(), ADMIN, PL).shipments().rows().get(0);
+
+        // then
+        assertThat(OrderPageModelFactory.removeLockedKey(failed, 0)).isNull();
+        assertThat(OrderPageModelFactory.removeLockedKey(unconfirmed, 0)).isNull();
+        assertThat(failedRow.removeHref()).isNotNull();
+        assertThat(failedRow.removeReasonKey()).isNull();
+    }
+
+    @Test
+    void aCourierShipmentWithACancellationPendingStaysLocked() {
+        // given
+        Order order = order(OrderStatus.Shipping);
+        labelled(order.getShipments().get(0), "T-1", "PKG-1");
+        order.getShipments().get(0).markCancellationPending("cmd-1", LocalDateTime.now());
+
+        // when
+        String locked = OrderPageModelFactory.removeLockedKey(order, 0);
+
+        // then
+        assertThat(locked).isEqualTo("order.shipments.remove.error.courier");
+    }
+
+    @Test
+    void aDeliveredShipmentStaysLockedWhateverItsCancellation() {
+        // given
+        Order order = order(OrderStatus.Shipping);
+        Shipment shipment = order.getShipments().get(0);
+        labelled(shipment, "T-1", "PKG-1");
+        shipment.markCancellationPending("cmd-1", LocalDateTime.now().minusMinutes(2));
+        shipment.markCancellationFailed("already delivered");
+        shipment.setDeliveredAt(LocalDateTime.now());
+
+        // when
+        String locked = OrderPageModelFactory.removeLockedKey(order, 0);
+
+        // then
+        assertThat(locked).isEqualTo("order.shipments.remove.error.shipmentDelivered");
+    }
+
+    @Test
     void aCourierShipmentOffersNoCarrierOrNumberEdit() {
         // given
         Order order = order(OrderStatus.Shipping);
