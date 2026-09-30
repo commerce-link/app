@@ -3,7 +3,7 @@
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
       layout:decorate="~{layout-print}">
 <head>
-    <title th:text="#{collection.title} + ' · ' + #{order.page.title(${print.shortId()})}"></title>
+    <title th:text="#{order.print.title.collection(${print.shortId()})}"></title>
 </head>
 <body>
 <!--/* The collection protocol: printed and signed by both sides when the customer picks the order up in person. */-->
@@ -21,12 +21,14 @@
             <article class="cl-card cl-print-sheet">
                 <dl class="cl-kv cl-print-meta">
                     <div>
-                        <dt th:text="#{collection.store.id}"></dt>
-                        <dd th:text="${p.store()}"></dd>
+                        <!--/* the customer signs this: the store by its name and the order by the short number the list
+                               shows, no technical ids (the link still carries the full order id) */-->
+                        <dt th:text="#{order.print.store}"></dt>
+                        <dd th:text="${p.store() != null} ? ${p.store()} : '—'"></dd>
                     </div>
                     <div>
-                        <dt th:text="#{collection.order.id}"></dt>
-                        <dd><a th:href="@{${p.detailsHref()}}" th:text="${p.orderId()}"></a></dd>
+                        <dt th:text="#{order.print.order}"></dt>
+                        <dd><a th:href="@{${p.detailsHref()}}" th:text="${p.shortId()}"></a></dd>
                     </div>
                     <div>
                         <dt th:text="#{collection.date}"></dt>
@@ -52,12 +54,12 @@
                         </thead>
                         <tbody>
                         <tr th:each="r : ${p.items()}">
-                            <td th:attr="data-label=#{collection.category}" th:classappend="${r.category() == null} ? 'is-empty'" th:text="${r.category()}"></td>
+                            <td th:attr="data-label=#{collection.category}" th:classappend="${r.category() == null} ? 'is-empty'" th:text="${r.category() != null} ? ${r.category()} : '—'"></td>
                             <td th:attr="data-label=#{collection.name}" th:text="${r.name()}"></td>
                             <td class="is-numeric" th:attr="data-label=#{collection.quantity}" th:text="${r.qty()}"></td>
-                            <td class="cl-print-code" th:attr="data-label=#{collection.manufacturer.code}" th:classappend="${r.mfn() == null} ? 'is-empty'" th:text="${r.mfn()}"></td>
+                            <td class="cl-print-code" th:attr="data-label=#{collection.manufacturer.code}" th:classappend="${r.mfn() == null} ? 'is-empty'" th:text="${r.mfn() != null} ? ${r.mfn()} : '—'"></td>
                             <!--/* each serial number stays whole; a line may break only between two of them */-->
-                            <td th:attr="data-label=#{collection.serial.no}" th:classappend="${r.serialNo() == null} ? 'is-empty'"><span
+                            <td th:attr="data-label=#{collection.serial.no}" th:classappend="${r.serialNo() == null} ? 'is-empty'"><th:block th:if="${r.serialNo() == null}">—</th:block><span
                                     th:if="${r.serialNo() != null}"><th:block th:each="sn, st : ${#strings.arraySplit(r.serialNo(), ',')}"><span
                                     class="cl-print-code" th:text="${#strings.trim(sn)}"></span><th:block th:unless="${st.last}">, </th:block></th:block></span></td>
                         </tr>

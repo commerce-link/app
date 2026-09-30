@@ -12,6 +12,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import pl.commercelink.orders.Order;
+import pl.commercelink.orders.OrderRealizationStepBack;
+import pl.commercelink.orders.OrderStatus;
+import pl.commercelink.orders.event.EventType;
+import pl.commercelink.orders.event.OrderEvent;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShipmentCancellationStatus;
@@ -42,6 +46,7 @@ import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -83,7 +88,7 @@ class ShipmentCancelServiceTest {
     }
 
     @Test
-    @DisplayName("cancelShipping throws ShippingException when no shipment carries valid shipping data")
+    @DisplayName("cancelShipping throws ShippingException when no shipment has a courier order")
     void cancelShippingThrowsShippingExceptionWhenNoShipmentHasShippingData() {
         // given
         Order order = orderWithShipments(new Shipment(ShipmentType.PersonalCollection));
@@ -93,7 +98,7 @@ class ShipmentCancelServiceTest {
         // when / then
         assertThatThrownBy(() -> shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID))
                 .isInstanceOf(ShippingException.class)
-                .hasMessageContaining("No valid shipment data");
+                .hasMessageContaining("No courier order to cancel");
 
         verify(shippingProviderFactory, never()).get(any());
         verify(ordersRepository, never()).save(any());
@@ -112,7 +117,7 @@ class ShipmentCancelServiceTest {
         // when / then
         assertThatThrownBy(() -> shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID))
                 .isInstanceOf(ShippingException.class)
-                .hasMessageContaining("no external package ID");
+                .hasMessageContaining("No courier order to cancel");
 
         verify(shippingProvider, never()).cancelShipment(any(), any());
         verify(ordersRepository, never()).save(any());
@@ -202,9 +207,7 @@ class ShipmentCancelServiceTest {
 
         // when / then
         assertThatThrownBy(() -> shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID))
-                .isExactlyInstanceOf(NoShippingProviderException.class)
-                .isInstanceOf(ShippingException.class)
-                .hasMessage("No shipping provider configured for the store");
+                .isExactlyInstanceOf(ShippingUnavailableException.class);
         verify(ordersRepository, never()).save(any());
         verify(publisher, never()).publish(any());
         assertThat(order.getShipments().get(0).getCancellationStatus()).isNull();

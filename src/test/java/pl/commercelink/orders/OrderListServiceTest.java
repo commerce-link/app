@@ -224,6 +224,20 @@ class OrderListServiceTest {
     }
 
     @Test
+    void aTileRowReturnsToTheListNarrowedByTheTile() {
+        // given
+        add("late", OrderStatus.New, TODAY.minusDays(1), 100, 100, null);
+
+        // when
+        OrdersPageModel overdue = page(query("focus", "overdue"));
+
+        // then: "‹ Zamówienia" on the details page goes back to the tile's list, not to the default filter
+        assertThat(overdue.rows()).hasSize(1);
+        assertThat(overdue.rows().get(0).href())
+                .isEqualTo("/dashboard/orders/late?returnTo=%2Fdashboard%2Forders%3Ffocus%3Doverdue");
+    }
+
+    @Test
     void aTileShowsExactlyTheOrdersItCounts() {
         // given
         add("late", OrderStatus.New, TODAY.minusDays(1), 100, 100, "Allegro");

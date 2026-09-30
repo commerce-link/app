@@ -144,6 +144,12 @@ public class Shipment {
         return type == ShipmentType.PersonalCollection && shippedAt != null;
     }
 
+    /** It has a shipped (or ready-for-collection) or a delivery date: what the card shows as "nadano" / "dostarczono". */
+    @DynamoDBIgnore
+    public boolean hasGoneOut() {
+        return shippedAt != null || deliveredAt != null;
+    }
+
     @DynamoDBIgnore
     public boolean isDeliveredToCollectionPoint() {
         return isNotBlank(collectionPointCode);
@@ -339,20 +345,6 @@ public class Shipment {
             this.cancellationError = previous.cancellationError;
             this.cancellationRequestedAt = previous.cancellationRequestedAt;
         }
-    }
-
-    /**
-     * What is left of removed when the order's only shipment is removed: the customer's choice of delivery (the type,
-     * the pickup point and, for a pickup point, its carrier), waiting to go out again. Its tracking, dates and courier
-     * order go with the removal.
-     */
-    public static Shipment placeholderFor(Shipment removed) {
-        Shipment placeholder = new Shipment(removed.type);
-        placeholder.collectionPointCode = removed.collectionPointCode;
-        if (removed.type == ShipmentType.PickupPoint) {
-            placeholder.carrier = removed.carrier;
-        }
-        return placeholder;
     }
 
     /** Nothing but the delivery choice: no tracking, no dates, no courier order. */

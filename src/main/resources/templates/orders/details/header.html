@@ -5,12 +5,14 @@
        lines and the actions. The slots are defined inside the replaced element, so they are never rendered twice. */-->
 <div th:fragment="header"
      th:replace="~{fragments/settings-header :: record(${page.backHref()}, #{orders.list.title},
-             #{order.page.title(${page.shortId()})}, ~{::orderStatus}, ~{::orderMeta}, ~{::orderActions})}">
-    <th:block th:fragment="orderStatus">
+             #{order.page.title(${page.shortId()})}, ~{::orderCopy}, ~{::orderStatus}, ~{::orderMeta}, ~{::orderActions})}">
+    <th:block th:fragment="orderCopy">
         <button type="button" class="cl-copy-inline is-icon"
                 th:attr="data-cl-copy=${page.orderId()}, aria-label=#{order.page.copy.id}, title=${page.orderId()}">
             <span class="cl-copy-icon"><span class="icon is-small" aria-hidden="true"><i class="far fa-copy"></i></span></span>
         </button>
+    </th:block>
+    <th:block th:fragment="orderStatus">
         <span class="cl-status" th:classappend="${page.header().statusTone()}" th:text="#{${page.header().statusKey()}}"></span>
         <a th:if="${page.header().canChangeStatus()}" class="cl-link-button"
            th:href="@{/dashboard/orders/{id}/status(id=${page.orderId()})}" data-cl-dialog-open="status-dialog"
@@ -70,9 +72,6 @@
                        the link opens the sheet and the browser prints it */-->
                 <li><a class="cl-menu-item" th:href="@{${h.cardHref()}}" data-cl-print-frame th:text="#{order.page.print.card}"></a></li>
                 <li><a class="cl-menu-item" th:href="@{${h.collectionHref()}}" data-cl-print-frame th:text="#{order.page.print.collection}"></a></li>
-                <li th:if="${h.itemHistoryHref() != null}">
-                    <a class="cl-menu-item" th:href="@{${h.itemHistoryHref()}}" th:text="#{item.history}"></a>
-                </li>
                 <!--/* a closed order keeps an available cancel (a completed order can still be cancelled after a full
                        return), but not the greyed-out placeholders: there is nothing left to explain */-->
                 <th:block th:unless="${page.superAdmin()}">
@@ -87,7 +86,7 @@
                            th:text="#{order.page.cancel}"></a>
                         <button th:unless="${h.canCancel()}" type="button" class="cl-menu-item is-danger" aria-disabled="true">
                             <span th:text="#{order.page.cancel}"></span>
-                            <span class="cl-menu-reason" th:text="#{${h.cancelLockedKey() != null ? h.cancelLockedKey() : 'order.page.cancel.unavailable'}}"></span>
+                            <span class="cl-menu-reason" th:text="#{${h.cancelLockedKey() != null ? h.cancelLockedKey() : (h.cancelUnavailableKey() != null ? h.cancelUnavailableKey() : 'order.page.cancel.unavailable')}}"></span>
                         </button>
                     </li>
                     <li th:if="${h.canDelete() or !page.closed()}">

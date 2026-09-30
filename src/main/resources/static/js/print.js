@@ -6,10 +6,22 @@
 (function () {
     'use strict';
 
-    // Some browsers never fire afterprint in a frame; the frame is dropped this long after print() returned instead.
-    // print() blocks while the dialog is open where it matters (Chromium, Safari), so this never cuts a dialog short.
-    var FALLBACK_MS = 60000;
+    // The frame lives until its afterprint, the next print or the page going away (pagehide), never on a timer: in
+    // Firefox print() may return while its preview is still open, and a timer would pull the sheet from under it.
+    // A frame left off screen costs nothing.
     var current = null;
+    // where the keyboard was before printing (the menu's summary, as the link itself hides with its menu): the frame
+    // takes the focus to print, and once it is gone the focus would fall back to the start of the page
+    var returnFocus = null;
+
+    function restoreFocus() {
+        var target = returnFocus;
+        returnFocus = null;
+        var active = document.activeElement;
+        if (target && target.isConnected && (!active || active === document.body || !active.isConnected)) {
+            target.focus();
+        }
+    }
 
     function remove(frame) {
         if (frame.parentNode) {
@@ -17,6 +29,7 @@
         }
         if (current === frame) {
             current = null;
+            restoreFocus();
         }
     }
 
@@ -28,18 +41,22 @@
         }
     }
 
+    // closes the link's menu and answers what should get the focus back after printing
     function closeMenuOf(link) {
         var menu = link.closest('details');
         if (menu) {
             menu.open = false;
+            return menu.querySelector(':scope > summary') || link;
         }
+        return link;
     }
 
-    function printInFrame(href) {
+    function printInFrame(href, opener) {
         // a second request (double click, the other printout) replaces the one still loading: one dialog at a time
         if (current) {
             remove(current);
         }
+        returnFocus = opener;
         var frame = document.createElement('iframe');
         frame.className = 'cl-print-frame';
         frame.setAttribute('aria-hidden', 'true');
@@ -66,9 +83,6 @@
             });
             view.focus();
             view.print();
-            window.setTimeout(function () {
-                remove(frame);
-            }, FALLBACK_MS);
         });
         frame.src = href;
         document.body.appendChild(frame);
@@ -80,7 +94,12 @@
             return;
         }
         event.preventDefault();
-        closeMenuOf(link);
-        printInFrame(link.href);
+        printInFrame(link.href, closeMenuOf(link));
+    });
+
+    window.addEventListener('pagehide', function () {
+        if (current) {
+            remove(current);
+        }
     });
 })();

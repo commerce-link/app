@@ -61,8 +61,16 @@ public final class OrderLabels {
         };
     }
 
+    /**
+     * The state of an order item. Delivered has its own label ("Skompletowany": the goods are in the store's hands),
+     * since FulfilmentStatus.Delivered is also the warehouse stock state, which the warehouse screens localise through
+     * the enum's own key ("Dostarczony": in stock).
+     */
     public static String itemStatus(FulfilmentStatus status) {
-        return status == null ? null : "FulfilmentStatus." + status.name();
+        if (status == null) {
+            return null;
+        }
+        return status == FulfilmentStatus.Delivered ? "order.item.status.Delivered" : "FulfilmentStatus." + status.name();
     }
 
     public static String tone(FulfilmentStatus status) {
@@ -109,6 +117,22 @@ public final class OrderLabels {
 
     public static String documentType(DocumentType type) {
         return type == null ? null : "DocumentType." + type.name();
+    }
+
+    /**
+     * The word before a document's number in the documents card, which the number itself already qualifies
+     * ("FV/2026/09/118", "WZ/MAG/2026/000001"): every invoice is "Faktura", the receipt "Paragon", a warehouse
+     * document "Dokument". A pro forma and an order confirmation keep their own names: neither is an invoice.
+     */
+    public static String documentPrefix(DocumentType type) {
+        if (type == null || type.isWarehouseDocument()) {
+            return "order.documents.prefix.document";
+        }
+        return switch (type) {
+            case Receipt -> "order.documents.prefix.receipt";
+            case InvoiceVat, InvoiceAdvance, InvoiceFinal, InvoicePersonal -> "order.documents.prefix.invoice";
+            default -> documentType(type);
+        };
     }
 
     public static String paymentSource(PaymentSource source) {

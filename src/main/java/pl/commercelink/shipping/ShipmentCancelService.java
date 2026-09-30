@@ -3,6 +3,7 @@ package pl.commercelink.shipping;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import pl.commercelink.orders.Order;
+import pl.commercelink.orders.OrderRealizationStepBack;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShipmentCancellationStatus;
@@ -24,7 +25,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Asks the shipping provider to cancel the courier order of the first dispatched shipment. The shipment is marked
+ * Asks the shipping provider to cancel the first courier order on the list whose parcel is not delivered. The shipment is marked
  * PENDING first; a result the provider gives right away is settled here by {@link ShipmentCancellationSettler},
  * otherwise {@link ShipmentCancellationChecker} clears the shipment once the provider confirms, or records why not.
  */
@@ -58,18 +59,15 @@ public class ShipmentCancelService {
         Store store = storesRepository.findById(storeId);
         Order order = ordersRepository.findById(storeId, orderId);
 
-        Shipment shipment = order.firstShipmentWithShippingData()
-                .orElseThrow(() -> new ShippingException("No valid shipment data to cancel"));
-
+        // by the courier order, not by the shipped date: the paid label is there whatever the dates say
+        Shipment shipment = order.courierShipmentToCancel()
+                .orElseThrow(() -> new ShippingException("No courier order to cancel"));
         String externalId = shipment.getExternalId();
-        if (externalId == null) {
-            throw new ShippingException("Shipment has no external package ID");
-        }
         // resolved before the mark: without a provider nothing can be sent, and a missing one must not look like a
         // command with an unknown outcome
         ShippingProvider provider = shippingProviderFactory.get(store);
         if (provider == null) {
-            throw new NoShippingProviderException();
+            throw new ShippingUnavailableException(storeId);
         }
 
         // an unknown result is read again rather than cancelled anew: a late success of the old command would make

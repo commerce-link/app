@@ -20,6 +20,7 @@ import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
+import pl.commercelink.orders.OrderRealizationStepBack;
 import pl.commercelink.orders.event.EventType;
 import pl.commercelink.orders.event.OrderEvent;
 import pl.commercelink.orders.event.OrderEventsRepository;
@@ -200,6 +201,37 @@ class OrderNotificationsServiceTest {
 
         // then
         verify(emailClient).send(any(), eq(EmailNotificationType.ORDER_ASSEMBLY_DATE_CHANGED), any());
+    }
+
+    @Test
+    void anOrderSteppedBackFromShippingGetsNoRealizationEmail() {
+        // given: the operator took the only shipped shipment back (OrderRealizationStepBack recorded it)
+        Order order = orderBase(OrderStatus.Realization);
+        order.setEstimatedShippingAt(LocalDate.now().plusDays(2));
+        when(orderEventsRepository.hasEvent(eq(ORDER_ID), eq(EventType.email), anyString())).thenReturn(false);
+        when(orderEventsRepository.hasEvent(ORDER_ID, EventType.action, OrderRealizationStepBack.EVENT)).thenReturn(true);
+        when(emailClient.send(any(), any(), any())).thenReturn(true);
+
+        // when
+        orderNotificationsService.send(order);
+
+        // then
+        verify(emailClient, never()).send(any(), eq(EmailNotificationType.ORDER_REALIZATION), any());
+    }
+
+    @Test
+    void anOrderEnteringRealizationForTheFirstTimeGetsTheRealizationEmail() {
+        // given
+        Order order = orderBase(OrderStatus.Realization);
+        order.setEstimatedShippingAt(LocalDate.now().plusDays(2));
+        when(orderEventsRepository.hasEvent(eq(ORDER_ID), eq(EventType.email), anyString())).thenReturn(false);
+        when(emailClient.send(any(), any(), any())).thenReturn(true);
+
+        // when
+        orderNotificationsService.send(order);
+
+        // then
+        verify(emailClient).send(eq(STORE_ID), eq(EmailNotificationType.ORDER_REALIZATION), any(EmailNotification.class));
     }
 
     private Order orderBase(OrderStatus status) {

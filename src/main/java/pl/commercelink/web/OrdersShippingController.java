@@ -77,7 +77,7 @@ public class OrdersShippingController extends AbstractShippingController {
 
     /** Every shipment already has its shipping data (a courier booked in another tab): nothing is left to book. */
     private static String refuseBooking(Order order) {
-        return order.hasShipmentWithoutShippingData() ? null : "shipping.error.all.defined";
+        return order.hasShipmentToBook() ? null : "shipping.error.all.defined";
     }
 
     @Override

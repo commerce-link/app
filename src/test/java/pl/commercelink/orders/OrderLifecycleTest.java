@@ -611,6 +611,60 @@ class OrderLifecycleTest {
     }
 
     @Test
+    void aShippingOrderDoesNotStampAPersonalCollectionWithoutItsDateAsReady() {
+        // given: K8 — the operator has just emptied the collection (removed shipment's placeholder, cleared date)
+        Order order = new Order("store-1");
+        order.setStatus(OrderStatus.Shipping);
+        Shipment parcel = new Shipment(ShipmentType.Courier);
+        parcel.setCarrier("InPost");
+        parcel.setTrackingNo("T-1");
+        parcel.setShippedAt(LocalDateTime.of(2026, 9, 27, 9, 0));
+        Shipment collection = new Shipment(ShipmentType.PersonalCollection);
+        order.setShipments(new ArrayList<>(List.of(parcel, collection)));
+
+        // when
+        orderLifecycle.update(order, List.of());
+
+        // then
+        assertEquals(OrderStatus.Shipping, order.getStatus());
+        assertThat(collection.getShippedAt()).isNull();
+    }
+
+    @Test
+    void anOrderWithoutShipmentsWaitsInRealizationWithNothingStamped() {
+        // given: the only shipment removed (the user's decision of 2026-09-30: no placeholder is kept)
+        Order order = new Order("store-1");
+        order.setStatus(OrderStatus.Realization);
+        order.setShipments(new ArrayList<>());
+        order.addDocument(new Document("doc-1", "FV/1/2026", "https://example.com/fv/1", DocumentType.InvoiceVat));
+
+        // when
+        orderLifecycle.update(order, List.of());
+
+        // then
+        assertEquals(OrderStatus.Realization, order.getStatus());
+        assertThat(order.getShipments()).isEmpty();
+        verifyNoInteractions(orderLifecycleEventPublisher, goodsOutEventPublisher);
+    }
+
+    @Test
+    void aReadyCollectionMovesARealizationOrderToShippingAsBefore() {
+        // given
+        Order order = new Order("store-1");
+        order.setStatus(OrderStatus.Realization);
+        Shipment collection = new Shipment(ShipmentType.PersonalCollection);
+        collection.setShippedAt(LocalDateTime.of(2026, 9, 30, 11, 40));
+        order.setShipments(new ArrayList<>(List.of(collection)));
+
+        // when
+        orderLifecycle.update(order, List.of());
+
+        // then
+        assertEquals(OrderStatus.Shipping, order.getStatus());
+        assertThat(collection.getShippedAt()).isEqualTo(LocalDateTime.of(2026, 9, 30, 11, 40));
+    }
+
+    @Test
     void aShippingOrderIsDeliveredOnceEveryShipmentHasADeliveryDate() {
         // given
         Order order = new Order("store-1");

@@ -517,7 +517,7 @@ class OrdersScriptContractTest {
         assertThat(print).contains("'use strict'").contains("a[data-cl-print-frame]").contains("event.preventDefault()")
                 .contains("event.ctrlKey").contains("event.metaKey").contains("createElement('iframe')")
                 .contains("view.focus()").contains("view.print()").contains("'afterprint'")
-                .contains("FALLBACK_MS").contains(".cl-print-sheet").contains("window.location.assign(href)")
+                .contains(".cl-print-sheet").contains("window.location.assign(href)")
                 .contains("menu.open = false")
                 .doesNotContain("innerHTML").doesNotContain("style.").doesNotContain("window.open");
         // the old preview page's button is gone
@@ -540,5 +540,46 @@ class OrdersScriptContractTest {
                 .contains("details.cl-menu[open]").contains("[data-cl-select-row]:checked").contains("'X-Requested-With': 'fetch'")
                 .contains("opaqueredirect")
                 .doesNotContain("innerHTML").doesNotContain("style.").doesNotContain("setInterval");
+    }
+
+    @Test
+    void printFrameIsRemovedOnlyOnAfterprintPagehideOrTheNextPrint() throws Exception {
+        // given: the script with its whitespace folded, so formatting does not matter
+        String print = read("src/main/resources/static/js/print.js").replaceAll("\\s+", " ");
+        java.util.regex.Matcher timers = java.util.regex.Pattern
+                .compile("setTimeout\\(\\s?function \\(\\) \\{([^}]*)\\}, ([^)]+)\\)").matcher(print);
+
+        // then: no timer takes the sheet away (Firefox may still show its preview); a deferral to the end of the
+        // current task (delay 0) is the only timer allowed to remove the frame
+        while (timers.find()) {
+            if (timers.group(1).contains("remove(")) {
+                assertThat(timers.group(2).trim()).as("delay of a timer that removes the frame").isEqualTo("0");
+            }
+        }
+        assertThat(print).containsPattern("addEventListener\\('afterprint', function \\(\\) \\{[^;]*setTimeout\\(function \\(\\) \\{ remove\\(frame\\);")
+                .containsPattern("addEventListener\\('pagehide', function \\(\\) \\{ if \\(current\\) \\{ remove\\(current\\);")
+                .containsPattern("function printInFrame\\([^)]*\\) \\{[^{]*if \\(current\\) \\{ remove\\(current\\);");
+        // and the keyboard goes back to the menu's summary once the frame that held the focus is gone
+        assertThat(print).containsPattern("function remove\\(frame\\) \\{.*restoreFocus\\(\\);")
+                .contains(":scope > summary")
+                .containsPattern("active === document.body")
+                .contains("target.focus()");
+    }
+
+    @Test
+    void menuFlipsToTheStartWhenItWouldLeaveTheViewport() throws Exception {
+        // given
+        String menu = read("src/main/resources/static/js/menu.js");
+        String css = css();
+
+        // then: any menu (not only a marker's popover) that would leave the window on the left opens from its
+        // toggle's left edge; the flag goes with the menu when it closes
+        String folded = menu.replaceAll("\\s+", " ");
+        assertThat(folded).contains("if (!isNote(menu) && box.left < MARGIN) { list.classList.add('is-start');")
+                .contains("list.classList.remove('is-up', 'is-end', 'is-start');");
+        // and falls back when opening from the start would leave the window on the right by more
+        assertThat(folded).containsPattern("list.classList.add\\('is-start'\\);[^}]*getBoundingClientRect\\(\\).right[^}]*"
+                + "if \\(overRight > 0 && overRight > MARGIN - box.left\\) \\{ list.classList.remove\\('is-start'\\);");
+        assertThat(rule(css, ".cl-page .cl-menu-list.is-start")).contains("left: 0").contains("right: auto");
     }
 }

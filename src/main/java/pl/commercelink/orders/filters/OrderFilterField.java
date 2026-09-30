@@ -71,6 +71,15 @@ public enum OrderFilterField {
                     .map(due -> due.covers(order.getShippingDueAt(), today))
                     .orElse(false);
         }
+    },
+
+    CustomerType {
+        @Override
+        public boolean matches(Order order, String value, LocalDate today) {
+            return pl.commercelink.orders.filters.CustomerType.parse(value)
+                    .map(type -> type.covers(order))
+                    .orElse(false);
+        }
     };
 
     public String normalize(String value) {

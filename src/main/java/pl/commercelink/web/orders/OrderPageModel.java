@@ -28,14 +28,17 @@ public record OrderPageModel(String orderId, String shortId, String backHref, bo
 
     /**
      * cancelLockedKey: why "Cancel order" is greyed although the order could otherwise be cancelled (an e-receipt
-     * being issued), null for the general reason; cancelMessage: the confirmation, with the fiscalised-receipt warning.
+     * being issued), null for the general reason; cancelUnavailableKey: that general reason, which names what the
+     * order still lacks (see OrderPageModelFactory#cancelUnavailableKey); cancelMessage: the confirmation, with the
+     * fiscalised-receipt warning.
      */
     public record Header(String statusKey, String statusTone, boolean canChangeStatus, boolean completedAutomatically,
                          String clientName, String sourceName, String sourceTypeKey, String orderedAt, String total,
                          String fulfilmentTypeShortKey, String fulfilmentTypeIcon, String externalOrderId, RoutedSupplierView routedSupplier,
                          String splitFromShortId, String splitFromHref, String clientOrderUrl, PrimaryAction primaryAction,
-                         String cardHref, String collectionHref, String itemHistoryHref, boolean canCancel,
-                         String cancelLockedKey, String cancelMessage, boolean canDelete, String deleteMessage) {
+                         String cardHref, String collectionHref, boolean canCancel,
+                         String cancelLockedKey, String cancelUnavailableKey, String cancelMessage, boolean canDelete,
+                         String deleteMessage) {
     }
 
     public record PrimaryAction(String labelKey, String href, String icon) {
@@ -103,7 +106,9 @@ public record OrderPageModel(String orderId, String shortId, String backHref, bo
      * date and one with a courier order (cancelled with "Cancel courier order" instead) removeHref is null and
      * removeReasonKey says why, so "Remove" shows greyed with that reason instead of disappearing. The only shipment
      * with nothing but the delivery choice has neither: removing it would change nothing. removeMessageKey and
-     * removeActionKey are the confirmation's text and button, which say when the removal delivers the order.
+     * removeActionKey are the confirmation's text and button, which say when the removal delivers the order or moves it
+     * back to Realization. placeholder: the order's only shipment holds nothing but the customer's delivery choice, so the
+     * row reads as "no shipment yet" with "Uzupełnij" instead of a shipment waiting to go out.
      * cancellationKey and cancellationTone: the pill of the courier cancellation, null without one; cancellationReason
      * is the argument of a failed one, already in the operator's language.
      */
@@ -112,7 +117,7 @@ public record OrderPageModel(String orderId, String shortId, String backHref, bo
                               String trackingTone, String trackingHelpKey, String cancellationKey,
                               String cancellationTone, String cancellationReason, String dialogId, String editHref,
                               String removeHref, String removeReasonKey, String removeMessageKey,
-                              String removeActionKey) {
+                              String removeActionKey, boolean placeholder) {
     }
 
     /**
@@ -167,7 +172,8 @@ public record OrderPageModel(String orderId, String shortId, String backHref, bo
     public record ReceiptEarlierRow(int attemptNo, String statusKey, String statusTone, String outcome) {
     }
 
-    public record DocumentRow(String typeKey, String number, String href, boolean external, String issuedAt,
+    /** prefixKey: the word before the number (OrderLabels#documentPrefix). */
+    public record DocumentRow(String prefixKey, String number, String href, boolean external, String issuedAt,
                               boolean removable, String removeHref) {
     }
 

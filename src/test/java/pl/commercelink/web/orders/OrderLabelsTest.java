@@ -45,6 +45,7 @@ class OrderLabelsTest {
         keys.addAll(keys(FulfilmentType.values(), OrderLabels::fulfilmentTypeShort));
         keys.addAll(keys(ShipmentType.values(), OrderLabels::shipmentType));
         keys.addAll(keys(DocumentType.values(), OrderLabels::documentType));
+        keys.addAll(keys(DocumentType.values(), OrderLabels::documentPrefix));
         keys.addAll(keys(PaymentSource.values(), OrderLabels::paymentSource));
         keys.addAll(keys(PaymentDirection.values(), d -> "PaymentDirection." + d.name()));
         keys.addAll(keys(OrderStatus.values(), s -> "order.status.effect." + s.name()));
@@ -104,6 +105,15 @@ class OrderLabelsTest {
         assertThat(OrderLabels.sourceType(null)).isNull();
         assertThat(OrderLabels.fulfilmentTypeShort(null)).isNull();
         assertThat(OrderLabels.fulfilmentTypeIcon(null)).isNull();
+    }
+
+    @Test
+    void anOrderItemInHandHasItsOwnLabelWhileTheOtherStatesKeepTheEnumKey() {
+        // when / then: FulfilmentStatus.Delivered stays the warehouse stock label ("Dostarczony")
+        assertThat(OrderLabels.itemStatus(FulfilmentStatus.Delivered)).isEqualTo("order.item.status.Delivered");
+        assertThat(OrderLabels.itemStatus(FulfilmentStatus.Ordered)).isEqualTo("FulfilmentStatus.Ordered");
+        assertThat(PL.getString("order.item.status.Delivered")).isEqualTo("Skompletowany");
+        assertThat(PL.getString("FulfilmentStatus.Delivered")).isEqualTo("Dostarczony");
     }
 
     @Test

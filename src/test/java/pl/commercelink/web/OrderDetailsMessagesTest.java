@@ -114,4 +114,81 @@ class OrderDetailsMessagesTest {
         assertThat(pl.getProperty("receipts.action.reissue.confirm.message")).contains("systemie e-paragonów");
         assertThat(pl.getProperty("receipts.action.close.help")).contains("systemie e-paragonów");
     }
+
+    /** The keys of the page and its e-receipt row, without the bell's texts (receipts.attention.*, kept as they were). */
+    private static List<String> pageKeys(Properties bundle) throws IOException {
+        Set<String> keys = new TreeSet<>();
+        for (Path p : sources().toList()) {
+            if (!Files.exists(p)) continue;
+            String text = Files.readString(p);
+            for (Pattern pattern : List.of(KEY, QUOTED)) {
+                Matcher m = pattern.matcher(text);
+                while (m.find()) {
+                    if (!m.group(1).endsWith(".")) keys.add(m.group(1));
+                }
+            }
+        }
+        bundle.stringPropertyNames().stream()
+                .filter(k -> k.startsWith("receipts.") && !k.startsWith("receipts.attention."))
+                .forEach(keys::add);
+        return keys.stream().filter(bundle::containsKey).toList();
+    }
+
+    @Test
+    void rowDescriptionsStartWithACapital() throws IOException {
+        // given: texts that open the description line of a list row (the parts after a " · " stay lower case)
+        Properties pl = load("messages_pl.properties"), en = load("messages_en.properties");
+        List<String> leads = List.of("order.documents.issued", "order.shipments.pickup", "receipts.row.fiscalised",
+                "receipts.row.closed", "order.history.review.none", "order.payments.empty", "order.documents.empty");
+
+        // then
+        for (Properties bundle : List.of(pl, en)) {
+            for (String key : leads) {
+                String value = bundle.getProperty(key);
+                assertThat(Character.isUpperCase(value.charAt(0))).as(key + " = " + value).isTrue();
+            }
+        }
+        assertThat(pl.getProperty("order.review.status.none")).isEqualTo("— nie jest zbierana —");
+        assertThat(pl.getProperty("order.payments.remove.locked.pending")).startsWith("Oczekiwana wpłata");
+    }
+
+    @Test
+    void oneTermForEmailAndEReceipt() throws IOException {
+        // given
+        Properties pl = load("messages_pl.properties");
+        Pattern bareMail = Pattern.compile("(?i)(?<![-\\p{L}])maila?\\b|(?<![-\\p{L}])mailem\\b");
+
+        // when
+        List<String> offending = pageKeys(pl).stream()
+                .filter(k -> bareMail.matcher(pl.getProperty(k)).find()
+                        || pl.getProperty(k).contains("paragonu/faktury")
+                        || pl.getProperty(k).contains("paragon albo fakturę")
+                        || pl.getProperty(k).contains("zestawu nie rozdzielisz")
+                        || pl.getProperty(k).contains("sprzedaż POS"))
+                .map(k -> k + " = " + pl.getProperty(k))
+                .toList();
+
+        // then: "e-mail", "fakturę albo paragon", "zestawu nie podzielisz" (the menu says "Podziel zestaw")
+        assertThat(offending).isEmpty();
+        assertThat(pl.getProperty("receipts.action.close.title")).isEqualTo("Zamknij e-paragon ręcznie");
+    }
+
+    @Test
+    void englishUsesTypographicQuotesAndDashes() throws IOException {
+        // given
+        Properties en = load("messages_en.properties");
+
+        // when: ASCII quotes, a hyphen standing for a dash, a doubled apostrophe or "e-mail" beside "email"
+        List<String> offending = pageKeys(en).stream()
+                .filter(k -> en.getProperty(k).contains("\"") || en.getProperty(k).contains(" - ")
+                        || en.getProperty(k).contains("''") || en.getProperty(k).toLowerCase(Locale.ROOT).contains("e-mail"))
+                .map(k -> k + " = " + en.getProperty(k))
+                .toList();
+
+        // then
+        assertThat(offending).isEmpty();
+        assertThat(en.getProperty("order.item.form.service.locked"))
+                .isEqualTo("The item has a supplier — you can no longer switch it to a service.");
+        assertThat(en.getProperty("order.page.action.dropship")).isEqualTo(en.getProperty("deliveries.purchase.button"));
+    }
 }

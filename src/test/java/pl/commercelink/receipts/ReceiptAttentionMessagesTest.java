@@ -63,7 +63,7 @@ class ReceiptAttentionMessagesTest {
         String formatted = messageSource.getMessage(
                 ReceiptAttention.EMAIL_NOT_SENT.messageKey(), ARGS, Locale.forLanguageTag("en"));
 
-        assertThat(formatted).contains("store's email templates").contains("order's documents");
+        assertThat(formatted).contains("store’s email templates").contains("order’s documents");
     }
 
     private static java.util.Properties raw(String file) throws java.io.IOException {
@@ -153,7 +153,39 @@ class ReceiptAttentionMessagesTest {
                 .contains("„Wystaw ponownie”").contains("sprzedaż zostałaby zafiskalizowana dwa razy")
                 .doesNotContain("„Dodaj” w dokumentach").doesNotContain("dane do faktury")
                 .doesNotContain("dwie sprzedaże");
-        assertThat(en).contains("\"Add document\" → Receipt").contains("billing details").contains("\"Reissue\"")
+        assertThat(en).contains("“Add document” → Receipt").contains("billing details").contains("“Reissue”")
                 .doesNotContain("two sales");
+    }
+
+    @Test
+    void bellNamesOnlyTheCurrentLabelsOfTheOrderPage() {
+        // given: every quoted name in the bell is a button, card or template the operator must find on the page
+        ResourceBundleMessageSource messageSource = messageSource();
+        java.util.regex.Pattern quoted = java.util.regex.Pattern.compile("[„“]([^”]+)”");
+        java.util.List<String> labelKeys = java.util.List.of("receipts.action.reissue", "receipts.action.close",
+                "receipts.action.resendEmail", "order.documents.add", "receipts.section.title");
+
+        for (String language : java.util.List.of("pl", "en")) {
+            Locale locale = Locale.forLanguageTag(language);
+            java.util.Set<String> labels = new java.util.HashSet<>();
+            labelKeys.forEach(key -> labels.add(messageSource.getMessage(key, null, locale)));
+
+            for (ReceiptAttention attention : ReceiptAttention.values()) {
+                // when
+                String bell = messageSource.getMessage(attention.messageKey(), ARGS, locale);
+                java.util.regex.Matcher m = quoted.matcher(bell);
+
+                // then
+                while (m.find()) {
+                    assertThat(labels).as(language + " " + attention + " names „" + m.group(1) + "”").contains(m.group(1));
+                }
+                assertThat(bell).as(language + " " + attention).doesNotContain("\"").doesNotContain("Sprzedaż POS")
+                        .doesNotContainPattern("(?i)(?<![-\\p{L}])maila?\\b").doesNotContain("Resend e-mail");
+            }
+        }
+        assertThat(messageSource.getMessage("receipts.attention.EMAIL_NOT_SENT", ARGS, Locale.forLanguageTag("pl")))
+                .contains("„" + messageSource.getMessage("receipts.action.resendEmail", null, Locale.forLanguageTag("pl")) + "”");
+        assertThat(messageSource.getMessage("receipts.attention.EMAIL_NOT_SENT", ARGS, Locale.ENGLISH))
+                .contains("“" + messageSource.getMessage("receipts.action.resendEmail", null, Locale.ENGLISH) + "”");
     }
 }
