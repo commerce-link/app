@@ -30,7 +30,19 @@ public class ShippingService {
     @Autowired
     private CarrierDictionary carrierDictionary;
 
+    /**
+     * Whether the store can price and book a courier: a shipping provider is connected and its adapter is installed.
+     * The one rule behind the order's "Zamów kuriera" action and every step of the courier page. The adapter is looked
+     * up by its descriptor, which is what makes ShippingProviderFactory#get return null, without loading the account's
+     * settings on every order page.
+     */
+    public boolean isAvailable(Store store) {
+        return store != null
+                && shippingProviderFactory.getDescriptor(store.getConfigurationValue(IntegrationType.SHIPPING_PROVIDER)) != null;
+    }
+
     public List<ShippingEstimate> estimateServicePrices(ShippingForm form, Store store, DeliveryTarget deliveryTarget) {
+        ShippingProvider shippingProvider = requireProvider(store);
         ShippingDetails pickupAddress = store.getPickUpAddress(form.getPickUpAddressId());
         ShippingDetails senderAddress = store.getDefaultSenderAddress().orElse(pickupAddress);
 
@@ -54,11 +66,11 @@ public class ShippingService {
                 .map(AuthorizedCarrier::getId)
                 .collect(Collectors.toSet());
 
-        ShippingProvider shippingProvider = shippingProviderFactory.get(store);
         return shippingProvider.estimateShipment(request, carrierIds);
     }
 
     public OperationResult<List<Shipment>> createShipping(ShippingForm form, Store store, DeliveryTarget deliveryTarget) {
+        ShippingProvider shippingProvider = requireProvider(store);
         ShippingDetails pickupAddress = store.getPickUpAddress(form.getPickUpAddressId());
         ShippingDetails senderAddress = store.getDefaultSenderAddress().orElse(pickupAddress);
 
@@ -79,7 +91,7 @@ public class ShippingService {
                 .options(new ShipmentOptions(form.isSaturdayDelivery(), false, cod))
                 .build();
 
-        return executeCreateShipment(request, store);
+        return executeCreateShipment(request, shippingProvider);
     }
 
 
@@ -108,6 +120,7 @@ public class ShippingService {
     }
 
     public OperationResult<List<Shipment>> createShipping(ShippingDetails pickupAddress, List<ParcelForm> parcels, Carrier carrier, Store store) {
+        ShippingProvider shippingProvider = requireProvider(store);
         ShippingDetails receiverAddress = store.getDefaultPickupAddress()
                 .orElseThrow(() -> new InvalidReturnConfigurationException(
                         "Default receiver address not configured. Contact store administrator."
@@ -121,17 +134,24 @@ public class ShippingService {
                 .options(new ShipmentOptions(false, true, null))
                 .build();
 
-        return executeCreateShipment(request, store);
+        return executeCreateShipment(request, shippingProvider);
     }
 
-    private OperationResult<List<Shipment>> executeCreateShipment(ShipmentRequest request, Store store) {
-        ShippingProvider shippingProvider = shippingProviderFactory.get(store);
+    private OperationResult<List<Shipment>> executeCreateShipment(ShipmentRequest request, ShippingProvider shippingProvider) {
         try {
             ShipmentResult result = shippingProvider.createShipment(request);
             return OperationResult.success(toShipments(result));
         } catch (ShippingException e) {
             return OperationResult.failure(e.getMessage());
         }
+    }
+
+    private ShippingProvider requireProvider(Store store) {
+        ShippingProvider shippingProvider = isAvailable(store) ? shippingProviderFactory.get(store) : null;
+        if (shippingProvider == null) {
+            throw new ShippingUnavailableException(store == null ? null : store.getStoreId());
+        }
+        return shippingProvider;
     }
 
     static ShipmentAddress toReceiverAddress(ShippingDetails details, String pointCode) {

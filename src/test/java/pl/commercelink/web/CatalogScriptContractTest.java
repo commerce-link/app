@@ -50,7 +50,8 @@ class CatalogScriptContractTest {
 
         // then
         for (String hook : List.of("data-cl-select-table", "data-cl-select-all", "data-cl-select-row", "data-cl-selection-bar",
-                "data-cl-selection-count", "data-cl-select-action", "data-cl-select-clear", "data-cl-select-form",
+                "data-cl-selection-count", "data-cl-select-action", "data-cl-select-form", "data-cl-label-select",
+                "data-cl-label-clear",
                 "data-cl-select-confirm-title", "data-cl-select-confirm-message", "data-cl-select-confirm-action",
                 "is-selected", "cl:table-filtered")) {
             assertThat(script).as("table-select.js handles " + hook).contains(hook);
@@ -359,10 +360,9 @@ class CatalogScriptContractTest {
         }
         assertThat(css).doesNotContain("picker-option-checkbox").doesNotContain(".picker-option-text")
                 .doesNotContain("font-size: 11.5px");
-        assertThat(css).contains("""
-                .cl-page .cl-selection-bar .cl-button.is-primary {
-                    background: var(--cl-accent);
-                    color: var(--cl-surface);""");
+        // the selection row takes the look of the table header it stands in for, not an accent box of its own
+        assertThat(rule(css, ".cl-page .cl-selection-row")).contains("background: var(--cl-surface-2);")
+                .contains("border-bottom: 1px solid var(--cl-line);").doesNotContain("--cl-accent");
         String chipRemove = css.split("\\.cl-page \\.cl-chip-tag-remove \\{")[1].split("}")[0];
         assertThat(chipRemove).contains("border-radius: calc(var(--cl-radius) - 2px);");
     }
@@ -488,7 +488,8 @@ class CatalogScriptContractTest {
 
     /**
      * RF-10/D-M7, D-M16, D-M19: the bulk form takes the address along, the count is announced from a region that is
-     * always there, and "Odznacz" leaves the focus on "Zaznacz widoczne" rather than on a bar that disappears.
+     * always there, and clearing through a select-all box leaves the focus on the header's box rather than on a row that
+     * disappears.
      */
     @Test
     void theSelectionCopiesTheAddressAnnouncesFromAPermanentRegionAndKeepsTheFocus() throws Exception {
@@ -497,7 +498,7 @@ class CatalogScriptContractTest {
 
         // then
         assertThat(script).contains("window.location.search").contains("data-cl-selection-status")
-                .containsPattern("all\\.focus\\(\\)");
+                .containsPattern("header\\.focus\\(\\)").doesNotContain("data-cl-select-clear");
     }
 
     /**
@@ -550,8 +551,9 @@ class CatalogScriptContractTest {
                 + ".cl-page .cl-card > .cl-visually-hidden:first-child + [data-cl-table-filter] > .cl-table-toolbar:first-child"))
                 .contains("padding-top: 14px;");
         assertThat(rule(css, ".cl-page .cl-table td.cl-table-actions .cl-link-button")).contains("margin-block: -12px;");
-        // a read-only field of a catalog form (the codes of a product the PIM knows, its brand) looks read-only
-        assertThat(rule(css, ".cl-page .cl-form .cl-input[readonly]")).contains("background: var(--cl-surface-2);")
+        // a read-only field (the codes of a product the PIM knows, its brand, the expected amount of "Dodaj wpłatę",
+        // whose form is not a .cl-form) looks read-only
+        assertThat(rule(css, ".cl-page .cl-input[readonly]")).contains("background: var(--cl-surface-2);")
                 .contains("color: var(--cl-ink-2);");
         // a pill that opens the line under a page title starts where the title does
         assertThat(rule(css, ".cl-page .cl-page-lead .cl-status.is-leading")).contains("margin-left: 0;");

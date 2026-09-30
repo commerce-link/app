@@ -1,5 +1,7 @@
 package pl.commercelink.orders;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import pl.commercelink.inventory.deliveries.DeliveriesRepository;
@@ -17,6 +19,8 @@ import static org.apache.commons.lang3.StringUtils.isNotBlank;
 @Service
 public class ItemHistoryService {
 
+    private static final Logger log = LoggerFactory.getLogger(ItemHistoryService.class);
+
     @Autowired
     private OrderItemsRepository orderItemsRepository;
     @Autowired
@@ -33,14 +37,37 @@ public class ItemHistoryService {
     public List<ItemHistoryEvent> getHistoryBySerial(String serialNo, String storeId) {
         List<ItemHistoryEvent> history = new ArrayList<>();
 
-        // Order Items
+        // Order Items: the lookup scans every store, so only items whose order is in this store count
         List<OrderItem> orderItems = orderItemsRepository.findBySerialNo(serialNo);
-        if (orderItems != null && !orderItems.isEmpty()) {
-            // Related Delivery
-            OrderItem firstOrderItem = orderItems.get(0);
-            if (isNotBlank(firstOrderItem.getDeliveryId())) {
+        OrderItem firstOwnItem = null;
+        if (orderItems != null) {
+            for (OrderItem orderItem : orderItems) {
+                // Related Order
+                Order order = ordersRepository.findById(storeId, orderItem.getOrderId());
+                if (order == null) {
+                    log.warn("Item history {}: order {} not found in store {}, skipped", serialNo, orderItem.getOrderId(), storeId);
+                    continue;
+                }
+                if (firstOwnItem == null) {
+                    firstOwnItem = orderItem;
+                }
+                history.add(new ItemHistoryEvent(
+                        order.getOrderId(),
+                        order.getLastEventDate(),
+                        "Order",
+                        "Order Status: " + order.getStatus(),
+                        "/dashboard/orders/" + order.getOrderId()
+                ));
+            }
+        }
 
-                Delivery delivery = deliveriesRepository.findById(storeId, firstOrderItem.getDeliveryId());
+        // Related Delivery, of the first item that belongs to this store. Before a delivery exists the field may hold
+        // something else (a supplier name): no delivery event then.
+        if (firstOwnItem != null && isNotBlank(firstOwnItem.getDeliveryId())) {
+            Delivery delivery = deliveriesRepository.findById(storeId, firstOwnItem.getDeliveryId());
+            if (delivery == null) {
+                log.warn("Item history {}: delivery {} not found in store {}, skipped", serialNo, firstOwnItem.getDeliveryId(), storeId);
+            } else {
                 history.add(new ItemHistoryEvent(
                         delivery.getDeliveryId(),
                         delivery.getOrderedAt(),
@@ -59,27 +86,19 @@ public class ItemHistoryService {
                     ));
                 }
             }
-
-            for (OrderItem orderItem : orderItems) {
-                // Related Order
-                Order order = ordersRepository.findById(storeId, orderItem.getOrderId());
-                history.add(new ItemHistoryEvent(
-                        order.getOrderId(),
-                        order.getLastEventDate(),
-                        "Order",
-                        "Order Status: " + order.getStatus(),
-                        "/dashboard/orders/" + order.getOrderId()
-                ));
-            }
         }
 
         // RMA Item
         List<RMAItem> rmaItems = rmaItemsRepository.findBySerialNo(serialNo);
         boolean movedToWarehouse = false;
 
-        if (!rmaItems.isEmpty()) {
+        if (rmaItems != null && !rmaItems.isEmpty()) {
             for (RMAItem rmaItem : rmaItems) {
                 RMA rma = rmaRepository.findById(storeId, rmaItem.getRmaId());
+                if (rma == null) {
+                    log.warn("Item history {}: RMA {} not found in store {}, skipped", serialNo, rmaItem.getRmaId(), storeId);
+                    continue;
+                }
                 String actualResolution = (rmaItem.getActualResolution() != null)
                         ? rmaItem.getActualResolution().toString()
                         : "N/A";
@@ -100,7 +119,8 @@ public class ItemHistoryService {
             }
         }
 
-        history.sort(Comparator.comparing(ItemHistoryEvent::getDate));
+        // an order without any date yet must not break the sort
+        history.sort(Comparator.comparing(ItemHistoryEvent::getDate, Comparator.nullsLast(Comparator.naturalOrder())));
 
         // Warehouse Item
         WarehouseItemView warehouseItem = warehouse.stockQueryService(storeId).findBySerialNo(storeId, serialNo);

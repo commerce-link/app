@@ -165,7 +165,8 @@ class CategoryPageTemplateTest {
         String html = rendered(false);
 
         // then
-        assertThat(occurrences(html, "<label class=\"cl-check-target\">")).isEqualTo(3);
+        // two rows, the header's "select visible" and the selection row's own
+        assertThat(occurrences(html, "<label class=\"cl-check-target\">")).isEqualTo(4);
         assertThat(html).containsPattern("<label class=\"cl-check-target\">\\s*<input type=\"checkbox\" class=\"cl-check-input\" data-cl-select-all")
                 .containsPattern("<label class=\"cl-check-target\">\\s*<input type=\"checkbox\" class=\"cl-check-input\" data-cl-select-row");
     }
@@ -337,12 +338,30 @@ class CategoryPageTemplateTest {
      * its text is often skipped. The bar keeps the visible count.
      */
     @Test
+    void theSelectionRowHasNoClearButtonAndKeepsTheTrashIconOnRemove() {
+        // when
+        String html = rendered(false);
+        String row = html.substring(html.indexOf("<div class=\"cl-selection-row\""), html.indexOf("<table"));
+
+        // then: the markup's order is the order on screen and in Tab, the select-all box clears the selection itself
+        // and names what it does: with a filter it checks only the visible rows, so it says so; "Remove" is a danger
+        // link with its icon
+        assertThat(row).doesNotContain("data-cl-select-clear")
+                .contains("aria-label=\"Select the visible rows\" data-cl-label-select=\"Select the visible rows\" "
+                        + "data-cl-label-clear=\"Deselect all\"");
+        assertThat(row.indexOf("data-cl-select-all")).isLessThan(row.indexOf("data-cl-selection-count"));
+        assertThat(row.indexOf("data-cl-selection-count")).isLessThan(row.indexOf("data-cl-select-action=\"enable\""));
+        assertThat(row).containsPattern("<button type=\"button\" class=\"cl-link-button is-danger cl-selection-remove\" "
+                + "data-cl-select-action=\"delete\"[^>]*>\\s*<span class=\"icon is-small\" aria-hidden=\"true\"><i class=\"fas fa-trash-alt\"></i></span>");
+    }
+
+    @Test
     void theSelectionIsAnnouncedFromAPermanentRegionOutsideTheBar() {
         // when
         String html = rendered(false);
 
         // then
-        assertThat(html).containsPattern("<p class=\"cl-visually-hidden\" role=\"status\" data-cl-selection-status></p>\\s*<div class=\"cl-selection-bar\"");
+        assertThat(html).containsPattern("<p class=\"cl-visually-hidden\" role=\"status\" data-cl-selection-status></p>\\s*<div class=\"cl-selection-row\"");
         String bar = html.substring(html.indexOf("data-cl-selection-bar"), html.indexOf("cl-selection-actions"));
         assertThat(bar).doesNotContain("role=\"status\"");
     }

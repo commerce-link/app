@@ -131,6 +131,12 @@ public class Shipment {
         return type == ShipmentType.PersonalCollection && shippedAt != null;
     }
 
+    /** It has a shipped (or ready-for-collection) or a delivery date: what the card shows as "nadano" / "dostarczono". */
+    @DynamoDBIgnore
+    public boolean hasGoneOut() {
+        return shippedAt != null || deliveredAt != null;
+    }
+
     @DynamoDBIgnore
     public boolean isDeliveredToCollectionPoint() {
         return isNotBlank(collectionPointCode);
@@ -207,6 +213,7 @@ public class Shipment {
         this.trackingSubscriptionStatus = ShipmentTrackingStatus.FAILED;
     }
 
+    /** The tracking subscription follows the tracking number: a changed number is tracked anew. */
     public void inheritTrackingSubscriptionFrom(Shipment previous) {
         if (previous == null || !previous.hasTrackingNo(trackingNo)) {
             return;
@@ -214,8 +221,23 @@ public class Shipment {
         this.trackingSubscriptionStatus = previous.trackingSubscriptionStatus;
         this.trackingSubscriptionId = previous.trackingSubscriptionId;
         this.trackingExternalId = previous.trackingExternalId;
-        if (externalId == null) {
+    }
+
+    /**
+     * The courier order (the paid label at the carrier) stays with the shipment whatever an edit does to its fields:
+     * only "Cancel courier order" cancels it at the carrier, and a shipment that lost it could be removed and leave the
+     * label orphaned.
+     */
+    public void inheritCourierOrderFrom(Shipment previous) {
+        if (previous != null && previous.externalId != null) {
             this.externalId = previous.externalId;
         }
+    }
+
+    /** Nothing but the delivery choice: no tracking, no dates, no courier order. */
+    @DynamoDBIgnore
+    public boolean isPlaceholder() {
+        return isEmpty(trackingNo) && isEmpty(trackingUrl) && isEmpty(externalId) && shippedAt == null
+                && deliveredAt == null;
     }
 }

@@ -1,0 +1,15 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--/* The outcome of the last order action (flash orderNotice), in the page body. */-->
+<div th:fragment="notice" th:if="${orderNotice != null}" class="cl-alert" th:classappend="${orderNotice.tone()}"
+     role="status" data-cl-saved-alert>
+    <i class="fas cl-alert-icon" aria-hidden="true"
+       th:classappend="${orderNotice.tone() == 'is-ok'} ? 'fa-check-circle' : 'fa-exclamation-triangle'"></i>
+    <p class="cl-alert-text">
+        <span th:text="${orderNotice.text()}"></span>
+        <a th:if="${orderNotice.linkHref() != null}" th:href="@{${orderNotice.linkHref()}}" th:text="${orderNotice.linkText()}"></a>
+    </p>
+</div>
+</body>
+</html>

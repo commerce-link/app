@@ -53,5 +53,33 @@
        class="cl-page-lead" th:text="${lead}"></p>
 </div>
 
+<!--/* Header of a record page with a status (an order): back link (or none, backHref null), h1 with the status pill and
+       its action beside it, the meta lines below and actions on the right. titleAction (the copy icon of the number),
+       status, meta and actions are fragment blocks (~{::x}) or null; titleAction stays glued to the end of the h1, so
+       on a narrow screen it never wraps alone onto the next line. */-->
+<div th:fragment="record(backHref, backLabel, title, titleAction, status, meta, actions)" class="cl-page-header">
+    <a th:if="${backHref != null}" class="cl-back" th:href="@{${backHref}}">
+        <span class="icon is-small" aria-hidden="true"><i class="fas fa-chevron-left"></i></span>
+        <span th:text="${backLabel}"></span>
+    </a>
+    <div class="cl-page-header-row is-record">
+        <div class="cl-record-title">
+            <div class="cl-record-name">
+                <h1 class="cl-page-title" th:text="${title}"></h1>
+                <th:block th:if="${titleAction != null}" th:insert="${titleAction}"></th:block>
+            </div>
+            <th:block th:if="${status != null}">
+                <th:block th:insert="${status}"></th:block>
+            </th:block>
+        </div>
+        <div th:if="${actions != null}" class="cl-page-actions">
+            <th:block th:insert="${actions}"></th:block>
+        </div>
+    </div>
+    <th:block th:if="${meta != null}">
+        <th:block th:insert="${meta}"></th:block>
+    </th:block>
+</div>
+
 </body>
 </html>

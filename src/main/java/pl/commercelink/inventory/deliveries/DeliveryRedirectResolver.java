@@ -24,12 +24,27 @@ public class DeliveryRedirectResolver {
         return "/dashboard/deliveries/details?deliveryId=" + item.getDeliveryId();
     }
 
-    public String resolveFor(Order order, OrderItem item) {
-        if (isAwaitingDropshipDelivery(order, item)) {
+    /**
+     * Where the item's delivery link of an order leads. dropship is the order's DropshipEligibility assessment: a
+     * direct-to-consumer item goes to the order's dropship page only when its supplier is one the assessment accepts,
+     * exactly the split DeliveriesPlanningService makes; any other supplier's items travel the ordinary warehouse
+     * route, so the link leads to that supplier's delivery planning like on a warehouse order.
+     */
+    public String resolveFor(Order order, OrderItem item, DropshipAssessment dropship) {
+        if (isAwaitingDropshipDelivery(order, item) && dropship.supports(item.getDeliveryId())) {
             return "/dashboard/orders/" + order.getOrderId() + "/dropship?provider="
                     + URLEncoder.encode(item.getDeliveryId(), StandardCharsets.UTF_8);
         }
         return resolveFor(item);
+    }
+
+    /**
+     * Whether the item's deliveryId is the id of a supplier delivery (claimed, ordered, delivered) rather than the
+     * supplier it waits for (New, unclaimed Allocation) or the warehouse; the same split as the links above.
+     */
+    public boolean pointsToDelivery(Item item) {
+        return item.getDeliveryId() != null && !SupplierRegistry.WAREHOUSE.equalsIgnoreCase(item.getDeliveryId())
+                && !isAwaitingDelivery(item);
     }
 
     private boolean isAwaitingDropshipDelivery(Order order, Item item) {

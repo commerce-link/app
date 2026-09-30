@@ -1,0 +1,33 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+<!--/* The bulk-action dialog of the order page as its own page, for a browser without JavaScript: same texts, and the
+       chosen items listed so the operator sees what the action will touch before it runs. */-->
+<div layout:fragment="content">
+    <section class="cl-page">
+        <div class="cl-page-body">
+            <div th:replace="~{fragments/settings-header :: subpage('/dashboard/orders/' + ${orderId}, ${backLabel}, ${title})}"></div>
+            <form class="cl-form" method="post" th:action="@{${actionPath}}">
+                <div class="cl-card">
+                    <p class="cl-card-body" th:text="${message}"></p>
+                    <ul class="cl-list">
+                        <li class="cl-list-item" th:each="item, i : ${items}">
+                            <span class="cl-list-title" th:text="${item.name}"></span>
+                            <input type="hidden" th:name="|orderItems[${i.index}].itemId|" th:value="${item.itemId}">
+                            <input type="hidden" th:name="|orderItems[${i.index}].selected|" value="true">
+                        </li>
+                    </ul>
+                    <div class="cl-card-footer">
+                        <button type="submit" class="cl-button" th:classappend="${danger} ? 'is-danger' : 'is-primary'"
+                                th:text="${confirmLabel}"></button>
+                        <a class="cl-button" th:href="@{/dashboard/orders/{o}(o=${orderId})}" th:text="#{general.cancel}"></a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </section>
+</div>
+</body>
+</html>

@@ -1,0 +1,48 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--/* The billing or shipping address form (web.orders.OrderAddressForm): in a dialog of the customer card, or on the
+       address page without JavaScript. Saved without reloading in the dialog: 422 comes back with the errors next to
+       the fields and the dialog stays open; 200 closes it and reloads the page, which shows the saved address and the
+       notice stored for it. Autofill is off: the operator types the customer's address, not their own. */-->
+<dialog th:fragment="dialog(address)" class="cl-dialog is-form" th:id="|address-dialog-${address.type()}|"
+        th:attr="aria-labelledby=|address-${address.type()}-title|">
+    <form th:replace="~{orders/details/address :: addressForm(${address}, true)}"></form>
+</dialog>
+
+<form th:fragment="dialogForm" th:replace="~{orders/details/address :: addressForm(${address}, true)}"></form>
+<form th:fragment="pageForm" th:replace="~{orders/details/address :: addressForm(${address}, false)}"></form>
+
+<form th:fragment="addressForm(address, inDialog)" th:id="|address-form-${address.type()}|" class="cl-form" method="post"
+      novalidate data-cl-async
+      th:action="@{/dashboard/orders/{o}/updateAddressDetails(o=${address.orderId()}, type=${address.type()})}"
+      th:attr="data-error-message=#{form.save.failed}, data-cl-dialog-close-on-success=${inDialog} ? 'true' : null">
+    <h2 th:if="${inDialog}" class="cl-dialog-title" th:id="|address-${address.type()}-title|"
+        th:text="${address.isBilling()} ? #{order.customer.billing.edit} : #{order.customer.shipping.edit}"></h2>
+    <div th:class="${inDialog} ? 'cl-dialog-body' : 'cl-card-inset'">
+        <div th:if="${address.refusal() != null}" class="cl-alert is-bad" tabindex="-1" data-cl-error-summary>
+            <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
+            <p class="cl-alert-title" th:text="${address.refusal()}"></p>
+        </div>
+        <div th:replace="~{fragments/settings-form :: errorSummary(|address-${address.type()}-errors|, ${address.errors()}, null)}"></div>
+        <div class="cl-form-grid cl-card-grid">
+            <div class="cl-span-3" th:insert="~{fragments/settings-form :: textField(${address.field('name')}, 'order.address.name', ${address.name()}, 'text', 'off', true, ${address.error('name')}, null)}"></div>
+            <div class="cl-span-3" th:insert="~{fragments/settings-form :: textField(${address.field('surname')}, 'order.address.surname', ${address.surname()}, 'text', 'off', true, ${address.error('surname')}, null)}"></div>
+            <div th:insert="~{fragments/settings-form :: textField(${address.field('streetAndNumber')}, 'order.address.street', ${address.streetAndNumber()}, 'text', 'off', true, ${address.error('streetAndNumber')}, null)}"></div>
+            <div class="cl-span-2" th:insert="~{fragments/settings-form :: textField(${address.field('postalCode')}, 'order.address.postal', ${address.postalCode()}, 'text', 'off', true, ${address.error('postalCode')}, null)}"></div>
+            <div class="cl-span-2" th:insert="~{fragments/settings-form :: textField(${address.field('city')}, 'order.address.city', ${address.city()}, 'text', 'off', true, ${address.error('city')}, null)}"></div>
+            <div class="cl-span-2" th:insert="~{fragments/settings-form :: textField(${address.field('country')}, 'order.address.country', ${address.country()}, 'text', 'off', true, ${address.error('country')}, #{order.address.country.help})}"></div>
+            <div class="cl-span-3" th:insert="~{fragments/settings-form :: textField(${address.field('email')}, 'order.address.email', ${address.email()}, 'email', 'off', true, ${address.error('email')}, null)}"></div>
+            <div class="cl-span-3" th:insert="~{fragments/settings-form :: textField(${address.field('phone')}, 'order.address.phone', ${address.phone()}, 'tel', 'off', true, ${address.error('phone')}, null)}"></div>
+            <div th:class="${address.isBilling()} ? 'cl-span-3' : null" th:insert="~{fragments/settings-form :: textField(${address.field('companyName')}, 'order.address.company', ${address.companyName()}, 'text', 'off', false, ${address.error('companyName')}, null)}"></div>
+            <div th:if="${address.isBilling()}" class="cl-span-3" th:insert="~{fragments/settings-form :: textField(${address.field('taxId')}, 'order.address.tax.id', ${address.taxId()}, 'text', 'off', false, ${address.error('taxId')}, null)}"></div>
+        </div>
+    </div>
+    <div th:class="${inDialog} ? 'cl-dialog-actions' : 'cl-card-footer'">
+        <button type="submit" class="cl-button is-primary" th:text="#{form.save.changes}"></button>
+        <button th:if="${inDialog}" type="button" class="cl-button" data-cl-dialog-close th:text="#{general.cancel}"></button>
+        <a th:unless="${inDialog}" class="cl-button" th:href="@{/dashboard/orders/{o}(o=${address.orderId()})}" th:text="#{general.cancel}"></a>
+    </div>
+</form>
+</body>
+</html>

@@ -23,6 +23,7 @@ import java.util.Locale;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import pl.commercelink.shipping.DeliveryTarget;
+import pl.commercelink.shipping.ShippingPageView;
 import pl.commercelink.stores.IntegrationType;
 import pl.commercelink.stores.Store;
 
@@ -150,5 +151,11 @@ public class RMAShippingController extends AbstractShippingController {
         }
         return new DeliveryTarget(getStore().getConfigurationValue(IntegrationType.SHIPPING_PROVIDER),
                 rmaConfiguration.getCarrier().getName(), null);
+    }
+
+    @Override
+    protected ShippingPageView pageView(ShippingForm form) {
+        return new ShippingPageView("/dashboard/rma/" + form.getShippingEntityId(), "rma.details", null,
+                form.isToClient() ? "shipping.lead.rma.client" : "shipping.lead.rma.center", form.getShippingEntityId());
     }
 }

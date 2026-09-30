@@ -85,10 +85,9 @@ class ShipmentTrackingSubscriptionStateTest {
     }
 
     @Test
-    void inheritsSubscriptionAndExternalIdFromPreviousShipmentWithSameTrackingNo() {
+    void inheritsSubscriptionFromPreviousShipmentWithSameTrackingNo() {
         // given
         Shipment previous = courier("PKG-1");
-        previous.setExternalId("furg-1");
         previous.markTrackingActive("21037943");
         Shipment edited = courier("PKG-1");
 
@@ -98,7 +97,23 @@ class ShipmentTrackingSubscriptionStateTest {
         // then
         assertThat(edited.getTrackingSubscriptionStatus()).isEqualTo(ShipmentTrackingStatus.ACTIVE);
         assertThat(edited.getTrackingExternalId()).isEqualTo("21037943");
+    }
+
+    @Test
+    void keepsTheCourierOrderWhateverTheTrackingNo() {
+        // given: dropping it with a changed number would unlock "Remove" and orphan the paid label
+        Shipment previous = courier("PKG-1");
+        previous.setExternalId("furg-1");
+        Shipment edited = courier("PKG-2");
+        Shipment typedByHand = courier("PKG-3");
+
+        // when
+        edited.inheritCourierOrderFrom(previous);
+        typedByHand.inheritCourierOrderFrom(courier("PKG-3"));
+
+        // then
         assertThat(edited.getExternalId()).isEqualTo("furg-1");
+        assertThat(typedByHand.getExternalId()).isNull();
     }
 
     @Test

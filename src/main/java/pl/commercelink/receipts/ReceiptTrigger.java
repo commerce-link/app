@@ -6,11 +6,10 @@ import org.springframework.stereotype.Component;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.stores.Store;
-import pl.commercelink.stores.StoresRepository;
 
 /**
  * Called after the order lifecycle saved an order: a delivered consumer order of a store with e-receipts gets its
- * first attempt, and an order with its closing document settles the alerts of its blocked or failed attempts. Runs
+ * first attempt, and the alerts of its blocked or failed attempts follow the order page's rule. Runs
  * after the save so a failed order write never leaves an attempt for an undelivered order, and never throws — a
  * receipt problem must not break the order update.
  */
@@ -18,25 +17,26 @@ import pl.commercelink.stores.StoresRepository;
 @Component
 public class ReceiptTrigger {
 
-    private final StoresRepository storesRepository;
     private final ReceiptEligibility eligibility;
     private final ReceiptAttemptService attemptService;
 
-    public ReceiptTrigger(StoresRepository storesRepository, ReceiptEligibility eligibility,
-                          @Lazy ReceiptAttemptService attemptService) {
-        this.storesRepository = storesRepository;
+    public ReceiptTrigger(ReceiptEligibility eligibility, @Lazy ReceiptAttemptService attemptService) {
         this.eligibility = eligibility;
         this.attemptService = attemptService;
     }
 
-    public void onOrderSaved(Order order) {
-        settleDeadAttemptAlerts(order);
-        if (order.getStatus() != OrderStatus.Delivered) {
+    /**
+     * store: the order's store as the lifecycle read it for this save (null when it could not be found), so the
+     * trigger reads no store of its own. The alerts are reconciled for every saved order, whatever its store: one
+     * attempts query per save.
+     */
+    public void onOrderSaved(Order order, Store store) {
+        reconcileDeadAttemptAlerts(order);
+        if (store == null || order.getStatus() != OrderStatus.Delivered) {
             return;
         }
         try {
-            Store store = storesRepository.findById(order.getStoreId());
-            if (store != null && eligibility.automaticCandidate(store, order)) {
+            if (eligibility.automaticCandidate(store, order)) {
                 attemptService.startAutomatic(store, order);
             }
         } catch (RuntimeException e) {
@@ -46,19 +46,29 @@ public class ReceiptTrigger {
     }
 
     /**
-     * A receipt or invoice recorded after a blocked or failed e-receipt settles what that alert asked for, whatever
-     * the order's status: a manual e-receipt can be blocked before delivery. Also called by saves that bypass the
-     * order lifecycle (invoicing). Never throws.
+     * Keeps the bell alerts of the order's blocked or failed attempts in line with the order page
+     * ({@link ReceiptAttemptService#reconcileDeadAttemptAlerts(Order)}), whatever the order's status: a manual
+     * e-receipt can be blocked before delivery. Also called by saves that bypass the order lifecycle (invoicing).
+     * Never throws.
      */
-    public void settleDeadAttemptAlerts(Order order) {
-        if (!order.isInvoiced() || order.getStatus() == OrderStatus.Cancelled) {
-            return;
-        }
+    public void reconcileDeadAttemptAlerts(Order order) {
         try {
-            attemptService.resolveDeadAttemptAlerts(order.getStoreId(), order.getOrderId());
+            attemptService.reconcileDeadAttemptAlerts(order);
         } catch (RuntimeException e) {
-            log.error("Receipt alerts of order {} of store {} could not be resolved",
+            log.warn("Receipt alerts of order {} of store {} could not be reconciled",
                     order.getOrderId(), order.getStoreId(), e);
         }
+    }
+
+    /**
+     * Whether the order's blocked or failed attempts no longer ask for anything: the order has its closing document
+     * (a receipt from the shop's cash register, an invoice), or it is cancelled, so there is no sale left to receipt
+     * and "Wystaw ponownie" is not offered (product owner's decision). Only dead attempts read it: they fiscalised
+     * nothing, so neither reason hides a registered sale; a live or fiscalised attempt keeps its own problem. The bell
+     * ({@link ReceiptAttemptService#reconcileDeadAttemptAlerts(Order)}) and the order page ({@link ReceiptOrderView})
+     * read the same rule.
+     */
+    static boolean settlesDeadAttempts(Order order) {
+        return order.getStatus() == OrderStatus.Cancelled || order.isInvoiced();
     }
 }

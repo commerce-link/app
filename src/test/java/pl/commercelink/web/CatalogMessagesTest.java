@@ -66,6 +66,23 @@ class CatalogMessagesTest {
                 .isEqualTo(catalogMessages("messages_en.properties").keySet());
     }
 
+    /**
+     * With a filter on, the select-all box of a catalog table checks only the rows left visible, so with nothing
+     * selected its name says "visible"; once anything is checked it clears the whole selection.
+     */
+    @Test
+    void theCatalogSelectAllBoxNamesTheVisibleRowsAndItsClearingNamesAll() throws Exception {
+        // given
+        Map<String, String> polish = catalogMessages("messages_pl.properties");
+        Map<String, String> english = catalogMessages("messages_en.properties");
+
+        // when / then
+        assertThat(polish).containsEntry("catalog.products.selectAll", "Zaznacz widoczne")
+                .containsEntry("catalog.products.deselectAll", "Odznacz wszystkie");
+        assertThat(english).containsEntry("catalog.products.selectAll", "Select the visible rows")
+                .containsEntry("catalog.products.deselectAll", "Deselect all");
+    }
+
     @Test
     void polishAndEnglishDefineTheSameCatalogsIntroKeys() throws Exception {
         // when / then

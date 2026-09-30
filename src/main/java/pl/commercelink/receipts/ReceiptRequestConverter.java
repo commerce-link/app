@@ -16,6 +16,7 @@ import pl.commercelink.receipts.api.ReceiptMedium;
 import pl.commercelink.receipts.api.ReceiptProvider;
 import pl.commercelink.receipts.api.ReceiptValidationException;
 import pl.commercelink.receipts.api.VatRate;
+import pl.commercelink.stores.Store;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -81,9 +82,9 @@ public class ReceiptRequestConverter {
                     Money.ofGrosze(linesTotal).toBigDecimal() + " ≠ " + Money.ofGrosze(orderTotal).toBigDecimal());
         }
         String email = BuyerEmail.of(order, storeEmail);
-        // a sale at the counter without the customer's own e-mail may already have its receipt from the shop's cash
-        // register: whatever the provider accepts, issuing now could register the sale twice
-        if (order.isPointOfSale() && email == null) {
+        // the second line of defence: the order page greys the actions and ReceiptAttemptService refuses them for the
+        // same predicate, but an automatic attempt (delivery) still comes this way
+        if (blocksPosWithoutCustomerEmail(order, storeEmail)) {
             return new ReceiptConversion.Blocked(ReceiptBlockReason.POS_NO_CUSTOMER_EMAIL, null);
         }
         if (provider.requiresBuyerEmail() && email == null) {
@@ -105,6 +106,22 @@ public class ReceiptRequestConverter {
             return new ReceiptConversion.Blocked(ReceiptBlockReason.INVALID_REQUEST, e.getMessage());
         }
         return new ReceiptConversion.Converted(snapshot);
+    }
+
+    /**
+     * A sale at the counter without the customer's own e-mail may already have its receipt from the shop's cash
+     * register: whatever the provider accepts, issuing now could register the sale twice. The one predicate behind the
+     * blocked attempt, the greyed "Wystaw ponownie" / "E-paragon" of the order page and the server's refusal of both.
+     * {@code storeEmail} is the store's own e-mail (a walk-in buyer copies it, see {@link BuyerEmail}).
+     */
+    public static boolean blocksPosWithoutCustomerEmail(Order order, String storeEmail) {
+        return order.isPointOfSale() && BuyerEmail.of(order, storeEmail) == null;
+    }
+
+    /** {@link #blocksPosWithoutCustomerEmail(Order, String)} with the store's own e-mail read from the store. */
+    public static boolean blocksPosWithoutCustomerEmail(Order order, Store store) {
+        return blocksPosWithoutCustomerEmail(order,
+                store == null || store.getBillingDetails() == null ? null : store.getBillingDetails().getEmail());
     }
 
     /**

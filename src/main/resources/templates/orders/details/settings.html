@@ -1,0 +1,95 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--/* Read-only card; the edit happens in the dialog below, or on orders/settings without JS. The card keeps to the
+       dates, notifications and the comment: the fulfilment type is in the page header, the affiliate id and GCLID only
+       in the dialog (its "Śledzenie" section). */-->
+<section th:fragment="card" class="cl-card" aria-labelledby="settings-title" data-cl-collapse>
+    <div class="cl-card-head">
+        <h2 class="cl-card-title" id="settings-title" th:text="#{order.card.settings}"></h2>
+        <a th:if="${settings.editable()}" class="cl-link-button" th:href="@{/dashboard/orders/{o}/settings(o=${orderId})}"
+           data-cl-dialog-open="settings-dialog" th:text="#{order.settings.edit}"></a>
+    </div>
+    <div class="cl-collapse-body" id="settings-body">
+        <dl class="cl-kv is-column">
+            <div><dt th:text="#{order.settings.assembly}"></dt><dd th:text="${settings.estimatedAssemblyText() ?: '—'}"></dd></div>
+            <div><dt th:text="#{order.settings.shipping}"></dt><dd th:text="${settings.estimatedShippingText() ?: '—'}"></dd></div>
+            <div><dt th:text="#{order.settings.preferred.chosen}"></dt><dd th:text="${settings.preferredShippingText() ?: '—'}"></dd></div>
+            <div><dt th:text="#{order.settings.notifications}"></dt><dd th:text="${settings.emailNotificationsEnabled()} ? #{order.settings.yes} : #{order.settings.no}"></dd></div>
+            <div th:if="${!#strings.isEmpty(settings.comment())}" class="cl-kv-wide"><dt th:text="#{order.settings.comment}"></dt><dd class="cl-kv-text" th:text="${settings.comment()}"></dd></div>
+        </dl>
+    </div>
+</section>
+
+<dialog th:fragment="dialog" class="cl-dialog is-form" id="settings-dialog" aria-labelledby="settings-dialog-title">
+    <th:block th:replace="~{orders/details/settings :: dialogForm}"></th:block>
+</dialog>
+
+<form th:fragment="dialogForm" th:replace="~{orders/details/settings :: settingsForm(true)}"></form>
+<form th:fragment="pageForm" th:replace="~{orders/details/settings :: settingsForm(false)}"></form>
+
+<form th:fragment="settingsForm(inDialog)" id="order-settings-form" class="cl-form" method="post" data-cl-async
+      th:action="@{/dashboard/orders/{o}/updateOrderInfo(o=${orderId})}"
+      th:attr="data-success-message=${settingsSaved}, data-error-message=#{form.save.failed}, data-cl-dialog-close-on-success=${inDialog} ? 'true' : null">
+    <h2 th:if="${inDialog}" class="cl-dialog-title" id="settings-dialog-title" th:text="#{order.settings.dialog.title}"></h2>
+    <div th:class="${inDialog} ? 'cl-dialog-body' : 'cl-card-inset'">
+        <div th:if="${settingsError != null}" class="cl-alert is-bad" tabindex="-1" data-cl-error-summary>
+            <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
+            <p class="cl-alert-title" th:text="${settingsError}"></p>
+        </div>
+        <div class="cl-form-grid cl-card-grid">
+            <div class="cl-span-3 cl-field">
+                <label class="cl-label" for="estimatedAssemblyAt" th:text="#{order.settings.assembly}"></label>
+                <input class="cl-input" type="date" id="estimatedAssemblyAt" name="estimatedAssemblyAt" th:value="${settings.estimatedAssemblyAt()}">
+            </div>
+            <div class="cl-span-3 cl-field">
+                <label class="cl-label" for="estimatedShippingAt" th:text="#{order.settings.shipping}"></label>
+                <input class="cl-input" type="date" id="estimatedShippingAt" name="estimatedShippingAt" th:value="${settings.estimatedShippingAt()}">
+            </div>
+            <div class="cl-span-3 cl-field">
+                <label class="cl-label" for="preferredShippingAt"><span th:text="#{order.settings.preferred}"></span> <span class="cl-optional" th:text="#{form.optional}"></span></label>
+                <input class="cl-input" type="date" id="preferredShippingAt" name="preferredShippingAt" aria-describedby="preferredShippingAt-help" th:value="${settings.preferredShippingAt()}">
+                <p class="cl-help" id="preferredShippingAt-help" th:text="#{order.settings.preferred.help}"></p>
+            </div>
+            <div class="cl-span-3 cl-field">
+                <label class="cl-label" for="fulfilmentType" th:text="#{order.settings.fulfilment}"></label>
+                <select class="cl-select" id="fulfilmentType" name="fulfilmentType" th:disabled="${settings.fulfilmentTypeLocked()}"
+                        th:attr="aria-describedby=${settings.fulfilmentTypeLocked()} ? 'fulfilmentType-help' : null">
+                    <option th:each="type : ${settings.fulfilmentTypes()}" th:value="${type.value().name()}"
+                            th:selected="${type.value() == settings.fulfilmentType()}" th:text="#{${type.labelKey()}}"></option>
+                </select>
+                <input th:if="${settings.fulfilmentTypeLocked() and settings.fulfilmentType() != null}" type="hidden" name="fulfilmentType" th:value="${settings.fulfilmentType().name()}">
+                <p th:if="${settings.fulfilmentTypeLocked()}" class="cl-help" id="fulfilmentType-help" th:text="#{order.fulfilment.type.locked}"></p>
+            </div>
+            <div class="cl-span-6 cl-check-field">
+                <label class="cl-check"><input type="checkbox" name="emailNotificationsEnabled" value="true" th:checked="${settings.emailNotificationsEnabled()}"><span th:text="#{order.settings.notifications}"></span></label>
+            </div>
+            <div class="cl-span-6 cl-field">
+                <label class="cl-label" for="comment"><span th:text="#{order.settings.comment}"></span> <span class="cl-optional" th:text="#{form.optional}"></span></label>
+                <textarea class="cl-input cl-textarea" id="comment" name="comment" rows="3" th:text="${settings.comment()}"></textarea>
+            </div>
+        </div>
+        <details class="cl-disclosure cl-card-extras" id="order-settings-tracking" th:open="${!#strings.isEmpty(settings.affiliateId()) or !#strings.isEmpty(settings.gclid())}">
+            <summary th:text="#{order.settings.tracking}"></summary>
+            <div class="cl-disclosure-body">
+                <div class="cl-form-grid cl-card-grid">
+                    <div class="cl-span-3 cl-field">
+                        <label class="cl-label" for="affiliateId"><span th:text="#{order.affiliate.id}"></span> <span class="cl-optional" th:text="#{form.optional}"></span></label>
+                        <input class="cl-input" type="text" id="affiliateId" name="affiliateId" th:value="${settings.affiliateId()}">
+                    </div>
+                    <div class="cl-span-3 cl-field">
+                        <label class="cl-label" for="gclid"><span th:text="#{order.gclid}"></span> <span class="cl-optional" th:text="#{form.optional}"></span></label>
+                        <input class="cl-input" type="text" id="gclid" name="gclid" th:value="${settings.gclid()}">
+                    </div>
+                </div>
+            </div>
+        </details>
+    </div>
+    <div th:class="${inDialog} ? 'cl-dialog-actions' : 'cl-card-footer'">
+        <button type="submit" class="cl-button is-primary" th:text="#{form.save.changes}"></button>
+        <button th:if="${inDialog}" type="button" class="cl-button" data-cl-dialog-close th:text="#{general.cancel}"></button>
+        <a th:unless="${inDialog}" class="cl-button" th:href="@{/dashboard/orders/{o}(o=${orderId})}" th:text="#{general.cancel}"></a>
+    </div>
+</form>
+</body>
+</html>

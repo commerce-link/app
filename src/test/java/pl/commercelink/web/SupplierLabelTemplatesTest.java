@@ -50,8 +50,6 @@ class SupplierLabelTemplatesTest {
     @Test
     void orderRmaAndDeliveryFiltersUseSelectsOfConnections() throws Exception {
         // when / then
-        assertThat(template("orderDetails.html"))
-                .contains("fragments/supplier-choice :: field('quickAssignSupplier', ${assignableSuppliers}, true)");
         assertThat(template("fragments/supplier-choice.html")).contains("name=\"supplier\"")
                 .contains("th:each=\"option : ${options}\"")
                 // "other supplier" reveals a text field for a supplier that is not connected to the store;

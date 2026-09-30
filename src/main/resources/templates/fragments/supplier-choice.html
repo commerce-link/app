@@ -47,5 +47,27 @@
     </script>
 </div>
 
+<!--/* The same choice in the cl-* forms: a select of the store's connections plus "Other supplier…", which reveals a
+       text field (static/js/supplier-choice.js). current is the chosen identity, custom the typed name (or null).
+       supplierOptional (th:with by the caller) makes the empty option mean "no supplier" instead of a placeholder; the
+       assign-supplier dialog never sets it, so its choice stays required. supplierFieldName (th:with, optional) renames
+       the select for a form that posts the choice under another name (the item page posts it as deliveryId). */-->
+<div th:fragment="clField(id, options, current, custom)" class="cl-field">
+    <label class="cl-label" th:for="${id}" th:text="#{order.item.supplier}"></label>
+    <select class="cl-select" th:id="${id}" th:name="${supplierFieldName != null} ? ${supplierFieldName} : 'supplier'" th:required="${supplierOptional == null or !supplierOptional}"
+            data-cl-custom-option="__custom__">
+        <option value="" th:text="${supplierOptional != null and supplierOptional} ? #{order.item.supplier.none} : #{general.select}"></option>
+        <option th:each="option : ${options}" th:value="${option.identity()}" th:selected="${option.identity() == current}"
+                th:text="${option.label()}"></option>
+        <option value="__custom__" th:selected="${custom != null}" th:text="#{order.item.supplier.custom}"></option>
+    </select>
+    <div class="cl-field" data-cl-custom-field>
+        <label class="cl-label" th:for="${id} + '-custom'" th:text="#{order.item.supplier.custom.placeholder}"></label>
+        <input class="cl-input" th:id="${id} + '-custom'" type="text" name="customSupplier" autocomplete="off"
+               pattern="[\p{L}\p{N}_\-]+" th:value="${custom}" th:title="#{order.item.supplier.custom.format}">
+        <p class="cl-help" th:text="#{order.item.supplier.custom.hint}"></p>
+    </div>
+</div>
+
 </body>
 </html>

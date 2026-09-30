@@ -18,6 +18,7 @@ import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.stores.WarehouseConfiguration;
 import pl.commercelink.web.orders.OrderListQuery;
+import pl.commercelink.web.orders.OrderRow;
 import pl.commercelink.web.orders.OrdersPageModel;
 
 import java.time.LocalDate;
@@ -108,11 +109,26 @@ class OrderListServiceTest {
 
         OrdersPageModel model = page(query());
 
-        assertThat(model.rows()).extracting(r -> r.href()).containsExactly(
+        assertThat(model.rows()).extracting(OrderListServiceTest::path).containsExactly(
                 "/dashboard/orders/late", "/dashboard/orders/today", "/dashboard/orders/soon", "/dashboard/orders/none");
         assertThat(model.resultsLine()).isEqualTo("Zamówienia: 4");
-        assertThat(page(query("sort", "due", "dir", "desc")).rows()).extracting(r -> r.href()).containsExactly(
+        assertThat(page(query("sort", "due", "dir", "desc")).rows()).extracting(OrderListServiceTest::path).containsExactly(
                 "/dashboard/orders/soon", "/dashboard/orders/today", "/dashboard/orders/late", "/dashboard/orders/none");
+    }
+
+    @Test
+    void aRowLinksToTheDetailsWithTheListItCameFrom() {
+        // given
+        add("new-1", OrderStatus.New, TODAY, 10, 10, null);
+
+        // when / then
+        // a narrowed list travels to the details page, so its "‹ Zamówienia" returns to it
+        assertThat(page(query("status", "New")).rows().get(0).href())
+                .isEqualTo("/dashboard/orders/new-1?returnTo=%2Fdashboard%2Forders%3Fstatus%3DNew");
+        // the list with nothing chosen returns to itself, not to the bare list: the bare list is an entry and would open
+        // the user's default filter again after they cleared it
+        assertThat(page(query()).rows().get(0).href())
+                .isEqualTo("/dashboard/orders/new-1?returnTo=%2Fdashboard%2Forders%3FfilterId%3D");
     }
 
     @Test
@@ -150,7 +166,7 @@ class OrderListServiceTest {
                 "/dashboard/orders?filterId=" + closed.getId() + "&q=a");
 
         OrdersPageModel chosen = page(query("status", "Assembled", "filterId", assembled.getId()));
-        assertThat(chosen.rows()).extracting(r -> r.href()).containsExactly("/dashboard/orders/a");
+        assertThat(chosen.rows()).extracting(OrderListServiceTest::path).containsExactly("/dashboard/orders/a");
         assertThat(chosen.statusSummary()).isEqualTo("Skompletowane");
     }
 
@@ -208,6 +224,20 @@ class OrderListServiceTest {
     }
 
     @Test
+    void aTileRowReturnsToTheListNarrowedByTheTile() {
+        // given
+        add("late", OrderStatus.New, TODAY.minusDays(1), 100, 100, null);
+
+        // when
+        OrdersPageModel overdue = page(query("focus", "overdue"));
+
+        // then: "‹ Zamówienia" on the details page goes back to the tile's list, not to the default filter
+        assertThat(overdue.rows()).hasSize(1);
+        assertThat(overdue.rows().get(0).href())
+                .isEqualTo("/dashboard/orders/late?returnTo=%2Fdashboard%2Forders%3Ffocus%3Doverdue");
+    }
+
+    @Test
     void aTileShowsExactlyTheOrdersItCounts() {
         // given
         add("late", OrderStatus.New, TODAY.minusDays(1), 100, 100, "Allegro");
@@ -223,7 +253,7 @@ class OrderListServiceTest {
         // the tile link starts from the tile alone, whatever else narrowed the list
         assertThat(all.tiles().get(0).href()).isEqualTo("/dashboard/orders?focus=overdue");
         assertThat(all.tiles().get(0).active()).isFalse();
-        assertThat(overdue.rows()).extracting(r -> r.href()).containsExactly("/dashboard/orders/lateBlocked", "/dashboard/orders/late");
+        assertThat(overdue.rows()).extracting(OrderListServiceTest::path).containsExactly("/dashboard/orders/lateBlocked", "/dashboard/orders/late");
         assertThat(overdue.rows()).hasSize((int) overdue.tiles().get(0).count());
         assertThat(overdue.tiles().get(0).active()).isTrue();
         // a second click on the pressed tile lets it go
@@ -244,7 +274,7 @@ class OrderListServiceTest {
         OrdersPageModel model = page(query("focus", "overdue", "status", "Blocked"));
 
         // then
-        assertThat(model.rows()).extracting(r -> r.href()).containsExactly("/dashboard/orders/lateBlocked");
+        assertThat(model.rows()).extracting(OrderListServiceTest::path).containsExactly("/dashboard/orders/lateBlocked");
         assertThat(option(model, "Nowe").count()).isEqualTo(1);
         assertThat(option(model, "Zablokowane").count()).isEqualTo(1);
         assertThat(model.chips()).extracting(c -> c.label()).containsExactly("Po terminie", "Status: Zablokowane");
@@ -277,7 +307,7 @@ class OrderListServiceTest {
 
         OrdersPageModel model = page(query("q", "nowak"));
 
-        assertThat(model.rows()).extracting(r -> r.href()).containsExactly("/dashboard/orders/open-1");
+        assertThat(model.rows()).extracting(OrderListServiceTest::path).containsExactly("/dashboard/orders/open-1");
         assertThat(model.resultsLine()).isEqualTo("Zamówienia: 1");
         assertThat(model.chips()).extracting(c -> c.label()).containsExactly("Szukasz: „nowak”");
     }
@@ -288,9 +318,9 @@ class OrderListServiceTest {
         add("a", OrderStatus.New, null, 100, 100, null);
         add("c", OrderStatus.New, null, 200, 200, null);
 
-        assertThat(page(query("sort", "amount")).rows()).extracting(r -> r.href()).containsExactly("/dashboard/orders/a", "/dashboard/orders/c", "/dashboard/orders/b");
-        assertThat(page(query("sort", "amount", "dir", "desc")).rows()).extracting(r -> r.href()).containsExactly("/dashboard/orders/b", "/dashboard/orders/c", "/dashboard/orders/a");
-        assertThat(page(query("sort", "number")).rows()).extracting(r -> r.href()).containsExactly("/dashboard/orders/a", "/dashboard/orders/b", "/dashboard/orders/c");
+        assertThat(page(query("sort", "amount")).rows()).extracting(OrderListServiceTest::path).containsExactly("/dashboard/orders/a", "/dashboard/orders/c", "/dashboard/orders/b");
+        assertThat(page(query("sort", "amount", "dir", "desc")).rows()).extracting(OrderListServiceTest::path).containsExactly("/dashboard/orders/b", "/dashboard/orders/c", "/dashboard/orders/a");
+        assertThat(page(query("sort", "number")).rows()).extracting(OrderListServiceTest::path).containsExactly("/dashboard/orders/a", "/dashboard/orders/b", "/dashboard/orders/c");
         assertThat(page(query("sort", "amount")).sortHeaders().get(OrderListQuery.Sort.AMOUNT).ariaSort()).isEqualTo("ascending");
         assertThat(page(query("sort", "amount")).sortHeaders().get(OrderListQuery.Sort.AMOUNT).href()).isEqualTo("/dashboard/orders?sort=amount&dir=desc");
         assertThat(page(query()).sortHeaders().get(OrderListQuery.Sort.DUE).ariaSort()).isEqualTo("ascending");
@@ -306,9 +336,9 @@ class OrderListServiceTest {
         add("new-undated", OrderStatus.New, null, 100, 100, null);
         add("new-soon", OrderStatus.New, TODAY.plusDays(1), 100, 100, null);
 
-        assertThat(page(query("sort", "status")).rows()).extracting(r -> r.href().substring(18)).containsExactly(
+        assertThat(page(query("sort", "status")).rows()).extracting(r -> path(r).substring(18)).containsExactly(
                 "new-soon", "new-later", "new-undated", "blocked", "delivered");
-        assertThat(page(query("sort", "status", "dir", "desc")).rows()).extracting(r -> r.href().substring(18)).containsExactly(
+        assertThat(page(query("sort", "status", "dir", "desc")).rows()).extracting(r -> path(r).substring(18)).containsExactly(
                 "delivered", "blocked", "new-soon", "new-later", "new-undated");
         assertThat(page(query("sort", "status")).sortHeaders().get(OrderListQuery.Sort.STATUS).ariaSort()).isEqualTo("ascending");
         assertThat(page(query()).sortHeaders().get(OrderListQuery.Sort.STATUS).href()).isEqualTo("/dashboard/orders?sort=status&dir=asc");
@@ -372,7 +402,7 @@ class OrderListServiceTest {
 
         OrdersPageModel model = page(query("status", "New", "status", "Blocked"));
 
-        assertThat(model.rows()).extracting(r -> r.href()).containsExactly("/dashboard/orders/b", "/dashboard/orders/n");
+        assertThat(model.rows()).extracting(OrderListServiceTest::path).containsExactly("/dashboard/orders/b", "/dashboard/orders/n");
         assertThat(model.statusSummary()).isEqualTo("2 wybrane");
         assertThat(option(model, "Nowe").selected()).isTrue();
         assertThat(option(model, "W kompletacji").selected()).isFalse();
@@ -434,7 +464,7 @@ class OrderListServiceTest {
         OrdersPageModel model = page(query("filterId", allegroOrCeneo.getId()));
 
         // then
-        assertThat(model.rows()).extracting(r -> r.href()).containsExactlyInAnyOrder("/dashboard/orders/a", "/dashboard/orders/c");
+        assertThat(model.rows()).extracting(OrderListServiceTest::path).containsExactlyInAnyOrder("/dashboard/orders/a", "/dashboard/orders/c");
     }
 
     @Test
@@ -451,7 +481,7 @@ class OrderListServiceTest {
         OrdersPageModel model = page(query("status", "Assembled", "filterId", newOrBlocked.getId()));
 
         // then
-        assertThat(model.rows()).extracting(r -> r.href()).containsExactly("/dashboard/orders/s");
+        assertThat(model.rows()).extracting(OrderListServiceTest::path).containsExactly("/dashboard/orders/s");
     }
 
     private static OrdersPageModel.StatusOption option(OrdersPageModel model, String label) {
@@ -471,5 +501,10 @@ class OrderListServiceTest {
         store.setWarehouseConfiguration(warehouse);
         when(storesRepository.findById("store-1")).thenReturn(store);
         assertThat(page(query()).rows().get(0).marks()).extracting(m -> m.kind() + ":" + m.state()).contains("wz:is-todo");
+    }
+
+    // a row's link carries the list's returnTo; these tests look at which orders are listed, in what order
+    private static String path(OrderRow row) {
+        return row.href().replaceFirst("\\?.*", "");
     }
 }

@@ -45,7 +45,8 @@ class ProductsAddTemplateTest {
         assertThat(source("products-add")).contains("data-cl-table-filter").contains("data-cl-filter-default=\"brand:all\"")
                 .contains("data-cl-filter-group=\"brand\"").contains("data-cl-filter-brand=")
                 .contains("data-cl-search=").contains("data-cl-table-search")
-                .contains("data-cl-selection-bar").contains("data-cl-selection-count").contains("data-cl-select-clear")
+                .contains("data-cl-selection-bar").contains("data-cl-selection-count").doesNotContain("data-cl-select-clear")
+                .contains("data-cl-label-select=").contains("data-cl-label-clear=")
                 .contains("data-cl-select-table=\"true\"").contains("data-cl-select-all").contains("data-cl-select-row")
                 .contains("@{/js/table-filter.js}").contains("@{/js/table-sort.js}").contains("@{/js/table-select.js}");
     }
@@ -102,7 +103,8 @@ class ProductsAddTemplateTest {
         String html = renderedProposals();
 
         // then
-        assertThat(occurrences(html, "<label class=\"cl-check-target\">")).isEqualTo(3);
+        // two rows, the header's "select visible" and the selection row's own
+        assertThat(occurrences(html, "<label class=\"cl-check-target\">")).isEqualTo(4);
         assertThat(html).containsPattern("<label class=\"cl-check-target\">\\s*<input type=\"checkbox\" class=\"cl-check-input\" data-cl-select-all")
                 .containsPattern("<label class=\"cl-check-target\">\\s*<input type=\"checkbox\" class=\"cl-check-input\" name=\"eans\"");
     }
@@ -236,7 +238,7 @@ class ProductsAddTemplateTest {
         // then
         assertThat(source("products-add")).doesNotContain("PLN");
         assertThat(html).contains("2 749,00 PLN")
-                .containsPattern("<p class=\"cl-visually-hidden\" role=\"status\" data-cl-selection-status></p>\\s*<div class=\"cl-selection-bar\"");
+                .containsPattern("<p class=\"cl-visually-hidden\" role=\"status\" data-cl-selection-status></p>\\s*<div class=\"cl-selection-row\"");
         String bar = html.substring(html.indexOf("data-cl-selection-bar"), html.indexOf("cl-selection-actions"));
         assertThat(bar).doesNotContain("role=\"status\"");
     }

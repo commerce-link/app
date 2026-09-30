@@ -1,0 +1,18 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout" layout:decorate="~{layout}">
+<body>
+<!--/* A shipment's dialog of the shipments card as its own page, for a browser without JavaScript. */-->
+<div layout:fragment="content">
+    <section class="cl-page">
+        <div class="cl-page-body is-form">
+            <div th:replace="~{fragments/settings-header :: subpage(|/dashboard/orders/${shipment.orderId()}|, #{order.page.title(${shortId})}, ${shipment.isNew()} ? #{order.shipments.page.title.new(${shortId})} : #{order.shipments.page.title.edit(${shipment.number()}, ${shortId})})}"></div>
+            <section class="cl-card" aria-labelledby="shipment-page-title">
+                <h2 class="cl-visually-hidden" id="shipment-page-title"
+                    th:text="${shipment.isNew()} ? #{order.shipments.dialog.title.new} : #{order.shipments.dialog.title.edit(${shipment.number()})}"></h2>
+                <form th:replace="~{orders/details/shipments :: pageForm}"></form>
+            </section>
+        </div>
+    </section>
+</div>
+</body>
+</html>

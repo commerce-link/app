@@ -50,6 +50,24 @@ class LayoutShellTemplateTest {
         assertThat(html).contains("<html th:lang=\"${#locale.language}\"");
     }
 
+    /**
+     * The item history page still draws its timeline with the `bulma-timeline` classes; dropping the stylesheet
+     * turns it into an unstyled list. Remove the link only together with a restyle of that page.
+     */
+    @Test
+    void keepsTheTimelineStylesheetWhileItemHistoryUsesIt() throws Exception {
+        // given
+        String itemHistory = Files.readString(Path.of("src/main/resources/templates/item-history.html"), StandardCharsets.UTF_8);
+
+        // when
+        String html = layout();
+
+        // then
+        if (itemHistory.contains("timeline")) {
+            assertThat(html).contains("https://cdn.jsdelivr.net/npm/bulma-timeline@3.0.5/dist/css/bulma-timeline.min.css");
+        }
+    }
+
     @Test
     void keepsExactlyOneContentFragmentSoEveryPageStillDecoratesIt() throws Exception {
         // when
@@ -104,7 +122,7 @@ class LayoutShellTemplateTest {
         String script = Files.readString(Path.of("src/main/resources/static/js/async-form.js"), StandardCharsets.UTF_8);
 
         // then
-        assertThat(layout).contains("<body th:attr=\"data-cl-server-error=#{form.save.serverError}\">");
+        assertThat(layout).contains("<body th:attr=\"data-cl-server-error=#{form.save.serverError}, data-cl-amount-format=#{general.currency.amount}\">");
         assertThat(script).contains("document.body.getAttribute('data-cl-server-error')");
     }
 }
