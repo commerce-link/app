@@ -1,7 +1,7 @@
 package pl.commercelink.web.deliveries;
 
 import pl.commercelink.inventory.deliveries.Delivery;
-import pl.commercelink.inventory.deliveries.DeliveryListKey;
+import pl.commercelink.inventory.deliveries.DeliveryListSortKey;
 import pl.commercelink.inventory.deliveries.DeliveryListState;
 
 import java.time.LocalDate;
@@ -33,7 +33,7 @@ public enum DeliveryAttention {
             case OVERDUE -> state.expectsArrival() && planned != null && planned.isBefore(today);
             case TODAY -> state.expectsArrival() && today.equals(planned);
             case PROBLEM -> state.isProblem();
-            case INVOICE -> DeliveryListKey.of(delivery).startsWith(DeliveryListKey.TO_SETTLE);
+            case INVOICE -> DeliveryListSortKey.of(delivery).startsWith(DeliveryListSortKey.TO_SETTLE);
             case APPROVAL -> state == DeliveryListState.AWAITING_APPROVAL;
         };
     }

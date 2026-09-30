@@ -3,12 +3,10 @@ package pl.commercelink.inventory.deliveries;
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapperConfig;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBQueryExpression;
-import com.amazonaws.services.dynamodbv2.model.AmazonDynamoDBException;
 import com.amazonaws.services.dynamodbv2.model.AttributeValue;
 import com.amazonaws.services.dynamodbv2.model.QueryRequest;
 import com.amazonaws.services.dynamodbv2.model.QueryResult;
 import com.amazonaws.services.dynamodbv2.model.Select;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import pl.commercelink.starter.dynamodb.DynamoDbRepository;
 
@@ -26,7 +24,6 @@ import java.util.stream.Collectors;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
-@Slf4j
 @Component
 public class  DeliveriesRepository extends DynamoDbRepository<Delivery> {
 
@@ -118,57 +115,45 @@ public class  DeliveriesRepository extends DynamoDbRepository<Delivery> {
                 .collect(Collectors.toList());
     }
 
-    public static final String LIST_INDEX = "StoreIdListKeyIndex";
+    public static final String LIST_INDEX = "StoreIdDeliveryListSortKeyIndex";
 
     /**
      * The store's deliveries on their way (spec §7.2). Like every list read below it answers with partial deliveries -
-     * only the attributes StoreIdListKeyIndex carries - which must never be saved back.
+     * only the attributes StoreIdDeliveryListSortKeyIndex carries - which must never be saved back.
      */
     public List<Delivery> findInTransit(String storeId) {
-        return readList(storeId, "begins_with(listKey, :lo)", DeliveryListKey.IN_TRANSIT, null,
-                key -> key.startsWith(DeliveryListKey.IN_TRANSIT));
+        return readList(storeId, "begins_with(deliveryListSortKey, :lo)", DeliveryListSortKey.IN_TRANSIT, null,
+                key -> key.startsWith(DeliveryListSortKey.IN_TRANSIT));
     }
 
     /** Received deliveries still waiting for a purchase invoice, over the whole history. Partial, see findInTransit. */
     public List<Delivery> findToSettle(String storeId) {
-        return readList(storeId, "begins_with(listKey, :lo)", DeliveryListKey.TO_SETTLE, null,
-                key -> key.startsWith(DeliveryListKey.TO_SETTLE));
+        return readList(storeId, "begins_with(deliveryListSortKey, :lo)", DeliveryListSortKey.TO_SETTLE, null,
+                key -> key.startsWith(DeliveryListSortKey.TO_SETTLE));
     }
 
     /**
      * How many received deliveries wait for a purchase invoice: a COUNT on the index, so the tile does not read the
      * backlog on every view. The index entry is not re-checked against the delivery's recomputed key, so a stale entry
-     * (a writer that does not maintain listKey) can be counted that findToSettle would drop; acceptable for a tile.
+     * (a writer that does not maintain deliveryListSortKey) can be counted that findToSettle would drop; acceptable for a tile.
      */
     public long countToSettle(String storeId) {
         Map<String, AttributeValue> eav = Map.of(":storeId", new AttributeValue(storeId),
-                ":lo", new AttributeValue(DeliveryListKey.TO_SETTLE));
+                ":lo", new AttributeValue(DeliveryListSortKey.TO_SETTLE));
         long count = 0;
-        try {
-            Map<String, AttributeValue> startKey = null;
-            do {
-                QueryResult page = amazonDynamoDB.query(new QueryRequest()
-                        .withTableName("Deliveries")
-                        .withIndexName(LIST_INDEX)
-                        .withSelect(Select.COUNT)
-                        .withKeyConditionExpression("storeId = :storeId AND begins_with(listKey, :lo)")
-                        .withExpressionAttributeValues(eav)
-                        .withExclusiveStartKey(startKey));
-                count += page.getCount();
-                startKey = page.getLastEvaluatedKey();
-            } while (startKey != null && !startKey.isEmpty());
-            return count;
-        } catch (AmazonDynamoDBException e) {
-            if (!namesListIndex(e)) {
-                throw e;
-            }
-            log.warn("{} is not available yet ({}); counting the store's partition for the deliveries list", LIST_INDEX, e.getErrorMessage());
-            return findByStore(storeId).stream().filter(d -> DeliveryListKey.of(d).startsWith(DeliveryListKey.TO_SETTLE)).count();
-        }
-    }
-
-    private static boolean namesListIndex(AmazonDynamoDBException e) {
-        return e.getErrorMessage() != null && e.getErrorMessage().contains(LIST_INDEX);
+        Map<String, AttributeValue> startKey = null;
+        do {
+            QueryResult page = amazonDynamoDB.query(new QueryRequest()
+                    .withTableName("Deliveries")
+                    .withIndexName(LIST_INDEX)
+                    .withSelect(Select.COUNT)
+                    .withKeyConditionExpression("storeId = :storeId AND begins_with(deliveryListSortKey, :lo)")
+                    .withExpressionAttributeValues(eav)
+                    .withExclusiveStartKey(startKey));
+            count += page.getCount();
+            startKey = page.getLastEvaluatedKey();
+        } while (startKey != null && !startKey.isEmpty());
+        return count;
     }
 
     /**
@@ -177,10 +162,10 @@ public class  DeliveriesRepository extends DynamoDbRepository<Delivery> {
      */
     public List<Delivery> findReceivedBetween(String storeId, LocalDate from, LocalDate to) {
         List<Delivery> result = new ArrayList<>();
-        for (String prefix : List.of(DeliveryListKey.TO_SETTLE, DeliveryListKey.SETTLED)) {
-            String lo = from == null ? prefix : DeliveryListKey.receivedBound(prefix, from, false);
-            String hi = to == null ? prefix + "\uffff" : DeliveryListKey.receivedBound(prefix, to, true);
-            result.addAll(readList(storeId, "listKey BETWEEN :lo AND :hi", lo, hi,
+        for (String prefix : List.of(DeliveryListSortKey.TO_SETTLE, DeliveryListSortKey.SETTLED)) {
+            String lo = from == null ? prefix : DeliveryListSortKey.receivedBound(prefix, from, false);
+            String hi = to == null ? prefix + "\uffff" : DeliveryListSortKey.receivedBound(prefix, to, true);
+            result.addAll(readList(storeId, "deliveryListSortKey BETWEEN :lo AND :hi", lo, hi,
                     key -> key.compareTo(lo) >= 0 && key.compareTo(hi) <= 0));
         }
         return result;
@@ -198,11 +183,12 @@ public class  DeliveriesRepository extends DynamoDbRepository<Delivery> {
     }
 
     /**
-     * One key range of StoreIdListKeyIndex, every page followed. Each delivery's key is recomputed from the projected
-     * attributes and an entry whose stored key no longer matches is dropped (the same guard as
-     * OrdersRepository.findByStoreAndStatuses): it protects against a writer that does not maintain listKey, such as
-     * the previous app version during a rollback, which leaves the stored key behind the delivery's real state. A missing index or one still being built after V019 names the index in
-     * its error; the store's partition is read instead and keyed the same way.
+     * One key range of StoreIdDeliveryListSortKeyIndex, every page followed. Each delivery's key is recomputed from the
+     * projected attributes and an entry whose stored key no longer matches is dropped (the same guard as
+     * OrdersRepository.findByStoreAndStatuses): it protects against a writer that does not maintain deliveryListSortKey,
+     * such as the previous app version during a rollback, which leaves the stored key behind the delivery's real state.
+     * There is no fallback: while the index is missing or still being built (V020 creates it at start-up) the
+     * DynamoDB error propagates.
      */
     private List<Delivery> readList(String storeId, String keyCondition, String lo, String hi, Predicate<String> keyMatches) {
         Map<String, AttributeValue> eav = new HashMap<>();
@@ -212,32 +198,18 @@ public class  DeliveriesRepository extends DynamoDbRepository<Delivery> {
             eav.put(":hi", new AttributeValue(hi));
         }
         List<Delivery> result = new ArrayList<>();
-        try {
-            Map<String, AttributeValue> startKey = null;
-            do {
-                QueryResult page = amazonDynamoDB.query(new QueryRequest()
-                        .withTableName("Deliveries")
-                        .withIndexName(LIST_INDEX)
-                        .withKeyConditionExpression("storeId = :storeId AND " + keyCondition)
-                        .withExpressionAttributeValues(eav)
-                        .withExclusiveStartKey(startKey));
-                page.getItems().forEach(item -> result.add(dynamoDBMapper.marshallIntoObject(Delivery.class, item)));
-                startKey = page.getLastEvaluatedKey();
-            } while (startKey != null && !startKey.isEmpty());
-        } catch (AmazonDynamoDBException e) {
-            if (!namesListIndex(e)) {
-                throw e;
-            }
-            log.warn("{} is not available yet ({}); reading the store's partition for the deliveries list", LIST_INDEX, e.getErrorMessage());
-            return findByStore(storeId).stream().filter(d -> keyMatches.test(DeliveryListKey.of(d))).toList();
-        }
-        return result.stream().filter(d -> keyMatches.test(DeliveryListKey.of(d))).toList();
-    }
-
-    private List<Delivery> findByStore(String storeId) {
-        Delivery key = new Delivery();
-        key.setStoreId(storeId);
-        return new ArrayList<>(dynamoDBMapper.query(Delivery.class, new DynamoDBQueryExpression<Delivery>().withHashKeyValues(key)));
+        Map<String, AttributeValue> startKey = null;
+        do {
+            QueryResult page = amazonDynamoDB.query(new QueryRequest()
+                    .withTableName("Deliveries")
+                    .withIndexName(LIST_INDEX)
+                    .withKeyConditionExpression("storeId = :storeId AND " + keyCondition)
+                    .withExpressionAttributeValues(eav)
+                    .withExclusiveStartKey(startKey));
+            page.getItems().forEach(item -> result.add(dynamoDBMapper.marshallIntoObject(Delivery.class, item)));
+            startKey = page.getLastEvaluatedKey();
+        } while (startKey != null && !startKey.isEmpty());
+        return result.stream().filter(d -> keyMatches.test(DeliveryListSortKey.of(d))).toList();
     }
 
     public List<Delivery> findPendingDeliveriesByProvider(String storeId, String provider, String excludedDeliveryId) {

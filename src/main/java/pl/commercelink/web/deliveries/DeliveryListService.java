@@ -155,7 +155,7 @@ public class DeliveryListService {
 
     private static boolean matchesSettle(Delivery d, List<Settle> settle) {
         return settle.stream().allMatch(s -> switch (s) {
-            // the own warehouse never gets a purchase invoice (DeliveryListKey), so it is neither missing one nor unsynced
+            // the own warehouse never gets a purchase invoice (DeliveryListSortKey), so it is neither missing one nor unsynced
             case NO_INVOICE -> !d.isInvoiced() && !SupplierRegistry.WAREHOUSE.equals(d.getProvider());
             case NO_SYNC -> d.isInvoiced() && !d.isSynced() && !SupplierRegistry.WAREHOUSE.equals(d.getProvider());
             case UNPAID -> !d.isPaid();
