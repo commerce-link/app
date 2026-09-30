@@ -170,6 +170,23 @@ class OrderShipmentFormTest {
     }
 
     @Test
+    void editKeepsThePendingCancellationOfTheCourierOrder() {
+        // given: the operator edits the shipment while Furgonetka is still cancelling its courier order
+        Shipment saved = courierOrder();
+        saved.markCancellationPending("cmd-1", NOW.minusSeconds(20));
+        OrderShipmentForm form = new OrderShipmentForm("o-1", 0, "v", ShipmentType.Courier, "DPD", "T-1", null, null,
+                null, null, List.of(), null, null);
+
+        // when
+        Shipment shipment = form.toShipment(saved, NOW);
+
+        // then: the cancellation check must still find the shipment
+        assertThat(shipment.getExternalId()).isEqualTo("EXT-1");
+        assertThat(shipment.isCancellationPending()).isTrue();
+        assertThat(shipment.hasCancellationCommand("cmd-1")).isTrue();
+    }
+
+    @Test
     void changingTheCarrierOfACourierShipmentIsAFieldError() {
         // given
         Shipment saved = courierOrder();
