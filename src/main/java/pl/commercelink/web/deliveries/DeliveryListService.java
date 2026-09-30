@@ -260,7 +260,9 @@ public class DeliveryListService {
     }
 
     private static Comparator<Delivery> comparator(DeliveryListQuery query, SupplierLabelMap labels) {
-        boolean desc = query.effectiveDir() == DeliveryListQuery.Direction.DESC;
+        boolean transitDesc = query.effectiveDir() == DeliveryListQuery.Direction.DESC;
+        // without a chosen direction the history is newest first, whatever the transit part does
+        boolean historyDesc = query.dir() == null || transitDesc;
         Comparator<Delivery> column = switch (query.effectiveSort()) {
             case DUE -> Comparator.comparing(DeliveryListService::sortDate, Comparator.nullsLast(Comparator.naturalOrder()));
             case ORDERED -> Comparator.comparing(Delivery::getOrderedAt, Comparator.nullsLast(Comparator.naturalOrder()));
@@ -270,13 +272,13 @@ public class DeliveryListService {
             case STATUS -> Comparator.comparing(d -> DeliveryListState.of(d).ordinal());
             case COST -> Comparator.comparingDouble(Delivery::getTotalCostGross);
         };
-        if (desc) {
-            column = column.reversed();
-        }
+        Comparator<Delivery> transitColumn = transitDesc ? column.reversed() : column;
+        Comparator<Delivery> historyColumn = historyDesc ? column.reversed() : column;
+        Comparator<Delivery> byPart = (a, b) -> a.getReceivedAt() == null ? transitColumn.compare(a, b) : historyColumn.compare(a, b);
         // on their way before received (the "Wszystkie" scope), undated deliveries always last of their part
         Comparator<Delivery> part = Comparator.comparing(d -> d.getReceivedAt() == null ? 0 : 1);
         Comparator<Delivery> undatedLast = Comparator.comparing(d -> query.effectiveSort() == Sort.DUE && sortDate(d) == null ? 1 : 0);
-        return part.thenComparing(undatedLast).thenComparing(column).thenComparing(Delivery::getDeliveryId);
+        return part.thenComparing(undatedLast).thenComparing(byPart).thenComparing(Delivery::getDeliveryId);
     }
 
     private static LocalDate sortDate(Delivery d) {

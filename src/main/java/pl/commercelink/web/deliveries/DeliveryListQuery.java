@@ -125,7 +125,9 @@ public record DeliveryListQuery(Scope scope, DeliveryAttention focus, List<Deliv
 
     public Direction effectiveDir() {
         if (dir != null) return dir;
-        return scope == Scope.TRANSIT ? Direction.ASC : Direction.DESC;
+        // "Wszystkie" opens on the transit part, whose nearest planned date comes first; its history part still starts
+        // with the newest reception (DeliveryListService.comparator)
+        return scope == Scope.RECEIVED ? Direction.DESC : Direction.ASC;
     }
 
     public DeliveryListQuery withScope(Scope s) { return new DeliveryListQuery(s, focus != null && focus.scope() != s ? null : focus, states, providers, settle, from, to, allHistory, q, sort, dir, 1); }

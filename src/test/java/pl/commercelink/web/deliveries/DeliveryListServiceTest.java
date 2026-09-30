@@ -159,6 +159,25 @@ class DeliveryListServiceTest {
     }
 
     @Test
+    void allScopeDefaultsToNearestPlannedDateFirstOnTheWayAndNewestFirstInTheHistory() {
+        // given
+        transit.add(onItsWay("store-1", "aaaa0002", TODAY.plusDays(9)));
+        transit.add(onItsWay("store-1", "aaaa0001", TODAY.plusDays(2)));
+        history.add(receivedOn("store-1", "bbbb0001", TODAY.minusDays(5), true));
+        history.add(receivedOn("store-1", "bbbb0002", TODAY.minusDays(1), true));
+
+        // when
+        DeliveriesPageModel page = page("scope", "all");
+
+        // then: one shared default direction would list the far planned dates first
+        assertThat(page.rows()).extracting(DeliveryRow::number).containsExactly("aaaa0001", "aaaa0002", "bbbb0002", "bbbb0001");
+        assertThat(page("scope", "all", "sort", "due", "dir", "desc").rows()).extracting(DeliveryRow::number)
+                .containsExactly("aaaa0002", "aaaa0001", "bbbb0002", "bbbb0001");
+        assertThat(page("scope", "all", "sort", "due", "dir", "asc").rows()).extracting(DeliveryRow::number)
+                .containsExactly("aaaa0001", "aaaa0002", "bbbb0001", "bbbb0002");
+    }
+
+    @Test
     void searchByNumberFindsADeliveryOutsideTheHistoryWindow() {
         // given
         Delivery old = receivedOn("store-1", "cccc0001", TODAY.minusDays(400), true);
