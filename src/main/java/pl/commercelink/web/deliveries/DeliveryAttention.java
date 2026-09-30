@@ -30,8 +30,8 @@ public enum DeliveryAttention {
     public boolean matches(Delivery delivery, DeliveryListState state, LocalDate today) {
         LocalDate planned = delivery.getEstimatedDeliveryAt();
         return switch (this) {
-            case OVERDUE -> !state.isReceived() && planned != null && planned.isBefore(today);
-            case TODAY -> !state.isReceived() && today.equals(planned);
+            case OVERDUE -> state.expectsArrival() && planned != null && planned.isBefore(today);
+            case TODAY -> state.expectsArrival() && today.equals(planned);
             case PROBLEM -> state.isProblem();
             case INVOICE -> DeliveryListKey.of(delivery).startsWith(DeliveryListKey.TO_SETTLE);
             case APPROVAL -> state == DeliveryListState.AWAITING_APPROVAL;

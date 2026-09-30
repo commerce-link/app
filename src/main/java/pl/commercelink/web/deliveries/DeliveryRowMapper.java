@@ -48,7 +48,7 @@ public class DeliveryRowMapper {
         LocalDate date = received ? delivery.getReceivedAt().toLocalDate() : delivery.getEstimatedDeliveryAt();
         String dueNote = null;
         String dueTone = "";
-        if (!received && date != null && !date.isAfter(today)) {
+        if (state.expectsArrival() && date != null && !date.isAfter(today)) {
             long days = ChronoUnit.DAYS.between(date, today);
             dueNote = days == 0 ? text("deliveries.list.due.today")
                     : days == 1 ? text("deliveries.list.due.overdue.one") : text("deliveries.list.due.overdue", days);

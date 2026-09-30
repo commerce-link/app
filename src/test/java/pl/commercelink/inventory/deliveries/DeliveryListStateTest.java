@@ -77,6 +77,16 @@ class DeliveryListStateTest {
     }
 
     @Test
+    void stateExpectsArrivalUnlessReceivedFailedOrCancelled() {
+        // when / then
+        assertThat(java.util.Arrays.stream(DeliveryListState.values()).filter(DeliveryListState::expectsArrival))
+                .containsExactly(DeliveryListState.AWAITING_APPROVAL, DeliveryListState.ORDER_PENDING,
+                        DeliveryListState.OUTCOME_UNKNOWN, DeliveryListState.DISPATCHED,
+                        DeliveryListState.SHIPPED_WITHOUT_DATA, DeliveryListState.AWAITING_SHIPMENT,
+                        DeliveryListState.IN_TRANSIT);
+    }
+
+    @Test
     void everyStateHasAToneAndAParameterThatParsesBack() {
         for (DeliveryListState state : DeliveryListState.values()) {
             assertThat(state.tone()).isIn("is-warn", "is-info", "is-bad", "is-ok");

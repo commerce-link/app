@@ -86,6 +86,14 @@ public enum DeliveryListState {
         return received;
     }
 
+    /**
+     * Still expected at the warehouse or the customer, so a passed planned date means late. A failed order or a delivery
+     * cancelled by the supplier is no longer coming: "overdue" next to it would contradict the state itself.
+     */
+    public boolean expectsArrival() {
+        return !received && this != FAILED && this != CANCELLED_BY_SUPPLIER;
+    }
+
     /** Needs an operator's decision: the "Do wyjaśnienia" tile. DISPATCHED is transient and turns into OUTCOME_UNKNOWN. */
     public boolean isProblem() {
         return problem;
