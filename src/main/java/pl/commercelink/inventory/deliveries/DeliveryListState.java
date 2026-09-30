@@ -34,6 +34,11 @@ public enum DeliveryListState {
     }
 
     public static DeliveryListState of(Delivery delivery) {
+        // reception supersedes a leftover order status (a dispatched or failed order that was received anyway): the goods
+        // are there, and the list files the delivery under the received part by its key as well
+        if (delivery.hasBeenReceived()) {
+            return delivery.isDropship() ? SHIPPED_TO_CUSTOMER : RECEIVED;
+        }
         if (delivery.isAwaitingApproval()) {
             return AWAITING_APPROVAL;
         }
@@ -48,9 +53,6 @@ public enum DeliveryListState {
         }
         if (delivery.isOrderFailed()) {
             return FAILED;
-        }
-        if (delivery.hasBeenReceived()) {
-            return delivery.isDropship() ? SHIPPED_TO_CUSTOMER : RECEIVED;
         }
         if (!delivery.isDropship()) {
             return IN_TRANSIT;

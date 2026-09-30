@@ -44,6 +44,26 @@ class DeliveryListStateTest {
     }
 
     @Test
+    void receptionSupersedesALeftoverOrderStatus() {
+        // given
+        Delivery unknown = warehouse();
+        unknown.setOrderStatus(DeliveryOrderStatus.ORDER_DISPATCHED);
+        unknown.setOrderErrorMessage("timeout");
+        unknown.setReceivedAt(LocalDateTime.of(2026, 9, 29, 10, 0));
+        Delivery failed = warehouse();
+        failed.setOrderStatus(DeliveryOrderStatus.FAILED);
+        failed.setReceivedAt(LocalDateTime.of(2026, 9, 29, 10, 0));
+        Delivery failedDropship = dropship(null);
+        failedDropship.setOrderStatus(DeliveryOrderStatus.FAILED);
+        failedDropship.setReceivedAt(LocalDateTime.of(2026, 9, 29, 10, 0));
+
+        // then
+        assertThat(DeliveryListState.of(unknown)).isEqualTo(DeliveryListState.RECEIVED);
+        assertThat(DeliveryListState.of(failed)).isEqualTo(DeliveryListState.RECEIVED);
+        assertThat(DeliveryListState.of(failedDropship)).isEqualTo(DeliveryListState.SHIPPED_TO_CUSTOMER);
+    }
+
+    @Test
     void receivedDropshipMeansShippedToTheCustomer() {
         // given
         Delivery warehouse = warehouse();
