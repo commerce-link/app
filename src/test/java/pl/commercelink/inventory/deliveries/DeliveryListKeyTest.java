@@ -27,8 +27,8 @@ class DeliveryListKeyTest {
         delivery.setEstimatedDeliveryAt(LocalDate.of(2026, 10, 1));
 
         // when / then
-        assertThat(DeliveryListKey.of(delivery)).isEqualTo("T#2026-10-01");
-        assertThat(delivery.getListKey()).isEqualTo("T#2026-10-01");
+        assertThat(DeliveryListKey.of(delivery)).isEqualTo("IN_TRANSIT#2026-10-01");
+        assertThat(delivery.getDeliveryListSortKey()).isEqualTo("IN_TRANSIT#2026-10-01");
     }
 
     @Test
@@ -37,8 +37,8 @@ class DeliveryListKeyTest {
         Delivery delivery = delivery("Acme");
 
         // when / then
-        assertThat(DeliveryListKey.of(delivery)).isEqualTo("T#9999-12-31");
-        assertThat(DeliveryListKey.of(delivery)).isGreaterThan("T#2099-12-31");
+        assertThat(DeliveryListKey.of(delivery)).isEqualTo("IN_TRANSIT#9999-12-31");
+        assertThat(DeliveryListKey.of(delivery)).isGreaterThan("IN_TRANSIT#2099-12-31");
     }
 
     @Test
@@ -48,7 +48,7 @@ class DeliveryListKeyTest {
         delivery.setReceivedAt(LocalDateTime.of(2026, 9, 29, 10, 15, 30));
 
         // when / then
-        assertThat(DeliveryListKey.of(delivery)).isEqualTo("S#2026-09-29T10:15:30");
+        assertThat(DeliveryListKey.of(delivery)).isEqualTo("TO_SETTLE#2026-09-29T10:15:30");
     }
 
     @Test
@@ -63,7 +63,7 @@ class DeliveryListKeyTest {
         delivery.addDocument(invoice);
 
         // then
-        assertThat(delivery.getListKey()).isEqualTo("R#2026-09-29T10:15:30");
+        assertThat(delivery.getDeliveryListSortKey()).isEqualTo("SETTLED#2026-09-29T10:15:30");
     }
 
     @Test
@@ -73,18 +73,18 @@ class DeliveryListKeyTest {
         delivery.setReceivedAt(LocalDateTime.of(2026, 9, 29, 10, 15, 30));
 
         // when / then
-        assertThat(DeliveryListKey.of(delivery)).startsWith("R#");
+        assertThat(DeliveryListKey.of(delivery)).startsWith("SETTLED#");
     }
 
     @Test
     void receivedBoundsCoverTheWholeLastDay() {
         // when
-        String lower = DeliveryListKey.receivedBound("S#", LocalDate.of(2026, 9, 1), false);
-        String upper = DeliveryListKey.receivedBound("S#", LocalDate.of(2026, 9, 30), true);
+        String lower = DeliveryListKey.receivedBound("TO_SETTLE#", LocalDate.of(2026, 9, 1), false);
+        String upper = DeliveryListKey.receivedBound("TO_SETTLE#", LocalDate.of(2026, 9, 30), true);
 
         // then
-        assertThat("S#2026-09-01T00:00:00").isGreaterThanOrEqualTo(lower);
-        assertThat("S#2026-09-30T23:59:59.999").isLessThanOrEqualTo(upper);
-        assertThat("S#2026-10-01T00:00:00").isGreaterThan(upper);
+        assertThat("TO_SETTLE#2026-09-01T00:00:00").isGreaterThanOrEqualTo(lower);
+        assertThat("TO_SETTLE#2026-09-30T23:59:59.999").isLessThanOrEqualTo(upper);
+        assertThat("TO_SETTLE#2026-10-01T00:00:00").isGreaterThan(upper);
     }
 }
