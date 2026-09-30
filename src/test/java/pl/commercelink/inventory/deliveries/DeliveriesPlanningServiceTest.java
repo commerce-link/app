@@ -15,8 +15,11 @@ import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.warehouse.builtin.WarehouseAllocationsManager;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -64,9 +67,10 @@ class DeliveriesPlanningServiceTest {
     void dropshipCandidatesAreKeptOutOfSupplierBatches() {
         // given
         Order order = new Order();
-        when(orderAllocationsManager.fetchAll(STORE_ID)).thenReturn(List.of(
+        when(orderAllocationsManager.fetchAllWithOrders(STORE_ID))
+                .thenReturn(new OrderAllocations(List.of(
                 allocation("order-1", "1", "Acme", false),
-                allocation("order-2", "2", "Acme", true)));
+                allocation("order-2", "2", "Acme", true)), Map.of()));
         when(warehouseAllocationsManager.fetchAll(STORE_ID)).thenReturn(List.of());
         when(ordersRepository.findById(STORE_ID, "order-2")).thenReturn(order);
         when(orderItemsRepository.findByOrderId("order-2")).thenReturn(List.of());
@@ -86,11 +90,12 @@ class DeliveriesPlanningServiceTest {
         // given
         Order order2 = new Order();
         Order order3 = new Order();
-        when(orderAllocationsManager.fetchAll(STORE_ID)).thenReturn(List.of(
+        when(orderAllocationsManager.fetchAllWithOrders(STORE_ID))
+                .thenReturn(new OrderAllocations(List.of(
                 allocation("order-1", "1", "Acme", false),
                 allocation("order-2", "2", "Acme", true),
                 allocation("order-2", "3", "Acme", true),
-                allocation("order-3", "4", "Acme", true)));
+                allocation("order-3", "4", "Acme", true)), Map.of()));
         when(ordersRepository.findById(STORE_ID, "order-2")).thenReturn(order2);
         when(orderItemsRepository.findByOrderId("order-2")).thenReturn(List.of());
         when(dropshipEligibility.assess(order2, List.of())).thenReturn(DropshipAssessment.of(List.of("Acme")));
@@ -116,8 +121,9 @@ class DeliveriesPlanningServiceTest {
     void directToConsumerOrderAtASupplierWithoutDropshipFallsBackToTheBatch() {
         // given
         Order order = new Order();
-        when(orderAllocationsManager.fetchAll(STORE_ID)).thenReturn(List.of(
-                allocation("order-2", "2", "AcmeB", true)));
+        when(orderAllocationsManager.fetchAllWithOrders(STORE_ID))
+                .thenReturn(new OrderAllocations(List.of(
+                allocation("order-2", "2", "AcmeB", true)), Map.of()));
         when(warehouseAllocationsManager.fetchAll(STORE_ID)).thenReturn(List.of());
         when(ordersRepository.findById(STORE_ID, "order-2")).thenReturn(order);
         when(orderItemsRepository.findByOrderId("order-2")).thenReturn(List.of());
@@ -139,9 +145,10 @@ class DeliveriesPlanningServiceTest {
     void directToConsumerAllocationsYieldOneDropshipCandidatePerSupplier() {
         // given
         Order order = new Order();
-        when(orderAllocationsManager.fetchAll(STORE_ID)).thenReturn(List.of(
+        when(orderAllocationsManager.fetchAllWithOrders(STORE_ID))
+                .thenReturn(new OrderAllocations(List.of(
                 allocation("order-2", "2", "Acme", true),
-                allocation("order-2", "3", "Elko", true)));
+                allocation("order-2", "3", "Elko", true)), Map.of()));
         when(warehouseAllocationsManager.fetchAll(STORE_ID)).thenReturn(List.of());
         when(ordersRepository.findById(STORE_ID, "order-2")).thenReturn(order);
         when(orderItemsRepository.findByOrderId("order-2")).thenReturn(List.of());
@@ -162,9 +169,10 @@ class DeliveriesPlanningServiceTest {
     void aMixedOrderYieldsADropshipCandidateAndAWarehouseDeliverySideBySide() {
         // given
         Order order = new Order();
-        when(orderAllocationsManager.fetchAll(STORE_ID)).thenReturn(List.of(
+        when(orderAllocationsManager.fetchAllWithOrders(STORE_ID))
+                .thenReturn(new OrderAllocations(List.of(
                 allocation("order-3", "4", "Acme", true),
-                allocation("order-3", "5", "Elko", true)));
+                allocation("order-3", "5", "Elko", true)), Map.of()));
         when(warehouseAllocationsManager.fetchAll(STORE_ID)).thenReturn(List.of());
         when(ordersRepository.findById(STORE_ID, "order-3")).thenReturn(order);
         when(orderItemsRepository.findByOrderId("order-3")).thenReturn(List.of());
@@ -185,8 +193,9 @@ class DeliveriesPlanningServiceTest {
     @Test
     void warehouseFulfilmentOrdersProduceNoDropshipCandidates() {
         // given
-        when(orderAllocationsManager.fetchAll(STORE_ID)).thenReturn(List.of(
-                allocation("order-1", "1", "Acme", false)));
+        when(orderAllocationsManager.fetchAllWithOrders(STORE_ID))
+                .thenReturn(new OrderAllocations(List.of(
+                allocation("order-1", "1", "Acme", false)), Map.of()));
 
         // when / then
         assertThat(service.plan(STORE_ID).dropshipCandidates()).isEmpty();
@@ -196,7 +205,8 @@ class DeliveriesPlanningServiceTest {
     void ineligibleDirectToConsumerOrderStaysInBatchAndYieldsNoCandidate() {
         // given
         Allocation dtc = allocation("order-1", "1", "Acme", true);
-        when(orderAllocationsManager.fetchAll(STORE_ID)).thenReturn(List.of(dtc));
+        when(orderAllocationsManager.fetchAllWithOrders(STORE_ID))
+                .thenReturn(new OrderAllocations(List.of(dtc), Map.of()));
         when(warehouseAllocationsManager.fetchAll(STORE_ID)).thenReturn(List.of());
         Order order = new Order();
         when(ordersRepository.findById(STORE_ID, "order-1")).thenReturn(order);
@@ -215,7 +225,8 @@ class DeliveriesPlanningServiceTest {
     @Test
     void planFetchesOrderAllocationsOnlyOnce() {
         // given
-        when(orderAllocationsManager.fetchAll(STORE_ID)).thenReturn(List.of());
+        when(orderAllocationsManager.fetchAllWithOrders(STORE_ID))
+                .thenReturn(new OrderAllocations(List.of(), Map.of()));
         when(warehouseAllocationsManager.fetchAll(STORE_ID)).thenReturn(List.of());
 
         // when
@@ -224,6 +235,43 @@ class DeliveriesPlanningServiceTest {
         // then
         assertThat(planning.deliveries()).isEmpty();
         assertThat(planning.dropshipCandidates()).isEmpty();
-        verify(orderAllocationsManager, times(1)).fetchAll(STORE_ID);
+        verify(orderAllocationsManager, times(1)).fetchAllWithOrders(STORE_ID);
+    }
+
+    @Test
+    void theDropshipAssessmentTakesTheOrderFromThePlanningInsteadOfReadingItAgain() {
+        // given
+        Allocation dropship = allocation("order-2", "2", "Acme", true);
+        Order order = new Order();
+        order.setOrderId("order-2");
+        when(orderAllocationsManager.fetchAllWithOrders(STORE_ID))
+                .thenReturn(new OrderAllocations(List.of(dropship), Map.of("order-2", order)));
+        when(warehouseAllocationsManager.fetchAll(STORE_ID)).thenReturn(List.of());
+        when(orderItemsRepository.findByOrderId("order-2")).thenReturn(List.of());
+        when(dropshipEligibility.assess(order, List.of())).thenReturn(DropshipAssessment.of(List.of("Acme")));
+
+        // when
+        DeliveriesPlanningService.Planning planning = service.plan(STORE_ID);
+
+        // then
+        assertThat(planning.dropshipCandidates()).extracting(DropshipCandidate::orderId).containsExactly("order-2");
+        verify(ordersRepository, never()).findById(any(), any());
+    }
+
+    @Test
+    void thePlanningCarriesTheOrdersOfItsAllocations() {
+        // given
+        Order order = new Order();
+        order.setOrderId("order-1");
+        when(orderAllocationsManager.fetchAllWithOrders(STORE_ID))
+                .thenReturn(new OrderAllocations(List.of(allocation("order-1", "1", "Acme", false)), Map.of("order-1", order)));
+        when(warehouseAllocationsManager.fetchAll(STORE_ID)).thenReturn(List.of());
+
+        // when
+        DeliveriesPlanningService.Planning planning = service.plan(STORE_ID);
+
+        // then
+        assertThat(planning.orders()).containsEntry("order-1", order);
+        assertThat(planning.deliveries()).extracting(Delivery::getProvider).containsExactly("Acme");
     }
 }
