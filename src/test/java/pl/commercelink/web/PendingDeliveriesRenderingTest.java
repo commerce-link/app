@@ -45,7 +45,7 @@ class PendingDeliveriesRenderingTest {
                 List.of(new Tile("Po terminie", "3", "termin wysyłki minął", PATH + "?focus=overdue", false),
                         new Tile("Na dziś", "1", "termin wysyłki dziś", PATH + "?focus=today", false),
                         new Tile("Na jutro", "2", "termin wysyłki jutro", PATH + "?focus=tomorrow", false),
-                        new Tile("Z akceptacją", "1", "zamówienie czeka na akceptację super admina", PATH + "?focus=approval", false)),
+                        new Tile("Z akceptacją", "1", "wymaga akceptacji super admina", PATH + "?focus=approval", false)),
                 List.of(new KindTab("Do magazynu", 4, PATH + "?kind=warehouse", active == Kind.WAREHOUSE),
                         new KindTab("Dropshipping", 8, PATH + "?kind=dropship", active == Kind.DROPSHIP)),
                 active, active == Kind.WAREHOUSE ? "Do magazynu" : "Dropshipping", "Opis zakładki.",
@@ -148,5 +148,31 @@ class PendingDeliveriesRenderingTest {
         assertThat(html.split("<h1", -1)).hasSize(2);
         assertThat(html).contains("Oczekujące dostawy").contains("class=\"cl-back\"").contains("href=\"/dashboard/deliveries\"")
                 .contains("Wyczyść filtry").contains("Usuń filtr Po terminie").doesNotContain("??");
+    }
+
+    @Test
+    void supplierMenuSitsInTheSingleToolbarRowAndTheClearLinkInTheChipsLine() {
+        // given
+        List<Chip> chips = List.of(new Chip("Po terminie", PATH, "Usuń filtr Po terminie"));
+
+        // when
+        String withChips = fragment(model(Kind.WAREHOUSE, List.of(warehouseRow(false)), null, false, chips));
+        String withoutChips = fragment(model(Kind.WAREHOUSE, List.of(warehouseRow(false)), null, false, List.of()));
+
+        // then
+        int rowStart = withChips.indexOf("class=\"cl-toolbar-row\"");
+        int menu = withChips.indexOf("data-cl-filter-menu=\"provider\"");
+        int search = withChips.indexOf("cl-toolbar-search");
+        int toolbarEnd = withChips.indexOf("cl-list-meta");
+        assertThat(withChips).contains("cl-table-toolbar is-single-row").doesNotContain("cl-toolbar-filters")
+                .doesNotContain("cl-toolbar-toggle").doesNotContain("data-cl-toolbar-toggle");
+        assertThat(rowStart).isNotNegative();
+        assertThat(withChips.indexOf("cl-segmented")).isBetween(rowStart, menu);
+        assertThat(menu).isLessThan(search);
+        assertThat(search).isLessThan(toolbarEnd);
+        String meta = withChips.substring(toolbarEnd);
+        assertThat(meta).contains("cl-toolbar-clear").contains("Wyczyść filtry");
+        assertThat(meta.indexOf("cl-filter-chips")).isLessThan(meta.indexOf("cl-toolbar-clear"));
+        assertThat(withoutChips).doesNotContain("cl-toolbar-clear");
     }
 }

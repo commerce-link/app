@@ -46,4 +46,14 @@ class PendingDeliveriesStylesContractTest {
                 .contains(".cl-row-toggle").contains("min-height: 44px").contains(".cl-ref")
                 .contains(".cl-subtable").contains(".cl-narrow-only").contains("prefers-reduced-motion");
     }
+
+    @Test
+    void singleRowToolbarIsStyledInThePendingSectionOnly() throws Exception {
+        // when
+        String section = section();
+
+        // then
+        assertThat(section).contains(".cl-table-toolbar.is-single-row .cl-toolbar-search").contains(".cl-list-meta .cl-toolbar-clear")
+                .doesNotContain(".cl-toolbar-toggle");
+    }
 }

@@ -40,7 +40,7 @@
                 </div>
 
                 <th:block th:unless="${page.nothingPending()}">
-                    <div class="cl-table-toolbar is-stacked">
+                    <div class="cl-table-toolbar is-single-row">
                         <div class="cl-toolbar-row">
                             <nav class="cl-segmented" th:attr="aria-label=#{deliveries.pending.kind.label}">
                                 <a class="cl-segment" th:each="tab : ${page.tabs()}" th:href="@{${tab.href()}}"
@@ -48,6 +48,19 @@
                                     <span th:text="${tab.label()}"></span><span class="cl-segment-sep">: </span><span class="cl-segment-count" th:text="${tab.count()}"></span>
                                 </a>
                             </nav>
+                            <details class="cl-filter-menu" data-cl-filter-menu="provider">
+                                <summary class="cl-filter-menu-trigger">
+                                    <span class="cl-filter-menu-key" th:text="#{deliveries.pending.provider.menu}"></span>
+                                    <span class="cl-filter-menu-value" th:text="${page.providerSummary()}"></span>
+                                </summary>
+                                <form method="get" th:action="@{${page.listPath()}}" class="cl-filter-menu-panel" data-cl-list-form data-cl-autosubmit>
+                                    <th:block th:replace="~{fragments/deliveries-pending :: hidden('provider')}"></th:block>
+                                    <th:block th:replace="~{fragments/deliveries-list :: checks('provider', null, ${page.providerOptions()})}"></th:block>
+                                    <div class="cl-filter-menu-actions">
+                                        <button type="submit" class="cl-button is-primary" data-cl-autosubmit-hide th:text="#{deliveries.pending.menu.apply}"></button>
+                                    </div>
+                                </form>
+                            </details>
                             <div class="cl-toolbar-search">
                                 <form method="get" th:action="@{${page.listPath()}}" class="cl-search-form" role="search" data-cl-list-form>
                                     <th:block th:replace="~{fragments/deliveries-pending :: hidden('search')}"></th:block>
@@ -66,28 +79,7 @@
                                         <span class="cl-search-submit-text" th:text="#{general.search}"></span>
                                     </button>
                                 </form>
-                                <button type="button" class="cl-button cl-toolbar-toggle" data-cl-toolbar-toggle aria-controls="pending-filters" aria-expanded="true">
-                                    <i class="fas fa-sliders-h" aria-hidden="true"></i>
-                                    <span class="cl-toolbar-toggle-label"><span th:text="#{deliveries.pending.filters}"></span><th:block th:if="${page.activeFilterCount() > 0}"><span>: </span><span class="cl-toolbar-toggle-count" th:text="${page.activeFilterCount()}"></span></th:block></span>
-                                </button>
                             </div>
-                        </div>
-                        <div class="cl-toolbar-filters" id="pending-filters">
-                            <details class="cl-filter-menu" data-cl-filter-menu="provider">
-                                <summary class="cl-filter-menu-trigger">
-                                    <span class="cl-filter-menu-key" th:text="#{deliveries.pending.provider.menu}"></span>
-                                    <span class="cl-filter-menu-value" th:text="${page.providerSummary()}"></span>
-                                </summary>
-                                <form method="get" th:action="@{${page.listPath()}}" class="cl-filter-menu-panel" data-cl-list-form data-cl-autosubmit>
-                                    <th:block th:replace="~{fragments/deliveries-pending :: hidden('provider')}"></th:block>
-                                    <th:block th:replace="~{fragments/deliveries-list :: checks('provider', null, ${page.providerOptions()})}"></th:block>
-                                    <div class="cl-filter-menu-actions">
-                                        <button type="submit" class="cl-button is-primary" data-cl-autosubmit-hide th:text="#{deliveries.pending.menu.apply}"></button>
-                                    </div>
-                                </form>
-                            </details>
-                            <a th:if="${!page.chips().isEmpty()}" class="cl-link-button cl-toolbar-clear" th:href="@{${page.clearHref()}}"
-                               th:text="#{general.clear.filters}" data-cl-list-nav></a>
                         </div>
                     </div>
 
@@ -99,6 +91,8 @@
                                    data-cl-list-nav><span aria-hidden="true">×</span></a>
                             </span>
                         </div>
+                        <a th:if="${!page.chips().isEmpty()}" class="cl-link-button cl-toolbar-clear" th:href="@{${page.clearHref()}}"
+                           th:text="#{general.clear.filters}" data-cl-list-nav></a>
                         <p class="cl-table-results" role="status" th:classappend="${page.chips().isEmpty()} ? 'cl-visually-hidden' : ''"
                            th:text="${page.resultsLine()}"></p>
                     </div>
