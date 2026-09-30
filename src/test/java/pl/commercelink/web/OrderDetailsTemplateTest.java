@@ -274,7 +274,7 @@ class OrderDetailsTemplateTest {
         // then
         assertThat(html).contains("<col class=\"cl-col-check\">").contains("<col class=\"cl-col-flag\">").contains("<col class=\"cl-col-menu\">")
                 .contains("class=\"cl-table-group\"").contains("Usługi i dostawa")
-                .contains("2 × 749,00").contains("koszt 579,00 netto")
+                .contains("2 × 749,00").contains("koszt 712,17 brutto")
                 .contains("data-cl-copy=\"100-100001084WOF\"")
                 .containsPattern("data-ready-for-allocation=\"false\"[^>]*data-removable=\"true\"")
                 .contains("name=\"orderItems[0].selected\"").contains("name=\"orderItems[0].itemId\"");
@@ -450,8 +450,8 @@ class OrderDetailsTemplateTest {
         String admin = page(render(order(OrderStatus.New), ADMIN));
 
         // then
-        assertThat(user).contains("koszt 579").contains("Zysk (z VAT)").contains("Koszt produktów (brutto)");
-        assertThat(admin).contains("koszt 579").contains("Zysk (z VAT)").contains("Koszt produktów (brutto)");
+        assertThat(user).contains("koszt 712,17 brutto").contains("Zysk (z VAT)").contains("Koszt produktów (brutto)");
+        assertThat(admin).contains("koszt 712,17 brutto").contains("Zysk (z VAT)").contains("Koszt produktów (brutto)");
     }
 
     @Test
@@ -1077,7 +1077,7 @@ class OrderDetailsTemplateTest {
         String html = page(render(order(OrderStatus.New), SUPER_ADMIN));
 
         // then
-        assertThat(html).contains("id=\"finances-costs\"").contains("<summary>Koszt i zysk</summary>").contains("koszt 579")
+        assertThat(html).contains("id=\"finances-costs\"").contains("<summary>Koszt i zysk</summary>").contains("koszt 712,17 brutto")
                 .doesNotContain("data-cl-dialog-open").doesNotContain("item-menu-");
     }
 
