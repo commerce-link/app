@@ -7754,6 +7754,13 @@ a.cl-link-button:hover {
     margin-left: auto;
 }
 
+/* With the rail (1024–1215 px) the card is ~746 px: a shorter field keeps tabs, menu and search on one line. */
+@media screen and (min-width: 1024px) and (max-width: 1215px) {
+    .cl-page .cl-table-toolbar.is-single-row .cl-search-field {
+        width: 190px;
+    }
+}
+
 /* "Wyczyść filtry" after the chips; the results count stays at the right edge. */
 .cl-page .cl-list-meta .cl-toolbar-clear {
     margin-right: auto;
