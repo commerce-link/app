@@ -193,6 +193,23 @@ class ShipmentCancelServiceTest {
     }
 
     @Test
+    void cancelShippingRefusesWhenTheStoreHasNoShippingProvider() {
+        // given: no provider configured, or its authorization was lost
+        Order order = orderWithShipments(courierShipment(EXTERNAL_ID));
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(shippingProviderFactory.get(store)).thenReturn(null);
+
+        // when / then
+        assertThatThrownBy(() -> shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID))
+                .isExactlyInstanceOf(ShippingException.class)
+                .hasMessage("No shipping provider configured for the store");
+        verify(ordersRepository, never()).save(any());
+        verify(publisher, never()).publish(any());
+        assertThat(order.getShipments().get(0).getCancellationStatus()).isNull();
+    }
+
+    @Test
     void cancelShippingRestoresNoCancellationWhenTheProviderRefusesTheCommand() {
         // given
         Order order = orderWithShipments(courierShipment(EXTERNAL_ID));

@@ -9,6 +9,7 @@ import pl.commercelink.orders.ShipmentCancellationStatus;
 import pl.commercelink.rest.client.HttpClientException;
 import pl.commercelink.shipping.api.ShipmentCancellation;
 import pl.commercelink.shipping.api.ShippingException;
+import pl.commercelink.shipping.api.ShippingProvider;
 import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
@@ -63,6 +64,12 @@ public class ShipmentCancelService {
         String externalId = shipment.getExternalId();
         if (externalId == null) {
             throw new ShippingException("Shipment has no external package ID");
+        }
+        // resolved before the mark: without a provider nothing can be sent, and a missing one must not look like a
+        // command with an unknown outcome
+        ShippingProvider provider = shippingProviderFactory.get(store);
+        if (provider == null) {
+            throw new ShippingException("No shipping provider configured for the store");
         }
 
         // an unknown result is read again rather than cancelled anew: a late success of the old command would make
@@ -119,7 +126,7 @@ public class ShipmentCancelService {
 
         ShipmentCancellation result;
         try {
-            result = shippingProviderFactory.get(store).cancelShipment(externalId, commandId);
+            result = provider.cancelShipment(externalId, commandId);
         } catch (RuntimeException e) {
             if (isRefusal(e)) {
                 restore(storeId, orderId, externalId, commandId, previous.get());
