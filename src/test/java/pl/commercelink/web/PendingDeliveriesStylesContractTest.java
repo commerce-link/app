@@ -48,6 +48,26 @@ class PendingDeliveriesStylesContractTest {
     }
 
     @Test
+    void keyCellWrapsLongNamesButKeepsPillsWhole() throws Exception {
+        // when
+        String section = section();
+
+        // then the shared key rule (white-space: nowrap) would push long supplier/customer names out of the card
+        assertThat(section).containsPattern("\\.cl-table\\.is-pending \\.cl-table-key\\s*\\{[^}]*white-space: normal")
+                .containsPattern("\\.cl-table\\.is-pending \\.cl-table-key \\.cl-status[^{]*\\{[^}]*white-space: nowrap");
+    }
+
+    @Test
+    void orderNumberIsATouchTargetAndOpenRowsKeepSubLineContrast() throws Exception {
+        // when
+        String section = section();
+
+        // then
+        assertThat(section).containsPattern("\\.cl-row-number\\s*\\{[^}]*min-height: 44px")
+                .containsPattern("is-open\\)[^{]*\\{[^}]*color: var\\(--cl-ink-2\\)");
+    }
+
+    @Test
     void toolbarHasNoSingleRowModifier() throws Exception {
         // when
         String css = section();

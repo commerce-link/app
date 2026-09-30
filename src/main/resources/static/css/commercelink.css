@@ -7762,9 +7762,22 @@ a.cl-link-button:hover {
     padding: 0 20px 16px;
 }
 
+/* The key here is a supplier or customer name, not a short number: it wraps (the shared key rule keeps it on one
+   line), a pill stays whole and moves to the next line instead of splitting. */
+.cl-page .cl-table.is-pending .cl-table-key {
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
 .cl-page .cl-table.is-pending .cl-table-key .cl-status {
     margin-left: 6px;
     vertical-align: 1px;
+    white-space: nowrap;
+}
+
+/* An open or hovered row sits on --cl-surface-2, where --cl-ink-3 falls under 4.5:1 */
+.cl-page .cl-table.is-pending tr.cl-row-main:is(:hover, .is-open) :is(.cl-table-sub, .cl-card-sub, .cl-due-note.is-none) {
+    color: var(--cl-ink-2);
 }
 
 .cl-page .cl-table.is-pending .cl-table-sub,
@@ -7886,6 +7899,10 @@ a.cl-link-button:hover {
     border-bottom: 0;
 }
 
+.cl-page .cl-subtable .cl-sub-product {
+    overflow-wrap: anywhere;
+}
+
 .cl-page .cl-subtable .is-numeric {
     text-align: right;
     white-space: nowrap;
@@ -7970,6 +7987,22 @@ a.cl-link-button:hover {
     .cl-page .cl-row-toggle,
     .cl-page .cl-ref {
         min-height: 44px;
+    }
+
+    /* Five columns with a nowrap cost and button fit the card from 720 px only with tighter gaps between cells */
+    .cl-page .cl-table.is-pending tr > :is(th, td):not(:first-child) {
+        padding-left: 8px;
+    }
+
+    .cl-page .cl-table.is-pending tr > :is(th, td):not(:last-child) {
+        padding-right: 8px;
+    }
+
+    .cl-page .cl-table.is-pending .cl-row-number {
+        display: inline-flex;
+        align-items: center;
+        min-height: 44px;
+        vertical-align: middle;
     }
 }
 
