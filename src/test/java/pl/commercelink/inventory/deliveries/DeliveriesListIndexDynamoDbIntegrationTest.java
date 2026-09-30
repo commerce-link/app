@@ -84,6 +84,9 @@ class DeliveriesListIndexDynamoDbIntegrationTest {
                 .containsExactlyInAnyOrder("aaaa0001-0000-0000-0000-000000000000", "aaaa0002-0000-0000-0000-000000000000");
         assertThat(deliveries.findToSettle("store-1")).extracting(Delivery::getDeliveryId)
                 .containsExactly("bbbb0001-0000-0000-0000-000000000000");
+        // the count falls back to the partition too, and only counts the backlog of its own store
+        assertThat(deliveries.countToSettle("store-1")).isEqualTo(1);
+        assertThat(deliveries.countToSettle("store-2")).isZero();
     }
 
     @Test
@@ -102,6 +105,9 @@ class DeliveriesListIndexDynamoDbIntegrationTest {
         assertThat(deliveries.findReceivedBetween("store-1", null, null)).hasSize(2);
         assertThat(deliveries.findByDeliveryIdPrefix("store-1", "bbbb0002")).extracting(Delivery::getDeliveryId)
                 .containsExactly("bbbb0002-0000-0000-0000-000000000000");
+        // COUNT on the active index
+        assertThat(deliveries.countToSettle("store-1")).isEqualTo(1);
+        assertThat(deliveries.countToSettle("store-2")).isZero();
     }
 
     @Test
@@ -119,6 +125,7 @@ class DeliveriesListIndexDynamoDbIntegrationTest {
         assertThat(deliveries.findInTransit("store-1")).extracting(Delivery::getDeliveryId)
                 .containsExactly("aaaa0002-0000-0000-0000-000000000000");
         assertThat(deliveries.findToSettle("store-1")).hasSize(2);
+        assertThat(deliveries.countToSettle("store-1")).isEqualTo(2);
     }
 
     @Test

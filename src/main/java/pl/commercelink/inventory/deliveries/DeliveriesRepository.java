@@ -7,6 +7,7 @@ import com.amazonaws.services.dynamodbv2.model.AmazonDynamoDBException;
 import com.amazonaws.services.dynamodbv2.model.AttributeValue;
 import com.amazonaws.services.dynamodbv2.model.QueryRequest;
 import com.amazonaws.services.dynamodbv2.model.QueryResult;
+import com.amazonaws.services.dynamodbv2.model.Select;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import pl.commercelink.starter.dynamodb.DynamoDbRepository;
@@ -135,8 +136,44 @@ public class  DeliveriesRepository extends DynamoDbRepository<Delivery> {
     }
 
     /**
-     * Received deliveries in a reception window; a missing bound means from the start / up to now. Partial, see
-     * findInTransit.
+     * How many received deliveries wait for a purchase invoice: a COUNT on the index, so the tile does not read the
+     * backlog on every view. The index entry is not re-checked against the delivery's recomputed key, so a stale entry
+     * (a writer that does not maintain listKey) can be counted that findToSettle would drop; acceptable for a tile.
+     */
+    public long countToSettle(String storeId) {
+        Map<String, AttributeValue> eav = Map.of(":storeId", new AttributeValue(storeId),
+                ":lo", new AttributeValue(DeliveryListKey.TO_SETTLE));
+        long count = 0;
+        try {
+            Map<String, AttributeValue> startKey = null;
+            do {
+                QueryResult page = amazonDynamoDB.query(new QueryRequest()
+                        .withTableName("Deliveries")
+                        .withIndexName(LIST_INDEX)
+                        .withSelect(Select.COUNT)
+                        .withKeyConditionExpression("storeId = :storeId AND begins_with(listKey, :lo)")
+                        .withExpressionAttributeValues(eav)
+                        .withExclusiveStartKey(startKey));
+                count += page.getCount();
+                startKey = page.getLastEvaluatedKey();
+            } while (startKey != null && !startKey.isEmpty());
+            return count;
+        } catch (AmazonDynamoDBException e) {
+            if (!namesListIndex(e)) {
+                throw e;
+            }
+            log.warn("{} is not available yet ({}); counting the store's partition for the deliveries list", LIST_INDEX, e.getErrorMessage());
+            return findByStore(storeId).stream().filter(d -> DeliveryListKey.of(d).startsWith(DeliveryListKey.TO_SETTLE)).count();
+        }
+    }
+
+    private static boolean namesListIndex(AmazonDynamoDBException e) {
+        return e.getErrorMessage() != null && e.getErrorMessage().contains(LIST_INDEX);
+    }
+
+    /**
+     * Received deliveries in a reception window; a missing bound means from the start, an open upper bound reaches
+     * every reception up to the end of the history. Partial, see findInTransit.
      */
     public List<Delivery> findReceivedBetween(String storeId, LocalDate from, LocalDate to) {
         List<Delivery> result = new ArrayList<>();
@@ -161,9 +198,10 @@ public class  DeliveriesRepository extends DynamoDbRepository<Delivery> {
     }
 
     /**
-     * One key range of StoreIdListKeyIndex, every page followed. The index is eventually consistent, so each delivery's
-     * key is recomputed from the projected attributes and one that has already moved on is dropped (the same guard as
-     * OrdersRepository.findByStoreAndStatuses). A missing index or one still being built after V019 names the index in
+     * One key range of StoreIdListKeyIndex, every page followed. Each delivery's key is recomputed from the projected
+     * attributes and an entry whose stored key no longer matches is dropped (the same guard as
+     * OrdersRepository.findByStoreAndStatuses): it protects against a writer that does not maintain listKey, such as
+     * the previous app version during a rollback, which leaves the stored key behind the delivery's real state. A missing index or one still being built after V019 names the index in
      * its error; the store's partition is read instead and keyed the same way.
      */
     private List<Delivery> readList(String storeId, String keyCondition, String lo, String hi, Predicate<String> keyMatches) {
@@ -187,7 +225,7 @@ public class  DeliveriesRepository extends DynamoDbRepository<Delivery> {
                 startKey = page.getLastEvaluatedKey();
             } while (startKey != null && !startKey.isEmpty());
         } catch (AmazonDynamoDBException e) {
-            if (e.getErrorMessage() == null || !e.getErrorMessage().contains(LIST_INDEX)) {
+            if (!namesListIndex(e)) {
                 throw e;
             }
             log.warn("{} is not available yet ({}); reading the store's partition for the deliveries list", LIST_INDEX, e.getErrorMessage());
