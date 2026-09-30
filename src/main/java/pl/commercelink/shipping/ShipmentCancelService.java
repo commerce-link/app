@@ -69,7 +69,7 @@ public class ShipmentCancelService {
         // command with an unknown outcome
         ShippingProvider provider = shippingProviderFactory.get(store);
         if (provider == null) {
-            throw new ShippingException("No shipping provider configured for the store");
+            throw new NoShippingProviderException();
         }
 
         // an unknown result is read again rather than cancelled anew: a late success of the old command would make

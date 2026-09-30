@@ -89,6 +89,7 @@ import pl.commercelink.orders.OrderReferenceResolver;
 import pl.commercelink.shipping.ShipmentCancelService;
 import pl.commercelink.shipping.ShipmentCancelResult;
 import pl.commercelink.shipping.ShipmentCancellationInProgressException;
+import pl.commercelink.shipping.NoShippingProviderException;
 import pl.commercelink.web.dtos.AssignSupplierForm;
 import pl.commercelink.web.orders.BulkAction;
 import pl.commercelink.web.orders.MoveTargetView;
@@ -4093,6 +4094,75 @@ class OrdersControllerTest {
             assertThat(flash(redirect))
                     .containsEntry("errorMessage", "shipment.cancel.failed [Przesyłka została już odebrana]")
                     .doesNotContainKey(OrderFlash.ATTRIBUTE);
+        }
+
+        @Test
+        void cancelShipmentShowsTheLibrarysNotReceivedReasonInTheOperatorsLanguage() {
+            // given
+            orderWithASentShipment();
+            when(shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID))
+                    .thenReturn(ShipmentCancelResult.failed("Furgonetka did not receive the cancel command"));
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            ordersController.cancelShipment(ORDER_ID, redirect, polish);
+
+            // then
+            assertThat(flash(redirect))
+                    .containsEntry("errorMessage", "shipment.cancel.failed [shipment.cancellation.reason.notReceived]");
+        }
+
+        @Test
+        void cancelShipmentSaysInTheOperatorsLanguageThatTheStoreHasNoShippingProvider() {
+            // given
+            orderWithASentShipment();
+            doThrow(new NoShippingProviderException()).when(shipmentCancelService).cancelShipping(ORDER_ID, STORE_ID);
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            ordersController.cancelShipment(ORDER_ID, redirect, polish);
+
+            // then
+            assertThat(flash(redirect)).containsEntry("errorMessage", "order.shipments.cancel.error.no.provider");
+        }
+
+        @Test
+        void theCancellationStateSaysWhetherAShipmentOfTheOrderIsStillBeingCancelled() {
+            // given
+            Order pending = order(OrderStatus.Shipping);
+            Shipment sent = new Shipment(ShipmentType.Courier);
+            sent.setExternalId("21353832");
+            sent.markCancellationPending("cmd-1", LocalDateTime.now());
+            pending.setShipments(new ArrayList<>(List.of(sent)));
+            Order settled = order(OrderStatus.Shipping);
+            Shipment failed = new Shipment(ShipmentType.Courier);
+            failed.setExternalId("21353832");
+            failed.markCancellationPending("cmd-1", LocalDateTime.now());
+            failed.markCancellationFailed("Przesyłka została już odebrana");
+            settled.setShipments(new ArrayList<>(List.of(failed)));
+
+            // when
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(pending);
+            ResponseEntity<OrdersController.CancellationState> inProgress = ordersController.shipmentCancellationState(ORDER_ID);
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(settled);
+            ResponseEntity<OrdersController.CancellationState> done = ordersController.shipmentCancellationState(ORDER_ID);
+
+            // then
+            assertThat(inProgress.getBody().inProgress()).isTrue();
+            assertThat(inProgress.getHeaders().getCacheControl()).isEqualTo("no-store");
+            assertThat(done.getBody().inProgress()).isFalse();
+        }
+
+        @Test
+        void theCancellationStateOfAnotherStoresOrderIsNotFound() {
+            // given: the order exists only under another store; the session's store finds nothing
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(null);
+
+            // when / then
+            assertThatThrownBy(() -> ordersController.shipmentCancellationState(ORDER_ID))
+                    .isInstanceOf(ResponseStatusException.class)
+                    .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode().value()).isEqualTo(404));
+            verify(ordersRepository).findById(STORE_ID, ORDER_ID);
         }
 
         @Test

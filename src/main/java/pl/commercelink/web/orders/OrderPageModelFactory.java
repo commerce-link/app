@@ -51,6 +51,7 @@ import pl.commercelink.web.dtos.SplitGroupPreviewDto;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -113,7 +114,7 @@ public class OrderPageModelFactory {
                 header(order, items, store, viewer, readOnly, links, locale, dropship, receipts, receiptLock),
                 items(order, items, store, viewer, readOnly, links, hasDropshipItems, hasWarehouseDocument, dropship,
                         receiptLock, locale),
-                shipments(order, store, readOnly),
+                shipments(order, store, readOnly, locale),
                 documents(order, store, viewer, closed, readOnly,
                         documentsEnabled && hasWarehouseItems && !hasWarehouseDocument, receipts, receiptLock),
                 payments(order, readOnly, receiptLock),
@@ -361,8 +362,9 @@ public class OrderPageModelFactory {
         return taxonomy != null && taxonomy.name() != null ? taxonomy.name() : "";
     }
 
-    private OrderPageModel.ShipmentsCard shipments(Order order, Store store, boolean readOnly) {
+    private OrderPageModel.ShipmentsCard shipments(Order order, Store store, boolean readOnly, Locale locale) {
         List<Shipment> shipments = order.getShipments();
+        LocalDateTime now = LocalDateTime.now();
         List<String> carriers = readOnly || store == null ? List.of() : shipmentCarrierOptions.forOrder(order, store);
         String base = "/dashboard/orders/" + order.getOrderId() + "/shipments/";
         List<OrderPageModel.ShipmentRow> rows = new ArrayList<>();
@@ -381,6 +383,8 @@ public class OrderPageModelFactory {
                     // the help sends the reader to "Edit", which a read-only page does not offer
                     !readOnly && s.getTrackingSubscriptionStatus() == ShipmentTrackingStatus.FAILED
                             ? "order.shipment.tracking.failed.help" : null,
+                    OrderLabels.cancellation(s, now), OrderLabels.cancellationTone(s, now),
+                    cancellationReason(s, now, locale),
                     form.dialogId(), readOnly ? null : base + i,
                     readOnly || removeLockedKey(order, i) != null || isBarePlaceholder(order, i) ? null
                             : base + i + "/remove?version=" + form.version(),
@@ -396,8 +400,24 @@ public class OrderPageModelFactory {
         String emptyKey = readOnly ? "order.shipments.empty.readonly"
                 : order.getFulfilmentType() == FulfilmentType.DirectToConsumer ? "order.shipments.empty.dropship"
                 : "order.shipments.empty";
-        return new OrderPageModel.ShipmentsCard(rows, emptyKey, !readOnly && courierCancellable != null, forms,
+        boolean canCancelCourier = !readOnly && courierCancellable != null;
+        // a second command while the first may still succeed would fail on the cancelled package (the server refuses it too)
+        String cancelCourierLockedKey = canCancelCourier && courierCancellable.isCancellationInProgress(now)
+                ? "order.shipments.cancel.locked.pending" : null;
+        // the super admin page is store-scoped by its path and has no polling route; it is refreshed by hand
+        String pollHref = !readOnly && shipments.stream().anyMatch(s -> s.isCancellationInProgress(now))
+                ? "/dashboard/orders/" + order.getOrderId() + "/shipments/cancellation-state" : null;
+        return new OrderPageModel.ShipmentsCard(rows, emptyKey, canCancelCourier, cancelCourierLockedKey, pollHref, forms,
                 readOnly ? null : OrderShipmentForm.blank(order, carriers));
+    }
+
+    /** The reason of a failed cancellation in the operator's language: the adapter's English text is translated. */
+    private String cancellationReason(Shipment shipment, LocalDateTime now, Locale locale) {
+        if (!"shipment.cancellation.failed".equals(OrderLabels.cancellation(shipment, now))) {
+            return null;
+        }
+        String key = OrderLabels.cancellationReasonKey(shipment.getCancellationError());
+        return key != null ? messageSource.getMessage(key, null, locale) : Objects.toString(shipment.getCancellationError(), "");
     }
 
     /**
@@ -675,6 +695,12 @@ public class OrderPageModelFactory {
      * it as a placeholder waiting to go out, with how the customer asked to receive the order (type, pickup point).
      */
     public static String removeShipmentMessageKey(Order order, int index) {
+        Shipment shipment = order.getShipments().get(index);
+        // removable only because its cancellation failed or is unknown: the label may still be live at the carrier.
+        // This warning wins over the delivery text; the button still says the removal delivers the order.
+        if (shipment.getExternalId() != null && shipment.isCancellationUnresolved()) {
+            return "order.shipments.remove.confirm.message.cancellationUnresolved";
+        }
         if (removalDelivers(order, index)) {
             return "order.shipments.remove.confirm.delivers";
         }

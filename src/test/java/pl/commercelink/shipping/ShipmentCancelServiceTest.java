@@ -202,7 +202,8 @@ class ShipmentCancelServiceTest {
 
         // when / then
         assertThatThrownBy(() -> shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID))
-                .isExactlyInstanceOf(ShippingException.class)
+                .isExactlyInstanceOf(NoShippingProviderException.class)
+                .isInstanceOf(ShippingException.class)
                 .hasMessage("No shipping provider configured for the store");
         verify(ordersRepository, never()).save(any());
         verify(publisher, never()).publish(any());

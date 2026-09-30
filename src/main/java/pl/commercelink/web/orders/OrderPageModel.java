@@ -89,7 +89,13 @@ public record OrderPageModel(String orderId, String shortId, String backHref, bo
      * emptyKey: what the card says with no shipment, i.e. what the viewer can do about it now. forms: one edit form per
      * shipment, in the order of rows; blank: the form of "Add shipment". Both empty/null on a read-only page.
      */
+    /**
+     * cancelCourierLockedKey: why "Cancel courier order" shows greyed (its cancellation is already in progress), null
+     * when it can run or is absent. cancellationPollHref: the JSON state the page polls while a cancellation of one of
+     * its shipments is in progress, reloading once it ends; null when nothing is in progress or the page is read-only.
+     */
     public record ShipmentsCard(List<ShipmentRow> rows, String emptyKey, boolean canCancelCourier,
+                                String cancelCourierLockedKey, String cancellationPollHref,
                                 List<OrderShipmentForm> forms, OrderShipmentForm blank) {
     }
 
@@ -100,10 +106,13 @@ public record OrderPageModel(String orderId, String shortId, String backHref, bo
      * removeReasonKey says why, so "Remove" shows greyed with that reason instead of disappearing. The only shipment
      * with nothing but the delivery choice has neither: removing it would change nothing. removeMessageKey and
      * removeActionKey are the confirmation's text and button, which say when the removal delivers the order.
+     * cancellationKey and cancellationTone: the pill of the courier cancellation, null without one; cancellationReason
+     * is the argument of a failed one, already in the operator's language.
      */
     public record ShipmentRow(int number, String typeKey, String carrier, String trackingNo, String trackingUrl,
                               String pickupPoint, String shippedAt, String deliveredAt, String trackingKey,
-                              String trackingTone, String trackingHelpKey, String dialogId, String editHref,
+                              String trackingTone, String trackingHelpKey, String cancellationKey,
+                              String cancellationTone, String cancellationReason, String dialogId, String editHref,
                               String removeHref, String removeReasonKey, String removeMessageKey,
                               String removeActionKey) {
     }
