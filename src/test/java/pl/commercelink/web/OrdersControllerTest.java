@@ -3120,7 +3120,8 @@ class OrdersControllerTest {
             var own = pl.commercelink.orders.filters.model.OrderFilter.of("Allegro lub Ceneo", List.of(
                     pl.commercelink.orders.filters.model.OrderFilterCondition.of(pl.commercelink.orders.filters.OrderFilterField.SourceName, "Allegro"),
                     pl.commercelink.orders.filters.model.OrderFilterCondition.of(pl.commercelink.orders.filters.OrderFilterField.SourceName, "Ceneo"),
-                    pl.commercelink.orders.filters.model.OrderFilterCondition.of(pl.commercelink.orders.filters.OrderFilterField.ShippingDue, "Overdue")));
+                    pl.commercelink.orders.filters.model.OrderFilterCondition.of(pl.commercelink.orders.filters.OrderFilterField.ShippingDue, "Overdue"),
+                    pl.commercelink.orders.filters.model.OrderFilterCondition.of(pl.commercelink.orders.filters.OrderFilterField.CustomerType, "B2C")));
             when(orderFilters.list(ACTOR)).thenReturn(new pl.commercelink.orders.filters.services.ListOrderFiltersView(List.of(), List.of(own)));
             when(messageSource.getMessage(eq("orders.filters.edit.title"), any(), any(Locale.class))).thenReturn("Edytuj filtr");
             ExtendedModelMap model = new ExtendedModelMap();
@@ -3133,6 +3134,7 @@ class OrdersControllerTest {
             assertThat(form.getSourceName()).containsExactly("Allegro", "Ceneo");
             assertThat(form.getStatus()).isEmpty();
             assertThat(form.getShippingDue()).isEqualTo("Overdue");
+            assertThat(form.getCustomerType()).isEqualTo("B2C");
         }
 
         @Test
