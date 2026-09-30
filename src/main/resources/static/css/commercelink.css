@@ -7513,6 +7513,13 @@ a.cl-link-button:hover {
 
 @media screen and (min-width: 720px) {
     .cl-page .cl-table.is-deliveries td[data-label]:has(.cl-status) {
+        min-width: 11ch;
+    }
+}
+
+/* From 1024 px the card is wide enough for the longer status texts to keep two lines at most. */
+@media screen and (min-width: 1024px) {
+    .cl-page .cl-table.is-deliveries td[data-label]:has(.cl-status) {
         min-width: 15ch;
     }
 }
@@ -7557,5 +7564,17 @@ a.cl-link-button:hover {
 
     .cl-page .cl-table-toolbar.is-collapsed .cl-toolbar-filters {
         display: none;
+    }
+
+    /* The date panel spans the filter row like the other panels; its right-aligned desktop position plus the two-column
+       grid made it 302 px wide and pushed it off the left edge of a 320 px screen. */
+    .cl-page .cl-filter-menu.is-end .cl-filter-menu-panel {
+        left: 0;
+        right: 0;
+        min-width: 0;
+    }
+
+    .cl-page .cl-filter-menu-dates {
+        grid-template-columns: minmax(0, 1fr);
     }
 }
