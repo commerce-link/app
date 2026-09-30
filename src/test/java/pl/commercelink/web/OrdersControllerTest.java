@@ -1248,6 +1248,54 @@ class OrdersControllerTest {
         }
 
         @Test
+        void aForcedMethodChangeOfAnInvoicedOrderIsRefused() {
+            // given: the receipt declared the method (owner decision Q3); removing a payment stays allowed
+            Payment paid = Payment.bankTransfer("REF-1", "Jan", 100);
+            Payment second = Payment.bankTransfer("REF-2", "Jan", 50);
+            Order order = orderWith(paid, second);
+            order.addDocument(new pl.commercelink.documents.Document("d-1", "PAR/1", null,
+                    pl.commercelink.documents.DocumentType.Receipt));
+            MockHttpServletResponse response = new MockHttpServletResponse();
+            ExtendedModelMap model = new ExtendedModelMap();
+
+            // when
+            save(0, OrderPaymentForm.version(paid), PaymentSource.Card, "100", "", null, "fetch", response, model);
+            String removed = ordersController.removePayment(ORDER_ID, 1, OrderPaymentForm.version(second), redirect,
+                    Locale.ENGLISH);
+
+            // then
+            assertThat(response.getStatus()).isEqualTo(422);
+            OrderPaymentForm form = (OrderPaymentForm) model.getAttribute("payment");
+            assertThat(form.errors()).containsEntry("payment-0-source", "order.payments.method.locked");
+            assertThat(form.methodLockedKey()).isEqualTo("order.payments.method.locked");
+            assertThat(paid.getSource()).isEqualTo(PaymentSource.BankTransfer);
+            assertThat(removed).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+            assertThat(errorMessage()).isNull();
+            assertThat(order.getPayments()).containsExactly(paid);
+            verify(orderLifecycle, times(1)).update(order);
+        }
+
+        @Test
+        void aForcedMethodChangeIsRefusedWhileTheFiscalisedEReceiptIsBeingAttached() {
+            // given
+            Payment paid = Payment.bankTransfer("REF-1", "Jan", 100);
+            Order order = orderWith(paid);
+            when(receiptAttemptService.receiptLock(order)).thenReturn(ReceiptLock.ATTACHING);
+            ExtendedModelMap page = new ExtendedModelMap();
+
+            // when
+            save(0, OrderPaymentForm.version(paid), PaymentSource.Card, "100", "", null, null,
+                    new MockHttpServletResponse(), new ExtendedModelMap());
+            ordersController.showPayment(ORDER_ID, "0", page, redirect, Locale.ENGLISH);
+
+            // then
+            assertThat(paid.getSource()).isEqualTo(PaymentSource.BankTransfer);
+            assertThat(((OrderPaymentForm) page.getAttribute("payment")).methodLockedKey())
+                    .isEqualTo("order.payments.method.locked.receiptAttaching");
+            verifyNoInteractions(orderLifecycle);
+        }
+
+        @Test
         void removingAPaymentOfACancelledOrderIsRefused() {
             // given
             Payment paid = Payment.bankTransfer("REF-1", "Jan", 100);

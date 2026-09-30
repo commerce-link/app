@@ -103,13 +103,21 @@
         </div>
         <div th:replace="~{fragments/settings-form :: errorSummary(|${payment.dialogId()}-errors|, ${payment.errors()}, null)}"></div>
         <div class="cl-form-grid cl-card-grid">
-            <div class="cl-span-3 cl-field" th:with="id=${payment.field('source')}, error=${payment.error('source')}">
+            <!--/* once the sale has its document the method is fixed: the select is disabled (not posted) with the reason
+                   under it, and a hidden field posts the method it shows (OrderPaymentForm.methodLockedKey) */-->
+            <div class="cl-span-3 cl-field" th:with="id=${payment.field('source')}, error=${payment.error('source')},
+                                                    locked=${payment.methodLockedKey() != null}">
                 <label class="cl-label" th:for="${id}" th:text="#{order.payment.source}"></label>
-                <select class="cl-select" th:id="${id}" name="source" th:classappend="${error != null} ? 'is-invalid'"
-                        th:attr="aria-invalid=${error != null ? 'true' : null}, aria-describedby=${error != null ? id + '-error' : null}">
+                <select class="cl-select" th:id="${id}" name="source" th:disabled="${locked}"
+                        th:classappend="${error != null} ? 'is-invalid'"
+                        th:attr="aria-invalid=${error != null ? 'true' : null},
+                                 aria-describedby=${error != null ? id + '-error' : (locked ? payment.methodLockedId() : null)}">
                     <option th:each="src : ${payment.sources()}" th:value="${src.value().name()}"
                             th:selected="${src.value() == payment.source()}" th:text="#{${src.labelKey()}}"></option>
                 </select>
+                <input th:if="${locked and payment.source() != null}" type="hidden" name="source" th:value="${payment.source().name()}">
+                <p th:if="${locked and error == null}" class="cl-help" th:id="${payment.methodLockedId()}"
+                   th:text="#{${payment.methodLockedKey()}}"></p>
                 <p th:if="${error != null}" class="cl-field-error" th:id="${id} + '-error'">
                     <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
                     <span th:text="#{${error}}"></span>
@@ -122,7 +130,7 @@
             <div class="cl-span-3" th:insert="~{orders/details/payments :: field(${payment}, 'bankTransactionNo', 'order.payment.bank.transaction.no', 'text', ${payment.bankTransactionNo()})}"></div>
             <div class="cl-span-3" th:insert="~{orders/details/payments :: field(${payment}, 'bankTransactionDate', 'order.payment.bank.transaction.date', 'date', ${payment.bankTransactionDate()})}"></div>
         </div>
-        <p th:if="${payment.pending()}" class="cl-help" th:text="#{order.payments.dialog.pending}"></p>
+        <p th:if="${payment.pending() and payment.methodLockedKey() == null}" class="cl-help" th:text="#{order.payments.dialog.pending}"></p>
         <p th:class="${inDialog} ? 'cl-dialog-effect' : 'cl-help'" th:text="#{order.payments.edit.effect}"></p>
     </div>
     <div th:class="${inDialog} ? 'cl-dialog-actions' : 'cl-card-footer'">

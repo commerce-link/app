@@ -1,9 +1,13 @@
 package pl.commercelink.web.orders;
 
 import org.junit.jupiter.api.Test;
+import pl.commercelink.documents.Document;
+import pl.commercelink.documents.DocumentType;
+import pl.commercelink.orders.Order;
 import pl.commercelink.orders.Payment;
 import pl.commercelink.orders.PaymentDirection;
 import pl.commercelink.orders.PaymentSource;
+import pl.commercelink.receipts.ReceiptLock;
 
 import java.time.LocalDate;
 import java.util.Map;
@@ -18,7 +22,7 @@ class OrderPaymentFormTest {
 
     private static OrderPaymentForm posted(boolean pending, boolean refund, String amount, String fee, String date) {
         return new OrderPaymentForm("o-1", 1, "v", pending, refund, PaymentSource.BankTransfer, " Jan ", amount, fee, "",
-                " OP-1 ", date, null, null);
+                " OP-1 ", date, null, null, null);
     }
 
     private static Payment refund(double amount) {
@@ -96,7 +100,7 @@ class OrderPaymentFormTest {
     void aPaymentWithoutAMethodIsRefused() {
         // given
         OrderPaymentForm form = new OrderPaymentForm("o-1", 0, "v", true, false, null, null, "0", null, null, null,
-                null, null, null);
+                null, null, null, null);
 
         // then
         assertThat(form.validate()).containsEntry("payment-0-source", "order.payments.error.source");
@@ -210,5 +214,34 @@ class OrderPaymentFormTest {
         assertThat(form.pending()).isTrue();
         assertThat(form.amount()).isEqualTo("0.00");
         assertThat(form.source()).isEqualTo(PaymentSource.CashOnDelivery);
+    }
+
+    @Test
+    void theMethodIsRefusedToChangeOnceTheSaleHasItsDocument() {
+        // given
+        Order withReceipt = new Order("store-1");
+        withReceipt.addDocument(new Document("d-1", "PAR/1", null, DocumentType.Receipt));
+        Order open = new Order("store-1");
+        Payment saved = Payment.bankTransfer("REF-1", "Jan", 100);
+        String locked = OrderPaymentForm.methodLockedKey(withReceipt, ReceiptLock.NONE);
+        OrderPaymentForm card = new OrderPaymentForm("o-1", 0, "v", false, false, PaymentSource.Card, "Jan", "120", null,
+                null, null, null, null, null, locked);
+        OrderPaymentForm sameMethod = new OrderPaymentForm("o-1", 0, "v", false, false, PaymentSource.BankTransfer, "Jan",
+                "120", null, null, null, null, null, null, locked);
+
+        // when
+        Map<String, String> refused = card.validate(saved);
+        Payment kept = sameMethod.toPayment(saved);
+
+        // then
+        assertThat(locked).isEqualTo("order.payments.method.locked");
+        assertThat(refused).containsEntry("payment-0-source", "order.payments.method.locked");
+        assertThat(sameMethod.validate(saved)).isEmpty();
+        assertThat(kept.getSource()).isEqualTo(PaymentSource.BankTransfer);
+        assertThat(kept.getAmount()).isEqualTo(120.0);
+        assertThat(OrderPaymentForm.methodLockedKey(open, ReceiptLock.ATTACHING))
+                .isEqualTo("order.payments.method.locked.receiptAttaching");
+        assertThat(OrderPaymentForm.methodLockedKey(open, ReceiptLock.ISSUING)).isEqualTo("order.payments.method.locked.receipt");
+        assertThat(OrderPaymentForm.methodLockedKey(open, ReceiptLock.NONE)).isNull();
     }
 }

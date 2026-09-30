@@ -114,7 +114,7 @@ public class OrderPageModelFactory {
                 shipments(order, store, readOnly),
                 documents(order, store, viewer, closed, readOnly,
                         documentsEnabled && hasWarehouseItems && !hasWarehouseDocument, receipts, receiptLock),
-                payments(order, readOnly),
+                payments(order, readOnly, receiptLock),
                 CustomerView.of(order, readOnly, receiptLock, locale),
                 settings(order, items, readOnly),
                 FinancesView.of(order, items),
@@ -599,15 +599,16 @@ public class OrderPageModelFactory {
                 document.isExternal(), OrderFormats.date(document.getIssuedAt()), removable, removeHref);
     }
 
-    private OrderPageModel.PaymentsCard payments(Order order, boolean readOnly) {
+    private OrderPageModel.PaymentsCard payments(Order order, boolean readOnly, ReceiptLock receiptLock) {
         // every payment is listed, complete or not: an incomplete one is still money recorded against the order
         List<Payment> payments = order.getPayments() == null ? List.of() : order.getPayments();
+        String methodLocked = OrderPaymentForm.methodLockedKey(order, receiptLock);
         String base = "/dashboard/orders/" + order.getOrderId() + "/payments/";
         List<OrderPageModel.PaymentRow> rows = new ArrayList<>();
         List<OrderPaymentForm> forms = new ArrayList<>();
         for (int i = 0; i < payments.size(); i++) {
             Payment p = payments.get(i);
-            OrderPaymentForm form = OrderPaymentForm.of(order.getOrderId(), i, p);
+            OrderPaymentForm form = OrderPaymentForm.of(order.getOrderId(), i, p, methodLocked);
             boolean refund = OrderPaymentForm.isRefund(p);
             // the row shows what "Wpłacono" counts: a refund saved positive by older code shows as the payment it is
             // counted as, not with a minus the totals do not have

@@ -1705,6 +1705,27 @@ class OrderDetailsTemplateTest {
     }
 
     @Test
+    void theMethodIsReadOnlyWithTheReasonOnceTheOrderHasAReceiptAndRemovingStaysOffered() {
+        // given
+        Order order = order(OrderStatus.Realization);
+        order.addDocument(new pl.commercelink.documents.Document("d-1", "PAR/1", null,
+                pl.commercelink.documents.DocumentType.Receipt));
+        order.addPayment(Payment.bankTransfer("REF-1", "Jan", 100));
+        order.addPayment(Payment.bankTransfer("REF-2", "Jan", 50));
+
+        // when
+        String html = page(render(order, ADMIN));
+        String dialog = dialog(html, "payment-dialog-0");
+
+        // then
+        assertThat(dialog).contains("<select class=\"cl-select\" id=\"payment-0-source\" name=\"source\""
+                        + " aria-describedby=\"payment-0-source-locked\" disabled=\"disabled\">")
+                .contains("<input type=\"hidden\" name=\"source\" value=\"BankTransfer\">")
+                .contains("id=\"payment-0-source-locked\">Zamówienie ma już fakturę albo paragon — metody płatności nie zmienisz.<");
+        assertThat(card(html, "platnosci")).contains("aria-label=\"Usuń płatność 1\"").contains("/payments/0/remove?version=");
+    }
+
+    @Test
     void anOverpaidOrderSaysOverpaymentInTheFinancesCard() {
         // given
         Order order = order(OrderStatus.Realization);

@@ -1,9 +1,11 @@
 package pl.commercelink.web.orders;
 
 import org.apache.commons.lang3.StringUtils;
+import pl.commercelink.orders.Order;
 import pl.commercelink.orders.Payment;
 import pl.commercelink.orders.PaymentDirection;
 import pl.commercelink.orders.PaymentSource;
+import pl.commercelink.receipts.ReceiptLock;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -30,24 +32,52 @@ import java.util.Objects;
  * and is stored negative whichever way it was typed, so the order counts it (Payment#getAppliedAmount) as money that
  * went back; a payment that came in cannot be negative. A refund stored positive by older code is shown without a sign
  * too and is stored negative once its dialog is saved.
+ * <p>
+ * methodLockedKey is why the payment method is fixed, or null: once the sale has its document (an invoice or a receipt
+ * on the order, or an e-receipt being issued or fiscalised, whose request declared the method) the method is shown
+ * read-only with this reason and a changed one is refused (owner decision Q3 of 2026-09-29). Amounts, adding and
+ * removing payments stay open.
  */
 public record OrderPaymentForm(String orderId, int index, String version, boolean pending, boolean refund,
                                PaymentSource source, String name, String amount, String fee, String referenceNo,
                                String bankTransactionNo, String bankTransactionDate, Map<String, String> errors,
-                               String refusal) {
+                               String refusal, String methodLockedKey) {
+
+    private static final String METHOD_LOCKED = "order.payments.method.locked";
 
     public OrderPaymentForm {
         errors = errors != null ? errors : Map.of();
     }
 
     public static OrderPaymentForm of(String orderId, int index, Payment payment) {
+        return of(orderId, index, payment, null);
+    }
+
+    /** The form of a stored payment; methodLockedKey from {@link #methodLockedKey(Order, ReceiptLock)}. */
+    public static OrderPaymentForm of(String orderId, int index, Payment payment, String methodLockedKey) {
         boolean refund = isRefund(payment);
         return new OrderPaymentForm(orderId, index, version(payment), payment.isUnsettled(), refund, payment.getSource(),
                 payment.getName(), plain(refund ? Math.abs(payment.getAmount()) : payment.getAmount()),
                 payment.getFee() == 0 ? null : plain(payment.getFee()),
                 payment.getReferenceNo(), payment.getBankTransactionNo(),
                 payment.getBankTransactionDate() == null ? null : payment.getBankTransactionDate().toString(),
-                Map.of(), null);
+                Map.of(), null, methodLockedKey);
+    }
+
+    /**
+     * Why the order's payment methods are fixed, or null: the predicate of the other "faktura albo paragon" locks
+     * (Order#isInvoiced, or the order's e-receipt locking it), worded after the e-receipt's state like them.
+     */
+    public static String methodLockedKey(Order order, ReceiptLock receiptLock) {
+        if (order.isInvoiced()) {
+            return METHOD_LOCKED;
+        }
+        return receiptLock.locks() ? receiptLock.key(METHOD_LOCKED + ".receipt") : null;
+    }
+
+    /** The id of the reason under a read-only method. */
+    public String methodLockedId() {
+        return field("source") + "-locked";
     }
 
     /** Whether the payment went back to the customer: its amount field carries no sign and it is stored negative. */
@@ -131,6 +161,18 @@ public record OrderPaymentForm(String orderId, int index, String version, boolea
     }
 
     /**
+     * {@link #validate()} plus the method lock: a method other than saved's is refused while methodLockedKey is set.
+     */
+    public Map<String, String> validate(Payment saved) {
+        Map<String, String> found = new LinkedHashMap<>();
+        if (methodLockedKey != null && saved != null && source != saved.getSource()) {
+            found.put(field("source"), methodLockedKey);
+        }
+        validate().forEach(found::putIfAbsent);
+        return found;
+    }
+
+    /**
      * The payment to store in place of saved: the posted fields over saved's direction, a refund's amount negative.
      * Call only after {@link #validate()} found nothing.
      */
@@ -139,20 +181,21 @@ public record OrderPaymentForm(String orderId, int index, String version, boolea
         BigDecimal typedAmount = AmountParser.parse(amount);
         double stored = direction == PaymentDirection.Outgoing ? typedAmount.abs().negate().doubleValue()
                 : typedAmount.doubleValue();
-        return new Payment(StringUtils.trimToNull(referenceNo), StringUtils.trimToNull(name), source, direction,
+        PaymentSource method = methodLockedKey != null ? saved.getSource() : source;
+        return new Payment(StringUtils.trimToNull(referenceNo), StringUtils.trimToNull(name), method, direction,
                 stored, AmountParser.parse(fee).doubleValue(),
                 StringUtils.trimToNull(bankTransactionNo), parseDate(bankTransactionDate));
     }
 
     public OrderPaymentForm withErrors(Map<String, String> found) {
         return new OrderPaymentForm(orderId, index, version, pending, refund, source, name, amount, fee, referenceNo,
-                bankTransactionNo, bankTransactionDate, found, refusal);
+                bankTransactionNo, bankTransactionDate, found, refusal, methodLockedKey);
     }
 
     /** A reason the whole form was refused (a cancelled order, a payment changed meanwhile), already translated. */
     public OrderPaymentForm withRefusal(String text) {
         return new OrderPaymentForm(orderId, index, version, pending, refund, source, name, amount, fee, referenceNo,
-                bankTransactionNo, bankTransactionDate, errors, text);
+                bankTransactionNo, bankTransactionDate, errors, text, methodLockedKey);
     }
 
     private static LocalDate parseDate(String value) {

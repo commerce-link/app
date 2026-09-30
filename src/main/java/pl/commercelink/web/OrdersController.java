@@ -1682,7 +1682,8 @@ public class OrdersController extends BaseController {
         if (order.isClosed()) {
             return refuse(redirectAttributes, orderId, closedPaymentsKey(order), locale);
         }
-        return paymentPage(order, OrderPaymentForm.of(orderId, index, order.getPayments().get(index)), model);
+        String methodLocked = OrderPaymentForm.methodLockedKey(order, receiptAttemptService.receiptLock(order));
+        return paymentPage(order, OrderPaymentForm.of(orderId, index, order.getPayments().get(index), methodLocked), model);
     }
 
     /**
@@ -1709,9 +1710,12 @@ public class OrdersController extends BaseController {
         boolean async = SettingsPaths.isAsync(requestedWith);
         List<Payment> current = existingOrder.getPayments() == null ? List.of() : existingOrder.getPayments();
         boolean known = index >= 0 && index < current.size();
+        // the sale's document fixes the method (owner decision Q3); read once, for the check and the form shown again
+        String methodLocked = OrderPaymentForm.methodLockedKey(existingOrder,
+                receiptAttemptService.receiptLock(existingOrder));
         OrderPaymentForm posted = new OrderPaymentForm(orderId, index, version, known && current.get(index).isUnsettled(),
                 known && OrderPaymentForm.isRefund(current.get(index)), source, name, amount, fee, referenceNo,
-                bankTransactionNo, bankTransactionDate, null, null);
+                bankTransactionNo, bankTransactionDate, null, null, methodLocked);
         String refusal = existingOrder.isClosed() ? closedPaymentsKey(existingOrder)
                 : !known || !OrderPaymentForm.version(current.get(index)).equals(version) ? "order.payments.error.stale"
                 : null;
@@ -1723,7 +1727,7 @@ public class OrdersController extends BaseController {
             }
             return refuse(redirectAttributes, orderId, refusal, locale);
         }
-        Map<String, String> errors = posted.validate();
+        Map<String, String> errors = posted.validate(current.get(index));
         if (!errors.isEmpty()) {
             if (async) {
                 response.setStatus(HttpStatus.UNPROCESSABLE_ENTITY.value());
