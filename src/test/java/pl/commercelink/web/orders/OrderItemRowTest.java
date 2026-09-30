@@ -51,7 +51,7 @@ class OrderItemRowTest {
         assertThat(state(row, ItemAction.ASSIGN_SKU).available()).isTrue();
         assertThat(state(row, ItemAction.ASSIGN_SUPPLIER).available()).isTrue();
         assertThat(state(row, ItemAction.ASSIGN_WAREHOUSE).available()).isTrue();
-        assertThat(state(row, ItemAction.CLEAR_SUPPLIER).reasonKey()).isEqualTo("order.item.unavailable.no.supplier");
+        assertThat(hasAction(row, ItemAction.CLEAR_SUPPLIER)).isFalse();
         assertThat(hasAction(row, ItemAction.SPLIT_GROUP)).isFalse();
         assertThat(state(row, ItemAction.CONSOLIDATE).labelKey()).isEqualTo("order.item.menu.consolidate");
         assertThat(state(row, ItemAction.EDIT).available()).isTrue();
@@ -165,13 +165,13 @@ class OrderItemRowTest {
 
         // then
         assertThat(hasAction(plainRow, ItemAction.SPLIT_GROUP)).isFalse();
-        assertThat(plainRow.actions()).hasSize(7);
+        assertThat(plainRow.actions()).hasSize(6);
         assertThat(hasAction(bundleRow, ItemAction.SPLIT_GROUP)).isTrue();
         assertThat(bundleRow.actions()).hasSize(8);
     }
 
     @Test
-    void anAllocatedItemSaysToRemoveTheSupplierFirst() {
+    void anAllocatedItemOffersOnlyRemovingTheSupplier() {
         // given
         OrderItem allocated = item(FulfilmentStatus.Allocation, "MFN-1");
         allocated.setDeliveryId("Acme");
@@ -180,20 +180,22 @@ class OrderItemRowTest {
         OrderItemRow row = OrderItemRow.of(allocated, 0, context());
 
         // then
-        assertThat(state(row, ItemAction.ASSIGN_SKU).reasonKey()).isEqualTo("order.item.unavailable.clear.first");
-        assertThat(state(row, ItemAction.ASSIGN_SUPPLIER).reasonKey()).isEqualTo("order.item.unavailable.clear.first");
-        assertThat(state(row, ItemAction.ASSIGN_WAREHOUSE).reasonKey()).isEqualTo("order.item.unavailable.clear.first");
+        assertThat(hasAction(row, ItemAction.ASSIGN_SKU)).isFalse();
+        assertThat(hasAction(row, ItemAction.ASSIGN_SUPPLIER)).isFalse();
+        assertThat(hasAction(row, ItemAction.ASSIGN_WAREHOUSE)).isFalse();
         assertThat(state(row, ItemAction.CLEAR_SUPPLIER).available()).isTrue();
     }
 
     @Test
-    void clearSupplierIsGreyedWithoutASupplier() {
+    void clearSupplierIsAbsentWithoutASupplier() {
         // when
         OrderItemRow row = OrderItemRow.of(item(FulfilmentStatus.New, "MFN-1"), 0, context());
 
         // then
-        assertThat(state(row, ItemAction.CLEAR_SUPPLIER).available()).isFalse();
-        assertThat(state(row, ItemAction.CLEAR_SUPPLIER).reasonKey()).isEqualTo("order.item.unavailable.no.supplier");
+        assertThat(hasAction(row, ItemAction.CLEAR_SUPPLIER)).isFalse();
+        assertThat(state(row, ItemAction.ASSIGN_SKU).available()).isTrue();
+        assertThat(state(row, ItemAction.ASSIGN_SUPPLIER).available()).isTrue();
+        assertThat(state(row, ItemAction.ASSIGN_WAREHOUSE).available()).isTrue();
     }
 
     @Test

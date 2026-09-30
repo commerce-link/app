@@ -281,7 +281,7 @@ class OrderDetailsTemplateTest {
     }
 
     @Test
-    void unavailableMenuEntriesStayVisibleWithTheirReason() {
+    void menuEntriesThatCannotBeDoneAreAbsentAndTheRestKeepTheirReason() {
         // given
         Order order = order(OrderStatus.New);
         OrderItem allocated = inDelivery(order, "Acme", FulfilmentStatus.Allocation);
@@ -290,12 +290,14 @@ class OrderDetailsTemplateTest {
         String html = page(render(order, ADMIN));
         String withSupplier = page(render(order, List.of(allocated), ADMIN, Set.of()));
 
-        // then: "Split set" is absent for an item that is not a set, not greyed out
-        assertThat(html).containsPattern("aria-disabled=\"true\">\\s*<span>Usuń dostawcę</span>\\s*<span class=\"cl-menu-reason\">Pozycja nie ma dostawcy</span>")
+        // then: "Split set" is absent for an item that is not a set, and so is the side that cannot be done: "Usuń
+        // dostawcę" without a supplier, the assign entries while a supplier is still held
+        assertThat(html).doesNotContain("<span>Usuń dostawcę</span>").doesNotContain("Pozycja nie ma dostawcy")
                 .doesNotContain("<span>Podziel zestaw</span>").doesNotContain("data-cl-dialog-open=\"split-group-dialog\"")
                 .contains("data-cl-dialog-open=\"assign-sku-dialog\"").contains("data-cl-dialog-open=\"assign-supplier-dialog\"");
         assertThat(withSupplier).contains("/clear-supplier?itemId=").contains("data-cl-confirm")
-                .containsPattern("<span>Przypisz dostawcę</span>\\s*<span class=\"cl-menu-reason\">Najpierw usuń obecnego dostawcę</span>");
+                .doesNotContain("Najpierw usuń obecnego dostawcę").doesNotContain("data-cl-dialog-open=\"assign-sku-dialog\"")
+                .doesNotContain("data-cl-dialog-open=\"assign-supplier-dialog\"");
     }
 
     @Test

@@ -130,24 +130,30 @@ public record OrderItemRow(String itemId, int index, String name, String categor
      */
     public static List<ItemAction.State> actions(OrderItem item, Order order, ReceiptLock receiptLock, boolean dropshipLocked) {
         List<ItemAction.State> states = new ArrayList<>();
-        // an item that already has a supplier (Allocation) is released first, then reassigned
+        // an item that already has a supplier (Allocation) is released first, then reassigned: while it is
+        // releasable only "Usuń dostawcę" is offered, the assign entries are absent rather than greyed
+        boolean releaseFirst = !item.isGroup() && !item.isNew() && item.isReleasable();
         String assignReason = item.isGroup() ? "order.item.unavailable.group"
                 : item.isNew() ? null
-                : item.isReleasable() ? "order.item.unavailable.clear.first"
                 : "order.item.unavailable.not.new";
-        states.add(ItemAction.State.of(ItemAction.ASSIGN_SKU, assignReason, null));
-        states.add(ItemAction.State.of(ItemAction.ASSIGN_SUPPLIER, assignReason, null));
-        // a marketplace-routed order keeps the supplier the marketplace chose; the server refuses the warehouse too
-        String warehouseReason = assignReason != null ? assignReason
-                : order.isBoundToExternalSupplier() ? "order.item.unavailable.routed" : null;
-        states.add(ItemAction.State.of(ItemAction.ASSIGN_WAREHOUSE, warehouseReason, null));
+        if (!releaseFirst) {
+            states.add(ItemAction.State.of(ItemAction.ASSIGN_SKU, assignReason, null));
+            states.add(ItemAction.State.of(ItemAction.ASSIGN_SUPPLIER, assignReason, null));
+            // a marketplace-routed order keeps the supplier the marketplace chose; the server refuses the warehouse too
+            String warehouseReason = assignReason != null ? assignReason
+                    : order.isBoundToExternalSupplier() ? "order.item.unavailable.routed" : null;
+            states.add(ItemAction.State.of(ItemAction.ASSIGN_WAREHOUSE, warehouseReason, null));
+        }
         states.add(ItemAction.State.of(ItemAction.ALLOCATE, allocateReason(item, dropshipLocked), null));
-        String clearReason = item.isGroup() ? "order.item.unavailable.group"
-                : item.isClaimed() ? "order.item.unavailable.claimed"
-                : StringUtils.isBlank(item.getDeliveryId()) ? "order.item.unavailable.no.supplier"
-                : item.isReleasable() ? null : "order.item.unavailable.fulfilled";
-        states.add(ItemAction.State.of(ItemAction.CLEAR_SUPPLIER, clearReason,
-                item.isClaimed() ? ConversionUtil.getShortenedId(item.getClaimedDeliveryId()) : null));
+        // an item without a supplier has nothing to release: the entry is absent rather than greyed
+        boolean hasNoSupplier = !item.isGroup() && !item.isClaimed() && StringUtils.isBlank(item.getDeliveryId());
+        if (!hasNoSupplier) {
+            String clearReason = item.isGroup() ? "order.item.unavailable.group"
+                    : item.isClaimed() ? "order.item.unavailable.claimed"
+                    : item.isReleasable() ? null : "order.item.unavailable.fulfilled";
+            states.add(ItemAction.State.of(ItemAction.CLEAR_SUPPLIER, clearReason,
+                    item.isClaimed() ? ConversionUtil.getShortenedId(item.getClaimedDeliveryId()) : null));
+        }
         // "Split set" only exists for a set; for any other item it is not greyed out but absent
         if (item.isGroup()) {
             // splitting rewrites the lines the sale document lists (OrdersController#splitGroupItem refuses the same)
