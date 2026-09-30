@@ -22,7 +22,6 @@ import pl.commercelink.web.orders.Pagination;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.function.Function;
-import java.util.function.Predicate;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -72,26 +71,29 @@ public class DeliveryListService {
             case RECEIVED -> history;
             case ALL -> Stream.concat(transit.stream(), history.stream()).toList();
         };
-        List<Delivery> narrowed = inScope.stream()
+        List<Delivery> base = inScope.stream()
                 .filter(d -> query.focus() == null || query.focus().matches(d, DeliveryListState.of(d), today))
-                .filter(d -> matchesSettle(d, query.settle()))
                 .filter(d -> matchesSearch(d, query.q()))
                 .toList();
-        List<Delivery> forProviders = narrowed.stream().filter(d -> matchesStates(d, query.states())).toList();
-        List<Delivery> forStates = narrowed.stream().filter(d -> matchesProviders(d, query.providers())).toList();
-        List<Delivery> shown = forStates.stream().filter(d -> matchesStates(d, query.states()))
+        // every menu counts what the list would show after picking its option, so it leaves out only its own filter
+        List<Delivery> forStates = base.stream().filter(d -> matchesSettle(d, query.settle()) && matchesProviders(d, query.providers())).toList();
+        List<Delivery> forProviders = base.stream().filter(d -> matchesSettle(d, query.settle()) && matchesStates(d, query.states())).toList();
+        List<Delivery> forSettle = base.stream().filter(d -> matchesStates(d, query.states()) && matchesProviders(d, query.providers())).toList();
+        List<Delivery> shown = forSettle.stream().filter(d -> matchesSettle(d, query.settle()))
                 .sorted(comparator(query, labels)).toList();
 
         Pagination pagination = Pagination.of(query.page(), shown.size(), DeliveryListQuery.PAGE_SIZE, n -> query.withPage(n).href());
         DeliveryRowMapper mapper = new DeliveryRowMapper(messages, locale, labels, actor.superAdmin());
         List<DeliveryRow> rows = shown.subList(pagination.fromIndex(), pagination.toIndex()).stream()
                 .map(d -> mapper.map(d, today)).toList();
-        List<Chip> chips = chips(query, labels, today, locale);
+        List<Option> providerOptions = providerOptions(query, forProviders, labels, actor, locale);
+        Map<String, String> providerNames = providerOptions.stream().collect(Collectors.toMap(Option::value, Option::label));
+        List<Chip> chips = chips(query, providerNames, today, locale);
         return new DeliveriesPageModel(query, actor.superAdmin(), actor.admin() || actor.superAdmin(), tiles,
                 scopes(query, transit.size(), locale),
                 stateOptions(query, forStates, locale), summary(query.states().size(), locale),
-                providerOptions(query, forProviders, labels, actor, locale), summary(query.providers().size(), locale),
-                settleOptions(query, inScope, locale), summary(query.settle().size(), locale),
+                providerOptions, summary(query.providers().size(), locale),
+                settleOptions(query, forSettle, locale), summary(query.settle().size(), locale),
                 dateMenu(query, today, locale), chips, text(locale, "deliveries.list.results", shown.size()),
                 sortHeaders(query), rows, pagination,
                 rows.isEmpty() ? emptyState(query, locale) : null,
@@ -179,8 +181,8 @@ public class DeliveryListService {
             choices.put(SupplierRegistry.WAREHOUSE, text(locale, "deliveries.list.warehouse"));
         }
         base.stream().filter(d -> d.getProvider() != null)
-                .forEach(d -> choices.computeIfAbsent(d.getProvider(), key -> providerLabel(d, labels, actor, locale)));
-        query.providers().forEach(p -> choices.putIfAbsent(p, p));
+                .forEach(d -> choices.computeIfAbsent(d.getProvider(), key -> providerLabel(d.getStoreId(), key, labels, actor, locale)));
+        query.providers().forEach(p -> choices.computeIfAbsent(p, key -> providerLabel(actor.storeId(), key, labels, actor, locale)));
         return choices.entrySet().stream()
                 .sorted(Map.Entry.comparingByValue(String.CASE_INSENSITIVE_ORDER))
                 .map(e -> new Option(e.getKey(), e.getValue(), counts.getOrDefault(e.getKey(), 0L),
@@ -188,20 +190,22 @@ public class DeliveryListService {
                 .toList();
     }
 
-    private String providerLabel(Delivery d, SupplierLabelMap labels, ListActor actor, Locale locale) {
-        String provider = d.getProvider();
+    private String providerLabel(String storeId, String provider, SupplierLabelMap labels, ListActor actor, Locale locale) {
         if (SupplierRegistry.WAREHOUSE.equals(provider)) {
             return text(locale, "deliveries.list.warehouse");
         }
         // the super admin's map has no default store and identities are per store, hence the delivery's own store
-        return actor.superAdmin() || labels.has(d.getStoreId(), provider) ? labels.of(d.getStoreId(), provider)
+        return actor.superAdmin() || labels.has(storeId, provider) ? labels.of(storeId, provider)
                 : text(locale, "deliveries.list.supplier.typed", provider);
     }
 
     private List<Option> settleOptions(DeliveryListQuery query, List<Delivery> base, Locale locale) {
-        return Arrays.stream(Settle.values()).map(s -> new Option(s.param(), text(locale, "deliveries.list.settle." + s.param()),
-                base.stream().filter(d -> matchesSettle(d, List.of(s))).count(),
-                query.settle().contains(s), query.toggleSettle(s).href())).toList();
+        return Arrays.stream(Settle.values()).map(s -> {
+            List<Settle> chosen = Stream.concat(query.settle().stream(), Stream.of(s)).distinct().toList();
+            return new Option(s.param(), text(locale, "deliveries.list.settle." + s.param()),
+                    base.stream().filter(d -> matchesSettle(d, chosen)).count(),
+                    query.settle().contains(s), query.toggleSettle(s).href());
+        }).toList();
     }
 
     private String summary(int selected, Locale locale) {
@@ -221,7 +225,7 @@ public class DeliveryListService {
                 query.to() == null ? null : query.to().toString(), query.withAllHistory().href(), window);
     }
 
-    private List<Chip> chips(DeliveryListQuery query, SupplierLabelMap labels, LocalDate today, Locale locale) {
+    private List<Chip> chips(DeliveryListQuery query, Map<String, String> providerNames, LocalDate today, Locale locale) {
         List<Chip> chips = new ArrayList<>();
         if (query.focus() != null) {
             chip(chips, text(locale, "deliveries.list.attention." + query.focus().param()), query.withoutFocus().href(), locale);
@@ -229,7 +233,7 @@ public class DeliveryListService {
         query.states().forEach(s -> chip(chips, text(locale, "deliveries.list.chip.state", text(locale, s.messageKey())),
                 query.withoutState(s).href(), locale));
         query.providers().forEach(p -> chip(chips, text(locale, "deliveries.list.chip.provider",
-                SupplierRegistry.WAREHOUSE.equals(p) ? text(locale, "deliveries.list.warehouse") : labels.of(p)),
+                providerNames.getOrDefault(p, p)),
                 query.withoutProvider(p).href(), locale));
         query.settle().forEach(s -> chip(chips, text(locale, "deliveries.list.chip.settle", text(locale, "deliveries.list.settle." + s.param())),
                 query.withoutSettle(s).href(), locale));

@@ -22,6 +22,8 @@ import java.util.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -57,7 +59,6 @@ class DeliveryListServiceTest {
         when(supplierLabels.forStoreId(anyString())).thenReturn(labels);
         when(supplierLabels.forStoreIds(any())).thenReturn(labels);
         when(labels.of(anyString(), anyString())).thenAnswer(inv -> inv.getArgument(1));
-        when(labels.has(anyString())).thenReturn(true);
         when(labels.has(anyString(), anyString())).thenReturn(true);
         when(labels.options()).thenReturn(List.of(new SupplierLabelMap.Option("Acme", "Acme")));
     }
@@ -233,5 +234,170 @@ class DeliveryListServiceTest {
 
         // then
         assertThat(page.emptyState().actionHref()).isEqualTo("/dashboard/deliveries?scope=received");
+    }
+
+    private Delivery receivedBy(String id, String provider, boolean invoiced, boolean synced) {
+        Delivery d = receivedOn("store-1", id, TODAY.minusDays(3), invoiced);
+        d.setProvider(provider);
+        d.setSynced(synced);
+        history.add(d);
+        return d;
+    }
+
+    @Test
+    void settleFilterNarrowsToWhatSettlementStillLacks() {
+        // given
+        receivedBy("aaaa0001", "Acme", false, false);
+        receivedBy("aaaa0002", "Acme", true, false);
+        Delivery paid = receivedBy("aaaa0003", "Acme", true, true);
+        paid.setPaid(true);
+
+        // when / then
+        assertThat(page("scope", "received", "settle", "noInvoice").rows()).extracting(DeliveryRow::number).containsExactly("aaaa0001");
+        assertThat(page("scope", "received", "settle", "noSync").rows()).extracting(DeliveryRow::number).containsExactly("aaaa0002");
+        assertThat(page("scope", "received", "settle", "unpaid").rows()).extracting(DeliveryRow::number)
+                .containsExactlyInAnyOrder("aaaa0001", "aaaa0002");
+    }
+
+    @Test
+    void menuCountsEqualTheRowsTheListShowsAfterPickingTheOption() {
+        // given
+        receivedBy("aaaa0001", "Acme", false, false);
+        receivedBy("aaaa0002", "Acme", true, false);
+        receivedBy("aaaa0003", "Other", false, false);
+
+        // when
+        DeliveriesPageModel withSupplier = page("scope", "received", "provider", "Acme");
+
+        // then
+        assertThat(withSupplier.settleOptions()).filteredOn(o -> o.value().equals("noInvoice")).extracting(DeliveriesPageModel.Option::count).containsExactly(1L);
+        assertThat(page("scope", "received", "provider", "Acme", "settle", "noInvoice").rows()).hasSize(1);
+        assertThat(withSupplier.providerOptions()).filteredOn(o -> o.value().equals("Other")).extracting(DeliveriesPageModel.Option::count).containsExactly(1L);
+        assertThat(withSupplier.providerOptions()).filteredOn(o -> o.value().equals("Acme")).extracting(DeliveriesPageModel.Option::count).containsExactly(2L);
+        assertThat(page("scope", "received", "provider", "Acme", "provider", "Other").rows()).hasSize(3);
+    }
+
+    @Test
+    void settleCountsFollowTheSearchToo() {
+        // given
+        receivedBy("aaaa0001", "Acme", false, false).setExternalDeliveryId("EXT-1");
+        receivedBy("aaaa0002", "Acme", false, false).setExternalDeliveryId("OTHER-2");
+
+        // when
+        DeliveriesPageModel page = page("scope", "received", "q", "ext-1");
+
+        // then
+        assertThat(page.settleOptions()).filteredOn(o -> o.value().equals("noInvoice")).extracting(DeliveriesPageModel.Option::count).containsExactly(1L);
+        assertThat(page.rows()).hasSize(1);
+    }
+
+    @Test
+    void textSearchMatchesExternalNumberAndCounterpartyIgnoringCase() {
+        // given
+        Delivery external = onItsWay("store-1", "aaaa0001", TODAY);
+        external.setExternalDeliveryId("EXT-ABC-77");
+        Delivery counterparty = onItsWay("store-1", "aaaa0002", TODAY);
+        counterparty.setCounterpartyShortcut("Kowalski");
+        transit.add(external);
+        transit.add(counterparty);
+
+        // when / then
+        assertThat(page("q", "ext-abc").rows()).extracting(DeliveryRow::number).containsExactly("aaaa0001");
+        assertThat(page("q", "KOWAL").rows()).extracting(DeliveryRow::number).containsExactly("aaaa0002");
+    }
+
+    @Test
+    void orderedDatesFilterTransitInclusively() {
+        // given
+        String[] ids = {"aaaa0001", "aaaa0002", "aaaa0003", "aaaa0004"};
+        LocalDateTime[] ordered = {LocalDateTime.of(2026, 9, 20, 23, 59), LocalDateTime.of(2026, 9, 21, 0, 0),
+                LocalDateTime.of(2026, 9, 22, 23, 59), LocalDateTime.of(2026, 9, 23, 0, 0)};
+        for (int i = 0; i < ids.length; i++) {
+            Delivery d = onItsWay("store-1", ids[i], TODAY);
+            d.setOrderedAt(ordered[i]);
+            transit.add(d);
+        }
+
+        // when
+        DeliveriesPageModel page = page("from", "2026-09-21", "to", "2026-09-22");
+
+        // then
+        assertThat(page.rows()).extracting(DeliveryRow::number).containsExactlyInAnyOrder("aaaa0002", "aaaa0003");
+    }
+
+    @Test
+    void chipsNameEveryFilterAndCarryTheirClearLinks() {
+        // when
+        DeliveriesPageModel page = page("provider", "Acme", "settle", "noInvoice", "from", "2026-09-21", "to", "2026-09-22", "q", "abc");
+
+        // then
+        assertThat(page.chips()).extracting(DeliveriesPageModel.Chip::label).containsExactly("Dostawca: Acme",
+                "Rozliczenie: Bez faktury", "Zam\u00f3wiona: 2026-09-21 \u2013 2026-09-22", "Szukasz: \u201eabc\u201d");
+        assertThat(page.chips()).extracting(DeliveriesPageModel.Chip::clearHref).containsExactly(
+                "/dashboard/deliveries?settle=noInvoice&from=2026-09-21&to=2026-09-22&q=abc",
+                "/dashboard/deliveries?provider=Acme&from=2026-09-21&to=2026-09-22&q=abc",
+                "/dashboard/deliveries?provider=Acme&settle=noInvoice&q=abc",
+                "/dashboard/deliveries?provider=Acme&settle=noInvoice&from=2026-09-21&to=2026-09-22");
+        assertThat(page.chips().get(0).clearLabel()).isEqualTo("Wyczy\u015b\u0107: Dostawca: Acme");
+        assertThat(page.activeFilterCount()).isEqualTo(4);
+    }
+
+    @Test
+    void providerChipReadsLikeTheMenu() {
+        // given
+        when(labels.has("store-1", "Hurtownia Kowalski")).thenReturn(false);
+
+        // when
+        DeliveriesPageModel page = page("provider", "Hurtownia Kowalski", "provider", "Warehouse");
+
+        // then
+        assertThat(page.chips()).extracting(DeliveriesPageModel.Chip::label)
+                .containsExactly("Dostawca: Inny: Hurtownia Kowalski", "Dostawca: Magazyn");
+    }
+
+    @Test
+    void emptyStatesOfferTheWayOut() {
+        // when
+        DeliveriesPageModel filtered = page("provider", "Acme");
+        DeliveriesPageModel history = page("scope", "received");
+        DeliveriesPageModel fromTheStart = page("scope", "received", "period", "all");
+        DeliveriesPageModel search = page("q", "zzz");
+
+        // then
+        assertThat(filtered.emptyState().text()).isEqualTo("Brak dostaw spe\u0142niaj\u0105cych filtry.");
+        assertThat(filtered.emptyState().actionLabel()).isEqualTo("Wyczy\u015b\u0107 filtry");
+        assertThat(filtered.emptyState().actionHref()).isEqualTo("/dashboard/deliveries");
+        assertThat(history.emptyState().actionLabel()).isEqualTo("Od pocz\u0105tku");
+        assertThat(history.emptyState().actionHref()).isEqualTo("/dashboard/deliveries?scope=received&period=all");
+        assertThat(fromTheStart.emptyState().actionLabel()).isNull();
+        assertThat(search.emptyState().actionLabel()).isEqualTo("Szukaj we wszystkich");
+        assertThat(search.emptyState().actionHref()).isEqualTo("/dashboard/deliveries?scope=all&q=zzz");
+    }
+
+    @Test
+    void numberSearchListsAPrefixHitInsideTheWindowOnce() {
+        // given
+        Delivery recent = receivedOn("store-1", "bbbb0001", TODAY.minusDays(1), true);
+        history.add(recent);
+        when(repository.findByDeliveryIdPrefix("store-1", "bbbb0001")).thenReturn(List.of(recent));
+
+        // when
+        DeliveriesPageModel page = page("scope", "all", "q", "bbbb0001");
+
+        // then
+        assertThat(page.rows()).extracting(DeliveryRow::number).containsExactly("bbbb0001");
+    }
+
+    @Test
+    void superAdminNeverReadsTheSettlementBacklog() {
+        // given
+        Store one = new Store(); one.setStoreId("store-1");
+        when(stores.findAll()).thenReturn(List.of(one));
+
+        // when
+        page(new DeliveryListService.ListActor(null, true, false));
+
+        // then
+        verify(repository, never()).findToSettle(any());
     }
 }
