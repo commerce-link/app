@@ -30,12 +30,15 @@ public class PendingDeliveriesService {
     private final SupplierLabels supplierLabels;
     private final MessageSource messages;
 
-    public PendingDeliveriesPageModel page(String storeId, boolean superAdmin, PendingDeliveriesQuery query,
+    public PendingDeliveriesPageModel page(String storeId, boolean superAdmin, PendingDeliveriesQuery requested,
                                            LocalDate today, Locale locale) {
         DeliveriesPlanningService.Planning planning = planningService.plan(storeId);
         Set<String> providers = new LinkedHashSet<>();
         planning.deliveries().forEach(d -> providers.add(d.getProvider()));
         planning.dropshipCandidates().forEach(c -> providers.add(c.provider()));
+        // A supplier that has nothing pending any more (e.g. its delivery was just created) is ignored, not an empty filter
+        PendingDeliveriesQuery query = requested.withProviders(
+                requested.providers().stream().filter(providers::contains).toList());
         Map<String, OrderingMode> modes = providers.isEmpty() ? Map.of() : orderingModes.of(storeId, providers);
         PendingDeliveryRowMapper mapper = new PendingDeliveryRowMapper(messages, locale, supplierLabels.forStoreId(storeId),
                 planning.orders(), modes, storeId, superAdmin);
@@ -50,19 +53,21 @@ public class PendingDeliveriesService {
         Kind active = query.kind() != null ? query.kind() : warehouse == 0 && dropship > 0 ? Kind.DROPSHIP : Kind.WAREHOUSE;
         List<PendingDeliveryRow> rows = filtered.stream().filter(r -> r.kind() == active).toList();
 
+        // Links that remove a filter keep the tab in view, also when it was chosen by default; narrowing links drop it
+        PendingDeliveriesQuery widening = query.kind() != null ? query : query.withKind(active);
         String path = superAdmin ? "/dashboard/store/" + storeId + "/deliveries/preview" : "/dashboard/deliveries/preview";
         Map<String, String> providerLabels = new LinkedHashMap<>();
         all.forEach(r -> providerLabels.putIfAbsent(r.provider(), r.providerLabel()));
 
         return new PendingDeliveriesPageModel(query, superAdmin, path, path + "/fragment", "/dashboard/deliveries",
-                tiles(all, query, path, today, mapper, locale),
+                tiles(all, query, widening, path, today, mapper, locale),
                 List.of(tab(Kind.WAREHOUSE, warehouse, active, query, path, locale), tab(Kind.DROPSHIP, dropship, active, query, path, locale)),
                 active, text(locale, "deliveries.pending.kind." + active.param()),
                 text(locale, "deliveries.pending.kind." + active.param() + ".desc"),
                 providerOptions(all, query, path, providerLabels), providerSummary(query, providerLabels, locale),
-                chips(query, path, providerLabels, locale), query.cleared().href(path), query.withoutQ().href(path),
+                chips(query, widening, path, providerLabels, locale), widening.cleared().href(path), widening.withoutQ().href(path),
                 text(locale, "deliveries.pending.results", rows.size()), rows,
-                emptyState(all, rows, query, path, active, locale), all.isEmpty(), query.activeFilterCount());
+                emptyState(all, rows, query, widening, path, active, locale), all.isEmpty(), query.activeFilterCount());
     }
 
     private static boolean matches(PendingDeliveryRow row, PendingDeliveriesQuery query, LocalDate today) {
@@ -71,7 +76,7 @@ public class PendingDeliveriesService {
                 && row.matches(query.q());
     }
 
-    private List<Tile> tiles(List<PendingDeliveryRow> all, PendingDeliveriesQuery query, String path, LocalDate today,
+    private List<Tile> tiles(List<PendingDeliveryRow> all, PendingDeliveriesQuery query, PendingDeliveriesQuery widening, String path, LocalDate today,
                              PendingDeliveryRowMapper mapper, Locale locale) {
         List<Tile> tiles = new ArrayList<>();
         for (Focus focus : Focus.values()) {
@@ -79,7 +84,7 @@ public class PendingDeliveriesService {
             long count = all.stream().filter(r -> focus.matches(r.due(), today)).count();
             String key = "deliveries.pending.tile." + focus.param();
             tiles.add(new Tile(text(locale, key), String.valueOf(count), text(locale, key + ".hint"),
-                    (active ? query.withoutFocus() : query.withFocus(focus)).href(path), active));
+                    (active ? widening.withoutFocus() : query.withFocus(focus)).href(path), active));
         }
         tiles.add(new Tile(text(locale, "deliveries.pending.tile.approval"),
                 String.valueOf(all.stream().filter(PendingDeliveryRow::approval).count()),
@@ -111,15 +116,15 @@ public class PendingDeliveriesService {
         return text(locale, "deliveries.pending.menu.selected", chosen.size());
     }
 
-    private List<Chip> chips(PendingDeliveriesQuery query, String path, Map<String, String> labels, Locale locale) {
+    private List<Chip> chips(PendingDeliveriesQuery query, PendingDeliveriesQuery widening, String path, Map<String, String> labels, Locale locale) {
         List<Chip> chips = new ArrayList<>();
         if (query.focus() != null) {
-            chip(chips, text(locale, "deliveries.pending.tile." + query.focus().param()), query.withoutFocus().href(path), locale);
+            chip(chips, text(locale, "deliveries.pending.tile." + query.focus().param()), widening.withoutFocus().href(path), locale);
         }
         query.providers().forEach(p -> chip(chips, text(locale, "deliveries.pending.chip.provider", labels.getOrDefault(p, p)),
-                query.withoutProvider(p).href(path), locale));
+                widening.withoutProvider(p).href(path), locale));
         if (query.q() != null) {
-            chip(chips, text(locale, "deliveries.pending.chip.search", query.q()), query.withoutQ().href(path), locale);
+            chip(chips, text(locale, "deliveries.pending.chip.search", query.q()), widening.withoutQ().href(path), locale);
         }
         return chips;
     }
@@ -129,7 +134,7 @@ public class PendingDeliveriesService {
     }
 
     private EmptyState emptyState(List<PendingDeliveryRow> all, List<PendingDeliveryRow> rows, PendingDeliveriesQuery query,
-                                  String path, Kind active, Locale locale) {
+                                  PendingDeliveriesQuery widening, String path, Kind active, Locale locale) {
         if (all.isEmpty()) {
             return new EmptyState(text(locale, "deliveries.pending.empty.nothing"),
                     text(locale, "deliveries.pending.empty.nothing.action"), "/dashboard/deliveries", false);
@@ -139,7 +144,7 @@ public class PendingDeliveriesService {
         }
         if (query.isFiltered()) {
             return new EmptyState(text(locale, "deliveries.pending.empty.filtered"), text(locale, "general.clear.filters"),
-                    query.cleared().href(path), false);
+                    widening.cleared().href(path), false);
         }
         return new EmptyState(text(locale, "deliveries.pending.empty." + active.param()), null, null, true);
     }

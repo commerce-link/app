@@ -159,7 +159,7 @@
                             <tr class="cl-row-main">
                                 <th scope="row" class="cl-table-key">
                                     <a class="cl-row-number cl-card-key" th:href="@{${row.keyHref()}}" th:text="${row.key()}"></a>
-                                    <span class="cl-table-sub cl-card-sub"><th:block th:if="${row.customer() != null}" th:text="${row.customer()}"></th:block><span class="cl-narrow-only" th:text="' · ' + ${row.providerLabel()}"></span></span>
+                                    <span class="cl-table-sub cl-card-sub"><th:block th:if="${row.customer() != null}" th:text="${row.customer()}"></th:block><span class="cl-narrow-only" th:text="(${row.customer() != null} ? ' · ' : '') + ${row.providerLabel()}"></span></span>
                                     <span class="cl-table-sub cl-narrow-only cl-card-hide" th:text="${row.modeText()}"></span>
                                 </th>
                                 <td class="is-secondary-column cl-card-hide" th:text="${row.providerLabel()}"></td>

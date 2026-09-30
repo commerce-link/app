@@ -86,7 +86,7 @@ class PendingDeliveriesServiceTest {
         assertThat(page.tiles()).extracting(PendingDeliveriesPageModel.Tile::value)
                 .containsExactly("1", "1", "1", "5 381,00 PLN");
         assertThat(page.tiles().get(0).active()).isTrue();
-        assertThat(page.tiles().get(0).href()).isEqualTo(PATH);
+        assertThat(page.tiles().get(0).href()).isEqualTo(PATH + "?kind=warehouse");
         assertThat(page.tiles().get(1).href()).isEqualTo(PATH + "?focus=today");
         assertThat(page.tiles().get(2).href()).isNull();
         assertThat(page.tabs()).extracting(PendingDeliveriesPageModel.KindTab::count).containsExactly(1L, 0L);
@@ -205,6 +205,50 @@ class PendingDeliveriesServiceTest {
     }
 
     @Test
+    void removingAFilterKeepsTheTabThatWasChosenByDefault() {
+        // given
+        planning(true, true);
+
+        // when
+        PendingDeliveriesPageModel page = page(query(null, Focus.TODAY, List.of("AcmeB"), "zając"));
+
+        // then
+        assertThat(page.activeKind()).isEqualTo(Kind.DROPSHIP);
+        assertThat(page.chips()).extracting(PendingDeliveriesPageModel.Chip::clearHref).containsExactly(
+                PATH + "?kind=dropship&provider=AcmeB&q=zaj%C4%85c",
+                PATH + "?kind=dropship&focus=today&q=zaj%C4%85c",
+                PATH + "?kind=dropship&focus=today&provider=AcmeB");
+        assertThat(page.clearHref()).isEqualTo(PATH + "?kind=dropship");
+        assertThat(page.searchClearHref()).isEqualTo(PATH + "?kind=dropship&focus=today&provider=AcmeB");
+        assertThat(page.tiles().get(1).active()).isTrue();
+        assertThat(page.tiles().get(1).href()).isEqualTo(PATH + "?kind=dropship&provider=AcmeB&q=zaj%C4%85c");
+        assertThat(page.tiles().get(0).href()).isEqualTo(PATH + "?focus=overdue&provider=AcmeB&q=zaj%C4%85c");
+        assertThat(page.providerOptions().stream().filter(o -> o.value().equals("Acme")).findFirst().orElseThrow().toggleHref())
+                .isEqualTo(PATH + "?focus=today&provider=AcmeB&provider=Acme&q=zaj%C4%85c");
+    }
+
+    @Test
+    void aSupplierMissingFromThePlanningIsIgnored() {
+        // given
+        planning(true, true);
+
+        // when
+        PendingDeliveriesPageModel unknown = page(query(null, null, List.of("Gone"), null));
+        PendingDeliveriesPageModel none = page(query(null, null, List.of(), null));
+        PendingDeliveriesPageModel mixed = page(query(null, null, List.of("Gone", "Acme"), null));
+
+        // then
+        assertThat(unknown.rows()).isEqualTo(none.rows());
+        assertThat(unknown.tabs()).isEqualTo(none.tabs());
+        assertThat(unknown.chips()).isEmpty();
+        assertThat(unknown.activeFilterCount()).isZero();
+        assertThat(unknown.providerSummary()).isEqualTo(none.providerSummary());
+        assertThat(unknown.emptyState()).isNull();
+        assertThat(mixed.chips()).extracting(PendingDeliveriesPageModel.Chip::label).containsExactly("Dostawca: Acme");
+        assertThat(mixed.activeFilterCount()).isEqualTo(1);
+    }
+
+    @Test
     void superAdminPathsAreStoreScoped() {
         // given
         planning(true, true);
@@ -215,7 +259,7 @@ class PendingDeliveriesServiceTest {
         // then
         assertThat(page.listPath()).isEqualTo("/dashboard/store/store-1/deliveries/preview");
         assertThat(page.fragmentPath()).isEqualTo("/dashboard/store/store-1/deliveries/preview/fragment");
-        assertThat(page.clearHref()).isEqualTo("/dashboard/store/store-1/deliveries/preview");
+        assertThat(page.clearHref()).isEqualTo("/dashboard/store/store-1/deliveries/preview?kind=warehouse");
         assertThat(page.rows().getFirst().createHref()).isEqualTo("/dashboard/store/store-1/deliveries/create/Acme");
     }
 }

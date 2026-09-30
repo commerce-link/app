@@ -57,6 +57,7 @@ public record PendingDeliveriesQuery(Kind kind, Focus focus, List<String> provid
     public int activeFilterCount() { return (focus != null ? 1 : 0) + providers.size() + (q != null ? 1 : 0); }
 
     public PendingDeliveriesQuery withKind(Kind k) { return new PendingDeliveriesQuery(k, focus, providers, q); }
+    public PendingDeliveriesQuery withProviders(List<String> p) { return new PendingDeliveriesQuery(kind, focus, p, q); }
     public PendingDeliveriesQuery withFocus(Focus f) { return new PendingDeliveriesQuery(null, f, providers, q); }
     public PendingDeliveriesQuery withoutFocus() { return new PendingDeliveriesQuery(kind, null, providers, q); }
     public PendingDeliveriesQuery toggleProvider(String p) { return new PendingDeliveriesQuery(null, focus, toggled(providers, p), q); }

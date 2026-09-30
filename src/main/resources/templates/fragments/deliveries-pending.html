@@ -73,7 +73,7 @@
                 </tbody>
                 <tfoot>
                 <tr>
-                    <td th:text="#{deliveries.pending.detail.total}"></td>
+                    <th scope="row" th:text="#{deliveries.pending.detail.total}"></th>
                     <td class="is-numeric cl-sub-qty" th:text="${row.piecesText()}"></td>
                     <td class="cl-sub-unit"></td>
                     <td class="is-numeric cl-sub-value" th:text="${row.costText()}"></td>

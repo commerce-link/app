@@ -450,7 +450,7 @@ class OrderAllocationsManagerTest {
                 .thenReturn(List.of(free, claimed));
 
         // when
-        List<Allocation> allocations = orderAllocationsManager.fetchAll(STORE_ID);
+        List<Allocation> allocations = orderAllocationsManager.fetchAllWithOrders(STORE_ID).allocations();
 
         // then
         assertThat(allocations).hasSize(1);

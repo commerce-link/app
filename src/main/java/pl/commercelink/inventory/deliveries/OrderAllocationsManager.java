@@ -20,10 +20,6 @@ public class OrderAllocationsManager {
     @Autowired
     private OrdersManager ordersManager;
 
-    public List<Allocation> fetchAll(String storeId) {
-        return fetchAllWithOrders(storeId).allocations();
-    }
-
     public OrderAllocations fetchAllWithOrders(String storeId) {
         List<Allocation> allocations = new LinkedList<>();
         Map<String, Order> orders = new LinkedHashMap<>();
