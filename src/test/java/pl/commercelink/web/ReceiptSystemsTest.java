@@ -46,7 +46,7 @@ class ReceiptSystemsTest {
     }
 
     @Test
-    void disconnectSwitchesAutomaticReceiptsOffAndRemembersTheDisconnection() {
+    void disconnectSwitchesAutomaticReceiptsOff() {
         // given
         Store store = configuredStore();
         store.getReceiptConfiguration().enable(LocalDateTime.of(2026, 1, 1, 10, 0));
@@ -58,8 +58,6 @@ class ReceiptSystemsTest {
         verify(receiptProviderFactory).deleteConfiguration(store, SYSTEM);
         assertThat(store.getConfigurationValue(IntegrationType.RECEIPT_PROVIDER)).isNull();
         assertThat(store.getReceiptConfiguration().isEnabled()).isFalse();
-        // its orders may keep dead attempts and their alerts, which the order lifecycle still reconciles
-        assertThat(store.getReceiptConfiguration().getDisconnectedAt()).isNotNull();
     }
 
     /** Reconnecting and switching e-receipts back on must set a fresh enabledAt: {@code enable} only moves it while

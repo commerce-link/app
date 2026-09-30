@@ -10,7 +10,6 @@ import pl.commercelink.stores.IntegrationType;
 import pl.commercelink.stores.Store;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -103,42 +102,13 @@ class ReceiptTriggerTest {
     }
 
     @Test
-    void aStoreThatNeverHadAReceiptSystemSkipsTheReconcile() {
-        // given: the lifecycle cron saves every Shipping and Delivered order of every store
+    void aStoreWithoutAReceiptSystemStillReconciles() {
+        // given: the alerts follow the order whatever the store's current receipt settings (a disconnected system
+        // leaves its attempts and alerts behind)
         Order order = b2cOrder(100);
 
         // when
         trigger.onOrderSaved(order, new Store());
-
-        // then: no attempt can exist, so no attempts query
-        verifyNoInteractions(service);
-    }
-
-    @Test
-    void aStoreThatDisconnectedItsReceiptSystemStillReconciles() {
-        // given: its orders may keep dead attempts and their alerts from before
-        Store store = new Store();
-        store.getReceiptConfiguration().setDisconnectedAt(LocalDateTime.of(2026, 9, 1, 12, 0));
-        Order order = b2cOrder(100);
-        order.addDocument(new Document(null, "KASA/1", null, DocumentType.Receipt, LocalDate.of(2026, 9, 29)));
-
-        // when
-        trigger.onOrderSaved(order, store);
-
-        // then
-        verify(service).reconcileDeadAttemptAlerts(order);
-    }
-
-    @Test
-    void aStoreDisconnectedBeforeTheMarkerExistedStillReconciles() {
-        // given: automatic receipts were on once (enabledAt is never cleared), the system was disconnected before
-        // disconnectedAt existed
-        Store store = new Store();
-        store.getReceiptConfiguration().setEnabledAt(LocalDateTime.of(2026, 9, 28, 12, 0));
-        Order order = b2cOrder(100);
-
-        // when
-        trigger.onOrderSaved(order, store);
 
         // then
         verify(service).reconcileDeadAttemptAlerts(order);

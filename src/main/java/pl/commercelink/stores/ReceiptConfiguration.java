@@ -21,15 +21,6 @@ public class ReceiptConfiguration {
     @DynamoDBAttribute(attributeName = "enabledAt")
     @DynamoDBTypeConverted(converter = DynamoDbLocalDateTimeConverter.class)
     private LocalDateTime enabledAt;
-    /**
-     * When the store last disconnected its receipt system, null if it never did: its orders may still hold attempts
-     * (and their bell alerts) from before, so the order lifecycle keeps reconciling them. Needed for a system used only
-     * by hand ({@code enabledAt} stays null then); V019 set it, with the backfill's moment, for such stores that
-     * disconnected before this field existed.
-     */
-    @DynamoDBAttribute(attributeName = "disconnectedAt")
-    @DynamoDBTypeConverted(converter = DynamoDbLocalDateTimeConverter.class)
-    private LocalDateTime disconnectedAt;
 
     public boolean isEnabled() {
         return enabled;
@@ -57,13 +48,5 @@ public class ReceiptConfiguration {
 
     public void disable() {
         enabled = false;
-    }
-
-    public LocalDateTime getDisconnectedAt() {
-        return disconnectedAt;
-    }
-
-    public void setDisconnectedAt(LocalDateTime disconnectedAt) {
-        this.disconnectedAt = disconnectedAt;
     }
 }

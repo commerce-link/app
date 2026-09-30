@@ -293,8 +293,10 @@ public class ReceiptAttemptService {
      * newest attempt, when dead, has its alert raised again (it may have been resolved by a closing document that is
      * gone now). Earlier, superseded attempts are left resolved: only the newest one asks for anything. Called by
      * every write that can change the rule's inputs: an order saved through the lifecycle, a document unpinned, an
-     * invoice issued, the order cancelled, an attempt that died while the order changed under it. Never throws: the
-     * alerts must not break the order write.
+     * invoice issued, the order cancelled, an attempt that died while the order changed under it. Costs one strongly
+     * consistent query of the order's own key range ({@link ReceiptAttemptStore#findByOrder}), empty for an order that
+     * never had an attempt; writes to the bell only for an order with a dead attempt. Never throws: the alerts must
+     * not break the order write.
      */
     public void reconcileDeadAttemptAlerts(Order order) {
         try {

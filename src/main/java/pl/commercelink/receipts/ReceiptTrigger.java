@@ -5,8 +5,6 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderStatus;
-import pl.commercelink.stores.IntegrationType;
-import pl.commercelink.stores.ReceiptConfiguration;
 import pl.commercelink.stores.Store;
 
 /**
@@ -28,13 +26,12 @@ public class ReceiptTrigger {
     }
 
     /**
-     * store: the order's store as the lifecycle read it for this save (null when it could not be found), so a save
-     * of a store without e-receipts costs no attempts query.
+     * store: the order's store as the lifecycle read it for this save (null when it could not be found), so the
+     * trigger reads no store of its own. The alerts are reconciled for every saved order, whatever its store: one
+     * attempts query per save.
      */
     public void onOrderSaved(Order order, Store store) {
-        if (store == null || mayHaveAttempts(store)) {
-            reconcileDeadAttemptAlerts(order);
-        }
+        reconcileDeadAttemptAlerts(order);
         if (store == null || order.getStatus() != OrderStatus.Delivered) {
             return;
         }
@@ -46,21 +43,6 @@ public class ReceiptTrigger {
             log.error("Automatic receipt for order {} of store {} could not be started",
                     order.getOrderId(), order.getStoreId(), e);
         }
-    }
-
-    /**
-     * Whether the store's orders can have e-receipt attempts: every attempt is created with the store's receipt
-     * system, automatic ones only after automatic receipts were switched on. So a store may have attempts when it has a
-     * receipt system now, ever switched automatic receipts on ({@code enabledAt} is never cleared, not even by a
-     * disconnect), or disconnected a system it used only by hand ({@code disconnectedAt}; V019 marks the stores that
-     * did so before the field existed). A store with none of these never had attempts, and the order lifecycle (which
-     * the cron runs over every Shipping and Delivered order) skips the attempts query for it.
-     */
-    static boolean mayHaveAttempts(Store store) {
-        ReceiptConfiguration receipts = store.getReceiptConfiguration();
-        return store.getConfigurationValue(IntegrationType.RECEIPT_PROVIDER) != null
-                || receipts.getEnabledAt() != null
-                || receipts.getDisconnectedAt() != null;
     }
 
     /**
