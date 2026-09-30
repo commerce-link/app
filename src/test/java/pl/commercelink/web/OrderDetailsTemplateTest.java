@@ -2480,6 +2480,22 @@ class OrderDetailsTemplateTest {
     }
 
     @Test
+    void theEReceiptEmailStateStartsTheLineWithACapitalWhenThereIsNoDate() {
+        // given: closed by hand, its document not on the order yet, so the row has no date; the e-mail went out
+        Order order = order(OrderStatus.Delivered);
+        ReceiptOrderState receipts = new ReceiptOrderState(List.of(attempt(1, ReceiptAttemptState.CLOSED_MANUALLY)),
+                new ReceiptOrderView(List.of(receiptRow(1, ReceiptAttemptState.CLOSED_MANUALLY, "is-neutral", null,
+                        "PAR/1", null, false, false, false, null)), false), false, true);
+
+        // when
+        String html = renderWithReceipts(order, ADMIN, receipts);
+
+        // then
+        String row = html.substring(html.indexOf("id=\"e-paragon\""), html.indexOf("id=\"platnosci\""));
+        assertThat(row).contains("<span>E-mail wysłany</span>").doesNotContain("<span>e-mail wysłany</span>");
+    }
+
+    @Test
     void aFiscalisedEReceiptLinksItsNumberAndIsNeverUnpinned() {
         // given: its order document is on the order and is the row itself
         Order order = order(OrderStatus.Delivered);

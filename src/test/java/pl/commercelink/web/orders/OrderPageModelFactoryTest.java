@@ -1401,15 +1401,30 @@ class OrderPageModelFactoryTest {
 
     @Test
     void cancelReasonOfAnOpenOrderPointsToRemoval() {
+        // given: a new order without items can be deleted
+        Order fresh = order(OrderStatus.New);
+
         // when
+        OrderPageModel.Header header = factory.build(fresh, List.of(), ADMIN, PL).header();
+
+        // then: the reason names the menu entry that is actually offered, by its label
+        ResourceBundle bundle = ResourceBundle.getBundle("messages", PL);
+        assertThat(header.canDelete()).isTrue();
+        assertThat(header.cancelUnavailableKey()).isEqualTo("order.page.cancel.unavailable.delete");
+        assertThat(bundle.getString(header.cancelUnavailableKey())).contains("„" + bundle.getString("order.page.delete") + "”");
+    }
+
+    @Test
+    void cancelReasonOfAnOpenOrderThatCannotBeDeletedStaysNeutral() {
+        // when: an order in assembly has items, so "Usuń zamówienie" is greyed too
         OrderPageModel.Header header = factory.build(order(OrderStatus.Assembly), List.of(item(FulfilmentStatus.New)),
                 ADMIN, PL).header();
 
-        // then: before delivery the way out of an order is "Usuń", not cancelling
-        assertThat(header.canCancel()).isFalse();
+        // then: no advice to delete what cannot be deleted
+        assertThat(header.canDelete()).isFalse();
         assertThat(header.cancelUnavailableKey()).isEqualTo("order.page.cancel.unavailable.open");
         assertThat(ResourceBundle.getBundle("messages", PL).getString(header.cancelUnavailableKey()))
-                .isEqualTo("Otwarte zamówienie usuwasz („Usuń”); anulować można dostarczone, po zwrocie wszystkich produktów i wpłat.");
+                .isEqualTo("Anulować można dostarczone zamówienie, po zwrocie wszystkich produktów i wpłat.");
     }
 
     @Test

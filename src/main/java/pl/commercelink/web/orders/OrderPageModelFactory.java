@@ -162,6 +162,9 @@ public class OrderPageModelFactory {
         // the type only stands in for a missing name: "Allegro (Marketplace)" says nothing the name does not
         String sourceTypeKey = order.getSource() == null || sourceName != null ? null
                 : OrderLabels.sourceType(order.getSource().getType());
+        // as OrdersController#deleteOrder refuses: an order whose e-receipt is being issued stays
+        boolean canDelete = !viewer.superAdmin() && order.hasStatus(OrderStatus.New) && items.isEmpty()
+                && !order.isInvoiced() && !receiptLocked;
         return new OrderPageModel.Header(
                 OrderLabels.status(order.getStatus()), OrderLabels.tone(order.getStatus()), !readOnly,
                 order.hasStatus(OrderStatus.Completed),
@@ -184,34 +187,33 @@ public class OrderPageModelFactory {
                 !viewer.superAdmin() && order.canBeCancelled(items) && !receiptLocked,
                 !viewer.superAdmin() && order.canBeCancelled(items) && receiptLocked
                         ? receiptLock.key(CANCEL_LOCKED_RECEIPT) : null,
-                cancelUnavailableKey(order, items),
+                cancelUnavailableKey(order, items, canDelete),
                 cancelMessage(receipts.hasFiscalisedReceipt(order), messageSource, locale),
-                // as OrdersController#deleteOrder refuses: an order whose e-receipt is being issued stays
-                !viewer.superAdmin() && order.hasStatus(OrderStatus.New) && items.isEmpty() && !order.isInvoiced()
-                        && !receiptLocked,
+                canDelete,
                 deleteMessage(order, messageSource, locale));
     }
 
     private static final String CANCEL_LOCKED_RECEIPT = "order.page.cancel.locked.receipt";
 
     /**
-     * Why "Anuluj zamówienie" is greyed when Order#canBeCancelled says no (the rule stays as on main): an open order is
-     * removed rather than cancelled, so its reason points there; a delivered one names the condition it still misses
-     * (every product returned, the payments refunded to 0).
+     * Why "Anuluj zamówienie" is greyed when Order#canBeCancelled says no (the rule stays as on main), built from
+     * Order#cancelBlockers so the reason cannot drift from the rule. Before delivery the reason suggests "Usuń
+     * zamówienie" only when the menu offers it; otherwise, and after delivery, it names what is still missing.
      */
-    static String cancelUnavailableKey(Order order, List<OrderItem> items) {
-        if (!order.hasOneOfStatuses(OrderStatus.Delivered, OrderStatus.Completed)) {
-            return "order.page.cancel.unavailable.open";
+    static String cancelUnavailableKey(Order order, List<OrderItem> items, boolean canDelete) {
+        Set<Order.CancelBlocker> blockers = order.cancelBlockers(items);
+        if (blockers.contains(Order.CancelBlocker.NOT_DELIVERED)) {
+            return canDelete ? "order.page.cancel.unavailable.delete" : "order.page.cancel.unavailable.open";
         }
-        boolean itemsOut = !items.stream().filter(OrderItem::isProduct).allMatch(OrderItem::isReturned);
-        boolean paid = order.getPaidAmount() != 0;
-        if (itemsOut && paid) {
+        boolean products = blockers.contains(Order.CancelBlocker.PRODUCTS_NOT_RETURNED);
+        boolean payments = blockers.contains(Order.CancelBlocker.PAYMENTS_NOT_REFUNDED);
+        if (products && payments) {
             return "order.page.cancel.unavailable.itemsAndPayments";
         }
-        if (itemsOut) {
+        if (products) {
             return "order.page.cancel.unavailable.items";
         }
-        return paid ? "order.page.cancel.unavailable.payments" : "order.page.cancel.unavailable";
+        return payments ? "order.page.cancel.unavailable.payments" : null;
     }
 
     /**

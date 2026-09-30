@@ -106,7 +106,9 @@
         <p class="cl-list-desc" th:if="${r.date() != null or r.emailKey() != null}">
             <span th:if="${r.date() != null}" th:text="#{${r.dateKey()}(${r.date()})}"></span>
             <span th:if="${r.date() != null and r.emailKey() != null}" aria-hidden="true"> · </span>
-            <span th:if="${r.emailKey() != null}" th:text="#{${r.emailKey()}}"></span>
+            <!--/* the e-mail state opens the line when there is no date yet: then it takes the capital */-->
+            <span th:if="${r.emailKey() != null}" th:with="email=#{${r.emailKey()}}"
+                  th:text="${r.date() == null} ? ${#strings.capitalize(email)} : ${email}"></span>
         </p>
         <!--/* fiscalised, its document still on its way to the order (the locks of the page say the same) */-->
         <p class="cl-list-desc" th:if="${r.attachingKey() != null}" th:id="|e-paragon-attaching-${r.attemptNo()}|"

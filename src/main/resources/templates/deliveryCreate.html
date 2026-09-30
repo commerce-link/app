@@ -81,7 +81,7 @@
                                     th:if="${purchaseAvailable}"
                                     formnovalidate
                                     th:formaction="${isSuperAdmin} ? @{/dashboard/store/{storeId}/deliveries/create/{provider}/purchase(storeId=${form.storeId},provider=${form.provider})} : @{/dashboard/deliveries/create/{provider}/purchase(provider=${form.provider})}"
-                                    th:text="#{deliveries.purchase.button}">Order at supplier</button>
+                                    th:text="#{deliveries.purchase.button}">Order from supplier</button>
                         </div>
                     </div>
                 </div>

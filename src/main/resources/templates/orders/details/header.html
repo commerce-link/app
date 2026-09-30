@@ -89,7 +89,7 @@
                            th:text="#{order.page.cancel}"></a>
                         <button th:unless="${h.canCancel()}" type="button" class="cl-menu-item is-danger" aria-disabled="true">
                             <span th:text="#{order.page.cancel}"></span>
-                            <span class="cl-menu-reason" th:text="#{${h.cancelLockedKey() != null ? h.cancelLockedKey() : h.cancelUnavailableKey()}}"></span>
+                            <span class="cl-menu-reason" th:text="#{${h.cancelLockedKey() != null ? h.cancelLockedKey() : (h.cancelUnavailableKey() != null ? h.cancelUnavailableKey() : 'order.page.cancel.unavailable')}}"></span>
                         </button>
                     </li>
                     <li th:if="${h.canDelete() or !page.closed()}">

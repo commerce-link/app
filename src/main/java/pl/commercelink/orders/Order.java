@@ -344,17 +344,28 @@ public class Order {
         return hasOneOfStatuses(OrderStatus.Delivered, OrderStatus.Completed);
     }
 
+    /** What stands between the order and cancelling it; empty when it can be cancelled. */
+    public enum CancelBlocker { NOT_DELIVERED, PRODUCTS_NOT_RETURNED, PAYMENTS_NOT_REFUNDED }
+
     @DynamoDBIgnore
     public boolean canBeCancelled(List<OrderItem> orderItems) {
+        return cancelBlockers(orderItems).isEmpty();
+    }
+
+    /** The conditions of {@link #canBeCancelled} this order does not meet yet, so a reason can name exactly those. */
+    @DynamoDBIgnore
+    public Set<CancelBlocker> cancelBlockers(List<OrderItem> orderItems) {
+        Set<CancelBlocker> blockers = EnumSet.noneOf(CancelBlocker.class);
         if (!hasOneOfStatuses(OrderStatus.Delivered, OrderStatus.Completed)) {
-            return false;
+            blockers.add(CancelBlocker.NOT_DELIVERED);
         }
         if (getPaidAmount() != 0) {
-            return false;
+            blockers.add(CancelBlocker.PAYMENTS_NOT_REFUNDED);
         }
-        return orderItems.stream()
-                .filter(OrderItem::isProduct)
-                .allMatch(OrderItem::isReturned);
+        if (!orderItems.stream().filter(OrderItem::isProduct).allMatch(OrderItem::isReturned)) {
+            blockers.add(CancelBlocker.PRODUCTS_NOT_RETURNED);
+        }
+        return blockers;
     }
 
     @DynamoDBIgnore

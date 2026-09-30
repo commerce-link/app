@@ -70,6 +70,12 @@
                 && summaryOf(menu).getBoundingClientRect().top > box.height);
             if (!isNote(menu) && box.left < MARGIN) {
                 list.classList.add('is-start');
+                // opened from the toggle's left edge it may leave the window on the right instead (a toggle in the
+                // middle of a narrow screen): keep whichever placement shows more of the list
+                var overRight = list.getBoundingClientRect().right - (document.documentElement.clientWidth - MARGIN);
+                if (overRight > 0 && overRight > MARGIN - box.left) {
+                    list.classList.remove('is-start');
+                }
             }
             if (isNote(menu) && box.right > document.documentElement.clientWidth - MARGIN) {
                 list.classList.add('is-end');

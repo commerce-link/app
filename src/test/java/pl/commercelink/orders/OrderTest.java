@@ -492,4 +492,32 @@ class OrderTest {
         // then
         assertThat(nothingLeft).isTrue();
     }
+
+    @Test
+    void cancelBlockersNameExactlyWhatCanBeCancelledMisses() {
+        // given
+        OrderItem delivered = new OrderItem("o1", "CPU", "Ryzen", 1, 100, "SKU", false, 0);
+        delivered.setStatus(FulfilmentStatus.Delivered);
+        OrderItem returned = new OrderItem("o1", "CPU", "Ryzen", 1, 100, "SKU", false, 0);
+        returned.setStatus(FulfilmentStatus.Returned);
+        Order open = new Order("store-1");
+        open.setStatus(OrderStatus.Assembly);
+        Order paid = new Order("store-1");
+        paid.setStatus(OrderStatus.Delivered);
+        paid.addPayment(new Payment("REF", "Jan", PaymentSource.BankTransfer, 100, 0));
+        Order settled = new Order("store-1");
+        settled.setStatus(OrderStatus.Delivered);
+
+        // when / then: the reason on the page is built from these, canBeCancelled is "none of them"
+        assertThat(open.cancelBlockers(List.of(returned))).containsExactly(Order.CancelBlocker.NOT_DELIVERED);
+        assertThat(paid.cancelBlockers(List.of(delivered))).containsExactlyInAnyOrder(
+                Order.CancelBlocker.PRODUCTS_NOT_RETURNED, Order.CancelBlocker.PAYMENTS_NOT_REFUNDED);
+        assertThat(paid.cancelBlockers(List.of(returned))).containsExactly(Order.CancelBlocker.PAYMENTS_NOT_REFUNDED);
+        assertThat(settled.cancelBlockers(List.of(returned))).isEmpty();
+        for (Order order : List.of(open, paid, settled)) {
+            for (List<OrderItem> items : List.of(List.of(delivered), List.of(returned), List.<OrderItem>of())) {
+                assertThat(order.canBeCancelled(items)).isEqualTo(order.cancelBlockers(items).isEmpty());
+            }
+        }
+    }
 }
