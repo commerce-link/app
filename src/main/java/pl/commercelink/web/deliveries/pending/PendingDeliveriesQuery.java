@@ -1,0 +1,101 @@
+package pl.commercelink.web.deliveries.pending;
+
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.util.MultiValueMap;
+
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
+import java.util.*;
+
+/**
+ * The state of the pending deliveries page, read from and written back to the address (spec §4.1). A narrowing link
+ * (tile, supplier, search) drops the tab so the page lands on the tab that has results; a widening one keeps it.
+ */
+public record PendingDeliveriesQuery(Kind kind, Focus focus, List<String> providers, String q) {
+
+    public static final int MAX_Q = 100;
+
+    public PendingDeliveriesQuery {
+        providers = providers == null ? List.of()
+                : providers.stream().map(StringUtils::trimToNull).filter(Objects::nonNull).distinct().toList();
+        q = normalizeQ(q);
+    }
+
+    public enum Kind {
+        WAREHOUSE("warehouse"), DROPSHIP("dropship");
+        private final String param;
+        Kind(String param) { this.param = param; }
+        public String param() { return param; }
+        static Optional<Kind> parse(String v) { return Arrays.stream(values()).filter(k -> k.param.equalsIgnoreCase(trim(v))).findFirst(); }
+    }
+
+    public enum Focus {
+        OVERDUE("overdue"), TODAY("today");
+        private final String param;
+        Focus(String param) { this.param = param; }
+        public String param() { return param; }
+        static Optional<Focus> parse(String v) { return Arrays.stream(values()).filter(f -> f.param.equalsIgnoreCase(trim(v))).findFirst(); }
+
+        public boolean matches(LocalDate due, LocalDate today) {
+            if (due == null) return false;
+            return this == OVERDUE ? due.isBefore(today) : due.isEqual(today);
+        }
+    }
+
+    public static PendingDeliveriesQuery parse(MultiValueMap<String, String> params) {
+        List<String> providers = params.get("provider");
+        return new PendingDeliveriesQuery(
+                Kind.parse(params.getFirst("kind")).orElse(null),
+                Focus.parse(params.getFirst("focus")).orElse(null),
+                providers == null ? List.of() : providers.stream().filter(Objects::nonNull).toList(),
+                params.getFirst("q"));
+    }
+
+    public boolean isFiltered() { return focus != null || !providers.isEmpty() || q != null; }
+
+    public int activeFilterCount() { return (focus != null ? 1 : 0) + providers.size() + (q != null ? 1 : 0); }
+
+    public PendingDeliveriesQuery withKind(Kind k) { return new PendingDeliveriesQuery(k, focus, providers, q); }
+    public PendingDeliveriesQuery withFocus(Focus f) { return new PendingDeliveriesQuery(null, f, providers, q); }
+    public PendingDeliveriesQuery withoutFocus() { return new PendingDeliveriesQuery(kind, null, providers, q); }
+    public PendingDeliveriesQuery toggleProvider(String p) { return new PendingDeliveriesQuery(null, focus, toggled(providers, p), q); }
+    public PendingDeliveriesQuery withoutProvider(String p) { return new PendingDeliveriesQuery(kind, focus, without(providers, p), q); }
+    public PendingDeliveriesQuery withQ(String newQ) { return new PendingDeliveriesQuery(null, focus, providers, newQ); }
+    public PendingDeliveriesQuery withoutQ() { return new PendingDeliveriesQuery(kind, focus, providers, null); }
+    public PendingDeliveriesQuery cleared() { return new PendingDeliveriesQuery(kind, null, List.of(), null); }
+
+    public String href(String path) {
+        List<String> parts = new ArrayList<>();
+        if (kind != null) parts.add("kind=" + kind.param());
+        if (focus != null) parts.add("focus=" + focus.param());
+        providers.forEach(p -> parts.add("provider=" + encode(p)));
+        if (q != null) parts.add("q=" + encode(q));
+        return parts.isEmpty() ? path : path + "?" + String.join("&", parts);
+    }
+
+    private static List<String> toggled(List<String> list, String value) {
+        List<String> next = new ArrayList<>(list);
+        if (!next.remove(value)) next.add(value);
+        return next;
+    }
+
+    private static List<String> without(List<String> list, String value) {
+        List<String> next = new ArrayList<>(list);
+        next.remove(value);
+        return next;
+    }
+
+    private static String normalizeQ(String value) {
+        String trimmed = StringUtils.trimToNull(value);
+        return trimmed == null ? null : StringUtils.left(trimmed, MAX_Q);
+    }
+
+    private static String trim(String value) {
+        return value == null ? "" : value.trim();
+    }
+
+    private static String encode(String value) {
+        return URLEncoder.encode(value, StandardCharsets.UTF_8);
+    }
+}
