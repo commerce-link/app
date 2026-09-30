@@ -7271,6 +7271,27 @@ a.cl-link-button:hover {
     }
 }
 
+/* The key column of such a table keeps 40 % of it, and .cl-col-num columns share the rest equally: a narrow card (the
+   dropship confirmation beside the consignee card) still leaves the product name room to wrap between words. Their
+   column names may take two lines, and a figure with its pill ("1 Brakuje: 1") wraps between the two. */
+.cl-page .cl-table col.cl-col-key { width: 40%; }
+
+.cl-page .cl-table.is-key-wrap thead th {
+    white-space: normal;
+    vertical-align: bottom;
+}
+
+@media screen and (min-width: 720px) {
+    .cl-page .cl-table.is-key-wrap td.is-numeric:has(.cl-status) {
+        white-space: normal;
+    }
+}
+
+/* A code copied by hand (EAN, manufacturer code) inside running text: never broken inside itself. */
+.cl-page .cl-code-nowrap {
+    white-space: nowrap;
+}
+
 /* A list summary with a form option on its left (dropship: "Usuń odznaczone" beside the net value). */
 .cl-page .cl-list-summary:has(> .cl-check) {
     align-items: center;

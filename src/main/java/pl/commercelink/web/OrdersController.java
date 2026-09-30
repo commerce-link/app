@@ -820,7 +820,7 @@ public class OrdersController extends BaseController {
 
         // the place is fixed text since the page was introduced; the store address is not used for it
         model.addAttribute("print", OrderPrintView.collection(order, orderItems, store, LocalDate.now(), "Kraków, PL",
-                OrderLinks.of(order, superAdmin), supplierLabels.forStore(store)));
+                OrderLinks.of(order, superAdmin), supplierLabels.forStore(store).withWarehouse(warehouseLabel())));
         return "orders/collection";
     }
 
@@ -836,10 +836,15 @@ public class OrdersController extends BaseController {
         return renderOrderCard(requireOrder(ordersRepository, storeId, orderId), true, model);
     }
 
+    /** The store's own warehouse as the printouts name an item's supplier, in the request's language. */
+    private String warehouseLabel() {
+        return OrderPageModelFactory.warehouseLabel(messageSource, LocaleContextHolder.getLocale());
+    }
+
     private String renderOrderCard(Order order, boolean superAdmin, Model model) {
         List<OrderItem> orderItems = orderItemsRepository.findByOrderId(order.getOrderId());
         model.addAttribute("print", OrderPrintView.card(order, orderItems, OrderLinks.of(order, superAdmin),
-                supplierLabels.forStoreId(order.getStoreId())));
+                supplierLabels.forStoreId(order.getStoreId()).withWarehouse(warehouseLabel())));
         return "orders/card";
     }
 
@@ -1238,7 +1243,8 @@ public class OrdersController extends BaseController {
         // The header shows the item's delivery as its row in the items table does (supplier label, or the short id of
         // a supplier delivery with its link).
         OrderItemRow.Delivery delivery = pageModelFactory.delivery(order, orderItem,
-                orderItemsRepository.findByOrderId(order.getOrderId()), new OrderPageModelFactory.Viewer(false, isAdmin(), null));
+                orderItemsRepository.findByOrderId(order.getOrderId()), new OrderPageModelFactory.Viewer(false, isAdmin(), null),
+                LocaleContextHolder.getLocale());
         boolean deliveryHeld = holdsDelivery(order, orderItem);
         model.addAttribute("delivery", delivery);
         model.addAttribute("deliveryHeld", deliveryHeld);

@@ -136,38 +136,40 @@
                         </div>
                     </div>
                     <table class="cl-table is-key-wrap">
+                        <!--/* beside the consignee card the table is ~680 px wide: the product keeps 40 % and the five figures
+                               share the rest, so the name wraps between words instead of every few letters */-->
                         <colgroup>
-                            <col>
-                            <col class="cl-col-qty">
-                            <col class="cl-col-qty">
-                            <col class="cl-col-price">
-                            <col class="cl-col-price">
-                            <col class="cl-col-price">
+                            <col class="cl-col-key">
+                            <col class="cl-col-num">
+                            <col class="cl-col-num">
+                            <col class="cl-col-num">
+                            <col class="cl-col-num">
+                            <col class="cl-col-num">
                         </colgroup>
                         <thead>
                         <tr>
                             <th scope="col" th:text="#{general.product}"></th>
                             <th scope="col" class="is-numeric" th:text="#{deliveries.purchase.confirm.requested}"></th>
-                            <th scope="col" class="is-numeric" th:text="#{deliveries.purchase.confirm.available}"></th>
-                            <th scope="col" class="is-numeric" th:text="#{deliveries.purchase.confirm.feedPrice}"></th>
-                            <th scope="col" class="is-numeric" th:text="#{deliveries.purchase.confirm.livePrice}"></th>
-                            <th scope="col" class="is-numeric"><abbr th:title="#{orders.dropship.page.priceDelta}">&Delta;</abbr></th>
+                            <th scope="col" class="is-numeric" th:text="#{orders.dropship.page.available}"></th>
+                            <th scope="col" class="is-numeric" th:text="#{orders.dropship.page.feedPrice}"></th>
+                            <th scope="col" class="is-numeric" th:text="#{orders.dropship.page.livePrice}"></th>
+                            <th scope="col" class="is-numeric" th:text="#{orders.dropship.page.priceDelta}"></th>
                         </tr>
                         </thead>
                         <tbody>
                         <tr th:each="line : ${validation.lines()}">
                             <th scope="row" class="cl-table-key" th:attr="data-label=#{general.product}">
                                 <span th:text="${line.name}"></span>
-                                <span class="cl-table-sub" th:text="#{orders.dropship.page.line.ean(${line.ean})}"></span>
+                                <span class="cl-table-sub"><span th:text="#{general.ean} + ':'"></span> <span class="cl-code-nowrap" th:text="${line.ean}"></span></span>
                             </th>
                             <td class="is-numeric" th:attr="data-label=#{deliveries.purchase.confirm.requested}"><span th:text="${line.requestedQty}"></span></td>
-                            <td class="is-numeric" th:attr="data-label=#{deliveries.purchase.confirm.available}">
+                            <td class="is-numeric" th:attr="data-label=#{orders.dropship.page.available}">
                                 <span><span th:text="${line.availableQty}"></span>
                                     <span class="cl-status is-bad" th:if="${!line.isAvailable()}"
                                           th:text="#{deliveries.purchase.confirm.missing} + ' ' + ${line.missingQty}"></span></span>
                             </td>
-                            <td class="is-numeric" th:attr="data-label=#{deliveries.purchase.confirm.feedPrice}"><span th:text="${#numbers.formatDecimal(line.feedUnitCost, 1, 'WHITESPACE', 2, 'COMMA')}"></span></td>
-                            <td class="is-numeric" th:attr="data-label=#{deliveries.purchase.confirm.livePrice}"><span th:text="${#numbers.formatDecimal(line.liveUnitCost, 1, 'WHITESPACE', 2, 'COMMA')}"></span></td>
+                            <td class="is-numeric" th:attr="data-label=#{orders.dropship.page.feedPrice}"><span th:text="${#numbers.formatDecimal(line.feedUnitCost, 1, 'WHITESPACE', 2, 'COMMA')}"></span></td>
+                            <td class="is-numeric" th:attr="data-label=#{orders.dropship.page.livePrice}"><span th:text="${#numbers.formatDecimal(line.liveUnitCost, 1, 'WHITESPACE', 2, 'COMMA')}"></span></td>
                             <td class="is-numeric" th:attr="data-label=#{orders.dropship.page.priceDelta}"><span th:text="${#numbers.formatDecimal(line.priceDelta, 1, 'WHITESPACE', 2, 'COMMA')}"></span></td>
                         </tr>
                         </tbody>

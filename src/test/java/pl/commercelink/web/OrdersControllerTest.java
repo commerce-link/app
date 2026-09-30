@@ -2270,7 +2270,7 @@ class OrdersControllerTest {
         when(orderItemsRepository.findById(ORDER_ID, item.getItemId())).thenReturn(item);
         pl.commercelink.web.orders.OrderItemRow.Delivery cell = new pl.commercelink.web.orders.OrderItemRow.Delivery(
                 "b58e2f14", "/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID, true);
-        when(pageModelFactory.delivery(any(), eq(item), any(), any())).thenReturn(cell);
+        when(pageModelFactory.delivery(any(), eq(item), any(), any(), any())).thenReturn(cell);
         ExtendedModelMap model = new ExtendedModelMap();
 
         // when

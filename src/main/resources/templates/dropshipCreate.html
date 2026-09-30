@@ -43,11 +43,13 @@
                             </div>
                             <div class="cl-span-2 cl-field">
                                 <label class="cl-label" for="shippingCost" th:text="#{deliveries.shippingCost}"></label>
-                                <input class="cl-input" type="number" inputmode="decimal" th:field="*{shippingCost}" step="0.01" required/>
+                                <input class="cl-input" type="number" inputmode="decimal" id="shippingCost" name="shippingCost" step="0.01" required
+                                       th:value="${T(pl.commercelink.web.orders.Money).input(form.shippingCost)}"/>
                             </div>
                             <div class="cl-span-2 cl-field">
                                 <label class="cl-label" for="paymentCost" th:text="#{deliveries.paymentCost}"></label>
-                                <input class="cl-input" type="number" inputmode="decimal" th:field="*{paymentCost}" step="0.01" required/>
+                                <input class="cl-input" type="number" inputmode="decimal" id="paymentCost" name="paymentCost" step="0.01" required
+                                       th:value="${T(pl.commercelink.web.orders.Money).input(form.paymentCost)}"/>
                             </div>
                             <div class="cl-span-2 cl-field">
                                 <label class="cl-label" for="sourceCurrency" th:text="#{general.currency}"></label>
@@ -58,7 +60,7 @@
                                 </select>
                             </div>
                             <div class="cl-span-3 cl-field">
-                                <label class="cl-label" for="tax" th:text="#{deliveries.tax}"></label>
+                                <label class="cl-label" for="tax" th:text="#{orders.dropship.page.tax}"></label>
                                 <input class="cl-input" type="number" inputmode="decimal" th:field="*{tax}" step="0.01" min="1.0"
                                        required aria-describedby="tax-help"/>
                                 <p class="cl-help" id="tax-help" th:text="#{orders.dropship.page.tax.help}"></p>
@@ -90,14 +92,16 @@
                                     <th scope="col" th:text="#{general.product}"></th>
                                     <th scope="col" th:text="#{deliveries.create.include}"></th>
                                     <th scope="col" class="is-numeric" th:text="#{deliveries.requestedQty}"></th>
-                                    <th scope="col" th:text="#{general.net.cost}"></th>
+                                    <th scope="col" th:text="#{orders.dropship.page.unitCost}"></th>
                                 </tr>
                                 </thead>
                                 <tbody>
                                 <tr th:each="item, itemStat : *{items}" data-cl-dropship-item>
                                     <th scope="row" class="cl-table-key" th:attr="data-label=#{general.product}">
                                         <span th:text="${item.name}"></span>
-                                        <span class="cl-table-sub" th:text="#{orders.dropship.page.item.codes(${item.ean}, ${item.mfn})}"></span>
+                                        <!--/* codes are copied by hand, so neither breaks inside itself (the line wraps only between them) */-->
+                                        <span class="cl-table-sub"><span th:text="#{general.ean} + ':'"></span> <span class="cl-code-nowrap" th:text="${item.ean}"></span>
+                                            · <span th:text="#{general.manufacturer.code} + ':'"></span> <span class="cl-code-nowrap" th:text="${item.mfn}"></span></span>
                                         <input type="hidden" th:field="*{items[__${itemStat.index}__].name}"/>
                                         <input type="hidden" th:field="*{items[__${itemStat.index}__].ean}"/>
                                         <input type="hidden" th:field="*{items[__${itemStat.index}__].mfn}"/>
@@ -129,9 +133,10 @@
                                     <td class="is-numeric" th:attr="data-label=#{deliveries.requestedQty}">
                                         <span data-cl-requested-qty-label th:text="${item.requestedQty}"></span>
                                     </td>
-                                    <td th:attr="data-label=#{general.net.cost}">
+                                    <td th:attr="data-label=#{orders.dropship.page.unitCost}">
                                         <input class="cl-input is-price" type="number" inputmode="decimal" step="0.01" min="0"
-                                               th:field="*{items[__${itemStat.index}__].unitCost}"
+                                               th:id="${'items' + itemStat.index + '.unitCost'}" th:name="${'items[' + itemStat.index + '].unitCost'}"
+                                               th:value="${T(pl.commercelink.web.orders.Money).input(item.unitCost)}"
                                                th:attr="aria-label=#{orders.dropship.page.unitCost.label(${item.name})}"/>
                                     </td>
                                 </tr>

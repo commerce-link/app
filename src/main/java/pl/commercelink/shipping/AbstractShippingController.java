@@ -32,7 +32,7 @@ public abstract class AbstractShippingController {
     private StoresRepository storesRepository;
 
     @Autowired
-    private ShippingService shippingService;
+    protected ShippingService shippingService;
 
     @Autowired
     private RMACentersRepository rmaCentersRepository;
@@ -66,7 +66,7 @@ public abstract class AbstractShippingController {
     }
 
     @PostMapping("/estimate")
-    public String estimateShipping(@ModelAttribute ShippingForm form, Model model) {
+    public String estimateShipping(@ModelAttribute ShippingForm form, Model model, Locale locale) {
         Store store = getStore();
 
         try {
@@ -75,6 +75,10 @@ public abstract class AbstractShippingController {
             model.addAttribute("servicePrices", estimates);
         } catch (HttpClientException ex) {
             return handleHttpClientException(ex, store, form, model);
+        } catch (ShippingUnavailableException ex) {
+            // a store without a courier account (RMA and warehouse reach this page without the order's check): the
+            // reason as the page's own alert, the form as it was
+            model.addAttribute("shippingUnavailable", messageSource.getMessage(noProviderKey(), null, locale));
         }
 
         return renderShippingForm(store, form, retrieveShippingDetailsList(form), model);
@@ -82,8 +86,20 @@ public abstract class AbstractShippingController {
 
     @PostMapping("/create")
     public String createShipping(@ModelAttribute ShippingForm form, RedirectAttributes redirectAttributes, Locale locale) {
+        // a double click or a tab left open must not book (and pay for) a second label
+        String refusal = refuseBooking(form);
+        if (refusal != null) {
+            redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage(refusal, null, locale));
+            return "redirect:" + getEntityUrl(form);
+        }
         Store store = getStore();
-        OperationResult<List<Shipment>> result = shippingService.createShipping(form, store, resolveDeliveryTarget(form));
+        OperationResult<List<Shipment>> result;
+        try {
+            result = shippingService.createShipping(form, store, resolveDeliveryTarget(form));
+        } catch (ShippingUnavailableException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage(noProviderKey(), null, locale));
+            return "redirect:" + getEntityUrl(form);
+        }
         if (!result.isSuccess()) {
             redirectAttributes.addFlashAttribute("errorMessage", result.getMessage());
             return "redirect:" + form.getShippingAction();
@@ -147,6 +163,19 @@ public abstract class AbstractShippingController {
 
     protected String getStoreId() {
         return CustomSecurityContext.getStoreId();
+    }
+
+    /** Message key of the reason shown when the store has no courier account to price or book with. */
+    protected String noProviderKey() {
+        return "shipping.error.no.provider";
+    }
+
+    /**
+     * Message key of the reason this booking must not be placed any more, or null. Checked again right before the
+     * courier is booked, since the page may be older than the record.
+     */
+    protected String refuseBooking(ShippingForm form) {
+        return null;
     }
 
     protected abstract double calculateShippingInsurance(ShippingForm form);

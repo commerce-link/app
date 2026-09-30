@@ -45,9 +45,11 @@ public class OrdersShippingController extends AbstractShippingController {
     public String initiate(@PathVariable("orderId") String orderId, Model model,
                            RedirectAttributes redirectAttributes, Locale locale) {
         Order order = requireOrder(orderId);
-        if (!order.hasShipmentWithoutShippingData()) {
-            redirectAttributes.addFlashAttribute("errorMessage",
-                    messageSource.getMessage("shipping.error.all.defined", null, locale));
+        // the order page offers no "Zamów kuriera" in either case (OrderPageModelFactory#header); an address typed in
+        // or an old bookmark gets the reason instead of a page that would fail at "Wyceń przesyłkę"
+        String refusal = !shippingService.isAvailable(getStore()) ? noProviderKey() : refuseBooking(order);
+        if (refusal != null) {
+            redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage(refusal, null, locale));
             return "redirect:/dashboard/orders/" + orderId;
         }
         ShippingForm form = new ShippingForm(orderId, "orders");
@@ -61,6 +63,21 @@ public class OrdersShippingController extends AbstractShippingController {
             model.addAttribute("preferredShippingWarning", order.getPreferredShippingAt());
         }
         return super.renderShippingForm(store, form, shippingDetailsList, model);
+    }
+
+    @Override
+    protected String noProviderKey() {
+        return "shipping.error.no.provider.order";
+    }
+
+    @Override
+    protected String refuseBooking(ShippingForm form) {
+        return refuseBooking(requireOrder(form.getShippingEntityId()));
+    }
+
+    /** Every shipment already has its shipping data (a courier booked in another tab): nothing is left to book. */
+    private static String refuseBooking(Order order) {
+        return order.hasShipmentWithoutShippingData() ? null : "shipping.error.all.defined";
     }
 
     @Override

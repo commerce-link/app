@@ -41,6 +41,8 @@ class OrdersControllerPrintTest {
     private StoresRepository storesRepository;
     @Mock
     private SupplierLabels supplierLabels;
+    @Mock
+    private org.springframework.context.MessageSource messageSource;
 
     @InjectMocks
     private OrdersController ordersController;

@@ -42,6 +42,7 @@ import pl.commercelink.receipts.ReceiptOrderView;
 import pl.commercelink.receipts.ReceiptAttemptService;
 import pl.commercelink.receipts.ReceiptOrderState;
 import pl.commercelink.receipts.ReceiptPageProblem;
+import pl.commercelink.shipping.ShippingService;
 import pl.commercelink.stores.FulfilmentConfiguration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
@@ -73,6 +74,7 @@ class OrderPageModelFactoryTest {
     @Mock private TaxonomyCache taxonomyCache;
     @Mock private ReceiptAttemptService receiptAttemptService;
     @Mock private ReceiptAlerts receiptAlerts;
+    @Mock private ShippingService shippingService;
     private final DeliveryRedirectResolver deliveryRedirectResolver = new DeliveryRedirectResolver();
     private final DropshipEligibility dropshipEligibility = DropshipEligibilityStubs.acceptingEverySupplier();
     private final MessageSource messageSource = messages();
@@ -92,7 +94,7 @@ class OrderPageModelFactoryTest {
     void setUp() {
         factory = new OrderPageModelFactory(storesRepository, orderEventsRepository, dropshipItemLookup,
                 deliveryRedirectResolver, dropshipEligibility, supplierLabels, shipmentCarrierOptions, productCatalogRepository, taxonomyCache,
-                messageSource, receiptAttemptService, receiptAlerts);
+                messageSource, receiptAttemptService, receiptAlerts, shippingService);
         ReflectionTestUtils.setField(factory, "appDomain", "https://app.example");
         Store store = new Store();
         store.setStoreId("store-1");
@@ -101,6 +103,7 @@ class OrderPageModelFactoryTest {
         when(dropshipItemLookup.itemIdsInDropshipDeliveries(anyString(), any())).thenReturn(Set.of());
         when(orderEventsRepository.findByOrderId(anyString())).thenReturn(List.of());
         when(receiptAttemptService.orderState(any(), any(), any(), any())).thenReturn(ReceiptOrderState.NONE);
+        when(shippingService.isAvailable(any())).thenReturn(true);
     }
 
     private static Order order(OrderStatus status) {
@@ -621,6 +624,49 @@ class OrderPageModelFactoryTest {
         order.getShipments().get(0).setExternalId("ext");
         order.getShipments().get(0).setTrackingNo("T");
         assertThat(factory.build(order, List.of(), viewer(), PL).header().primaryAction()).isNull();
+    }
+
+    @Test
+    void noCourierActionWithoutAShippingProvider() {
+        // given: a store that types its shipping data in by hand (no courier account connected)
+        Order order = assembledOrderWithOneEmptyShipment();
+        when(shippingService.isAvailable(any())).thenReturn(false);
+
+        // when
+        OrderPageModel page = factory.build(order, List.of(), viewer(), PL);
+
+        // then: the courier page would only refuse, so the header does not lead there
+        assertThat(page.header().primaryAction()).isNull();
+    }
+
+    @Test
+    void courierActionWithAShippingProvider() {
+        // given
+        Order order = assembledOrderWithOneEmptyShipment();
+        when(shippingService.isAvailable(any())).thenReturn(true);
+
+        // when
+        OrderPageModel page = factory.build(order, List.of(), viewer(), PL);
+
+        // then
+        assertThat(page.header().primaryAction().labelKey()).isEqualTo("order.page.action.courier");
+        assertThat(page.header().primaryAction().href()).endsWith("/shipping");
+    }
+
+    @Test
+    void warehouseItemsReadAsTheStoresWarehouse() {
+        // given
+        Order order = order(OrderStatus.Realization);
+        OrderItem item = item(FulfilmentStatus.Delivered);
+        item.setDeliveryId(OrderItem.GENERIC_WAREHOUSE_ORDER_NO);
+
+        // when
+        OrderPageModel page = factory.build(order, List.of(item), viewer(), PL);
+        OrderItemRow.Delivery delivery = factory.delivery(order, item, List.of(item), viewer(), PL);
+
+        // then: the technical id "Warehouse" never reaches the items table or the item page
+        assertThat(page.items().products().get(0).deliveryLabel()).isEqualTo("Magazyn sklepu");
+        assertThat(delivery.label()).isEqualTo("Magazyn sklepu");
     }
 
     @Test

@@ -43,6 +43,20 @@ public final class SupplierLabelMap {
         return identity != null && byKey.containsKey(key(defaultStoreId, identity));
     }
 
+    /**
+     * The same map where the store's own warehouse ({@link SupplierRegistry#WAREHOUSE}, a technical identity in English)
+     * reads as the given text, e.g. "Magazyn sklepu" on the order screens and printouts. The select options stay as
+     * they are: the warehouse is not a connection to choose.
+     */
+    public SupplierLabelMap withWarehouse(String label) {
+        if (label == null) {
+            return this;
+        }
+        Map<String, String> copy = new java.util.LinkedHashMap<>(byKey);
+        copy.put(key(defaultStoreId, SupplierRegistry.WAREHOUSE), label);
+        return new SupplierLabelMap(defaultStoreId, copy, options);
+    }
+
     /** Enabled connections of the default store, for select inputs. */
     public List<Option> options() {
         return options;

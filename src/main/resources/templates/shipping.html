@@ -16,6 +16,11 @@
                      #{${view.leadKey()}(${view.leadArgument()})}, null)}"></div>
 
             <div class="cl-stack is-wide">
+                <!--/* the store has no courier account to price or book with (ShippingUnavailableException) */-->
+                <div th:if="${shippingUnavailable != null}" class="cl-alert is-warn" id="shipping-unavailable" role="alert">
+                    <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+                    <p class="cl-alert-text" th:text="${shippingUnavailable}"></p>
+                </div>
                 <div th:if="${preferredShippingWarning != null}" class="cl-alert is-warn">
                     <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
                     <p class="cl-alert-text" th:text="#{shipping.preferred.shipping.warning(${preferredShippingWarning})}"></p>
@@ -195,7 +200,8 @@
                             </fieldset>
                         </fieldset>
                         <div th:if="${priced and !servicePrices.isEmpty()}" class="cl-card-footer">
-                            <button type="submit" class="cl-button is-primary" th:text="#{shipping.order.courier}"></button>
+                            <!--/* no name, so disabling it on submit (shipping-booking.js) drops nothing from the post */-->
+                            <button type="submit" id="shipping-create-submit" class="cl-button is-primary" th:text="#{shipping.order.courier}"></button>
                         </div>
                     </div>
                 </form>

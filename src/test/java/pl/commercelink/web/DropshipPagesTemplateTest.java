@@ -146,10 +146,10 @@ class DropshipPagesTemplateTest {
         // then
         assertThat(occurrences(html, "<h1")).isEqualTo(1);
         assertThat(html).contains("href=\"/dashboard/orders/" + ORDER_ID + "\"").contains("Zamówienie e2ed0004")
-                .contains("Utwórz dostawę — Acme").contains("cl-status is-info is-leading").contains("Dropshipping")
+                .contains("Zamów u Acme").contains("cl-status is-info is-leading").contains("Dropshipping")
                 .contains("action=\"/dashboard/orders/" + ORDER_ID + "/dropship/create\"")
                 .contains("formaction=\"/dashboard/orders/" + ORDER_ID + "/dropship/purchase\"")
-                .contains("AMD Ryzen 7 9800X3D").contains("EAN: 5901234123457 · Kod producenta: 100-100001084WOF")
+                .contains("AMD Ryzen 7 9800X3D").contains("<span class=\"cl-code-nowrap\">5901234123457</span>").contains("<span class=\"cl-code-nowrap\">100-100001084WOF</span>")
                 .contains("jan.kowalski · 2 szt.").contains("Dane adresowe klienta").contains("ul. Polna 1")
                 .contains("href=\"tel:+48601234567\"").contains("1 159,00")
                 .doesNotContain("??");
@@ -176,7 +176,7 @@ class DropshipPagesTemplateTest {
                 "paymentCost", "tax", "paymentTerms")) {
             assertThat(html).as(id).contains("for=\"" + id + "\"").contains("id=\"" + id + "\"");
         }
-        assertThat(html).contains("aria-label=\"Koszt netto (szt): AMD Ryzen 7 9800X3D\"")
+        assertThat(html).contains("aria-label=\"Koszt netto / szt.: AMD Ryzen 7 9800X3D\"")
                 .contains("data-cl-allocation-qty=\"2\"").contains("checked=\"checked\"")
                 .contains("<script src=\"/js/dropship-create.js\" defer");
     }
@@ -243,13 +243,13 @@ class DropshipPagesTemplateTest {
 
         // then
         assertThat(occurrences(html, "<h1")).isEqualTo(1);
-        assertThat(html).contains("Potwierdzenie zamówienia dropshipping").contains("Dostępność u dostawcy")
+        assertThat(html).contains("Potwierdź zamówienie u dostawcy").contains("Dostępność u dostawcy")
                 .contains("id=\"validation-area\"").contains("aria-live=\"polite\"").contains("cl-spinner")
-                .contains("Sprawdzanie dostępności u dostawcy...")
+                .contains("Sprawdzanie dostępności u dostawcy…")
                 .contains("<legend class=\"cl-fieldset-title\">Warunki u dostawcy</legend>")
                 .contains("for=\"order-option-0\"").contains("name=\"supplierOrderChoices[lane]\"")
                 .contains("data-required=\"true\"").contains("name=\"purchaseRef\" value=\"ref-1\"")
-                .contains("name=\"items[0].allocations[0].selected\"").contains("Wyślij od dostawcy").contains("Cofnij")
+                .contains("name=\"items[0].allocations[0].selected\"").contains(">Zamów u dostawcy</button>").contains("Cofnij")
                 .contains("<script src=\"/js/dropship-confirmation.js\" defer")
                 .doesNotContain("estimatedDeliveryAt").doesNotContain("data-fully-available").doesNotContain("??");
         int submit = html.indexOf("id=\"purchase-confirm-submit\"");
@@ -283,7 +283,7 @@ class DropshipPagesTemplateTest {
 
         // then
         assertThat(html).contains("data-fully-available=\"false\"").contains("cl-alert is-warn")
-                .contains("cl-table is-key-wrap").contains("data-label=\"Dostępne u dostawcy\"")
+                .contains("cl-table is-key-wrap").contains("data-label=\"Dostępne\"")
                 .contains("cl-status is-bad").contains("Brakuje: 1").contains("579,50").contains("589,50")
                 .contains("10,00").contains("1 159,00 PLN").doesNotContain("onclick").doesNotContain("??");
     }
@@ -336,10 +336,72 @@ class DropshipPagesTemplateTest {
         for (String key : List.of("orders.dropship.page.create.title", "orders.dropship.page.card.delivery",
                 "orders.dropship.page.card.items", "orders.dropship.page.card.availability",
                 "orders.dropship.page.paymentTerms.help", "orders.dropship.page.tax.help",
-                "orders.dropship.page.item.codes", "orders.dropship.page.allocation", "orders.dropship.page.unitCost.label",
-                "orders.dropship.page.line.ean", "orders.dropship.page.priceDelta")) {
+                "orders.dropship.page.available", "orders.dropship.page.feedPrice", "orders.dropship.page.livePrice", "orders.dropship.page.tax", "orders.dropship.page.unitCost", "orders.dropship.page.allocation", "orders.dropship.page.unitCost.label",
+                "orders.dropship.page.priceDelta")) {
             assertThat(pl.getProperty(key)).as(key + " pl").isNotBlank();
             assertThat(en.getProperty(key)).as(key + " en").isNotBlank();
         }
+    }
+
+    @Test
+    void confirmationGivesTheProductColumnAMinimumWidth() throws Exception {
+        // given
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("validation", new PurchaseValidation("Acme", "ref-1", "PLN", 1159.0, true, List.of(
+                new PurchaseValidation.Line("AMD Ryzen 7 9800X3D", "sku", "5901234123457", "100-100001084WOF", 2, 2,
+                        579.5, 579.5))));
+        String css = Files.readString(Path.of("src/main/resources/static/css/commercelink.css"), StandardCharsets.UTF_8);
+
+        // when
+        String html = fragment(variables);
+
+        // then: the product keeps 40 % of the table beside the consignee card; the figures share the rest
+        assertThat(html).contains("<col class=\"cl-col-key\">").doesNotContain("cl-col-price").doesNotContain("cl-col-qty");
+        assertThat(occurrences(html, "<col class=\"cl-col-num\">")).isEqualTo(5);
+        assertThat(css).contains(".cl-page .cl-table col.cl-col-key { width: 40%; }");
+        // and the column names read without a hover: no "Δ" abbreviation, no feed jargon
+        assertThat(html).contains(">Dostępne</th>").contains(">Cena z cennika</th>").contains(">Cena teraz</th>")
+                .contains(">Różnica</th>").doesNotContain("<abbr").doesNotContain("feed");
+    }
+
+    @Test
+    void producerCodesDoNotBreak() throws Exception {
+        // given
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("validation", new PurchaseValidation("Acme", "ref-1", "PLN", 1159.0, true, List.of(
+                new PurchaseValidation.Line("AMD Ryzen 7 9800X3D", "sku", "5901234123457", "100-100001084WOF", 2, 2,
+                        579.5, 579.5))));
+        String css = Files.readString(Path.of("src/main/resources/static/css/commercelink.css"), StandardCharsets.UTF_8);
+
+        // when
+        String create = render("dropshipCreate", model(order(false), false, null));
+        String confirmation = fragment(variables);
+
+        // then
+        assertThat(create).contains("Kod producenta:</span> <span class=\"cl-code-nowrap\">100-100001084WOF</span>")
+                .contains("EAN:</span> <span class=\"cl-code-nowrap\">5901234123457</span>");
+        assertThat(confirmation).contains("EAN:</span> <span class=\"cl-code-nowrap\">5901234123457</span>");
+        assertThat(css).containsPattern("\\.cl-page \\.cl-code-nowrap \\{\\s*white-space: nowrap;");
+    }
+
+    @Test
+    void theDropshipStepsShareOneNameAndTheCreatePageShowsAmountsWithTwoDecimals() {
+        // given
+        Map<String, Object> variables = model(order(false), false, null);
+        DeliveryCreationForm form = (DeliveryCreationForm) variables.get("form");
+        form.setShippingCost(15);
+
+        // when
+        String create = render("dropshipCreate", variables);
+        String confirmation = render("dropshipConfirmation", model(order(false), false, null));
+
+        // then: "Zamów u Acme" -> "Potwierdź zamówienie u dostawcy" -> "Zamów u dostawcy"
+        assertThat(create).contains("<h1 class=\"cl-page-title\">Zamów u Acme</h1>")
+                .contains(">Mnożnik VAT</label>").contains(">Koszt netto / szt.</th>")
+                .containsPattern("id=\"shippingCost\" name=\"shippingCost\"[^>]*value=\"15.00\"")
+                .containsPattern("id=\"paymentCost\" name=\"paymentCost\"[^>]*value=\"0.00\"")
+                .containsPattern("name=\"items\\[0]\\.unitCost\"\\s+value=\"579.50\"");
+        assertThat(confirmation).contains("<h1 class=\"cl-page-title\">Potwierdź zamówienie u dostawcy</h1>")
+                .contains(">Zamów u dostawcy</button>");
     }
 }

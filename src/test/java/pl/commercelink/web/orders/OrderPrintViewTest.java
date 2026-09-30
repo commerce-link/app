@@ -147,4 +147,31 @@ class OrderPrintViewTest {
         assertThat(collection.location()).isEqualTo("Kraków, PL");
         assertThat(collection.detailsHref()).isEqualTo("/dashboard/orders/" + ORDER_ID);
     }
+
+    @Test
+    void warehouseDeliveryReadsAsTheStoresWarehouse() {
+        // given: the labels as OrdersController hands them to both printouts
+        org.springframework.context.support.ResourceBundleMessageSource messages =
+                new org.springframework.context.support.ResourceBundleMessageSource();
+        messages.setBasename("messages");
+        messages.setDefaultEncoding("UTF-8");
+        messages.setFallbackToSystemLocale(false);
+        SupplierLabelMap labels = labels().withWarehouse(
+                OrderPageModelFactory.warehouseLabel(messages, java.util.Locale.forLanguageTag("pl")));
+        OrderItem fromWarehouse = item("Pamięć", false);
+        fromWarehouse.setDeliveryId(OrderItem.GENERIC_WAREHOUSE_ORDER_NO);
+        OrderItem fromConnection = item("AMD Ryzen 7", false);
+        fromConnection.setDeliveryId("manual-abcd1234");
+
+        // when
+        OrderPrintView.Card card = OrderPrintView.card(order(), List.of(fromWarehouse, fromConnection),
+                OrderLinks.of(order(), false), labels);
+        OrderPrintView.Collection collection = OrderPrintView.collection(order(), List.of(fromWarehouse), store(),
+                LocalDate.of(2026, 9, 29), "Kraków, PL", OrderLinks.of(order(), false), labels);
+
+        // then
+        assertThat(card.items()).extracting(OrderPrintView.ItemRow::delivery)
+                .containsExactly("Magazyn sklepu", "Hurtownia Kowalski");
+        assertThat(collection.items()).extracting(OrderPrintView.ItemRow::delivery).containsExactly("Magazyn sklepu");
+    }
 }

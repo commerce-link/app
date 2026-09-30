@@ -39,6 +39,7 @@ import pl.commercelink.receipts.ReceiptLock;
 import pl.commercelink.receipts.ReceiptOrderState;
 import pl.commercelink.receipts.ReceiptOrderView;
 import pl.commercelink.receipts.ReceiptRequestConverter;
+import pl.commercelink.shipping.ShippingService;
 import pl.commercelink.starter.util.ConversionUtil;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
@@ -80,6 +81,7 @@ public class OrderPageModelFactory {
     private final MessageSource messageSource;
     private final ReceiptAttemptService receiptAttemptService;
     private final ReceiptAlerts receiptAlerts;
+    private final ShippingService shippingService;
 
     /** Fiscal dates are Polish dates, whatever zone the server runs in (as ReceiptEffects dates the document). */
     private static final ZoneId WARSAW = ZoneId.of("Europe/Warsaw");
@@ -110,7 +112,7 @@ public class OrderPageModelFactory {
                 closed, readOnly, viewer.superAdmin(), viewer.admin(), store == null ? null : store.getName(),
                 header(order, items, store, viewer, readOnly, links, locale, dropship, receipts, receiptLock),
                 items(order, items, store, viewer, readOnly, links, hasDropshipItems, hasWarehouseDocument, dropship,
-                        receiptLock),
+                        receiptLock, locale),
                 shipments(order, store, readOnly),
                 documents(order, store, viewer, closed, readOnly,
                         documentsEnabled && hasWarehouseItems && !hasWarehouseDocument, receipts, receiptLock),
@@ -142,7 +144,10 @@ public class OrderPageModelFactory {
         if (firstDropship != null) {
             primary = new OrderPageModel.PrimaryAction("order.page.action.dropship", links.details() + "/dropship?provider="
                     + URLEncoder.encode(firstDropship.getDeliveryId(), StandardCharsets.UTF_8), "fa-truck");
-        } else if (!readOnly && canOrderShipment && order.hasShipmentWithoutShippingData()) {
+        } else if (!readOnly && canOrderShipment && order.hasShipmentWithoutShippingData()
+                && shippingService.isAvailable(store)) {
+            // the courier page's own rule (OrdersShippingController#initiate): a store without a courier account types
+            // the shipping data into the shipment, so the page would only end on its refusal
             primary = new OrderPageModel.PrimaryAction("order.page.action.courier", links.details() + "/shipping", "fa-truck");
         }
         // the header link names one physical item; with several serial numbers the rows link each of theirs
@@ -226,8 +231,8 @@ public class OrderPageModelFactory {
     private OrderPageModel.ItemsCard items(Order order, List<OrderItem> items, Store store, Viewer viewer,
                                            boolean readOnly, OrderLinks links, boolean hasDropshipItems,
                                            boolean hasWarehouseDocument, DropshipAssessment dropship,
-                                           ReceiptLock receiptLock) {
-        SupplierLabelMap labels = supplierLabels.forStore(store);
+                                           ReceiptLock receiptLock, Locale locale) {
+        SupplierLabelMap labels = labels(store, locale);
         OrderItemRow.Context context = new OrderItemRow.Context(order, readOnly, viewer.superAdmin(), labels,
                 item -> deliveryHref(order, item, viewer, links, dropship),
                 serial -> viewer.superAdmin() ? null
@@ -315,14 +320,24 @@ public class OrderPageModelFactory {
      * The delivery of one item as its row in the items table shows it; null when the item has none. items are all of
      * the order's items: whether the item's supplier may dropship depends on the whole order.
      */
-    public OrderItemRow.Delivery delivery(Order order, OrderItem item, List<OrderItem> items, Viewer viewer) {
+    public OrderItemRow.Delivery delivery(Order order, OrderItem item, List<OrderItem> items, Viewer viewer, Locale locale) {
         if (StringUtils.isBlank(item.getDeliveryId())) {
             return null;
         }
-        SupplierLabelMap labels = supplierLabels.forStore(storesRepository.findById(order.getStoreId()));
+        SupplierLabelMap labels = labels(storesRepository.findById(order.getStoreId()), locale);
         return new OrderItemRow.Delivery(OrderItemRow.deliveryLabel(item, labels),
                 deliveryHref(order, item, viewer, OrderLinks.of(order, viewer.superAdmin()), dropship(order, items)),
                 deliveryRedirectResolver.pointsToDelivery(item));
+    }
+
+    /** The store's supplier labels, with its own warehouse read as "Magazyn sklepu" rather than its technical id. */
+    private SupplierLabelMap labels(Store store, Locale locale) {
+        return supplierLabels.forStore(store).withWarehouse(warehouseLabel(messageSource, locale));
+    }
+
+    /** What the store's own warehouse is called where an item's supplier is shown (items, item page, printouts). */
+    public static String warehouseLabel(MessageSource messages, Locale locale) {
+        return messages.getMessage("order.item.delivery.warehouse", null, locale);
     }
 
     /** Assessed only for a direct-to-consumer order: a warehouse order never leads to the dropship page anyway. */

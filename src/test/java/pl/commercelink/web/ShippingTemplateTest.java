@@ -123,8 +123,8 @@ class ShippingTemplateTest {
                 .contains("<option value=\"t-pc\" selected=\"selected\">Komputer</option>")
                 .contains("class=\"cl-button is-primary\">Wczytaj paczki</button>")
                 .contains("Wybierz szablon paczek i kliknij „Wczytaj paczki”.")
-                .contains("Wyceń dostawę, żeby zobaczyć oferty przewoźników.")
-                .doesNotContain("id=\"shipping-parcels\"").doesNotContain("Wyceń dostawę</button>")
+                .contains("Wyceń przesyłkę, żeby zobaczyć oferty przewoźników.")
+                .doesNotContain("id=\"shipping-parcels\"").doesNotContain("Wyceń przesyłkę</button>")
                 .doesNotContain("Zamów kuriera</button>").doesNotContain("data-cl-recipient-select")
                 .doesNotContain("??");
     }
@@ -149,7 +149,7 @@ class ShippingTemplateTest {
                 .contains("id=\"cashOnDelivery\" name=\"cashOnDelivery\" value=\"true\" data-cl-reveal=\"shipping-cod\" aria-controls=\"shipping-cod\" checked=\"checked\"")
                 .contains("<div class=\"cl-reveal\" id=\"shipping-cod\">")
                 .contains("class=\"cl-input is-price\"").contains("name=\"cashOnDeliveryAmount\" value=\"149.5\"")
-                .contains("class=\"cl-button\">Wyceń dostawę</button>")
+                .contains("class=\"cl-button\">Wyceń przesyłkę</button>")
                 .contains("value=\"dpd\" checked=\"checked\"").contains("23,5 PLN brutto")
                 .contains("value=\"ups\" disabled=\"disabled\"").contains("Niedostępna")
                 .contains("<span class=\"cl-choice-description is-warn\">Za ciężka paczka</span>")
@@ -202,6 +202,41 @@ class ShippingTemplateTest {
                 .contains("Wysyłka przedmiotów z magazynu do dystrybutora. Przedmioty: 3")
                 .contains("action=\"/dashboard/warehouse/shipping/template\"")
                 .doesNotContain("name=\"shippingEntityId\"").doesNotContain("??");
+    }
+
+    @Test
+    void withoutACourierAccountTheReasonIsThePagesOwnAlert() {
+        // given
+        Map<String, Object> variables = model(pricedOrderForm(), List.of(recipient("Jan", "Prosta 5")), orderView());
+        variables.put("shippingUnavailable", "Sklep nie ma podłączonego przewoźnika — dane nadania wpisz w przesyłce.");
+
+        // when
+        String html = render(variables);
+
+        // then: a warning alert of the page, not the layout's old banner; no offers to book
+        assertThat(html).contains("<div class=\"cl-alert is-warn\" id=\"shipping-unavailable\" role=\"alert\">")
+                .contains("Sklep nie ma podłączonego przewoźnika — dane nadania wpisz w przesyłce.")
+                .doesNotContain("id=\"shipping-create-submit\"");
+    }
+
+    @Test
+    void theCourierButtonIsDisabledOnceItsFormIsSent() throws IOException {
+        // given
+        String js = Files.readString(Path.of("src/main/resources/static/js/shipping-booking.js"), StandardCharsets.UTF_8);
+        Map<String, Object> variables = model(pricedOrderForm(), List.of(recipient("Jan", "Prosta 5")), orderView());
+        variables.put("servicePrices", List.of(
+                new ShippingEstimate("dpd", "DPD", true, new BigDecimal("23.50"), new BigDecimal("19.11"), List.of())));
+
+        // when
+        String html = render(variables);
+
+        // then: one click books one label; the button has no name, so disabling it drops nothing from the post
+        int button = html.indexOf("id=\"shipping-create-submit\"");
+        assertThat(button).isPositive();
+        assertThat(html.substring(html.lastIndexOf("<button", button), html.indexOf(">", button))).doesNotContain("name=");
+        assertThat(js).contains("event.submitter && event.submitter.id === 'shipping-create-submit'")
+                .contains("event.submitter.disabled = true").contains("addEventListener('pageshow'")
+                .contains("event.persisted");
     }
 
     @Test

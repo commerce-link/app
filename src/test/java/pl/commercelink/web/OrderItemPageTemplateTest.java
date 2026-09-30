@@ -99,7 +99,7 @@ class OrderItemPageTemplateTest {
                 "serialNo", "comment", "service", "consolidated", "deliveryId", "customSupplier")) {
             assertThat(html).as(name).contains("name=\"" + name + "\"");
         }
-        assertThat(html).contains("value=\"Laptop Pro 14\"").contains("value=\"4999.0\"").contains("value=\"3500.0\"")
+        assertThat(html).contains("value=\"Laptop Pro 14\"").contains("value=\"4999.00\"").contains("value=\"3500.00\"")
                 .contains("value=\"1.23\"").contains("<option value=\"Laptopy\" selected=\"selected\">Laptopy</option>")
                 .contains("<option value=\"Acme\">Acme</option>").contains("Bez dostawcy")
                 .doesNotContain("disabled").doesNotContain("id=\"item-locked-note\"").doesNotContain("name=\"supplier\"")
@@ -208,7 +208,7 @@ class OrderItemPageTemplateTest {
         // then
         assertThat(html).containsPattern("id=\"item-name\"[^>]*readonly")
                 .containsPattern("id=\"item-qty\"[^>]*disabled").doesNotContainPattern("id=\"item-qty\"[^>]*readonly")
-                .contains("id=\"item-tax\" type=\"text\" name=\"tax\" value=\"1.23\" aria-describedby=\"item-numbers-help\" disabled=\"disabled\">")
+                .contains("id=\"item-tax\" type=\"text\" name=\"tax\" value=\"1.23\" disabled=\"disabled\">")
                 .doesNotContain("id=\"item-sale-help\"");
     }
 
@@ -304,8 +304,8 @@ class OrderItemPageTemplateTest {
                 new pl.commercelink.web.orders.OrderPageModelFactory.Viewer(false, true, null);
 
         // when
-        OrderItemRow.Delivery delivery = factory.delivery(order, ordered, List.of(ordered), admin);
-        OrderItemRow.Delivery supplier = factory.delivery(order, allocated, List.of(allocated), admin);
+        OrderItemRow.Delivery delivery = factory.delivery(order, ordered, List.of(ordered), admin, OrderDetailsTemplateTest.PL);
+        OrderItemRow.Delivery supplier = factory.delivery(order, allocated, List.of(allocated), admin, OrderDetailsTemplateTest.PL);
         OrderItemRow row = factory.build(order, List.of(ordered), admin, OrderDetailsTemplateTest.PL).items().products().get(0);
 
         // then
@@ -315,6 +315,60 @@ class OrderItemPageTemplateTest {
         assertThat(delivery.href()).isEqualTo(row.deliveryHref());
         assertThat(supplier.delivery()).isFalse();
         assertThat(supplier.label()).isEqualTo("HURT-ABC");
-        assertThat(factory.delivery(order, none, List.of(none), admin)).isNull();
+        assertThat(factory.delivery(order, none, List.of(none), admin, OrderDetailsTemplateTest.PL)).isNull();
+    }
+
+    @Test
+    void amountsShowTwoDecimals() {
+        // given
+        OrderItem item = item(FulfilmentStatus.New);
+        item.setPrice(649.0);
+        item.setCost(448.5);
+
+        // when
+        String html = render(variables(item, false));
+
+        // then: as the rest of the app shows amounts, not "649.0"; a cost stored with more decimals keeps them
+        assertThat(html).contains("id=\"item-price\" type=\"text\" name=\"price\" value=\"649.00\"")
+                .contains("id=\"item-cost\" type=\"text\" name=\"cost\" value=\"448.50\"")
+                .contains("id=\"item-numbers-help\"");
+        item.setCost(123.4567);
+        assertThat(render(variables(item, false))).contains("name=\"cost\" value=\"123.4567\"");
+    }
+
+    @Test
+    void amountHelpIsHiddenWhenNoAmountIsEditable() {
+        // given: an item in fulfilment of an invoiced order, price locked by the document, cost and VAT fixed
+        OrderItem item = item(FulfilmentStatus.Delivered);
+        Map<String, Object> variables = variables(item, false);
+        variables.put("saleLock", ItemSaleLock.INVOICED);
+        variables.put("priceLocked", true);
+        variables.put("priceLockedKey", ItemSaleLock.INVOICED.priceKey());
+
+        // when
+        String html = render(variables);
+
+        // then
+        assertThat(html).containsPattern("id=\"item-price\"[^>]*disabled").containsPattern("id=\"item-cost\"[^>]*disabled")
+                .doesNotContain("id=\"item-numbers-help\"").doesNotContain("item-numbers-help")
+                .doesNotContain("wpisuj z kropką");
+    }
+
+    @Test
+    void theStoresWarehouseReadsInPolishInTheHeader() {
+        // given
+        pl.commercelink.orders.Order order = OrderDetailsTemplateTest.order(pl.commercelink.orders.OrderStatus.Realization);
+        OrderItem item = item(FulfilmentStatus.Delivered);
+        item.setDeliveryId(OrderItem.GENERIC_WAREHOUSE_ORDER_NO);
+        pl.commercelink.web.orders.OrderPageModelFactory factory = OrderDetailsTemplateTest.factory(java.util.Set.of());
+        Map<String, Object> variables = variables(item, false);
+        variables.put("delivery", factory.delivery(order, item, List.of(item),
+                new pl.commercelink.web.orders.OrderPageModelFactory.Viewer(false, true, null), OrderDetailsTemplateTest.PL));
+
+        // when
+        String html = render(variables);
+
+        // then
+        assertThat(html).contains("Magazyn sklepu").doesNotContain("Warehouse");
     }
 }

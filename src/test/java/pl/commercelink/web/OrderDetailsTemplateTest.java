@@ -116,9 +116,16 @@ class OrderDetailsTemplateTest {
         when(receiptService.orderState(any(), any(), any(), any())).thenReturn(receipts);
         OrderPageModelFactory factory = new OrderPageModelFactory(stores, events, dropship, new DeliveryRedirectResolver(),
                 pl.commercelink.web.orders.DropshipEligibilityStubs.acceptingEverySupplier(), labels, carrierOptions, mock(ProductCatalogRepository.class), mock(TaxonomyCache.class), messages,
-                receiptService, mock(ReceiptAlerts.class));
+                receiptService, mock(ReceiptAlerts.class), courierAvailable());
         ReflectionTestUtils.setField(factory, "appDomain", "https://app.example");
         return factory;
+    }
+
+    /** A store with a courier account: the page offers "Zamów kuriera" where a shipment waits for it. */
+    static pl.commercelink.shipping.ShippingService courierAvailable() {
+        pl.commercelink.shipping.ShippingService shipping = mock(pl.commercelink.shipping.ShippingService.class);
+        when(shipping.isAvailable(any())).thenReturn(true);
+        return shipping;
     }
 
     static Order order(OrderStatus status) {

@@ -19,6 +19,16 @@ public final class Money {
         return value.signum() < 0 ? "\u2212" + digits : digits;
     }
 
+    /**
+     * An amount as the value of a form field bound to a number: a decimal point, no grouping and at least two decimals
+     * ("649.00", not "649.0"). A value stored with more decimals (a cost converted from another currency) keeps them,
+     * so saving the form never rounds what the operator did not touch.
+     */
+    public static String input(double amount) {
+        BigDecimal value = BigDecimal.valueOf(amount);
+        return value.setScale(Math.max(2, value.stripTrailingZeros().scale()), RoundingMode.UNNECESSARY).toPlainString();
+    }
+
     private static DecimalFormatSymbols symbols() {
         DecimalFormatSymbols symbols = DecimalFormatSymbols.getInstance(Locale.forLanguageTag("pl-PL"));
         symbols.setGroupingSeparator('\u00A0');

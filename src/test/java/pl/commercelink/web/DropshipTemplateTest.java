@@ -94,7 +94,10 @@ class DropshipTemplateTest {
         assertThat(dropship).contains("deliveries.purchase.button");
         assertThat(dropship).contains("general.save");
         assertThat(dropship).contains("allocations[__${allocStat.index}__].key.orderId");
-        for (String sharedField : List.of("*{sourceCurrency}", "*{shippingCost}", "*{paymentCost}",
+        // the two costs are written out by hand on the dropship page, so their values show two decimals
+        assertThat(dropship).contains("name=\"shippingCost\"").contains("name=\"paymentCost\"");
+        assertThat(warehouse).contains("*{shippingCost}").contains("*{paymentCost}");
+        for (String sharedField : List.of("*{sourceCurrency}",
                 "*{paymentTerms}", "*{tax}", "*{removeUnselected}", "*{externalDeliveryId}",
                 "*{estimatedDeliveryAt}", "deliveries.create.include", "deliveries.create.netValue")) {
             assertThat(dropship).contains(sharedField);

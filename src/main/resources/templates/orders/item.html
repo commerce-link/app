@@ -117,7 +117,9 @@
                             </div>
                         </fieldset>
 
-                        <fieldset class="cl-fieldset">
+                        <!--/* the entry hint only where an amount can be typed: the price until a document locks it, the cost and
+                               the VAT multiplier while the item is new (the multiplier read-only under a sale lock) */-->
+                        <fieldset class="cl-fieldset" th:with="amountEditable=${!priceLocked or fullEdit}">
                             <legend class="cl-fieldset-title" th:text="#{order.item.page.section.price}"></legend>
                             <div class="cl-form-grid">
                                 <div class="cl-span-1 cl-field">
@@ -128,23 +130,23 @@
                                 </div>
                                 <div class="cl-span-2 cl-field">
                                     <label class="cl-label" for="item-price" th:text="#{order.item.form.price}"></label>
-                                    <input class="cl-input" id="item-price" type="text" name="price" th:value="${item.price}" th:disabled="${priceLocked}"
+                                    <input class="cl-input" id="item-price" type="text" name="price" th:value="${T(pl.commercelink.web.orders.Money).input(item.price)}" th:disabled="${priceLocked}"
                                            th:attr="aria-describedby=${priceLocked} ? 'item-price-help' : null">
                                     <p th:if="${priceLocked}" class="cl-help" id="item-price-help" th:text="#{${priceLockedKey != null ? priceLockedKey : 'order.item.form.price.locked'}}"></p>
                                 </div>
                                 <div class="cl-span-2 cl-field">
                                     <label class="cl-label" for="item-cost" th:text="#{order.item.form.cost}"></label>
-                                    <input class="cl-input" id="item-cost" type="text" name="cost" th:value="${item.cost}" th:disabled="${!fullEdit}">
+                                    <input class="cl-input" id="item-cost" type="text" name="cost" th:value="${T(pl.commercelink.web.orders.Money).input(item.cost)}" th:disabled="${!fullEdit}">
                                 </div>
                                 <div class="cl-span-1 cl-field">
                                     <label class="cl-label" for="item-tax" th:text="#{order.item.page.tax}"></label>
                                     <input class="cl-input" id="item-tax" type="text" name="tax" th:value="${item.tax}" th:disabled="${!fullEdit}"
                                            th:readonly="${fullEdit and saleLock != null}"
-                                           th:attr="aria-describedby=${fullEdit and saleLock != null} ? 'item-sale-help item-numbers-help' : 'item-numbers-help'">
+                                           th:attr="aria-describedby=${fullEdit and saleLock != null} ? 'item-sale-help item-numbers-help' : (${amountEditable} ? 'item-numbers-help' : null)">
                                 </div>
                             </div>
                             <p th:if="${fullEdit and saleLock != null}" class="cl-help" id="item-sale-help" th:text="#{${saleLock.numbersKey()}}"></p>
-                            <p class="cl-help" id="item-numbers-help" th:text="#{order.item.page.numbers.help}"></p>
+                            <p th:if="${amountEditable}" class="cl-help" id="item-numbers-help" th:text="#{order.item.page.numbers.help}"></p>
                         </fieldset>
 
                         <fieldset class="cl-fieldset">

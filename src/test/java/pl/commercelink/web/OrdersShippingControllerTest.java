@@ -22,11 +22,13 @@ import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.ShippingForm;
 import pl.commercelink.shipping.ShippingPageView;
 import pl.commercelink.shipping.ShippingService;
+import pl.commercelink.shipping.ShippingUnavailableException;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 
@@ -34,6 +36,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -60,6 +64,7 @@ class OrdersShippingControllerTest {
         when(storesRepository.findById(STORE_ID)).thenReturn(new Store());
         when(messageSource.getMessage(any(String.class), any(), any(Locale.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
+        when(shippingService.isAvailable(any())).thenReturn(true);
     }
 
     @AfterEach
@@ -124,5 +129,81 @@ class OrdersShippingControllerTest {
         assertThatThrownBy(() -> controller.loadTemplates(form, new ExtendedModelMap()))
                 .isInstanceOf(ResponseStatusException.class);
         verifyNoInteractions(shippingService);
+    }
+
+    @Test
+    void courierPageWithoutAShippingProviderRedirectsWithTheReason() {
+        // given
+        Order order = orderWithShipments(new Shipment(ShipmentType.Courier));
+        when(ordersRepository.findById(STORE_ID, order.getOrderId())).thenReturn(order);
+        when(shippingService.isAvailable(any())).thenReturn(false);
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        String view = controller.initiate(order.getOrderId(), new ExtendedModelMap(), redirect, Locale.ENGLISH);
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + order.getOrderId());
+        assertThat(new HashMap<String, Object>(redirect.getFlashAttributes()))
+                .containsEntry("errorMessage", "shipping.error.no.provider.order");
+    }
+
+    @Test
+    void estimateWithoutAShippingProviderShowsAMessageNotAnError() {
+        // given: an address typed in by hand, or the RMA and warehouse routes that reach the page without the check
+        Order order = orderWithShipments(new Shipment(ShipmentType.Courier));
+        when(ordersRepository.findById(STORE_ID, order.getOrderId())).thenReturn(order);
+        when(shippingService.estimateServicePrices(any(), any(), any()))
+                .thenThrow(new ShippingUnavailableException(STORE_ID));
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        String view = controller.estimateShipping(new ShippingForm(order.getOrderId(), "orders"), model, Locale.ENGLISH);
+
+        // then: the page again, with the reason as its alert and no offers
+        assertThat(view).isEqualTo("shipping");
+        assertThat(model.get("shippingUnavailable")).isEqualTo("shipping.error.no.provider.order");
+        assertThat(model.get("errorMessage")).isNull();
+        assertThat(model.get("servicePrices")).isNull();
+    }
+
+    @Test
+    void bookingWithoutAShippingProviderReturnsToTheOrderWithTheReason() {
+        // given
+        Order order = orderWithShipments(new Shipment(ShipmentType.Courier));
+        when(ordersRepository.findById(STORE_ID, order.getOrderId())).thenReturn(order);
+        when(shippingService.createShipping(any(ShippingForm.class), any(), any()))
+                .thenThrow(new ShippingUnavailableException(STORE_ID));
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        String view = controller.createShipping(new ShippingForm(order.getOrderId(), "orders"), redirect, Locale.ENGLISH);
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + order.getOrderId());
+        assertThat(new HashMap<String, Object>(redirect.getFlashAttributes()))
+                .containsEntry("errorMessage", "shipping.error.no.provider.order");
+    }
+
+    @Test
+    void aSecondCourierOrderForShipmentsWithShippingDataIsRefused() {
+        // given: the first click (or another tab) already booked the courier, so the shipment has its data
+        Shipment booked = new Shipment(ShipmentType.Courier);
+        booked.setExternalId("ext-1");
+        booked.setCarrier("DPD");
+        booked.setTrackingNo("T-1");
+        booked.setShippedAt(java.time.LocalDateTime.now());
+        Order order = orderWithShipments(booked);
+        when(ordersRepository.findById(STORE_ID, order.getOrderId())).thenReturn(order);
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        String view = controller.createShipping(new ShippingForm(order.getOrderId(), "orders"), redirect, Locale.ENGLISH);
+
+        // then: no second label is booked
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + order.getOrderId());
+        assertThat(new HashMap<String, Object>(redirect.getFlashAttributes()))
+                .containsEntry("errorMessage", "shipping.error.all.defined");
+        verify(shippingService, never()).createShipping(any(ShippingForm.class), any(), any());
     }
 }
