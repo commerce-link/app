@@ -274,7 +274,7 @@ class OrderDetailsTemplateTest {
         // then
         assertThat(html).contains("<col class=\"cl-col-check\">").contains("<col class=\"cl-col-flag\">").contains("<col class=\"cl-col-menu\">")
                 .contains("class=\"cl-table-group\"").contains("Usługi i dostawa")
-                .contains("2 × 749,00").contains("koszt 579,00 netto")
+                .contains("2 × 749,00").contains("koszt 712,17 brutto")
                 .contains("data-cl-copy=\"100-100001084WOF\"")
                 .containsPattern("data-ready-for-allocation=\"false\"[^>]*data-removable=\"true\"")
                 .contains("name=\"orderItems[0].selected\"").contains("name=\"orderItems[0].itemId\"");
@@ -346,7 +346,7 @@ class OrderDetailsTemplateTest {
     }
 
     @Test
-    void theDeliveryStandsOnTheLineOfTheItemStatePill() {
+    void theDeliveryStandsUnderTheItemStatePill() {
         // given
         Order order = order(OrderStatus.Assembly);
         OrderItem ordered = inDelivery(order, "delivery-9", FulfilmentStatus.Ordered);
@@ -354,9 +354,11 @@ class OrderDetailsTemplateTest {
         // when
         String html = page(render(order, List.of(ordered), ADMIN, Set.of()));
 
-        // then: one flex line holds the pill and the delivery, which wraps under the pill only when out of room (CSS)
-        assertThat(html).containsPattern("<td class=\"cl-table-fulfilment\" data-label=\"Stan\">\\s*<div class=\"cl-table-state\">"
-                + "\\s*<span class=\"cl-status[^\"]*\">Zamówiony</span>\\s*<span class=\"cl-table-sub\">");
+        // then: the delivery is the cell's second line, under the pill (client request 2026-09-30: the number beside the
+        // pill read worse than under it)
+        assertThat(html).containsPattern("<td class=\"cl-table-fulfilment\" data-label=\"Stan\">"
+                + "\\s*<span class=\"cl-status[^\"]*\">Zamówiony</span>\\s*<span class=\"cl-table-sub\">")
+                .doesNotContain("cl-table-state");
     }
 
     @Test
@@ -450,8 +452,8 @@ class OrderDetailsTemplateTest {
         String admin = page(render(order(OrderStatus.New), ADMIN));
 
         // then
-        assertThat(user).contains("koszt 579").contains("Zysk (z VAT)").contains("Koszt produktów (brutto)");
-        assertThat(admin).contains("koszt 579").contains("Zysk (z VAT)").contains("Koszt produktów (brutto)");
+        assertThat(user).contains("koszt 712,17 brutto").contains("Zysk (z VAT)").contains("Koszt produktów (brutto)");
+        assertThat(admin).contains("koszt 712,17 brutto").contains("Zysk (z VAT)").contains("Koszt produktów (brutto)");
     }
 
     @Test
@@ -1077,7 +1079,7 @@ class OrderDetailsTemplateTest {
         String html = page(render(order(OrderStatus.New), SUPER_ADMIN));
 
         // then
-        assertThat(html).contains("id=\"finances-costs\"").contains("<summary>Koszt i zysk</summary>").contains("koszt 579")
+        assertThat(html).contains("id=\"finances-costs\"").contains("<summary>Koszt i zysk</summary>").contains("koszt 712,17 brutto")
                 .doesNotContain("data-cl-dialog-open").doesNotContain("item-menu-");
     }
 
@@ -1687,10 +1689,10 @@ class OrderDetailsTemplateTest {
         String html = page(render(order, ADMIN));
 
         // then: the new-tab icon is inside the link, joined to the number by a word joiner, never a sibling that
-        // wraps onto its own line
+        // wraps onto its own line; cl-link-icon (not Bulma's 16 px .icon box) keeps it off the last character
         String documents = html.substring(html.indexOf("id=\"dokumenty\""), html.indexOf("id=\"platnosci\""));
         assertThat(documents).containsPattern("<a href=\"https://faktury.example/118\" target=\"_blank\" rel=\"noopener\">"
-                + "<span>FV/2026/09/118</span>(&#8288;|\u2060)<span class=\"icon is-small\" aria-hidden=\"true\">"
+                + "<span>FV/2026/09/118</span>(&#8288;|\u2060)<span class=\"cl-link-icon\" aria-hidden=\"true\">"
                 + "<i\\s+class=\"fas fa-external-link-alt\"></i></span></a>");
         assertThat(occurrences(documents, "fa-external-link-alt")).isEqualTo(1);
     }
@@ -2659,7 +2661,8 @@ class OrderDetailsTemplateTest {
 
         // then
         String documents = html.substring(html.indexOf("id=\"dokumenty\""), html.indexOf("id=\"platnosci\""));
-        assertThat(documents).containsPattern("<a href=\"https://paragony.example/7\" target=\"_blank\" rel=\"noopener\"><span>PAR/7/2026</span>")
+        assertThat(documents).containsPattern("<a href=\"https://paragony.example/7\" target=\"_blank\" rel=\"noopener\"><span>PAR/7/2026</span>"
+                        + "(&#8288;|\u2060)<span\\s+class=\"cl-link-icon\" aria-hidden=\"true\"><i class=\"fas fa-external-link-alt\"></i></span></a>")
                 .contains("<span class=\"cl-status is-ok\">Zafiskalizowany</span>")
                 .contains("Zafiskalizowano 28.09.2026").contains("e-mail wysłany")
                 .doesNotContain("Odepnij").doesNotContain("Paragon PAR").doesNotContain("cl-list-actions");

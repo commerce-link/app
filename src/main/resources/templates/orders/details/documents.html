@@ -71,7 +71,7 @@
                     <!--/* the new-tab icon is part of the link, joined to the number (&#8288;) so it never wraps alone */-->
                     <a th:if="${d.href() != null}" th:href="@{${d.href()}}" th:attr="target=${d.external()} ? '_blank' : null,
                        rel=${d.external()} ? 'noopener' : null"><span th:text="${d.number()}"></span><th:block
-                            th:if="${d.external()}">&#8288;<span class="icon is-small" aria-hidden="true"><i
+                            th:if="${d.external()}">&#8288;<span class="cl-link-icon" aria-hidden="true"><i
                             class="fas fa-external-link-alt"></i></span></th:block></a>
                     <span th:unless="${d.href() != null}" th:text="${d.number()}"></span>
                 </p>
@@ -99,7 +99,7 @@
             <span th:text="#{receipts.section.title}"></span>
             <a th:if="${r.href() != null}" th:href="${r.href()}" target="_blank" rel="noopener"><span
                     th:text="${r.number() != null} ? ${r.number()} : #{receipts.document.open}"></span>&#8288;<span
-                    class="icon is-small" aria-hidden="true"><i class="fas fa-external-link-alt"></i></span></a>
+                    class="cl-link-icon" aria-hidden="true"><i class="fas fa-external-link-alt"></i></span></a>
             <span th:if="${r.href() == null and r.number() != null}" th:text="${r.number()}"></span>
             <span class="cl-status" th:classappend="${r.statusTone()}" th:text="#{${r.statusKey()}}"></span>
         </p>

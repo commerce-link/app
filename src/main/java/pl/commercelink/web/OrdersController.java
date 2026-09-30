@@ -32,6 +32,7 @@ import pl.commercelink.orders.filters.FilterActor;
 import pl.commercelink.orders.filters.OrderFilterField;
 import pl.commercelink.orders.filters.services.OrderFiltersService;
 
+import pl.commercelink.orders.filters.CustomerType;
 import pl.commercelink.orders.filters.ShippingDue;
 import pl.commercelink.orders.filters.services.ListOrderFiltersView;
 import pl.commercelink.orders.fulfilment.ExternalSupplierBinding;
@@ -394,6 +395,7 @@ public class OrdersController extends BaseController {
         form.setShippingDue(first(byField, OrderFilterField.ShippingDue));
         form.setSourceName(byField.get(OrderFilterField.SourceName.name()));
         form.setShippingPostalCode(first(byField, OrderFilterField.ShippingPostalCode));
+        form.setCustomerType(first(byField, OrderFilterField.CustomerType));
         return form;
     }
 
@@ -439,6 +441,7 @@ public class OrdersController extends BaseController {
         model.addAttribute("shipmentTypes", ShipmentType.values());
         model.addAttribute("paymentSources", PaymentSource.values());
         model.addAttribute("shippingDueOptions", ShippingDue.values());
+        model.addAttribute("customerTypeOptions", CustomerType.values());
         model.addAttribute("marketplaces", connectedMarketplaceNames());
         model.addAttribute("returnTo", returnTo);
     }
