@@ -53,6 +53,7 @@ import pl.commercelink.taxonomy.TaxonomyCache;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.ResourceBundle;
 import java.util.Locale;
 import java.util.Set;
 
@@ -1399,6 +1400,42 @@ class OrderPageModelFactoryTest {
     }
 
     @Test
+    void cancelReasonOfAnOpenOrderPointsToRemoval() {
+        // when
+        OrderPageModel.Header header = factory.build(order(OrderStatus.Assembly), List.of(item(FulfilmentStatus.New)),
+                ADMIN, PL).header();
+
+        // then: before delivery the way out of an order is "Usuń", not cancelling
+        assertThat(header.canCancel()).isFalse();
+        assertThat(header.cancelUnavailableKey()).isEqualTo("order.page.cancel.unavailable.open");
+        assertThat(ResourceBundle.getBundle("messages", PL).getString(header.cancelUnavailableKey()))
+                .isEqualTo("Otwarte zamówienie usuwasz („Usuń”); anulować można dostarczone, po zwrocie wszystkich produktów i wpłat.");
+    }
+
+    @Test
+    void cancelReasonOfADeliveredOrderNamesTheMissingCondition() {
+        // given
+        Order paid = order(OrderStatus.Delivered);
+        paid.addPayment(new Payment("REF-1", "Jan", PaymentSource.BankTransfer, 100, 0));
+        Order unpaid = order(OrderStatus.Delivered);
+
+        // when
+        String itemsAndPayments = factory.build(paid, List.of(item(FulfilmentStatus.Delivered)), ADMIN, PL).header().cancelUnavailableKey();
+        String payments = factory.build(paid, returnedItems(), ADMIN, PL).header().cancelUnavailableKey();
+        String items = factory.build(unpaid, List.of(item(FulfilmentStatus.Delivered)), ADMIN, PL).header().cancelUnavailableKey();
+        OrderPageModel.Header cancellable = factory.build(order(OrderStatus.Delivered), returnedItems(), ADMIN, PL).header();
+
+        // then
+        assertThat(itemsAndPayments).isEqualTo("order.page.cancel.unavailable.itemsAndPayments");
+        assertThat(payments).isEqualTo("order.page.cancel.unavailable.payments");
+        assertThat(items).isEqualTo("order.page.cancel.unavailable.items");
+        assertThat(cancellable.canCancel()).isTrue();
+        ResourceBundle bundle = ResourceBundle.getBundle("messages", PL);
+        assertThat(bundle.getString(payments)).contains("wpłat").doesNotContain("produktów");
+        assertThat(bundle.getString(items)).contains("produktów").doesNotContain("wpłat");
+    }
+
+    @Test
     void anOrderThatCannotBeCancelledAnywayKeepsTheGeneralReasonWhileIssuing() {
         // given
         receipts(issuing());
@@ -1431,7 +1468,7 @@ class OrderPageModelFactoryTest {
         assertThat(withReceipt.cancelLockedKey()).isNull();
         assertThat(withReceipt.cancelMessage()).isEqualTo(
                 "Zamówienie przejdzie w status Anulowane, a ceny usług zostaną wyzerowane. Zamówienie ma zafiskalizowany"
-                        + " e-paragon — anulowanie go nie cofa. Zwrot rozlicz osobno (korekta lub zwrot).");
+                        + " e-paragon — anulowanie go nie cofa. Pieniądze rozlicz osobno: fakturą korygującą albo zwrotem.");
         assertThat(without.canCancel()).isTrue();
         assertThat(without.cancelMessage()).isEqualTo("Zamówienie przejdzie w status Anulowane, a ceny usług zostaną wyzerowane.");
     }
@@ -1457,7 +1494,7 @@ class OrderPageModelFactoryTest {
         receipts(new ReceiptOrderState(List.of(attempt(KEY_1, 1, ReceiptAttemptState.BLOCKED)),
                 new ReceiptOrderView(List.of(new ReceiptOrderView.Row(KEY_1, ReceiptAttemptState.BLOCKED,
                         "receipts.state.BLOCKED", "is-neutral", null, null, null, null, false, false, false, 1, null, null,
-                        "sprzedaż POS bez e-maila klienta", true)), false), false, false));
+                        "sprzedaż z kasy (POS) bez e-maila klienta", true)), false), false, false));
 
         // when
         OrderPageModel.DocumentsCard documents = factory.build(order, List.of(), ADMIN, PL).documents();
@@ -1466,7 +1503,7 @@ class OrderPageModelFactoryTest {
         assertThat(documents.rows()).extracting(OrderPageModel.DocumentRow::number).containsExactly("PAR/KASA/1");
         OrderPageModel.ReceiptRow receipt = documents.receipt();
         assertThat(receipt.settled()).isTrue();
-        assertThat(receipt.settledOutcome()).isEqualTo("sprzedaż POS bez e-maila klienta");
+        assertThat(receipt.settledOutcome()).isEqualTo("sprzedaż z kasy (POS) bez e-maila klienta");
         assertThat(receipt.problem()).isNull();
         assertThat(receipt.hasActions()).isFalse();
     }
@@ -1505,7 +1542,7 @@ class OrderPageModelFactoryTest {
         return new ReceiptOrderState(List.of(attempt(KEY_1, 1, ReceiptAttemptState.BLOCKED)),
                 new ReceiptOrderView(List.of(row(KEY_1, 1, ReceiptAttemptState.BLOCKED, null, null, null,
                         ReceiptPageProblem.ofLines("E-paragonu nie wysłano", List.of("a", "b", "c"), null, null),
-                        false, false, false, "sprzedaż POS bez e-maila klienta")), true), false, false);
+                        false, false, false, "sprzedaż z kasy (POS) bez e-maila klienta")), true), false, false);
     }
 
     @Test

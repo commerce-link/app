@@ -184,6 +184,7 @@ public class OrderPageModelFactory {
                 !viewer.superAdmin() && order.canBeCancelled(items) && !receiptLocked,
                 !viewer.superAdmin() && order.canBeCancelled(items) && receiptLocked
                         ? receiptLock.key(CANCEL_LOCKED_RECEIPT) : null,
+                cancelUnavailableKey(order, items),
                 cancelMessage(receipts.hasFiscalisedReceipt(order), messageSource, locale),
                 // as OrdersController#deleteOrder refuses: an order whose e-receipt is being issued stays
                 !viewer.superAdmin() && order.hasStatus(OrderStatus.New) && items.isEmpty() && !order.isInvoiced()
@@ -192,6 +193,26 @@ public class OrderPageModelFactory {
     }
 
     private static final String CANCEL_LOCKED_RECEIPT = "order.page.cancel.locked.receipt";
+
+    /**
+     * Why "Anuluj zamówienie" is greyed when Order#canBeCancelled says no (the rule stays as on main): an open order is
+     * removed rather than cancelled, so its reason points there; a delivered one names the condition it still misses
+     * (every product returned, the payments refunded to 0).
+     */
+    static String cancelUnavailableKey(Order order, List<OrderItem> items) {
+        if (!order.hasOneOfStatuses(OrderStatus.Delivered, OrderStatus.Completed)) {
+            return "order.page.cancel.unavailable.open";
+        }
+        boolean itemsOut = !items.stream().filter(OrderItem::isProduct).allMatch(OrderItem::isReturned);
+        boolean paid = order.getPaidAmount() != 0;
+        if (itemsOut && paid) {
+            return "order.page.cancel.unavailable.itemsAndPayments";
+        }
+        if (itemsOut) {
+            return "order.page.cancel.unavailable.items";
+        }
+        return paid ? "order.page.cancel.unavailable.payments" : "order.page.cancel.unavailable";
+    }
 
     /**
      * The cancel confirmation, in the dialog and on the no-JS page: once the e-receipt is fiscalised (or closed by

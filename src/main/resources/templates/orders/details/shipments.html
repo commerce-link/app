@@ -35,7 +35,8 @@
                           th:attr="title=${s.trackingHelpKey() != null} ? #{${s.trackingHelpKey()}} : null"
                           th:text="#{${s.trackingKey()}}"></span>
                 </p>
-                <p class="cl-list-desc">
+                <!--/* each part starts lower case after a separator; the first one of the line takes a capital */-->
+                <p class="cl-list-desc" th:with="lead=${s.trackingNo() == null and s.pickupPoint() == null}">
                     <th:block th:if="${s.trackingNo() != null}">
                         <span th:text="#{order.shipments.tracking}"></span>
                         <a th:if="${s.trackingUrl() != null}" th:href="${s.trackingUrl()}" target="_blank" rel="noopener"
@@ -43,11 +44,15 @@
                         <span th:unless="${s.trackingUrl() != null}" th:text="${s.trackingNo()}"></span>
                         <span> · </span>
                     </th:block>
-                    <th:block th:if="${s.pickupPoint() != null}"><span th:text="#{order.shipments.pickup(${s.pickupPoint()})}"></span><span> · </span></th:block>
-                    <span th:if="${s.shippedAt() != null}" th:text="#{order.shipments.shipped(${s.shippedAt()})}"></span>
+                    <!--/* a pickup-point shipment is titled "Punkt odbioru" already: its line shows the point's code alone */-->
+                    <th:block th:if="${s.pickupPoint() != null}"><span th:text="${s.typeKey() == 'ShipmentType.PickupPoint'} ? ${s.pickupPoint()}
+                            : #{order.shipments.pickup(${s.pickupPoint()})}"></span><span> · </span></th:block>
+                    <span th:if="${s.shippedAt() != null}"
+                          th:with="shipped=#{order.shipments.shipped(${s.shippedAt()})}" th:text="${lead} ? ${#strings.capitalize(shipped)} : ${shipped}"></span>
                     <span th:if="${s.deliveredAt() != null}" th:text="' · ' + #{order.shipments.delivered(${s.deliveredAt()})}"></span>
                     <span th:if="${s.shippedAt() != null and s.deliveredAt() == null}" th:text="' · ' + #{order.shipments.in.transit}"></span>
-                    <span th:if="${s.shippedAt() == null}" th:text="#{order.shipments.waiting}"></span>
+                    <span th:if="${s.shippedAt() == null}"
+                          th:with="waiting=#{order.shipments.waiting}" th:text="${lead} ? ${#strings.capitalize(waiting)} : ${waiting}"></span>
                 </p>
                 <p th:if="${s.removeReasonKey() != null}" class="cl-list-desc" th:id="|shipment-${s.number()}-remove-reason|"
                    th:text="#{${s.removeReasonKey()}}"></p>

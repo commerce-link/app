@@ -916,8 +916,8 @@ class OrderDetailsTemplateTest {
         String open = page(render(order(OrderStatus.Assembly), ADMIN));
 
         // then
-        assertThat(completed).doesNotContain("Usunąć można tylko nowe zamówienie");
-        assertThat(open).contains("Usunąć można tylko nowe zamówienie");
+        assertThat(completed).doesNotContain("Usuniesz tylko nowe zamówienie");
+        assertThat(open).contains("Usuniesz tylko nowe zamówienie");
     }
 
     @Test
@@ -1015,7 +1015,7 @@ class OrderDetailsTemplateTest {
         String html = page(render(b2bOrder(OrderStatus.New), SUPER_ADMIN));
 
         // then
-        assertThat(html).doesNotContain("Następny do wystawienia").contains("Brak paragonu/faktury");
+        assertThat(html).doesNotContain("Następny do wystawienia").contains("Brak faktury ani paragonu.");
     }
 
     @Test
@@ -1210,7 +1210,7 @@ class OrderDetailsTemplateTest {
         // then
         assertThat(card).contains("aria-label=\"Edytuj płatność 1\"").doesNotContain("/remove")
                 .containsPattern("<button type=\"button\" class=\"cl-link-button\" aria-disabled=\"true\"[^>]*aria-label=\"Usuń płatność 1\"[^>]*aria-describedby=\"payment-1-remove-reason\"")
-                .contains("id=\"payment-1-remove-reason\">Oczekiwana płatność zniknie sama po dodaniu wpłaty.</p>");
+                .contains("id=\"payment-1-remove-reason\">Oczekiwana wpłata zniknie sama po dodaniu wpłaty.</p>");
     }
 
     @Test
@@ -1614,6 +1614,24 @@ class OrderDetailsTemplateTest {
     }
 
     @Test
+    void aShipmentLineStartsWithACapitalAndAPickupPointIsNotNamedTwice() {
+        // given: a courier shipment waiting for its data and a pickup-point one (titled "Punkt odbioru" already)
+        Order order = order(OrderStatus.Assembly);
+        Shipment pickup = new Shipment(ShipmentType.PickupPoint);
+        pickup.setCollectionPointCode("WAW01M");
+        order.addShipment(pickup);
+
+        // when
+        String html = page(render(order, ADMIN));
+
+        // then: the first part of a line takes a capital, a part after " · " stays lower case
+        String shipments = html.substring(html.indexOf("id=\"przesylki\""), html.indexOf("id=\"dokumenty\""));
+        assertThat(shipments.replaceAll("\\s+", " ")).contains("<span>Czeka na nadanie</span>")
+                .contains("<span>WAW01M</span><span> · </span> <span>czeka na nadanie</span>")
+                .doesNotContain("unkt odbioru WAW01M");
+    }
+
+    @Test
     void bothMoveTargetFieldsAcceptNoLongerANumberThanTheResolverLooksUp() {
         // when
         String html = page(render(order(OrderStatus.New), ADMIN));
@@ -1901,7 +1919,7 @@ class OrderDetailsTemplateTest {
         String collected = dialog(page(render(order(OrderStatus.Delivered), ADMIN)), "review-dialog");
 
         // then
-        assertThat(none).contains("<option value=\"\" selected>— nie zbieramy —</option>").contains("Status opinii");
+        assertThat(none).contains("<option value=\"\" selected>— nie jest zbierana —</option>").contains("Status opinii");
         assertThat(collected).doesNotContain("nie zbieramy")
                 .containsPattern("<option value=\"ToBeCollected\"\\s+selected=\"selected\">Do zebrania</option>");
     }
@@ -2213,7 +2231,7 @@ class OrderDetailsTemplateTest {
 
         // then
         assertThat(b2c).contains("Brak dokumentów. Paragon dodasz przyciskiem „Dodaj dokument”.");
-        assertThat(b2b).contains("Brak dokumentów. Następny do wystawienia: Faktura VAT.");
+        assertThat(b2b).contains("Brak dokumentów. Następny do wystawienia: Faktura VAT — z menu „Wystaw”.");
     }
 
     @Test
@@ -2357,7 +2375,7 @@ class OrderDetailsTemplateTest {
                                         "Szczegóły dla Paragony.pl (Fakturownia)",
                                         "Sprawdź fiscal_status paragonu."), true, true, false, null),
                         receiptRow(1, ReceiptAttemptState.BLOCKED, "is-bad", null, null, null,
-                                false, false, false, "brak e-maila kupującego")), false),
+                                false, false, false, "brak e-maila klienta")), false),
                 false, true);
     }
 
@@ -2373,7 +2391,7 @@ class OrderDetailsTemplateTest {
                 .contains("Paragon czeka na drukarkę fiskalną ponad 48 h.")
                 .contains("<details class=\"cl-row-disclosure\">").contains("Wcześniejsze próby (1)")
                 .contains("Próba 1").contains("<span class=\"cl-status is-bad\">Zablokowany</span>")
-                .contains("brak e-maila kupującego")
+                .contains("brak e-maila klienta")
                 .contains("Sprawdź teraz").contains("Zamknij ręcznie")
                 .doesNotContain("Wystaw ponownie").doesNotContain("Brak paragonu").doesNotContain("??");
         // the earlier attempt has no actions: the only receiptKey posted is the newest one's
@@ -2436,7 +2454,7 @@ class OrderDetailsTemplateTest {
         assertThat(dialog).contains("aria-labelledby=\"receipt-close-2-title\"").contains("id=\"receipt-close-2-title\"")
                 .contains("action=\"/dashboard/orders/" + ORDER_ID + "/receipts/close\"")
                 .contains("name=\"receiptKey\" value=\"" + ORDER_ID + ":R2\"")
-                .containsPattern("<label class=\"cl-label\" for=\"receipt-close-2-number\">Numer paragonu</label>")
+                .containsPattern("<label class=\"cl-label\" for=\"receipt-close-2-number\">Numer e-paragonu</label>")
                 .containsPattern("name=\"number\" required autocomplete=\"off\" id=\"receipt-close-2-number\"")
                 .contains("for=\"receipt-close-2-link\"").contains("type=\"url\" name=\"link\"")
                 .contains("opcjonalne").contains("rozstrzygnąłeś")
@@ -2457,7 +2475,7 @@ class OrderDetailsTemplateTest {
         // then
         assertThat(html).contains("action=\"/dashboard/orders/" + ORDER_ID + "/receipts/close\"")
                 .contains("id=\"receipt-close-2-number\"").contains("id=\"receipt-close-2-link\"")
-                .contains("href=\"/dashboard/orders/" + ORDER_ID + "\"").contains("Zamknij paragon ręcznie")
+                .contains("href=\"/dashboard/orders/" + ORDER_ID + "\"").contains("Zamknij e-paragon ręcznie")
                 .doesNotContain("data-cl-dialog-close").doesNotContain("<dialog").doesNotContain("??");
     }
 
@@ -2479,7 +2497,7 @@ class OrderDetailsTemplateTest {
         String documents = html.substring(html.indexOf("id=\"dokumenty\""), html.indexOf("id=\"platnosci\""));
         assertThat(documents).containsPattern("<a href=\"https://paragony.example/7\" target=\"_blank\" rel=\"noopener\"><span>PAR/7/2026</span>")
                 .contains("<span class=\"cl-status is-ok\">Zafiskalizowany</span>")
-                .contains("zafiskalizowano 28.09.2026").contains("mail wysłany")
+                .contains("Zafiskalizowano 28.09.2026").contains("e-mail wysłany")
                 .doesNotContain("Odepnij").doesNotContain("Paragon PAR").doesNotContain("cl-list-actions");
         assertThat(occurrences(documents, "PAR/7/2026")).isEqualTo(1);
     }
@@ -2583,7 +2601,7 @@ class OrderDetailsTemplateTest {
         // then
         assertThat(withReceipt).contains("href=\"/dashboard/orders/" + ORDER_ID + "/cancel\"")
                 .contains("data-cl-confirm-message=\"Zamówienie przejdzie w status Anulowane, a ceny usług zostaną wyzerowane. "
-                        + "Zamówienie ma zafiskalizowany e-paragon — anulowanie go nie cofa. Zwrot rozlicz osobno (korekta lub zwrot).\"");
+                        + "Zamówienie ma zafiskalizowany e-paragon — anulowanie go nie cofa. Pieniądze rozlicz osobno: fakturą korygującą albo zwrotem.\"");
         assertThat(without).contains("href=\"/dashboard/orders/" + ORDER_ID + "/cancel\"")
                 .contains("data-cl-confirm-message=\"Zamówienie przejdzie w status Anulowane, a ceny usług zostaną wyzerowane.\"")
                 .doesNotContain("zafiskalizowany e-paragon");
@@ -2600,15 +2618,15 @@ class OrderDetailsTemplateTest {
                 new ReceiptOrderView(List.of(new ReceiptOrderView.Row(
                         ORDER_ID + ":R1", ReceiptAttemptState.BLOCKED,
                         "receipts.state.BLOCKED", "is-neutral", null, null, null, null, false, false, false, 1, null,
-                        null, "sprzedaż POS bez e-maila klienta", true)), false), false, false);
+                        null, "sprzedaż z kasy (POS) bez e-maila klienta", true)), false), false, false);
 
         // when
         String html = renderWithReceipts(order, ADMIN, settled);
 
         // then
         assertThat(html).containsPattern("<span class=\"cl-status is-neutral\">Zablokowany</span>")
-                .contains("<p class=\"cl-list-desc\" id=\"e-paragon-settled-1\">Nie wystawiono (sprzedaż POS bez e-maila "
-                        + "klienta). Nie trzeba nic robić — zamówienie ma już paragon albo fakturę.</p>")
+                .contains("<p class=\"cl-list-desc\" id=\"e-paragon-settled-1\">Nie wystawiono (sprzedaż z kasy (POS) bez e-maila "
+                        + "klienta). Nie trzeba nic robić — zamówienie ma już fakturę albo paragon.</p>")
                 .doesNotContain("e-paragon-problem-1").doesNotContain("Wystaw ponownie");
     }
 
@@ -2640,13 +2658,13 @@ class OrderDetailsTemplateTest {
         order.setSource(new OrderSource("operator", OrderSourceType.PointOfSale));
         order.getBillingDetails().setEmail(null);
         ReceiptPageProblem advice = ReceiptPageProblem.ofLines(
-                "E-paragonu nie wysłano: sprzedaż POS nie ma e-maila klienta.",
+                "E-paragonu nie wysłano: sprzedaż z kasy (POS) nie ma e-maila klienta.",
                 List.of("Kasa wydrukowała paragon?", "Klient chce e-paragon?", "Nie rób obu."), null, null);
         ReceiptOrderState receipts = new ReceiptOrderState(
                 List.of(attempt(1, ReceiptAttemptState.BLOCKED)),
                 new ReceiptOrderView(List.of(receiptRow(1,
                         ReceiptAttemptState.BLOCKED, "is-bad", null, null, advice,
-                        false, false, false, "sprzedaż POS bez e-maila klienta")), true),
+                        false, false, false, "sprzedaż z kasy (POS) bez e-maila klienta")), true),
                 false, false);
 
         // when

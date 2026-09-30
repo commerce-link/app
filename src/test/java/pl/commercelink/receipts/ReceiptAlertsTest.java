@@ -277,13 +277,13 @@ class ReceiptAlertsTest {
 
         // when / then
         ReceiptPageProblem blockedProblem = page.pageProblem(blocked, ReceiptAttention.BLOCKED, pl);
-        assertThat(blockedProblem.cause()).isEqualTo("Paragonu nie wysłano: brak e-maila kupującego (pusty adres).");
+        assertThat(blockedProblem.cause()).isEqualTo("Paragonu nie wysłano: brak e-maila klienta (pusty adres).");
         assertThat(blockedProblem.action()).isEqualTo("Popraw dane zamówienia i kliknij „Wystaw ponownie”.");
         ReceiptPageProblem email = page.pageProblem(troubled("fakturownia"), ReceiptAttention.EMAIL_NOT_SENT, pl);
-        assertThat(email.cause()).isEqualTo("Mail z e-paragonem nie wyszedł.");
-        assertThat(email.action()).isEqualTo("Sprawdź szablon „E-paragon” i kliknij „Wyślij mail ponownie”.");
+        assertThat(email.cause()).isEqualTo("E-mail z e-paragonem nie wyszedł.");
+        assertThat(email.action()).isEqualTo("Sprawdź szablon „E-paragon” i kliknij „Wyślij e-mail ponownie”.");
         assertThat(page.pageProblem(troubled("fakturownia"), ReceiptAttention.EFFECTS_FAILED, pl).cause())
-                .contains("marketplace'u");
+                .contains("marketplace’u");
     }
 
     @Test
@@ -355,16 +355,16 @@ class ReceiptAlertsTest {
         ReceiptPageProblem english = page.pageProblem(pos, ReceiptAttention.BLOCKED, Locale.ENGLISH);
 
         // then: the buttons of the new page, one alternative per line with its condition first, and never both
-        assertThat(problem.cause()).isEqualTo("E-paragonu nie wysłano: sprzedaż POS nie ma e-maila klienta, "
+        assertThat(problem.cause()).isEqualTo("E-paragonu nie wysłano: sprzedaż z kasy (POS) nie ma e-maila klienta, "
                 + "a paragon mogła już wydrukować kasa sklepu.");
         assertThat(problem.actions()).containsExactly(
                 "Kasa wydrukowała paragon? Wpisz jego numer: „Dodaj dokument”\u00a0→\u00a0Paragon.",
                 "Klient chce e-paragon? Wpisz jego e-mail w danych rozliczeniowych, potem „Wystaw ponownie”.",
                 "Nie rób obu — sprzedaż zostałaby zafiskalizowana dwa razy.");
         assertThat(problem.action()).isEqualTo(String.join(" ", problem.actions())).doesNotContain(ORDER_ID);
-        assertThat(english.cause()).contains("shop's cash register");
+        assertThat(english.cause()).contains("store’s cash register");
         assertThat(english.actions()).hasSize(3);
-        assertThat(english.actions().get(0)).contains("\"Add document\"\u00a0→\u00a0Receipt");
+        assertThat(english.actions().get(0)).contains("“Add document”\u00a0→\u00a0Receipt");
         assertThat(english.actions().get(2)).isEqualTo("Never both: the sale would be fiscalised twice.");
     }
 }
