@@ -2242,8 +2242,13 @@ public class OrdersController extends BaseController {
                         messageSource.getMessage("shipment.cancel.requested", null, locale));
                 case RECHECKING -> OrderFlash.saved(redirectAttributes,
                         messageSource.getMessage("shipment.cancel.rechecking", null, locale));
-                case CANCELLED -> OrderFlash.saved(redirectAttributes,
-                        messageSource.getMessage("shipment.cancel.success", null, locale));
+                case CANCELLED -> {
+                    // an immediate confirmation settles the shipments here, the step back included; after one in
+                    // the background the reloaded page shows the new status instead
+                    String notice = messageSource.getMessage("shipment.cancel.success", null, locale);
+                    OrderFlash.saved(redirectAttributes,
+                            result.backToRealization() ? notice + " " + backToRealizationNotice(locale) : notice);
+                }
                 case FAILED -> {
                     String reasonKey = OrderLabels.cancellationReasonKey(result.error());
                     return refuse(redirectAttributes, orderId, "shipment.cancel.failed", locale,

@@ -3,7 +3,6 @@ package pl.commercelink.shipping;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import pl.commercelink.orders.Order;
-import pl.commercelink.orders.OrderRealizationStepBack;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShipmentCancellationStatus;
@@ -142,10 +141,7 @@ public class ShipmentCancelService {
                 publisher.publish(check);
                 yield ShipmentCancelResult.requested();
             }
-            case SUCCEEDED -> {
-                settler.succeed(check);
-                yield ShipmentCancelResult.cancelled();
-            }
+            case SUCCEEDED -> ShipmentCancelResult.cancelled(settler.succeed(check).backToRealization());
             case FAILED -> {
                 settler.fail(check, result.error());
                 yield ShipmentCancelResult.failed(result.error());

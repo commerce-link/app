@@ -82,7 +82,8 @@ class ShipmentCancelServiceTest {
                 .thenAnswer(OptimisticLockingExecutorMocks.passThroughModifyAndSave());
         // the real settler: an immediate provider result is written by the same rules as the checker's
         ShipmentCancellationSettler settler =
-                new ShipmentCancellationSettler(ordersRepository, orderEventsRepository, optimisticLockingExecutor);
+                new ShipmentCancellationSettler(ordersRepository, orderEventsRepository, optimisticLockingExecutor,
+                        new OrderRealizationStepBack(orderEventsRepository));
         shipmentCancelService = new ShipmentCancelService(storesRepository, ordersRepository, shippingProviderFactory,
                 publisher, optimisticLockingExecutor, settler);
     }
@@ -607,6 +608,171 @@ class ShipmentCancelServiceTest {
         assertThat(shipment.getCancellationCommandId()).isNull();
         verify(ordersRepository, times(2)).save(order);
         verify(publisher, never()).publish(any());
+    }
+
+    private void succeedsRightAway() {
+        when(shippingProvider.cancelShipment(eq(EXTERNAL_ID), anyString()))
+                .thenAnswer(invocation -> ShipmentCancellation.succeeded(invocation.getArgument(1), List.of()));
+    }
+
+    @Test
+    void anImmediateCancellationOfTheOnlyShippedCourierOrderTakesTheOrderBackToRealizationWithoutAnEmail() {
+        // given
+        Order order = orderWithShipments(courierShipment(EXTERNAL_ID));
+        order.setStatus(OrderStatus.Shipping);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(shippingProviderFactory.get(store)).thenReturn(shippingProvider);
+        succeedsRightAway();
+
+        // when
+        ShipmentCancelResult result = shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID);
+
+        // then: the step back is recorded before the settling save, so the notifications skip "Zamówienie w realizacji"
+        assertThat(result.outcome()).isEqualTo(ShipmentCancelOutcome.CANCELLED);
+        assertThat(result.backToRealization()).isTrue();
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.Realization);
+        ArgumentCaptor<OrderEvent> event = ArgumentCaptor.forClass(OrderEvent.class);
+        InOrder inOrder = inOrder(orderEventsRepository, ordersRepository);
+        inOrder.verify(ordersRepository).save(order);
+        inOrder.verify(orderEventsRepository).save(event.capture());
+        inOrder.verify(ordersRepository).save(order);
+        assertThat(event.getValue().getType()).isEqualTo(EventType.action);
+        assertThat(event.getValue().getName()).isEqualTo(OrderRealizationStepBack.EVENT);
+    }
+
+    @Test
+    void anImmediateCancellationBeforeShippingKeepsTheStatus() {
+        // given
+        Order order = orderWithShipments(courierShipment(EXTERNAL_ID));
+        order.setStatus(OrderStatus.Assembled);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(shippingProviderFactory.get(store)).thenReturn(shippingProvider);
+        succeedsRightAway();
+
+        // when
+        ShipmentCancelResult result = shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID);
+
+        // then
+        assertThat(result.outcome()).isEqualTo(ShipmentCancelOutcome.CANCELLED);
+        assertThat(result.backToRealization()).isFalse();
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.Assembled);
+        verify(orderEventsRepository, never()).save(any());
+    }
+
+    @Test
+    void aRequestedCancellationLeavesTheStatusToTheBackgroundCheck() {
+        // given: the provider takes the command and answers later
+        Order order = orderWithShipments(courierShipment(EXTERNAL_ID));
+        order.setStatus(OrderStatus.Shipping);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(shippingProviderFactory.get(store)).thenReturn(shippingProvider);
+        when(shippingProvider.cancelShipment(eq(EXTERNAL_ID), anyString()))
+                .thenAnswer(invocation -> ShipmentCancellation.pending(invocation.getArgument(1)));
+
+        // when
+        ShipmentCancelResult result = shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID);
+
+        // then
+        assertThat(result.outcome()).isEqualTo(ShipmentCancelOutcome.REQUESTED);
+        assertThat(result.backToRealization()).isFalse();
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.Shipping);
+        assertThat(order.getShipments().get(0).getExternalId()).isEqualTo(EXTERNAL_ID);
+        verify(orderEventsRepository, never()).save(any());
+    }
+
+    @Test
+    void theCourierOrderIsFoundByItsIdWhenItsShipmentLostTheShippedDate() {
+        // given: a hand-typed shipment that went out first, then the booked courier without its date
+        Shipment typed = courierShipment(null);
+        Shipment booked = courierShipment(EXTERNAL_ID);
+        booked.setShippedAt(null);
+        Order order = orderWithShipments(typed, booked);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(shippingProviderFactory.get(store)).thenReturn(shippingProvider);
+        when(shippingProvider.cancelShipment(eq(EXTERNAL_ID), anyString()))
+                .thenAnswer(invocation -> ShipmentCancellation.pending(invocation.getArgument(1)));
+
+        // when
+        shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID);
+
+        // then
+        verify(shippingProvider).cancelShipment(eq(EXTERNAL_ID), anyString());
+        assertThat(booked.isCancellationPending()).isTrue();
+    }
+
+    @Test
+    void anImmediateCancellationOfOneCourierOrderKeepsTheOtherShipmentsAndTheStatusWhileOneOfThemIsShipped() {
+        // given: the courier order first, a parcel typed by hand that really went out after it
+        Shipment booked = courierShipment(EXTERNAL_ID);
+        Shipment typed = courierShipment(null);
+        typed.setTrackingNo("TRK-TYPED");
+        Order order = orderWithShipments(booked, typed);
+        order.setStatus(OrderStatus.Shipping);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(shippingProviderFactory.get(store)).thenReturn(shippingProvider);
+        succeedsRightAway();
+
+        // when
+        ShipmentCancelResult result = shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID);
+
+        // then: the typed parcel is with the carrier, so the order stays Shipping and the customer's e-mail stands
+        assertThat(result.backToRealization()).isFalse();
+        assertThat(order.getShipments()).containsExactly(typed);
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.Shipping);
+        verify(orderEventsRepository, never()).save(any());
+        verify(orderEventsRepository, never()).deleteByOrderIdAndName(any(), any());
+    }
+
+    @Test
+    void anImmediateCancellationOfACourierOrderOfTwoParcelsRemovesBothAndStepsBackWhenWhatIsLeftHasNotGoneOut() {
+        // given: two parcels of one courier order and a shipment still waiting for its data
+        Shipment parcel = courierShipment(EXTERNAL_ID);
+        Shipment secondParcel = courierShipment(EXTERNAL_ID);
+        secondParcel.setTrackingNo("TRK-124");
+        Shipment waiting = new Shipment(ShipmentType.Courier);
+        waiting.setTrackingNo("TRK-WAITING");
+        Order order = orderWithShipments(parcel, secondParcel, waiting);
+        order.setStatus(OrderStatus.Shipping);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(shippingProviderFactory.get(store)).thenReturn(shippingProvider);
+        succeedsRightAway();
+
+        // when
+        ShipmentCancelResult result = shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID);
+
+        // then
+        verify(shippingProvider).cancelShipment(eq(EXTERNAL_ID), anyString());
+        assertThat(order.getShipments()).containsExactly(waiting);
+        assertThat(result.backToRealization()).isTrue();
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.Realization);
+        verify(orderEventsRepository).deleteByOrderIdAndName(ORDER_ID, EmailNotificationType.ORDER_SHIPPING.name());
+    }
+
+    @Test
+    void aStoreThatLostItsShippingProviderGetsARefusalAndNothingChanges() {
+        // given: the carrier authorisation was lost, so the factory has no provider for the store
+        Shipment booked = courierShipment(EXTERNAL_ID);
+        Order order = orderWithShipments(booked);
+        order.setStatus(OrderStatus.Shipping);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(shippingProviderFactory.get(store)).thenReturn(null);
+
+        // when / then
+        assertThatThrownBy(() -> shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID))
+                .isInstanceOf(ShippingUnavailableException.class);
+        assertThat(order.getShipments()).containsExactly(booked);
+        assertThat(booked.getCancellationStatus()).isNull();
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.Shipping);
+        verify(ordersRepository, never()).save(any());
+        verify(publisher, never()).publish(any());
+        verifyNoInteractions(orderEventsRepository);
     }
 
     private Order orderWithShipments(Shipment... shipments) {

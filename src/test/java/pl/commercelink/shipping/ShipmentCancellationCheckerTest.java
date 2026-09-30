@@ -8,6 +8,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import pl.commercelink.orders.Order;
+import pl.commercelink.orders.OrderRealizationStepBack;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShipmentCancellationStatus;
@@ -69,7 +70,8 @@ class ShipmentCancellationCheckerTest {
         when(shippingProviderFactory.get(store)).thenReturn(provider);
         // the real settler: its own write rules are pinned in ShipmentCancellationSettlerTest
         ShipmentCancellationSettler settler =
-                new ShipmentCancellationSettler(ordersRepository, orderEventsRepository, optimisticLockingExecutor);
+                new ShipmentCancellationSettler(ordersRepository, orderEventsRepository, optimisticLockingExecutor,
+                        new OrderRealizationStepBack(orderEventsRepository));
         checker = new ShipmentCancellationChecker(storesRepository, ordersRepository, shippingProviderFactory, publisher, settler);
     }
 

@@ -4484,6 +4484,21 @@ class OrdersControllerTest {
         }
 
         @Test
+        void cancellingTheCourierOrderThatTakesTheOrderBackToRealizationSaysSo() {
+            // given: the provider confirmed right away and the settled order went back to Realization
+            orderWithASentShipment();
+            when(shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID)).thenReturn(ShipmentCancelResult.cancelled(true));
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            ordersController.cancelShipment(ORDER_ID, redirect, polish);
+
+            // then
+            assertThat(((OrderNotice) redirect.getFlashAttributes().get(OrderFlash.ATTRIBUTE)).text())
+                    .startsWith("shipment.cancel.success").contains("order.shipments.backToRealization");
+        }
+
+        @Test
         void cancelShipmentReportsAShipmentThatDisappearedMeanwhile() {
             // given
             orderWithASentShipment();
