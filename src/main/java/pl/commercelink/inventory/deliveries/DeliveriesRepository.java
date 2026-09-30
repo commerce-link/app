@@ -24,6 +24,7 @@ import java.util.Optional;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
+import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 @Slf4j
@@ -152,6 +153,9 @@ public class  DeliveriesRepository extends DynamoDbRepository<Delivery> {
 
     /** A delivery number typed from the list (its first 8 characters) or whole; the table key, no index needed. */
     public List<Delivery> findByDeliveryIdPrefix(String storeId, String prefix) {
+        if (isBlank(prefix)) {
+            return List.of();
+        }
         Map<String, AttributeValue> eav = Map.of(":storeId", new AttributeValue(storeId), ":p", new AttributeValue(prefix));
         return new ArrayList<>(dynamoDBMapper.query(Delivery.class, new DynamoDBQueryExpression<Delivery>()
                 .withKeyConditionExpression("storeId = :storeId AND begins_with(deliveryId, :p)")

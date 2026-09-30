@@ -134,4 +134,47 @@ class DeliveriesListIndexDynamoDbIntegrationTest {
         // when / then
         assertThat(deliveries.findInTransit("store-1")).isEmpty();
     }
+
+    @Test
+    @Order(5)
+    void backfillDoesNotOverwriteAKeyWrittenByASaveAfterTheScan() {
+        // given: a scanned copy that is stale, because the delivery was saved (fresh key, new version) after the scan
+        Delivery scanned = mapper.load(Delivery.class, "store-2", "cccc0001-0000-0000-0000-000000000000");
+        Delivery saved = mapper.load(Delivery.class, "store-2", "cccc0001-0000-0000-0000-000000000000");
+        saved.setReceivedAt(LocalDateTime.of(2026, 9, 30, 14, 0));
+        mapper.save(saved);
+        String freshKey = DeliveryListKey.of(saved);
+
+        // when
+        new V019_AddDeliveriesListKeyIndex(client).backfillListKey(scanned, true);
+
+        // then
+        assertThat(rawItem("store-2", "cccc0001-0000-0000-0000-000000000000").get("listKey").getS()).isEqualTo(freshKey);
+    }
+
+    @Test
+    @Order(6)
+    void backfillLeavesTheVersionUntouched() {
+        // given
+        Map<String, AttributeValue> before = rawItem("store-1", "bbbb0001-0000-0000-0000-000000000000");
+        new V019_AddDeliveriesListKeyIndex(client).backfillListKey(
+                mapper.load(Delivery.class, "store-1", "bbbb0001-0000-0000-0000-000000000000"), true);
+
+        // when
+        new V019_AddDeliveriesListKeyIndex(client).execute();
+
+        // then
+        assertThat(rawItem("store-1", "bbbb0001-0000-0000-0000-000000000000").get("version")).isEqualTo(before.get("version"));
+    }
+
+    @Test
+    @Order(7)
+    void aBlankDeliveryNumberFindsNothing() {
+        assertThat(deliveries.findByDeliveryIdPrefix("store-1", " ")).isEmpty();
+    }
+
+    static Map<String, AttributeValue> rawItem(String storeId, String deliveryId) {
+        return client.getItem("Deliveries", Map.of("storeId", new AttributeValue(storeId),
+                "deliveryId", new AttributeValue(deliveryId))).getItem();
+    }
 }
