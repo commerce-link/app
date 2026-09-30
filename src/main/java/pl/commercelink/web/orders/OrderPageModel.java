@@ -88,8 +88,6 @@ public record OrderPageModel(String orderId, String shortId, String backHref, bo
     /**
      * emptyKey: what the card says with no shipment, i.e. what the viewer can do about it now. forms: one edit form per
      * shipment, in the order of rows; blank: the form of "Add shipment". Both empty/null on a read-only page.
-     */
-    /**
      * cancelCourierLockedKey: why "Cancel courier order" shows greyed (its cancellation is already in progress), null
      * when it can run or is absent. cancellationPollHref: the JSON state the page polls while a cancellation of one of
      * its shipments is in progress, reloading once it ends; null when nothing is in progress or the page is read-only.

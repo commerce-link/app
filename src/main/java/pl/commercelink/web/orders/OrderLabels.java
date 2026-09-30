@@ -26,6 +26,9 @@ public final class OrderLabels {
     public static final String BAD = "is-bad";
     public static final String NEUTRAL = "is-neutral";
 
+    /** The text shipping-furgonetka stores when Furgonetka never got the cancel command (commandNotExists). */
+    static final String CANCEL_NOT_RECEIVED = "Furgonetka did not receive the cancel command";
+
     private OrderLabels() {
     }
 
@@ -159,9 +162,6 @@ public final class OrderLabels {
         }
         return shipment.needsCancellationRecheck(now) ? WARN : BAD;
     }
-
-    /** The text shipping-furgonetka stores when Furgonetka never got the cancel command (commandNotExists). */
-    static final String CANCEL_NOT_RECEIVED = "Furgonetka did not receive the cancel command";
 
     /**
      * The message key of a failed cancellation's reason when it is the adapter's own English text, or null: every
