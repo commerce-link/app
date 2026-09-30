@@ -4,8 +4,10 @@
 <!--/* Shipment rows with their own "Edytuj" and "Usuń", "Dodaj przesyłkę" and the courier cancellation in the head.
        "Edytuj" and "Dodaj przesyłkę" open the shipment's dialog (one per shipment, a fixed size whatever the number of
        shipments); without JavaScript they lead to the shipment page. "Usuń" goes through the confirmation dialog, or
-       its page without JavaScript; its text and button say when the removal delivers the order. The only shipment
-       with nothing but the delivery choice has no "Usuń": removing it would leave the same placeholder. */-->
+       its page without JavaScript; its text and button say when the removal delivers the order or moves it back to
+       "W realizacji". The only shipment with nothing but the delivery choice (the placeholder) reads as no shipment:
+       a greyed row "Sposób dostawy: …", "Brak przesyłki" and "Uzupełnij" (the same dialog) instead of "Edytuj", no
+       "Usuń" (removing it would leave the same placeholder). */-->
 <section th:fragment="card" class="cl-card" id="przesylki" aria-labelledby="shipments-title"
          th:with="shipments=${page.shipments()}">
     <div class="cl-card-head">
@@ -25,7 +27,21 @@
         </div>
     </div>
     <ul class="cl-list" th:if="${!shipments.rows().isEmpty()}">
-        <li class="cl-list-item" th:each="s : ${shipments.rows()}">
+        <li th:each="s : ${shipments.rows()}" th:if="${s.placeholder()}" class="cl-list-item is-placeholder" id="shipment-placeholder">
+            <div>
+                <p class="cl-list-title">
+                    <span th:text="#{order.shipments.placeholder.title(${#messages.msg(s.typeKey())})}
+                                   + (${s.pickupPoint() != null} ? ', ' + ${s.pickupPoint()} : '')"></span>
+                    <span th:if="${s.carrier() != null}" th:text="'· ' + ${s.carrier()}"></span>
+                </p>
+                <p class="cl-list-desc" th:text="#{order.shipments.placeholder.none}"></p>
+            </div>
+            <div class="cl-list-actions" th:if="${s.editHref() != null}">
+                <a class="cl-link-button" th:href="@{${s.editHref()}}" th:attr="data-cl-dialog-open=${s.dialogId()},
+                   aria-label=#{order.shipments.placeholder.fill.for(${s.number()})}" th:text="#{order.shipments.placeholder.fill}"></a>
+            </div>
+        </li>
+        <li class="cl-list-item" th:each="s : ${shipments.rows()}" th:unless="${s.placeholder()}">
             <div>
                 <p class="cl-list-title">
                     <span th:text="#{${s.typeKey()}}"></span>

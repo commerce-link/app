@@ -131,6 +131,12 @@ public class Shipment {
         return type == ShipmentType.PersonalCollection && shippedAt != null;
     }
 
+    /** It has a shipped (or ready-for-collection) or a delivery date: what the card shows as "nadano" / "dostarczono". */
+    @DynamoDBIgnore
+    public boolean hasGoneOut() {
+        return shippedAt != null || deliveredAt != null;
+    }
+
     @DynamoDBIgnore
     public boolean isDeliveredToCollectionPoint() {
         return isNotBlank(collectionPointCode);

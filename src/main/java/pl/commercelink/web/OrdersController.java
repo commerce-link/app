@@ -103,6 +103,7 @@ import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import pl.commercelink.inventory.deliveries.DropshipItemLookup;
 import pl.commercelink.inventory.supplier.SupplierChoice;
 import pl.commercelink.inventory.supplier.SupplierLabelMap;
@@ -620,6 +621,10 @@ public class OrdersController extends BaseController {
         }
         if (refusal != null) {
             return refuse(redirectAttributes, orderId, refusal, locale);
+        }
+        if (requested == OrderStatus.Shipping && order.getStatus() != OrderStatus.Shipping) {
+            // "W dostawie" by hand: a personal collection is ready for collection from now
+            order.markCollectionsReady(LocalDateTime.now());
         }
         order.setStatus(requested);
         // the lifecycle may move the order on at once (New with every item delivered becomes Assembled), as it did
@@ -1928,10 +1933,16 @@ public class OrdersController extends BaseController {
         } else {
             shipments.set(index, saved);
         }
-        storeShipments(existingOrder, shipments, saved, before);
+        // clearing the shipped date of the last shipment that went out takes a Shipping order back to Realization
+        boolean unshipped = before != null && before.hasGoneOut() && !saved.hasGoneOut();
+        boolean realizationEmail = realizationEmail(existingOrder);
+        boolean backToRealization = storeShipments(existingOrder, shipments, saved, before, unshipped);
 
         String notice = index == null ? messageSource.getMessage("order.shipments.added", null, locale)
                 : messageSource.getMessage("order.shipments.saved", new Object[]{index + 1}, locale);
+        if (backToRealization) {
+            notice += " " + backToRealizationNotice(realizationEmail, locale);
+        }
         if (async) {
             // the dialog reloads the page it is on (keeping its returnTo), which takes this notice
             OrderFlash.forNextPage(request, response, "/dashboard/orders/" + orderId,
@@ -1956,7 +1967,8 @@ public class OrdersController extends BaseController {
         // the same text and button as the card's confirmation dialog: they say when the removal delivers the order
         return OrderConfirmPages.render(model, new ConfirmAction(
                 messageSource.getMessage("order.shipments.remove.confirm.title", new Object[]{index + 1}, locale),
-                messageSource.getMessage(OrderPageModelFactory.removeShipmentMessageKey(order, index), null, locale),
+                messageSource.getMessage(OrderPageModelFactory.removeShipmentMessageKey(order, index,
+                        OrderPageModelFactory.removalReturnsToRealization(order, index) && realizationEmail(order)), null, locale),
                 messageSource.getMessage(OrderPageModelFactory.removeShipmentActionKey(order, index), null, locale),
                 "/dashboard/orders/" + orderId + "/shipments/" + index + "/remove?version=" + version,
                 "/dashboard/orders/" + orderId, true), orderPageTitle(order, locale));
@@ -1969,7 +1981,8 @@ public class OrdersController extends BaseController {
      * the shipment, and the order keeps a shipment to deliver. Once no shipment has shipping data left, the shipping
      * e-mail is forgotten (as "Cancel courier order" does), so the customer gets it with the number of the shipment
      * added next instead of keeping a link to the removed one. Removing the last undelivered shipment while the others
-     * are delivered delivers the order; the confirmation says so (OrderPageModelFactory.removeShipmentMessageKey).
+     * are delivered delivers the order; removing the last one that went out of a Shipping order takes it back to
+     * Realization; the confirmation and the notice say so (OrderPageModelFactory.removeShipmentMessageKey).
      */
     @PostMapping("/dashboard/orders/{orderId}/shipments/{index}/remove")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
@@ -1983,14 +1996,24 @@ public class OrdersController extends BaseController {
         }
         List<Shipment> shipments = new ArrayList<>(existingOrder.getShipments());
         Shipment removed = shipments.remove(index);
-        if (shipments.isEmpty()) {
-            shipments.add(Shipment.placeholderFor(removed));
+        Shipment placeholder = shipments.isEmpty() ? Shipment.placeholderFor(removed) : null;
+        if (placeholder != null) {
+            shipments.add(placeholder);
         }
-        storeShipments(existingOrder, shipments, null, null);
+        boolean realizationEmail = realizationEmail(existingOrder);
+        boolean backToRealization = storeShipments(existingOrder, shipments, null, null, true);
         if (removed.hasShippingData() && existingOrder.firstShipmentWithShippingData().isEmpty()) {
             orderEventsRepository.deleteByOrderIdAndName(orderId, EmailNotificationType.ORDER_SHIPPING.name());
         }
-        OrderFlash.saved(redirectAttributes, messageSource.getMessage("order.shipments.removed", new Object[]{index + 1}, locale));
+        // the notice says what is left in place of the only shipment, and that the order went back
+        String notice = placeholder == null
+                ? messageSource.getMessage("order.shipments.removed", new Object[]{index + 1}, locale)
+                : messageSource.getMessage("order.shipments.removed.placeholder",
+                        new Object[]{index + 1, deliveryChoice(placeholder, locale)}, locale);
+        if (backToRealization) {
+            notice += " " + backToRealizationNotice(realizationEmail, locale);
+        }
+        OrderFlash.saved(redirectAttributes, notice);
         return details(orderId);
     }
 
@@ -2026,10 +2049,15 @@ public class OrdersController extends BaseController {
      * delivery date on every shipment moves the order to Delivered). saved is the shipment just added or edited (null
      * for a removal) and before its previous state (null for a new one): only its own shipping data, when new or
      * changed, is announced (the e-mail to the customer, the number to the marketplace), never a shipment already
-     * announced that merely sits next to it, nor a corrected date of one already announced.
+     * announced that merely sits next to it, nor a corrected date of one already announced. unshipping: the change
+     * takes a shipment back from having gone out (a removal, a cleared date); when that leaves a Shipping order with
+     * nothing gone out, the order goes back to Realization before the lifecycle sees it (the user's decision of
+     * 2026-09-30, see Order#returnToRealizationWhenNothingShipped). Returns whether it went back.
      */
-    private void storeShipments(Order existingOrder, List<Shipment> shipments, Shipment saved, Shipment before) {
+    private boolean storeShipments(Order existingOrder, List<Shipment> shipments, Shipment saved, Shipment before,
+                                   boolean unshipping) {
         existingOrder.setShipments(shipments);
+        boolean backToRealization = unshipping && existingOrder.returnToRealizationWhenNothingShipped();
         shipmentTrackingSubscriber.subscribe(getStoreId(), existingOrder);
         orderLifecycle.update(existingOrder);
         boolean notifiable = saved != null && isAnnounceable(saved);
@@ -2038,6 +2066,27 @@ public class OrdersController extends BaseController {
         if (notifiable && changed) {
             orderLifecycleEventPublisher.publish(existingOrder, OrderLifecycleEventType.ShipmentCreated);
         }
+        return backToRealization;
+    }
+
+    /** Whether the order, going back to Realization now, may send the customer the Realization e-mail. */
+    private boolean realizationEmail(Order order) {
+        return order.getStatus() == OrderStatus.Shipping
+                && OrderPageModelFactory.sendsRealizationEmail(order, pageModelFactory.realizationEmailSent(order));
+    }
+
+    private String backToRealizationNotice(boolean realizationEmail, Locale locale) {
+        String status = messageSource.getMessage(OrderLabels.status(OrderStatus.Realization), null, locale);
+        return messageSource.getMessage(realizationEmail ? "order.shipments.backToRealization.email"
+                : "order.shipments.backToRealization", new Object[]{status}, locale);
+    }
+
+    /** The customer's delivery choice a placeholder keeps, as the removal notice names it ("odbiór osobisty", "punkt odbioru WAW01A"). */
+    private String deliveryChoice(Shipment placeholder, Locale locale) {
+        String type = placeholder.getType() == null ? ""
+                : messageSource.getMessage(OrderLabels.shipmentType(placeholder.getType()), null, locale).toLowerCase(locale);
+        String point = StringUtils.trimToNull(placeholder.getCollectionPointCode());
+        return point == null ? type : type + " " + point;
     }
 
     private List<String> shipmentCarriers(Order order) {

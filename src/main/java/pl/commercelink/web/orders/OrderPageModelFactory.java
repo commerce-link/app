@@ -386,6 +386,10 @@ public class OrderPageModelFactory {
         // the courier order can be cancelled only while its labelled parcel is still on the way
         Shipment courierCancellable = order.canOrderShipment() ? order.firstShipmentWithShippingData()
                 .filter(s -> s.getExternalId() != null && s.getDeliveredAt() == null).orElse(null) : null;
+        // only a Shipping order can go back to Realization, so only its page asks the history for the e-mail
+        boolean realizationEmail = !readOnly && order.getStatus() == OrderStatus.Shipping
+                && sendsRealizationEmail(order, realizationEmailSent(order));
+        boolean placeholder = order.onlyPlaceholder().isPresent();
         for (int i = 0; i < shipments.size(); i++) {
             Shipment s = shipments.get(i);
             OrderShipmentForm form = OrderShipmentForm.of(order.getOrderId(), i, s, carriers);
@@ -403,8 +407,8 @@ public class OrderPageModelFactory {
                     // every parcel of one courier order carries its externalId, and cancelling it cancels them all
                     readOnly ? null : removeReasonKey(order, i, courierCancellable != null
                             && Objects.equals(s.getExternalId(), courierCancellable.getExternalId())),
-                    removeShipmentMessageKey(order, i),
-                    removeShipmentActionKey(order, i)));
+                    removeShipmentMessageKey(order, i, realizationEmail),
+                    removeShipmentActionKey(order, i), placeholder));
             if (!readOnly) {
                 forms.add(form);
             }
@@ -437,7 +441,8 @@ public class OrderPageModelFactory {
     /**
      * Why the shipment at index cannot be removed, or null. The only shipment can go: OrdersController keeps a
      * placeholder with the customer's delivery choice in its place, and the order waits for it to be sent (OrderLifecycle
-     * neither delivers nor completes an order before its shipments are delivered). A delivered order keeps its
+     * neither delivers nor completes an order before its shipments are delivered; a Shipping order left with nothing
+     * shipped goes back to Realization). A delivered order keeps its
      * shipments, they are the record of the delivery; so does a shipment with a delivery date. One with a courier order
      * is cancelled with "Cancel courier order", which also cancels the paid label at the carrier, never by dropping
      * the record.
@@ -687,13 +692,44 @@ public class OrderPageModelFactory {
      * others are delivered moves the order to Delivered in the same save (OrderLifecycle), with what follows from it: the
      * goods issue note, the e-receipt for the customer, the notice to the marketplace. Removing the only shipment keeps
      * it as a placeholder waiting to go out, with how the customer asked to receive the order (type, pickup point).
+     * Removing the last shipment that went out of a Shipping order moves it back to Realization
+     * (Order#returnToRealizationWhenNothingShipped); realizationEmail: the customer may get the Realization e-mail then
+     * (sendsRealizationEmail), which the text says instead of "the customer is not notified".
      */
-    public static String removeShipmentMessageKey(Order order, int index) {
+    public static String removeShipmentMessageKey(Order order, int index, boolean realizationEmail) {
         if (removalDelivers(order, index)) {
             return "order.shipments.remove.confirm.delivers";
         }
-        return order.getShipments().size() == 1 ? "order.shipments.remove.confirm.message.last"
+        String key = order.getShipments().size() == 1 ? "order.shipments.remove.confirm.message.last"
                 : "order.shipments.remove.confirm.message";
+        if (removalReturnsToRealization(order, index)) {
+            return key + (realizationEmail ? ".realization.email" : ".realization");
+        }
+        return key;
+    }
+
+    /** Whether removing the shipment at index leaves a Shipping order with nothing gone out (the placeholder never has). */
+    public static boolean removalReturnsToRealization(Order order, int index) {
+        if (order.getStatus() != OrderStatus.Shipping) {
+            return false;
+        }
+        List<Shipment> rest = new ArrayList<>(order.getShipments());
+        rest.remove(index);
+        return rest.stream().noneMatch(Shipment::hasGoneOut);
+    }
+
+    /**
+     * Whether an order going back to Realization may send the customer the Realization e-mail
+     * (OrderNotificationsService sends it once, with the estimated shipping date, while notifications are on).
+     * realizationEmailSent: the order's history has that e-mail already.
+     */
+    public static boolean sendsRealizationEmail(Order order, boolean realizationEmailSent) {
+        return order.isEmailNotificationsEnabled() && order.getEstimatedShippingAt() != null && !realizationEmailSent;
+    }
+
+    /** Whether the order's history has the Realization e-mail already. */
+    public boolean realizationEmailSent(Order order) {
+        return orderEventsRepository.hasEvent(order.getOrderId(), EventType.email, EmailNotificationType.ORDER_REALIZATION.name());
     }
 
     /** The confirmation's button: it names the delivery when the removal delivers the order. */

@@ -211,6 +211,38 @@ public class Order {
         return !getShipments().isEmpty() && getShipments().stream().allMatch(s -> s.hasCollectionData() || s.hasShippingData());
     }
 
+    /** At least one shipment has gone out (a shipped or delivery date), or waits for collection. */
+    @DynamoDBIgnore
+    public boolean hasShippedShipment() {
+        return getShipments().stream().anyMatch(Shipment::hasGoneOut);
+    }
+
+    /**
+     * An operator's correction left a Shipping order with nothing shipped (the only shipment removed, a shipped date
+     * cleared): the order goes back to Realization and waits for the next shipment, which moves it to Shipping again
+     * (OrderLifecycle). Returns whether it went back. Kept out of OrderLifecycle on purpose: the lifecycle never moves
+     * an order back by itself, only this operator action does.
+     */
+    public boolean returnToRealizationWhenNothingShipped() {
+        if (status != OrderStatus.Shipping || hasShippedShipment()) {
+            return false;
+        }
+        status = OrderStatus.Realization;
+        return true;
+    }
+
+    /**
+     * For a personal collection "Shipping" means ready for collection: every collection shipment without its moment of
+     * readiness gets now. Called when the operator moves the order to Shipping by hand; the lifecycle's own move to
+     * Shipping needs every shipment shipped or ready already.
+     */
+    public void markCollectionsReady(LocalDateTime now) {
+        getShipments().stream()
+                .filter(shipment -> shipment.getType() == ShipmentType.PersonalCollection)
+                .filter(shipment -> shipment.getShippedAt() == null)
+                .forEach(shipment -> shipment.setShippedAt(now));
+    }
+
     @DynamoDBIgnore
     public boolean isB2B() {
         return billingDetails != null && billingDetails.hasTaxId();

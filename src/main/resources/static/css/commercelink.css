@@ -1443,6 +1443,26 @@ body.cl-drawer-open .cl-sidebar {
     font-size: 13px;
 }
 
+/* A row standing in for a record that does not exist yet (the shipments card's placeholder: the customer's delivery
+   choice, no shipment): greyed on the secondary surface, its title in the regular weight of a description. */
+.cl-page .cl-list .cl-list-item.is-placeholder {
+    background: var(--cl-surface-2);
+}
+
+/* the card does not clip its content: the last row's tint follows the card's rounded bottom itself */
+.cl-page .cl-card > .cl-list:last-child > .cl-list-item.is-placeholder:last-child {
+    border-radius: 0 0 calc(var(--cl-radius) - 1px) calc(var(--cl-radius) - 1px);
+}
+
+.cl-page .cl-list .cl-list-item.is-placeholder .cl-list-title {
+    font-weight: 500;
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-list .cl-list-item.is-placeholder .cl-list-desc {
+    color: var(--cl-ink-3);
+}
+
 /* What a record still lacks, in the colour of its warning pill so it is read together with it */
 .cl-page .cl-list .cl-list-desc.is-warn {
     color: var(--cl-warn);

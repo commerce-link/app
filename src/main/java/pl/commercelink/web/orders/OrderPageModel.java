@@ -102,13 +102,15 @@ public record OrderPageModel(String orderId, String shortId, String backHref, bo
      * date and one with a courier order (cancelled with "Cancel courier order" instead) removeHref is null and
      * removeReasonKey says why, so "Remove" shows greyed with that reason instead of disappearing. The only shipment
      * with nothing but the delivery choice has neither: removing it would change nothing. removeMessageKey and
-     * removeActionKey are the confirmation's text and button, which say when the removal delivers the order.
+     * removeActionKey are the confirmation's text and button, which say when the removal delivers the order or moves it
+     * back to Realization. placeholder: the order's only shipment holds nothing but the customer's delivery choice, so the
+     * row reads as "no shipment yet" with "Uzupełnij" instead of a shipment waiting to go out.
      */
     public record ShipmentRow(int number, String typeKey, String carrier, String trackingNo, String trackingUrl,
                               String pickupPoint, String shippedAt, String deliveredAt, String trackingKey,
                               String trackingTone, String trackingHelpKey, String dialogId, String editHref,
                               String removeHref, String removeReasonKey, String removeMessageKey,
-                              String removeActionKey) {
+                              String removeActionKey, boolean placeholder) {
     }
 
     /**

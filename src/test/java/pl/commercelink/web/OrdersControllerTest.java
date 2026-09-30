@@ -101,6 +101,13 @@ import pl.commercelink.web.orders.OrderPaymentForm;
 import pl.commercelink.web.orders.OrderShipmentForm;
 import pl.commercelink.web.settings.ConfirmAction;
 
+import org.springframework.test.util.ReflectionTestUtils;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
+import pl.commercelink.orders.notifications.OrderNotificationsEventPublisher;
+import pl.commercelink.warehouse.GoodsOutEventPublisher;
+import pl.commercelink.receipts.ReceiptTrigger;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -388,6 +395,10 @@ class OrdersControllerTest {
 
         private Object errorMessage() {
             return redirect.getFlashAttributes().get("errorMessage");
+        }
+
+        private OrderNotice notice(RedirectAttributesModelMap redirect) {
+            return (OrderNotice) redirect.getFlashAttributes().get(OrderFlash.ATTRIBUTE);
         }
 
         @Test
@@ -683,7 +694,7 @@ class OrdersControllerTest {
         }
 
         @Test
-        void removingTheOnlyShipmentLeavesAPlaceholderWithTheCustomersChoice() {
+        void removingTheOnlyShipmentLeavesAPlaceholderWithTheCustomersChoiceAndTakesTheOrderBackToRealization() {
             // given: a pickup-point shipment with a number typed by hand; the customer card, the client page and the
             // dropship flow read the delivery type and the pickup point from the shipment
             Shipment only = new Shipment(ShipmentType.PickupPoint);
@@ -699,7 +710,8 @@ class OrdersControllerTest {
             // when
             String view = ordersController.removeShipment(ORDER_ID, 0, OrderShipmentForm.version(only), redirect, Locale.ENGLISH);
 
-            // then: the choice stays, waiting to go out again; the order keeps a shipment to deliver
+            // then: the choice stays, waiting to go out again; the order keeps a shipment to deliver and, with nothing
+            // shipped any more, waits in Realization for it (the user's decision of 2026-09-30, overturning Q2)
             assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
             assertThat(errorMessage()).isNull();
             assertThat(order.getShipments()).singleElement().satisfies(placeholder -> {
@@ -714,7 +726,8 @@ class OrdersControllerTest {
                 assertThat(placeholder.getExternalId()).isNull();
                 assertThat(placeholder.hasTrackingSubscription()).isFalse();
             });
-            assertThat(order.getStatus()).isEqualTo(OrderStatus.Shipping);
+            assertThat(order.getStatus()).isEqualTo(OrderStatus.Realization);
+            assertThat(notice(redirect).text()).isEqualTo("order.shipments.removed.placeholder order.shipments.backToRealization");
             verify(orderLifecycle).update(order);
             verify(orderLifecycleEventPublisher, never()).publish(any(), any());
         }
@@ -779,13 +792,13 @@ class OrdersControllerTest {
             ConfirmAction confirm = (ConfirmAction) model.getAttribute("confirm");
             assertThat(confirm.message()).isEqualTo("order.shipments.remove.confirm.delivers");
             assertThat(confirm.confirmLabel()).isEqualTo("order.shipments.remove.confirm.action.delivers");
-            assertThat(OrderPageModelFactory.removeShipmentMessageKey(order, 1)).isEqualTo("order.shipments.remove.confirm.delivers");
+            assertThat(OrderPageModelFactory.removeShipmentMessageKey(order, 1, false)).isEqualTo("order.shipments.remove.confirm.delivers");
             // removing an undelivered one next to another undelivered one delivers nothing
             Order twoOnTheWay = orderBase();
             twoOnTheWay.setStatus(OrderStatus.Shipping);
             twoOnTheWay.setShipments(new ArrayList<>(List.of(courier("TRACK-1", LocalDateTime.of(2026, 9, 1, 9, 0)),
                     courier("TRACK-2", LocalDateTime.of(2026, 9, 1, 9, 0)))));
-            assertThat(OrderPageModelFactory.removeShipmentMessageKey(twoOnTheWay, 1)).isEqualTo("order.shipments.remove.confirm.message");
+            assertThat(OrderPageModelFactory.removeShipmentMessageKey(twoOnTheWay, 1, false)).isEqualTo("order.shipments.remove.confirm.message");
             assertThat(OrderPageModelFactory.removeShipmentActionKey(twoOnTheWay, 1)).isEqualTo("order.shipments.remove.confirm.action");
         }
 
@@ -803,6 +816,155 @@ class OrdersControllerTest {
             ConfirmAction confirm = (ConfirmAction) model.getAttribute("confirm");
             assertThat(confirm.message()).isEqualTo("order.shipments.remove.confirm.message.last");
             assertThat(confirm.actionPath()).endsWith("/shipments/0/remove?version=" + OrderShipmentForm.version(only));
+        }
+
+        @Test
+        void theRemovalConfirmationSaysWhenTheOrderGoesBackToRealizationAndWhetherTheCustomerHearsOfIt() {
+            // given: a Shipping order whose only shipped shipment is the one removed
+            Shipment only = courier("TRACK-1", LocalDateTime.of(2026, 9, 1, 9, 0));
+            Order order = orderWith(only);
+            order.setStatus(OrderStatus.Shipping);
+            order.setEstimatedShippingAt(LocalDate.of(2026, 9, 3));
+            order.setEmailNotificationsEnabled(true);
+            Shipment shipped = courier("TRACK-2", LocalDateTime.of(2026, 9, 1, 9, 0));
+            Shipment waiting = courier(null, null);
+            Order twoOfThem = orderBase();
+            twoOfThem.setStatus(OrderStatus.Shipping);
+            twoOfThem.setShipments(new ArrayList<>(List.of(waiting, shipped)));
+            ExtendedModelMap model = new ExtendedModelMap();
+            when(pageModelFactory.realizationEmailSent(order)).thenReturn(false);
+
+            // when
+            ordersController.confirmRemoveShipment(ORDER_ID, 0, OrderShipmentForm.version(only), model, redirect, Locale.ENGLISH);
+
+            // then: the no-JS page says it as the dialog does, here with the Realization e-mail still to go out
+            ConfirmAction confirm = (ConfirmAction) model.getAttribute("confirm");
+            assertThat(confirm.message()).isEqualTo("order.shipments.remove.confirm.message.last.realization.email");
+            assertThat(OrderPageModelFactory.removeShipmentMessageKey(order, 0, false))
+                    .isEqualTo("order.shipments.remove.confirm.message.last.realization");
+            assertThat(OrderPageModelFactory.removeShipmentMessageKey(twoOfThem, 1, false))
+                    .isEqualTo("order.shipments.remove.confirm.message.realization");
+            assertThat(OrderPageModelFactory.removeShipmentMessageKey(twoOfThem, 0, false))
+                    .isEqualTo("order.shipments.remove.confirm.message");
+            // the e-mail goes once, with the estimated shipping date, while notifications are on
+            assertThat(OrderPageModelFactory.sendsRealizationEmail(order, true)).isFalse();
+            order.setEstimatedShippingAt(null);
+            assertThat(OrderPageModelFactory.sendsRealizationEmail(order, false)).isFalse();
+        }
+
+        /**
+         * The real OrderLifecycle, its own collaborators mocked: the removal and the edit are checked against what the
+         * lifecycle does to the saved order, which a mocked lifecycle hid (K8: a personal collection re-stamped as
+         * ready in the same save, so "Remove" seemed to do nothing).
+         */
+        private OrderLifecycle realLifecycle() {
+            OrderLifecycle lifecycle = new OrderLifecycle();
+            ReflectionTestUtils.setField(lifecycle, "storesRepository", storesRepository);
+            ReflectionTestUtils.setField(lifecycle, "ordersRepository", ordersRepository);
+            ReflectionTestUtils.setField(lifecycle, "orderItemsRepository", orderItemsRepository);
+            ReflectionTestUtils.setField(lifecycle, "orderLifecycleEventPublisher", orderLifecycleEventPublisher);
+            ReflectionTestUtils.setField(lifecycle, "notificationEventPublisher", mock(OrderNotificationsEventPublisher.class));
+            ReflectionTestUtils.setField(lifecycle, "invoiceCreationEventPublisher", invoiceCreationEventPublisher);
+            ReflectionTestUtils.setField(lifecycle, "goodsOutEventPublisher", mock(GoodsOutEventPublisher.class));
+            ReflectionTestUtils.setField(lifecycle, "dropshipItemLookup", dropshipItemLookup);
+            ReflectionTestUtils.setField(lifecycle, "receiptTrigger", mock(ReceiptTrigger.class));
+            ReflectionTestUtils.setField(lifecycle, "receiptAttemptService", receiptAttemptService);
+            ReflectionTestUtils.setField(ordersController, "orderLifecycle", lifecycle);
+            return lifecycle;
+        }
+
+        private Shipment shipped(ShipmentType type) {
+            Shipment shipment = new Shipment(type);
+            if (type != ShipmentType.PersonalCollection) {
+                shipment.setCarrier("InPost");
+                shipment.setTrackingNo("TRACK-" + type.name());
+            }
+            if (type == ShipmentType.PickupPoint) {
+                shipment.setCollectionPointCode("WAW01M");
+            }
+            shipment.setShippedAt(LocalDateTime.of(2026, 9, 30, 11, 40));
+            return shipment;
+        }
+
+        @ParameterizedTest
+        @EnumSource(ShipmentType.class)
+        void removingTheOnlyShippedShipmentWithTheRealLifecycleLeavesAnEmptyPlaceholderInRealization(ShipmentType type) {
+            // given
+            realLifecycle();
+            Shipment only = shipped(type);
+            Order order = orderWith(only);
+            order.setStatus(OrderStatus.Shipping);
+
+            // when
+            ordersController.removeShipment(ORDER_ID, 0, OrderShipmentForm.version(only), redirect, Locale.ENGLISH);
+
+            // then: nothing regrows a shipped date, the row offers no "Remove" and the order waits in Realization
+            assertThat(order.getStatus()).isEqualTo(OrderStatus.Realization);
+            assertThat(order.getShipments()).singleElement().satisfies(placeholder -> {
+                assertThat(placeholder.getType()).isEqualTo(type);
+                assertThat(placeholder.getShippedAt()).isNull();
+                assertThat(placeholder.isPlaceholder()).isTrue();
+            });
+            assertThat(order.onlyPlaceholder()).isPresent();
+            verify(ordersRepository).save(order);
+            assertThat(notice(redirect).text()).isEqualTo("order.shipments.removed.placeholder order.shipments.backToRealization");
+        }
+
+        @ParameterizedTest
+        @EnumSource(ShipmentType.class)
+        void clearingTheShippedDateOfTheOnlyShipmentWithTheRealLifecycleTakesTheOrderBackToRealization(ShipmentType type) {
+            // given
+            realLifecycle();
+            Shipment only = shipped(type);
+            Order order = orderWith(only);
+            order.setStatus(OrderStatus.Shipping);
+            Shipment cleared = shipped(type);
+            cleared.setShippedAt(null);
+
+            // when
+            save(0, OrderShipmentForm.version(only), cleared);
+
+            // then
+            assertThat(order.getStatus()).isEqualTo(OrderStatus.Realization);
+            assertThat(order.getShipments()).singleElement().satisfies(s -> assertThat(s.getShippedAt()).isNull());
+            assertThat(notice(redirect).text()).isEqualTo("order.shipments.saved order.shipments.backToRealization");
+        }
+
+        @Test
+        void aCollectionEmptiedWhileAnotherShipmentKeepsTheOrderShippingIsNotStampedReadyAgain() {
+            // given: a courier parcel on its way and a personal collection, both out; the operator clears the latter
+            realLifecycle();
+            Shipment parcel = shipped(ShipmentType.Courier);
+            Shipment collection = shipped(ShipmentType.PersonalCollection);
+            Order order = orderWith(parcel, collection);
+            order.setStatus(OrderStatus.Shipping);
+            Shipment cleared = new Shipment(ShipmentType.PersonalCollection);
+
+            // when
+            save(1, OrderShipmentForm.version(collection), cleared);
+
+            // then: the order stays Shipping for the parcel, the collection keeps the date the operator took away
+            assertThat(order.getStatus()).isEqualTo(OrderStatus.Shipping);
+            assertThat(order.getShipments().get(1).getShippedAt()).isNull();
+            assertThat(notice(redirect).text()).isEqualTo("order.shipments.saved");
+        }
+
+        @Test
+        void removingOneOfTwoShippedShipmentsKeepsTheOrderShipping() {
+            // given
+            realLifecycle();
+            Shipment first = shipped(ShipmentType.Courier);
+            Shipment second = shipped(ShipmentType.PersonalCollection);
+            Order order = orderWith(first, second);
+            order.setStatus(OrderStatus.Shipping);
+
+            // when
+            ordersController.removeShipment(ORDER_ID, 0, OrderShipmentForm.version(first), redirect, Locale.ENGLISH);
+
+            // then
+            assertThat(order.getStatus()).isEqualTo(OrderStatus.Shipping);
+            assertThat(order.getShipments()).containsExactly(second);
+            assertThat(notice(redirect).text()).isEqualTo("order.shipments.removed");
         }
 
         @Test
@@ -3170,6 +3332,26 @@ class OrdersControllerTest {
             assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
             assertThat(notice(redirect).tone()).isEqualTo("is-warn");
             assertThat(notice(redirect).text()).startsWith("order.status.changed.auto");
+        }
+
+        @Test
+        void movingAnOrderToShippingByHandMarksItsPersonalCollectionReadyFromNow() {
+            // given: "W dostawie" for a personal collection means ready for collection
+            Order order = order(OrderStatus.Realization);
+            Shipment collection = new Shipment(ShipmentType.PersonalCollection);
+            order.setShipments(new ArrayList<>(List.of(collection)));
+            Order again = order(OrderStatus.Shipping);
+            Shipment emptied = new Shipment(ShipmentType.PersonalCollection);
+            again.setShipments(new ArrayList<>(List.of(emptied)));
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order, again);
+
+            // when
+            ordersController.changeStatus(ORDER_ID, "Shipping", new RedirectAttributesModelMap(), polish);
+            ordersController.changeStatus(ORDER_ID, "Shipping", new RedirectAttributesModelMap(), polish);
+
+            // then: only the move into Shipping stamps; choosing it again for a Shipping order changes nothing
+            assertThat(collection.getShippedAt()).isNotNull();
+            assertThat(emptied.getShippedAt()).isNull();
         }
 
         @Test
