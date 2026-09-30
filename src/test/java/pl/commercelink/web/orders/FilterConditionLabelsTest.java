@@ -34,6 +34,13 @@ class FilterConditionLabelsTest {
     }
 
     @Test
+    void aCustomerTypePillNamesTheKindOfCustomer() {
+        // when / then
+        assertThat(FilterConditionLabels.pill("CustomerType", List.of("B2B"), PL)).isEqualTo("Klient: Firma (B2B)");
+        assertThat(FilterConditionLabels.pill("CustomerType", List.of("b2c"), PL)).isEqualTo("Klient: Osoba prywatna (B2C)");
+    }
+
+    @Test
     void anUnknownValueIsShownAsStored() {
         // when / then
         assertThat(FilterConditionLabels.pill("Status", List.of("Archived"), PL)).isEqualTo("Status: Archived");
