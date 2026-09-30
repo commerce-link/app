@@ -1,6 +1,8 @@
 package pl.commercelink.taxonomy;
 
-import org.springframework.scheduling.annotation.Scheduled;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import pl.commercelink.pim.api.CategoryMatchRequest;
 import pl.commercelink.pim.api.PimCatalog;
@@ -8,8 +10,10 @@ import pl.commercelink.taxonomy.mapping.CategoryMappingCache;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
+@Slf4j
 @Component
-class TaxonomyCategoryMatchScheduler {
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
+class TaxonomyCategoryMatchSweep {
 
     private final TaxonomyCache taxonomyCache;
     private final PimCatalog pimCatalog;
@@ -17,22 +21,10 @@ class TaxonomyCategoryMatchScheduler {
     private final TaxonomyCategoryEnrichment enrichment;
     private final CategoryMappingCache mappingCache;
     private final CategoryMatchAttempts attempts;
+    // Per instance on purpose: the queue hands each tick to a single instance, and a local counter still walks
+    // that instance through every bucket of its own in-memory pending rows, however the ticks are split.
     private final AtomicInteger sweepCounter = new AtomicInteger();
 
-    TaxonomyCategoryMatchScheduler(TaxonomyCache taxonomyCache, PimCatalog pimCatalog,
-                                   TaxonomyCategoryMatchProperties properties,
-                                   TaxonomyCategoryEnrichment enrichment,
-                                   CategoryMappingCache mappingCache,
-                                   CategoryMatchAttempts attempts) {
-        this.taxonomyCache = taxonomyCache;
-        this.pimCatalog = pimCatalog;
-        this.properties = properties;
-        this.enrichment = enrichment;
-        this.mappingCache = mappingCache;
-        this.attempts = attempts;
-    }
-
-    @Scheduled(cron = "${taxonomy.category-match.sweep-cron:0 2-57/5 * * * ?}")
     void sweep() {
         int bucket = Math.floorMod(sweepCounter.getAndIncrement(), properties.buckets());
         int pendingTotal = 0;
@@ -61,15 +53,13 @@ class TaxonomyCategoryMatchScheduler {
                 submitted++;
                 attempts.record(taxonomy.mfn());
             } catch (IllegalStateException e) {
-                System.out.println("Category match sweep aborted: " + e.getMessage());
+                log.warn("Category match sweep aborted: {}", e.getMessage());
                 return;
             }
         }
         if (pendingTotal > 0) {
-            System.out.println("Category match sweep: bucket=" + bucket
-                    + " pending=" + pendingTotal + " submitted=" + submitted
-                    + " resolvedFromMapping=" + resolvedFromMapping
-                    + " givenUp=" + givenUp);
+            log.info("Category match sweep: bucket={} pending={} submitted={} resolvedFromMapping={} givenUp={}",
+                    bucket, pendingTotal, submitted, resolvedFromMapping, givenUp);
         }
     }
 
