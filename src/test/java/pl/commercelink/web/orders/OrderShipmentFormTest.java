@@ -194,6 +194,31 @@ class OrderShipmentFormTest {
     }
 
     @Test
+    void theShippedDateOfACourierShipmentChangesButIsNotCleared() {
+        // given: a booked courier with its shipped date
+        Shipment saved = courierOrder();
+        saved.setShippedAt(LocalDateTime.of(2026, 9, 27, 8, 5));
+
+        // when
+        Map<String, String> cleared = posted(" ").validate(saved);
+        Map<String, String> moved = posted("2026-09-28").validate(saved);
+        Map<String, String> clearedWithoutCourier = posted("").validate(courierShipped());
+
+        // then: without its date the shipment would stop counting as sent and a second courier could be booked
+        assertThat(cleared).containsOnly(Map.entry("shipment-0-shippedDate", "order.shipments.error.courierShippedDate"));
+        assertThat(moved).isEmpty();
+        assertThat(clearedWithoutCourier).isEmpty();
+    }
+
+    private static Shipment courierShipped() {
+        Shipment shipment = new Shipment(ShipmentType.Courier);
+        shipment.setCarrier("DPD");
+        shipment.setTrackingNo("T-1");
+        shipment.setShippedAt(LocalDateTime.of(2026, 9, 27, 8, 5));
+        return shipment;
+    }
+
+    @Test
     void aDeliveryDateInTheFutureIsAFieldError() {
         // when
         Map<String, String> tomorrow = dated("2026-09-29", "2026-09-30").validate();

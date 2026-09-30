@@ -64,6 +64,8 @@ The app depends only on contract and shared libraries, never on adapter implemen
 3. Adapter libraries implement the interfaces and register via `META-INF/services/` for `ServiceLoader` discovery
 4. The app's `ProviderFactory` subclasses (e.g. `InvoicingProviderFactory`, `MarketplaceProviderFactory`, `SupplierProviderFactory`, `PaymentProviderFactory`) instantiate per-store providers from the discovered descriptors
 
+A provider's per-store configuration (API keys and other settings) lives in Secrets Manager, and `ProviderConfigurationManager` reads it on every use, without an in-memory cache: a save in the dashboard is handled by one instance, so a copy kept in memory would stay stale on the others until a restart.
+
 ### Package Layout (`src/main/java/pl/commercelink/`)
 
 | Package | Purpose |

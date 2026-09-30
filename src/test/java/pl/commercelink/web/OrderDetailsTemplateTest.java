@@ -219,7 +219,7 @@ class OrderDetailsTemplateTest {
     }
 
     @Test
-    void theFulfilmentTypeShowsAsAnIconAndAShortLabelInTheHeaderAndTheSettingsCard() {
+    void theFulfilmentTypeShowsAsAnIconAndAShortLabelInTheHeaderOnly() {
         // given: WarehouseFulfilment is order()'s default
         Order warehouse = order(OrderStatus.Assembly);
         Order dropship = order(OrderStatus.Assembly);
@@ -233,14 +233,15 @@ class OrderDetailsTemplateTest {
         String dropshipHeader = header(dropshipFullHtml);
         String dropshipSettings = card(dropshipFullHtml, "settings-title");
 
-        // then: decorative icon + short text in both read-only places, not the long store-settings label
-        for (String html : List.of(warehouseHeader, warehouseSettings)) {
-            assertThat(html).contains("cl-icon-text").contains("fas fa-warehouse\" aria-hidden=\"true\"")
-                    .contains("Magazyn sklepu").doesNotContain("Przez magazyn sklepu");
-        }
-        for (String html : List.of(dropshipHeader, dropshipSettings)) {
-            assertThat(html).contains("cl-icon-text").contains("fas fa-truck\" aria-hidden=\"true\"")
-                    .contains("Dropshipping").doesNotContain("Wysyłką od dostawcy do klienta");
+        // then: decorative icon + short text in the header, not the long store-settings label; the settings card no
+        // longer repeats it
+        assertThat(warehouseHeader).contains("cl-icon-text").contains("fas fa-warehouse\" aria-hidden=\"true\"")
+                .contains("Magazyn sklepu").doesNotContain("Przez magazyn sklepu");
+        assertThat(dropshipHeader).contains("cl-icon-text").contains("fas fa-truck\" aria-hidden=\"true\"")
+                .contains("Dropshipping").doesNotContain("Wysyłką od dostawcy do klienta");
+        for (String html : List.of(warehouseSettings, dropshipSettings)) {
+            assertThat(html).doesNotContain("Typ realizacji").doesNotContain("cl-icon-text")
+                    .doesNotContain("Magazyn sklepu").doesNotContain("Dropshipping");
         }
         // then: the settings dialog/no-JS form still offers the full labels to choose from
         assertThat(warehouseFullHtml).contains("Przez magazyn sklepu").contains("Wysyłką od dostawcy do klienta");
@@ -280,7 +281,7 @@ class OrderDetailsTemplateTest {
     }
 
     @Test
-    void unavailableMenuEntriesStayVisibleWithTheirReason() {
+    void menuEntriesThatCannotBeDoneAreAbsentAndTheRestKeepTheirReason() {
         // given
         Order order = order(OrderStatus.New);
         OrderItem allocated = inDelivery(order, "Acme", FulfilmentStatus.Allocation);
@@ -289,12 +290,90 @@ class OrderDetailsTemplateTest {
         String html = page(render(order, ADMIN));
         String withSupplier = page(render(order, List.of(allocated), ADMIN, Set.of()));
 
-        // then: "Split set" is absent for an item that is not a set, not greyed out
-        assertThat(html).containsPattern("aria-disabled=\"true\">\\s*<span>Usuń dostawcę</span>\\s*<span class=\"cl-menu-reason\">Pozycja nie ma dostawcy</span>")
+        // then: "Split set" is absent for an item that is not a set, and so is the side that cannot be done: "Usuń
+        // dostawcę" without a supplier, the assign entries while a supplier is still held
+        assertThat(html).doesNotContain("<span>Usuń dostawcę</span>").doesNotContain("Pozycja nie ma dostawcy")
                 .doesNotContain("<span>Podziel zestaw</span>").doesNotContain("data-cl-dialog-open=\"split-group-dialog\"")
                 .contains("data-cl-dialog-open=\"assign-sku-dialog\"").contains("data-cl-dialog-open=\"assign-supplier-dialog\"");
         assertThat(withSupplier).contains("/clear-supplier?itemId=").contains("data-cl-confirm")
-                .containsPattern("<span>Przypisz dostawcę</span>\\s*<span class=\"cl-menu-reason\">Najpierw usuń obecnego dostawcę</span>");
+                .doesNotContain("Najpierw usuń obecnego dostawcę").doesNotContain("data-cl-dialog-open=\"assign-sku-dialog\"")
+                .doesNotContain("data-cl-dialog-open=\"assign-supplier-dialog\"");
+    }
+
+    @Test
+    void theItemMenuSendsOneItemToAllocationThroughItsOwnFormOrSaysWhyNot() {
+        // given
+        Order order = order(OrderStatus.New);
+        OrderItem ready = items(order).get(0);
+        ready.setItemId("item-ready");
+        ready.setEan("5900000000001");
+        ready.setDeliveryId("Acme");
+
+        // when
+        String withoutSupplier = page(render(order, ADMIN));
+        String html = page(render(order, List.of(ready), ADMIN, Set.of()));
+
+        // then: the entry posts the item as the one selected item of the bulk endpoint, without JavaScript too
+        assertThat(html).containsPattern("<form id=\"allocate-item-form\" method=\"post\"\\s+action=\"/dashboard/orders/"
+                        + "3e373abc-1111-2222-3333-444455556666/moveSelectedItemsToAllocation\">\\s*"
+                        + "(<input type=\"hidden\" name=\"_csrf\"[^>]*>\\s*)?"
+                        + "<input type=\"hidden\" name=\"orderItems\\[0\\].selected\" value=\"true\">")
+                .containsPattern("<button type=\"submit\" class=\"cl-menu-item\" form=\"allocate-item-form\" "
+                        + "name=\"orderItems\\[0\\].itemId\"\\s+value=\"item-ready\">Do alokacji</button>");
+        assertThat(withoutSupplier).containsPattern("aria-disabled=\"true\">\\s*<span>Do alokacji</span>\\s*"
+                + "<span class=\"cl-menu-reason\">Najpierw przypisz dostawcę</span>");
+    }
+
+    @Test
+    void anItemInHandReadsAssembledWhileTheWarehouseDialogKeepsItsOwnWord() {
+        // given
+        Order order = order(OrderStatus.Assembly);
+
+        // when
+        String html = page(render(order, ADMIN));
+
+        // then: the item state pill of the delivered service says "Skompletowany"; the order status keeps "Dostarczone"
+        // and the warehouse stock in the "Przypisz z magazynu" dialog is still "Dostarczony" (in stock)
+        assertThat(html).containsPattern("<span class=\"cl-status[^\"]*\">Skompletowany</span>")
+                .doesNotContainPattern("<span class=\"cl-status[^\"]*\">Dostarczony</span>")
+                .contains("data-status-delivered=\"Dostarczony\"");
+        assertThat(ResourceBundle.getBundle("messages", Locale.ENGLISH).getString("order.item.status.Delivered"))
+                .isEqualTo("Assembled");
+        // the warehouse screens localise the stock state through the enum's own key (EnumLocalizer): unchanged
+        assertThat(ResourceBundle.getBundle("messages", PL).getString("FulfilmentStatus.Delivered")).isEqualTo("Dostarczony");
+        assertThat(ResourceBundle.getBundle("messages", Locale.ENGLISH).getString("FulfilmentStatus.Delivered")).isEqualTo("Delivered");
+        assertThat(ResourceBundle.getBundle("messages", PL).getString("OrderStatus.Delivered")).isEqualTo("Dostarczone");
+    }
+
+    @Test
+    void theDeliveryStandsOnTheLineOfTheItemStatePill() {
+        // given
+        Order order = order(OrderStatus.Assembly);
+        OrderItem ordered = inDelivery(order, "delivery-9", FulfilmentStatus.Ordered);
+
+        // when
+        String html = page(render(order, List.of(ordered), ADMIN, Set.of()));
+
+        // then: one flex line holds the pill and the delivery, which wraps under the pill only when out of room (CSS)
+        assertThat(html).containsPattern("<td class=\"cl-table-fulfilment\" data-label=\"Stan\">\\s*<div class=\"cl-table-state\">"
+                + "\\s*<span class=\"cl-status[^\"]*\">Zamówiony</span>\\s*<span class=\"cl-table-sub\">");
+    }
+
+    @Test
+    void theMoreMenuNoLongerNamesTheItemHistory() {
+        // given
+        Order order = order(OrderStatus.Delivered);
+        List<OrderItem> items = items(order);
+        items.get(0).setSerialNo("SN-1");
+
+        // when
+        String html = page(render(order, items, ADMIN, Set.of()));
+        String more = html.substring(html.indexOf("id=\"order-more-menu\""));
+        more = more.substring(0, more.indexOf("</ul>"));
+
+        // then: the serial number in the item's row still leads to its history
+        assertThat(more).doesNotContain("Historia przedmiotu").doesNotContain("/dashboard/item/history");
+        assertThat(html).contains("href=\"/dashboard/item/history?serialNo=SN-1\"");
     }
 
     /**
@@ -498,7 +577,7 @@ class OrderDetailsTemplateTest {
     }
 
     @Test
-    void theOnlyShipmentCanBeRemovedBackToWaitingButABarePlaceholderOffersNoRemove() {
+    void theOnlyShipmentCanBeRemovedCompletelyButABarePlaceholderOffersNoRemove() {
         // given: a number typed by hand on the only shipment; another order with nothing but the delivery choice
         Order order = order(OrderStatus.Realization);
         order.getShipments().get(0).setTrackingNo("T-1");
@@ -509,13 +588,35 @@ class OrderDetailsTemplateTest {
         String card = card(page(render(order, ADMIN)), "przesylki");
         String bareCard = card(page(render(bare, ADMIN)), "przesylki");
 
-        // then: removing it leaves a placeholder that keeps the customer's choice, which the confirmation says
+        // then: removing it takes the customer's delivery choice with it, which the confirmation says
         assertThat(card).contains("aria-label=\"Edytuj przesyłkę 1\"").contains("/shipments/0/remove?version=" + version)
                 .doesNotContain("aria-disabled").doesNotContain("remove-reason")
-                .contains("data-cl-confirm-message=\"Przesyłka wróci do stanu „czeka na nadanie”")
+                .contains("data-cl-confirm-message=\"Przesyłka zniknie z zamówienia razem ze sposobem dostawy wybranym przez klienta")
                 .contains("data-cl-confirm-action=\"Usuń przesyłkę\"");
-        assertThat(bareCard).contains("aria-label=\"Edytuj przesyłkę 1\"").doesNotContain("/remove?version=")
-                .doesNotContain("aria-label=\"Usuń przesyłkę 1\"").doesNotContain("remove-reason");
+        // the placeholder reads as no shipment: greyed, the delivery choice, "Brak przesyłki" and "Uzupełnij"
+        assertThat(bareCard).contains("class=\"cl-list-item is-placeholder\"").contains("<span>Sposób dostawy: Kurier</span>")
+                .contains("<p class=\"cl-list-desc\">Brak przesyłki</p>")
+                .containsPattern("<a class=\"cl-link-button\" href=\"/dashboard/orders/[^\"]+/shipments/0\"\\s+"
+                        + "data-cl-dialog-open=\"shipment-dialog-0\" aria-label=\"Uzupełnij przesyłkę 1\">Uzupełnij</a>")
+                .doesNotContain("Edytuj przesyłkę 1").doesNotContain("/remove?version=")
+                .doesNotContain("aria-label=\"Usuń przesyłkę 1\"").doesNotContain("remove-reason")
+                .doesNotContain("zeka na nadanie");
+    }
+
+    @Test
+    void removingTheOnlyShippedShipmentOfAShippingOrderSaysTheOrderGoesBackToRealization() {
+        // given
+        Order order = order(OrderStatus.Shipping);
+        Shipment only = order.getShipments().get(0);
+        only.setType(ShipmentType.PersonalCollection);
+        only.setShippedAt(java.time.LocalDateTime.of(2026, 9, 30, 11, 40));
+
+        // when
+        String card = card(page(render(order, ADMIN)), "przesylki");
+
+        // then: the dialog's text is honest about the status; the row is an ordinary shipment, not the placeholder
+        assertThat(card).contains("a zamówienie wróci do „W realizacji”")
+                .doesNotContain("is-placeholder").contains("aria-label=\"Usuń przesyłkę 1\"");
     }
 
     @Test
@@ -916,8 +1017,8 @@ class OrderDetailsTemplateTest {
         String open = page(render(order(OrderStatus.Assembly), ADMIN));
 
         // then
-        assertThat(completed).doesNotContain("Usunąć można tylko nowe zamówienie");
-        assertThat(open).contains("Usunąć można tylko nowe zamówienie");
+        assertThat(completed).doesNotContain("Usuniesz tylko nowe zamówienie");
+        assertThat(open).contains("Usuniesz tylko nowe zamówienie");
     }
 
     @Test
@@ -1015,7 +1116,7 @@ class OrderDetailsTemplateTest {
         String html = page(render(b2bOrder(OrderStatus.New), SUPER_ADMIN));
 
         // then
-        assertThat(html).doesNotContain("Następny do wystawienia").contains("Brak paragonu/faktury");
+        assertThat(html).doesNotContain("Następny do wystawienia").contains("Brak faktury ani paragonu.");
     }
 
     @Test
@@ -1067,7 +1168,7 @@ class OrderDetailsTemplateTest {
 
         // then
         assertThat(html).contains("data-cl-scope-template=\"{label} ({n} z {m})\"").contains("/js/order-items.js")
-                .contains("data-cl-bulk-confirm-message=\"Do alokacji trafią zaznaczone pozycje: {n}.");
+                .contains("data-cl-bulk-confirm-message=\"Zamówione i przyjęte pozycje wrócą na stan magazynu");
     }
 
     @Test
@@ -1210,7 +1311,7 @@ class OrderDetailsTemplateTest {
         // then
         assertThat(card).contains("aria-label=\"Edytuj płatność 1\"").doesNotContain("/remove")
                 .containsPattern("<button type=\"button\" class=\"cl-link-button\" aria-disabled=\"true\"[^>]*aria-label=\"Usuń płatność 1\"[^>]*aria-describedby=\"payment-1-remove-reason\"")
-                .contains("id=\"payment-1-remove-reason\">Oczekiwana płatność zniknie sama po dodaniu wpłaty.</p>");
+                .contains("id=\"payment-1-remove-reason\">Oczekiwana wpłata zniknie sama po dodaniu wpłaty.</p>");
     }
 
     @Test
@@ -1371,13 +1472,15 @@ class OrderDetailsTemplateTest {
         String html = page(render(order, List.of(dropship), ADMIN, Set.of(dropship.getItemId())));
 
         // then: the bulk actions are greyed through aria-disabled (menu entries and "Remove" stay focusable with
-        // their reason); the add-items button keeps its native disabled
+        // their reason); so is the add-items button, which opens nothing
         assertThat(html).containsPattern("data-cl-bulk-action=\"[^\"]*moveSelectedItemsToTheWarehouse\"[^>]*aria-disabled=\"true\"")
-                .containsPattern("data-cl-bulk-action=\"[^\"]*moveSelectedItemsToAllocation\"[^>]*aria-disabled=\"true\"")
+                // "Do alokacji" is the item's own entry now, greyed with the order's dropship reason
+                .containsPattern("<span>Do alokacji</span>\\s*<span class=\"cl-menu-reason\">Zamówienie ma pozycje w dostawie dropship</span>")
                 // the dropship lock disables every bulk action, not only the two above
                 .containsPattern("data-cl-bulk-action=\"[^\"]*moveSelectedItemsToTheWarehouseForRMA\"[^>]*aria-disabled=\"true\"")
                 .containsPattern("data-cl-bulk-action=\"[^\"]*removeSelectedItemsFromOrder\"[^>]*aria-disabled=\"true\"")
-                .containsPattern("data-cl-dialog-open=\"item-add-dialog\"[^>]*disabled=\"disabled\"")
+                .containsPattern("<button type=\"button\" class=\"cl-button\" aria-disabled=\"true\"[^>]*aria-describedby=\"add-items-reason\"")
+                .doesNotContain("data-cl-dialog-open=\"item-add-dialog\"")
                 .contains("id=\"add-items-reason\"");
         String reason = ResourceBundle.getBundle("messages", PL).getString("order.items.action.dropship.locked");
         assertThat(html).contains(reason);
@@ -1426,7 +1529,8 @@ class OrderDetailsTemplateTest {
         String fallback = html.substring(html.indexOf("<noscript>"), html.indexOf("</noscript>"));
 
         // then: nothing but "move" posts straight to the action, so removing items is never one click away
-        assertThat(fallback).contains("formaction=\"/dashboard/orders/3e373abc-1111-2222-3333-444455556666/bulk-confirm?action=ALLOCATE\"")
+        assertThat(fallback).contains("formaction=\"/dashboard/orders/3e373abc-1111-2222-3333-444455556666/bulk-confirm?action=TO_WAREHOUSE\"")
+                .doesNotContain("action=ALLOCATE")
                 .contains("formaction=\"/dashboard/orders/3e373abc-1111-2222-3333-444455556666/bulk-confirm?action=REMOVE\"")
                 .doesNotContain("/moveSelectedItemsToAllocation\"").doesNotContain("/removeSelectedItemsFromOrder\"")
                 .containsPattern("class=\"cl-button is-danger\"\\s+formaction=\"[^\"]+action=REMOVE\"");
@@ -1549,6 +1653,113 @@ class OrderDetailsTemplateTest {
     }
 
     @Test
+    void eachDocumentRowNamesItsKindInOneWordBeforeTheNumber() {
+        // given
+        Order order = order(OrderStatus.Delivered);
+        order.addDocument(new Document("pf", "PF/1", null, DocumentType.Proforma));
+        order.addDocument(new Document("fz", "FZ/1", null, DocumentType.InvoiceAdvance));
+        order.addDocument(new Document("fv", "FV/1", null, DocumentType.InvoiceVat));
+        order.addDocument(new Document("fi", "FI/1", null, DocumentType.InvoicePersonal));
+        order.addDocument(new Document("par", "PAR/1", null, DocumentType.Receipt));
+        order.addDocument(new Document("wz", "WZ/MAG/2026/000001", null, DocumentType.GoodsIssue));
+
+        // when
+        String html = page(render(order, ADMIN));
+        String documents = html.substring(html.indexOf("id=\"dokumenty\""), html.indexOf("id=\"platnosci\""));
+
+        // then: "Faktura" for every invoice, "Paragon", "Dokument" for the warehouse note; a pro forma keeps its name
+        assertThat(documents).containsPattern("<span>Proforma</span>\\s*<span>PF/1</span>")
+                .containsPattern("<span>Faktura</span>\\s*<span>FZ/1</span>")
+                .containsPattern("<span>Faktura</span>\\s*<span>FV/1</span>")
+                .containsPattern("<span>Faktura</span>\\s*<span>FI/1</span>")
+                .containsPattern("<span>Paragon</span>\\s*<span>PAR/1</span>")
+                .containsPattern("<span>Dokument</span>\\s*(<a [^>]*>)?<span>WZ/MAG/2026/000001</span>")
+                .doesNotContain("<span>WZ</span>").doesNotContain("<span>Faktura VAT</span>");
+    }
+
+    @Test
+    void documentNumberLinkCarriesItsIconInside() {
+        // given
+        Order order = order(OrderStatus.Delivered);
+        order.addDocument(new Document("fv", "FV/2026/09/118", "https://faktury.example/118", DocumentType.InvoiceVat));
+
+        // when
+        String html = page(render(order, ADMIN));
+
+        // then: the new-tab icon is inside the link, joined to the number by a word joiner, never a sibling that
+        // wraps onto its own line
+        String documents = html.substring(html.indexOf("id=\"dokumenty\""), html.indexOf("id=\"platnosci\""));
+        assertThat(documents).containsPattern("<a href=\"https://faktury.example/118\" target=\"_blank\" rel=\"noopener\">"
+                + "<span>FV/2026/09/118</span>(&#8288;|\u2060)<span class=\"icon is-small\" aria-hidden=\"true\">"
+                + "<i\\s+class=\"fas fa-external-link-alt\"></i></span></a>");
+        assertThat(occurrences(documents, "fa-external-link-alt")).isEqualTo(1);
+    }
+
+    @Test
+    void addItemGreyedUsesAriaDisabledWithItsReason() {
+        // given: an item in a dropship delivery stops adding items
+        Order order = order(OrderStatus.Assembly);
+        OrderItem dropship = inDelivery(order, "delivery-9", FulfilmentStatus.Ordered);
+
+        // when
+        String html = page(render(order, List.of(dropship), ADMIN, Set.of(dropship.getItemId())));
+
+        // then: focusable and described by its reason, like "Dodaj dokument", not a native disabled button
+        String head = html.substring(html.indexOf("id=\"pozycje\""), html.indexOf("id=\"add-items-reason\""));
+        assertThat(head).containsPattern("<button type=\"button\" class=\"cl-button\" aria-disabled=\"true\"\\s+aria-describedby=\"add-items-reason\">")
+                .doesNotContain("disabled=\"disabled\"").doesNotContain("data-cl-dialog-open=\"item-add-dialog\"");
+        assertThat(html).contains("id=\"add-items-reason\"");
+    }
+
+    @Test
+    void documentLinkFieldsAcceptOnlyHttpAddresses() {
+        // given
+        Order order = order(OrderStatus.Delivered);
+
+        // when
+        String html = page(render(order, ADMIN));
+
+        // then: type=url alone lets ftp:// or mailto: through; the help says http(s)
+        assertThat(html).containsPattern("<input class=\"cl-input\" type=\"url\" id=\"document-link\"[^>]*pattern=\"https\\?://\\.\\+\"");
+        assertThat(html).containsPattern("<label class=\"cl-label\" for=\"document-link\">\\s*<span>Link do dokumentu</span>\\s*"
+                + "<span class=\"cl-optional\">opcjonalne</span>");
+    }
+
+    @Test
+    void rowTitlesHaveNoDoubleSpaceBeforeTheSeparator() {
+        // given: the title line is a flex row with its own gap, so a leading space doubles it
+        Order order = order(OrderStatus.Shipping);
+        order.getShipments().get(0).setCarrier("InPost");
+        order.getShipments().get(0).setTrackingNo("E2E1");
+        order.addPayment(new Payment("REF-1", "Jan Kowalski", PaymentSource.BankTransfer, 500, 0));
+
+        // when
+        String html = page(render(order, ADMIN));
+
+        // then
+        assertThat(html).contains("<span>· InPost</span>").contains("<span>· Przelew bankowy</span>")
+                .doesNotContain("<span> · InPost</span>").doesNotContain("<span> · Przelew");
+    }
+
+    @Test
+    void aShipmentLineStartsWithACapitalAndAPickupPointIsNotNamedTwice() {
+        // given: a courier shipment waiting for its data and a pickup-point one (titled "Punkt odbioru" already)
+        Order order = order(OrderStatus.Assembly);
+        Shipment pickup = new Shipment(ShipmentType.PickupPoint);
+        pickup.setCollectionPointCode("WAW01M");
+        order.addShipment(pickup);
+
+        // when
+        String html = page(render(order, ADMIN));
+
+        // then: the first part of a line takes a capital, a part after " · " stays lower case
+        String shipments = html.substring(html.indexOf("id=\"przesylki\""), html.indexOf("id=\"dokumenty\""));
+        assertThat(shipments.replaceAll("\\s+", " ")).contains("<span>Czeka na nadanie</span>")
+                .contains("<span>WAW01M</span><span> · </span> <span>czeka na nadanie</span>")
+                .doesNotContain("unkt odbioru WAW01M");
+    }
+
+    @Test
     void bothMoveTargetFieldsAcceptNoLongerANumberThanTheResolverLooksUp() {
         // when
         String html = page(render(order(OrderStatus.New), ADMIN));
@@ -1634,7 +1845,7 @@ class OrderDetailsTemplateTest {
 
     static OrderSettingsView lockedSettings(FulfilmentType type) {
         return new OrderSettingsView("2026-09-20", "2026-09-22", null, "20.09.2026", "22.09.2026", null,
-                type, OrderLabels.fulfilmentTypeShort(type), OrderLabels.fulfilmentTypeIcon(type), true, false, null,
+                type, true, false, null,
                 null, null, true, OrderLabels.Option.of(FulfilmentType.values(), OrderLabels::fulfilmentType));
     }
 
@@ -1836,7 +2047,7 @@ class OrderDetailsTemplateTest {
         String collected = dialog(page(render(order(OrderStatus.Delivered), ADMIN)), "review-dialog");
 
         // then
-        assertThat(none).contains("<option value=\"\" selected>— nie zbieramy —</option>").contains("Status opinii");
+        assertThat(none).contains("<option value=\"\" selected>— nie jest zbierana —</option>").contains("Status opinii");
         assertThat(collected).doesNotContain("nie zbieramy")
                 .containsPattern("<option value=\"ToBeCollected\"\\s+selected=\"selected\">Do zebrania</option>");
     }
@@ -2038,15 +2249,15 @@ class OrderDetailsTemplateTest {
         // then: every greyed entry names its reason as text inside it, as the row menu does; "Remove" points to a short
         // form of the same reason right before it, which fits the row's one line
         String shortReason = ResourceBundle.getBundle("messages", PL).getString("order.items.action.dropship.locked.short");
-        assertThat(row).containsPattern("data-cl-bulk-action=\"[^\"]*moveSelectedItemsToAllocation\"[^>]*aria-disabled=\"true\"[^>]*>"
-                        + "\\s*<span data-cl-bulk-label>Do alokacji</span>\\s*<span class=\"cl-menu-reason\" data-cl-bulk-reason>"
+        assertThat(row).containsPattern("data-cl-bulk-action=\"[^\"]*moveSelectedItemsToTheWarehouse\"[^>]*aria-disabled=\"true\"[^>]*>"
+                        + "\\s*<span data-cl-bulk-label>Do magazynu</span>\\s*<span class=\"cl-menu-reason\" data-cl-bulk-reason>"
                         + Pattern.quote(reason) + "</span>")
                 .containsPattern("<span class=\"cl-help cl-selection-reason\" id=\"bulk-remove-reason\">"
                         + Pattern.quote(shortReason) + "</span>\\s*<button[^>]*class=\"cl-link-button is-danger cl-selection-remove\"")
                 .containsPattern("data-cl-bulk-action=\"[^\"]*removeSelectedItemsFromOrder\"[^>]*aria-describedby=\"bulk-remove-reason\"")
                 .doesNotContainPattern("\\stitle=").doesNotContain("cl-visually-hidden").doesNotContain("cl-help is-note");
-        // the three routing entries
-        assertThat(occurrences(row, reason)).isEqualTo(3);
+        // the two warehouse entries
+        assertThat(occurrences(row, reason)).isEqualTo(2);
     }
 
     @Test
@@ -2055,23 +2266,23 @@ class OrderDetailsTemplateTest {
         String html = page(render(order(OrderStatus.New), ADMIN));
 
         // then
-        assertThat(html).containsPattern("data-cl-bulk-action=\"[^\"]*moveSelectedItemsToAllocation\"[^>]*"
-                        + "data-skipped=\"Pominięte pozycje nie mają kompletu danych alokacji albo nie są nowe.\"")
+        assertThat(html).containsPattern("data-cl-bulk-action=\"[^\"]*moveSelectedItemsToTheWarehouse\"[^>]*"
+                        + "data-skipped=\"Pominięte pozycje nie są zamówione ani przyjęte na stan.\"")
                 .containsPattern("<span class=\"cl-menu-reason\" data-cl-bulk-reason hidden=\"hidden\"></span>")
                 .contains("<span class=\"cl-help cl-selection-reason\" id=\"bulk-remove-reason\" hidden=\"hidden\"></span>")
                 .containsPattern("removeSelectedItemsFromOrder\"[^>]*data-skipped=\"Tylko nowe i usługi\"")
                 // the hidden reason describes nothing; order-items.js links it while it shows
                 .doesNotContainPattern("removeSelectedItemsFromOrder\"[^>]*aria-describedby")
-                .doesNotContainPattern("data-cl-bulk-action=\"[^\"]*moveSelectedItemsToAllocation\"[^>]*aria-disabled");
+                .doesNotContainPattern("data-cl-bulk-action=\"[^\"]*moveSelectedItemsToTheWarehouse\"[^>]*aria-disabled");
     }
 
     @Test
-    void theSelectionRowStandsInForTheHeaderWithItsOwnSelectAllTheCountTwoMenusAndRemove() {
+    void theSelectionRowStandsInForTheHeaderWithItsOwnSelectAllTheCountTheMoveMenuAndRemove() {
         // when
         String html = page(render(order(OrderStatus.New), ADMIN));
         String row = html.substring(html.indexOf("<div class=\"cl-selection-row\""), html.indexOf("<table"));
 
-        // then: left to right, which is also the tab order — select-all, "k of n", "Route to", "Move", "Remove"; the
+        // then: left to right, which is also the tab order — select-all, "k of n", "Move", "Remove"; the
         // select-all box itself clears the selection, so there is no separate "Clear"
         assertThat(html).contains("<div class=\"cl-selection-row\" data-cl-selection-bar hidden>");
         assertThat(row).containsPattern("<label class=\"cl-check-target\"><input class=\"cl-check-input\" type=\"checkbox\" "
@@ -2080,16 +2291,17 @@ class OrderDetailsTemplateTest {
                 .contains("data-template=\"Zaznaczono {k} z {n}\"");
         assertThat(row).doesNotContain("data-cl-select-clear").doesNotContain("cl-selection-clear");
         List<String> sequence = List.of("data-cl-select-all", "data-cl-selection-count",
-                "<span>Skieruj</span>", "Do alokacji", "Do magazynu", "Do magazynu (RMA)", "<span>Przenieś</span>",
-                "Do nowego zamówienia", "Do istniejącego…", "cl-link-button is-danger cl-selection-remove");
+                "<span>Przenieś</span>", "Do nowego zamówienia", "Do istniejącego…", "Do magazynu", "Do magazynu (RMA)",
+                "cl-link-button is-danger cl-selection-remove");
         int at = -1;
         for (String part : sequence) {
             int next = row.indexOf(part, at + 1);
             assertThat(next).as(part).isGreaterThan(at);
             at = next;
         }
-        assertThat(occurrences(row, "<details class=\"cl-menu\">")).isEqualTo(2);
-        assertThat(occurrences(row, "<summary class=\"cl-button\">")).isEqualTo(2);
+        assertThat(occurrences(row, "<details class=\"cl-menu\">")).isEqualTo(1);
+        assertThat(occurrences(row, "<summary class=\"cl-button\">")).isEqualTo(1);
+        assertThat(row).doesNotContain("Skieruj").doesNotContain("Do alokacji").doesNotContain("moveSelectedItemsToAllocation");
         assertThat(row).containsPattern("<button type=\"button\" class=\"cl-menu-item\"\\s+data-cl-dialog-open=\"move-dialog\"")
                 .doesNotContain("disabled=\"disabled\"").doesNotContain("class=\"cl-selection-bar").doesNotContain("is-primary");
     }
@@ -2106,7 +2318,7 @@ class OrderDetailsTemplateTest {
 
         // then
         assertThat(row).doesNotContain("removeSelectedItemsFromOrder").doesNotContain("bulk-remove-reason")
-                .contains("<span>Skieruj</span>").contains("data-cl-select-all");
+                .contains("<span>Przenieś</span>").contains("data-cl-select-all");
     }
 
     @Test
@@ -2116,6 +2328,25 @@ class OrderDetailsTemplateTest {
 
         // then
         assertThat(html).contains("data-cl-scope-count-template=\"{k} z {n}\"");
+    }
+
+    @Test
+    void theSettingsCardLeavesTheAffiliateIdAndTheGclidToTheDialog() {
+        // given
+        Order order = order(OrderStatus.New);
+        order.setAffiliateId("AFF-17");
+        order.setGclid("GCL-42");
+        order.setComment("Zadzwonić przed wysyłką");
+
+        // when
+        String html = page(render(order, ADMIN));
+        String card = card(html, "settings-title");
+        String dialog = dialog(html, "settings-dialog");
+
+        // then: the card is dates, notifications and the comment; the tracking ids are edited in the dialog
+        assertThat(card).doesNotContain("ID afiliacji").doesNotContain("AFF-17").doesNotContain("GCLID")
+                .doesNotContain("GCL-42").doesNotContain("Typ realizacji").contains("Zadzwonić przed wysyłką");
+        assertThat(dialog).contains("value=\"AFF-17\"").contains("value=\"GCL-42\"").contains("id=\"fulfilmentType\"");
     }
 
     @Test
@@ -2148,7 +2379,7 @@ class OrderDetailsTemplateTest {
 
         // then
         assertThat(b2c).contains("Brak dokumentów. Paragon dodasz przyciskiem „Dodaj dokument”.");
-        assertThat(b2b).contains("Brak dokumentów. Następny do wystawienia: Faktura VAT.");
+        assertThat(b2b).contains("Brak dokumentów. Następny do wystawienia: Faktura VAT — z menu „Wystaw”.");
     }
 
     @Test
@@ -2292,7 +2523,7 @@ class OrderDetailsTemplateTest {
                                         "Szczegóły dla Paragony.pl (Fakturownia)",
                                         "Sprawdź fiscal_status paragonu."), true, true, false, null),
                         receiptRow(1, ReceiptAttemptState.BLOCKED, "is-bad", null, null, null,
-                                false, false, false, "brak e-maila kupującego")), false),
+                                false, false, false, "brak e-maila klienta")), false),
                 false, true);
     }
 
@@ -2308,7 +2539,7 @@ class OrderDetailsTemplateTest {
                 .contains("Paragon czeka na drukarkę fiskalną ponad 48 h.")
                 .contains("<details class=\"cl-row-disclosure\">").contains("Wcześniejsze próby (1)")
                 .contains("Próba 1").contains("<span class=\"cl-status is-bad\">Zablokowany</span>")
-                .contains("brak e-maila kupującego")
+                .contains("brak e-maila klienta")
                 .contains("Sprawdź teraz").contains("Zamknij ręcznie")
                 .doesNotContain("Wystaw ponownie").doesNotContain("Brak paragonu").doesNotContain("??");
         // the earlier attempt has no actions: the only receiptKey posted is the newest one's
@@ -2371,7 +2602,7 @@ class OrderDetailsTemplateTest {
         assertThat(dialog).contains("aria-labelledby=\"receipt-close-2-title\"").contains("id=\"receipt-close-2-title\"")
                 .contains("action=\"/dashboard/orders/" + ORDER_ID + "/receipts/close\"")
                 .contains("name=\"receiptKey\" value=\"" + ORDER_ID + ":R2\"")
-                .containsPattern("<label class=\"cl-label\" for=\"receipt-close-2-number\">Numer paragonu</label>")
+                .containsPattern("<label class=\"cl-label\" for=\"receipt-close-2-number\">Numer e-paragonu</label>")
                 .containsPattern("name=\"number\" required autocomplete=\"off\" id=\"receipt-close-2-number\"")
                 .contains("for=\"receipt-close-2-link\"").contains("type=\"url\" name=\"link\"")
                 .contains("opcjonalne").contains("rozstrzygnąłeś")
@@ -2392,8 +2623,24 @@ class OrderDetailsTemplateTest {
         // then
         assertThat(html).contains("action=\"/dashboard/orders/" + ORDER_ID + "/receipts/close\"")
                 .contains("id=\"receipt-close-2-number\"").contains("id=\"receipt-close-2-link\"")
-                .contains("href=\"/dashboard/orders/" + ORDER_ID + "\"").contains("Zamknij paragon ręcznie")
+                .contains("href=\"/dashboard/orders/" + ORDER_ID + "\"").contains("Zamknij e-paragon ręcznie")
                 .doesNotContain("data-cl-dialog-close").doesNotContain("<dialog").doesNotContain("??");
+    }
+
+    @Test
+    void theEReceiptEmailStateStartsTheLineWithACapitalWhenThereIsNoDate() {
+        // given: closed by hand, its document not on the order yet, so the row has no date; the e-mail went out
+        Order order = order(OrderStatus.Delivered);
+        ReceiptOrderState receipts = new ReceiptOrderState(List.of(attempt(1, ReceiptAttemptState.CLOSED_MANUALLY)),
+                new ReceiptOrderView(List.of(receiptRow(1, ReceiptAttemptState.CLOSED_MANUALLY, "is-neutral", null,
+                        "PAR/1", null, false, false, false, null)), false), false, true);
+
+        // when
+        String html = renderWithReceipts(order, ADMIN, receipts);
+
+        // then
+        String row = html.substring(html.indexOf("id=\"e-paragon\""), html.indexOf("id=\"platnosci\""));
+        assertThat(row).contains("<span>E-mail wysłany</span>").doesNotContain("<span>e-mail wysłany</span>");
     }
 
     @Test
@@ -2412,9 +2659,9 @@ class OrderDetailsTemplateTest {
 
         // then
         String documents = html.substring(html.indexOf("id=\"dokumenty\""), html.indexOf("id=\"platnosci\""));
-        assertThat(documents).containsPattern("<a href=\"https://paragony.example/7\" target=\"_blank\" rel=\"noopener\">PAR/7/2026</a>")
+        assertThat(documents).containsPattern("<a href=\"https://paragony.example/7\" target=\"_blank\" rel=\"noopener\"><span>PAR/7/2026</span>")
                 .contains("<span class=\"cl-status is-ok\">Zafiskalizowany</span>")
-                .contains("zafiskalizowano 28.09.2026").contains("mail wysłany")
+                .contains("Zafiskalizowano 28.09.2026").contains("e-mail wysłany")
                 .doesNotContain("Odepnij").doesNotContain("Paragon PAR").doesNotContain("cl-list-actions");
         assertThat(occurrences(documents, "PAR/7/2026")).isEqualTo(1);
     }
@@ -2452,7 +2699,8 @@ class OrderDetailsTemplateTest {
         assertThat(html).contains("Trwa wystawianie e-paragonu — pozycji nie dodasz.")
                 .doesNotContain("Dodawanie pozycji: Trwa")
                 .contains("Trwa wystawianie e-paragonu — danych rozliczeniowych nie zmienisz.")
-                .containsPattern("<button type=\"button\" class=\"cl-button\" aria-disabled=\"true\"\\s+aria-describedby=\"document-add-reason\">Dodaj dokument</button>")
+                .containsPattern("<button type=\"button\" class=\"cl-button\" aria-disabled=\"true\"\\s+aria-describedby=\"document-add-reason\">\\s*"
+                        + "<span class=\"icon is-small\" aria-hidden=\"true\"><i class=\"fas fa-plus\"></i></span>\\s*<span>Dodaj dokument</span>\\s*</button>")
                 .contains("id=\"document-add-reason\"").contains("Trwa wystawianie e-paragonu — dokumentu nie dodasz ręcznie.")
                 .contains("Trwa wystawianie e-paragonu — pozycji nie usuniesz")
                 .doesNotContain("id=\"document-dialog\"").doesNotContain("??");
@@ -2517,7 +2765,7 @@ class OrderDetailsTemplateTest {
         // then
         assertThat(withReceipt).contains("href=\"/dashboard/orders/" + ORDER_ID + "/cancel\"")
                 .contains("data-cl-confirm-message=\"Zamówienie przejdzie w status Anulowane, a ceny usług zostaną wyzerowane. "
-                        + "Zamówienie ma zafiskalizowany e-paragon — anulowanie go nie cofa. Zwrot rozlicz osobno (korekta lub zwrot).\"");
+                        + "Zamówienie ma zafiskalizowany e-paragon — anulowanie go nie cofa. Pieniądze rozlicz osobno: fakturą korygującą albo zwrotem.\"");
         assertThat(without).contains("href=\"/dashboard/orders/" + ORDER_ID + "/cancel\"")
                 .contains("data-cl-confirm-message=\"Zamówienie przejdzie w status Anulowane, a ceny usług zostaną wyzerowane.\"")
                 .doesNotContain("zafiskalizowany e-paragon");
@@ -2534,15 +2782,15 @@ class OrderDetailsTemplateTest {
                 new ReceiptOrderView(List.of(new ReceiptOrderView.Row(
                         ORDER_ID + ":R1", ReceiptAttemptState.BLOCKED,
                         "receipts.state.BLOCKED", "is-neutral", null, null, null, null, false, false, false, 1, null,
-                        null, "sprzedaż POS bez e-maila klienta", true)), false), false, false);
+                        null, "sprzedaż z kasy (POS) bez e-maila klienta", true)), false), false, false);
 
         // when
         String html = renderWithReceipts(order, ADMIN, settled);
 
         // then
         assertThat(html).containsPattern("<span class=\"cl-status is-neutral\">Zablokowany</span>")
-                .contains("<p class=\"cl-list-desc\" id=\"e-paragon-settled-1\">Nie wystawiono (sprzedaż POS bez e-maila "
-                        + "klienta). Nie trzeba nic robić — zamówienie ma już paragon albo fakturę.</p>")
+                .contains("<p class=\"cl-list-desc\" id=\"e-paragon-settled-1\">Nie wystawiono (sprzedaż z kasy (POS) bez e-maila "
+                        + "klienta). Nie trzeba nic robić — zamówienie ma już fakturę albo paragon.</p>")
                 .doesNotContain("e-paragon-problem-1").doesNotContain("Wystaw ponownie");
     }
 
@@ -2574,13 +2822,13 @@ class OrderDetailsTemplateTest {
         order.setSource(new OrderSource("operator", OrderSourceType.PointOfSale));
         order.getBillingDetails().setEmail(null);
         ReceiptPageProblem advice = ReceiptPageProblem.ofLines(
-                "E-paragonu nie wysłano: sprzedaż POS nie ma e-maila klienta.",
+                "E-paragonu nie wysłano: sprzedaż z kasy (POS) nie ma e-maila klienta.",
                 List.of("Kasa wydrukowała paragon?", "Klient chce e-paragon?", "Nie rób obu."), null, null);
         ReceiptOrderState receipts = new ReceiptOrderState(
                 List.of(attempt(1, ReceiptAttemptState.BLOCKED)),
                 new ReceiptOrderView(List.of(receiptRow(1,
                         ReceiptAttemptState.BLOCKED, "is-bad", null, null, advice,
-                        false, false, false, "sprzedaż POS bez e-maila klienta")), true),
+                        false, false, false, "sprzedaż z kasy (POS) bez e-maila klienta")), true),
                 false, false);
 
         // when

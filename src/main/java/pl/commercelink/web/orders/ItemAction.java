@@ -6,6 +6,7 @@ public enum ItemAction {
     ASSIGN_SKU("order.item.menu.assign.sku", "assign-sku-dialog"),
     ASSIGN_SUPPLIER("order.item.menu.assign.supplier", "assign-supplier-dialog"),
     ASSIGN_WAREHOUSE("order.item.menu.assign.warehouse", "assign-warehouse-dialog"),
+    ALLOCATE("order.item.menu.allocate", null),
     CLEAR_SUPPLIER("order.item.menu.clear.supplier", null),
     SPLIT_GROUP("order.item.menu.split.group", "split-group-dialog"),
     CONSOLIDATE("order.item.menu.consolidate", null),

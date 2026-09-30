@@ -8,7 +8,13 @@
         <div class="cl-card-actions" th:if="${menus}">
             <button th:if="${items.canAddSerials()}" type="button" class="cl-link-button" data-cl-dialog-open="serials-dialog"
                     th:text="#{order.items.serials.add}"></button>
-            <button type="button" class="cl-button" data-cl-dialog-open="item-add-dialog" th:disabled="${!items.canAddItems()}"
+            <button th:if="${items.canAddItems()}" type="button" class="cl-button" data-cl-dialog-open="item-add-dialog"
+                    th:attr="aria-describedby=${items.addItemsReasonKey() != null} ? 'add-items-reason' : null">
+                <span class="icon is-small" aria-hidden="true"><i class="fas fa-plus"></i></span>
+                <span th:text="#{order.items.add}"></span>
+            </button>
+            <!--/* greyed, still focusable, its reason under the head (like "Dodaj dokument"); opens nothing */-->
+            <button th:unless="${items.canAddItems()}" type="button" class="cl-button" aria-disabled="true"
                     th:attr="aria-describedby=${items.addItemsReasonKey() != null} ? 'add-items-reason' : null">
                 <span class="icon is-small" aria-hidden="true"><i class="fas fa-plus"></i></span>
                 <span th:text="#{order.items.add}"></span>
@@ -144,6 +150,12 @@
     </form>
     <form th:unless="${page.readOnly()}" id="consolidate-form" method="post"
           th:action="@{/dashboard/orders/{o}/toggle-consolidation(o=${page.orderId()})}"></form>
+    <!--/* "Do alokacji" of one item: the menu entry submits this form with the item's id as the one selected item of
+           the bulk endpoint (forms cannot nest in #order-items-form); it works without JavaScript too */-->
+    <form th:unless="${page.readOnly()}" id="allocate-item-form" method="post"
+          th:action="@{/dashboard/orders/{o}/moveSelectedItemsToAllocation(o=${page.orderId()})}">
+        <input type="hidden" name="orderItems[0].selected" value="true">
+    </form>
 </section>
 
 <tr th:fragment="row(row)" th:with="menus=${!page.readOnly()}"
@@ -194,12 +206,15 @@
         <span th:text="#{order.items.qty.price(${row.qty()}, ${row.unitPrice()})}"></span>
         <span class="cl-table-sub" th:text="#{order.items.cost(${row.unitCost()})}"></span>
     </td>
+    <!--/* the state pill and the delivery on one line, the delivery wrapping under the pill only when both do not fit */-->
     <td class="cl-table-fulfilment" th:attr="data-label=#{order.items.column.fulfilment}">
-        <span class="cl-status" th:classappend="${row.statusTone()}" th:text="#{${row.statusKey()}}"></span>
-        <span th:if="${row.deliveryLabel() != null}" class="cl-table-sub">
-            <a th:if="${row.deliveryHref() != null}" class="cl-table-link" th:href="@{${row.deliveryHref()}}" th:text="${row.deliveryLabel()}"></a>
-            <span th:unless="${row.deliveryHref() != null}" th:text="${row.deliveryLabel()}"></span>
-        </span>
+        <div class="cl-table-state">
+            <span class="cl-status" th:classappend="${row.statusTone()}" th:text="#{${row.statusKey()}}"></span>
+            <span th:if="${row.deliveryLabel() != null}" class="cl-table-sub">
+                <a th:if="${row.deliveryHref() != null}" class="cl-table-link" th:href="@{${row.deliveryHref()}}" th:text="${row.deliveryLabel()}"></a>
+                <span th:unless="${row.deliveryHref() != null}" th:text="${row.deliveryLabel()}"></span>
+            </span>
+        </div>
     </td>
     <!--/* display only: the item menu toggles it. The glyph is hidden from screen readers, the hidden word says it; an
            unconsolidated item leaves the cell empty, and in card mode an empty cell is not shown at all. */-->
@@ -234,6 +249,10 @@
                                     data-cl-confirm-message=#{order.item.clear.confirm.message},
                                     data-cl-confirm-action=#{order.item.clear.confirm.action}"
                            th:text="#{${state.labelKey()}}"></a>
+                    </li>
+                    <li th:if="${state.available() and state.action().name() == 'ALLOCATE'}">
+                        <button type="submit" class="cl-menu-item" form="allocate-item-form" name="orderItems[0].itemId"
+                                th:value="${row.itemId()}" th:text="#{${state.labelKey()}}"></button>
                     </li>
                     <li th:if="${state.available() and state.action().name() == 'CONSOLIDATE'}">
                         <!--/* forms cannot nest: the button submits the separate form#consolidate-form, its value is the itemId */-->

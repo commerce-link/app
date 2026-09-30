@@ -97,6 +97,22 @@ class OrdersShippingControllerTest {
     }
 
     @Test
+    void anOrderWhoseOnlyShipmentWasRemovedStillOpensTheShippingForm() {
+        // given: "Usuń" of the only shipment leaves no shipment (2026-09-30); the booking creates the shipment
+        Order order = orderWithShipments();
+        when(ordersRepository.findById(STORE_ID, order.getOrderId())).thenReturn(order);
+        ExtendedModelMap model = new ExtendedModelMap();
+        RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+        // when
+        String view = controller.initiate(order.getOrderId(), model, redirect, Locale.ENGLISH);
+
+        // then
+        assertThat(view).isEqualTo("shipping");
+        assertThat(redirect.getFlashAttributes()).doesNotContainKey("errorMessage");
+    }
+
+    @Test
     void whenEveryShipmentHasDataTheOperatorReturnsToTheOrderWithAMessage() {
         // given
         Shipment sent = new Shipment(ShipmentType.Courier);

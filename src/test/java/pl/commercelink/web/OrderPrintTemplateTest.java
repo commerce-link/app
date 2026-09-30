@@ -108,12 +108,12 @@ class OrderPrintTemplateTest {
         // then
         assertThat(occurrences(html, "<h1")).isEqualTo(1);
         assertThat(html).contains("Karta zamówienia")
-                .contains("ID zamówienia").contains(ORDER_ID)
+                .contains("Numer zamówienia").contains(order().getShortenedOrderId())
                 .contains("anna.nowak74@test.com").contains("27.09.2026, 21:33")
                 .contains("Memory").contains("G.Skill TwinMatch 32GB DDR5 Kit").contains("MFN-TWIN-01")
                 .contains("Sprawdzić etykietę").contains("Montaż i testy zestawu")
                 .contains("Zadzwonić przed wysyłką")
-                .contains("FV/6/2026").contains("Faktura VAT").contains("Wystawiony")
+                .contains("FV/6/2026").contains("Faktura VAT")
                 .contains("Kurier").contains("E2E0000000001").contains("InPost").contains("26.09.2026, 21:33")
                 .doesNotContain("??").doesNotContain("null");
         assertThat(occurrences(html, "<h2")).isEqualTo(4);
@@ -154,8 +154,6 @@ class OrderPrintTemplateTest {
                     .doesNotContain("deleteModal").doesNotContain("googletagmanager");
             assertThat(occurrences(html, "<h1")).isEqualTo(1);
         }
-        assertThat(card).contains("<title>Karta zamówienia · Zamówienie " + order.getShortenedOrderId() + "</title>");
-        assertThat(collection).contains("<title>Protokół odbioru · Zamówienie " + order.getShortenedOrderId() + "</title>");
     }
 
     @Test
@@ -212,7 +210,7 @@ class OrderPrintTemplateTest {
 
         // then
         assertThat(occurrences(html, "<h1")).isEqualTo(1);
-        assertThat(html).contains("Protokół odbioru").contains("store-1 (Demo)").contains(ORDER_ID)
+        assertThat(html).contains("Protokół odbioru").contains("Demo")
                 .contains("28.09.2026").contains("Kraków, PL")
                 .contains("G.Skill TwinMatch 32GB DDR5 Kit").contains("SN-E2E-0006").contains("MFN-TWIN-01")
                 .doesNotContain("Montaż i testy zestawu")
@@ -229,6 +227,69 @@ class OrderPrintTemplateTest {
 
         // then
         assertThat(html).contains("Brak produktów do wydania").doesNotContain("<table");
+    }
+
+    @Test
+    void sheetTitleNamesTheDocumentAndTheShortOrderNumber() {
+        // given: the frame's title heads the printed page and names the file "Save as PDF" suggests
+        Order order = order();
+        String shortId = order.getShortenedOrderId();
+
+        // when
+        String card = render("orders/card", OrderPrintView.card(order, items(), OrderLinks.of(order, false), noLabels()));
+        String collection = render("orders/collection", OrderPrintView.collection(order, items(), store(),
+                LocalDate.of(2026, 9, 28), "Kraków, PL", OrderLinks.of(order, false), noLabels()));
+
+        // then
+        assertThat(card).contains("<title>Karta zamówienia " + shortId + "</title>").doesNotContain("<title>Commerce Link");
+        assertThat(collection).contains("<title>Protokół odbioru " + shortId + "</title>");
+    }
+
+    @Test
+    void collectionProtocolShowsTheStoreNameNotItsId() {
+        // when
+        String html = collection(items());
+        String shortId = order().getShortenedOrderId();
+
+        // then: the customer gets the store's name and the short number; the full id is only in the link
+        assertThat(html.replaceAll("\\s+", " ")).contains("<dt>Sklep</dt> <dd>Demo</dd>")
+                .contains("<dt>Numer zamówienia</dt> <dd><a href=\"/dashboard/orders/" + ORDER_ID + "\">" + shortId + "</a></dd>")
+                .doesNotContain("store-1").doesNotContain("ID sklepu").doesNotContain(">" + ORDER_ID + "<");
+    }
+
+    @Test
+    void cardHasNoDocumentStatusColumn() {
+        // when
+        String html = card(order(), items(), false);
+
+        // then: the page dropped the always-"Wystawiony" column, so does the card; its terms follow the page
+        assertThat(html).doesNotContain("Wystawiony").doesNotContain("data-label=\"Status\"")
+                .contains("<h2 class=\"cl-print-title\" id=\"print-items-title\">Pozycje</h2>")
+                .contains("<dt>E-mail</dt>").doesNotContain("Przedmioty").doesNotContain(">Email<")
+                .doesNotContain(">" + ORDER_ID + "<");
+    }
+
+    @Test
+    void emptyShipmentCellsShowADash() {
+        // given: a shipment with neither a tracking number, a carrier nor a date, an item without its codes
+        Order order = order();
+        order.getShipments().set(0, new Shipment(ShipmentType.Courier));
+        OrderItem bare = new OrderItem(ORDER_ID, null, "Kabel", 1, 10, "SKU", false, 0);
+
+        // when
+        String html = card(order, List.of(bare), false);
+        String protocol = collection(List.of(bare));
+
+        // then: one way of saying "nothing" in every column
+        assertThat(html).contains("<td data-label=\"Numer śledzenia\" class=\"is-empty\">—</td>")
+                .contains("<td data-label=\"Przewoźnik\" class=\"is-empty\">—</td>")
+                .contains("<td data-label=\"Data wysyłki\">—</td>")
+                .contains("<td data-label=\"Kategoria\" class=\"is-empty\">—</td>")
+                .contains("<td class=\"cl-print-code is-empty\" data-label=\"Kod producenta\">—</td>")
+                .contains("<td class=\"cl-print-text is-empty\" data-label=\"Komentarz\">—</td>")
+                .doesNotContain("class=\"is-empty\"></td>");
+        assertThat(protocol.replaceAll("\\s+", " ")).contains("class=\"is-empty\">—</td>").doesNotContain("class=\"is-empty\"></td>")
+                .doesNotContain("class=\"is-empty\"> </td>");
     }
 
     @Test

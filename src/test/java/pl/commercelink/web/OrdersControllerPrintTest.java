@@ -135,7 +135,7 @@ class OrdersControllerPrintTest {
         assertThat(view).isEqualTo("orders/collection");
         OrderPrintView.Collection collection = (OrderPrintView.Collection) model.get("print");
         assertThat(collection.detailsHref()).isEqualTo("/dashboard/store/" + STORE_ID + "/orders/" + ORDER_ID);
-        assertThat(collection.store()).isEqualTo("store-1 (Demo)");
+        assertThat(collection.store()).isEqualTo("Demo");
         assertThat(collection.location()).isEqualTo("Kraków, PL");
         assertThat(collection.items()).extracting(OrderPrintView.ItemRow::name).containsExactly("Ryzen");
     }

@@ -3,7 +3,7 @@
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
       layout:decorate="~{layout-print}">
 <head>
-    <title th:text="#{order.card.title} + ' · ' + #{order.page.title(${print.shortId()})}"></title>
+    <title th:text="#{order.print.title.card(${print.shortId()})}"></title>
 </head>
 <body>
 <!--/* The order card: a printout for the packing table, printed on A4 straight from the order page's menu. */-->
@@ -21,11 +21,12 @@
             <article class="cl-card cl-print-sheet">
                 <dl class="cl-kv cl-print-meta">
                     <div>
-                        <dt th:text="#{order.order.id}"></dt>
-                        <dd><a th:href="@{${p.detailsHref()}}" th:text="${p.orderId()}"></a></dd>
+                        <!--/* the short number the list shows; the link still carries the full order id */-->
+                        <dt th:text="#{order.print.order}"></dt>
+                        <dd><a th:href="@{${p.detailsHref()}}" th:text="${p.shortId()}"></a></dd>
                     </div>
                     <div>
-                        <dt th:text="#{orders.email}"></dt>
+                        <dt th:text="#{order.print.email}"></dt>
                         <dd th:text="${p.email() != null} ? ${p.email()} : '—'"></dd>
                     </div>
                     <div>
@@ -35,7 +36,7 @@
                 </dl>
 
                 <section class="cl-print-section" aria-labelledby="print-items-title">
-                    <h2 class="cl-print-title" id="print-items-title" th:text="#{order.items}"></h2>
+                    <h2 class="cl-print-title" id="print-items-title" th:text="#{order.print.items}"></h2>
                     <table class="cl-table is-compact cl-print-table">
                         <thead>
                         <tr>
@@ -49,12 +50,12 @@
                         </thead>
                         <tbody>
                         <tr th:each="r : ${p.items()}">
-                            <td th:attr="data-label=#{order.item.category}" th:classappend="${r.category() == null} ? 'is-empty'" th:text="${r.category()}"></td>
+                            <td th:attr="data-label=#{order.item.category}" th:classappend="${r.category() == null} ? 'is-empty'" th:text="${r.category() != null} ? ${r.category()} : '—'"></td>
                             <td th:attr="data-label=#{order.item.name}" th:text="${r.name()}"></td>
                             <td class="is-numeric" th:attr="data-label=#{general.quantity}" th:text="${r.qty()}"></td>
-                            <td class="cl-print-code" th:attr="data-label=#{general.manufacturer.code}" th:classappend="${r.mfn() == null} ? 'is-empty'" th:text="${r.mfn()}"></td>
-                            <td th:attr="data-label=#{order.print.column.delivery}" th:classappend="${r.delivery() == null} ? 'is-empty'" th:text="${r.delivery()}"></td>
-                            <td class="cl-print-text" th:attr="data-label=#{order.item.comment}" th:classappend="${r.comment() == null} ? 'is-empty'" th:text="${r.comment()}"></td>
+                            <td class="cl-print-code" th:attr="data-label=#{general.manufacturer.code}" th:classappend="${r.mfn() == null} ? 'is-empty'" th:text="${r.mfn() != null} ? ${r.mfn()} : '—'"></td>
+                            <td th:attr="data-label=#{order.print.column.delivery}" th:classappend="${r.delivery() == null} ? 'is-empty'" th:text="${r.delivery() != null} ? ${r.delivery()} : '—'"></td>
+                            <td class="cl-print-text" th:attr="data-label=#{order.item.comment}" th:classappend="${r.comment() == null} ? 'is-empty'" th:text="${r.comment() != null} ? ${r.comment()} : '—'"></td>
                         </tr>
                         </tbody>
                     </table>
@@ -74,15 +75,14 @@
                         <tr>
                             <th scope="col" th:text="#{order.print.document.number}"></th>
                             <th scope="col" th:text="#{order.document.type}"></th>
-                            <th scope="col" th:text="#{order.status}"></th>
                         </tr>
                         </thead>
                         <tbody>
-                        <!--/* a document without a number yet (generation still running) prints a dash, never "null" */-->
+                        <!--/* a document without a number yet (generation still running) prints a dash, never "null"; no status column:
+                               every document on the order is issued, so it would always say the same */-->
                         <tr th:each="d : ${p.documents()}">
                             <td th:attr="data-label=#{order.print.document.number}" th:text="${d.number() != null} ? ${d.number()} : '—'"></td>
                             <td th:attr="data-label=#{order.document.type}" th:text="${d.typeKey() != null} ? #{${d.typeKey()}} : '—'"></td>
-                            <td th:attr="data-label=#{order.status}" th:text="#{document.status.issued}"></td>
                         </tr>
                         </tbody>
                     </table>
@@ -103,8 +103,8 @@
                         <tbody>
                         <tr th:each="s : ${p.shipments()}">
                             <td th:attr="data-label=#{order.shipment.type}" th:text="${s.typeKey() != null} ? #{${s.typeKey()}} : '—'"></td>
-                            <td th:attr="data-label=#{order.shipment.tracking}" th:classappend="${s.trackingNo() == null} ? 'is-empty'" th:text="${s.trackingNo()}"></td>
-                            <td th:attr="data-label=#{order.shipment.carrier}" th:classappend="${s.carrier() == null} ? 'is-empty'" th:text="${s.carrier()}"></td>
+                            <td th:attr="data-label=#{order.shipment.tracking}" th:classappend="${s.trackingNo() == null} ? 'is-empty'" th:text="${s.trackingNo() != null} ? ${s.trackingNo()} : '—'"></td>
+                            <td th:attr="data-label=#{order.shipment.carrier}" th:classappend="${s.carrier() == null} ? 'is-empty'" th:text="${s.carrier() != null} ? ${s.carrier()} : '—'"></td>
                             <td th:attr="data-label=#{order.shipped.at}" th:text="${s.shippedAt() != null} ? ${s.shippedAt()} : '—'"></td>
                         </tr>
                         </tbody>

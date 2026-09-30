@@ -347,7 +347,7 @@ class OrderTest {
     }
 
     @Test
-    void hasShipmentWithoutShippingDataIsTrueOnlyWhenSomeShipmentLacksLabelData() {
+    void hasShipmentToBookWhenSomeShipmentLacksLabelDataOrThereIsNone() {
         // given
         Order order = new Order("store-1");
         Shipment withData = new Shipment(ShipmentType.Courier);
@@ -357,11 +357,36 @@ class OrderTest {
         Shipment empty = new Shipment(ShipmentType.Courier);
         // when / then
         order.setShipments(List.of(withData));
-        assertThat(order.hasShipmentWithoutShippingData()).isFalse();
+        assertThat(order.hasShipmentToBook()).isFalse();
         order.setShipments(List.of(withData, empty));
-        assertThat(order.hasShipmentWithoutShippingData()).isTrue();
+        assertThat(order.hasShipmentToBook()).isTrue();
+        // the only shipment removed (2026-09-30): the courier booking creates the shipment, so there is one to book
         order.setShipments(List.of());
-        assertThat(order.hasShipmentWithoutShippingData()).isFalse();
+        assertThat(order.hasShipmentToBook()).isTrue();
+    }
+
+    @Test
+    void aShipmentWithACourierOrderIsNeverBookedAgainAndIsFoundForCancellationWithoutItsDate() {
+        // given: a booked courier whose shipped date is gone (legacy data), next to a delivered courier order
+        Order order = new Order("store-1");
+        Shipment booked = new Shipment(ShipmentType.Courier);
+        booked.setCarrier("DPD");
+        booked.setTrackingNo("T-2");
+        booked.setExternalId("EXT-2");
+        Shipment delivered = new Shipment(ShipmentType.Courier);
+        delivered.setCarrier("DPD");
+        delivered.setTrackingNo("T-1");
+        delivered.setExternalId("EXT-1");
+        delivered.setShippedAt(java.time.LocalDateTime.of(2026, 9, 1, 9, 0));
+        delivered.setDeliveredAt(java.time.LocalDateTime.of(2026, 9, 2, 9, 0));
+        order.setShipments(List.of(delivered, booked));
+
+        // when / then: booking again would pay for a second label; the delivered parcel has nothing to cancel
+        assertThat(order.hasShipmentToBook()).isFalse();
+        assertThat(order.firstShipmentWithShippingData()).contains(delivered);
+        assertThat(order.courierShipmentToCancel()).contains(booked);
+        order.setShipments(List.of(delivered));
+        assertThat(order.courierShipmentToCancel()).isEmpty();
     }
 
     @Test
@@ -491,5 +516,33 @@ class OrderTest {
 
         // then
         assertThat(nothingLeft).isTrue();
+    }
+
+    @Test
+    void cancelBlockersNameExactlyWhatCanBeCancelledMisses() {
+        // given
+        OrderItem delivered = new OrderItem("o1", "CPU", "Ryzen", 1, 100, "SKU", false, 0);
+        delivered.setStatus(FulfilmentStatus.Delivered);
+        OrderItem returned = new OrderItem("o1", "CPU", "Ryzen", 1, 100, "SKU", false, 0);
+        returned.setStatus(FulfilmentStatus.Returned);
+        Order open = new Order("store-1");
+        open.setStatus(OrderStatus.Assembly);
+        Order paid = new Order("store-1");
+        paid.setStatus(OrderStatus.Delivered);
+        paid.addPayment(new Payment("REF", "Jan", PaymentSource.BankTransfer, 100, 0));
+        Order settled = new Order("store-1");
+        settled.setStatus(OrderStatus.Delivered);
+
+        // when / then: the reason on the page is built from these, canBeCancelled is "none of them"
+        assertThat(open.cancelBlockers(List.of(returned))).containsExactly(Order.CancelBlocker.NOT_DELIVERED);
+        assertThat(paid.cancelBlockers(List.of(delivered))).containsExactlyInAnyOrder(
+                Order.CancelBlocker.PRODUCTS_NOT_RETURNED, Order.CancelBlocker.PAYMENTS_NOT_REFUNDED);
+        assertThat(paid.cancelBlockers(List.of(returned))).containsExactly(Order.CancelBlocker.PAYMENTS_NOT_REFUNDED);
+        assertThat(settled.cancelBlockers(List.of(returned))).isEmpty();
+        for (Order order : List.of(open, paid, settled)) {
+            for (List<OrderItem> items : List.of(List.of(delivered), List.of(returned), List.<OrderItem>of())) {
+                assertThat(order.canBeCancelled(items)).isEqualTo(order.cancelBlockers(items).isEmpty());
+            }
+        }
     }
 }

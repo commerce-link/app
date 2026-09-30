@@ -53,6 +53,7 @@ import pl.commercelink.taxonomy.TaxonomyCache;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.ResourceBundle;
 import java.util.Locale;
 import java.util.Set;
 
@@ -427,11 +428,27 @@ class OrderPageModelFactoryTest {
     }
 
     @Test
+    void aCourierOrderWithoutItsShippedDateIsNotBookedAgainAndStaysCancellable() {
+        // given: legacy data (the dialog no longer lets the date go); the paid label is there whatever the dates say
+        Order order = order(OrderStatus.Realization);
+        labelled(order.getShipments().get(0), "T-1", "PKG-1");
+        order.getShipments().get(0).setShippedAt(null);
+
+        // when
+        OrderPageModel page = factory.build(order, List.of(), ADMIN, PL);
+
+        // then
+        assertThat(page.header().primaryAction()).isNull();
+        assertThat(page.shipments().canCancelCourier()).isTrue();
+        assertThat(page.shipments().rows().get(0).removeReasonKey()).isEqualTo("order.shipments.remove.locked.courier");
+    }
+
+    @Test
     void aCourierShipmentOfAnOrderNotYetShippingSaysWhenItCanBeCancelled() {
         // given: a courier ordered while the order is still being assembled; "Cancel courier order" is not offered yet
         Order assembling = order(OrderStatus.Assembly);
         labelled(assembling.getShipments().get(0), "T-1", "PKG-1");
-        // two couriers: the button only ever cancels the first shipment that went out
+        // two couriers: the button only ever cancels the first courier order on the list
         Order twoCouriers = order(OrderStatus.Shipping);
         labelled(twoCouriers.getShipments().get(0), "T-1", "PKG-1");
         Shipment second = new Shipment(ShipmentType.Courier);
@@ -516,7 +533,8 @@ class OrderPageModelFactoryTest {
         withData.getShipments().get(0).setTrackingNo("T-1");
 
         // when
-        OrderShipmentForm blank = factory.build(order, List.of(), ADMIN, PL).shipments().blank();
+        OrderPageModel.ShipmentsCard card = factory.build(order, List.of(), ADMIN, PL).shipments();
+        OrderShipmentForm blank = card.blank();
         OrderShipmentForm plain = factory.build(withData, List.of(), ADMIN, PL).shipments().blank();
 
         // then: "Add shipment" fills the placeholder, so its form starts from what the placeholder keeps
@@ -526,6 +544,10 @@ class OrderPageModelFactoryTest {
         assertThat(blank.collectionPointCode()).isEqualTo("KRA01M");
         assertThat(plain.type()).isEqualTo(ShipmentType.Courier);
         assertThat(plain.collectionPointCode()).isNull();
+        // the placeholder offers no "Remove" (the server refuses one too) and no greyed one to explain
+        assertThat(card.rows().get(0).removeHref()).isNull();
+        assertThat(card.rows().get(0).removeReasonKey()).isNull();
+        assertThat(OrderPageModelFactory.removeLockedKey(order, 0)).isEqualTo("order.shipments.remove.error.placeholder");
     }
 
     private static void labelled(Shipment shipment, String trackingNo, String packageId) {
@@ -627,6 +649,16 @@ class OrderPageModelFactoryTest {
         order.getShipments().get(0).setExternalId("ext");
         order.getShipments().get(0).setTrackingNo("T");
         assertThat(factory.build(order, List.of(), viewer(), PL).header().primaryAction()).isNull();
+    }
+
+    @Test
+    void anOrderWithoutShipmentsStillOffersTheCourier() {
+        // given: the only shipment removed (2026-09-30)
+        Order order = assembledOrderWithOneEmptyShipment();
+        order.setShipments(new java.util.ArrayList<>());
+
+        // when / then
+        assertThat(factory.build(order, List.of(), viewer(), PL).header().primaryAction().labelKey()).isEqualTo("order.page.action.courier");
     }
 
     @Test
@@ -929,26 +961,6 @@ class OrderPageModelFactoryTest {
         assertThat(MoveTargetView.of(business, 1, "Nowe", "1,00 PLN", null).clientName()).isEqualTo("Firma Sp. z o.o.");
     }
 
-    private String itemHistory(String... serials) {
-        List<OrderItem> items = java.util.Arrays.stream(serials).map(sn -> {
-            OrderItem item = item(FulfilmentStatus.Delivered);
-            item.setSerialNo(sn);
-            return item;
-        }).toList();
-        return factory.build(order(OrderStatus.Delivered), items, ADMIN, PL).header().itemHistoryHref();
-    }
-
-    @Test
-    void theItemHistoryLinkNeedsExactlyOneSerialNumber() {
-        // when / then
-        assertThat(itemHistory()).isNull();
-        assertThat(itemHistory(new String[]{null})).isNull();
-        assertThat(itemHistory("SN-1")).isEqualTo("/dashboard/item/history?serialNo=SN-1");
-        assertThat(itemHistory("A, B")).isNull();
-        assertThat(itemHistory("A", "B")).isNull();
-        assertThat(itemHistory("SN-1", " SN-1 ")).isEqualTo("/dashboard/item/history?serialNo=SN-1");
-    }
-
     @Test
     void aMarketplaceSourceShowsItsNameOnly() {
         // given
@@ -980,7 +992,7 @@ class OrderPageModelFactoryTest {
     }
 
     @Test
-    void theSelectionRowGroupsTheActionsIntoRouteAndMoveMenusEachCarryingItsOwnReason() {
+    void theSelectionRowHasOneMoveMenuWithTheWarehouseEntriesAndNoAllocation() {
         // given
         Order order = order(OrderStatus.New);
         order.addPayment(Payment.bankTransfer("R/1", "Jan", 10));
@@ -991,19 +1003,67 @@ class OrderPageModelFactoryTest {
         OrderPageModel.ItemsCard items = factory.build(order, List.of(item), ADMIN, PL).items();
 
         // then
-        assertThat(items.bulkMenus()).extracting(OrderPageModel.BulkMenu::menu)
-                .containsExactly(BulkAction.Menu.ROUTE, BulkAction.Menu.MOVE);
+        assertThat(items.bulkActions()).extracting(OrderPageModel.BulkActionButton::action)
+                .doesNotContain(BulkAction.ALLOCATE);
+        assertThat(items.bulkMenus()).extracting(OrderPageModel.BulkMenu::menu).containsExactly(BulkAction.Menu.MOVE);
         assertThat(items.bulkMenus().get(0).actions()).extracting(OrderPageModel.BulkActionButton::action)
-                .containsExactly(BulkAction.ALLOCATE, BulkAction.TO_WAREHOUSE, BulkAction.TO_WAREHOUSE_RMA);
+                .containsExactly(BulkAction.SPLIT, BulkAction.MOVE, BulkAction.TO_WAREHOUSE, BulkAction.TO_WAREHOUSE_RMA);
         assertThat(items.bulkMenus().get(0).actions()).extracting(OrderPageModel.BulkActionButton::reasonKey)
-                .containsOnly("order.items.action.dropship.locked");
-        assertThat(items.bulkMenus().get(1).actions()).extracting(OrderPageModel.BulkActionButton::action)
-                .containsExactly(BulkAction.SPLIT, BulkAction.MOVE);
-        assertThat(items.bulkMenus().get(1).actions()).extracting(OrderPageModel.BulkActionButton::reasonKey)
-                .containsOnly("order.bulk.unavailable.split");
+                .containsExactly("order.bulk.unavailable.split", "order.bulk.unavailable.split",
+                        "order.items.action.dropship.locked", "order.items.action.dropship.locked");
         assertThat(items.bulkStandalone().action()).isEqualTo(BulkAction.REMOVE);
         assertThat(items.bulkStandalone().reasonKey()).isEqualTo("order.items.action.dropship.locked");
         assertThat(items.bulkStandalone().shortReasonKey()).isEqualTo("order.items.action.dropship.locked.short");
+    }
+
+    @Test
+    void theItemMenuOffersAllocationWithTheReasonWhenItWouldChangeNothing() {
+        // given
+        Order order = order(OrderStatus.New);
+        OrderItem ready = item(FulfilmentStatus.New);
+        ready.setEan("5900000000001");
+        ready.setManufacturerCode("MFN-1");
+        ready.setDeliveryId("Acme");
+        OrderItem noSupplier = item(FulfilmentStatus.New);
+        noSupplier.setEan("5900000000001");
+        noSupplier.setManufacturerCode("MFN-1");
+        noSupplier.setDeliveryId(null);
+        OrderItem noCodes = item(FulfilmentStatus.New);
+        noCodes.setEan(null);
+        noCodes.setDeliveryId("Acme");
+        OrderItem ordered = item(FulfilmentStatus.Ordered);
+
+        // when
+        OrderPageModel.ItemsCard items = factory.build(order, List.of(ready, noSupplier, noCodes, ordered), ADMIN, PL).items();
+
+        // then
+        assertThat(items.products()).extracting(row -> allocate(row).reasonKey())
+                .containsExactly(null, "order.item.unavailable.allocation.supplier",
+                        "order.item.unavailable.allocation.codes", "order.item.unavailable.not.new");
+        assertThat(allocate(items.products().get(0)).available()).isTrue();
+        assertThat(allocate(items.products().get(0)).labelKey()).isEqualTo("order.item.menu.allocate");
+    }
+
+    @Test
+    void theItemMenuGreysAllocationWhileTheOrderHasDropshipItems() {
+        // given
+        Order order = order(OrderStatus.New);
+        OrderItem ready = item(FulfilmentStatus.New);
+        ready.setEan("5900000000001");
+        ready.setManufacturerCode("MFN-1");
+        ready.setDeliveryId("Acme");
+        when(dropshipItemLookup.itemIdsInDropshipDeliveries(anyString(), any())).thenReturn(Set.of("other-item"));
+
+        // when
+        OrderItemRow row = factory.build(order, List.of(ready), ADMIN, PL).items().products().get(0);
+
+        // then
+        assertThat(allocate(row).available()).isFalse();
+        assertThat(allocate(row).reasonKey()).isEqualTo("order.item.unavailable.dropship");
+    }
+
+    private static ItemAction.State allocate(OrderItemRow row) {
+        return row.actions().stream().filter(state -> state.action() == ItemAction.ALLOCATE).findFirst().orElseThrow();
     }
 
     @Test
@@ -1056,7 +1116,7 @@ class OrderPageModelFactoryTest {
 
         // then
         assertThat(items.bulkStandalone()).isNull();
-        assertThat(items.bulkMenus()).hasSize(2);
+        assertThat(items.bulkMenus()).hasSize(1);
     }
 
     @Test
@@ -1321,9 +1381,12 @@ class OrderPageModelFactoryTest {
         assertThat(page.items().bulkStandalone().action()).isEqualTo(BulkAction.REMOVE);
         assertThat(page.items().bulkStandalone().reasonKey()).isEqualTo("order.bulk.unavailable.receipt");
         assertThat(page.items().bulkStandalone().shortReasonKey()).isEqualTo("order.bulk.unavailable.receipt.short");
-        assertThat(page.items().bulkMenus().get(1).actions()).extracting(OrderPageModel.BulkActionButton::reasonKey)
-                .containsOnly("order.bulk.unavailable.receipt");
-        assertThat(page.items().bulkMenus().get(0).actions()).allMatch(OrderPageModel.BulkActionButton::available);
+        assertThat(page.items().bulkMenus().get(0).actions())
+                .filteredOn(b -> b.action() == BulkAction.SPLIT || b.action() == BulkAction.MOVE)
+                .extracting(OrderPageModel.BulkActionButton::reasonKey).containsOnly("order.bulk.unavailable.receipt");
+        assertThat(page.items().bulkMenus().get(0).actions())
+                .filteredOn(b -> b.action() == BulkAction.TO_WAREHOUSE || b.action() == BulkAction.TO_WAREHOUSE_RMA)
+                .hasSize(2).allMatch(OrderPageModel.BulkActionButton::available);
         // merge on invoice
         assertThat(page.items().products().get(0).actions()).filteredOn(a -> a.action() == ItemAction.CONSOLIDATE)
                 .singleElement().satisfies(a -> {
@@ -1399,6 +1462,57 @@ class OrderPageModelFactoryTest {
     }
 
     @Test
+    void cancelReasonOfAnOpenOrderPointsToRemoval() {
+        // given: a new order without items can be deleted
+        Order fresh = order(OrderStatus.New);
+
+        // when
+        OrderPageModel.Header header = factory.build(fresh, List.of(), ADMIN, PL).header();
+
+        // then: the reason names the menu entry that is actually offered, by its label
+        ResourceBundle bundle = ResourceBundle.getBundle("messages", PL);
+        assertThat(header.canDelete()).isTrue();
+        assertThat(header.cancelUnavailableKey()).isEqualTo("order.page.cancel.unavailable.delete");
+        assertThat(bundle.getString(header.cancelUnavailableKey())).contains("„" + bundle.getString("order.page.delete") + "”");
+    }
+
+    @Test
+    void cancelReasonOfAnOpenOrderThatCannotBeDeletedStaysNeutral() {
+        // when: an order in assembly has items, so "Usuń zamówienie" is greyed too
+        OrderPageModel.Header header = factory.build(order(OrderStatus.Assembly), List.of(item(FulfilmentStatus.New)),
+                ADMIN, PL).header();
+
+        // then: no advice to delete what cannot be deleted
+        assertThat(header.canDelete()).isFalse();
+        assertThat(header.cancelUnavailableKey()).isEqualTo("order.page.cancel.unavailable.open");
+        assertThat(ResourceBundle.getBundle("messages", PL).getString(header.cancelUnavailableKey()))
+                .isEqualTo("Anulować można dostarczone zamówienie, po zwrocie wszystkich produktów i wpłat.");
+    }
+
+    @Test
+    void cancelReasonOfADeliveredOrderNamesTheMissingCondition() {
+        // given
+        Order paid = order(OrderStatus.Delivered);
+        paid.addPayment(new Payment("REF-1", "Jan", PaymentSource.BankTransfer, 100, 0));
+        Order unpaid = order(OrderStatus.Delivered);
+
+        // when
+        String itemsAndPayments = factory.build(paid, List.of(item(FulfilmentStatus.Delivered)), ADMIN, PL).header().cancelUnavailableKey();
+        String payments = factory.build(paid, returnedItems(), ADMIN, PL).header().cancelUnavailableKey();
+        String items = factory.build(unpaid, List.of(item(FulfilmentStatus.Delivered)), ADMIN, PL).header().cancelUnavailableKey();
+        OrderPageModel.Header cancellable = factory.build(order(OrderStatus.Delivered), returnedItems(), ADMIN, PL).header();
+
+        // then
+        assertThat(itemsAndPayments).isEqualTo("order.page.cancel.unavailable.itemsAndPayments");
+        assertThat(payments).isEqualTo("order.page.cancel.unavailable.payments");
+        assertThat(items).isEqualTo("order.page.cancel.unavailable.items");
+        assertThat(cancellable.canCancel()).isTrue();
+        ResourceBundle bundle = ResourceBundle.getBundle("messages", PL);
+        assertThat(bundle.getString(payments)).contains("wpłat").doesNotContain("produktów");
+        assertThat(bundle.getString(items)).contains("produktów").doesNotContain("wpłat");
+    }
+
+    @Test
     void anOrderThatCannotBeCancelledAnywayKeepsTheGeneralReasonWhileIssuing() {
         // given
         receipts(issuing());
@@ -1431,7 +1545,7 @@ class OrderPageModelFactoryTest {
         assertThat(withReceipt.cancelLockedKey()).isNull();
         assertThat(withReceipt.cancelMessage()).isEqualTo(
                 "Zamówienie przejdzie w status Anulowane, a ceny usług zostaną wyzerowane. Zamówienie ma zafiskalizowany"
-                        + " e-paragon — anulowanie go nie cofa. Zwrot rozlicz osobno (korekta lub zwrot).");
+                        + " e-paragon — anulowanie go nie cofa. Pieniądze rozlicz osobno: fakturą korygującą albo zwrotem.");
         assertThat(without.canCancel()).isTrue();
         assertThat(without.cancelMessage()).isEqualTo("Zamówienie przejdzie w status Anulowane, a ceny usług zostaną wyzerowane.");
     }
@@ -1457,7 +1571,7 @@ class OrderPageModelFactoryTest {
         receipts(new ReceiptOrderState(List.of(attempt(KEY_1, 1, ReceiptAttemptState.BLOCKED)),
                 new ReceiptOrderView(List.of(new ReceiptOrderView.Row(KEY_1, ReceiptAttemptState.BLOCKED,
                         "receipts.state.BLOCKED", "is-neutral", null, null, null, null, false, false, false, 1, null, null,
-                        "sprzedaż POS bez e-maila klienta", true)), false), false, false));
+                        "sprzedaż z kasy (POS) bez e-maila klienta", true)), false), false, false));
 
         // when
         OrderPageModel.DocumentsCard documents = factory.build(order, List.of(), ADMIN, PL).documents();
@@ -1466,7 +1580,7 @@ class OrderPageModelFactoryTest {
         assertThat(documents.rows()).extracting(OrderPageModel.DocumentRow::number).containsExactly("PAR/KASA/1");
         OrderPageModel.ReceiptRow receipt = documents.receipt();
         assertThat(receipt.settled()).isTrue();
-        assertThat(receipt.settledOutcome()).isEqualTo("sprzedaż POS bez e-maila klienta");
+        assertThat(receipt.settledOutcome()).isEqualTo("sprzedaż z kasy (POS) bez e-maila klienta");
         assertThat(receipt.problem()).isNull();
         assertThat(receipt.hasActions()).isFalse();
     }
@@ -1505,7 +1619,7 @@ class OrderPageModelFactoryTest {
         return new ReceiptOrderState(List.of(attempt(KEY_1, 1, ReceiptAttemptState.BLOCKED)),
                 new ReceiptOrderView(List.of(row(KEY_1, 1, ReceiptAttemptState.BLOCKED, null, null, null,
                         ReceiptPageProblem.ofLines("E-paragonu nie wysłano", List.of("a", "b", "c"), null, null),
-                        false, false, false, "sprzedaż POS bez e-maila klienta")), true), false, false);
+                        false, false, false, "sprzedaż z kasy (POS) bez e-maila klienta")), true), false, false);
     }
 
     @Test

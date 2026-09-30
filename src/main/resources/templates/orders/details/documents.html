@@ -9,11 +9,16 @@
     <div class="cl-card-head">
         <h2 class="cl-card-title" id="documents-title" th:text="#{order.card.documents}"></h2>
         <div class="cl-card-actions" th:unless="${page.readOnly()}">
-            <button th:if="${documents.canAdd()}" type="button" class="cl-button" data-cl-dialog-open="document-dialog"
-                    th:text="#{order.documents.add}"></button>
+            <button th:if="${documents.canAdd()}" type="button" class="cl-button" data-cl-dialog-open="document-dialog">
+                <span class="icon is-small" aria-hidden="true"><i class="fas fa-plus"></i></span>
+                <span th:text="#{order.documents.add}"></span>
+            </button>
             <!--/* greyed, still focusable, its reason under the head (design system: action that cannot run) */-->
             <button th:if="${documents.addLockedKey() != null}" type="button" class="cl-button" aria-disabled="true"
-                    aria-describedby="document-add-reason" th:text="#{order.documents.add}"></button>
+                    aria-describedby="document-add-reason">
+                <span class="icon is-small" aria-hidden="true"><i class="fas fa-plus"></i></span>
+                <span th:text="#{order.documents.add}"></span>
+            </button>
             <details class="cl-menu" th:if="${documents.canIssue()}">
                 <summary class="cl-button">
                     <span th:text="#{order.documents.issue}"></span>
@@ -62,11 +67,13 @@
         <li class="cl-list-item" th:each="d : ${documents.rows()}">
             <div>
                 <p class="cl-list-title">
-                    <span th:text="#{${d.typeKey()}}"></span>
+                    <span th:text="#{${d.prefixKey()}}"></span>
+                    <!--/* the new-tab icon is part of the link, joined to the number (&#8288;) so it never wraps alone */-->
                     <a th:if="${d.href() != null}" th:href="@{${d.href()}}" th:attr="target=${d.external()} ? '_blank' : null,
-                       rel=${d.external()} ? 'noopener' : null" th:text="${d.number()}"></a>
+                       rel=${d.external()} ? 'noopener' : null"><span th:text="${d.number()}"></span><th:block
+                            th:if="${d.external()}">&#8288;<span class="icon is-small" aria-hidden="true"><i
+                            class="fas fa-external-link-alt"></i></span></th:block></a>
                     <span th:unless="${d.href() != null}" th:text="${d.number()}"></span>
-                    <span th:if="${d.external()}" class="icon is-small" aria-hidden="true"><i class="fas fa-external-link-alt"></i></span>
                 </p>
                 <p class="cl-list-desc" th:if="${d.issuedAt() != null}" th:text="#{order.documents.issued(${d.issuedAt()})}"></p>
             </div>
@@ -90,16 +97,18 @@
     <div>
         <p class="cl-list-title">
             <span th:text="#{receipts.section.title}"></span>
-            <a th:if="${r.href() != null}" th:href="${r.href()}" target="_blank" rel="noopener"
-               th:text="${r.number() != null} ? ${r.number()} : #{receipts.document.open}"></a>
+            <a th:if="${r.href() != null}" th:href="${r.href()}" target="_blank" rel="noopener"><span
+                    th:text="${r.number() != null} ? ${r.number()} : #{receipts.document.open}"></span>&#8288;<span
+                    class="icon is-small" aria-hidden="true"><i class="fas fa-external-link-alt"></i></span></a>
             <span th:if="${r.href() == null and r.number() != null}" th:text="${r.number()}"></span>
-            <span th:if="${r.href() != null}" class="icon is-small" aria-hidden="true"><i class="fas fa-external-link-alt"></i></span>
             <span class="cl-status" th:classappend="${r.statusTone()}" th:text="#{${r.statusKey()}}"></span>
         </p>
         <p class="cl-list-desc" th:if="${r.date() != null or r.emailKey() != null}">
             <span th:if="${r.date() != null}" th:text="#{${r.dateKey()}(${r.date()})}"></span>
             <span th:if="${r.date() != null and r.emailKey() != null}" aria-hidden="true"> · </span>
-            <span th:if="${r.emailKey() != null}" th:text="#{${r.emailKey()}}"></span>
+            <!--/* the e-mail state opens the line when there is no date yet: then it takes the capital */-->
+            <span th:if="${r.emailKey() != null}" th:with="email=#{${r.emailKey()}}"
+                  th:text="${r.date() == null} ? ${#strings.capitalize(email)} : ${email}"></span>
         </p>
         <!--/* fiscalised, its document still on its way to the order (the locks of the page say the same) */-->
         <p class="cl-list-desc" th:if="${r.attachingKey() != null}" th:id="|e-paragon-attaching-${r.attemptNo()}|"
@@ -181,7 +190,7 @@
     <h2 th:if="${inDialog}" class="cl-dialog-title" th:id="|${close.dialogId()}-title|" th:text="#{receipts.action.close.title}"></h2>
     <input type="hidden" name="receiptKey" th:value="${close.receiptKey()}">
     <div th:class="${inDialog} ? 'cl-dialog-body' : 'cl-card-inset'">
-        <p class="cl-help" th:id="${close.helpId()}" th:text="#{receipts.action.close.help}"></p>
+        <p th:class="${inDialog} ? 'cl-dialog-effect' : 'cl-help'" th:id="${close.helpId()}" th:text="#{receipts.action.close.help}"></p>
         <div class="cl-form-grid">
             <div class="cl-span-6 cl-field">
                 <label class="cl-label" th:for="${close.numberId()}" th:text="#{receipts.action.close.number}"></label>
@@ -192,7 +201,7 @@
                     <span th:text="#{receipts.action.close.link}"></span>
                     <span class="cl-optional" th:text="#{form.optional}"></span>
                 </label>
-                <input class="cl-input" type="url" name="link" inputmode="url" autocomplete="off"
+                <input class="cl-input" type="url" name="link" inputmode="url" autocomplete="off" pattern="https?://.+"
                        th:id="${close.linkId()}" th:attr="aria-describedby=|${close.linkId()}-help|">
                 <p class="cl-help" th:id="|${close.linkId()}-help|" th:text="#{receipts.action.close.link.help}"></p>
             </div>
@@ -227,9 +236,12 @@
                     <input class="cl-input" type="text" id="document-number" name="number" required autocomplete="off">
                 </div>
                 <div class="cl-span-6 cl-field">
-                    <label class="cl-label" for="document-link" th:text="#{order.documents.link}"></label>
+                    <label class="cl-label" for="document-link">
+                        <span th:text="#{order.documents.link}"></span>
+                        <span class="cl-optional" th:text="#{form.optional}"></span>
+                    </label>
                     <input class="cl-input" type="url" id="document-link" name="link" inputmode="url" autocomplete="off"
-                           aria-describedby="document-link-help">
+                           pattern="https?://.+" aria-describedby="document-link-help">
                     <p class="cl-help" id="document-link-help" th:text="#{order.documents.link.help}"></p>
                 </div>
             </div>

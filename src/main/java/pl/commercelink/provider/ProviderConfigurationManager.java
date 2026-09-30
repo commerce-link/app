@@ -8,14 +8,12 @@ import pl.commercelink.stores.Store;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
 @Service
 public class ProviderConfigurationManager {
 
-    private final Map<String, Map<String, String>> cache = new ConcurrentHashMap<>();
     private final SecretsManager secretsManager;
 
     public ProviderConfigurationManager(SecretsManager secretsManager) {
@@ -54,7 +52,6 @@ public class ProviderConfigurationManager {
                 }
             }
             secretsManager.updateSecret(secretName, merged);
-            cache.remove(secretName);
             return true;
         } else {
             boolean hasAllRequired = descriptor.configurationFields().stream()
@@ -73,19 +70,15 @@ public class ProviderConfigurationManager {
         if (secretsManager.exists(secretName)) {
             secretsManager.deleteSecret(secretName);
         }
-        cache.remove(secretName);
     }
 
+    // Read on every use, never kept in memory: a change saved on one instance must reach the others at once, and a
+    // kept copy is only ever cleared on the instance that saved it.
     public Map<String, String> loadConfiguration(Store store, String providerName) {
         String secretName = store.getSecretesName(providerName);
-        Map<String, String> cached = cache.get(secretName);
-        if (cached != null) {
-            return cached;
-        }
         if (secretsManager.exists(secretName)) {
             @SuppressWarnings("unchecked")
             Map<String, String> config = secretsManager.getSecret(secretName, Map.class);
-            cache.put(secretName, config);
             return config;
         }
         return new HashMap<>();
@@ -112,7 +105,6 @@ public class ProviderConfigurationManager {
         } else if (secretsManager.exists(secretName)) {
             secretsManager.deleteSecret(secretName);
         }
-        cache.remove(secretName);
     }
 
     public record SecretSnapshot(boolean existed, Map<String, String> value) {

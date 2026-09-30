@@ -17,6 +17,7 @@ import pl.commercelink.stores.StoreSupplierConnection;
 import pl.commercelink.web.orders.ItemSaleLock;
 import pl.commercelink.web.orders.OrderItemRow;
 import pl.commercelink.web.orders.OrderLabels;
+import pl.commercelink.web.orders.OrderLinks;
 import pl.commercelink.web.orders.OrderPageModelFactory;
 import pl.commercelink.web.settings.SettingsTemplateRenderer;
 
@@ -60,6 +61,7 @@ class OrderItemPageTemplateTest {
         variables.put("serviceFlagLocked", false);
         variables.put("priceLocked", false);
         variables.put("consolidationLocked", false);
+        variables.put("serialHistory", OrderLinks.serialHistory(item.getSerialNo()));
         variables.put("statusKey", OrderLabels.itemStatus(item.getStatus()));
         variables.put("statusTone", OrderLabels.tone(item.getStatus()));
         variables.put("suppliers", labels.options());
@@ -87,6 +89,28 @@ class OrderItemPageTemplateTest {
         String html = SettingsTemplateRenderer.render("orders/item", variables);
         int start = html.indexOf("<section class=\"cl-page\"");
         return html.substring(start, html.indexOf("</main>", start));
+    }
+
+    @Test
+    void theItemPageLinksTheHistoryOfEachOfItsSerialNumbers() {
+        // given
+        OrderItem single = item(FulfilmentStatus.Delivered);
+        single.setSerialNo("SN-1");
+        OrderItem none = item(FulfilmentStatus.Delivered);
+        none.setSerialNo(null);
+
+        // when
+        String several = render(variables(item(FulfilmentStatus.Delivered), false));
+        String one = render(variables(single, true));
+        String without = render(variables(none, false));
+
+        // then: one serial number is one link; several are a menu of their own links, in the page header's actions
+        assertThat(one).containsPattern("<div class=\"cl-page-actions\">\\s*<a class=\"cl-button\" id=\"item-history-link\"\\s+"
+                + "href=\"/dashboard/item/history\\?serialNo=SN-1\">[\\s\\S]*?<span>Historia przedmiotu</span>");
+        assertThat(several).contains("<details class=\"cl-menu\" id=\"item-history-menu\">")
+                .contains("<a class=\"cl-menu-item\" href=\"/dashboard/item/history?serialNo=SN-1\">SN SN-1</a>")
+                .contains("<a class=\"cl-menu-item\" href=\"/dashboard/item/history?serialNo=SN-2\">SN SN-2</a>");
+        assertThat(without).doesNotContain("/dashboard/item/history").doesNotContain("cl-page-actions");
     }
 
     @Test
@@ -247,7 +271,7 @@ class OrderItemPageTemplateTest {
                 .contains("5901234123457").contains("LP14-2026").contains("SN-1, SN-2").contains("Klient prosi o fakturę na firmę")
                 .contains("4 999,00 PLN").contains("3 500,00 PLN").contains("23%").contains("<dt>Dostawa</dt>")
                 .contains("<a href=\"/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID + "\">b58e2f14</a>")
-                .contains("Wróć do zamówienia").contains("Dostarczony");
+                .contains("Wróć do zamówienia").contains(">Skompletowany</span>");
     }
 
     @Test

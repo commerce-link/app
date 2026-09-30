@@ -4,8 +4,10 @@
 <!--/* Shipment rows with their own "Edytuj" and "Usuń", "Dodaj przesyłkę" and the courier cancellation in the head.
        "Edytuj" and "Dodaj przesyłkę" open the shipment's dialog (one per shipment, a fixed size whatever the number of
        shipments); without JavaScript they lead to the shipment page. "Usuń" goes through the confirmation dialog, or
-       its page without JavaScript; its text and button say when the removal delivers the order. The only shipment
-       with nothing but the delivery choice has no "Usuń": removing it would leave the same placeholder. */-->
+       its page without JavaScript; its text and button say when the removal delivers the order or moves it back to
+       "W realizacji"; removing the only shipment leaves the card empty. The only shipment with nothing but the
+       delivery choice (the one the order was created with) reads as no shipment: a greyed row "Sposób dostawy: …",
+       "Brak przesyłki" and "Uzupełnij" (the same dialog) instead of "Edytuj", no "Usuń". */-->
 <section th:fragment="card" class="cl-card" id="przesylki" aria-labelledby="shipments-title"
          th:with="shipments=${page.shipments()}">
     <div class="cl-card-head">
@@ -25,17 +27,32 @@
         </div>
     </div>
     <ul class="cl-list" th:if="${!shipments.rows().isEmpty()}">
-        <li class="cl-list-item" th:each="s : ${shipments.rows()}">
+        <li th:each="s : ${shipments.rows()}" th:if="${s.placeholder()}" class="cl-list-item is-placeholder" id="shipment-placeholder">
+            <div>
+                <p class="cl-list-title">
+                    <span th:text="#{order.shipments.placeholder.title(${#messages.msg(s.typeKey())})}
+                                   + (${s.pickupPoint() != null} ? ', ' + ${s.pickupPoint()} : '')"></span>
+                    <span th:if="${s.carrier() != null}" th:text="'· ' + ${s.carrier()}"></span>
+                </p>
+                <p class="cl-list-desc" th:text="#{order.shipments.placeholder.none}"></p>
+            </div>
+            <div class="cl-list-actions" th:if="${s.editHref() != null}">
+                <a class="cl-link-button" th:href="@{${s.editHref()}}" th:attr="data-cl-dialog-open=${s.dialogId()},
+                   aria-label=#{order.shipments.placeholder.fill.for(${s.number()})}" th:text="#{order.shipments.placeholder.fill}"></a>
+            </div>
+        </li>
+        <li class="cl-list-item" th:each="s : ${shipments.rows()}" th:unless="${s.placeholder()}">
             <div>
                 <p class="cl-list-title">
                     <span th:text="#{${s.typeKey()}}"></span>
-                    <span th:if="${s.carrier() != null}" th:text="' · ' + ${s.carrier()}"></span>
+                    <span th:if="${s.carrier() != null}" th:text="'· ' + ${s.carrier()}"></span>
                     <!--/* the pill text carries the state; the title only adds what to do about a failure */-->
                     <span th:if="${s.trackingKey() != null}" class="cl-status" th:classappend="${s.trackingTone()}"
                           th:attr="title=${s.trackingHelpKey() != null} ? #{${s.trackingHelpKey()}} : null"
                           th:text="#{${s.trackingKey()}}"></span>
                 </p>
-                <p class="cl-list-desc">
+                <!--/* each part starts lower case after a separator; the first one of the line takes a capital */-->
+                <p class="cl-list-desc" th:with="lead=${s.trackingNo() == null and s.pickupPoint() == null}">
                     <th:block th:if="${s.trackingNo() != null}">
                         <span th:text="#{order.shipments.tracking}"></span>
                         <a th:if="${s.trackingUrl() != null}" th:href="${s.trackingUrl()}" target="_blank" rel="noopener"
@@ -43,11 +60,15 @@
                         <span th:unless="${s.trackingUrl() != null}" th:text="${s.trackingNo()}"></span>
                         <span> · </span>
                     </th:block>
-                    <th:block th:if="${s.pickupPoint() != null}"><span th:text="#{order.shipments.pickup(${s.pickupPoint()})}"></span><span> · </span></th:block>
-                    <span th:if="${s.shippedAt() != null}" th:text="#{order.shipments.shipped(${s.shippedAt()})}"></span>
+                    <!--/* a pickup-point shipment is titled "Punkt odbioru" already: its line shows the point's code alone */-->
+                    <th:block th:if="${s.pickupPoint() != null}"><span th:text="${s.typeKey() == 'ShipmentType.PickupPoint'} ? ${s.pickupPoint()}
+                            : #{order.shipments.pickup(${s.pickupPoint()})}"></span><span> · </span></th:block>
+                    <span th:if="${s.shippedAt() != null}"
+                          th:with="shipped=#{order.shipments.shipped(${s.shippedAt()})}" th:text="${lead} ? ${#strings.capitalize(shipped)} : ${shipped}"></span>
                     <span th:if="${s.deliveredAt() != null}" th:text="' · ' + #{order.shipments.delivered(${s.deliveredAt()})}"></span>
                     <span th:if="${s.shippedAt() != null and s.deliveredAt() == null}" th:text="' · ' + #{order.shipments.in.transit}"></span>
-                    <span th:if="${s.shippedAt() == null}" th:text="#{order.shipments.waiting}"></span>
+                    <span th:if="${s.shippedAt() == null}"
+                          th:with="waiting=#{order.shipments.waiting}" th:text="${lead} ? ${#strings.capitalize(waiting)} : ${waiting}"></span>
                 </p>
                 <p th:if="${s.removeReasonKey() != null}" class="cl-list-desc" th:id="|shipment-${s.number()}-remove-reason|"
                    th:text="#{${s.removeReasonKey()}}"></p>

@@ -151,7 +151,7 @@ public record OrderShipmentForm(String orderId, Integer index, String version, S
 
     /**
      * Field id to message key, in the order of the form. saved is the shipment the form edits (null for a new one): one
-     * with a courier order keeps its type, carrier and tracking number.
+     * with a courier order keeps its type, carrier and tracking number, and its shipped date can change but not go.
      */
     public Map<String, String> validate(Shipment saved) {
         Map<String, String> found = new LinkedHashMap<>();
@@ -170,6 +170,11 @@ public record OrderShipmentForm(String orderId, Integer index, String version, S
             }
             if (!Objects.equals(StringUtils.trimToNull(trackingNo), StringUtils.trimToNull(saved.getTrackingNo()))) {
                 found.put(field("trackingNo"), "order.shipments.error.courierLocked");
+            }
+            // without its shipped date the shipment would stop counting as sent: "Cancel courier order" would lose it
+            // and "Book courier" would come back, paying for a second label; another past day stays allowed
+            if (saved.getShippedAt() != null && StringUtils.isBlank(shippedDate)) {
+                found.put(field("shippedDate"), "order.shipments.error.courierShippedDate");
             }
         }
         LocalDate shipped = checkDate(found, "shippedDate", shippedDate);

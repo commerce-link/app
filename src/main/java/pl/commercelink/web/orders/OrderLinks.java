@@ -4,6 +4,11 @@ import org.springframework.web.util.UriComponentsBuilder;
 import pl.commercelink.documents.DocumentType;
 import pl.commercelink.orders.Order;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.List;
+
 /** Addresses of an order for the one looking at it: a super admin gets the store-scoped variants. */
 public record OrderLinks(String base, String storeId, boolean superAdmin) {
 
@@ -44,5 +49,26 @@ public record OrderLinks(String base, String storeId, boolean superAdmin) {
                 .queryParam("type", type.name())
                 .queryParam("number", number)
                 .encode().build().toUriString().replace("+", "%2B");
+    }
+
+    /** The history of one physical item, by its serial number (the store's page; a super admin has none). */
+    public static String itemHistory(String serialNo) {
+        return "/dashboard/item/history?serialNo=" + URLEncoder.encode(serialNo, StandardCharsets.UTF_8);
+    }
+
+    /** One serial number of an item with the link to its history. */
+    public record SerialHistory(String serialNo, String href) {
+    }
+
+    /**
+     * The history links of an item's serial numbers (a comma-separated list for qty &gt; 1), each once, in the
+     * item's order; empty without a serial number.
+     */
+    public static List<SerialHistory> serialHistory(String serialNo) {
+        if (serialNo == null) {
+            return List.of();
+        }
+        return Arrays.stream(serialNo.split(",")).map(String::trim).filter(sn -> !sn.isEmpty()).distinct()
+                .map(sn -> new SerialHistory(sn, itemHistory(sn))).toList();
     }
 }

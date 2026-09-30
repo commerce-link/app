@@ -108,14 +108,10 @@ public class OrderLifecycle {
             }
         }
 
-        if (order.getStatus() == OrderStatus.Shipping) {
-            order.getShipments().stream()
-                    .filter(shipment -> shipment.getType() == ShipmentType.PersonalCollection)
-                    .filter(shipment -> shipment.getShippedAt() == null)
-                    .forEach(shipment -> {
-                        shipment.setShippedAt(LocalDateTime.now());
-                    });
-        }
+        // No personal collection is stamped "ready" here while the order is Shipping: every save of a Shipping order
+        // would re-stamp a collection the operator has just emptied (a removed shipment's placeholder, a cleared date),
+        // so it could never be taken back. The move above needs every shipment ready already; a move by hand stamps in
+        // OrdersController#changeStatus (Order#markCollectionsReady).
 
         // isDelivered is false without shipments, and so is hasNothingLeftToDeliver before Delivered: an order that
         // lost its shipments waits for a new one in whatever status it is, it is neither delivered nor completed

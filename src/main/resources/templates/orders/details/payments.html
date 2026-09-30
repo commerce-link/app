@@ -23,7 +23,7 @@
                     <!--/* a payment with no amount yet is the one the order waits for, not a payment of 0,00 */-->
                     <span th:if="${p.pending()}" th:text="#{order.payments.pending}"></span>
                     <span th:unless="${p.pending()}" th:text="#{general.currency.amount(${p.amount()})}"></span>
-                    <span th:if="${p.sourceKey() != null}" th:text="' · ' + #{${p.sourceKey()}}"></span>
+                    <span th:if="${p.sourceKey() != null}" th:text="'· ' + #{${p.sourceKey()}}"></span>
                     <span th:if="${p.pending()}" class="cl-status is-neutral" th:text="#{order.payments.pending.pill}"></span>
                     <span th:if="${p.refund()}" class="cl-status is-warn" th:text="#{order.payments.refund}"></span>
                 </p>

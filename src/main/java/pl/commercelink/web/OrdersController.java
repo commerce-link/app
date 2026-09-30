@@ -50,6 +50,7 @@ import pl.commercelink.receipts.ReceiptAttemptService;
 import pl.commercelink.receipts.ReceiptLock;
 import pl.commercelink.rest.client.HttpClientException;
 import pl.commercelink.shipping.ShipmentCancelService;
+import pl.commercelink.shipping.ShippingUnavailableException;
 import pl.commercelink.shipping.ShipmentTrackingSubscriber;
 import pl.commercelink.shipping.api.ShippingException;
 import pl.commercelink.starter.dynamodb.OptimisticLockingExhaustedException;
@@ -103,6 +104,7 @@ import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import pl.commercelink.inventory.deliveries.DropshipItemLookup;
 import pl.commercelink.inventory.supplier.SupplierChoice;
 import pl.commercelink.inventory.supplier.SupplierLabelMap;
@@ -165,6 +167,8 @@ public class OrdersController extends BaseController {
 
     @Autowired
     private ShipmentCancelService shipmentCancelService;
+    @Autowired
+    private OrderRealizationStepBack realizationStepBack;
 
     @Autowired
     private OrderEventsRepository orderEventsRepository;
@@ -620,6 +624,10 @@ public class OrdersController extends BaseController {
         }
         if (refusal != null) {
             return refuse(redirectAttributes, orderId, refusal, locale);
+        }
+        if (requested == OrderStatus.Shipping && order.getStatus() != OrderStatus.Shipping) {
+            // "W dostawie" by hand: a personal collection is ready for collection from now
+            order.markCollectionsReady(LocalDateTime.now());
         }
         order.setStatus(requested);
         // the lifecycle may move the order on at once (New with every item delivered becomes Assembled), as it did
@@ -1237,6 +1245,8 @@ public class OrdersController extends BaseController {
         model.addAttribute("consolidationLockedKey", !consolidationLocked ? null
                 : order.isInvoiced() ? "order.item.consolidation.locked"
                 : receiptLock.key("order.item.consolidation.locked.receipt"));
+        // the item's history, by serial number, lives on the item page (the order's "Więcej" menu no longer names one item)
+        model.addAttribute("serialHistory", OrderLinks.serialHistory(orderItem.getSerialNo()));
         model.addAttribute("statusKey", OrderLabels.itemStatus(orderItem.getStatus()));
         model.addAttribute("statusTone", OrderLabels.tone(orderItem.getStatus()));
 
@@ -1915,8 +1925,8 @@ public class OrdersController extends BaseController {
         }
 
         List<Shipment> shipments = new ArrayList<>(current);
-        // a new shipment fills the only placeholder (the customer's choice kept in place of a removed shipment, or the
-        // one every order is created with) instead of standing next to it and holding the order back from Shipping
+        // a new shipment fills the only placeholder (the one every order is created with, or one whose date was
+        // cleared) instead of standing next to it and holding the order back from Shipping
         boolean fillsPlaceholder = index == null && existingOrder.onlyPlaceholder().isPresent();
         Shipment saved = posted.toShipment(before);
         if (fillsPlaceholder) {
@@ -1926,10 +1936,18 @@ public class OrdersController extends BaseController {
         } else {
             shipments.set(index, saved);
         }
-        storeShipments(existingOrder, shipments, saved, before);
+        // clearing the shipped date of the last shipment that went out takes a Shipping order back to Realization
+        boolean unshipped = before != null && before.hasGoneOut() && !saved.hasGoneOut();
+        boolean backToRealization = storeShipments(existingOrder, shipments, saved, before, unshipped);
+        if (unshipped) {
+            forgetShipmentEmails(existingOrder, before);
+        }
 
         String notice = index == null ? messageSource.getMessage("order.shipments.added", null, locale)
                 : messageSource.getMessage("order.shipments.saved", new Object[]{index + 1}, locale);
+        if (backToRealization) {
+            notice += " " + backToRealizationNotice(locale);
+        }
         if (async) {
             // the dialog reloads the page it is on (keeping its returnTo), which takes this notice
             OrderFlash.forNextPage(request, response, "/dashboard/orders/" + orderId,
@@ -1962,12 +1980,15 @@ public class OrdersController extends BaseController {
 
     /**
      * Removes one shipment. No "shipment created" notice goes out: nothing was shipped by removing a record. The only
-     * shipment is not dropped but goes back to waiting to be shipped: a placeholder keeps how the customer asked to
-     * receive the order (type, pickup point), which the customer card, the client page and the dropship flow read from
-     * the shipment, and the order keeps a shipment to deliver. Once no shipment has shipping data left, the shipping
+     * shipment goes as well, with how the customer asked to receive the order (type, pickup point): the user's decision
+     * of 2026-09-30 overturns Q2, which kept a placeholder with that choice. The customer card, the client page and
+     * the dropship flow then fall back to their defaults, and the operator types the choice with the next shipment;
+     * an order without shipments is never delivered nor completed before Delivered (Order#hasNothingLeftToDeliver).
+     * Once no shipment has shipping data left, the shipping
      * e-mail is forgotten (as "Cancel courier order" does), so the customer gets it with the number of the shipment
      * added next instead of keeping a link to the removed one. Removing the last undelivered shipment while the others
-     * are delivered delivers the order; the confirmation says so (OrderPageModelFactory.removeShipmentMessageKey).
+     * are delivered delivers the order; removing the last one that went out of a Shipping order takes it back to
+     * Realization; the confirmation and the notice say so (OrderPageModelFactory.removeShipmentMessageKey).
      */
     @PostMapping("/dashboard/orders/{orderId}/shipments/{index}/remove")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
@@ -1981,14 +2002,13 @@ public class OrdersController extends BaseController {
         }
         List<Shipment> shipments = new ArrayList<>(existingOrder.getShipments());
         Shipment removed = shipments.remove(index);
-        if (shipments.isEmpty()) {
-            shipments.add(Shipment.placeholderFor(removed));
+        boolean backToRealization = storeShipments(existingOrder, shipments, null, null, true);
+        forgetShipmentEmails(existingOrder, removed);
+        String notice = messageSource.getMessage("order.shipments.removed", new Object[]{index + 1}, locale);
+        if (backToRealization) {
+            notice += " " + backToRealizationNotice(locale);
         }
-        storeShipments(existingOrder, shipments, null, null);
-        if (removed.hasShippingData() && existingOrder.firstShipmentWithShippingData().isEmpty()) {
-            orderEventsRepository.deleteByOrderIdAndName(orderId, EmailNotificationType.ORDER_SHIPPING.name());
-        }
-        OrderFlash.saved(redirectAttributes, messageSource.getMessage("order.shipments.removed", new Object[]{index + 1}, locale));
+        OrderFlash.saved(redirectAttributes, notice);
         return details(orderId);
     }
 
@@ -2024,10 +2044,16 @@ public class OrdersController extends BaseController {
      * delivery date on every shipment moves the order to Delivered). saved is the shipment just added or edited (null
      * for a removal) and before its previous state (null for a new one): only its own shipping data, when new or
      * changed, is announced (the e-mail to the customer, the number to the marketplace), never a shipment already
-     * announced that merely sits next to it, nor a corrected date of one already announced.
+     * announced that merely sits next to it, nor a corrected date of one already announced. unshipping: the change
+     * takes a shipment back from having gone out (a removal, a cleared date); when that leaves a Shipping order with
+     * nothing gone out, the order goes back to Realization before the lifecycle sees it (the user's decision of
+     * 2026-09-30, OrderRealizationStepBack, which also keeps the "in realization" e-mail from the customer). Returns
+     * whether it went back.
      */
-    private void storeShipments(Order existingOrder, List<Shipment> shipments, Shipment saved, Shipment before) {
+    private boolean storeShipments(Order existingOrder, List<Shipment> shipments, Shipment saved, Shipment before,
+                                   boolean unshipping) {
         existingOrder.setShipments(shipments);
+        boolean backToRealization = unshipping && realizationStepBack.apply(existingOrder);
         shipmentTrackingSubscriber.subscribe(getStoreId(), existingOrder);
         orderLifecycle.update(existingOrder);
         boolean notifiable = saved != null && isAnnounceable(saved);
@@ -2035,6 +2061,26 @@ public class OrdersController extends BaseController {
                 || !shipmentData(saved).equals(shipmentData(before)));
         if (notifiable && changed) {
             orderLifecycleEventPublisher.publish(existingOrder, OrderLifecycleEventType.ShipmentCreated);
+        }
+        return backToRealization;
+    }
+
+    private String backToRealizationNotice(Locale locale) {
+        String status = messageSource.getMessage(OrderLabels.status(OrderStatus.Realization), null, locale);
+        return messageSource.getMessage("order.shipments.backToRealization", new Object[]{status}, locale);
+    }
+
+    /**
+     * A shipment taken back (removed, or its shipped date cleared) that the customer was told about: once no other
+     * shipment of the order carries that news, its e-mail event is forgotten (as "Cancel courier order" does), so the
+     * shipment entered next announces itself again instead of the customer keeping the old number or pickup notice.
+     */
+    private void forgetShipmentEmails(Order order, Shipment takenBack) {
+        if (takenBack.hasShippingData() && order.firstShipmentWithShippingData().isEmpty()) {
+            orderEventsRepository.deleteByOrderIdAndName(order.getOrderId(), EmailNotificationType.ORDER_SHIPPING.name());
+        }
+        if (takenBack.hasCollectionData() && order.getShipments().stream().noneMatch(Shipment::hasCollectionData)) {
+            orderEventsRepository.deleteByOrderIdAndName(order.getOrderId(), EmailNotificationType.ORDER_PICKUP.name());
         }
     }
 
@@ -2174,16 +2220,20 @@ public class OrdersController extends BaseController {
     public String cancelShipment(@PathVariable String orderId,
                                  RedirectAttributes redirectAttributes, Locale locale) {
         Order order = requireOrder(ordersRepository, getStoreId(), orderId);
-        Optional<Shipment> sent = order.firstShipmentWithShippingData();
         // the same shipment ShipmentCancelService picks; its English errors never reach the operator
-        String refusal = sent.isEmpty() ? "order.shipments.cancel.error.no.data"
-                : sent.get().getExternalId() == null ? "order.shipments.cancel.error.no.package" : null;
+        String refusal = order.courierShipmentToCancel().isPresent() ? null
+                : order.firstShipmentWithShippingData().isEmpty() ? "order.shipments.cancel.error.no.data"
+                : "order.shipments.cancel.error.no.package";
         if (refusal != null) {
             return refuse(redirectAttributes, orderId, refusal, locale);
         }
         try {
-            shipmentCancelService.cancelShipping(orderId, getStoreId());
-            OrderFlash.saved(redirectAttributes, messageSource.getMessage("shipment.cancel.success", null, locale));
+            boolean backToRealization = shipmentCancelService.cancelShipping(orderId, getStoreId());
+            String notice = messageSource.getMessage("shipment.cancel.success", null, locale);
+            OrderFlash.saved(redirectAttributes, backToRealization ? notice + " " + backToRealizationNotice(locale) : notice);
+        } catch (ShippingUnavailableException e) {
+            // the store's carrier authorisation was lost: nothing was cancelled nor changed
+            return refuse(redirectAttributes, orderId, "order.shipments.cancel.error.no.provider", locale);
         } catch (HttpClientException ex) {
             return handleHttpClientException(ex, orderId, redirectAttributes);
         } catch (ShippingException e) {
