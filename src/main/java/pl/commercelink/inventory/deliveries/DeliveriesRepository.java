@@ -3,7 +3,6 @@ package pl.commercelink.inventory.deliveries;
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapperConfig;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBQueryExpression;
-import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBScanExpression;
 import com.amazonaws.services.dynamodbv2.model.AmazonDynamoDBException;
 import com.amazonaws.services.dynamodbv2.model.AttributeValue;
 import com.amazonaws.services.dynamodbv2.model.QueryRequest;
@@ -11,7 +10,6 @@ import com.amazonaws.services.dynamodbv2.model.QueryResult;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import pl.commercelink.starter.dynamodb.DynamoDbRepository;
-import pl.commercelink.stores.ConnectionMode;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -204,109 +202,6 @@ public class  DeliveriesRepository extends DynamoDbRepository<Delivery> {
         return new ArrayList<>(dynamoDBMapper.query(Delivery.class, new DynamoDBQueryExpression<Delivery>().withHashKeyValues(key)));
     }
 
-    public List<Delivery> searchActiveDeliveries(String storeId, DeliveryFilter filter, int page, int pageSize) {
-        QueryAndFilterExpressions expressions = buildFilterExpressions(filter, storeId);
-
-        DynamoDBQueryExpression<Delivery> queryExpression = new DynamoDBQueryExpression<Delivery>()
-                .withKeyConditionExpression(expressions.keyConditionExpression)
-                .withFilterExpression(expressions.filterExpression)
-                .withExpressionAttributeValues(expressions.eav);
-
-        return queryWithPagination(queryExpression, page, pageSize, Delivery.class)
-                .stream()
-                .sorted(Comparator.comparing(Delivery::getEstimatedDeliveryAt, Comparator.nullsFirst(Comparator.naturalOrder())))
-                .collect(Collectors.toList());
-    }
-
-    public List<Delivery> searchActiveDeliveries(DeliveryFilter filter, int page, int pageSize) {
-        QueryAndFilterExpressions expressions = buildFilterExpressions(filter, null);
-
-        DynamoDBScanExpression scanExpression = new DynamoDBScanExpression()
-                .withFilterExpression(expressions.filterExpression)
-                .withExpressionAttributeValues(expressions.eav);
-
-        return scanWithPagination(scanExpression, page, pageSize, Delivery.class);
-    }
-
-    private QueryAndFilterExpressions buildFilterExpressions(DeliveryFilter filter, String storeId) {
-        Map<String, AttributeValue> eav = new HashMap<>();
-        StringBuilder filterExpression = new StringBuilder();
-        String keyConditionExpression = null;
-
-        eav.put(":null", new AttributeValue().withNULL(true));
-        appendFilter(filterExpression, "(attribute_not_exists(deliveredAt) OR deliveredAt = :null)");
-
-        if (storeId != null) {
-            keyConditionExpression = "storeId = :storeId";
-            eav.put(":storeId", new AttributeValue().withS(storeId));
-
-            if (isNotBlank(filter.getDeliveryId())) {
-                eav.put(":deliveryId", new AttributeValue().withS(filter.getDeliveryId()));
-                keyConditionExpression += " AND deliveryId = :deliveryId";
-            }
-        } else {
-            if (isNotBlank(filter.getDeliveryId())) {
-                eav.put(":deliveryId", new AttributeValue().withS(filter.getDeliveryId()));
-                appendFilter(filterExpression, "deliveryId = :deliveryId");
-            }
-        }
-
-        if (isNotBlank(filter.getExternalDeliveryId())) {
-            eav.put(":externalDeliveryId", new AttributeValue().withS(filter.getExternalDeliveryId()));
-            appendFilter(filterExpression, "externalDeliveryId = :externalDeliveryId");
-        }
-
-        if (isNotBlank(filter.getProvider())) {
-            eav.put(":provider", new AttributeValue().withS(filter.getProvider()));
-            appendFilter(filterExpression, "provider = :provider");
-        }
-
-        // contains() keeps the match inside the DynamoDB filter, so pagination stays correct; it is case-sensitive.
-        if (isNotBlank(filter.getCounterpartyShortcut())) {
-            eav.put(":counterpartyShortcut", new AttributeValue().withS(filter.getCounterpartyShortcut()));
-            appendFilter(filterExpression, "contains(counterpartyShortcut, :counterpartyShortcut)");
-        }
-
-        if (filter.getOrderedAtStart() != null && filter.getOrderedAtEnd() != null) {
-            eav.put(":orderedAtStart", new AttributeValue().withS(filter.getOrderedAtStart().toString()));
-            eav.put(":orderedAtEnd", new AttributeValue().withS(filter.getOrderedAtEnd().toString()));
-            appendFilter(filterExpression, "orderedAt BETWEEN :orderedAtStart AND :orderedAtEnd");
-        } else if (filter.getOrderedAtStart() != null) {
-            eav.put(":orderedAtStart", new AttributeValue().withS(filter.getOrderedAtStart().toString()));
-            appendFilter(filterExpression, "orderedAt >= :orderedAtStart");
-        } else if (filter.getOrderedAtEnd() != null) {
-            eav.put(":orderedAtEnd", new AttributeValue().withS(filter.getOrderedAtEnd().toString()));
-            appendFilter(filterExpression, "orderedAt <= :orderedAtEnd");
-        }
-
-        if (filter.isWaitingForCollection()) {
-            eav.put(":null", new AttributeValue().withNULL(true));
-            appendFilter(filterExpression, "(attribute_not_exists(receivedAt) OR receivedAt = :null)");
-        }
-
-        if (filter.isWithoutInvoice()) {
-            eav.put(":zero", new AttributeValue().withN("0"));
-            appendFilter(filterExpression, "(attribute_not_exists(invoiced) OR invoiced = :zero)");
-        }
-
-        if (filter.isWithoutSync()) {
-            eav.put(":false", new AttributeValue().withN("0"));
-            appendFilter(filterExpression, "(attribute_not_exists(synced) OR synced = :false)");
-        }
-
-        if (filter.isAwaitingApproval()) {
-            eav.put(":awaitingApproval", new AttributeValue().withS(DeliveryOrderStatus.AWAITING_APPROVAL.name()));
-            appendFilter(filterExpression, "orderStatus = :awaitingApproval");
-        }
-
-        if (filter.isGlobalOnly()) {
-            eav.put(":globalMode", new AttributeValue().withS(ConnectionMode.GLOBAL.name()));
-            appendFilter(filterExpression, "connectionMode = :globalMode");
-        }
-
-        return new QueryAndFilterExpressions(keyConditionExpression, filterExpression.toString(), eav);
-    }
-
     public List<Delivery> findPendingDeliveriesByProvider(String storeId, String provider, String excludedDeliveryId) {
         Delivery deliveryKey = new Delivery();
         deliveryKey.setStoreId(storeId);
@@ -356,17 +251,5 @@ public class  DeliveriesRepository extends DynamoDbRepository<Delivery> {
                 .filter(delivery -> isNotBlank(delivery.getExternalDeliveryId()))
                 .sorted(Comparator.comparing(Delivery::getOrderedAt, Comparator.nullsFirst(Comparator.naturalOrder())))
                 .collect(Collectors.toList());
-    }
-
-    private static class QueryAndFilterExpressions {
-        private final String keyConditionExpression;
-        private final String filterExpression;
-        private final Map<String, AttributeValue> eav;
-
-        QueryAndFilterExpressions(String keyConditionExpression, String filterExpression, Map<String, AttributeValue> eav) {
-            this.keyConditionExpression = keyConditionExpression;
-            this.filterExpression = filterExpression;
-            this.eav = eav;
-        }
     }
 }

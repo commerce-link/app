@@ -41,18 +41,12 @@ import pl.commercelink.web.dtos.RoutedOrderView;
 import pl.commercelink.web.dtos.RoutedSupplierView;
 import pl.commercelink.web.dtos.SuggestedDeliveryItem;
 import pl.commercelink.web.dtos.SupplierOrderChoicesParams;
-import pl.commercelink.inventory.supplier.SupplierChoice;
-import pl.commercelink.inventory.supplier.SupplierLabelMap;
 import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.SupplierDeliveryAddress;
 
 import java.time.LocalDate;
-import pl.commercelink.inventory.deliveries.DropshipCandidate;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.Map;
-import java.util.function.Function;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -146,75 +140,6 @@ public class DeliveriesController {
 
     @Autowired
     private SupplierLabels supplierLabels;
-
-    private static final int DELIVERY_PAGE_SIZE = 25;
-
-    @GetMapping("/dashboard/deliveries")
-    public String deliveries(
-            @RequestParam(required = false) String deliveryId,
-            @RequestParam(required = false) String externalDeliveryId,
-            @RequestParam(required = false) String provider,
-            @RequestParam(required = false) String providerCustom,
-            @RequestParam(required = false) String counterpartyShortcut,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate orderedAtStart,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate orderedAtEnd,
-            @RequestParam(required = false, defaultValue = "false") boolean showArchived,
-            @RequestParam(required = false, defaultValue = "false") boolean showWithoutInvoice,
-            @RequestParam(required = false, defaultValue = "false") boolean showWithoutSync,
-            @RequestParam(required = false, defaultValue = "false") boolean showAwaitingApproval,
-            @RequestParam(required = false, defaultValue = "1") int page,
-            Model model) {
-        provider = providerFilter(provider, providerCustom);
-        DeliveryFilter deliveryFilter = new DeliveryFilter(deliveryId, externalDeliveryId, provider, counterpartyShortcut,
-                orderedAtStart, orderedAtEnd, !showArchived, showWithoutInvoice, showWithoutSync,
-                showAwaitingApproval, isSuperAdmin());
-
-        List<Delivery> paginatedDeliveries;
-        if (isSuperAdmin()) {
-            paginatedDeliveries = deliveriesRepository.searchActiveDeliveries(deliveryFilter, page, DELIVERY_PAGE_SIZE);
-        } else {
-            paginatedDeliveries = deliveriesRepository.searchActiveDeliveries(getStoreId(), deliveryFilter, page, DELIVERY_PAGE_SIZE);
-        }
-
-        HashMap<String, Object> searchParams = new HashMap<>();
-        searchParams.put("deliveryId", deliveryId);
-        searchParams.put("externalDeliveryId", externalDeliveryId);
-        searchParams.put("provider", provider);
-        searchParams.put("counterpartyShortcut", counterpartyShortcut);
-        searchParams.put("orderedAtStart", orderedAtStart);
-        searchParams.put("orderedAtEnd", orderedAtEnd);
-        searchParams.put("showArchived", showArchived);
-        searchParams.put("showWithoutInvoice", showWithoutInvoice);
-        searchParams.put("showWithoutSync", showWithoutSync);
-        searchParams.put("showAwaitingApproval", showAwaitingApproval);
-
-        model.addAttribute("deliveries", paginatedDeliveries.subList(0, Math.min(paginatedDeliveries.size(), DELIVERY_PAGE_SIZE)));
-        model.addAttribute("currentPage", page);
-        model.addAttribute("hasNextPage", paginatedDeliveries.size() > DELIVERY_PAGE_SIZE);
-        model.addAttribute("searchParams", searchParams);
-        model.addAttribute("isSuperAdmin", isSuperAdmin());
-        model.addAttribute("isAdmin", isAdmin());
-
-        List<String> storeIds = paginatedDeliveries.stream().map(Delivery::getStoreId).distinct().toList();
-        SupplierLabelMap labels = isSuperAdmin() ? supplierLabels.forStoreIds(storeIds) : supplierLabels.forStoreId(getStoreId());
-        model.addAttribute("supplierLabels", labels);
-        model.addAttribute("providerOptions", isSuperAdmin() ? List.of() : providerFilterOptions(labels));
-
-        return "deliveries";
-    }
-
-    // Deliveries can also sit on the internal warehouse, so the filter offers it next to the
-    // store's connections (spec: the deliveries filter lists connections plus Warehouse).
-    static List<SupplierLabelMap.Option> providerFilterOptions(SupplierLabelMap labels) {
-        List<SupplierLabelMap.Option> options = new ArrayList<>(labels.options());
-        options.add(new SupplierLabelMap.Option(SupplierRegistry.WAREHOUSE, SupplierRegistry.WAREHOUSE));
-        return options;
-    }
-
-    // Deliveries on suppliers typed by hand in an order (no connection) are filtered by the typed name.
-    static String providerFilter(String provider, String providerCustom) {
-        return SupplierChoice.CUSTOM.equals(provider) ? StringUtils.trimToNull(providerCustom) : provider;
-    }
 
     @PostMapping("/dashboard/deliveries/{deliveryId}/addPayment")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
