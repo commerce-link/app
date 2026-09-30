@@ -91,7 +91,8 @@ public class DeliveryListService {
         List<Chip> chips = chips(query, providerNames, today, locale);
         return new DeliveriesPageModel(query, actor.superAdmin(), actor.admin() || actor.superAdmin(), tiles,
                 scopes(query, transit.size(), locale),
-                stateOptions(query, forStates, locale), summary(query.states().size(), locale),
+                stateOptions(query, forStates, false, locale), stateOptions(query, forStates, true, locale),
+                summary(query.states().size(), locale),
                 providerOptions, summary(query.providers().size(), locale),
                 settleOptions(query, forSettle, locale), summary(query.settle().size(), locale),
                 dateMenu(query, today, locale), chips, text(locale, "deliveries.list.results", shown.size()),
@@ -162,9 +163,11 @@ public class DeliveryListService {
         return providers.isEmpty() || providers.contains(d.getProvider());
     }
 
-    private List<Option> stateOptions(DeliveryListQuery query, List<Delivery> base, Locale locale) {
+    /** One group of the "Stan" menu: the received states or the ones still on their way; empty outside the query's scope. */
+    private List<Option> stateOptions(DeliveryListQuery query, List<Delivery> base, boolean received, Locale locale) {
         Map<DeliveryListState, Long> counts = base.stream().collect(Collectors.groupingBy(DeliveryListState::of, Collectors.counting()));
         return Arrays.stream(DeliveryListState.values())
+                .filter(s -> s.isReceived() == received)
                 .filter(s -> query.scope() == Scope.ALL || s.isReceived() == (query.scope() == Scope.RECEIVED))
                 .map(s -> new Option(s.param(), text(locale, s.messageKey()), counts.getOrDefault(s, 0L),
                         query.states().contains(s), query.toggleState(s).href()))

@@ -183,8 +183,8 @@ class DeliveryListServiceTest {
         DeliveriesPageModel page = page("state", "orderPending");
 
         // then
-        assertThat(page.stateOptions()).extracting(DeliveriesPageModel.Option::value).doesNotContain("received", "shippedToCustomer");
-        assertThat(page.stateOptions()).filteredOn(o -> o.value().equals("inTransit")).extracting(DeliveriesPageModel.Option::count).containsExactly(1L);
+        assertThat(page.stateReceivedOptions()).isEmpty();
+        assertThat(page.stateTransitOptions()).filteredOn(o -> o.value().equals("inTransit")).extracting(DeliveriesPageModel.Option::count).containsExactly(1L);
         assertThat(page.rows()).extracting(DeliveryRow::number).containsExactly("aaaa0002");
         assertThat(page.chips()).extracting(DeliveriesPageModel.Chip::label).containsExactly("Stan: W trakcie zamawiania");
     }

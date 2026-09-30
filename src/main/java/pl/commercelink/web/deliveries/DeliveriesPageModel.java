@@ -7,7 +7,8 @@ import java.util.Map;
 
 /** Everything the deliveries list template renders, texts resolved (spec §3). */
 public record DeliveriesPageModel(DeliveryListQuery query, boolean superAdmin, boolean canCreate, List<Tile> tiles,
-                                  List<ScopeOption> scopes, List<Option> stateOptions, String stateSummary,
+                                  List<ScopeOption> scopes, List<Option> stateTransitOptions,
+                                  List<Option> stateReceivedOptions, String stateSummary,
                                   List<Option> providerOptions, String providerSummary, List<Option> settleOptions,
                                   String settleSummary, DateMenu dates, List<Chip> chips, String resultsLine,
                                   Map<DeliveryListQuery.Sort, SortHeader> sortHeaders, List<DeliveryRow> rows,

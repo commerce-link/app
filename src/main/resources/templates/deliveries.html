@@ -55,7 +55,7 @@
                         </nav>
                         <div class="cl-toolbar-search">
                             <form method="get" th:action="@{/dashboard/deliveries}" class="cl-search-form" role="search" data-cl-list-form>
-                                <th:block th:replace="~{deliveries :: hidden('search')}"></th:block>
+                                <th:block th:replace="~{fragments/deliveries-list :: hidden('search')}"></th:block>
                                 <label class="cl-visually-hidden" for="deliveries-search" th:text="#{deliveries.list.search.label}"></label>
                                 <div class="cl-search-field">
                                     <span class="cl-search-icon icon is-small" aria-hidden="true"><i class="fas fa-search"></i></span>
@@ -85,13 +85,9 @@
                                 <span class="cl-filter-menu-value" th:text="${page.stateSummary()}"></span>
                             </summary>
                             <form method="get" th:action="@{/dashboard/deliveries}" class="cl-filter-menu-panel" data-cl-list-form data-cl-autosubmit>
-                                <th:block th:replace="~{deliveries :: hidden('state')}"></th:block>
-                                <!--/* Received states form their own group; in the "In transit" scope only the first group is non-empty. */-->
-                                <th:block th:with="transit=${page.stateOptions().?[!T(pl.commercelink.inventory.deliveries.DeliveryListState).parse(#this.value()).get().isReceived()]},
-                                                   received=${page.stateOptions().?[T(pl.commercelink.inventory.deliveries.DeliveryListState).parse(#this.value()).get().isReceived()]}">
-                                    <th:block th:replace="~{deliveries :: checks('state', 'deliveries.list.state.group.transit', ${transit})}"></th:block>
-                                    <th:block th:replace="~{deliveries :: checks('state', 'deliveries.list.state.group.received', ${received})}"></th:block>
-                                </th:block>
+                                <th:block th:replace="~{fragments/deliveries-list :: hidden('state')}"></th:block>
+                                <th:block th:replace="~{fragments/deliveries-list :: checks('state', 'deliveries.list.state.group.transit', ${page.stateTransitOptions()})}"></th:block>
+                                <th:block th:replace="~{fragments/deliveries-list :: checks('state', 'deliveries.list.state.group.received', ${page.stateReceivedOptions()})}"></th:block>
                                 <div class="cl-filter-menu-actions">
                                     <button type="submit" class="cl-button is-primary" data-cl-autosubmit-hide th:text="#{deliveries.list.menu.apply}"></button>
                                 </div>
@@ -104,8 +100,8 @@
                                 <span class="cl-filter-menu-value" th:text="${page.providerSummary()}"></span>
                             </summary>
                             <form method="get" th:action="@{/dashboard/deliveries}" class="cl-filter-menu-panel" data-cl-list-form data-cl-autosubmit>
-                                <th:block th:replace="~{deliveries :: hidden('provider')}"></th:block>
-                                <th:block th:replace="~{deliveries :: checks('provider', null, ${page.providerOptions()})}"></th:block>
+                                <th:block th:replace="~{fragments/deliveries-list :: hidden('provider')}"></th:block>
+                                <th:block th:replace="~{fragments/deliveries-list :: checks('provider', null, ${page.providerOptions()})}"></th:block>
                                 <div class="cl-filter-menu-actions">
                                     <button type="submit" class="cl-button is-primary" data-cl-autosubmit-hide th:text="#{deliveries.list.menu.apply}"></button>
                                 </div>
@@ -118,8 +114,8 @@
                                 <span class="cl-filter-menu-value" th:text="${page.settleSummary()}"></span>
                             </summary>
                             <form method="get" th:action="@{/dashboard/deliveries}" class="cl-filter-menu-panel" data-cl-list-form data-cl-autosubmit>
-                                <th:block th:replace="~{deliveries :: hidden('settle')}"></th:block>
-                                <th:block th:replace="~{deliveries :: checks('settle', null, ${page.settleOptions()})}"></th:block>
+                                <th:block th:replace="~{fragments/deliveries-list :: hidden('settle')}"></th:block>
+                                <th:block th:replace="~{fragments/deliveries-list :: checks('settle', null, ${page.settleOptions()})}"></th:block>
                                 <div class="cl-filter-menu-actions">
                                     <button type="submit" class="cl-button is-primary" data-cl-autosubmit-hide th:text="#{deliveries.list.menu.apply}"></button>
                                 </div>
@@ -134,16 +130,16 @@
                                 <span class="cl-filter-menu-value" th:text="${page.dates().value()}"></span>
                             </summary>
                             <form method="get" th:action="@{/dashboard/deliveries}" class="cl-filter-menu-panel" data-cl-list-form>
-                                <th:block th:replace="~{deliveries :: hidden('dates')}"></th:block>
+                                <th:block th:replace="~{fragments/deliveries-list :: hidden('dates')}"></th:block>
                                 <div class="cl-filter-menu-dates">
-                                <label>
-                                    <span th:text="#{deliveries.list.dates.from}"></span>
-                                    <input class="cl-input" type="date" name="from" th:value="${page.dates().from()}"/>
-                                </label>
-                                <label>
-                                    <span th:text="#{deliveries.list.dates.to}"></span>
-                                    <input class="cl-input" type="date" name="to" th:value="${page.dates().to()}"/>
-                                </label>
+                                    <label>
+                                        <span th:text="#{deliveries.list.dates.from}"></span>
+                                        <input class="cl-input" type="date" name="from" th:value="${page.dates().from()}"/>
+                                    </label>
+                                    <label>
+                                        <span th:text="#{deliveries.list.dates.to}"></span>
+                                        <input class="cl-input" type="date" name="to" th:value="${page.dates().to()}"/>
+                                    </label>
                                 </div>
                                 <div class="cl-filter-menu-actions">
                                     <button type="submit" class="cl-button is-primary" th:text="#{deliveries.list.menu.apply}"></button>
@@ -287,34 +283,6 @@
 </section>
 
 <script th:src="@{/js/list-page.js}" defer></script>
-
-<!--/* The rest of the query as hidden fields, so a menu's form never drops what the others set; "skip" names the
-       parameter the form itself submits (state, provider, settle, dates = from/to/period, search = q). */-->
-<th:block th:fragment="hidden(skip)" th:with="q=${page.query()}">
-    <input type="hidden" name="scope" th:value="${q.scope().param()}"/>
-    <input type="hidden" name="focus" th:if="${q.focus() != null}" th:value="${q.focus().param()}"/>
-    <th:block th:if="${skip != 'state'}"><input type="hidden" name="state" th:each="s : ${q.states()}" th:value="${s.param()}"/></th:block>
-    <th:block th:if="${skip != 'provider'}"><input type="hidden" name="provider" th:each="p : ${q.providers()}" th:value="${p}"/></th:block>
-    <th:block th:if="${skip != 'settle'}"><input type="hidden" name="settle" th:each="s : ${q.settle()}" th:value="${s.param()}"/></th:block>
-    <th:block th:if="${skip != 'dates'}">
-        <input type="hidden" name="from" th:if="${q.from() != null}" th:value="${q.from()}"/>
-        <input type="hidden" name="to" th:if="${q.to() != null}" th:value="${q.to()}"/>
-        <input type="hidden" name="period" th:if="${q.allHistory()}" value="all"/>
-    </th:block>
-    <input type="hidden" name="q" th:if="${skip != 'search' and q.q() != null}" th:value="${q.q()}"/>
-    <input type="hidden" name="sort" th:if="${q.sort() != null}" th:value="${q.sort().param()}"/>
-    <input type="hidden" name="dir" th:if="${q.dir() != null}" th:value="${q.dir().param()}"/>
-</th:block>
-
-<!--/* One group of tick boxes of a menu, the option's count on the right; an option that would leave nothing is dimmed. */-->
-<div th:fragment="checks(name, title, options)" th:if="${!options.isEmpty()}" class="cl-filter-menu-group" role="group" th:attr="aria-label=${title != null} ? #{${title}} : null">
-    <span class="cl-eyebrow cl-filter-menu-group-title" aria-hidden="true" th:if="${title != null}" th:text="#{${title}}"></span>
-    <label class="cl-filter-menu-check" th:each="o : ${options}" th:classappend="${o.count() == 0} ? 'is-empty' : ''">
-        <input type="checkbox" th:name="${name}" th:value="${o.value()}" th:checked="${o.selected()}"/>
-        <span class="cl-filter-menu-text" th:text="${o.label()}"></span>
-        <span class="cl-filter-menu-meta" th:text="${o.count()}"></span>
-    </label>
-</div>
 </div>
 
 </body>
