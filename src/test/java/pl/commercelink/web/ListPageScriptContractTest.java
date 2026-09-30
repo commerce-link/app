@@ -58,4 +58,14 @@ class ListPageScriptContractTest {
                 .contains("data-cl-toolbar-toggle").contains("is-collapsed").contains("aria-expanded")
                 .contains("matchMedia('(max-width: 719px)')");
     }
+
+    @Test
+    void aClickAnywhereOnADateFieldOpensTheDatePicker() throws Exception {
+        // given
+        String script = read("src/main/resources/static/js/list-page.js");
+
+        // then: a click (not a focus, so typing the date stays possible) opens the native picker where the browser has one
+        assertThat(script).contains("input[type=\"date\"]").contains("typeof field.showPicker !== 'function'")
+                .contains("field.showPicker()").doesNotContain("addEventListener('focus'");
+    }
 }

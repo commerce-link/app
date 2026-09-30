@@ -161,6 +161,15 @@
     });
     if (phone && phone.addEventListener) { phone.addEventListener('change', applyFold); }
 
+    // A click anywhere on a date field opens the browser's date picker, not only a click on its calendar icon. Only a
+    // click: opening it on focus would get in the way of typing the date from the keyboard. Browsers without
+    // showPicker (or refusing it, e.g. when the picker is already open) keep the plain field.
+    document.addEventListener('click', function (event) {
+        var field = event.target.closest && event.target.closest('input[type="date"]');
+        if (!field || !root.contains(field) || typeof field.showPicker !== 'function') { return; }
+        try { field.showPicker(); } catch (e) { /* the icon and typing still work */ }
+    });
+
     hideAutosubmitButtons();
     applyFold();
     history.replaceState({ listPage: true }, '', window.location.pathname + window.location.search);
