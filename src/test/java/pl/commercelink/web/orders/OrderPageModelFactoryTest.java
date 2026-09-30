@@ -1534,4 +1534,44 @@ class OrderPageModelFactoryTest {
         assertThat(owned.manualTypes()).extracting(o -> o.value()).doesNotContain(DocumentType.Receipt);
         assertThat(free.manualTypes()).extracting(o -> o.value()).contains(DocumentType.Receipt);
     }
+
+    @Test
+    void aReceiptWhoseAttachingKeepsFailingPointsToTheRowInsteadOfAskingToWait() {
+        // given: fiscalised, its effects failed often enough to raise EFFECTS_FAILED, the document never reached the order
+        ReceiptAttempt stuck = attempt(KEY_1, 1, ReceiptAttemptState.FISCALISED);
+        stuck.setEffectsFailures(3);
+        receipts(new ReceiptOrderState(List.of(stuck),
+                new ReceiptOrderView(List.of(row(KEY_1, 1, ReceiptAttemptState.FISCALISED, null, "PAR/1", null,
+                        new ReceiptPageProblem("Dołączenie wciąż się nie udaje", "Sprawdź, czego brakuje.", null, null),
+                        false, false, false, null)), false), false, true));
+
+        // when
+        OrderPageModel page = factory.build(order(OrderStatus.Delivered), List.of(item(FulfilmentStatus.New)), ADMIN, PL);
+        OrderPageModel.Header cancellable = factory.build(order(OrderStatus.Delivered), returnedItems(), ADMIN, PL).header();
+
+        // then: no "Dołączanie … odśwież za chwilę" under a problem saying it keeps failing
+        assertThat(page.documents().receipt().attachingKey()).isNull();
+        assertThat(page.documents().receipt().problem()).isNotNull();
+        // the lock stays, its reasons send the operator to the row instead of promising it clears by itself
+        assertThat(page.items().addItemsReasonKey()).isEqualTo("order.items.add.locked.receiptAttachFailed");
+        assertThat(page.items().addItemsReasonIsSentence()).isTrue();
+        assertThat(page.items().bulkStandalone().reasonKey()).isEqualTo("order.bulk.unavailable.receiptAttachFailed");
+        assertThat(page.customer().billingLockedKey()).isEqualTo("order.customer.billing.locked.receiptAttachFailed");
+        assertThat(page.documents().addLockedKey()).isEqualTo("order.documents.add.locked.receiptAttachFailed");
+        assertThat(cancellable.cancelLockedKey()).isEqualTo("order.page.cancel.locked.receiptAttachFailed");
+        assertThat(ItemSaleLock.of(order(OrderStatus.Delivered), ReceiptLock.ATTACH_FAILED))
+                .isEqualTo(ItemSaleLock.RECEIPT_ATTACH_FAILED);
+        for (String key : List.of("order.items.add.locked.receiptAttachFailed", "order.bulk.unavailable.receiptAttachFailed",
+                "order.bulk.unavailable.receiptAttachFailed.short", "order.item.unavailable.receiptAttachFailed",
+                "order.customer.billing.locked.receiptAttachFailed", "order.documents.add.locked.receiptAttachFailed",
+                "order.page.cancel.locked.receiptAttachFailed", "order.page.delete.locked.receiptAttachFailed",
+                "order.item.consolidation.locked.receiptAttachFailed", "order.item.form.name.locked.receiptAttachFailed",
+                "order.item.form.numbers.locked.receiptAttachFailed", "order.item.form.price.locked.receiptAttachFailed",
+                "order.item.error.sale.locked.receiptAttachFailed", "order.item.split.group.locked.receiptAttachFailed")) {
+            String pl = messageSource.getMessage(key, null, PL);
+            assertThat(pl).as(key).doesNotContain("odśwież").doesNotContain("trwa dołączanie");
+            assertThat(messageSource.getMessage(key, null, Locale.ENGLISH)).as(key).doesNotContain("refresh");
+        }
+        assertThat(messageSource.getMessage("order.page.cancel.locked.receiptAttaching", null, PL)).doesNotContain("odśwież");
+    }
 }

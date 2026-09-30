@@ -12,7 +12,7 @@ import java.util.Objects;
  * drift from its document. INVOICED: a closing document is on the order ({@link Order#isInvoiced()}: an invoice or a
  * receipt); RECEIPT_ISSUING: an e-receipt is being issued and its request snapshot is frozen, but its document is not
  * on the order yet (ReceiptOrderState#locksOrder); RECEIPT_ATTACHING: the same once the receipt is fiscalised and
- * only its document is still being attached. A sale is corrected with a correcting invoice or a return, outside
+ * only its document is still being attached; RECEIPT_ATTACH_FAILED: attaching it keeps failing. A sale is corrected with a correcting invoice or a return, outside
  * the order page. Serial numbers, supplier, cost and comment are not sale fields and stay editable.
  *
  * <p>Each value carries the short reasons the item page shows next to the locked fields, the full refusal text of a
@@ -29,7 +29,11 @@ public enum ItemSaleLock {
             "order.item.unavailable.receipt", "order.item.split.group.locked.receipt"),
     RECEIPT_ATTACHING("order.item.form.name.locked.receiptAttaching", "order.item.form.numbers.locked.receiptAttaching",
             "order.item.form.price.locked.receiptAttaching", "order.item.error.sale.locked.receiptAttaching",
-            "order.item.unavailable.receiptAttaching", "order.item.split.group.locked.receiptAttaching");
+            "order.item.unavailable.receiptAttaching", "order.item.split.group.locked.receiptAttaching"),
+    RECEIPT_ATTACH_FAILED("order.item.form.name.locked.receiptAttachFailed",
+            "order.item.form.numbers.locked.receiptAttachFailed", "order.item.form.price.locked.receiptAttachFailed",
+            "order.item.error.sale.locked.receiptAttachFailed", "order.item.unavailable.receiptAttachFailed",
+            "order.item.split.group.locked.receiptAttachFailed");
 
     private final String nameKey;
     private final String numbersKey;
@@ -62,6 +66,7 @@ public enum ItemSaleLock {
             case NONE -> null;
             case ISSUING -> RECEIPT_ISSUING;
             case ATTACHING -> RECEIPT_ATTACHING;
+            case ATTACH_FAILED -> RECEIPT_ATTACH_FAILED;
         };
     }
 

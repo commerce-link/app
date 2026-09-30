@@ -45,8 +45,9 @@ public record ReceiptOrderState(List<ReceiptAttempt> attempts, ReceiptOrderView 
 
     /**
      * {@link #locksOrder} with why: {@link ReceiptLock#ATTACHING} once the receipt is fiscalised (or closed by hand)
-     * and only its document is still on its way to the order, {@link ReceiptLock#ISSUING} while there is no outcome
-     * yet. The page words its reasons after it: "Trwa wystawianie" would contradict the "Zafiskalizowany" pill.
+     * and only its document is still on its way to the order, {@link ReceiptLock#ATTACH_FAILED} when attaching it keeps
+     * failing ({@link ReceiptAttention#EFFECTS_FAILED}: it will not clear by itself), {@link ReceiptLock#ISSUING} while
+     * there is no outcome yet. The page words its reasons after it: "Trwa wystawianie" would contradict the "Zafiskalizowany" pill.
      */
     public ReceiptLock receiptLock(Order order) {
         return receiptLock(attempts, order);
@@ -56,6 +57,9 @@ public record ReceiptOrderState(List<ReceiptAttempt> attempts, ReceiptOrderView 
     public static ReceiptLock receiptLock(List<ReceiptAttempt> orderAttempts, Order order) {
         if (!locksOrder(ReceiptAttemptService.blocksManualReceipt(orderAttempts), order)) {
             return ReceiptLock.NONE;
+        }
+        if (orderAttempts.stream().anyMatch(ReceiptAttentionEvaluator::effectsFailing)) {
+            return ReceiptLock.ATTACH_FAILED;
         }
         boolean registered = orderAttempts.stream().anyMatch(a -> a.getState() == ReceiptAttemptState.FISCALISED
                 || a.getState() == ReceiptAttemptState.CLOSED_MANUALLY);

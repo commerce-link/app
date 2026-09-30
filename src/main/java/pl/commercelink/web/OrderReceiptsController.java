@@ -56,8 +56,7 @@ public class OrderReceiptsController {
         // a new attempt is not destructive: the primary button, as in the dialog
         return OrderConfirmPages.render(model, new ConfirmAction(
                 messageSource.getMessage("receipts.action.reissue.confirm.title", null, locale),
-                messageSource.getMessage(messageKey != null ? messageKey : "receipts.action.reissue.confirm.message",
-                        null, locale),
+                messageSource.getMessage(messageKey, null, locale),
                 messageSource.getMessage("receipts.action.reissue", null, locale),
                 orderPath + "/receipts/reissue", orderPath, false), backLabel(orderId, locale));
     }
@@ -158,13 +157,10 @@ public class OrderReceiptsController {
 
     private String run(String orderId, Locale locale, RedirectAttributes redirectAttributes, String successKey,
                        Runnable action) {
-        try {
+        return start(orderId, locale, redirectAttributes, successKey, () -> {
             action.run();
-            OrderFlash.saved(redirectAttributes, messageSource.getMessage(successKey, null, locale));
-        } catch (ReceiptActionException e) {
-            redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage(e.getMessageKey(), null, locale));
-        }
-        return "redirect:/dashboard/orders/" + orderId;
+            return null;
+        });
     }
 
     /**
@@ -174,7 +170,7 @@ public class OrderReceiptsController {
     private String start(String orderId, Locale locale, RedirectAttributes redirectAttributes, String successKey,
                          Supplier<ReceiptAttempt> action) {
         try {
-            ReceiptAttempt attempt = action.get();
+            ReceiptAttempt attempt = action.get();   // null for an action that creates no attempt (run)
             if (attempt != null && attempt.getState() == ReceiptAttemptState.BLOCKED) {
                 OrderFlash.warning(redirectAttributes, messageSource.getMessage("receipts.action.blockedAtOnce", null, locale));
             } else {

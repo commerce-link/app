@@ -15,6 +15,8 @@ import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.OrderReview;
 import pl.commercelink.orders.OrderReviewStatus;
+import pl.commercelink.orders.OrderSource;
+import pl.commercelink.orders.OrderSourceType;
 import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.Payment;
 import pl.commercelink.orders.PaymentSource;
@@ -30,6 +32,8 @@ import pl.commercelink.orders.event.OrderEventsRepository;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.receipts.ReceiptAlerts;
+import pl.commercelink.receipts.ReceiptAttempt;
+import pl.commercelink.receipts.ReceiptPageProblem;
 import pl.commercelink.receipts.ReceiptAttemptService;
 import pl.commercelink.receipts.ReceiptOrderState;
 import pl.commercelink.receipts.ReceiptOrderView;
@@ -2175,23 +2179,23 @@ class OrderDetailsTemplateTest {
 
     private static final String ORDER_ID = "3e373abc-1111-2222-3333-444455556666";
 
-    private static pl.commercelink.receipts.ReceiptAttempt attempt(int attemptNo,
-                                                                   pl.commercelink.receipts.ReceiptAttemptState state) {
-        pl.commercelink.receipts.ReceiptAttempt attempt = new pl.commercelink.receipts.ReceiptAttempt();
+    private static ReceiptAttempt attempt(int attemptNo,
+                                                                   ReceiptAttemptState state) {
+        ReceiptAttempt attempt = new ReceiptAttempt();
         attempt.setReceiptKey(ORDER_ID + ":R" + attemptNo);
         attempt.setAttemptNo(attemptNo);
         attempt.setState(state);
         return attempt;
     }
 
-    private static pl.commercelink.receipts.ReceiptOrderView.Row receiptRow(int attemptNo,
-            pl.commercelink.receipts.ReceiptAttemptState state, String tone, String url, String number,
-            pl.commercelink.receipts.ReceiptPageProblem problem, boolean canCheck, boolean canClose, boolean canResend,
+    private static ReceiptOrderView.Row receiptRow(int attemptNo,
+            ReceiptAttemptState state, String tone, String url, String number,
+            ReceiptPageProblem problem, boolean canCheck, boolean canClose, boolean canResend,
             String outcome) {
-        return new pl.commercelink.receipts.ReceiptOrderView.Row(ORDER_ID + ":R" + attemptNo, state,
+        return new ReceiptOrderView.Row(ORDER_ID + ":R" + attemptNo, state,
                 "receipts.state." + state.name(), tone, url, problem, canResend ? null : java.time.Instant.parse("2026-09-28T10:00:00Z"),
                 null, canCheck, canClose, canResend, attemptNo, number,
-                state == pl.commercelink.receipts.ReceiptAttemptState.FISCALISED ? java.time.Instant.parse("2026-09-28T10:00:00Z") : null,
+                state == ReceiptAttemptState.FISCALISED ? java.time.Instant.parse("2026-09-28T10:00:00Z") : null,
                 outcome, false);
     }
 
@@ -2202,16 +2206,16 @@ class OrderDetailsTemplateTest {
 
     private static ReceiptOrderState pendingAfterABlockedAttempt() {
         return new ReceiptOrderState(
-                List.of(attempt(1, pl.commercelink.receipts.ReceiptAttemptState.BLOCKED),
-                        attempt(2, pl.commercelink.receipts.ReceiptAttemptState.PENDING)),
-                new pl.commercelink.receipts.ReceiptOrderView(List.of(
-                        receiptRow(2, pl.commercelink.receipts.ReceiptAttemptState.PENDING, "is-warn", null, null,
-                                new pl.commercelink.receipts.ReceiptPageProblem(
+                List.of(attempt(1, ReceiptAttemptState.BLOCKED),
+                        attempt(2, ReceiptAttemptState.PENDING)),
+                new ReceiptOrderView(List.of(
+                        receiptRow(2, ReceiptAttemptState.PENDING, "is-warn", null, null,
+                                new ReceiptPageProblem(
                                         "Paragon czeka na drukarkę fiskalną ponad 48 h.",
                                         "Sprawdź, czy drukarka albo moduł Paragony.pl działa.",
                                         "Szczegóły dla Paragony.pl (Fakturownia)",
                                         "Sprawdź fiscal_status paragonu."), true, true, false, null),
-                        receiptRow(1, pl.commercelink.receipts.ReceiptAttemptState.BLOCKED, "is-bad", null, null, null,
+                        receiptRow(1, ReceiptAttemptState.BLOCKED, "is-bad", null, null, null,
                                 false, false, false, "brak e-maila kupującego")), false),
                 false, true);
     }
@@ -2260,10 +2264,10 @@ class OrderDetailsTemplateTest {
     void anEReceiptProblemWithoutProviderDetailsHasNoDisclosure() {
         // given: a failed attempt whose problem has a cause and an action only
         ReceiptOrderState failed = new ReceiptOrderState(
-                List.of(attempt(1, pl.commercelink.receipts.ReceiptAttemptState.FAILED)),
-                new pl.commercelink.receipts.ReceiptOrderView(List.of(receiptRow(1,
-                        pl.commercelink.receipts.ReceiptAttemptState.FAILED, "is-bad", null, null,
-                        new pl.commercelink.receipts.ReceiptPageProblem("System Dev Receipts odrzucił paragon: VAT.",
+                List.of(attempt(1, ReceiptAttemptState.FAILED)),
+                new ReceiptOrderView(List.of(receiptRow(1,
+                        ReceiptAttemptState.FAILED, "is-bad", null, null,
+                        new ReceiptPageProblem("System Dev Receipts odrzucił paragon: VAT.",
                                 "Popraw przyczynę i kliknij „Wystaw ponownie”.", null, null),
                         false, false, false, "VAT")), true),
                 true, false);
@@ -2322,9 +2326,9 @@ class OrderDetailsTemplateTest {
         Order order = order(OrderStatus.Delivered);
         order.addDocument(new Document(ORDER_ID + ":R1", "PAR/7/2026", "https://paragony.example/7", DocumentType.Receipt,
                 LocalDate.of(2026, 9, 28)));
-        ReceiptOrderState receipts = new ReceiptOrderState(List.of(attempt(1, pl.commercelink.receipts.ReceiptAttemptState.FISCALISED)),
-                new pl.commercelink.receipts.ReceiptOrderView(List.of(receiptRow(1,
-                        pl.commercelink.receipts.ReceiptAttemptState.FISCALISED, "is-ok", "https://paragony.example/7",
+        ReceiptOrderState receipts = new ReceiptOrderState(List.of(attempt(1, ReceiptAttemptState.FISCALISED)),
+                new ReceiptOrderView(List.of(receiptRow(1,
+                        ReceiptAttemptState.FISCALISED, "is-ok", "https://paragony.example/7",
                         "PAR/7/2026", null, false, false, false, null)), false), false, true);
 
         // when
@@ -2343,7 +2347,7 @@ class OrderDetailsTemplateTest {
     void eParagonIsAConfirmedEntryOfTheIssueMenu() {
         // given
         ReceiptOrderState receipts = new ReceiptOrderState(List.of(),
-                new pl.commercelink.receipts.ReceiptOrderView(List.of(), false), true, false);
+                new ReceiptOrderView(List.of(), false), true, false);
 
         // when
         String html = renderWithReceipts(order(OrderStatus.Shipping), ADMIN, receipts);
@@ -2360,9 +2364,9 @@ class OrderDetailsTemplateTest {
     @Test
     void whileTheEReceiptIsBeingIssuedTheLockedActionsShowGreyedWithTheirReason() {
         // given
-        ReceiptOrderState receipts = new ReceiptOrderState(List.of(attempt(1, pl.commercelink.receipts.ReceiptAttemptState.ISSUING)),
-                new pl.commercelink.receipts.ReceiptOrderView(List.of(receiptRow(1,
-                        pl.commercelink.receipts.ReceiptAttemptState.ISSUING, "is-info", null, null, null, true, true,
+        ReceiptOrderState receipts = new ReceiptOrderState(List.of(attempt(1, ReceiptAttemptState.ISSUING)),
+                new ReceiptOrderView(List.of(receiptRow(1,
+                        ReceiptAttemptState.ISSUING, "is-info", null, null, null, true, true,
                         false, null)), false), false, true);
 
         // when
@@ -2403,9 +2407,9 @@ class OrderDetailsTemplateTest {
     void whileAnEReceiptIsBeingIssuedCancelIsGreyedWithItsReason() {
         // given
         ReceiptOrderState issuing = new ReceiptOrderState(
-                List.of(attempt(1, pl.commercelink.receipts.ReceiptAttemptState.ISSUING)),
-                new pl.commercelink.receipts.ReceiptOrderView(List.of(receiptRow(1,
-                        pl.commercelink.receipts.ReceiptAttemptState.ISSUING, "is-info", null, null, null,
+                List.of(attempt(1, ReceiptAttemptState.ISSUING)),
+                new ReceiptOrderView(List.of(receiptRow(1,
+                        ReceiptAttemptState.ISSUING, "is-info", null, null, null,
                         true, false, false, null)), false), false, true);
 
         // when
@@ -2425,9 +2429,9 @@ class OrderDetailsTemplateTest {
         order.addDocument(new pl.commercelink.documents.Document(ORDER_ID + ":R1", "PAR/1", null,
                 pl.commercelink.documents.DocumentType.Receipt));
         ReceiptOrderState fiscalised = new ReceiptOrderState(
-                List.of(attempt(1, pl.commercelink.receipts.ReceiptAttemptState.FISCALISED)),
-                new pl.commercelink.receipts.ReceiptOrderView(List.of(receiptRow(1,
-                        pl.commercelink.receipts.ReceiptAttemptState.FISCALISED, "is-ok", null, "PAR/1", null,
+                List.of(attempt(1, ReceiptAttemptState.FISCALISED)),
+                new ReceiptOrderView(List.of(receiptRow(1,
+                        ReceiptAttemptState.FISCALISED, "is-ok", null, "PAR/1", null,
                         false, false, false, null)), false), false, true);
 
         // when
@@ -2450,9 +2454,9 @@ class OrderDetailsTemplateTest {
         order.addDocument(new pl.commercelink.documents.Document("typed", "PAR/KASA/1", null,
                 pl.commercelink.documents.DocumentType.Receipt));
         ReceiptOrderState settled = new ReceiptOrderState(
-                List.of(attempt(1, pl.commercelink.receipts.ReceiptAttemptState.BLOCKED)),
-                new pl.commercelink.receipts.ReceiptOrderView(List.of(new pl.commercelink.receipts.ReceiptOrderView.Row(
-                        ORDER_ID + ":R1", pl.commercelink.receipts.ReceiptAttemptState.BLOCKED,
+                List.of(attempt(1, ReceiptAttemptState.BLOCKED)),
+                new ReceiptOrderView(List.of(new ReceiptOrderView.Row(
+                        ORDER_ID + ":R1", ReceiptAttemptState.BLOCKED,
                         "receipts.state.BLOCKED", "is-neutral", null, null, null, null, false, false, false, 1, null,
                         null, "sprzedaż POS bez e-maila klienta", true)), false), false, false);
 
@@ -2491,15 +2495,15 @@ class OrderDetailsTemplateTest {
     void aPosSaleWithoutTheCustomersEmailGreysReissueAndShowsTheAdviceAsThreeLines() {
         // given: the POS sale's attempt blocked for the missing e-mail (the walk-in buyer has none of their own)
         Order order = order(OrderStatus.Delivered);
-        order.setSource(new pl.commercelink.orders.OrderSource("operator", pl.commercelink.orders.OrderSourceType.PointOfSale));
+        order.setSource(new OrderSource("operator", OrderSourceType.PointOfSale));
         order.getBillingDetails().setEmail(null);
-        pl.commercelink.receipts.ReceiptPageProblem advice = pl.commercelink.receipts.ReceiptPageProblem.ofLines(
+        ReceiptPageProblem advice = ReceiptPageProblem.ofLines(
                 "E-paragonu nie wysłano: sprzedaż POS nie ma e-maila klienta.",
                 List.of("Kasa wydrukowała paragon?", "Klient chce e-paragon?", "Nie rób obu."), null, null);
         ReceiptOrderState receipts = new ReceiptOrderState(
-                List.of(attempt(1, pl.commercelink.receipts.ReceiptAttemptState.BLOCKED)),
-                new pl.commercelink.receipts.ReceiptOrderView(List.of(receiptRow(1,
-                        pl.commercelink.receipts.ReceiptAttemptState.BLOCKED, "is-bad", null, null, advice,
+                List.of(attempt(1, ReceiptAttemptState.BLOCKED)),
+                new ReceiptOrderView(List.of(receiptRow(1,
+                        ReceiptAttemptState.BLOCKED, "is-bad", null, null, advice,
                         false, false, false, "sprzedaż POS bez e-maila klienta")), true),
                 false, false);
 
@@ -2524,11 +2528,11 @@ class OrderDetailsTemplateTest {
     void reissueIsConfirmedWithThePrimaryButtonAndTheCashRegisterSentenceForAPosSale() {
         // given: the POS sale got the customer's e-mail since its attempt blocked
         Order order = order(OrderStatus.Delivered);
-        order.setSource(new pl.commercelink.orders.OrderSource("operator", pl.commercelink.orders.OrderSourceType.PointOfSale));
+        order.setSource(new OrderSource("operator", OrderSourceType.PointOfSale));
         ReceiptOrderState receipts = new ReceiptOrderState(
-                List.of(attempt(1, pl.commercelink.receipts.ReceiptAttemptState.BLOCKED)),
-                new pl.commercelink.receipts.ReceiptOrderView(List.of(receiptRow(1,
-                        pl.commercelink.receipts.ReceiptAttemptState.BLOCKED, "is-bad", null, null, null,
+                List.of(attempt(1, ReceiptAttemptState.BLOCKED)),
+                new ReceiptOrderView(List.of(receiptRow(1,
+                        ReceiptAttemptState.BLOCKED, "is-bad", null, null, null,
                         false, false, false, null)), true),
                 false, false);
 
@@ -2545,10 +2549,10 @@ class OrderDetailsTemplateTest {
     void theEReceiptEntryOfTheIssueMenuIsGreyedForAPosSaleWithoutTheCustomersEmail() {
         // given
         Order order = order(OrderStatus.New);
-        order.setSource(new pl.commercelink.orders.OrderSource("operator", pl.commercelink.orders.OrderSourceType.PointOfSale));
+        order.setSource(new OrderSource("operator", OrderSourceType.PointOfSale));
         order.getBillingDetails().setEmail(null);
         ReceiptOrderState receipts = new ReceiptOrderState(List.of(),
-                new pl.commercelink.receipts.ReceiptOrderView(List.of(), false), true, false);
+                new ReceiptOrderView(List.of(), false), true, false);
 
         // when
         String html = renderWithReceipts(order, ADMIN, receipts);

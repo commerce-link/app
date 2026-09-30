@@ -52,6 +52,7 @@ import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.StoreCategories;
 import pl.commercelink.receipts.ReceiptAttempt;
 import pl.commercelink.receipts.ReceiptAttemptService;
+import pl.commercelink.receipts.ReceiptLock;
 import pl.commercelink.web.dtos.OrderItemsForm;
 import pl.commercelink.web.dtos.SplitGroupForm;
 import pl.commercelink.web.orders.ItemSaleLock;
@@ -211,6 +212,8 @@ class OrdersControllerTest {
     @BeforeEach
     void setUpSupplierLabels() {
         when(supplierLabels.forStore(any())).thenReturn(new SupplierLabels(mock(StoresRepository.class)).forStore(null));
+        // no e-receipt locks the order unless a test says so
+        when(receiptAttemptService.receiptLock(any())).thenReturn(ReceiptLock.NONE);
     }
 
     @AfterEach
@@ -4290,7 +4293,7 @@ class OrdersControllerTest {
             // given
             Order order = order(OrderStatus.Delivered);
             when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
-            when(receiptAttemptService.locksOrder(order)).thenReturn(true);
+            when(receiptAttemptService.receiptLock(order)).thenReturn(ReceiptLock.ISSUING);
             RedirectAttributesModelMap add = new RedirectAttributesModelMap();
             RedirectAttributesModelMap remove = new RedirectAttributesModelMap();
             RedirectAttributesModelMap split = new RedirectAttributesModelMap();
@@ -4327,8 +4330,7 @@ class OrdersControllerTest {
             // given: fiscalised, its document not on the order yet — the page says "being attached", so does the server
             Order order = order(OrderStatus.Delivered);
             when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
-            when(receiptAttemptService.locksOrder(order)).thenReturn(true);
-            when(receiptAttemptService.receiptLock(order)).thenReturn(pl.commercelink.receipts.ReceiptLock.ATTACHING);
+            when(receiptAttemptService.receiptLock(order)).thenReturn(ReceiptLock.ATTACHING);
             RedirectAttributesModelMap add = new RedirectAttributesModelMap();
             RedirectAttributesModelMap remove = new RedirectAttributesModelMap();
             RedirectAttributesModelMap consolidate = new RedirectAttributesModelMap();
@@ -4349,6 +4351,28 @@ class OrdersControllerTest {
             assertThat(flash(cancel)).containsEntry("errorMessage", "order.page.cancel.locked.receiptAttaching");
             assertThat(flash(document)).containsEntry("errorMessage", "order.documents.add.locked.receiptAttaching");
             verifyNoInteractions(ordersManager);
+        }
+
+        @Test
+        void whenAttachingTheFiscalisedEReceiptKeepsFailingTheRefusalsPointToTheRow() {
+            // given
+            Order order = order(OrderStatus.Delivered);
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            when(receiptAttemptService.receiptLock(order)).thenReturn(ReceiptLock.ATTACH_FAILED);
+            RedirectAttributesModelMap cancel = new RedirectAttributesModelMap();
+            RedirectAttributesModelMap remove = new RedirectAttributesModelMap();
+
+            // when
+            ordersController.cancelOrder(ORDER_ID, cancel, polish);
+            ordersController.removeSelectedItemsFromOrder(ORDER_ID, selected("a"), remove, polish);
+
+            // then
+            assertThat(flash(cancel)).containsEntry("errorMessage", "order.page.cancel.locked.receiptAttachFailed");
+            assertThat(flash(remove)).containsEntry("errorMessage", "order.bulk.unavailable.receiptAttachFailed");
+            verifyNoInteractions(ordersManager);
+            // one read of the attempts per request, two requests
+            verify(receiptAttemptService, times(2)).receiptLock(order);
+            verify(receiptAttemptService, never()).locksOrder(any());
         }
 
         @Test
@@ -4392,7 +4416,7 @@ class OrdersControllerTest {
             when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(orderBase());
             Order target = new Order(STORE_ID);
             when(orderReferenceResolver.resolve(STORE_ID, "51aa")).thenReturn(OrderReferenceResolver.Resolution.found(target));
-            when(receiptAttemptService.locksOrder(target)).thenReturn(true);
+            when(receiptAttemptService.receiptLock(target)).thenReturn(ReceiptLock.ISSUING);
             RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
             // when
@@ -4409,7 +4433,7 @@ class OrdersControllerTest {
             // given
             Order order = order(OrderStatus.Delivered);
             when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
-            when(receiptAttemptService.locksOrder(order)).thenReturn(true);
+            when(receiptAttemptService.receiptLock(order)).thenReturn(ReceiptLock.ISSUING);
             Order posted = new Order(STORE_ID);
             posted.setBillingDetails(new BillingDetails());
             RedirectAttributesModelMap page = new RedirectAttributesModelMap();
@@ -4438,7 +4462,7 @@ class OrdersControllerTest {
             item.setConsolidated(false);
             when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
             when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of(item));
-            when(receiptAttemptService.locksOrder(order)).thenReturn(true);
+            when(receiptAttemptService.receiptLock(order)).thenReturn(ReceiptLock.ISSUING);
             OrderItem posted = new OrderItem();
             posted.setName("Ryzen");
             posted.setQty(1);
@@ -4561,7 +4585,7 @@ class OrdersControllerTest {
             // given
             Order order = order(OrderStatus.Realization);
             OrderItem item = storedNewItem(order);
-            when(receiptAttemptService.locksOrder(order)).thenReturn(true);
+            when(receiptAttemptService.receiptLock(order)).thenReturn(ReceiptLock.ISSUING);
             OrderItem posted = postedUnchanged(item);
             posted.setName("Ryzen 9");
             ExtendedModelMap model = new ExtendedModelMap();
@@ -4607,7 +4631,7 @@ class OrdersControllerTest {
             ordersController.getOrderItem(ORDER_ID, "i1", invoicedModel);
             Order issuing = order(OrderStatus.Realization);
             when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(issuing);
-            when(receiptAttemptService.locksOrder(issuing)).thenReturn(true);
+            when(receiptAttemptService.receiptLock(issuing)).thenReturn(ReceiptLock.ISSUING);
             ordersController.getOrderItem(ORDER_ID, "i1", issuingModel);
             when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order(OrderStatus.New));
             ordersController.getOrderItem(ORDER_ID, "i1", openModel);
@@ -4627,7 +4651,7 @@ class OrdersControllerTest {
             SplitGroupForm form = new SplitGroupForm();
             form.setItemId("i1");
             Order issuing = order(OrderStatus.Realization);
-            when(receiptAttemptService.locksOrder(issuing)).thenReturn(true);
+            when(receiptAttemptService.receiptLock(issuing)).thenReturn(ReceiptLock.ISSUING);
             RedirectAttributesModelMap afterDocument = new RedirectAttributesModelMap();
             RedirectAttributesModelMap whileIssuing = new RedirectAttributesModelMap();
 
@@ -4648,7 +4672,7 @@ class OrdersControllerTest {
             // given
             Order order = order(OrderStatus.Delivered);
             when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
-            when(receiptAttemptService.locksOrder(order)).thenReturn(true);
+            when(receiptAttemptService.receiptLock(order)).thenReturn(ReceiptLock.ISSUING);
             RedirectAttributesModelMap page = new RedirectAttributesModelMap();
             RedirectAttributesModelMap cancel = new RedirectAttributesModelMap();
 
@@ -4686,7 +4710,7 @@ class OrdersControllerTest {
             // given
             Order order = order(OrderStatus.Delivered);
             when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
-            when(receiptAttemptService.locksOrder(order)).thenReturn(true);
+            when(receiptAttemptService.receiptLock(order)).thenReturn(ReceiptLock.ISSUING);
             RedirectAttributesModelMap page = new RedirectAttributesModelMap();
 
             // when

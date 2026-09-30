@@ -20,8 +20,10 @@ public record ReceiptOrderView(List<Row> rows, boolean canReissue) {
                       String outcome, boolean settled) {
 
         /**
-         * The tone of the problem's cause, the colour of the pill it is read with: bad for an attempt that fiscalised
-         * nothing (refused, blocked), warn for one that still waits or whose e-mail failed.
+         * The tone of the problem's cause: bad for an attempt that fiscalised nothing (refused, blocked — read with its
+         * red pill), warn for every other problem: an attempt still waiting (amber pill, or the blue "issuing" one), and
+         * a fiscalised receipt whose document, link or e-mail is missing, whose pill stays green because the sale is
+         * registered while the cause still needs the operator.
          */
         public String problemTone() {
             return state == ReceiptAttemptState.FAILED || state == ReceiptAttemptState.BLOCKED ? "is-bad" : "is-warn";

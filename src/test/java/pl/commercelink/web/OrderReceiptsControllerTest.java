@@ -241,6 +241,7 @@ class OrderReceiptsControllerTest {
 
     @Test
     void confirmReissueRendersTheConfirmationPage() {
+        when(attemptService.reissueConfirmMessageKey(STORE_ID, ORDER_ID)).thenReturn("receipts.action.reissue.confirm.message");
         when(messageSource.getMessage(eq("receipts.action.reissue.confirm.title"), any(), eq(LOCALE))).thenReturn("Wystawić nowy paragon?");
         when(messageSource.getMessage(eq("receipts.action.reissue.confirm.message"), any(), eq(LOCALE))).thenReturn("message");
         when(messageSource.getMessage(eq("receipts.action.reissue"), any(), eq(LOCALE))).thenReturn("Wystaw ponownie");

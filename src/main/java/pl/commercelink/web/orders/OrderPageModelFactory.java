@@ -291,7 +291,11 @@ public class OrderPageModelFactory {
     /** The same, worded after why the e-receipt locks the order (still issuing, or fiscalised and being attached). */
     static BulkReason bulkReason(BulkAction action, boolean canSplitOrder, boolean hasDropshipItems, ReceiptLock receiptLock) {
         if (receiptLock.locks() && (action == BulkAction.REMOVE || action == BulkAction.SPLIT || action == BulkAction.MOVE)) {
-            return receiptLock == ReceiptLock.ATTACHING ? BulkReason.RECEIPT_ATTACHING : BulkReason.RECEIPT_ISSUING;
+            return switch (receiptLock) {
+                case ATTACHING -> BulkReason.RECEIPT_ATTACHING;
+                case ATTACH_FAILED -> BulkReason.RECEIPT_ATTACH_FAILED;
+                default -> BulkReason.RECEIPT_ISSUING;
+            };
         }
         return switch (action) {
             case SPLIT, MOVE -> canSplitOrder ? null : BulkReason.SPLIT_UNAVAILABLE;
@@ -505,8 +509,9 @@ public class OrderPageModelFactory {
                 close.dialogId(), act ? close.pageHref() : null, earlier,
                 newest.settled(), newest.settled() ? newest.outcome() : null,
                 newest.settled() ? settledKey(order, newest.outcome()) : null,
-                // the pill says fiscalised while the order still waits for the document the locks name: say so here
-                receiptLock == ReceiptLock.ATTACHING ? "receipts.row.attaching" : null);
+                // the pill says fiscalised while the order still waits for the document the locks name: say so here,
+                // unless the row has a problem (e.g. attaching keeps failing), which says what to do instead
+                receiptLock == ReceiptLock.ATTACHING && newest.problem() == null ? "receipts.row.attaching" : null);
     }
 
     /** A cancelled order needs no sale document at all; any other settled order already has its receipt or invoice. */
