@@ -1459,8 +1459,9 @@ body.cl-drawer-open .cl-sidebar {
     color: var(--cl-ink-2);
 }
 
+/* --cl-ink-2, not --cl-ink-3: on the tinted surface the lighter ink falls below 4.5:1 */
 .cl-page .cl-list .cl-list-item.is-placeholder .cl-list-desc {
-    color: var(--cl-ink-3);
+    color: var(--cl-ink-2);
 }
 
 /* What a record still lacks, in the colour of its warning pill so it is read together with it */
