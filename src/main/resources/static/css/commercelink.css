@@ -3914,6 +3914,17 @@ a.cl-link-button:hover {
     color: var(--cl-accent-ink);
 }
 
+/* The "opens in a new tab" icon after a link's text, inside the <a> and glued to it by a word joiner: a gap so the glyph
+   never touches the last character (Bulma's 16 px .icon box put it flush against it), smaller than the text so it reads
+   as a marker, and lifted to sit on the text's line. */
+.cl-page .cl-link-icon {
+    display: inline-block;
+    margin-left: 4px;
+    font-size: 0.75em;
+    line-height: 1;
+    vertical-align: 0.1em;
+}
+
 @media screen and (max-width: 1023px) {
     .cl-page .cl-list-title a:not(.cl-link-button) {
         padding-block: 12px;

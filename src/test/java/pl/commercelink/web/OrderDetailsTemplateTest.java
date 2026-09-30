@@ -1689,10 +1689,10 @@ class OrderDetailsTemplateTest {
         String html = page(render(order, ADMIN));
 
         // then: the new-tab icon is inside the link, joined to the number by a word joiner, never a sibling that
-        // wraps onto its own line
+        // wraps onto its own line; cl-link-icon (not Bulma's 16 px .icon box) keeps it off the last character
         String documents = html.substring(html.indexOf("id=\"dokumenty\""), html.indexOf("id=\"platnosci\""));
         assertThat(documents).containsPattern("<a href=\"https://faktury.example/118\" target=\"_blank\" rel=\"noopener\">"
-                + "<span>FV/2026/09/118</span>(&#8288;|\u2060)<span class=\"icon is-small\" aria-hidden=\"true\">"
+                + "<span>FV/2026/09/118</span>(&#8288;|\u2060)<span class=\"cl-link-icon\" aria-hidden=\"true\">"
                 + "<i\\s+class=\"fas fa-external-link-alt\"></i></span></a>");
         assertThat(occurrences(documents, "fa-external-link-alt")).isEqualTo(1);
     }
@@ -2661,7 +2661,8 @@ class OrderDetailsTemplateTest {
 
         // then
         String documents = html.substring(html.indexOf("id=\"dokumenty\""), html.indexOf("id=\"platnosci\""));
-        assertThat(documents).containsPattern("<a href=\"https://paragony.example/7\" target=\"_blank\" rel=\"noopener\"><span>PAR/7/2026</span>")
+        assertThat(documents).containsPattern("<a href=\"https://paragony.example/7\" target=\"_blank\" rel=\"noopener\"><span>PAR/7/2026</span>"
+                        + "(&#8288;|\u2060)<span\\s+class=\"cl-link-icon\" aria-hidden=\"true\"><i class=\"fas fa-external-link-alt\"></i></span></a>")
                 .contains("<span class=\"cl-status is-ok\">Zafiskalizowany</span>")
                 .contains("Zafiskalizowano 28.09.2026").contains("e-mail wysłany")
                 .doesNotContain("Odepnij").doesNotContain("Paragon PAR").doesNotContain("cl-list-actions");
