@@ -16,6 +16,7 @@ import pl.commercelink.inventory.deliveries.Delivery;
 import pl.commercelink.inventory.deliveries.DropshipItemLookup;
 import pl.commercelink.invoicing.InvoiceCreationEventPublisher;
 import pl.commercelink.orders.notifications.OrderNotificationsEventPublisher;
+import pl.commercelink.receipts.ReceiptTrigger;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.warehouse.GoodsOutEventPublisher;
@@ -50,6 +51,7 @@ class OrderLifecycleTest {
     @Mock private InvoiceCreationEventPublisher invoiceCreationEventPublisher;
     @Mock private GoodsOutEventPublisher goodsOutEventPublisher;
     @Mock private DropshipItemLookup dropshipItemLookup;
+    @Mock private ReceiptTrigger receiptTrigger;
 
     @InjectMocks
     private OrderLifecycle orderLifecycle;
@@ -167,6 +169,9 @@ class OrderLifecycleTest {
         assertEquals(OrderStatus.Completed, order.getStatus());
         verify(orderLifecycleEventPublisher).publish(order, OrderLifecycleEventType.OrderCompleted);
         verifyNoMoreInteractions(orderLifecycleEventPublisher);
+        InOrder inOrder = inOrder(ordersRepository, receiptTrigger);
+        inOrder.verify(ordersRepository).save(order);
+        inOrder.verify(receiptTrigger).onOrderSaved(order);
     }
 
     @Test

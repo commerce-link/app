@@ -6,7 +6,7 @@
 
     <groupId>pl.commercelink</groupId>
     <artifactId>commercelink</artifactId>
-    <version>2026.09.58</version>
+    <version>2026.09.64</version>
     <packaging>jar</packaging>
 
     <parent>
@@ -69,7 +69,7 @@
         <dependency>
             <groupId>pl.commercelink</groupId>
             <artifactId>commercelink-starter</artifactId>
-            <version>0.1.10</version>
+            <version>0.1.11</version>
         </dependency>
         <dependency>
             <groupId>pl.commercelink</groupId>
@@ -79,7 +79,7 @@
         <dependency>
             <groupId>pl.commercelink</groupId>
             <artifactId>supplier-api</artifactId>
-            <version>0.5.1</version>
+            <version>0.5.2</version>
         </dependency>
         <dependency>
             <groupId>pl.commercelink</groupId>
@@ -94,6 +94,11 @@
         <dependency>
             <groupId>pl.commercelink</groupId>
             <artifactId>invoicing-api</artifactId>
+            <version>0.2.0</version>
+        </dependency>
+        <dependency>
+            <groupId>pl.commercelink</groupId>
+            <artifactId>receipts-api</artifactId>
             <version>0.2.0</version>
         </dependency>
         <dependency>
@@ -349,6 +354,11 @@
                     <groupId>pl.commercelink</groupId>
                     <artifactId>invoicing-dev</artifactId>
                     <version>0.1.0</version>
+                </dependency>
+                <dependency>
+                    <groupId>pl.commercelink</groupId>
+                    <artifactId>receipts-dev</artifactId>
+                    <version>0.2.0</version>
                 </dependency>
             </dependencies>
         </profile>
