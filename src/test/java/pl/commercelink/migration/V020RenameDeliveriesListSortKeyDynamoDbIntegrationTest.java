@@ -15,7 +15,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 import pl.commercelink.inventory.deliveries.DeliveriesRepository;
 import pl.commercelink.inventory.deliveries.Delivery;
-import pl.commercelink.inventory.deliveries.DeliveryListSortKey;
+import pl.commercelink.inventory.deliveries.DeliveryListKey;
 
 import java.time.Duration;
 import java.time.LocalDate;
@@ -150,7 +150,7 @@ class V020RenameDeliveriesListSortKeyDynamoDbIntegrationTest {
         Delivery saved = mapper.load(Delivery.class, "store-2", OTHER_STORE);
         saved.setReceivedAt(LocalDateTime.of(2026, 9, 30, 14, 0));
         mapper.save(saved);
-        String freshKey = DeliveryListSortKey.of(saved);
+        String freshKey = DeliveryListKey.of(saved);
 
         // when
         migration().backfillDeliveryListSortKey(scanned, true);

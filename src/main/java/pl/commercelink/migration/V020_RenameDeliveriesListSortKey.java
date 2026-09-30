@@ -8,7 +8,7 @@ import io.mongock.api.annotations.ChangeUnitConstructor;
 import io.mongock.api.annotations.Execution;
 import io.mongock.api.annotations.RollbackExecution;
 import pl.commercelink.inventory.deliveries.Delivery;
-import pl.commercelink.inventory.deliveries.DeliveryListSortKey;
+import pl.commercelink.inventory.deliveries.DeliveryListKey;
 
 import java.time.Duration;
 import java.util.HashMap;
@@ -32,8 +32,13 @@ import java.util.function.Predicate;
 public class V020_RenameDeliveriesListSortKey {
 
     public static final String NEW_INDEX = "StoreIdDeliveryListSortKeyIndex";
-    static final String OLD_INDEX = V019_AddDeliveriesListKeyIndex.INDEX;
-    static final String OLD_ATTRIBUTE = V019_AddDeliveriesListKeyIndex.KEY_ATTRIBUTE;
+    // The shape V019 created (already applied in production). Literals, not V019's constants: an applied change unit is
+    // never edited, and this one must keep undoing exactly what V019 wrote.
+    static final String OLD_INDEX = "StoreIdListKeyIndex";
+    static final String OLD_ATTRIBUTE = "listKey";
+    static final List<String> PROJECTED = List.of("provider", "counterpartyShortcut", "type", "orderStatus",
+            "orderErrorMessage", "tracking", "estimatedDeliveryAt", "orderedAt", "receivedAt", "externalDeliveryId",
+            "totalCost", "tax", "invoiced", "synced", "paid", "connectionMode");
     static final String NEW_ATTRIBUTE = "deliveryListSortKey";
     static final Duration TIMEOUT = Duration.ofMinutes(10);
     static final Duration POLL_INTERVAL = Duration.ofSeconds(5);
@@ -82,7 +87,7 @@ public class V020_RenameDeliveriesListSortKey {
                 .withIndexName(NEW_INDEX)
                 .withKeySchema(new KeySchemaElement("storeId", KeyType.HASH), new KeySchemaElement(NEW_ATTRIBUTE, KeyType.RANGE))
                 .withProjection(new Projection().withProjectionType(ProjectionType.INCLUDE)
-                        .withNonKeyAttributes(V019_AddDeliveriesListKeyIndex.PROJECTED));
+                        .withNonKeyAttributes(PROJECTED));
         // A provisioned table rejects an index without its own throughput (same as V018 and V019).
         boolean onDemand = table.getBillingModeSummary() != null
                 && BillingMode.PAY_PER_REQUEST.toString().equals(table.getBillingModeSummary().getBillingMode());
@@ -126,7 +131,7 @@ public class V020_RenameDeliveriesListSortKey {
 
     private static boolean isMigrated(Map<String, AttributeValue> item, Delivery scanned) {
         AttributeValue stored = item.get(NEW_ATTRIBUTE);
-        return !item.containsKey(OLD_ATTRIBUTE) && stored != null && DeliveryListSortKey.of(scanned).equals(stored.getS());
+        return !item.containsKey(OLD_ATTRIBUTE) && stored != null && DeliveryListKey.of(scanned).equals(stored.getS());
     }
 
     /**
@@ -136,7 +141,7 @@ public class V020_RenameDeliveriesListSortKey {
      */
     public void backfillDeliveryListSortKey(Delivery scanned, boolean versioned) {
         Map<String, AttributeValue> values = new HashMap<>();
-        values.put(":key", new AttributeValue(DeliveryListSortKey.of(scanned)));
+        values.put(":key", new AttributeValue(DeliveryListKey.of(scanned)));
         String condition = "attribute_exists(deliveryId) AND attribute_not_exists(#v)";
         if (versioned) {
             condition = "attribute_exists(deliveryId) AND #v = :v";

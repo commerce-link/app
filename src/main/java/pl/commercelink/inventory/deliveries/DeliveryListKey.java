@@ -11,14 +11,14 @@ import java.time.LocalDate;
  * one): the settled history, by reception. Recomputed on every save, so a date change, a reception or an attached
  * invoice moves the delivery by itself.
  */
-public final class DeliveryListSortKey {
+public final class DeliveryListKey {
 
     public static final String IN_TRANSIT = "IN_TRANSIT#";
     public static final String TO_SETTLE = "TO_SETTLE#";
     public static final String SETTLED = "SETTLED#";
     public static final String UNDATED = "9999-12-31";
 
-    private DeliveryListSortKey() {
+    private DeliveryListKey() {
     }
 
     public static String of(Delivery delivery) {

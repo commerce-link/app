@@ -7,23 +7,23 @@ import io.mongock.api.annotations.ChangeUnit;
 import io.mongock.api.annotations.Execution;
 import io.mongock.api.annotations.RollbackExecution;
 import pl.commercelink.inventory.deliveries.Delivery;
-import pl.commercelink.inventory.deliveries.DeliveryListSortKey;
+import pl.commercelink.inventory.deliveries.DeliveryListKey;
 
 import java.util.List;
 import java.util.Map;
 
 /**
- * Deliveries by store and list key (spec §7), the first version of the deliveries list index. V020 renames the key to
- * deliveryListSortKey and replaces this index, so this unit keeps its own literal attribute and index names: it must
- * still run on a fresh database, where V020 then moves everything it wrote. The key is new, so the existing deliveries
- * get it here once, before the index is created, so the index build never sees an unkeyed delivery. Only listKey is
- * written, without touching version, so an operator saving a delivery meanwhile is not refused by optimistic locking.
+ * Deliveries by store and list key (spec §7): the deliveries list reads the deliveries on their way, the settlement
+ * backlog and a window of the history as key ranges, however long the store's history grows. The key is new, so the
+ * existing deliveries get it here once, before the index is created; every later save recomputes it (Delivery.getListKey). Only listKey is written,
+ * without touching version, so an operator saving a delivery meanwhile is not refused by optimistic locking. The list
+ * reads the store's partition until the index is active (DeliveriesRepository). The backfill runs before the index
+ * is created, so the index build never sees an unkeyed delivery and the fallback covers the whole build.
  */
 @ChangeUnit(id = "V019-add-deliveries-list-key-index", order = "019", author = "commercelink")
 public class V019_AddDeliveriesListKeyIndex {
 
     public static final String INDEX = "StoreIdListKeyIndex";
-    static final String KEY_ATTRIBUTE = "listKey";
     static final List<String> PROJECTED = List.of("provider", "counterpartyShortcut", "type", "orderStatus",
             "orderErrorMessage", "tracking", "estimatedDeliveryAt", "orderedAt", "receivedAt", "externalDeliveryId",
             "totalCost", "tax", "invoiced", "synced", "paid", "connectionMode");
@@ -36,7 +36,8 @@ public class V019_AddDeliveriesListKeyIndex {
 
     @Execution
     public void execute() {
-        // keys first: the index then builds over fully keyed items
+        // keys first: the index then builds over fully keyed items, and until it is active the repository fallback
+        // (DeliveriesRepository) already reads correct keys for the whole build
         backfillListKeys();
         createIndexIfAbsent();
     }
@@ -50,7 +51,7 @@ public class V019_AddDeliveriesListKeyIndex {
         }
         CreateGlobalSecondaryIndexAction create = new CreateGlobalSecondaryIndexAction()
                 .withIndexName(INDEX)
-                .withKeySchema(new KeySchemaElement("storeId", KeyType.HASH), new KeySchemaElement(KEY_ATTRIBUTE, KeyType.RANGE))
+                .withKeySchema(new KeySchemaElement("storeId", KeyType.HASH), new KeySchemaElement("listKey", KeyType.RANGE))
                 .withProjection(new Projection().withProjectionType(ProjectionType.INCLUDE).withNonKeyAttributes(PROJECTED));
         // Same as V018: a provisioned table rejects an index without its own throughput.
         boolean onDemand = table.getBillingModeSummary() != null
@@ -64,13 +65,13 @@ public class V019_AddDeliveriesListKeyIndex {
                 .withTableName("Deliveries")
                 .withAttributeDefinitions(
                         new AttributeDefinition("storeId", ScalarAttributeType.S),
-                        new AttributeDefinition(KEY_ATTRIBUTE, ScalarAttributeType.S))
+                        new AttributeDefinition("listKey", ScalarAttributeType.S))
                 .withGlobalSecondaryIndexUpdates(new GlobalSecondaryIndexUpdate().withCreate(create)));
     }
 
     /**
      * Scans page by page with a narrow projection (a mapper scan list caches every item it iterates, which would keep
-     * the whole table in memory at startup) and only what DeliveryListSortKey needs.
+     * the whole table in memory at startup) and only what DeliveryListKey needs.
      */
     private void backfillListKeys() {
         DynamoDBMapper mapper = new DynamoDBMapper(dynamoDB);
@@ -95,7 +96,7 @@ public class V019_AddDeliveriesListKeyIndex {
      */
     public void backfillListKey(Delivery scanned, boolean versioned) {
         Map<String, AttributeValue> values = new java.util.HashMap<>();
-        values.put(":key", new AttributeValue(DeliveryListSortKey.of(scanned)));
+        values.put(":key", new AttributeValue(DeliveryListKey.of(scanned)));
         String condition = "attribute_exists(deliveryId) AND attribute_not_exists(#v)";
         if (versioned) {
             condition = "attribute_exists(deliveryId) AND #v = :v";
@@ -106,7 +107,7 @@ public class V019_AddDeliveriesListKeyIndex {
                     .withTableName("Deliveries")
                     .withKey(Map.of("storeId", new AttributeValue(scanned.getStoreId()),
                             "deliveryId", new AttributeValue(scanned.getDeliveryId())))
-                    .withUpdateExpression("SET " + KEY_ATTRIBUTE + " = :key")
+                    .withUpdateExpression("SET listKey = :key")
                     .withConditionExpression(condition)
                     .withExpressionAttributeNames(Map.of("#v", "version"))
                     .withExpressionAttributeValues(values));

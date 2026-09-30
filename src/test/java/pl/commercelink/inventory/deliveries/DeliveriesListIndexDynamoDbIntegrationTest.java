@@ -139,7 +139,7 @@ class DeliveriesListIndexDynamoDbIntegrationTest {
         Delivery saved = mapper.load(Delivery.class, "store-2", "cccc0001-0000-0000-0000-000000000000");
         saved.setReceivedAt(LocalDateTime.of(2026, 9, 30, 14, 0));
         mapper.save(saved);
-        String freshKey = DeliveryListSortKey.of(saved);
+        String freshKey = DeliveryListKey.of(saved);
 
         // when
         new V020_RenameDeliveriesListSortKey(client).backfillDeliveryListSortKey(scanned, true);

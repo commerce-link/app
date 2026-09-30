@@ -122,14 +122,14 @@ public class  DeliveriesRepository extends DynamoDbRepository<Delivery> {
      * only the attributes StoreIdDeliveryListSortKeyIndex carries - which must never be saved back.
      */
     public List<Delivery> findInTransit(String storeId) {
-        return readList(storeId, "begins_with(deliveryListSortKey, :lo)", DeliveryListSortKey.IN_TRANSIT, null,
-                key -> key.startsWith(DeliveryListSortKey.IN_TRANSIT));
+        return readList(storeId, "begins_with(deliveryListSortKey, :lo)", DeliveryListKey.IN_TRANSIT, null,
+                key -> key.startsWith(DeliveryListKey.IN_TRANSIT));
     }
 
     /** Received deliveries still waiting for a purchase invoice, over the whole history. Partial, see findInTransit. */
     public List<Delivery> findToSettle(String storeId) {
-        return readList(storeId, "begins_with(deliveryListSortKey, :lo)", DeliveryListSortKey.TO_SETTLE, null,
-                key -> key.startsWith(DeliveryListSortKey.TO_SETTLE));
+        return readList(storeId, "begins_with(deliveryListSortKey, :lo)", DeliveryListKey.TO_SETTLE, null,
+                key -> key.startsWith(DeliveryListKey.TO_SETTLE));
     }
 
     /**
@@ -139,7 +139,7 @@ public class  DeliveriesRepository extends DynamoDbRepository<Delivery> {
      */
     public long countToSettle(String storeId) {
         Map<String, AttributeValue> eav = Map.of(":storeId", new AttributeValue(storeId),
-                ":lo", new AttributeValue(DeliveryListSortKey.TO_SETTLE));
+                ":lo", new AttributeValue(DeliveryListKey.TO_SETTLE));
         long count = 0;
         Map<String, AttributeValue> startKey = null;
         do {
@@ -162,9 +162,9 @@ public class  DeliveriesRepository extends DynamoDbRepository<Delivery> {
      */
     public List<Delivery> findReceivedBetween(String storeId, LocalDate from, LocalDate to) {
         List<Delivery> result = new ArrayList<>();
-        for (String prefix : List.of(DeliveryListSortKey.TO_SETTLE, DeliveryListSortKey.SETTLED)) {
-            String lo = from == null ? prefix : DeliveryListSortKey.receivedBound(prefix, from, false);
-            String hi = to == null ? prefix + "\uffff" : DeliveryListSortKey.receivedBound(prefix, to, true);
+        for (String prefix : List.of(DeliveryListKey.TO_SETTLE, DeliveryListKey.SETTLED)) {
+            String lo = from == null ? prefix : DeliveryListKey.receivedBound(prefix, from, false);
+            String hi = to == null ? prefix + "\uffff" : DeliveryListKey.receivedBound(prefix, to, true);
             result.addAll(readList(storeId, "deliveryListSortKey BETWEEN :lo AND :hi", lo, hi,
                     key -> key.compareTo(lo) >= 0 && key.compareTo(hi) <= 0));
         }
@@ -209,7 +209,7 @@ public class  DeliveriesRepository extends DynamoDbRepository<Delivery> {
             page.getItems().forEach(item -> result.add(dynamoDBMapper.marshallIntoObject(Delivery.class, item)));
             startKey = page.getLastEvaluatedKey();
         } while (startKey != null && !startKey.isEmpty());
-        return result.stream().filter(d -> keyMatches.test(DeliveryListSortKey.of(d))).toList();
+        return result.stream().filter(d -> keyMatches.test(DeliveryListKey.of(d))).toList();
     }
 
     public List<Delivery> findPendingDeliveriesByProvider(String storeId, String provider, String excludedDeliveryId) {
