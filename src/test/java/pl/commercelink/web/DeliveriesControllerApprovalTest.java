@@ -9,8 +9,13 @@ import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.MessageSource;
+import org.springframework.beans.MutablePropertyValues;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
+import org.springframework.validation.BeanPropertyBindingResult;
+import org.springframework.validation.BindingResult;
+import org.springframework.validation.FieldError;
+import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.inventory.deliveries.Allocation;
 import pl.commercelink.inventory.deliveries.AllocationKey;
@@ -2083,5 +2088,45 @@ class DeliveriesControllerApprovalTest {
         assertThat(delivery.getPayments().get(0).getDirection()).isEqualTo(PaymentDirection.Outgoing);
         verify(deliveriesRepository).save(delivery);
         verify(redirectAttributes, never()).addFlashAttribute(eq("errorMessage"), any());
+    }
+
+    @Test
+    void theDeliveryPaymentsEditReadsCommaAmounts() {
+        // given: the Bulma edit modal posts payments[i].amount / .fee as text
+        Delivery posted = new Delivery();
+        WebDataBinder binder = new WebDataBinder(posted, "delivery");
+        deliveriesController.paymentAmounts(binder);
+        MutablePropertyValues values = new MutablePropertyValues();
+        values.add("payments[0].amount", "1 499,99");
+        values.add("payments[0].fee", "2,50");
+        values.add("payments[0].source", "BankTransfer");
+        values.add("payments[1].amount", "1.000");
+
+        // when
+        binder.bind(values);
+
+        // then
+        assertThat(posted.getPayments().get(0).getAmount()).isEqualTo(1499.99);
+        assertThat(posted.getPayments().get(0).getFee()).isEqualTo(2.5);
+        assertThat(binder.getBindingResult().getFieldErrors()).extracting(FieldError::getField)
+                .containsExactly("payments[1].amount");
+    }
+
+    @Test
+    void aDeliveryPaymentsEditWithAnAmountThatIsNotANumberSavesNothing() {
+        // given
+        BindingResult binding = new BeanPropertyBindingResult(new Delivery(), "delivery");
+        binding.rejectValue("payments", "typeMismatch");
+        when(messageSource.getMessage(eq("error.message.payment.amount.format"), eq(null), eq(Locale.ENGLISH)))
+                .thenReturn("Enter the amount as a number");
+
+        // when
+        String view = deliveriesController.updatePayments(DELIVERY_ID, new Delivery(), binding, redirectAttributes,
+                Locale.ENGLISH);
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID);
+        verify(redirectAttributes).addFlashAttribute("errorMessage", "Enter the amount as a number");
+        verify(deliveriesRepository, never()).save(any());
     }
 }

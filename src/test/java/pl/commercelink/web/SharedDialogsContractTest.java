@@ -127,6 +127,10 @@ class SharedDialogsContractTest {
         assertThat(html).contains("id=\"paymentsEditModal\"").contains("togglePaymentsEditModal(true)")
                 .contains("openAddPaymentModalFromButton(this)").contains("id=\"addPaymentModal\"")
                 .contains("action=\"/dashboard/deliveries/d-1/addPayment\"");
+        // the edit modal's amounts are text read on the server (AmountParser), as in "Dodaj wpłatę"
+        assertThat(html).containsPattern("type=\"text\" inputmode=\"decimal\" autocomplete=\"off\"\\s+name=\"payments\\[0\\]\\.amount\"\\s+value=\"50.00\"")
+                .containsPattern("type=\"text\" inputmode=\"decimal\" autocomplete=\"off\"\\s+name=\"payments\\[0\\]\\.fee\"\\s+value=\"0.00\"")
+                .doesNotContain("step=\"0.01\"");
         // the edit modal's own <select> (payments-section.html) must read the same Option value/labelKey the add
         // dialog does, not Option's own toString(), or no option can be preselected or saved
         assertThat(html).doesNotContain("Option[")

@@ -22,7 +22,7 @@ class OrderPaymentFormTest {
 
     private static OrderPaymentForm posted(boolean pending, boolean refund, String amount, String fee, String date) {
         return new OrderPaymentForm("o-1", 1, "v", pending, refund, PaymentSource.BankTransfer, " Jan ", amount, fee, "",
-                " OP-1 ", date, null, null, null);
+                " OP-1 ", date, null, null, null, null);
     }
 
     private static Payment refund(double amount) {
@@ -100,7 +100,7 @@ class OrderPaymentFormTest {
     void aPaymentWithoutAMethodIsRefused() {
         // given
         OrderPaymentForm form = new OrderPaymentForm("o-1", 0, "v", true, false, null, null, "0", null, null, null,
-                null, null, null, null);
+                null, null, null, null, null);
 
         // then
         assertThat(form.validate()).containsEntry("payment-0-source", "order.payments.error.source");
@@ -169,11 +169,14 @@ class OrderPaymentFormTest {
         Payment saved = Payment.bankTransfer("REF-1", "Jan", 100);
 
         // when
-        Payment rounded = posted(false, "100.125", "0.005", null).toPayment(saved);
+        Payment stored = posted(false, "100,12", "0.5", null).toPayment(saved);
 
         // then
-        assertThat(rounded.getAmount()).isEqualTo(100.13);
-        assertThat(rounded.getFee()).isEqualTo(0.01);
+        assertThat(stored.getAmount()).isEqualTo(100.12);
+        assertThat(stored.getFee()).isEqualTo(0.5);
+        assertThat(posted(false, "100.125", "0.005", null).validate())
+                .containsEntry("payment-1-amount", "order.payments.error.amount")
+                .containsEntry("payment-1-fee", "order.payments.error.fee");
         assertThat(OrderPaymentForm.of("o-1", 0, new Payment("R", "J", PaymentSource.Card, 100.125, 0)).amount())
                 .isEqualTo("100.13");
     }
@@ -181,14 +184,14 @@ class OrderPaymentFormTest {
     @Test
     void anAmountThatRoundsToZeroIsZeroForASettledPayment() {
         // then
-        assertThat(posted(false, "0.001", null, null).validate())
+        assertThat(posted(false, "1e-3", null, null).validate())
                 .containsEntry("payment-1-amount", "order.payments.error.amount.zero");
         assertThat(posted(false, "1e-400", null, null).validate())
                 .containsEntry("payment-1-amount", "order.payments.error.amount.zero");
         assertThat(posted(false, "1e-999999999", null, null).validate())
                 .containsEntry("payment-1-amount", "order.payments.error.amount.zero");
-        assertThat(posted(true, "0.004", null, null).validate()).isEmpty();
-        assertThat(posted(false, "0.005", null, null).validate()).isEmpty();
+        assertThat(posted(true, "4e-3", null, null).validate()).isEmpty();
+        assertThat(posted(false, "5e-3", null, null).validate()).isEmpty();
     }
 
     @Test
@@ -225,9 +228,9 @@ class OrderPaymentFormTest {
         Payment saved = Payment.bankTransfer("REF-1", "Jan", 100);
         String locked = OrderPaymentForm.methodLockedKey(withReceipt, ReceiptLock.NONE);
         OrderPaymentForm card = new OrderPaymentForm("o-1", 0, "v", false, false, PaymentSource.Card, "Jan", "120", null,
-                null, null, null, null, null, locked);
+                null, null, null, null, null, locked, null);
         OrderPaymentForm sameMethod = new OrderPaymentForm("o-1", 0, "v", false, false, PaymentSource.BankTransfer, "Jan",
-                "120", null, null, null, null, null, null, locked);
+                "120", null, null, null, null, null, null, locked, null);
 
         // when
         Map<String, String> refused = card.validate(saved);
@@ -243,5 +246,36 @@ class OrderPaymentFormTest {
                 .isEqualTo("order.payments.method.locked.receiptAttaching");
         assertThat(OrderPaymentForm.methodLockedKey(open, ReceiptLock.ISSUING)).isEqualTo("order.payments.method.locked.receipt");
         assertThat(OrderPaymentForm.methodLockedKey(open, ReceiptLock.NONE)).isNull();
+    }
+
+    @Test
+    void aRefundStoredPositiveWarnsThatPaidGoesDownByTwiceItsAmount() {
+        // when
+        OrderPaymentForm legacy = OrderPaymentForm.of("o-1", 0, refund(100));
+        OrderPaymentForm negative = OrderPaymentForm.of("o-1", 0, refund(-100));
+        OrderPaymentForm incoming = OrderPaymentForm.of("o-1", 0, Payment.bankTransfer("R", "J", 100));
+
+        // then
+        assertThat(legacy.positiveRefundShift()).isEqualTo("200,00");
+        assertThat(negative.positiveRefundShift()).isNull();
+        assertThat(incoming.positiveRefundShift()).isNull();
+        assertThat(legacy.withErrors(Map.of()).positiveRefundShift()).isEqualTo("200,00");
+    }
+
+    @Test
+    void aLockedMethodThatWasNeverSetDoesNotKeepTheAmountFromBeingCorrected() {
+        // given: an old payment without a method on an order that has its receipt
+        Payment saved = new Payment("REF-1", "Jan", null, 100, 0);
+        OrderPaymentForm posted = new OrderPaymentForm("o-1", 0, "v", false, false, null, "Jan", "120", null, null,
+                null, null, null, null, "order.payments.method.locked", null);
+
+        // when
+        Map<String, String> found = posted.validate(saved);
+        Payment stored = posted.toPayment(saved);
+
+        // then
+        assertThat(found).isEmpty();
+        assertThat(stored.getAmount()).isEqualTo(120.0);
+        assertThat(stored.getSource()).isNull();
     }
 }

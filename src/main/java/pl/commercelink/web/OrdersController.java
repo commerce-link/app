@@ -1631,6 +1631,10 @@ public class OrdersController extends BaseController {
                              RedirectAttributes redirectAttributes,
                              Locale locale) {
         Order existingOrder = requireOrder(ordersRepository, getStoreId(), orderId);
+        // the closed page offers no "Dodaj wpłatę"; a cancelled order would drop the payment while saying it was added
+        if (existingOrder.isClosed()) {
+            return refuse(redirectAttributes, orderId, closedPaymentsKey(existingOrder), locale);
+        }
 
         String invalid = form.validate();
         if (invalid != null) {
@@ -1715,7 +1719,8 @@ public class OrdersController extends BaseController {
                 receiptAttemptService.receiptLock(existingOrder));
         OrderPaymentForm posted = new OrderPaymentForm(orderId, index, version, known && current.get(index).isUnsettled(),
                 known && OrderPaymentForm.isRefund(current.get(index)), source, name, amount, fee, referenceNo,
-                bankTransactionNo, bankTransactionDate, null, null, methodLocked);
+                bankTransactionNo, bankTransactionDate, null, null, methodLocked,
+                known ? OrderPaymentForm.positiveRefundShift(current.get(index)) : null);
         String refusal = existingOrder.isClosed() ? closedPaymentsKey(existingOrder)
                 : !known || !OrderPaymentForm.version(current.get(index)).equals(version) ? "order.payments.error.stale"
                 : null;
@@ -1808,10 +1813,9 @@ public class OrdersController extends BaseController {
     }
 
     /**
-     * Payments of a closed order are not edited or removed, as its shipments are not: the card offers neither action,
-     * and a cancelled order would lose the save anyway (OrderLifecycle.update does not persist it). This replaces the
-     * decision of 2026-09-27 that let a completed order take the change (review 2, R-27); "Dodaj wpłatę" is not
-     * refused here.
+     * Payments of a closed order are not added, edited or removed, as its shipments are not: the card offers none of
+     * these actions, and a cancelled order would lose the save anyway (OrderLifecycle.update does not persist it). This
+     * replaces the decision of 2026-09-27 that let a completed order take the change (review 2, R-27).
      */
     private static String closedPaymentsKey(Order order) {
         return order.getStatus() == OrderStatus.Cancelled ? "order.payments.error.cancelled"

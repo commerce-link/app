@@ -711,6 +711,24 @@ class OrderPageModelFactoryTest {
     }
 
     @Test
+    void aRefundWithAFeeShowsWhatPaidCountsAndTheFeeInItsDescription() {
+        // given: a refund of 50 with a fee of 2 counts as -52 (Payment#getAppliedAmount); the dialog shows 50 and 2
+        Order order = order(OrderStatus.New);
+        order.addPayment(new Payment("ZW/1", "Zwrot", PaymentSource.BankTransfer,
+                pl.commercelink.orders.PaymentDirection.Outgoing, -50, 2, null, null));
+
+        // when
+        OrderPageModel.PaymentsCard card = factory.build(order, List.of(), ADMIN, PL).payments();
+
+        // then
+        assertThat(card.rows().get(0).amount()).isEqualTo("−52,00");
+        assertThat(card.rows().get(0).fee()).isEqualTo("2,00");
+        assertThat(card.paid()).isEqualTo("−52,00");
+        assertThat(card.forms().get(0).amount()).isEqualTo("50.00");
+        assertThat(card.forms().get(0).fee()).isEqualTo("2.00");
+    }
+
+    @Test
     void aPlaceholderPaymentReadsAsExpected() {
         // given
         Order order = order(OrderStatus.New);

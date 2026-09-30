@@ -1718,11 +1718,29 @@ class OrderDetailsTemplateTest {
         String dialog = dialog(html, "payment-dialog-0");
 
         // then
-        assertThat(dialog).contains("<select class=\"cl-select\" id=\"payment-0-source\" name=\"source\""
-                        + " aria-describedby=\"payment-0-source-locked\" disabled=\"disabled\">")
+        String select = dialog.substring(dialog.indexOf("<select"), dialog.indexOf(">", dialog.indexOf("<select")) + 1);
+        assertThat(select).contains("id=\"payment-0-source\"").contains("name=\"source\"")
+                .contains("aria-describedby=\"payment-0-source-locked\"").contains("disabled=\"disabled\"");
+        assertThat(dialog)
                 .contains("<input type=\"hidden\" name=\"source\" value=\"BankTransfer\">")
                 .contains("id=\"payment-0-source-locked\">Zamówienie ma już fakturę albo paragon — metody płatności nie zmienisz.<");
         assertThat(card(html, "platnosci")).contains("aria-label=\"Usuń płatność 1\"").contains("/payments/0/remove?version=");
+    }
+
+    @Test
+    void theDialogOfARefundStoredPositiveWarnsThatPaidGoesDownByTwiceItsAmount() {
+        // given
+        Order order = order(OrderStatus.Realization);
+        order.addPayment(refund(40));
+        order.addPayment(refund(-10));
+
+        // when
+        String html = page(render(order, ADMIN));
+
+        // then
+        assertThat(dialog(html, "payment-dialog-0")).contains("class=\"cl-alert is-warn\"")
+                .contains("Ten zwrot był zapisany bez minusa i liczył się jako wpłata. Po zapisaniu „Wpłacono” zmniejszy się o 80,00 PLN.");
+        assertThat(dialog(html, "payment-dialog-1")).doesNotContain("bez minusa");
     }
 
     @Test

@@ -37,11 +37,15 @@ import java.util.Objects;
  * on the order, or an e-receipt being issued or fiscalised, whose request declared the method) the method is shown
  * read-only with this reason and a changed one is refused (owner decision Q3 of 2026-09-29). Amounts, adding and
  * removing payments stay open.
+ * <p>
+ * positiveRefundShift is set for a refund stored with a positive amount by older code, which the order counted as a
+ * payment: saving the dialog stores it negative, so "Wpłacono" goes down by twice its amount. The dialog says so, with
+ * that amount formatted; the stored data is not corrected any other way (review 2, controller ruling).
  */
 public record OrderPaymentForm(String orderId, int index, String version, boolean pending, boolean refund,
                                PaymentSource source, String name, String amount, String fee, String referenceNo,
                                String bankTransactionNo, String bankTransactionDate, Map<String, String> errors,
-                               String refusal, String methodLockedKey) {
+                               String refusal, String methodLockedKey, String positiveRefundShift) {
 
     private static final String METHOD_LOCKED = "order.payments.method.locked";
 
@@ -61,7 +65,12 @@ public record OrderPaymentForm(String orderId, int index, String version, boolea
                 payment.getFee() == 0 ? null : plain(payment.getFee()),
                 payment.getReferenceNo(), payment.getBankTransactionNo(),
                 payment.getBankTransactionDate() == null ? null : payment.getBankTransactionDate().toString(),
-                Map.of(), null, methodLockedKey);
+                Map.of(), null, methodLockedKey, positiveRefundShift(payment));
+    }
+
+    /** Twice the amount of a refund stored positive (see positiveRefundShift), formatted; null for any other payment. */
+    public static String positiveRefundShift(Payment payment) {
+        return isRefund(payment) && payment.getAmount() > 0 ? Money.format(2 * payment.getAmount()) : null;
     }
 
     /**
@@ -165,10 +174,15 @@ public record OrderPaymentForm(String orderId, int index, String version, boolea
      */
     public Map<String, String> validate(Payment saved) {
         Map<String, String> found = new LinkedHashMap<>();
-        if (methodLockedKey != null && saved != null && source != saved.getSource()) {
+        boolean locked = methodLockedKey != null && saved != null;
+        if (locked && source != saved.getSource()) {
             found.put(field("source"), methodLockedKey);
         }
         validate().forEach(found::putIfAbsent);
+        // a locked method that was never set cannot be chosen now; it must not keep the amount from being corrected
+        if (locked && source == null && saved.getSource() == null) {
+            found.remove(field("source"));
+        }
         return found;
     }
 
@@ -189,13 +203,13 @@ public record OrderPaymentForm(String orderId, int index, String version, boolea
 
     public OrderPaymentForm withErrors(Map<String, String> found) {
         return new OrderPaymentForm(orderId, index, version, pending, refund, source, name, amount, fee, referenceNo,
-                bankTransactionNo, bankTransactionDate, found, refusal, methodLockedKey);
+                bankTransactionNo, bankTransactionDate, found, refusal, methodLockedKey, positiveRefundShift);
     }
 
     /** A reason the whole form was refused (a cancelled order, a payment changed meanwhile), already translated. */
     public OrderPaymentForm withRefusal(String text) {
         return new OrderPaymentForm(orderId, index, version, pending, refund, source, name, amount, fee, referenceNo,
-                bankTransactionNo, bankTransactionDate, errors, text, methodLockedKey);
+                bankTransactionNo, bankTransactionDate, errors, text, methodLockedKey, positiveRefundShift);
     }
 
     private static LocalDate parseDate(String value) {

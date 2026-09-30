@@ -1058,6 +1058,24 @@ class OrdersControllerTest {
         }
 
         @Test
+        void theDialogOfARefundStoredPositiveKeepsItsWarningWhenItComesBackWith422() {
+            // given
+            Payment legacy = new Payment("ZW/1", "Jan", PaymentSource.BankTransfer, PaymentDirection.Outgoing, 40, 0,
+                    null, null);
+            orderWith(legacy);
+            MockHttpServletResponse response = new MockHttpServletResponse();
+            ExtendedModelMap model = new ExtendedModelMap();
+
+            // when
+            save(0, OrderPaymentForm.version(legacy), PaymentSource.BankTransfer, "40", "x", null, "fetch", response, model);
+
+            // then
+            assertThat(response.getStatus()).isEqualTo(422);
+            assertThat(((OrderPaymentForm) model.getAttribute("payment")).positiveRefundShift()).isEqualTo("80,00");
+            assertThat(legacy.getAmount()).isEqualTo(40);
+        }
+
+        @Test
         void aNegativeIncomingPaymentComesBackToTheDialogWith422() {
             // given
             Payment paid = Payment.bankTransfer("REF-1", "Jan", 100);
@@ -1102,6 +1120,38 @@ class OrdersControllerTest {
             assertThat(order.getPayments().get(0).getAmount()).isEqualTo(1499.99);
             assertThat(order.getPayments().get(0).getFee()).isEqualTo(1.5);
             verify(orderLifecycle).update(order);
+        }
+
+        @Test
+        void addingAPaymentToACancelledOrderIsRefused() {
+            // given: the closed page offers no "Dodaj wpłatę", and the lifecycle would drop the payment anyway
+            Order order = orderWith(new Payment(PaymentSource.BankTransfer));
+            order.setStatus(OrderStatus.Cancelled);
+
+            // when
+            String view = ordersController.addPayment(ORDER_ID, addForm("100", "", PaymentDirection.Incoming), redirect,
+                    Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+            assertThat(errorMessage()).isEqualTo("order.payments.error.cancelled");
+            assertThat(order.getPayments().get(0).isUnsettled()).isTrue();
+            verifyNoInteractions(orderLifecycle);
+        }
+
+        @Test
+        void addingAPaymentToACompletedOrderIsRefused() {
+            // given
+            Order order = orderWith(Payment.bankTransfer("REF-1", "Jan", 100));
+            order.setStatus(OrderStatus.Completed);
+
+            // when
+            ordersController.addPayment(ORDER_ID, addForm("50", "", PaymentDirection.Outgoing), redirect, Locale.ENGLISH);
+
+            // then
+            assertThat(errorMessage()).isEqualTo("order.payments.error.closed");
+            assertThat(order.getPayments()).hasSize(1);
+            verifyNoInteractions(orderLifecycle);
         }
 
         @Test

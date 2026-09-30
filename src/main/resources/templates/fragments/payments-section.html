@@ -22,6 +22,8 @@
   to a specific model attribute name. Spring binds names to whatever @ModelAttribute the
   controller declares (e.g. "order" or "delivery"). Both controllers filter out
   `Payment::isComplete=false` rows on save — clearing amount+fee removes a payment.
+  Amount and fee are text fields (inputmode decimal): DeliveriesController reads them with AmountParser
+  (@InitBinder "delivery"), so "149,99" is not turned into 14999 by a browser with an en-US locale.
 -->
 <div th:fragment="paymentsSection(payments, addPaymentAction, updatePaymentsAction, expectedAmount, pendingPayment, paymentSources, addDisabled, editEnabled, mode)">
 
@@ -122,15 +124,15 @@
                                        th:placeholder="#{payments.source.name.placeholder}"/>
                             </td>
                             <td>
-                                <input class="input" type="number" step="0.01"
+                                <input class="input" type="text" inputmode="decimal" autocomplete="off"
                                        th:name="'payments[' + ${iterStat.index} + '].amount'"
-                                       th:value="${payment.amount}"
+                                       th:value="${#numbers.formatDecimal(payment.amount, 1, 2, 'POINT')}"
                                        th:placeholder="#{order.payment.amount.placeholder}"/>
                             </td>
                             <td>
-                                <input class="input" type="number" step="0.01"
+                                <input class="input" type="text" inputmode="decimal" autocomplete="off"
                                        th:name="'payments[' + ${iterStat.index} + '].fee'"
-                                       th:value="${payment.fee}"
+                                       th:value="${#numbers.formatDecimal(payment.fee, 1, 2, 'POINT')}"
                                        th:placeholder="#{order.payment.processing.fee.placeholder}"/>
                             </td>
                             <td>

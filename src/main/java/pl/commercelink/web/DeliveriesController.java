@@ -6,6 +6,8 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.validation.BindingResult;
+import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.inventory.deliveries.*;
@@ -23,6 +25,7 @@ import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.documents.Document;
 import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.starter.security.CustomSecurityContext;
+import pl.commercelink.web.orders.AmountEditor;
 import pl.commercelink.web.orders.OrderLabels;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.Store;
@@ -262,10 +265,25 @@ public class DeliveriesController {
         return redirectTarget;
     }
 
+    /**
+     * The payments edit modal (fragments/payments-section.html) posts its amounts as text: read them like every other
+     * payment amount (AmountParser), whatever the browser's language, instead of Double.valueOf, which refused "149,99".
+     */
+    @InitBinder("delivery")
+    void paymentAmounts(WebDataBinder binder) {
+        binder.registerCustomEditor(double.class, "payments.amount", new AmountEditor());
+        binder.registerCustomEditor(double.class, "payments.fee", new AmountEditor());
+    }
+
     @PostMapping("/dashboard/deliveries/{deliveryId}/updatePayments")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String updatePayments(@PathVariable String deliveryId, @ModelAttribute("delivery") Delivery updatedDelivery,
-                                 RedirectAttributes redirectAttributes, Locale locale) {
+                                 BindingResult binding, RedirectAttributes redirectAttributes, Locale locale) {
+        if (binding.hasErrors()) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage("error.message.payment.amount.format", null, locale));
+            return "redirect:/dashboard/deliveries/details?deliveryId=" + deliveryId;
+        }
         Delivery existingDelivery = deliveriesRepository.findById(getStoreId(), deliveryId);
         if (existingDelivery.isAwaitingApproval()) {
             return redirectEditLocked(getStoreId(), deliveryId, redirectAttributes, locale);

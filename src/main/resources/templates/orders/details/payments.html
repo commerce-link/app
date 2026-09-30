@@ -102,6 +102,11 @@
             </div>
         </div>
         <div th:replace="~{fragments/settings-form :: errorSummary(|${payment.dialogId()}-errors|, ${payment.errors()}, null)}"></div>
+        <!--/* a refund stored positive by older code counted as a payment; its save stores it negative (OrderPaymentForm) */-->
+        <div th:if="${payment.positiveRefundShift() != null}" class="cl-alert is-warn" th:id="|${payment.dialogId()}-positive-refund|">
+            <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+            <p class="cl-alert-text" th:text="#{order.payments.refund.positive(${#messages.msg('general.currency.amount', payment.positiveRefundShift())})}"></p>
+        </div>
         <div class="cl-form-grid cl-card-grid">
             <!--/* once the sale has its document the method is fixed: the select is disabled (not posted) with the reason
                    under it, and a hidden field posts the method it shows (OrderPaymentForm.methodLockedKey) */-->
