@@ -4771,7 +4771,7 @@ a.cl-link-button:hover {
 }
 
 /* Search: the icon sits in the field, a clear "×" appears once something is searched (it is a link, so it works
-   without JavaScript; with it, orders-list.js also refreshes the list when the field is emptied). */
+   without JavaScript; with it, list-page.js also refreshes the list when the field is emptied). */
 .cl-page .cl-search-form {
     display: flex;
     align-items: center;

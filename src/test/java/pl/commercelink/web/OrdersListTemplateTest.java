@@ -53,7 +53,7 @@ class OrdersListTemplateTest {
                 .contains("th:href=\"@{${page.sortHeaders().get(statusSort).href()}}\" th:text=\"#{orders.list.column.status}\"")
                 .doesNotContain("orders.list.sort.ordered")   // "date placed" only sorted the history, which is gone
                 .contains("fragments/pagination :: pages(${page.pagination()})")
-                .contains("data-cl-orders-results").contains("data-cl-orders-nav")
+                .contains("data-cl-list-results").contains("data-cl-list-nav")
                 .contains("cl-list-empty").contains("orders.new.pos.button");
     }
 
@@ -86,7 +86,7 @@ class OrdersListTemplateTest {
 
         // then
         assertThat(tiles).contains("<a class=\"cl-stat is-link\"").contains("th:href=\"@{${tile.href()}}\"")
-                .contains("aria-current=${tile.active()} ? 'true' : null").contains("data-cl-orders-nav")
+                .contains("aria-current=${tile.active()} ? 'true' : null").contains("data-cl-list-nav")
                 .contains("#{orders.list.attention.active}").contains("cl-visually-hidden");
     }
 
@@ -118,7 +118,7 @@ class OrdersListTemplateTest {
     @Test
     void onlyTheListScriptIsIncluded() throws Exception {
         // no dialog is left on the list: "save this view" is gone and filters are managed on their own page
-        assertThat(page()).contains("@{/js/orders-list.js}").doesNotContain("dialog.js").doesNotContain("confirm-dialog");
+        assertThat(page()).contains("@{/js/list-page.js}").doesNotContain("dialog.js").doesNotContain("confirm-dialog");
         assertThat(Path.of("src/main/resources/templates/orders/filter-new.html")).doesNotExist();
     }
 
