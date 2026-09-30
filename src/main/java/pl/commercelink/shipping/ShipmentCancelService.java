@@ -1,32 +1,44 @@
 package pl.commercelink.shipping;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.Shipment;
-import pl.commercelink.orders.event.OrderEventsRepository;
-import pl.commercelink.orders.notifications.EmailNotificationType;
 import pl.commercelink.shipping.api.ShippingException;
-import pl.commercelink.shipping.api.ShippingProvider;
+import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 
-import java.util.Collections;
+import java.time.LocalDateTime;
+import java.util.concurrent.atomic.AtomicBoolean;
 
+/**
+ * Asks the shipping provider to cancel the courier order of the first dispatched shipment. The cancellation is only
+ * requested here: the shipment is marked PENDING and {@link ShipmentCancellationChecker} clears it once the provider
+ * confirms, or records why it did not.
+ */
+@Slf4j
 @Service
 public class ShipmentCancelService {
 
+    static final String ALREADY_IN_PROGRESS = "Shipment cancellation is already in progress";
+
     private final StoresRepository storesRepository;
     private final OrdersRepository ordersRepository;
-    private final OrderEventsRepository orderEventsRepository;
     private final ShippingProviderFactory shippingProviderFactory;
+    private final ShipmentCancellationEventPublisher publisher;
+    private final OptimisticLockingExecutor optimisticLockingExecutor;
 
     public ShipmentCancelService(StoresRepository storesRepository, OrdersRepository ordersRepository,
-                                 OrderEventsRepository orderEventsRepository, ShippingProviderFactory shippingProviderFactory) {
+                                 ShippingProviderFactory shippingProviderFactory,
+                                 ShipmentCancellationEventPublisher publisher,
+                                 OptimisticLockingExecutor optimisticLockingExecutor) {
         this.storesRepository = storesRepository;
         this.ordersRepository = ordersRepository;
-        this.orderEventsRepository = orderEventsRepository;
         this.shippingProviderFactory = shippingProviderFactory;
+        this.publisher = publisher;
+        this.optimisticLockingExecutor = optimisticLockingExecutor;
     }
 
     public void cancelShipping(String orderId, String storeId) {
@@ -36,15 +48,42 @@ public class ShipmentCancelService {
         Shipment shipment = order.firstShipmentWithShippingData()
                 .orElseThrow(() -> new ShippingException("No valid shipment data to cancel"));
 
-        if (shipment.getExternalId() == null) {
+        String externalId = shipment.getExternalId();
+        if (externalId == null) {
             throw new ShippingException("Shipment has no external package ID");
         }
 
-        ShippingProvider shippingProvider = shippingProviderFactory.get(store);
-        shippingProvider.cancelShipment(shipment.getExternalId());
+        LocalDateTime now = LocalDateTime.now();
+        if (shipment.isCancellationInProgress(now)) {
+            throw new ShippingException(ALREADY_IN_PROGRESS);
+        }
 
-        order.replaceShipments(Collections.singletonList(new Shipment(shipment.getType())));
-        orderEventsRepository.deleteByOrderIdAndName(orderId, EmailNotificationType.ORDER_SHIPPING.name());
-        ordersRepository.save(order);
+        // an unknown result is read again rather than cancelled anew: a late success of the old command would make
+        // a new one fail and mark a cancelled package as not cancelled
+        String commandId = shipment.needsCancellationRecheck(now)
+                ? shipment.getCancellationCommandId()
+                : shippingProviderFactory.get(store).cancelShipment(externalId).commandId();
+
+        AtomicBoolean marked = new AtomicBoolean();
+        optimisticLockingExecutor.modifyAndSave(
+                () -> ordersRepository.findById(storeId, orderId),
+                fresh -> fresh.getShipments().stream()
+                        .filter(s -> externalId.equals(s.getExternalId()))
+                        .findFirst()
+                        .ifPresent(s -> {
+                            s.markCancellationPending(commandId, now);
+                            marked.set(true);
+                        }),
+                fresh -> {
+                    if (marked.get()) {
+                        ordersRepository.save(fresh);
+                    }
+                });
+        if (!marked.get()) {
+            log.error("Cancel command {} for package {} was sent but order {} of store {} no longer has the shipment",
+                    commandId, externalId, orderId, storeId);
+            return;
+        }
+        publisher.publish(ShipmentCancellationCheckRequest.first(storeId, orderId, externalId, commandId));
     }
 }

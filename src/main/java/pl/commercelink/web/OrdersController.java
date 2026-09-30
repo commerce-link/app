@@ -103,6 +103,7 @@ import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import pl.commercelink.inventory.deliveries.DropshipItemLookup;
 import pl.commercelink.inventory.supplier.SupplierChoice;
 import pl.commercelink.inventory.supplier.SupplierLabelMap;
@@ -2177,13 +2178,14 @@ public class OrdersController extends BaseController {
         Optional<Shipment> sent = order.firstShipmentWithShippingData();
         // the same shipment ShipmentCancelService picks; its English errors never reach the operator
         String refusal = sent.isEmpty() ? "order.shipments.cancel.error.no.data"
-                : sent.get().getExternalId() == null ? "order.shipments.cancel.error.no.package" : null;
+                : sent.get().getExternalId() == null ? "order.shipments.cancel.error.no.package"
+                : sent.get().isCancellationInProgress(LocalDateTime.now()) ? "order.shipments.cancel.error.pending" : null;
         if (refusal != null) {
             return refuse(redirectAttributes, orderId, refusal, locale);
         }
         try {
             shipmentCancelService.cancelShipping(orderId, getStoreId());
-            OrderFlash.saved(redirectAttributes, messageSource.getMessage("shipment.cancel.success", null, locale));
+            OrderFlash.saved(redirectAttributes, messageSource.getMessage("shipment.cancel.requested", null, locale));
         } catch (HttpClientException ex) {
             return handleHttpClientException(ex, orderId, redirectAttributes);
         } catch (ShippingException e) {

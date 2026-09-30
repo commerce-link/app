@@ -3973,6 +3973,50 @@ class OrdersControllerTest {
         }
 
         @Test
+        void cancelShipmentRefusesWhileACancellationIsInProgress() {
+            // given
+            Order order = order(OrderStatus.Shipping);
+            Shipment sent = new Shipment(ShipmentType.Courier);
+            sent.setCarrier("DPD");
+            sent.setTrackingNo("TRACK-1");
+            sent.setShippedAt(LocalDateTime.now());
+            sent.setExternalId("21353832");
+            sent.markCancellationPending("cmd-1", LocalDateTime.now());
+            order.setShipments(new ArrayList<>(List.of(sent)));
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            ordersController.cancelShipment(ORDER_ID, redirect, polish);
+
+            // then
+            verifyNoInteractions(shipmentCancelService);
+            assertThat(flash(redirect)).containsEntry("errorMessage", "order.shipments.cancel.error.pending");
+        }
+
+        @Test
+        void cancelShipmentReportsThatTheCancellationWasRequested() {
+            // given
+            Order order = order(OrderStatus.Shipping);
+            Shipment sent = new Shipment(ShipmentType.Courier);
+            sent.setCarrier("DPD");
+            sent.setTrackingNo("TRACK-1");
+            sent.setShippedAt(LocalDateTime.now());
+            sent.setExternalId("21353832");
+            order.setShipments(new ArrayList<>(List.of(sent)));
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            ordersController.cancelShipment(ORDER_ID, redirect, polish);
+
+            // then
+            verify(shipmentCancelService).cancelShipping(ORDER_ID, STORE_ID);
+            assertThat(((OrderNotice) redirect.getFlashAttributes().get(OrderFlash.ATTRIBUTE)).text())
+                    .isEqualTo("shipment.cancel.requested");
+        }
+
+        @Test
         void theShippingAddressStillChangesInShippingWithoutALabel() {
             // given
             Order order = order(OrderStatus.Shipping);
