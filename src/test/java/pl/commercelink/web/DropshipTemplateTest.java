@@ -143,39 +143,22 @@ class DropshipTemplateTest {
     }
 
     @Test
-    void deliveriesListKeepsStatusTagsInTheirOwnColumn() throws Exception {
+    void deliveriesListShowsTheDeliveryTypeUnderTheNumberAndStatusInItsOwnColumn() throws Exception {
         // when
         String html = read("deliveries.html");
 
-        // then
-        assertThat(html).contains("<th th:text=\"#{deliveries.list.status}\"></th>");
-        int deliveryIdCell = html.indexOf("${delivery.shortenedDeliveryId}");
-        int cellEnd = html.indexOf("</td>", deliveryIdCell);
-        assertThat(html.substring(deliveryIdCell, cellEnd)).doesNotContain("class=\"tag");
-    }
-
-    @Test
-    void deliveriesListShowsTheDeliveryTypeInItsOwnColumn() throws Exception {
-        // when
-        String html = read("deliveries.html");
-
-        // then - a "Typ" column right after the supplier, before the delivery number
-        int typeHeader = html.indexOf("<th th:text=\"#{deliveries.list.type}\"></th>");
-        assertThat(typeHeader).isGreaterThan(html.indexOf("<th th:text=\"#{deliveries.provider}\"></th>"));
-        assertThat(typeHeader).isLessThan(html.indexOf("<th th:text=\"#{deliveries.order.no}\"></th>"));
-        // the type cell names both kinds, the status cell no longer carries the dropship badge
-        int typeCell = html.lastIndexOf("<td>", html.indexOf("deliveries.dropship.badge"));
-        int typeCellEnd = html.indexOf("</td>", typeCell);
-        String typeCellHtml = html.substring(typeCell, typeCellEnd);
-        assertThat(typeCellHtml).contains("deliveries.type.warehouse");
-        // both kinds are tags, in different colours
-        assertThat(typeCellHtml).contains("<span class=\"tag is-info is-light mb-0\" th:if=\"${delivery.dropship}\"");
-        assertThat(typeCellHtml).contains("<span class=\"tag is-primary is-light mb-0\" th:unless=\"${delivery.dropship}\"");
-        int statusCell = html.indexOf("deliveries.status.orderPending");
+        // then - the type is the second line of the number cell, both kinds named, neither is a status tag
+        int numberCell = html.indexOf("${row.number()}");
+        int numberCellEnd = html.indexOf("</th>", numberCell);
+        String numberCellHtml = html.substring(numberCell, numberCellEnd);
+        assertThat(numberCellHtml).contains("cl-icon-text").contains("deliveries.dropship.badge").contains("deliveries.type.warehouse");
+        assertThat(numberCellHtml).doesNotContain("cl-status");
+        // and the status cell carries the state, never the dropship badge
+        int statusCell = html.indexOf("${row.stateLabel()}");
         int statusCellEnd = html.indexOf("</td>", statusCell);
         assertThat(html.substring(statusCell, statusCellEnd)).doesNotContain("deliveries.dropship.badge");
-        assertThat(typeCell).isLessThan(statusCell);
-        for (String key : List.of("deliveries.list.type", "deliveries.type.warehouse")) {
+        assertThat(numberCell).isLessThan(statusCell);
+        for (String key : List.of("deliveries.type.warehouse", "deliveries.dropship.badge")) {
             assertThat(Files.readString(Path.of("src/main/resources/messages_pl.properties"), StandardCharsets.UTF_8)).contains("\n" + key + "=");
             assertThat(Files.readString(Path.of("src/main/resources/messages_en.properties"), StandardCharsets.UTF_8)).contains("\n" + key + "=");
         }
