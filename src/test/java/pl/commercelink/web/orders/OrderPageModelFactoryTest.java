@@ -533,7 +533,8 @@ class OrderPageModelFactoryTest {
         withData.getShipments().get(0).setTrackingNo("T-1");
 
         // when
-        OrderShipmentForm blank = factory.build(order, List.of(), ADMIN, PL).shipments().blank();
+        OrderPageModel.ShipmentsCard card = factory.build(order, List.of(), ADMIN, PL).shipments();
+        OrderShipmentForm blank = card.blank();
         OrderShipmentForm plain = factory.build(withData, List.of(), ADMIN, PL).shipments().blank();
 
         // then: "Add shipment" fills the placeholder, so its form starts from what the placeholder keeps
@@ -543,6 +544,10 @@ class OrderPageModelFactoryTest {
         assertThat(blank.collectionPointCode()).isEqualTo("KRA01M");
         assertThat(plain.type()).isEqualTo(ShipmentType.Courier);
         assertThat(plain.collectionPointCode()).isNull();
+        // the placeholder offers no "Remove" (the server refuses one too) and no greyed one to explain
+        assertThat(card.rows().get(0).removeHref()).isNull();
+        assertThat(card.rows().get(0).removeReasonKey()).isNull();
+        assertThat(OrderPageModelFactory.removeLockedKey(order, 0)).isEqualTo("order.shipments.remove.error.placeholder");
     }
 
     private static void labelled(Shipment shipment, String trackingNo, String packageId) {

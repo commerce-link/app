@@ -883,11 +883,9 @@ class OrdersControllerTest {
         @ParameterizedTest
         @EnumSource(value = OrderStatus.class, names = {"New", "Assembly", "Assembled", "Realization"})
         void removingTheOnlyShipmentBeforeShippingWithTheRealLifecycleKeepsTheStatus(OrderStatus status) {
-            // given
+            // given: a number typed but not shipped yet (a bare placeholder offers no "Remove" at all)
             realLifecycle();
-            Shipment only = shipped(ShipmentType.PersonalCollection);
-            only.setShippedAt(null);
-            only.setCarrier("InPost");
+            Shipment only = courier("TRACK-1", null);
             Order order = orderWith(only);
             order.setStatus(status);
 
@@ -1051,6 +1049,28 @@ class OrdersControllerTest {
 
             // then
             assertThat(errorMessage()).isEqualTo("order.shipments.remove.error.courier");
+            verifyNoInteractions(orderLifecycle);
+        }
+
+        @Test
+        void aForcedRemovalOfTheCreationPlaceholderIsRefusedLikeThePageOffersNoRemove() {
+            // given: the shipment the order was created with, holding only the customer's pickup point
+            Shipment placeholder = new Shipment(ShipmentType.PickupPoint);
+            placeholder.setCarrier("InPost");
+            placeholder.setCollectionPointCode("KRA01M");
+            Order order = orderWith(placeholder);
+            order.setStatus(OrderStatus.Realization);
+            ExtendedModelMap model = new ExtendedModelMap();
+
+            // when
+            String confirm = ordersController.confirmRemoveShipment(ORDER_ID, 0, OrderShipmentForm.version(placeholder),
+                    model, redirect, Locale.ENGLISH);
+            ordersController.removeShipment(ORDER_ID, 0, OrderShipmentForm.version(placeholder), redirect, Locale.ENGLISH);
+
+            // then: the choice of delivery stays with the order
+            assertThat(confirm).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+            assertThat(errorMessage()).isEqualTo("order.shipments.remove.error.placeholder");
+            assertThat(order.getShipments()).containsExactly(placeholder);
             verifyNoInteractions(orderLifecycle);
         }
 

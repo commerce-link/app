@@ -401,7 +401,7 @@ public class OrderPageModelFactory {
                     !readOnly && s.getTrackingSubscriptionStatus() == ShipmentTrackingStatus.FAILED
                             ? "order.shipment.tracking.failed.help" : null,
                     form.dialogId(), readOnly ? null : base + i,
-                    readOnly || removeLockedKey(order, i) != null || isBarePlaceholder(order, i) ? null
+                    readOnly || removeLockedKey(order, i) != null ? null
                             : base + i + "/remove?version=" + form.version(),
                     // every parcel of one courier order carries its externalId, and cancelling it cancels them all
                     readOnly ? null : removeReasonKey(order, i, courierCancellable != null
@@ -419,6 +419,8 @@ public class OrderPageModelFactory {
                 readOnly ? null : OrderShipmentForm.blank(order, carriers));
     }
 
+    private static final String PLACEHOLDER_LOCKED = "order.shipments.remove.error.placeholder";
+
     /**
      * The short reason next to a greyed "Remove" in the row; the refusal of a forced removal says it in full. A
      * shipment with a courier order points to "Cancel courier order" only when the card offers it for that shipment's
@@ -427,7 +429,8 @@ public class OrderPageModelFactory {
      */
     private static String removeReasonKey(Order order, int index, boolean courierCancellable) {
         String locked = removeLockedKey(order, index);
-        if (locked == null) {
+        // the placeholder's row reads as "no shipment yet" with "Uzupełnij": no greyed "Remove" to explain
+        if (locked == null || locked.equals(PLACEHOLDER_LOCKED)) {
             return null;
         }
         if (locked.equals("order.shipments.remove.error.courier") && !courierCancellable) {
@@ -444,11 +447,16 @@ public class OrderPageModelFactory {
      * Realization). A delivered order keeps its
      * shipments, they are the record of the delivery; so does a shipment with a delivery date. One with a courier order
      * is cancelled with "Cancel courier order", which also cancels the paid label at the carrier, never by dropping
-     * the record.
+     * the record. The only shipment with nothing but the customer's choice of delivery (the one every order is created
+     * with) is not removed either: its row reads as "no shipment yet" with "Uzupełnij", and removing it would only lose
+     * the choice.
      */
     public static String removeLockedKey(Order order, int index) {
         if (order.getStatus() == OrderStatus.Delivered) {
             return "order.shipments.remove.error.delivered";
+        }
+        if (order.onlyPlaceholder().isPresent()) {
+            return PLACEHOLDER_LOCKED;
         }
         Shipment shipment = order.getShipments().get(index);
         if (shipment.getDeliveredAt() != null) {
@@ -676,15 +684,6 @@ public class OrderPageModelFactory {
      */
     public static String removePaymentLockedKey(Order order, int index) {
         return order.getPayments().get(index).isUnsettled() ? "order.payments.remove.error.pending" : null;
-    }
-
-    /**
-     * The only shipment with nothing but the customer's choice of delivery (the one every order is created with): the
-     * row reads as "no shipment yet" with "Uzupełnij" and offers no "Remove", whose only effect would be losing the
-     * choice.
-     */
-    private static boolean isBarePlaceholder(Order order, int index) {
-        return order.onlyPlaceholder().isPresent();
     }
 
     /**
