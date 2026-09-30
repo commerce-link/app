@@ -4,9 +4,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Service;
 import pl.commercelink.inventory.deliveries.DeliveriesPlanningService;
-import pl.commercelink.inventory.deliveries.SupplierOrderingModes;
-import pl.commercelink.inventory.deliveries.SupplierOrderingModes.OrderingMode;
 import pl.commercelink.inventory.supplier.SupplierLabels;
+import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.deliveries.pending.PendingDeliveriesPageModel.*;
 import pl.commercelink.web.deliveries.pending.PendingDeliveriesQuery.Focus;
 import pl.commercelink.web.deliveries.pending.PendingDeliveriesQuery.Kind;
@@ -26,7 +26,7 @@ public class PendingDeliveriesService {
             .thenComparing(PendingDeliveryRow::key, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER));
 
     private final DeliveriesPlanningService planningService;
-    private final SupplierOrderingModes orderingModes;
+    private final StoresRepository storesRepository;
     private final SupplierLabels supplierLabels;
     private final MessageSource messages;
 
@@ -39,9 +39,14 @@ public class PendingDeliveriesService {
         // A supplier that has nothing pending any more (e.g. its delivery was just created) is ignored, not an empty filter
         PendingDeliveriesQuery query = requested.withProviders(
                 requested.providers().stream().filter(providers::contains).toList());
-        Map<String, OrderingMode> modes = providers.isEmpty() ? Map.of() : orderingModes.of(storeId, providers);
-        PendingDeliveryRowMapper mapper = new PendingDeliveryRowMapper(messages, locale, supplierLabels.forStoreId(storeId),
-                planning.orders(), modes, storeId, superAdmin);
+        Store store = storesRepository.findById(storeId);
+        // Approval is configuration on the store (a GLOBAL supplier), so unlike API ordering it needs no secret read
+        Set<String> approvalProviders = new HashSet<>();
+        if (store != null) {
+            providers.stream().filter(Objects::nonNull).filter(store::isGlobalSupplier).forEach(approvalProviders::add);
+        }
+        PendingDeliveryRowMapper mapper = new PendingDeliveryRowMapper(messages, locale, supplierLabels.forStore(store),
+                planning.orders(), approvalProviders, storeId, superAdmin);
 
         List<PendingDeliveryRow> all = Stream.concat(
                         planning.deliveries().stream().map(d -> mapper.warehouse(d, today)),
@@ -60,7 +65,7 @@ public class PendingDeliveriesService {
         all.forEach(r -> providerLabels.putIfAbsent(r.provider(), r.providerLabel()));
 
         return new PendingDeliveriesPageModel(query, superAdmin, path, path + "/fragment", "/dashboard/deliveries",
-                tiles(all, query, widening, path, today, mapper, locale),
+                tiles(all, query, widening, path, today, locale),
                 List.of(tab(Kind.WAREHOUSE, warehouse, active, query, path, locale), tab(Kind.DROPSHIP, dropship, active, query, path, locale)),
                 active, text(locale, "deliveries.pending.kind." + active.param()),
                 text(locale, "deliveries.pending.kind." + active.param() + ".desc"),
@@ -71,27 +76,21 @@ public class PendingDeliveriesService {
     }
 
     private static boolean matches(PendingDeliveryRow row, PendingDeliveriesQuery query, LocalDate today) {
-        return (query.focus() == null || query.focus().matches(row.due(), today))
+        return (query.focus() == null || query.focus().matches(row, today))
                 && (query.providers().isEmpty() || query.providers().contains(row.provider()))
                 && row.matches(query.q());
     }
 
     private List<Tile> tiles(List<PendingDeliveryRow> all, PendingDeliveriesQuery query, PendingDeliveriesQuery widening, String path, LocalDate today,
-                             PendingDeliveryRowMapper mapper, Locale locale) {
+                             Locale locale) {
         List<Tile> tiles = new ArrayList<>();
         for (Focus focus : Focus.values()) {
             boolean active = query.focus() == focus;
-            long count = all.stream().filter(r -> focus.matches(r.due(), today)).count();
+            long count = all.stream().filter(r -> focus.matches(r, today)).count();
             String key = "deliveries.pending.tile." + focus.param();
             tiles.add(new Tile(text(locale, key), String.valueOf(count), text(locale, key + ".hint"),
                     (active ? widening.withoutFocus() : query.withFocus(focus)).href(path), active));
         }
-        tiles.add(new Tile(text(locale, "deliveries.pending.tile.approval"),
-                String.valueOf(all.stream().filter(PendingDeliveryRow::approval).count()),
-                text(locale, "deliveries.pending.tile.approval.hint"), null, false));
-        tiles.add(new Tile(text(locale, "deliveries.pending.tile.cost"),
-                mapper.amount(all.stream().mapToDouble(PendingDeliveryRow::cost).sum()),
-                text(locale, "deliveries.pending.tile.cost.hint"), null, false));
         return tiles;
     }
 

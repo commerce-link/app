@@ -17,7 +17,7 @@ public record PendingDeliveriesPageModel(PendingDeliveriesQuery query, boolean s
         return activeKind == Kind.DROPSHIP;
     }
 
-    /** A tile without href only counts (approval, cost); one with href narrows the page to what it counts. */
+    /** A filter tile: its count over everything pending, and the link that narrows the page to it (or widens it when active). */
     public record Tile(String label, String value, String hint, String href, boolean active) { }
     public record KindTab(String label, long count, String href, boolean active) { }
     public record Option(String value, String label, long count, boolean selected, String toggleHref) { }

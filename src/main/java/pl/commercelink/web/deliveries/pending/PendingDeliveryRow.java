@@ -12,8 +12,8 @@ import java.util.Locale;
  */
 public record PendingDeliveryRow(Kind kind, String key, String keyHref, String customer, String provider,
                                  String providerLabel, String sourceText, boolean forwardToCustomer, int pieces,
-                                 String piecesText, LocalDate due, String dueNote, String dueTone, boolean api,
-                                 boolean approval, String modeText, double cost, String costText, String createHref,
+                                 String piecesText, LocalDate due, String dueNote, String dueTone,
+                                 boolean approval, double cost, String costText, String createHref,
                                  String detailId, List<Item> items, List<String> orderIds, String searchText) {
 
     public record Item(String name, String codes, String qtyText, String unitText, String valueText, List<Source> sources) {

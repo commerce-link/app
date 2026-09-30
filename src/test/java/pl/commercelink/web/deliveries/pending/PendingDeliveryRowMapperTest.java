@@ -7,7 +7,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.support.ResourceBundleMessageSource;
 import pl.commercelink.inventory.deliveries.*;
-import pl.commercelink.inventory.deliveries.SupplierOrderingModes.OrderingMode;
 import pl.commercelink.inventory.supplier.SupplierLabelMap;
 import pl.commercelink.orders.*;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
@@ -41,8 +40,8 @@ class PendingDeliveryRowMapperTest {
         lenient().when(labels.of(anyString(), anyString())).thenAnswer(invocation -> invocation.getArgument(1));
     }
 
-    private PendingDeliveryRowMapper mapper(boolean superAdmin, Map<String, Order> orders, Map<String, OrderingMode> modes) {
-        return new PendingDeliveryRowMapper(messages, new Locale("pl"), labels, orders, modes, "store-1", superAdmin);
+    private PendingDeliveryRowMapper mapper(boolean superAdmin, Map<String, Order> orders, Set<String> approvalProviders) {
+        return new PendingDeliveryRowMapper(messages, new Locale("pl"), labels, orders, approvalProviders, "store-1", superAdmin);
     }
 
     static Order order(String orderId, String name, String email, LocalDate shippingAt, boolean directToConsumer) {
@@ -104,7 +103,7 @@ class PendingDeliveryRowMapperTest {
                 fromOrder(b, "2", "Logitech MX Keys S", "MFN-MXKEYS", 1, 389.0, "AcmeB")));
 
         // when
-        PendingDeliveryRow row = mapper(false, Map.of(ORDER_A, a, ORDER_B, b), Map.of("AcmeB", new OrderingMode(true, false)))
+        PendingDeliveryRow row = mapper(false, Map.of(ORDER_A, a, ORDER_B, b), Set.of())
                 .warehouse(delivery, TODAY);
 
         // then
@@ -118,7 +117,7 @@ class PendingDeliveryRowMapperTest {
         assertThat(row.due()).isEqualTo(TODAY.minusDays(1));
         assertThat(row.dueNote()).isEqualTo("po terminie: 1 dzień");
         assertThat(row.dueTone()).isEqualTo("is-bad");
-        assertThat(row.modeText()).isEqualTo("Przez API");
+        assertThat(row.approval()).isFalse();
         assertThat(row.createHref()).isEqualTo("/dashboard/deliveries/create/AcmeB");
         assertThat(row.items()).extracting(PendingDeliveryRow.Item::name)
                 .containsExactly("Logitech MX Keys S", "Samsung MirageDrive 2TB NVMe");
@@ -138,7 +137,7 @@ class PendingDeliveryRowMapperTest {
                 List.of(fromOrder(c, "3", "Samsung MirageDrive 2TB NVMe", "MFN-MIRAGE-01", 1, 635.0, "AcmeB")));
 
         // when
-        PendingDeliveryRow row = mapper(false, Map.of(ORDER_C, c), Map.of("AcmeB", new OrderingMode(true, true)))
+        PendingDeliveryRow row = mapper(false, Map.of(ORDER_C, c), Set.of("AcmeB"))
                 .dropship(candidate, TODAY);
 
         // then
@@ -149,7 +148,6 @@ class PendingDeliveryRowMapperTest {
         assertThat(row.createHref()).isEqualTo("/dashboard/orders/" + ORDER_C + "/dropship?provider=AcmeB");
         assertThat(row.dueNote()).isEqualTo("dziś");
         assertThat(row.dueTone()).isEqualTo("is-warn");
-        assertThat(row.modeText()).isEqualTo("Przez API · wymaga akceptacji");
         assertThat(row.approval()).isTrue();
         assertThat(row.forwardToCustomer()).isFalse();
         assertThat(row.label()).isEqualTo("1de57483");
@@ -164,7 +162,7 @@ class PendingDeliveryRowMapperTest {
                 fromWarehouse("w-9", "Produkt", "MFN-1", 1, 10.0, "Acme")));
         Order c = order(ORDER_C, "Barbara Zając", "barbara@example.com", TODAY, true);
         DropshipCandidate candidate = candidate(c, "Acme", List.of(fromOrder(c, "3", "Produkt", "MFN-1", 1, 10.0, "Acme")));
-        PendingDeliveryRowMapper mapper = mapper(true, Map.of(ORDER_A, a, ORDER_C, c), Map.of());
+        PendingDeliveryRowMapper mapper = mapper(true, Map.of(ORDER_A, a, ORDER_C, c), Set.of());
 
         // when
         PendingDeliveryRow warehouse = mapper.warehouse(delivery, TODAY);
@@ -175,9 +173,30 @@ class PendingDeliveryRowMapperTest {
         assertThat(warehouse.items().getFirst().sources()).containsExactly(
                 new PendingDeliveryRow.Source("5a7c3e10", "/dashboard/store/store-1/orders/" + ORDER_A, 1, false),
                 new PendingDeliveryRow.Source("Magazyn", null, 1, true));
-        assertThat(warehouse.modeText()).isEqualTo("Ręcznie");
+        assertThat(warehouse.approval()).isFalse();
         assertThat(dropship.keyHref()).isEqualTo("/dashboard/store/store-1/orders/" + ORDER_C);
         assertThat(dropship.createHref()).isEqualTo("/dashboard/store/store-1/orders/" + ORDER_C + "/dropship?provider=Acme");
+    }
+
+    @Test
+    void approvalComesFromTheSuppliersMarkedForApproval() {
+        // given
+        Order c = order(ORDER_C, "Barbara Zając", "barbara@example.com", TODAY, true);
+        Order a = order(ORDER_A, "Jan Nowak", "jan@example.com", TODAY, false);
+        PendingDeliveryRowMapper mapper = mapper(false, Map.of(ORDER_A, a, ORDER_C, c), Set.of("Global"));
+        Delivery global = warehouseDelivery("Global", List.of(fromOrder(a, "1", "Produkt", "MFN-1", 1, 10.0, "Global")));
+        Delivery own = warehouseDelivery("Own", List.of(fromOrder(a, "2", "Produkt", "MFN-1", 1, 10.0, "Own")));
+        DropshipCandidate dropship = candidate(c, "Global", List.of(fromOrder(c, "3", "Produkt", "MFN-1", 1, 10.0, "Global")));
+
+        // when
+        boolean globalWarehouse = mapper.warehouse(global, TODAY).approval();
+        boolean ownWarehouse = mapper.warehouse(own, TODAY).approval();
+        boolean globalDropship = mapper.dropship(dropship, TODAY).approval();
+
+        // then
+        assertThat(globalWarehouse).isTrue();
+        assertThat(ownWarehouse).isFalse();
+        assertThat(globalDropship).isTrue();
     }
 
     @Test
@@ -188,7 +207,7 @@ class PendingDeliveryRowMapperTest {
         Order nextYear = order(ORDER_C, "C", "c@example.com", LocalDate.of(2027, 1, 5), true);
         Order overdue = order("9e2b7c41-0000-4000-8000-000000000000", "D", "d@example.com", TODAY.minusDays(3), true);
         Map<String, Order> orders = Map.of(ORDER_A, tomorrow, ORDER_B, later, ORDER_C, nextYear, overdue.getOrderId(), overdue);
-        PendingDeliveryRowMapper mapper = mapper(false, orders, Map.of());
+        PendingDeliveryRowMapper mapper = mapper(false, orders, Set.of());
 
         // when / then
         assertThat(mapper.dropship(candidate(tomorrow, "Acme", List.of(fromOrder(tomorrow, "1", "P", "M", 1, 1.0, "Acme"))), TODAY).dueNote()).isEqualTo("jutro");
@@ -209,7 +228,7 @@ class PendingDeliveryRowMapperTest {
         // given
         String provider = "Acme B#2/ł";
         Order c = order(ORDER_C, "C", "c@example.com", TODAY, true);
-        PendingDeliveryRowMapper mapper = mapper(false, Map.of(ORDER_C, c), Map.of());
+        PendingDeliveryRowMapper mapper = mapper(false, Map.of(ORDER_C, c), Set.of());
 
         // when
         PendingDeliveryRow warehouse = mapper.warehouse(warehouseDelivery(provider, List.of(fromWarehouse("w-1", "P", "M", 1, 1.0, provider))), TODAY);
@@ -229,7 +248,7 @@ class PendingDeliveryRowMapperTest {
         DropshipCandidate candidate = candidate(c, "Acme", List.of(fromOrder(c, "1", "P", "M", 1, 1.0, "Acme")));
 
         // when
-        PendingDeliveryRow row = mapper(false, Map.of(), Map.of()).dropship(candidate, TODAY);
+        PendingDeliveryRow row = mapper(false, Map.of(), Set.of()).dropship(candidate, TODAY);
 
         // then
         assertThat(row.customer()).isNull();
@@ -244,7 +263,7 @@ class PendingDeliveryRowMapperTest {
         Order c = order(ORDER_C, " ", "barbara@example.com", TODAY, true);
 
         // when
-        PendingDeliveryRow row = mapper(false, Map.of(ORDER_C, c), Map.of())
+        PendingDeliveryRow row = mapper(false, Map.of(ORDER_C, c), Set.of())
                 .dropship(candidate(c, "Acme", List.of(fromOrder(c, "1", "P", "M", 1, 1.0, "Acme"))), TODAY);
 
         // then
@@ -255,7 +274,7 @@ class PendingDeliveryRowMapperTest {
     void searchIsLiteralAndCaseInsensitive() {
         // given
         Order c = order(ORDER_C, "Barbara Zając", "barbara@example.com", TODAY, true);
-        PendingDeliveryRow row = mapper(false, Map.of(ORDER_C, c), Map.of())
+        PendingDeliveryRow row = mapper(false, Map.of(ORDER_C, c), Set.of())
                 .dropship(candidate(c, "AcmeB", List.of(fromOrder(c, "1", "Samsung MirageDrive", "MFN-MIRAGE-01", 1, 1.0, "AcmeB"))), TODAY);
 
         // when / then
@@ -275,7 +294,7 @@ class PendingDeliveryRowMapperTest {
         Order dtc = order(ORDER_A, "Jan Nowak", "jan@example.com", TODAY, true);
 
         // when
-        PendingDeliveryRow row = mapper(false, Map.of(ORDER_A, dtc), Map.of())
+        PendingDeliveryRow row = mapper(false, Map.of(ORDER_A, dtc), Set.of())
                 .warehouse(warehouseDelivery("Kosatec", List.of(fromOrder(dtc, "1", "P", "M", 1, 1.0, "Kosatec"))), TODAY);
 
         // then

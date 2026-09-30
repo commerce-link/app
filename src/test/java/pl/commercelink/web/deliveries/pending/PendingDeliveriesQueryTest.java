@@ -72,16 +72,54 @@ class PendingDeliveriesQueryTest {
         assertThat(query.activeFilterCount()).isEqualTo(3);
     }
 
+    private static PendingDeliveryRow row(LocalDate due, boolean approval) {
+        return new PendingDeliveryRow(Kind.WAREHOUSE, "Acme", null, null, "Acme", "Acme", null, false, 1, "1 szt.", due,
+                "", "", approval, 10.0, "10,00 PLN", "/create", "pending-w-Acme", List.of(), List.of(), "");
+    }
+
     @Test
-    void focusMatchesTheDueDate() {
+    void dateFociMatchTheDueDateOfTheRow() {
+        // given
+        LocalDate today = LocalDate.of(2026, 9, 30);
+        PendingDeliveryRow yesterday = row(today.minusDays(1), false);
+        PendingDeliveryRow now = row(today, false);
+        PendingDeliveryRow next = row(today.plusDays(1), false);
+        PendingDeliveryRow later = row(today.plusDays(2), false);
+
+        // when / then
+        assertThat(List.of(yesterday, now, next, later)).filteredOn(r -> Focus.OVERDUE.matches(r, today)).containsExactly(yesterday);
+        assertThat(List.of(yesterday, now, next, later)).filteredOn(r -> Focus.TODAY.matches(r, today)).containsExactly(now);
+        assertThat(List.of(yesterday, now, next, later)).filteredOn(r -> Focus.TOMORROW.matches(r, today)).containsExactly(next);
+    }
+
+    @Test
+    void dateFociNeverMatchARowWithoutAShippingDate() {
+        // given
+        LocalDate today = LocalDate.of(2026, 9, 30);
+        PendingDeliveryRow undated = row(null, true);
+
+        // when / then
+        assertThat(Focus.OVERDUE.matches(undated, today)).isFalse();
+        assertThat(Focus.TODAY.matches(undated, today)).isFalse();
+        assertThat(Focus.TOMORROW.matches(undated, today)).isFalse();
+    }
+
+    @Test
+    void approvalFocusFollowsTheRowFlagWhateverTheDate() {
         // given
         LocalDate today = LocalDate.of(2026, 9, 30);
 
         // when / then
-        assertThat(Focus.OVERDUE.matches(today.minusDays(1), today)).isTrue();
-        assertThat(Focus.OVERDUE.matches(today, today)).isFalse();
-        assertThat(Focus.TODAY.matches(today, today)).isTrue();
-        assertThat(Focus.TODAY.matches(null, today)).isFalse();
-        assertThat(Focus.OVERDUE.matches(null, today)).isFalse();
+        assertThat(Focus.APPROVAL.matches(row(null, true), today)).isTrue();
+        assertThat(Focus.APPROVAL.matches(row(today.plusDays(9), true), today)).isTrue();
+        assertThat(Focus.APPROVAL.matches(row(today, false), today)).isFalse();
+    }
+
+    @Test
+    void parsesTheNewFociFromTheAddress() {
+        // when / then
+        assertThat(parse("focus", "tomorrow").focus()).isEqualTo(Focus.TOMORROW);
+        assertThat(parse("focus", "APPROVAL").focus()).isEqualTo(Focus.APPROVAL);
+        assertThat(new PendingDeliveriesQuery(null, Focus.APPROVAL, List.of(), null).href(PATH)).isEqualTo(PATH + "?focus=approval");
     }
 }

@@ -24,12 +24,6 @@
     <span class="cl-card-due"><span class="cl-due-note" th:classappend="${row.dueTone()}" th:text="${row.dueNote()}"></span></span>
 </th:block>
 
-<th:block th:fragment="mode(row)">
-    <span class="cl-icon-text" th:if="${row.api()}"><i class="fas fa-plug" aria-hidden="true"></i><th:block th:text="#{deliveries.pending.mode.api}"></th:block></span>
-    <span class="cl-icon-text" th:unless="${row.api()}"><i class="fas fa-hand-paper" aria-hidden="true"></i><th:block th:text="#{deliveries.pending.mode.manual}"></th:block></span>
-    <span class="cl-table-sub cl-mode-approval" th:if="${row.approval()}" th:text="#{deliveries.pending.mode.approval}"></span>
-</th:block>
-
 <th:block th:fragment="action(row)">
     <span class="cl-card-action">
         <a class="cl-button is-primary" th:href="@{${row.createHref()}}" th:text="#{deliveries.preview.create}"
@@ -39,7 +33,7 @@
 
 <!--/* The expanded row: one item table (the old "Items" + "Allocations"), sources only in the warehouse tab. */-->
 <tr th:fragment="detail(row, withSources)" class="cl-row-detail" th:id="${row.detailId()}">
-    <td colspan="7">
+    <td colspan="6">
         <div class="cl-row-detail-inner">
             <p class="cl-row-detail-note" th:if="${row.forwardToCustomer()}">
                 <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>

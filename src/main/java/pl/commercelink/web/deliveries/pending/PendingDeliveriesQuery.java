@@ -31,15 +31,22 @@ public record PendingDeliveriesQuery(Kind kind, Focus focus, List<String> provid
     }
 
     public enum Focus {
-        OVERDUE("overdue"), TODAY("today");
+        OVERDUE("overdue"), TODAY("today"), TOMORROW("tomorrow"), APPROVAL("approval");
         private final String param;
         Focus(String param) { this.param = param; }
         public String param() { return param; }
         static Optional<Focus> parse(String v) { return Arrays.stream(values()).filter(f -> f.param.equalsIgnoreCase(trim(v))).findFirst(); }
 
-        public boolean matches(LocalDate due, LocalDate today) {
+        /** The date foci never match a row without a shipping date; APPROVAL ignores the date. */
+        public boolean matches(PendingDeliveryRow row, LocalDate today) {
+            if (this == APPROVAL) return row.approval();
+            LocalDate due = row.due();
             if (due == null) return false;
-            return this == OVERDUE ? due.isBefore(today) : due.isEqual(today);
+            return switch (this) {
+                case OVERDUE -> due.isBefore(today);
+                case TODAY -> due.isEqual(today);
+                default -> due.isEqual(today.plusDays(1));
+            };
         }
     }
 

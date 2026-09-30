@@ -18,21 +18,16 @@
 
         <div data-cl-list-results th:fragment="results" th:with="q=${page.query()}"
              th:attr="data-cl-list-path=${page.listPath()},data-cl-list-fragment=${page.fragmentPath()}">
-            <!--/* Overdue and today narrow the page to what they count; approval and cost only count (spec §3.1). */-->
+            <!--/* Every tile narrows the page to what it counts; the active one widens it again (spec §3.1). */-->
             <ul class="cl-stat-grid is-orders" th:attr="aria-label=#{deliveries.pending.tiles.label}">
                 <li th:each="tile : ${page.tiles()}">
-                    <a th:if="${tile.href() != null}" class="cl-stat is-link" th:href="@{${tile.href()}}"
+                    <a class="cl-stat is-link" th:href="@{${tile.href()}}"
                        th:attr="aria-current=${tile.active()} ? 'true' : null" data-cl-list-nav>
                         <span class="cl-eyebrow" th:text="${tile.label()}"></span>
                         <span class="cl-stat-value" th:text="${tile.value()}"></span>
                         <span class="cl-stat-hint" th:text="${tile.hint()}"></span>
                         <span class="cl-visually-hidden" th:if="${tile.active()}" th:text="#{deliveries.pending.tiles.active}"></span>
                     </a>
-                    <div th:if="${tile.href() == null}" class="cl-stat is-static">
-                        <span class="cl-eyebrow" th:text="${tile.label()}"></span>
-                        <span class="cl-stat-value" th:text="${tile.value()}"></span>
-                        <span class="cl-stat-hint" th:text="${tile.hint()}"></span>
-                    </div>
                 </li>
             </ul>
 
@@ -117,7 +112,6 @@
                             <th scope="col" th:text="#{deliveries.pending.column.items}"></th>
                             <th scope="col" class="is-secondary-column" th:text="#{deliveries.pending.column.source}"></th>
                             <th scope="col" th:text="#{deliveries.pending.column.due}"></th>
-                            <th scope="col" class="is-secondary-column" th:text="#{deliveries.pending.column.mode}"></th>
                             <th scope="col" class="is-numeric" th:text="#{deliveries.pending.column.cost}"></th>
                             <th scope="col"><span class="cl-visually-hidden" th:text="#{deliveries.pending.column.action}"></span></th>
                         </tr>
@@ -126,14 +120,12 @@
                         <th:block th:each="row : ${page.rows()}">
                             <tr class="cl-row-main">
                                 <th scope="row" class="cl-table-key">
-                                    <span class="cl-card-key"><th:block th:text="${row.providerLabel()}"></th:block><span th:if="${row.forwardToCustomer()}" class="cl-status is-warn" th:text="#{deliveries.directToConsumer.viaWarehouse.badge}"></span></span>
+                                    <span class="cl-card-key"><th:block th:text="${row.providerLabel()}"></th:block><span th:if="${row.forwardToCustomer()}" class="cl-status is-warn" th:text="#{deliveries.directToConsumer.viaWarehouse.badge}"></span><span th:if="${row.approval()}" class="cl-status is-info" th:text="#{deliveries.pending.tile.approval}"></span></span>
                                     <span class="cl-table-sub cl-card-sub cl-narrow-only" th:text="${row.sourceText()}"></span>
-                                    <span class="cl-table-sub cl-narrow-only cl-card-hide" th:text="${row.modeText()}"></span>
                                 </th>
                                 <td><th:block th:replace="~{fragments/deliveries-pending :: toggle(${row})}"></th:block></td>
                                 <td class="is-secondary-column cl-card-hide" th:text="${row.sourceText()}"></td>
                                 <td><th:block th:replace="~{fragments/deliveries-pending :: due(${row})}"></th:block></td>
-                                <td class="is-secondary-column cl-card-hide"><th:block th:replace="~{fragments/deliveries-pending :: mode(${row})}"></th:block></td>
                                 <td class="is-numeric"><span class="cl-card-cost" th:text="${row.costText()}"></span></td>
                                 <td class="cl-cell-action"><th:block th:replace="~{fragments/deliveries-pending :: action(${row})}"></th:block></td>
                             </tr>
@@ -149,7 +141,6 @@
                             <th scope="col" class="is-secondary-column" th:text="#{deliveries.pending.column.supplier}"></th>
                             <th scope="col" th:text="#{deliveries.pending.column.items}"></th>
                             <th scope="col" th:text="#{deliveries.pending.column.due}"></th>
-                            <th scope="col" class="is-secondary-column" th:text="#{deliveries.pending.column.mode}"></th>
                             <th scope="col" class="is-numeric" th:text="#{deliveries.pending.column.cost}"></th>
                             <th scope="col"><span class="cl-visually-hidden" th:text="#{deliveries.pending.column.action}"></span></th>
                         </tr>
@@ -158,14 +149,12 @@
                         <th:block th:each="row : ${page.rows()}">
                             <tr class="cl-row-main">
                                 <th scope="row" class="cl-table-key">
-                                    <a class="cl-row-number cl-card-key" th:href="@{${row.keyHref()}}" th:text="${row.key()}"></a>
+                                    <a class="cl-row-number cl-card-key" th:href="@{${row.keyHref()}}" th:text="${row.key()}"></a><span th:if="${row.approval()}" class="cl-status is-info" th:text="#{deliveries.pending.tile.approval}"></span>
                                     <span class="cl-table-sub cl-card-sub"><th:block th:if="${row.customer() != null}" th:text="${row.customer()}"></th:block><span class="cl-narrow-only" th:text="(${row.customer() != null} ? ' · ' : '') + ${row.providerLabel()}"></span></span>
-                                    <span class="cl-table-sub cl-narrow-only cl-card-hide" th:text="${row.modeText()}"></span>
                                 </th>
                                 <td class="is-secondary-column cl-card-hide" th:text="${row.providerLabel()}"></td>
                                 <td><th:block th:replace="~{fragments/deliveries-pending :: toggle(${row})}"></th:block></td>
                                 <td><th:block th:replace="~{fragments/deliveries-pending :: due(${row})}"></th:block></td>
-                                <td class="is-secondary-column cl-card-hide"><th:block th:replace="~{fragments/deliveries-pending :: mode(${row})}"></th:block></td>
                                 <td class="is-numeric"><span class="cl-card-cost" th:text="${row.costText()}"></span></td>
                                 <td class="cl-cell-action"><th:block th:replace="~{fragments/deliveries-pending :: action(${row})}"></th:block></td>
                             </tr>

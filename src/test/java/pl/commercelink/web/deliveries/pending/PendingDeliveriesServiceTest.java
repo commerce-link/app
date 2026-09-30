@@ -7,10 +7,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.support.ResourceBundleMessageSource;
 import pl.commercelink.inventory.deliveries.*;
-import pl.commercelink.inventory.deliveries.SupplierOrderingModes.OrderingMode;
 import pl.commercelink.inventory.supplier.SupplierLabelMap;
 import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.orders.Order;
+import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.deliveries.pending.PendingDeliveriesQuery.Focus;
 import pl.commercelink.web.deliveries.pending.PendingDeliveriesQuery.Kind;
 
@@ -31,17 +32,20 @@ class PendingDeliveriesServiceTest {
     @Mock
     private DeliveriesPlanningService planningService;
     @Mock
-    private SupplierOrderingModes orderingModes;
+    private StoresRepository storesRepository;
+    @Mock
+    private Store store;
     @Mock
     private SupplierLabels supplierLabels;
     @Mock
     private SupplierLabelMap labels;
     private PendingDeliveriesService service;
 
-    // Acme warehouse (overdue order A), Kosatec restock (no date), dropship C at AcmeB (today), dropship D at Acme (in 6 days)
+    // Acme warehouse (overdue order A), Kosatec restock (no date), dropship C at AcmeB (today, AcmeB is a GLOBAL supplier),
+    // dropship D at Acme (tomorrow)
     private final Order a = order(ORDER_A, "Jan Nowak", "jan@example.com", TODAY.minusDays(2), false);
     private final Order c = order(ORDER_C, "Barbara Zając", "barbara@example.com", TODAY, true);
-    private final Order d = order("da13c41a-4444-4444-8444-444444444444", "Michał Zieliński", "michal@example.com", TODAY.plusDays(6), true);
+    private final Order d = order("da13c41a-4444-4444-8444-444444444444", "Michał Zieliński", "michal@example.com", TODAY.plusDays(1), true);
 
     @BeforeEach
     void setUp() {
@@ -49,10 +53,11 @@ class PendingDeliveriesServiceTest {
         messages.setBasename("messages");
         messages.setDefaultEncoding("UTF-8");
         messages.setFallbackToSystemLocale(false);
-        service = new PendingDeliveriesService(planningService, orderingModes, supplierLabels, messages);
-        lenient().when(supplierLabels.forStoreId(anyString())).thenReturn(labels);
+        service = new PendingDeliveriesService(planningService, storesRepository, supplierLabels, messages);
+        lenient().when(storesRepository.findById("store-1")).thenReturn(store);
+        lenient().when(store.isGlobalSupplier(anyString())).thenAnswer(invocation -> "AcmeB".equals(invocation.getArgument(0)));
+        lenient().when(supplierLabels.forStore(store)).thenReturn(labels);
         lenient().when(labels.of(anyString(), anyString())).thenAnswer(invocation -> invocation.getArgument(1));
-        lenient().when(orderingModes.of(anyString(), anyCollection())).thenReturn(Map.of("AcmeB", new OrderingMode(true, true)));
     }
 
     private void planning(boolean withWarehouse, boolean withDropship) {
@@ -75,7 +80,7 @@ class PendingDeliveriesServiceTest {
     }
 
     @Test
-    void tilesCountEverythingAndTabsCountWhatTheFiltersLeave() {
+    void fourFilterTilesCountEverythingAndTabsCountWhatTheFiltersLeave() {
         // given
         planning(true, true);
 
@@ -84,16 +89,54 @@ class PendingDeliveriesServiceTest {
 
         // then
         assertThat(page.tiles()).extracting(PendingDeliveriesPageModel.Tile::value)
-                .containsExactly("1", "1", "1", "5 381,00 PLN");
+                .containsExactly("1", "1", "1", "1");
+        assertThat(page.tiles()).extracting(PendingDeliveriesPageModel.Tile::label)
+                .containsExactly("Po terminie", "Na dziś", "Na jutro", "Z akceptacją");
         assertThat(page.tiles().get(0).active()).isTrue();
         assertThat(page.tiles().get(0).href()).isEqualTo(PATH + "?kind=warehouse");
         assertThat(page.tiles().get(1).href()).isEqualTo(PATH + "?focus=today");
-        assertThat(page.tiles().get(2).href()).isNull();
+        assertThat(page.tiles().get(2).href()).isEqualTo(PATH + "?focus=tomorrow");
+        assertThat(page.tiles().get(3).href()).isEqualTo(PATH + "?focus=approval");
+        assertThat(page.tiles()).allSatisfy(tile -> assertThat(tile.href()).isNotNull());
         assertThat(page.tabs()).extracting(PendingDeliveriesPageModel.KindTab::count).containsExactly(1L, 0L);
         assertThat(page.activeKind()).isEqualTo(Kind.WAREHOUSE);
         assertThat(page.rows()).extracting(PendingDeliveryRow::key).containsExactly("Acme");
         assertThat(page.chips()).extracting(PendingDeliveriesPageModel.Chip::label).containsExactly("Po terminie");
         assertThat(page.resultsLine()).isEqualTo("Wyniki: 1");
+    }
+
+    @Test
+    void tomorrowFocusKeepsOnlyRowsDueTomorrow() {
+        // given
+        planning(true, true);
+
+        // when
+        PendingDeliveriesPageModel page = page(query(null, Focus.TOMORROW, List.of(), null));
+
+        // then
+        assertThat(page.activeKind()).isEqualTo(Kind.DROPSHIP);
+        assertThat(page.rows()).extracting(PendingDeliveryRow::key).containsExactly("da13c41a");
+        assertThat(page.tiles().get(2).active()).isTrue();
+        assertThat(page.chips()).extracting(PendingDeliveriesPageModel.Chip::label).containsExactly("Na jutro");
+    }
+
+    @Test
+    void approvalFocusKeepsOnlyRowsOfGlobalSuppliersAndMarksThem() {
+        // given
+        planning(true, true);
+
+        // when
+        PendingDeliveriesPageModel page = page(query(null, Focus.APPROVAL, List.of(), null));
+        PendingDeliveriesPageModel all = page(query(Kind.DROPSHIP, null, List.of(), null));
+
+        // then
+        assertThat(page.activeKind()).isEqualTo(Kind.DROPSHIP);
+        assertThat(page.rows()).extracting(PendingDeliveryRow::key).containsExactly("1de57483");
+        assertThat(page.rows()).allMatch(PendingDeliveryRow::approval);
+        assertThat(page.tiles().get(3).active()).isTrue();
+        assertThat(page.tiles().get(3).href()).isEqualTo(PATH + "?kind=dropship");
+        assertThat(page.chips()).extracting(PendingDeliveriesPageModel.Chip::label).containsExactly("Z akceptacją");
+        assertThat(all.rows()).extracting(PendingDeliveryRow::approval).containsExactly(true, false);
     }
 
     @Test
@@ -177,8 +220,7 @@ class PendingDeliveriesServiceTest {
         assertThat(nothing.nothingPending()).isTrue();
         assertThat(nothing.emptyState().actionHref()).isEqualTo("/dashboard/deliveries");
         assertThat(nothing.emptyState().inline()).isFalse();
-        assertThat(nothing.tiles()).extracting(PendingDeliveriesPageModel.Tile::value).containsExactly("0", "0", "0", "0,00 PLN");
-        verifyNoInteractions(orderingModes);
+        assertThat(nothing.tiles()).extracting(PendingDeliveriesPageModel.Tile::value).containsExactly("0", "0", "0", "0");
 
         // given
         planning(true, true);
@@ -192,7 +234,7 @@ class PendingDeliveriesServiceTest {
     }
 
     @Test
-    void orderingModesAreAskedOnceForEverySupplierOfThePage() {
+    void theStoreIsReadOnceForLabelsAndApproval() {
         // given
         planning(true, true);
 
@@ -200,8 +242,24 @@ class PendingDeliveriesServiceTest {
         PendingDeliveriesPageModel page = page(query(null, null, List.of(), null));
 
         // then
-        verify(orderingModes, times(1)).of(eq("store-1"), argThat(p -> new HashSet<>(p).equals(Set.of("Acme", "Kosatec", "AcmeB"))));
-        assertThat(page.tiles().get(2).value()).isEqualTo("1");
+        verify(storesRepository, times(1)).findById("store-1");
+        verify(supplierLabels, times(1)).forStore(store);
+        verify(supplierLabels, never()).forStoreId(anyString());
+        assertThat(page.tiles().get(3).value()).isEqualTo("1");
+    }
+
+    @Test
+    void anUnknownStoreMarksNothingForApproval() {
+        // given
+        planning(true, true);
+        when(storesRepository.findById("store-1")).thenReturn(null);
+        when(supplierLabels.forStore(null)).thenReturn(labels);
+
+        // when
+        PendingDeliveriesPageModel page = page(query(null, null, List.of(), null));
+
+        // then
+        assertThat(page.tiles().get(3).value()).isEqualTo("0");
     }
 
     @Test

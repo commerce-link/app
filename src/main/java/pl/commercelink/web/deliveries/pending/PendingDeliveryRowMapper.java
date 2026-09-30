@@ -4,7 +4,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.context.MessageSource;
 import org.springframework.web.util.UriUtils;
 import pl.commercelink.inventory.deliveries.*;
-import pl.commercelink.inventory.deliveries.SupplierOrderingModes.OrderingMode;
 import pl.commercelink.inventory.supplier.SupplierLabelMap;
 import pl.commercelink.orders.BillingDetails;
 import pl.commercelink.orders.Order;
@@ -32,18 +31,18 @@ public class PendingDeliveryRowMapper {
     private final Locale locale;
     private final SupplierLabelMap labels;
     private final Map<String, Order> orders;
-    private final Map<String, OrderingMode> modes;
+    private final Set<String> approvalProviders;
     private final String storeId;
     private final boolean superAdmin;
     private final DecimalFormat amount;
 
     public PendingDeliveryRowMapper(MessageSource messages, Locale locale, SupplierLabelMap labels, Map<String, Order> orders,
-                                    Map<String, OrderingMode> modes, String storeId, boolean superAdmin) {
+                                    Set<String> approvalProviders, String storeId, boolean superAdmin) {
         this.messages = messages;
         this.locale = locale;
         this.labels = labels;
         this.orders = orders;
-        this.modes = modes;
+        this.approvalProviders = approvalProviders;
         this.storeId = storeId;
         this.superAdmin = superAdmin;
         DecimalFormatSymbols symbols = new DecimalFormatSymbols(locale);
@@ -95,13 +94,10 @@ public class PendingDeliveryRowMapper {
                 .toList();
         int pieces = sorted.stream().mapToInt(DeliveryItem::getOrderedQty).sum();
         double cost = sorted.stream().mapToDouble(i -> i.getOrderedQty() * i.getUnitCost()).sum();
-        OrderingMode mode = modes.getOrDefault(provider, OrderingMode.MANUAL);
-        String modeText = text(mode.api() ? "deliveries.pending.mode.api" : "deliveries.pending.mode.manual")
-                + (mode.approval() ? " · " + text("deliveries.pending.mode.approval") : "");
         String providerLabel = labels.of(storeId, provider);
         return new PendingDeliveryRow(kind, key, keyHref, customer, provider, providerLabel, source, forward, pieces,
-                text("deliveries.pending.pieces", pieces), due, dueNote(due, today), dueTone(due, today), mode.api(),
-                mode.approval(), modeText, cost, amount(cost), createHref, detailId,
+                text("deliveries.pending.pieces", pieces), due, dueNote(due, today), dueTone(due, today),
+                approvalProviders.contains(provider), cost, amount(cost), createHref, detailId,
                 sorted.stream().map(i -> item(i, withSources)).toList(), orderIds,
                 searchText(orderIds, providerLabel, sorted));
     }

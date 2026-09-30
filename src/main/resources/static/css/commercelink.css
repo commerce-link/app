@@ -7727,18 +7727,8 @@ a.cl-link-button:hover {
 }
 
 /* --- Pending deliveries (spec docs/active/dostawy-tworzenie/2026-09-30-oczekujace-dostawy-design.md §3, §6):
-   tiles that only count next to link tiles, a tab description, an empty tab, the expandable row with its item
+   four filter tiles, a tab description, an empty tab, the expandable row with its item
    sub-table and source references, columns folding under the row key below 1216 px, and the phone card. */
-.cl-page .cl-stat-grid.is-orders > li > .cl-stat.is-static {
-    width: 100%;
-    height: 100%;
-    box-sizing: border-box;
-}
-
-.cl-page .cl-stat.is-static {
-    cursor: default;
-}
-
 .cl-page .cl-tab-desc {
     margin: 0;
     padding: 14px 20px 10px;
@@ -7798,10 +7788,6 @@ a.cl-link-button:hover {
 
 .cl-page .cl-table.is-pending .cl-due-note.is-none {
     color: var(--cl-ink-3);
-}
-
-.cl-page .cl-table.is-pending .cl-mode-approval {
-    color: var(--cl-warn);
 }
 
 .cl-page .cl-table.is-pending .cl-row-number {

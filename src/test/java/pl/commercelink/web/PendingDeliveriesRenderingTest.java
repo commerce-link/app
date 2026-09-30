@@ -22,7 +22,7 @@ class PendingDeliveriesRenderingTest {
     private static PendingDeliveryRow warehouseRow(boolean forward) {
         return new PendingDeliveryRow(Kind.WAREHOUSE, "AcmeB", null, null, "AcmeB", "AcmeB",
                 "Zamówienia: 4 + uzupełnienie magazynu", forward, 8, "8 szt.", LocalDate.of(2026, 9, 30), "dziś", "is-warn",
-                true, true, "Przez API · wymaga akceptacji", 1975.0, "1 975,00 PLN", "/dashboard/deliveries/create/AcmeB",
+                true, 1975.0, "1 975,00 PLN", "/dashboard/deliveries/create/AcmeB",
                 "pending-w-AcmeB-1", List.of(new PendingDeliveryRow.Item("Samsung MirageDrive 2TB NVMe",
                         "MFN MFN-MIRAGE-01 · EAN 5900000000006", "3 szt.", "635,00 PLN", "1 905,00 PLN",
                         List.of(new PendingDeliveryRow.Source("5a7c3e10", "/dashboard/orders/5a7c3e10-x", 1, false),
@@ -32,8 +32,8 @@ class PendingDeliveriesRenderingTest {
 
     private static PendingDeliveryRow dropshipRow() {
         return new PendingDeliveryRow(Kind.DROPSHIP, "1de57483", "/dashboard/orders/1de57483-x", "Barbara Zając", "AcmeB",
-                "AcmeB", null, false, 1, "1 szt.", LocalDate.of(2026, 9, 28), "po terminie: 2 dni", "is-bad", true, false,
-                "Przez API", 635.0, "635,00 PLN", "/dashboard/orders/1de57483-x/dropship?provider=AcmeB", "pending-d-1",
+                "AcmeB", null, false, 1, "1 szt.", LocalDate.of(2026, 9, 28), "po terminie: 2 dni", "is-bad", false,
+                635.0, "635,00 PLN", "/dashboard/orders/1de57483-x/dropship?provider=AcmeB", "pending-d-1",
                 List.of(new PendingDeliveryRow.Item("Samsung MirageDrive 2TB NVMe", "MFN MFN-MIRAGE-01 · EAN 5900000000006",
                         "1 szt.", "635,00 PLN", "635,00 PLN", List.of())), List.of("1de57483-x"), "");
     }
@@ -44,8 +44,8 @@ class PendingDeliveriesRenderingTest {
         return new PendingDeliveriesPageModel(query, false, PATH, PATH + "/fragment", "/dashboard/deliveries",
                 List.of(new Tile("Po terminie", "3", "termin wysyłki minął", PATH + "?focus=overdue", false),
                         new Tile("Na dziś", "1", "termin wysyłki dziś", PATH + "?focus=today", false),
-                        new Tile("Do akceptacji", "1", "dostawca wymaga akceptacji", null, false),
-                        new Tile("Koszt netto", "31 052,50 PLN", "wszystko, co czeka", null, false)),
+                        new Tile("Na jutro", "2", "termin wysyłki jutro", PATH + "?focus=tomorrow", false),
+                        new Tile("Z akceptacją", "1", "zamówienie czeka na akceptację super admina", PATH + "?focus=approval", false)),
                 List.of(new KindTab("Do magazynu", 4, PATH + "?kind=warehouse", active == Kind.WAREHOUSE),
                         new KindTab("Dropshipping", 8, PATH + "?kind=dropship", active == Kind.DROPSHIP)),
                 active, active == Kind.WAREHOUSE ? "Do magazynu" : "Dropshipping", "Opis zakładki.",
@@ -66,11 +66,50 @@ class PendingDeliveriesRenderingTest {
         assertThat(html).contains("cl-table is-pending").contains(">AcmeB<").contains("Do dosłania klientowi")
                 .contains("aria-controls=\"pending-w-AcmeB-1\"").contains("id=\"pending-w-AcmeB-1\"")
                 .contains("/dashboard/deliveries/create/AcmeB").contains("5a7c3e10").contains("×2")
-                .contains("/dashboard/warehouse/items/w-1").contains("wymaga akceptacji").contains("Przez API")
-                .contains("aria-current=\"page\"").doesNotContain("??");
+                .contains("/dashboard/warehouse/items/w-1").contains("aria-current=\"page\"").doesNotContain("??");
         // without JavaScript the detail row is visible and the toggle button hidden (row-toggle.js swaps them)
         assertThat(html).doesNotContainPattern("<tr[^>]*class=\"cl-row-detail\"[^>]*hidden")
                 .containsPattern("<button[^>]*data-cl-row-toggle[^>]*hidden");
+    }
+
+    @Test
+    void approvalRowsCarryThePillAndOthersDoNot() {
+        // when
+        String warehouse = fragment(model(Kind.WAREHOUSE, List.of(warehouseRow(true)), null, false, List.of()));
+        String dropship = fragment(model(Kind.DROPSHIP, List.of(dropshipRow()), null, false, List.of()));
+
+        // then
+        assertThat(warehouse).contains("cl-status is-info\">Z akceptacją</span>").contains("Do dosłania klientowi");
+        assertThat(warehouse.indexOf("Do dosłania klientowi")).isLessThan(warehouse.indexOf("cl-status is-info"));
+        assertThat(dropship).doesNotContain("cl-status is-info");
+    }
+
+    @Test
+    void approvalPillFollowsTheOrderNumberInTheDropshipTab() {
+        // given
+        PendingDeliveryRow approval = new PendingDeliveryRow(Kind.DROPSHIP, "1de57483", "/dashboard/orders/1de57483-x", null,
+                "Global", "Global", null, false, 1, "1 szt.", null, "brak terminu", "is-none", true, 10.0, "10,00 PLN",
+                "/dashboard/orders/1de57483-x/dropship?provider=Global", "pending-d-2", List.of(), List.of("1de57483-x"), "");
+
+        // when
+        String html = fragment(model(Kind.DROPSHIP, List.of(approval), null, false, List.of()));
+
+        // then
+        assertThat(html).containsPattern(">1de57483</a><span class=\"cl-status is-info\">Z akceptacją</span>");
+    }
+
+    @Test
+    void noOrderingModeColumnAndFourLinkTilesOnly() {
+        // when
+        String warehouse = fragment(model(Kind.WAREHOUSE, List.of(warehouseRow(false)), null, false, List.of()));
+        String dropship = fragment(model(Kind.DROPSHIP, List.of(dropshipRow()), null, false, List.of()));
+
+        // then
+        for (String html : List.of(warehouse, dropship)) {
+            assertThat(html).doesNotContain("Zamawianie").doesNotContain("Przez API").doesNotContain("Ręcznie")
+                    .doesNotContain("is-static").contains("colspan=\"6\"");
+            assertThat(html.split("<a class=\"cl-stat is-link\"", -1)).hasSize(5);
+        }
     }
 
     @Test
