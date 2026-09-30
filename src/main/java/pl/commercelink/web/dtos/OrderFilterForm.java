@@ -17,6 +17,7 @@ public class OrderFilterForm {
     private String shippingDue;
     private List<String> sourceName = List.of();
     private String shippingPostalCode;
+    private String customerType;
     private String returnTo;
 
     public List<OrderFilterCondition> toConditions() {
@@ -27,6 +28,7 @@ public class OrderFilterForm {
         add(conditions, OrderFilterField.ShippingDue, shippingDue);
         sourceName.forEach(value -> add(conditions, OrderFilterField.SourceName, value));
         add(conditions, OrderFilterField.ShippingPostalCode, shippingPostalCode);
+        add(conditions, OrderFilterField.CustomerType, customerType);
         return conditions;
     }
 
@@ -111,6 +113,14 @@ public class OrderFilterForm {
 
     public void setShippingPostalCode(String shippingPostalCode) {
         this.shippingPostalCode = shippingPostalCode;
+    }
+
+    public String getCustomerType() {
+        return customerType;
+    }
+
+    public void setCustomerType(String customerType) {
+        this.customerType = customerType;
     }
 
     public String getReturnTo() {
