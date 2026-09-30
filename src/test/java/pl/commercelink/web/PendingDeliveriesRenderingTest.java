@@ -151,7 +151,7 @@ class PendingDeliveriesRenderingTest {
     }
 
     @Test
-    void supplierMenuSitsInTheSingleToolbarRowAndTheClearLinkInTheChipsLine() {
+    void supplierMenuSitsInTheSecondRowNextToTheClearLinkOnlyWithChips() {
         // given
         List<Chip> chips = List.of(new Chip("Po terminie", PATH, "Usuń filtr Po terminie"));
 
@@ -161,18 +161,17 @@ class PendingDeliveriesRenderingTest {
 
         // then
         int rowStart = withChips.indexOf("class=\"cl-toolbar-row\"");
+        int filters = withChips.indexOf("id=\"pending-filters\"");
         int menu = withChips.indexOf("data-cl-filter-menu=\"provider\"");
-        int search = withChips.indexOf("cl-toolbar-search");
-        int toolbarEnd = withChips.indexOf("cl-list-meta");
-        assertThat(withChips).contains("cl-table-toolbar is-single-row").doesNotContain("cl-toolbar-filters")
-                .doesNotContain("cl-toolbar-toggle").doesNotContain("data-cl-toolbar-toggle");
-        assertThat(rowStart).isNotNegative();
-        assertThat(withChips.indexOf("cl-segmented")).isBetween(rowStart, menu);
-        assertThat(menu).isLessThan(search);
-        assertThat(search).isLessThan(toolbarEnd);
-        String meta = withChips.substring(toolbarEnd);
-        assertThat(meta).contains("cl-toolbar-clear").contains("Wyczyść filtry");
-        assertThat(meta.indexOf("cl-filter-chips")).isLessThan(meta.indexOf("cl-toolbar-clear"));
+        int clear = withChips.indexOf("cl-toolbar-clear");
+        int meta = withChips.indexOf("cl-list-meta");
+        assertThat(withChips).contains("cl-table-toolbar is-stacked").doesNotContain("is-single-row")
+                .contains("data-cl-toolbar-toggle").contains("aria-controls=\"pending-filters\"");
+        assertThat(withChips.indexOf("cl-segmented")).isBetween(rowStart, filters);
+        assertThat(withChips.indexOf("data-cl-toolbar-toggle")).isBetween(rowStart, filters);
+        assertThat(filters).isLessThan(menu);
+        assertThat(menu).isLessThan(clear);
+        assertThat(clear).isLessThan(meta);
         assertThat(withoutChips).doesNotContain("cl-toolbar-clear");
     }
 }

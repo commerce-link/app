@@ -7744,52 +7744,6 @@ a.cl-link-button:hover {
     color: var(--cl-ink-2);
 }
 
-/* One toolbar row: tabs, the supplier menu, then the search pushed to the right. With a single filter there is no
-   second row and no "Filtry" fold; the row wraps when the card is too narrow (search first, then the menu). */
-.cl-page .cl-table-toolbar.is-single-row .cl-toolbar-row {
-    justify-content: flex-start;
-}
-
-.cl-page .cl-table-toolbar.is-single-row .cl-toolbar-search {
-    margin-left: auto;
-}
-
-/* With the rail (1024–1215 px) the card is ~746 px: a shorter field keeps tabs, menu and search on one line. */
-@media screen and (min-width: 1024px) and (max-width: 1215px) {
-    .cl-page .cl-table-toolbar.is-single-row .cl-search-field {
-        width: 190px;
-    }
-}
-
-/* "Wyczyść filtry" after the chips; the results count stays at the right edge. */
-.cl-page .cl-list-meta .cl-toolbar-clear {
-    margin-right: auto;
-}
-
-@media screen and (max-width: 719px) {
-    .cl-page .cl-table-toolbar.is-single-row .cl-toolbar-row {
-        gap: 10px;
-    }
-
-    .cl-page .cl-table-toolbar.is-single-row .cl-segmented,
-    .cl-page .cl-table-toolbar.is-single-row .cl-filter-menu,
-    .cl-page .cl-table-toolbar.is-single-row .cl-toolbar-search {
-        flex: 1 1 100%;
-        width: 100%;
-        max-width: none;
-    }
-
-    .cl-page .cl-table-toolbar.is-single-row .cl-filter-menu-trigger {
-        min-height: 44px;
-    }
-
-    .cl-page .cl-list-meta .cl-toolbar-clear {
-        display: inline-flex;
-        align-items: center;
-        min-height: 44px;
-    }
-}
-
 .cl-page .cl-table.is-pending tr.cl-row-main > :is(th, td) {
     vertical-align: middle;
 }

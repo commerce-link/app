@@ -48,12 +48,11 @@ class PendingDeliveriesStylesContractTest {
     }
 
     @Test
-    void singleRowToolbarIsStyledInThePendingSectionOnly() throws Exception {
+    void toolbarHasNoSingleRowModifier() throws Exception {
         // when
-        String section = section();
+        String css = section();
 
         // then
-        assertThat(section).contains(".cl-table-toolbar.is-single-row .cl-toolbar-search").contains(".cl-list-meta .cl-toolbar-clear")
-                .doesNotContain(".cl-toolbar-toggle");
+        assertThat(css).doesNotContain("is-single-row");
     }
 }
