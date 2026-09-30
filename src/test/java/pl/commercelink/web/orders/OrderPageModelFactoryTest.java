@@ -37,6 +37,7 @@ import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.receipts.ReceiptAlerts;
 import pl.commercelink.receipts.ReceiptAttempt;
 import pl.commercelink.receipts.ReceiptAttemptState;
+import pl.commercelink.receipts.ReceiptLock;
 import pl.commercelink.receipts.ReceiptOrderView;
 import pl.commercelink.receipts.ReceiptAttemptService;
 import pl.commercelink.receipts.ReceiptOrderState;
@@ -1188,11 +1189,12 @@ class OrderPageModelFactoryTest {
         // when
         OrderPageModel.DocumentsCard documents = factory.build(order, List.of(), ADMIN, PL).documents();
 
-        // then: a second sale document is offered neither from the invoicing system nor by hand
+        // then: a second sale document is offered neither from the invoicing system nor by hand (worded as being
+        // attached: the receipt is fiscalised, only its document is on its way)
         assertThat(documents.issuable()).isEmpty();
         assertThat(documents.canIssue()).isFalse();
         assertThat(documents.canAdd()).isFalse();
-        assertThat(documents.addLockedKey()).isEqualTo("order.documents.add.locked.receipt");
+        assertThat(documents.addLockedKey()).isEqualTo("order.documents.add.locked.receiptAttaching");
     }
 
     @Test
@@ -1391,5 +1393,145 @@ class OrderPageModelFactoryTest {
         assertThat(receipt.settledKey()).isEqualTo("receipts.row.settled.cancelled");
         assertThat(receipt.settledOutcome()).isEqualTo("zła stawka VAT");
         assertThat(receipt.canReissue()).isFalse();
+    }
+
+    // --- a POS sale without the customer's e-mail; the fiscalised receipt being attached ---------------------------
+
+    /** A point-of-sale order whose walk-in buyer has no e-mail of their own. */
+    private static Order posSale(OrderStatus status) {
+        Order order = order(status);
+        order.setSource(new pl.commercelink.orders.OrderSource("operator", pl.commercelink.orders.OrderSourceType.PointOfSale));
+        order.setBillingDetails(new BillingDetails());
+        return order;
+    }
+
+    /** The POS sale's automatic attempt, blocked for the missing e-mail: dead, so "Wystaw ponownie" is offered. */
+    private static ReceiptOrderState posBlocked() {
+        return new ReceiptOrderState(List.of(attempt(KEY_1, 1, ReceiptAttemptState.BLOCKED)),
+                new ReceiptOrderView(List.of(row(KEY_1, 1, ReceiptAttemptState.BLOCKED, null, null, null,
+                        ReceiptPageProblem.ofLines("E-paragonu nie wysłano", List.of("a", "b", "c"), null, null),
+                        false, false, false, "sprzedaż POS bez e-maila klienta")), true), false, false);
+    }
+
+    @Test
+    void reissueIsGreyedForAPosSaleWithoutTheCustomersEmail() {
+        // given
+        receipts(posBlocked());
+
+        // when
+        OrderPageModel.ReceiptRow receipt = factory.build(posSale(OrderStatus.Delivered), List.of(), ADMIN, PL)
+                .documents().receipt();
+
+        // then: still there (the row's only way on), greyed with what to do first; the cause has the bad tone
+        assertThat(receipt.canReissue()).isTrue();
+        assertThat(receipt.reissueBlockedKey()).isEqualTo("receipts.action.posNeedsEmail");
+        assertThat(receipt.hasActions()).isTrue();
+        assertThat(receipt.problemTone()).isEqualTo("is-bad");
+        assertThat(receipt.problem().actions()).hasSize(3);
+    }
+
+    @Test
+    void eReceiptInTheIssueMenuIsGreyedForAPosSaleWithoutTheCustomersEmail() {
+        // given: no attempt yet, the store has a receipt system
+        receipts(new ReceiptOrderState(List.of(), new ReceiptOrderView(List.of(), false), true, false));
+
+        // when
+        OrderPageModel.DocumentsCard pos = factory.build(posSale(OrderStatus.New), List.of(), ADMIN, PL).documents();
+        OrderPageModel.DocumentsCard web = factory.build(order(OrderStatus.New), List.of(), ADMIN, PL).documents();
+
+        // then: the entry and its menu stay, greyed with the same reason as "Wystaw ponownie"
+        assertThat(pos.canIssueReceipt()).isTrue();
+        assertThat(pos.canIssue()).isTrue();
+        assertThat(pos.issueReceiptBlockedKey()).isEqualTo("receipts.action.posNeedsEmail");
+        assertThat(web.canIssueReceipt()).isTrue();
+        assertThat(web.issueReceiptBlockedKey()).isNull();
+    }
+
+    @Test
+    void reissueIsOfferedOnceThePosSaleHasTheCustomersEmail() {
+        // given
+        receipts(posBlocked());
+        Order order = posSale(OrderStatus.Delivered);
+        order.getBillingDetails().setEmail("klient@example.com");
+
+        // when
+        OrderPageModel.ReceiptRow receipt = factory.build(order, List.of(), ADMIN, PL).documents().receipt();
+        OrderPageModel.ReceiptRow web = factory.build(order(OrderStatus.Delivered), List.of(), ADMIN, PL)
+                .documents().receipt();
+
+        // then: the confirmation adds the cash register sentence for the POS sale only
+        assertThat(receipt.canReissue()).isTrue();
+        assertThat(receipt.reissueBlockedKey()).isNull();
+        assertThat(receipt.reissueConfirmKey()).isEqualTo("receipts.action.reissue.confirm.message.pos");
+        assertThat(web.reissueConfirmKey()).isEqualTo("receipts.action.reissue.confirm.message");
+    }
+
+    @Test
+    void locksSayTheReceiptIsBeingAttachedOnceItIsFiscalised() {
+        // given: fiscalised, its document not on the order yet
+        receipts(new ReceiptOrderState(List.of(attempt(KEY_1, 1, ReceiptAttemptState.FISCALISED)),
+                new ReceiptOrderView(List.of(row(KEY_1, 1, ReceiptAttemptState.FISCALISED, null, "PAR/1", null, null,
+                        false, false, false, null)), false), false, true));
+        OrderItem item = item(FulfilmentStatus.New);
+
+        // when
+        OrderPageModel page = factory.build(order(OrderStatus.Delivered), List.of(item), ADMIN, PL);
+        OrderPageModel.Header cancellable = factory.build(order(OrderStatus.Delivered), returnedItems(), ADMIN, PL).header();
+
+        // then: every reason says "being attached", none "being issued"
+        assertThat(page.items().addItemsReasonKey()).isEqualTo("order.items.add.locked.receiptAttaching");
+        assertThat(page.items().addItemsReasonIsSentence()).isTrue();
+        assertThat(page.items().bulkStandalone().reasonKey()).isEqualTo("order.bulk.unavailable.receiptAttaching");
+        assertThat(page.items().bulkStandalone().shortReasonKey()).isEqualTo("order.bulk.unavailable.receiptAttaching.short");
+        assertThat(page.items().products().get(0).actions()).filteredOn(a -> a.action() == ItemAction.CONSOLIDATE)
+                .singleElement().satisfies(a -> assertThat(a.reasonKey()).isEqualTo("order.item.unavailable.receiptAttaching"));
+        assertThat(page.customer().billingLockedKey()).isEqualTo("order.customer.billing.locked.receiptAttaching");
+        assertThat(page.documents().addLockedKey()).isEqualTo("order.documents.add.locked.receiptAttaching");
+        assertThat(cancellable.cancelLockedKey()).isEqualTo("order.page.cancel.locked.receiptAttaching");
+        // the row says what the pill does not: the document is on its way
+        assertThat(page.documents().receipt().attachingKey()).isEqualTo("receipts.row.attaching");
+        // the server wording agrees
+        assertThat(ItemSaleLock.of(order(OrderStatus.Delivered), ReceiptLock.ATTACHING)).isEqualTo(ItemSaleLock.RECEIPT_ATTACHING);
+        // every attaching key exists in both bundles (OrderDetailsMessagesTest only sees the keys written out)
+        for (String key : List.of("order.items.add.locked.receiptAttaching", "order.bulk.unavailable.receiptAttaching",
+                "order.bulk.unavailable.receiptAttaching.short", "order.item.unavailable.receiptAttaching",
+                "order.customer.billing.locked.receiptAttaching", "order.documents.add.locked.receiptAttaching",
+                "order.page.cancel.locked.receiptAttaching", "order.page.delete.locked.receiptAttaching",
+                "order.item.consolidation.locked.receiptAttaching")) {
+            assertThat(messageSource.getMessage(key, null, PL)).as(key).contains("dołącza");
+            assertThat(messageSource.getMessage(key, null, Locale.ENGLISH)).as(key).containsIgnoringCase("attached");
+        }
+    }
+
+    @Test
+    void whileTheReceiptIsBeingIssuedTheRowHasNoAttachingNote() {
+        // given
+        receipts(issuing());
+
+        // when
+        OrderPageModel page = factory.build(order(OrderStatus.New), List.of(item(FulfilmentStatus.New)), ADMIN, PL);
+
+        // then
+        assertThat(page.documents().receipt().attachingKey()).isNull();
+        assertThat(page.items().addItemsReasonKey()).isEqualTo("order.items.add.locked.receipt");
+        assertThat(page.items().addItemsReasonIsSentence()).isTrue();
+    }
+
+    @Test
+    void manualReceiptIsNotOfferedWhileAnAttemptOwnsTheReceipt() {
+        // given: an attempt is issuing (it owns the receipt); then one that failed (it owns nothing)
+        receipts(issuing());
+        Order order = order(OrderStatus.Delivered);
+
+        // when
+        OrderPageModel.DocumentsCard owned = factory.build(order, List.of(), ADMIN, PL).documents();
+        receipts(new ReceiptOrderState(List.of(attempt(KEY_1, 1, ReceiptAttemptState.FAILED)),
+                new ReceiptOrderView(List.of(row(KEY_1, 1, ReceiptAttemptState.FAILED, null, null, null, null,
+                        false, false, false, "VAT")), true), false, false));
+        OrderPageModel.DocumentsCard free = factory.build(order, List.of(), ADMIN, PL).documents();
+
+        // then: a typed-in "Paragon" would be a second receipt for the same sale
+        assertThat(owned.manualTypes()).extracting(o -> o.value()).doesNotContain(DocumentType.Receipt);
+        assertThat(free.manualTypes()).extracting(o -> o.value()).contains(DocumentType.Receipt);
     }
 }

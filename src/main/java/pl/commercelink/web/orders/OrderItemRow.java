@@ -4,6 +4,7 @@ import org.apache.commons.lang3.StringUtils;
 import pl.commercelink.inventory.supplier.SupplierLabelMap;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
+import pl.commercelink.receipts.ReceiptLock;
 import pl.commercelink.starter.util.ConversionUtil;
 import pl.commercelink.warehouse.api.ItemCondition;
 
@@ -29,12 +30,12 @@ public record OrderItemRow(String itemId, int index, String name, String categor
      */
     public record Context(Order order, boolean readOnly, boolean superAdmin, SupplierLabelMap labels,
                           Function<OrderItem, String> deliveryHref, Function<String, String> serialHref,
-                          boolean receiptLocked) {
+                          ReceiptLock receiptLock) {
 
-        /** receiptLocked: an e-receipt is being issued for the order (ReceiptOrderState#locksOrder). */
+        /** receiptLock: why the order's e-receipt locks it, if it does (ReceiptOrderState#receiptLock). */
         public Context(Order order, boolean readOnly, boolean superAdmin, SupplierLabelMap labels,
                        Function<OrderItem, String> deliveryHref, Function<String, String> serialHref) {
-            this(order, readOnly, superAdmin, labels, deliveryHref, serialHref, false);
+            this(order, readOnly, superAdmin, labels, deliveryHref, serialHref, ReceiptLock.NONE);
         }
     }
 
@@ -56,7 +57,7 @@ public record OrderItemRow(String itemId, int index, String name, String categor
                 deliveryLabel, deliveryId == null ? null : context.deliveryHref().apply(item),
                 item.isReadyForAllocation(), item.isProduct() && item.isAllocated(), item.isProduct() && item.isDelivered(),
                 item.canBeMovedToAnotherOrder(), item.isNew() || item.isService(),
-                context.readOnly() ? List.of() : actions(item, context.order(), context.receiptLocked()),
+                context.readOnly() ? List.of() : actions(item, context.order(), context.receiptLock()),
                 context.readOnly() ? null : itemHref,
                 item.getPrice(), item.getTax(), item.isGroup(),
                 // without the item menu a closed order would have no way to its item page (EAN, VAT, delivery dates)
@@ -107,6 +108,11 @@ public record OrderItemRow(String itemId, int index, String name, String categor
      * invoice is issued (the same refusals as OrdersController#toggleConsolidation and #splitGroupItem).
      */
     public static List<ItemAction.State> actions(OrderItem item, Order order, boolean receiptLocked) {
+        return actions(item, order, ReceiptLock.of(receiptLocked));
+    }
+
+    /** The same, worded after why the e-receipt locks the order (still issuing, or fiscalised and being attached). */
+    public static List<ItemAction.State> actions(OrderItem item, Order order, ReceiptLock receiptLock) {
         List<ItemAction.State> states = new ArrayList<>();
         // an item that already has a supplier (Allocation) is released first, then reassigned
         String assignReason = item.isGroup() ? "order.item.unavailable.group"
@@ -128,7 +134,7 @@ public record OrderItemRow(String itemId, int index, String name, String categor
         // "Split set" only exists for a set; for any other item it is not greyed out but absent
         if (item.isGroup()) {
             // splitting rewrites the lines the sale document lists (OrdersController#splitGroupItem refuses the same)
-            ItemSaleLock saleLock = ItemSaleLock.of(order, receiptLocked);
+            ItemSaleLock saleLock = ItemSaleLock.of(order, receiptLock);
             String splitReason = item.isService() ? "order.item.unavailable.service"
                     : !item.isNew() ? "order.item.unavailable.not.new"
                     : saleLock != null ? saleLock.menuReasonKey() : null;
@@ -136,7 +142,7 @@ public record OrderItemRow(String itemId, int index, String name, String categor
         }
         boolean invoiced = order.isInvoiced();
         String consolidateReason = invoiced ? "order.item.unavailable.invoiced"
-                : receiptLocked ? "order.item.unavailable.receipt" : null;
+                : receiptLock.locks() ? receiptLock.key("order.item.unavailable.receipt") : null;
         states.add(new ItemAction.State(ItemAction.CONSOLIDATE,
                 item.isConsolidated() ? "order.item.menu.deconsolidate" : "order.item.menu.consolidate",
                 consolidateReason == null, consolidateReason, null));

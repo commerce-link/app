@@ -91,4 +91,27 @@ class OrderDetailsMessagesTest {
         try (var r = new InputStreamReader(Files.newInputStream(Path.of("src/main/resources", name)), StandardCharsets.UTF_8)) { p.load(r); }
         return p;
     }
+
+    @Test
+    void receiptTextsNameTheReceiptSystemNotTheSupplier() throws IOException {
+        // given: on the order page "Dostawca" is the wholesaler; the e-receipt's provider is the e-receipt system
+        Properties pl = load("messages_pl.properties"), en = load("messages_en.properties");
+
+        // when
+        List<String> supplierPanel = pl.stringPropertyNames().stream()
+                .filter(k -> k.startsWith("receipts."))
+                .filter(k -> pl.getProperty(k).contains("panelu dostawcy") || pl.getProperty(k).contains("panel dostawcy")
+                        || pl.getProperty(k).contains("pod nowym kluczem"))
+                .toList();
+        List<String> providerPanel = en.stringPropertyNames().stream()
+                .filter(k -> k.startsWith("receipts."))
+                .filter(k -> en.getProperty(k).contains("provider's panel") || en.getProperty(k).contains("under a new key"))
+                .toList();
+
+        // then
+        assertThat(supplierPanel).isEmpty();
+        assertThat(providerPanel).isEmpty();
+        assertThat(pl.getProperty("receipts.action.reissue.confirm.message")).contains("systemie e-paragonów");
+        assertThat(pl.getProperty("receipts.action.close.help")).contains("systemie e-paragonów");
+    }
 }

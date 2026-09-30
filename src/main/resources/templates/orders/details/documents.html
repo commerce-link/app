@@ -21,8 +21,15 @@
                 </summary>
                 <ul class="cl-menu-list" id="issue-menu">
                     <!--/* without JavaScript the link leads to the confirmation page (GET …/receipts/issue) */-->
+                    <!--/* a POS sale without the customer's e-mail: greyed with what to do first (the server refuses too) */-->
                     <li th:if="${documents.canIssueReceipt()}">
-                        <a class="cl-menu-item" data-cl-confirm data-cl-confirm-tone="primary"
+                        <button th:if="${documents.issueReceiptBlockedKey() != null}" type="button" class="cl-menu-item"
+                                aria-disabled="true">
+                            <span th:text="#{receipts.action.issue}"></span>
+                            <span class="cl-menu-reason" th:text="#{${documents.issueReceiptBlockedKey()}}"></span>
+                        </button>
+                        <a th:unless="${documents.issueReceiptBlockedKey() != null}"
+                           class="cl-menu-item" data-cl-confirm data-cl-confirm-tone="primary"
                            th:href="@{/dashboard/orders/{o}/receipts/issue(o=${page.orderId()})}"
                            th:attr="data-cl-confirm-title=#{receipts.action.issue.confirm.title},
                                     data-cl-confirm-message=#{receipts.action.issue.confirm.message},
@@ -94,18 +101,26 @@
             <span th:if="${r.date() != null and r.emailKey() != null}" aria-hidden="true"> · </span>
             <span th:if="${r.emailKey() != null}" th:text="#{${r.emailKey()}}"></span>
         </p>
+        <!--/* fiscalised, its document still on its way to the order (the locks of the page say the same) */-->
+        <p class="cl-list-desc" th:if="${r.attachingKey() != null}" th:id="|e-paragon-attaching-${r.attemptNo()}|"
+           th:text="#{${r.attachingKey()}}"></p>
         <!--/* The problem in the operator's words (cause, then what to do with this row's buttons); the provider's
                technical hints stay folded under their own disclosure. */-->
         <th:block th:if="${r.problem() != null}">
-            <p class="cl-list-desc is-warn" th:id="|e-paragon-problem-${r.attemptNo()}|" th:text="${r.problem().cause()}"></p>
-            <p class="cl-list-desc" th:if="${r.problem().action() != null}" th:id="|e-paragon-action-${r.attemptNo()}|"
-               th:text="${r.problem().action()}"></p>
+            <p class="cl-list-desc" th:classappend="${r.problemTone()}" th:id="|e-paragon-problem-${r.attemptNo()}|"
+               th:text="${r.problem().cause()}"></p>
+            <!--/* one paragraph per line: advice with alternatives (POS sale) reads as separate steps */-->
+            <p class="cl-list-desc" th:each="line, it : ${r.problem().actions()}"
+               th:id="${it.first} ? |e-paragon-action-${r.attemptNo()}| : |e-paragon-action-${r.attemptNo()}-${it.count}|"
+               th:text="${line}"></p>
             <details class="cl-row-disclosure" th:if="${r.problem().details() != null}"
                      th:id="|e-paragon-details-${r.attemptNo()}|">
                 <summary th:text="${r.problem().detailsSummary()}"></summary>
                 <p class="cl-list-desc" th:text="${r.problem().details()}"></p>
             </details>
         </th:block>
+        <p class="cl-list-desc" th:if="${r.canReissue() and r.reissueBlockedKey() != null}"
+           th:id="|e-paragon-reissue-reason-${r.attemptNo()}|" th:text="#{${r.reissueBlockedKey()}}"></p>
         <!--/* A dead attempt on an order that got its receipt or invoice another way, or was cancelled: nothing left to do. */-->
         <p class="cl-list-desc" th:if="${r.settled()}" th:id="|e-paragon-settled-${r.attemptNo()}|"
            th:text="#{${r.settledKey()}(${r.settledOutcome()})}"></p>
@@ -133,12 +148,18 @@
         </form>
         <a th:if="${r.canClose()}" class="cl-link-button" th:href="@{${r.closeHref()}}"
            th:attr="data-cl-dialog-open=${r.closeDialogId()}" th:text="#{receipts.action.close}"></a>
-        <a th:if="${r.canReissue()}" class="cl-link-button" data-cl-confirm
+        <!--/* a new attempt is not destructive: the confirmation's button is primary */-->
+        <a th:if="${r.canReissue() and r.reissueBlockedKey() == null}" class="cl-link-button" data-cl-confirm
+           data-cl-confirm-tone="primary"
            th:href="@{/dashboard/orders/{o}/receipts/reissue(o=${page.orderId()})}"
            th:attr="data-cl-confirm-title=#{receipts.action.reissue.confirm.title},
-                    data-cl-confirm-message=#{receipts.action.reissue.confirm.message},
+                    data-cl-confirm-message=#{${r.reissueConfirmKey()}},
                     data-cl-confirm-action=#{receipts.action.reissue}"
            th:text="#{receipts.action.reissue}"></a>
+        <!--/* greyed, still focusable, its reason in the text of the row (design system: link action that cannot run) */-->
+        <button th:if="${r.canReissue() and r.reissueBlockedKey() != null}" type="button" class="cl-link-button"
+                aria-disabled="true" th:attr="aria-describedby=|e-paragon-reissue-reason-${r.attemptNo()}|"
+                th:text="#{receipts.action.reissue}"></button>
     </div>
 </li>
 

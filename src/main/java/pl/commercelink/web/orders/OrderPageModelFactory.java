@@ -36,8 +36,10 @@ import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.receipts.ReceiptAlerts;
 import pl.commercelink.receipts.ReceiptAttemptService;
 import pl.commercelink.receipts.ReceiptAttemptState;
+import pl.commercelink.receipts.ReceiptLock;
 import pl.commercelink.receipts.ReceiptOrderState;
 import pl.commercelink.receipts.ReceiptOrderView;
+import pl.commercelink.receipts.ReceiptRequestConverter;
 import pl.commercelink.starter.util.ConversionUtil;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
@@ -103,18 +105,18 @@ public class OrderPageModelFactory {
         DropshipAssessment dropship = dropship(order, items);
         // the order's e-receipt attempts are read once here; the documents card and every lock below derive from them
         ReceiptOrderState receipts = receiptAttemptService.orderState(store, order, receiptAlerts, locale);
-        boolean receiptLocked = receipts.locksOrder(order);
+        ReceiptLock receiptLock = receipts.receiptLock(order);
         return new OrderPageModel(order.getOrderId(), order.getShortenedOrderId(),
                 viewer.superAdmin() ? null : OrderBackLink.sanitize(viewer.back()),
                 closed, readOnly, viewer.superAdmin(), viewer.admin(), store == null ? null : store.getName(),
-                header(order, items, store, viewer, readOnly, links, locale, dropship, receipts, receiptLocked),
+                header(order, items, store, viewer, readOnly, links, locale, dropship, receipts, receiptLock),
                 items(order, items, store, viewer, readOnly, links, hasDropshipItems, hasWarehouseDocument, dropship,
-                        receiptLocked),
+                        receiptLock),
                 shipments(order, store, readOnly),
-                documents(order, viewer, closed, readOnly, documentsEnabled && hasWarehouseItems && !hasWarehouseDocument,
-                        receipts, receiptLocked),
+                documents(order, store, viewer, closed, readOnly,
+                        documentsEnabled && hasWarehouseItems && !hasWarehouseDocument, receipts, receiptLock),
                 payments(order, readOnly),
-                CustomerView.of(order, readOnly, receiptLocked, locale),
+                CustomerView.of(order, readOnly, receiptLock, locale),
                 settings(order, items, readOnly),
                 FinancesView.of(order, items),
                 history(order, readOnly),
@@ -127,7 +129,8 @@ public class OrderPageModelFactory {
 
     private OrderPageModel.Header header(Order order, List<OrderItem> items, Store store, Viewer viewer, boolean readOnly,
                                          OrderLinks links, Locale locale, DropshipAssessment dropship,
-                                         ReceiptOrderState receipts, boolean receiptLocked) {
+                                         ReceiptOrderState receipts, ReceiptLock receiptLock) {
+        boolean receiptLocked = receiptLock.locks();
         boolean canOrderShipment = order.canOrderShipment();
         OrderPageModel.PrimaryAction primary = null;
         // with items at several suppliers the dropship page without ?provider= sends the operator back to choose one,
@@ -175,7 +178,8 @@ public class OrderPageModelFactory {
                 // while an e-receipt is being issued OrdersController#cancelOrder refuses it, so it is greyed with that
                 // reason (only when the order could otherwise be cancelled: the general reason says more otherwise)
                 !viewer.superAdmin() && order.canBeCancelled(items) && !receiptLocked,
-                !viewer.superAdmin() && order.canBeCancelled(items) && receiptLocked ? CANCEL_LOCKED_RECEIPT : null,
+                !viewer.superAdmin() && order.canBeCancelled(items) && receiptLocked
+                        ? receiptLock.key(CANCEL_LOCKED_RECEIPT) : null,
                 cancelMessage(receipts.hasFiscalisedReceipt(order), messageSource, locale),
                 // as OrdersController#deleteOrder refuses: an order whose e-receipt is being issued stays
                 !viewer.superAdmin() && order.hasStatus(OrderStatus.New) && items.isEmpty() && !order.isInvoiced()
@@ -223,13 +227,13 @@ public class OrderPageModelFactory {
     private OrderPageModel.ItemsCard items(Order order, List<OrderItem> items, Store store, Viewer viewer,
                                            boolean readOnly, OrderLinks links, boolean hasDropshipItems,
                                            boolean hasWarehouseDocument, DropshipAssessment dropship,
-                                           boolean receiptLocked) {
+                                           ReceiptLock receiptLock) {
         SupplierLabelMap labels = supplierLabels.forStore(store);
         OrderItemRow.Context context = new OrderItemRow.Context(order, readOnly, viewer.superAdmin(), labels,
                 item -> deliveryHref(order, item, viewer, links, dropship),
                 serial -> viewer.superAdmin() ? null
                         : "/dashboard/item/history?serialNo=" + URLEncoder.encode(serial, StandardCharsets.UTF_8),
-                receiptLocked);
+                receiptLock);
         List<OrderItem> sorted = items.stream().sorted(Comparator.comparingInt(OrderItem::getPosition)).toList();
         List<OrderItemRow> products = new ArrayList<>();
         List<OrderItemRow> services = new ArrayList<>();
@@ -245,7 +249,7 @@ public class OrderPageModelFactory {
             }
         }
         boolean canSplitOrder = order.canBeSplit() && !items.isEmpty();
-        String addReason = addItemsLockedKey(order, hasDropshipItems, receiptLocked);
+        String addReason = addItemsLockedKey(order, hasDropshipItems, receiptLock);
         List<OrderPageModel.SerialItemRow> serialItems = items.stream()
                 .filter(i -> i.hasOneOfTheStatuses(FulfilmentStatus.Delivered)).filter(OrderItem::isProduct)
                 .map(i -> serialItemRow(i, labels)).toList();
@@ -254,7 +258,7 @@ public class OrderPageModelFactory {
             if (action == BulkAction.REMOVE && order.isInvoiced()) {
                 continue;
             }
-            BulkReason reason = bulkReason(action, canSplitOrder, hasDropshipItems, receiptLocked);
+            BulkReason reason = bulkReason(action, canSplitOrder, hasDropshipItems, receiptLock);
             bulk.add(OrderPageModel.BulkActionButton.of(action, reason,
                     "/dashboard/orders/" + order.getOrderId() + "/" + action.path()));
         }
@@ -281,8 +285,13 @@ public class OrderPageModelFactory {
      * receipt carries and stays.
      */
     static BulkReason bulkReason(BulkAction action, boolean canSplitOrder, boolean hasDropshipItems, boolean receiptLocked) {
-        if (receiptLocked && (action == BulkAction.REMOVE || action == BulkAction.SPLIT || action == BulkAction.MOVE)) {
-            return BulkReason.RECEIPT_ISSUING;
+        return bulkReason(action, canSplitOrder, hasDropshipItems, ReceiptLock.of(receiptLocked));
+    }
+
+    /** The same, worded after why the e-receipt locks the order (still issuing, or fiscalised and being attached). */
+    static BulkReason bulkReason(BulkAction action, boolean canSplitOrder, boolean hasDropshipItems, ReceiptLock receiptLock) {
+        if (receiptLock.locks() && (action == BulkAction.REMOVE || action == BulkAction.SPLIT || action == BulkAction.MOVE)) {
+            return receiptLock == ReceiptLock.ATTACHING ? BulkReason.RECEIPT_ATTACHING : BulkReason.RECEIPT_ISSUING;
         }
         return switch (action) {
             case SPLIT, MOVE -> canSplitOrder ? null : BulkReason.SPLIT_UNAVAILABLE;
@@ -410,8 +419,9 @@ public class OrderPageModelFactory {
         return shipment.getExternalId() != null ? "order.shipments.remove.error.courier" : null;
     }
 
-    private OrderPageModel.DocumentsCard documents(Order order, Viewer viewer, boolean closed, boolean readOnly,
-                                                   boolean goodsIssue, ReceiptOrderState receipts, boolean receiptLocked) {
+    private OrderPageModel.DocumentsCard documents(Order order, Store store, Viewer viewer, boolean closed,
+                                                   boolean readOnly, boolean goodsIssue, ReceiptOrderState receipts,
+                                                   ReceiptLock receiptLock) {
         List<DocumentType> manual = manualDocumentTypes(order, receipts.blocksManualReceipt());
         DocumentType next = order.getNextDocumentToIssue().orElse(null);
         // the document an e-receipt attempt attached (its id is the attempt's key) is the e-receipt row itself, never
@@ -423,6 +433,10 @@ public class OrderPageModelFactory {
         // controller refuses it too (OrdersController#createInvoice)
         List<DocumentType> issuable = receipts.blocksManualReceipt() ? List.of() : order.getIssuableDocumentTypes();
         boolean canIssueReceipt = !readOnly && receipts.canIssueManually();
+        // a POS sale without the customer's e-mail would only get one more blocked attempt: "E-paragon" and "Wystaw
+        // ponownie" stay in place, greyed with what to do first (ReceiptAttemptService refuses both the same way)
+        String posNeedsEmailKey = ReceiptRequestConverter.blocksPosWithoutCustomerEmail(order, store)
+                ? ReceiptAttemptService.POS_NEEDS_EMAIL : null;
         // A consumer receipt is typed in with "Add document", or issued as an e-receipt from "Issue" when the store
         // has a receipt system; the text says so. A closed order will not get another document and a read-only
         // viewer cannot issue one, so neither names it.
@@ -430,14 +444,16 @@ public class OrderPageModelFactory {
                 : issuable.contains(next) ? "order.documents.empty.next"
                 : next == DocumentType.Receipt && canIssueReceipt ? "order.documents.empty.next.receipt"
                 : "order.documents.empty.next.manual";
-        String addLocked = readOnly ? null : addDocumentLockedKey(order, null, receiptLocked);
-        return new OrderPageModel.DocumentsCard(rows, receiptRow(order, receipts, viewer, readOnly), emptyKey,
+        String addLocked = readOnly ? null : addDocumentLockedKey(order, null, receiptLock);
+        return new OrderPageModel.DocumentsCard(rows,
+                receiptRow(order, receipts, viewer, readOnly, receiptLock, posNeedsEmailKey), emptyKey,
                 !readOnly && addLocked == null,
                 // greyed with its reason only for the receipt; the other locks leave the button out, as before
-                RECEIPT_ADD_LOCKED.equals(addLocked) ? addLocked : null,
+                receiptLock.locks() && receiptLock.key(RECEIPT_ADD_LOCKED).equals(addLocked) ? addLocked : null,
                 OrderLabels.Option.of(manual, OrderLabels::documentType), next,
                 next == null ? null : OrderLabels.documentType(next), OrderLabels.Option.of(issuable, OrderLabels::documentType),
-                !readOnly && goodsIssue, canIssueReceipt, !readOnly && (goodsIssue || !issuable.isEmpty() || canIssueReceipt),
+                !readOnly && goodsIssue, canIssueReceipt, canIssueReceipt ? posNeedsEmailKey : null,
+                !readOnly && (goodsIssue || !issuable.isEmpty() || canIssueReceipt),
                 OrderFormats.isoDate(LocalDate.now()), closeForms(order, receipts, viewer));
     }
 
@@ -453,7 +469,8 @@ public class OrderPageModelFactory {
      * keeps them on a closed order too: resending the buyer's e-mail or closing a hung attempt by hand changes the
      * receipt, not the order, and the old order page offered them on every order.
      */
-    private OrderPageModel.ReceiptRow receiptRow(Order order, ReceiptOrderState receipts, Viewer viewer, boolean readOnly) {
+    private OrderPageModel.ReceiptRow receiptRow(Order order, ReceiptOrderState receipts, Viewer viewer, boolean readOnly,
+                                                 ReceiptLock receiptLock, String posNeedsEmailKey) {
         List<ReceiptOrderView.Row> rows = receipts.view().rows();
         if (rows.isEmpty()) {
             return null;
@@ -475,16 +492,21 @@ public class OrderPageModelFactory {
         String emailKey = newest.emailSentAt() != null ? "receipts.email.sent"
                 : newest.emailSkippedAt() != null ? "receipts.email.skipped" : null;
         ReceiptCloseForm close = new ReceiptCloseForm(order.getOrderId(), newest.key(), newest.attemptNo());
+        boolean canReissue = !readOnly && receipts.view().canReissue();
         List<OrderPageModel.ReceiptEarlierRow> earlier = rows.subList(1, rows.size()).stream()
                 .map(r -> new OrderPageModel.ReceiptEarlierRow(r.attemptNo(), r.statusKey(), r.statusTone(), r.outcome()))
                 .toList();
         return new OrderPageModel.ReceiptRow(newest.key(), newest.attemptNo(), newest.receiptNumber(),
                 safeWebUrl(newest.documentUrl()), newest.statusKey(), newest.statusTone(), dateKey, date, emailKey,
-                newest.problem(), act && newest.canCheck(), act && newest.canResendEmail(), act && newest.canClose(),
+                newest.problem(), newest.problemTone(), act && newest.canCheck(), act && newest.canResendEmail(),
+                act && newest.canClose(),
                 // a new attempt changes the order's documents, which a read-only page never does
-                !readOnly && receipts.view().canReissue(), close.dialogId(), act ? close.pageHref() : null, earlier,
+                canReissue, canReissue ? posNeedsEmailKey : null, ReceiptAttemptService.reissueConfirmMessageKey(order),
+                close.dialogId(), act ? close.pageHref() : null, earlier,
                 newest.settled(), newest.settled() ? newest.outcome() : null,
-                newest.settled() ? settledKey(order, newest.outcome()) : null);
+                newest.settled() ? settledKey(order, newest.outcome()) : null,
+                // the pill says fiscalised while the order still waits for the document the locks name: say so here
+                receiptLock == ReceiptLock.ATTACHING ? "receipts.row.attaching" : null);
     }
 
     /** A cancelled order needs no sale document at all; any other settled order already has its receipt or invoice. */
@@ -530,6 +552,11 @@ public class OrderPageModelFactory {
      * room for another closing document typed in by hand, of any type.
      */
     public static String addDocumentLockedKey(Order order, DocumentType posted, boolean receiptLocked) {
+        return addDocumentLockedKey(order, posted, ReceiptLock.of(receiptLocked));
+    }
+
+    /** The same, worded after why the e-receipt locks the order (still issuing, or fiscalised and being attached). */
+    public static String addDocumentLockedKey(Order order, DocumentType posted, ReceiptLock receiptLock) {
         if (order.isClosed()) {
             return "order.documents.add.locked.closed";
         }
@@ -538,7 +565,7 @@ public class OrderPageModelFactory {
         if (next == null || !manual.contains(next) || (posted != null && !manual.contains(posted))) {
             return "order.documents.add.locked";
         }
-        return receiptLocked ? RECEIPT_ADD_LOCKED : null;
+        return receiptLock.locks() ? receiptLock.key(RECEIPT_ADD_LOCKED) : null;
     }
 
     /**
@@ -694,6 +721,11 @@ public class OrderPageModelFactory {
 
     /** receiptLocked: an e-receipt is being issued; its frozen request lists the items, so none is added. */
     public static String addItemsLockedKey(Order order, boolean hasDropshipItems, boolean receiptLocked) {
+        return addItemsLockedKey(order, hasDropshipItems, ReceiptLock.of(receiptLocked));
+    }
+
+    /** The same, worded after why the e-receipt locks the order (still issuing, or fiscalised and being attached). */
+    public static String addItemsLockedKey(Order order, boolean hasDropshipItems, ReceiptLock receiptLock) {
         if (order.isClosed()) {
             return "order.items.add.locked.closed";
         }
@@ -703,8 +735,8 @@ public class OrderPageModelFactory {
         if (order.isInvoiced()) {
             return "order.items.add.locked.invoiced";
         }
-        if (receiptLocked) {
-            return "order.items.add.locked.receipt";
+        if (receiptLock.locks()) {
+            return receiptLock.key("order.items.add.locked.receipt");
         }
         return hasDropshipItems ? "order.items.action.dropship.locked" : null;
     }

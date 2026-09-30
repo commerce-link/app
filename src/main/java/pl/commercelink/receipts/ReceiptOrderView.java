@@ -18,6 +18,14 @@ public record ReceiptOrderView(List<Row> rows, boolean canReissue) {
                       ReceiptPageProblem problem, Instant emailSentAt, Instant emailSkippedAt, boolean canCheck, boolean canClose,
                       boolean canResendEmail, int attemptNo, String receiptNumber, Instant fiscalisedAt,
                       String outcome, boolean settled) {
+
+        /**
+         * The tone of the problem's cause, the colour of the pill it is read with: bad for an attempt that fiscalised
+         * nothing (refused, blocked), warn for one that still waits or whose e-mail failed.
+         */
+        public String problemTone() {
+            return state == ReceiptAttemptState.FAILED || state == ReceiptAttemptState.BLOCKED ? "is-bad" : "is-warn";
+        }
     }
 
     public boolean isEmpty() {
@@ -40,7 +48,9 @@ public record ReceiptOrderView(List<Row> rows, boolean canReissue) {
                     ReceiptPageProblem problem = attention == null || superseded || settled ? null
                             : alerts.pageProblem(a, attention, locale);
                     return new Row(a.getReceiptKey(), a.getState(), "receipts.state." + a.getState().name(),
-                            settled ? "is-neutral" : tone(a.getState()), a.getDocumentUrl(), problem, a.getEmailSentAt(),
+                            // only a state that asks something of the operator is coloured: a superseded attempt
+                            // is history, a settled one needs nothing
+                            settled || superseded ? "is-neutral" : tone(a.getState()), a.getDocumentUrl(), problem, a.getEmailSentAt(),
                             a.getEmailSkippedAt(),
                             a.isScheduled() && !a.isLeasedAt(now),
                             (a.getState() == ReceiptAttemptState.ISSUING || a.getState() == ReceiptAttemptState.PENDING)

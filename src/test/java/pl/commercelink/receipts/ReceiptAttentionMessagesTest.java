@@ -138,4 +138,22 @@ class ReceiptAttentionMessagesTest {
                     .isEqualTo(StringUtils.countMatches(raw, "''"));
         }
     }
+
+    @Test
+    void posAdviceInTheBellNamesTheButtonsOfTheOrderPage() {
+        // given
+        ResourceBundleMessageSource messageSource = messageSource();
+
+        // when
+        String pl = messageSource.getMessage("receipts.attention.BLOCKED_POS", ARGS, Locale.forLanguageTag("pl"));
+        String en = messageSource.getMessage("receipts.attention.BLOCKED_POS", ARGS, Locale.ENGLISH);
+
+        // then: the same buttons and card as the advice in the e-receipt row, not the old page's "Dodaj" / "dane do faktury"
+        assertThat(pl).contains("„Dodaj dokument” → Paragon").contains("danych rozliczeniowych")
+                .contains("„Wystaw ponownie”").contains("sprzedaż zostałaby zafiskalizowana dwa razy")
+                .doesNotContain("„Dodaj” w dokumentach").doesNotContain("dane do faktury")
+                .doesNotContain("dwie sprzedaże");
+        assertThat(en).contains("\"Add document\" → Receipt").contains("billing details").contains("\"Reissue\"")
+                .doesNotContain("two sales");
+    }
 }

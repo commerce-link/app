@@ -127,18 +127,56 @@ class ReceiptAttemptServiceTest {
     }
 
     @Test
-    void manualEReceiptOfAPosSaleWithTheStoresEmailBlocksInsteadOfMailingTheStore() {
+    void manualEReceiptOfAPosSaleWithTheStoresEmailIsRefusedBeforeAnyAttemptIsCreated() {
         // given
         withStoreEmail(store);
         order = posOrder(100.00);
 
+        // when / then: no blocked attempt, no bell alert, nothing queued — the order page greys "E-paragon" for this
+        assertThatThrownBy(() -> service.issueManually(STORE_ID, ORDER_ID, "operator"))
+                .isInstanceOf(ReceiptActionException.class)
+                .extracting(e -> ((ReceiptActionException) e).getMessageKey())
+                .isEqualTo(ReceiptAttemptService.POS_NEEDS_EMAIL);
+        assertThat(service.issueRefusal(STORE_ID, ORDER_ID)).isEqualTo(ReceiptAttemptService.POS_NEEDS_EMAIL);
+        assertThat(attempts.all()).isEmpty();
+        verify(publisher, never()).publishDue(any());
+        assertThat(provider.issueCalls.get()).isZero();
+    }
+
+    @Test
+    void reissueOfAPosSaleWithoutTheCustomersEmailIsRefusedBeforeAnyAttemptIsCreated() {
+        // given: the automatic attempt blocked for the missing e-mail
+        withStoreEmail(store);
+        order = posOrder(100.00);
+        ReceiptAttempt first = service.startAutomatic(store, order).orElseThrow();
+
+        // when / then
+        assertThatThrownBy(() -> service.reissue(STORE_ID, ORDER_ID, "operator"))
+                .isInstanceOf(ReceiptActionException.class)
+                .extracting(e -> ((ReceiptActionException) e).getMessageKey())
+                .isEqualTo(ReceiptAttemptService.POS_NEEDS_EMAIL);
+        assertThat(service.reissueRefusal(STORE_ID, ORDER_ID)).isEqualTo(ReceiptAttemptService.POS_NEEDS_EMAIL);
+        assertThat(attempts.all()).extracting(ReceiptAttempt::getReceiptKey).containsExactly(first.getReceiptKey());
+        // the blocked attempt keeps its bell alert: nothing superseded it
+        verify(alerts, never()).resolve(any());
+    }
+
+    @Test
+    void reissueOfAPosSaleGoesAheadOnceTheCustomersEmailIsEntered() {
+        // given
+        withStoreEmail(store);
+        order = posOrder(100.00);
+        service.startAutomatic(store, order);
+        order.getBillingDetails().setEmail("klient@example.com");
+
         // when
-        ReceiptAttempt attempt = service.issueManually(STORE_ID, ORDER_ID, "operator");
+        ReceiptAttempt second = service.reissue(STORE_ID, ORDER_ID, "operator");
 
         // then
-        assertThat(attempt.getState()).isEqualTo(ReceiptAttemptState.BLOCKED);
-        assertThat(attempt.getBlockedReason()).isEqualTo(ReceiptBlockReason.POS_NO_CUSTOMER_EMAIL.name());
-        assertThat(provider.issueCalls.get()).isZero();
+        assertThat(second.getAttemptNo()).isEqualTo(2);
+        assertThat(second.getState()).isEqualTo(ReceiptAttemptState.ISSUING);
+        assertThat(ReceiptAttemptService.reissueConfirmMessageKey(order))
+                .isEqualTo("receipts.action.reissue.confirm.message.pos");
     }
 
     @Test

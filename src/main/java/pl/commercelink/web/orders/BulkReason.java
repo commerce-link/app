@@ -9,7 +9,8 @@ public enum BulkReason {
 
     DROPSHIP_LOCKED("order.items.action.dropship.locked", "order.items.action.dropship.locked.short"),
     SPLIT_UNAVAILABLE("order.bulk.unavailable.split", "order.bulk.unavailable.split.short"),
-    RECEIPT_ISSUING("order.bulk.unavailable.receipt", "order.bulk.unavailable.receipt.short");
+    RECEIPT_ISSUING("order.bulk.unavailable.receipt", "order.bulk.unavailable.receipt.short"),
+    RECEIPT_ATTACHING("order.bulk.unavailable.receiptAttaching", "order.bulk.unavailable.receiptAttaching.short");
 
     private final String key;
     private final String shortKey;

@@ -15,7 +15,8 @@
             </button>
         </div>
         <p th:if="${items.addItemsReasonKey() != null}" class="cl-help is-note" id="add-items-reason"
-           th:text="#{order.items.add.reason(${#messages.msg(items.addItemsReasonKey())})}"></p>
+           th:text="${items.addItemsReasonIsSentence()} ? #{${items.addItemsReasonKey()}}
+                    : #{order.items.add.reason(${#messages.msg(items.addItemsReasonKey())})}"></p>
     </div>
 
     <!--/* read-only (closed order, super admin): the same block without method and action, so it never posts */-->

@@ -1443,6 +1443,11 @@ body.cl-drawer-open .cl-sidebar {
     color: var(--cl-warn);
 }
 
+/* ... and under a bad pill (a refused or blocked e-receipt) in the bad tone */
+.cl-page .cl-list .cl-list-desc.is-bad {
+    color: var(--cl-bad);
+}
+
 .cl-page .cl-list-actions {
     display: flex;
     flex-wrap: wrap;

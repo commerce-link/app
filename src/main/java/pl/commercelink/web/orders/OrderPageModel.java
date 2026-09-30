@@ -47,6 +47,14 @@ public record OrderPageModel(String orderId, String shortId, String backHref, bo
                             List<ProductCatalog> catalogs, List<SupplierLabelMap.Option> suppliers,
                             Map<String, SplitGroupPreviewDto> splitPreviews) {
 
+        /**
+         * Whether addItemsReasonKey is a whole sentence shown as it is ("Trwa wystawianie e-paragonu — pozycji nie
+         * dodasz."), not a short reason after the "Dodawanie pozycji:" prefix.
+         */
+        public boolean addItemsReasonIsSentence() {
+            return addItemsReasonKey != null && addItemsReasonKey.startsWith("order.items.add.locked.receipt");
+        }
+
         /** The drop-downs of the selection row, each with its actions in the order of BulkAction; none is empty. */
         public List<BulkMenu> bulkMenus() {
             return Arrays.stream(BulkAction.Menu.values())
@@ -104,12 +112,14 @@ public record OrderPageModel(String orderId, String shortId, String backHref, bo
      * emptyKey takes the next type's label as its argument: "Issue" makes it, or "Add document" when it is typed by hand.
      * receipt: the order's e-receipt, or null when it has no attempt; its document is not repeated in rows.
      * addLockedKey: why "Add document" shows greyed (an e-receipt being issued), null when it is available or simply
-     * absent. canIssueReceipt: "E-paragon" in the "Issue" menu.
+     * absent. canIssueReceipt: "E-paragon" in the "Issue" menu; issueReceiptBlockedKey: it is shown greyed with this
+     * reason (a POS sale without the customer's e-mail), null when it can run.
      */
     public record DocumentsCard(List<DocumentRow> rows, ReceiptRow receipt, String emptyKey, boolean canAdd,
                                 String addLockedKey, List<OrderLabels.Option<DocumentType>> manualTypes,
                                 DocumentType nextType, String nextTypeKey, List<OrderLabels.Option<DocumentType>> issuable,
-                                boolean goodsIssue, boolean canIssueReceipt, boolean canIssue, String today,
+                                boolean goodsIssue, boolean canIssueReceipt, String issueReceiptBlockedKey,
+                                boolean canIssue, String today,
                                 List<ReceiptCloseForm> closeForms) {
 
         /** No document row and no e-receipt: the card shows its empty text. */
@@ -122,18 +132,23 @@ public record OrderPageModel(String orderId, String shortId, String backHref, bo
      * The order's e-receipt as one row of the documents card: its newest attempt, with the earlier (dead, superseded)
      * attempts under it. number and href once known (href only a web address); dateKey/date say when it was
      * fiscalised or closed by hand; emailKey whether the buyer's e-mail went out or was skipped; problem what went
-     * wrong (warning tone), what the operator should do and the provider's technical hints, null without a problem.
+     * wrong, what the operator should do and the provider's technical hints, null without a problem; problemTone the
+     * colour of its cause, that of the pill (ReceiptOrderView.Row#problemTone).
      * The actions are false on a super admin's page; closeHref is the "Zamknij ręcznie" page without JavaScript,
      * closeDialogId its dialog. settled: the attempt fiscalised nothing but the order got its sale document another way
      * (a receipt from the shop's cash register, an invoice) or was cancelled, so the row says nothing is needed, with
      * settledOutcome (why the attempt stopped) when known; settledKey is that sentence's message key, null when not
-     * settled.
+     * settled. reissueBlockedKey: "Wystaw ponownie" is shown greyed with this reason (a POS sale without the customer's
+     * e-mail), null when it can run; reissueConfirmKey is its confirmation text. attachingKey: the receipt is
+     * fiscalised but its document is not on the order yet (the locks say so too), null otherwise.
      */
     public record ReceiptRow(String key, int attemptNo, String number, String href, String statusKey, String statusTone,
-                             String dateKey, String date, String emailKey, ReceiptPageProblem problem, boolean canCheck,
-                             boolean canResendEmail, boolean canClose, boolean canReissue, String closeDialogId,
-                             String closeHref, List<ReceiptEarlierRow> earlier, boolean settled, String settledOutcome,
-                             String settledKey) {
+                             String dateKey, String date, String emailKey, ReceiptPageProblem problem,
+                             String problemTone, boolean canCheck,
+                             boolean canResendEmail, boolean canClose, boolean canReissue, String reissueBlockedKey,
+                             String reissueConfirmKey, String closeDialogId, String closeHref,
+                             List<ReceiptEarlierRow> earlier, boolean settled, String settledOutcome, String settledKey,
+                             String attachingKey) {
 
         /** Whether the row offers any action at all (the actions column is left out otherwise). */
         public boolean hasActions() {

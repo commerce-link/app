@@ -180,4 +180,42 @@ class ReceiptOrderViewTest {
             assertThat(row.outcome()).isEqualTo("invalid VAT rate");
         });
     }
+
+    @Test
+    void aSupersededDeadAttemptIsNeutral() {
+        // given: R1 blocked, then R2 refused by the provider — only R2 still asks something of the operator
+        ReceiptAttempt r1 = deadAttempt("order-1:R1", ReceiptAttemptState.BLOCKED, 1);
+        ReceiptAttempt r2 = deadAttempt("order-1:R2", ReceiptAttemptState.FAILED, 2);
+        ReceiptAttempt pending = deadAttempt("order-1:R3", ReceiptAttemptState.PENDING, 3);
+
+        // when
+        ReceiptOrderView twoDead = ReceiptOrderView.of(List.of(r1, r2), true, false, alerts, NOW, Locale.ENGLISH);
+        ReceiptOrderView underLive = ReceiptOrderView.of(List.of(r1, r2, pending), false, false, alerts, NOW, Locale.ENGLISH);
+
+        // then: the same history is grey whatever the newer attempt's state
+        assertThat(twoDead.rows()).extracting(ReceiptOrderView.Row::statusTone).containsExactly("is-bad", "is-neutral");
+        assertThat(underLive.rows()).extracting(ReceiptOrderView.Row::statusTone)
+                .containsExactly("is-warn", "is-neutral", "is-neutral");
+    }
+
+    @Test
+    void theCauseOfARefusedAttemptHasTheBadTone() {
+        // given
+        ReceiptAttempt failed = deadAttempt("order-1:R1", ReceiptAttemptState.FAILED, 1);
+        ReceiptAttempt blocked = deadAttempt("order-2:R1", ReceiptAttemptState.BLOCKED, 1);
+        ReceiptAttempt pending = deadAttempt("order-3:R1", ReceiptAttemptState.PENDING, 1);
+
+        // when
+        ReceiptOrderView.Row failedRow = ReceiptOrderView.of(List.of(failed), true, false, alerts, NOW, Locale.ENGLISH).rows().get(0);
+        ReceiptOrderView.Row blockedRow = ReceiptOrderView.of(List.of(blocked), true, false, alerts, NOW, Locale.ENGLISH).rows().get(0);
+        ReceiptOrderView.Row pendingRow = ReceiptOrderView.of(List.of(pending), false, false, alerts, NOW, Locale.ENGLISH).rows().get(0);
+        ReceiptOrderView.Row emailRow = ReceiptOrderView.of(List.of(failedEmailAttempt()), false, false, alerts, NOW,
+                Locale.ENGLISH).rows().get(0);
+
+        // then: the cause is read in the colour of its pill
+        assertThat(failedRow.problemTone()).isEqualTo("is-bad");
+        assertThat(blockedRow.problemTone()).isEqualTo("is-bad");
+        assertThat(pendingRow.problemTone()).isEqualTo("is-warn");
+        assertThat(emailRow.problemTone()).isEqualTo("is-warn");
+    }
 }

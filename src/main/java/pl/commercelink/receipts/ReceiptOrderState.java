@@ -44,6 +44,25 @@ public record ReceiptOrderState(List<ReceiptAttempt> attempts, ReceiptOrderView 
     }
 
     /**
+     * {@link #locksOrder} with why: {@link ReceiptLock#ATTACHING} once the receipt is fiscalised (or closed by hand)
+     * and only its document is still on its way to the order, {@link ReceiptLock#ISSUING} while there is no outcome
+     * yet. The page words its reasons after it: "Trwa wystawianie" would contradict the "Zafiskalizowany" pill.
+     */
+    public ReceiptLock receiptLock(Order order) {
+        return receiptLock(attempts, order);
+    }
+
+    /** The same rule over attempts the caller already read. */
+    public static ReceiptLock receiptLock(List<ReceiptAttempt> orderAttempts, Order order) {
+        if (!locksOrder(ReceiptAttemptService.blocksManualReceipt(orderAttempts), order)) {
+            return ReceiptLock.NONE;
+        }
+        boolean registered = orderAttempts.stream().anyMatch(a -> a.getState() == ReceiptAttemptState.FISCALISED
+                || a.getState() == ReceiptAttemptState.CLOSED_MANUALLY);
+        return registered ? ReceiptLock.ATTACHING : ReceiptLock.ISSUING;
+    }
+
+    /**
      * Whether the order's e-receipt is registered in fiscal memory or was closed by hand with a document resolved at
      * the provider: an attempt is FISCALISED or CLOSED_MANUALLY, or its document is on the order. Cancelling the order
      * does not undo such a receipt, so the cancel confirmation says so.

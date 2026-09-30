@@ -8,6 +8,8 @@ import pl.commercelink.stores.StoreNotification;
 import pl.commercelink.stores.StoreNotificationSeverity;
 import pl.commercelink.stores.StoreNotificationType;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 
@@ -114,11 +116,30 @@ public class ReceiptAlerts {
         };
         String base = "receipts.page." + pageKey(attempt, attention) + ".";
         String cause = pageText(base + "cause", attempt.getProvider(), args, locale);
-        String action = pageText(base + "action", attempt.getProvider(), args, locale);
+        List<String> actions = pageLines(base + "action", attempt.getProvider(), args, locale);
         String details = pageText(base + "details", attempt.getProvider(), args, locale);
         String summary = details == null ? null : messageSource.getMessage("receipts.page.details.summary",
                 new Object[]{providerName}, locale);
-        return new ReceiptPageProblem(cause == null ? attention.name() : cause, action, summary, details);
+        return ReceiptPageProblem.ofLines(cause == null ? attention.name() : cause, actions, summary, details);
+    }
+
+    /**
+     * The action as its lines: the one text under {@code key}, or, for advice that offers alternatives, the numbered
+     * lines {@code key.1}, {@code key.2}, ... (each may be overridden per provider like any page text).
+     */
+    private List<String> pageLines(String key, String providerId, Object[] args, Locale locale) {
+        String single = pageText(key, providerId, args, locale);
+        if (single != null) {
+            return List.of(single);
+        }
+        List<String> lines = new ArrayList<>();
+        for (int n = 1; ; n++) {
+            String line = pageText(key + "." + n, providerId, args, locale);
+            if (line == null) {
+                return lines;
+            }
+            lines.add(line);
+        }
     }
 
     /** The provider-specific text when the provider has one, the generic one otherwise; null when neither exists. */

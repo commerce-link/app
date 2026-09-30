@@ -4323,6 +4323,35 @@ class OrdersControllerTest {
         }
 
         @Test
+        void onceTheEReceiptIsFiscalisedTheRefusalsSayItIsBeingAttached() {
+            // given: fiscalised, its document not on the order yet — the page says "being attached", so does the server
+            Order order = order(OrderStatus.Delivered);
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            when(receiptAttemptService.locksOrder(order)).thenReturn(true);
+            when(receiptAttemptService.receiptLock(order)).thenReturn(pl.commercelink.receipts.ReceiptLock.ATTACHING);
+            RedirectAttributesModelMap add = new RedirectAttributesModelMap();
+            RedirectAttributesModelMap remove = new RedirectAttributesModelMap();
+            RedirectAttributesModelMap consolidate = new RedirectAttributesModelMap();
+            RedirectAttributesModelMap cancel = new RedirectAttributesModelMap();
+            RedirectAttributesModelMap document = new RedirectAttributesModelMap();
+
+            // when
+            ordersController.addOrderItems(ORDER_ID, new AddItemsForm(), add, polish);
+            ordersController.removeSelectedItemsFromOrder(ORDER_ID, selected("a"), remove, polish);
+            ordersController.toggleConsolidation(ORDER_ID, "i1", consolidate, polish);
+            ordersController.cancelOrder(ORDER_ID, cancel, polish);
+            ordersController.addReceipt(ORDER_ID, document(DocumentType.InvoicePersonal, "FV/1"), document, polish);
+
+            // then
+            assertThat(flash(add)).containsEntry("errorMessage", "order.items.add.locked.receiptAttaching");
+            assertThat(flash(remove)).containsEntry("errorMessage", "order.bulk.unavailable.receiptAttaching");
+            assertThat(flash(consolidate)).containsEntry("errorMessage", "order.item.consolidation.locked.receiptAttaching");
+            assertThat(flash(cancel)).containsEntry("errorMessage", "order.page.cancel.locked.receiptAttaching");
+            assertThat(flash(document)).containsEntry("errorMessage", "order.documents.add.locked.receiptAttaching");
+            verifyNoInteractions(ordersManager);
+        }
+
+        @Test
         void itemsOfAnInvoicedOrderAreNotRemovedEvenFromAStalePage() {
             // given: the page no longer offers "Usuń" once the receipt document is on the order
             Order order = order(OrderStatus.Delivered);

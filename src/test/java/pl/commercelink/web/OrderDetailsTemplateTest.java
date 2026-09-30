@@ -803,7 +803,7 @@ class OrderDetailsTemplateTest {
 
         // then
         assertThat(invoicedHtml).doesNotContain("address-dialog-billing").contains("address-dialog-shipping")
-                .contains("Po wystawieniu faktury danych rozliczeniowych nie zmienisz.");
+                .contains("Zamówienie ma już fakturę albo paragon — danych rozliczeniowych nie zmienisz.");
         assertThat(labelledHtml).doesNotContain("address-dialog-shipping").contains("address-dialog-billing")
                 .contains("Etykieta już nadana — adresu wysyłki nie zmienisz.");
         assertThat(closedHtml).doesNotContain("address-dialog").doesNotContain("updateAddressDetails");
@@ -2369,7 +2369,8 @@ class OrderDetailsTemplateTest {
         String html = renderWithReceipts(order(OrderStatus.New), ADMIN, receipts);
 
         // then
-        assertThat(html).contains("Dodawanie pozycji: Trwa wystawianie e-paragonu.")
+        assertThat(html).contains("Trwa wystawianie e-paragonu — pozycji nie dodasz.")
+                .doesNotContain("Dodawanie pozycji: Trwa")
                 .contains("Trwa wystawianie e-paragonu — danych rozliczeniowych nie zmienisz.")
                 .containsPattern("<button type=\"button\" class=\"cl-button\" aria-disabled=\"true\"\\s+aria-describedby=\"document-add-reason\">Dodaj dokument</button>")
                 .contains("id=\"document-add-reason\"").contains("Trwa wystawianie e-paragonu — dokumentu nie dodasz ręcznie.")
@@ -2484,5 +2485,79 @@ class OrderDetailsTemplateTest {
                 .contains("<p class=\"cl-list-desc\" id=\"e-paragon-settled-1\">Nie wystawiono (zła stawka VAT). "
                         + "Zamówienie jest anulowane — nie trzeba nic robić.</p>")
                 .doesNotContain("e-paragon-problem-1").doesNotContain("Wystaw ponownie");
+    }
+
+    @Test
+    void aPosSaleWithoutTheCustomersEmailGreysReissueAndShowsTheAdviceAsThreeLines() {
+        // given: the POS sale's attempt blocked for the missing e-mail (the walk-in buyer has none of their own)
+        Order order = order(OrderStatus.Delivered);
+        order.setSource(new pl.commercelink.orders.OrderSource("operator", pl.commercelink.orders.OrderSourceType.PointOfSale));
+        order.getBillingDetails().setEmail(null);
+        pl.commercelink.receipts.ReceiptPageProblem advice = pl.commercelink.receipts.ReceiptPageProblem.ofLines(
+                "E-paragonu nie wysłano: sprzedaż POS nie ma e-maila klienta.",
+                List.of("Kasa wydrukowała paragon?", "Klient chce e-paragon?", "Nie rób obu."), null, null);
+        ReceiptOrderState receipts = new ReceiptOrderState(
+                List.of(attempt(1, pl.commercelink.receipts.ReceiptAttemptState.BLOCKED)),
+                new pl.commercelink.receipts.ReceiptOrderView(List.of(receiptRow(1,
+                        pl.commercelink.receipts.ReceiptAttemptState.BLOCKED, "is-bad", null, null, advice,
+                        false, false, false, "sprzedaż POS bez e-maila klienta")), true),
+                false, false);
+
+        // when
+        String html = renderWithReceipts(order, ADMIN, receipts);
+
+        // then: the cause in the colour of the red pill, one paragraph per alternative
+        String row = html.substring(html.indexOf("id=\"e-paragon\""));
+        row = row.substring(0, row.indexOf("</li>"));
+        assertThat(row).contains("<p class=\"cl-list-desc is-bad\" id=\"e-paragon-problem-1\">")
+                .contains("<p class=\"cl-list-desc\" id=\"e-paragon-action-1\">Kasa wydrukowała paragon?</p>")
+                .contains("<p class=\"cl-list-desc\" id=\"e-paragon-action-1-2\">Klient chce e-paragon?</p>")
+                .contains("<p class=\"cl-list-desc\" id=\"e-paragon-action-1-3\">Nie rób obu.</p>");
+        // "Wystaw ponownie" greyed, still focusable, with its reason in the row; no confirmation link
+        assertThat(row).containsPattern("<button type=\"button\" class=\"cl-link-button\"\\s+aria-disabled=\"true\""
+                        + "\\s+aria-describedby=\"e-paragon-reissue-reason-1\">Wystaw ponownie</button>")
+                .contains("id=\"e-paragon-reissue-reason-1\">Najpierw wpisz e-mail klienta w danych rozliczeniowych.</p>")
+                .doesNotContain("/receipts/reissue");
+    }
+
+    @Test
+    void reissueIsConfirmedWithThePrimaryButtonAndTheCashRegisterSentenceForAPosSale() {
+        // given: the POS sale got the customer's e-mail since its attempt blocked
+        Order order = order(OrderStatus.Delivered);
+        order.setSource(new pl.commercelink.orders.OrderSource("operator", pl.commercelink.orders.OrderSourceType.PointOfSale));
+        ReceiptOrderState receipts = new ReceiptOrderState(
+                List.of(attempt(1, pl.commercelink.receipts.ReceiptAttemptState.BLOCKED)),
+                new pl.commercelink.receipts.ReceiptOrderView(List.of(receiptRow(1,
+                        pl.commercelink.receipts.ReceiptAttemptState.BLOCKED, "is-bad", null, null, null,
+                        false, false, false, null)), true),
+                false, false);
+
+        // when
+        String html = renderWithReceipts(order, ADMIN, receipts);
+
+        // then
+        assertThat(html).containsPattern("<a class=\"cl-link-button\" data-cl-confirm\\s+data-cl-confirm-tone=\"primary\"")
+                .contains("w systemie e-paragonów").contains("Jeśli kasa wydrukowała paragon, nie wystawiaj e-paragonu.")
+                .doesNotContain("panelu dostawcy").doesNotContain("e-paragon-reissue-reason-1");
+    }
+
+    @Test
+    void theEReceiptEntryOfTheIssueMenuIsGreyedForAPosSaleWithoutTheCustomersEmail() {
+        // given
+        Order order = order(OrderStatus.New);
+        order.setSource(new pl.commercelink.orders.OrderSource("operator", pl.commercelink.orders.OrderSourceType.PointOfSale));
+        order.getBillingDetails().setEmail(null);
+        ReceiptOrderState receipts = new ReceiptOrderState(List.of(),
+                new pl.commercelink.receipts.ReceiptOrderView(List.of(), false), true, false);
+
+        // when
+        String html = renderWithReceipts(order, ADMIN, receipts);
+
+        // then
+        String menu = html.substring(html.indexOf("id=\"issue-menu\""));
+        menu = menu.substring(0, menu.indexOf("</ul>"));
+        assertThat(menu).containsPattern("<button type=\"button\" class=\"cl-menu-item\"\\s+aria-disabled=\"true\">\\s*"
+                        + "<span>E-paragon</span>\\s*<span class=\"cl-menu-reason\">Najpierw wpisz e-mail klienta w danych rozliczeniowych.</span>")
+                .doesNotContain("/receipts/issue");
     }
 }

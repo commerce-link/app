@@ -35,6 +35,8 @@ import java.util.Optional;
 public class ReceiptAttemptService {
 
     static final String SYSTEM = "System";
+    /** Why "E-paragon" and "Wystaw ponownie" are refused (and greyed) for a POS sale without the customer's e-mail. */
+    public static final String POS_NEEDS_EMAIL = "receipts.action.posNeedsEmail";
 
     private final ReceiptAttemptStore attempts;
     private final StoresRepository storesRepository;
@@ -130,7 +132,32 @@ public class ReceiptAttemptService {
         if (!hasProvider(store)) {
             throw new ReceiptActionException("receipts.action.reissue.noProvider");
         }
+        refusePosWithoutCustomerEmail(store, order);
         return new Reissue(store, order);
+    }
+
+    /**
+     * A point-of-sale sale without the customer's e-mail would only get one more blocked attempt (and one more bell
+     * alert): refused before any attempt is created, with the reason the order page shows under the greyed button.
+     */
+    private static void refusePosWithoutCustomerEmail(Store store, Order order) {
+        if (ReceiptRequestConverter.blocksPosWithoutCustomerEmail(order, store)) {
+            throw new ReceiptActionException(POS_NEEDS_EMAIL);
+        }
+    }
+
+    /**
+     * The "Wystaw ponownie" confirmation: a point-of-sale sale adds the cash register warning (its receipt may have
+     * been printed there meanwhile). The same key in the dialog and on the page without JavaScript.
+     */
+    public static String reissueConfirmMessageKey(Order order) {
+        return order != null && order.isPointOfSale()
+                ? "receipts.action.reissue.confirm.message.pos" : "receipts.action.reissue.confirm.message";
+    }
+
+    /** {@link #reissueConfirmMessageKey(Order)} for the confirmation page, which has only the order's id. */
+    public String reissueConfirmMessageKey(String storeId, String orderId) {
+        return reissueConfirmMessageKey(ordersRepository.findById(storeId, orderId));
     }
 
     private record Reissue(Store store, Order order) {
@@ -143,6 +170,22 @@ public class ReceiptAttemptService {
      * attempt is refused: a live one owns the receipt, a dead one is replaced with "Wystaw ponownie".
      */
     public ReceiptAttempt issueManually(String storeId, String orderId, String actor) {
+        Reissue issue = checkIssue(storeId, orderId);
+        return create(issue.store(), issue.order(), 1, actor)
+                .orElseThrow(() -> new ReceiptActionException("receipts.action.reissue.concurrent"));
+    }
+
+    /** Why {@link #issueManually} would refuse the order now (its message key), null when it would go ahead. */
+    public String issueRefusal(String storeId, String orderId) {
+        try {
+            checkIssue(storeId, orderId);
+            return null;
+        } catch (ReceiptActionException e) {
+            return e.getMessageKey();
+        }
+    }
+
+    private Reissue checkIssue(String storeId, String orderId) {
         if (!attempts.findByOrder(storeId, orderId).isEmpty()) {
             throw new ReceiptActionException("receipts.action.issue.exists");
         }
@@ -154,8 +197,8 @@ public class ReceiptAttemptService {
         if (!hasProvider(store)) {
             throw new ReceiptActionException("receipts.action.reissue.noProvider");
         }
-        return create(store, order, 1, actor)
-                .orElseThrow(() -> new ReceiptActionException("receipts.action.reissue.concurrent"));
+        refusePosWithoutCustomerEmail(store, order);
+        return new Reissue(store, order);
     }
 
     /** Whether the order documents offer "E-paragon": the conditions of {@link #issueManually} hold. */
@@ -364,7 +407,15 @@ public class ReceiptAttemptService {
      * order edit endpoint runs before changing anything the receipt's frozen request depends on.
      */
     public boolean locksOrder(Order order) {
-        return ReceiptOrderState.locksOrder(blocksManualReceipt(order.getStoreId(), order.getOrderId()), order);
+        return receiptLock(order).locks();
+    }
+
+    /**
+     * {@link #locksOrder} with why ({@link ReceiptOrderState#receiptLock}): still being issued, or fiscalised and
+     * being attached to the order; the edit endpoints word their refusal after it.
+     */
+    public ReceiptLock receiptLock(Order order) {
+        return ReceiptOrderState.receiptLock(attemptsOf(order.getStoreId(), order.getOrderId()), order);
     }
 
     /**

@@ -3,6 +3,7 @@ package pl.commercelink.web.orders;
 import org.apache.commons.lang3.StringUtils;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
+import pl.commercelink.receipts.ReceiptLock;
 
 import java.util.Objects;
 
@@ -10,7 +11,8 @@ import java.util.Objects;
  * Why an item's sale fields (name, quantity, VAT rate) are fixed: the order's sale is registered and the order must not
  * drift from its document. INVOICED: a closing document is on the order ({@link Order#isInvoiced()}: an invoice or a
  * receipt); RECEIPT_ISSUING: an e-receipt is being issued and its request snapshot is frozen, but its document is not
- * on the order yet (ReceiptOrderState#locksOrder). A sale is corrected with a correcting invoice or a return, outside
+ * on the order yet (ReceiptOrderState#locksOrder); RECEIPT_ATTACHING: the same once the receipt is fiscalised and
+ * only its document is still being attached. A sale is corrected with a correcting invoice or a return, outside
  * the order page. Serial numbers, supplier, cost and comment are not sale fields and stay editable.
  *
  * <p>Each value carries the short reasons the item page shows next to the locked fields, the full refusal text of a
@@ -24,7 +26,10 @@ public enum ItemSaleLock {
             "order.item.unavailable.sale.invoiced", "order.item.split.group.locked.invoiced"),
     RECEIPT_ISSUING("order.item.form.name.locked.receipt", "order.item.form.numbers.locked.receipt",
             "order.item.form.price.locked.receipt", "order.item.error.sale.locked.receipt",
-            "order.item.unavailable.receipt", "order.item.split.group.locked.receipt");
+            "order.item.unavailable.receipt", "order.item.split.group.locked.receipt"),
+    RECEIPT_ATTACHING("order.item.form.name.locked.receiptAttaching", "order.item.form.numbers.locked.receiptAttaching",
+            "order.item.form.price.locked.receiptAttaching", "order.item.error.sale.locked.receiptAttaching",
+            "order.item.unavailable.receiptAttaching", "order.item.split.group.locked.receiptAttaching");
 
     private final String nameKey;
     private final String numbersKey;
@@ -45,7 +50,19 @@ public enum ItemSaleLock {
 
     /** The lock of this order, or null. receiptLocked: ReceiptOrderState#locksOrder (false once the order is invoiced). */
     public static ItemSaleLock of(Order order, boolean receiptLocked) {
-        return order.isInvoiced() ? INVOICED : receiptLocked ? RECEIPT_ISSUING : null;
+        return of(order, ReceiptLock.of(receiptLocked));
+    }
+
+    /** The same, worded after why the e-receipt locks the order (still issuing, or fiscalised and being attached). */
+    public static ItemSaleLock of(Order order, ReceiptLock receiptLock) {
+        if (order.isInvoiced()) {
+            return INVOICED;
+        }
+        return switch (receiptLock) {
+            case NONE -> null;
+            case ISSUING -> RECEIPT_ISSUING;
+            case ATTACHING -> RECEIPT_ATTACHING;
+        };
     }
 
     /**

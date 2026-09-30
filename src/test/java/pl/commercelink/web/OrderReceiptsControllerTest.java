@@ -255,6 +255,8 @@ class OrderReceiptsControllerTest {
         assertThat(confirm.title()).isEqualTo("Wystawić nowy paragon?");
         assertThat(confirm.actionPath()).isEqualTo("/dashboard/orders/" + ORDER_ID + "/receipts/reissue");
         assertThat(confirm.cancelPath()).isEqualTo("/dashboard/orders/" + ORDER_ID);
+        // a new attempt removes nothing: the primary button, as in the dialog
+        assertThat(confirm.destructive()).isFalse();
         // back to the order by its number, as the order page's own confirmation pages lead
         assertThat(model.getAttribute("backLabel")).isEqualTo("Zamówienie order-1");
     }
@@ -288,7 +290,6 @@ class OrderReceiptsControllerTest {
     @Test
     void confirmIssueRendersAPrimaryConfirmationPageThatPostsTheIssue() {
         // given
-        when(attemptService.attemptsOf(STORE_ID, ORDER_ID)).thenReturn(List.of());
         when(messageSource.getMessage(eq("receipts.action.issue.confirm.title"), any(), eq(LOCALE))).thenReturn("Wystawić e-paragon?");
         when(messageSource.getMessage(eq("receipts.action.issue.confirm.message"), any(), eq(LOCALE))).thenReturn("message");
         when(messageSource.getMessage(eq("receipts.action.issue.confirm.action"), any(), eq(LOCALE))).thenReturn("Wystaw e-paragon");
@@ -313,8 +314,7 @@ class OrderReceiptsControllerTest {
     @Test
     void confirmIssueOfAnOrderThatAlreadyHasAnAttemptGoesBackWithTheReason() {
         // given
-        when(attemptService.attemptsOf(STORE_ID, ORDER_ID))
-                .thenReturn(List.of(attempt(ORDER_ID + ":R1", 1, ReceiptAttemptState.FAILED)));
+        when(attemptService.issueRefusal(STORE_ID, ORDER_ID)).thenReturn("receipts.action.issue.exists");
         when(messageSource.getMessage("receipts.action.issue.exists", null, LOCALE)).thenReturn("Ma już e-paragon.");
 
         // when
@@ -372,5 +372,97 @@ class OrderReceiptsControllerTest {
         assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
         assertThat(redirectAttributes.getFlashAttributes().get("errorMessage")).isEqualTo("Nie znaleziono paragonu.");
         verifyNoInteractions(attemptService);
+    }
+
+    // --- a POS sale without the customer's e-mail, an attempt blocked at once ---------------------------------------
+
+    @Test
+    void issueIsRefusedBeforeCreatingAnAttemptForAPosSaleWithoutTheCustomersEmail() {
+        // given: the service refuses before it creates anything (ReceiptAttemptServiceTest pins that side)
+        when(attemptService.issueManually(STORE_ID, ORDER_ID, "Jan Kowalski"))
+                .thenThrow(new ReceiptActionException(ReceiptAttemptService.POS_NEEDS_EMAIL));
+        when(messageSource.getMessage(ReceiptAttemptService.POS_NEEDS_EMAIL, null, LOCALE))
+                .thenReturn("Najpierw wpisz e-mail klienta w danych rozliczeniowych.");
+        when(attemptService.issueRefusal(STORE_ID, ORDER_ID)).thenReturn(ReceiptAttemptService.POS_NEEDS_EMAIL);
+
+        // when
+        String view = controller.issue(ORDER_ID, LOCALE, redirectAttributes);
+        RedirectAttributes confirmAttributes = new RedirectAttributesModelMap();
+        String confirmView = controller.confirmIssue(ORDER_ID, LOCALE, new ExtendedModelMap(), confirmAttributes);
+
+        // then: the reason the page shows under the greyed entry, never "is being issued"
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+        assertThat(redirectAttributes.getFlashAttributes().get("errorMessage"))
+                .isEqualTo("Najpierw wpisz e-mail klienta w danych rozliczeniowych.");
+        assertThat(redirectAttributes.getFlashAttributes()).doesNotContainKey(OrderFlash.ATTRIBUTE);
+        // the page without JavaScript does not offer the confirmation either
+        assertThat(confirmView).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+        assertThat(confirmAttributes.getFlashAttributes().get("errorMessage"))
+                .isEqualTo("Najpierw wpisz e-mail klienta w danych rozliczeniowych.");
+    }
+
+    @Test
+    void reissueIsRefusedBeforeCreatingAnAttemptForAPosSaleWithoutTheCustomersEmail() {
+        // given
+        when(attemptService.reissue(STORE_ID, ORDER_ID, "Jan Kowalski"))
+                .thenThrow(new ReceiptActionException(ReceiptAttemptService.POS_NEEDS_EMAIL));
+        when(attemptService.reissueRefusal(STORE_ID, ORDER_ID)).thenReturn(ReceiptAttemptService.POS_NEEDS_EMAIL);
+        when(messageSource.getMessage(ReceiptAttemptService.POS_NEEDS_EMAIL, null, LOCALE))
+                .thenReturn("Najpierw wpisz e-mail klienta w danych rozliczeniowych.");
+
+        // when
+        String view = controller.reissue(ORDER_ID, LOCALE, redirectAttributes);
+        RedirectAttributes confirmAttributes = new RedirectAttributesModelMap();
+        Model model = new ExtendedModelMap();
+        String confirmView = controller.confirmReissue(ORDER_ID, LOCALE, model, confirmAttributes);
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+        assertThat(redirectAttributes.getFlashAttributes().get("errorMessage"))
+                .isEqualTo("Najpierw wpisz e-mail klienta w danych rozliczeniowych.");
+        assertThat(redirectAttributes.getFlashAttributes()).doesNotContainKey(OrderFlash.ATTRIBUTE);
+        assertThat(confirmView).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+        assertThat(model.getAttribute("confirm")).isNull();
+    }
+
+    @Test
+    void anAttemptBlockedAtOnceShowsAWarningNotSuccess() {
+        // given: the converter blocked the new attempt (e.g. an unknown VAT rate): nothing was sent anywhere
+        when(attemptService.issueManually(STORE_ID, ORDER_ID, "Jan Kowalski"))
+                .thenReturn(attempt(ORDER_ID + ":R1", 1, ReceiptAttemptState.BLOCKED));
+        when(attemptService.reissue(STORE_ID, ORDER_ID, "Jan Kowalski"))
+                .thenReturn(attempt(ORDER_ID + ":R2", 2, ReceiptAttemptState.BLOCKED));
+        when(messageSource.getMessage("receipts.action.blockedAtOnce", null, LOCALE))
+                .thenReturn("E-paragonu nie wysłano — powód w wierszu E-paragon.");
+
+        // when
+        controller.issue(ORDER_ID, LOCALE, redirectAttributes);
+        RedirectAttributes reissueAttributes = new RedirectAttributesModelMap();
+        controller.reissue(ORDER_ID, LOCALE, reissueAttributes);
+
+        // then
+        for (RedirectAttributes attributes : List.of(redirectAttributes, reissueAttributes)) {
+            OrderNotice notice = (OrderNotice) attributes.getFlashAttributes().get(OrderFlash.ATTRIBUTE);
+            assertThat(notice.tone()).isEqualTo(OrderLabels.WARN);
+            assertThat(notice.text()).isEqualTo("E-paragonu nie wysłano — powód w wierszu E-paragon.");
+            assertThat(attributes.getFlashAttributes()).doesNotContainKey("errorMessage");
+        }
+    }
+
+    @Test
+    void theReissueConfirmationPageOfAPosSaleWarnsAboutTheCashRegister() {
+        // given
+        when(attemptService.reissueConfirmMessageKey(STORE_ID, ORDER_ID))
+                .thenReturn("receipts.action.reissue.confirm.message.pos");
+        when(messageSource.getMessage(eq("receipts.action.reissue.confirm.message.pos"), any(), eq(LOCALE)))
+                .thenReturn("… Jeśli kasa wydrukowała paragon, nie wystawiaj e-paragonu.");
+        Model model = new ExtendedModelMap();
+
+        // when
+        controller.confirmReissue(ORDER_ID, LOCALE, model, redirectAttributes);
+
+        // then
+        assertThat(((ConfirmAction) model.getAttribute("confirm")).message())
+                .endsWith("Jeśli kasa wydrukowała paragon, nie wystawiaj e-paragonu.");
     }
 }

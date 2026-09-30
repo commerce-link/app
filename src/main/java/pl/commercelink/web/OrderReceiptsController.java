@@ -26,12 +26,13 @@ import pl.commercelink.web.settings.ConfirmAction;
 
 import java.util.Locale;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 /**
  * Operator actions on an order's e-receipt attempts, from the e-receipt row of the order's documents card. Each
  * refusal names its reason (the layout's error flash); a success is the order page's own notice (OrderFlash), like
- * every other action of the page. Nothing here calls a provider. "E-paragon" and "Wystaw ponownie" are confirmed
- * first: the {@code a[data-cl-confirm]} links lead to a plain confirmation page here, which JavaScript turns into the
+ * every other action of the page, and an attempt blocked at once a warning notice. Nothing here calls a provider.
+ * "E-paragon" and "Wystaw ponownie" are confirmed first: the {@code a[data-cl-confirm]} links lead to a plain confirmation page here, which JavaScript turns into the
  * page's confirmation dialog; "Zamknij ręcznie" opens its dialog, or its own page here without JavaScript.
  */
 @Controller
@@ -51,33 +52,35 @@ public class OrderReceiptsController {
             return refuse(orderId, refusal, locale, redirectAttributes);
         }
         String orderPath = "/dashboard/orders/" + orderId;
-        model.addAttribute("confirm", new ConfirmAction(
+        String messageKey = attemptService.reissueConfirmMessageKey(CustomSecurityContext.getStoreId(), orderId);
+        // a new attempt is not destructive: the primary button, as in the dialog
+        return OrderConfirmPages.render(model, new ConfirmAction(
                 messageSource.getMessage("receipts.action.reissue.confirm.title", null, locale),
-                messageSource.getMessage("receipts.action.reissue.confirm.message", null, locale),
+                messageSource.getMessage(messageKey != null ? messageKey : "receipts.action.reissue.confirm.message",
+                        null, locale),
                 messageSource.getMessage("receipts.action.reissue", null, locale),
-                orderPath + "/receipts/reissue",
-                orderPath));
-        model.addAttribute("backLabel", backLabel(orderId, locale));
-        return "settings-confirm";
+                orderPath + "/receipts/reissue", orderPath, false), backLabel(orderId, locale));
     }
 
     @PostMapping("/dashboard/orders/{orderId}/receipts/reissue")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String reissue(@PathVariable String orderId, Locale locale, RedirectAttributes redirectAttributes) {
-        return run(orderId, locale, redirectAttributes, "receipts.action.reissue.done",
+        return start(orderId, locale, redirectAttributes, "receipts.action.reissue.done",
                 () -> attemptService.reissue(CustomSecurityContext.getStoreId(), orderId, actor()));
     }
 
     /**
-     * The "E-paragon" entry of the "Issue" menu without JavaScript. An order that already has an attempt is sent back
-     * with the reason at once, as the POST would refuse it; the POST still checks everything itself.
+     * The "E-paragon" entry of the "Issue" menu without JavaScript. An order the POST would refuse (it already has an
+     * attempt, a POS sale without the customer's e-mail, ...) is sent back with the reason at once; the POST still
+     * checks everything itself.
      */
     @GetMapping("/dashboard/orders/{orderId}/receipts/issue")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String confirmIssue(@PathVariable String orderId, Locale locale, Model model,
                                RedirectAttributes redirectAttributes) {
-        if (!attemptService.attemptsOf(CustomSecurityContext.getStoreId(), orderId).isEmpty()) {
-            return refuse(orderId, "receipts.action.issue.exists", locale, redirectAttributes);
+        String refusal = attemptService.issueRefusal(CustomSecurityContext.getStoreId(), orderId);
+        if (refusal != null) {
+            return refuse(orderId, refusal, locale, redirectAttributes);
         }
         String orderPath = "/dashboard/orders/" + orderId;
         return OrderConfirmPages.render(model, new ConfirmAction(
@@ -90,7 +93,7 @@ public class OrderReceiptsController {
     @PostMapping("/dashboard/orders/{orderId}/receipts/issue")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String issue(@PathVariable String orderId, Locale locale, RedirectAttributes redirectAttributes) {
-        return run(orderId, locale, redirectAttributes, "receipts.action.issue.done",
+        return start(orderId, locale, redirectAttributes, "receipts.action.issue.done",
                 () -> attemptService.issueManually(CustomSecurityContext.getStoreId(), orderId, actor()));
     }
 
@@ -158,6 +161,25 @@ public class OrderReceiptsController {
         try {
             action.run();
             OrderFlash.saved(redirectAttributes, messageSource.getMessage(successKey, null, locale));
+        } catch (ReceiptActionException e) {
+            redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage(e.getMessageKey(), null, locale));
+        }
+        return "redirect:/dashboard/orders/" + orderId;
+    }
+
+    /**
+     * "E-paragon" and "Wystaw ponownie": an attempt the converter blocked at once (no lines, an unknown VAT rate, ...)
+     * was sent nowhere, so it is not reported as being issued but as a warning pointing at the row that says why.
+     */
+    private String start(String orderId, Locale locale, RedirectAttributes redirectAttributes, String successKey,
+                         Supplier<ReceiptAttempt> action) {
+        try {
+            ReceiptAttempt attempt = action.get();
+            if (attempt != null && attempt.getState() == ReceiptAttemptState.BLOCKED) {
+                OrderFlash.warning(redirectAttributes, messageSource.getMessage("receipts.action.blockedAtOnce", null, locale));
+            } else {
+                OrderFlash.saved(redirectAttributes, messageSource.getMessage(successKey, null, locale));
+            }
         } catch (ReceiptActionException e) {
             redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage(e.getMessageKey(), null, locale));
         }
