@@ -7482,11 +7482,18 @@ a.cl-link-button:hover {
     right: 0;
 }
 
+/* One field under the other at every width: a native date input will not shrink below ~170 px, so two of them side by
+   side overflow the 260-360 px panel and overlap. Side padding matches the other menus' rows (16 px). */
 .cl-page .cl-filter-menu-dates {
     display: grid;
-    grid-template-columns: repeat(2, minmax(132px, 1fr));
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--cl-gap-fields);
-    padding: 12px;
+    padding: 8px 16px 4px;
+}
+
+.cl-page .cl-filter-menu-dates .cl-input {
+    width: 100%;
+    min-width: 0;
 }
 
 .cl-page .cl-filter-menu-dates label {
@@ -7575,15 +7582,12 @@ a.cl-link-button:hover {
         display: none;
     }
 
-    /* The date panel spans the filter row like the other panels; its right-aligned desktop position plus the two-column
-       grid made it 302 px wide and pushed it off the left edge of a 320 px screen. */
+    /* The date panel spans the filter row like the other panels; its right-aligned desktop position pushed it off the
+       left edge of a 320 px screen. */
     .cl-page .cl-filter-menu.is-end .cl-filter-menu-panel {
         left: 0;
         right: 0;
         min-width: 0;
     }
 
-    .cl-page .cl-filter-menu-dates {
-        grid-template-columns: minmax(0, 1fr);
-    }
 }

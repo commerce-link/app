@@ -25,7 +25,7 @@ class DeliveriesListStylesContractTest {
                 .contains(".cl-filter-menu.is-end").contains(".cl-table.is-deliveries .cl-status")
                 .contains(".cl-table.is-deliveries .is-secondary-column").contains(".cl-toolbar-toggle")
                 .contains(".cl-table-toolbar.is-collapsed")
-                .contains("grid-template-columns: repeat(2, minmax(132px, 1fr))");
+                .contains(".cl-page .cl-filter-menu-dates .cl-input {").doesNotContain("repeat(2, minmax(132px, 1fr))");
         assertThat(section.replaceAll("\\(max-width: (719|1023|1215)px\\)|\\(min-width: (720|1024|1216)px\\)", ""))
                 .doesNotContainPattern("\\((max|min)-width:");
         assertThat(section).doesNotContain("--cl-ok:");
