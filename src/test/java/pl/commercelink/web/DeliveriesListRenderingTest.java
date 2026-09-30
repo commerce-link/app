@@ -72,7 +72,7 @@ class DeliveriesListRenderingTest {
         // then
         assertThat(html).contains("cl-status is-info").contains("cl-status is-ok").contains("cl-doc-mark is-todo")
                 .contains("po terminie").contains("aria-current=\"true\"").contains("nr ZS/1").contains("kontrahent EuSarl")
-                .contains("Dropshipping").contains("Magazyn").contains("Dostawy w drodze").contains("Dostawy odebrane")
+                .contains("Dropshipping").contains("Magazyn").contains("Nieodebrane").contains("Dostawy odebrane")
                 .doesNotContain("Sklep").doesNotContain("??");
     }
 
