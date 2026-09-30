@@ -32,6 +32,16 @@ class DeliveryListQueryTest {
     }
 
     @Test
+    void reversedDateRangeIsSwapped() {
+        // when
+        DeliveryListQuery query = DeliveryListQuery.parse(params("from", "2026-09-30", "to", "2026-09-01"));
+
+        // then
+        assertThat(query.from()).isEqualTo(LocalDate.of(2026, 9, 1));
+        assertThat(query.to()).isEqualTo(LocalDate.of(2026, 9, 30));
+    }
+
+    @Test
     void everyParameterSurvivesARoundTrip() {
         // given
         String href = "/dashboard/deliveries?scope=received&state=received&state=shippedToCustomer&provider=Acme"

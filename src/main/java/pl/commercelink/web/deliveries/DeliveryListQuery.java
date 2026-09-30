@@ -30,6 +30,12 @@ public record DeliveryListQuery(Scope scope, DeliveryAttention focus, List<Deliv
         states = states == null || states.isEmpty() ? List.of() : List.copyOf(EnumSet.copyOf(states));
         providers = providers == null ? List.of() : providers.stream().filter(StringUtils::isNotBlank).distinct().toList();
         settle = settle == null || settle.isEmpty() ? List.of() : List.copyOf(EnumSet.copyOf(settle));
+        // a reversed range (typed by hand or from an old bookmark) would build an inverted key range the index rejects
+        if (from != null && to != null && from.isAfter(to)) {
+            LocalDate earlier = to;
+            to = from;
+            from = earlier;
+        }
         page = Math.max(1, page);
     }
 
