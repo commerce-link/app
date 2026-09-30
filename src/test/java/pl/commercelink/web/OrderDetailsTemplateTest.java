@@ -572,7 +572,7 @@ class OrderDetailsTemplateTest {
     }
 
     @Test
-    void theOnlyShipmentCanBeRemovedBackToWaitingButABarePlaceholderOffersNoRemove() {
+    void theOnlyShipmentCanBeRemovedCompletelyButABarePlaceholderOffersNoRemove() {
         // given: a number typed by hand on the only shipment; another order with nothing but the delivery choice
         Order order = order(OrderStatus.Realization);
         order.getShipments().get(0).setTrackingNo("T-1");
@@ -583,10 +583,10 @@ class OrderDetailsTemplateTest {
         String card = card(page(render(order, ADMIN)), "przesylki");
         String bareCard = card(page(render(bare, ADMIN)), "przesylki");
 
-        // then: removing it leaves a placeholder that keeps the customer's choice, which the confirmation says
+        // then: removing it takes the customer's delivery choice with it, which the confirmation says
         assertThat(card).contains("aria-label=\"Edytuj przesyłkę 1\"").contains("/shipments/0/remove?version=" + version)
                 .doesNotContain("aria-disabled").doesNotContain("remove-reason")
-                .contains("data-cl-confirm-message=\"Numer śledzenia i daty znikną. Zostanie tylko sposób dostawy wybrany przez klienta")
+                .contains("data-cl-confirm-message=\"Przesyłka zniknie z zamówienia razem ze sposobem dostawy wybranym przez klienta")
                 .contains("data-cl-confirm-action=\"Usuń przesyłkę\"");
         // the placeholder reads as no shipment: greyed, the delivery choice, "Brak przesyłki" and "Uzupełnij"
         assertThat(bareCard).contains("class=\"cl-list-item is-placeholder\"").contains("<span>Sposób dostawy: Kurier</span>")
@@ -610,7 +610,7 @@ class OrderDetailsTemplateTest {
         String card = card(page(render(order, ADMIN)), "przesylki");
 
         // then: the dialog's text is honest about the status; the row is an ordinary shipment, not the placeholder
-        assertThat(card).contains("Żadna przesyłka nie będzie nadana, więc zamówienie wróci do „W realizacji”")
+        assertThat(card).contains("a zamówienie wróci do „W realizacji”")
                 .doesNotContain("is-placeholder").contains("aria-label=\"Usuń przesyłkę 1\"");
     }
 

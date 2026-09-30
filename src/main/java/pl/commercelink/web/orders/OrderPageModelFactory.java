@@ -439,10 +439,10 @@ public class OrderPageModelFactory {
     }
 
     /**
-     * Why the shipment at index cannot be removed, or null. The only shipment can go: OrdersController keeps a
-     * placeholder with the customer's delivery choice in its place, and the order waits for it to be sent (OrderLifecycle
-     * neither delivers nor completes an order before its shipments are delivered; a Shipping order left with nothing
-     * shipped goes back to Realization). A delivered order keeps its
+     * Why the shipment at index cannot be removed, or null. The only shipment can go, with the customer's delivery
+     * choice (the user's decision of 2026-09-30): the order waits for the next one (OrderLifecycle neither delivers nor
+     * completes an order without shipments before Delivered; a Shipping order left with nothing shipped goes back to
+     * Realization). A delivered order keeps its
      * shipments, they are the record of the delivery; so does a shipment with a delivery date. One with a courier order
      * is cancelled with "Cancel courier order", which also cancels the paid label at the carrier, never by dropping
      * the record.
@@ -680,8 +680,9 @@ public class OrderPageModelFactory {
     }
 
     /**
-     * The only shipment with nothing but the customer's choice of delivery: removing it would leave the same placeholder
-     * (OrdersController keeps one in place of the only shipment), so the row offers no "Remove" and needs no reason.
+     * The only shipment with nothing but the customer's choice of delivery (the one every order is created with): the
+     * row reads as "no shipment yet" with "Uzupełnij" and offers no "Remove", whose only effect would be losing the
+     * choice.
      */
     private static boolean isBarePlaceholder(Order order, int index) {
         return order.onlyPlaceholder().isPresent();
@@ -690,9 +691,9 @@ public class OrderPageModelFactory {
     /**
      * The confirmation's text, which says what the removal does. Removing the last shipment not yet delivered while the
      * others are delivered moves the order to Delivered in the same save (OrderLifecycle), with what follows from it: the
-     * goods issue note, the e-receipt for the customer, the notice to the marketplace. Removing the only shipment keeps
-     * it as a placeholder waiting to go out, with how the customer asked to receive the order (type, pickup point).
-     * Removing the last shipment that went out of a Shipping order moves it back to Realization
+     * goods issue note, the e-receipt for the customer, the notice to the marketplace. Removing the only shipment
+     * removes how the customer asked to receive the order (type, pickup point) with it. Removing the last shipment that
+     * went out of a Shipping order moves it back to Realization
      * (Order#returnToRealizationWhenNothingShipped); realizationEmail: the customer may get the Realization e-mail then
      * (sendsRealizationEmail), which the text says instead of "the customer is not notified".
      */
@@ -708,7 +709,7 @@ public class OrderPageModelFactory {
         return key;
     }
 
-    /** Whether removing the shipment at index leaves a Shipping order with nothing gone out (the placeholder never has). */
+    /** Whether removing the shipment at index leaves a Shipping order with nothing gone out (no shipment at all included). */
     public static boolean removalReturnsToRealization(Order order, int index) {
         if (order.getStatus() != OrderStatus.Shipping) {
             return false;

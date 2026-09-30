@@ -1976,9 +1976,11 @@ public class OrdersController extends BaseController {
 
     /**
      * Removes one shipment. No "shipment created" notice goes out: nothing was shipped by removing a record. The only
-     * shipment is not dropped but goes back to waiting to be shipped: a placeholder keeps how the customer asked to
-     * receive the order (type, pickup point), which the customer card, the client page and the dropship flow read from
-     * the shipment, and the order keeps a shipment to deliver. Once no shipment has shipping data left, the shipping
+     * shipment goes as well, with how the customer asked to receive the order (type, pickup point): the user's decision
+     * of 2026-09-30 overturns Q2, which kept a placeholder with that choice. The customer card, the client page and
+     * the dropship flow then fall back to their defaults, and the operator types the choice with the next shipment;
+     * an order without shipments is never delivered nor completed before Delivered (Order#hasNothingLeftToDeliver).
+     * Once no shipment has shipping data left, the shipping
      * e-mail is forgotten (as "Cancel courier order" does), so the customer gets it with the number of the shipment
      * added next instead of keeping a link to the removed one. Removing the last undelivered shipment while the others
      * are delivered delivers the order; removing the last one that went out of a Shipping order takes it back to
@@ -1996,20 +1998,12 @@ public class OrdersController extends BaseController {
         }
         List<Shipment> shipments = new ArrayList<>(existingOrder.getShipments());
         Shipment removed = shipments.remove(index);
-        Shipment placeholder = shipments.isEmpty() ? Shipment.placeholderFor(removed) : null;
-        if (placeholder != null) {
-            shipments.add(placeholder);
-        }
         boolean realizationEmail = realizationEmail(existingOrder);
         boolean backToRealization = storeShipments(existingOrder, shipments, null, null, true);
         if (removed.hasShippingData() && existingOrder.firstShipmentWithShippingData().isEmpty()) {
             orderEventsRepository.deleteByOrderIdAndName(orderId, EmailNotificationType.ORDER_SHIPPING.name());
         }
-        // the notice says what is left in place of the only shipment, and that the order went back
-        String notice = placeholder == null
-                ? messageSource.getMessage("order.shipments.removed", new Object[]{index + 1}, locale)
-                : messageSource.getMessage("order.shipments.removed.placeholder",
-                        new Object[]{index + 1, deliveryChoice(placeholder, locale)}, locale);
+        String notice = messageSource.getMessage("order.shipments.removed", new Object[]{index + 1}, locale);
         if (backToRealization) {
             notice += " " + backToRealizationNotice(realizationEmail, locale);
         }
@@ -2081,13 +2075,6 @@ public class OrdersController extends BaseController {
                 : "order.shipments.backToRealization", new Object[]{status}, locale);
     }
 
-    /** The customer's delivery choice a placeholder keeps, as the removal notice names it ("odbiór osobisty", "punkt odbioru WAW01A"). */
-    private String deliveryChoice(Shipment placeholder, Locale locale) {
-        String type = placeholder.getType() == null ? ""
-                : messageSource.getMessage(OrderLabels.shipmentType(placeholder.getType()), null, locale).toLowerCase(locale);
-        String point = StringUtils.trimToNull(placeholder.getCollectionPointCode());
-        return point == null ? type : type + " " + point;
-    }
 
     private List<String> shipmentCarriers(Order order) {
         Store store = storesRepository.findById(getStoreId());

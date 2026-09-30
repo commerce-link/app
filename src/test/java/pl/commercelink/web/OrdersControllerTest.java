@@ -694,9 +694,8 @@ class OrdersControllerTest {
         }
 
         @Test
-        void removingTheOnlyShipmentLeavesAPlaceholderWithTheCustomersChoiceAndTakesTheOrderBackToRealization() {
-            // given: a pickup-point shipment with a number typed by hand; the customer card, the client page and the
-            // dropship flow read the delivery type and the pickup point from the shipment
+        void removingTheOnlyShipmentRemovesItCompletelyAndTakesTheOrderBackToRealization() {
+            // given: a pickup-point shipment with a number typed by hand
             Shipment only = new Shipment(ShipmentType.PickupPoint);
             only.setCarrier("InPost");
             only.setCollectionPointCode("KRA01M");
@@ -710,24 +709,13 @@ class OrdersControllerTest {
             // when
             String view = ordersController.removeShipment(ORDER_ID, 0, OrderShipmentForm.version(only), redirect, Locale.ENGLISH);
 
-            // then: the choice stays, waiting to go out again; the order keeps a shipment to deliver and, with nothing
-            // shipped any more, waits in Realization for it (the user's decision of 2026-09-30, overturning Q2)
+            // then: no placeholder keeps the delivery choice (the user's decision of 2026-09-30, overturning Q2); with
+            // nothing shipped the order waits in Realization for the next shipment
             assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
             assertThat(errorMessage()).isNull();
-            assertThat(order.getShipments()).singleElement().satisfies(placeholder -> {
-                assertThat(placeholder).isNotSameAs(only);
-                assertThat(placeholder.getType()).isEqualTo(ShipmentType.PickupPoint);
-                assertThat(placeholder.getCollectionPointCode()).isEqualTo("KRA01M");
-                assertThat(placeholder.getCarrier()).isEqualTo("InPost");
-                assertThat(placeholder.getTrackingNo()).isNull();
-                assertThat(placeholder.getTrackingUrl()).isNull();
-                assertThat(placeholder.getShippedAt()).isNull();
-                assertThat(placeholder.getDeliveredAt()).isNull();
-                assertThat(placeholder.getExternalId()).isNull();
-                assertThat(placeholder.hasTrackingSubscription()).isFalse();
-            });
+            assertThat(order.getShipments()).isEmpty();
             assertThat(order.getStatus()).isEqualTo(OrderStatus.Realization);
-            assertThat(notice(redirect).text()).isEqualTo("order.shipments.removed.placeholder order.shipments.backToRealization");
+            assertThat(notice(redirect).text()).isEqualTo("order.shipments.removed order.shipments.backToRealization");
             verify(orderLifecycle).update(order);
             verify(orderLifecycleEventPublisher, never()).publish(any(), any());
         }
@@ -759,23 +747,6 @@ class OrdersControllerTest {
         }
 
         @Test
-        void theCourierPlaceholderKeepsOnlyTheType() {
-            // given: a courier carrier is not part of the customer's choice, a pickup point's carrier is
-            Shipment only = courier("TRACK-1", null);
-            Order order = orderWith(only);
-
-            // when
-            ordersController.removeShipment(ORDER_ID, 0, OrderShipmentForm.version(only), redirect, Locale.ENGLISH);
-
-            // then
-            assertThat(order.getShipments()).singleElement().satisfies(placeholder -> {
-                assertThat(placeholder.getType()).isEqualTo(ShipmentType.Courier);
-                assertThat(placeholder.getCarrier()).isNull();
-                assertThat(placeholder.getTrackingNo()).isNull();
-            });
-        }
-
-        @Test
         void removingTheLastUndeliveredShipmentConfirmsThatTheOrderBecomesDelivered() {
             // given: Q1 = A, the removal may deliver the order, and the confirmation must say so plainly
             Shipment delivered = courier("TRACK-1", LocalDateTime.of(2026, 9, 1, 9, 0));
@@ -803,7 +774,7 @@ class OrdersControllerTest {
         }
 
         @Test
-        void theRemovalConfirmationOfTheOnlyShipmentSaysItGoesBackToWaiting() {
+        void theRemovalConfirmationOfTheOnlyShipmentSaysTheDeliveryChoiceGoesWithIt() {
             // given
             Shipment only = courier("TRACK-1", LocalDateTime.of(2026, 9, 1, 9, 0));
             orderWith(only);
@@ -888,7 +859,7 @@ class OrdersControllerTest {
 
         @ParameterizedTest
         @EnumSource(ShipmentType.class)
-        void removingTheOnlyShippedShipmentWithTheRealLifecycleLeavesAnEmptyPlaceholderInRealization(ShipmentType type) {
+        void removingTheOnlyShippedShipmentWithTheRealLifecycleLeavesNoShipmentAndTheOrderInRealization(ShipmentType type) {
             // given
             realLifecycle();
             Shipment only = shipped(type);
@@ -898,16 +869,31 @@ class OrdersControllerTest {
             // when
             ordersController.removeShipment(ORDER_ID, 0, OrderShipmentForm.version(only), redirect, Locale.ENGLISH);
 
-            // then: nothing regrows a shipped date, the row offers no "Remove" and the order waits in Realization
+            // then: nothing is left to stamp or regrow; the order waits in Realization for the next shipment
             assertThat(order.getStatus()).isEqualTo(OrderStatus.Realization);
-            assertThat(order.getShipments()).singleElement().satisfies(placeholder -> {
-                assertThat(placeholder.getType()).isEqualTo(type);
-                assertThat(placeholder.getShippedAt()).isNull();
-                assertThat(placeholder.isPlaceholder()).isTrue();
-            });
-            assertThat(order.onlyPlaceholder()).isPresent();
+            assertThat(order.getShipments()).isEmpty();
             verify(ordersRepository).save(order);
-            assertThat(notice(redirect).text()).isEqualTo("order.shipments.removed.placeholder order.shipments.backToRealization");
+            assertThat(notice(redirect).text()).isEqualTo("order.shipments.removed order.shipments.backToRealization");
+        }
+
+        @ParameterizedTest
+        @EnumSource(value = OrderStatus.class, names = {"New", "Assembly", "Assembled", "Realization"})
+        void removingTheOnlyShipmentBeforeShippingWithTheRealLifecycleKeepsTheStatus(OrderStatus status) {
+            // given
+            realLifecycle();
+            Shipment only = shipped(ShipmentType.PersonalCollection);
+            only.setShippedAt(null);
+            only.setCarrier("InPost");
+            Order order = orderWith(only);
+            order.setStatus(status);
+
+            // when
+            ordersController.removeShipment(ORDER_ID, 0, OrderShipmentForm.version(only), redirect, Locale.ENGLISH);
+
+            // then
+            assertThat(order.getShipments()).isEmpty();
+            assertThat(order.getStatus()).isEqualTo(status);
+            assertThat(notice(redirect).text()).isEqualTo("order.shipments.removed");
         }
 
         @ParameterizedTest

@@ -631,6 +631,23 @@ class OrderLifecycleTest {
     }
 
     @Test
+    void anOrderWithoutShipmentsWaitsInRealizationWithNothingStamped() {
+        // given: the only shipment removed (the user's decision of 2026-09-30: no placeholder is kept)
+        Order order = new Order("store-1");
+        order.setStatus(OrderStatus.Realization);
+        order.setShipments(new ArrayList<>());
+        order.addDocument(new Document("doc-1", "FV/1/2026", "https://example.com/fv/1", DocumentType.InvoiceVat));
+
+        // when
+        orderLifecycle.update(order, List.of());
+
+        // then
+        assertEquals(OrderStatus.Realization, order.getStatus());
+        assertThat(order.getShipments()).isEmpty();
+        verifyNoInteractions(orderLifecycleEventPublisher, goodsOutEventPublisher);
+    }
+
+    @Test
     void aReadyCollectionMovesARealizationOrderToShippingAsBefore() {
         // given
         Order order = new Order("store-1");

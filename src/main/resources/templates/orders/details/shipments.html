@@ -5,9 +5,9 @@
        "Edytuj" and "Dodaj przesyłkę" open the shipment's dialog (one per shipment, a fixed size whatever the number of
        shipments); without JavaScript they lead to the shipment page. "Usuń" goes through the confirmation dialog, or
        its page without JavaScript; its text and button say when the removal delivers the order or moves it back to
-       "W realizacji". The only shipment with nothing but the delivery choice (the placeholder) reads as no shipment:
-       a greyed row "Sposób dostawy: …", "Brak przesyłki" and "Uzupełnij" (the same dialog) instead of "Edytuj", no
-       "Usuń" (removing it would leave the same placeholder). */-->
+       "W realizacji"; removing the only shipment leaves the card empty. The only shipment with nothing but the
+       delivery choice (the one the order was created with) reads as no shipment: a greyed row "Sposób dostawy: …",
+       "Brak przesyłki" and "Uzupełnij" (the same dialog) instead of "Edytuj", no "Usuń". */-->
 <section th:fragment="card" class="cl-card" id="przesylki" aria-labelledby="shipments-title"
          th:with="shipments=${page.shipments()}">
     <div class="cl-card-head">

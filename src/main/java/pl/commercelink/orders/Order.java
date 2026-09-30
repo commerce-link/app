@@ -637,7 +637,7 @@ public class Order {
 
     /**
      * The order's only shipment when it holds nothing but the customer's choice of delivery (every order is created
-     * with one, and removing the only shipment leaves one): a new shipment fills it instead of standing next to it,
+     * with one; a date cleared in the edit leaves one too): a new shipment fills it instead of standing next to it,
      * where the placeholder, never sent nor delivered, would hold the order back from Shipping and Delivered.
      */
     @DynamoDBIgnore
