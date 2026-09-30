@@ -177,7 +177,7 @@
                                    costSort=${T(pl.commercelink.web.deliveries.DeliveryListQuery.Sort).COST},
                                    dateKey=${q.scope().name() == 'RECEIVED'} ? 'deliveries.list.column.received' : (${q.scope().name() == 'ALL'} ? 'deliveries.list.column.date' : 'deliveries.list.column.planned')">
                 <!--/* Below 1024 px the table turns into cards without a header row, so the sort moves to this bar. */-->
-                <nav class="cl-table-sortbar" th:attr="aria-label=#{deliveries.list.sort.label}">
+                <nav class="cl-table-sortbar is-wrap" th:attr="aria-label=#{deliveries.list.sort.label}">
                     <span class="cl-eyebrow" th:text="#{deliveries.list.sort.label}"></span>
                     <a class="cl-tab" th:with="h=${page.sortHeaders().get(dueSort)}" th:href="@{${h.href()}}"
                        th:attr="aria-current=${h.ariaSort() != 'none'} ? 'page' : null" data-cl-list-nav>

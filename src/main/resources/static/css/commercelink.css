@@ -7542,13 +7542,22 @@ a.cl-link-button:hover {
         min-height: 44px;
     }
 
+    /* At 320 px the search field beside "Filtry: n" shrank to a "Nr" placeholder: the field keeps 200 px and the button
+       drops to its own row when the two do not fit. */
     .cl-page .cl-toolbar-search {
         width: 100%;
+        flex-wrap: wrap;
     }
 
     .cl-page .cl-toolbar-search .cl-search-form {
-        flex: 1 1 0;
+        flex: 1 1 200px;
         min-width: 0;
+    }
+
+    /* The sort bar scrolls sideways in the orders list; here "Dostawca" sat clipped at the edge of a 320 px screen. */
+    .cl-page .cl-table-sortbar.is-wrap {
+        flex-wrap: wrap;
+        overflow-x: visible;
     }
 
     .cl-page .cl-toolbar-toggle {

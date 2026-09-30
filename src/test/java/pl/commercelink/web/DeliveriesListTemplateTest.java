@@ -39,7 +39,7 @@ class DeliveriesListTemplateTest {
                 .contains("data-cl-toolbar-toggle").contains("${page.chips()}").contains("class=\"cl-table-results\"")
                 .contains("cl-table is-orders is-deliveries").contains("class=\"cl-row-link\"").contains("cl-table-sortbar")
                 .contains("fragments/pagination :: pages(${page.pagination()})").contains("${page.emptyState()}")
-                .contains("deliveries.dropship.badge").contains("is-secondary-column");
+                .contains("deliveries.dropship.badge").contains("is-secondary-column").contains("cl-table-sortbar is-wrap");
     }
 
     @Test

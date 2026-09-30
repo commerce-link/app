@@ -41,7 +41,9 @@ class DeliveriesListStylesContractTest {
 
         // then: a right-aligned 302 px panel overflowed a 320 px screen on the left
         assertThat(phone).contains(".cl-page .cl-filter-menu.is-end .cl-filter-menu-panel {\n        left: 0;\n        right: 0;\n        min-width: 0;")
-                .contains("grid-template-columns: minmax(0, 1fr)");
+                .contains("grid-template-columns: minmax(0, 1fr)")
+                // then: at 320 px the search field shrank to a "Nr" placeholder and the last sort tab was clipped
+                .contains("flex: 1 1 200px").contains(".cl-page .cl-table-sortbar.is-wrap {\n        flex-wrap: wrap;");
         // then: 15ch for the status column pushed the table 26 px past the card at 720 px, so it applies from 1024 px only
         assertThat(section).containsPattern(Pattern.compile("@media screen and \\(min-width: 720px\\) \\{\\s+\\.cl-page \\.cl-table\\.is-deliveries td\\[data-label\\]:has\\(\\.cl-status\\) \\{\\s+min-width: 11ch;"))
                 .containsPattern(Pattern.compile("@media screen and \\(min-width: 1024px\\) \\{\\s+\\.cl-page \\.cl-table\\.is-deliveries td\\[data-label\\]:has\\(\\.cl-status\\) \\{\\s+min-width: 15ch;"));
