@@ -457,30 +457,6 @@ public class DeliveriesController {
         return "redirect:/dashboard/deliveries";
     }
 
-    @GetMapping("/dashboard/deliveries/preview")
-    @PreAuthorize("hasRole('ADMIN')")
-    public String deliveriesPreview(Model model) {
-        return showDeliveriesPreview(getStoreId(), model);
-    }
-
-    @GetMapping("/dashboard/store/{storeId}/deliveries/preview")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public String deliveriesPreviewForSuperAdmin(@PathVariable("storeId") String storeId, Model model) {
-        return showDeliveriesPreview(storeId, model);
-    }
-
-    private String showDeliveriesPreview(String storeId, Model model) {
-        var planning = deliveriesPlanningService.plan(storeId);
-
-        model.addAttribute("deliveries", planning.deliveries());
-        model.addAttribute("dropshipCandidates", planning.dropshipCandidates());
-        model.addAttribute("storeId", storeId);
-        model.addAttribute("isSuperAdmin", isSuperAdmin());
-        model.addAttribute("supplierLabels", supplierLabels.forStoreId(storeId));
-
-        return "deliveriesPreview";
-    }
-
     @GetMapping("/dashboard/deliveries/create/{provider}")
     @PreAuthorize("hasRole('ADMIN')")
     public String createDeliveryForm(@PathVariable("provider") String provider, Model model) {
