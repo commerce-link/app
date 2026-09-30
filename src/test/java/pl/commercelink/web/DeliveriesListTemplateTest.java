@@ -43,6 +43,19 @@ class DeliveriesListTemplateTest {
     }
 
     @Test
+    void filtersToggleKeepsLabelAndCountInOneSpanSoTheFlexGapDoesNotSplitTheColon() throws Exception {
+        // when
+        String html = page();
+        int toggle = html.indexOf("data-cl-toolbar-toggle");
+        String button = html.substring(toggle, html.indexOf("</button>", toggle));
+
+        // then
+        assertThat(button).contains("cl-toolbar-toggle-label");
+        assertThat(button.indexOf("cl-toolbar-toggle-label")).isLessThan(button.indexOf("deliveries.list.filters"))
+                .isLessThan(button.indexOf("activeFilterCount"));
+    }
+
+    @Test
     void superAdminColumnAndCreateButtonAreConditional() throws Exception {
         // when / then
         assertThat(page()).contains("th:if=\"${page.superAdmin()}\"").contains("th:if=\"${page.canCreate()}\"")

@@ -73,7 +73,7 @@
                             </form>
                             <button type="button" class="cl-button cl-toolbar-toggle" data-cl-toolbar-toggle aria-controls="deliveries-filters" aria-expanded="true">
                                 <i class="fas fa-sliders-h" aria-hidden="true"></i>
-                                <span th:text="#{deliveries.list.filters}"></span><th:block th:if="${page.activeFilterCount() > 0}"><span class="cl-segment-sep">: </span><span th:text="${page.activeFilterCount()}"></span></th:block>
+                                <!--/* one span for label and count: the button is a flex row with a gap, which put a space before the colon */--><span class="cl-toolbar-toggle-label"><span th:text="#{deliveries.list.filters}"></span><th:block th:if="${page.activeFilterCount() > 0}"><span class="cl-segment-sep">: </span><span th:text="${page.activeFilterCount()}"></span></th:block></span>
                             </button>
                         </div>
                     </div>
