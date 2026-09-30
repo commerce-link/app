@@ -29,7 +29,7 @@
             <div>
                 <p class="cl-list-title">
                     <span th:text="#{${s.typeKey()}}"></span>
-                    <span th:if="${s.carrier() != null}" th:text="' · ' + ${s.carrier()}"></span>
+                    <span th:if="${s.carrier() != null}" th:text="'· ' + ${s.carrier()}"></span>
                     <!--/* the pill text carries the state; the title only adds what to do about a failure */-->
                     <span th:if="${s.trackingKey() != null}" class="cl-status" th:classappend="${s.trackingTone()}"
                           th:attr="title=${s.trackingHelpKey() != null} ? #{${s.trackingHelpKey()}} : null"

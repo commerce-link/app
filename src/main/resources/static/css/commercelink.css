@@ -996,7 +996,12 @@ body.cl-drawer-open .cl-sidebar {
     color: #fff;
 }
 
-.cl-button:disabled,
+/* disabled means "cannot run", not "running": the progress cursor is only for a form being sent */
+.cl-button:disabled {
+    opacity: .6;
+    cursor: not-allowed;
+}
+
 .cl-form[aria-busy="true"] .cl-button[type="submit"] {
     opacity: .6;
     cursor: progress;
@@ -1707,6 +1712,16 @@ a.cl-link-button:hover {
 .cl-page .cl-choice-description {
     font-size: 13px;
     line-height: 1.4;
+    color: var(--cl-ink-2);
+}
+
+/* an option that cannot be chosen looks it: the title greys and loses its weight, the reason stays readable */
+.cl-page .cl-choice:has(input:disabled) {
+    cursor: not-allowed;
+}
+
+.cl-page .cl-choice:has(input:disabled) .cl-choice-title {
+    font-weight: 400;
     color: var(--cl-ink-2);
 }
 
@@ -3635,6 +3650,18 @@ a.cl-link-button:hover {
     background: var(--cl-accent-soft);
 }
 
+/* In card mode (< 720 px) the row is a grid of cells with gaps between them: tinting the cells left white seams, so
+   the row carries the tint as one surface. */
+@media screen and (max-width: 719px) {
+    .cl-page .cl-table tr.is-selected {
+        background: var(--cl-accent-soft);
+    }
+
+    .cl-page .cl-table tr.is-selected > * {
+        background: transparent;
+    }
+}
+
 /* --cl-ink-3 is 4.04:1 on --cl-accent-soft, below AA for 12.5 px; the codes of a selected row use the darker grey. */
 .cl-page .cl-table tr.is-selected .cl-table-sub {
     color: var(--cl-ink-2);
@@ -3860,6 +3887,24 @@ a.cl-link-button:hover {
     border-radius: 4px;
 }
 
+/* A link in a list row's title (a document's number): the design system's link colour, not Bulma's, and a 44 px
+   target below 1024 px without making the line taller (the padding is taken back by the margin). */
+.cl-page .cl-list-title a:not(.cl-link-button) {
+    color: var(--cl-accent-ink);
+}
+
+@media screen and (max-width: 1023px) {
+    .cl-page .cl-list-title a:not(.cl-link-button) {
+        padding-block: 12px;
+        margin-block: -12px;
+    }
+}
+
+/* the list row's actions stay by its title when a disclosure (earlier attempts, technical details) makes it tall */
+.cl-page .cl-list .cl-list-item:has(.cl-row-disclosure) {
+    align-items: start;
+}
+
 /* The hidden inputs of the multi picker travel in a span, which would otherwise take a grid row of its own. */
 .cl-page .cl-picker > [data-picker-values] {
     display: none;
@@ -4065,6 +4110,14 @@ a.cl-link-button:hover {
 .cl-page .cl-table.is-editable .cl-select {
     font-size: 14px;
     width: 100%;
+}
+
+/* Safari on iOS zooms the page when a field it focuses has text smaller than 16px (e.g. "Dodaj numery seryjne") */
+@media screen and (max-width: 719px) {
+    .cl-page .cl-table.is-editable .cl-input,
+    .cl-page .cl-table.is-editable .cl-select {
+        font-size: 16px;
+    }
 }
 
 /* The product cell of the bulk review holds the brand and then the two identifier fields, each under its label, one
@@ -5501,6 +5554,12 @@ a.cl-link-button:hover {
     bottom: calc(100% + 4px);
 }
 
+/* menu.js: right-aligned, the list would leave the window on the left (a toggle near the left edge at 320 px) */
+.cl-page .cl-menu-list.is-start {
+    left: 0;
+    right: auto;
+}
+
 .cl-page .cl-menu-list > li {
     margin: 0;
 }
@@ -5895,6 +5954,19 @@ a.cl-link-button:hover {
     color: var(--cl-ink-3);
 }
 
+/* the h1 and its copy icon as one unit: the heading wraps inside it, the icon stays after its last word */
+.cl-page .cl-record-name {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    max-width: 100%;
+}
+
+.cl-page .cl-record-name > .cl-page-title {
+    min-width: 0;
+}
+
 .cl-page .cl-record-meta {
     display: flex;
     flex-wrap: wrap;
@@ -6180,6 +6252,12 @@ a.cl-link-button:hover {
         justify-content: center;
     }
 
+    /* "Więcej" alone or next to the primary action fills its share of the row, like the primary action: the menu
+       (details) already stretches, its summary did not */
+    .cl-page .cl-page-header-row.is-record .cl-page-actions details.cl-menu > summary {
+        width: 100%;
+    }
+
     .cl-page .cl-menu-list {
         max-width: calc(100vw - 32px);
     }
@@ -6348,6 +6426,24 @@ a.cl-link-button:hover {
 
 .cl-page .cl-card-inset {
     padding: 16px 20px;
+}
+
+/* A form that sits inside its card (the no-JavaScript page of a dialog, e.g. "Zamknij paragon ręcznie"): the footer
+   spans the card, the fields keep the form's 760 px measure. */
+.cl-page .cl-card > .cl-form:has(> .cl-card-inset) {
+    max-width: none;
+}
+
+.cl-page .cl-card > .cl-form > .cl-card-inset {
+    max-width: 760px;
+}
+
+/* the dialog's description on its no-JavaScript page: the look of p.cl-dialog-effect */
+.cl-page .cl-card-inset > .cl-help {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.4;
+    color: var(--cl-ink-2);
 }
 
 /* Narrow fields: a quantity in a table row, a short code. */

@@ -5,12 +5,14 @@
        lines and the actions. The slots are defined inside the replaced element, so they are never rendered twice. */-->
 <div th:fragment="header"
      th:replace="~{fragments/settings-header :: record(${page.backHref()}, #{orders.list.title},
-             #{order.page.title(${page.shortId()})}, ~{::orderStatus}, ~{::orderMeta}, ~{::orderActions})}">
-    <th:block th:fragment="orderStatus">
+             #{order.page.title(${page.shortId()})}, ~{::orderCopy}, ~{::orderStatus}, ~{::orderMeta}, ~{::orderActions})}">
+    <th:block th:fragment="orderCopy">
         <button type="button" class="cl-copy-inline is-icon"
                 th:attr="data-cl-copy=${page.orderId()}, aria-label=#{order.page.copy.id}, title=${page.orderId()}">
             <span class="cl-copy-icon"><span class="icon is-small" aria-hidden="true"><i class="far fa-copy"></i></span></span>
         </button>
+    </th:block>
+    <th:block th:fragment="orderStatus">
         <span class="cl-status" th:classappend="${page.header().statusTone()}" th:text="#{${page.header().statusKey()}}"></span>
         <a th:if="${page.header().canChangeStatus()}" class="cl-link-button"
            th:href="@{/dashboard/orders/{id}/status(id=${page.orderId()})}" data-cl-dialog-open="status-dialog"

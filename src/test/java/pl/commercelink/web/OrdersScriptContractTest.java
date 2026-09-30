@@ -543,4 +543,17 @@ class OrdersScriptContractTest {
         assertThat(print.split("setTimeout", -1)).hasSize(2);
         assertThat(print).contains("}, 0);");
     }
+
+    @Test
+    void menuFlipsToTheStartWhenItWouldLeaveTheViewport() throws Exception {
+        // given
+        String menu = read("src/main/resources/static/js/menu.js");
+        String css = css();
+
+        // then: any menu (not only a marker's popover) that would leave the window on the left opens from its
+        // toggle's left edge; the flag goes with the menu when it closes
+        assertThat(menu).contains("if (!isNote(menu) && box.left < MARGIN) {\n                list.classList.add('is-start');")
+                .contains("list.classList.remove('is-up', 'is-end', 'is-start');");
+        assertThat(rule(css, ".cl-page .cl-menu-list.is-start")).contains("left: 0").contains("right: auto");
+    }
 }

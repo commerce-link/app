@@ -1371,13 +1371,14 @@ class OrderDetailsTemplateTest {
         String html = page(render(order, List.of(dropship), ADMIN, Set.of(dropship.getItemId())));
 
         // then: the bulk actions are greyed through aria-disabled (menu entries and "Remove" stay focusable with
-        // their reason); the add-items button keeps its native disabled
+        // their reason); so is the add-items button, which opens nothing
         assertThat(html).containsPattern("data-cl-bulk-action=\"[^\"]*moveSelectedItemsToTheWarehouse\"[^>]*aria-disabled=\"true\"")
                 .containsPattern("data-cl-bulk-action=\"[^\"]*moveSelectedItemsToAllocation\"[^>]*aria-disabled=\"true\"")
                 // the dropship lock disables every bulk action, not only the two above
                 .containsPattern("data-cl-bulk-action=\"[^\"]*moveSelectedItemsToTheWarehouseForRMA\"[^>]*aria-disabled=\"true\"")
                 .containsPattern("data-cl-bulk-action=\"[^\"]*removeSelectedItemsFromOrder\"[^>]*aria-disabled=\"true\"")
-                .containsPattern("data-cl-dialog-open=\"item-add-dialog\"[^>]*disabled=\"disabled\"")
+                .containsPattern("<button type=\"button\" class=\"cl-button\" aria-disabled=\"true\"[^>]*aria-describedby=\"add-items-reason\"")
+                .doesNotContain("data-cl-dialog-open=\"item-add-dialog\"")
                 .contains("id=\"add-items-reason\"");
         String reason = ResourceBundle.getBundle("messages", PL).getString("order.items.action.dropship.locked");
         assertThat(html).contains(reason);
@@ -1546,6 +1547,70 @@ class OrderDetailsTemplateTest {
         // then
         assertThat(html).doesNotContain("href=\"javascript:");
         assertThat(html).contains("<span>PAR/1</span>");
+    }
+
+    @Test
+    void documentNumberLinkCarriesItsIconInside() {
+        // given
+        Order order = order(OrderStatus.Delivered);
+        order.addDocument(new Document("fv", "FV/2026/09/118", "https://faktury.example/118", DocumentType.InvoiceVat));
+
+        // when
+        String html = page(render(order, ADMIN));
+
+        // then: the new-tab icon is inside the link, joined to the number by a word joiner, never a sibling that
+        // wraps onto its own line
+        String documents = html.substring(html.indexOf("id=\"dokumenty\""), html.indexOf("id=\"platnosci\""));
+        assertThat(documents).containsPattern("<a href=\"https://faktury.example/118\" target=\"_blank\" rel=\"noopener\">"
+                + "<span>FV/2026/09/118</span>(&#8288;|\u2060)<span class=\"icon is-small\" aria-hidden=\"true\">"
+                + "<i\\s+class=\"fas fa-external-link-alt\"></i></span></a>");
+        assertThat(occurrences(documents, "fa-external-link-alt")).isEqualTo(1);
+    }
+
+    @Test
+    void addItemGreyedUsesAriaDisabledWithItsReason() {
+        // given: an item in a dropship delivery stops adding items
+        Order order = order(OrderStatus.Assembly);
+        OrderItem dropship = inDelivery(order, "delivery-9", FulfilmentStatus.Ordered);
+
+        // when
+        String html = page(render(order, List.of(dropship), ADMIN, Set.of(dropship.getItemId())));
+
+        // then: focusable and described by its reason, like "Dodaj dokument", not a native disabled button
+        String head = html.substring(html.indexOf("id=\"pozycje\""), html.indexOf("id=\"add-items-reason\""));
+        assertThat(head).containsPattern("<button type=\"button\" class=\"cl-button\" aria-disabled=\"true\"\\s+aria-describedby=\"add-items-reason\">")
+                .doesNotContain("disabled=\"disabled\"").doesNotContain("data-cl-dialog-open=\"item-add-dialog\"");
+        assertThat(html).contains("id=\"add-items-reason\"");
+    }
+
+    @Test
+    void documentLinkFieldsAcceptOnlyHttpAddresses() {
+        // given
+        Order order = order(OrderStatus.Delivered);
+
+        // when
+        String html = page(render(order, ADMIN));
+
+        // then: type=url alone lets ftp:// or mailto: through; the help says http(s)
+        assertThat(html).containsPattern("<input class=\"cl-input\" type=\"url\" id=\"document-link\"[^>]*pattern=\"https\\?://\\.\\+\"");
+        assertThat(html).containsPattern("<label class=\"cl-label\" for=\"document-link\">\\s*<span>Link do dokumentu</span>\\s*"
+                + "<span class=\"cl-optional\">opcjonalne</span>");
+    }
+
+    @Test
+    void rowTitlesHaveNoDoubleSpaceBeforeTheSeparator() {
+        // given: the title line is a flex row with its own gap, so a leading space doubles it
+        Order order = order(OrderStatus.Shipping);
+        order.getShipments().get(0).setCarrier("InPost");
+        order.getShipments().get(0).setTrackingNo("E2E1");
+        order.addPayment(new Payment("REF-1", "Jan Kowalski", PaymentSource.BankTransfer, 500, 0));
+
+        // when
+        String html = page(render(order, ADMIN));
+
+        // then
+        assertThat(html).contains("<span>· InPost</span>").contains("<span>· Przelew bankowy</span>")
+                .doesNotContain("<span> · InPost</span>").doesNotContain("<span> · Przelew");
     }
 
     @Test
@@ -2412,7 +2477,7 @@ class OrderDetailsTemplateTest {
 
         // then
         String documents = html.substring(html.indexOf("id=\"dokumenty\""), html.indexOf("id=\"platnosci\""));
-        assertThat(documents).containsPattern("<a href=\"https://paragony.example/7\" target=\"_blank\" rel=\"noopener\">PAR/7/2026</a>")
+        assertThat(documents).containsPattern("<a href=\"https://paragony.example/7\" target=\"_blank\" rel=\"noopener\"><span>PAR/7/2026</span>")
                 .contains("<span class=\"cl-status is-ok\">Zafiskalizowany</span>")
                 .contains("zafiskalizowano 28.09.2026").contains("mail wysłany")
                 .doesNotContain("Odepnij").doesNotContain("Paragon PAR").doesNotContain("cl-list-actions");
@@ -2452,7 +2517,8 @@ class OrderDetailsTemplateTest {
         assertThat(html).contains("Trwa wystawianie e-paragonu — pozycji nie dodasz.")
                 .doesNotContain("Dodawanie pozycji: Trwa")
                 .contains("Trwa wystawianie e-paragonu — danych rozliczeniowych nie zmienisz.")
-                .containsPattern("<button type=\"button\" class=\"cl-button\" aria-disabled=\"true\"\\s+aria-describedby=\"document-add-reason\">Dodaj dokument</button>")
+                .containsPattern("<button type=\"button\" class=\"cl-button\" aria-disabled=\"true\"\\s+aria-describedby=\"document-add-reason\">\\s*"
+                        + "<span class=\"icon is-small\" aria-hidden=\"true\"><i class=\"fas fa-plus\"></i></span>\\s*<span>Dodaj dokument</span>\\s*</button>")
                 .contains("id=\"document-add-reason\"").contains("Trwa wystawianie e-paragonu — dokumentu nie dodasz ręcznie.")
                 .contains("Trwa wystawianie e-paragonu — pozycji nie usuniesz")
                 .doesNotContain("id=\"document-dialog\"").doesNotContain("??");

@@ -14,7 +14,8 @@ class SharedFragmentsTemplateTest {
         // given: the StringTemplateResolver's "*<*" resolvable pattern only matches a single-line candidate
         // (Thymeleaf's glob-to-regex translation does not set DOTALL), so the markup is one concatenated line
         String template = "<div th:replace=\"~{fragments/settings-header :: record('/dashboard/orders', 'Zamówienia', "
-                + "'Zamówienie 3e373abc', ~{::status}, ~{::meta}, null)}\">"
+                + "'Zamówienie 3e373abc', ~{::copy}, ~{::status}, ~{::meta}, null)}\">"
+                + "<button th:fragment=\"copy\" type=\"button\" class=\"cl-copy-inline\">c</button>"
                 + "<span th:fragment=\"status\" class=\"cl-status is-warn\">W kompletacji</span>"
                 + "<p th:fragment=\"meta\" class=\"cl-record-meta\"><span>Jan</span></p>"
                 + "</div>";
@@ -26,5 +27,8 @@ class SharedFragmentsTemplateTest {
         assertThat(html).contains("class=\"cl-record-title\"").contains("<h1 class=\"cl-page-title\">Zamówienie 3e373abc</h1>")
                 .contains("cl-status is-warn").contains("cl-record-meta").contains("href=\"/dashboard/orders\"");
         assertThat(html.indexOf("cl-status")).isLessThan(html.indexOf("cl-record-meta"));
+        // the copy icon shares a box with the h1, so it never wraps onto a line of its own
+        assertThat(html.replaceAll("\\s+", " ")).contains("<div class=\"cl-record-name\"> <h1 class=\"cl-page-title\">Zamówienie 3e373abc</h1> "
+                + "<button type=\"button\" class=\"cl-copy-inline\">c</button> </div>");
     }
 }
