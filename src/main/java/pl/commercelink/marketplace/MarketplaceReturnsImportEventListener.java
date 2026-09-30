@@ -11,6 +11,7 @@ import pl.commercelink.marketplace.api.MarketplaceReturn;
 import pl.commercelink.scheduling.ScheduledExecutionCounter;
 import pl.commercelink.scheduling.ScheduledExecution;
 import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoreActivity;
 import pl.commercelink.starter.util.ElapsedTime;
 import pl.commercelink.stores.StoresRepository;
 
@@ -28,6 +29,7 @@ public class MarketplaceReturnsImportEventListener {
     private final MarketplaceReturnImporter marketplaceReturnImporter;
     private final MarketplaceProviderFactory providerFactory;
     private final ScheduledExecutionCounter scheduledExecutionCounter;
+    private final StoreActivity storeActivity;
 
     @Value("${marketplace.returns.enabled:true}")
     private boolean returnsEnabled = true;
@@ -51,6 +53,10 @@ public class MarketplaceReturnsImportEventListener {
         Store store = storesRepository.findById(payload.getStoreId());
         if (store == null || !store.hasActiveMarketplaceIntegration(marketplace)) {
             log.warn("Marketplace {} returns import skipped store {}: no active integration", marketplace, payload.getStoreId());
+            return;
+        }
+        if (!storeActivity.isActive(store)) {
+            log.warn("Marketplace {} returns import skipped store {}: the store is inactive", marketplace, payload.getStoreId());
             return;
         }
         log.info("Marketplace {} returns import started: store={}", marketplace, store.getStoreId());

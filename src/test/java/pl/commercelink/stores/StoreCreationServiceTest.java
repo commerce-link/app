@@ -37,6 +37,7 @@ class StoreCreationServiceTest {
         assertEquals("key-1", store.getApiKey());
         assertNotNull(store.getCreatedAt());
         assertNull(store.getDemo());
+        assertNull(store.getTrial());
         verify(storesRepository).save(store);
     }
 
@@ -118,13 +119,30 @@ class StoreCreationServiceTest {
     void setsRegistrationEmailAsBillingEmail() {
         // given
         when(storesRepository.findById(anyString())).thenReturn(null);
+        TrialPeriod trial = new TrialPeriod("owner@example.com", "2026-07-13T10:00:00Z", "2026-07-27T10:00:00Z");
 
         // when
-        Store store = service.createStore(CreateStoreRequest.registered("Sklep X", "owner@example.com"));
+        Store store = service.createStore(CreateStoreRequest.registered("Sklep X", trial));
 
         // then
         assertNotNull(store.getBillingDetails());
         assertEquals("owner@example.com", store.getBillingDetails().getEmail());
+    }
+
+    @Test
+    void startsTrialOfRegisteredStoreWithoutSeeding() {
+        // given
+        when(storesRepository.findById(anyString())).thenReturn(null);
+        TrialPeriod trial = new TrialPeriod("owner@example.com", "2026-07-13T10:00:00Z", "2026-07-27T10:00:00Z");
+
+        // when
+        Store store = service.createStore(CreateStoreRequest.registered("Sklep X", trial));
+
+        // then
+        assertSame(trial, store.getTrial());
+        assertNull(store.getDemo());
+        verify(storesRepository, times(1)).save(store);
+        verifyNoInteractions(seeder);
     }
 
     @Test

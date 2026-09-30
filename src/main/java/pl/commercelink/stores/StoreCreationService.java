@@ -30,6 +30,7 @@ public class StoreCreationService {
         if (request.demoMetadata() != null) {
             store.setDemo(request.demoMetadata());
         }
+        store.setTrial(request.trial());
         storesRepository.save(store);
         if (request.seeder() != null) {
             try {

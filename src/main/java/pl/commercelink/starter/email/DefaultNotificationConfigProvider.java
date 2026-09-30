@@ -4,23 +4,26 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 import pl.commercelink.stores.ClientNotificationsConfiguration;
 import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoreActivity;
 import pl.commercelink.stores.StoresRepository;
 
 @Component
 public class DefaultNotificationConfigProvider implements NotificationConfigProvider {
 
     private final StoresRepository storesRepository;
+    private final StoreActivity storeActivity;
 
-    public DefaultNotificationConfigProvider(StoresRepository storesRepository) {
+    public DefaultNotificationConfigProvider(StoresRepository storesRepository, StoreActivity storeActivity) {
         this.storesRepository = storesRepository;
+        this.storeActivity = storeActivity;
     }
 
     // Blank sender fields fall back to the store name and the company email, so a store that never filled the form
-    // still signs its emails and receives replies.
+    // still signs its emails and receives replies. An inactive store has no settings, so it sends nothing at all.
     @Override
     public NotificationSettings settings(String storeId) {
         Store store = storesRepository.findById(storeId);
-        if (store == null) {
+        if (!storeActivity.isActive(store)) {
             return null;
         }
         ClientNotificationsConfiguration configuration = store.getClientNotificationsConfiguration();

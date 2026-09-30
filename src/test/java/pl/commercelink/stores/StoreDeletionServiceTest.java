@@ -28,10 +28,19 @@ import pl.commercelink.warehouse.builtin.WarehouseDocument;
 import pl.commercelink.warehouse.builtin.WarehouseDocumentItem;
 import pl.commercelink.inventory.supplier.StoreSupplierFeedScheduler;
 import pl.commercelink.inventory.supplier.SupplierProviderFactory;
+import pl.commercelink.invoicing.InvoicingProviderFactory;
 import pl.commercelink.marketplace.MarketplaceOrdersImportScheduler;
+import pl.commercelink.marketplace.MarketplaceProviderFactory;
 import pl.commercelink.marketplace.MarketplaceReturnsImportScheduler;
+import pl.commercelink.notifications.StoreNotificationRecord;
+import pl.commercelink.orders.filters.model.OwnedOrderFilters;
+import pl.commercelink.payments.PaymentProviderFactory;
 import pl.commercelink.pricelist.PricelistEventScheduler;
-import pl.commercelink.starter.storage.FileStorage;
+import pl.commercelink.receipts.ReceiptAttempt;
+import pl.commercelink.receipts.ReceiptProviderFactory;
+import pl.commercelink.scheduling.DailyScheduleExecutionCount;
+import pl.commercelink.shipping.ShipmentTracking;
+import pl.commercelink.shipping.ShippingProviderFactory;
 import pl.commercelink.users.CognitoUserService;
 
 import java.util.List;
@@ -54,10 +63,15 @@ class StoreDeletionServiceTest {
     @Mock private RMACentersRepository rmaCentersRepository;
     @Mock private RMAItemsRepository rmaItemsRepository;
     @Mock private StoreWipeRepository wipeRepository;
-    @Mock private FileStorage fileStorage;
+    @Mock private StoreFilesWipe storeFilesWipe;
     @Mock private StoreInventoryCache storeInventoryCache;
     @Mock private CognitoUserService cognitoUserService;
     @Mock private SupplierProviderFactory supplierProviderFactory;
+    @Mock private ShippingProviderFactory shippingProviderFactory;
+    @Mock private InvoicingProviderFactory invoicingProviderFactory;
+    @Mock private ReceiptProviderFactory receiptProviderFactory;
+    @Mock private MarketplaceProviderFactory marketplaceProviderFactory;
+    @Mock private PaymentProviderFactory paymentProviderFactory;
     @Mock private MarketplaceOrdersImportScheduler ordersImportScheduler;
     @Mock private MarketplaceReturnsImportScheduler returnsImportScheduler;
     @Mock private StoreSupplierFeedScheduler feedScheduler;
@@ -69,8 +83,9 @@ class StoreDeletionServiceTest {
     void setUp() {
         service = new StoreDeletionService(storesRepository, ordersRepository, orderItemsRepository,
                 orderEventsRepository, productCatalogRepository, productRepository, rmaCentersRepository,
-                rmaItemsRepository, wipeRepository, fileStorage, storeInventoryCache, cognitoUserService,
-                supplierProviderFactory,
+                rmaItemsRepository, wipeRepository, storeFilesWipe, storeInventoryCache, cognitoUserService,
+                supplierProviderFactory, shippingProviderFactory, invoicingProviderFactory, receiptProviderFactory,
+                marketplaceProviderFactory, paymentProviderFactory,
                 ordersImportScheduler, returnsImportScheduler, feedScheduler, pricelistEventScheduler);
         service.storesBucket = "stores";
     }
@@ -113,6 +128,12 @@ class StoreDeletionServiceTest {
         return store;
     }
 
+    private Store trialStore() {
+        Store store = regularStore();
+        store.setTrial(new TrialPeriod("owner@example.com", "2026-09-28T10:00:00Z", "2026-10-12T10:00:00Z"));
+        return store;
+    }
+
     private void stubEmptyCascade() {
         when(ordersRepository.findAll(STORE_ID)).thenReturn(List.of());
         when(productCatalogRepository.findAll(STORE_ID)).thenReturn(List.of());
@@ -134,7 +155,7 @@ class StoreDeletionServiceTest {
 
         // when / then
         assertThrows(IllegalStateException.class, () -> service.deleteDemoStore(STORE_ID));
-        verifyNoInteractions(wipeRepository, fileStorage, storeInventoryCache);
+        verifyNoInteractions(wipeRepository, storeFilesWipe, storeInventoryCache);
     }
 
     @Test
@@ -146,7 +167,7 @@ class StoreDeletionServiceTest {
         service.deleteDemoStore(STORE_ID);
 
         // then
-        verifyNoInteractions(wipeRepository, fileStorage, storeInventoryCache);
+        verifyNoInteractions(wipeRepository, storeFilesWipe, storeInventoryCache);
     }
 
     @Test
@@ -214,7 +235,7 @@ class StoreDeletionServiceTest {
         verify(wipeRepository).deleteAll(List.of(documentItem));
         verify(wipeRepository).deleteAll(List.of(document));
         verify(wipeRepository, never()).deleteAll(List.of(sharedCenter));
-        verify(fileStorage).deleteAll("stores", STORE_ID + "/");
+        verify(storeFilesWipe).deleteAllVersions("stores", STORE_ID + "/");
         InOrder lastStep = inOrder(storeInventoryCache, storesRepository);
         lastStep.verify(storeInventoryCache).evict(STORE_ID);
         lastStep.verify(storesRepository).delete(store);
@@ -234,7 +255,7 @@ class StoreDeletionServiceTest {
         // then
         assertFalse(deleted);
         verify(storesRepository, never()).delete(any(Store.class));
-        verify(fileStorage).deleteAll("stores", STORE_ID + "/");
+        verify(storeFilesWipe).deleteAllVersions("stores", STORE_ID + "/");
         verify(storeInventoryCache).evict(STORE_ID);
     }
 
@@ -263,7 +284,7 @@ class StoreDeletionServiceTest {
         // when / then
         assertThrows(IllegalStateException.class,
                 () -> service.deleteStore(STORE_ID, StoreDeletionService.Guard.DEMO_ONLY));
-        verifyNoInteractions(wipeRepository, fileStorage, storeInventoryCache);
+        verifyNoInteractions(wipeRepository, storeFilesWipe, storeInventoryCache);
     }
 
     @Test
@@ -278,6 +299,50 @@ class StoreDeletionServiceTest {
 
         // then
         verify(cognitoUserService).deleteUser("user@example.com");
+    }
+
+    @Test
+    void deletesOwnerAccountOfTrialStore() {
+        // given
+        Store store = trialStore();
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        stubEmptyCascade();
+
+        // when
+        boolean deleted = service.deleteStore(STORE_ID, StoreDeletionService.Guard.ANY);
+
+        // then
+        assertTrue(deleted);
+        verify(cognitoUserService).deleteStoreOwner("owner@example.com", STORE_ID);
+        verify(cognitoUserService, never()).deleteUser(any());
+        verify(storesRepository).delete(store);
+    }
+
+    @Test
+    void keepsTrialStoreRecordWhenOwnerDeletionFails() {
+        // given
+        Store store = trialStore();
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        doThrow(new RuntimeException("cognito down")).when(cognitoUserService).deleteStoreOwner(any(), any());
+        stubEmptyCascade();
+
+        // when
+        boolean deleted = service.deleteStore(STORE_ID, StoreDeletionService.Guard.ANY);
+
+        // then
+        assertFalse(deleted);
+        verify(storesRepository, never()).delete(any(Store.class));
+    }
+
+    @Test
+    void demoOnlyGuardRefusesTrialStore() {
+        // given
+        when(storesRepository.findById(STORE_ID)).thenReturn(trialStore());
+
+        // when / then
+        assertThrows(IllegalStateException.class,
+                () -> service.deleteStore(STORE_ID, StoreDeletionService.Guard.DEMO_ONLY));
+        verifyNoInteractions(cognitoUserService, wipeRepository, storeFilesWipe);
     }
 
     @Test
@@ -314,5 +379,141 @@ class StoreDeletionServiceTest {
         // then
         verifyNoInteractions(supplierProviderFactory);
         verify(storesRepository).delete(store);
+    }
+
+    @Test
+    void deletesEveryRecordTheStoreOwnsInItsOwnTables() {
+        // given
+        Store store = regularStore();
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        stubEmptyCascade();
+        ReceiptAttempt attempt = new ReceiptAttempt();
+        when(wipeRepository.findReceiptAttempts(STORE_ID)).thenReturn(List.of(attempt));
+        StoreNotificationRecord notification = new StoreNotificationRecord();
+        when(wipeRepository.findStoreNotifications(STORE_ID)).thenReturn(List.of(notification));
+        OwnedOrderFilters filters = new OwnedOrderFilters();
+        when(wipeRepository.findOrderFilters(STORE_ID)).thenReturn(List.of(filters));
+        ShipmentTracking tracking = new ShipmentTracking();
+        when(wipeRepository.findShipmentTrackings(STORE_ID)).thenReturn(List.of(tracking));
+
+        // when
+        boolean deleted = service.deleteStore(STORE_ID, StoreDeletionService.Guard.ANY);
+
+        // then
+        assertTrue(deleted);
+        verify(wipeRepository).deleteAll(List.of(attempt));
+        verify(wipeRepository).deleteAll(List.of(notification));
+        verify(wipeRepository).deleteAll(List.of(filters));
+        verify(wipeRepository).deleteAll(List.of(tracking));
+        verify(storeFilesWipe).deleteAllVersions("stores", STORE_ID + "/");
+    }
+
+    @Test
+    void keepsScheduleExecutionCountsOfPayingStoreForBilling() {
+        // given
+        Store store = regularStore();
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        stubEmptyCascade();
+
+        // when
+        service.deleteStore(STORE_ID, StoreDeletionService.Guard.ANY);
+
+        // then
+        verify(wipeRepository, never()).findScheduleExecutionCounts(any());
+        verify(storesRepository).delete(store);
+    }
+
+    @Test
+    void deletesScheduleExecutionCountsOfTrialStore() {
+        // given
+        Store store = trialStore();
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        stubEmptyCascade();
+        DailyScheduleExecutionCount count = new DailyScheduleExecutionCount();
+        when(wipeRepository.findScheduleExecutionCounts(STORE_ID)).thenReturn(List.of(count));
+
+        // when
+        service.deleteStore(STORE_ID, StoreDeletionService.Guard.TRIAL_ONLY);
+
+        // then
+        verify(wipeRepository).deleteAll(List.of(count));
+        verify(storesRepository).delete(store);
+    }
+
+    @Test
+    void deletesSecretsOfEveryIntegration() {
+        // given
+        Store store = regularStore();
+        store.setConfigurationValue(IntegrationType.SHIPPING_PROVIDER, "Courier");
+        store.setConfigurationValue(IntegrationType.INVOICING_PROVIDER, "Invoices");
+        store.setConfigurationValue(IntegrationType.RECEIPT_PROVIDER, "Fiscal");
+        store.getMarketplaces().add(new MarketplaceIntegration("Allegro"));
+        store.addPaymentIntegration("PayU");
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        stubEmptyCascade();
+
+        // when
+        boolean deleted = service.deleteStore(STORE_ID, StoreDeletionService.Guard.ANY);
+
+        // then
+        assertTrue(deleted);
+        verify(shippingProviderFactory).deleteConfiguration(store, "Courier");
+        verify(invoicingProviderFactory).deleteConfiguration(store, "Invoices");
+        verify(receiptProviderFactory).deleteConfiguration(store, "Fiscal");
+        verify(marketplaceProviderFactory).deleteConfiguration(store, "Allegro");
+        verify(paymentProviderFactory).deleteConfiguration(store, "PayU");
+    }
+
+    @Test
+    void storeWithoutIntegrationsDeletesNoIntegrationSecrets() {
+        // given
+        Store store = regularStore();
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        stubEmptyCascade();
+
+        // when
+        service.deleteStore(STORE_ID, StoreDeletionService.Guard.ANY);
+
+        // then
+        verifyNoInteractions(shippingProviderFactory, invoicingProviderFactory, receiptProviderFactory,
+                marketplaceProviderFactory, paymentProviderFactory);
+    }
+
+    @Test
+    void keepsStoreRecordWhenFilesCannotBeDeleted() {
+        // given
+        Store store = trialStore();
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        stubEmptyCascade();
+        doThrow(new IllegalStateException("access denied")).when(storeFilesWipe).deleteAllVersions(any(), any());
+
+        // when
+        boolean deleted = service.deleteStore(STORE_ID, StoreDeletionService.Guard.TRIAL_ONLY);
+
+        // then
+        assertFalse(deleted);
+        verify(storesRepository, never()).delete(any(Store.class));
+    }
+
+    @Test
+    void trialOnlyGuardRefusesStoreWithoutTrial() {
+        // given
+        when(storesRepository.findById(STORE_ID)).thenReturn(regularStore());
+
+        // when / then
+        assertThrows(IllegalStateException.class,
+                () -> service.deleteStore(STORE_ID, StoreDeletionService.Guard.TRIAL_ONLY));
+        verifyNoInteractions(cognitoUserService, wipeRepository, storeFilesWipe);
+    }
+
+    @Test
+    void trialOnlyGuardRefusesDemoStore() {
+        // given
+        when(storesRepository.findById(STORE_ID)).thenReturn(demoStore());
+
+        // when / then
+        assertThrows(IllegalStateException.class,
+                () -> service.deleteStore(STORE_ID, StoreDeletionService.Guard.TRIAL_ONLY));
+        verifyNoInteractions(cognitoUserService, wipeRepository, storeFilesWipe);
     }
 }

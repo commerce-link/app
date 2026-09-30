@@ -96,7 +96,7 @@ class EmailVerificationServiceTest {
                 ArgumentCaptor.forClass(GetUserAttributeVerificationCodeRequest.class);
 
         // when
-        service().sendCode();
+        service().sendCode(request);
 
         // then
         verify(cognitoClient).getUserAttributeVerificationCode(captor.capture());
@@ -105,14 +105,53 @@ class EmailVerificationServiceTest {
     }
 
     @Test
-    void swallowsSendFailureWhenSendingQuietly() {
+    void codeSentOnRequestCountsAsTheCodeOfTheSession() {
         // given
         loggedIn(Boolean.FALSE);
-        when(cognitoClient.getUserAttributeVerificationCode(any(GetUserAttributeVerificationCodeRequest.class)))
-                .thenThrow(new RuntimeException("cognito down"));
+        EmailVerificationService service = service();
+        service.sendCode(request);
 
-        // when / then
-        assertDoesNotThrow(() -> service().sendCodeQuietly("user@example.com"));
+        // when
+        boolean sent = service.sendCodeOnce(request);
+
+        // then
+        assertTrue(sent);
+        verify(cognitoClient, times(1)).getUserAttributeVerificationCode(any(GetUserAttributeVerificationCodeRequest.class));
+    }
+
+    @Test
+    void sendsCodeOnlyOncePerSession() {
+        // given
+        loggedIn(Boolean.FALSE);
+        EmailVerificationService service = service();
+
+        // when
+        boolean first = service.sendCodeOnce(request);
+        boolean second = service.sendCodeOnce(request);
+
+        // then
+        assertTrue(first);
+        assertTrue(second);
+        verify(cognitoClient, times(1)).getUserAttributeVerificationCode(any(GetUserAttributeVerificationCodeRequest.class));
+    }
+
+    @Test
+    void sendsCodeAgainAfterFailedSend() {
+        // given
+        loggedIn(Boolean.FALSE);
+        EmailVerificationService service = service();
+        when(cognitoClient.getUserAttributeVerificationCode(any(GetUserAttributeVerificationCodeRequest.class)))
+                .thenThrow(new RuntimeException("cognito down"))
+                .thenReturn(null);
+
+        // when
+        boolean failed = service.sendCodeOnce(request);
+        boolean retried = service.sendCodeOnce(request);
+
+        // then
+        assertFalse(failed);
+        assertTrue(retried);
+        verify(cognitoClient, times(2)).getUserAttributeVerificationCode(any(GetUserAttributeVerificationCodeRequest.class));
     }
 
     @Test

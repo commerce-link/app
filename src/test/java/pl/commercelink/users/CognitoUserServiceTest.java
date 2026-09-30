@@ -10,6 +10,7 @@ import software.amazon.awssdk.services.cognitoidentityprovider.CognitoIdentityPr
 import software.amazon.awssdk.services.cognitoidentityprovider.model.AdminCreateUserRequest;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.AdminDeleteUserRequest;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.AdminGetUserRequest;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.AdminGetUserResponse;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.AdminSetUserPasswordRequest;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.AttributeType;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.MessageActionType;
@@ -20,6 +21,7 @@ import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -98,5 +100,54 @@ class CognitoUserServiceTest {
 
         // when / then
         assertDoesNotThrow(() -> cognitoUserService.deleteUser("user@example.com"));
+    }
+
+    @Test
+    void deleteStoreOwnerDeletesAccountOfThatStore() {
+        // given
+        when(cognitoClient.adminGetUser(any(AdminGetUserRequest.class))).thenReturn(accountOfStore("abc123def4"));
+        ArgumentCaptor<AdminDeleteUserRequest> deleteCaptor = ArgumentCaptor.forClass(AdminDeleteUserRequest.class);
+
+        // when
+        cognitoUserService.deleteStoreOwner("user@example.com", "abc123def4");
+
+        // then
+        verify(cognitoClient).adminDeleteUser(deleteCaptor.capture());
+        assertEquals(POOL_ID, deleteCaptor.getValue().userPoolId());
+        assertEquals("user@example.com", deleteCaptor.getValue().username());
+    }
+
+    @Test
+    void deleteStoreOwnerKeepsAccountOfAnotherStore() {
+        // given
+        when(cognitoClient.adminGetUser(any(AdminGetUserRequest.class))).thenReturn(accountOfStore("other-store"));
+
+        // when
+        cognitoUserService.deleteStoreOwner("user@example.com", "abc123def4");
+
+        // then
+        verify(cognitoClient, never()).adminDeleteUser(any(AdminDeleteUserRequest.class));
+    }
+
+    @Test
+    void deleteStoreOwnerIgnoresMissingAccount() {
+        // given
+        when(cognitoClient.adminGetUser(any(AdminGetUserRequest.class)))
+                .thenThrow(UserNotFoundException.builder().message("missing").build());
+
+        // when
+        cognitoUserService.deleteStoreOwner("user@example.com", "abc123def4");
+
+        // then
+        verify(cognitoClient, never()).adminDeleteUser(any(AdminDeleteUserRequest.class));
+    }
+
+    private static AdminGetUserResponse accountOfStore(String storeId) {
+        return AdminGetUserResponse.builder()
+                .username("user@example.com")
+                .userAttributes(
+                        AttributeType.builder().name("custom:role").value("ADMIN").build(),
+                        AttributeType.builder().name("custom:storeId").value(storeId).build())
+                .build();
     }
 }

@@ -7,6 +7,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoreActivity;
 import pl.commercelink.stores.StoresRepository;
 
 import java.time.Clock;
@@ -17,6 +18,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -33,6 +35,8 @@ class DropshipTrackingSweepTest {
     private DeliveriesRepository deliveriesRepository;
     @Mock
     private DropshipTrackingEventPublisher publisher;
+    @Mock
+    private StoreActivity storeActivity;
 
     private DropshipTrackingSweep sweep;
 
@@ -40,7 +44,8 @@ class DropshipTrackingSweepTest {
     void setUp() {
         Clock clock = Clock.fixed(NOW.atZone(ZONE).toInstant(), ZONE);
         sweep = new DropshipTrackingSweep(storesRepository, deliveriesRepository, publisher,
-                DropshipTrackingProperties.defaults(), clock);
+                DropshipTrackingProperties.defaults(), storeActivity, clock);
+        lenient().when(storeActivity.isActive(any(Store.class))).thenReturn(true);
     }
 
     private static Delivery delivery(String id, LocalDateTime orderedAt, LocalDateTime nextCheckAt) {
@@ -93,6 +98,21 @@ class DropshipTrackingSweepTest {
 
         // then
         verify(publisher).publish(any());
+    }
+
+    @Test
+    void skipsDeliveriesOfInactiveStore() {
+        // given
+        Store inactive = store("inactive");
+        when(storesRepository.findAll()).thenReturn(List.of(inactive));
+        when(storeActivity.isActive(inactive)).thenReturn(false);
+
+        // when
+        sweep.sweep();
+
+        // then
+        verify(deliveriesRepository, never()).findTrackableDropshipDeliveries(any());
+        verify(publisher, never()).publish(any());
     }
 
     @Test

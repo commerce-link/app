@@ -13,6 +13,7 @@ import pl.commercelink.orders.rma.MarketplaceReturnAction;
 import pl.commercelink.orders.rma.ReturnLifecycleEvent;
 import pl.commercelink.stores.MarketplaceIntegration;
 import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoreActivity;
 import pl.commercelink.stores.StoresRepository;
 
 import java.util.Optional;
@@ -27,6 +28,7 @@ public class MarketplaceReturnLifecycleEventListener {
 
     private final StoresRepository storesRepository;
     private final MarketplaceProviderFactory providerFactory;
+    private final StoreActivity storeActivity;
 
     @SqsListener(
             value = "marketplace-return-lifecycle-queue",
@@ -49,6 +51,11 @@ public class MarketplaceReturnLifecycleEventListener {
         // No order is loaded on purpose: the event is self-describing, so a decision stays actionable even
         // when the order was hard-deleted (cancel-on-delete) between the publish and this delivery.
         Store store = storesRepository.findById(event.storeId());
+        if (!storeActivity.isActive(store)) {
+            log.error("Store {} is inactive; {} decision for RMA {} dropped without calling the marketplace",
+                    event.storeId(), event.type(), event.action().rmaId());
+            return;
+        }
         MarketplaceIntegration integration = store.getMarketplaceIntegration(event.marketplace());
         if (integration == null) {
             log.error("No {} integration configured for store {}; {} decision for RMA {} dropped without"

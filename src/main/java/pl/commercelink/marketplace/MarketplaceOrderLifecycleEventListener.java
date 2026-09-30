@@ -2,6 +2,7 @@ package pl.commercelink.marketplace;
 
 import io.awspring.cloud.sqs.annotation.SqsListener;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import pl.commercelink.documents.Document;
@@ -12,12 +13,14 @@ import pl.commercelink.shipping.CarrierDictionary;
 import pl.commercelink.orders.*;
 import pl.commercelink.stores.MarketplaceIntegration;
 import pl.commercelink.stores.Store;
+import pl.commercelink.stores.StoreActivity;
 import pl.commercelink.stores.StoresRepository;
 
 import java.util.Optional;
 import pl.commercelink.stores.IntegrationType;
 
 
+@Slf4j
 @Component
 @ConditionalOnProperty(name = "application.env", havingValue = "prod", matchIfMissing = false)
 @RequiredArgsConstructor
@@ -27,6 +30,7 @@ public class MarketplaceOrderLifecycleEventListener {
     private final OrdersRepository ordersRepository;
     private final MarketplaceProviderFactory providerFactory;
     private final CarrierDictionary carrierDictionary;
+    private final StoreActivity storeActivity;
 
     @SqsListener(
             value = "marketplace-order-lifecycle-queue",
@@ -36,6 +40,11 @@ public class MarketplaceOrderLifecycleEventListener {
     )
     public void handleMessage(OrderLifecycleEvent payload) {
         Store store = storesRepository.findById(payload.getStoreId());
+        if (!storeActivity.isActive(store)) {
+            log.warn("Marketplace {} event for order {} skipped: store {} is inactive",
+                    payload.getType(), payload.getOrderId(), payload.getStoreId());
+            return;
+        }
         Order order = ordersRepository.findById(payload.getStoreId(), payload.getOrderId());
 
         // The order may have been hard-deleted (cancel-on-delete) before this runs; in that

@@ -25,7 +25,6 @@ class RegistrationControllerTest {
 
     @Mock private RegistrationService registrationService;
     @Mock private RegistrationAutoLoginService autoLoginService;
-    @Mock private EmailVerificationService emailVerificationService;
     @Mock private CaptchaVerifier captchaVerifier;
     @Mock private MessageSource messageSource;
 
@@ -42,8 +41,8 @@ class RegistrationControllerTest {
     }
 
     private RegistrationController controller(boolean demoMode) {
-        return new RegistrationController(registrationService, autoLoginService, emailVerificationService,
-                captchaVerifier, messageSource, demoMode, 3, "", "/dashboard");
+        return new RegistrationController(registrationService, autoLoginService, captchaVerifier, messageSource,
+                demoMode, 3, 14, 14, "", "/dashboard");
     }
 
     private void captchaPasses() {
@@ -230,11 +229,10 @@ class RegistrationControllerTest {
         // then
         assertEquals("redirect:/dashboard", view);
         assertNull(sessionPending());
-        verifyNoInteractions(emailVerificationService);
     }
 
     @Test
-    void sendsVerificationCodeAndGoesToVerifyScreenInProductionMode() {
+    void goesToVerifyScreenInProductionMode() {
         // given
         pending("user@firma.pl", "Moja Firma");
         when(registrationService.register("user@firma.pl", "Moja Firma", "1.1.1.1", PASSWORD))
@@ -247,7 +245,6 @@ class RegistrationControllerTest {
 
         // then
         assertEquals("redirect:/register/verify-email", view);
-        verify(emailVerificationService).sendCodeQuietly("user@firma.pl");
     }
 
     @Test
@@ -300,7 +297,6 @@ class RegistrationControllerTest {
 
         // then
         assertEquals("register-success", view);
-        verifyNoInteractions(emailVerificationService);
     }
 
     @Test
@@ -325,6 +321,7 @@ class RegistrationControllerTest {
         assertEquals("register", view);
         assertEquals(true, model.getAttribute("demoMode"));
         assertEquals(3, model.getAttribute("ttlDays"));
+        assertEquals(14, model.getAttribute("trialDays"));
         assertEquals("site-key", model.getAttribute("captchaSiteKey"));
     }
 }
