@@ -3,7 +3,6 @@ package pl.commercelink.shipping;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -60,7 +59,6 @@ class ShipmentCancellationCheckerTest {
     @Mock
     private ShippingProvider provider;
 
-    @InjectMocks
     private ShipmentCancellationChecker checker;
 
     @BeforeEach
@@ -69,6 +67,10 @@ class ShipmentCancellationCheckerTest {
                 .thenAnswer(OptimisticLockingExecutorMocks.passThroughModifyAndSave());
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(shippingProviderFactory.get(store)).thenReturn(provider);
+        // the real settler: its own write rules are pinned in ShipmentCancellationSettlerTest
+        ShipmentCancellationSettler settler =
+                new ShipmentCancellationSettler(ordersRepository, orderEventsRepository, optimisticLockingExecutor);
+        checker = new ShipmentCancellationChecker(storesRepository, ordersRepository, shippingProviderFactory, publisher, settler);
     }
 
     private static Shipment pendingShipment(String commandId) {

@@ -49,6 +49,7 @@ import pl.commercelink.receipts.ReceiptAttempt;
 import pl.commercelink.receipts.ReceiptAttemptService;
 import pl.commercelink.receipts.ReceiptLock;
 import pl.commercelink.rest.client.HttpClientException;
+import pl.commercelink.shipping.ShipmentCancelResult;
 import pl.commercelink.shipping.ShipmentCancelService;
 import pl.commercelink.shipping.ShipmentCancellationInProgressException;
 import pl.commercelink.shipping.ShipmentTrackingSubscriber;
@@ -2185,8 +2186,22 @@ public class OrdersController extends BaseController {
             return refuse(redirectAttributes, orderId, refusal, locale);
         }
         try {
-            shipmentCancelService.cancelShipping(orderId, getStoreId());
-            OrderFlash.saved(redirectAttributes, messageSource.getMessage("shipment.cancel.requested", null, locale));
+            ShipmentCancelResult result = shipmentCancelService.cancelShipping(orderId, getStoreId());
+            switch (result.outcome()) {
+                case REQUESTED -> OrderFlash.saved(redirectAttributes,
+                        messageSource.getMessage("shipment.cancel.requested", null, locale));
+                case RECHECKING -> OrderFlash.saved(redirectAttributes,
+                        messageSource.getMessage("shipment.cancel.rechecking", null, locale));
+                case CANCELLED -> OrderFlash.saved(redirectAttributes,
+                        messageSource.getMessage("shipment.cancel.success", null, locale));
+                case FAILED -> {
+                    return refuse(redirectAttributes, orderId, "shipment.cancel.failed", locale,
+                            Objects.toString(result.error(), ""));
+                }
+                case GONE -> {
+                    return refuse(redirectAttributes, orderId, "shipment.cancel.gone", locale);
+                }
+            }
         } catch (ShipmentCancellationInProgressException e) {
             // a concurrent request marked the cancellation between the check above and the service's fresh read
             return refuse(redirectAttributes, orderId, "order.shipments.cancel.error.pending", locale);

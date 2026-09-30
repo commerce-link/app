@@ -6,21 +6,26 @@ import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShipmentCancellationStatus;
+import pl.commercelink.rest.client.HttpClientException;
+import pl.commercelink.shipping.api.ShipmentCancellation;
 import pl.commercelink.shipping.api.ShippingException;
 import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Asks the shipping provider to cancel the courier order of the first dispatched shipment. The cancellation is only
- * requested here: the shipment is marked PENDING and {@link ShipmentCancellationChecker} clears it once the provider
- * confirms, or records why it did not.
+ * Asks the shipping provider to cancel the courier order of the first dispatched shipment. The shipment is marked
+ * PENDING first; a result the provider gives right away is settled here by {@link ShipmentCancellationSettler},
+ * otherwise {@link ShipmentCancellationChecker} clears the shipment once the provider confirms, or records why not.
  */
 @Slf4j
 @Service
@@ -33,19 +38,22 @@ public class ShipmentCancelService {
     private final ShippingProviderFactory shippingProviderFactory;
     private final ShipmentCancellationEventPublisher publisher;
     private final OptimisticLockingExecutor optimisticLockingExecutor;
+    private final ShipmentCancellationSettler settler;
 
     public ShipmentCancelService(StoresRepository storesRepository, OrdersRepository ordersRepository,
                                  ShippingProviderFactory shippingProviderFactory,
                                  ShipmentCancellationEventPublisher publisher,
-                                 OptimisticLockingExecutor optimisticLockingExecutor) {
+                                 OptimisticLockingExecutor optimisticLockingExecutor,
+                                 ShipmentCancellationSettler settler) {
         this.storesRepository = storesRepository;
         this.ordersRepository = ordersRepository;
         this.shippingProviderFactory = shippingProviderFactory;
         this.publisher = publisher;
         this.optimisticLockingExecutor = optimisticLockingExecutor;
+        this.settler = settler;
     }
 
-    public void cancelShipping(String orderId, String storeId) {
+    public ShipmentCancelResult cancelShipping(String orderId, String storeId) {
         Store store = storesRepository.findById(storeId);
         Order order = ordersRepository.findById(storeId, orderId);
 
@@ -76,7 +84,11 @@ public class ShipmentCancelService {
                     inProgress.set(false);
                     previous.set(null);
                     findShipment(fresh, externalId).ifPresent(s -> {
-                        if (s.isCancellationInProgress(now)) {
+                        // the decision taken on the first read holds only if the fresh read still leads to it;
+                        // otherwise another request changed the cancellation in between
+                        if (s.isCancellationInProgress(now)
+                                || s.needsCancellationRecheck(now) != recheck
+                                || (recheck && !s.hasCancellationCommand(commandId))) {
                             inProgress.set(true);
                             return;
                         }
@@ -96,18 +108,66 @@ public class ShipmentCancelService {
         if (!marked.get()) {
             log.warn("Order {} of store {} no longer has package {}; no cancel command was sent",
                     orderId, storeId, externalId);
-            return;
+            return ShipmentCancelResult.gone();
         }
 
-        if (!recheck) {
-            try {
-                shippingProviderFactory.get(store).cancelShipment(externalId, commandId);
-            } catch (RuntimeException e) {
+        ShipmentCancellationCheckRequest check = ShipmentCancellationCheckRequest.first(storeId, orderId, externalId, commandId);
+        if (recheck) {
+            publisher.publish(check);
+            return ShipmentCancelResult.rechecking();
+        }
+
+        ShipmentCancellation result;
+        try {
+            result = shippingProviderFactory.get(store).cancelShipment(externalId, commandId);
+        } catch (RuntimeException e) {
+            if (isRefusal(e)) {
                 restore(storeId, orderId, externalId, commandId, previous.get());
                 throw e;
             }
+            // the command id is ours and already recorded, so the checker finds out whether the command ran
+            log.warn("Cancel command {} for package {} of order {} in store {} has an unknown outcome; "
+                    + "it stays PENDING and its result will be checked", commandId, externalId, orderId, storeId, e);
+            publisher.publish(check);
+            return ShipmentCancelResult.requested();
         }
-        publisher.publish(ShipmentCancellationCheckRequest.first(storeId, orderId, externalId, commandId));
+        settler.reportOtherCancelledPackages(check, result);
+        return switch (result.status()) {
+            case PENDING -> {
+                publisher.publish(check);
+                yield ShipmentCancelResult.requested();
+            }
+            case SUCCEEDED -> {
+                settler.succeed(check);
+                yield ShipmentCancelResult.cancelled();
+            }
+            case FAILED -> {
+                settler.fail(check, result.error());
+                yield ShipmentCancelResult.failed(result.error());
+            }
+        };
+    }
+
+    /**
+     * Only a clear refusal means the command was not run: a check before sending (no HTTP answer behind it) or a 4xx
+     * answer. A 5xx, a timeout or any other error may come after the provider already accepted the command.
+     */
+    static boolean isRefusal(RuntimeException e) {
+        HttpClientException http = httpCause(e);
+        if (http != null) {
+            return http.getStatusCode() >= 400 && http.getStatusCode() < 500;
+        }
+        return e instanceof ShippingException;
+    }
+
+    private static HttpClientException httpCause(Throwable e) {
+        Set<Throwable> seen = Collections.newSetFromMap(new IdentityHashMap<>());
+        for (Throwable current = e; current != null && seen.add(current); current = current.getCause()) {
+            if (current instanceof HttpClientException http) {
+                return http;
+            }
+        }
+        return null;
     }
 
     /** The provider refused the command, so nothing is being cancelled: the shipment gets back its earlier state. */
@@ -139,6 +199,9 @@ public class ShipmentCancelService {
     }
 
     private static Optional<Shipment> findShipment(Order order, String externalId) {
+        if (order == null) {
+            return Optional.empty();
+        }
         return order.getShipments().stream()
                 .filter(s -> externalId.equals(s.getExternalId()))
                 .findFirst();
