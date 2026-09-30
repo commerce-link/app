@@ -45,7 +45,6 @@ public record DeliveryListQuery(Scope scope, DeliveryAttention focus, List<Deliv
         Scope(String param) { this.param = param; }
         public String param() { return param; }
         static Optional<Scope> parse(String v) { return Arrays.stream(values()).filter(s -> s.param.equalsIgnoreCase(trim(v))).findFirst(); }
-        public boolean includesTransit() { return this != RECEIVED; }
         public boolean includesHistory() { return this != TRANSIT; }
     }
 
@@ -145,7 +144,6 @@ public record DeliveryListQuery(Scope scope, DeliveryAttention focus, List<Deliv
     public DeliveryListQuery withoutProvider(String p) { return new DeliveryListQuery(scope, focus, states, without(providers, p), settle, from, to, allHistory, q, sort, dir, 1); }
     public DeliveryListQuery toggleSettle(Settle s) { return new DeliveryListQuery(scope, focus, states, providers, toggled(settle, s), from, to, allHistory, q, sort, dir, 1); }
     public DeliveryListQuery withoutSettle(Settle s) { return new DeliveryListQuery(scope, focus, states, providers, without(settle, s), from, to, allHistory, q, sort, dir, 1); }
-    public DeliveryListQuery withDates(LocalDate f, LocalDate t) { return new DeliveryListQuery(scope, focus, states, providers, settle, f, t, false, q, sort, dir, 1); }
     public DeliveryListQuery withAllHistory() { return new DeliveryListQuery(scope, focus, states, providers, settle, null, null, true, q, sort, dir, 1); }
     public DeliveryListQuery withoutDates() { return new DeliveryListQuery(scope, focus, states, providers, settle, null, null, false, q, sort, dir, 1); }
     public DeliveryListQuery withQ(String newQ) { return new DeliveryListQuery(scope, focus, states, providers, settle, from, to, allHistory, normalizeQ(newQ), sort, dir, 1); }
