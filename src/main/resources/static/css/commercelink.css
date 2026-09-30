@@ -7307,124 +7307,6 @@ a.cl-link-button:hover {
     margin: 0;
 }
 
-/* --- Deliveries list (spec docs/active/dostawy-redesign/2026-09-30-deliveries-list-design.md §8): the orders list
-   components (cl-icon-text from app#240) plus a scope switch made of links, a date-range menu, status pills that wrap inside themselves, a
-   secondary column hidden on the rail width and, on a phone, filter menus folded under "Filtry: n". --- */
-
-/* cl-icon-text comes from the order details (app#240); in the key cell it must not wrap. */
-.cl-page .cl-table-key .cl-icon-text {
-    white-space: nowrap;
-}
-
-/* The scope switch changes the list's address, so its segments are links; the chosen one looks like a pressed button. */
-.cl-page .cl-segmented a.cl-segment {
-    display: inline-flex;
-    align-items: center;
-    text-decoration: none;
-}
-
-.cl-page .cl-segmented a.cl-segment[aria-current="page"] {
-    background: var(--cl-surface);
-    color: var(--cl-accent-ink);
-    box-shadow: 0 1px 2px rgba(14, 23, 33, .12), inset 0 0 0 1px var(--cl-accent);
-    font-weight: 600;
-}
-
-.cl-page .cl-segmented a.cl-segment[aria-current="page"] .cl-segment-count {
-    color: inherit;
-}
-
-/* The date menu is the last one in its row: its panel opens towards the left so it stays inside the card. */
-.cl-page .cl-filter-menu.is-end .cl-filter-menu-panel {
-    left: auto;
-    right: 0;
-}
-
-.cl-page .cl-filter-menu-dates {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: var(--cl-gap-fields);
-    padding: 12px;
-}
-
-.cl-page .cl-filter-menu-dates label {
-    display: grid;
-    gap: var(--cl-gap-attached);
-    font-size: 13.5px;
-    color: var(--cl-ink-2);
-}
-
-/* "Anulowana przez dostawcę" in one line pushed the table past the card at 1024 px: the pill wraps by words instead. */
-.cl-page .cl-table.is-deliveries .cl-status
-{
-    white-space: normal;
-}
-
-.cl-page .cl-toolbar-search {
-    display: flex;
-    gap: var(--cl-gap-related);
-    align-items: center;
-}
-
-.cl-page .cl-toolbar-toggle {
-    display: none;
-}
-
-@media screen and (min-width: 720px) {
-    .cl-page .cl-table.is-deliveries td[data-label]:has(.cl-status) {
-        min-width: 15ch;
-    }
-}
-
-/* With the rail (720–1215 px) the card is ~790 px wide: the order date gives way to the columns that matter. */
-@media screen and (min-width: 720px) and (max-width: 1215px) {
-    .cl-page .cl-table.is-deliveries .is-secondary-column {
-        display: none;
-    }
-}
-
-@media screen and (max-width: 1023px) {
-    .cl-page .cl-segmented a.cl-segment {
-        min-height: 44px;
-    }
-}
-
-@media screen and (max-width: 719px) {
-    .cl-page .cl-table-toolbar .cl-segmented {
-        width: 100%;
-    }
-
-    .cl-page .cl-segmented a.cl-segment {
-        flex: 1;
-        justify-content: center;
-    }
-
-    .cl-page .cl-toolbar-search {
-        width: 100%;
-    }
-
-    .cl-page .cl-toolbar-search .cl-search-form {
-        flex: 1 1 0;
-        min-width: 0;
-    }
-
-    .cl-page .cl-toolbar-toggle {
-        display: inline-flex;
-        gap: 6px;
-        align-items: center;
-    }
-
-    .cl-page .cl-toolbar-toggle[aria-expanded="true"] {
-        border-color: var(--cl-accent);
-        color: var(--cl-accent-ink);
-    }
-
-    .cl-page .cl-table-toolbar.is-collapsed .cl-toolbar-filters {
-        display: none;
-    }
-}
-
-/* --- Receipt page --- */
 /* Receipt-like document page without the app frame (dev e-receipt preview): a narrow printable card, monospace
    figures, a tone banner on top. Generic so a real receipt or document preview can reuse it. */
 .cl-receipt-page {
@@ -7564,6 +7446,116 @@ a.cl-link-button:hover {
     }
 
     .cl-receipt-back {
+        display: none;
+    }
+}
+
+/* --- Deliveries list (spec docs/active/dostawy-redesign/2026-09-30-deliveries-list-design.md §8):
+   scope switch, date-range menu, wrapping status pills, secondary column visibility, phone filters. --- */
+
+/* cl-icon-text comes from the order details (app#240); in the key cell it must not wrap. */
+.cl-page .cl-table-key .cl-icon-text {
+    white-space: nowrap;
+}
+
+/* The scope switch changes the list's address, so its segments are links; the chosen one looks pressed. */
+.cl-page .cl-segmented a.cl-segment {
+    display: inline-flex;
+    align-items: center;
+    text-decoration: none;
+}
+
+.cl-page .cl-segmented a.cl-segment[aria-current="page"] {
+    background: var(--cl-surface);
+    color: var(--cl-accent-ink);
+    box-shadow: 0 1px 2px rgba(14, 23, 33, .12), inset 0 0 0 1px var(--cl-accent);
+    font-weight: 600;
+}
+
+.cl-page .cl-segmented a.cl-segment[aria-current="page"] .cl-segment-count {
+    color: inherit;
+}
+
+/* The date menu is the last one in its row: its panel opens towards the left so it stays inside. */
+.cl-page .cl-filter-menu.is-end .cl-filter-menu-panel {
+    left: auto;
+    right: 0;
+}
+
+.cl-page .cl-filter-menu-dates {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(132px, 1fr));
+    gap: var(--cl-gap-fields);
+    padding: 12px;
+}
+
+.cl-page .cl-filter-menu-dates label {
+    display: grid;
+    gap: var(--cl-gap-attached);
+    font-size: 13.5px;
+    color: var(--cl-ink-2);
+}
+
+/* "Anulowana przez dostawcę" in one line pushed the table past the card at 1024 px: wrap by words. */
+.cl-page .cl-table.is-deliveries .cl-status {
+    white-space: normal;
+}
+
+.cl-page .cl-toolbar-search {
+    display: flex;
+    gap: var(--cl-gap-related);
+    align-items: center;
+}
+
+.cl-page .cl-toolbar-toggle {
+    display: none;
+}
+
+@media screen and (min-width: 720px) {
+    .cl-page .cl-table.is-deliveries td[data-label]:has(.cl-status) {
+        min-width: 15ch;
+    }
+}
+
+/* With the rail (720–1215 px) the card is ~790 px wide: order date gives way to columns that matter. */
+@media screen and (min-width: 720px) and (max-width: 1215px) {
+    .cl-page .cl-table.is-deliveries .is-secondary-column {
+        display: none;
+    }
+}
+
+@media screen and (max-width: 719px) {
+    .cl-page .cl-table-toolbar .cl-segmented {
+        width: 100%;
+    }
+
+    .cl-page .cl-segmented a.cl-segment {
+        flex: 1;
+        justify-content: center;
+        min-height: 44px;
+    }
+
+    .cl-page .cl-toolbar-search {
+        width: 100%;
+    }
+
+    .cl-page .cl-toolbar-search .cl-search-form {
+        flex: 1 1 0;
+        min-width: 0;
+    }
+
+    .cl-page .cl-toolbar-toggle {
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+    }
+
+    .cl-page .cl-toolbar-toggle[aria-expanded="true"] {
+        border-color: var(--cl-accent);
+        color: var(--cl-accent-ink);
+    }
+
+    .cl-page .cl-table-toolbar.is-collapsed .cl-toolbar-filters {
         display: none;
     }
 }
