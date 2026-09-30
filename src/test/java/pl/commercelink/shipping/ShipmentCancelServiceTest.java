@@ -32,6 +32,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -184,10 +185,78 @@ class ShipmentCancelServiceTest {
         verify(shippingProvider).cancelShipment(EXTERNAL_ID);
     }
 
+    @Test
+    void cancellingOneCourierOrderKeepsTheOtherShipmentsAndTheStatusWhileOneOfThemIsShipped() {
+        // given: the courier order first, a parcel typed by hand that really went out after it
+        Shipment booked = courierShipment(EXTERNAL_ID);
+        Shipment typed = courierShipment(null);
+        typed.setTrackingNo("TRK-TYPED");
+        Order order = orderWithShipments(booked, typed);
+        order.setStatus(OrderStatus.Shipping);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(shippingProviderFactory.get(store)).thenReturn(shippingProvider);
+
+        // when
+        boolean back = shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID);
+
+        // then: the typed parcel is with the carrier, so the order stays Shipping and the customer's e-mail stands
+        assertThat(back).isFalse();
+        assertThat(order.getShipments()).containsExactly(typed);
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.Shipping);
+        verify(orderEventsRepository, never()).save(any());
+        verify(orderEventsRepository, never()).deleteByOrderIdAndName(any(), any());
+        verify(ordersRepository).save(order);
+    }
+
+    @Test
+    void cancellingACourierOrderOfTwoParcelsRemovesBothAndStepsBackWhenWhatIsLeftHasNotGoneOut() {
+        // given: two parcels of one courier order and a shipment still waiting for its data
+        Shipment parcel = courierShipment(EXTERNAL_ID);
+        Shipment secondParcel = courierShipment(EXTERNAL_ID);
+        secondParcel.setTrackingNo("TRK-124");
+        Shipment waiting = new Shipment(ShipmentType.Courier);
+        waiting.setTrackingNo("TRK-WAITING");
+        Order order = orderWithShipments(parcel, secondParcel, waiting);
+        order.setStatus(OrderStatus.Shipping);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(shippingProviderFactory.get(store)).thenReturn(shippingProvider);
+
+        // when
+        boolean back = shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID);
+
+        // then
+        verify(shippingProvider).cancelShipment(EXTERNAL_ID);
+        assertThat(order.getShipments()).containsExactly(waiting);
+        assertThat(back).isTrue();
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.Realization);
+        verify(orderEventsRepository).deleteByOrderIdAndName(ORDER_ID, EmailNotificationType.ORDER_SHIPPING.name());
+    }
+
+    @Test
+    void aStoreThatLostItsShippingProviderGetsARefusalAndNothingChanges() {
+        // given: the carrier authorisation was lost, so the factory has no provider for the store
+        Shipment booked = courierShipment(EXTERNAL_ID);
+        Order order = orderWithShipments(booked);
+        order.setStatus(OrderStatus.Shipping);
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(shippingProviderFactory.get(store)).thenReturn(null);
+
+        // when / then
+        assertThatThrownBy(() -> shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID))
+                .isInstanceOf(ShippingUnavailableException.class);
+        assertThat(order.getShipments()).containsExactly(booked);
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.Shipping);
+        verify(ordersRepository, never()).save(any());
+        verifyNoInteractions(orderEventsRepository);
+    }
+
     private Order orderWithShipments(Shipment... shipments) {
         Order order = new Order(STORE_ID);
         order.setOrderId(ORDER_ID);
-        order.setShipments(List.of(shipments));
+        order.setShipments(new java.util.ArrayList<>(List.of(shipments)));
         return order;
     }
 

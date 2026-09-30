@@ -87,6 +87,7 @@ import pl.commercelink.documents.Document;
 import pl.commercelink.documents.DocumentType;
 import pl.commercelink.orders.OrderReferenceResolver;
 import pl.commercelink.shipping.ShipmentCancelService;
+import pl.commercelink.shipping.ShippingUnavailableException;
 import pl.commercelink.web.dtos.AssignSupplierForm;
 import pl.commercelink.web.orders.BulkAction;
 import pl.commercelink.web.orders.MoveTargetView;
@@ -4265,6 +4266,29 @@ class OrdersControllerTest {
             // then
             verify(shipmentCancelService).cancelShipping(ORDER_ID, STORE_ID);
             assertThat(flash(redirect)).doesNotContainKey("errorMessage");
+        }
+
+        @Test
+        void aCourierCancellationInAStoreThatLostItsCarrierIsRefusedWithAReason() {
+            // given
+            Order order = order(OrderStatus.Shipping);
+            Shipment labelled = new Shipment(ShipmentType.Courier);
+            labelled.setCarrier("DPD");
+            labelled.setTrackingNo("TRACK-1");
+            labelled.setShippedAt(LocalDateTime.now());
+            labelled.setExternalId("PKG-1");
+            order.setShipments(new ArrayList<>(List.of(labelled)));
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            when(shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID))
+                    .thenThrow(new ShippingUnavailableException(STORE_ID));
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            String view = ordersController.cancelShipment(ORDER_ID, redirect, polish);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+            assertThat(flash(redirect)).containsEntry("errorMessage", "order.shipments.cancel.error.no.provider");
         }
 
         @Test

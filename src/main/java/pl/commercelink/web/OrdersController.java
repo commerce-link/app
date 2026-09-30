@@ -50,6 +50,7 @@ import pl.commercelink.receipts.ReceiptAttemptService;
 import pl.commercelink.receipts.ReceiptLock;
 import pl.commercelink.rest.client.HttpClientException;
 import pl.commercelink.shipping.ShipmentCancelService;
+import pl.commercelink.shipping.ShippingUnavailableException;
 import pl.commercelink.shipping.ShipmentTrackingSubscriber;
 import pl.commercelink.shipping.api.ShippingException;
 import pl.commercelink.starter.dynamodb.OptimisticLockingExhaustedException;
@@ -2230,6 +2231,9 @@ public class OrdersController extends BaseController {
             boolean backToRealization = shipmentCancelService.cancelShipping(orderId, getStoreId());
             String notice = messageSource.getMessage("shipment.cancel.success", null, locale);
             OrderFlash.saved(redirectAttributes, backToRealization ? notice + " " + backToRealizationNotice(locale) : notice);
+        } catch (ShippingUnavailableException e) {
+            // the store's carrier authorisation was lost: nothing was cancelled nor changed
+            return refuse(redirectAttributes, orderId, "order.shipments.cancel.error.no.provider", locale);
         } catch (HttpClientException ex) {
             return handleHttpClientException(ex, orderId, redirectAttributes);
         } catch (ShippingException e) {
