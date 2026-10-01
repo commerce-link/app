@@ -40,7 +40,7 @@
                                         th:text="${T(pl.commercelink.web.orders.Money).format(requested.isEmpty() ? 0 : #aggregates.sum(requested.![requestedQty * unitCost]))}"></output>
                                     <span data-cl-total-currency th:text="${form.sourceCurrency}"></span></dd></div>
                         </dl>
-                        <div class="cl-card-footer is-block">
+                        <div class="cl-card-footer is-stacked">
                             <button id="save-button" type="submit" class="cl-button is-primary" aria-describedby="save-help"
                                     th:text="#{deliveries.create.manual.save}"></button>
                             <p class="cl-help" id="save-help" th:text="#{deliveries.create.manual.save.help}"></p>

@@ -129,7 +129,7 @@
                             <div class="cl-kv-total"><dt th:text="#{deliveries.create.summary.total}"></dt>
                                 <dd class="is-numeric"><output data-cl-live-total aria-live="polite">—</output></dd></div>
                         </dl>
-                        <div class="cl-card-footer is-block">
+                        <div class="cl-card-footer is-stacked">
                             <button id="purchase-confirm-submit" type="submit" class="cl-button is-primary" disabled
                                     aria-describedby="confirm-reasons confirm-help"
                                     th:attr="data-blocked=${page.purchaseBlockedReason() != null or orderOptionsError != null or deliveryAddressError != null}"

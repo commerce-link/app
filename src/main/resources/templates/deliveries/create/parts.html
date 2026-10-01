@@ -376,7 +376,7 @@
         <div class="cl-kv-total"><dt th:text="#{deliveries.create.summary.net}"></dt>
             <dd class="is-numeric"><output data-cl-total-net aria-live="polite" th:text="${T(pl.commercelink.web.orders.Money).format(net)}"></output> PLN</dd></div>
     </dl>
-    <div class="cl-card-footer is-block">
+    <div class="cl-card-footer is-stacked">
         <th:block th:if="${page.purchaseAvailable() and !blocked}">
             <button type="submit" class="cl-button is-primary" id="purchase-button" formnovalidate
                     th:formaction="@{${page.links().purchase()}}" aria-describedby="purchase-help">

@@ -43,7 +43,8 @@ class DeliveryCreateScriptsContractTest {
 
         // then
         assertThat(purchase).contains("event.submitter && event.submitter.id === 'purchase-confirm-submit'")
-                .contains("addEventListener('pageshow'").contains("event.persisted").contains("event.key === 'Enter'");
+                .contains("addEventListener('pageshow'").contains("event.persisted").contains("event.key === 'Enter'")
+                .contains("scrollIntoView");
         assertThat(manual).contains("event.submitter && event.submitter.id === 'save-button'")
                 .contains("addEventListener('pageshow'");
     }
@@ -65,7 +66,7 @@ class DeliveryCreateScriptsContractTest {
         String block = css.substring(css.indexOf("/* --- New delivery"));
 
         // then
-        assertThat(block).contains(".cl-layout-side.is-sticky").contains(".cl-card-footer.is-block")
+        assertThat(block).contains(".cl-layout-side.is-sticky").contains(".cl-card-footer.is-stacked")
                 .contains(".cl-table.is-delivery").contains(".cl-choice-group.is-scroll")
                 .doesNotContain("--cl-ok:").doesNotContain("#00d1b2");
         assertThat(block.replaceAll("@media screen and \\((max|min)-width: (719|720|1023|1024|1215|1216|1365|1366)px\\)", ""))

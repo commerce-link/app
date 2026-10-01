@@ -66,6 +66,9 @@ class DeliveryCreatePurchaseTemplateTest {
         // then
         assertThat(html.substring(0, html.indexOf("id=\"purchase-confirm-submit\""))).doesNotContain("type=\"submit\"");
         assertThat(html).contains("id=\"back-submit\"").contains("data-cl-back-submit=\"back-submit\"");
+        int back = html.indexOf("id=\"back-submit\"");
+        assertThat(html.substring(html.lastIndexOf("<button", back), html.indexOf(">", back)))
+                .contains("formaction=\"/dashboard/deliveries/create/Acme/back\"");
     }
 
     @Test
@@ -151,6 +154,51 @@ class DeliveryCreatePurchaseTemplateTest {
                 .contains("removeUnselected", "items[0].requestedQty", "items[0].unitCost",
                         "items[0].allocations[0].key.orderId", "items[0].allocations[0].selected",
                         "externalDeliveryId", "estimatedDeliveryAt", "shippingCost", "tax");
+    }
+
+    @Test
+    void optionsErrorBlocksTheOrder() {
+        // given
+        Map<String, Object> variables = warehouse(addresses(1));
+        variables.put("orderOptionsError", "timeout");
+
+        // when
+        String html = render("deliveries/create/purchase", variables);
+
+        // then
+        assertThat(html).contains("id=\"order-options-blocked\"").contains("(timeout)");
+        int submit = html.indexOf("id=\"purchase-confirm-submit\"");
+        assertThat(html.substring(html.lastIndexOf("<button", submit), html.indexOf(">", submit))).contains("data-blocked=\"true\"");
+    }
+
+    @Test
+    void dropshipConfirmationCarriesTheEstimatedDeliveryDateOnlyAsTheHiddenStepTwoValue() {
+        // given
+        Map<String, Object> variables = model(dropshipPage(false, null, false), dropshipForm());
+        variables.put("purchaseRef", "ref-1");
+        variables.put("requiresApproval", false);
+
+        // when
+        String html = render("deliveries/create/purchase", variables);
+
+        // then
+        assertThat(occurrences(html, "name=\"estimatedDeliveryAt\"")).isEqualTo(1);
+        assertThat(html).containsPattern("<input type=\"hidden\" name=\"estimatedDeliveryAt\"")
+                .doesNotContain("for=\"estimatedDeliveryAt\"");
+    }
+
+    @Test
+    void confirmationGivesTheProductColumnAMinimumWidth() {
+        // given
+        Map<String, Object> variables = warehouse(addresses(1));
+        variables.put("validation", new PurchaseValidation("Acme", "ref-1", "PLN", 1198.0, true, List.of(
+                new PurchaseValidation.Line("AMD Ryzen 7 9800X3D", "sku", "5901234123457", "MFN", 2, 2, 579.5, 599.0))));
+
+        // when
+        String html = fragment("deliveries/create/purchase :: validationResult", variables);
+
+        // then
+        assertThat(html).contains("col class=\"cl-col-key\"");
     }
 
     @Test

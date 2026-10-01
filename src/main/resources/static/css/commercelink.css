@@ -7280,7 +7280,7 @@ a.cl-link-button:hover {
     }
 }
 
-/* --- Dropship pages (dropshipCreate, dropshipConfirmation; order details subpages, group C, 2026-09-28) --- */
+/* --- Dropship pages (now deliveries/create; order details subpages, group C, 2026-09-28) --- */
 /* Checkboxes stacked in one table cell (a product's order lines): no bullets, 4 px apart, each keeps its target. */
 .cl-page .cl-check-list {
     display: grid;
@@ -8183,38 +8183,38 @@ a.cl-link-button:hover {
     }
 }
 
-.cl-page .cl-card-footer.is-block {
+.cl-page .cl-card-footer.is-stacked {
     display: grid;
     gap: var(--cl-gap-attached);
 }
 
-.cl-page .cl-card-footer.is-block .cl-button {
+.cl-page .cl-card-footer.is-stacked .cl-button {
     width: 100%;
     justify-content: center;
 }
 
-.cl-page .cl-card-footer.is-block .cl-help {
+.cl-page .cl-card-footer.is-stacked .cl-help {
     margin: 0;
     font-size: 13px;
     line-height: 1.4;
     color: var(--cl-ink-2);
 }
 
-.cl-page .cl-card-footer.is-block .cl-help.is-warn {
+.cl-page .cl-card-footer.is-stacked .cl-help.is-warn {
     color: var(--cl-warn);
 }
 
-.cl-page .cl-card-footer.is-block .cl-help + .cl-button,
-.cl-page .cl-card-footer.is-block .cl-help + .cl-help + .cl-button {
+.cl-page .cl-card-footer.is-stacked .cl-help + .cl-button,
+.cl-page .cl-card-footer.is-stacked .cl-help + .cl-help + .cl-button {
     margin-top: var(--cl-gap-related);
 }
 
-.cl-page .cl-card-footer.is-block .cl-reasons {
+.cl-page .cl-card-footer.is-stacked .cl-reasons {
     margin: 2px 0 0;
     padding-left: 18px;
 }
 
-.cl-page .cl-card-footer.is-block .cl-reasons li[hidden] {
+.cl-page .cl-card-footer.is-stacked .cl-reasons li[hidden] {
     display: none;
 }
 

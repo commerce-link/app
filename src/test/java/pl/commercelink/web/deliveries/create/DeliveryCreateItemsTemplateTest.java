@@ -72,7 +72,7 @@ class DeliveryCreateItemsTemplateTest {
         String html = render("deliveries/create/items", model(warehousePage(false, true, false), warehouseForm()));
 
         // then
-        String footer = html.substring(html.indexOf("cl-card-footer is-block"));
+        String footer = html.substring(html.indexOf("cl-card-footer is-stacked"));
         assertThat(footer.indexOf("id=\"purchase-button\"")).isLessThan(footer.indexOf("id=\"manual-button\""));
         assertThat(footer).contains("formaction=\"/dashboard/deliveries/create/Acme/purchase\"")
                 .contains("formaction=\"/dashboard/deliveries/create/Acme/manual\"")
@@ -122,6 +122,15 @@ class DeliveryCreateItemsTemplateTest {
     }
 
     @Test
+    void dropshipStepOneNeverLetsTheOrderedQuantityGrow() {
+        // when
+        String html = render("deliveries/create/items", model(dropshipPage(false, null, false), dropshipForm()));
+
+        // then
+        assertThat(html).doesNotContainPattern("type=\"number\"[^>]*data-cl-requested-qty");
+    }
+
+    @Test
     void dropshipFromTheOrderGoesBackToTheOrder() {
         // when
         String html = render("deliveries/create/items", model(dropshipPage(true, null, false), dropshipForm()));
@@ -138,7 +147,7 @@ class DeliveryCreateItemsTemplateTest {
                 model(dropshipPage(false, "orders.dropship.error.pickupPointUnsupported", true), dropshipForm()));
 
         // then
-        String footer = html.substring(html.indexOf("cl-card-footer is-block"));
+        String footer = html.substring(html.indexOf("cl-card-footer is-stacked"));
         assertThat(footer.indexOf("id=\"manual-button\"")).isLessThan(footer.indexOf("id=\"purchase-button\""));
         int purchase = footer.indexOf("id=\"purchase-button\"");
         assertThat(footer.substring(footer.lastIndexOf("<button", purchase), footer.indexOf(">", purchase)))

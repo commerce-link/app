@@ -133,6 +133,11 @@
                 refresh(form);
             }
         });
+        // The list can be long: bring the preselected address into view so the choice is visible without scrolling.
+        var checkedAddress = form.querySelector('input[name="deliveryAddressId"]:checked');
+        if (checkedAddress) {
+            checkedAddress.scrollIntoView({block: 'nearest'});
+        }
         loadValidation(form);
     }
 
