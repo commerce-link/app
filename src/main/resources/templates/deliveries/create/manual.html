@@ -1,0 +1,59 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+<!--/* Step 2 outside the system: the operator ordered by phone, e-mail or in the supplier's shop and copies the order
+       number, date and costs from the confirmation; the delivery is saved without calling the supplier. */-->
+<div layout:fragment="content">
+    <section class="cl-page">
+        <div class="cl-page-body">
+            <div th:replace="~{deliveries/create/parts :: header(${page}, 2, #{deliveries.create.manual.title(${page.supplierName()})}, 'deliveries.create.lead.manual')}"></div>
+            <th:block th:if="${errors != null and !errors.isEmpty()}">
+                <div th:replace="~{fragments/settings-form :: errorSummary('manual-errors', ${errors}, null)}"></div>
+            </th:block>
+            <th:block th:if="${errorMessage != null}">
+                <div class="cl-alert is-bad" tabindex="-1" data-cl-error-summary>
+                    <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
+                    <p class="cl-alert-text" th:text="${errorMessage}"></p>
+                </div>
+            </th:block>
+            <form method="post" id="delivery-step-form" class="cl-layout-aside" data-cl-delivery-manual
+                  th:action="@{${page.links().save()}}">
+                <th:block th:replace="~{deliveries/create/parts :: scope(${page})}"></th:block>
+                <th:block th:replace="~{deliveries/create/parts :: hiddenItems}"></th:block>
+                <div class="cl-layout-main">
+                    <section th:replace="~{deliveries/create/parts :: orderData(${page}, ${errors})}"></section>
+                    <section th:replace="~{deliveries/create/parts :: readonlyItems(${page})}"></section>
+                </div>
+                <aside class="cl-layout-side is-sticky">
+                    <th:block th:replace="~{deliveries/create/parts :: recipient(${page}, 'deliveries.create.recipient.help.manual')}"></th:block>
+                    <section class="cl-card" aria-labelledby="summary-title"
+                             th:with="requested=${form.items.?[requestedQty > 0]}">
+                        <div class="cl-card-head"><h2 class="cl-card-title" id="summary-title" th:text="#{deliveries.create.summary}"></h2></div>
+                        <dl class="cl-kv is-column cl-card-inset">
+                            <div><dt th:text="#{deliveries.create.summary.products}"></dt><dd class="is-numeric" th:text="${requested.size()}"></dd></div>
+                            <div><dt th:text="#{deliveries.create.summary.pieces}"></dt>
+                                <dd class="is-numeric" th:text="${requested.isEmpty() ? 0 : #aggregates.sum(requested.![requestedQty])}"></dd></div>
+                            <div class="cl-kv-total"><dt th:text="#{deliveries.create.summary.net}"></dt>
+                                <dd class="is-numeric"><output data-cl-total-net aria-live="polite"
+                                        th:text="${T(pl.commercelink.web.orders.Money).format(requested.isEmpty() ? 0 : #aggregates.sum(requested.![requestedQty * unitCost]))}"></output>
+                                    <span data-cl-total-currency th:text="${form.sourceCurrency}"></span></dd></div>
+                        </dl>
+                        <div class="cl-card-footer is-block">
+                            <button id="save-button" type="submit" class="cl-button is-primary" aria-describedby="save-help"
+                                    th:text="#{deliveries.create.manual.save}"></button>
+                            <p class="cl-help" id="save-help" th:text="#{deliveries.create.manual.save.help}"></p>
+                            <button type="submit" id="back-submit" class="cl-button" formnovalidate th:formaction="@{${page.links().back()}}">
+                                <i class="fas fa-arrow-left" aria-hidden="true"></i> <span th:text="#{deliveries.create.back}"></span>
+                            </button>
+                        </div>
+                    </section>
+                </aside>
+            </form>
+        </div>
+    </section>
+    <script th:src="@{/js/delivery-manual.js}" defer></script>
+</div>
+</body>
+</html>

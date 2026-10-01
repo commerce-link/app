@@ -500,5 +500,67 @@
         <p th:replace="~{deliveries/create/parts :: fieldError('paymentTerms', ${errors})}"></p>
     </div>
 </div>
+
+<!--/* Step 2 "Zarejestruj zamówienie": the supplier order's number, date and costs, copied from its confirmation. */-->
+<section th:fragment="orderData(page, errors)" class="cl-card" aria-labelledby="order-data-title">
+    <div class="cl-card-head"><h2 class="cl-card-title" id="order-data-title" th:text="#{deliveries.create.manual.orderData}"></h2></div>
+    <p class="cl-card-desc" th:text="${page.requiresOrderIdentity()} ? #{deliveries.create.manual.orderData.desc} : #{deliveries.create.manual.orderData.desc.dropship}"></p>
+    <div class="cl-card-inset">
+        <div class="cl-form-grid">
+            <div class="cl-span-3 cl-field" th:each="field : ${ {'externalDeliveryId', 'estimatedDeliveryAt'} }"
+                 th:with="invalid=${errors != null and errors.containsKey(field)}">
+                <label class="cl-label" th:for="${field}">
+                    <span th:text="${field == 'externalDeliveryId'} ? #{deliveries.create.field.orderNumber} : #{deliveries.create.field.deliveryDate}"></span>
+                    <span th:if="${!page.requiresOrderIdentity()}" class="cl-optional" th:text="#{form.optional}"></span>
+                </label>
+                <input class="cl-input" th:id="${field}" th:name="${field}" autocomplete="off"
+                       th:type="${field == 'estimatedDeliveryAt'} ? 'date' : 'text'"
+                       th:value="${field == 'externalDeliveryId'} ? ${form.externalDeliveryId} : ${form.estimatedDeliveryAt}"
+                       th:required="${page.requiresOrderIdentity()}" th:classappend="${invalid} ? 'is-invalid'"
+                       th:attr="aria-invalid=${invalid} ? 'true' : null, aria-describedby=${invalid} ? |${field}-error| : null"/>
+                <p th:replace="~{deliveries/create/parts :: fieldError(${field}, ${errors})}"></p>
+            </div>
+        </div>
+        <div th:replace="~{deliveries/create/parts :: costFields(${errors})}"></div>
+    </div>
+</section>
+
+<!--/* Step 2 "Zarejestruj zamówienie": what is being recorded, read-only; changes go through step 1. */-->
+<section th:fragment="readonlyItems(page)" class="cl-card" aria-labelledby="items-title" id="items">
+    <div class="cl-card-head">
+        <h2 class="cl-card-title" id="items-title" th:text="#{deliveries.create.items.title}"></h2>
+        <div class="cl-card-actions">
+            <button type="button" class="cl-link-button" data-cl-back-submit="back-submit">
+                <i class="fas fa-pencil-alt" aria-hidden="true"></i> <span th:text="#{deliveries.create.manual.changeItems}"></span>
+            </button>
+        </div>
+    </div>
+    <div class="cl-card-section">
+        <table class="cl-table is-key-wrap">
+            <colgroup><col class="cl-col-key"><col class="cl-col-num"><col class="cl-col-num"><col class="cl-col-num"></colgroup>
+            <thead>
+            <tr>
+                <th scope="col" th:text="#{general.product}"></th>
+                <th scope="col" class="is-numeric" th:text="#{deliveries.create.col.qty}"></th>
+                <th scope="col" class="is-numeric" th:text="#{deliveries.create.col.unitCost}"></th>
+                <th scope="col" class="is-numeric" th:text="#{deliveries.create.col.value}"></th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="item : ${form.items.?[requestedQty > 0]}" data-cl-readonly-item
+                th:attr="data-qty=${item.requestedQty}, data-unit-cost=${item.unitCost}">
+                <th scope="row" class="cl-table-key" th:attr="data-label=#{general.product}">
+                    <span th:text="${item.name}"></span>
+                    <span class="cl-table-sub"><span th:text="#{general.ean} + ':'"></span> <span class="cl-code-nowrap" th:text="${item.ean}"></span></span>
+                </th>
+                <td class="is-numeric" th:attr="data-label=#{deliveries.create.col.qty}" th:text="${item.requestedQty}"></td>
+                <td class="is-numeric" th:attr="data-label=#{deliveries.create.col.unitCost}" th:text="${T(pl.commercelink.web.orders.Money).format(item.unitCost)}"></td>
+                <td class="is-numeric" th:attr="data-label=#{deliveries.create.col.value}" th:text="${T(pl.commercelink.web.orders.Money).format(item.requestedQty * item.unitCost)}"></td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+
 </body>
 </html>
