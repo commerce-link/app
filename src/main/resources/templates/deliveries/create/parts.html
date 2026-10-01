@@ -459,13 +459,17 @@
         <summary id="costs-title" th:text="#{deliveries.create.purchase.costs}"></summary>
         <div class="cl-disclosure-body">
             <p class="cl-card-desc" th:text="#{deliveries.create.purchase.costs.help}"></p>
-            <div th:replace="~{deliveries/create/parts :: costFields(null)}"></div>
+            <div class="cl-form-grid">
+                <th:block th:replace="~{deliveries/create/parts :: costFields(null)}"></th:block>
+            </div>
         </div>
     </details>
 </section>
 
-<!--/* Currency, shipping, payment, VAT multiplier and payment terms; shared by the costs card and "Dane zamówienia". */-->
-<div th:fragment="costFields(errors)" class="cl-form-grid">
+<!--/* Currency, shipping, payment, VAT multiplier and payment terms; shared by the costs card and "Dane zamówienia".
+       Grid cells only: the caller's single cl-form-grid keeps one row rhythm with the fields around them, and the
+       inputs fill their columns (the fixed-width table inputs is-price / cl-input-days left ragged gaps here). */-->
+<th:block th:fragment="costFields(errors)">
     <div class="cl-span-2 cl-field">
         <label class="cl-label" for="sourceCurrency" th:text="#{deliveries.create.field.currency}"></label>
         <select class="cl-select" id="sourceCurrency" name="sourceCurrency" data-cl-currency>
@@ -475,7 +479,7 @@
     </div>
     <div class="cl-span-2 cl-field" th:each="field : ${ {'shippingCost', 'paymentCost'} }">
         <label class="cl-label" th:for="${field}" th:text="${field == 'shippingCost'} ? #{deliveries.create.field.shipping} : #{deliveries.create.field.payment}"></label>
-        <input class="cl-input is-price" type="number" inputmode="decimal" step="0.01" min="0" th:id="${field}" th:name="${field}"
+        <input class="cl-input" type="number" inputmode="decimal" step="0.01" min="0" th:id="${field}" th:name="${field}"
                th:value="${T(pl.commercelink.web.orders.Money).input(field == 'shippingCost' ? form.shippingCost : form.paymentCost)}"
                th:classappend="${errors != null and errors.containsKey(field)} ? 'is-invalid'"
                th:attr="aria-invalid=${errors != null and errors.containsKey(field)} ? 'true' : null,
@@ -484,7 +488,7 @@
     </div>
     <div class="cl-span-3 cl-field">
         <label class="cl-label" for="tax" th:text="#{deliveries.create.field.tax}"></label>
-        <input class="cl-input is-price" type="number" inputmode="decimal" step="0.01" min="1" id="tax" name="tax"
+        <input class="cl-input" type="number" inputmode="decimal" step="0.01" min="1" id="tax" name="tax"
                th:value="${form.tax}" th:classappend="${errors != null and errors.containsKey('tax')} ? 'is-invalid'"
                th:attr="aria-invalid=${errors != null and errors.containsKey('tax')} ? 'true' : null,
                         aria-describedby=${errors != null and errors.containsKey('tax')} ? 'tax-help tax-error' : 'tax-help'"/>
@@ -493,7 +497,7 @@
     </div>
     <div class="cl-span-3 cl-field">
         <label class="cl-label" for="paymentTerms" th:text="#{deliveries.create.field.terms}"></label>
-        <input class="cl-input cl-input-days" type="number" inputmode="numeric" step="1" min="0" id="paymentTerms"
+        <input class="cl-input" type="number" inputmode="numeric" step="1" min="0" id="paymentTerms"
                name="paymentTerms" th:value="${form.paymentTerms}"
                th:classappend="${errors != null and errors.containsKey('paymentTerms')} ? 'is-invalid'"
                th:attr="aria-invalid=${errors != null and errors.containsKey('paymentTerms')} ? 'true' : null,
@@ -501,7 +505,7 @@
         <p class="cl-help" id="paymentTerms-help" th:text="#{deliveries.create.field.terms.help}"></p>
         <p th:replace="~{deliveries/create/parts :: fieldError('paymentTerms', ${errors})}"></p>
     </div>
-</div>
+</th:block>
 
 <!--/* Step 2 "Zarejestruj zamówienie": the supplier order's number, date and costs, copied from its confirmation. */-->
 <section th:fragment="orderData(page, errors)" class="cl-card" aria-labelledby="order-data-title">
@@ -522,8 +526,8 @@
                        th:attr="aria-invalid=${invalid} ? 'true' : null, aria-describedby=${invalid} ? |${field}-error| : null"/>
                 <p th:replace="~{deliveries/create/parts :: fieldError(${field}, ${errors})}"></p>
             </div>
+            <th:block th:replace="~{deliveries/create/parts :: costFields(${errors})}"></th:block>
         </div>
-        <div th:replace="~{deliveries/create/parts :: costFields(${errors})}"></div>
     </div>
 </section>
 
