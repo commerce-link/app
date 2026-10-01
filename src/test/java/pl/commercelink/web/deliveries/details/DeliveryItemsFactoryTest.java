@@ -52,6 +52,23 @@ class DeliveryItemsFactoryTest {
     }
 
     @Test
+    void theDirectToConsumerMarkerAppearsOnlyOnAWarehouseDelivery() {
+        // given
+        Delivery dropship = dropship();
+        Delivery warehouse = withAllocations(warehouse(), orderAllocation("SSD", "590", "MFN-SSD", 100, 1, true));
+
+        // when
+        DeliveryPageModel.AllocationRow dropshipRow = items(dropship, ADMIN).products().get(0).allocations().get(0);
+        List<DeliveryPageModel.AllocationRow> warehouseRows = items(warehouse, ADMIN).products().stream()
+                .flatMap(product -> product.allocations().stream()).toList();
+
+        // then
+        assertThat(dropship.getAllocations().get(0).isDirectToConsumer()).isTrue();
+        assertThat(dropshipRow.directToConsumer()).isFalse();
+        assertThat(warehouseRows).extracting(DeliveryPageModel.AllocationRow::directToConsumer).containsExactly(true);
+    }
+
+    @Test
     void anAllocationNamesItsDestinationAndItsState() {
         // given
         Delivery delivery = partlyReceived(warehouse());

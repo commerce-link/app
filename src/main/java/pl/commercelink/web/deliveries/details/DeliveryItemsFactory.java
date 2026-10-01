@@ -115,8 +115,10 @@ final class DeliveryItemsFactory {
         String stateKey = !received ? "deliveries.details.items.state.waiting"
                 : delivery.isDropship() ? "deliveries.details.items.state.shipped" : "deliveries.details.items.state.received";
         boolean checkbox = selectable && !received;
+        // a dropship allocation carries the flag too, but its goods never pass the warehouse (Delivery.hasDirectToConsumerAllocations)
+        boolean directToConsumer = allocation.isDirectToConsumer() && !delivery.isDropship();
         return new AllocationRow(index, warehouse, orderId == null ? null : ConversionUtil.getShortenedId(orderId),
-                warehouse || key == null ? null : StringUtils.trimToNull(key.getName()), href, allocation.isDirectToConsumer(),
+                warehouse || key == null ? null : StringUtils.trimToNull(key.getName()), href, directToConsumer,
                 allocation.getQty(), received, checkbox, checkbox && checked, stateKey,
                 received ? OrderLabels.OK : OrderLabels.NEUTRAL, allocation.getName(),
                 new AllocationFields(orderId, itemId, key == null ? null : key.getName(),
