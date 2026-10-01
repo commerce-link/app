@@ -60,6 +60,17 @@ class DeliveryCreateScriptsContractTest {
     }
 
     @Test
+    void tickingAnOrderSourceBackRaisesTheQuantityByItsPiecesAsUntickingLoweredIt() throws Exception {
+        // when
+        String js = read("src/main/resources/static/js/delivery-items.js");
+
+        // then: untick lowers the quantity by the source's pieces, tick adds them back (not only up to the minimum,
+        // which would leave a negative warehouse adjustment after untick + tick)
+        assertThat(js).contains("checkbox.checked ? Math.max(current + qty, min) : Math.max(min, current - qty)")
+                .doesNotContain("Math.max(current, min)");
+    }
+
+    @Test
     void stylesAddOnlyTheProposedPiecesWithinTheAllowedBreakpoints() throws Exception {
         // when
         String css = read("src/main/resources/static/css/commercelink.css");

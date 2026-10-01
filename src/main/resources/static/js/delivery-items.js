@@ -1,5 +1,6 @@
 // Step 1 of a new delivery (deliveries/create/items.html). Ticking a source changes the product's minimum and
-// quantity as the warehouse page always did (an order source moves the minimum, a warehouse source only the quantity),
+// quantity (an order source moves the minimum and the quantity by its pieces, both ways, a warehouse source only the
+// quantity),
 // the warehouse adjustment line follows, dropship quantities are the ticked lines, totals and the step buttons follow
 // everything, and Enter inside the table moves to the next field instead of leaving for step 2.
 (function () {
@@ -40,7 +41,7 @@
             minLabel.setAttribute('data-min', String(min));
             minLabel.textContent = minLabel.textContent.replace(/\d+/, String(min));
             qtyInput.min = String(min);
-            qtyInput.value = String(checkbox.checked ? Math.max(current, min) : Math.max(min, current - qty));
+            qtyInput.value = String(checkbox.checked ? Math.max(current + qty, min) : Math.max(min, current - qty));
         } else {
             qtyInput.value = String(checkbox.checked ? current + qty : Math.max(min, current - qty));
         }
