@@ -12,6 +12,13 @@
         return (value < 0 ? '−' : '') + parts.join(',');
     }
 
+    // A grouped number inside a label the server rendered ("min. 1 000", "+1 500 szt."): MessageFormat groups thousands.
+    var NUMBER = /\d(?:[\d\s\u00a0\u202f]*\d)?/;
+
+    function group(value) {
+        return formatAmount(value).replace(/,00$/, '');
+    }
+
     function intOf(input) {
         return input ? parseInt(input.value, 10) || 0 : 0;
     }
@@ -39,7 +46,7 @@
         if (checkbox.getAttribute('data-cl-source-type') === 'Order') {
             min = Math.max(0, checkbox.checked ? min + qty : min - qty);
             minLabel.setAttribute('data-min', String(min));
-            minLabel.textContent = minLabel.textContent.replace(/\d+/, String(min));
+            minLabel.textContent = minLabel.textContent.replace(NUMBER, group(min));
             qtyInput.min = String(min);
             qtyInput.value = String(checkbox.checked ? Math.max(current + qty, min) : Math.max(min, current - qty));
         } else {
@@ -63,7 +70,8 @@
             - (parseInt(minLabel.getAttribute('data-min'), 10) || 0) - warehouseTicked;
         var value = foot.querySelector('[data-cl-adjustment-value]');
         foot.hidden = adjustment === 0;
-        value.textContent = value.textContent.replace(/^[^\s]+/, adjustment > 0 ? '+' + adjustment : String(adjustment));
+        var sign = adjustment > 0 ? '+' : adjustment < 0 ? '−' : '';
+        value.textContent = value.textContent.replace(/^[−+-]?/, '').replace(NUMBER, sign + group(Math.abs(adjustment)));
         value.classList.toggle('is-ok', adjustment >= 0);
         value.classList.toggle('is-warn', adjustment < 0);
     }
@@ -122,11 +130,26 @@
             release ? manual.getAttribute('data-release-label') : manual.getAttribute('data-label');
         manualHelp.textContent = release ? manualHelp.getAttribute('data-release-help') : manualHelp.getAttribute('data-help');
         emptyHelp.hidden = pieces > 0 || !!release;
+        // the reason a button is off is read with the button
+        [purchase, manual].forEach(function (button) {
+            if (!button) {
+                return;
+            }
+            if (!button.hasAttribute('data-describedby')) {
+                button.setAttribute('data-describedby', button.getAttribute('aria-describedby') || '');
+            }
+            var base = button.getAttribute('data-describedby');
+            button.setAttribute('aria-describedby', emptyHelp.hidden || !button.disabled ? base : (base + ' empty-help').trim());
+        });
     }
 
+    // Only fields the operator can see: the source checkboxes of a folded row and the folded suggestions are skipped
+    // (focusing them does nothing, which used to stop Enter at the first product).
     function nextField(field) {
         var fields = Array.prototype.slice.call(field.form.querySelectorAll(
-            '.cl-layout-main input:not([type="hidden"]):not([disabled])'));
+            '.cl-layout-main input:not([type="hidden"]):not([disabled])')).filter(function (input) {
+            return input === field || input.getClientRects().length > 0;
+        });
         var next = fields[fields.indexOf(field) + 1];
         if (next) {
             next.focus();

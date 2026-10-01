@@ -248,7 +248,8 @@ class DeliveryCreateControllerTest {
 
         // then
         assertThat(view).isEqualTo("deliveries/create/manual");
-        assertThat(model.getAttribute("errorMessage")).isEqualTo("msg:orders.dropship.error.nothingSelected");
+        assertThat(model.containsAttribute("errorMessage")).isFalse();
+        assertThat(model.getAttribute("failureMessage")).isEqualTo("msg:orders.dropship.error.nothingSelected");
     }
 
     @Test
@@ -365,7 +366,8 @@ class DeliveryCreateControllerTest {
         // then
         assertThat(view).isEqualTo("deliveries/create/purchase");
         assertThat(model.getAttribute("purchaseRef")).isEqualTo("ref-1");
-        assertThat(model.getAttribute("errorMessage")).isEqualTo("msg:deliveries.purchase.error.failed");
+        assertThat(model.containsAttribute("errorMessage")).isFalse();
+        assertThat(model.getAttribute("failureMessage")).isEqualTo("msg:deliveries.purchase.error.failed");
         verify(scope).addPurchaseModel(form, model);
     }
 

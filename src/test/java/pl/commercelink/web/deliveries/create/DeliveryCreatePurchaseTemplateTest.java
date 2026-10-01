@@ -207,7 +207,7 @@ class DeliveryCreatePurchaseTemplateTest {
     void failedSubmitShowsTheErrorAboveTheCards() {
         // given
         Map<String, Object> variables = warehouse(addresses(1));
-        variables.put("errorMessage", "Złożenie zamówienia u dostawcy nie powiodło się.");
+        variables.put("failureMessage", "Złożenie zamówienia u dostawcy nie powiodło się.");
 
         // when
         String html = render("deliveries/create/purchase", variables);

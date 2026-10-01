@@ -44,7 +44,7 @@ class DeliveryCreateScriptsContractTest {
         // then
         assertThat(purchase).contains("event.submitter && event.submitter.id === 'purchase-confirm-submit'")
                 .contains("addEventListener('pageshow'").contains("event.persisted").contains("event.key === 'Enter'")
-                .contains("scrollIntoView");
+                .contains("addressList.scrollTop").doesNotContain("scrollIntoView");
         assertThat(manual).contains("event.submitter && event.submitter.id === 'save-button'")
                 .contains("addEventListener('pageshow'");
     }
@@ -56,7 +56,8 @@ class DeliveryCreateScriptsContractTest {
 
         // then
         assertThat(js).contains("event.key === 'Enter'").contains("data-cl-source-type")
-                .contains("data-cl-remove-unselected").contains("release-label").contains("empty-help");
+                .contains("data-cl-remove-unselected").contains("release-label").contains("empty-help")
+                .contains("getClientRects().length > 0");
     }
 
     @Test

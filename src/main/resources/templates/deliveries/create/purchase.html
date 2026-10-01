@@ -28,10 +28,10 @@
                     <p class="cl-alert-text"><span th:text="#{deliveries.options.error}"></span> <span th:text="|(${orderOptionsError})|"></span></p>
                 </div>
             </th:block>
-            <th:block th:if="${errorMessage != null}">
+            <th:block th:if="${failureMessage != null}">
                 <div class="cl-alert is-bad" tabindex="-1" data-cl-error-summary>
                     <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
-                    <p class="cl-alert-text" th:text="${errorMessage}"></p>
+                    <p class="cl-alert-text" th:text="${failureMessage}"></p>
                 </div>
             </th:block>
             <form method="post" id="delivery-step-form" class="cl-layout-aside" data-cl-delivery-purchase
@@ -135,6 +135,7 @@
                                 <span th:text="#{deliveries.create.purchase.reasons}"></span>
                                 <ul class="cl-reasons">
                                     <li data-reason="checking" th:text="#{deliveries.create.purchase.reason.checking}"></li>
+                                    <li data-reason="checkFailed" hidden th:text="#{deliveries.create.purchase.reason.checkFailed}"></li>
                                     <li data-reason="availability" hidden th:text="#{deliveries.create.purchase.reason.availability}"></li>
                                     <li data-reason="address" hidden th:text="#{deliveries.create.purchase.reason.address}"></li>
                                     <li data-reason="options" hidden th:text="#{deliveries.create.purchase.reason.options}"></li>
@@ -171,7 +172,7 @@
 
 <!--/* The supplier's live answer (POST validate), parsed into #validation-area by delivery-purchase.js. */-->
 <th:block th:fragment="validationResult">
-    <div th:if="${validationError != null}" class="cl-card-inset">
+    <div th:if="${validationError != null}" class="cl-card-inset" data-cl-validation-error>
         <div class="cl-alert is-bad">
             <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
             <p class="cl-alert-text"><span th:text="${validationError}"></span>

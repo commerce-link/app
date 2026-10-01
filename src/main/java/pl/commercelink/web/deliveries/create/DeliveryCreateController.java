@@ -369,7 +369,7 @@ public class DeliveryCreateController {
             if (!result.isSuccess()) {
                 addPage(model, scope, links, form);
                 model.addAttribute("errors", Map.of());
-                model.addAttribute("errorMessage", message(result.getMessage(), locale));
+                model.addAttribute("failureMessage", message(result.getMessage(), locale));
                 return "deliveries/create/manual";
             }
             return "redirect:" + links.deliveryDetails(result.getPayload());
@@ -445,7 +445,7 @@ public class DeliveryCreateController {
                 typed.restoreTo(form);
                 addPage(model, scope, links, form);
                 model.addAttribute("purchaseRef", purchaseRef);
-                model.addAttribute("errorMessage", message(result.getMessage(), locale));
+                model.addAttribute("failureMessage", message(result.getMessage(), locale));
                 scope.addPurchaseModel(form, model);
                 return "deliveries/create/purchase";
             }

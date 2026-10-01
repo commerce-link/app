@@ -12,10 +12,10 @@
             <th:block th:if="${errors != null and !errors.isEmpty()}">
                 <div th:replace="~{fragments/settings-form :: errorSummary('manual-errors', ${errors}, null)}"></div>
             </th:block>
-            <th:block th:if="${errorMessage != null}">
+            <th:block th:if="${failureMessage != null}">
                 <div class="cl-alert is-bad" tabindex="-1" data-cl-error-summary>
                     <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
-                    <p class="cl-alert-text" th:text="${errorMessage}"></p>
+                    <p class="cl-alert-text" th:text="${failureMessage}"></p>
                 </div>
             </th:block>
             <form method="post" id="delivery-step-form" class="cl-layout-aside" data-cl-delivery-manual novalidate
