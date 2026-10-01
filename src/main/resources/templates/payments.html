@@ -5,136 +5,262 @@
 <body>
 
 <div layout:fragment="content">
+<section class="cl-page">
+    <div class="cl-page-body is-wide">
 
-    <section class="section">
-        <div class="container">
-            <div class="is-flex is-align-items-center is-justify-content-space-between mb-4">
-                <div class="is-flex is-align-items-center" style="gap: 0.6rem">
-                    <h2 class="title mb-0" th:text="#{payments.unpaid.deliveries}"></h2>
-                    <button th:replace="~{fragments/screen-intro :: toggle}"></button>
+        <header class="cl-page-header">
+            <div class="cl-page-header-row">
+                <h1 class="cl-page-title" th:text="#{payments.title}"></h1>
+                <button th:replace="~{fragments/screen-intro :: toggle}"></button>
+                <div class="cl-page-actions">
+                    <!--/* Fetching payments needs an invoicing system: without one the action stays visible, greyed out,
+                           with the reason next to it (spec §6.2). */-->
+                    <form th:if="${page.invoicingConnected()}" class="cl-page-action-form" method="post"
+                          th:action="@{/dashboard/deliveries/syncPaymentStatuses}">
+                        <button type="submit" class="cl-button cl-tooltip" th:attr="data-tooltip=#{payments.sync.help}">
+                            <span class="icon is-small" aria-hidden="true"><i class="fas fa-sync-alt"></i></span>
+                            <span th:text="#{payments.sync.action}"></span>
+                        </button>
+                    </form>
+                    <th:block th:unless="${page.invoicingConnected()}">
+                        <button type="button" class="cl-button" aria-disabled="true" aria-describedby="payments-sync-reason">
+                            <span class="icon is-small" aria-hidden="true"><i class="fas fa-sync-alt"></i></span>
+                            <span th:text="#{payments.sync.action}"></span>
+                        </button>
+                        <p class="cl-help is-note" id="payments-sync-reason">
+                            <a th:href="@{/dashboard/store/invoicing}" th:text="#{payments.sync.unavailable}"></a>
+                        </p>
+                    </th:block>
                 </div>
-                <form th:action="@{/dashboard/deliveries/syncPaymentStatuses}" method="post" onsubmit="event.preventDefault();">
-                    <button type="submit" class="button is-info" onclick="confirmSave(this)" th:text="#{payments.sync.statuses}"></button>
-                </form>
             </div>
+            <p class="cl-page-lead" th:text="#{payments.lead}"></p>
+        </header>
 
-            <div th:replace="~{fragments/screen-intro :: panel('payments', 'fas fa-money-bill-alt')}"></div>
-            <p>
-                <span th:text="#{payments.total.unpaid.net} + ': ' + ${#numbers.formatDecimal(unpaidDeliveriesAmountNet, 1, 2)} + ' PLN'"></span>
-                <span class="mx-3">|</span>
-                <span th:text="#{payments.total.unpaid.gross} + ': ' + ${#numbers.formatDecimal(unpaidDeliveriesAmountGross, 1, 2)} + ' PLN'"></span>
-            </p>
-            <table class="table is-fullwidth is-striped is-hoverable">
-                <thead>
-                <tr>
-                    <th style="width: 150px;" th:text="#{payments.status}"></th>
-                    <th style="width: 150px;" th:text="#{deliveries.provider}"></th>
-                    <th style="width: 280px;" th:text="#{deliveries.order.no}"></th>
-                    <th th:text="#{payments.amount.net}"></th>
-                    <th th:text="#{payments.amount.gross}"></th>
-                    <th th:text="#{payments.order.date}"></th>
-                    <th th:text="#{payments.due.date}"></th>
-                    <th th:text="#{general.operations}"></th>
-                </tr>
-                </thead>
-                <tbody>
-                <tr th:each="delivery : ${unpaidDeliveries}">
-                    <td>
-                        <span class="tag"
-                              th:classappend="${delivery.overpaid} ? 'is-danger' :
-                                              (${delivery.underpaid} ? 'is-warning' : 'is-light')"
-                              th:text="${delivery.overpaid} ? #{deliveries.status.overpaid} :
-                                       (${delivery.underpaid} ? #{deliveries.status.underpaid} : #{deliveries.status.unpaid})"></span>
-                    </td>
-                    <td th:text="${supplierLabels.of(delivery.provider)}"></td>
-                    <td>
-                        <a th:href="@{/dashboard/deliveries/details(deliveryId=${delivery.deliveryId})}">
-                            <span th:text="${delivery.shortenedDeliveryId}"></span>
-                        </a>
-                    </td>
-                    <td th:text="${delivery.unpaidAmountNet}"></td>
-                    <td th:text="${delivery.unpaidAmountGross}"></td>
-                    <td th:text="${delivery.orderedAt.toLocalDate}"></td>
-                    <td th:text="${delivery.paymentDueDate}"></td>
-                    <td>
-                        <button type="button" class="button is-small is-primary"
-                                th:with="pp=${delivery.pendingPayment}"
-                                th:data-delivery-id="${delivery.deliveryId}"
-                                th:data-unpaid="${delivery.unpaidAmount}"
-                                th:data-pending-source="${pp != null ? pp.source : ''}"
-                                th:data-pending-name="${pp != null ? pp.name : ''}"
-                                th:data-pending-ref="${pp != null ? pp.referenceNo : ''}"
-                                th:data-pending-fee="${pp != null ? pp.fee : 0}"
-                                th:data-pending-bank-trx-no="${pp != null ? pp.bankTransactionNo : ''}"
-                                th:data-pending-bank-trx-date="${pp != null ? pp.bankTransactionDate : ''}"
-                                onclick="openPaymentModalForDeliveryFromButton(this)"
-                                th:text="#{order.payment.action.add}"></button>
-                    </td>
-                </tr>
-                </tbody>
-            </table>
+        <div th:replace="~{fragments/screen-intro :: panel('payments', 'fas fa-money-bill-alt')}"></div>
+
+        <div th:if="${paymentsNotice}" class="cl-alert is-ok" role="status">
+            <i class="fas fa-check-circle cl-alert-icon" aria-hidden="true"></i>
+            <p class="cl-alert-title" th:text="${paymentsNotice}"></p>
         </div>
-    </section>
-
-    <section class="section">
-        <div class="container">
-            <h2 class="title" th:text="#{payments.unpaid.orders}"></h2>
-            <p>
-                <span th:text="#{payments.total.unpaid.net} + ': ' + ${#numbers.formatDecimal(unpaidOrdersAmountNet, 1, 2)} + ' PLN'"></span>
-                <span class="mx-3">|</span>
-                <span th:text="#{payments.total.unpaid.gross} + ': ' + ${#numbers.formatDecimal(unpaidOrdersAmountGross, 1, 2)} + ' PLN'"></span>
-            </p>
-            <div class="table-container">
-            <table class="table is-fullwidth is-striped is-hoverable">
-                <thead>
-                <tr>
-                    <th style="width: 150px;" th:text="#{payments.status}"></th>
-                    <th style="width: 280px;" th:text="#{order.order.id}"></th>
-                    <th th:text="#{payments.amount.net}"></th>
-                    <th th:text="#{payments.amount.gross}"></th>
-                    <th th:text="#{order.payment.reference.no}"></th>
-                    <th th:text="#{payments.method}"></th>
-                    <th th:text="#{general.operations}"></th>
-                </tr>
-                </thead>
-                <tbody>
-                <tr th:each="order : ${unpaidOrders}">
-                    <td th:text="${enumI18n.localize(order.status)}"></td>
-                    <td>
-                        <a th:href="@{/dashboard/orders/{orderId}(orderId=${order.orderId})}" th:text="${order.email}"></a>
-                    </td>
-                    <td th:text="${order.unpaidAmountNet}"></td>
-                    <td th:text="${order.unpaidAmountGross}"></td>
-                    <td th:text="${order.latestPayment?.referenceNo}"></td>
-                    <td th:text="${order.latestPayment?.source}"></td>
-                    <td>
-                        <button type="button" class="button is-small is-primary"
-                                th:with="pp=${order.pendingPayment}"
-                                th:data-order-id="${order.orderId}"
-                                th:data-unpaid="${order.unpaidAmount}"
-                                th:data-pending-source="${pp != null ? pp.source : ''}"
-                                th:data-pending-name="${pp != null ? pp.name : ''}"
-                                th:data-pending-ref="${pp != null ? pp.referenceNo : ''}"
-                                th:data-pending-fee="${pp != null ? pp.fee : 0}"
-                                th:data-pending-bank-trx-no="${pp != null ? pp.bankTransactionNo : ''}"
-                                th:data-pending-bank-trx-date="${pp != null ? pp.bankTransactionDate : ''}"
-                                onclick="openPaymentModalForOrderFromButton(this)"
-                                th:text="#{order.payment.action.add}"></button>
-                    </td>
-                </tr>
-                </tbody>
-            </table>
-            </div>
+        <div th:if="${paymentsError}" class="cl-alert is-bad" role="status">
+            <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
+            <p class="cl-alert-title" th:text="${paymentsError}"></p>
         </div>
-    </section>
 
-    <div th:replace="~{fragments/add-payment-modal :: addPaymentModal(
-            formAction='',
-            expectedAmount=0,
-            pendingPayment=${null},
-            paymentSources=${paymentSources},
-            loadMoneyJs=true)}"></div>
+        <div data-cl-list-results data-cl-list-path="/dashboard/payments" data-cl-list-fragment="/dashboard/payments/fragment"
+             th:fragment="results" th:with="q=${page.query()}">
 
+            <!--/* The tiles count both sides and each narrows both tabs to exactly what it counts (spec §4.1). */-->
+            <ul class="cl-stat-grid is-orders" th:attr="aria-label=#{payments.tiles.label}">
+                <li th:each="tile : ${page.tiles()}">
+                    <a class="cl-stat is-link" th:href="@{${tile.href()}}" th:attr="aria-current=${tile.active()} ? 'true' : null" data-cl-list-nav>
+                        <span class="cl-eyebrow" th:text="${tile.label()}"></span>
+                        <span class="cl-stat-value" th:text="${tile.count()}"></span>
+                        <span class="cl-stat-hint"><span class="cl-nowrap" th:text="${tile.payablesHint()}"></span> · <span class="cl-nowrap" th:text="${tile.receivablesHint()}"></span></span>
+                        <span class="cl-visually-hidden" th:if="${tile.active()}" th:text="#{payments.tile.active}"></span>
+                    </a>
+                </li>
+            </ul>
+
+            <section class="cl-card" aria-labelledby="payments-table-title">
+                <h2 class="cl-visually-hidden" id="payments-table-title"
+                    th:text="${page.payablesShown()} ? #{payments.table.payables} : #{payments.table.receivables}"></h2>
+
+                <div class="cl-table-toolbar">
+                    <div class="cl-toolbar-row">
+                        <nav class="cl-segmented" th:attr="aria-label=#{payments.side.label}">
+                            <a class="cl-segment" th:each="tab : ${page.tabs()}" th:href="@{${tab.href()}}"
+                               th:attr="aria-current=${tab.active()} ? 'page' : null" data-cl-list-nav>
+                                <span th:text="${tab.label()}"></span><span class="cl-segment-sep">: </span><span class="cl-segment-count" th:text="${tab.count()}"></span>
+                            </a>
+                        </nav>
+                        <div class="cl-toolbar-end">
+                            <details class="cl-filter-menu" th:attr="data-cl-filter-menu=${page.menuParam()}" th:unless="${page.menuOptions().isEmpty()}">
+                                <summary class="cl-filter-menu-trigger">
+                                    <span class="cl-filter-menu-key" th:text="${page.menuKey()}"></span>
+                                    <span class="cl-filter-menu-value" th:text="${page.menuSummary()}"></span>
+                                </summary>
+                                <form method="get" th:action="@{/dashboard/payments}" class="cl-filter-menu-panel" data-cl-list-form data-cl-autosubmit>
+                                    <input type="hidden" name="side" th:value="${page.side().param()}"/>
+                                    <input type="hidden" name="focus" th:if="${q.focus() != null}" th:value="${q.focus().param()}"/>
+                                    <input type="hidden" name="q" th:if="${q.q() != null}" th:value="${q.q()}"/>
+                                    <div class="cl-filter-menu-group" role="group" th:attr="aria-label=${page.menuKey()}">
+                                        <label class="cl-filter-menu-check" th:each="o : ${page.menuOptions()}" th:classappend="${o.count() == 0} ? 'is-empty' : ''">
+                                            <input type="checkbox" th:name="${page.menuParam()}" th:value="${o.value()}" th:checked="${o.selected()}"/>
+                                            <span class="cl-filter-menu-text" th:text="${o.label()}"></span>
+                                            <span class="cl-filter-menu-meta" th:text="${o.count()}"></span>
+                                        </label>
+                                    </div>
+                                    <div class="cl-filter-menu-actions">
+                                        <button type="submit" class="cl-button is-primary" data-cl-autosubmit-hide th:text="#{deliveries.list.menu.apply}"></button>
+                                    </div>
+                                </form>
+                            </details>
+                            <!--/* A new search lands on the side that has results, so the form does not carry the side. */-->
+                            <form method="get" th:action="@{/dashboard/payments}" class="cl-search-form" role="search" data-cl-list-form>
+                                <input type="hidden" name="focus" th:if="${q.focus() != null}" th:value="${q.focus().param()}"/>
+                                <label class="cl-visually-hidden" for="payments-search" th:text="#{payments.search.label}"></label>
+                                <div class="cl-search-field">
+                                    <span class="cl-search-icon icon is-small" aria-hidden="true"><i class="fas fa-search"></i></span>
+                                    <input class="cl-input cl-table-search" type="search" id="payments-search" name="q" autocomplete="off"
+                                           th:value="${q.q()}" th:attr="placeholder=${page.searchPlaceholder()}, data-cl-search-had=${q.q() != null}"/>
+                                    <a th:if="${q.q() != null}" class="cl-search-clear" th:href="@{${q.withQ(null).href()}}"
+                                       th:attr="aria-label=#{deliveries.list.search.clear}" data-cl-list-nav>
+                                        <i class="fas fa-times" aria-hidden="true"></i>
+                                    </a>
+                                </div>
+                                <button type="submit" class="cl-button is-primary cl-search-submit" th:attr="aria-label=#{general.search}">
+                                    <span class="icon is-small cl-search-submit-icon" aria-hidden="true"><i class="fas fa-search"></i></span>
+                                    <span class="cl-search-submit-text" th:text="#{general.search}"></span>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="cl-list-meta">
+                    <div class="cl-filter-chips" th:if="${!page.chips().isEmpty()}">
+                        <span class="cl-filter-chip" th:each="chip : ${page.chips()}">
+                            <span th:text="${chip.label()}"></span>
+                            <a class="cl-filter-chip-clear" th:href="@{${chip.clearHref()}}" th:attr="aria-label=${chip.clearLabel()}"
+                               data-cl-list-nav><span aria-hidden="true">×</span></a>
+                        </span>
+                        <a class="cl-link-button cl-toolbar-clear" th:href="@{${q.cleared().href()}}" th:text="#{general.clear.filters}" data-cl-list-nav></a>
+                    </div>
+                    <p class="cl-table-results" role="status">
+                        <span th:text="${page.resultsCount()}"></span>
+                        <span class="cl-results-amount" th:text="${page.resultsAmount()}"></span>
+                        <span th:text="${page.resultsTail()}"></span>
+                    </p>
+                </div>
+
+                <table class="cl-table is-orders is-payments" th:if="${page.payablesShown() and !page.payables().isEmpty()}">
+                    <thead>
+                    <tr>
+                        <th scope="col" th:text="#{payments.column.delivery}"></th>
+                        <th scope="col" th:text="#{payments.column.supplier}"></th>
+                        <th scope="col" th:text="#{payments.column.due}"></th>
+                        <th scope="col" th:text="#{payments.column.state}"></th>
+                        <th scope="col" class="is-numeric" th:text="#{payments.column.amount}"></th>
+                        <th scope="col"><span class="cl-visually-hidden" th:text="#{payments.column.actions}"></span></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="row : ${page.payables()}">
+                        <th scope="row" class="cl-table-key" th:attr="data-label=#{payments.column.delivery}">
+                            <a th:href="@{${row.href()}}" th:text="${row.number()}"></a>
+                            <span class="cl-table-sub">
+                                <span class="cl-icon-text" th:if="${row.dropship()}" th:title="#{deliveries.dropship.badge}"><i class="fas fa-truck" aria-hidden="true"></i><span class="cl-icon-label" th:text="#{deliveries.dropship.badge}"></span></span>
+                                <span class="cl-icon-text" th:unless="${row.dropship()}" th:title="#{deliveries.type.warehouse}"><i class="fas fa-warehouse" aria-hidden="true"></i><span class="cl-icon-label" th:text="#{deliveries.type.warehouse}"></span></span>
+                            </span>
+                            <span class="cl-table-sub cl-cards-hide" th:if="${row.orderedText() != null}" th:text="${row.orderedText()}"></span>
+                        </th>
+                        <td th:attr="data-label=#{payments.column.supplier}">
+                            <span class="cl-cell-client" th:text="${row.supplierLabel()}"></span>
+                            <span class="cl-table-sub cl-cards-hide"><span class="cl-table-code" th:text="${row.externalText()}" th:title="${row.externalText()}"></span></span>
+                        </td>
+                        <td class="cl-cell-due" th:attr="data-label=#{payments.column.due}">
+                            <span class="cl-cell-date" th:text="${row.dueText()}"></span>
+                            <span th:if="${row.dueNote() != null}" class="cl-table-sub cl-due-note" th:classappend="${row.dueTone()}" th:text="${row.dueNote()}"></span>
+                        </td>
+                        <td th:attr="data-label=#{payments.column.state}">
+                            <span class="cl-status" th:classappend="${row.stateTone()}" th:text="${row.stateLabel()}"></span>
+                            <ul class="cl-doc-marks" th:classappend="${row.invoiced()} ? '' : 'has-todo'" th:attr="aria-label=#{deliveries.list.marks.label}">
+                                <li class="cl-doc-mark" th:classappend="${row.invoiced()} ? 'is-done' : 'is-todo'">
+                                    <i th:if="${row.invoiced()}" class="fas fa-check cl-doc-mark-icon" aria-hidden="true"></i>
+                                    <i th:unless="${row.invoiced()}" class="fas fa-times cl-doc-mark-icon" aria-hidden="true"></i>
+                                    <span aria-hidden="true">FV</span>
+                                    <span class="cl-visually-hidden" th:text="${row.invoiceMarkLabel()}"></span>
+                                </li>
+                            </ul>
+                        </td>
+                        <td class="is-numeric" th:attr="data-label=#{payments.column.amount}">
+                            <span class="cl-cell-amount" th:text="${row.amountText()}"></span>
+                            <span class="cl-table-sub" th:classappend="${row.paidOfLine()} ? 'cl-paid-of' : 'cl-cards-hide'" th:text="${row.subText()}"></span>
+                        </td>
+                        <td class="cl-table-actions" th:attr="data-label=#{payments.column.actions}">
+                            <a class="cl-link-button" th:href="@{${row.href()}}" data-cl-payment-open
+                               th:attr="data-delivery-id=${row.deliveryId()}, data-unpaid=${row.expected()}, data-return-to=${page.returnTo()},
+                                        data-pending-source=${row.pending().source()}, data-pending-name=${row.pending().name()},
+                                        data-pending-ref=${row.pending().referenceNo()}, data-pending-fee=${row.pending().fee()},
+                                        data-pending-bank-trx-no=${row.pending().bankTransactionNo()}, data-pending-bank-trx-date=${row.pending().bankTransactionDate()},
+                                        aria-label=${row.refund()} ? #{payments.action.refund.label(${row.number()})} : #{payments.action.payment.label(${row.number()})}">
+                                <span class="icon is-small" aria-hidden="true"><i class="fas" th:classappend="${row.refund()} ? 'fa-undo-alt' : 'fa-plus'"></i></span>
+                                <span class="cl-action-label" th:text="${row.actionLabel()}"></span>
+                            </a>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+
+                <table class="cl-table is-orders is-payments" th:if="${!page.payablesShown() and !page.receivables().isEmpty()}">
+                    <thead>
+                    <tr>
+                        <th scope="col" th:text="#{payments.column.order}"></th>
+                        <th scope="col" th:text="#{payments.column.client}"></th>
+                        <th scope="col" th:text="#{payments.column.shipping}"></th>
+                        <th scope="col" class="is-secondary-column" th:text="#{payments.column.method}"></th>
+                        <th scope="col" th:text="#{payments.column.state}"></th>
+                        <th scope="col" class="is-numeric" th:text="#{payments.column.amount}"></th>
+                        <th scope="col"><span class="cl-visually-hidden" th:text="#{payments.column.actions}"></span></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="row : ${page.receivables()}">
+                        <th scope="row" class="cl-table-key" th:attr="data-label=#{payments.column.order}">
+                            <a th:href="@{${row.href()}}" th:text="${row.number()}"></a>
+                            <span class="cl-table-sub" th:text="${row.sourceText()}"></span>
+                        </th>
+                        <td th:attr="data-label=#{payments.column.client}">
+                            <span class="cl-cell-client" th:text="${row.clientName()}"></span>
+                            <span class="cl-table-sub cl-cell-email cl-cards-hide" th:if="${row.email() != null}" th:text="${row.email()}"></span>
+                        </td>
+                        <td class="cl-cell-due" th:attr="data-label=#{payments.column.shipping}">
+                            <span class="cl-cell-date" th:text="${row.shipText()}"></span>
+                            <span th:if="${row.shipNote() != null}" class="cl-table-sub cl-due-note" th:classappend="${row.shipTone()}" th:text="${row.shipNote()}"></span>
+                        </td>
+                        <td class="is-secondary-column cl-cards-hide" th:attr="data-label=#{payments.column.method}" th:text="${row.methodLabel()}"></td>
+                        <td th:attr="data-label=#{payments.column.state}">
+                            <span class="cl-status" th:classappend="${row.stateTone()}" th:text="${row.stateLabel()}"></span>
+                        </td>
+                        <td class="is-numeric" th:attr="data-label=#{payments.column.amount}">
+                            <span class="cl-cell-amount" th:text="${row.amountText()}"></span>
+                            <span class="cl-table-sub" th:classappend="${row.paidOfLine()} ? 'cl-paid-of' : 'cl-cards-hide'" th:text="${row.subText()}"></span>
+                        </td>
+                        <td class="cl-table-actions" th:attr="data-label=#{payments.column.actions}">
+                            <a class="cl-link-button" th:href="@{${row.href()}}" data-cl-payment-open
+                               th:attr="data-order-id=${row.orderId()}, data-unpaid=${row.expected()}, data-return-to=${page.returnTo()},
+                                        data-direction=${row.refund()} ? 'Outgoing' : null,
+                                        data-pending-source=${row.pending().source()}, data-pending-name=${row.pending().name()},
+                                        data-pending-ref=${row.pending().referenceNo()}, data-pending-fee=${row.pending().fee()},
+                                        data-pending-bank-trx-no=${row.pending().bankTransactionNo()}, data-pending-bank-trx-date=${row.pending().bankTransactionDate()},
+                                        aria-label=${row.refund()} ? #{payments.action.refund.label(${row.number()})} : #{payments.action.payment.label(${row.number()})}">
+                                <span class="icon is-small" aria-hidden="true"><i class="fas" th:classappend="${row.refund()} ? 'fa-undo-alt' : 'fa-plus'"></i></span>
+                                <span class="cl-action-label" th:text="${row.actionLabel()}"></span>
+                            </a>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+
+                <div class="cl-list-empty" th:if="${page.emptyState() != null}" th:with="es=${page.emptyState()}">
+                    <span th:text="${es.text()}"></span>
+                    <a th:if="${es.actionHref() != null}" class="cl-link-button" th:href="@{${es.actionHref()}}"
+                       th:text="${es.actionLabel()}" data-cl-list-nav></a>
+                </div>
+            </section>
+        </div>
+    </div>
+</section>
+
+<div th:replace="~{fragments/add-payment-modal :: addPaymentModal(
+        formAction='',
+        expectedAmount=0,
+        pendingPayment=${null},
+        paymentSources=${paymentSources},
+        loadMoneyJs=true)}"></div>
+
+<script th:src="@{/js/list-page.js}" defer></script>
 </div>
 
 </body>

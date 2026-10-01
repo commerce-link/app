@@ -7,13 +7,9 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import pl.commercelink.inventory.deliveries.DeliveriesRepository;
-import pl.commercelink.inventory.deliveries.Delivery;
-import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.orders.*;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.starter.util.PaginationUtil;
-import pl.commercelink.web.orders.OrderLabels;
 
 import java.time.LocalDate;
 import java.util.*;
@@ -26,12 +22,6 @@ public class WebController {
 
     @Autowired
     private OrdersRepository ordersRepository;
-
-    @Autowired
-    private DeliveriesRepository deliveriesRepository;
-
-    @Autowired
-    private SupplierLabels supplierLabels;
 
     private static final int CLIENTS_PAGE_SIZE = 25;
 
@@ -75,44 +65,6 @@ public class WebController {
         model.addAttribute("searchParams", searchParams);
 
         return "clients";
-    }
-
-    @GetMapping("/dashboard/payments")
-    @PreAuthorize("hasRole('ADMIN')")
-    public String payments(Model model) {
-
-        List<Delivery> unpaidDeliveries = deliveriesRepository.findUnpaidDeliveries(getStoreId());
-
-        double unpaidDeliveriesAmountNet = unpaidDeliveries.stream()
-                .mapToDouble(Delivery::getUnpaidAmountNet)
-                .sum();
-        double unpaidDeliveriesAmountGross = unpaidDeliveries.stream()
-                .mapToDouble(Delivery::getUnpaidAmountGross)
-                .sum();
-
-        List<Order> unpaidOrders = ordersRepository.findAllActiveOrders(CustomSecurityContext.getStoreId())
-                .stream()
-                .filter(o -> !o.isFullyPaid())
-                .sorted(Comparator.comparing(Order::getEstimatedShippingAt, Comparator.nullsLast(Comparator.naturalOrder())))
-                .collect(Collectors.toList());
-
-        double unpaidOrdersAmountNet = unpaidOrders.stream()
-                .mapToDouble(Order::getUnpaidAmountNet)
-                .sum();
-        double unpaidOrdersAmountGross = unpaidOrders.stream()
-                .mapToDouble(Order::getUnpaidAmountGross)
-                .sum();
-
-        model.addAttribute("unpaidOrders", unpaidOrders);
-        model.addAttribute("unpaidOrdersAmountNet", unpaidOrdersAmountNet);
-        model.addAttribute("unpaidOrdersAmountGross", unpaidOrdersAmountGross);
-        model.addAttribute("unpaidDeliveries", unpaidDeliveries);
-        model.addAttribute("unpaidDeliveriesAmountNet", unpaidDeliveriesAmountNet);
-        model.addAttribute("paymentSources", OrderLabels.Option.of(PaymentSource.values(), OrderLabels::paymentSource));
-        model.addAttribute("unpaidDeliveriesAmountGross", unpaidDeliveriesAmountGross);
-        model.addAttribute("supplierLabels", supplierLabels.forStoreId(getStoreId()));
-
-        return "payments";
     }
 
     private String getStoreId() {

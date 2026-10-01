@@ -7720,3 +7720,100 @@ a.cl-link-button:hover {
     }
 
 }
+
+/* Payments (spec docs/active/payments-redesign §5.3, §7) ------------------------------------------------------------ */
+
+/* The end of the toolbar's first row: the filter menu left of the search, both on the right of the tabs. */
+.cl-page .cl-table-toolbar .cl-toolbar-end {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--cl-gap-related);
+}
+
+.cl-page .cl-table-toolbar .cl-toolbar-end .cl-search-form {
+    min-width: 280px;
+}
+
+/* The results line is always visible on Payments: it carries the totals that the old page printed above each table. */
+.cl-page .cl-table-results .cl-results-amount {
+    color: var(--cl-ink);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+/* A part of a short text that may only wrap as a whole ("dostawy: 2 · zamówienia: 2" under a tile). */
+.cl-page .cl-nowrap {
+    white-space: nowrap;
+}
+
+.cl-page .cl-table.is-payments .cl-status {
+    white-space: normal;
+}
+
+.cl-page .cl-table.is-payments .cl-paid-of {
+    white-space: normal;
+}
+
+.cl-page .cl-table.is-payments .cl-table-actions .cl-link-button {
+    gap: 4px;
+}
+
+@media screen and (min-width: 720px) {
+    /* the pill wraps between its words, never inside one ("Nieopłac / ona" at 1024 px) */
+    .cl-page .cl-table.is-payments td[data-label]:has(.cl-status) {
+        min-width: 11ch;
+    }
+}
+
+@media screen and (min-width: 720px) and (max-width: 1215px) {
+    .cl-page .cl-table.is-payments .is-secondary-column {
+        display: none;
+    }
+}
+
+/* 720-1023 px: the row action and the delivery type as icons, their words kept for screen readers, so six columns fit. */
+@media screen and (min-width: 720px) and (max-width: 1023px) {
+    .cl-page .cl-table.is-payments :is(.cl-action-label, .cl-icon-label) {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+    }
+
+    .cl-page .cl-table.is-payments .cl-table-actions .cl-link-button {
+        min-width: 44px;
+        min-height: 44px;
+        justify-content: center;
+    }
+}
+
+@media screen and (max-width: 719px) {
+    .cl-page .cl-table-toolbar .cl-toolbar-end {
+        width: 100%;
+    }
+
+    .cl-page .cl-table-toolbar .cl-toolbar-end .cl-search-form {
+        flex: 1 1 100%;
+        min-width: 0;
+        order: -1;
+    }
+
+    /* phone card: "wpłacono X z Y" next to the date, the action as the card's last line */
+    .cl-page .cl-table.is-payments .cl-paid-of {
+        grid-column: 2;
+        justify-self: end;
+        text-align: right;
+        order: 6;
+        font-size: 12.5px;
+    }
+
+    .cl-page .cl-table.is-payments .cl-table-actions .cl-link-button {
+        grid-column: 1 / -1;
+        order: 8;
+        justify-self: start;
+        min-height: 44px;
+    }
+}

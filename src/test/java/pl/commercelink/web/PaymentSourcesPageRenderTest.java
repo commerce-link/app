@@ -8,34 +8,33 @@ import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
-import pl.commercelink.inventory.deliveries.Delivery;
-import pl.commercelink.inventory.deliveries.DeliveriesRepository;
-import pl.commercelink.inventory.supplier.SupplierLabels;
-import pl.commercelink.orders.BillingDetails;
-import pl.commercelink.orders.Order;
-import pl.commercelink.orders.OrderStatus;
-import pl.commercelink.orders.OrdersRepository;
-import pl.commercelink.orders.Payment;
-import pl.commercelink.orders.PaymentSource;
+import org.springframework.util.LinkedMultiValueMap;
 import pl.commercelink.starter.security.CustomSecurityContext;
-import pl.commercelink.stores.StoresRepository;
+import pl.commercelink.web.payments.PayableRow;
+import pl.commercelink.web.payments.PaymentSide;
+import pl.commercelink.web.payments.PaymentsController;
+import pl.commercelink.web.payments.PaymentsModelFactory;
+import pl.commercelink.web.payments.PaymentsPageModel;
+import pl.commercelink.web.payments.PaymentsQuery;
+import pl.commercelink.web.payments.ReceivableRow;
 import pl.commercelink.web.settings.SettingsTemplateRenderer;
 
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.mock;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
 /**
- * Renders the real Payments page (payments.html) through the exact model
- * {@link WebController#payments} builds, not a hand-picked stand-in. This is what should have caught the
- * paymentSources type mismatch before it reached a browser (the report only opened the dialog in a manual E2E
- * check, which happened to catch it that time, but no automated test did).
+ * Renders the real Payments page (payments.html) with the real message bundle through the model
+ * {@link PaymentsController#payments} builds. Besides the paymentSources type mismatch it once caught, it proves the
+ * template parses on both sides: a Thymeleaf expression error would surface only in a browser otherwise.
  */
 @ExtendWith(MockitoExtension.class)
 class PaymentSourcesPageRenderTest {
@@ -43,8 +42,7 @@ class PaymentSourcesPageRenderTest {
     private static final String STORE_ID = "store-1";
 
     /** SettingsTemplateRenderer builds a bare TemplateEngine; enumI18n is normally added by an unrelated starter
-     * auto-configuration this test does not load, so a stand-in is supplied (payments.html's own use of it, an
-     * order-status label, is not part of what this test checks). */
+     * auto-configuration this test does not load, so a stand-in is supplied. */
     public static class EnumLocalizerStub {
         public String localize(Object value) {
             return value == null ? "" : value.toString();
@@ -52,53 +50,56 @@ class PaymentSourcesPageRenderTest {
     }
 
     @Mock
-    private OrdersRepository ordersRepository;
-    @Mock
-    private DeliveriesRepository deliveriesRepository;
-    @Mock
-    private SupplierLabels supplierLabels;
+    private PaymentsModelFactory factory;
     @InjectMocks
-    private WebController webController;
+    private PaymentsController controller;
 
-    private static Order unpaidOrder() {
-        Order order = new Order(STORE_ID);
-        order.setOrderId("11111111-1111-1111-1111-111111111111");
-        order.setStatus(OrderStatus.New);
-        BillingDetails billing = new BillingDetails();
-        billing.setEmail("jan@example.pl");
-        order.setBillingDetails(billing);
-        order.setTotalPrice(200);
-        return order;
+    private static PaymentsPageModel.Tile tile(boolean active) {
+        return new PaymentsPageModel.Tile("Wszystkie", 2, "dostawy: 1", "zamowienia: 1", "/dashboard/payments", active);
     }
 
-    private static Delivery unpaidDelivery() {
-        Delivery delivery = new Delivery(STORE_ID, null, "Acme");
-        delivery.setPaymentCost(150);
-        return delivery;
+    private static PayableRow.PendingData pending() {
+        return new PayableRow.PendingData("BankTransfer", "Jan", "REF-1", "0", "", "");
     }
 
-    @Test
-    void paymentsPageRendersPaymentSourceOptionsAsEnumNamesWithResolvedLabels() {
-        // given: exactly the model WebController.payments(...) builds for real
-        var labels = new SupplierLabels(mock(StoresRepository.class)).forStoreId(STORE_ID);
-        when(ordersRepository.findAllActiveOrders(STORE_ID)).thenReturn(List.of(unpaidOrder()));
-        when(deliveriesRepository.findUnpaidDeliveries(STORE_ID)).thenReturn(List.of(unpaidDelivery()));
-        when(supplierLabels.forStoreId(STORE_ID)).thenReturn(labels);
+    private static PaymentsPageModel model(PaymentSide side, boolean invoicingConnected) {
+        PayableRow payable = new PayableRow("/dashboard/deliveries/d-1", "DOS-1", true, "zamowiono 1.10", "Acme",
+                "EXT-1", "15.10.2026", "za 14 dni", "is-neutral", "Nieoplacona", "is-bad", false, "brak faktury",
+                "150,00 zl", "brutto", false, false, "d-1", "150.00", pending(), "Dodaj platnosc");
+        ReceivableRow receivable = new ReceivableRow("/dashboard/orders/o-1", "ZAM-1", "Allegro", "Jan Kowalski",
+                "jan@example.pl", "20.10.2026", "za 19 dni", "is-neutral", "Przelew", "Do zwrotu", "is-warn",
+                "200,00 zl", "zwrot", true, true, "o-1", "200.00", pending(), "Zwroc");
+        boolean payables = side == PaymentSide.PAYABLES;
+        return new PaymentsPageModel(PaymentsQuery.parse(new LinkedMultiValueMap<>()), side, List.of(tile(true)),
+                List.of(new PaymentsPageModel.SideTab("Do zaplaty", 1, "/dashboard/payments?side=payables", payables),
+                        new PaymentsPageModel.SideTab("Do otrzymania", 1, "/dashboard/payments?side=receivables", !payables)),
+                "Dostawca", "supplier", "Wszyscy", List.of(new PaymentsPageModel.Option("Acme", "Acme", 1, false)),
+                "Szukaj", List.of(new PaymentsPageModel.Chip("Acme", "/dashboard/payments", "Usun filtr")),
+                "1 pozycja", "150,00 zl", "do zaplaty", payables ? List.of(payable) : List.of(),
+                payables ? List.of() : List.of(receivable), null, invoicingConnected,
+                "/dashboard/payments?side=" + side.param());
+    }
 
+    private String render(PaymentsPageModel page) {
+        when(factory.page(eq(STORE_ID), any(), any(), any())).thenReturn(page);
         Model model = new ConcurrentModel();
         String view;
         try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
             security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-            view = webController.payments(model);
+            view = controller.payments(new LinkedMultiValueMap<>(), new Locale("pl"), model);
         }
         assertThat(view).isEqualTo("payments");
 
         Map<String, Object> variables = new HashMap<>(model.asMap());
         variables.put("navigation", null);
         variables.put("enumI18n", new EnumLocalizerStub());
+        return SettingsTemplateRenderer.render("payments", variables);
+    }
 
-        // when
-        String html = SettingsTemplateRenderer.render("payments", variables);
+    @Test
+    void payablesSideRendersTheRowActionAndPaymentSourceOptions() {
+        // given / when
+        String html = render(model(PaymentSide.PAYABLES, true));
 
         // then: the add-payment dialog renders, with real enum names as option values and resolved Polish labels
         assertThat(html).contains("id=\"addPaymentModal\"")
@@ -107,8 +108,23 @@ class PaymentSourcesPageRenderTest {
                 .containsPattern("<option[^>]*value=\"Cash\"")
                 .contains(">Gotówka<")
                 .doesNotContain("Option[").doesNotContain("??");
+        // the row opens the dialog from its link and carries what the dialog needs
+        assertThat(html).contains("data-cl-payment-open").contains("data-delivery-id=\"d-1\"")
+                .contains("data-unpaid=\"150.00\"").contains("data-return-to=\"/dashboard/payments?side=payables\"")
+                .contains("data-pending-ref=\"REF-1\"").contains("DOS-1");
         // this page's own add-payment dialog must load money.js exactly once
         assertThat(occurrences(html, "/js/money.js")).isEqualTo(1);
+    }
+
+    @Test
+    void receivablesSideRendersARefundActionAndDisabledSyncWithoutInvoicing() {
+        // given / when
+        String html = render(model(PaymentSide.RECEIVABLES, false));
+
+        // then
+        assertThat(html).contains("data-order-id=\"o-1\"").contains("data-direction=\"Outgoing\"")
+                .contains("ZAM-1").doesNotContain("data-delivery-id=").doesNotContain("??");
+        assertThat(html).contains("id=\"payments-sync-reason\"").doesNotContain("/dashboard/deliveries/syncPaymentStatuses");
     }
 
     static int occurrences(String html, String needle) {
