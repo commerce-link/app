@@ -19,7 +19,7 @@ class DeliveryCreateMessagesTest {
             "deliveries.create.lead.manual",
             "deliveries.create.items.title", "deliveries.create.items.title.dropship", "deliveries.create.items.desc",
             "deliveries.create.items.desc.dropship", "deliveries.create.col.qty", "deliveries.create.col.unitCost",
-            "deliveries.create.col.value", "deliveries.create.col.incoming", "deliveries.create.sources",
+            "deliveries.create.col.value", "deliveries.create.col.targetStock", "deliveries.create.suggestions.atSupplier", "deliveries.create.sources",
             "deliveries.create.lines", "deliveries.create.min", "deliveries.create.source.include",
             "deliveries.create.source.include.label", "deliveries.create.source.type",
             "deliveries.create.source.type.Order", "deliveries.create.source.type.Warehouse",

@@ -316,7 +316,7 @@
                 <thead>
                 <tr>
                     <th scope="col" th:text="#{general.product}"></th>
-                    <th scope="col" class="is-numeric" th:text="#{deliveries.create.col.incoming}"></th>
+                    <th scope="col" class="is-numeric" th:text="#{deliveries.create.col.targetStock}"></th>
                     <th scope="col" th:text="#{deliveries.create.col.qty}"></th>
                     <th scope="col" th:text="#{deliveries.create.col.unitCost}"></th>
                 </tr>
@@ -326,6 +326,8 @@
                     data-cl-delivery-item data-cl-suggestion>
                     <th scope="row" class="cl-table-key" th:attr="data-label=#{general.product}">
                         <span th:text="${suggested.name}"></span>
+                        <span class="cl-table-sub" th:if="${suggested.availableAtSupplier > 0}"
+                              th:text="#{deliveries.create.suggestions.atSupplier(${suggested.availableAtSupplier})}"></span>
                         <span class="cl-table-sub"><span th:text="#{general.ean} + ':'"></span> <span class="cl-code-nowrap" th:text="${suggested.ean}"></span>
                             <th:block th:if="${suggested.priceCategory != null and suggested.priceCategory.name() != 'Standard'}"> ·
                                 <span class="cl-status is-ok" th:text="#{|RestockPriceCategory.${suggested.priceCategory}|}"></span></th:block></span>
@@ -333,7 +335,7 @@
                         <input type="hidden" th:name="|suggestedItems[${k}].ean|" th:value="${suggested.ean}"/>
                         <input type="hidden" th:name="|suggestedItems[${k}].mfn|" th:value="${suggested.mfn}"/>
                     </th>
-                    <td class="is-numeric" th:attr="data-label=#{deliveries.create.col.incoming}" th:text="${suggested.expectedQty}"></td>
+                    <td class="is-numeric" th:attr="data-label=#{deliveries.create.col.targetStock}" th:text="${suggested.expectedQty}"></td>
                     <td th:attr="data-label=#{deliveries.create.col.qty}">
                         <input class="cl-input is-qty" type="number" inputmode="numeric" step="1" min="0" data-cl-requested-qty
                                th:name="|suggestedItems[${k}].requestedQty|" th:value="${suggested.requestedQty}" th:classappend="${invalidFields != null and invalidFields.contains(suggested.mfn + '|requestedQty')} ? 'is-invalid'"

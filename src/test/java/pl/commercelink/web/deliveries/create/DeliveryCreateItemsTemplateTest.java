@@ -309,4 +309,17 @@ class DeliveryCreateItemsTemplateTest {
         assertThat(html.substring(html.lastIndexOf("<input", suggestion), html.indexOf(">", suggestion))).contains("is-invalid");
         assertThat(html.substring(html.indexOf("<details"), html.indexOf(">", html.indexOf("<details")))).contains("open");
     }
+
+    @Test
+    void suggestionsNameTheTargetStockAndWhatTheSupplierHas() {
+        // given
+        DeliveryCreationForm form = warehouseForm();
+        form.getSuggestedItems().getFirst().setAvailableAtSupplier(7);
+
+        // when
+        String html = render("deliveries/create/items", model(warehousePage(false, true, false), form));
+
+        // then
+        assertThat(html).contains("Stan docelowy").doesNotContain("W drodze").contains("u dostawcy: 7 szt.");
+    }
 }
