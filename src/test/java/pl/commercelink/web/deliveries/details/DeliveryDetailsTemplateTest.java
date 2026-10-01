@@ -1,9 +1,14 @@
 package pl.commercelink.web.deliveries.details;
 
 import org.junit.jupiter.api.Test;
+import pl.commercelink.documents.Document;
+import pl.commercelink.documents.DocumentType;
 import pl.commercelink.inventory.deliveries.Delivery;
 import pl.commercelink.inventory.deliveries.DeliveryOrderStatus;
 import pl.commercelink.inventory.deliveries.DeliveryTrackingState;
+import pl.commercelink.orders.Payment;
+import pl.commercelink.orders.PaymentDirection;
+import pl.commercelink.orders.PaymentSource;
 import pl.commercelink.orders.event.Event;
 import pl.commercelink.orders.event.EventType;
 import pl.commercelink.web.dtos.DeliveryTermsForm;
@@ -663,5 +668,141 @@ class DeliveryDetailsTemplateTest {
         // then
         assertThat(html).doesNotContain("id=\"terms-dialog\"").doesNotContain("id=\"qty-dialog\"")
                 .doesNotContain("id=\"invoice-dialog\"").doesNotContain("id=\"receive-dialog\"");
+    }
+
+    @Test
+    void documentsListTheReceiptAndTheInvoiceWithTheirActionsForTheStoreAdmin() {
+        // given
+        Delivery delivery = received(withGoodsReceipt(warehouse()));
+        delivery.addDocument(new Document("inv-1", "FV/ACME/0412", "https://invoices.example/0412", DocumentType.InvoiceVat, LocalDate.of(2026, 9, 25)));
+        delivery.setSynced(true);
+
+        // when
+        String admin = render(data(delivery), ADMIN);
+        String superAdmin = render(data(delivery), SUPER_ADMIN);
+
+        // then
+        assertThat(admin).contains(">Dokumenty<").contains("<span class=\"cl-status is-ok\">Faktura</span>")
+                .contains("<span class=\"cl-status is-ok\">Zsynchronizowana</span>")
+                .contains("href=\"/dashboard/warehouse-documents/details?documentId=pz-1\"").contains(">PZ<")
+                .contains("href=\"https://invoices.example/0412\" target=\"_blank\" rel=\"noopener\"").contains("fa-external-link-alt")
+                .contains(">Wystawiono 25.09.2026<").contains(">Synchronizuj<")
+                .contains("href=\"/dashboard/deliveries/" + DELIVERY_ID + "/confirm/unlink-invoice?invoiceId=inv-1\"")
+                .contains("data-cl-confirm-title=\"Odpiąć fakturę FV/ACME/0412?\"").contains("data-cl-confirm-tone=\"primary\"");
+        assertThat(superAdmin).contains("href=\"/dashboard/store/store-1/warehouse-documents/details?documentId=pz-1\"")
+                .doesNotContain(">Synchronizuj<").doesNotContain("unlink-invoice").doesNotContain("invoice-dialog");
+    }
+
+    @Test
+    void documentsHaveAnEmptyStateAndTheLinkActionOnlyForTheStoreAdmin() {
+        // when
+        String admin = render(data(warehouse()), ADMIN);
+        String user = render(data(warehouse()), USER);
+
+        // then
+        assertThat(admin).contains("<span class=\"cl-status is-neutral\">Bez faktury</span>")
+                .contains(">Brak dokumentów. PZ powstanie przy odbiorze, fakturę możesz powiązać.<")
+                .contains("data-cl-dialog-open=\"invoice-dialog\"").contains(">Powiąż fakturę<");
+        assertThat(user).contains(">Brak dokumentów. PZ powstanie przy odbiorze.<").doesNotContain(">Powiąż fakturę<");
+        assertThat(render(data(received(warehouse())), ADMIN)).contains("<span class=\"cl-status is-warn\">Bez faktury</span>");
+    }
+
+    @Test
+    void paymentsSummariseTheDebtAndListEachPaymentWithItsOwnEditDialog() {
+        // given
+        Delivery delivery = warehouse();
+        delivery.addPayment(new Payment("MH-2026/0917", "mBank", PaymentSource.BankTransfer, PaymentDirection.Outgoing,
+                3000, 0, "202610010417", LocalDate.of(2026, 10, 1)));
+
+        // when
+        String html = render(data(delivery), ADMIN);
+
+        // then
+        assertThat(html).contains(">Płatności<").contains("<span class=\"cl-status is-warn\">Niedopłata 3 253,32 PLN</span>")
+                .contains(">Do zapłaty<").contains(">Pozostało<").contains(">15.10.2026 (14 dni)<")
+                .contains(">3 000,00 PLN<").contains("· Przelew bankowy").contains("ref. MH-2026/0917")
+                .contains("operacja 202610010417").contains("data-cl-dialog-open=\"payment-0-dialog\"")
+                .contains("data-cl-dialog-open=\"addPaymentModal\" data-mode=\"delivery\"").contains("id=\"addPaymentModal\"")
+                .contains("id=\"payment-0-dialog\"").containsPattern("<option value=\"BankTransfer\"[^>]*selected")
+                .contains("name=\"payments[0].amount\"").contains("value=\"3000.00\"").contains("inputmode=\"decimal\"")
+                .contains("form=\"payment-0-dialog-remove\"").contains(">Usuń wpłatę<")
+                .doesNotContain("paymentsEditModal").doesNotContain("togglePaymentsEditModal").doesNotContain("Option[");
+        assertThat(occurrences(html, "/js/money.js")).isEqualTo(1);
+    }
+
+    @Test
+    void removingOnePaymentPostsTheOthersUnderConsecutiveIndexes() {
+        // given
+        Delivery delivery = warehouse();
+        delivery.addPayment(new Payment("A", "Bank", PaymentSource.BankTransfer, 100, 0));
+        delivery.addPayment(new Payment("B", "Bank", PaymentSource.Cash, 200, 0));
+        delivery.addPayment(new Payment("C", "Bank", PaymentSource.Card, 300, 0));
+
+        // when
+        String html = render(data(delivery), ADMIN);
+        int start = html.indexOf("<form id=\"payment-1-dialog-remove\"");
+        String remove = html.substring(start, html.indexOf("</form>", start));
+        int editStart = html.indexOf("action=\"/dashboard/deliveries/" + DELIVERY_ID + "/updatePayments\"", html.indexOf("id=\"payment-1-dialog\""));
+        String edit = html.substring(editStart, html.indexOf("</form>", editStart));
+
+        // then
+        assertThat(remove).contains("name=\"payments[0].referenceNo\" value=\"A\"").contains("name=\"payments[1].referenceNo\" value=\"C\"")
+                .doesNotContain("value=\"B\"").doesNotContain("payments[2]");
+        assertThat(DeliveryDetailsTemplates.fieldNameCounts(edit)).allSatisfy((name, count) -> assertThat(count).as(name).isEqualTo(1));
+        assertThat(edit).contains("name=\"payments[0].referenceNo\" value=\"A\"").contains("name=\"payments[2].referenceNo\" value=\"C\"")
+                .contains("id=\"payment-1-dialog-reference\"");
+    }
+
+    @Test
+    void onlyTheStoreAdminOutsideApprovalEditsPayments() {
+        // given
+        Delivery delivery = warehouse();
+        delivery.addPayment(new Payment("A", "Bank", PaymentSource.BankTransfer, 100, 0));
+
+        // when
+        String superAdmin = render(data(delivery), SUPER_ADMIN);
+        String user = render(data(delivery), USER);
+        String approval = render(data(global(withStatus(delivery, DeliveryOrderStatus.AWAITING_APPROVAL))), ADMIN);
+
+        // then
+        for (String html : List.of(superAdmin, user, approval)) {
+            assertThat(html).contains(">Płatności<").doesNotContain("id=\"addPaymentModal\"").doesNotContain("payment-0-dialog")
+                    .doesNotContain(">Dodaj wpłatę<");
+        }
+    }
+
+    @Test
+    void anUnpaidDeliveryWithoutPaymentsSaysSo() {
+        // when
+        String html = render(data(warehouse()), ADMIN);
+
+        // then
+        assertThat(html).contains("<span class=\"cl-status is-neutral\">Nieopłacona</span>").contains(">Brak wpłat.<");
+    }
+
+    @Test
+    void paymentsSayDashForWhatIsOwedWhileTheVatIsUnset() {
+        // given
+        Delivery delivery = warehouse();
+        delivery.setTax(0.0);
+
+        // when
+        String html = render(data(delivery), ADMIN);
+
+        // then
+        assertThat(html).containsPattern("<dt>Do zapłaty</dt><dd class=\"is-numeric\"\\s*>—</dd>")
+                .containsPattern("<dt>Pozostało</dt><dd class=\"is-numeric[^\"]*\"\\s*>—</dd>");
+    }
+
+    @Test
+    void cardsComeInTheReadingOrderOfTheSpec() {
+        // when
+        String html = render(data(warehouse()), ADMIN);
+
+        // then
+        assertThat(html.indexOf("id=\"pozycje\"")).isLessThan(html.indexOf("id=\"dokumenty\""));
+        assertThat(html.indexOf("id=\"dokumenty\"")).isLessThan(html.indexOf("id=\"platnosci\""));
+        assertThat(html.indexOf("id=\"platnosci\"")).isLessThan(html.indexOf("id=\"historia\""));
+        assertThat(html.indexOf("id=\"historia\"")).isLessThan(html.indexOf("id=\"supplier-title\""));
     }
 }

@@ -317,11 +317,12 @@
     function initPaymentRemoval() {
         document.querySelectorAll('[data-cl-remove-payment]').forEach(function (button) {
             button.addEventListener('click', function (event) {
-                event.preventDefault();
                 var target = document.getElementById(button.getAttribute('form'));
+                // without the remove form or the confirm dialog the button stays a plain submit of the remove form
                 if (!target || typeof window.CL_confirmBulk !== 'function') {
                     return;
                 }
+                event.preventDefault();
                 window.CL_confirmBulk(button, '1', function () {
                     target.submit();
                 }, 'data-cl-select-confirm-title', 'data-cl-select-confirm-message', 'data-cl-select-confirm-action');

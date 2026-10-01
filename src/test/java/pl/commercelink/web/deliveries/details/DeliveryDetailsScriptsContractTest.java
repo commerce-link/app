@@ -112,7 +112,9 @@ class DeliveryDetailsScriptsContractTest {
                 // a refused check must stop the listener that marks the dialog as sent, so it is registered first
                 .containsPattern("initValidation\\(\\);\\s*initDialogs\\(\\);")
                 // Enter on the shipment type's radios must not submit the dialog
-                .contains(":not([type=\"radio\"])").contains("event.target.matches(TEXT_INPUT)");
+                .contains(":not([type=\"radio\"])").contains("event.target.matches(TEXT_INPUT)")
+                // without the remove form or the confirm dialog, "Usuń wpłatę" stays a plain submit of the remove form
+                .containsPattern("typeof window\\.CL_confirmBulk !== 'function'\\) \\{\\s*return;\\s*}\\s*event\\.preventDefault\\(\\);");
         assertThat(page).contains("/js/async-form.js");
     }
 }

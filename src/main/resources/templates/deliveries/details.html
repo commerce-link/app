@@ -13,7 +13,8 @@
                 <div class="cl-layout-main">
                     <th:block th:each="card, s : ${page.statusCards()}"><section th:replace="~{deliveries/details/status-card :: card(${card}, ${s.index})}"></section></th:block>
                     <section th:replace="~{deliveries/details/items :: card}"></section>
-                    <!--/* documents and payments (Task 12) */-->
+                    <section th:replace="~{deliveries/details/documents :: card}"></section>
+                    <section th:replace="~{deliveries/details/payments :: card}"></section>
                     <th:block th:if="${!page.history().events().isEmpty()}"><section th:replace="~{deliveries/details/history :: card}"></section></th:block>
                 </div>
                 <!--/* read-only context; between the phone and the two-column layout the cards share a grid (P8) */-->
@@ -28,7 +29,7 @@
             <th:block th:if="${page.header().more().refresh().enabled()}"><form th:replace="~{deliveries/details/header :: refreshForm}"></form></th:block>
             <dialog th:replace="~{fragments/confirm-dialog :: dialog}"></dialog>
             <th:block th:replace="~{deliveries/details/dialogs :: standalone}"></th:block>
-            <!--/* payment dialogs (Task 12) */-->
+            <th:block th:replace="~{deliveries/details/payments :: dialogs}"></th:block>
         </div>
     </section>
     <script th:src="@{/js/menu.js}" defer></script>

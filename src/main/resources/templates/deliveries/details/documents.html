@@ -1,0 +1,50 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--/* Documents (spec §7): the goods receipt and the invoices; the invoice and sync pills in the head (FV/SYNC of the
+       list), "Powiąż fakturę" for the store's admin. A typed link is a link only when it is a web address. */-->
+<section th:fragment="card" class="cl-card" id="dokumenty" aria-labelledby="documents-title" th:with="docs=${page.documents()}">
+    <div class="cl-card-head">
+        <h2 class="cl-card-title" id="documents-title"><span th:text="#{deliveries.details.documents.title}"></span>
+            <th:block th:if="${docs.showInvoicePills()}">
+                <span class="cl-status" th:classappend="${docs.invoiceTone()}"
+                      th:text="${docs.invoiced()} ? #{deliveries.details.documents.invoice} : #{deliveries.details.documents.noInvoice}"></span>
+                <span th:if="${docs.invoiced()}" class="cl-status" th:classappend="${docs.synced()} ? 'is-ok' : 'is-warn'"
+                      th:text="${docs.synced()} ? #{deliveries.details.documents.synced} : #{deliveries.details.documents.notSynced}"></span>
+            </th:block>
+        </h2>
+        <div th:if="${docs.link().visible()}" class="cl-card-actions">
+            <a class="cl-button" th:href="@{${docs.linkHref()}}" data-cl-dialog-open="invoice-dialog">
+                <span class="icon is-small" aria-hidden="true"><i class="fas fa-link"></i></span>
+                <span th:text="#{deliveries.details.documents.link}"></span>
+            </a>
+        </div>
+    </div>
+    <ul th:if="${!docs.rows().isEmpty()}" class="cl-list">
+        <li class="cl-list-item" th:each="doc : ${docs.rows()}">
+            <div>
+                <p class="cl-list-title"><span th:text="#{${doc.typeKey()}}"></span>
+                    <a th:if="${doc.href() != null and doc.external()}" th:href="${doc.href()}" target="_blank" rel="noopener"><span
+                            th:text="${doc.number()}"></span>&#8288;<span class="cl-link-icon" aria-hidden="true"><i
+                            class="fas fa-external-link-alt"></i></span></a>
+                    <a th:if="${doc.href() != null and !doc.external()}" th:href="@{${doc.href()}}" th:text="${doc.number()}"></a>
+                    <span th:if="${doc.href() == null}" th:text="${doc.number()}"></span>
+                </p>
+                <p th:if="${doc.issuedAt() != null}" class="cl-list-desc" th:text="#{deliveries.details.documents.issued(${doc.issuedAt()})}"></p>
+            </div>
+            <div th:if="${doc.syncHref() != null}" class="cl-list-actions">
+                <a class="cl-link-button" th:href="@{${doc.syncHref()}}"
+                   th:attr="aria-label=#{deliveries.details.documents.sync.for(${doc.number()})}" th:text="#{deliveries.details.documents.sync}"></a>
+                <a class="cl-link-button is-danger" th:href="@{${doc.unlinkHref()}}" data-cl-confirm data-cl-confirm-tone="primary"
+                   th:attr="aria-label=#{deliveries.details.documents.unlink.for(${doc.number()})},
+                            data-cl-confirm-title=#{deliveries.details.unlink.title(${doc.number()})},
+                            data-cl-confirm-message=#{deliveries.details.unlink.message},
+                            data-cl-confirm-action=#{deliveries.details.unlink.action}"
+                   th:text="#{deliveries.details.documents.unlink}"></a>
+            </div>
+        </li>
+    </ul>
+    <p th:if="${docs.rows().isEmpty()}" class="cl-list-empty" th:text="#{${docs.emptyKey()}}"></p>
+</section>
+</body>
+</html>
