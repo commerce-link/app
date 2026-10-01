@@ -67,6 +67,30 @@ class DeliveryDetailsStylesContractTest {
     }
 
     @Test
+    void aLongSupplierNumberIgnoresTheTemplateWhitespaceThatPreLineWouldTurnIntoBlankLines() throws Exception {
+        // when
+        String section = section();
+        // as specific as the pre-line rule (.cl-page .cl-kv.is-column dd.cl-kv-text) and one class more, so it wins
+        int rule = section.indexOf(".cl-page .cl-kv.is-column dd.cl-kv-text.is-break {");
+
+        // then
+        assertThat(rule).isPositive();
+        assertThat(section.substring(rule, section.indexOf('}', rule))).contains("white-space: normal;");
+    }
+
+    @Test
+    void aLongUnbreakableDestinationWrapsInsteadOfWideningThePhoneLayout() throws Exception {
+        // when
+        String section = section();
+        int rule = section.indexOf(".cl-page .cl-table.is-allocations tr.cl-alloc-row .cl-alloc-dest > * {");
+
+        // then
+        assertThat(rule).isPositive();
+        assertThat(section.substring(rule, section.indexOf('}', rule)))
+                .contains("max-width: 100%;").contains("overflow-wrap: anywhere;");
+    }
+
+    @Test
     void theDockedBarIsFixedBelowTheScrimAndEveryMediaQueryIsScreenOnly() throws Exception {
         // when
         String section = section();

@@ -8468,6 +8468,12 @@ a.cl-link-button:hover {
     color: var(--cl-accent-ink);
 }
 
+/* a customer login has no break opportunity; as a flex item it would keep its full width and widen a 320 px page */
+.cl-page .cl-table.is-allocations tr.cl-alloc-row .cl-alloc-dest > * {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+}
+
 .cl-page .cl-table.is-allocations tr.cl-alloc-row.is-done .cl-alloc-dest {
     color: var(--cl-ink-2);
 }
@@ -8774,7 +8780,10 @@ a.cl-link-button:hover {
     vertical-align: bottom;
 }
 
-.cl-page .cl-kv .cl-kv-text.is-break {
+/* cl-kv-text keeps the line breaks of a comment (pre-line); the number's dd holds markup, whose indentation would
+   become blank lines */
+.cl-page .cl-kv.is-column dd.cl-kv-text.is-break {
+    white-space: normal;
     overflow-wrap: anywhere;
     font-variant-numeric: tabular-nums;
 }
