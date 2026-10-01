@@ -8505,7 +8505,7 @@ a.cl-link-button:hover {
 /* P1 on phones: the tbody is the product card (name, codes, menu; "Odebrano: …", value), its destinations below as
    lines checkbox · destination and quantity · state. */
 @media screen and (max-width: 719px) {
-    .cl-page .cl-table.is-allocations tbody {
+    .cl-page .cl-table.is-allocations.is-wrap tbody {
         padding: 12px 16px;
     }
 
@@ -8622,7 +8622,7 @@ a.cl-link-button:hover {
         right: 0;
         bottom: 0;
         left: 0;
-        z-index: 24;
+        z-index: 15;
         margin: 0;
         padding: 4px 16px calc(4px + env(safe-area-inset-bottom));
         border-top: 1px solid var(--cl-line);
@@ -8691,7 +8691,7 @@ a.cl-link-button:hover {
     padding: 8px 20px 18px;
 }
 
-.cl-page .cl-card.is-status > p:last-child {
+.cl-page .cl-card.is-status:is(.is-bad, .is-warn, .is-info) > p:last-child {
     margin-bottom: 18px;
 }
 

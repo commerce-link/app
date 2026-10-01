@@ -51,4 +51,30 @@ class DeliveryDetailsStylesContractTest {
         // then
         assertThat(section).contains("@media screen and (min-width: 720px) and (max-width: 1365px) {\n    .cl-page .cl-layout-side.is-grid {");
     }
+
+    @Test
+    void statusCardRulesNeverReachTheExistingFlatStatusCards() throws Exception {
+        // when
+        String section = section();
+
+        // then
+        for (String line : section.split("\\n")) {
+            if (line.contains(".cl-card.is-status") && line.trim().endsWith("{")) {
+                assertThat(line).as("selector must be scoped to the tone modifiers or the new status parts")
+                        .containsPattern("\\.cl-card\\.is-status(\\.is-(bad|warn|info)|:is\\(\\.is-bad, \\.is-warn, \\.is-info\\)| \\.cl-status-(reason|actions)| \\.cl-card-title \\.is-(bad|info))");
+            }
+        }
+    }
+
+    @Test
+    void theDockedBarIsFixedBelowTheScrimAndEveryMediaQueryIsScreenOnly() throws Exception {
+        // when
+        String section = section();
+        int docked = section.indexOf("position: fixed");
+
+        // then
+        assertThat(docked).isPositive();
+        assertThat(section.substring(docked, docked + 200)).contains("z-index: 15");
+        assertThat(section).doesNotContainPattern("@media \\((?!prefers-reduced-motion)");
+    }
 }
