@@ -130,14 +130,22 @@ class DeliveryCreateControllerTest {
                 () -> controller.save(PROVIDER, requested(1), binding(requested(1)), ORDER_ID, null, new ConcurrentModel(), flash, Locale.ENGLISH),
                 () -> controller.confirm(PROVIDER, "ref-1", requested(1), binding(requested(1)), ORDER_ID, null, new ConcurrentModel(), flash, Locale.ENGLISH),
                 () -> controller.back(PROVIDER, requested(1), binding(requested(1)), ORDER_ID, "order", new ConcurrentModel(), flash, Locale.ENGLISH));
+        Model validateModel = new ConcurrentModel();
 
-        // when / then
-        for (Supplier<String> post : posts) {
-            assertThat(asStoreAdmin(post)).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
-        }
+        // when
+        List<String> views = posts.stream().map(this::asStoreAdmin).toList();
+        String validate = asStoreAdmin(() -> controller.validate(PROVIDER, requested(1), binding(requested(1)), ORDER_ID, null,
+                validateModel, flash, Locale.ENGLISH));
+
+        // then
+        assertThat(views).allMatch(view -> view.equals("redirect:/dashboard/orders/" + ORDER_ID));
         assertThat(flash.getFlashAttributes().get("errorMessage")).isEqualTo("msg:orders.dropship.rejected.providerMismatch");
+        assertThat(validate).isEqualTo("deliveries/create/purchase :: validationResult");
+        assertThat(validateModel.getAttribute("validationError")).isEqualTo("msg:orders.dropship.rejected.providerMismatch");
         verify(scope, never()).save(any());
         verify(scope, never()).submit(any(), any());
+        verify(scope, never()).validate(any());
+        verify(scope, never()).releaseUnselected(any());
     }
 
     @Test
@@ -167,12 +175,14 @@ class DeliveryCreateControllerTest {
         // when
         String manual = asStoreAdmin(() -> controller.manual(PROVIDER, posted, binding(posted), null, null, model, flash, Locale.ENGLISH));
         when(scope.purchaseAvailable()).thenReturn(true);
-        String purchase = asStoreAdmin(() -> controller.purchase(PROVIDER, requested(0), binding(requested(0)), null, null, new ConcurrentModel(), flash, Locale.ENGLISH));
+        Model purchaseModel = new ConcurrentModel();
+        String purchase = asStoreAdmin(() -> controller.purchase(PROVIDER, requested(0), binding(requested(0)), null, null, purchaseModel, flash, Locale.ENGLISH));
 
         // then
         assertThat(manual).isEqualTo("deliveries/create/items");
         assertThat(purchase).isEqualTo("deliveries/create/items");
         assertThat(model.getAttribute("stepError")).isEqualTo("deliveries.create.error.nothingRequested");
+        assertThat(purchaseModel.getAttribute("stepError")).isEqualTo("deliveries.create.error.nothingRequested");
     }
 
     @Test
@@ -333,6 +343,23 @@ class DeliveryCreateControllerTest {
         // then
         assertThat(view).isEqualTo("deliveries/create/purchase :: validationResult");
         assertThat(model.getAttribute("validationError")).isEqualTo("msg:deliveries.purchase.confirm.checkFailed (timeout)");
+    }
+
+    @Test
+    void refusedLiveCheckWithoutAReasonAnswersWithTheGenericCheckFailure() {
+        // given
+        when(scopes.resolve(STORE_ID, PROVIDER, ORDER_ID)).thenReturn(new DeliveryScopes.Resolution.Refused(null));
+        Model model = new ConcurrentModel();
+
+        // when
+        String view = asStoreAdmin(() -> controller.validate(PROVIDER, requested(1), binding(requested(1)), ORDER_ID, null,
+                model, flash, Locale.ENGLISH));
+
+        // then
+        assertThat(view).isEqualTo("deliveries/create/purchase :: validationResult");
+        assertThat(model.getAttribute("validationError")).isEqualTo("msg:deliveries.purchase.confirm.checkFailed");
+        assertThat(model.containsAttribute("page")).isFalse();
+        assertThat(flash.getFlashAttributes()).isEmpty();
     }
 
     @Test

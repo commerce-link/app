@@ -36,6 +36,8 @@ public class DeliveryCreateController {
     private static final String STORE = "/dashboard/deliveries/create/{provider}";
     private static final String SUPER = "/dashboard/store/{storeId}/deliveries/create/{provider}";
     private static final String NOTHING_REQUESTED = "deliveries.create.error.nothingRequested";
+    private static final String CHECK_FAILED = "deliveries.purchase.confirm.checkFailed";
+    private static final String VALIDATION_RESULT = "deliveries/create/purchase :: validationResult";
 
     private final DeliveryScopes scopes;
     private final SupplierPurchaseService supplierPurchaseService;
@@ -149,7 +151,7 @@ public class DeliveryCreateController {
                            BindingResult binding, @RequestParam(value = "order", required = false) String orderId,
                            @RequestParam(value = "from", required = false) String from,
                            Model model, RedirectAttributes flash, Locale locale) {
-        return renderValidation(storeId(), provider, orderId, from, form, model, flash, locale);
+        return renderValidation(storeId(), provider, orderId, from, form, model, locale);
     }
 
     @PostMapping(SUPER + "/purchase/validate")
@@ -159,7 +161,7 @@ public class DeliveryCreateController {
                                         @RequestParam(value = "order", required = false) String orderId,
                                         @RequestParam(value = "from", required = false) String from,
                                         Model model, RedirectAttributes flash, Locale locale) {
-        return renderValidation(storeId, provider, orderId, from, form, model, flash, locale);
+        return renderValidation(storeId, provider, orderId, from, form, model, locale);
     }
 
     @PostMapping(STORE + "/purchase/confirm")
@@ -300,20 +302,26 @@ public class DeliveryCreateController {
     }
 
     private String renderValidation(String storeId, String provider, String orderId, String from,
-                                    DeliveryCreationForm form, Model model, RedirectAttributes flash, Locale locale) {
+                                    DeliveryCreationForm form, Model model, Locale locale) {
         DeliveryCreateLinks links = links(storeId, provider, orderId, from);
-        return withScope(storeId, provider, links, flash, locale, scope -> {
-            form.setStoreId(storeId);
-            form.setProvider(provider);
-            addPage(model, scope, links, form);
-            try {
-                model.addAttribute("validation", scope.validate(form));
-            } catch (Exception e) {
-                model.addAttribute("validationError", message("deliveries.purchase.confirm.checkFailed", locale)
-                        + (e.getMessage() != null ? " (" + e.getMessage() + ")" : ""));
-            }
-            return "deliveries/create/purchase :: validationResult";
-        });
+        DeliveryScopes.Resolution resolution = scopes.resolve(storeId, provider, links.orderId());
+        // The page fetches this fragment into the availability card, so a refusal is answered there, not by a redirect.
+        if (resolution instanceof DeliveryScopes.Resolution.Refused refused) {
+            model.addAttribute("validationError", message(
+                    refused.messageKey() != null ? refused.messageKey() : CHECK_FAILED, locale));
+            return VALIDATION_RESULT;
+        }
+        DeliveryScope scope = ((DeliveryScopes.Resolution.Found) resolution).scope();
+        form.setStoreId(storeId);
+        form.setProvider(provider);
+        addPage(model, scope, links, form);
+        try {
+            model.addAttribute("validation", scope.validate(form));
+        } catch (Exception e) {
+            model.addAttribute("validationError", message(CHECK_FAILED, locale)
+                    + (e.getMessage() != null ? " (" + e.getMessage() + ")" : ""));
+        }
+        return VALIDATION_RESULT;
     }
 
     private String executePurchase(String storeId, String provider, String orderId, String from, String purchaseRef,

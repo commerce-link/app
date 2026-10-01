@@ -195,4 +195,18 @@ class DeliveryCreatePurchaseTemplateTest {
         assertThat(html).contains("cl-alert is-bad").contains("(timeout)").contains("data-cl-validation-retry")
                 .doesNotContain("data-fully-available=\"true\"");
     }
+
+    @Test
+    void refusedLiveCheckRendersTheReasonWithoutThePageModel() {
+        // given
+        Map<String, Object> variables = new java.util.HashMap<>();
+        variables.put("validationError", "Zamówienie nie kwalifikuje się do wysyłki bezpośredniej.");
+
+        // when
+        String html = fragment("deliveries/create/purchase :: validationResult", variables);
+
+        // then
+        assertThat(html).contains("cl-alert is-bad").contains("Zamówienie nie kwalifikuje się do wysyłki bezpośredniej.")
+                .doesNotContain("data-fully-available");
+    }
 }
