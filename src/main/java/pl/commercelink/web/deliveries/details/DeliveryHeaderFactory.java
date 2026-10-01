@@ -104,7 +104,8 @@ final class DeliveryHeaderFactory {
             cards.add(new StatusCard(OrderLabels.INFO, "fa-hourglass-half", "deliveries.details.status.approval.title",
                     "deliveries.details.status.approval.text", null, List.of()));
         }
-        if (DeliveryRules.trackingIs(delivery, DeliveryTrackingState.CANCELLED_BY_SUPPLIER)) {
+        // the card tells the operator to remove the items; once they are gone there is nothing left to act on
+        if (DeliveryRules.trackingIs(delivery, DeliveryTrackingState.CANCELLED_BY_SUPPLIER) && !delivery.getAllocations().isEmpty()) {
             boolean removable = DeliveryRules.remove(viewer, delivery).enabled() && DeliveryRules.hasPendingAllocations(delivery);
             cards.add(new StatusCard(OrderLabels.BAD, "fa-exclamation-circle", "deliveries.details.status.cancelled.title",
                     "deliveries.details.status.cancelled.text", null,

@@ -306,6 +306,18 @@ class DeliveryHeaderFactoryTest {
     }
 
     @Test
+    void theSupplierCancellationCardGoesAwayOnceTheItemsAreRemoved() {
+        // given
+        Delivery emptied = withAllocations(tracking(dropship(), DeliveryTrackingState.CANCELLED_BY_SUPPLIER));
+
+        // when
+        List<DeliveryPageModel.StatusCard> cards = cards(emptied, ADMIN);
+
+        // then
+        assertThat(cards).as("the card asks to remove the items; with none left it has nothing to ask").isEmpty();
+    }
+
+    @Test
     void goodsBoundForACustomerAreAnnouncedUntilReceived() {
         // given
         Delivery dtc = withAllocations(warehouse(), orderAllocation("SSD", "590", "MFN-SSD", 100, 1, true));
