@@ -1,7 +1,6 @@
 package pl.commercelink.web;
 
 import org.junit.jupiter.api.Test;
-import pl.commercelink.orders.Payment;
 import pl.commercelink.orders.PaymentDirection;
 import pl.commercelink.orders.PaymentSource;
 import pl.commercelink.web.orders.OrderLabels;
@@ -112,47 +111,20 @@ class SharedDialogsContractTest {
     }
 
     @Test
-    void theDeliveryPaymentsSectionKeepsItsBulmaEditModalAndGetsTheNewDialog() {
-        // given
-        Map<String, Object> variables = paymentVariables();
-        variables.put("payments", List.of(new Payment("REF-1", "Jan", PaymentSource.BankTransfer, 50, 0)));
-
-        // when
-        String html = SettingsTemplateRenderer.render(
-                "<div th:replace=\"~{fragments/payments-section :: paymentsSection(${payments}, '/dashboard/deliveries/d-1/addPayment',"
-                        + " '/dashboard/deliveries/d-1/updatePayments', 50, ${null}, ${paymentSources}, false, true, 'delivery')}\"></div>",
-                variables);
-
-        // then
-        assertThat(html).contains("id=\"paymentsEditModal\"").contains("togglePaymentsEditModal(true)")
-                .contains("openAddPaymentModalFromButton(this)").contains("id=\"addPaymentModal\"")
-                .contains("action=\"/dashboard/deliveries/d-1/addPayment\"");
-        // the edit modal's amounts are text read on the server (AmountParser), as in "Dodaj wpłatę"
-        assertThat(html).containsPattern("type=\"text\" inputmode=\"decimal\" autocomplete=\"off\"\\s+name=\"payments\\[0\\]\\.amount\"\\s+value=\"50.00\"")
-                .containsPattern("type=\"text\" inputmode=\"decimal\" autocomplete=\"off\"\\s+name=\"payments\\[0\\]\\.fee\"\\s+value=\"0.00\"")
-                .doesNotContain("step=\"0.01\"");
-        // the edit modal's own <select> (payments-section.html) must read the same Option value/labelKey the add
-        // dialog does, not Option's own toString(), or no option can be preselected or saved
-        assertThat(html).doesNotContain("Option[")
-                .containsPattern("<option value=\"BankTransfer\"[^>]*selected[^>]*>Przelew bankowy<");
-    }
-
-    @Test
     void theAddPaymentScriptKeepsEveryPublicFunctionOfPaymentsAndDeliveries() throws Exception {
         // given
         String script = read("src/main/resources/static/js/add-payment-dialog.js");
         String payments = read("src/main/resources/templates/payments.html");
 
-        // then
+        // when / then
         assertThat(script).contains("window.toggleAddPaymentModal = toggleAddPaymentModal")
-                .contains("window.togglePaymentsEditModal = togglePaymentsEditModal")
-                .contains("window.openAddPaymentModalFromButton = openAddPaymentModalFromButton")
                 .contains("window.openPaymentModalForOrder = openPaymentModalForOrder")
                 .contains("window.openPaymentModalForOrderFromButton = openPaymentModalForOrderFromButton")
                 .contains("window.openPaymentModalForDelivery = openPaymentModalForDelivery")
                 .contains("window.openPaymentModalForDeliveryFromButton = openPaymentModalForDeliveryFromButton")
                 .contains("showModal").contains("cl:dialog-open").contains("'use strict'")
-                .doesNotContain("innerHTML").doesNotContain(".style.").doesNotContain("pełna wpłata");
+                .doesNotContain("innerHTML").doesNotContain(".style.").doesNotContain("pełna wpłata")
+                .doesNotContain("togglePaymentsEditModal").doesNotContain("openAddPaymentModalFromButton");
         assertThat(payments).contains("openPaymentModalForOrderFromButton(this)").contains("openPaymentModalForDeliveryFromButton(this)");
         // the fragment lists the directions by hand (no T() in templates); a third direction must be added there too
         assertThat(PaymentDirection.values()).containsExactly(PaymentDirection.Incoming, PaymentDirection.Outgoing);

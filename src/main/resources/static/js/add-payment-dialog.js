@@ -51,14 +51,6 @@
         }
     }
 
-    // Deliveries keep their Bulma edit modal (fragments/payments-section.html), opened through this public function.
-    function togglePaymentsEditModal(show) {
-        var modal = document.getElementById('paymentsEditModal');
-        if (modal) {
-            modal.classList.toggle('is-active', show);
-        }
-    }
-
     function setPaymentModalMode(mode) {
         dialog.setAttribute('data-mode', mode);
         dialog.querySelectorAll('[data-payment-mode]').forEach(function (field) {
@@ -157,12 +149,6 @@
         };
     }
 
-    function openAddPaymentModalFromButton(btn) {
-        setPaymentModalMode(btn.dataset.mode || 'order');
-        renderHint();
-        toggleAddPaymentModal(true);
-    }
-
     function openPaymentModalForOrder(orderId, expectedAmount, pending) {
         setPaymentModalMode('order');
         reset('/dashboard/orders/' + encodeURIComponent(orderId) + '/addPayment', expectedAmount, pending);
@@ -240,8 +226,6 @@
     setPaymentModalMode(dialog.getAttribute('data-mode') || 'order');
 
     window.toggleAddPaymentModal = toggleAddPaymentModal;
-    window.togglePaymentsEditModal = togglePaymentsEditModal;
-    window.openAddPaymentModalFromButton = openAddPaymentModalFromButton;
     window.openPaymentModalForOrder = openPaymentModalForOrder;
     window.openPaymentModalForOrderFromButton = openPaymentModalForOrderFromButton;
     window.openPaymentModalForDelivery = openPaymentModalForDelivery;

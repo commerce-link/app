@@ -1218,7 +1218,7 @@ class DeliveriesControllerApprovalTest {
             security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
 
             // when
-            String view = deliveriesController.deleteDelivery(DELIVERY_ID, redirectAttributes, Locale.ENGLISH);
+            String view = deliveriesController.deleteDeliveryConfirmed(DELIVERY_ID, redirectAttributes, Locale.ENGLISH);
 
             // then
             assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID);
@@ -1407,7 +1407,7 @@ class DeliveriesControllerApprovalTest {
             security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
 
             // when
-            String view = deliveriesController.deleteDelivery(DELIVERY_ID, redirectAttributes, Locale.ENGLISH);
+            String view = deliveriesController.deleteDeliveryConfirmed(DELIVERY_ID, redirectAttributes, Locale.ENGLISH);
 
             // then
             assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID);
@@ -1537,7 +1537,7 @@ class DeliveriesControllerApprovalTest {
             security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
 
             // when
-            String view = deliveriesController.deleteDelivery(DELIVERY_ID, redirectAttributes, Locale.ENGLISH);
+            String view = deliveriesController.deleteDeliveryConfirmed(DELIVERY_ID, redirectAttributes, Locale.ENGLISH);
 
             // then
             assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID);

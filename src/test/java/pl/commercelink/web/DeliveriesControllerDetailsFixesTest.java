@@ -229,7 +229,7 @@ class DeliveriesControllerDetailsFixesTest {
         when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, delivery.getDeliveryId())).thenReturn(withItems);
 
         // when
-        String view = controller.deleteDelivery(delivery.getDeliveryId(), redirectAttributes, PL);
+        String view = controller.deleteDeliveryConfirmed(delivery.getDeliveryId(), redirectAttributes, PL);
 
         // then
         assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + delivery.getDeliveryId());

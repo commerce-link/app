@@ -387,6 +387,22 @@ class DeliveryDetailsTemplateTest {
     }
 
     @Test
+    void dropshipOffersNoQuantityChangeAndTheApprovalPanelNeverReturns() throws Exception {
+        // when
+        String dropship = render(data(dropship()), ADMIN);
+        String awaiting = render(data(global(withStatus(dropship(), DeliveryOrderStatus.AWAITING_APPROVAL))), ADMIN);
+        String sources = String.join("\n", DeliveryDetailsScriptsContractTest.templates().stream()
+                .map(path -> { try { return DeliveryDetailsScriptsContractTest.read(path); } catch (Exception e) { throw new IllegalStateException(e); } })
+                .toList());
+
+        // then
+        assertThat(dropship).doesNotContain("Zmień zamówioną ilość").doesNotContain("id=\"qty-dialog\"");
+        assertThat(awaiting).contains(">Czeka na akceptację<").doesNotContain("pickerScript('deliveryAddressId'");
+        assertThat(sources).doesNotContain("deliveries.purchase.submitted.approval").doesNotContain("deliveries.approval.rejectedBy")
+                .doesNotContain("supplierRegistry.getPartnerSiteUrl");
+    }
+
+    @Test
     void receivingIsGreyedWhileTheOrderIsBeingPlacedAndAbsentForTheSuperAdmin() {
         // when
         String admin = render(data(withStatus(warehouse(), DeliveryOrderStatus.ORDER_PENDING)), ADMIN);

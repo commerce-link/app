@@ -48,8 +48,8 @@
     <p th:if="${pay.rows().isEmpty()}" class="cl-list-empty" th:text="#{deliveries.details.payments.empty}"></p>
 </section>
 
-<!--/* The shared add dialog and one edit dialog per payment, only where the store admin may change them (this replaces
-       fragments/payments-section.html, whose th:if beside th:replace rendered the dialog for everybody). */-->
+<!--/* The shared add dialog and one edit dialog per payment, only where the store admin may change them; the guard sits
+       on its own th:block because a th:if beside th:replace would render the dialog for everybody. */-->
 <th:block th:fragment="dialogs" th:with="pay=${page.payments()}">
     <th:block th:if="${pay.editable()}">
         <div th:replace="~{fragments/add-payment-modal :: addPaymentModal(

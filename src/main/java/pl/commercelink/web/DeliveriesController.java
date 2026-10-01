@@ -186,8 +186,9 @@ public class DeliveriesController {
     }
 
     /**
-     * The payments edit modal (fragments/payments-section.html) posts its amounts as text: read them like every other
-     * payment amount (AmountParser), whatever the browser's language, instead of Double.valueOf, which refused "149,99".
+     * The payment dialogs of the delivery details (deliveries/details/payments.html) post their amounts as text: read
+     * them like every other payment amount (AmountParser), whatever the browser's language, instead of Double.valueOf,
+     * which refused "149,99".
      */
     @InitBinder("delivery")
     void paymentAmounts(WebDataBinder binder) {
@@ -438,20 +439,6 @@ public class DeliveriesController {
                     messageSource.getMessage("deliveries.details.split.error.payment", null, locale));
         }
         return detailsRedirect(storeId, form.getDeliveryId());
-    }
-
-    @PostMapping("/dashboard/deliveries/delete")
-    @PreAuthorize("hasRole('ADMIN')")
-    public String deleteDelivery(@RequestParam String deliveryId,
-                                 RedirectAttributes redirectAttributes, Locale locale) {
-        return deleteDelivery(getStoreId(), deliveryId, redirectAttributes, locale);
-    }
-
-    @PostMapping("/dashboard/store/{storeId}/deliveries/delete")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public String deleteDeliveryForSuperAdmin(@PathVariable("storeId") String storeId, @RequestParam String deliveryId,
-                                              RedirectAttributes redirectAttributes, Locale locale) {
-        return deleteDelivery(storeId, deliveryId, redirectAttributes, locale);
     }
 
     private String deleteDelivery(String storeId, String deliveryId,
@@ -1185,17 +1172,6 @@ public class DeliveriesController {
             return redirectEditLocked(getStoreId(), deliveryId, redirectAttributes, locale);
         }
         invoiceLinkingService.linkInvoiceById(getStoreId(), deliveryId, invoiceId);
-        return "redirect:/dashboard/deliveries/details?deliveryId=" + deliveryId;
-    }
-
-    @PostMapping("/dashboard/deliveries/unlink-invoice")
-    @PreAuthorize("hasRole('ADMIN')")
-    public String unlinkInvoice(@RequestParam String deliveryId, @RequestParam String invoiceId,
-                                RedirectAttributes redirectAttributes, Locale locale) {
-        if (isEditLocked(getStoreId(), deliveryId)) {
-            return redirectEditLocked(getStoreId(), deliveryId, redirectAttributes, locale);
-        }
-        invoiceLinkingService.unlinkInvoice(getStoreId(), deliveryId, invoiceId);
         return "redirect:/dashboard/deliveries/details?deliveryId=" + deliveryId;
     }
 
