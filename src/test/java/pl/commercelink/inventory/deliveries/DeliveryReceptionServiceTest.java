@@ -20,6 +20,7 @@ import pl.commercelink.warehouse.api.Warehouse;
 
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -89,6 +90,7 @@ class DeliveryReceptionServiceTest {
         assertFalse(result.isSuccess());
         verify(warehouse, never()).goodsInHandler(any());
         verify(deliveriesRepository, never()).save(any());
+        assertEquals("deliveries.receive.error.invoicing", result.getMessage());
     }
 
     @Test
@@ -103,6 +105,7 @@ class DeliveryReceptionServiceTest {
         // then
         assertFalse(result.isSuccess());
         verify(invoicingProviderFactory, never()).get(any());
+        assertEquals("deliveries.receive.error.warehouseConfig", result.getMessage());
     }
 
     private OperationResult<Document> receive() {

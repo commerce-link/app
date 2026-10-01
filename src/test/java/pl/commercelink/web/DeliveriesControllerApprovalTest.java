@@ -54,6 +54,9 @@ import pl.commercelink.stores.StoreSupplierConnection;
 import pl.commercelink.web.dtos.AddPaymentForm;
 import pl.commercelink.web.dtos.DeliveryAllocationsForm;
 import pl.commercelink.web.dtos.RoutedOrderView;
+import pl.commercelink.web.orders.OrderFlash;
+import pl.commercelink.web.orders.OrderLabels;
+import pl.commercelink.web.orders.OrderNotice;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -643,7 +646,7 @@ class DeliveriesControllerApprovalTest {
             // then
             assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID);
             verify(supplierPurchaseService).reconcile(STORE_ID, DELIVERY_ID);
-            verify(redirectAttributes).addFlashAttribute("successMessage", "Dostawca potwierdzil zamowienie.");
+            verify(redirectAttributes).addFlashAttribute(OrderFlash.ATTRIBUTE, new OrderNotice(OrderLabels.OK, "Dostawca potwierdzil zamowienie.", null, null));
             verify(redirectAttributes, never()).addFlashAttribute(eq("errorMessage"), any());
         }
     }
@@ -670,7 +673,7 @@ class DeliveriesControllerApprovalTest {
             // then
             assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID);
             verify(supplierPurchaseService).completeManually(STORE_ID, DELIVERY_ID, "17200617", ESTIMATED_DELIVERY_AT);
-            verify(redirectAttributes).addFlashAttribute("successMessage", "Dostawa oznaczona jako zamowiona.");
+            verify(redirectAttributes).addFlashAttribute(OrderFlash.ATTRIBUTE, new OrderNotice(OrderLabels.OK, "Dostawa oznaczona jako zamowiona.", null, null));
             verify(redirectAttributes, never()).addFlashAttribute(eq("errorMessage"), any());
         }
     }
@@ -743,7 +746,7 @@ class DeliveriesControllerApprovalTest {
             // then
             assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID);
             verify(redirectAttributes).addFlashAttribute("errorMessage", "The supplier does not see an order with this reference number.");
-            verify(redirectAttributes, never()).addFlashAttribute(eq("successMessage"), any());
+            verify(redirectAttributes, never()).addFlashAttribute(eq(OrderFlash.ATTRIBUTE), any());
         }
     }
 
@@ -769,7 +772,7 @@ class DeliveriesControllerApprovalTest {
             // then
             assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID);
             verify(redirectAttributes).addFlashAttribute("errorMessage", "Cannot complete - the delivery is not in a failed order state.");
-            verify(redirectAttributes, never()).addFlashAttribute(eq("successMessage"), any());
+            verify(redirectAttributes, never()).addFlashAttribute(eq(OrderFlash.ATTRIBUTE), any());
         }
     }
 
@@ -786,7 +789,7 @@ class DeliveriesControllerApprovalTest {
         // then
         assertThat(view).isEqualTo("redirect:/dashboard/store/store-1/deliveries/details?deliveryId=delivery-1");
         verify(supplierPurchaseService).reconcile(STORE_ID, DELIVERY_ID);
-        verify(redirectAttributes).addFlashAttribute("successMessage", "Dostawca potwierdzil zamowienie.");
+        verify(redirectAttributes).addFlashAttribute(OrderFlash.ATTRIBUTE, new OrderNotice(OrderLabels.OK, "Dostawca potwierdzil zamowienie.", null, null));
     }
 
     @Test
@@ -919,7 +922,7 @@ class DeliveriesControllerApprovalTest {
         // then
         assertThat(view).isEqualTo("redirect:/dashboard/store/store-1/deliveries/details?deliveryId=delivery-1");
         verify(supplierPurchaseService).completeManually(STORE_ID, DELIVERY_ID, "17200617", ESTIMATED_DELIVERY_AT);
-        verify(redirectAttributes).addFlashAttribute("successMessage", "Dostawa oznaczona jako zamowiona.");
+        verify(redirectAttributes).addFlashAttribute(OrderFlash.ATTRIBUTE, new OrderNotice(OrderLabels.OK, "Dostawa oznaczona jako zamowiona.", null, null));
     }
 
     @Test
@@ -1143,6 +1146,8 @@ class DeliveriesControllerApprovalTest {
         DeliveryAllocationsForm form = new DeliveryAllocationsForm(STORE_ID, DELIVERY_ID, PROVIDER, List.of());
 
         try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+
             // when
             String view = deliveriesController.markSelectedAllocationsAsReceived(form, redirectAttributes, Locale.ENGLISH);
 

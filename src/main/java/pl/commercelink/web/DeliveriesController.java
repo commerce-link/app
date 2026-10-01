@@ -3,12 +3,14 @@ package pl.commercelink.web;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.inventory.deliveries.*;
 import pl.commercelink.inventory.supplier.api.SupplierOrderOptionsContext;
@@ -26,6 +28,7 @@ import pl.commercelink.documents.Document;
 import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.web.orders.AmountEditor;
+import pl.commercelink.web.orders.OrderFlash;
 import pl.commercelink.web.orders.OrderLabels;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.Store;
@@ -207,18 +210,26 @@ public class DeliveriesController {
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String markSelectedAllocationsAsReceived(@ModelAttribute DeliveryAllocationsForm form,
                                                     RedirectAttributes redirectAttributes, Locale locale) {
-        Delivery delivery = deliveriesRepository.findById(form.getStoreId(), form.getDeliveryId());
-        if (delivery != null && delivery.isAwaitingApproval()) {
-            return redirectEditLocked(form.getStoreId(), form.getDeliveryId(), redirectAttributes, locale);
+        // the store comes from the session: the form's storeId would let a store reach another store's delivery
+        String storeId = getStoreId();
+        Delivery delivery = deliveriesRepository.findById(storeId, form.getDeliveryId());
+        if (delivery == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
-        if (delivery != null && delivery.isDropship()) {
+        if (delivery.isAwaitingApproval()) {
+            return redirectEditLocked(storeId, form.getDeliveryId(), redirectAttributes, locale);
+        }
+        if (delivery.isOrderPending()) {
+            return redirectOrderingInProgress(storeId, form.getDeliveryId(), redirectAttributes, locale);
+        }
+        if (delivery.isDropship()) {
             redirectAttributes.addFlashAttribute("errorMessage",
                     messageSource.getMessage("deliveries.receive.error.dropship", null, locale));
-            return detailsRedirect(form.getStoreId(), form.getDeliveryId());
+            return detailsRedirect(storeId, form.getDeliveryId());
         }
         OperationResult<Document> result = deliveryReceptionService.receive(
-                form.getStoreId(),
-                form.getProvider(),
+                storeId,
+                delivery.getProvider(),
                 form.getDeliveryId(),
                 form.getSelectedOrderAllocations(),
                 form.getSelectedWarehouseAllocations(),
@@ -226,7 +237,9 @@ public class DeliveriesController {
         );
 
         if (!result.isSuccess()) {
-            redirectAttributes.addFlashAttribute("errorMessage", result.getMessage());
+            // the reception's own refusals are message keys; a warehouse handler may still answer with plain text
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage(result.getMessage(), null, result.getMessage(), locale));
         } else if (result.hasPayload()) {
             return "redirect:/dashboard/warehouse-documents/details?documentId=" + result.getPayload().getId();
         }
@@ -275,7 +288,7 @@ public class DeliveriesController {
         String successKey = result.getPayload() == DropshipShipmentResult.COMPLETED
                 ? "deliveries.dropship.shipment.success"
                 : "deliveries.dropship.shipment.success.partial";
-        redirectAttributes.addFlashAttribute("successMessage", messageSource.getMessage(successKey, null, locale));
+        OrderFlash.saved(redirectAttributes, messageSource.getMessage(successKey, null, locale));
         return detailsRedirect(storeId, form.getDeliveryId());
     }
 
@@ -331,7 +344,8 @@ public class DeliveriesController {
     private String mergeAllocations(String storeId, DeliveryAllocationsForm form,
                                     RedirectAttributes redirectAttributes, Locale locale) {
         if (StringUtils.isBlank(form.getTargetDeliveryId())) {
-            redirectAttributes.addFlashAttribute("errorMessage", "Target delivery ID cannot be empty for merge operation.");
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage("deliveries.details.merge.error.target", null, locale));
             return detailsRedirect(storeId, form.getDeliveryId());
         }
 
@@ -390,7 +404,9 @@ public class DeliveriesController {
             return redirectOrderingInProgress(storeId, form.getDeliveryId(), redirectAttributes, locale);
         }
         if (StringUtils.isBlank(form.getTargetExternalDeliveryId())) {
-            redirectAttributes.addFlashAttribute("errorMessage", "Target external delivery ID cannot be empty for split operation.");
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage("deliveries.details.split.error.number", null, locale));
+            return detailsRedirect(storeId, form.getDeliveryId());
         }
 
         try {
@@ -403,7 +419,9 @@ public class DeliveriesController {
                     form.getSelectedWarehouseAllocations()
             );
         } catch (IllegalArgumentException e) {
-            redirectAttributes.addFlashAttribute("errorMessage", e.getMessage());
+            // the only refusal of a split is the payment rule (Delivery.validateSplittablePayment)
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage("deliveries.details.split.error.payment", null, locale));
         }
         return detailsRedirect(storeId, form.getDeliveryId());
     }
@@ -430,6 +448,13 @@ public class DeliveriesController {
         }
         if (delivery != null && (delivery.isOrderPending() || delivery.isOrderDispatched())) {
             return redirectOrderingInProgress(storeId, deliveryId, redirectAttributes, locale);
+        }
+        Delivery withAllocations = deliveriesQueryService.fetchDeliveryWithAllocations(storeId, deliveryId);
+        if (withAllocations != null && !withAllocations.getAllocations().isEmpty()) {
+            // removing a delivery that still holds items would orphan their order and warehouse lines
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage("deliveries.details.reason.removeItemsFirst", null, locale));
+            return detailsRedirect(storeId, deliveryId);
         }
         deliveriesRepository.delete(delivery);
         return "redirect:/dashboard/deliveries";
@@ -532,7 +557,7 @@ public class DeliveriesController {
     private String refreshOrderId(String storeId, String deliveryId,
                                   RedirectAttributes redirectAttributes, Locale locale) {
         switch (orderIdRefreshService.refreshManually(storeId, deliveryId)) {
-            case CONFIRMED -> redirectAttributes.addFlashAttribute("successMessage",
+            case CONFIRMED -> OrderFlash.saved(redirectAttributes,
                     messageSource.getMessage("deliveries.orderId.refresh.confirmed", null, locale));
             case STILL_PENDING -> redirectAttributes.addFlashAttribute("errorMessage",
                     messageSource.getMessage("deliveries.orderId.refresh.stillPending", null, locale));
@@ -639,7 +664,7 @@ public class DeliveriesController {
                                    RedirectAttributes redirectAttributes, Locale locale) {
         OperationResult<String> result = supplierPurchaseService.reconcile(storeId, deliveryId);
         if (result.isSuccess()) {
-            redirectAttributes.addFlashAttribute("successMessage",
+            OrderFlash.saved(redirectAttributes,
                     messageSource.getMessage("deliveries.purchase.reconcile.found", null, locale));
         } else {
             redirectAttributes.addFlashAttribute("errorMessage",
@@ -682,7 +707,7 @@ public class DeliveriesController {
         OperationResult<String> result = supplierPurchaseService.completeManually(
                 storeId, deliveryId, externalOrderId, estimatedDeliveryAt);
         if (result.isSuccess()) {
-            redirectAttributes.addFlashAttribute("successMessage",
+            OrderFlash.saved(redirectAttributes,
                     messageSource.getMessage("deliveries.purchase.complete.success", null, locale));
         } else {
             redirectAttributes.addFlashAttribute("errorMessage",
@@ -875,6 +900,9 @@ public class DeliveriesController {
         if (isEditLocked(getStoreId(), deliveryId)) {
             return redirectEditLocked(getStoreId(), deliveryId, redirectAttributes, locale);
         }
+        if (isOrderPending(getStoreId(), deliveryId)) {
+            return redirectOrderingInProgress(getStoreId(), deliveryId, redirectAttributes, locale);
+        }
         return updateItemQty(getStoreId(), deliveryId, mfn, qty, redirectAttributes, locale);
     }
 
@@ -887,6 +915,9 @@ public class DeliveriesController {
             @RequestParam int qty,
             RedirectAttributes redirectAttributes,
             Locale locale) {
+        if (isOrderPending(storeId, deliveryId)) {
+            return redirectOrderingInProgress(storeId, deliveryId, redirectAttributes, locale);
+        }
         return updateItemQty(storeId, deliveryId, mfn, qty, redirectAttributes, locale);
     }
 
@@ -904,11 +935,23 @@ public class DeliveriesController {
     @PostMapping("/dashboard/deliveries/link-invoices")
     @PreAuthorize("hasRole('ADMIN')")
     public String linkInvoices(@RequestParam String deliveryId,
+                               @RequestParam(required = false) String linkMode,
+                               @RequestParam(required = false) String invoiceId,
                                RedirectAttributes redirectAttributes, Locale locale) {
         if (isEditLocked(getStoreId(), deliveryId)) {
             return redirectEditLocked(getStoreId(), deliveryId, redirectAttributes, locale);
         }
-        invoiceLinkingService.linkInvoices(getStoreId(), deliveryId);
+        // one dialog, two ways: the chosen radio decides, so the form works without JavaScript too
+        if ("byId".equals(linkMode)) {
+            if (StringUtils.isBlank(invoiceId)) {
+                redirectAttributes.addFlashAttribute("errorMessage",
+                        messageSource.getMessage("deliveries.details.invoice.error.id", null, locale));
+                return "redirect:/dashboard/deliveries/details?deliveryId=" + deliveryId;
+            }
+            invoiceLinkingService.linkInvoiceById(getStoreId(), deliveryId, invoiceId.trim());
+        } else {
+            invoiceLinkingService.linkInvoices(getStoreId(), deliveryId);
+        }
         return "redirect:/dashboard/deliveries/details?deliveryId=" + deliveryId;
     }
 
@@ -936,11 +979,13 @@ public class DeliveriesController {
 
     @GetMapping("/dashboard/deliveries/sync/preview")
     @PreAuthorize("hasRole('ADMIN')")
-    public String showInvoiceSyncPreview(@RequestParam String deliveryId, @RequestParam String invoiceId, Model model, RedirectAttributes redirectAttributes) {
+    public String showInvoiceSyncPreview(@RequestParam String deliveryId, @RequestParam String invoiceId, Model model,
+                                         RedirectAttributes redirectAttributes, Locale locale) {
         InvoiceSyncPreview preview = invoiceSyncPreviewBuilder.build(getStoreId(), deliveryId, invoiceId);
 
         if (preview == null) {
-            redirectAttributes.addFlashAttribute("errorMessage", "Nie udalo sie pobrac danych faktury.");
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage("deliveries.details.invoice.preview.error", null, locale));
             return "redirect:/dashboard/deliveries/details?deliveryId=" + deliveryId;
         }
 
@@ -963,7 +1008,7 @@ public class DeliveriesController {
             return redirectEditLocked(getStoreId(), form.getDeliveryId(), redirectAttributes, locale);
         }
         invoiceSynchronizationService.apply(getStoreId(), form);
-        redirectAttributes.addFlashAttribute("successMessage", "Synchronizacja zakonczona pomyslnie.");
+        OrderFlash.saved(redirectAttributes, messageSource.getMessage("deliveries.details.invoice.synced", null, locale));
         return "redirect:/dashboard/deliveries/details?deliveryId=" + form.getDeliveryId();
     }
 
@@ -988,6 +1033,11 @@ public class DeliveriesController {
     private boolean isOrderingInProgress(String storeId, String deliveryId) {
         Delivery delivery = deliveriesRepository.findById(storeId, deliveryId);
         return delivery != null && (delivery.isOrderPending() || delivery.isOrderDispatched());
+    }
+
+    private boolean isOrderPending(String storeId, String deliveryId) {
+        Delivery delivery = deliveriesRepository.findById(storeId, deliveryId);
+        return delivery != null && delivery.isOrderPending();
     }
 
     // Removing allocations is the operator's way out of a purchase that ended badly, so it is blocked only

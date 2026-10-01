@@ -49,24 +49,24 @@ public class DeliveryReceptionService {
 
         if (documentsGenerationEnabled) {
             if (!warehouseConfiguration.isComplete()) {
-                return OperationResult.failure("Warehouse configuration is missing for store: " + storeId);
+                return OperationResult.failure("deliveries.receive.error.warehouseConfig");
             }
 
             InvoicingProvider invoicingProvider = invoicingProviderFactory.get(store);
             if (invoicingProvider == null) {
-                return OperationResult.failure("Invoicing provider is not configured for store: " + storeId);
+                return OperationResult.failure("deliveries.receive.error.invoicing");
             }
 
             BillingParty issuer = invoicingProvider.fetchCostCenterById(warehouseConfiguration.getCostCenterId());
             if (issuer == null || !issuer.hasCompanyDetails()) {
-                return OperationResult.failure("Failed to fetch cost center with id: " + warehouseConfiguration.getCostCenterId());
+                return OperationResult.failure("deliveries.receive.error.costCenter");
             }
 
             Delivery delivery = deliveriesRepository.findById(storeId, deliveryId);
             String shortcut = delivery != null ? counterpartyShortcuts.forDelivery(store, delivery) : provider;
             BillingParty counterparty = invoicingProvider.fetchBillingPartyByShortcut(shortcut);
             if (counterparty == null || !counterparty.hasCompanyDetails()) {
-                return OperationResult.failure("Failed to fetch counterparty with shortcut: " + shortcut);
+                return OperationResult.failure("deliveries.receive.error.counterparty");
             }
 
             builder.issuer(issuer)

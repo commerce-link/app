@@ -13,6 +13,9 @@ import pl.commercelink.inventory.deliveries.DeliveriesRepository;
 import pl.commercelink.inventory.deliveries.OrderIdRefreshService;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.stores.ConnectionMode;
+import pl.commercelink.web.orders.OrderFlash;
+import pl.commercelink.web.orders.OrderLabels;
+import pl.commercelink.web.orders.OrderNotice;
 
 import java.util.Locale;
 
@@ -62,7 +65,7 @@ class DeliveriesControllerRefreshTest {
 
             // then
             assertThat(view).isEqualTo("redirect:/dashboard/store/store-1/deliveries/details?deliveryId=delivery-1");
-            verify(redirectAttributes).addFlashAttribute("successMessage", "Fetched the final order number from the supplier");
+            verify(redirectAttributes).addFlashAttribute(OrderFlash.ATTRIBUTE, new OrderNotice(OrderLabels.OK, "Fetched the final order number from the supplier", null, null));
             verify(redirectAttributes, never()).addFlashAttribute(eq("errorMessage"), any());
         }
     }
@@ -84,7 +87,7 @@ class DeliveriesControllerRefreshTest {
             // then
             assertThat(view).isEqualTo("redirect:/dashboard/store/store-1/deliveries/details?deliveryId=delivery-1");
             verify(redirectAttributes).addFlashAttribute("errorMessage", "The supplier has not confirmed the order number yet");
-            verify(redirectAttributes, never()).addFlashAttribute(eq("successMessage"), any());
+            verify(redirectAttributes, never()).addFlashAttribute(eq(OrderFlash.ATTRIBUTE), any());
         }
     }
 
@@ -105,7 +108,7 @@ class DeliveriesControllerRefreshTest {
             // then
             assertThat(view).isEqualTo("redirect:/dashboard/store/store-1/deliveries/details?deliveryId=delivery-1");
             verify(redirectAttributes).addFlashAttribute("errorMessage", "Order number refresh is not available for this delivery");
-            verify(redirectAttributes, never()).addFlashAttribute(eq("successMessage"), any());
+            verify(redirectAttributes, never()).addFlashAttribute(eq(OrderFlash.ATTRIBUTE), any());
         }
     }
 
@@ -126,7 +129,7 @@ class DeliveriesControllerRefreshTest {
 
             // then
             assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=delivery-1");
-            verify(redirectAttributes).addFlashAttribute("successMessage", "Fetched the final order number from the supplier");
+            verify(redirectAttributes).addFlashAttribute(OrderFlash.ATTRIBUTE, new OrderNotice(OrderLabels.OK, "Fetched the final order number from the supplier", null, null));
         }
     }
 
@@ -150,7 +153,7 @@ class DeliveriesControllerRefreshTest {
             // then
             assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=delivery-1");
             verify(orderIdRefreshService).refreshManually(STORE_ID, DELIVERY_ID);
-            verify(redirectAttributes).addFlashAttribute("successMessage", "Fetched the final order number from the supplier");
+            verify(redirectAttributes).addFlashAttribute(OrderFlash.ATTRIBUTE, new OrderNotice(OrderLabels.OK, "Fetched the final order number from the supplier", null, null));
             verify(redirectAttributes, never()).addFlashAttribute(eq("errorMessage"), any());
         }
     }
