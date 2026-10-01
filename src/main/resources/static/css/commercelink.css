@@ -7774,8 +7774,10 @@ a.cl-link-button:hover {
     .cl-page .cl-table.is-payments td[data-label]:has(.cl-status) {
         min-width: 120px;
     }
+}
 
-    /* "wpłacono 400,00 z 1 000,00" may take two lines instead of widening the column */
+/* the widest column set only just misses the card at 720-759 px: the amount's second line may take two lines there */
+@media screen and (min-width: 720px) and (max-width: 759px) {
     .cl-page .cl-table.is-payments td.is-numeric .cl-table-sub {
         white-space: normal;
     }
