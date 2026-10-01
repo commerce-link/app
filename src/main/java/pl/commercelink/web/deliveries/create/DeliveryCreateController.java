@@ -337,6 +337,11 @@ public class DeliveryCreateController {
             if (binding.hasFieldErrors("tax")) {
                 form.setTax(scope.defaultTax());
             }
+            // The warehouse integration page shows no currency and its costs are PLN, but the hidden field still carries
+            // whatever the "ordered outside the system" step picked earlier, which would convert the claimed costs.
+            if (!scope.dropship()) {
+                form.setSourceCurrency("PLN");
+            }
             OperationResult<PurchaseSubmission> result = scope.submit(form, purchaseRef);
             if (!result.isSuccess()) {
                 addPage(model, scope, links, form);

@@ -314,6 +314,39 @@ class DeliveryCreateControllerTest {
     }
 
     @Test
+    void warehouseConfirmAlwaysPostsPlnCostsWhateverCurrencyTheRecordStepLeft() {
+        // given
+        when(scope.purchaseAvailable()).thenReturn(true);
+        when(scope.dropship()).thenReturn(false);
+        DeliveryCreationForm form = requested(1);
+        form.setSourceCurrency("EUR");
+        when(scope.submit(form, "ref-1")).thenReturn(OperationResult.success(new PurchaseSubmission("d-9", false)));
+
+        // when
+        asStoreAdmin(() -> controller.confirm(PROVIDER, "ref-1", form, binding(form), null, null, new ConcurrentModel(), flash, Locale.ENGLISH));
+
+        // then
+        verify(scope).submit(argThat(submitted -> "PLN".equals(submitted.getSourceCurrency())), eq("ref-1"));
+    }
+
+    @Test
+    void dropshipConfirmKeepsTheCurrencyTheCostsCardShowed() {
+        // given
+        when(scopes.resolve(STORE_ID, PROVIDER, ORDER_ID)).thenReturn(new DeliveryScopes.Resolution.Found(scope));
+        when(scope.purchaseAvailable()).thenReturn(true);
+        when(scope.dropship()).thenReturn(true);
+        DeliveryCreationForm form = requested(1);
+        form.setSourceCurrency("EUR");
+        when(scope.submit(form, "ref-1")).thenReturn(OperationResult.success(new PurchaseSubmission("d-9", false)));
+
+        // when
+        asStoreAdmin(() -> controller.confirm(PROVIDER, "ref-1", form, binding(form), ORDER_ID, null, new ConcurrentModel(), flash, Locale.ENGLISH));
+
+        // then
+        verify(scope).submit(argThat(submitted -> "EUR".equals(submitted.getSourceCurrency())), eq("ref-1"));
+    }
+
+    @Test
     void failedConfirmKeepsThePurchaseRefForAnIdempotentRetry() {
         // given
         when(scope.purchaseAvailable()).thenReturn(true);
