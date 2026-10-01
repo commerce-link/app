@@ -27,8 +27,6 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.*;
 
-// StoresRepository, Store, Delivery, Allocation, SupplierDeliveryAddress, ConcurrentModel, Model, Set
-
 @ExtendWith(MockitoExtension.class)
 class DeliveryScopesTest {
 
@@ -249,5 +247,155 @@ class DeliveryScopesTest {
 
         // when / then
         assertThatThrownBy(() -> scope.validate(new DeliveryCreationForm())).isInstanceOf(IllegalStateException.class);
+    }
+
+    private DeliveryScope warehouseScope() {
+        return ((DeliveryScopes.Resolution.Found) scopes.resolve(STORE_ID, PROVIDER, null)).scope();
+    }
+
+    private DeliveryScope dropshipScope(Order order) {
+        when(orders.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(eligibility.assess(same(order), any())).thenReturn(DropshipAssessment.of(List.of(PROVIDER)));
+        return ((DeliveryScopes.Resolution.Found) scopes.resolve(STORE_ID, PROVIDER, ORDER_ID)).scope();
+    }
+
+    @Test
+    void dropshipPurchaseModelSkipsTheOptionsWhenTheConnectionNeedsApproval() {
+        // given
+        DeliveryScope scope = dropshipScope(order());
+        when(supplierPurchase.requiresApproval(STORE_ID, PROVIDER)).thenReturn(true);
+        Model model = new ConcurrentModel();
+
+        // when
+        scope.addPurchaseModel(new DeliveryCreationForm(), model);
+
+        // then
+        assertThat(model.getAttribute("requiresApproval")).isEqualTo(true);
+        assertThat(model.containsAttribute("orderOptions")).isFalse();
+        verify(supplierPurchase, never()).orderOptions(any(), any(), any());
+    }
+
+    @Test
+    void dropshipPurchaseModelFetchesTheOptionsWithoutApproval() {
+        // given
+        DeliveryScope scope = dropshipScope(order());
+        when(supplierPurchase.requiresApproval(STORE_ID, PROVIDER)).thenReturn(false);
+        Model model = new ConcurrentModel();
+
+        // when
+        scope.addPurchaseModel(new DeliveryCreationForm(), model);
+
+        // then
+        assertThat(model.getAttribute("requiresApproval")).isEqualTo(false);
+        assertThat(model.containsAttribute("orderOptions")).isTrue();
+        verify(supplierPurchase).orderOptions(eq(STORE_ID), eq(PROVIDER), any());
+    }
+
+    @Test
+    void dropshipValidationThrowsWhenDropshipIsUnavailableAndDelegatesOtherwise() {
+        // given
+        DeliveryScope scope = dropshipScope(order());
+        DeliveryCreationForm form = new DeliveryCreationForm();
+        PurchaseValidation validation = mock(PurchaseValidation.class);
+        when(dropshipPurchase.isDropshipAvailable(STORE_ID, PROVIDER)).thenReturn(false, true);
+        when(supplierPurchase.validate(STORE_ID, form)).thenReturn(validation);
+
+        // when / then
+        assertThatThrownBy(() -> scope.validate(form)).isInstanceOf(IllegalStateException.class);
+        assertThat(scope.validate(form)).isSameAs(validation);
+    }
+
+    @Test
+    void warehouseValidationDelegatesWhenOrderingIsAvailable() {
+        // given
+        DeliveryScope scope = warehouseScope();
+        DeliveryCreationForm form = new DeliveryCreationForm();
+        PurchaseValidation validation = mock(PurchaseValidation.class);
+        when(supplierPurchase.isOrderingAvailable(STORE_ID, PROVIDER)).thenReturn(true);
+        when(supplierPurchase.validate(STORE_ID, form)).thenReturn(validation);
+
+        // when / then
+        assertThat(scope.validate(form)).isSameAs(validation);
+    }
+
+    @Test
+    void submittingDelegatesToThePurchaseServiceOfEachScope() {
+        // given
+        Order order = order();
+        DeliveryCreationForm form = new DeliveryCreationForm();
+        OperationResult<PurchaseSubmission> warehouseResult = OperationResult.success(mock(PurchaseSubmission.class));
+        OperationResult<PurchaseSubmission> dropshipResult = OperationResult.success(mock(PurchaseSubmission.class));
+        when(supplierPurchase.submitPurchase(STORE_ID, form, "ref-1")).thenReturn(warehouseResult);
+        when(dropshipPurchase.submitDropship(STORE_ID, order, form, "ref-1")).thenReturn(dropshipResult);
+        DeliveryScope warehouse = warehouseScope();
+        DeliveryScope dropship = dropshipScope(order);
+
+        // when
+        OperationResult<PurchaseSubmission> fromWarehouse = warehouse.submit(form, "ref-1");
+        OperationResult<PurchaseSubmission> fromDropship = dropship.submit(form, "ref-1");
+
+        // then
+        assertThat(fromWarehouse).isSameAs(warehouseResult);
+        assertThat(fromDropship).isSameAs(dropshipResult);
+    }
+
+    @Test
+    void releasingUnselectedLinesIsADropshipActionOnly() {
+        // given
+        DeliveryCreationForm form = new DeliveryCreationForm();
+        DeliveryScope dropship = dropshipScope(order());
+        DeliveryScope warehouse = warehouseScope();
+
+        // when
+        dropship.releaseUnselected(form);
+
+        // then
+        verify(dropshipPurchase).releaseUnselected(STORE_ID, form);
+        assertThatThrownBy(() -> warehouse.releaseUnselected(form)).isInstanceOf(UnsupportedOperationException.class);
+    }
+
+    @Test
+    void warehousePurchaseModelPreselectsTheOnlyAddress() {
+        // given
+        when(supplierPurchase.requiresApproval(STORE_ID, PROVIDER)).thenReturn(false);
+        when(supplierPurchase.deliveryAddresses(STORE_ID, PROVIDER))
+                .thenReturn(List.of(new SupplierDeliveryAddress("only", "ul. Polna 1", "Warszawa", "00-001", "PL")));
+        DeliveryCreationForm form = new DeliveryCreationForm();
+
+        // when
+        warehouseScope().addPurchaseModel(form, new ConcurrentModel());
+
+        // then
+        assertThat(form.getDeliveryAddressId()).isEqualTo("only");
+    }
+
+    @Test
+    void warehousePurchaseModelKeepsAnAddressTheOperatorAlreadyChose() {
+        // given
+        when(supplierPurchase.requiresApproval(STORE_ID, PROVIDER)).thenReturn(false);
+        when(supplierPurchase.deliveryAddresses(STORE_ID, PROVIDER)).thenReturn(List.of(
+                new SupplierDeliveryAddress("a-1", "ul. Polna 1", "Warszawa", "00-001", "PL"),
+                new SupplierDeliveryAddress("a-2", "ul. Składowa 12", "Pruszków", "05-800", "PL")));
+        DeliveryCreationForm form = new DeliveryCreationForm();
+        form.setDeliveryAddressId("a-2");
+
+        // when
+        warehouseScope().addPurchaseModel(form, new ConcurrentModel());
+
+        // then
+        assertThat(form.getDeliveryAddressId()).isEqualTo("a-2");
+        verifyNoInteractions(stores);
+    }
+
+    @Test
+    void dropshipPurchaseBlockedReasonComesFromTheDropshipService() {
+        // given
+        Order order = order();
+        DeliveryScope scope = dropshipScope(order);
+        when(dropshipPurchase.purchaseBlockedReason(STORE_ID, order, PROVIDER))
+                .thenReturn("orders.dropship.error.pickupPointUnsupported");
+
+        // when / then
+        assertThat(scope.purchaseBlockedReason()).isEqualTo("orders.dropship.error.pickupPointUnsupported");
     }
 }
