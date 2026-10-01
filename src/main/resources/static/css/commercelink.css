@@ -8298,6 +8298,12 @@ a.cl-link-button:hover {
     font-weight: 500;
 }
 
+/* The release checkbox and its note sit at the start of the footer: .cl-list-summary pushes its content to the end
+   (it was made for a total), which slid a short note and its checkbox towards the middle. */
+.cl-page .cl-list-summary > .cl-release {
+    margin-right: auto;
+}
+
 .cl-page .cl-release-help {
     margin: 4px 0 0 24px;
 }
