@@ -308,7 +308,7 @@
     <details class="cl-disclosure cl-card-extras" th:open="${!form.suggestedItems.?[requestedQty > 0].isEmpty()}">
         <summary id="suggestions-title" th:text="#{deliveries.create.suggestions.summary(${form.suggestedItems.size()})}"></summary>
         <div class="cl-disclosure-body">
-            <p class="cl-help" th:text="#{deliveries.create.suggestions.help}"></p>
+            <p class="cl-card-desc" th:text="#{deliveries.create.suggestions.help}"></p>
             <table class="cl-table is-key-wrap is-delivery">
                 <colgroup><col><col class="cl-col-qty"><col class="cl-col-qty"><col class="cl-col-price-input"></colgroup>
                 <thead>
@@ -458,7 +458,7 @@
              th:open="${form.shippingCost != 0 or form.paymentCost != 0 or form.paymentTerms != 0 or form.sourceCurrency != 'PLN'}">
         <summary id="costs-title" th:text="#{deliveries.create.purchase.costs}"></summary>
         <div class="cl-disclosure-body">
-            <p class="cl-help" th:text="#{deliveries.create.purchase.costs.help}"></p>
+            <p class="cl-card-desc" th:text="#{deliveries.create.purchase.costs.help}"></p>
             <div th:replace="~{deliveries/create/parts :: costFields(null)}"></div>
         </div>
     </details>

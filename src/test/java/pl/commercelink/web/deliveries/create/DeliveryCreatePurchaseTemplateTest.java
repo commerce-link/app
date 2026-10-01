@@ -145,6 +145,20 @@ class DeliveryCreatePurchaseTemplateTest {
     }
 
     @Test
+    void optionalCostsDescriptionIsACardDescriptionInsideTheCardPadding() {
+        // given
+        Map<String, Object> variables = model(dropshipPage(false, null, false), dropshipForm());
+        variables.put("purchaseRef", "ref-1");
+        variables.put("requiresApproval", false);
+
+        // when
+        String html = render("deliveries/create/purchase", variables);
+
+        // then: a bare cl-help in the folded body had no padding and no type size, so it ran to the card's edge
+        assertThat(html).contains("<p class=\"cl-card-desc\">Koszt wysyłki do klienta");
+    }
+
+    @Test
     void warehouseConfirmationCarriesStepOneAndTheOrderDataOnce() {
         // when
         String html = render("deliveries/create/purchase", warehouse(addresses(1)));
