@@ -7788,6 +7788,11 @@ a.cl-link-button:hover {
         min-height: 44px;
         justify-content: center;
     }
+
+    /* the due note may break ("po terminie:" / "31 dni"): without it the table is 9-20 px wider than its card at 720 px */
+    .cl-page .cl-table.is-payments .cl-due-note {
+        white-space: normal;
+    }
 }
 
 @media screen and (max-width: 719px) {
