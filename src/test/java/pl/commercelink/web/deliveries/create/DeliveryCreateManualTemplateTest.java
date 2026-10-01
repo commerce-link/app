@@ -125,4 +125,15 @@ class DeliveryCreateManualTemplateTest {
         String change = html.substring(html.lastIndexOf("<button", html.indexOf("Zmień pozycje")), html.indexOf("Zmień pozycje"));
         assertThat(change).contains("type=\"button\"").contains("data-cl-back-submit=\"back-submit\"");
     }
+
+    @Test
+    void headerBackAndChangeItemsWaitForTheScriptAndTheItemsTableIsTheDeliveryTable() {
+        // when
+        String html = render("deliveries/create/manual", warehouse(Map.of()));
+
+        // then: type=button controls only work through the page script, so they start hidden
+        assertThat(html).containsPattern("<button type=\"button\" class=\"cl-back\"[^>]*hidden")
+                .containsPattern("<button type=\"button\" class=\"cl-link-button\" data-cl-back-submit=\"back-submit\"[^>]*hidden")
+                .contains("cl-table is-key-wrap is-delivery");
+    }
 }

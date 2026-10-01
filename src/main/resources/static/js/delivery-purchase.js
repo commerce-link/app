@@ -103,6 +103,10 @@
         if (!form) {
             return;
         }
+        // the back controls are type=button and only work through this script, so the page shows them only now
+        document.querySelectorAll('button[data-cl-back-submit][hidden]').forEach(function (button) {
+            button.hidden = false;
+        });
         form.addEventListener('change', function () {
             refresh(form);
         });

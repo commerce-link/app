@@ -332,4 +332,24 @@ class DeliveryCreateItemsTemplateTest {
         assertThat(html).doesNotContain("przy zamówieniu przez integrację")
                 .contains("Towar przyjedzie na adres, który podasz dostawcy.");
     }
+
+    @Test
+    void linesOfOneDropshipProductAreNumberedAndNamedForScreenReaders() {
+        // when
+        String html = render("deliveries/create/items", model(dropshipPage(false, null, false), dropshipFormWithTwoLines()));
+
+        // then
+        assertThat(html).contains(">Linia 1<").contains(">Linia 2<")
+                .containsPattern("aria-label=\"Dołącz do dostawy: [^\"]+, linia 2\"");
+    }
+
+    @Test
+    void theOrderLinkInTheLeadIsATouchTarget() {
+        // when
+        String html = render("deliveries/create/items", model(dropshipPage(false, null, false), dropshipForm()));
+
+        // then
+        int lead = html.indexOf("cl-page-lead");
+        assertThat(html.substring(lead, html.indexOf("</p>", lead))).contains("class=\"cl-lead-link\"");
+    }
 }

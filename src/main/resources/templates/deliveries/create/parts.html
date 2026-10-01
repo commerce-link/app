@@ -14,7 +14,7 @@
     </a>
     <!--/* type=button: a submit here would stand first in tree order and catch Enter; the page script clicks the
            form's own #back-submit ("Wróć do pozycji"), which carries the state. */-->
-    <button th:if="${step == 2}" type="button" class="cl-back" data-cl-back-submit="back-submit">
+    <button th:if="${step == 2}" type="button" class="cl-back" data-cl-back-submit="back-submit" hidden>
         <span class="icon is-small" aria-hidden="true"><i class="fas fa-chevron-left"></i></span>
         <span th:text="#{deliveries.create.page.title(${page.supplierName()})}"></span>
     </button>
@@ -25,7 +25,7 @@
         <th:block th:if="${page.dropship()}"><span class="cl-status is-info is-leading" th:text="#{deliveries.dropship.badge}"></span> </th:block>
         <span th:text="#{deliveries.create.step(${step})}"></span>
         <th:block th:if="${page.dropship()}"> · <span th:text="#{deliveries.create.lead.order}"></span>
-            <a th:href="@{${page.links().order()}}" th:text="${page.order().shortenedOrderId}"></a></th:block>
+            <a class="cl-lead-link" th:href="@{${page.links().order()}}" th:text="${page.order().shortenedOrderId}"></a></th:block>
         · <span th:text="#{${leadKey}}"></span>
         <th:block th:if="${step == 1 and !page.dropship()}"> · <span th:text="#{deliveries.create.lead.warehouse}"></span>
             <th:block th:if="${page.orderCount() > 0}"> · <span th:text="#{deliveries.create.lead.orders(${page.orderCount()})}"></span></th:block>
@@ -277,8 +277,9 @@
                                     <label class="cl-check">
                                         <input type="checkbox" value="true"
                                                th:name="|items[${i}].allocations[${allocStat.index}].selected|"
-                                               th:checked="${allocation.selected}" th:attr="data-cl-source-qty=${allocation.qty}"/>
-                                        <span th:text="${allocation.key.name}"></span>
+                                               th:checked="${allocation.selected}"
+                                               th:attr="data-cl-source-qty=${allocation.qty}, aria-label=#{deliveries.create.line.label(${item.name}, ${allocStat.count})}"/>
+                                        <span th:text="#{deliveries.create.line(${allocStat.count})}"></span>
                                     </label>
                                     <input type="hidden" th:name="|_items[${i}].allocations[${allocStat.index}].selected|" value="on"/>
                                 </td>
@@ -528,13 +529,13 @@
     <div class="cl-card-head">
         <h2 class="cl-card-title" id="items-title" th:text="#{deliveries.create.items.title}"></h2>
         <div class="cl-card-actions">
-            <button type="button" class="cl-link-button" data-cl-back-submit="back-submit">
+            <button type="button" class="cl-link-button" data-cl-back-submit="back-submit" hidden>
                 <i class="fas fa-pencil-alt" aria-hidden="true"></i> <span th:text="#{deliveries.create.manual.changeItems}"></span>
             </button>
         </div>
     </div>
     <div class="cl-card-section">
-        <table class="cl-table is-key-wrap">
+        <table class="cl-table is-key-wrap is-delivery">
             <colgroup><col class="cl-col-key"><col class="cl-col-num"><col class="cl-col-num"><col class="cl-col-num"></colgroup>
             <thead>
             <tr>

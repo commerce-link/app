@@ -8229,6 +8229,15 @@ a.cl-link-button:hover {
     cursor: pointer;
 }
 
+/* the order link in a dropship lead: a 44 px touch target below 1024 px without moving the line */
+@media (max-width: 1023px) {
+    .cl-page .cl-page-lead .cl-lead-link {
+        display: inline-block;
+        padding-block: 12px;
+        margin-block: -12px;
+    }
+}
+
 .cl-page .cl-table.is-delivery td {
     vertical-align: top;
 }
