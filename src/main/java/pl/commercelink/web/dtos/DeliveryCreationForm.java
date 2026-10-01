@@ -195,6 +195,12 @@ public class DeliveryCreationForm {
                 applyToSuggestedItem(postedItem);
             }
         }
+        // Step 1 sent back before step 2 merged them (an unreadable number): the suggestions are still suggestions.
+        if (posted.getSuggestedItems() != null) {
+            for (SuggestedDeliveryItem postedSuggestion : posted.getSuggestedItems()) {
+                applyToSuggestedItem(postedSuggestion.getMfn(), postedSuggestion.getRequestedQty(), postedSuggestion.getUnitCost());
+            }
+        }
     }
 
     private DeliveryItem findItemByMfn(String mfn) {
@@ -218,12 +224,16 @@ public class DeliveryCreationForm {
     }
 
     private void applyToSuggestedItem(DeliveryItem postedItem) {
+        applyToSuggestedItem(postedItem.getMfn(), postedItem.getRequestedQty(), postedItem.getUnitCost());
+    }
+
+    private void applyToSuggestedItem(String mfn, int requestedQty, double unitCost) {
         suggestedItems.stream()
-                .filter(suggested -> Objects.equals(suggested.getMfn(), postedItem.getMfn()))
+                .filter(suggested -> Objects.equals(suggested.getMfn(), mfn))
                 .findFirst()
                 .ifPresent(suggested -> {
-                    suggested.setRequestedQty(postedItem.getRequestedQty());
-                    suggested.setUnitCost(postedItem.getUnitCost());
+                    suggested.setRequestedQty(requestedQty);
+                    suggested.setUnitCost(unitCost);
                 });
     }
 }

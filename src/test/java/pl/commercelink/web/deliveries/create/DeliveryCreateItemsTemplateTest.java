@@ -288,4 +288,25 @@ class DeliveryCreateItemsTemplateTest {
         int adjustment = html.indexOf("<tfoot");
         assertThat(html.substring(adjustment, html.indexOf(">", adjustment))).contains("hidden");
     }
+
+    @Test
+    void anUnreadableNumberIsMarkedAtItsField() {
+        // given
+        Map<String, Object> model = model(warehousePage(false, true, false), warehouseForm());
+        model.put("stepError", "deliveries.create.error.itemNumber");
+        model.put("invalidFields", java.util.Set.of("100-100001084WOF|unitCost", "MFN-FURY-16|requestedQty"));
+
+        // when
+        String html = render("deliveries/create/items", model);
+
+        // then
+        int cost = html.indexOf("name=\"items[0].unitCost\"");
+        String costInput = html.substring(html.lastIndexOf("<input", cost), html.indexOf(">", cost));
+        assertThat(costInput).contains("is-invalid").contains("aria-invalid=\"true\"");
+        int qty = html.indexOf("name=\"items[0].requestedQty\"");
+        assertThat(html.substring(html.lastIndexOf("<input", qty), html.indexOf(">", qty))).doesNotContain("is-invalid");
+        int suggestion = html.indexOf("name=\"suggestedItems[0].requestedQty\"");
+        assertThat(html.substring(html.lastIndexOf("<input", suggestion), html.indexOf(">", suggestion))).contains("is-invalid");
+        assertThat(html.substring(html.indexOf("<details"), html.indexOf(">", html.indexOf("<details")))).contains("open");
+    }
 }

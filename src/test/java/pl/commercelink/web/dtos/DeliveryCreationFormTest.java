@@ -37,6 +37,29 @@ class DeliveryCreationFormTest {
     }
 
     @Test
+    void overlayCopiesSuggestionsThatWereNotMergedYet() {
+        // given: step 1 came back before step 2 merged the suggestions, so they are still suggestions
+        DeliveryCreationForm fresh = new DeliveryCreationForm();
+        SuggestedDeliveryItem planned = new SuggestedDeliveryItem();
+        planned.setMfn("MFN-S");
+        planned.setUnitCost(100.0);
+        fresh.setSuggestedItems(new ArrayList<>(List.of(planned)));
+        DeliveryCreationForm posted = new DeliveryCreationForm();
+        SuggestedDeliveryItem typed = new SuggestedDeliveryItem();
+        typed.setMfn("MFN-S");
+        typed.setRequestedQty(5);
+        typed.setUnitCost(92.0);
+        posted.setSuggestedItems(new ArrayList<>(List.of(typed)));
+
+        // when
+        fresh.applyUserSelections(posted);
+
+        // then
+        assertThat(fresh.getSuggestedItems().getFirst().getRequestedQty()).isEqualTo(5);
+        assertThat(fresh.getSuggestedItems().getFirst().getUnitCost()).isEqualTo(92.0);
+    }
+
+    @Test
     void overlayCopiesRequestedQtyAndUnitCostByMfn() {
         // given
         DeliveryCreationForm fresh = formWithItem("MFN-1", 1, 10.0);
