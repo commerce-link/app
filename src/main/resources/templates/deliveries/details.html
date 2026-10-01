@@ -27,7 +27,8 @@
 
             <th:block th:if="${page.header().more().refresh().enabled()}"><form th:replace="~{deliveries/details/header :: refreshForm}"></form></th:block>
             <dialog th:replace="~{fragments/confirm-dialog :: dialog}"></dialog>
-            <!--/* standalone dialogs (Task 11), payment dialogs (Task 12) */-->
+            <th:block th:replace="~{deliveries/details/dialogs :: standalone}"></th:block>
+            <!--/* payment dialogs (Task 12) */-->
         </div>
     </section>
     <script th:src="@{/js/menu.js}" defer></script>
@@ -36,6 +37,7 @@
     <script th:src="@{/js/timeline.js}" defer></script>
     <script th:src="@{/js/copy-field.js}" defer></script>
     <script th:src="@{/js/confirm-dialog.js}" defer></script>
+    <script th:src="@{/js/async-form.js}" defer></script>
     <script th:src="@{/js/table-select.js}" defer></script>
     <script th:src="@{/js/delivery-details.js}" defer></script>
 </div>

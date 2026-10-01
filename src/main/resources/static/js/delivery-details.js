@@ -3,11 +3,14 @@
 // the destination rows' toggles; the selection row docked to the bottom on phones while the items card is on screen
 // (P2); a "…-all" opener (data-cl-select-pending) checking every waiting destination before its dialog opens and
 // restoring the selection when the dialog closes unsent; the list of what a selection dialog acts on, rebuilt from
-// the checked rows; Enter inside a dialog field running that dialog's own action, never the form's first button.
+// the checked rows; Enter inside a dialog field running that dialog's own action, never the form's first button; the
+// dialogs' own checks (field errors at the field instead of alert()), the shipment form's pickup point, the quantity
+// dialog filled from its opener, the invoice id choosing its way, and "Usuń wpłatę" asking first.
 (function () {
     'use strict';
 
     var form = document.getElementById('allocationsForm');
+    var TEXT_INPUT = 'input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"])';
 
     function rowBoxes() {
         return form ? Array.prototype.slice.call(form.querySelectorAll('input[data-cl-select-row]')) : [];
@@ -163,7 +166,8 @@
             return;
         }
         form.addEventListener('keydown', function (event) {
-            if (event.key !== 'Enter' || !event.target.matches('input')) {
+            // a radio or checkbox keeps its own keys; Enter in a text field runs the dialog's action
+            if (event.key !== 'Enter' || !event.target.matches(TEXT_INPUT)) {
                 return;
             }
             var dialog = event.target.closest('dialog');
@@ -178,13 +182,163 @@
         });
     }
 
-    // dialogs of Task 11
+    function filled(fieldId, errorId) {
+        var field = document.getElementById(fieldId);
+        var ok = !!field && field.value.trim() !== '';
+        var error = document.getElementById(errorId);
+        if (error) {
+            error.hidden = ok;
+        }
+        if (field) {
+            field.setAttribute('aria-invalid', ok ? 'false' : 'true');
+            if (!ok) {
+                field.focus();
+            }
+        }
+        return ok;
+    }
+
+    function shipmentFields() {
+        return {
+            type: form ? form.querySelector('input[name="shipmentType"]:checked') : null,
+            carrier: document.getElementById('shipmentCarrier'),
+            tracking: document.getElementById('shipmentTrackingNo'),
+            point: document.getElementById('shipmentCollectionPointCode'),
+            shippedAt: document.getElementById('shipmentShippedAt')
+        };
+    }
+
+    // the server's own rule (DropshipShipment.validationError): type, carrier, tracking number, date, a point for a pickup point
+    function shipmentComplete() {
+        var f = shipmentFields();
+        var pickup = !!f.type && f.type.value === 'PickupPoint';
+        return !!f.type && !!f.carrier && f.carrier.value.trim() !== '' && !!f.tracking && f.tracking.value.trim() !== ''
+            && !!f.shippedAt && f.shippedAt.value !== '' && (!pickup || (!!f.point && f.point.value.trim() !== ''));
+    }
+
+    function invoiceReady() {
+        var byId = document.querySelector('input[name="linkMode"][value="byId"]');
+        return !byId || !byId.checked || filled('invoiceId', 'invoiceId-error');
+    }
+
+    // registered before initDialogs, so a refused submit never marks its dialog as sent
+    function initValidation() {
+        document.querySelectorAll('[data-cl-validate]').forEach(function (button) {
+            button.addEventListener('click', function (event) {
+                var kind = button.getAttribute('data-cl-validate');
+                var ok = kind === 'merge' ? filled('targetDeliveryId', 'targetDeliveryId-error')
+                    : kind === 'split' ? filled('targetExternalDeliveryId', 'targetExternalDeliveryId-error')
+                    : kind === 'ship' ? shipmentComplete()
+                    : kind === 'invoice' ? invoiceReady() : true;
+                var shipError = kind === 'ship' && document.getElementById('ship-error');
+                if (shipError) {
+                    shipError.hidden = ok;
+                }
+                if (!ok) {
+                    event.preventDefault();
+                    event.stopImmediatePropagation();
+                }
+            });
+        });
+    }
+
+    // the pickup point field only means something for a pickup point; the button waits for complete data (M7)
+    function initShipment() {
+        var dialog = document.getElementById('ship-dialog');
+        var f = shipmentFields();
+        if (!dialog || !f.point) {
+            return;
+        }
+        var submit = dialog.querySelector('[data-cl-dialog-submit]');
+        var update = function () {
+            var current = form.querySelector('input[name="shipmentType"]:checked');
+            f.point.disabled = !current || current.value !== 'PickupPoint';
+            if (submit) {
+                submit.disabled = !shipmentComplete();
+            }
+        };
+        dialog.addEventListener('input', update);
+        dialog.addEventListener('change', update);
+        dialog.addEventListener('cl:dialog-open', update);
+        update();
+    }
+
+    function initQuantity() {
+        var dialog = document.getElementById('qty-dialog');
+        var input = document.getElementById('qty');
+        var delta = document.getElementById('qty-delta');
+        var help = document.getElementById('qty-help');
+        if (!dialog || !input || !delta || !help) {
+            return;
+        }
+        var original = parseInt(input.value, 10) || 0;
+        var render = function () {
+            var diff = (parseInt(input.value, 10) || 0) - original;
+            delta.hidden = diff === 0;
+            delta.textContent = (diff > 0 ? delta.getAttribute('data-up') : delta.getAttribute('data-down'))
+                .replace('{n}', String(Math.abs(diff)));
+            delta.classList.toggle('is-ok', diff > 0);
+            delta.classList.toggle('is-warn', diff < 0);
+        };
+        dialog.addEventListener('cl:dialog-open', function (event) {
+            var trigger = event.detail && event.detail.trigger;
+            if (!trigger || !trigger.hasAttribute('data-mfn')) {
+                return;
+            }
+            var min = trigger.getAttribute('data-min-qty');
+            var ean = trigger.getAttribute('data-ean');
+            original = parseInt(trigger.getAttribute('data-qty'), 10) || 0;
+            document.getElementById('qty-mfn').value = trigger.getAttribute('data-mfn');
+            document.getElementById('qty-name').textContent = trigger.getAttribute('data-name');
+            document.getElementById('qty-codes').textContent = (ean ? ean + ' · ' : '') + trigger.getAttribute('data-mfn');
+            input.value = String(original);
+            input.min = min;
+            help.textContent = help.getAttribute('data-template').replace('{min}', min);
+            render();
+        });
+        input.addEventListener('input', render);
+    }
+
+    // typing an id means the operator chose that way: the field is visible next to both options (D7)
+    function initInvoice() {
+        var field = document.getElementById('invoiceId');
+        var byId = document.querySelector('input[name="linkMode"][value="byId"]');
+        if (!field || !byId) {
+            return;
+        }
+        field.addEventListener('input', function () {
+            if (field.value.trim() !== '') {
+                byId.checked = true;
+            }
+        });
+    }
+
+    // "Usuń wpłatę" posts its own form (the other payments); with JavaScript it asks first, in the page's confirm dialog
+    function initPaymentRemoval() {
+        document.querySelectorAll('[data-cl-remove-payment]').forEach(function (button) {
+            button.addEventListener('click', function (event) {
+                event.preventDefault();
+                var target = document.getElementById(button.getAttribute('form'));
+                if (!target || typeof window.CL_confirmBulk !== 'function') {
+                    return;
+                }
+                window.CL_confirmBulk(button, '1', function () {
+                    target.submit();
+                }, 'data-cl-select-confirm-title', 'data-cl-select-confirm-message', 'data-cl-select-confirm-action');
+            });
+        });
+    }
 
     function init() {
         initToggles();
         initDockedBar();
+        initValidation();
         initDialogs();
         initEnter();
+        initShipment();
+        initQuantity();
+        initInvoice();
+        initPaymentRemoval();
     }
 
     if (document.readyState === 'loading') {

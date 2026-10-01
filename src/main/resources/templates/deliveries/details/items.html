@@ -128,7 +128,7 @@
                         th:formaction="@{${page.links().confirm('remove-allocations')}}" th:text="#{deliveries.details.selection.remove}"></button>
             </div>
         </noscript>
-        <!--/* selection dialogs (Task 11) */-->
+        <th:block th:if="${items.selectable()}"><th:block th:replace="~{deliveries/details/dialogs :: selection}"></th:block></th:block>
     </form>
 </section>
 

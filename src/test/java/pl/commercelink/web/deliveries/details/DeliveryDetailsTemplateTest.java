@@ -6,10 +6,12 @@ import pl.commercelink.inventory.deliveries.DeliveryOrderStatus;
 import pl.commercelink.inventory.deliveries.DeliveryTrackingState;
 import pl.commercelink.orders.event.Event;
 import pl.commercelink.orders.event.EventType;
+import pl.commercelink.web.dtos.DeliveryTermsForm;
 import pl.commercelink.web.orders.OrderFlash;
 import pl.commercelink.web.orders.OrderLabels;
 import pl.commercelink.web.orders.OrderNotice;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -315,7 +317,7 @@ class DeliveryDetailsTemplateTest {
         OrderNotice notice = new OrderNotice(OrderLabels.OK, "Zapisano warunki dostawy.", null, null);
 
         // when
-        String html = renderPage(page, Map.of(OrderFlash.ATTRIBUTE, notice));
+        String html = renderPage(page, Map.of(OrderFlash.ATTRIBUTE, notice, "termsDialog", TermsDialog.of(warehouse(), page.links())));
 
         // then
         assertThat(occurrences(html, "Zapisano warunki dostawy.")).isEqualTo(1);
@@ -467,5 +469,199 @@ class DeliveryDetailsTemplateTest {
 
         // then
         assertThat(html).containsPattern("<th scope=\"col\" class=\"cl-table-check\">\\s*<label class=\"cl-check-target\"><input class=\"cl-check-input\" type=\"checkbox\" data-cl-select-all hidden");
+    }
+
+    private static String allocationsForm(String html) {
+        int start = html.indexOf("<form id=\"allocationsForm\"");
+        return html.substring(start, html.indexOf("</form>", start));
+    }
+
+    @Test
+    void theSelectionDialogsSitInsideTheAllocationsFormWithEveryFieldOnce() {
+        // given
+        Delivery target = warehouse();
+        target.setDeliveryId("4c1d9e07-0000-0000-0000-000000000000");
+        target.setExternalDeliveryId(null);
+        target.setEstimatedDeliveryAt(LocalDate.of(2026, 10, 10));
+        DeliveryPageData data = new DeliveryPageData(warehouse(), "Manual-Hurt", null, List.of(target), null, List.of(),
+                null, Set.of(), null, null, NOW);
+
+        // when
+        String form = allocationsForm(render(data, ADMIN));
+
+        // then
+        assertThat(DeliveryDetailsTemplates.fieldNameCounts(form)).allSatisfy((name, count) -> assertThat(count).as(name).isEqualTo(1));
+        assertThat(occurrences(form, "<form")).isEqualTo(1);
+        assertThat(form).contains("id=\"receive-dialog\"").contains("id=\"receive-all-dialog\"").contains("id=\"merge-dialog\"")
+                .contains("id=\"split-dialog\"").contains("id=\"remove-dialog\"").doesNotContain("id=\"ship-dialog\"")
+                .contains("formaction=\"/dashboard/deliveries/markSelectedAsReceived\"")
+                .contains("formaction=\"/dashboard/deliveries/mergeSelectedAllocations\"")
+                .contains("formaction=\"/dashboard/deliveries/splitSelectedAllocations\"")
+                .contains("formaction=\"/dashboard/deliveries/deleteSelectedAllocations\"")
+                .contains(">#4c1d9e07 · bez numeru · termin 10.10.2026<")
+                .contains("name=\"targetEstimatedDeliveryAt\" value=\"2026-10-08\"");
+    }
+
+    @Test
+    void receiveAllListsEveryWaitingDestinationAndWhatHappensNext() {
+        // when
+        String html = render(data(partlyReceived(warehouse())), ADMIN);
+
+        // then
+        assertThat(html).contains(">Odebrać całą dostawę 2f9eb794?<")
+                .contains("Odbierzesz wszystko, co jeszcze czeka w tej dostawie (1 z 2 przeznaczeń):")
+                .contains("→ Magazyn").contains("dostawa stanie się „Odebrana”");
+    }
+
+    @Test
+    void withoutJavaScriptTheRequestedDialogIsRenderedOpenWithItsSelection() {
+        // when
+        String receiveAll = render(data(warehouse(), "receive-all", Set.of()), ADMIN);
+        String split = render(data(warehouse(), "split", Set.of(1)), ADMIN);
+
+        // then
+        assertThat(receiveAll).containsPattern("id=\"receive-all-dialog\"[^>]*open=\"open\"");
+        assertThat(receiveAll).containsPattern("name=\"allocations\\[0\\]\\.selected\"[^>]*checked");
+        assertThat(split).containsPattern("id=\"split-dialog\"[^>]*open=\"open\"")
+                .containsPattern("<ul class=\"cl-dialog-list\" data-cl-selection-list>\\s*<li><span>Samsung MirageDrive 2TB NVMe</span>");
+    }
+
+    @Test
+    void theShipmentDialogOffersCourierOrPickupPointAndTheCustomersChoice() {
+        // given
+        DeliveryPageData data = new DeliveryPageData(dropship(), "AcmeB", null, List.of(), dropshipOrder(),
+                List.of("DPD", "InPost"), null, Set.of(), null, null, NOW);
+
+        // when
+        String html = render(data, ADMIN);
+
+        // then
+        assertThat(html).contains("id=\"ship-dialog\"").contains("value=\"Courier\"")
+                .containsPattern("value=\"PickupPoint\"[^>]*checked").doesNotContain("PersonalCollection")
+                .containsPattern("<option value=\"DPD\" selected")
+                .contains("name=\"shipmentCollectionPointCode\"").contains("value=\"PL12345\"")
+                .contains("name=\"shipmentTrackingNo\"").contains("type=\"datetime-local\"").contains("value=\"2026-10-01T12:00\"")
+                .contains("formaction=\"/dashboard/deliveries/confirmDropshipShipment\"").contains("id=\"ship-error\"");
+    }
+
+    @Test
+    void removingFromTheDeliverySaysWhatItDoesInEachSituation() {
+        // when
+        String regular = render(data(warehouse()), ADMIN);
+        String dropship = render(data(dropship()), ADMIN);
+        String unknown = render(data(outcomeUnknown(own(warehouse()))), ADMIN);
+
+        // then
+        assertThat(regular).contains("Pozycje zamówień wrócą do przydziału.");
+        assertThat(dropship).contains("Zlecenia u dostawcy to nie anuluje — zrób to w panelu dostawcy.");
+        assertThat(unknown).contains("class=\"cl-alert is-warn\"").contains("Wynik zamówienia u dostawcy jest nieznany");
+        assertThat(regular).containsPattern("class=\"cl-button is-danger\" data-cl-dialog-submit")
+                .containsPattern("data-cl-dialog-close autofocus");
+    }
+
+    @Test
+    void theTermsDialogTypesVatAsAPercentageAndShowsErrorsAtTheFields() {
+        // given
+        DeliveryPageModel page = DeliveryPageModelFactory.build(data(warehouse()), ADMIN);
+        DeliveryTermsForm typed = DeliveryTermsForm.of(warehouse());
+        typed.setShippingCost("19.9.0");
+        TermsDialog dialog = TermsDialog.of(warehouse(), page.links())
+                .withErrors(typed, Map.of("shippingCost", "deliveries.details.terms.error.shippingCost"));
+
+        // when
+        String html = DeliveryDetailsTemplates.render(page, Map.of("termsDialog", dialog));
+
+        // then
+        assertThat(html).contains("id=\"delivery-terms-form\"").contains("data-cl-async").contains("data-cl-dialog-close-on-success=\"true\"")
+                .contains("action=\"/dashboard/deliveries/details\"").contains("name=\"vat\"").contains("value=\"23\"")
+                .contains("inputmode=\"decimal\"").contains("value=\"19.9.0\"").contains("aria-invalid=\"true\"")
+                .contains("id=\"shippingCost-error\"").contains("Koszt wysyłki netto: wpisz kwotę liczbą, np. 149,99.")
+                .contains("data-cl-error-summary").contains(">Terminy i koszty dostawy 2f9eb794<")
+                .doesNotContain("type=\"number\" name=\"vat\"");
+    }
+
+    @Test
+    void theCommentDialogPostsOnlyTheComment() {
+        // given
+        Delivery delivery = warehouse();
+        delivery.setComment("Rampa B");
+
+        // when
+        String html = render(data(delivery), ADMIN);
+        int start = html.indexOf("<form id=\"delivery-comment-form\"");
+        String form = html.substring(start, html.indexOf("</form>", start));
+
+        // then
+        assertThat(DeliveryDetailsTemplates.fieldNameCounts(form)).containsOnlyKeys("source", "deliveryId", "comment");
+        assertThat(form).contains("value=\"comment\"").contains(">Rampa B</textarea>");
+    }
+
+    @Test
+    void theInvoiceDialogOffersBothWaysWithTheIdFieldAlwaysVisible() {
+        // when
+        String html = render(data(warehouse()), ADMIN);
+
+        // then
+        assertThat(html).contains("id=\"invoice-dialog\"").contains("action=\"/dashboard/deliveries/link-invoices\"")
+                .containsPattern("name=\"linkMode\" value=\"byOrder\" checked").contains("name=\"linkMode\" value=\"byId\"")
+                .contains("faktur zakupowych z numerem MH-2026/0917").contains("class=\"cl-choice-reveal cl-field\"")
+                .contains("id=\"invoiceId-error\"").doesNotContain("alert(");
+    }
+
+    @Test
+    void purchaseRepairDialogsAppearWhereTheirCardOffersThem() {
+        // given
+        DeliveryPageData failed = new DeliveryPageData(own(withStatus(warehouse(), DeliveryOrderStatus.FAILED)), "AcmeB", null,
+                List.of(), null, List.of(), LocalDate.of(2026, 10, 9), Set.of(), null, null, NOW);
+
+        // when
+        String failedHtml = render(failed, ADMIN);
+        String unknownHtml = render(data(outcomeUnknown(own(warehouse()))), ADMIN);
+        String inTransit = render(data(warehouse()), ADMIN);
+
+        // then
+        assertThat(failedHtml).contains("id=\"complete-dialog\"").contains("action=\"/dashboard/deliveries/" + DELIVERY_ID + "/purchase/complete\"")
+                .contains("name=\"externalOrderId\"").contains("name=\"estimatedDeliveryAt\" required value=\"2026-10-09\"")
+                .doesNotContain("id=\"force-dialog\"");
+        assertThat(unknownHtml).contains("id=\"force-dialog\"").contains("/purchase/force\"")
+                .contains("Jeśli zamówienie jednak istnieje u dostawcy, zostanie złożone drugie zamówienie.");
+        assertThat(inTransit).doesNotContain("id=\"complete-dialog\"").doesNotContain("id=\"force-dialog\"");
+    }
+
+    @Test
+    void theSuperAdminRejectsWithAnOptionalReason() {
+        // when
+        String html = render(data(global(withStatus(dropship(), DeliveryOrderStatus.AWAITING_APPROVAL))), SUPER_ADMIN);
+
+        // then
+        assertThat(html).contains("id=\"reject-dialog\"").contains("action=\"/dashboard/store/store-1/deliveries/ed2fca8a-073d-47cd-8bd3-2f1cedfdbeb2/reject\"")
+                .contains("<textarea class=\"cl-input cl-textarea\" id=\"reject-reason\" name=\"reason\"");
+    }
+
+    @Test
+    void theQuantityDialogIsFilledForTheProductNamedInTheAddress() {
+        // given
+        DeliveryPageData data = new DeliveryPageData(warehouse(), "Manual-Hurt", null, List.of(), null, List.of(), null,
+                Set.of(), "qty", "MFN-MIRAGE-01", NOW);
+
+        // when
+        String html = render(data, ADMIN);
+
+        // then
+        assertThat(html).containsPattern("id=\"qty-dialog\"[^>]*open=\"open\"")
+                .contains("name=\"mfn\" id=\"qty-mfn\" value=\"MFN-MIRAGE-01\"")
+                .contains("action=\"/dashboard/deliveries/updateItemQty\"").contains("min=\"1\"").contains("value=\"2\"")
+                .contains("Najmniej: 1 — sztuki zarezerwowane dla zamówień i odebrane.")
+                .contains("data-up=\"+{n} szt. — stan magazynowy wzrośnie\"");
+    }
+
+    @Test
+    void readOnlyViewersGetNoDialogs() {
+        // when
+        String html = render(data(received(warehouse())), USER);
+
+        // then
+        assertThat(html).doesNotContain("id=\"terms-dialog\"").doesNotContain("id=\"qty-dialog\"")
+                .doesNotContain("id=\"invoice-dialog\"").doesNotContain("id=\"receive-dialog\"");
     }
 }

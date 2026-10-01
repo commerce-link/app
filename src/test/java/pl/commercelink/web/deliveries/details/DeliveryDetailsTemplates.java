@@ -14,7 +14,8 @@ final class DeliveryDetailsTemplates {
     }
 
     static String render(DeliveryPageData data, DeliveryViewer viewer) {
-        return render(DeliveryPageModelFactory.build(data, viewer), Map.of());
+        DeliveryPageModel page = DeliveryPageModelFactory.build(data, viewer);
+        return render(page, Map.of("termsDialog", TermsDialog.of(data.delivery(), page.links())));
     }
 
     static String render(DeliveryPageModel page, Map<String, Object> extra) {

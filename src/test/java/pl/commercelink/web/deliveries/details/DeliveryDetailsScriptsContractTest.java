@@ -98,4 +98,21 @@ class DeliveryDetailsScriptsContractTest {
                 .containsPattern("if \\(unchecked\\) \\{\\s*refreshSelection\\(\\);")
                 .containsPattern("before = checkedBoxes\\(\\);[\\s\\S]*?expandAll\\(\\);");
     }
+
+    @Test
+    void theDialogScriptsValidateFillAndConfirm() throws Exception {
+        // when
+        String js = read(Path.of("src/main/resources/static/js/delivery-details.js"));
+        String page = read(Path.of("src/main/resources/templates/deliveries/details.html"));
+
+        // then
+        assertThat(js).contains("data-cl-validate").contains("stopImmediatePropagation").contains("'PickupPoint'")
+                .contains("qty-delta").contains("data-min-qty").contains("linkMode").contains("data-cl-remove-payment")
+                .contains("CL_confirmBulk")
+                // a refused check must stop the listener that marks the dialog as sent, so it is registered first
+                .containsPattern("initValidation\\(\\);\\s*initDialogs\\(\\);")
+                // Enter on the shipment type's radios must not submit the dialog
+                .contains(":not([type=\"radio\"])").contains("event.target.matches(TEXT_INPUT)");
+        assertThat(page).contains("/js/async-form.js");
+    }
 }
