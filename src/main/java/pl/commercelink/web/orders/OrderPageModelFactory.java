@@ -134,15 +134,14 @@ public class OrderPageModelFactory {
         boolean receiptLocked = receiptLock.locks();
         boolean canOrderShipment = order.canOrderShipment();
         OrderPageModel.PrimaryAction primary = null;
-        // with items at several suppliers the dropship page without ?provider= sends the operator back to choose one,
-        // so the button names the first waiting supplier the dropship page accepts (DropshipEligibility, as the
-        // delivery link and the deliveries planning); a supplier without dropshipping is ordered through the
-        // warehouse route, so it gets no button that would only end on the page's refusal
+        // the button opens the new-delivery page of the first waiting supplier the dropship flow accepts
+        // (DropshipEligibility, as the delivery link and the deliveries planning); a supplier without dropshipping is
+        // ordered through the warehouse route, so it gets no button that would only end on the page's refusal
         OrderItem firstDropship = !readOnly && viewer.admin() && order.getFulfilmentType() == FulfilmentType.DirectToConsumer
                 ? items.stream().filter(OrderPageModelFactory::awaitsDropship)
                         .filter(item -> dropship.supports(item.getDeliveryId())).findFirst().orElse(null) : null;
         if (firstDropship != null) {
-            primary = new OrderPageModel.PrimaryAction("order.page.action.dropship", 
+            primary = new OrderPageModel.PrimaryAction("order.page.action.dropship",
                     links.forViewer(DeliveryRedirectResolver.dropshipCreateLink(order.getOrderId(), firstDropship.getDeliveryId())),
                     "fa-truck");
         } else if (!readOnly && canOrderShipment && order.hasShipmentToBook()

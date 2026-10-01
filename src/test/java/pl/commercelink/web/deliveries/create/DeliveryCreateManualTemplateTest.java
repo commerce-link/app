@@ -108,4 +108,21 @@ class DeliveryCreateManualTemplateTest {
         assertThat(form.substring(form.lastIndexOf("<button", firstSubmit), form.indexOf(">", firstSubmit)))
                 .contains("id=\"save-button\"");
     }
+
+    @Test
+    void theScriptsDataContractIsRendered() {
+        // when
+        String html = render("deliveries/create/manual", warehouse(Map.of()));
+
+        // then: delivery-manual.js finds everything below by these attributes
+        assertThat(html).containsPattern("<form[^>]*data-cl-delivery-manual")
+                .containsPattern("<select[^>]*data-cl-currency")
+                .contains("data-cl-total-net").contains("data-cl-total-currency")
+                .containsPattern("<tr[^>]*data-cl-readonly-item[^>]*data-qty=\"[^\"]+\"[^>]*data-unit-cost=\"[^\"]+\"");
+        assertThat(occurrences(html, "data-cl-back-submit=\"back-submit\"")).isEqualTo(2);
+        assertThat(html).containsPattern("<button[^>]*type=\"button\"[^>]*data-cl-back-submit=\"back-submit\"");
+        assertThat(html.indexOf("Zmień pozycje")).isPositive();
+        String change = html.substring(html.lastIndexOf("<button", html.indexOf("Zmień pozycje")), html.indexOf("Zmień pozycje"));
+        assertThat(change).contains("type=\"button\"").contains("data-cl-back-submit=\"back-submit\"");
+    }
 }

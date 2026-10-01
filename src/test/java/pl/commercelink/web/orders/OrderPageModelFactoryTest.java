@@ -315,7 +315,7 @@ class OrderPageModelFactoryTest {
 
     @Test
     void withItemsAtTwoSuppliersTheSupplierOrderNamesTheFirstWaitingOne() {
-        // given: without ?provider= the dropship page redirects back to choose a supplier
+        // given: the order has waiting items at several suppliers
         Order dropship = order(OrderStatus.New);
         dropship.setFulfilmentType(FulfilmentType.DirectToConsumer);
         OrderItem fresh = item(FulfilmentStatus.New);
