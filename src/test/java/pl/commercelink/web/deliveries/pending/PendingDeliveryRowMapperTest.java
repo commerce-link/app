@@ -145,7 +145,7 @@ class PendingDeliveryRowMapperTest {
         assertThat(row.key()).isEqualTo("1de57483");
         assertThat(row.keyHref()).isEqualTo("/dashboard/orders/" + ORDER_C);
         assertThat(row.customer()).isEqualTo("Barbara Zając");
-        assertThat(row.createHref()).isEqualTo("/dashboard/orders/" + ORDER_C + "/dropship?provider=AcmeB");
+        assertThat(row.createHref()).isEqualTo("/dashboard/deliveries/create/AcmeB?order=" + ORDER_C);
         assertThat(row.dueNote()).isEqualTo("dziś");
         assertThat(row.dueTone()).isEqualTo("is-warn");
         assertThat(row.approval()).isTrue();
@@ -175,7 +175,7 @@ class PendingDeliveryRowMapperTest {
                 new PendingDeliveryRow.Source("Magazyn", null, 1, true));
         assertThat(warehouse.approval()).isFalse();
         assertThat(dropship.keyHref()).isEqualTo("/dashboard/store/store-1/orders/" + ORDER_C);
-        assertThat(dropship.createHref()).isEqualTo("/dashboard/store/store-1/orders/" + ORDER_C + "/dropship?provider=Acme");
+        assertThat(dropship.createHref()).isEqualTo("/dashboard/store/store-1/deliveries/create/Acme?order=" + ORDER_C);
     }
 
     @Test
@@ -236,7 +236,7 @@ class PendingDeliveryRowMapperTest {
 
         // then
         assertThat(warehouse.createHref()).isEqualTo("/dashboard/deliveries/create/Acme%20B%232%2F%C5%82");
-        assertThat(dropship.createHref()).endsWith("/dropship?provider=Acme+B%232%2F%C5%82");
+        assertThat(dropship.createHref()).endsWith("/deliveries/create/Acme%20B%232%2F%C5%82?order=" + ORDER_C);
         assertThat(warehouse.detailId()).matches("[A-Za-z][A-Za-z0-9_-]*");
         assertThat(dropship.detailId()).matches("[A-Za-z][A-Za-z0-9_-]*").isNotEqualTo(warehouse.detailId());
     }

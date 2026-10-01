@@ -307,7 +307,8 @@ class OrderPageModelFactoryTest {
         OrderPageModel user = factory.build(dropship, List.of(allocated), new OrderPageModelFactory.Viewer(false, false, null), PL);
 
         // then
-        assertThat(admin.header().primaryAction().href()).endsWith("/dropship?provider=Acme");
+        assertThat(admin.header().primaryAction().href())
+                .isEqualTo("/dashboard/deliveries/create/Acme?order=" + dropship.getOrderId() + "&from=order");
         assertThat(user.header().primaryAction()).isNull();
         assertThat(user.items().products().get(0).deliveryHref()).isNull();
     }
@@ -329,7 +330,7 @@ class OrderPageModelFactoryTest {
                 new OrderPageModelFactory.Viewer(false, true, null), PL);
 
         // then
-        assertThat(page.header().primaryAction().href()).endsWith("/dropship?provider=Acme+B");
+        assertThat(page.header().primaryAction().href()).endsWith("/deliveries/create/Acme%20B?order=" + dropship.getOrderId() + "&from=order");
     }
 
     @Test
@@ -351,8 +352,10 @@ class OrderPageModelFactoryTest {
         // then
         assertThat(onlyAcmeB.header().primaryAction()).isNull();
         assertThat(onlyAcmeB.items().products().get(0).deliveryHref()).isEqualTo("/dashboard/deliveries/create/AcmeB");
-        assertThat(both.header().primaryAction().href()).endsWith("/dropship?provider=Acme");
-        assertThat(both.items().products().get(1).deliveryHref()).endsWith("/dropship?provider=Acme");
+        assertThat(both.header().primaryAction().href())
+                .isEqualTo("/dashboard/deliveries/create/Acme?order=" + dropship.getOrderId() + "&from=order");
+        assertThat(both.items().products().get(1).deliveryHref())
+                .isEqualTo("/dashboard/deliveries/create/Acme?order=" + dropship.getOrderId() + "&from=order");
     }
 
     @Test
