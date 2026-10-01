@@ -81,7 +81,7 @@ public final class DeliveryPageModelFactory {
     }
 
     private static int paymentIndex(String requested) {
-        if (!requested.matches("payment-\\d{1,3}")) {
+        if (!requested.matches("payment-(0|[1-9]\\d{0,2})")) {
             return -1;
         }
         return Integer.parseInt(requested.substring("payment-".length()));

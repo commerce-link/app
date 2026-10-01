@@ -135,6 +135,7 @@ public record DeliveryPageModel(String deliveryId, String shortId, boolean super
     /**
      * pillAmount: the argument of the overpaid/underpaid pill, else null. fields: every payment as the edit and remove
      * forms post it back (updatePayments replaces the whole list). expected, pending, sources feed "Dodaj wpłatę".
+     * toPay, remaining: null while the VAT is unset (tax below 1.0), rendered as "—"; the pill keeps today's logic.
      */
     public record PaymentsCard(String pillKey, String pillTone, String pillAmount, String toPay, String paid,
                                String remaining, boolean remainingDue, String dueDate, int paymentTerms,

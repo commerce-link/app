@@ -74,6 +74,7 @@ class DeliveryPageModelFactoryTest {
         assertThat(DeliveryPageModelFactory.build(data(delivery, "payment-0", Set.of()), ADMIN).openDialog()).isEqualTo("payment-0");
         assertThat(DeliveryPageModelFactory.build(data(delivery, "payment-1", Set.of()), ADMIN).openDialog()).isNull();
         assertThat(DeliveryPageModelFactory.build(data(delivery, "payment-0", Set.of()), SUPER_ADMIN).openDialog()).isNull();
+        assertThat(DeliveryPageModelFactory.build(data(delivery, "payment-00", Set.of()), ADMIN).openDialog()).isNull();
     }
 
     @Test

@@ -108,6 +108,22 @@ class DeliveryCardsFactoryTest {
     }
 
     @Test
+    void anUnsetVatLeavesWhatIsOwedEmptyButKeepsTheSettlementPill() {
+        // given
+        Delivery unset = warehouse();
+        unset.setTax(0.0);
+
+        // when
+        DeliveryPageModel.PaymentsCard card = DeliveryCardsFactory.payments(unset, ADMIN, links(ADMIN, unset));
+
+        // then
+        assertThat(card.toPay()).isNull();
+        assertThat(card.remaining()).isNull();
+        assertThat(card.pillKey()).isEqualTo("deliveries.details.payments.unpaid");
+        assertThat(card.paid()).isEqualTo("0,00");
+    }
+
+    @Test
     void anIncomingPaymentIsARefund() {
         // given
         Delivery delivery = warehouse();
@@ -276,6 +292,28 @@ class DeliveryCardsFactoryTest {
         assertThat(terms.reverseCharge()).isFalse();
         assertThat(terms.vatPercent()).isEqualTo("23");
         assertThat(terms.totalGross()).isEqualTo("6 253,32");
+    }
+
+    @Test
+    void aBareDeliveryWithTheUnsetVatOfAPurchaseBuildsWithEmptyGrossAmounts() {
+        // given
+        Delivery bare = new Delivery();
+        bare.setStoreId(STORE_ID);
+        bare.setDeliveryId("d-bare");
+        bare.setProvider("Other");
+        bare.setTax(0.0);
+
+        // when
+        DeliveryPageModel model = DeliveryPageModelFactory.build(data(bare), ADMIN);
+
+        // then
+        assertThat(model.header().totalGross()).isNull();
+        assertThat(model.terms().totalGross()).isNull();
+        assertThat(model.terms().vatPercent()).isNull();
+        assertThat(model.payments().toPay()).isNull();
+        assertThat(model.payments().remaining()).isNull();
+        assertThat(model.items().products()).isEmpty();
+        assertThat(model.consignee()).isNull();
     }
 
     @Test

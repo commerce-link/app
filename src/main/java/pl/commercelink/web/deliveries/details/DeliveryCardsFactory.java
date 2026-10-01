@@ -114,8 +114,10 @@ final class DeliveryCardsFactory {
             pillKey = "deliveries.details.payments.unpaid";
             pillTone = OrderLabels.NEUTRAL;
         }
-        return new PaymentsCard(pillKey, pillTone, pillAmount, Money.format(delivery.getTotalCostGross()),
-                Money.format(delivery.getPaidAmount()), Money.format(Math.max(0, unpaid)), unpaid > 0.005,
+        // an unset VAT (tax below 1.0) has no gross to pay yet: "—" like every other gross amount (Task 7 ruling)
+        String remaining = delivery.getTax() < 1.0 ? null : Money.format(Math.max(0, unpaid));
+        return new PaymentsCard(pillKey, pillTone, pillAmount, DeliveryRules.grossOrNull(delivery, delivery.getTotalCost()),
+                Money.format(delivery.getPaidAmount()), remaining, unpaid > 0.005,
                 OrderFormats.date(delivery.getPaymentDueDate()), delivery.getPaymentTerms(), editable, rows, fields,
                 Math.max(0, unpaid), delivery.getPendingPayment(),
                 OrderLabels.Option.of(PaymentSource.values(), OrderLabels::paymentSource));
