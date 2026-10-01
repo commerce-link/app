@@ -32,7 +32,8 @@ public class PaymentsRowMapper {
         this.locale = locale;
         this.labels = labels;
         DecimalFormatSymbols symbols = new DecimalFormatSymbols(locale);
-        symbols.setGroupingSeparator(' ');
+        // Non-breaking, like web/orders/Money: a number must never wrap in the middle.
+        symbols.setGroupingSeparator('\u00A0');
         symbols.setDecimalSeparator(',');
         this.amount = new DecimalFormat("#,##0.00", symbols);
     }
@@ -67,7 +68,7 @@ public class PaymentsRowMapper {
                         : text("payments.row.net", money(Math.abs(d.getUnpaidAmountNet()))),
                 paidOf, refund,
                 d.getDeliveryId(),
-                expected(entry.amount()),
+                expected(entry.unpaid()),
                 pending(d.getPendingPayment()),
                 text(refund ? "payments.action.refund" : "payments.action.payment"));
     }
@@ -109,7 +110,7 @@ public class PaymentsRowMapper {
     }
 
     public String money(double value) {
-        return text("general.currency.amount", amount.format(value));
+        return text("general.currency.amount", amount.format(value)).replace(' ', '\u00A0');
     }
 
     /** A provider without a connection was typed in by hand (the same rule as the deliveries list). */
@@ -166,7 +167,10 @@ public class PaymentsRowMapper {
                 p.getBankTransactionDate() == null ? "" : p.getBankTransactionDate().toString());
     }
 
-    /** The dialog reads data-unpaid with parseFloat, so it gets a dot and no grouping. */
+    /**
+     * The dialog reads data-unpaid with parseFloat, so it gets a dot and no grouping. A delivery refund is typed negative
+     * (deliveryDetails.html does the same); an order refund is passed positive because the server negates it.
+     */
     private static String expected(double value) {
         return String.format(Locale.ROOT, "%.2f", value);
     }

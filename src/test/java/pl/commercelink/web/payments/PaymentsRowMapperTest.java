@@ -50,8 +50,8 @@ class PaymentsRowMapperTest {
         assertThat(row.dueNote()).isEqualTo("po terminie: 3 dni");
         assertThat(row.dueTone()).isEqualTo("is-bad");
         assertThat(row.stateLabel()).isEqualTo("Nieopłacona");
-        assertThat(row.amountText()).isEqualTo("4 157,40 PLN");
-        assertThat(row.subText()).isEqualTo("netto 3 380,00 PLN");
+        assertThat(row.amountText()).isEqualTo("4\u00A0157,40\u00A0PLN");
+        assertThat(row.subText()).isEqualTo("netto 3\u00A0380,00\u00A0PLN");
         assertThat(row.orderedText()).isEqualTo("zam. 14.09");
         assertThat(row.externalText()).isEqualTo("nr ZS/1");
         assertThat(row.expected()).isEqualTo("4157.40");
@@ -85,10 +85,20 @@ class PaymentsRowMapperTest {
 
         // then
         assertThat(row.stateLabel()).isEqualTo("Do zwrotu od dostawcy");
-        assertThat(row.amountText()).isEqualTo("120,00 PLN");
+        assertThat(row.amountText()).isEqualTo("120,00\u00A0PLN");
         assertThat(row.dueNote()).as("a refund is not overdue").isNull();
         assertThat(row.refund()).isTrue();
+        assertThat(row.expected()).as("a delivery refund is typed negative in the dialog").isEqualTo("-120.00");
         assertThat(row.actionLabel()).isEqualTo("Zwrot");
+    }
+
+    @Test
+    void amountsNeverBreakInsideTheNumberOrBeforeTheCurrency() {
+        // when
+        String money = mapper.money(1234567.5);
+
+        // then
+        assertThat(money).isEqualTo("1\u00A0234\u00A0567,50\u00A0PLN").doesNotContain(" ");
     }
 
     @Test

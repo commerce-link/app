@@ -18,6 +18,7 @@ import pl.commercelink.stores.IntegrationType;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 
+import java.time.LocalDate;
 import java.util.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -134,8 +135,47 @@ class PaymentsModelFactoryTest {
 
         // then
         assertThat(page.resultsCount()).isEqualTo("Dostawy: 3 · do zapłaty");
-        assertThat(page.resultsAmount()).isEqualTo("150,00 PLN");
-        assertThat(page.resultsTail()).isEqualTo("brutto (150,00 PLN netto) · do zwrotu od dostawców 20,00 PLN");
+        assertThat(page.resultsAmount()).isEqualTo("150,00\u00A0PLN");
+        assertThat(page.resultsTail()).isEqualTo("brutto (150,00\u00A0PLN netto) · do zwrotu od dostawców 20,00\u00A0PLN");
+    }
+
+    @Test
+    void receivablesAreOrderedByUrgencyThenShipDateThenRefundsLast() {
+        // given: one receivable per rank, added in a shuffled order
+        open.add(receivable("e0000006", 100, OrderStatus.New, PaymentSource.BankTransfer, 150, null));
+        open.add(receivable("e0000004", 100, OrderStatus.New, PaymentSource.BankTransfer, 0, null));
+        open.add(receivable("e0000005", 100, OrderStatus.Realization, PaymentSource.CashOnDelivery, 0, null));
+        open.add(receivable("e0000003", 100, OrderStatus.New, PaymentSource.BankTransfer, 0, TODAY.plusDays(9)));
+        open.add(receivable("e0000001", 100, OrderStatus.Shipping, PaymentSource.BankTransfer, 0, null));
+        open.add(receivable("e0000002", 100, OrderStatus.New, PaymentSource.BankTransfer, 0, TODAY));
+
+        // when
+        PaymentsPageModel page = page("side", "receivables");
+
+        // then: shipped unpaid, ship today, dated, undated (last within its rank), COD in transit, refund
+        assertThat(page.receivables()).extracting(ReceivableRow::number)
+                .containsExactly("e0000001", "e0000002", "e0000003", "e0000004", "e0000005", "e0000006");
+    }
+
+    private static Order receivable(String id, double total, OrderStatus status, PaymentSource method, double paid, LocalDate ship) {
+        Order o = order(total, status, method, paid);
+        o.setOrderId(id + "-0000-0000-0000-000000000000");
+        o.setEstimatedShippingAt(ship);
+        return o;
+    }
+
+    @Test
+    void switchingATileOffKeepsTheShownSide() {
+        // given
+        unpaid.add(withProvider(delivery(100, TODAY.minusDays(20), 14), "aaaa0001", "Acme"));
+        open.add(order(3499, OrderStatus.Shipping, PaymentSource.BankTransfer, 0));
+
+        // when
+        PaymentsPageModel page = page("side", "receivables", "focus", "overdue");
+
+        // then
+        assertThat(page.tiles().stream().filter(PaymentsPageModel.Tile::active).findFirst().orElseThrow().href())
+                .isEqualTo("/dashboard/payments?side=receivables");
     }
 
     @Test

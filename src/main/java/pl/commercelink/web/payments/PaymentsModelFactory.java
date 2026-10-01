@@ -45,15 +45,6 @@ public class PaymentsModelFactory {
         List<ReceivableEntry> receivables = orders.findByStoreAndStatuses(storeId, ReceivableEntry.OPEN_STATUSES).stream()
                 .map(o -> ReceivableEntry.of(o, today)).flatMap(Optional::stream).toList();
 
-        List<Tile> tiles = Arrays.stream(PaymentFocus.values()).map(f -> {
-            long p = payables.stream().filter(e -> f.matches(e, today)).count();
-            long r = receivables.stream().filter(f::matches).count();
-            boolean active = f == query.focus();
-            return new Tile(text(locale, "payments.tile." + f.param()), p + r,
-                    text(locale, "payments.tile.hint.payables", p), text(locale, "payments.tile.hint.receivables", r),
-                    active ? query.withoutFocus().href() : query.withFocus(f).href(), active);
-        }).toList();
-
         Predicate<PayableEntry> payableBase = e -> (query.focus() == null || query.focus().matches(e, today))
                 && matches(e, query.q(), mapper);
         Predicate<ReceivableEntry> receivableBase = e -> (query.focus() == null || query.focus().matches(e))
@@ -70,6 +61,15 @@ public class PaymentsModelFactory {
         PaymentSide side = query.side() != null ? query.side()
                 : shownPayables.isEmpty() && !shownReceivables.isEmpty() ? PaymentSide.RECEIVABLES : PaymentSide.PAYABLES;
         PaymentsQuery current = query.withSide(side);
+
+        List<Tile> tiles = Arrays.stream(PaymentFocus.values()).map(f -> {
+            long p = payables.stream().filter(e -> f.matches(e, today)).count();
+            long r = receivables.stream().filter(f::matches).count();
+            boolean active = f == query.focus();
+            return new Tile(text(locale, "payments.tile." + f.param()), p + r,
+                    text(locale, "payments.tile.hint.payables", p), text(locale, "payments.tile.hint.receivables", r),
+                    active ? current.withoutFocus().href() : query.withFocus(f).href(), active);
+        }).toList();
 
         List<SideTab> tabs = List.of(
                 new SideTab(text(locale, "payments.side.payables"), shownPayables.size(),

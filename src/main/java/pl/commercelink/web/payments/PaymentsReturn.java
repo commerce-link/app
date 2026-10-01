@@ -20,7 +20,8 @@ public final class PaymentsReturn {
         }
         String target = returnTo.trim();
         boolean own = target.equals(PaymentsQuery.PATH) || target.startsWith(PaymentsQuery.PATH + "?");
-        boolean clean = target.chars().noneMatch(c -> c == '\r' || c == '\n');
+        // Braces would be expanded as URI template variables by RedirectView.
+        boolean clean = target.chars().noneMatch(c -> c == '\r' || c == '\n' || c == '{' || c == '}');
         return own && clean ? Optional.of(target) : Optional.empty();
     }
 }
