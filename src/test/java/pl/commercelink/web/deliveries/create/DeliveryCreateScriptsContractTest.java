@@ -71,6 +71,37 @@ class DeliveryCreateScriptsContractTest {
     }
 
     @Test
+    void openDeliveryRowKeepsItsCodesReadableOnTheTintedSurface() throws Exception {
+        // when
+        String css = read("src/main/resources/static/css/commercelink.css");
+        String block = css.substring(css.indexOf("/* --- New delivery"));
+
+        // then: --cl-ink-3 on --cl-surface-2 is 4.47:1, below AA for the 12.5 px EAN and code line
+        assertThat(block).containsPattern(
+                "\\.cl-table\\.is-delivery tr\\.cl-row-main\\.is-open \\.cl-table-sub \\{\\s*color: var\\(--cl-ink-2\\);");
+    }
+
+    @Test
+    void sourceLinksAreTouchTargetsBelowDesktop() throws Exception {
+        // when
+        String css = read("src/main/resources/static/css/commercelink.css");
+        String block = css.substring(css.indexOf("/* --- New delivery"));
+        String touch = block.substring(block.indexOf("@media screen and (max-width: 1023px)"));
+
+        // then: the link to a source sits inside the 44 px checkbox label, and is a target of its own
+        assertThat(touch).containsPattern("\\.cl-table\\.is-delivery \\.cl-subtable \\.cl-check a \\{[^}]*min-height: 44px;");
+    }
+
+    @Test
+    void stepPagesMoveTheFocusToTheErrorSummary() throws Exception {
+        // then: a page answered with errors puts the keyboard and screen reader on the summary (spec 5.2)
+        for (String script : List.of("delivery-items.js", "delivery-manual.js", "delivery-purchase.js")) {
+            assertThat(read("src/main/resources/static/js/" + script)).as(script)
+                    .contains("document.querySelector('[data-cl-error-summary]')").contains("summary.focus()");
+        }
+    }
+
+    @Test
     void stylesAddOnlyTheProposedPiecesWithinTheAllowedBreakpoints() throws Exception {
         // when
         String css = read("src/main/resources/static/css/commercelink.css");

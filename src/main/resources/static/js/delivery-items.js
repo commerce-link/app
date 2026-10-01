@@ -171,6 +171,12 @@
             }
         });
         syncTotals(form);
+
+        // a page answered with errors puts the keyboard and screen reader on their summary
+        var summary = document.querySelector('[data-cl-error-summary]');
+        if (summary) {
+            summary.focus();
+        }
     }
 
     if (document.readyState === 'loading') {
