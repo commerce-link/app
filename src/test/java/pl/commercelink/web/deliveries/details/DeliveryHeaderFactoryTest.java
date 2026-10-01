@@ -45,6 +45,7 @@ class DeliveryHeaderFactoryTest {
                 Arguments.of("in transit, user", (Supplier<Delivery>) DeliveryFixtures::warehouse, USER, "deliveries.details.primary.receiveAll"),
                 Arguments.of("in transit, super admin", (Supplier<Delivery>) DeliveryFixtures::warehouse, SUPER_ADMIN, null),
                 Arguments.of("received", (Supplier<Delivery>) () -> received(warehouse()), ADMIN, null),
+                Arguments.of("failed, then received", (Supplier<Delivery>) () -> received(own(withStatus(warehouse(), DeliveryOrderStatus.FAILED))), ADMIN, null),
                 Arguments.of("dropship waiting, store admin", (Supplier<Delivery>) DeliveryFixtures::dropship, ADMIN, "deliveries.details.primary.shipAll"),
                 Arguments.of("dropship waiting, super admin", (Supplier<Delivery>) DeliveryFixtures::dropship, SUPER_ADMIN, "deliveries.details.primary.shipAll"),
                 Arguments.of("dropship waiting, user", (Supplier<Delivery>) DeliveryFixtures::dropship, USER, null),

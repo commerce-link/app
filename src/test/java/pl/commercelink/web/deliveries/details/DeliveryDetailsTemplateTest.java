@@ -97,11 +97,13 @@ class DeliveryDetailsTemplateTest {
         // when
         String retry = render(data(own(withStatus(warehouse(), DeliveryOrderStatus.FAILED))), ADMIN);
         String reconcile = render(data(outcomeUnknown(own(warehouse()))), ADMIN);
+        String receivedAfterFailure = render(data(received(own(withStatus(warehouse(), DeliveryOrderStatus.FAILED)))), ADMIN);
 
         // then
         assertThat(retry).contains("class=\"cl-page-action-form\" method=\"post\" action=\"/dashboard/deliveries/" + DELIVERY_ID + "/purchase/retry\"")
                 .contains(">Powtórz zamówienie<");
         assertThat(reconcile).contains("/purchase/reconcile\"").contains(">Sprawdź u dostawcy<");
+        assertThat(receivedAfterFailure).doesNotContain("/purchase/retry").doesNotContain(">Powtórz zamówienie<");
     }
 
     @Test
@@ -397,9 +399,9 @@ class DeliveryDetailsTemplateTest {
 
         // then
         assertThat(dropship).doesNotContain("Zmień zamówioną ilość").doesNotContain("id=\"qty-dialog\"");
-        assertThat(awaiting).contains(">Czeka na akceptację<").doesNotContain("pickerScript('deliveryAddressId'");
+        assertThat(awaiting).contains(">Czeka na akceptację<");
         assertThat(sources).doesNotContain("deliveries.purchase.submitted.approval").doesNotContain("deliveries.approval.rejectedBy")
-                .doesNotContain("supplierRegistry.getPartnerSiteUrl");
+                .doesNotContain("supplierRegistry.getPartnerSiteUrl").doesNotContain("pickerScript('deliveryAddressId'");
     }
 
     @Test
