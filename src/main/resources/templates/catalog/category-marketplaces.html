@@ -1,0 +1,95 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+<div layout:fragment="content">
+    <section class="cl-page">
+        <div class="cl-page-body">
+            <div th:replace="~{fragments/settings-header :: subpageWithActions(${backHref}, ${backLabel}, #{catalog.category.marketplaces.title}, ${lead}, null)}"></div>
+
+            <div th:replace="~{fragments/settings-form :: savedAlert}"></div>
+            <!--/* Outcome of a refused removal, in the page body; the layout banner is Bulma markup. */-->
+            <div th:if="${catalogError}" class="cl-alert is-bad" role="status">
+                <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
+                <p class="cl-alert-text" th:text="${catalogError}"></p>
+            </div>
+            <div th:if="${rows.isEmpty()}" class="cl-alert is-warn">
+                <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+                <p class="cl-alert-text">
+                    <span th:text="#{catalog.category.marketplaces.none}"></span>
+                    <a th:href="@{${storeMarketplacesHref}}" th:text="#{catalog.category.marketplaces.none.action}"></a>
+                </p>
+            </div>
+
+            <section class="cl-card" aria-labelledby="marketplaces-title">
+                <div class="cl-card-head">
+                    <h2 class="cl-card-title" id="marketplaces-title" th:text="#{catalog.category.marketplaces.store}"></h2>
+                </div>
+                <ul class="cl-list" th:if="${!rows.isEmpty()}">
+                    <li class="cl-list-item" th:each="row : ${rows}">
+                        <div>
+                            <div class="cl-list-title">
+                                <a th:href="@{${row.editHref()}}" th:text="${row.displayName()}"></a>
+                                <span th:if="${row.hasDefinition()}" class="cl-status" th:classappend="${row.stateTone()}"
+                                      th:text="#{${row.stateKey()}}"></span>
+                            </div>
+                            <p class="cl-list-desc" th:if="${row.state().name() == 'NOT_CONFIGURED'}"
+                               th:text="#{catalog.category.marketplace.row.notConfigured}"></p>
+                            <p class="cl-list-desc is-warn" th:if="${row.state().name() == 'INCOMPLETE'}"
+                               th:text="#{catalog.category.marketplace.row.incomplete}"></p>
+                            <p class="cl-list-desc" th:if="${row.state().name() == 'EXPORTING' or row.state().name() == 'DISABLED'}"
+                               th:with="d=${row.definition().get()}">
+                                <span th:text="#{catalog.category.marketplace.row.markup(${#numbers.formatDecimal(d.markup, 1, 2, 'COMMA')})}"></span>
+                                <th:block th:if="${d.minWarehouseQty > 0}"><span> · </span><span th:text="#{catalog.category.marketplace.row.warehouse(${d.minWarehouseQty})}"></span></th:block>
+                                <th:block th:if="${d.minQtyPerDistributor > 0}"><span> · </span><span th:text="${d.minDistributorsQty > 0} ? #{catalog.category.marketplace.row.distributors(${d.minDistributorsQty}, ${d.minQtyPerDistributor}, ${d.minNumOfDistributors}, ${d.minNumOfLocalDistributors})} : #{catalog.category.marketplace.row.distributors.noTotal(${d.minQtyPerDistributor}, ${d.minNumOfDistributors}, ${d.minNumOfLocalDistributors})}"></span></th:block>
+                                <span> · </span>
+                                <span th:text="${d.exportSelectedProducts} ? #{catalog.category.marketplace.row.selected(${row.approvedProducts()})} : #{catalog.category.marketplace.row.all}"></span>
+                            </p>
+                        </div>
+                        <div class="cl-list-actions">
+                            <!--/* The accessible name follows the visible text (WCAG 2.5.3): "Skonfiguruj", "Uzupełnij" or "Edytuj". */-->
+                            <a class="cl-link-button" th:href="@{${row.editHref()}}"
+                               th:text="${row.state().name() == 'NOT_CONFIGURED'} ? #{catalog.category.marketplace.configure} : (${row.state().name() == 'INCOMPLETE'} ? #{settings.list.complete} : #{settings.list.edit})"
+                               th:attr="aria-label=${row.state().name() == 'NOT_CONFIGURED'} ? #{catalog.category.marketplace.configure.for(${row.displayName()})} : (${row.state().name() == 'INCOMPLETE'} ? #{settings.list.complete.for(${row.displayName()})} : #{settings.list.edit.for(${row.displayName()})})"></a>
+                            <a th:if="${row.hasDefinition()}" class="cl-link-button is-danger" th:href="@{${row.deleteHref()}}"
+                               data-cl-confirm th:text="#{settings.list.delete}"
+                               th:attr="aria-label=#{settings.list.delete.for(${row.displayName()})},
+                                        data-cl-confirm-title=#{catalog.category.marketplace.delete.title(${row.displayName()})},
+                                        data-cl-confirm-message=#{catalog.category.marketplace.delete.message},
+                                        data-cl-confirm-action=#{catalog.category.marketplace.delete}"></a>
+                        </div>
+                    </li>
+                </ul>
+                <!--/* Definitions no export can use: the marketplace is gone from the store, or the definition never had a name. */-->
+                <th:block th:if="${!orphans.isEmpty()}">
+                    <h3 class="cl-list-group" id="orphans-title" th:text="#{catalog.category.marketplaces.orphans}"></h3>
+                    <ul class="cl-list" aria-labelledby="orphans-title">
+                        <li class="cl-list-item" th:each="row : ${orphans}"
+                            th:with="name=${row.displayName() ?: #messages.msg('settings.list.untitled')}">
+                            <div>
+                                <div class="cl-list-title">
+                                    <span th:text="${name}"></span>
+                                    <span class="cl-status is-warn" th:text="#{catalog.category.marketplace.state.ORPHANED}"></span>
+                                </div>
+                                <p class="cl-list-desc" th:text="#{catalog.category.marketplace.row.orphan}"></p>
+                            </div>
+                            <div class="cl-list-actions">
+                                <a class="cl-link-button is-danger" th:href="@{${row.deleteHref()}}" data-cl-confirm
+                                   th:text="#{settings.list.delete}"
+                                   th:attr="aria-label=#{settings.list.delete.for(${name})},
+                                            data-cl-confirm-title=#{catalog.category.marketplace.delete.title(${name})},
+                                            data-cl-confirm-message=#{catalog.category.marketplace.delete.message},
+                                            data-cl-confirm-action=#{catalog.category.marketplace.delete}"></a>
+                            </div>
+                        </li>
+                    </ul>
+                </th:block>
+            </section>
+            <dialog th:replace="~{fragments/confirm-dialog :: dialog}"></dialog>
+        </div>
+    </section>
+    <script th:src="@{/js/confirm-dialog.js}" defer></script>
+</div>
+</body>
+</html>

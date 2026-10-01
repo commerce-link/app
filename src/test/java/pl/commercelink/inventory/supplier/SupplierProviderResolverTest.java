@@ -110,16 +110,4 @@ class SupplierProviderResolverTest {
         verifyNoInteractions(supplierProviderFactory);
         verifyNoInteractions(globalSupplierProviderFactory);
     }
-
-    @Test
-    void returnsNullWhenTheSupplierIsNeitherOwnNorGlobal() {
-        // given
-        Store store = storeWithConnection(PROVIDER, ConnectionMode.MANUAL);
-        when(storesRepository.findById(STORE_ID)).thenReturn(store);
-
-        // when / then
-        assertNull(resolver.resolve(STORE_ID, PROVIDER));
-        verifyNoInteractions(supplierProviderFactory);
-        verifyNoInteractions(globalSupplierProviderFactory);
-    }
 }

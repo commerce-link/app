@@ -4,6 +4,7 @@ import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapper;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapperConfig;
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import pl.commercelink.documents.Document;
@@ -42,10 +43,12 @@ import pl.commercelink.orders.rma.RMAStatus;
 import pl.commercelink.products.AvailabilityDefinition;
 import pl.commercelink.products.CategoryDefinition;
 import pl.commercelink.products.CategoryDefinitionType;
+import pl.commercelink.products.MarketplaceDefinition;
 import pl.commercelink.products.PriceDefinition;
 import pl.commercelink.products.Product;
 import pl.commercelink.products.ProductCatalog;
 import pl.commercelink.products.StockDefinition;
+import pl.commercelink.receipts.ReceiptProviderFactory;
 import pl.commercelink.stores.AuthorizedCarrier;
 import pl.commercelink.stores.BankAccount;
 import pl.commercelink.stores.CheckoutConfiguration;
@@ -71,6 +74,7 @@ import pl.commercelink.warehouse.builtin.WarehouseDocument;
 import pl.commercelink.warehouse.builtin.WarehouseDocumentItem;
 import pl.commercelink.warehouse.builtin.WarehouseDocumentSequence;
 import pl.commercelink.warehouse.builtin.WarehouseItem;
+import pl.commercelink.web.DevReceiptPreviewController;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -153,6 +157,10 @@ public class DemoStoreSeeder implements StoreSeeder {
     static final String ACME_B_PICKUP_POINTS_KNOB = "orderingPickupPointsEnabled";
     /** The dev invoicing adapter, present only under the `dev` Maven profile. */
     static final String DEV_INVOICING = "invoicing-dev";
+    /** The dev receipts adapter, present only under the `dev` Maven profile. */
+    public static final String DEV_RECEIPTS = "receipts-dev";
+    /** The receipts-dev setting its e-receipt links start with; the provider's receipt id is appended. */
+    static final String DEV_RECEIPTS_DOCUMENT_URL_BASE = "documentUrlBase";
     /**
      * Id prefix the invoicing-dev adapter uses for synthesised supplier invoices. Mirrored here so
      * a seeded invoice document matches what the adapter returns: InvoiceLinkingService then
@@ -161,6 +169,25 @@ public class DemoStoreSeeder implements StoreSeeder {
     static final String DEV_PURCHASE_INVOICE_ID_PREFIX = "dev-pur-";
     private static final String SIM_LABEL_PREFIX = "Symulacja: ";
     private static final String ENABLED_CATEGORY_GROUP = "Komputery i urządzenia peryferyjne";
+    /**
+     * The catalog screens need what the plain seed has nowhere: an automatic category, a category with labels, a
+     * second pricing group and a marketplace definition, plus products that are disabled, unknown to the PIM or
+     * labelled outside the list. All of it is put on CPU and on one extra automatic category.
+     */
+    static final String SHOWCASE_CATEGORY = "CPU";
+    static final List<String> SHOWCASE_LABELS = List.of("Intel LGA 1851", "AMD AM5");
+    static final String SHOWCASE_PRICING_GROUP = "Premium";
+    /** Marketplaces the demo store is "connected" to; no adapter is installed locally, so the names are the labels. */
+    static final String DEMO_MARKETPLACE = "Allegro";
+    static final String DEMO_MARKETPLACE_SPARE = "Empik";
+    /** The automatic category: its list is computed from the inventory, so it maps to PIM categories that have offers. */
+    static final String AUTOMATIC_CATEGORY = "Cooling";
+    static final String AUTOMATIC_CATEGORY_NAME = "Chłodzenie i wentylacja";
+    private static final List<String> AUTOMATIC_PIM_CATEGORY_IDS = List.of("921", "1571");
+    private static final String SHOWCASE_APPROVED_PIM_ID = "local-seed-0001";
+    private static final String SHOWCASE_LABELLED_PIM_ID = "local-seed-0062";
+    private static final String SHOWCASE_DISABLED_PIM_ID = "local-seed-0063";
+    private static final String SHOWCASE_WITHOUT_PIM_ID = "local-seed-0064";
     private static final String PRICELIST_TEMPLATE = "/local-init/s3/stores/uma2dqukxr/pricelists/cat-local-01/seed.csv";
     private static final String CARRIER_ID = "local-carrier-01";
     private static final String CARRIER_NAME = "local";
@@ -173,20 +200,26 @@ public class DemoStoreSeeder implements StoreSeeder {
     private final SupplierRegistry supplierRegistry;
     private final SupplierProviderFactory supplierProviderFactory;
     private final InvoicingProviderFactory invoicingProviderFactory;
+    private final ReceiptProviderFactory receiptProviderFactory;
 
     @Value("${s3.bucket.stores}")
     String storesBucket;
+
+    @Value("${app.domain}")
+    String appDomain;
 
     @Override
     public void seed(Store store) {
         applyStoreConfiguration(store, store.getStoreId(), store.getName(), store.getDemo());
         enableDevInvoicing(store, invoicingProviderFactory);
+        enableDevReceipts(store, receiptProviderFactory, LocalDateTime.now());
+        pointDevReceiptLinksAtPreview(store, receiptProviderFactory, appDomain);
         applyDemoWarehouseId(store);
         applyDemoCompanyDetails(store);
         applyDemoInvoicingConfiguration(store);
         applyDemoFulfilmentDefaults(store);
         List<CatalogSeedRow> rows = loadFilteredRows();
-        seedStoreData(store.getStoreId(), rows);
+        seedStoreData(store.getStoreId(), rows, false);
         enableAcmeBDropship(store, ACME_B);
         saveSupplierRmaCenters(store.getStoreId());
         saveCompletedOrders(store, rows);
@@ -198,14 +231,27 @@ public class DemoStoreSeeder implements StoreSeeder {
         Store store = Objects.requireNonNullElseGet(mapper.load(Store.class, storeId), Store::new);
         applyStoreConfiguration(store, storeId, storeName, demo);
         connectSecondAcmeB(store);
+        connectDemoMarketplaces(store);
         enableDevInvoicing(store, invoicingProviderFactory);
+        enableDevReceipts(store, receiptProviderFactory, LocalDateTime.now());
+        pointDevReceiptLinksAtPreview(store, receiptProviderFactory, appDomain);
         mapper.save(store);
         List<CatalogSeedRow> rows = loadFilteredRows();
-        seedStoreData(storeId, rows);
+        seedStoreData(storeId, rows, true);
         enableAcmeBDropship(store, ACME_B);
         enableAcmeBDropship(store, ACME_B_SECOND);
         saveInvoicingFixtures(storeId, rows);
         return store;
+    }
+
+    /**
+     * Marketplaces of the local store, connected on paper: no marketplace adapter is installed locally, so the names
+     * are the labels. Only the local store gets them — a store registered on the demo environment would otherwise be
+     * connected to Allegro without credentials, and its pricelist runs would queue offer exports for it.
+     */
+    private static void connectDemoMarketplaces(Store store) {
+        store.connectMarketplace(DEMO_MARKETPLACE, false);
+        store.connectMarketplace(DEMO_MARKETPLACE_SPARE, false);
     }
 
     private static void connectSecondAcmeB(Store store) {
@@ -252,6 +298,53 @@ public class DemoStoreSeeder implements StoreSeeder {
     }
 
     /**
+     * Picks the in-memory receipts adapter for demo stores when it is on the classpath (dev profile
+     * only). Both guards matter: without the adapter on the classpath there is nothing to select,
+     * and a store that already has a receipt integration keeps it, so a real (e.g. Fakturownia)
+     * configuration is never replaced by the mock. Enabling receipts for the first time also turns
+     * on the {@code ORDER_RECEIPT} e-mail, the same first-time rule the settings form applies, so the
+     * demo store's first fiscalised receipt does not raise a permanent {@code EMAIL_NOT_SENT} alert.
+     */
+    static void enableDevReceipts(Store store, ReceiptProviderFactory receiptProviderFactory, LocalDateTime now) {
+        if (receiptProviderFactory.getDescriptor(DEV_RECEIPTS) == null) {
+            return;
+        }
+        if (store.hasIntegration(IntegrationType.RECEIPT_PROVIDER)) {
+            return;
+        }
+        store.setConfigurationValue(IntegrationType.RECEIPT_PROVIDER, DEV_RECEIPTS);
+        boolean firstTime = store.getReceiptConfiguration().getEnabledAt() == null;
+        store.getReceiptConfiguration().enable(now);
+        if (firstTime) {
+            store.enableOrderReceiptEmailNotification();
+        }
+    }
+
+    /**
+     * Points the receipts-dev e-receipt links at the app's own preview page ({@link DevReceiptPreviewController}), so
+     * the link on the order and in the customer e-mail opens something instead of the simulator's dead default host.
+     * Runs on every seed, so a store that got receipts-dev before the preview existed is fixed too; a base already
+     * set (by hand in the settings) is kept, and the rest of the configuration (webhook secret, scenario override) is
+     * saved back unchanged. Only for a store actually using receipts-dev, and only when the adapter is present.
+     */
+    static void pointDevReceiptLinksAtPreview(Store store, ReceiptProviderFactory receiptProviderFactory, String appDomain) {
+        if (receiptProviderFactory.getDescriptor(DEV_RECEIPTS) == null) {
+            return;
+        }
+        if (!DEV_RECEIPTS.equals(store.getConfigurationValue(IntegrationType.RECEIPT_PROVIDER))) {
+            return;
+        }
+        Map<String, String> current = receiptProviderFactory.loadConfiguration(store, DEV_RECEIPTS);
+        if (StringUtils.isNotBlank(current.get(DEV_RECEIPTS_DOCUMENT_URL_BASE))) {
+            return;
+        }
+        Map<String, String> updated = new HashMap<>(current);
+        updated.put(DEV_RECEIPTS_DOCUMENT_URL_BASE,
+                StringUtils.removeEnd(appDomain, "/") + DevReceiptPreviewController.PATH_PREFIX);
+        receiptProviderFactory.saveConfiguration(store, DEV_RECEIPTS, updated);
+    }
+
+    /**
      * The single gate shared by every invoicing-fixture seeding path: fixtures are synthesised for
      * the dev invoicing adapter's responses, so seeding them without that adapter on the classpath
      * would leave the deployed demo with deliveries nothing can ever invoice or pay.
@@ -264,7 +357,14 @@ public class DemoStoreSeeder implements StoreSeeder {
         return filterSimulationRows(CatalogSeed.load(), simulationSuppliersAvailable());
     }
 
-    private void seedStoreData(String storeId, List<CatalogSeedRow> rows) {
+    /**
+     * @param localShowcase whether this is the local store, whose catalog carries what the catalog screens need to
+     *                      show (an automatic category, labels, a second pricing group, a marketplace definition and
+     *                      products in every state). A store seeded on registration gets the plain catalog: it has no
+     *                      marketplace credentials, and a category exporting to one would make every pricelist run
+     *                      queue an offer export nobody can send.
+     */
+    private void seedStoreData(String storeId, List<CatalogSeedRow> rows, boolean localShowcase) {
         DynamoDBMapper mapper = new DynamoDBMapper(dynamoDB);
 
         savePricelist(storeId);
@@ -277,8 +377,8 @@ public class DemoStoreSeeder implements StoreSeeder {
                 .withSaveBehavior(DynamoDBMapperConfig.SaveBehavior.CLOBBER)
                 .build();
 
-        saveCatalog(mapper, clobber, rows, storeId);
-        saveProducts(mapper, rows, storeId);
+        saveCatalog(mapper, clobber, rows, storeId, localShowcase);
+        saveProducts(mapper, rows, storeId, localShowcase);
         saveWarehouseItems(mapper, rows, storeId);
         saveRmaCenter(mapper, clobber, storeId);
         saveOrders(mapper, clobber, storeId, rows);
@@ -367,8 +467,9 @@ public class DemoStoreSeeder implements StoreSeeder {
         store.setFulfilmentConfiguration(fulfilment);
     }
 
-    private void saveCatalog(DynamoDBMapper mapper, DynamoDBMapperConfig clobber, List<CatalogSeedRow> rows, String storeId) {
-        List<CategoryDefinition> categories = buildCategoryDefinitions(rows, storeId);
+    private void saveCatalog(DynamoDBMapper mapper, DynamoDBMapperConfig clobber, List<CatalogSeedRow> rows, String storeId,
+                            boolean localShowcase) {
+        List<CategoryDefinition> categories = buildCategoryDefinitions(rows, storeId, localShowcase);
 
         ProductCatalog catalog = new ProductCatalog();
         catalog.setStoreId(storeId);
@@ -379,11 +480,16 @@ public class DemoStoreSeeder implements StoreSeeder {
         mapper.save(catalog, clobber);
     }
 
-    private void saveProducts(DynamoDBMapper mapper, List<CatalogSeedRow> rows, String storeId) {
-        mapper.batchSave(buildProducts(rows, storeId));
+    private void saveProducts(DynamoDBMapper mapper, List<CatalogSeedRow> rows, String storeId, boolean localShowcase) {
+        mapper.batchSave(buildProducts(rows, storeId, localShowcase));
     }
 
+    /** The products of a store seeded on registration: enabled, known to the PIM, approved nowhere. */
     static List<Product> buildProducts(List<CatalogSeedRow> rows, String storeId) {
+        return buildProducts(rows, storeId, false);
+    }
+
+    static List<Product> buildProducts(List<CatalogSeedRow> rows, String storeId, boolean localShowcase) {
         List<Product> products = new ArrayList<>();
         for (CatalogSeedRow row : rows) {
             if (!row.inCatalog()) {
@@ -394,9 +500,36 @@ public class DemoStoreSeeder implements StoreSeeder {
             product.setProductId("prod-" + row.pimId());
             product.setEnabled(true);
             product.setEstimatedDeliveryDays(row.estimatedDeliveryDays());
+            if (localShowcase && SHOWCASE_CATEGORY.equals(row.category())) {
+                showcaseProduct(product, row);
+            }
             products.add(product);
         }
         return products;
+    }
+
+    /**
+     * One product per state the category page can show: approved for the marketplace and expecting stock, disabled,
+     * and one the PIM does not know. The product left with its feed label is the one whose label is outside the
+     * category's list, which is exactly the case no screen used to show.
+     */
+    private static void showcaseProduct(Product product, CatalogSeedRow row) {
+        switch (row.pimId()) {
+            case SHOWCASE_APPROVED_PIM_ID -> {
+                product.setLabel(SHOWCASE_LABELS.get(1));
+                product.setPricingGroup(SHOWCASE_PRICING_GROUP);
+                product.setStockExpectedQty(5);
+                product.setMarketplaces(new LinkedList<>(List.of(DEMO_MARKETPLACE)));
+            }
+            case SHOWCASE_LABELLED_PIM_ID -> product.setLabel(SHOWCASE_LABELS.get(0));
+            case SHOWCASE_DISABLED_PIM_ID -> {
+                product.setLabel(SHOWCASE_LABELS.get(1));
+                product.setEnabled(false);
+            }
+            case SHOWCASE_WITHOUT_PIM_ID -> product.setPimId(null);
+            default -> {
+            }
+        }
     }
 
     private void saveWarehouseItems(DynamoDBMapper mapper, List<CatalogSeedRow> rows, String storeId) {
@@ -1233,7 +1366,13 @@ public class DemoStoreSeeder implements StoreSeeder {
         return item;
     }
 
+    /** The catalog of a store seeded on registration: the categories of the feed, nothing added for the local screens. */
     static List<CategoryDefinition> buildCategoryDefinitions(List<CatalogSeedRow> rows, String storeId) {
+        return buildCategoryDefinitions(rows, storeId, false);
+    }
+
+    static List<CategoryDefinition> buildCategoryDefinitions(List<CatalogSeedRow> rows, String storeId,
+                                                            boolean localShowcase) {
         Map<String, String> pimCategoryIdByCategory = rows.stream()
                 .filter(row -> !row.pimCategoryId().isBlank())
                 .collect(Collectors.toMap(CatalogSeedRow::category, CatalogSeedRow::pimCategoryId, (first, second) -> first));
@@ -1258,9 +1397,45 @@ public class DemoStoreSeeder implements StoreSeeder {
             if (pimCategoryId != null) {
                 definition.setPimCategoryIds(new LinkedList<>(List.of(pimCategoryId)));
             }
+            if (localShowcase && SHOWCASE_CATEGORY.equals(category)) {
+                showcaseCategory(definition);
+            }
             categories.add(definition);
         }
+        if (localShowcase) {
+            categories.add(automaticCategory(storeId, ++sequence));
+        }
         return categories;
+    }
+
+    /** Labels, a second pricing group picked by label and a marketplace definition — the parts of a category no other seeded one has. */
+    private static void showcaseCategory(CategoryDefinition definition) {
+        definition.setGroupingOrder(new LinkedList<>(SHOWCASE_LABELS));
+        PriceDefinition premium = new PriceDefinition(1.25, 20, 0, 0, 0, SHOWCASE_PRICING_GROUP);
+        premium.setLabelMatch(SHOWCASE_LABELS.get(1));
+        definition.getPriceDefinitions().add(premium);
+        // Exports only approved products, so the approval checkbox of the product page has a visible effect.
+        MarketplaceDefinition marketplace = new MarketplaceDefinition(DEMO_MARKETPLACE, 1.10, 0, 0, 0, 0, 3);
+        marketplace.setExportSelectedProducts(true);
+        definition.getMarketplaceDefinitions().add(marketplace);
+    }
+
+    private static CategoryDefinition automaticCategory(String storeId, int sequence) {
+        CategoryDefinition definition = new CategoryDefinition();
+        definition.setCategoryId(CatalogSeed.categoryId(AUTOMATIC_CATEGORY, storeId));
+        definition.setName(AUTOMATIC_CATEGORY_NAME);
+        definition.setCategory(AUTOMATIC_CATEGORY);
+        definition.setType(CategoryDefinitionType.Dynamic);
+        definition.setRequiredDuringOrder(false);
+        definition.setSequenceNumber(sequence);
+        definition.setMaxQty(2);
+        definition.setDeletionProtection(false);
+        definition.setStockDefinition(new StockDefinition(2, 5, 20));
+        definition.setAvailabilityDefinition(new AvailabilityDefinition(1, 1));
+        definition.setPriceDefinitions(new LinkedList<>(List.of(
+                new PriceDefinition(1.15, 10, 0, 0, 0, PriceDefinition.DEFAULT_PRICING_GROUP))));
+        definition.setPimCategoryIds(new LinkedList<>(AUTOMATIC_PIM_CATEGORY_IDS));
+        return definition;
     }
 
     private static List<String> distinctCategories(List<CatalogSeedRow> rows) {

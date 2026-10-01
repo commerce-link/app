@@ -1,5 +1,6 @@
 package pl.commercelink.products;
 
+import com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -213,5 +214,43 @@ class ProductCatalogDetailsServiceTest {
         // then
         assertThat(result.errors()).extracting(ErrorMessage::code).containsExactly("catalog.delete.error.failed");
         verify(pricelistEventScheduler).restore(STORE_ID, CATALOG_ID, Optional.of("cron(0 5 * * ? *)"));
+    }
+
+    /**
+     * RF-5: two POSTs of one new-catalog form both find no catalog and both create it; the second save loses the
+     * conditional put. The catalog and its schedule are the first request's, so nothing is restored and the second
+     * request is told the catalog exists rather than that the save failed.
+     */
+    @Test
+    void aCatalogCreatedByAParallelRequestIsReportedAsCreatedAndItsScheduleIsKept() {
+        // given
+        when(productCatalogRepository.findById(STORE_ID, "new-cat")).thenReturn(null);
+        doThrow(new ConditionalCheckFailedException("exists"))
+                .when(productCatalogRepository).save(any());
+
+        // when
+        ProductCatalogDetailsService.UpdateResult result = service.save(STORE_ID, "new-cat", submittedCatalog(null));
+
+        // then
+        assertThat(result.hasErrors()).isFalse();
+        assertThat(result.createdMeanwhile()).isTrue();
+        verify(pricelistEventScheduler, never()).restore(any(), any(), any());
+    }
+
+    /** A conflict on a catalog that existed before the save is still a failed save, with the schedule restored. */
+    @Test
+    void aConflictOnAnExistingCatalogIsStillAFailedSave() {
+        // given
+        when(productCatalogRepository.findById(STORE_ID, CATALOG_ID)).thenReturn(submittedCatalog("0 5 * * ? *"));
+        doThrow(new ConditionalCheckFailedException("version changed"))
+                .when(productCatalogRepository).save(any());
+
+        // when
+        ProductCatalogDetailsService.UpdateResult result = service.save(STORE_ID, CATALOG_ID, submittedCatalog("0 6 * * ? *"));
+
+        // then
+        assertThat(result.hasErrors()).isTrue();
+        assertThat(result.createdMeanwhile()).isFalse();
+        verify(pricelistEventScheduler).restore(any(), any(), any());
     }
 }

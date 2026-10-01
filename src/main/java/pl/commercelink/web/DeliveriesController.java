@@ -6,6 +6,8 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.validation.BindingResult;
+import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.inventory.deliveries.*;
@@ -23,6 +25,8 @@ import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.documents.Document;
 import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.starter.security.CustomSecurityContext;
+import pl.commercelink.web.orders.AmountEditor;
+import pl.commercelink.web.orders.OrderLabels;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
@@ -37,18 +41,12 @@ import pl.commercelink.web.dtos.RoutedOrderView;
 import pl.commercelink.web.dtos.RoutedSupplierView;
 import pl.commercelink.web.dtos.SuggestedDeliveryItem;
 import pl.commercelink.web.dtos.SupplierOrderChoicesParams;
-import pl.commercelink.inventory.supplier.SupplierChoice;
-import pl.commercelink.inventory.supplier.SupplierLabelMap;
 import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.SupplierDeliveryAddress;
 
 import java.time.LocalDate;
-import pl.commercelink.inventory.deliveries.DropshipCandidate;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.Map;
-import java.util.function.Function;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -143,73 +141,6 @@ public class DeliveriesController {
     @Autowired
     private SupplierLabels supplierLabels;
 
-    private static final int DELIVERY_PAGE_SIZE = 25;
-
-    @GetMapping("/dashboard/deliveries")
-    public String deliveries(
-            @RequestParam(required = false) String deliveryId,
-            @RequestParam(required = false) String externalDeliveryId,
-            @RequestParam(required = false) String provider,
-            @RequestParam(required = false) String providerCustom,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate orderedAtStart,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate orderedAtEnd,
-            @RequestParam(required = false, defaultValue = "false") boolean showArchived,
-            @RequestParam(required = false, defaultValue = "false") boolean showWithoutInvoice,
-            @RequestParam(required = false, defaultValue = "false") boolean showWithoutSync,
-            @RequestParam(required = false, defaultValue = "false") boolean showAwaitingApproval,
-            @RequestParam(required = false, defaultValue = "1") int page,
-            Model model) {
-        provider = providerFilter(provider, providerCustom);
-        DeliveryFilter deliveryFilter = new DeliveryFilter(deliveryId, externalDeliveryId, provider,
-                orderedAtStart, orderedAtEnd, !showArchived, showWithoutInvoice, showWithoutSync,
-                showAwaitingApproval, isSuperAdmin());
-
-        List<Delivery> paginatedDeliveries;
-        if (isSuperAdmin()) {
-            paginatedDeliveries = deliveriesRepository.searchActiveDeliveries(deliveryFilter, page, DELIVERY_PAGE_SIZE);
-        } else {
-            paginatedDeliveries = deliveriesRepository.searchActiveDeliveries(getStoreId(), deliveryFilter, page, DELIVERY_PAGE_SIZE);
-        }
-
-        HashMap<String, Object> searchParams = new HashMap<>();
-        searchParams.put("deliveryId", deliveryId);
-        searchParams.put("externalDeliveryId", externalDeliveryId);
-        searchParams.put("provider", provider);
-        searchParams.put("orderedAtStart", orderedAtStart);
-        searchParams.put("orderedAtEnd", orderedAtEnd);
-        searchParams.put("showArchived", showArchived);
-        searchParams.put("showWithoutInvoice", showWithoutInvoice);
-        searchParams.put("showWithoutSync", showWithoutSync);
-        searchParams.put("showAwaitingApproval", showAwaitingApproval);
-
-        model.addAttribute("deliveries", paginatedDeliveries.subList(0, Math.min(paginatedDeliveries.size(), DELIVERY_PAGE_SIZE)));
-        model.addAttribute("currentPage", page);
-        model.addAttribute("hasNextPage", paginatedDeliveries.size() > DELIVERY_PAGE_SIZE);
-        model.addAttribute("searchParams", searchParams);
-        model.addAttribute("isSuperAdmin", isSuperAdmin());
-        model.addAttribute("isAdmin", isAdmin());
-
-        List<String> storeIds = paginatedDeliveries.stream().map(Delivery::getStoreId).distinct().toList();
-        SupplierLabelMap labels = isSuperAdmin() ? supplierLabels.forStoreIds(storeIds) : supplierLabels.forStoreId(getStoreId());
-        model.addAttribute("supplierLabels", labels);
-        model.addAttribute("providerOptions", isSuperAdmin() ? List.of() : providerFilterOptions(labels));
-
-        return "deliveries";
-    }
-
-    // Deliveries can also sit on the internal warehouse, so the filter offers it next to the
-    // store's connections (spec: the deliveries filter lists connections plus Warehouse).
-    static List<SupplierLabelMap.Option> providerFilterOptions(SupplierLabelMap labels) {
-        List<SupplierLabelMap.Option> options = new ArrayList<>(labels.options());
-        options.add(new SupplierLabelMap.Option(SupplierRegistry.WAREHOUSE, SupplierRegistry.WAREHOUSE));
-        return options;
-    }
-
-    // Deliveries on suppliers typed by hand in an order (no connection) are filtered by the typed name.
-    static String providerFilter(String provider, String providerCustom) {
-        return SupplierChoice.CUSTOM.equals(provider) ? StringUtils.trimToNull(providerCustom) : provider;
-    }
-
     @PostMapping("/dashboard/deliveries/{deliveryId}/addPayment")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String addPayment(@PathVariable String deliveryId,
@@ -229,15 +160,10 @@ public class DeliveriesController {
             return redirectTarget;
         }
 
-        if (form.getBankAmount() == 0) {
-            redirectAttributes.addFlashAttribute("errorMessage",
-                    messageSource.getMessage("error.message.payment.amount.invalid", null, locale));
-            return redirectTarget;
-        }
-
-        if (form.getProcessingFee() < 0) {
-            redirectAttributes.addFlashAttribute("errorMessage",
-                    messageSource.getMessage("error.message.payment.fee.invalid", null, locale));
+        // a delivery keeps its sign as typed: a payout to the supplier is stored positive
+        String invalid = form.validate();
+        if (invalid != null) {
+            redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage(invalid, null, locale));
             return redirectTarget;
         }
 
@@ -254,8 +180,8 @@ public class DeliveriesController {
         target.setDirection(form.getDirection() != null ? form.getDirection() : PaymentDirection.Outgoing);
         target.setReferenceNo(form.getReferenceNo());
         target.setName(form.getName());
-        target.setAmount(form.getBankAmount());
-        target.setFee(form.getProcessingFee());
+        target.setAmount(form.amount());
+        target.setFee(form.fee());
         target.setBankTransactionNo(form.getBankTransactionNo());
         target.setBankTransactionDate(form.getBankTransactionDate());
 
@@ -264,10 +190,25 @@ public class DeliveriesController {
         return redirectTarget;
     }
 
+    /**
+     * The payments edit modal (fragments/payments-section.html) posts its amounts as text: read them like every other
+     * payment amount (AmountParser), whatever the browser's language, instead of Double.valueOf, which refused "149,99".
+     */
+    @InitBinder("delivery")
+    void paymentAmounts(WebDataBinder binder) {
+        binder.registerCustomEditor(double.class, "payments.amount", new AmountEditor());
+        binder.registerCustomEditor(double.class, "payments.fee", new AmountEditor());
+    }
+
     @PostMapping("/dashboard/deliveries/{deliveryId}/updatePayments")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String updatePayments(@PathVariable String deliveryId, @ModelAttribute("delivery") Delivery updatedDelivery,
-                                 RedirectAttributes redirectAttributes, Locale locale) {
+                                 BindingResult binding, RedirectAttributes redirectAttributes, Locale locale) {
+        if (binding.hasErrors()) {
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage("error.message.payment.amount.format", null, locale));
+            return "redirect:/dashboard/deliveries/details?deliveryId=" + deliveryId;
+        }
         Delivery existingDelivery = deliveriesRepository.findById(getStoreId(), deliveryId);
         if (existingDelivery.isAwaitingApproval()) {
             return redirectEditLocked(getStoreId(), deliveryId, redirectAttributes, locale);
@@ -1175,7 +1116,7 @@ public class DeliveriesController {
         model.addAttribute("isSuperAdmin", isSuperAdmin());
         model.addAttribute("isAdmin", isAdmin());
         model.addAttribute("supplierRegistry", supplierRegistry);
-        model.addAttribute("paymentSources", PaymentSource.values());
+        model.addAttribute("paymentSources", OrderLabels.Option.of(PaymentSource.values(), OrderLabels::paymentSource));
         model.addAttribute("pendingPayment", delivery.getPendingPayment());
         if (delivery.isDropship()) {
             var dropshipOrder = resolveDropshipOrder(storeId, delivery);

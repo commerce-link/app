@@ -5,6 +5,7 @@ import com.amazonaws.services.dynamodbv2.model.AttributeDefinition;
 import com.amazonaws.services.dynamodbv2.model.AttributeValue;
 import com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException;
 import com.amazonaws.services.dynamodbv2.model.CreateTableRequest;
+import com.amazonaws.services.dynamodbv2.model.DescribeTableRequest;
 import com.amazonaws.services.dynamodbv2.model.DescribeTableResult;
 import com.amazonaws.services.dynamodbv2.model.GlobalSecondaryIndex;
 import com.amazonaws.services.dynamodbv2.model.GlobalSecondaryIndexDescription;
@@ -38,6 +39,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -57,6 +59,12 @@ class V013_MoveStoreNotificationsToTableTest {
     void setUp() {
         // no-op pause so the wait-for-ACTIVE loop never sleeps for real in tests
         migration = new V013_MoveStoreNotificationsToTable(dynamoDB, millis -> { });
+        // the starter's createTableIfAbsent (0.1.11+) waits for ACTIVE through the request overload before returning;
+        // answer ACTIVE there so it returns at once, while the migration's own wait (table + index status, GSI
+        // presence) keeps polling the String overload that each test stubs
+        lenient().when(dynamoDB.describeTable(any(DescribeTableRequest.class)))
+                .thenReturn(new DescribeTableResult().withTable(new TableDescription()
+                        .withTableName("StoreNotifications").withTableStatus("ACTIVE")));
     }
 
     // advances on every clock read so a deadline test can pass it without any real waiting

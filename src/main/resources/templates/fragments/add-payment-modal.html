@@ -1,436 +1,115 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
-
-<!--
-  Reusable "register payment" modal.
-  Caller passes:
-    - formAction       : URL the form posts to (use empty string when JS sets it dynamically)
-    - expectedAmount   : double, kwota oczekiwana (unpaidAmount); 0 when unknown at render time
-    - pendingPayment   : Payment or null; pre-fills source/name/refNo/bankTrx fields when present
-    - paymentSources   : iterable of PaymentSource enum values
--->
-<div th:fragment="addPaymentModal(formAction, expectedAmount, pendingPayment, paymentSources)">
-
-    <div id="addPaymentModal" class="modal">
-        <div class="modal-background" onclick="toggleAddPaymentModal(false)"></div>
-        <div class="modal-card">
-            <header class="modal-card-head">
-                <p class="modal-card-title" th:text="#{order.payment.action.add.title}"></p>
-                <button type="button" class="delete" aria-label="close" onclick="toggleAddPaymentModal(false)"></button>
-            </header>
-
-            <form th:action="${formAction}" method="post">
-                <section class="modal-card-body">
-                    <div class="field">
-                        <label class="label" th:text="#{order.payment.expected.amount}"></label>
-                        <div class="control">
-                            <input class="input" type="text" readonly
-                                   id="addPaymentExpected"
-                                   th:data-value="${expectedAmount}"
-                                   th:value="${#numbers.formatDecimal(expectedAmount, 1, 2)}"/>
-                        </div>
+<!--/* The "register payment" dialog, shared by the order details, Payments (payments.html) and Deliveries (through
+       fragments/payments-section.html). formAction may be '' when a page script sets it per row; expectedAmount is the
+       unpaid amount (0 when unknown); pendingPayment (or null) pre-fills the fields; paymentSources is a list of
+       OrderLabels.Option<PaymentSource> (value + labelKey), like every other enum choice list on this page.
+       loadMoneyJs is required (Thymeleaf's named-parameter fragment call rejects a missing declared parameter);
+       every caller passes true except the order details page, which passes false because it also includes
+       fragments/item-add-modal.html, which loads money.js already. */-->
+<div class="cl-page cl-dialog-host" th:fragment="addPaymentModal(formAction, expectedAmount, pendingPayment, paymentSources, loadMoneyJs)">
+    <dialog class="cl-dialog is-form" id="addPaymentModal" aria-labelledby="add-payment-title" data-mode="order"
+            th:attr="data-hint=#{order.payment.hint}, data-hint-full=#{order.payment.hint.full},
+                     data-hint-under=#{order.payment.hint.under}, data-hint-over=#{order.payment.hint.over}">
+        <form method="post" th:action="${formAction}">
+            <h2 class="cl-dialog-title" id="add-payment-title" th:text="#{order.payment.action.add.title}"></h2>
+            <div class="cl-dialog-body">
+                <div class="cl-form-grid">
+                    <div class="cl-span-3 cl-field">
+                        <label class="cl-label" for="addPaymentExpected" th:text="#{order.payment.expected.amount}"></label>
+                        <!--/* shown, not typed: the read-only look (commercelink.css), the focus starts on the amount */-->
+                        <input class="cl-input" type="text" readonly id="addPaymentExpected"
+                               th:attr="data-value=${expectedAmount}" th:value="${#numbers.formatDecimal(expectedAmount, 1, 2)}">
                     </div>
-
-                    <div class="field">
-                        <label class="label" th:text="#{order.payment.bank.amount}"></label>
-                        <div class="control">
-                            <input class="input" type="number" step="0.01" required
-                                   id="addPaymentBankAmount"
-                                   name="bankAmount"
-                                   th:placeholder="#{order.payment.bank.amount.placeholder}"
-                                   oninput="onAddPaymentBankAmountInput()"/>
-                        </div>
+                    <div class="cl-span-3 cl-field">
+                        <label class="cl-label" for="addPaymentBankAmount" th:text="#{order.payment.bank.amount}"></label>
+                        <!--/* amounts are text read on the server (AmountParser), whatever the browser's language */-->
+                        <input class="cl-input" type="text" inputmode="decimal" autocomplete="off" required autofocus
+                               id="addPaymentBankAmount" name="bankAmount">
                     </div>
-
-                    <div class="field">
-                        <label class="label" th:text="#{order.payment.processing.fee}"></label>
-                        <div class="control">
-                            <input class="input" type="number" step="0.01" min="0"
-                                   id="addPaymentProcessingFee"
-                                   name="processingFee"
-                                   th:value="${pendingPayment != null and pendingPayment.fee > 0} ? ${pendingPayment.fee} : '0'"
-                                   th:placeholder="#{order.payment.processing.fee.placeholder}"
-                                   oninput="onAddPaymentFeeInput()"/>
-                        </div>
-                        <div class="control mt-2 payment-checkbox-order">
-                            <label class="checkbox">
-                                <input type="checkbox"
-                                       id="addPaymentFeeAutofill"
-                                       onchange="onAddPaymentFeeAutofillToggle()"/>
-                                <span th:text="#{order.payment.fee.autofill}"></span>
-                            </label>
-                            <p class="help" th:text="#{order.payment.fee.autofill.help}"></p>
-                        </div>
-                        <div class="control mt-2 payment-checkbox-order">
-                            <label class="checkbox">
-                                <input type="checkbox"
-                                       id="addPaymentFeeIncluded"
-                                       name="feeIncluded"
-                                       value="true"
-                                       onchange="renderAddPaymentHint()"/>
-                                <span th:text="#{order.payment.fee.included}"></span>
-                            </label>
-                            <p class="help" th:text="#{order.payment.fee.included.help}"></p>
-                        </div>
-                        <div class="control mt-2 payment-checkbox-delivery">
-                            <label class="checkbox">
-                                <input type="checkbox"
-                                       id="addPaymentFeeFromSurplus"
-                                       onchange="onAddPaymentFeeFromSurplusToggle()"/>
-                                <span th:text="#{delivery.payment.fee.from.surplus}"></span>
-                            </label>
-                            <p class="help" th:text="#{delivery.payment.fee.from.surplus.help}"></p>
-                        </div>
+                    <div class="cl-span-3 cl-field">
+                        <label class="cl-label" for="addPaymentProcessingFee" th:text="#{order.payment.processing.fee}"></label>
+                        <input class="cl-input" type="text" inputmode="decimal" autocomplete="off" id="addPaymentProcessingFee"
+                               name="processingFee"
+                               th:value="${pendingPayment != null and pendingPayment.fee > 0} ? ${pendingPayment.fee} : '0'">
                     </div>
-
-                    <div class="field">
-                        <p class="help has-text-grey" id="addPaymentComputed"></p>
+                    <div class="cl-span-3 cl-field">
+                        <label class="cl-label" for="addPaymentDirection" th:text="#{order.payment.direction}"></label>
+                        <select class="cl-select" name="direction" id="addPaymentDirection" required aria-describedby="addPaymentDirectionHelp">
+                            <option value="Incoming" th:text="#{PaymentDirection.Incoming}"></option>
+                            <option value="Outgoing" th:text="#{PaymentDirection.Outgoing}"></option>
+                        </select>
                     </div>
+                    <!--/* an order's refund is typed without a sign, a delivery keeps the sign as typed: the script swaps the text with the mode */-->
+                    <p class="cl-span-6 cl-help" id="addPaymentDirectionHelp" th:text="#{order.payment.direction.help}"
+                       th:attr="data-help-order=#{order.payment.direction.help}, data-help-delivery=#{delivery.payment.direction.help}"></p>
 
-                    <div class="field">
-                        <label class="label" th:text="#{order.payment.direction}"></label>
-                        <div class="control">
-                            <div class="select is-fullwidth">
-                                <select name="direction" id="addPaymentDirection" required>
-                                    <option th:each="dir : ${T(pl.commercelink.orders.PaymentDirection).values()}"
-                                            th:value="${dir}"
-                                            th:text="${enumI18n.localize(dir)}"></option>
-                                </select>
-                            </div>
-                        </div>
-                        <p class="help" th:text="#{order.payment.direction.help}"></p>
+                    <div class="cl-span-6 cl-field" data-payment-mode="order">
+                        <label class="cl-check">
+                            <input type="checkbox" id="addPaymentFeeAutofill">
+                            <span th:text="#{order.payment.fee.autofill}"></span>
+                        </label>
+                        <p class="cl-help" th:text="#{order.payment.fee.autofill.help}"></p>
                     </div>
-
-                    <div class="field">
-                        <label class="label" th:text="#{order.payment.source}"></label>
-                        <div class="control">
-                            <div class="select is-fullwidth">
-                                <select name="source" required>
-                                    <option th:each="source : ${paymentSources}"
-                                            th:value="${source}"
-                                            th:text="${source}"
-                                            th:selected="${pendingPayment != null and pendingPayment.source == source}"></option>
-                                </select>
-                            </div>
-                        </div>
+                    <div class="cl-span-6 cl-field" data-payment-mode="order">
+                        <label class="cl-check">
+                            <input type="checkbox" id="addPaymentFeeIncluded" name="feeIncluded" value="true">
+                            <span th:text="#{order.payment.fee.included}"></span>
+                        </label>
+                        <p class="cl-help" th:text="#{order.payment.fee.included.help}"></p>
                     </div>
-
-                    <div class="field">
-                        <label class="label" th:text="#{order.payment.reference.no}"></label>
-                        <div class="control">
-                            <input class="input" type="text" name="referenceNo"
-                                   th:value="${pendingPayment != null} ? ${pendingPayment.referenceNo} : ''"
-                                   th:placeholder="#{order.payment.reference.no.placeholder}"/>
-                        </div>
+                    <div class="cl-span-6 cl-field" data-payment-mode="delivery" hidden>
+                        <label class="cl-check">
+                            <input type="checkbox" id="addPaymentFeeFromSurplus">
+                            <span th:text="#{delivery.payment.fee.from.surplus}"></span>
+                        </label>
+                        <p class="cl-help" th:text="#{delivery.payment.fee.from.surplus.help}"></p>
                     </div>
+                    <p class="cl-span-6 cl-help cl-payment-hint" id="addPaymentComputed" aria-live="polite"></p>
 
-                    <div class="field">
-                        <label class="label" th:text="#{payments.source.name}"></label>
-                        <div class="control">
-                            <input class="input" type="text" name="name"
-                                   th:value="${pendingPayment != null} ? ${pendingPayment.name} : ''"
-                                   th:placeholder="#{payments.source.name.placeholder}"/>
-                        </div>
+                    <div class="cl-span-3 cl-field">
+                        <label class="cl-label" for="addPaymentSource" th:text="#{order.payment.source}"></label>
+                        <select class="cl-select" id="addPaymentSource" name="source" required>
+                            <option th:each="source : ${paymentSources}" th:value="${source.value().name()}"
+                                    th:selected="${pendingPayment != null and pendingPayment.source == source.value()}"
+                                    th:text="#{${source.labelKey()}}"></option>
+                        </select>
                     </div>
-
-                    <div class="field">
-                        <label class="label" th:text="#{order.payment.bank.transaction.no}"></label>
-                        <div class="control">
-                            <input class="input" type="text" name="bankTransactionNo"
-                                   th:value="${pendingPayment != null} ? ${pendingPayment.bankTransactionNo} : ''"
-                                   th:placeholder="#{order.payment.bank.transaction.no.placeholder}"/>
-                        </div>
+                    <div class="cl-span-3 cl-field">
+                        <label class="cl-label" for="addPaymentName" th:text="#{payments.source.name}"></label>
+                        <input class="cl-input" type="text" id="addPaymentName" name="name" autocomplete="off"
+                               th:value="${pendingPayment != null} ? ${pendingPayment.name} : ''">
                     </div>
-
-                    <div class="field">
-                        <label class="label" th:text="#{order.payment.bank.transaction.date}"></label>
-                        <div class="control">
-                            <input class="input" type="date" name="bankTransactionDate"
-                                   th:value="${pendingPayment != null} ? ${pendingPayment.bankTransactionDate} : ''"/>
-                        </div>
+                    <div class="cl-span-2 cl-field">
+                        <label class="cl-label" for="addPaymentReference" th:text="#{order.payment.reference.no}"></label>
+                        <input class="cl-input" type="text" id="addPaymentReference" name="referenceNo" autocomplete="off"
+                               th:value="${pendingPayment != null} ? ${pendingPayment.referenceNo} : ''">
                     </div>
-                </section>
-
-                <footer class="modal-card-foot">
-                    <button class="button is-primary" type="submit" th:text="#{general.save}"></button>
-                    <button class="button" type="button" onclick="toggleAddPaymentModal(false)" th:text="#{general.cancel}"></button>
-                </footer>
-            </form>
-        </div>
-    </div>
-
-    <script>
-        function toggleAddPaymentModal(show) {
-            const modal = document.getElementById('addPaymentModal');
-            if (!modal) return;
-            modal.classList.toggle('is-active', show);
-        }
-
-        function togglePaymentsEditModal(show) {
-            const modal = document.getElementById('paymentsEditModal');
-            if (!modal) return;
-            modal.classList.toggle('is-active', show);
-        }
-
-        function setPaymentModalMode(mode) {
-            const modal = document.getElementById('addPaymentModal');
-            if (modal) modal.dataset.mode = mode;
-            document.querySelectorAll('.payment-checkbox-order').forEach(el => {
-                el.style.display = mode === 'order' ? '' : 'none';
-            });
-            document.querySelectorAll('.payment-checkbox-delivery').forEach(el => {
-                el.style.display = mode === 'delivery' ? '' : 'none';
-            });
-            const fromSurplusEl = document.getElementById('addPaymentFeeFromSurplus');
-            if (fromSurplusEl) fromSurplusEl.checked = false;
-            const directionEl = document.getElementById('addPaymentDirection');
-            if (directionEl) directionEl.value = mode === 'delivery' ? 'Outgoing' : 'Incoming';
-        }
-
-        function isAddPaymentDeliveryMode() {
-            const modal = document.getElementById('addPaymentModal');
-            return modal && modal.dataset.mode === 'delivery';
-        }
-
-        function openAddPaymentModalFromButton(btn) {
-            setPaymentModalMode(btn.dataset.mode || 'order');
-            toggleAddPaymentModal(true);
-        }
-
-        function getAddPaymentExpected() {
-            const el = document.getElementById('addPaymentExpected');
-            return el ? (parseFloat(el.dataset.value || '0') || 0) : 0;
-        }
-
-        function onAddPaymentBankAmountInput() {
-            const autofillEl = document.getElementById('addPaymentFeeAutofill');
-            if (autofillEl && autofillEl.checked) {
-                applyAddPaymentFeeAutofill();
-            }
-            const fromSurplusEl = document.getElementById('addPaymentFeeFromSurplus');
-            if (fromSurplusEl && fromSurplusEl.checked) {
-                applyAddPaymentFeeFromSurplus();
-            }
-            renderAddPaymentHint();
-        }
-
-        function onAddPaymentFeeInput() {
-            const autofillEl = document.getElementById('addPaymentFeeAutofill');
-            if (autofillEl) autofillEl.checked = false;
-            const fromSurplusEl = document.getElementById('addPaymentFeeFromSurplus');
-            if (fromSurplusEl) fromSurplusEl.checked = false;
-            renderAddPaymentHint();
-        }
-
-        function onAddPaymentFeeAutofillToggle() {
-            const autofillEl = document.getElementById('addPaymentFeeAutofill');
-            if (autofillEl && autofillEl.checked) {
-                const fromSurplusEl = document.getElementById('addPaymentFeeFromSurplus');
-                if (fromSurplusEl) fromSurplusEl.checked = false;
-                applyAddPaymentFeeAutofill();
-            }
-            renderAddPaymentHint();
-        }
-
-        function onAddPaymentFeeFromSurplusToggle() {
-            const fromSurplusEl = document.getElementById('addPaymentFeeFromSurplus');
-            if (fromSurplusEl && fromSurplusEl.checked) {
-                const autofillEl = document.getElementById('addPaymentFeeAutofill');
-                if (autofillEl) autofillEl.checked = false;
-                applyAddPaymentFeeFromSurplus();
-            }
-            renderAddPaymentHint();
-        }
-
-        function applyAddPaymentFeeAutofill() {
-            const bankEl = document.getElementById('addPaymentBankAmount');
-            const feeEl = document.getElementById('addPaymentProcessingFee');
-            if (!bankEl || !feeEl) return;
-            const expected = getAddPaymentExpected();
-            const bank = parseFloat(bankEl.value) || 0;
-            const fee = Math.max(0, expected - bank);
-            feeEl.value = fee.toFixed(2);
-        }
-
-        function applyAddPaymentFeeFromSurplus() {
-            const bankEl = document.getElementById('addPaymentBankAmount');
-            const feeEl = document.getElementById('addPaymentProcessingFee');
-            if (!bankEl || !feeEl) return;
-            const expected = getAddPaymentExpected();
-            const bank = parseFloat(bankEl.value) || 0;
-            const fee = Math.max(0, bank - expected);
-            feeEl.value = fee.toFixed(2);
-        }
-
-        function renderAddPaymentHint() {
-            const bankEl = document.getElementById('addPaymentBankAmount');
-            const feeEl = document.getElementById('addPaymentProcessingFee');
-            const hintEl = document.getElementById('addPaymentComputed');
-            const includedEl = document.getElementById('addPaymentFeeIncluded');
-            if (!bankEl || !feeEl || !hintEl) return;
-
-            const bank = parseFloat(bankEl.value) || 0;
-            const fee = parseFloat(feeEl.value) || 0;
-
-            if (bank <= 0) {
-                hintEl.textContent = '';
-                return;
-            }
-
-            const expected = getAddPaymentExpected();
-            let amount, applied;
-            if (isAddPaymentDeliveryMode()) {
-                amount = bank;
-                applied = amount - fee;
-            } else {
-                const feeIncluded = includedEl ? includedEl.checked : false;
-                amount = feeIncluded ? bank : bank + fee;
-                applied = amount;
-            }
-            const diff = expected - applied;
-            let status = '';
-            if (Math.abs(diff) < 0.005) {
-                status = ' (pełna wpłata)';
-            } else if (diff > 0) {
-                status = ` (niedopłata ${diff.toFixed(2)})`;
-            } else {
-                status = ` (nadpłata ${Math.abs(diff).toFixed(2)})`;
-            }
-            hintEl.textContent = `amount = ${amount.toFixed(2)}, fee = ${fee.toFixed(2)}${status}`;
-        }
-
-        function openPaymentModalForOrder(orderId, expected, pending) {
-            const modal = document.getElementById('addPaymentModal');
-            if (!modal) return;
-            setPaymentModalMode('order');
-            const form = modal.querySelector('form');
-            if (form) form.action = '/dashboard/orders/' + encodeURIComponent(orderId) + '/addPayment';
-
-            const expectedEl = document.getElementById('addPaymentExpected');
-            if (expectedEl) {
-                const value = parseFloat(expected) || 0;
-                expectedEl.dataset.value = value;
-                expectedEl.value = value.toFixed(2);
-            }
-
-            const bank = document.getElementById('addPaymentBankAmount');
-            if (bank) bank.value = '';
-            const fee = document.getElementById('addPaymentProcessingFee');
-            if (fee) fee.value = '0';
-            const autofill = document.getElementById('addPaymentFeeAutofill');
-            if (autofill) autofill.checked = false;
-            const included = document.getElementById('addPaymentFeeIncluded');
-            if (included) included.checked = false;
-            const fromSurplus = document.getElementById('addPaymentFeeFromSurplus');
-            if (fromSurplus) fromSurplus.checked = false;
-
-            ['name', 'referenceNo', 'bankTransactionNo', 'bankTransactionDate'].forEach(n => {
-                const el = modal.querySelector('input[name="' + n + '"]');
-                if (el) el.value = '';
-            });
-
-            const sourceSelect = modal.querySelector('select[name="source"]');
-            if (sourceSelect && sourceSelect.options.length > 0) {
-                sourceSelect.selectedIndex = 0;
-            }
-
-            if (pending) {
-                if (sourceSelect && pending.source) {
-                    sourceSelect.value = pending.source;
-                }
-                ['name', 'referenceNo', 'bankTransactionNo', 'bankTransactionDate'].forEach(n => {
-                    const el = modal.querySelector('input[name="' + n + '"]');
-                    if (el && pending[n]) el.value = pending[n];
-                });
-                if (fee) {
-                    const pendingFee = parseFloat(pending.fee) || 0;
-                    if (pendingFee > 0) fee.value = pendingFee.toFixed(2);
-                }
-            }
-
-            renderAddPaymentHint();
-            toggleAddPaymentModal(true);
-        }
-
-        function openPaymentModalForOrderFromButton(btn) {
-            const pending = {
-                source: btn.dataset.pendingSource || '',
-                name: btn.dataset.pendingName || '',
-                referenceNo: btn.dataset.pendingRef || '',
-                fee: btn.dataset.pendingFee || 0,
-                bankTransactionNo: btn.dataset.pendingBankTrxNo || '',
-                bankTransactionDate: btn.dataset.pendingBankTrxDate || ''
-            };
-            openPaymentModalForOrder(btn.dataset.orderId, btn.dataset.unpaid, pending);
-        }
-
-        function openPaymentModalForDelivery(deliveryId, expected, pending) {
-            const modal = document.getElementById('addPaymentModal');
-            if (!modal) return;
-            setPaymentModalMode('delivery');
-            const form = modal.querySelector('form');
-            if (form) form.action = '/dashboard/deliveries/' + encodeURIComponent(deliveryId) + '/addPayment?redirectToPayments=true';
-
-            const expectedEl = document.getElementById('addPaymentExpected');
-            if (expectedEl) {
-                const value = parseFloat(expected) || 0;
-                expectedEl.dataset.value = value;
-                expectedEl.value = value.toFixed(2);
-            }
-
-            const bank = document.getElementById('addPaymentBankAmount');
-            if (bank) bank.value = '';
-            const fee = document.getElementById('addPaymentProcessingFee');
-            if (fee) fee.value = '0';
-            const autofill = document.getElementById('addPaymentFeeAutofill');
-            if (autofill) autofill.checked = false;
-            const included = document.getElementById('addPaymentFeeIncluded');
-            if (included) included.checked = false;
-            const fromSurplus = document.getElementById('addPaymentFeeFromSurplus');
-            if (fromSurplus) fromSurplus.checked = false;
-
-            ['name', 'referenceNo', 'bankTransactionNo', 'bankTransactionDate'].forEach(n => {
-                const el = modal.querySelector('input[name="' + n + '"]');
-                if (el) el.value = '';
-            });
-
-            const sourceSelect = modal.querySelector('select[name="source"]');
-            if (sourceSelect && sourceSelect.options.length > 0) {
-                sourceSelect.selectedIndex = 0;
-            }
-
-            if (pending) {
-                if (sourceSelect && pending.source) {
-                    sourceSelect.value = pending.source;
-                }
-                ['name', 'referenceNo', 'bankTransactionNo', 'bankTransactionDate'].forEach(n => {
-                    const el = modal.querySelector('input[name="' + n + '"]');
-                    if (el && pending[n]) el.value = pending[n];
-                });
-                if (fee) {
-                    const pendingFee = parseFloat(pending.fee) || 0;
-                    if (pendingFee > 0) fee.value = pendingFee.toFixed(2);
-                }
-            }
-
-            renderAddPaymentHint();
-            toggleAddPaymentModal(true);
-        }
-
-        function openPaymentModalForDeliveryFromButton(btn) {
-            const pending = {
-                source: btn.dataset.pendingSource || '',
-                name: btn.dataset.pendingName || '',
-                referenceNo: btn.dataset.pendingRef || '',
-                fee: btn.dataset.pendingFee || 0,
-                bankTransactionNo: btn.dataset.pendingBankTrxNo || '',
-                bankTransactionDate: btn.dataset.pendingBankTrxDate || ''
-            };
-            openPaymentModalForDelivery(btn.dataset.deliveryId, btn.dataset.unpaid, pending);
-        }
-    </script>
+                    <div class="cl-span-2 cl-field">
+                        <label class="cl-label" for="addPaymentBankNo" th:text="#{order.payment.bank.transaction.no}"></label>
+                        <input class="cl-input" type="text" id="addPaymentBankNo" name="bankTransactionNo" autocomplete="off"
+                               th:value="${pendingPayment != null} ? ${pendingPayment.bankTransactionNo} : ''">
+                    </div>
+                    <div class="cl-span-2 cl-field">
+                        <label class="cl-label" for="addPaymentBankDate" th:text="#{order.payment.bank.transaction.date}"></label>
+                        <input class="cl-input" type="date" id="addPaymentBankDate" name="bankTransactionDate"
+                               th:value="${pendingPayment != null} ? ${pendingPayment.bankTransactionDate} : ''">
+                    </div>
+                </div>
+            </div>
+            <div class="cl-dialog-actions">
+                <button class="cl-button is-primary" type="submit" th:text="#{order.payment.save}"></button>
+                <button class="cl-button" type="button" data-cl-payment-close th:text="#{general.cancel}"></button>
+            </div>
+        </form>
+    </dialog>
+    <!--/* loadMoneyJs is false only on the order details page, where fragments/item-add-modal.html is included
+           on the same page and already loads money.js -- loading it twice would run its IIFE twice. Every other
+           caller passes true explicitly (Thymeleaf requires it); the "== null" half of the guard only matters
+           for a test that calls this fragment directly with ${null}. */-->
+    <script th:if="${loadMoneyJs == null or loadMoneyJs}" th:src="@{/js/money.js}" defer></script>
+    <script th:src="@{/js/add-payment-dialog.js}" defer></script>
 </div>
-
 </body>
 </html>

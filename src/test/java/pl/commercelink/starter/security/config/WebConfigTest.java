@@ -3,6 +3,8 @@ package pl.commercelink.starter.security.config;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.util.ServletRequestPathUtils;
@@ -40,16 +42,18 @@ class WebConfigTest {
         configurer.addInterceptors(registry);
     }
 
-    @Test
-    void storeAccessInterceptorDoesNotGuardTheAdminStoreCategoriesPage() {
+    @ParameterizedTest(name = "{0} {1}")
+    @CsvSource({
+            "GET, /dashboard/store/categories",
+            "POST, /dashboard/store/categories",
+            "GET, /dashboard/store/fulfilment",
+            "GET, /dashboard/store/receipts",
+            "GET, /dashboard/store/receipts/system",
+            "GET, /dashboard/store/receipts/system/disconnect"
+    })
+    void storeAccessInterceptorDoesNotGuardTheAdminStorePages(String method, String path) {
         // given / when / then
-        assertThat(storeAccessGuards(get("/dashboard/store/categories"))).isFalse();
-    }
-
-    @Test
-    void storeAccessInterceptorDoesNotGuardTheAdminStoreCategoriesUpdate() {
-        // given / when / then
-        assertThat(storeAccessGuards(post("/dashboard/store/categories"))).isFalse();
+        assertThat(storeAccessGuards(new MockHttpServletRequest(method, path))).isFalse();
     }
 
     @Test
@@ -59,9 +63,9 @@ class WebConfigTest {
     }
 
     @Test
-    void storeAccessInterceptorDoesNotGuardTheAdminStoreFulfilmentPage() {
+    void storeAccessInterceptorStillGuardsTheSuperAdminStoreReceiptsPage() {
         // given / when / then
-        assertThat(storeAccessGuards(get("/dashboard/store/fulfilment"))).isFalse();
+        assertThat(storeAccessGuards(get("/dashboard/store/other-store/receipts"))).isTrue();
     }
 
     private boolean storeAccessGuards(HttpServletRequest request) {
@@ -81,9 +85,5 @@ class WebConfigTest {
 
     private HttpServletRequest get(String path) {
         return new MockHttpServletRequest("GET", path);
-    }
-
-    private HttpServletRequest post(String path) {
-        return new MockHttpServletRequest("POST", path);
     }
 }

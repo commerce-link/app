@@ -69,4 +69,17 @@
         init(event.target);
     });
     init(document);
+
+    // A code in a table cell (button.cl-copy-inline[data-cl-copy]): one click copies it, the toast says so.
+    document.addEventListener('click', function (event) {
+        var button = event.target.closest && event.target.closest('button.cl-copy-inline[data-cl-copy]');
+        if (!button || !navigator.clipboard) {
+            return;
+        }
+        navigator.clipboard.writeText(button.getAttribute('data-cl-copy')).then(function () {
+            if (typeof showToast === 'function') {
+                showToast(typeof CL_TOAST_COPIED === 'string' ? CL_TOAST_COPIED : '', 'success');
+            }
+        });
+    });
 })();

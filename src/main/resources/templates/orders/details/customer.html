@@ -1,0 +1,42 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--/* Billing and shipping address blocks, both always in full. E-mail and phone links sit on lines of their own
+       (div), so a link is never inside a run of text it is told apart from by colour alone (axe link-in-text-block);
+       the e-mail copies with the order number's copy button. "Edytuj" opens the block's dialog (orders/details/address),
+       without JavaScript it leads to the address page. */-->
+<section th:fragment="card" class="cl-card" aria-labelledby="customer-title" th:with="c=${page.customer()}">
+    <div class="cl-card-head"><h2 class="cl-card-title" id="customer-title" th:text="#{order.card.customer}"></h2></div>
+    <div class="cl-address">
+        <div class="cl-address-head">
+            <span class="cl-eyebrow" th:text="#{order.customer.billing}"></span>
+            <a th:if="${c.billingEditHref() != null}" class="cl-link-button" th:href="@{${c.billingEditHref()}}"
+               data-cl-dialog-open="address-dialog-billing" th:attr="aria-label=#{order.customer.billing.edit}" th:text="#{general.edit}"></a>
+        </div>
+        <th:block th:replace="~{orders/details/customer :: address(${c.billing()})}"></th:block>
+        <p th:if="${c.billingLockedKey() != null}" class="cl-help is-note" th:text="#{${c.billingLockedKey()}}"></p>
+    </div>
+    <div class="cl-address">
+        <div class="cl-address-head">
+            <span class="cl-eyebrow" th:text="${c.shipmentTypeKey() != null} ? #{order.customer.shipping(${#messages.msg(c.shipmentTypeKey())})} : #{order.customer.shipping.plain}"></span>
+            <a th:if="${c.shippingEditHref() != null}" class="cl-link-button" th:href="@{${c.shippingEditHref()}}"
+               data-cl-dialog-open="address-dialog-shipping" th:attr="aria-label=#{order.customer.shipping.edit}" th:text="#{general.edit}"></a>
+        </div>
+        <th:block th:replace="~{orders/details/customer :: address(${c.shipping()})}"></th:block>
+        <div th:if="${c.pickupPoint() != null}" th:text="#{order.customer.pickup.point(${c.pickupPoint()})}"></div>
+        <p th:if="${c.shippingLockedKey() != null}" class="cl-help is-note" th:text="#{${c.shippingLockedKey()}}"></p>
+    </div>
+</section>
+
+<th:block th:fragment="address(block)">
+    <th:block th:if="${block.name() != null}"><strong th:text="${block.name()}"></strong><br></th:block>
+    <th:block th:if="${block.company() != null}"><span th:text="${block.company()}"></span><br></th:block>
+    <th:block th:if="${block.taxId() != null}"><span th:text="#{order.customer.tax.id(${block.taxId()})}"></span><br></th:block>
+    <th:block th:if="${block.street() != null}"><span th:text="${block.street()}"></span><br></th:block>
+    <th:block th:if="${block.cityLine() != null}"><span th:text="${block.country() != null} ? ${block.cityLine() + ', ' + block.country()} : ${block.cityLine()}"></span><br></th:block>
+    <div th:if="${block.email() != null}"><a th:href="'mailto:' + ${block.email()}" th:text="${block.email()}"></a>&#8288;<button type="button" class="cl-copy-inline is-icon"
+            th:attr="data-cl-copy=${block.email()}, aria-label=#{order.customer.copy.email(${block.email()})}"><span class="cl-copy-icon" aria-hidden="true"><i class="far fa-copy"></i></span></button></div>
+    <div th:if="${block.phone() != null}"><a th:href="'tel:' + ${block.phone()}" th:text="${block.phone()}"></a></div>
+</th:block>
+</body>
+</html>

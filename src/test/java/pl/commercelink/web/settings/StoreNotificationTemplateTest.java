@@ -9,9 +9,6 @@ import pl.commercelink.stores.Store;
 import pl.commercelink.templates.EmailTemplate;
 import pl.commercelink.web.dtos.NotificationSenderForm;
 
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -86,7 +83,7 @@ class StoreNotificationTemplateTest {
         String html = SettingsTemplateRenderer.render("store-notification", page(store, NotificationSenderForm.from(store), Map.of()));
 
         // then
-        assertThat(html).contains("Wysyłane: 1 z 19.");
+        assertThat(html).contains("Wysyłane: 1 z 20.");
         assertThat(html).contains("href=\"/dashboard/store/email-templates\"");
         assertThat(html).doesNotContain("Zamówienie wysłane").doesNotContain("class=\"cl-list\"")
                 .doesNotContain("/dashboard/store/email-templates/ORDER_SHIPPING");
@@ -140,16 +137,5 @@ class StoreNotificationTemplateTest {
         // then
         assertThat(html).startsWith("<form").contains("id=\"notification-sender-form\"").contains("data-success-message=\"Zapisano\"");
         assertThat(html).doesNotContain("Wiadomości do klientów");
-    }
-
-    @Test
-    void dropsBulmaMarkupTheSaveConfirmationAndTheOldEditEndpoint() throws Exception {
-        // when
-        String template = Files.readString(Path.of("src/main/resources/templates/store-notification.html"), StandardCharsets.UTF_8);
-
-        // then
-        assertThat(template).doesNotContain("confirmSave").doesNotContain("/notification/edit")
-                .doesNotContain("class=\"box\"").doesNotContain("\"button is-primary").doesNotContain("style=");
-        assertThat(template).contains("cl-button is-primary");
     }
 }

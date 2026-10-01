@@ -1,0 +1,220 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--/* Shipment rows with their own "Edytuj" and "Usuń", "Dodaj przesyłkę" and the courier cancellation in the head.
+       "Edytuj" and "Dodaj przesyłkę" open the shipment's dialog (one per shipment, a fixed size whatever the number of
+       shipments); without JavaScript they lead to the shipment page. "Usuń" goes through the confirmation dialog, or
+       its page without JavaScript; its text and button say when the removal delivers the order or moves it back to
+       "W realizacji"; removing the only shipment leaves the card empty. The only shipment with nothing but the
+       delivery choice (the one the order was created with) reads as no shipment: a greyed row "Sposób dostawy: …",
+       "Brak przesyłki" and "Uzupełnij" (the same dialog) instead of "Edytuj", no "Usuń". */-->
+<section th:fragment="card" class="cl-card" id="przesylki" aria-labelledby="shipments-title"
+         th:with="shipments=${page.shipments()}">
+    <div class="cl-card-head">
+        <h2 class="cl-card-title" id="shipments-title" th:text="#{order.card.shipments}"></h2>
+        <div class="cl-card-actions" th:unless="${page.readOnly()}">
+            <a th:if="${shipments.canCancelCourier()}" class="cl-link-button is-danger" data-cl-confirm
+               th:href="@{/dashboard/orders/{o}/cancelShipment(o=${page.orderId()})}"
+               th:attr="data-cl-confirm-title=#{order.shipments.cancel.confirm.title},
+                        data-cl-confirm-message=#{order.shipments.cancel.confirm.message},
+                        data-cl-confirm-action=#{order.shipments.cancel.confirm.action}"
+               th:text="#{order.shipments.cancel}"></a>
+            <a class="cl-button" data-cl-dialog-open="shipment-dialog-new"
+               th:href="@{/dashboard/orders/{o}/shipments/new(o=${page.orderId()})}">
+                <i class="fas fa-plus" aria-hidden="true"></i>
+                <span th:text="#{order.shipments.add}"></span>
+            </a>
+        </div>
+    </div>
+    <ul class="cl-list" th:if="${!shipments.rows().isEmpty()}">
+        <li th:each="s : ${shipments.rows()}" th:if="${s.placeholder()}" class="cl-list-item is-placeholder" id="shipment-placeholder">
+            <div>
+                <p class="cl-list-title">
+                    <span th:text="#{order.shipments.placeholder.title(${#messages.msg(s.typeKey())})}
+                                   + (${s.pickupPoint() != null} ? ', ' + ${s.pickupPoint()} : '')"></span>
+                    <span th:if="${s.carrier() != null}" th:text="'· ' + ${s.carrier()}"></span>
+                </p>
+                <p class="cl-list-desc" th:text="#{order.shipments.placeholder.none}"></p>
+            </div>
+            <div class="cl-list-actions" th:if="${s.editHref() != null}">
+                <a class="cl-link-button" th:href="@{${s.editHref()}}" th:attr="data-cl-dialog-open=${s.dialogId()},
+                   aria-label=#{order.shipments.placeholder.fill.for(${s.number()})}" th:text="#{order.shipments.placeholder.fill}"></a>
+            </div>
+        </li>
+        <li class="cl-list-item" th:each="s : ${shipments.rows()}" th:unless="${s.placeholder()}">
+            <div>
+                <p class="cl-list-title">
+                    <span th:text="#{${s.typeKey()}}"></span>
+                    <span th:if="${s.carrier() != null}" th:text="'· ' + ${s.carrier()}"></span>
+                    <!--/* the pill text carries the state; the title only adds what to do about a failure */-->
+                    <span th:if="${s.trackingKey() != null}" class="cl-status" th:classappend="${s.trackingTone()}"
+                          th:attr="title=${s.trackingHelpKey() != null} ? #{${s.trackingHelpKey()}} : null"
+                          th:text="#{${s.trackingKey()}}"></span>
+                </p>
+                <!--/* each part starts lower case after a separator; the first one of the line takes a capital */-->
+                <p class="cl-list-desc" th:with="lead=${s.trackingNo() == null and s.pickupPoint() == null}">
+                    <th:block th:if="${s.trackingNo() != null}">
+                        <span th:text="#{order.shipments.tracking}"></span>
+                        <a th:if="${s.trackingUrl() != null}" th:href="${s.trackingUrl()}" target="_blank" rel="noopener"
+                           th:text="${s.trackingNo()}"></a>
+                        <span th:unless="${s.trackingUrl() != null}" th:text="${s.trackingNo()}"></span>
+                        <span> · </span>
+                    </th:block>
+                    <!--/* a pickup-point shipment is titled "Punkt odbioru" already: its line shows the point's code alone */-->
+                    <th:block th:if="${s.pickupPoint() != null}"><span th:text="${s.typeKey() == 'ShipmentType.PickupPoint'} ? ${s.pickupPoint()}
+                            : #{order.shipments.pickup(${s.pickupPoint()})}"></span><span> · </span></th:block>
+                    <span th:if="${s.shippedAt() != null}"
+                          th:with="shipped=#{order.shipments.shipped(${s.shippedAt()})}" th:text="${lead} ? ${#strings.capitalize(shipped)} : ${shipped}"></span>
+                    <span th:if="${s.deliveredAt() != null}" th:text="' · ' + #{order.shipments.delivered(${s.deliveredAt()})}"></span>
+                    <span th:if="${s.shippedAt() != null and s.deliveredAt() == null}" th:text="' · ' + #{order.shipments.in.transit}"></span>
+                    <span th:if="${s.shippedAt() == null}"
+                          th:with="waiting=#{order.shipments.waiting}" th:text="${lead} ? ${#strings.capitalize(waiting)} : ${waiting}"></span>
+                </p>
+                <p th:if="${s.removeReasonKey() != null}" class="cl-list-desc" th:id="|shipment-${s.number()}-remove-reason|"
+                   th:text="#{${s.removeReasonKey()}}"></p>
+            </div>
+            <div class="cl-list-actions" th:if="${s.editHref() != null}">
+                <a class="cl-link-button" th:href="@{${s.editHref()}}" th:attr="data-cl-dialog-open=${s.dialogId()},
+                   aria-label=#{order.shipments.edit.for(${s.number()})}" th:text="#{general.edit}"></a>
+                <a th:if="${s.removeHref() != null}" class="cl-link-button is-danger" data-cl-confirm th:href="@{${s.removeHref()}}"
+                   th:attr="aria-label=#{order.shipments.remove.for(${s.number()})},
+                            data-cl-confirm-title=#{order.shipments.remove.confirm.title(${s.number()})},
+                            data-cl-confirm-message=#{${s.removeMessageKey()}},
+                            data-cl-confirm-action=#{${s.removeActionKey()}}"
+                   th:text="#{general.delete}"></a>
+                <!--/* greyed, still focusable, its reason in the text of the row (design system: link action that cannot run) */-->
+                <button th:if="${s.removeReasonKey() != null}" type="button" class="cl-link-button" aria-disabled="true"
+                        th:attr="aria-label=#{order.shipments.remove.for(${s.number()})},
+                                 aria-describedby=|shipment-${s.number()}-remove-reason|"
+                        th:text="#{general.delete}"></button>
+            </div>
+        </li>
+    </ul>
+    <p th:if="${shipments.rows().isEmpty()}" class="cl-list-empty" th:text="#{${shipments.emptyKey()}}"></p>
+</section>
+
+<!--/* One dialog per shipment and one for "Dodaj przesyłkę"; none on a read-only page. */-->
+<th:block th:fragment="dialogs" th:with="shipments=${page.shipments()}">
+    <!--/* th:replace runs before th:each and th:if on one element, so both sit on their own blocks. */-->
+    <th:block th:each="form : ${shipments.forms()}"><dialog th:replace="~{orders/details/shipments :: shipmentDialog(${form})}"></dialog></th:block>
+    <th:block th:if="${shipments.blank() != null}"><dialog th:replace="~{orders/details/shipments :: shipmentDialog(${shipments.blank()})}"></dialog></th:block>
+</th:block>
+
+<dialog th:fragment="shipmentDialog(shipment)" class="cl-dialog is-form" th:id="${shipment.dialogId()}"
+        th:attr="aria-labelledby=|${shipment.dialogId()}-title|">
+    <form th:replace="~{orders/details/shipments :: shipmentForm(${shipment}, true)}"></form>
+</dialog>
+
+<form th:fragment="dialogForm" th:replace="~{orders/details/shipments :: shipmentForm(${shipment}, true)}"></form>
+<form th:fragment="pageForm" th:replace="~{orders/details/shipments :: shipmentForm(${shipment}, false)}"></form>
+
+<!--/* The fields of one shipment (web.orders.OrderShipmentForm). Saved without reloading in the dialog: 422 comes back
+       with the errors next to the fields and the dialog stays open; 200 closes it and reloads the page, which shows the
+       saved shipment and the notice stored for it. The carrier is picked from the store's carriers, or typed after
+       "Inny…": the select only fills the named text field (order-shipments.js), so without JavaScript the text field
+       alone is posted. The shipped and delivered moments are dates only (OrderShipmentForm keeps a saved time on the
+       same day) and offer nothing after the operator's today (max). A shipment with a courier order shows its type, carrier
+       and tracking number read-only (posted, the server refuses a change) with the reason under them. */-->
+<form th:fragment="shipmentForm(shipment, inDialog)" th:id="|${shipment.dialogId()}-form|" class="cl-form" method="post"
+      novalidate data-cl-async data-cl-shipment-form
+      th:action="@{/dashboard/orders/{o}/shipments(o=${shipment.orderId()})}"
+      th:attr="data-error-message=#{form.save.failed}, data-cl-dialog-close-on-success=${inDialog} ? 'true' : null"
+      th:with="picker=${!shipment.carriers().isEmpty() and !shipment.courierOrder()},
+               lockedHelp=${shipment.courierOrder()} ? ${shipment.field('courierLocked')} : null">
+    <h2 th:if="${inDialog}" class="cl-dialog-title" th:id="|${shipment.dialogId()}-title|"
+        th:text="${shipment.isNew()} ? #{order.shipments.dialog.title.new} : #{order.shipments.dialog.title.edit(${shipment.number()})}"></h2>
+    <input th:unless="${shipment.isNew()}" type="hidden" name="index" th:value="${shipment.index()}">
+    <input th:unless="${shipment.isNew()}" type="hidden" name="version" th:value="${shipment.version()}">
+    <div th:class="${inDialog} ? 'cl-dialog-body' : 'cl-card-inset'">
+        <!--/* a refusal (closed order, shipment changed meanwhile) is not fixed in the form: the page must be reloaded */-->
+        <div th:if="${shipment.refusal() != null}" class="cl-alert is-bad" tabindex="-1" data-cl-error-summary>
+            <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
+            <div>
+                <p class="cl-alert-title" th:text="${shipment.refusal()}"></p>
+                <p><a th:href="@{/dashboard/orders/{o}(o=${shipment.orderId()})}" th:text="#{order.shipments.reload}"></a></p>
+            </div>
+        </div>
+        <div th:replace="~{fragments/settings-form :: errorSummary(|${shipment.dialogId()}-errors|, ${shipment.errors()}, null)}"></div>
+        <div class="cl-form-grid cl-card-grid">
+            <div class="cl-span-3 cl-field">
+                <label class="cl-label" th:for="${shipment.field('type')}" th:text="#{order.shipments.dialog.type}"></label>
+                <!--/* a select cannot be read-only: with a courier order it is disabled and the type is posted hidden */-->
+                <select class="cl-select" th:id="${shipment.field('type')}" th:name="${shipment.courierOrder()} ? null : 'type'"
+                        th:disabled="${shipment.courierOrder()}" th:attr="aria-describedby=${lockedHelp}">
+                    <option th:each="t : ${shipment.types()}"
+                            th:value="${t.value().name()}" th:selected="${t.value() == shipment.type()}" th:text="#{${t.labelKey()}}"></option>
+                </select>
+                <input th:if="${shipment.courierOrder()}" type="hidden" name="type" th:value="${shipment.type().name()}">
+                <p th:if="${shipment.error('type') != null}" class="cl-field-error" th:id="${shipment.field('type')} + '-error'">
+                    <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                    <span th:text="#{${shipment.error('type')}}"></span>
+                </p>
+            </div>
+            <div class="cl-span-3 cl-field">
+                <label class="cl-label" th:for="${shipment.field(picker ? 'carrierSelect' : 'carrier')}" th:text="#{order.shipments.dialog.carrier}"></label>
+                <select th:if="${picker}" class="cl-select" data-cl-carrier-select hidden th:id="${shipment.field('carrierSelect')}">
+                    <option value=""></option>
+                    <option th:each="c : ${shipment.carriers()}" th:value="${c}" th:selected="${c == shipment.carrier()}" th:text="${c}"></option>
+                    <option value="__other__" th:selected="${!shipment.knownCarrier()}" th:text="#{order.shipments.dialog.carrier.other}"></option>
+                </select>
+                <th:block th:with="carrierId=${shipment.field('carrier')}, carrierError=${shipment.error('carrier')},
+                                   carrierDescribedBy=${#strings.trim((carrierError != null ? carrierId + '-error ' : '') + (lockedHelp != null ? lockedHelp : ''))}">
+                    <input class="cl-input" type="text" autocomplete="off" data-cl-carrier-input th:id="${carrierId}"
+                           name="carrier" th:value="${shipment.carrier()}" th:readonly="${shipment.courierOrder()}"
+                           th:classappend="${carrierError != null} ? 'is-invalid'"
+                           th:attr="aria-label=${picker} ? #{order.shipments.dialog.carrier.name} : null,
+                                    aria-invalid=${carrierError != null ? 'true' : null},
+                                    aria-describedby=${carrierDescribedBy.isEmpty() ? null : carrierDescribedBy}">
+                    <p th:if="${carrierError != null}" class="cl-field-error" th:id="${carrierId} + '-error'">
+                        <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                        <span th:text="#{${carrierError}}"></span>
+                    </p>
+                </th:block>
+            </div>
+            <div class="cl-span-3" th:insert="~{orders/details/shipments :: text(${shipment}, 'trackingNo', 'order.shipments.dialog.tracking', 'text', ${shipment.trackingNo()}, ${lockedHelp})}"></div>
+            <div class="cl-span-3" th:insert="~{orders/details/shipments :: text(${shipment}, 'collectionPointCode', 'order.shipments.dialog.point', 'text', ${shipment.collectionPointCode()}, null)}"></div>
+            <p th:if="${lockedHelp != null}" class="cl-help" th:id="${lockedHelp}" th:text="#{order.shipments.dialog.courierLocked}"></p>
+            <div th:insert="~{orders/details/shipments :: text(${shipment}, 'trackingUrl', 'order.shipments.dialog.url', 'url', ${shipment.trackingUrl()}, null)}"></div>
+            <div class="cl-span-3" th:insert="~{orders/details/shipments :: dateField(${shipment}, 'shipped', ${shipment.shippedDate()})}"></div>
+            <div class="cl-span-3" th:insert="~{orders/details/shipments :: dateField(${shipment}, 'delivered', ${shipment.deliveredDate()})}"></div>
+        </div>
+        <p th:class="${inDialog} ? 'cl-dialog-effect' : 'cl-help'" th:text="#{order.shipments.dialog.effect}"></p>
+    </div>
+    <div th:class="${inDialog} ? 'cl-dialog-actions' : 'cl-card-footer'">
+        <button type="submit" class="cl-button is-primary"
+                th:text="${shipment.isNew()} ? #{order.shipments.dialog.save.new} : #{order.shipments.dialog.save}"></button>
+        <button th:if="${inDialog}" type="button" class="cl-button" data-cl-dialog-close th:text="#{general.cancel}"></button>
+        <a th:unless="${inDialog}" class="cl-button" th:href="@{/dashboard/orders/{o}(o=${shipment.orderId()})}" th:text="#{general.cancel}"></a>
+    </div>
+</form>
+
+<!--/* A labelled text field of the shipment form: the id carries the form's key (several dialogs on one page), the
+       posted name is the property alone. lockedHelp: the id of the reason the field is read-only, or null when it is
+       editable. */-->
+<div th:fragment="text(shipment, property, labelKey, type, value, lockedHelp)" class="cl-field"
+     th:with="id=${shipment.field(property)}, error=${shipment.error(property)},
+              describedBy=${#strings.trim((error != null ? id + '-error ' : '') + (lockedHelp != null ? lockedHelp : ''))}">
+    <label class="cl-label" th:for="${id}" th:text="#{${labelKey}}"></label>
+    <input class="cl-input" autocomplete="off" th:type="${type}" th:id="${id}" th:name="${property}"
+           th:value="${value}" th:readonly="${lockedHelp != null}" th:classappend="${error != null} ? 'is-invalid'"
+           th:attr="aria-invalid=${error != null ? 'true' : null}, aria-describedby=${describedBy.isEmpty() ? null : describedBy}">
+    <p th:if="${error != null}" class="cl-field-error" th:id="${id} + '-error'">
+        <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+        <span th:text="#{${error}}"></span>
+    </p>
+</div>
+
+<!--/* The shipped or delivered date ("shipped" or "delivered"); the posted name is shippedDate or deliveredDate. */-->
+<div th:fragment="dateField(shipment, name, value)" class="cl-field"
+     th:with="id=${shipment.field(name + 'Date')}, error=${shipment.error(name + 'Date')}">
+    <label class="cl-label" th:for="${id}" th:text="#{|order.shipments.dialog.${name}|}"></label>
+    <input class="cl-input" type="date" th:id="${id}" th:name="${name + 'Date'}" th:value="${value}"
+           th:max="${shipment.today()}" th:classappend="${error != null} ? 'is-invalid'"
+           th:attr="aria-invalid=${error != null ? 'true' : null}, aria-describedby=${error != null ? id + '-error' : null}">
+    <p th:if="${error != null}" class="cl-field-error" th:id="${id} + '-error'">
+        <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+        <span th:text="#{${error}}"></span>
+    </p>
+</div>
+</body>
+</html>

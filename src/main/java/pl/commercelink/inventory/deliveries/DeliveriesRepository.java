@@ -3,20 +3,25 @@ package pl.commercelink.inventory.deliveries;
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapperConfig;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBQueryExpression;
-import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBScanExpression;
 import com.amazonaws.services.dynamodbv2.model.AttributeValue;
+import com.amazonaws.services.dynamodbv2.model.QueryRequest;
+import com.amazonaws.services.dynamodbv2.model.QueryResult;
+import com.amazonaws.services.dynamodbv2.model.Select;
 import org.springframework.stereotype.Component;
 import pl.commercelink.starter.dynamodb.DynamoDbRepository;
-import pl.commercelink.stores.ConnectionMode;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
+import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 @Component
@@ -110,101 +115,101 @@ public class  DeliveriesRepository extends DynamoDbRepository<Delivery> {
                 .collect(Collectors.toList());
     }
 
-    public List<Delivery> searchActiveDeliveries(String storeId, DeliveryFilter filter, int page, int pageSize) {
-        QueryAndFilterExpressions expressions = buildFilterExpressions(filter, storeId);
+    public static final String LIST_INDEX = "StoreIdDeliveryListSortKeyIndex";
 
-        DynamoDBQueryExpression<Delivery> queryExpression = new DynamoDBQueryExpression<Delivery>()
-                .withKeyConditionExpression(expressions.keyConditionExpression)
-                .withFilterExpression(expressions.filterExpression)
-                .withExpressionAttributeValues(expressions.eav);
-
-        return queryWithPagination(queryExpression, page, pageSize, Delivery.class)
-                .stream()
-                .sorted(Comparator.comparing(Delivery::getEstimatedDeliveryAt, Comparator.nullsFirst(Comparator.naturalOrder())))
-                .collect(Collectors.toList());
+    /**
+     * The store's deliveries on their way (spec §7.2). Like every list read below it answers with partial deliveries -
+     * only the attributes StoreIdDeliveryListSortKeyIndex carries - which must never be saved back.
+     */
+    public List<Delivery> findInTransit(String storeId) {
+        return readList(storeId, "begins_with(deliveryListSortKey, :lo)", DeliveryListKey.IN_TRANSIT, null,
+                key -> key.startsWith(DeliveryListKey.IN_TRANSIT));
     }
 
-    public List<Delivery> searchActiveDeliveries(DeliveryFilter filter, int page, int pageSize) {
-        QueryAndFilterExpressions expressions = buildFilterExpressions(filter, null);
-
-        DynamoDBScanExpression scanExpression = new DynamoDBScanExpression()
-                .withFilterExpression(expressions.filterExpression)
-                .withExpressionAttributeValues(expressions.eav);
-
-        return scanWithPagination(scanExpression, page, pageSize, Delivery.class);
+    /** Received deliveries still waiting for a purchase invoice, over the whole history. Partial, see findInTransit. */
+    public List<Delivery> findToSettle(String storeId) {
+        return readList(storeId, "begins_with(deliveryListSortKey, :lo)", DeliveryListKey.TO_SETTLE, null,
+                key -> key.startsWith(DeliveryListKey.TO_SETTLE));
     }
 
-    private QueryAndFilterExpressions buildFilterExpressions(DeliveryFilter filter, String storeId) {
+    /**
+     * How many received deliveries wait for a purchase invoice: a COUNT on the index, so the tile does not read the
+     * backlog on every view. The index entry is not re-checked against the delivery's recomputed key, so a stale entry
+     * (a writer that does not maintain deliveryListSortKey) can be counted that findToSettle would drop; acceptable for a tile.
+     */
+    public long countToSettle(String storeId) {
+        Map<String, AttributeValue> eav = Map.of(":storeId", new AttributeValue(storeId),
+                ":lo", new AttributeValue(DeliveryListKey.TO_SETTLE));
+        long count = 0;
+        Map<String, AttributeValue> startKey = null;
+        do {
+            QueryResult page = amazonDynamoDB.query(new QueryRequest()
+                    .withTableName("Deliveries")
+                    .withIndexName(LIST_INDEX)
+                    .withSelect(Select.COUNT)
+                    .withKeyConditionExpression("storeId = :storeId AND begins_with(deliveryListSortKey, :lo)")
+                    .withExpressionAttributeValues(eav)
+                    .withExclusiveStartKey(startKey));
+            count += page.getCount();
+            startKey = page.getLastEvaluatedKey();
+        } while (startKey != null && !startKey.isEmpty());
+        return count;
+    }
+
+    /**
+     * Received deliveries in a reception window; a missing bound means from the start, an open upper bound reaches
+     * every reception up to the end of the history. Partial, see findInTransit.
+     */
+    public List<Delivery> findReceivedBetween(String storeId, LocalDate from, LocalDate to) {
+        List<Delivery> result = new ArrayList<>();
+        for (String prefix : List.of(DeliveryListKey.TO_SETTLE, DeliveryListKey.SETTLED)) {
+            String lo = from == null ? prefix : DeliveryListKey.receivedBound(prefix, from, false);
+            String hi = to == null ? prefix + "\uffff" : DeliveryListKey.receivedBound(prefix, to, true);
+            result.addAll(readList(storeId, "deliveryListSortKey BETWEEN :lo AND :hi", lo, hi,
+                    key -> key.compareTo(lo) >= 0 && key.compareTo(hi) <= 0));
+        }
+        return result;
+    }
+
+    /** A delivery number typed from the list (its first 8 characters) or whole; the table key, no index needed. */
+    public List<Delivery> findByDeliveryIdPrefix(String storeId, String prefix) {
+        if (isBlank(prefix)) {
+            return List.of();
+        }
+        Map<String, AttributeValue> eav = Map.of(":storeId", new AttributeValue(storeId), ":p", new AttributeValue(prefix));
+        return new ArrayList<>(dynamoDBMapper.query(Delivery.class, new DynamoDBQueryExpression<Delivery>()
+                .withKeyConditionExpression("storeId = :storeId AND begins_with(deliveryId, :p)")
+                .withExpressionAttributeValues(eav)));
+    }
+
+    /**
+     * One key range of StoreIdDeliveryListSortKeyIndex, every page followed. Each delivery's key is recomputed from the
+     * projected attributes and an entry whose stored key no longer matches is dropped (the same guard as
+     * OrdersRepository.findByStoreAndStatuses): it protects against a writer that does not maintain deliveryListSortKey,
+     * such as the previous app version during a rollback, which leaves the stored key behind the delivery's real state.
+     * There is no fallback: while the index is missing or still being built (V020 creates it at start-up) the
+     * DynamoDB error propagates.
+     */
+    private List<Delivery> readList(String storeId, String keyCondition, String lo, String hi, Predicate<String> keyMatches) {
         Map<String, AttributeValue> eav = new HashMap<>();
-        StringBuilder filterExpression = new StringBuilder();
-        String keyConditionExpression = null;
-
-        eav.put(":null", new AttributeValue().withNULL(true));
-        appendFilter(filterExpression, "(attribute_not_exists(deliveredAt) OR deliveredAt = :null)");
-
-        if (storeId != null) {
-            keyConditionExpression = "storeId = :storeId";
-            eav.put(":storeId", new AttributeValue().withS(storeId));
-
-            if (isNotBlank(filter.getDeliveryId())) {
-                eav.put(":deliveryId", new AttributeValue().withS(filter.getDeliveryId()));
-                keyConditionExpression += " AND deliveryId = :deliveryId";
-            }
-        } else {
-            if (isNotBlank(filter.getDeliveryId())) {
-                eav.put(":deliveryId", new AttributeValue().withS(filter.getDeliveryId()));
-                appendFilter(filterExpression, "deliveryId = :deliveryId");
-            }
+        eav.put(":storeId", new AttributeValue(storeId));
+        eav.put(":lo", new AttributeValue(lo));
+        if (hi != null) {
+            eav.put(":hi", new AttributeValue(hi));
         }
-
-        if (isNotBlank(filter.getExternalDeliveryId())) {
-            eav.put(":externalDeliveryId", new AttributeValue().withS(filter.getExternalDeliveryId()));
-            appendFilter(filterExpression, "externalDeliveryId = :externalDeliveryId");
-        }
-
-        if (isNotBlank(filter.getProvider())) {
-            eav.put(":provider", new AttributeValue().withS(filter.getProvider()));
-            appendFilter(filterExpression, "provider = :provider");
-        }
-
-        if (filter.getOrderedAtStart() != null && filter.getOrderedAtEnd() != null) {
-            eav.put(":orderedAtStart", new AttributeValue().withS(filter.getOrderedAtStart().toString()));
-            eav.put(":orderedAtEnd", new AttributeValue().withS(filter.getOrderedAtEnd().toString()));
-            appendFilter(filterExpression, "orderedAt BETWEEN :orderedAtStart AND :orderedAtEnd");
-        } else if (filter.getOrderedAtStart() != null) {
-            eav.put(":orderedAtStart", new AttributeValue().withS(filter.getOrderedAtStart().toString()));
-            appendFilter(filterExpression, "orderedAt >= :orderedAtStart");
-        } else if (filter.getOrderedAtEnd() != null) {
-            eav.put(":orderedAtEnd", new AttributeValue().withS(filter.getOrderedAtEnd().toString()));
-            appendFilter(filterExpression, "orderedAt <= :orderedAtEnd");
-        }
-
-        if (filter.isWaitingForCollection()) {
-            eav.put(":null", new AttributeValue().withNULL(true));
-            appendFilter(filterExpression, "(attribute_not_exists(receivedAt) OR receivedAt = :null)");
-        }
-
-        if (filter.isWithoutInvoice()) {
-            eav.put(":zero", new AttributeValue().withN("0"));
-            appendFilter(filterExpression, "(attribute_not_exists(invoiced) OR invoiced = :zero)");
-        }
-
-        if (filter.isWithoutSync()) {
-            eav.put(":false", new AttributeValue().withN("0"));
-            appendFilter(filterExpression, "(attribute_not_exists(synced) OR synced = :false)");
-        }
-
-        if (filter.isAwaitingApproval()) {
-            eav.put(":awaitingApproval", new AttributeValue().withS(DeliveryOrderStatus.AWAITING_APPROVAL.name()));
-            appendFilter(filterExpression, "orderStatus = :awaitingApproval");
-        }
-
-        if (filter.isGlobalOnly()) {
-            eav.put(":globalMode", new AttributeValue().withS(ConnectionMode.GLOBAL.name()));
-            appendFilter(filterExpression, "connectionMode = :globalMode");
-        }
-
-        return new QueryAndFilterExpressions(keyConditionExpression, filterExpression.toString(), eav);
+        List<Delivery> result = new ArrayList<>();
+        Map<String, AttributeValue> startKey = null;
+        do {
+            QueryResult page = amazonDynamoDB.query(new QueryRequest()
+                    .withTableName("Deliveries")
+                    .withIndexName(LIST_INDEX)
+                    .withKeyConditionExpression("storeId = :storeId AND " + keyCondition)
+                    .withExpressionAttributeValues(eav)
+                    .withExclusiveStartKey(startKey));
+            page.getItems().forEach(item -> result.add(dynamoDBMapper.marshallIntoObject(Delivery.class, item)));
+            startKey = page.getLastEvaluatedKey();
+        } while (startKey != null && !startKey.isEmpty());
+        return result.stream().filter(d -> keyMatches.test(DeliveryListKey.of(d))).toList();
     }
 
     public List<Delivery> findPendingDeliveriesByProvider(String storeId, String provider, String excludedDeliveryId) {
@@ -256,17 +261,5 @@ public class  DeliveriesRepository extends DynamoDbRepository<Delivery> {
                 .filter(delivery -> isNotBlank(delivery.getExternalDeliveryId()))
                 .sorted(Comparator.comparing(Delivery::getOrderedAt, Comparator.nullsFirst(Comparator.naturalOrder())))
                 .collect(Collectors.toList());
-    }
-
-    private static class QueryAndFilterExpressions {
-        private final String keyConditionExpression;
-        private final String filterExpression;
-        private final Map<String, AttributeValue> eav;
-
-        QueryAndFilterExpressions(String keyConditionExpression, String filterExpression, Map<String, AttributeValue> eav) {
-            this.keyConditionExpression = keyConditionExpression;
-            this.filterExpression = filterExpression;
-            this.eav = eav;
-        }
     }
 }

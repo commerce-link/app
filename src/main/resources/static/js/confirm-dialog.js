@@ -73,7 +73,9 @@
 
     dialog.addEventListener('close', function () {
         if (opener && document.contains(opener)) {
-            opener.focus();
+            // a link from an action menu sits in a closed details by now: its summary takes the focus instead
+            var menu = opener.closest('details.cl-menu');
+            (menu && !menu.open ? menu.querySelector(':scope > summary') : opener).focus();
         }
     });
 })();

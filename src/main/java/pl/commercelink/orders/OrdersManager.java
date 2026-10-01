@@ -22,6 +22,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.Map;
 import java.util.function.BiConsumer;
+import java.util.function.BiPredicate;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
@@ -132,17 +133,19 @@ public class OrdersManager {
                 .filter(i -> orderItemIds.contains(i.getItemId()))
                 .collect(Collectors.toList());
 
+        int removed = 0;
         for (OrderItem selectedOrderItem : selectedOrderItems) {
             if (selectedOrderItem.isNew() || selectedOrderItem.isService()) {
                 orderItems.remove(selectedOrderItem);
                 orderItemsRepository.delete(selectedOrderItem);
 
                 order.decreaseTotalPrice(selectedOrderItem.getTotalPrice());
+                removed++;
             }
         }
 
         orderLifecycle.update(order);
-        return new Result(order, orderItems);
+        return new Result(order, orderItems, 0, removed, orderItemIds.size());
     }
 
     public void markOrderItemsAsOrdered(String storeId, String orderId, String deliveryId, Map<String, Double> orderItemId2Costs, LocalDate estimatedDeliveryAt) {
@@ -209,47 +212,53 @@ public class OrdersManager {
     }
 
     public Result moveItemsToAllocation(String storeId, String orderId, List<String> orderItemIds) {
-        return execute(storeId, orderId, orderItemIds, (order, orderItem) -> {
-            if (orderItem.isReadyForAllocation()) {
-                orderItem.markAsInAllocation();
-                orderItemsRepository.save(orderItem);
+        return executeCounting(storeId, orderId, orderItemIds, (order, orderItem) -> {
+            if (!orderItem.isReadyForAllocation()) {
+                return false;
             }
+            orderItem.markAsInAllocation();
+            orderItemsRepository.save(orderItem);
+            return true;
         });
     }
 
     public Result moveOrderItemsToTheWarehouseForRMA(String storeId, String orderId, List<String> orderItemIds) {
         return executeSkippingDropshipItems(storeId, orderId, orderItemIds, (order, orderItem) -> {
-            if (orderItem.isProduct() && orderItem.isDelivered()) {
-                warehouse.reservationService(storeId)
-                        .remove(
-                                Reservation.orderFulfilmentToRMA(
-                                        storeId,
-                                        ReservationRemovalItem.from(orderItem)
-                                )
-                        );
-
-                orderItem.removeFulfilment();
-                orderItem.setComment(null);
-                orderItemsRepository.save(orderItem);
+            if (!(orderItem.isProduct() && orderItem.isDelivered())) {
+                return false;
             }
+            warehouse.reservationService(storeId)
+                    .remove(
+                            Reservation.orderFulfilmentToRMA(
+                                    storeId,
+                                    ReservationRemovalItem.from(orderItem)
+                            )
+                    );
+
+            orderItem.removeFulfilment();
+            orderItem.setComment(null);
+            orderItemsRepository.save(orderItem);
+            return true;
         });
     }
 
     public Result moveOrderItemsToTheWarehouse(String storeId, String orderId, List<String> orderItemIds) {
         return executeSkippingDropshipItems(storeId, orderId, orderItemIds, (order, orderItem) -> {
-            if (orderItem.isProduct() && orderItem.isAllocated()) {
-                warehouse.reservationService(storeId)
-                        .remove(
-                                Reservation.orderFulfilmentToStock(
-                                        storeId,
-                                        ReservationRemovalItem.from(orderItem)
-                                )
-                        );
-
-                orderItem.removeFulfilment();
-                orderItem.setComment(null);
-                orderItemsRepository.save(orderItem);
+            if (!(orderItem.isProduct() && orderItem.isAllocated())) {
+                return false;
             }
+            warehouse.reservationService(storeId)
+                    .remove(
+                            Reservation.orderFulfilmentToStock(
+                                    storeId,
+                                    ReservationRemovalItem.from(orderItem)
+                            )
+                    );
+
+            orderItem.removeFulfilment();
+            orderItem.setComment(null);
+            orderItemsRepository.save(orderItem);
+            return true;
         });
     }
 
@@ -257,16 +266,32 @@ public class OrdersManager {
         return execute(storeId, orderId, orderItemIds, action, (o, items) -> { });
     }
 
+    private Result executeCounting(String storeId, String orderId, Collection<String> orderItemIds,
+                                   BiPredicate<Order, OrderItem> action) {
+        int[] changed = {0};
+        Result result = execute(storeId, orderId, orderItemIds, (order, item) -> {
+            if (action.test(order, item)) {
+                changed[0]++;
+            }
+        });
+        return new Result(result.getOrder(), result.getOrderItems(), 0, changed[0], orderItemIds.size());
+    }
+
     /** Items sitting in a dropship delivery never reach the warehouse: they are left untouched and counted. */
     private Result executeSkippingDropshipItems(String storeId, String orderId, Collection<String> orderItemIds,
-                                                BiConsumer<Order, OrderItem> action) {
+                                                BiPredicate<Order, OrderItem> action) {
         Order order = ordersRepository.findById(storeId, orderId);
         List<OrderItem> orderItems = orderItemsRepository.findByOrderId(order.getOrderId());
         Set<String> dropshipItemIds = dropshipItemLookup.itemIdsInDropshipDeliveries(storeId, orderItems);
         List<String> selected = orderItemIds.stream().filter(id -> !dropshipItemIds.contains(id)).toList();
         int skipped = orderItemIds.size() - selected.size();
-        Result result = execute(storeId, orderId, selected, action, (o, items) -> { });
-        return new Result(result.getOrder(), result.getOrderItems(), skipped);
+        int[] changed = {0};
+        Result result = execute(storeId, orderId, selected, (o, item) -> {
+            if (action.test(o, item)) {
+                changed[0]++;
+            }
+        }, (o, items) -> { });
+        return new Result(result.getOrder(), result.getOrderItems(), skipped, changed[0], orderItemIds.size());
     }
 
     private Result execute(String storeId, String orderId, Collection<String> orderItemIds, BiConsumer<Order, OrderItem> action, BiConsumer<Order, List<OrderItem>> lifecycleAction) {
@@ -468,19 +493,35 @@ public class OrdersManager {
         private final Order order;
         private final List<OrderItem> orderItems;
         private final int skippedDropshipItems;
+        private final int changed;
+        private final int requested;
 
         public Result(Order order, List<OrderItem> orderItems) {
-            this(order, orderItems, 0);
+            this(order, orderItems, 0, 0, 0);
         }
 
         public Result(Order order, List<OrderItem> orderItems, int skippedDropshipItems) {
+            this(order, orderItems, skippedDropshipItems, 0, 0);
+        }
+
+        public Result(Order order, List<OrderItem> orderItems, int skippedDropshipItems, int changed, int requested) {
             this.order = order;
             this.orderItems = orderItems;
             this.skippedDropshipItems = skippedDropshipItems;
+            this.changed = changed;
+            this.requested = requested;
         }
 
         public int getSkippedDropshipItems() {
             return skippedDropshipItems;
+        }
+
+        public int getChanged() {
+            return changed;
+        }
+
+        public int getRequested() {
+            return requested;
         }
 
         public Order getOrder() {

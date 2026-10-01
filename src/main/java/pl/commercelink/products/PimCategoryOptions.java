@@ -10,10 +10,12 @@ import java.text.Collator;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Component
@@ -33,6 +35,13 @@ public class PimCategoryOptions {
     }
 
     /**
+     * A category already chosen in the multi picker — one chip. {@code path} names its ancestors, top level first, as
+     * the chip shows them, or is {@code null} for a top level or a category the PIM no longer has.
+     */
+    public record SelectedCategory(String id, String name, String path) {
+    }
+
+    /**
      * One checkbox on the store settings page. {@code inCatalogue} is false for a name the store has saved but PIM no
      * longer offers — it still gets a checkbox, otherwise saving the form would drop it without saying so.
      */
@@ -42,6 +51,9 @@ public class PimCategoryOptions {
     private static final Collator POLISH_COLLATOR = Collator.getInstance(Locale.forLanguageTag("pl-PL"));
 
     private static final String LANG = "pl";
+
+    /** The separator of a breadcrumb, the same the picker script uses and the chip style appends after the path. */
+    private static final String PATH_SEPARATOR = " \u203a ";
 
     private final PimCatalog pimCatalog;
 
@@ -125,11 +137,26 @@ public class PimCategoryOptions {
     }
 
     /**
-     * Options for already selected ids, in the given order — the chips next to the multi picker.
+     * The already selected ids, in the given order, with the path of each — the chips next to the multi picker.
      */
-    public List<CategoryOption> optionsOf(Collection<String> categoryIds) {
+    public List<SelectedCategory> selectedOf(Collection<String> categoryIds) {
         Map<String, PimCategory> byId = byId(categories());
-        return categoryIds.stream().map(id -> optionOf(id, byId)).toList();
+        return categoryIds.stream().map(id -> {
+            CategoryOption option = optionOf(id, byId);
+            return new SelectedCategory(option.id(), option.name(), pathOf(option.parentId(), byId));
+        }).toList();
+    }
+
+    /** The names above a category, top level first, joined as the picker joins them; {@code null} when there are none. */
+    private static String pathOf(String parentId, Map<String, PimCategory> byId) {
+        List<String> names = new ArrayList<>();
+        Set<String> visited = new HashSet<>();
+        while (parentId != null && byId.containsKey(parentId) && visited.add(parentId)) {
+            PimCategory parent = byId.get(parentId);
+            names.addFirst(parent.name());
+            parentId = parent.parentId();
+        }
+        return names.isEmpty() ? null : String.join(PATH_SEPARATOR, names);
     }
 
     /**

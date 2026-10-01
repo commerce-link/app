@@ -4,6 +4,8 @@ import com.amazonaws.services.dynamodbv2.model.ResourceNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.pim.api.PimCatalog;
@@ -107,34 +109,21 @@ class CategoryMappingCacheTest {
         assertThat(mappingCache.findActive("Acme", "Karty graficzne")).isEmpty();
     }
 
-    @Test
-    void nonLeafSampleIsIgnored() {
+    @ParameterizedTest(name = "{0}")
+    @CsvSource({
+            "non-leaf category, Dyski, 206, Przechowywanie danych, 5",
+            "root category, Komputery, 2833, Komputery i urządzenia peryferyjne, 1",
+            "unknown category, Dyski, 555, Nieznana, 1"
+    })
+    void sampleOfAnInvalidCategoryIsIgnored(String rule, String rawCategory, String categoryId, String categoryName, int samples) {
         // when
-        for (int i = 0; i < 5; i++) {
-            mappingCache.recordSample("Acme", "Dyski", "206", "Przechowywanie danych");
+        for (int i = 0; i < samples; i++) {
+            mappingCache.recordSample("Acme", rawCategory, categoryId, categoryName);
         }
 
         // then
         verify(repository, never()).save(any(CategoryMapping.class));
-        assertThat(mappingCache.findActive("Acme", "Dyski")).isEmpty();
-    }
-
-    @Test
-    void rootCategorySampleIsIgnored() {
-        // when
-        mappingCache.recordSample("Acme", "Komputery", "2833", "Komputery i urządzenia peryferyjne");
-
-        // then
-        verify(repository, never()).save(any(CategoryMapping.class));
-    }
-
-    @Test
-    void unknownCategorySampleIsIgnored() {
-        // when
-        mappingCache.recordSample("Acme", "Dyski", "555", "Nieznana");
-
-        // then
-        verify(repository, never()).save(any(CategoryMapping.class));
+        assertThat(mappingCache.findActive("Acme", rawCategory)).isEmpty();
     }
 
     @Test

@@ -113,7 +113,10 @@
                                 </td>
                             </tr>
                             <tr th:if="${preview.invoiceShortcut}">
-                                <th th:text="#{invoiceSync.provider}"></th>
+                                <th>
+                                    <span th:text="#{invoiceSync.provider}"></span>
+                                    <p class="help has-text-weight-normal" th:text="#{invoiceSync.provider.hint}"></p>
+                                </th>
                                 <td th:unless="${preview.shortcutDiffers}" colspan="3">
                                     <span class="tag" th:text="${preview.invoiceShortcut}"></span>
                                 </td>

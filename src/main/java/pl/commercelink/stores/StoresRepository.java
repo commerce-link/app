@@ -2,18 +2,14 @@ package pl.commercelink.stores;
 
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBScanExpression;
-import com.amazonaws.services.dynamodbv2.model.AttributeValue;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import pl.commercelink.starter.storage.FileStorage;
 import pl.commercelink.starter.dynamodb.DynamoDbRepository;
 import pl.commercelink.starter.storage.FileImageStorage;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 @Component
 public class StoresRepository extends DynamoDbRepository<Store> {
@@ -66,19 +62,6 @@ public class StoresRepository extends DynamoDbRepository<Store> {
             }
         }
         return null;
-    }
-
-    @Cacheable(value = "storeByApiKey", key = "#apiKey")
-    public String findByApiKey(String apiKey) {
-        Map<String, AttributeValue> eav = new HashMap<>();
-        eav.put(":apiKey", new AttributeValue().withS(apiKey));
-
-        DynamoDBScanExpression scanExpression = new DynamoDBScanExpression()
-                .withFilterExpression("apiKey = :apiKey")
-                .withExpressionAttributeValues(eav);
-
-        List<Store> results = dynamoDBMapper.scan(Store.class, scanExpression);
-        return results != null && !results.isEmpty() ? results.get(0).getStoreId() : null;
     }
 
 }

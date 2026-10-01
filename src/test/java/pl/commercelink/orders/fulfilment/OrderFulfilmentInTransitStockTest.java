@@ -20,6 +20,7 @@ import pl.commercelink.orders.OrderLifecycleEventPublisher;
 import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.notifications.OrderNotificationsEventPublisher;
+import pl.commercelink.receipts.ReceiptTrigger;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.taxonomy.Categories;
 import pl.commercelink.warehouse.GoodsOutEventPublisher;
@@ -70,6 +71,8 @@ class OrderFulfilmentInTransitStockTest {
     private GoodsOutEventPublisher goodsOutEventPublisher;
     @Mock
     private DropshipItemLookup dropshipItemLookup;
+    @Mock
+    private ReceiptTrigger receiptTrigger;
 
     @InjectMocks
     private OrderLifecycle orderLifecycle;

@@ -535,6 +535,11 @@
                         </div>
                         <th:block th:if="${view.preferredShippingEditable}">
                             <p class="is-size-7 has-text-grey mt-3" th:text="#{client.order.preferred.shipping.hint(${#temporals.format(view.estimatedShippingAt, 'd MMMM')}, ${#temporals.format(view.preferredShippingWindowEnd, 'd MMMM')})}"></p>
+                            <p class="is-size-7 has-text-grey">
+                                <span th:text="#{client.order.preferred.shipping.days}"></span>
+                                <span th:each="day, iter : ${view.preferredShippingDays}"
+                                      th:text="#{'DayOfWeek.short.' + ${day.name()}} + (${iter.last} ? '' : ', ')"></span>
+                            </p>
                             <form method="post" class="mt-2"
                                   th:action="@{/store/{storeId}/client/order/{orderId}/preferred-shipping(storeId=${store.storeId},orderId=${view.orderId})}">
                                 <div class="field has-addons">
@@ -543,7 +548,8 @@
                                                th:value="${view.preferredShippingAt}"
                                                th:min="${view.estimatedShippingAt}"
                                                th:max="${view.preferredShippingWindowEnd}"
-                                               th:data-weekend-message="#{client.order.preferred.shipping.error.weekend}">
+                                               th:data-allowed-days="${view.preferredShippingDayNumbers}"
+                                               th:data-day-message="#{client.order.preferred.shipping.error.day}">
                                     </div>
                                     <div class="control">
                                         <button type="submit" class="button is-primary is-small"
@@ -628,9 +634,11 @@
                     document.addEventListener("DOMContentLoaded", function () {
                         const input = document.getElementById("preferredShippingDate");
                         if (!input) return;
+                        const allowedDays = (input.dataset.allowedDays || "").split(",");
                         function validate() {
                             const day = input.valueAsDate ? input.valueAsDate.getUTCDay() : -1;
-                            input.setCustomValidity(day === 0 || day === 6 ? input.dataset.weekendMessage : "");
+                            const isoDay = day === 0 ? 7 : day;
+                            input.setCustomValidity(day >= 0 && !allowedDays.includes(String(isoDay)) ? input.dataset.dayMessage : "");
                         }
                         input.addEventListener("input", validate);
                         input.addEventListener("change", function () { validate(); input.reportValidity(); });

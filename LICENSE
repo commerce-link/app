@@ -17,6 +17,10 @@ Additional Use Grant: You may make production use of the Licensed Work,
                          to third parties as a standalone product, whether on
                          a paid or free basis.
 
+                      3. Operating the Licensed Work or a derivative work
+                         in production without the attribution described
+                         below.
+
                       For purposes of this license:
 
                       A "competitive offering" is a Product that is offered to
@@ -40,6 +44,18 @@ Additional Use Grant: You may make production use of the Licensed Work,
                       or business, is expressly permitted and is not considered
                       a competitive offering.
 
+                      Attribution: every production use of the Licensed
+                      Work or a derivative work, including use for Your own
+                      internal business purposes, must display the notice
+                      "Powered by CommerceLink" as a link to
+                      https://github.com/commerce-link/app. The notice must
+                      appear in a readily visible place, such as the page
+                      footer, on every user interface served by the
+                      Licensed Work or the derivative work. A derivative
+                      work without a user interface must include the notice
+                      in its documentation. In production use, the notice
+                      may not be removed, hidden or altered.
+
 Change Date:          Four years from the date the Licensed Work is published.
 Change License:       MIT
 
@@ -47,6 +63,10 @@ For information about alternative licensing arrangements for the Licensed Work,
 please contact hello@commercelink.pl.
 
 Notice
+
+The Business Source License (this document, or the "License") is not an Open
+Source license. However, the Licensed Work will eventually be made available
+under an Open Source License, as stated in this License.
 
 Business Source License 1.1
 

@@ -16,11 +16,18 @@ import pl.commercelink.inventory.deliveries.Delivery;
 import pl.commercelink.inventory.deliveries.DropshipItemLookup;
 import pl.commercelink.invoicing.InvoiceCreationEventPublisher;
 import pl.commercelink.orders.notifications.OrderNotificationsEventPublisher;
+import pl.commercelink.receipts.ReceiptAttempt;
+import pl.commercelink.receipts.ReceiptAttemptService;
+import pl.commercelink.receipts.ReceiptAttemptState;
+import pl.commercelink.receipts.ReceiptOrderState;
+import pl.commercelink.receipts.ReceiptTrigger;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.warehouse.GoodsOutEventPublisher;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
@@ -32,6 +39,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -50,6 +58,8 @@ class OrderLifecycleTest {
     @Mock private InvoiceCreationEventPublisher invoiceCreationEventPublisher;
     @Mock private GoodsOutEventPublisher goodsOutEventPublisher;
     @Mock private DropshipItemLookup dropshipItemLookup;
+    @Mock private ReceiptTrigger receiptTrigger;
+    @Mock private ReceiptAttemptService receiptAttemptService;
 
     @InjectMocks
     private OrderLifecycle orderLifecycle;
@@ -150,6 +160,132 @@ class OrderLifecycleTest {
     }
 
     @Test
+    void allItemsReturnedDoesNotCancelWhileTheEReceiptIsBeingIssued() {
+        // given: every item came back through RMA while the e-receipt is still being issued
+        Order order = fullyReturnedDeliveredOrder();
+        withAttempt(order, ReceiptAttemptState.ISSUING);
+        OrderItem item = returnedItem();
+
+        // when: e.g. the refund is recorded with "Dodaj wpłatę"
+        orderLifecycle.update(order, List.of(item));
+
+        // then: a cancel now could leave a fiscalised receipt on a cancelled order nobody was warned about
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.Delivered);
+        verify(ordersRepository).save(order);
+        verify(orderLifecycleEventPublisher, never()).publish(order, OrderLifecycleEventType.OrderCancelled);
+    }
+
+    @Test
+    void allItemsReturnedDoesNotCancelWhileAFiscalisedReceiptIsNotYetAttached() {
+        // given: registered in fiscal memory, its document not on the order yet
+        Order order = fullyReturnedDeliveredOrder();
+        withAttempt(order, ReceiptAttemptState.FISCALISED);
+        OrderItem item = returnedItem();
+
+        // when
+        orderLifecycle.update(order, List.of(item));
+
+        // then
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.Delivered);
+        verify(orderLifecycleEventPublisher, never()).publish(order, OrderLifecycleEventType.OrderCancelled);
+    }
+
+    @Test
+    void allItemsReturnedCancelsOnceTheFiscalisedReceiptIsAttached() {
+        // given: the receipt's document is on the order (the save that attaches it goes through here)
+        Order order = fullyReturnedDeliveredOrder();
+        ReceiptAttempt attempt = withAttempt(order, ReceiptAttemptState.FISCALISED);
+        order.addDocument(new Document(attempt.getReceiptKey(), "PAR/1/2026", null, DocumentType.Receipt,
+                LocalDate.of(2026, 9, 29)));
+        OrderItem item = returnedItem();
+
+        // when
+        orderLifecycle.update(order, List.of(item));
+
+        // then: cancelling after fiscalisation is allowed (owner decision); the receipt stays as issued
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.Cancelled);
+        verify(orderLifecycleEventPublisher).publish(order, OrderLifecycleEventType.OrderCancelled);
+    }
+
+    @Test
+    void aHeldBackCancelGoesThroughOnTheNextSaveOnceTheAttemptDied() {
+        // given: cancelling was held back while the e-receipt was being issued
+        Order order = fullyReturnedDeliveredOrder();
+        ReceiptAttempt attempt = withAttempt(order, ReceiptAttemptState.ISSUING);
+        OrderItem item = returnedItem();
+        orderLifecycle.update(order, List.of(item));
+        attempt.setState(ReceiptAttemptState.FAILED);
+
+        // when: the next save (the processor saves no order; the lifecycle cron's pass at the latest)
+        orderLifecycle.update(order, List.of(item));
+
+        // then: a dead attempt fiscalised nothing, so nothing holds the cancel any more
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.Cancelled);
+        verify(orderLifecycleEventPublisher).publish(order, OrderLifecycleEventType.OrderCancelled);
+    }
+
+    private static Order fullyReturnedDeliveredOrder() {
+        Order order = spy(new Order("store-1"));
+        order.setStatus(OrderStatus.Delivered);
+        doReturn(false).when(order).isAwaitingInvoiceGeneration();
+        doReturn(false).when(order).isAwaitingDocumentsGeneration(anyBoolean());
+        doReturn(false).when(order).isSettled(anyBoolean());
+        return order;
+    }
+
+    private static OrderItem returnedItem() {
+        OrderItem item = mock(OrderItem.class);
+        when(item.isReturned()).thenReturn(true);
+        return item;
+    }
+
+    /** The order's only attempt, read through the real lock rule (ReceiptOrderState#locksOrder). */
+    private ReceiptAttempt withAttempt(Order order, ReceiptAttemptState state) {
+        ReceiptAttempt attempt = new ReceiptAttempt();
+        attempt.setReceiptKey(order.getOrderId() + ":R1");
+        attempt.setState(state);
+        when(receiptAttemptService.locksOrder(order)).thenAnswer(i -> ReceiptOrderState.locksOrder(
+                ReceiptAttemptService.blocksManualReceipt(List.of(attempt)), order));
+        return attempt;
+    }
+
+    @Test
+    void aDeliveredOrderWithoutItemsIsNotCancelled() {
+        // given
+        Order order = spy(new Order("store-1"));
+        order.setStatus(OrderStatus.Delivered);
+        doReturn(false).when(order).isAwaitingInvoiceGeneration();
+        doReturn(false).when(order).isAwaitingDocumentsGeneration(anyBoolean());
+        doReturn(false).when(order).isSettled(anyBoolean());
+
+        // when
+        orderLifecycle.update(order, List.of());
+
+        // then
+        assertThat(order.getStatus()).isNotEqualTo(OrderStatus.Cancelled);
+        verify(orderLifecycleEventPublisher, never()).publish(order, OrderLifecycleEventType.OrderCancelled);
+    }
+
+    @Test
+    void anOrderWithoutAReviewIsCancelledAfterAFullReturnWithoutFailing() {
+        // given
+        Order order = spy(new Order("store-1"));
+        order.setStatus(OrderStatus.Delivered);
+        order.setReview(null);
+        doReturn(false).when(order).isAwaitingInvoiceGeneration();
+        doReturn(false).when(order).isAwaitingDocumentsGeneration(anyBoolean());
+        doReturn(false).when(order).isSettled(anyBoolean());
+        OrderItem item = mock(OrderItem.class);
+        when(item.isReturned()).thenReturn(true);
+
+        // when
+        orderLifecycle.update(order, List.of(item));
+
+        // then
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.Cancelled);
+    }
+
+    @Test
     void publishesOrderCompletedWhenDeliveredOrderIsSettled() {
         // given
         Order order = spy(new Order("store-1"));
@@ -167,6 +303,9 @@ class OrderLifecycleTest {
         assertEquals(OrderStatus.Completed, order.getStatus());
         verify(orderLifecycleEventPublisher).publish(order, OrderLifecycleEventType.OrderCompleted);
         verifyNoMoreInteractions(orderLifecycleEventPublisher);
+        InOrder inOrder = inOrder(ordersRepository, receiptTrigger);
+        inOrder.verify(ordersRepository).save(order);
+        inOrder.verify(receiptTrigger).onOrderSaved(eq(order), any());
     }
 
     @Test
@@ -195,6 +334,7 @@ class OrderLifecycleTest {
         Order order = new Order("store-1");
         order.setStatus(OrderStatus.Blocked);
         order.addDocument(new Document("doc-1", "FV/1/2026", "https://example.com/fv/1", DocumentType.InvoiceVat));
+        order.addShipment(deliveredShipment());
 
         // when
         orderLifecycle.update(order);
@@ -228,6 +368,7 @@ class OrderLifecycleTest {
         // given
         Order order = new Order("store-1");
         order.addDocument(new Document("doc-1", "FV/1/2026", "https://example.com/fv/1", DocumentType.InvoiceVat));
+        order.addShipment(deliveredShipment());
         OrderItem item = mock(OrderItem.class);
         when(item.isOrdered()).thenReturn(true);
         when(item.isDelivered()).thenReturn(true);
@@ -437,7 +578,7 @@ class OrderLifecycleTest {
         // given
         Order order = spy(new Order("store-1"));
         order.setStatus(OrderStatus.Assembly);
-        doReturn(false).when(order).isDelivered();
+        order.setShipments(new ArrayList<>(List.of(new Shipment(ShipmentType.Courier))));
         OrderItem item = mock(OrderItem.class);
         when(item.isOrdered()).thenReturn(false);
         when(item.isDelivered()).thenReturn(false);
@@ -451,5 +592,144 @@ class OrderLifecycleTest {
 
         // then
         verifyNoInteractions(dropshipItemLookup);
+    }
+
+    @Test
+    void aShippingOrderWhoseOnlyShipmentWasRemovedStaysShipping() {
+        // given: allMatch on no shipments is true, which delivered (and could complete) the order
+        Order order = new Order("store-1");
+        order.setStatus(OrderStatus.Shipping);
+        order.setShipments(new ArrayList<>());
+        order.addDocument(new Document("doc-1", "FV/1/2026", "https://example.com/fv/1", DocumentType.InvoiceVat));
+
+        // when
+        orderLifecycle.update(order, List.of());
+
+        // then
+        assertEquals(OrderStatus.Shipping, order.getStatus());
+        verifyNoInteractions(orderLifecycleEventPublisher, goodsOutEventPublisher);
+    }
+
+    @Test
+    void aShippingOrderDoesNotStampAPersonalCollectionWithoutItsDateAsReady() {
+        // given: K8 — the operator has just emptied the collection (removed shipment's placeholder, cleared date)
+        Order order = new Order("store-1");
+        order.setStatus(OrderStatus.Shipping);
+        Shipment parcel = new Shipment(ShipmentType.Courier);
+        parcel.setCarrier("InPost");
+        parcel.setTrackingNo("T-1");
+        parcel.setShippedAt(LocalDateTime.of(2026, 9, 27, 9, 0));
+        Shipment collection = new Shipment(ShipmentType.PersonalCollection);
+        order.setShipments(new ArrayList<>(List.of(parcel, collection)));
+
+        // when
+        orderLifecycle.update(order, List.of());
+
+        // then
+        assertEquals(OrderStatus.Shipping, order.getStatus());
+        assertThat(collection.getShippedAt()).isNull();
+    }
+
+    @Test
+    void anOrderWithoutShipmentsWaitsInRealizationWithNothingStamped() {
+        // given: the only shipment removed (the user's decision of 2026-09-30: no placeholder is kept)
+        Order order = new Order("store-1");
+        order.setStatus(OrderStatus.Realization);
+        order.setShipments(new ArrayList<>());
+        order.addDocument(new Document("doc-1", "FV/1/2026", "https://example.com/fv/1", DocumentType.InvoiceVat));
+
+        // when
+        orderLifecycle.update(order, List.of());
+
+        // then
+        assertEquals(OrderStatus.Realization, order.getStatus());
+        assertThat(order.getShipments()).isEmpty();
+        verifyNoInteractions(orderLifecycleEventPublisher, goodsOutEventPublisher);
+    }
+
+    @Test
+    void aReadyCollectionMovesARealizationOrderToShippingAsBefore() {
+        // given
+        Order order = new Order("store-1");
+        order.setStatus(OrderStatus.Realization);
+        Shipment collection = new Shipment(ShipmentType.PersonalCollection);
+        collection.setShippedAt(LocalDateTime.of(2026, 9, 30, 11, 40));
+        order.setShipments(new ArrayList<>(List.of(collection)));
+
+        // when
+        orderLifecycle.update(order, List.of());
+
+        // then
+        assertEquals(OrderStatus.Shipping, order.getStatus());
+        assertThat(collection.getShippedAt()).isEqualTo(LocalDateTime.of(2026, 9, 30, 11, 40));
+    }
+
+    @Test
+    void aShippingOrderIsDeliveredOnceEveryShipmentHasADeliveryDate() {
+        // given
+        Order order = new Order("store-1");
+        order.setStatus(OrderStatus.Shipping);
+        Shipment shipment = new Shipment(ShipmentType.Courier);
+        shipment.setShippedAt(LocalDateTime.of(2026, 9, 27, 9, 0));
+        shipment.setDeliveredAt(LocalDateTime.of(2026, 9, 28, 0, 0));
+        order.setShipments(new ArrayList<>(List.of(shipment)));
+        OrderItem item = mock(OrderItem.class);
+        when(item.isReturned()).thenReturn(false);
+
+        // when
+        orderLifecycle.update(order, List.of(item));
+
+        // then
+        assertEquals(OrderStatus.Delivered, order.getStatus());
+    }
+
+    @Test
+    void removingTheOnlyShipmentOfAPaidInvoicedOrderInRealizationDoesNotCompleteIt() {
+        // given: paid in full, invoiced, no review to collect; its only shipment (still waiting to go out) was removed
+        Order order = new Order("store-1");
+        order.setStatus(OrderStatus.Realization);
+        order.setTotalPrice(100);
+        order.addPayment(new Payment("ref-1", "Wpłata", PaymentSource.BankTransfer, 100, 0));
+        order.addDocument(new Document("doc-1", "FV/1/2026", "https://example.com/fv/1", DocumentType.InvoiceVat));
+        order.setShipments(new ArrayList<>());
+
+        // when
+        orderLifecycle.update(order, List.of());
+
+        // then: it never shipped, so it is neither delivered nor completed, and the marketplace hears nothing
+        assertEquals(OrderStatus.Realization, order.getStatus());
+        verify(orderLifecycleEventPublisher, never()).publish(order, OrderLifecycleEventType.OrderCompleted);
+        verifyNoInteractions(goodsOutEventPublisher);
+    }
+
+    @Test
+    void editingAPaymentAfterTheOnlyShipmentWasRemovedDoesNotCompleteTheOrder() {
+        // given: an invoiced Realization order left without shipments, paid only in part
+        Order order = new Order("store-1");
+        order.setStatus(OrderStatus.Realization);
+        order.setTotalPrice(100);
+        Payment payment = new Payment("ref-1", "Wpłata", PaymentSource.BankTransfer, 40, 0);
+        order.addPayment(payment);
+        order.addDocument(new Document("doc-1", "FV/1/2026", "https://example.com/fv/1", DocumentType.InvoiceVat));
+        order.setShipments(new ArrayList<>());
+        orderLifecycle.update(order, List.of());
+
+        // when: the payment is corrected to the full amount, which is saved through the lifecycle
+        payment.setAmount(100);
+        orderLifecycle.update(order, List.of());
+
+        // then
+        assertEquals(OrderStatus.Realization, order.getStatus());
+        verify(orderLifecycleEventPublisher, never()).publish(order, OrderLifecycleEventType.OrderCompleted);
+    }
+
+    /** Shipped and delivered: without shipments an order waits before Delivered instead of settling. */
+    private static Shipment deliveredShipment() {
+        Shipment shipment = new Shipment(ShipmentType.Courier);
+        shipment.setCarrier("DPD");
+        shipment.setTrackingNo("T-1");
+        shipment.setShippedAt(LocalDateTime.of(2026, 9, 27, 9, 0));
+        shipment.setDeliveredAt(LocalDateTime.of(2026, 9, 28, 10, 0));
+        return shipment;
     }
 }

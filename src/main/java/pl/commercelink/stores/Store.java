@@ -6,10 +6,12 @@ import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBIgnore;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTable;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBVersionAttribute;
 import pl.commercelink.orders.BillingDetails;
+import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.notifications.EmailNotificationType;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 
+import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -29,6 +31,8 @@ public class Store {
     private Branding branding;
     @DynamoDBAttribute(attributeName = "invoicing")
     private InvoicingConfiguration invoicingConfiguration;
+    @DynamoDBAttribute(attributeName = "receipts")
+    private ReceiptConfiguration receiptConfiguration;
     @DynamoDBAttribute(attributeName = "marketplaces")
     private List<MarketplaceIntegration> marketplaces = new LinkedList<>();
     @DynamoDBAttribute(attributeName = "payments")
@@ -203,11 +207,17 @@ public class Store {
         return removed;
     }
 
+    /**
+     * The name configured for the integration type, or null. A provider that lost its authorisation is stored with a
+     * null name (ShippingProviderFactory#onAuthorizationLost) and reads as not configured: findFirst on a null element
+     * would throw, taking down every page that asks (the order page, the courier page).
+     */
     @DynamoDBIgnore
     public String getConfigurationValue(IntegrationType type) {
         return integrations.stream()
                 .filter(config -> config.getType() == type)
                 .map(Integration::getName)
+                .filter(Objects::nonNull)
                 .findFirst()
                 .orElse(null);
     }
@@ -372,6 +382,17 @@ public class Store {
         this.invoicingConfiguration = invoicingConfiguration;
     }
 
+    public ReceiptConfiguration getReceiptConfiguration() {
+        if (receiptConfiguration == null) {
+            receiptConfiguration = new ReceiptConfiguration();
+        }
+        return receiptConfiguration;
+    }
+
+    public void setReceiptConfiguration(ReceiptConfiguration receiptConfiguration) {
+        this.receiptConfiguration = receiptConfiguration;
+    }
+
     public ClientNotificationsConfiguration getClientNotificationsConfiguration() {
         return clientNotificationsConfiguration;
     }
@@ -510,6 +531,22 @@ public class Store {
         return clientNotificationsConfiguration != null && clientNotificationsConfiguration.supports(type);
     }
 
+    /**
+     * Turns on the {@code ORDER_RECEIPT} e-mail, creating the client notifications configuration if the store has
+     * none yet. Called whenever e-receipts are enabled for the first time (the settings form and the demo seeder
+     * alike), so a store never starts raising a permanent {@code EMAIL_NOT_SENT} alert on its first fiscalised
+     * receipt for lack of an e-mail type to send. Idempotent: a store that already supports the type is untouched.
+     */
+    public void enableOrderReceiptEmailNotification() {
+        if (clientNotificationsConfiguration == null) {
+            clientNotificationsConfiguration = new ClientNotificationsConfiguration();
+        }
+        if (!clientNotificationsConfiguration.supports(EmailNotificationType.ORDER_RECEIPT)) {
+            clientNotificationsConfiguration.enableNotification(EmailNotificationType.ORDER_RECEIPT,
+                    EmailNotificationType.ORDER_RECEIPT.getTemplateName());
+        }
+    }
+
     public void enableClientShippingAddressChangeNotifications() {
         if (clientNotificationsConfiguration == null) {
             clientNotificationsConfiguration = new ClientNotificationsConfiguration();
@@ -551,6 +588,13 @@ public class Store {
         return isClientOrderPageEnabled() && Optional.ofNullable(fulfilmentConfiguration)
                 .map(FulfilmentConfiguration::isClientPreferredShippingDateEnabled)
                 .orElse(false);
+    }
+
+    @DynamoDBIgnore
+    public Set<DayOfWeek> preferredShippingDaysFor(ShipmentType type) {
+        return Optional.ofNullable(fulfilmentConfiguration)
+                .map(configuration -> configuration.preferredShippingDaysFor(type))
+                .orElse(FulfilmentConfiguration.DEFAULT_PREFERRED_SHIPPING_DAYS);
     }
 
     @DynamoDBIgnore

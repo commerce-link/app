@@ -1,12 +1,16 @@
 package pl.commercelink.stores;
 
 import org.junit.jupiter.api.Test;
+import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
+import java.time.DayOfWeek;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -25,6 +29,35 @@ class FulfilmentConfigurationTest {
     void newConfigurationLeavesEnabledCategoriesUnsetToDetectFormsWithoutCategoryCheckboxes() {
         // when / then
         assertNull(new FulfilmentConfiguration().getEnabledCategories());
+    }
+
+    @Test
+    void preferredShippingDaysDefaultToWeekdaysForEveryShipmentTypeUntilConfigured() {
+        // given
+        FulfilmentConfiguration configuration = new FulfilmentConfiguration();
+
+        // when / then
+        for (ShipmentType type : ShipmentType.values()) {
+            assertEquals(EnumSet.range(DayOfWeek.MONDAY, DayOfWeek.FRIDAY), configuration.preferredShippingDaysFor(type));
+        }
+        assertEquals(EnumSet.range(DayOfWeek.MONDAY, DayOfWeek.FRIDAY), configuration.preferredShippingDaysFor(null));
+    }
+
+    @Test
+    void preferredShippingDaysComeFromTheConfiguredTypeAndFallBackForTheOthers() {
+        // given
+        FulfilmentConfiguration configuration = new FulfilmentConfiguration();
+        configuration.setPreferredShippingDays(Map.of(
+                ShipmentType.PersonalCollection.name(), List.of("SATURDAY", "MONDAY"),
+                ShipmentType.PickupPoint.name(), List.of()));
+
+        // when / then
+        assertEquals(EnumSet.of(DayOfWeek.MONDAY, DayOfWeek.SATURDAY),
+                configuration.preferredShippingDaysFor(ShipmentType.PersonalCollection));
+        assertEquals(EnumSet.range(DayOfWeek.MONDAY, DayOfWeek.FRIDAY),
+                configuration.preferredShippingDaysFor(ShipmentType.Courier));
+        assertEquals(EnumSet.range(DayOfWeek.MONDAY, DayOfWeek.FRIDAY),
+                configuration.preferredShippingDaysFor(ShipmentType.PickupPoint));
     }
 
     @Test
@@ -103,6 +136,9 @@ class FulfilmentConfigurationTest {
         }
         if (type == List.class) {
             return List.of("value");
+        }
+        if (type == Map.class) {
+            return Map.of("key", List.of("value"));
         }
         if (type.isEnum()) {
             for (Object constant : type.getEnumConstants()) {

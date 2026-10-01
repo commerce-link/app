@@ -81,7 +81,7 @@
                         <fieldset class="cl-fieldset">
                             <legend class="cl-fieldset-title" th:text="#{store.suppliers.admin.title}"></legend>
                             <p class="cl-help" th:text="#{store.suppliers.admin.help}"></p>
-                            <div th:replace="~{fragments/settings-form :: check('canUseGlobalSuppliers', 'store.suppliers.admin.global', *{canUseGlobalSuppliers}, 'store.suppliers.admin.global.description', null)}"></div>
+                            <div th:replace="~{fragments/settings-form :: check('canUseGlobalSuppliers', 'store.suppliers.admin.global', *{canUseGlobalSuppliers}, 'store.suppliers.admin.global.description', null, null)}"></div>
                             <div class="cl-form-grid">
                                 <div class="cl-span-3" th:insert="~{fragments/settings-form :: textField('inventoryCacheTtlMinutes', 'store.suppliers.admin.cacheTtl', *{inventoryCacheTtlMinutes}, 'text', 'off', false, ${errors['inventoryCacheTtlMinutes']}, #{store.suppliers.admin.cacheTtl.help})}"></div>
                             </div>

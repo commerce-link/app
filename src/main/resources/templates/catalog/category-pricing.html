@@ -1,0 +1,182 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+<div layout:fragment="content">
+    <section class="cl-page">
+        <div class="cl-page-body">
+            <div th:replace="~{fragments/settings-header :: subpageWithActions(${backHref}, ${backLabel}, #{catalog.category.pricing.title}, ${lead}, null)}"></div>
+
+            <form th:fragment="pricingForm" id="category-pricing-form" class="cl-form is-wide" th:action="@{${formAction}}"
+                  th:object="${form}" method="post" novalidate data-cl-async
+                  th:attr="data-cl-redirect=${redirectTo}, data-error-message=#{form.save.failed}">
+                <div th:replace="~{fragments/settings-form :: errorSummaryWithArguments('category-pricing-errors', ${errors}, ${form.errorArgumentsByField()})}"></div>
+                <div class="cl-card">
+                    <fieldset class="cl-fieldset">
+                        <legend class="cl-fieldset-title" th:text="#{catalog.category.pricing.stock}"></legend>
+                        <p class="cl-help" th:text="#{catalog.category.pricing.stock.help}"></p>
+                        <div class="cl-form-grid">
+                            <div class="cl-span-2" th:insert="~{fragments/settings-form :: textField('critical', 'catalog.category.pricing.critical', *{critical}, 'text', 'off', true, ${errors['critical']}, null)}"></div>
+                            <div class="cl-span-2" th:insert="~{fragments/settings-form :: textField('low', 'catalog.category.pricing.low', *{low}, 'text', 'off', true, ${errors['low']}, null)}"></div>
+                            <div class="cl-span-2" th:insert="~{fragments/settings-form :: textField('high', 'catalog.category.pricing.high', *{high}, 'text', 'off', true, ${errors['high']}, null)}"></div>
+                        </div>
+                    </fieldset>
+                    <fieldset class="cl-fieldset">
+                        <legend class="cl-fieldset-title" th:text="#{catalog.category.pricing.availability}"></legend>
+                        <p class="cl-help" th:text="#{catalog.category.pricing.availability.help}"></p>
+                        <div class="cl-form-grid">
+                            <div class="cl-span-2" th:insert="~{fragments/settings-form :: textField('minQty', 'catalog.category.pricing.minQty', *{minQty}, 'text', 'off', true, ${errors['minQty']}, null)}"></div>
+                            <div class="cl-span-2" th:insert="~{fragments/settings-form :: textField('minProviders', 'catalog.category.pricing.minProviders', *{minProviders}, 'text', 'off', true, ${errors['minProviders']}, null)}"></div>
+                        </div>
+                    </fieldset>
+                    <fieldset class="cl-fieldset" id="groups" tabindex="-1">
+                        <legend class="cl-fieldset-title" th:text="#{catalog.category.pricing.groups}"></legend>
+                        <p class="cl-help" th:text="#{catalog.category.pricing.groups.help}"></p>
+                        <p class="cl-help" th:text="#{catalog.category.pricing.groups.order.help}"></p>
+                        <p th:if="${errors['groups'] != null}" class="cl-field-error">
+                            <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                            <span th:text="#{${errors['groups']}}"></span>
+                        </p>
+                        <!--/* A group is deleted by dropping its fields; the controller compares what comes back with
+                               what the category has, so no hidden input carries the removal. */-->
+                        <div class="cl-repeat" data-cl-repeat="groups" data-cl-repeat-id="group" data-cl-repeat-min="1">
+                            <!--/* th:insert runs before th:each on one element, so the loop sits on its own block. */-->
+                            <th:block th:each="group, stat : *{groups}">
+                                <fieldset class="cl-fieldset" data-cl-repeat-item
+                                          th:insert="~{catalog/category-pricing :: priceGroup(${stat.index}, ${stat.count}, ${group})}"></fieldset>
+                            </th:block>
+                            <template data-cl-repeat-template>
+                                <fieldset class="cl-fieldset" data-cl-repeat-item
+                                          th:insert="~{catalog/category-pricing :: priceGroup('@INDEX@', '@NUMBER@', null)}"></fieldset>
+                            </template>
+                            <div class="cl-repeat-add">
+                                <button type="button" class="cl-button" data-cl-repeat-add hidden>
+                                    <i class="fas fa-plus" aria-hidden="true"></i>
+                                    <span th:text="#{catalog.category.pricing.group.add}"></span>
+                                </button>
+                                <span class="cl-visually-hidden" role="status" data-cl-repeat-status
+                                      th:attr="data-template=#{catalog.category.pricing.group.removed('@N@')}"></span>
+                            </div>
+                        </div>
+                    </fieldset>
+                    <div class="cl-card-footer">
+                        <button class="cl-button is-primary" type="submit" th:text="#{catalog.category.pricing.save}"></button>
+                        <a class="cl-button" th:href="@{${backHref}}" th:text="#{general.cancel}"></a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </section>
+    <script th:if="${!errors.isEmpty()}">
+        document.getElementById('category-pricing-errors').focus();
+    </script>
+    <script th:src="@{/js/async-form.js}" defer></script>
+    <script th:src="@{/js/repeat-fields.js}" defer></script>
+</div>
+
+<!--/* One price group: its index in the posted list, the number shown to people, and its values (null for a blank one).
+       The "Default" group keeps its name and cannot be removed: products without another assignment are priced by it. */-->
+<th:block th:fragment="priceGroup(index, number, group)"
+          th:with="prefix=${'groups[' + index + '].'}, isDefault=${group != null and group.isDefault()}">
+    <legend class="cl-fieldset-title">
+        <span th:text="#{catalog.category.pricing.group}"></span>
+        <span data-cl-repeat-number th:text="${number}"></span>
+        <span th:if="${isDefault}" class="cl-status is-info" th:text="#{catalog.category.pricing.group.default}"></span>
+        <!--/* One group may be several rules (the same name, another label or price threshold); its rows say so. */-->
+        <span th:if="${group != null and form.repeatsAGroup(group)}" class="cl-status is-info"
+              th:text="#{catalog.category.pricing.group.repeated}"></span>
+        <!--/* What the group picks up by itself, in the legend: the order of the groups is only readable with it.
+               A price threshold without a label assigns nothing, so that combination is a warning, not a summary. */-->
+        <span th:if="${group != null and group.autoSummaryKey() != null}" class="cl-status"
+              th:classappend="${group.autoSummaryInactive} ? 'is-warn' : 'is-neutral'"
+              th:text="#{${group.autoSummaryKey()}(${group.labelMatch}, ${group.priceMatch})}"></span>
+        <!--/* Put back by a refused removal: products still use it. */-->
+        <span th:if="${group != null and group.inUse}" class="cl-status is-warn"
+              th:text="#{catalog.category.pricing.group.inUse.pill}"></span>
+    </legend>
+    <div class="cl-form-grid">
+        <div class="cl-span-2 cl-field" th:with="id=${'group-' + index + '-name'}, error=${errors.get(id)}">
+            <label class="cl-label" th:for="${id}" th:text="#{catalog.category.pricing.group.name}"></label>
+            <input class="cl-input" type="text" autocomplete="off" th:classappend="${error != null} ? 'is-invalid'"
+                   th:id="${id}" th:name="${prefix + 'name'}" th:value="${group?.name}" th:readonly="${isDefault}"
+                   th:attr="aria-invalid=${error != null ? 'true' : null}, aria-describedby=${error != null ? id + '-error' : null}"/>
+            <p th:if="${error != null}" class="cl-field-error" th:id="${id} + '-error'">
+                <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                <span th:text="#{${error}}"></span>
+            </p>
+        </div>
+        <th:block th:each="field : ${ {'multiplier', 'minProfit'} }">
+            <div class="cl-span-2 cl-field"
+                 th:with="id=${'group-' + index + '-' + field}, error=${errors.get(id)}">
+                <label class="cl-label" th:for="${id}" th:text="#{'catalog.category.pricing.group.' + ${field}}"></label>
+                <input class="cl-input" type="text" inputmode="decimal" autocomplete="off"
+                       th:classappend="${error != null} ? 'is-invalid'"
+                       th:id="${id}" th:name="${prefix + field}"
+                       th:value="${group == null ? (field == 'multiplier' ? '1,00' : '0') : group[field]}"
+                       th:attr="aria-invalid=${error != null ? 'true' : null}, aria-describedby=${error != null ? id + '-error' : null}"/>
+                <p th:if="${error != null}" class="cl-field-error" th:id="${id} + '-error'">
+                    <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                    <span th:text="${#messages.msgWithParams(error, form.errorArguments(id))}"></span>
+                </p>
+            </div>
+        </th:block>
+        <div class="cl-span-6">
+            <span class="cl-label" th:text="#{catalog.category.pricing.adjustments}"></span>
+        </div>
+        <th:block th:each="field : ${ {'critical', 'low', 'medium'} }">
+            <div class="cl-span-2 cl-field"
+                 th:with="id=${'group-' + index + '-' + field}, error=${errors.get(id)}">
+                <label class="cl-label" th:for="${id}" th:text="#{'catalog.category.pricing.adjustment.' + ${field}}"></label>
+                <input class="cl-input" type="text" inputmode="numeric" autocomplete="off"
+                       th:classappend="${error != null} ? 'is-invalid'"
+                       th:id="${id}" th:name="${prefix + field}" th:value="${group == null ? '0' : group[field]}"
+                       th:attr="aria-invalid=${error != null ? 'true' : null}, aria-describedby=${error != null ? id + '-error' : null}"/>
+                <p th:if="${error != null}" class="cl-field-error" th:id="${id} + '-error'">
+                    <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                    <span th:text="${#messages.msgWithParams(error, form.errorArguments(id))}"></span>
+                </p>
+            </div>
+        </th:block>
+    </div>
+    <details class="cl-disclosure" th:id="${'group-' + index + '-auto'}"
+             th:open="${group != null and (!#strings.isEmpty(group.labelMatch) or !#strings.isEmpty(group.priceMatch))}">
+        <summary th:text="#{catalog.category.pricing.auto}"></summary>
+        <div class="cl-disclosure-body">
+            <div class="cl-form-grid">
+                <div class="cl-span-3 cl-field" th:with="id=${'group-' + index + '-labelMatch'}">
+                    <label class="cl-label" th:for="${id}">
+                        <span th:text="#{catalog.category.pricing.labelMatch}"></span>
+                        <span class="cl-optional" th:text="#{form.optional}"></span>
+                    </label>
+                    <input class="cl-input" type="text" autocomplete="off" th:id="${id}" th:name="${prefix + 'labelMatch'}"
+                           th:value="${group?.labelMatch}"/>
+                </div>
+                <div class="cl-span-3 cl-field"
+                     th:with="id=${'group-' + index + '-priceMatch'}, error=${errors.get(id)}">
+                    <label class="cl-label" th:for="${id}">
+                        <span th:text="#{catalog.category.pricing.priceMatch}"></span>
+                        <span class="cl-optional" th:text="#{form.optional}"></span>
+                    </label>
+                    <input class="cl-input" type="text" inputmode="decimal" autocomplete="off"
+                           th:classappend="${error != null} ? 'is-invalid'"
+                           th:id="${id}" th:name="${prefix + 'priceMatch'}" th:value="${group?.priceMatch}"
+                           th:attr="aria-invalid=${error != null ? 'true' : null}, aria-describedby=${error != null ? id + '-error' : null}"/>
+                    <p th:if="${error != null}" class="cl-field-error" th:id="${id} + '-error'">
+                        <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                        <span th:text="#{${error}}"></span>
+                    </p>
+                </div>
+                <div class="cl-span-6">
+                    <p class="cl-help" th:text="#{catalog.category.pricing.auto.help}"></p>
+                </div>
+            </div>
+        </div>
+    </details>
+    <button th:unless="${isDefault}" type="button" class="cl-link-button is-danger cl-repeat-remove"
+            data-cl-repeat-remove hidden th:text="#{catalog.category.pricing.group.removeShort}"
+            th:attr="aria-label=#{catalog.category.pricing.group.remove(${number})},
+                     data-cl-repeat-label=#{catalog.category.pricing.group.remove('@N@')}"></button>
+</th:block>
+</body>
+</html>

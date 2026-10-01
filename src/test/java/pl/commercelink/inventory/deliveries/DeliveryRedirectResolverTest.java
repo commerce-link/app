@@ -23,6 +23,13 @@ class DeliveryRedirectResolverTest {
         return order;
     }
 
+    /** Resolved as for an order whose dropship assessment accepts the item's supplier. */
+    private String resolve(Order order, OrderItem item) {
+        return resolver.resolveFor(order, item, item.getDeliveryId() == null
+                ? DropshipAssessment.rejected(DropshipRejection.NOTHING_ALLOCATED)
+                : DropshipAssessment.of(java.util.List.of(item.getDeliveryId())));
+    }
+
     private static OrderItem item(String deliveryId, FulfilmentStatus status) {
         OrderItem item = new OrderItem();
         item.setDeliveryId(deliveryId);
@@ -37,7 +44,7 @@ class DeliveryRedirectResolverTest {
         OrderItem item = item(SupplierRegistry.WAREHOUSE, FulfilmentStatus.Delivered);
 
         // when
-        String url = resolver.resolveFor(order, item);
+        String url = resolve(order, item);
 
         // then
         assertThat(url).isEqualTo("/dashboard/warehouse");
@@ -50,7 +57,7 @@ class DeliveryRedirectResolverTest {
         OrderItem item = item("AcmeB", FulfilmentStatus.New);
 
         // when
-        String url = resolver.resolveFor(order, item);
+        String url = resolve(order, item);
 
         // then
         assertThat(url).isEqualTo("/dashboard/deliveries/create/AcmeB");
@@ -63,7 +70,7 @@ class DeliveryRedirectResolverTest {
         OrderItem item = item("AcmeB", FulfilmentStatus.New);
 
         // when
-        String url = resolver.resolveFor(order, item);
+        String url = resolve(order, item);
 
         // then
         assertThat(url).isEqualTo("/dashboard/orders/order-1/dropship?provider=AcmeB");
@@ -76,7 +83,7 @@ class DeliveryRedirectResolverTest {
         OrderItem item = item("AcmeB", FulfilmentStatus.Allocation);
 
         // when
-        String url = resolver.resolveFor(order, item);
+        String url = resolve(order, item);
 
         // then
         assertThat(url).isEqualTo("/dashboard/orders/order-1/dropship?provider=AcmeB");
@@ -89,7 +96,7 @@ class DeliveryRedirectResolverTest {
         OrderItem item = item("AcmeB", FulfilmentStatus.Ordered);
 
         // when
-        String url = resolver.resolveFor(order, item);
+        String url = resolve(order, item);
 
         // then
         assertThat(url).isEqualTo("/dashboard/deliveries/details?deliveryId=AcmeB");
@@ -102,7 +109,7 @@ class DeliveryRedirectResolverTest {
         OrderItem item = item(SupplierRegistry.WAREHOUSE, FulfilmentStatus.Allocation);
 
         // when
-        String url = resolver.resolveFor(order, item);
+        String url = resolve(order, item);
 
         // then
         assertThat(url).isEqualTo("/dashboard/warehouse");
@@ -116,7 +123,7 @@ class DeliveryRedirectResolverTest {
         item.markAsClaimed("delivery-1");
 
         // when
-        String url = resolver.resolveFor(order, item);
+        String url = resolve(order, item);
 
         // then
         assertThat(url).isEqualTo("/dashboard/deliveries/details?deliveryId=delivery-1");
@@ -130,7 +137,7 @@ class DeliveryRedirectResolverTest {
         item.markAsClaimed("delivery-1");
 
         // when
-        String url = resolver.resolveFor(order, item);
+        String url = resolve(order, item);
 
         // then
         assertThat(url).isEqualTo("/dashboard/deliveries/details?deliveryId=delivery-1");
@@ -144,11 +151,24 @@ class DeliveryRedirectResolverTest {
         OrderItem item = item(provider, FulfilmentStatus.New);
 
         // when
-        String url = resolver.resolveFor(order, item);
+        String url = resolve(order, item);
 
         // then
         String encodedProvider = URLEncoder.encode(provider, StandardCharsets.UTF_8);
         assertThat(url).isEqualTo("/dashboard/orders/order-1/dropship?provider=" + encodedProvider);
         assertThat(url).isEqualTo("/dashboard/orders/order-1/dropship?provider=Acme+%26+B");
+    }
+
+    @Test
+    void aDirectToConsumerItemOfASupplierWithoutDropshippingLinksToTheWarehouseDeliveryPlanning() {
+        // given: DeliveriesPlanningService sends such items the ordinary warehouse route, the dropship page refuses them
+        Order order = order(FulfilmentType.DirectToConsumer);
+        OrderItem item = item("AcmeB", FulfilmentStatus.Allocation);
+
+        // when
+        String url = resolver.resolveFor(order, item, DropshipAssessment.of(java.util.List.of("Acme")));
+
+        // then
+        assertThat(url).isEqualTo("/dashboard/deliveries/create/AcmeB");
     }
 }

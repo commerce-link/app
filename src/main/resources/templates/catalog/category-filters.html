@@ -1,0 +1,226 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+<div layout:fragment="content">
+    <section class="cl-page">
+        <div class="cl-page-body">
+            <!--/* The lead is defined inside the replaced element: the header pulls it in as its slot, and the body of a
+                   th:replace host is dropped, so it is never rendered twice. */-->
+            <div th:replace="~{fragments/settings-header :: subpageWithActions(${backHref}, ${backLabel}, #{catalog.category.filters.title},
+                    ~{::filtersLead}, null)}">
+                <th:block th:fragment="filtersLead">
+                    <span th:text="${category.name} + ' · ' + #{catalog.category.filters.lead}"></span>
+                    <a th:if="${matchingProducts != null}" th:href="@{${productsAddHref}}"
+                       th:text="#{catalog.category.filters.matching(${matchingProducts})}"></a>
+                </th:block>
+            </div>
+
+            <form th:fragment="filtersForm" id="category-filters-form" class="cl-form is-wide" th:action="@{${formAction}}"
+                  th:object="${form}" method="post" novalidate data-cl-async
+                  th:attr="data-cl-redirect=${redirectTo}, data-error-message=#{form.save.failed}">
+                <!--/* The messages are already translated: the line of a broken brand line does not fit in a message key. */-->
+                <div th:replace="~{fragments/settings-form :: errorSummaryText('category-filters-errors', ${errorSummary})}"></div>
+                <div class="cl-card">
+                    <div class="cl-card-head">
+                        <h2 class="cl-card-title" th:text="#{catalog.category.filters.card}"></h2>
+                        <p class="cl-card-desc" th:utext="#{catalog.category.filters.card.desc}"></p>
+                    </div>
+                    <!--/* No spare group in noscript: a blank filter would be an incomplete one, and the page would not
+                           save until it was filled in. Without JavaScript the filters can be edited, but not added. */-->
+                    <div class="cl-repeat" data-cl-repeat="filters" data-cl-repeat-id="filter" data-cl-repeat-min="0">
+                        <!--/* th:insert runs before th:each on one element, so the loop sits on its own block. */-->
+                        <th:block th:each="filter, stat : *{filters}">
+                            <fieldset class="cl-fieldset" data-cl-repeat-item
+                                      th:insert="~{catalog/category-filters :: filterGroup(${stat.index}, ${stat.count}, ${filter})}"></fieldset>
+                        </th:block>
+                        <template data-cl-repeat-template>
+                            <fieldset class="cl-fieldset" data-cl-repeat-item
+                                      th:insert="~{catalog/category-filters :: filterGroup('@INDEX@', '@NUMBER@', null)}"></fieldset>
+                        </template>
+                        <div class="cl-repeat-add">
+                            <button type="button" class="cl-button" data-cl-repeat-add hidden>
+                                <i class="fas fa-plus" aria-hidden="true"></i>
+                                <span th:text="#{catalog.category.filters.add}"></span>
+                            </button>
+                            <span class="cl-visually-hidden" role="status" data-cl-repeat-status
+                                  th:attr="data-template=#{catalog.category.filters.removed('@N@')}"></span>
+                        </div>
+                    </div>
+                    <div class="cl-card-footer">
+                        <button class="cl-button is-primary" type="submit" th:text="#{catalog.category.filters.save}"></button>
+                        <a class="cl-button" th:href="@{${backHref}}" th:text="#{general.cancel}"></a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </section>
+    <script th:if="${!errors.isEmpty()}">
+        document.getElementById('category-filters-errors').focus();
+    </script>
+    <script th:src="@{/js/async-form.js}" defer></script>
+    <script th:src="@{/js/repeat-fields.js}" defer></script>
+    <script th:src="@{/js/variant-fields.js}" defer></script>
+</div>
+
+<!--/* One filter: its index in the posted list, the number shown to people, and its values (null for a blank one).
+       Every kind posts the same field names; the fields of the kinds that were not chosen are hidden (and, inside a
+       fieldset, disabled) by variant-fields.js, and the server reads only the fields of the chosen kind anyway. */-->
+<th:block th:fragment="filterGroup(index, number, filter)"
+          th:with="prefix=${'filters[' + index + '].'}, group=${'filter-' + index + '-kind'}, selected=${filter?.type},
+                   labels=${T(pl.commercelink.web.catalog.InventoryFilterLabels)},
+                   listShown=${labels.shownType('LIST', filter?.type)},
+                   priceShown=${labels.shownType('PRICE_RANGE', filter?.type)},
+                   brandShown=${labels.shownType('BY_BRAND', filter?.type)}">
+    <legend class="cl-fieldset-title">
+        <span th:text="#{catalog.category.filters.filter}"></span>
+        <span data-cl-repeat-number th:text="${number}"></span>
+    </legend>
+    <div class="cl-form-grid">
+        <div class="cl-span-6 cl-field" th:with="id=${'filter-' + index + '-type'}, error=${errors.get(id)}">
+            <label class="cl-label" th:for="${id}" th:text="#{catalog.category.filters.type}"></label>
+            <select class="cl-select" th:classappend="${error != null} ? 'is-invalid'" th:id="${id}" th:name="${prefix + 'type'}"
+                    th:attr="data-cl-variant-select=${group}, aria-invalid=${error != null ? 'true' : null},
+                             aria-describedby=${error != null ? id + '-error' : null}">
+                <option th:each="option : ${filterTypes}" th:value="${option.value}" th:text="#{${option.labelKey}}"
+                        th:selected="${option.value == selected}"></option>
+            </select>
+            <p th:if="${error != null}" class="cl-field-error" th:id="${id} + '-error'">
+                <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                <span th:text="${error}"></span>
+            </p>
+        </div>
+    </div>
+    <fieldset class="cl-choice-group" th:attr="data-cl-variant-when=${group + '=' + listVariants}">
+        <div class="cl-form-grid">
+            <div class="cl-span-6 cl-field" th:with="id=${'filter-' + index + '-values'}, error=${errors.get(id)}">
+                <label class="cl-label" th:for="${id}">
+                    <th:block th:replace="~{catalog/category-filters :: variantTexts(${group}, ${listShown}, 'LIST', 'fieldKey')}"></th:block>
+                </label>
+                <input class="cl-input" type="text" autocomplete="off" th:classappend="${error != null} ? 'is-invalid'"
+                       th:id="${id}" th:name="${prefix + 'values'}" th:value="${filter?.values}"
+                       th:attr="aria-invalid=${error != null ? 'true' : null},
+                                aria-describedby=${id + '-help' + (error != null ? ' ' + id + '-error' : '')}"/>
+                <p class="cl-help" th:id="${id} + '-help'">
+                    <th:block th:replace="~{catalog/category-filters :: variantTexts(${group}, ${listShown}, 'LIST', 'helpKey')}"></th:block>
+                </p>
+                <p th:if="${error != null}" class="cl-field-error" th:id="${id} + '-error'">
+                    <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                    <span th:text="${error}"></span>
+                </p>
+            </div>
+        </div>
+    </fieldset>
+    <fieldset class="cl-choice-group" th:attr="data-cl-variant-group=${group}, data-cl-variant='PRICE_RANGE'">
+        <div class="cl-form-grid">
+            <div class="cl-span-3 cl-field" th:with="id=${'filter-' + index + '-minPrice'}, error=${errors.get(id)}">
+                <label class="cl-label" th:for="${id}" th:text="#{catalog.filter.price.min}"></label>
+                <input class="cl-input" type="text" inputmode="numeric" autocomplete="off"
+                       th:classappend="${error != null} ? 'is-invalid'"
+                       th:id="${id}" th:name="${prefix + 'minPrice'}" th:value="${filter?.minPrice}"
+                       th:attr="aria-invalid=${error != null ? 'true' : null},
+                                aria-describedby=${error != null ? id + '-error' : null}"/>
+                <p th:if="${error != null}" class="cl-field-error" th:id="${id} + '-error'">
+                    <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                    <span th:text="${error}"></span>
+                </p>
+            </div>
+            <div class="cl-span-3 cl-field" th:with="id=${'filter-' + index + '-maxPrice'}, error=${errors.get(id)}">
+                <label class="cl-label" th:for="${id}">
+                    <span th:text="#{catalog.filter.price.max}"></span>
+                    <span class="cl-optional" th:text="#{form.optional}"></span>
+                </label>
+                <input class="cl-input" type="text" inputmode="numeric" autocomplete="off"
+                       th:classappend="${error != null} ? 'is-invalid'"
+                       th:id="${id}" th:name="${prefix + 'maxPrice'}" th:value="${filter?.maxPrice}"
+                       th:attr="aria-invalid=${error != null ? 'true' : null},
+                                aria-describedby=${error != null ? id + '-error' : null}"/>
+                <p th:if="${error != null}" class="cl-field-error" th:id="${id} + '-error'">
+                    <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                    <span th:text="${error}"></span>
+                </p>
+            </div>
+            <div class="cl-span-6">
+                <p class="cl-help">
+                    <th:block th:replace="~{catalog/category-filters :: variantTexts(${group}, ${priceShown}, 'PRICE_RANGE', 'helpKey')}"></th:block>
+                </p>
+            </div>
+        </div>
+    </fieldset>
+    <fieldset class="cl-choice-group" th:attr="data-cl-variant-when=${group + '=' + brandVariants}">
+        <div class="cl-form-grid">
+            <div class="cl-span-6 cl-field" th:with="id=${'filter-' + index + '-brandLines'}, error=${errors.get(id)}">
+                <label class="cl-label" th:for="${id}">
+                    <th:block th:replace="~{catalog/category-filters :: variantTexts(${group}, ${brandShown}, 'BY_BRAND', 'fieldKey')}"></th:block>
+                </label>
+                <textarea class="cl-input cl-textarea" rows="4" th:classappend="${error != null} ? 'is-invalid'"
+                          th:id="${id}" th:name="${prefix + 'brandLines'}" th:text="${filter?.brandLines}"
+                          th:attr="aria-invalid=${error != null ? 'true' : null},
+                                   aria-describedby=${id + '-help' + (error != null ? ' ' + id + '-error' : '')}"></textarea>
+                <p class="cl-help" th:id="${id} + '-help'">
+                    <th:block th:replace="~{catalog/category-filters :: variantTexts(${group}, ${brandShown}, 'BY_BRAND', 'helpKey')}"></th:block>
+                </p>
+                <p th:if="${error != null}" class="cl-field-error" th:id="${id} + '-error'">
+                    <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+                    <span th:text="${error}"></span>
+                </p>
+            </div>
+        </div>
+    </fieldset>
+    <!--/* Metadata this page has no field for: one editable row each, so a filter written by hand can be corrected or
+           cleaned up. The rows are their own repeated group, which repeat-fields.js renumbers inside the filter. */-->
+    <div th:if="${filter != null and !filter.unknown.isEmpty()}" class="cl-repeat cl-repeat-lines"
+         data-cl-repeat="unknown" data-cl-repeat-id="unknown" data-cl-repeat-min="0">
+        <p class="cl-help" th:text="#{catalog.filter.unknown.help}"></p>
+        <!--/* th:insert runs before th:each on one element, so the loop sits on its own block. */-->
+        <th:block th:each="pair, row : ${filter.unknown}">
+            <div class="cl-repeat-line is-unknown" data-cl-repeat-item
+                 th:insert="~{catalog/category-filters :: unknownRow(${index}, ${row.index}, ${row.count}, ${prefix}, ${pair})}"></div>
+        </th:block>
+        <!--/* No "Add": the rows exist because the filter carries them, and a new pair belongs in the typed fields. */-->
+        <span class="cl-visually-hidden" role="status" data-cl-repeat-status
+              th:attr="data-template=#{catalog.filter.unknown.removed('@N@')}"></span>
+    </div>
+    <button type="button" class="cl-link-button is-danger cl-repeat-remove" data-cl-repeat-remove hidden
+            th:text="#{catalog.category.filters.removeShort}"
+            th:attr="aria-label=#{catalog.category.filters.remove(${number})},
+                     data-cl-repeat-label=#{catalog.category.filters.remove('@N@')}"></button>
+</th:block>
+
+<!--/* One metadata pair the filter carries but the typed fields do not cover: its key and its value, both editable,
+       and the row is removed by the "Remove" beside it. The ids carry both indexes, which repeat-fields.js renumbers. */-->
+<th:block th:fragment="unknownRow(index, row, number, prefix, pair)"
+          th:with="keyId=${'filter-' + index + '-unknown-' + row + '-key'},
+                   valueId=${'filter-' + index + '-unknown-' + row + '-value'}, keyError=${errors.get(keyId)}">
+    <span class="cl-status is-warn" th:text="#{catalog.filter.unknown.pill}"></span>
+    <label class="cl-visually-hidden" th:for="${keyId}" th:text="#{catalog.filter.unknown.key}"></label>
+    <input class="cl-input" type="text" autocomplete="off" th:classappend="${keyError != null} ? 'is-invalid'"
+           th:id="${keyId}" th:name="${prefix + 'unknown[' + row + '].key'}" th:value="${pair?.key}"
+           th:attr="aria-invalid=${keyError != null ? 'true' : null},
+                    aria-describedby=${keyError != null ? keyId + '-error' : null}"/>
+    <label class="cl-visually-hidden" th:for="${valueId}" th:text="#{catalog.filter.unknown.value}"></label>
+    <input class="cl-input" type="text" autocomplete="off" th:id="${valueId}"
+           th:name="${prefix + 'unknown[' + row + '].value'}" th:value="${pair?.value}"/>
+    <button type="button" class="cl-link-button is-danger cl-repeat-remove" data-cl-repeat-remove hidden
+            th:text="#{settings.list.delete}"
+            th:attr="aria-label=#{catalog.filter.unknown.remove(${number})},
+                     data-cl-repeat-label=#{catalog.filter.unknown.remove('@N@')}"></button>
+    <p th:if="${keyError != null}" class="cl-field-error" th:id="${keyId} + '-error'">
+        <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+        <span th:text="${keyError}"></span>
+    </p>
+</th:block>
+
+<!--/* The label or the help of the field shared by the filters of one kind: one text per type of the kind, of which
+       only the one of the shown type is visible. The server hides the others, so without JavaScript exactly one text
+       stands under the field instead of all of them. */-->
+<th:block th:fragment="variantTexts(group, shown, kind, keyName)">
+    <th:block th:each="option : ${filterTypes}">
+        <span th:if="${option.kind == kind}" th:text="#{${option.get(keyName)}}"
+              th:attr="data-cl-variant-when=${group + '=' + option.value},
+                       hidden=${option.value == shown ? null : 'hidden'}"></span>
+    </th:block>
+</th:block>
+</body>
+</html>

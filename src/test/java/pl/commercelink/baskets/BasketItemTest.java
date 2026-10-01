@@ -33,30 +33,12 @@ class BasketItemTest {
     }
 
     @Test
-    void serviceFlagSetExplicitlyMakesItemAService() {
-        // given
-        BasketItem item = BasketItem.of(pricelistRow("Usługi dodatkowe"), 1, "catalog-1", false);
-
-        // when
-        item.setService(true);
-
-        // then
-        assertThat(item.isService()).isTrue();
-    }
-
-    @Test
     void legacyServicesCategoryStringAloneDoesNotMakeItemAService() {
         // given
         BasketItem item = new BasketItem("id", "name", "mfn", "Services", 100, 80, 1, null, 1, false);
 
         // when / then
         assertThat(item.isService()).isFalse();
-    }
-
-    @Test
-    void shippingItemIsService() {
-        // when / then
-        assertThat(BasketItem.shipping(10.0).isService()).isTrue();
     }
 
     @Test

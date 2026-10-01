@@ -1,5 +1,5 @@
 <!DOCTYPE HTML>
-<html xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout">
+<html th:lang="${#locale.language}" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout">
 <head>
     <title th:text="#{general.title}"></title>
 
@@ -47,7 +47,7 @@
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <th:block th:replace="~{fragments/gtm :: tag}"></th:block>
 </head>
-<body th:attr="data-cl-server-error=#{form.save.serverError}">
+<body th:attr="data-cl-server-error=#{form.save.serverError}, data-cl-amount-format=#{general.currency.amount}">
 <th:block th:replace="~{fragments/gtm :: noscript}"></th:block>
 
 <a class="cl-skip" href="#clContent" th:text="#{nav.skip.to.content}"></a>

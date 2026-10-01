@@ -24,7 +24,7 @@
                             <div class="cl-span-3" th:insert="~{fragments/settings-form :: textField('swiftCode', 'bank.swift.code', *{swiftCode}, 'text', 'off', false, ${errors['swiftCode']}, #{store.payments.account.swift.help})}"></div>
                             <p th:if="${alreadyDefault}" class="cl-help" th:text="#{store.payments.account.isDefault}"></p>
                             <th:block th:unless="${alreadyDefault}">
-                                <div th:replace="~{fragments/settings-form :: check('makeDefault', 'store.payments.account.makeDefault', *{makeDefault}, 'store.payments.account.makeDefault.description', null)}"></div>
+                                <div th:replace="~{fragments/settings-form :: check('makeDefault', 'store.payments.account.makeDefault', *{makeDefault}, 'store.payments.account.makeDefault.description', null, null)}"></div>
                             </th:block>
                         </div>
                     </fieldset>

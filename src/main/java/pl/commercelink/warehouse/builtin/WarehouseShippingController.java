@@ -17,6 +17,7 @@ import pl.commercelink.starter.security.CustomSecurityContext;
 import java.util.List;
 import java.util.stream.Collectors;
 import pl.commercelink.shipping.DeliveryTarget;
+import pl.commercelink.shipping.ShippingPageView;
 
 @Controller
 @RequestMapping("/dashboard/warehouse/shipping")
@@ -77,5 +78,11 @@ public class WarehouseShippingController extends AbstractShippingController {
     @Override
     protected DeliveryTarget resolveDeliveryTarget(ShippingForm form) {
         return new DeliveryTarget(null, null, null);
+    }
+
+    @Override
+    protected ShippingPageView pageView(ShippingForm form) {
+        return new ShippingPageView("/dashboard/warehouse", "nav.warehouse", null,
+                "shipping.lead.warehouse", form.getOrderItemIds().size());
     }
 }

@@ -1,0 +1,299 @@
+package pl.commercelink.web;
+
+import org.junit.jupiter.api.Test;
+import pl.commercelink.orders.ShippingDetails;
+import pl.commercelink.orders.ShippingForm;
+import pl.commercelink.shipping.ParcelForm;
+import pl.commercelink.shipping.ShippingPageView;
+import pl.commercelink.shipping.api.ShippingEstimate;
+import pl.commercelink.stores.PackageTemplate;
+import pl.commercelink.web.settings.SettingsTemplateRenderer;
+
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+/** The courier booking page (shipping.html) as orders, RMA and the warehouse render it, with Polish messages. */
+class ShippingTemplateTest {
+
+    static final String ORDER_ID = "3e373abc-1111-2222-3333-444455556666";
+    static final Path TEMPLATE = Path.of("src/main/resources/templates/shipping.html");
+
+    static ShippingDetails recipient(String name, String street) {
+        ShippingDetails details = new ShippingDetails();
+        details.setName(name);
+        details.setSurname("Kowalski");
+        details.setCompanyName("Serwis Sp. z o.o.");
+        details.setStreetAndNumber(street);
+        details.setPostalCode("00-001");
+        details.setCity("Warszawa");
+        details.setCountry("PL");
+        details.setEmail("jan@example.pl");
+        details.setPhone("500600700");
+        return details;
+    }
+
+    static PackageTemplate template(String id, String name, boolean isDefault) {
+        PackageTemplate template = new PackageTemplate(name, List.of());
+        template.setId(id);
+        template.setDefault(isDefault);
+        return template;
+    }
+
+    static Map<String, Object> model(ShippingForm form, List<ShippingDetails> recipients, ShippingPageView view) {
+        if (form.getShippingDetails() == null && !recipients.isEmpty()) {
+            form.setShippingDetails(recipients.get(0));
+        }
+        ShippingDetails pickup = recipient("Magazyn", "Magazynowa 1");
+        pickup.setId("pickup-1");
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("navigation", null);
+        variables.put("shippingForm", form);
+        variables.put("shippingEntityId", form.getShippingEntityId());
+        variables.put("shippingDetailsList", recipients);
+        variables.put("deliveryPointCode", null);
+        variables.put("pickUpAddresses", List.of(pickup));
+        variables.put("packageTemplates", List.of(template("t-small", "Mała paczka", false), template("t-pc", "Komputer", true)));
+        variables.put("shippingPage", view);
+        return variables;
+    }
+
+    static ShippingPageView orderView() {
+        return new ShippingPageView("/dashboard/orders/" + ORDER_ID, "order.page.title", "3e373abc",
+                "shipping.lead.order", "3e373abc");
+    }
+
+    static String page(String html) {
+        int start = html.indexOf("<section class=\"cl-page\"");
+        return html.substring(start, html.indexOf("</section>", html.lastIndexOf("shipping-create-form")) + "</section>".length());
+    }
+
+    static String render(Map<String, Object> variables) {
+        return page(SettingsTemplateRenderer.render("shipping", variables)).replaceAll("\\s+", " ");
+    }
+
+    static ShippingForm pricedOrderForm() {
+        ShippingForm form = new ShippingForm(ORDER_ID, "orders");
+        form.setPickUpAddressId("pickup-1");
+        form.setPackageTemplateId("t-small");
+        form.setCashOnDelivery(true);
+        form.setCashOnDeliveryAmount(149.5);
+        List<ParcelForm> parcels = new ArrayList<>();
+        parcels.add(new ParcelForm(40, 60, 30, 8, 1797, "Komputer", "package"));
+        parcels.add(ParcelForm.empty());
+        form.setParcels(parcels);
+        form.setServiceId("dpd");
+        return form;
+    }
+
+    @Test
+    void beforeTheParcelsAreLoadedOnlyTheFirstStepCanBeSent() {
+        // given
+        Map<String, Object> variables = model(new ShippingForm(ORDER_ID, "orders"),
+                List.of(recipient("Jan", "Prosta 5")), orderView());
+        variables.put("preferredShippingWarning", "2026-10-02");
+
+        // when
+        String html = render(variables);
+
+        // then
+        assertThat(html).contains("<h1 class=\"cl-page-title\">Zamów kuriera</h1>")
+                .contains("href=\"/dashboard/orders/" + ORDER_ID + "\"").contains("Zamówienie 3e373abc")
+                .contains("Przesyłka do klienta z zamówienia 3e373abc.")
+                .contains("class=\"cl-alert is-warn\"").contains("Klient poprosił o wysyłkę 2026-10-02.")
+                .contains("action=\"/dashboard/orders/" + ORDER_ID + "/shipping/template\"")
+                .contains("<legend class=\"cl-fieldset-title\">Adres dostawy</legend>")
+                .contains("data-cl-recipient-view=\"street\">Prosta 5</div>")
+                .contains("name=\"shippingDetails.streetAndNumber\" value=\"Prosta 5\" data-cl-recipient-field=\"street\"")
+                .contains("<option value=\"pickup-1\">Magazynowa 1 Warszawa</option>")
+                .contains("<option value=\"t-pc\" selected=\"selected\">Komputer</option>")
+                .contains("class=\"cl-button is-primary\">Wczytaj paczki</button>")
+                .contains("Wybierz szablon paczek i kliknij „Wczytaj paczki”.")
+                .contains("Wyceń przesyłkę, żeby zobaczyć oferty przewoźników.")
+                .doesNotContain("id=\"shipping-parcels\"").doesNotContain("Wyceń przesyłkę</button>")
+                .doesNotContain("Zamów kuriera</button>").doesNotContain("data-cl-recipient-select")
+                .doesNotContain("??");
+    }
+
+    @Test
+    void afterPricingTheParcelsOptionsAndOffersAreEditableAndCarriedToTheBooking() {
+        // given
+        Map<String, Object> variables = model(pricedOrderForm(), List.of(recipient("Jan", "Prosta 5")), orderView());
+        variables.put("servicePrices", List.of(
+                new ShippingEstimate("dpd", "DPD", true, new BigDecimal("23.50"), new BigDecimal("19.11"), List.of()),
+                new ShippingEstimate("ups", "UPS", false, null, null, List.of("Za ciężka paczka"))));
+
+        // when
+        String html = render(variables);
+
+        // then
+        assertThat(html).contains("id=\"shipping-parcels\"")
+                .contains("<th scope=\"row\" class=\"cl-table-key\">Paczka 1</th>")
+                .contains("name=\"parcels[0].depth\" value=\"60\"").contains("name=\"parcels[0].value\" value=\"1797\"")
+                .contains("aria-label=\"Paczka 1 · Długość (cm)\"").contains("data-label=\"Zawartość\"")
+                .contains("<input type=\"hidden\" name=\"parcels[0].type\" value=\"package\">")
+                .contains("id=\"cashOnDelivery\" name=\"cashOnDelivery\" value=\"true\" data-cl-reveal=\"shipping-cod\" aria-controls=\"shipping-cod\" checked=\"checked\"")
+                .contains("<div class=\"cl-reveal\" id=\"shipping-cod\">")
+                .contains("class=\"cl-input is-price\"").contains("name=\"cashOnDeliveryAmount\" value=\"149.5\"")
+                .contains("class=\"cl-button\">Wyceń przesyłkę</button>")
+                .contains("value=\"dpd\" checked=\"checked\"").contains("23,5 PLN brutto")
+                .contains("value=\"ups\" disabled=\"disabled\"").contains("Niedostępna")
+                .contains("<span class=\"cl-choice-description is-warn\">Za ciężka paczka</span>")
+                .contains("class=\"cl-button is-primary\">Zamów kuriera</button>")
+                .contains("action=\"/dashboard/orders/" + ORDER_ID + "/shipping/create\"")
+                .contains("<input type=\"hidden\" name=\"parcels[1].description\" value=\"\">")
+                .contains("<input type=\"hidden\" name=\"pickUpAddressId\" value=\"pickup-1\">")
+                .doesNotContain("??");
+        assertThat(OrderDetailsTemplateTest.occurrences(html, "name=\"cashOnDelivery\"")).isEqualTo(2);
+        assertThat(OrderDetailsTemplateTest.occurrences(html, "name=\"shippingDetails.phone\" value=\"500600700\"")).isEqualTo(3);
+    }
+
+    @Test
+    void anRmaWithSeveralServiceCentresLetsTheOperatorChooseTheRecipient() {
+        // given
+        ShippingForm form = new ShippingForm("rma-7", "rma");
+        form.setOrderItemIds(List.of("item-1", "item-2"));
+        ShippingPageView view = new ShippingPageView("/dashboard/rma/rma-7", "rma.details", null,
+                "shipping.lead.rma.center", "rma-7");
+
+        // when
+        String html = render(model(form, List.of(recipient("Serwis A", "Długa 1"), recipient("Serwis B", "Krótka 2")), view));
+
+        // then
+        assertThat(html).contains("href=\"/dashboard/rma/rma-7\"").contains("Szczegóły RMA")
+                .contains("Wysyłka produktów z reklamacji rma-7 do dystrybutora.")
+                .contains("<select class=\"cl-select\" id=\"shipping-recipient\" data-cl-recipient-select>")
+                .contains("data-street=\"Długa 1\" data-postal=\"00-001\" data-city=\"Warszawa\" data-country=\"PL\" data-email=\"jan@example.pl\" data-phone=\"500600700\" selected=\"selected\">")
+                .contains("data-street=\"Krótka 2\"")
+                .contains("Serwis B Kowalski, Krótka 2, Warszawa</option>")
+                .contains("action=\"/dashboard/rma/rma-7/shipping/template\"")
+                .contains("<input type=\"hidden\" name=\"orderItemIds\" value=\"item-2\">")
+                .contains("<input type=\"hidden\" name=\"toClient\" value=\"false\">")
+                .doesNotContain("??");
+    }
+
+    @Test
+    void warehouseItemsHaveNoRecordIdAndGoBackToTheWarehouse() {
+        // given
+        ShippingForm form = new ShippingForm(null, "warehouse");
+        form.setOrderItemIds(List.of("w-1", "w-2", "w-3"));
+        ShippingPageView view = new ShippingPageView("/dashboard/warehouse", "nav.warehouse", null,
+                "shipping.lead.warehouse", 3);
+
+        // when
+        String html = render(model(form, List.of(recipient("Serwis", "Długa 1")), view));
+
+        // then
+        assertThat(html).contains("href=\"/dashboard/warehouse\"")
+                .contains("Wysyłka przedmiotów z magazynu do dystrybutora. Przedmioty: 3")
+                .contains("action=\"/dashboard/warehouse/shipping/template\"")
+                .doesNotContain("name=\"shippingEntityId\"").doesNotContain("??");
+    }
+
+    @Test
+    void withoutACourierAccountTheReasonIsThePagesOwnAlert() {
+        // given
+        Map<String, Object> variables = model(pricedOrderForm(), List.of(recipient("Jan", "Prosta 5")), orderView());
+        variables.put("shippingUnavailable", "Sklep nie ma podłączonego przewoźnika — dane nadania wpisz w przesyłce.");
+
+        // when
+        String html = render(variables);
+
+        // then: a warning alert of the page, not the layout's old banner; no offers to book
+        assertThat(html).contains("<div class=\"cl-alert is-warn\" id=\"shipping-unavailable\" role=\"alert\">")
+                .contains("Sklep nie ma podłączonego przewoźnika — dane nadania wpisz w przesyłce.")
+                .doesNotContain("id=\"shipping-create-submit\"");
+    }
+
+    @Test
+    void theCourierButtonIsDisabledOnceItsFormIsSent() throws IOException {
+        // given
+        String js = Files.readString(Path.of("src/main/resources/static/js/shipping-booking.js"), StandardCharsets.UTF_8);
+        Map<String, Object> variables = model(pricedOrderForm(), List.of(recipient("Jan", "Prosta 5")), orderView());
+        variables.put("servicePrices", List.of(
+                new ShippingEstimate("dpd", "DPD", true, new BigDecimal("23.50"), new BigDecimal("19.11"), List.of())));
+
+        // when
+        String html = render(variables);
+
+        // then: one click books one label; the button has no name, so disabling it drops nothing from the post
+        int button = html.indexOf("id=\"shipping-create-submit\"");
+        assertThat(button).isPositive();
+        assertThat(html.substring(html.lastIndexOf("<button", button), html.indexOf(">", button))).doesNotContain("name=");
+        assertThat(js).contains("event.submitter && event.submitter.id === 'shipping-create-submit'")
+                .contains("event.submitter.disabled = true").contains("addEventListener('pageshow'")
+                .contains("event.persisted");
+    }
+
+    @Test
+    void theTemplateHasNoInlineBehaviourNoBulmaLookAndNoDuplicateIds() throws IOException {
+        // given
+        String source = Files.readString(TEMPLATE, StandardCharsets.UTF_8);
+        Map<String, Object> variables = model(pricedOrderForm(), List.of(recipient("Jan", "Prosta 5")), orderView());
+        variables.put("servicePrices", List.of(
+                new ShippingEstimate("dpd", "DPD", true, BigDecimal.TEN, BigDecimal.ONE, List.of())));
+
+        // when
+        String html = render(variables);
+
+        // then
+        assertThat(source).doesNotContain("style=").doesNotContain("onclick=").doesNotContain("onchange=")
+                .doesNotContain("<script>").doesNotContain("th:field=").doesNotContain("class=\"button")
+                .doesNotContain("class=\"box").doesNotContain("class=\"notification").doesNotContain("class=\"tag")
+                .doesNotContain("class=\"select").doesNotContain("class=\"table").doesNotContain("class=\"title");
+        Matcher ids = Pattern.compile(" id=\"([^\"]+)\"").matcher(html);
+        Set<String> seen = new TreeSet<>();
+        while (ids.find()) {
+            assertThat(seen.add(ids.group(1))).as("duplicate id " + ids.group(1)).isTrue();
+        }
+        assertThat(OrderDetailsTemplateTest.occurrences(html, "<h1")).isEqualTo(1);
+    }
+
+    @Test
+    void everyKeyOfTheTemplateExistsInBothBundles() throws IOException {
+        // given
+        String source = Files.readString(TEMPLATE, StandardCharsets.UTF_8);
+        Properties pl = load("messages_pl.properties");
+        Properties en = load("messages_en.properties");
+        Set<String> missing = new TreeSet<>();
+
+        // when
+        Matcher keys = Pattern.compile("(?:#\\{|')(shipping\\.[a-zA-Z0-9_.]+|person\\.[a-zA-Z0-9_.]+)").matcher(source);
+        while (keys.find()) {
+            String key = keys.group(1);
+            if (!pl.containsKey(key)) missing.add("pl:" + key);
+            if (!en.containsKey(key)) missing.add("en:" + key);
+        }
+        for (String key : List.of("order.page.title", "rma.details", "nav.warehouse", "shipping.lead.rma.client",
+                "shipping.lead.rma.center", "shipping.lead.warehouse", "shipping.lead.order")) {
+            if (!pl.containsKey(key)) missing.add("pl:" + key);
+            if (!en.containsKey(key)) missing.add("en:" + key);
+        }
+
+        // then
+        assertThat(missing).isEmpty();
+    }
+
+    private static Properties load(String name) throws IOException {
+        Properties properties = new Properties();
+        try (InputStreamReader reader = new InputStreamReader(
+                ShippingTemplateTest.class.getClassLoader().getResourceAsStream(name), StandardCharsets.UTF_8)) {
+            properties.load(reader);
+        }
+        return properties;
+    }
+}

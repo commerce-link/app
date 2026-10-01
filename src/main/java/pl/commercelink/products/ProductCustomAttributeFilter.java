@@ -37,7 +37,7 @@ public class ProductCustomAttributeFilter {
             throw new RuntimeException("Unknown operator: " + text);
         }
 
-        private static boolean isKnown(String op) {
+        public static boolean isKnown(String op) {
             for (Operator o : Operator.values()) {
                 if (o.operator.equals(op)) {
                     return true;

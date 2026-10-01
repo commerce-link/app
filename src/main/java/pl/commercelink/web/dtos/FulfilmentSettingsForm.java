@@ -3,11 +3,15 @@ package pl.commercelink.web.dtos;
 import lombok.Getter;
 import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
+import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.stores.FulfilmentConfiguration;
 import pl.commercelink.stores.Store;
 
+import java.time.DayOfWeek;
+import java.util.EnumSet;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -29,6 +33,7 @@ public class FulfilmentSettingsForm {
     private boolean clientOrderPageEnabled;
     private boolean clientShippingAddressChangeEnabled;
     private boolean clientPreferredShippingDateEnabled;
+    private Map<String, List<String>> preferredShippingDays = new LinkedHashMap<>();
 
     public static FulfilmentSettingsForm from(Store store) {
         FulfilmentConfiguration config = store.getFulfilmentConfiguration() != null
@@ -42,7 +47,15 @@ public class FulfilmentSettingsForm {
         form.clientOrderPageEnabled = config.isClientOrderPageEnabled();
         form.clientShippingAddressChangeEnabled = config.isClientShippingAddressChangeEnabled();
         form.clientPreferredShippingDateEnabled = config.isClientPreferredShippingDateEnabled();
+        for (ShipmentType type : ShipmentType.values()) {
+            form.preferredShippingDays.put(type.name(), dayNames(config.preferredShippingDaysFor(type)));
+        }
         return form;
+    }
+
+    public boolean hasPreferredShippingDay(String type, String day) {
+        List<String> days = preferredShippingDays.get(type);
+        return days != null && days.contains(day);
     }
 
     public Map<String, String> validate() {
@@ -55,6 +68,11 @@ public class FulfilmentSettingsForm {
         }
         if (fulfilmentType() == null) {
             errors.put("defaultFulfilmentType", "store.fulfilment.type.required");
+        }
+        for (ShipmentType type : ShipmentType.values()) {
+            if (selectedDays(type).isEmpty()) {
+                errors.put("preferredShippingDays", "store.fulfilment.preferredDays.required");
+            }
         }
         return errors;
     }
@@ -71,7 +89,32 @@ public class FulfilmentSettingsForm {
         config.setClientOrderPageEnabled(clientOrderPageEnabled);
         config.setClientShippingAddressChangeEnabled(clientShippingAddressChangeEnabled);
         config.setClientPreferredShippingDateEnabled(clientPreferredShippingDateEnabled);
+        Map<String, List<String>> days = new LinkedHashMap<>();
+        for (ShipmentType type : ShipmentType.values()) {
+            days.put(type.name(), dayNames(selectedDays(type)));
+        }
+        config.setPreferredShippingDays(days);
         return config;
+    }
+
+    private EnumSet<DayOfWeek> selectedDays(ShipmentType type) {
+        EnumSet<DayOfWeek> days = EnumSet.noneOf(DayOfWeek.class);
+        List<String> names = preferredShippingDays.get(type.name());
+        if (names == null) {
+            return days;
+        }
+        for (DayOfWeek day : DayOfWeek.values()) {
+            if (names.contains(day.name())) {
+                days.add(day);
+            }
+        }
+        return days;
+    }
+
+    private static List<String> dayNames(Iterable<DayOfWeek> days) {
+        EnumSet<DayOfWeek> ordered = EnumSet.noneOf(DayOfWeek.class);
+        days.forEach(ordered::add);
+        return ordered.stream().map(DayOfWeek::name).toList();
     }
 
     private FulfilmentType fulfilmentType() {

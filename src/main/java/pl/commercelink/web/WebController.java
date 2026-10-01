@@ -13,6 +13,7 @@ import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.orders.*;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.starter.util.PaginationUtil;
+import pl.commercelink.web.orders.OrderLabels;
 
 import java.time.LocalDate;
 import java.util.*;
@@ -107,7 +108,7 @@ public class WebController {
         model.addAttribute("unpaidOrdersAmountGross", unpaidOrdersAmountGross);
         model.addAttribute("unpaidDeliveries", unpaidDeliveries);
         model.addAttribute("unpaidDeliveriesAmountNet", unpaidDeliveriesAmountNet);
-        model.addAttribute("paymentSources", PaymentSource.values());
+        model.addAttribute("paymentSources", OrderLabels.Option.of(PaymentSource.values(), OrderLabels::paymentSource));
         model.addAttribute("unpaidDeliveriesAmountGross", unpaidDeliveriesAmountGross);
         model.addAttribute("supplierLabels", supplierLabels.forStoreId(getStoreId()));
 

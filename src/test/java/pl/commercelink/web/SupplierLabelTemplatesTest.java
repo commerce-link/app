@@ -20,8 +20,8 @@ class SupplierLabelTemplatesTest {
     @Test
     void deliveryScreensShowLabelsNotIdentities() throws Exception {
         // when / then
-        assertThat(template("deliveries.html")).contains("supplierLabels.of(delivery.storeId, delivery.provider)")
-                .doesNotContain("th:text=\"${delivery.provider}\"");
+        // the list resolves the label once per row in DeliveryRowMapper, so the template never sees an identity
+        assertThat(template("deliveries.html")).contains("row.supplierLabel()").doesNotContain("delivery.provider");
         assertThat(template("deliveriesPreview.html")).contains("supplierLabels.of(candidate.provider)")
                 .contains("supplierLabels.of(delivery.provider)");
         assertThat(template("deliveryApproval.html")).contains("supplierLabels.of(delivery.provider)");
@@ -48,10 +48,8 @@ class SupplierLabelTemplatesTest {
     }
 
     @Test
-    void orderRmaAndDeliveryFiltersUseSelectsOfConnections() throws Exception {
+    void orderAndRmaFiltersUseSelectsOfConnections() throws Exception {
         // when / then
-        assertThat(template("orderDetails.html"))
-                .contains("fragments/supplier-choice :: field('quickAssignSupplier', ${assignableSuppliers}, true)");
         assertThat(template("fragments/supplier-choice.html")).contains("name=\"supplier\"")
                 .contains("th:each=\"option : ${options}\"")
                 // "other supplier" reveals a text field for a supplier that is not connected to the store;
@@ -60,15 +58,6 @@ class SupplierLabelTemplatesTest {
                 .contains("data-custom=\"" + SupplierChoice.CUSTOM + "\"")
                 .contains("name=\"customSupplier\"")
                 .contains("order.item.supplier.custom.hint");
-        assertThat(template("deliveries.html")).contains("<select name=\"provider\"")
-                .contains("th:each=\"option : ${providerOptions}\"")
-                .contains("value=\"" + SupplierChoice.CUSTOM + "\"")
-                .contains("data-custom=\"" + SupplierChoice.CUSTOM + "\"")
-                .contains("name=\"providerCustom\"")
-                // a filter value outside the options (e.g. a disconnected instance) must stay
-                // visible as the selected option instead of silently showing "all"
-                .contains("!#lists.contains(providerOptions.![identity()], searchParams.provider)")
-                .contains("supplierLabels.of(searchParams.provider)");
         // The RMA pages resolve the label in the controller (RmaCenterView.title), so the templates must not fall
         // back to the stored identity, which carries a connection token such as "Elko-k7f3a9c2".
         assertThat(template("rma-center-form.html")).contains("${providerOptions}");
@@ -78,11 +67,13 @@ class SupplierLabelTemplatesTest {
     }
 
     @Test
-    void theRecommendationTableShowsLabelsForItsAlternativeSuppliers() throws Exception {
-        // when / then -- alternativeSuppliers carries connection identities, not display names
-        assertThat(template("catalogDetails_categoryDefinition_productRecommendations.html"))
-                .contains("supplierLabels.of(provider)")
-                .doesNotContain("th:text=\"${provider}\"");
+    void theProposalsTableShowsLabelsForItsAlternativeSuppliers() throws Exception {
+        // when / then -- alternativeSuppliers carries connection identities; RecommendationRow maps them through the
+        // label function in the controller, so the proposals table only joins the names it was handed
+        assertThat(template("catalog/products-add.html"))
+                .contains("${#strings.listJoin(row.suppliers(), ', ')}")
+                .doesNotContain("alternativeSuppliers")
+                .doesNotContain("${row.provider");
     }
 
     /**

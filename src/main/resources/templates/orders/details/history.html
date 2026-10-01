@@ -1,0 +1,83 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--/* Review status and the event timeline. */-->
+<section th:fragment="card" class="cl-card" id="historia" aria-labelledby="history-title" data-cl-collapse
+         th:with="h=${page.history()}">
+    <div class="cl-card-head"><h2 class="cl-card-title" id="history-title" th:text="#{order.card.history}"></h2></div>
+    <div class="cl-collapse-body" id="history-body">
+        <p class="cl-card-desc" th:if="${h.reviewStatusKey() != null or h.reviewEditable()}">
+            <span th:text="#{order.history.review}"></span>
+            <strong th:text="${h.reviewStatusKey() != null} ? #{${h.reviewStatusKey()}} : #{order.history.review.none}"></strong>
+            <span th:if="${h.review() != null and h.review().referenceNo != null}"
+                  th:text="' · ' + #{order.history.review.reference(${h.review().referenceNo})}"></span>
+            <span th:if="${h.reviewRequestedAt() != null}" th:text="' · ' + #{order.history.review.requested(${h.reviewRequestedAt()})}"></span>
+            <th:block th:if="${h.reviewEditable()}"><span> · </span><button type="button" class="cl-link-button"
+                    data-cl-dialog-open="review-dialog" th:attr="aria-label=#{order.review.edit}" th:text="#{general.edit}"></button></th:block>
+        </p>
+        <!--/* One list, newest first. timeline.js hides the events past data-cl-timeline-limit and shows the row under the
+               list: collapsed, a node on the timeline axis that expands it (the line runs on dashed down to it);
+               expanded, a plain "collapse" link under the list. Without JavaScript every event stays visible and the
+               row stays hidden. */-->
+        <ol class="cl-timeline" id="history-events" th:if="${!h.events().isEmpty()}"
+            th:attr="data-cl-timeline-limit=${h.rest().isEmpty()} ? null : ${h.visible()}">
+            <th:block th:each="e : ${h.events()}"><li class="cl-timeline-item" th:insert="~{orders/details/history :: event(${e})}"></li></th:block>
+        </ol>
+        <th:block th:if="${!h.rest().isEmpty()}">
+            <div class="cl-timeline-more" hidden data-cl-timeline-more
+                 th:attr="data-shown-text=#{order.history.shown(${h.rest().size()})}, data-hidden-text=#{order.history.hidden(${h.rest().size()})}">
+                <button type="button" class="cl-link-button cl-timeline-node" aria-controls="history-events" aria-expanded="false"
+                        data-cl-timeline-toggle="expand"><span class="cl-timeline-node-dot" aria-hidden="true"></span><span
+                        th:text="#{${h.moreKey()}(${h.rest().size()})}"></span></button>
+                <button type="button" class="cl-link-button cl-timeline-less" aria-controls="history-events" aria-expanded="true"
+                        data-cl-timeline-toggle="collapse" hidden th:text="#{order.history.less}"></button>
+            </div>
+            <p class="cl-visually-hidden" role="status" data-cl-timeline-status></p>
+        </th:block>
+        <p th:if="${h.events().isEmpty()}" class="cl-list-empty" th:text="#{order.history.empty}"></p>
+    </div>
+</section>
+
+<th:block th:fragment="event(e)">
+    <time th:text="${e.at()}"></time>
+    <p class="cl-timeline-title"
+       th:text="${e.argKey() != null} ? #{${e.titleKey()}(${#messages.msg(e.argKey())})}
+               : (${e.arg() != null} ? #{${e.titleKey()}(${e.arg()})} : #{${e.titleKey()}})"></p>
+</th:block>
+
+<!--/* Plain name= attributes, not th:field: on an order without a review yet, th:field="*{review.referenceNo}"
+       fails on the null path. A plain POST binds it fine -- WebDataBinder grows the nested OrderReview itself. */-->
+<dialog th:fragment="reviewDialog" class="cl-dialog is-form" id="review-dialog" aria-labelledby="review-dialog-title"
+        th:with="h=${page.history()}, r=${page.history().review()}">
+    <form method="post" th:action="@{/dashboard/orders/{o}/updateReview(o=${page.orderId()})}">
+        <h2 class="cl-dialog-title" id="review-dialog-title" th:text="#{order.review.edit}"></h2>
+        <div class="cl-dialog-body">
+            <div class="cl-form-grid">
+                <div class="cl-span-6 cl-field">
+                    <label class="cl-label" for="review-status" th:text="#{order.review.status}"></label>
+                    <select class="cl-select" id="review-status" name="review.status">
+                        <option th:if="${r == null or r.status == null}" value="" selected th:text="#{order.review.status.none}"></option>
+                        <option th:each="status : ${h.reviewStatuses()}" th:value="${status.value().name()}"
+                                th:selected="${r != null and r.status == status.value()}" th:text="#{${status.labelKey()}}"></option>
+                    </select>
+                </div>
+                <div class="cl-span-3 cl-field">
+                    <label class="cl-label" for="review-reference" th:text="#{order.review.reference.no}"></label>
+                    <input class="cl-input" type="text" id="review-reference" name="review.referenceNo" autocomplete="off"
+                           th:value="${r != null} ? ${r.referenceNo} : ''">
+                </div>
+                <div class="cl-span-3 cl-field">
+                    <label class="cl-label" for="review-requested" th:text="#{order.review.requested.at}"></label>
+                    <input class="cl-input" type="date" id="review-requested" name="review.requestedAt"
+                           th:value="${r != null and r.requestedAt != null} ? ${r.requestedAt} : ''">
+                </div>
+            </div>
+        </div>
+        <div class="cl-dialog-actions">
+            <button type="submit" class="cl-button is-primary" th:text="#{order.review.save}"></button>
+            <button type="button" class="cl-button" data-cl-dialog-close th:text="#{general.cancel}"></button>
+        </div>
+    </form>
+</dialog>
+</body>
+</html>

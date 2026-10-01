@@ -13,6 +13,12 @@ public class UniqueIdentifierGenerator {
         // Prevent instantiation
     }
 
+    /** Whether {@code identifier} has the shape {@link #generate()} gives: ten lower-case letters and digits. */
+    public static boolean isWellFormed(String identifier) {
+        return identifier != null && identifier.length() == ID_LENGTH
+                && identifier.chars().allMatch(c -> CHARACTERS.indexOf(c) >= 0);
+    }
+
     public static String generate() {
         StringBuilder identifier = new StringBuilder(ID_LENGTH);
         for (int i = 0; i < ID_LENGTH; i++) {

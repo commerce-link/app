@@ -1,13 +1,17 @@
 package pl.commercelink.orders;
 
 import jakarta.annotation.Nullable;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 import pl.commercelink.documents.DocumentType;
 import pl.commercelink.inventory.deliveries.Delivery;
 import pl.commercelink.inventory.deliveries.DropshipItemLookup;
 import pl.commercelink.invoicing.InvoiceCreationEventPublisher;
 import pl.commercelink.orders.notifications.OrderNotificationsEventPublisher;
+import pl.commercelink.receipts.ReceiptAttemptService;
+import pl.commercelink.receipts.ReceiptTrigger;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.starter.security.model.CustomUser;
 import pl.commercelink.stores.Store;
@@ -21,6 +25,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
+@Slf4j
 @Component
 public class OrderLifecycle {
 
@@ -40,6 +45,12 @@ public class OrderLifecycle {
     private GoodsOutEventPublisher goodsOutEventPublisher;
     @Autowired
     private DropshipItemLookup dropshipItemLookup;
+    @Autowired
+    private ReceiptTrigger receiptTrigger;
+    // lazy: the attempt service saves orders through this lifecycle
+    @Autowired
+    @Lazy
+    private ReceiptAttemptService receiptAttemptService;
 
     public void update(Order order) {
         update(order, null);
@@ -58,8 +69,10 @@ public class OrderLifecycle {
         // The item fetch + dropship lookup below is only relevant once the order can possibly be Delivered
         // (either already is, or has just reached that point earlier in this same update). Every other status
         // short-circuits before paying for it, keeping this out of the hot path for New/Assembly/Shipping etc.
+        // It asks what isSettled asks, so a legacy Delivered order without shipments still waits for its
+        // warehouse document.
         boolean warehouseDocumentsRequired = documentsGenerationEnabled
-                && (order.getStatus() == OrderStatus.Delivered || order.isDelivered())
+                && (order.getStatus() == OrderStatus.Delivered || order.hasNothingLeftToDeliver())
                 && warehouseDocumentsRequired(order, orderItems);
 
         if (order.getStatus() == OrderStatus.New || order.getStatus() == OrderStatus.Assembly) {
@@ -95,16 +108,14 @@ public class OrderLifecycle {
             }
         }
 
-        if (order.getStatus() == OrderStatus.Shipping) {
-            order.getShipments().stream()
-                    .filter(shipment -> shipment.getType() == ShipmentType.PersonalCollection)
-                    .filter(shipment -> shipment.getShippedAt() == null)
-                    .forEach(shipment -> {
-                        shipment.setShippedAt(LocalDateTime.now());
-                    });
-        }
+        // No personal collection is stamped "ready" here while the order is Shipping: every save of a Shipping order
+        // would re-stamp a collection the operator has just emptied (a removed shipment's placeholder, a cleared date),
+        // so it could never be taken back. The move above needs every shipment ready already; a move by hand stamps in
+        // OrdersController#changeStatus (Order#markCollectionsReady).
 
-        if (order.getStatus() == OrderStatus.Shipping && order.getShipments().stream().allMatch(s -> s.getDeliveredAt() != null)) {
+        // isDelivered is false without shipments, and so is hasNothingLeftToDeliver before Delivered: an order that
+        // lost its shipments waits for a new one in whatever status it is, it is neither delivered nor completed
+        if (order.getStatus() == OrderStatus.Shipping && order.isDelivered()) {
             order.setStatus(OrderStatus.Delivered);
         }
 
@@ -127,11 +138,21 @@ public class OrderLifecycle {
                 goodsOutEventPublisher.publish(order, createdBy);
             }
 
-            boolean hasAllOrderItemsReturned = getOrFetchOrderItems(order.getOrderId(), orderItems).stream().allMatch(OrderItem::isReturned);
-            if (hasAllOrderItemsReturned) {
+            List<OrderItem> items = getOrFetchOrderItems(order.getOrderId(), orderItems);
+            // allMatch on no items is true: an order without items must not read as fully returned and be cancelled
+            boolean hasAllOrderItemsReturned = !items.isEmpty() && items.stream().allMatch(OrderItem::isReturned);
+            if (hasAllOrderItemsReturned && receiptAttemptService.locksOrder(order)) {
+                // the e-receipt attempt owns the sale but its outcome is not on the order yet: cancelling now could
+                // leave a fiscalised receipt on a cancelled order, the case the manual cancel refuses. The first save
+                // once the lock is gone cancels the order: after fiscalisation the one attaching the document
+                // (ReceiptEffects saves through here); after an attempt dies (FAILED/BLOCKED, the processor saves no
+                // order) the next save, at the latest the lifecycle cron's pass over Delivered orders.
+                log.debug("Order {} of store {} has every item returned; cancelling waits for its e-receipt",
+                        order.getOrderId(), order.getStoreId());
+            } else if (hasAllOrderItemsReturned) {
                 order.setStatus(OrderStatus.Cancelled);
 
-                if (order.getReview().getStatus() == OrderReviewStatus.ToBeCollected) {
+                if (order.getReview() != null && order.getReview().getStatus() == OrderReviewStatus.ToBeCollected) {
                     order.getReview().setStatus(OrderReviewStatus.NotApplicable);
                 }
             }
@@ -143,6 +164,8 @@ public class OrderLifecycle {
 
         // Save the updated order back to the database
         ordersRepository.save(order);
+
+        receiptTrigger.onOrderSaved(order, store);
 
         notificationEventPublisher.publish(order);
 

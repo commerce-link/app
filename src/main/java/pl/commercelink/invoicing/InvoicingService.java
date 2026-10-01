@@ -14,6 +14,7 @@ import pl.commercelink.orders.event.EventType;
 import pl.commercelink.orders.event.OrderEvent;
 import pl.commercelink.orders.event.OrderEventsRepository;
 import pl.commercelink.orders.notifications.EmailNotificationType;
+import pl.commercelink.receipts.ReceiptTrigger;
 import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.starter.email.EmailClient;
 import pl.commercelink.stores.InvoicingConfiguration;
@@ -57,6 +58,9 @@ public class InvoicingService {
 
     @Autowired
     private OptimisticLockingExecutor optimisticLockingExecutor;
+
+    @Autowired
+    private ReceiptTrigger receiptTrigger;
 
     public OperationResult createProforma(Basket basket, Locale locale, boolean send) {
         Store store = storesRepository.findById(basket.getStoreId());
@@ -133,6 +137,8 @@ public class InvoicingService {
         );
 
         orderLifecycleEventPublisher.publish(saved, OrderLifecycleEventType.InvoiceCreated);
+        // this save bypasses the order lifecycle, so the receipts hear about the new closing document here
+        receiptTrigger.reconcileDeadAttemptAlerts(saved);
 
         return op;
     }

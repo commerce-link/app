@@ -2,14 +2,23 @@ package pl.commercelink.stores;
 
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBAttribute;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBDocument;
+import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBIgnore;
 import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTypeConvertedEnum;
+import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 
+import java.time.DayOfWeek;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 @DynamoDBDocument
 public class FulfilmentConfiguration {
+
+    public static final Set<DayOfWeek> DEFAULT_PREFERRED_SHIPPING_DAYS =
+            Set.copyOf(EnumSet.range(DayOfWeek.MONDAY, DayOfWeek.FRIDAY));
 
     @DynamoDBAttribute(attributeName = "orderAssemblyDays")
     private int orderAssemblyDays;
@@ -36,6 +45,8 @@ public class FulfilmentConfiguration {
     private boolean clientShippingAddressChangeEnabled = false;
     @DynamoDBAttribute(attributeName = "clientPreferredShippingDateEnabled")
     private boolean clientPreferredShippingDateEnabled = false;
+    @DynamoDBAttribute(attributeName = "preferredShippingDays")
+    private Map<String, List<String>> preferredShippingDays;
 
     public FulfilmentConfiguration() {
     }
@@ -136,6 +147,30 @@ public class FulfilmentConfiguration {
         this.clientPreferredShippingDateEnabled = clientPreferredShippingDateEnabled;
     }
 
+    public Map<String, List<String>> getPreferredShippingDays() {
+        return preferredShippingDays;
+    }
+
+    public void setPreferredShippingDays(Map<String, List<String>> preferredShippingDays) {
+        this.preferredShippingDays = preferredShippingDays;
+    }
+
+    @DynamoDBIgnore
+    public Set<DayOfWeek> preferredShippingDaysFor(ShipmentType type) {
+        if (preferredShippingDays == null || type == null) {
+            return DEFAULT_PREFERRED_SHIPPING_DAYS;
+        }
+        List<String> names = preferredShippingDays.get(type.name());
+        if (names == null || names.isEmpty()) {
+            return DEFAULT_PREFERRED_SHIPPING_DAYS;
+        }
+        EnumSet<DayOfWeek> days = EnumSet.noneOf(DayOfWeek.class);
+        for (String name : names) {
+            days.add(DayOfWeek.valueOf(name));
+        }
+        return Set.copyOf(days);
+    }
+
     /**
      * Returns a copy carrying the given connection list. Used by the per-supplier save paths: the
      * persister computes what changed by comparing the store's current configuration against the
@@ -154,6 +189,7 @@ public class FulfilmentConfiguration {
         copy.setClientOrderPageEnabled(clientOrderPageEnabled);
         copy.setClientShippingAddressChangeEnabled(clientShippingAddressChangeEnabled);
         copy.setClientPreferredShippingDateEnabled(clientPreferredShippingDateEnabled);
+        copy.setPreferredShippingDays(preferredShippingDays);
         copy.setSupplierConnections(new ArrayList<>(connections));
         return copy;
     }

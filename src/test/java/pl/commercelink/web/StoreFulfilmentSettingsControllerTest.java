@@ -17,6 +17,7 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 import pl.commercelink.inventory.supplier.ErrorMessage;
 import pl.commercelink.inventory.supplier.StoreSupplierConnectionService;
+import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.FulfilmentConfiguration;
@@ -83,6 +84,9 @@ class StoreFulfilmentSettingsControllerTest {
         form.setAutomatedFulfilment(true);
         form.setClientOrderPageEnabled(true);
         form.setClientShippingAddressChangeEnabled(true);
+        for (ShipmentType type : ShipmentType.values()) {
+            form.getPreferredShippingDays().put(type.name(), List.of("MONDAY"));
+        }
         return form;
     }
 

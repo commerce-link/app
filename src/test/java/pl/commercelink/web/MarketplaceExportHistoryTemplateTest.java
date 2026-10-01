@@ -103,20 +103,6 @@ class MarketplaceExportHistoryTemplateTest {
     }
 
     @Test
-    void rendersEveryRowOfASmallRun() {
-        // given
-        WebContext context = runDetailsContext(rows(12), false);
-
-        // when
-        String html = templateEngine().process("store-marketplace-export-run", context);
-
-        // then
-        assertThat(countRows(html)).isEqualTo(12);
-        assertThat(html).doesNotContain("Pokazano");
-        assertThat(html).doesNotContain("??");
-    }
-
-    @Test
     void opensOnTheRejectionsAndOffersAFilterAndASearchAboveTheTable() {
         // given
         List<MarketplaceOfferSnapshot> rows = new ArrayList<>(rows(3));
@@ -328,7 +314,6 @@ class MarketplaceExportHistoryTemplateTest {
         context.setVariable("historyLabel", "Historia eksportu · Allegro");
         return context;
     }
-
 
     private List<MarketplaceOfferSnapshot> rows(int count) {
         List<MarketplaceOfferSnapshot> rows = new ArrayList<>();

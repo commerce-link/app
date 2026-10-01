@@ -131,27 +131,19 @@ class TaxonomyCategoryEnrichmentTest {
     void applyMatchUpdatesCacheAndDecrementsCounter() {
         // given
         enrichment.addPending(taxonomy("MFN-1", null, 10), "Acme");
+        enrichment.addPending(taxonomy("MFN-2", null, 10), "Acme");
 
         // when
         enrichment.applyMatch(new CategoryMatchedEvent("1234567890123", "MFN-1", "CPU", "301", 0.9, "mock"));
+        // a free-text category name with a space, no confidence: applyMatch must not restrict it to a known list
+        enrichment.applyMatch(new CategoryMatchedEvent("e", "MFN-2", "Dowolna Kategoria", "999", null, "mock"));
 
         // then
         assertEquals("CPU", cache.findByMfn("MFN-1").category());
         assertEquals("301", cache.findByMfn("MFN-1").categoryId());
+        assertEquals("Dowolna Kategoria", cache.findByMfn("MFN-2").category());
+        assertEquals("999", cache.findByMfn("MFN-2").categoryId());
         assertEquals(0, enrichment.pendingCount());
-    }
-
-    @Test
-    void applyMatchAcceptsArbitraryCategoryName() {
-        // given
-        enrichment.addPending(taxonomy("MFN-1", null, 10), "Acme");
-
-        // when
-        enrichment.applyMatch(new CategoryMatchedEvent("e", "MFN-1", "Dowolna Kategoria", "999", null, "mock"));
-
-        // then
-        assertEquals("Dowolna Kategoria", cache.findByMfn("MFN-1").category());
-        assertEquals("999", cache.findByMfn("MFN-1").categoryId());
     }
 
     @Test
