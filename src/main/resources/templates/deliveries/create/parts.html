@@ -219,8 +219,9 @@
             </tr>
             </thead>
             <tbody th:each="item, itemStat : ${form.items}"
-                   th:with="i=${itemStat.index}, single=${item.allocations.size() == 1}, detailId=|lines-${itemStat.index}|">
-            <tr class="cl-row-main" data-cl-delivery-item>
+                   th:with="i=${itemStat.index}, single=${item.allocations.size() == 1}, detailId=|lines-${itemStat.index}|,
+                            open=${!single and !item.allocations.?[!selected].isEmpty()}">
+            <tr class="cl-row-main" th:classappend="${open} ? 'is-open'" data-cl-delivery-item>
                 <td class="cl-table-check">
                     <label th:if="${single}" class="cl-check-target">
                         <input class="cl-check-input" type="checkbox" value="true" data-cl-include
@@ -235,8 +236,8 @@
                     <span class="cl-table-sub"><span th:text="#{general.ean} + ':'"></span> <span class="cl-code-nowrap" th:text="${item.ean}"></span>
                         · <span th:text="#{general.manufacturer.code} + ':'"></span> <span class="cl-code-nowrap" th:text="${item.mfn}"></span></span>
                     <th:block th:if="${!single}">
-                        <button type="button" class="cl-row-toggle" data-cl-row-toggle hidden aria-expanded="false"
-                                th:attr="aria-controls=${detailId}">
+                        <button type="button" class="cl-row-toggle" data-cl-row-toggle hidden
+                                th:attr="aria-expanded=${open}, aria-controls=${detailId}">
                             <span th:text="#{deliveries.create.lines(${item.allocations.size()})}"></span><i class="fas fa-chevron-down cl-row-toggle-caret" aria-hidden="true"></i>
                         </button>
                         <span class="cl-row-toggle-fallback" data-cl-row-toggle-fallback th:text="#{deliveries.create.lines(${item.allocations.size()})}"></span>

@@ -219,6 +219,34 @@ class DeliveryCreateItemsTemplateTest {
     }
 
     @Test
+    void dropshipProductWithAnUntickedLineComesBackWithItsLinesOpen() {
+        // given: back from step 2 with the second line unticked
+        DeliveryCreationForm form = dropshipFormWithTwoLines();
+        form.getItems().get(0).getAllocations().get(1).setSelected(false);
+
+        // when
+        String html = render("deliveries/create/items", model(dropshipPage(false, null, false), form));
+
+        // then
+        int main = html.indexOf("class=\"cl-row-main");
+        assertThat(html.substring(main, html.indexOf(">", main))).contains("is-open");
+        int toggle = html.indexOf("data-cl-row-toggle");
+        assertThat(html.substring(toggle, html.indexOf(">", toggle))).contains("aria-expanded=\"true\"");
+    }
+
+    @Test
+    void dropshipProductWithEveryLineTickedKeepsItsLinesClosed() {
+        // when
+        String html = render("deliveries/create/items", model(dropshipPage(false, null, false), dropshipFormWithTwoLines()));
+
+        // then
+        int main = html.indexOf("class=\"cl-row-main");
+        assertThat(html.substring(main, html.indexOf(">", main))).doesNotContain("is-open");
+        int toggle = html.indexOf("data-cl-row-toggle");
+        assertThat(html.substring(toggle, html.indexOf(">", toggle))).contains("aria-expanded=\"false\"");
+    }
+
+    @Test
     void untickedRestockSourceOpensTheSourcesAndShowsThePositiveAdjustment() {
         // when: 3 requested = 2 ordered + 1 above the sources
         String html = render("deliveries/create/items",
