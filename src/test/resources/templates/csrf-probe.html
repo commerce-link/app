@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head><title>CSRF probe</title></head>
+<body>
+<form id="plain" th:action="@{/dashboard/probe}" method="post">
+    <input type="text" name="note" value="hello"/>
+</form>
+<form id="upload" th:action="@{/dashboard/probe-upload}" method="post" enctype="multipart/form-data">
+    <input type="file" name="file"/>
+</form>
+<form id="search" th:action="@{/dashboard/probe}" method="get"></form>
+</body>
+</html>
