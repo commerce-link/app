@@ -2,6 +2,8 @@ package pl.commercelink.web.orders;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.context.support.ResourceBundleMessageSource;
 import pl.commercelink.documents.Document;
 import pl.commercelink.documents.DocumentType;
@@ -231,8 +233,13 @@ class OrderRowMapperTest {
     /** An advance invoice is information, not a gap: a green FZ before delivery, nothing that holds the order open. */
     @Test
     void advanceInvoiceBeforeDeliveryShowsDoneAdvanceMarkOnly() {
-        OrderRow row = mapper.map(companyOrderWithAdvanceInvoice(OrderStatus.Realization), TODAY);
+        // given
+        Order order = companyOrderWithAdvanceInvoice(OrderStatus.Realization);
 
+        // when
+        OrderRow row = mapper.map(order, TODAY);
+
+        // then
         assertThat(row.marks()).extracting(DocMark::kind, DocMark::code, DocMark::state)
                 .containsExactly(tuple("advance", "FZ", "is-done"));
         assertThat(row.marks()).extracting(DocMark::label).containsExactly("Faktura zaliczkowa: wystawiono FZ/3/2026");
@@ -241,8 +248,13 @@ class OrderRowMapperTest {
 
     @Test
     void deliveredOrderWithAdvanceInvoiceAwaitsFinalInvoice() {
-        OrderRow row = mapper.map(companyOrderWithAdvanceInvoice(OrderStatus.Delivered), TODAY);
+        // given
+        Order order = companyOrderWithAdvanceInvoice(OrderStatus.Delivered);
 
+        // when
+        OrderRow row = mapper.map(order, TODAY);
+
+        // then
         assertThat(row.marks()).extracting(DocMark::kind, DocMark::code, DocMark::state).containsExactly(
                 tuple("advance", "FZ", "is-done"), tuple("invoice", "FK", "is-todo"));
         assertThat(row.marks()).extracting(DocMark::label).containsExactly(
@@ -254,55 +266,86 @@ class OrderRowMapperTest {
     /** The final invoice always settles the advance one, so FK alone says both were issued and the row does not grow. */
     @Test
     void finalInvoiceReplacesAdvanceMark() {
+        // given
         Order order = companyOrderWithAdvanceInvoice(OrderStatus.Delivered);
         order.addDocument(new Document("d3", "FK/12/2026", null, DocumentType.InvoiceFinal));
 
+        // when
         OrderRow row = mapper.map(order, TODAY);
 
+        // then
         assertThat(row.marks()).extracting(DocMark::kind, DocMark::code, DocMark::state)
                 .containsExactly(tuple("invoice", "FK", "is-done"));
         assertThat(row.marks()).extracting(DocMark::label).containsExactly("Faktura końcowa: wystawiono FK/12/2026");
     }
 
-    @Test
-    void advanceInvoiceIsShownInAnyStatusAndNeverBlocks() {
-        for (OrderStatus status : List.of(OrderStatus.New, OrderStatus.Blocked, OrderStatus.Cancelled)) {
-            OrderRow row = mapper.map(companyOrderWithAdvanceInvoice(status), TODAY);
+    @ParameterizedTest
+    @EnumSource(value = OrderStatus.class, names = {"New", "Blocked", "Cancelled"})
+    void advanceInvoiceIsShownInAnyStatusAndNeverBlocks(OrderStatus status) {
+        // given
+        Order order = companyOrderWithAdvanceInvoice(status);
 
-            assertThat(row.marks()).as(status.name()).extracting(DocMark::kind, DocMark::state)
-                    .containsExactly(tuple("advance", "is-done"));
-        }
+        // when
+        OrderRow row = mapper.map(order, TODAY);
+
+        // then
+        assertThat(row.marks()).extracting(DocMark::kind, DocMark::state)
+                .containsExactly(tuple("advance", "is-done"));
     }
 
     @Test
-    void otherClosingDocumentsKeepTheirCodes() {
-        Order personal = order();
-        personal.addDocument(new Document("d1", "FV/8/2026", null, DocumentType.InvoicePersonal));
-        assertThat(mapper.map(personal, TODAY).marks()).extracting(DocMark::code).containsExactly("FV");
+    void personalInvoiceKeepsInvoiceCode() {
+        // given
+        Order order = order();
+        order.addDocument(new Document("d1", "FV/8/2026", null, DocumentType.InvoicePersonal));
 
-        Order receipt = order();
-        receipt.addDocument(new Document("d1", "PAR/9/2026", null, DocumentType.Receipt));
-        assertThat(mapper.map(receipt, TODAY).marks()).extracting(DocMark::code).containsExactly("PAR");
+        // when
+        OrderRow row = mapper.map(order, TODAY);
+
+        // then
+        assertThat(row.marks()).extracting(DocMark::code).containsExactly("FV");
+    }
+
+    @Test
+    void receiptKeepsReceiptCode() {
+        // given
+        Order order = order();
+        order.addDocument(new Document("d1", "PAR/9/2026", null, DocumentType.Receipt));
+
+        // when
+        OrderRow row = mapper.map(order, TODAY);
+
+        // then
+        assertThat(row.marks()).extracting(DocMark::code).containsExactly("PAR");
     }
 
     @Test
     void advanceInvoiceWithoutNumberStillShowsItsMark() {
+        // given
         Order order = order();
         order.addDocument(new Document("d1", null, null, DocumentType.InvoiceAdvance));
 
-        assertThat(mapper.map(order, TODAY).marks()).extracting(DocMark::kind, DocMark::code)
+        // when
+        OrderRow row = mapper.map(order, TODAY);
+
+        // then
+        assertThat(row.marks()).extracting(DocMark::kind, DocMark::code)
                 .containsExactly(tuple("advance", "FZ"));
     }
 
     @Test
     void englishCodesForAdvanceAndFinalInvoice() {
+        // given
         ResourceBundleMessageSource messages = new ResourceBundleMessageSource();
         messages.setBasename("messages");
         messages.setDefaultEncoding("UTF-8");
         OrderRowMapper english = new OrderRowMapper(messages, Locale.ENGLISH, false);
+        Order order = companyOrderWithAdvanceInvoice(OrderStatus.Delivered);
 
-        OrderRow row = english.map(companyOrderWithAdvanceInvoice(OrderStatus.Delivered), TODAY);
+        // when
+        OrderRow row = english.map(order, TODAY);
 
+        // then
         assertThat(row.marks()).extracting(DocMark::code).containsExactly("ADV", "FIN");
         assertThat(row.marks()).extracting(DocMark::label).containsExactly(
                 "Advance invoice: issued FZ/3/2026",
