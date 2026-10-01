@@ -1,5 +1,6 @@
 package pl.commercelink.inventory.deliveries;
 
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -20,10 +21,13 @@ import pl.commercelink.warehouse.api.Warehouse;
 import pl.commercelink.web.dtos.InvoiceSyncPreview;
 
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+@Slf4j
 @Service
 public class InvoiceSyncService {
 
@@ -45,29 +49,44 @@ public class InvoiceSyncService {
     @Autowired
     private DeliveryCostSync deliveryCostSync;
 
-    public void sync(String storeId) {
+    public InvoiceSyncResult sync(String storeId) {
         Store store = storesRepository.findById(storeId);
-        InvoicingProvider invoicingProvider = invoicingProviderFactory.get(store);
+        InvoicingProvider invoicingProvider = store == null ? null : invoicingProviderFactory.get(store);
+        if (invoicingProvider == null) {
+            return InvoiceSyncResult.notConfigured();
+        }
 
+        int checked = 0;
+        int unpaid = 0;
+        List<String> paidDeliveries = new ArrayList<>();
+        List<String> failedInvoices = new ArrayList<>();
         for (Delivery delivery : deliveriesRepository.findUnpaidDeliveries(storeId)) {
             if (!delivery.isInvoiced() || !delivery.isWaitingForPayment() || !delivery.getPayments().isEmpty()) {
                 continue;
             }
-
             Optional<Document> invoiceDocument = delivery.getDocuments().stream()
                     .filter(doc -> doc.getType() == DocumentType.InvoiceVat)
                     .findFirst();
-
             if (invoiceDocument.isEmpty()) {
                 continue;
             }
-
-            Invoice invoice = invoicingProvider.fetchInvoiceById(invoiceDocument.get().getId(), InvoiceDirection.Purchase);
-            if (invoice.paid()) {
-                delivery.addPayment(Payment.outgoingBankTransfer(invoice.number(), null, delivery.getTotalCostGross()));
-                deliveriesRepository.save(delivery);
+            checked++;
+            try {
+                Invoice invoice = invoicingProvider.fetchInvoiceById(invoiceDocument.get().getId(), InvoiceDirection.Purchase);
+                if (invoice.paid()) {
+                    delivery.addPayment(Payment.outgoingBankTransfer(invoice.number(), null, delivery.getTotalCostGross()));
+                    deliveriesRepository.save(delivery);
+                    paidDeliveries.add(delivery.getShortenedDeliveryId());
+                } else {
+                    unpaid++;
+                }
+            } catch (RuntimeException e) {
+                // one invoice the system cannot answer for must not hide the payments of all the others
+                log.error("Purchase invoice {} of delivery {} could not be checked", invoiceDocument.get().getId(), delivery.getDeliveryId(), e);
+                failedInvoices.add(invoiceDocument.get().getNumber() != null ? invoiceDocument.get().getNumber() : invoiceDocument.get().getId());
             }
         }
+        return new InvoiceSyncResult(true, checked, paidDeliveries, unpaid, failedInvoices);
     }
 
     public void apply(String storeId, InvoiceSyncPreview preview) {

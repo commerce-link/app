@@ -35,6 +35,8 @@ import pl.commercelink.inventory.deliveries.DeliveryReceptionService;
 import pl.commercelink.inventory.deliveries.DeliveryTaxResolver;
 import pl.commercelink.inventory.deliveries.DeliveryType;
 import pl.commercelink.inventory.deliveries.DropshipOrderLocator;
+import pl.commercelink.inventory.deliveries.InvoiceSyncResult;
+import pl.commercelink.inventory.deliveries.InvoiceSyncService;
 import pl.commercelink.inventory.deliveries.SupplierPurchaseService;
 import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
@@ -141,6 +143,9 @@ class DeliveriesControllerApprovalTest {
 
     @Mock
     private SupplierLabels supplierLabels;
+
+    @Mock
+    private InvoiceSyncService invoiceSynchronizationService;
 
     @InjectMocks
     private DeliveriesController deliveriesController;
@@ -1932,5 +1937,45 @@ class DeliveriesControllerApprovalTest {
         assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID);
         verify(redirectAttributes).addFlashAttribute("errorMessage", "Enter the amount as a number");
         verify(deliveriesRepository, never()).save(any());
+    }
+
+    @Test
+    void syncWithoutInvoicingSystemFlashesAnErrorOnThePaymentsPage() {
+        // given
+        when(invoiceSynchronizationService.sync(STORE_ID)).thenReturn(InvoiceSyncResult.notConfigured());
+        when(messageSource.getMessage("payments.sync.notConfigured", null, Locale.ENGLISH)).thenReturn("not configured");
+
+        // when
+        String view;
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            view = deliveriesController.syncPaymentStatuses(redirectAttributes, Locale.ENGLISH);
+        }
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/payments");
+        verify(redirectAttributes).addFlashAttribute(PaymentsReturn.ERROR, "not configured");
+    }
+
+    @Test
+    void syncWithPaidDeliveriesFlashesANoticeNamingThem() {
+        // given
+        when(invoiceSynchronizationService.sync(STORE_ID))
+                .thenReturn(new InvoiceSyncResult(true, 3, List.of("aaaa0001", "aaaa0002"), 1, List.of()));
+        when(messageSource.getMessage(eq("payments.sync.result"), any(Object[].class), eq(Locale.ENGLISH))).thenReturn("Checked 3.");
+        when(messageSource.getMessage(eq("payments.sync.result.paid"), eq(new Object[]{"aaaa0001, aaaa0002"}), eq(Locale.ENGLISH)))
+                .thenReturn("Paid: aaaa0001, aaaa0002.");
+
+        // when
+        String view;
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            view = deliveriesController.syncPaymentStatuses(redirectAttributes, Locale.ENGLISH);
+        }
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/payments");
+        verify(redirectAttributes).addFlashAttribute(PaymentsReturn.NOTICE, "Checked 3. Paid: aaaa0001, aaaa0002.");
+        verify(redirectAttributes, never()).addFlashAttribute(eq(PaymentsReturn.ERROR), any());
     }
 }

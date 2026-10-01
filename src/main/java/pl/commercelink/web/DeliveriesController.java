@@ -32,6 +32,7 @@ import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.warehouse.RestockSuggestionService;
 import pl.commercelink.web.dtos.AddPaymentForm;
+import pl.commercelink.web.payments.PaymentsQuery;
 import pl.commercelink.web.payments.PaymentsReturn;
 import pl.commercelink.web.dtos.DeliveryAllocationsForm;
 import pl.commercelink.web.dtos.DeliveryCreationForm;
@@ -1301,9 +1302,25 @@ public class DeliveriesController {
 
     @PostMapping("/dashboard/deliveries/syncPaymentStatuses")
     @PreAuthorize("hasRole('ADMIN')")
-    public String syncPaymentStatuses() {
-        invoiceSynchronizationService.sync(getStoreId());
-        return "redirect:/dashboard/payments";
+    public String syncPaymentStatuses(RedirectAttributes redirectAttributes, Locale locale) {
+        InvoiceSyncResult result = invoiceSynchronizationService.sync(getStoreId());
+        if (!result.configured()) {
+            redirectAttributes.addFlashAttribute(PaymentsReturn.ERROR, messageSource.getMessage("payments.sync.notConfigured", null, locale));
+            return "redirect:" + PaymentsQuery.PATH;
+        }
+        String message = result.checked() == 0
+                ? messageSource.getMessage("payments.sync.result.none", null, locale)
+                : messageSource.getMessage("payments.sync.result",
+                        new Object[]{result.checked(), result.paidDeliveries().size(), result.unpaid()}, locale);
+        if (!result.paidDeliveries().isEmpty()) {
+            message += " " + messageSource.getMessage("payments.sync.result.paid", new Object[]{String.join(", ", result.paidDeliveries())}, locale);
+        }
+        if (!result.failedInvoices().isEmpty()) {
+            redirectAttributes.addFlashAttribute(PaymentsReturn.ERROR,
+                    messageSource.getMessage("payments.sync.result.failed", new Object[]{String.join(", ", result.failedInvoices())}, locale));
+        }
+        redirectAttributes.addFlashAttribute(PaymentsReturn.NOTICE, message);
+        return "redirect:" + PaymentsQuery.PATH;
     }
 
     @PostMapping("/dashboard/deliveries/sync/apply")
