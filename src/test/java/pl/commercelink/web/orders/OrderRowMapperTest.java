@@ -217,4 +217,95 @@ class OrderRowMapperTest {
         order.setReview(null);
         assertThat(mapper.map(order, TODAY).marks()).extracting(DocMark::kind).containsExactly("invoice");
     }
+
+    private static Order companyOrderWithAdvanceInvoice(OrderStatus status) {
+        Order order = order();
+        order.setStatus(status);
+        order.getBillingDetails().setCompanyName("Nowak IT sp. z o.o.");
+        order.getBillingDetails().setTaxId("6762461234");
+        order.addDocument(new Document("d1", "ZAM/2/2026", null, DocumentType.Order));
+        order.addDocument(new Document("d2", "FZ/3/2026", null, DocumentType.InvoiceAdvance));
+        return order;
+    }
+
+    /** An advance invoice is information, not a gap: a green FZ before delivery, nothing that holds the order open. */
+    @Test
+    void advanceInvoiceBeforeDeliveryShowsDoneAdvanceMarkOnly() {
+        OrderRow row = mapper.map(companyOrderWithAdvanceInvoice(OrderStatus.Realization), TODAY);
+
+        assertThat(row.marks()).extracting(DocMark::kind, DocMark::code, DocMark::state)
+                .containsExactly(tuple("advance", "FZ", "is-done"));
+        assertThat(row.marks()).extracting(DocMark::label).containsExactly("Faktura zaliczkowa: wystawiono FZ/3/2026");
+        assertThat(row.hasTodo()).as("the phone card shows nothing for a lone FZ").isFalse();
+    }
+
+    @Test
+    void deliveredOrderWithAdvanceInvoiceAwaitsFinalInvoice() {
+        OrderRow row = mapper.map(companyOrderWithAdvanceInvoice(OrderStatus.Delivered), TODAY);
+
+        assertThat(row.marks()).extracting(DocMark::kind, DocMark::code, DocMark::state).containsExactly(
+                tuple("advance", "FZ", "is-done"), tuple("invoice", "FK", "is-todo"));
+        assertThat(row.marks()).extracting(DocMark::label).containsExactly(
+                "Faktura zaliczkowa: wystawiono FZ/3/2026",
+                "Faktura końcowa: do wystawienia — blokuje zakończenie zamówienia");
+        assertThat(row.hasTodo()).isTrue();
+    }
+
+    /** The final invoice always settles the advance one, so FK alone says both were issued and the row does not grow. */
+    @Test
+    void finalInvoiceReplacesAdvanceMark() {
+        Order order = companyOrderWithAdvanceInvoice(OrderStatus.Delivered);
+        order.addDocument(new Document("d3", "FK/12/2026", null, DocumentType.InvoiceFinal));
+
+        OrderRow row = mapper.map(order, TODAY);
+
+        assertThat(row.marks()).extracting(DocMark::kind, DocMark::code, DocMark::state)
+                .containsExactly(tuple("invoice", "FK", "is-done"));
+        assertThat(row.marks()).extracting(DocMark::label).containsExactly("Faktura końcowa: wystawiono FK/12/2026");
+    }
+
+    @Test
+    void advanceInvoiceIsShownInAnyStatusAndNeverBlocks() {
+        for (OrderStatus status : List.of(OrderStatus.New, OrderStatus.Blocked, OrderStatus.Cancelled)) {
+            OrderRow row = mapper.map(companyOrderWithAdvanceInvoice(status), TODAY);
+
+            assertThat(row.marks()).as(status.name()).extracting(DocMark::kind, DocMark::state)
+                    .containsExactly(tuple("advance", "is-done"));
+        }
+    }
+
+    @Test
+    void otherClosingDocumentsKeepTheirCodes() {
+        Order personal = order();
+        personal.addDocument(new Document("d1", "FV/8/2026", null, DocumentType.InvoicePersonal));
+        assertThat(mapper.map(personal, TODAY).marks()).extracting(DocMark::code).containsExactly("FV");
+
+        Order receipt = order();
+        receipt.addDocument(new Document("d1", "PAR/9/2026", null, DocumentType.Receipt));
+        assertThat(mapper.map(receipt, TODAY).marks()).extracting(DocMark::code).containsExactly("PAR");
+    }
+
+    @Test
+    void advanceInvoiceWithoutNumberStillShowsItsMark() {
+        Order order = order();
+        order.addDocument(new Document("d1", null, null, DocumentType.InvoiceAdvance));
+
+        assertThat(mapper.map(order, TODAY).marks()).extracting(DocMark::kind, DocMark::code)
+                .containsExactly(tuple("advance", "FZ"));
+    }
+
+    @Test
+    void englishCodesForAdvanceAndFinalInvoice() {
+        ResourceBundleMessageSource messages = new ResourceBundleMessageSource();
+        messages.setBasename("messages");
+        messages.setDefaultEncoding("UTF-8");
+        OrderRowMapper english = new OrderRowMapper(messages, Locale.ENGLISH, false);
+
+        OrderRow row = english.map(companyOrderWithAdvanceInvoice(OrderStatus.Delivered), TODAY);
+
+        assertThat(row.marks()).extracting(DocMark::code).containsExactly("ADV", "FIN");
+        assertThat(row.marks()).extracting(DocMark::label).containsExactly(
+                "Advance invoice: issued FZ/3/2026",
+                "Final invoice: to be issued — blocks closing the order");
+    }
 }
