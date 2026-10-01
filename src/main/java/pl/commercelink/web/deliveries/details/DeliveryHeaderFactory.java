@@ -10,7 +10,6 @@ import pl.commercelink.web.deliveries.details.DeliveryPageModel.Header;
 import pl.commercelink.web.deliveries.details.DeliveryPageModel.MoreMenu;
 import pl.commercelink.web.deliveries.details.DeliveryPageModel.PrimaryAction;
 import pl.commercelink.web.deliveries.details.DeliveryPageModel.StatusCard;
-import pl.commercelink.web.orders.Money;
 import pl.commercelink.web.orders.OrderFormats;
 import pl.commercelink.web.orders.OrderLabels;
 import pl.commercelink.web.orders.OrderPageModelFactory;
@@ -43,7 +42,7 @@ final class DeliveryHeaderFactory {
                 delivery.isExternalDeliveryIdProvisional(), noteKey, OrderFormats.date(delivery.getOrderedAt()), dateKey,
                 received ? OrderFormats.date(delivery.getReceivedAt()) : OrderFormats.date(delivery.getEstimatedDeliveryAt()),
                 done, total, !delivery.isDropship() && !received && done > 0 && done < total,
-                Money.format(delivery.getTotalCostGross()), primary(data, viewer, links),
+                DeliveryRules.grossOrNull(delivery, delivery.getTotalCost()), primary(data, viewer, links),
                 new MoreMenu(DeliveryRules.refresh(viewer, delivery), links.refreshOrderId(),
                         DeliveryRules.reject(viewer, delivery), links.open("reject"),
                         DeliveryRules.delete(viewer, delivery), links.confirm("delete")));

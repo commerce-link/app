@@ -116,6 +116,23 @@ class DeliveryHeaderFactoryTest {
     }
 
     @Test
+    void theGrossTotalIsMissingUntilTheVatIsSet() {
+        // given
+        Delivery unset = warehouse();
+        unset.setTax(0.0);
+        Delivery set = warehouse();
+        set.setTax(1.23);
+
+        // when
+        String unsetGross = header(unset, ADMIN).totalGross();
+        String setGross = header(set, ADMIN).totalGross();
+
+        // then
+        assertThat(unsetGross).isNull();
+        assertThat(setGross).isEqualTo("6 253,32");
+    }
+
+    @Test
     void theNumberSaysWhyItIsMissing() {
         // given
         Delivery ordering = withStatus(warehouse(), DeliveryOrderStatus.ORDER_PENDING);

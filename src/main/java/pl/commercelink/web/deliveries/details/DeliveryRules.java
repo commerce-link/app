@@ -3,8 +3,10 @@ package pl.commercelink.web.deliveries.details;
 import pl.commercelink.inventory.deliveries.Allocation;
 import pl.commercelink.inventory.deliveries.Delivery;
 import pl.commercelink.inventory.deliveries.DeliveryTrackingState;
+import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.web.deliveries.details.DeliveryPageModel.ActionState;
+import pl.commercelink.web.orders.Money;
 
 /**
  * Who may do what on a delivery, with the reason when not now. The conditions are the controller's own guards
@@ -22,6 +24,14 @@ public final class DeliveryRules {
     static final String REMOVE_ITEMS_FIRST = "deliveries.details.reason.removeItemsFirst";
 
     private DeliveryRules() {
+    }
+
+    /**
+     * The gross of a net amount at the delivery's VAT, formatted, or null while the VAT is unset (tax below 1.0:
+     * deliveries created by a purchase start at 0.0), so the page prints "—" instead of a gross of zero.
+     */
+    public static String grossOrNull(Delivery delivery, double net) {
+        return delivery.getTax() >= 1.0 ? Money.format(Price.fromNet(net, delivery.getTax()).grossValue()) : null;
     }
 
     /** A GLOBAL delivery is bought with the platform's account, so only the super admin repeats or confirms it. */

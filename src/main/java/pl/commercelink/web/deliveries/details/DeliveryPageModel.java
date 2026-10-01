@@ -43,7 +43,10 @@ public record DeliveryPageModel(String deliveryId, String shortId, boolean super
         }
     }
 
-    /** externalIdNoteKey: what stands instead of a missing supplier number (ordering, sent unconfirmed), else null. */
+    /**
+     * externalIdNoteKey: what stands instead of a missing supplier number (ordering, sent unconfirmed), else null.
+     * totalGross: null while the VAT is unset (DeliveryRules.grossOrNull), rendered as "—".
+     */
     public record Header(String stateKey, String stateTone, String typeKey, String typeIcon, String supplierName,
                          String externalId, String externalIdHref, boolean provisional, String externalIdNoteKey,
                          String orderedAt, String dateKey, String date, int receivedAllocations, int totalAllocations,
