@@ -164,6 +164,18 @@ class DeliveriesControllerApprovalTest {
     }
 
     @Test
+    void approvalAvailabilityCheckRendersTheApprovalScreensOwnFragment() {
+        // given
+        Model model = new ConcurrentModel();
+
+        // when
+        String view = deliveriesController.validatePendingApproval(STORE_ID, DELIVERY_ID, model, Locale.ENGLISH);
+
+        // then
+        assertThat(view).isEqualTo("fragments/approval-validation :: validationResult");
+    }
+
+    @Test
     void rejectingRedirectsToTheDeliveriesListWithASuccessMessage() {
         // given
         when(supplierPurchaseService.reject(STORE_ID, DELIVERY_ID, "out of stock"))

@@ -734,7 +734,7 @@ public class DeliveriesController {
                     messageSource.getMessage("deliveries.purchase.confirm.checkFailed", null, locale)
                             + (e.getMessage() != null ? " (" + e.getMessage() + ")" : ""));
         }
-        return "deliveryPurchaseConfirmation :: validationResult";
+        return "fragments/approval-validation :: validationResult";
     }
 
     @GetMapping("/dashboard/deliveries/details")
