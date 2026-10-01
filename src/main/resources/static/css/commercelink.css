@@ -8172,3 +8172,211 @@ a.cl-link-button:hover {
         transition: none;
     }
 }
+
+/* --- New delivery (spec docs/active/dostawy-tworzenie-formularz/2026-10-01-nowa-dostawa-design.md §7):
+   P1 sticky side column, P2 summary card with the step actions, P3 delivery items table, P4 scrolling choice list. */
+
+@media screen and (min-width: 1366px) {
+    .cl-page .cl-layout-side.is-sticky {
+        position: sticky;
+        top: calc(var(--cl-topbar-height) + 16px);
+    }
+}
+
+.cl-page .cl-card-footer.is-block {
+    display: grid;
+    gap: var(--cl-gap-attached);
+}
+
+.cl-page .cl-card-footer.is-block .cl-button {
+    width: 100%;
+    justify-content: center;
+}
+
+.cl-page .cl-card-footer.is-block .cl-help {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.4;
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-card-footer.is-block .cl-help.is-warn {
+    color: var(--cl-warn);
+}
+
+.cl-page .cl-card-footer.is-block .cl-help + .cl-button,
+.cl-page .cl-card-footer.is-block .cl-help + .cl-help + .cl-button {
+    margin-top: var(--cl-gap-related);
+}
+
+.cl-page .cl-card-footer.is-block .cl-reasons {
+    margin: 2px 0 0;
+    padding-left: 18px;
+}
+
+.cl-page .cl-card-footer.is-block .cl-reasons li[hidden] {
+    display: none;
+}
+
+/* the step-2 back link is a button (it carries the form state) dressed as .cl-back */
+.cl-page button.cl-back {
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    font-size: 13.5px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.cl-page .cl-table.is-delivery td {
+    vertical-align: top;
+}
+
+.cl-page .cl-table.is-delivery col.cl-col-value {
+    width: 120px;
+}
+
+.cl-page .cl-table.is-delivery .cl-table-edit {
+    min-width: 28px;
+    min-height: 28px;
+    margin-left: 6px;
+    padding: 2px 4px;
+    border: 0;
+    border-radius: 6px;
+    background: none;
+    color: var(--cl-ink-3);
+    cursor: pointer;
+}
+
+.cl-page .cl-table.is-delivery .cl-table-edit:hover {
+    color: var(--cl-accent-ink);
+    background: var(--cl-accent-soft);
+}
+
+.cl-page .cl-table.is-delivery .cl-table-edit:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
+}
+
+.cl-page .cl-table.is-delivery .cl-row-toggle {
+    margin-top: 6px;
+    font-size: 13px;
+}
+
+.cl-page .cl-table.is-delivery .cl-min {
+    display: block;
+    margin-top: 4px;
+    font-size: 12.5px;
+    color: var(--cl-ink-2);
+    white-space: nowrap;
+}
+
+.cl-page .cl-table.is-delivery tr.cl-row-main.is-open > * {
+    background: var(--cl-surface-2);
+    border-bottom-color: transparent;
+}
+
+.cl-page .cl-table.is-delivery tr.cl-row-detail > td {
+    padding: 0 20px 16px;
+    background: var(--cl-surface-2);
+}
+
+.cl-page .cl-table.is-delivery .cl-subtable .cl-check {
+    min-height: 24px;
+    padding: 0;
+}
+
+.cl-page .cl-table.is-delivery .cl-subtable tfoot td {
+    font-weight: 500;
+}
+
+.cl-page .cl-release-help {
+    margin: 4px 0 0 24px;
+}
+
+.cl-page .cl-choice-group.is-scroll {
+    max-height: 320px;
+    overflow: auto;
+    padding: 4px 12px;
+    border: 1px solid var(--cl-line);
+    border-radius: var(--cl-radius);
+}
+
+.cl-page .cl-choice-group.is-scroll .cl-choice {
+    flex-shrink: 0;
+    padding: 10px 0;
+}
+
+.cl-page .cl-choice-group.is-scroll .cl-choice + .cl-choice {
+    border-top: 1px solid var(--cl-line);
+}
+
+.cl-page .cl-choice-group.is-scroll .cl-choice[hidden] {
+    display: none;
+}
+
+@media screen and (max-width: 1023px) {
+    .cl-page .cl-table.is-delivery .cl-table-edit {
+        min-width: 44px;
+        min-height: 44px;
+    }
+}
+
+@media screen and (max-width: 719px) {
+    .cl-page .cl-table.is-delivery tbody th.cl-table-key {
+        display: block;
+    }
+
+    .cl-page .cl-table.is-delivery tbody th.cl-table-key::before {
+        content: none;
+    }
+
+    .cl-page .cl-table.is-delivery tr.cl-row-detail {
+        padding: 0 16px 12px;
+        border-top: 0;
+        background: var(--cl-surface-2);
+    }
+
+    .cl-page .cl-table.is-delivery tr.cl-row-detail > td {
+        display: block;
+        padding: 0;
+        background: none;
+    }
+
+    .cl-page .cl-table.is-delivery tr.cl-row-detail > td::before {
+        content: none;
+    }
+
+    .cl-page .cl-table.is-delivery .cl-subtable thead {
+        display: none;
+    }
+
+    .cl-page .cl-table.is-delivery .cl-subtable tr {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 4px 8px;
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--cl-line);
+    }
+
+    .cl-page .cl-table.is-delivery .cl-subtable tr:last-child {
+        border-bottom: 0;
+    }
+
+    .cl-page .cl-table.is-delivery .cl-subtable td {
+        display: block;
+        padding: 0;
+        border: 0;
+    }
+
+    .cl-page .cl-table.is-delivery .cl-subtable td:first-child {
+        grid-column: 1 / -1;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cl-page .cl-layout-side.is-sticky {
+        scroll-behavior: auto;
+    }
+}
