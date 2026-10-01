@@ -159,13 +159,14 @@
                             <tr th:each="allocation, allocStat : ${item.allocations}">
                                 <td>
                                     <th:block th:replace="~{deliveries/create/parts :: hiddenAllocation(${i}, ${allocStat.index}, ${allocation}, false)}"></th:block>
-                                    <label class="cl-check">
+                                    <label class="cl-check" th:with="sourceName=${allocation.type.name() == 'Order'}
+                                                ? ${allocation.key.refName + ' · ' + allocation.key.name} : #{deliveries.create.source.warehouseItem}">
                                         <input type="checkbox" value="true"
                                                th:name="|items[${i}].allocations[${allocStat.index}].selected|"
                                                th:checked="${allocation.selected}"
                                                th:attr="data-cl-source-qty=${allocation.qty}, data-cl-source-type=${allocation.type},
-                                                        aria-label=#{deliveries.create.source.include.label(${allocation.key.name})}"/>
-                                        <a th:href="@{${allocation.key.url}}" target="_blank" rel="noopener" th:text="${allocation.key.name}"></a>
+                                                        aria-label=#{deliveries.create.source.include.label(${sourceName})}"/>
+                                        <a th:href="@{${allocation.key.url}}" target="_blank" rel="noopener" th:text="${sourceName}"></a>
                                     </label>
                                     <input type="hidden" th:name="|_items[${i}].allocations[${allocStat.index}].selected|" value="on"/>
                                 </td>

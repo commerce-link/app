@@ -247,6 +247,19 @@ class DeliveryCreateItemsTemplateTest {
     }
 
     @Test
+    void sourcesAreNamedByTheShortOrderNumberAndTheWarehouseItemInTheOperatorsLanguage() {
+        // when
+        String html = render("deliveries/create/items",
+                model(warehousePage(false, true, false), warehouseFormWithRestockSource(3)));
+
+        // then: like the pending deliveries, an order source starts with its short number; a restock source is not
+        // the raw "Warehouse" key name
+        assertThat(html).contains(">e2ed0004 · ").contains("Dołącz źródło: e2ed0004 · ")
+                .contains(">Pozycja magazynu</a>").contains("Dołącz źródło: Pozycja magazynu")
+                .doesNotContain(">Warehouse</a>");
+    }
+
+    @Test
     void untickedRestockSourceOpensTheSourcesAndShowsThePositiveAdjustment() {
         // when: 3 requested = 2 ordered + 1 above the sources
         String html = render("deliveries/create/items",
