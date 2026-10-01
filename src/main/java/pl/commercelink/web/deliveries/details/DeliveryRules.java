@@ -148,15 +148,19 @@ public final class DeliveryRules {
         return reason == null ? ActionState.on() : ActionState.off(reason);
     }
 
-    /** Why the delivery cannot be deleted now, or null; the same order the menu shows the reasons in. */
+    /**
+     * Why the delivery cannot be deleted now, or null. The purchase states come first, in the order the server refuses
+     * them: while they last the items cannot be removed either, so "remove the items first" would send the operator
+     * to an action he does not have.
+     */
     public static String deleteReasonKey(Delivery delivery) {
-        if (!delivery.getAllocations().isEmpty()) {
-            return REMOVE_ITEMS_FIRST;
+        if (delivery.isAwaitingApproval()) {
+            return AWAITING;
         }
         if (delivery.isOrderPending() || delivery.isOrderDispatched()) {
             return ORDERING;
         }
-        return delivery.isAwaitingApproval() ? AWAITING : null;
+        return delivery.getAllocations().isEmpty() ? null : REMOVE_ITEMS_FIRST;
     }
 
     /** A dropship tracking state worth a warning: only while the shipment is still expected (spec §12.1 p. 22). */

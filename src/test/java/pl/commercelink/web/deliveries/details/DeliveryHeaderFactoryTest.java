@@ -181,6 +181,21 @@ class DeliveryHeaderFactoryTest {
     }
 
     @Test
+    void anAdminSeesTheApprovalAsTheReasonDeleteIsGreyedEvenWhileTheDeliveryHoldsItems() {
+        // given
+        Delivery awaitingWithItems = withStatus(warehouse(), DeliveryOrderStatus.AWAITING_APPROVAL);
+        Delivery orderingWithItems = withStatus(warehouse(), DeliveryOrderStatus.ORDER_PENDING);
+
+        // when
+        DeliveryPageModel.MoreMenu awaiting = header(awaitingWithItems, ADMIN).more();
+        DeliveryPageModel.MoreMenu ordering = header(orderingWithItems, ADMIN).more();
+
+        // then
+        assertThat(awaiting.delete()).isEqualTo(DeliveryPageModel.ActionState.off("deliveries.details.reason.awaitingApproval"));
+        assertThat(ordering.delete()).isEqualTo(DeliveryPageModel.ActionState.off("deliveries.details.reason.ordering"));
+    }
+
+    @Test
     void refreshingTheProvisionalNumberEndsWithTheReceipt() {
         // given
         Delivery inTransit = warehouse();
