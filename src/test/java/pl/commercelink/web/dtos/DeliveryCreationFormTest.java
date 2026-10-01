@@ -6,11 +6,35 @@ import pl.commercelink.inventory.deliveries.AllocationKey;
 import pl.commercelink.inventory.deliveries.AllocationType;
 import pl.commercelink.inventory.deliveries.DeliveryItem;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class DeliveryCreationFormTest {
+
+    @Test
+    void backRestoresTheUnitCostOfASuggestion() {
+        // given: step 2 merged the suggestion into the items, so it comes back as an item without allocations
+        DeliveryCreationForm fresh = new DeliveryCreationForm();
+        SuggestedDeliveryItem suggested = new SuggestedDeliveryItem();
+        suggested.setMfn("MFN-S");
+        suggested.setUnitCost(100.0);
+        fresh.setSuggestedItems(new ArrayList<>(List.of(suggested)));
+        DeliveryCreationForm posted = new DeliveryCreationForm();
+        DeliveryItem merged = new DeliveryItem();
+        merged.setMfn("MFN-S");
+        merged.setRequestedQty(3);
+        merged.setUnitCost(89.5);
+        posted.setItems(new ArrayList<>(List.of(merged)));
+
+        // when
+        fresh.applyUserSelections(posted);
+
+        // then
+        assertThat(fresh.getSuggestedItems().getFirst().getRequestedQty()).isEqualTo(3);
+        assertThat(fresh.getSuggestedItems().getFirst().getUnitCost()).isEqualTo(89.5);
+    }
 
     @Test
     void overlayCopiesRequestedQtyAndUnitCostByMfn() {

@@ -1093,7 +1093,7 @@ class SupplierPurchaseServiceTest {
 
         // then
         assertFalse(result.isSuccess());
-        assertEquals("deliveries.purchase.error.availability", result.getMessage());
+        assertEquals("deliveries.purchase.error.nothingRequested", result.getMessage());
         verify(deliveriesRepository, never()).save(any(Delivery.class));
         verify(supplierPurchaseEventPublisher, never()).publish(any());
     }

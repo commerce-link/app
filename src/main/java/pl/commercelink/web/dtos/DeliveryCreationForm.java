@@ -221,6 +221,9 @@ public class DeliveryCreationForm {
         suggestedItems.stream()
                 .filter(suggested -> Objects.equals(suggested.getMfn(), postedItem.getMfn()))
                 .findFirst()
-                .ifPresent(suggested -> suggested.setRequestedQty(postedItem.getRequestedQty()));
+                .ifPresent(suggested -> {
+                    suggested.setRequestedQty(postedItem.getRequestedQty());
+                    suggested.setUnitCost(postedItem.getUnitCost());
+                });
     }
 }

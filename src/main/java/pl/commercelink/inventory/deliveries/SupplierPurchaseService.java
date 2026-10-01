@@ -567,7 +567,7 @@ public class SupplierPurchaseService {
                                                               String purchaseRef) {
         boolean hasOrderableItems = form.getItems().stream().anyMatch(item -> item.getRequestedQty() > 0);
         if (!hasOrderableItems) {
-            return OperationResult.failure("deliveries.purchase.error.availability");
+            return OperationResult.failure("deliveries.purchase.error.nothingRequested");
         }
 
         Store store = storesRepository.findById(storeId);
