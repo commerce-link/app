@@ -83,10 +83,7 @@ final class DeliveryCardsFactory {
             Payment payment = payments.get(i);
             rows.add(new PaymentRow(i, i + 1, Money.format(payment.getAmount()),
                     payment.getDirection() == PaymentDirection.Incoming, payment.isUnsettled(),
-                    OrderLabels.paymentSource(payment.getSource()), StringUtils.trimToNull(payment.getName()),
-                    StringUtils.trimToNull(payment.getReferenceNo()), StringUtils.trimToNull(payment.getBankTransactionNo()),
-                    OrderFormats.date(payment.getBankTransactionDate()),
-                    payment.getFee() > 0 ? Money.format(payment.getFee()) : null,
+                    OrderLabels.paymentSource(payment.getSource()), paymentDetails(payment),
                     DeliveryPageModelFactory.dialogId("payment-" + i), editable ? links.open("payment-" + i) : null));
             fields.add(new PaymentFields(payment.getSource() == null ? null : payment.getSource().name(),
                     (payment.getDirection() == null ? PaymentDirection.Outgoing : payment.getDirection()).name(),
@@ -121,6 +118,30 @@ final class DeliveryCardsFactory {
                 OrderFormats.date(delivery.getPaymentDueDate()), delivery.getPaymentTerms(), editable, rows, fields,
                 Math.max(0, unpaid), delivery.getPendingPayment(),
                 OrderLabels.Option.of(PaymentSource.values(), OrderLabels::paymentSource));
+    }
+
+    // only the parts the payment has, so the line never starts with a separator nor stays as an empty paragraph
+    private static List<PaymentDetail> paymentDetails(Payment payment) {
+        List<PaymentDetail> details = new ArrayList<>();
+        String name = StringUtils.trimToNull(payment.getName());
+        String reference = StringUtils.trimToNull(payment.getReferenceNo());
+        String operation = StringUtils.trimToNull(payment.getBankTransactionNo());
+        String date = OrderFormats.date(payment.getBankTransactionDate());
+        if (name != null) {
+            details.add(PaymentDetail.text(name));
+        }
+        if (reference != null) {
+            details.add(PaymentDetail.message("deliveries.details.payments.reference", reference));
+        }
+        if (operation != null) {
+            details.add(new PaymentDetail(null, "deliveries.details.payments.operation", operation, false, date));
+        } else if (date != null) {
+            details.add(PaymentDetail.message("deliveries.details.payments.operationDate", date));
+        }
+        if (payment.getFee() > 0) {
+            details.add(new PaymentDetail(null, "deliveries.details.payments.fee", Money.format(payment.getFee()), true, null));
+        }
+        return details;
     }
 
     static HistoryCard history(Delivery delivery) {

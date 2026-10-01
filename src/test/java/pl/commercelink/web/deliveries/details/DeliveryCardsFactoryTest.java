@@ -98,7 +98,7 @@ class DeliveryCardsFactoryTest {
         assertThat(row.amount()).isEqualTo("3 000,00");
         assertThat(row.sourceKey()).isEqualTo("PaymentSource.BankTransfer");
         assertThat(row.refund()).isFalse();
-        assertThat(row.bankTransactionDate()).isEqualTo("01.10.2026");
+        assertThat(row.details()).extracting(DeliveryPageModel.PaymentDetail::dateArg).contains("01.10.2026");
         assertThat(row.dialogId()).isEqualTo("payment-0-dialog");
         assertThat(row.editHref()).endsWith("&open=payment-0#payment-0-dialog");
         assertThat(admin.fields().get(0)).isEqualTo(new DeliveryPageModel.PaymentFields("BankTransfer", "Outgoing", "mBank",
@@ -292,6 +292,31 @@ class DeliveryCardsFactoryTest {
         assertThat(terms.reverseCharge()).isFalse();
         assertThat(terms.vatPercent()).isEqualTo("23");
         assertThat(terms.totalGross()).isEqualTo("6 253,32");
+    }
+
+    @Test
+    void aPaymentDescribesOnlyThePartsItHasWithTheOperationDateNextToItsNumber() {
+        // given
+        Delivery delivery = warehouse();
+        delivery.addPayment(new Payment("MH-2026/0917", "mBank", PaymentSource.BankTransfer, PaymentDirection.Outgoing,
+                3000, 5, "202610010417", LocalDate.of(2026, 10, 1)));
+        delivery.addPayment(new Payment("REF-2", " ", PaymentSource.Cash, PaymentDirection.Outgoing,
+                100, 0, null, LocalDate.of(2026, 10, 2)));
+        delivery.addPayment(new Payment(null, null, PaymentSource.Card, 50, 0));
+
+        // when
+        List<DeliveryPageModel.PaymentRow> rows = DeliveryCardsFactory.payments(delivery, ADMIN, links(ADMIN, delivery)).rows();
+
+        // then
+        assertThat(rows.get(0).details()).containsExactly(
+                DeliveryPageModel.PaymentDetail.text("mBank"),
+                DeliveryPageModel.PaymentDetail.message("deliveries.details.payments.reference", "MH-2026/0917"),
+                new DeliveryPageModel.PaymentDetail(null, "deliveries.details.payments.operation", "202610010417", false, "01.10.2026"),
+                new DeliveryPageModel.PaymentDetail(null, "deliveries.details.payments.fee", "5,00", true, null));
+        assertThat(rows.get(1).details()).containsExactly(
+                DeliveryPageModel.PaymentDetail.message("deliveries.details.payments.reference", "REF-2"),
+                DeliveryPageModel.PaymentDetail.message("deliveries.details.payments.operationDate", "02.10.2026"));
+        assertThat(rows.get(2).details()).isEmpty();
     }
 
     @Test

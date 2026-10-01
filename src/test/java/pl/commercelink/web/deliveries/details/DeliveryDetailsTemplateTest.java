@@ -747,9 +747,11 @@ class DeliveryDetailsTemplateTest {
 
         // then
         assertThat(remove).contains("name=\"payments[0].referenceNo\" value=\"A\"").contains("name=\"payments[1].referenceNo\" value=\"C\"")
+                .contains("name=\"payments[1].source\" value=\"Card\"").contains("name=\"payments[1].amount\" value=\"300.00\"")
                 .doesNotContain("value=\"B\"").doesNotContain("payments[2]");
         assertThat(DeliveryDetailsTemplates.fieldNameCounts(edit)).allSatisfy((name, count) -> assertThat(count).as(name).isEqualTo(1));
         assertThat(edit).contains("name=\"payments[0].referenceNo\" value=\"A\"").contains("name=\"payments[2].referenceNo\" value=\"C\"")
+                .contains("name=\"payments[2].source\" value=\"Card\"").contains("name=\"payments[2].amount\" value=\"300.00\"")
                 .contains("id=\"payment-1-dialog-reference\"");
     }
 
@@ -778,6 +780,54 @@ class DeliveryDetailsTemplateTest {
 
         // then
         assertThat(html).contains("<span class=\"cl-status is-neutral\">Nieopłacona</span>").contains(">Brak wpłat.<");
+    }
+
+    @Test
+    void thePaymentDescriptionJoinsOnlyThePartsThePaymentHas() {
+        // given
+        Delivery delivery = warehouse();
+        delivery.addPayment(new Payment("REF-2", null, PaymentSource.Cash, PaymentDirection.Outgoing,
+                100, 0, null, LocalDate.of(2026, 10, 2)));
+        delivery.addPayment(new Payment(null, null, PaymentSource.Card, 50, 0));
+
+        // when
+        String html = render(data(delivery), ADMIN);
+
+        // then
+        assertThat(html).containsPattern("<p class=\"cl-list-desc\"><span>ref\\. REF-2</span> · <span>z 02\\.10\\.2026</span></p>")
+                .doesNotContainPattern("<p class=\"cl-list-desc\">\\s*·").doesNotContainPattern("<p class=\"cl-list-desc\">\\s*</p>");
+        assertThat(occurrences(html, "class=\"cl-list-desc\"")).isEqualTo(1);
+    }
+
+    @Test
+    void anOperationNumberCarriesItsDate() {
+        // given
+        Delivery delivery = warehouse();
+        delivery.addPayment(new Payment(null, "mBank", PaymentSource.BankTransfer, PaymentDirection.Outgoing,
+                100, 2.5, "OP-1", LocalDate.of(2026, 10, 1)));
+
+        // when
+        String html = render(data(delivery), ADMIN);
+
+        // then
+        assertThat(html).contains("<span>mBank</span> · <span>operacja OP-1</span><span> z 01.10.2026</span> · <span>prowizja 2,50 PLN</span>");
+    }
+
+    @Test
+    void invoiceActionsAreAbsentWhileAwaitingApprovalAndForTheUser() {
+        // given
+        Delivery delivery = received(warehouse());
+        delivery.addDocument(new Document("inv-1", "FV/ACME/0412", "https://invoices.example/0412", DocumentType.InvoiceVat, LocalDate.of(2026, 9, 25)));
+
+        // when
+        String approval = render(data(global(withStatus(delivery, DeliveryOrderStatus.AWAITING_APPROVAL))), ADMIN);
+        String user = render(data(delivery), USER);
+
+        // then
+        for (String html : List.of(approval, user)) {
+            assertThat(html).contains(">FV/ACME/0412<").doesNotContain(">Synchronizuj<").doesNotContain("unlink-invoice")
+                    .doesNotContain(">Powiąż fakturę<");
+        }
     }
 
     @Test

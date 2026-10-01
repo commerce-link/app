@@ -33,13 +33,10 @@
                     <span th:if="${p.sourceKey() != null}" th:text="'· ' + #{${p.sourceKey()}}"></span>
                     <span th:if="${p.refund()}" class="cl-status is-warn" th:text="#{deliveries.details.payments.refund}"></span>
                 </p>
-                <p class="cl-list-desc">
-                    <span th:if="${p.name() != null}" th:text="${p.name()}"></span>
-                    <span th:if="${p.referenceNo() != null}" th:text="' · ' + #{deliveries.details.payments.reference(${p.referenceNo()})}"></span>
-                    <span th:if="${p.bankTransactionNo() != null}" th:text="' · ' + #{deliveries.details.payments.operation(${p.bankTransactionNo()})}"></span>
-                    <span th:if="${p.bankTransactionDate() != null}" th:text="' ' + #{deliveries.details.payments.operationDate(${p.bankTransactionDate()})}"></span>
-                    <span th:if="${p.fee() != null}" th:text="' · ' + #{deliveries.details.payments.fee(${#messages.msg('general.currency.amount', p.fee())})}"></span>
-                </p>
+                <p th:if="${!p.details().isEmpty()}" class="cl-list-desc"><th:block th:each="d, s : ${p.details()}"><th:block
+                        th:unless="${s.first}"> · </th:block><span th:text="${d.text() != null} ? ${d.text()}
+                        : (${d.amount()} ? #{${d.key()}(${#messages.msg('general.currency.amount', d.arg())})} : #{${d.key()}(${d.arg()})})"></span><span
+                        th:if="${d.dateArg() != null}" th:text="' ' + #{deliveries.details.payments.operationDate(${d.dateArg()})}"></span></th:block></p>
             </div>
             <div th:if="${p.editHref() != null}" class="cl-list-actions">
                 <a class="cl-link-button" th:href="@{${p.editHref()}}"

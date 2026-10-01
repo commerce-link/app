@@ -167,9 +167,24 @@ public record DeliveryPageModel(String deliveryId, String shortId, boolean super
                                Payment pending, List<OrderLabels.Option<PaymentSource>> sources) {
     }
 
+    /** details: the description line, only the parts the payment has, in reading order (joined with " · "). */
     public record PaymentRow(int index, int number, String amount, boolean refund, boolean pending, String sourceKey,
-                             String name, String referenceNo, String bankTransactionNo, String bankTransactionDate,
-                             String fee, String dialogId, String editHref) {
+                             List<PaymentDetail> details, String dialogId, String editHref) {
+    }
+
+    /**
+     * One part of a payment's description: plain text (the payment provider's name) or a message key with its argument.
+     * amount: the argument is an amount printed with the currency. dateArg: the operation date kept with its number.
+     */
+    public record PaymentDetail(String text, String key, String arg, boolean amount, String dateArg) {
+
+        public static PaymentDetail text(String text) {
+            return new PaymentDetail(text, null, null, false, null);
+        }
+
+        public static PaymentDetail message(String key, String arg) {
+            return new PaymentDetail(null, key, arg, false, null);
+        }
     }
 
     public record PaymentFields(String source, String direction, String name, String amount, String fee,
