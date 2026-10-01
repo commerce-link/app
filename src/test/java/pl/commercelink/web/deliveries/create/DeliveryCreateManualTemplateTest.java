@@ -41,6 +41,17 @@ class DeliveryCreateManualTemplateTest {
     }
 
     @Test
+    void serverValidatesTheRecordStepSoItsErrorsReachTheSummaryAndTheFields() {
+        // when
+        String html = render("deliveries/create/manual", warehouse(Map.of()));
+
+        // then: "required" stays as a hint for assistive technology, but the browser must not stop the post with its
+        // own bubble before the server can answer with the error summary and the errors at the fields
+        int form = html.indexOf("<form");
+        assertThat(html.substring(form, html.indexOf(">", form))).contains("data-cl-delivery-manual").contains("novalidate");
+    }
+
+    @Test
     void dropshipRecordStepMarksEveryFieldOptional() {
         // given
         Map<String, Object> variables = model(dropshipPage(false, null, true), dropshipForm());

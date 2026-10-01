@@ -18,7 +18,7 @@
                     <p class="cl-alert-text" th:text="${errorMessage}"></p>
                 </div>
             </th:block>
-            <form method="post" id="delivery-step-form" class="cl-layout-aside" data-cl-delivery-manual
+            <form method="post" id="delivery-step-form" class="cl-layout-aside" data-cl-delivery-manual novalidate
                   th:action="@{${page.links().save()}}">
                 <th:block th:replace="~{deliveries/create/parts :: scope(${page})}"></th:block>
                 <th:block th:replace="~{deliveries/create/parts :: hiddenItems}"></th:block>
