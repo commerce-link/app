@@ -25,6 +25,7 @@ import pl.commercelink.orders.PaymentDirection;
 import pl.commercelink.orders.ShipmentCarrierOptions;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.documents.Document;
+import pl.commercelink.documents.DocumentType;
 import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.web.orders.AmountEditor;
@@ -553,10 +554,7 @@ public class DeliveriesController {
     public String confirmUnlinkInvoice(@PathVariable String deliveryId, @RequestParam String invoiceId, Model model,
                                        RedirectAttributes redirectAttributes, Locale locale) {
         Delivery delivery = deliveriesRepository.findById(getStoreId(), deliveryId);
-        Document invoice = delivery == null ? null : delivery.findDocumentById(invoiceId);
-        if (invoice == null) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
-        }
+        Document invoice = linkedInvoiceOrNotFound(delivery, invoiceId);
         if (delivery.isAwaitingApproval()) {
             return redirectEditLocked(getStoreId(), deliveryId, redirectAttributes, locale);
         }
@@ -569,13 +567,7 @@ public class DeliveriesController {
     public String unlinkInvoiceConfirmed(@PathVariable String deliveryId, @RequestParam String invoiceId,
                                          RedirectAttributes redirectAttributes, Locale locale) {
         Delivery delivery = deliveriesRepository.findById(getStoreId(), deliveryId);
-        if (delivery == null) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
-        }
-        Document invoice = delivery.findDocumentById(invoiceId);
-        if (invoice == null) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
-        }
+        Document invoice = linkedInvoiceOrNotFound(delivery, invoiceId);
         if (delivery.isAwaitingApproval()) {
             return redirectEditLocked(getStoreId(), deliveryId, redirectAttributes, locale);
         }
@@ -583,6 +575,18 @@ public class DeliveriesController {
         OrderFlash.saved(redirectAttributes,
                 messageSource.getMessage("deliveries.details.unlink.done", new Object[]{invoice.getNumber()}, locale));
         return detailsRedirect(getStoreId(), deliveryId);
+    }
+
+    /**
+     * The page offers unlinking only for a VAT invoice; unlinking removes whatever document matches the id, so a forged
+     * id of a goods receipt (PZ) would otherwise strip it from the delivery.
+     */
+    private static Document linkedInvoiceOrNotFound(Delivery delivery, String invoiceId) {
+        Document invoice = delivery == null ? null : delivery.findDocumentById(invoiceId);
+        if (invoice == null || invoice.getType() != DocumentType.InvoiceVat) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+        return invoice;
     }
 
     @GetMapping("/dashboard/store/{storeId}/deliveries/{deliveryId}/approval")
@@ -1147,7 +1151,7 @@ public class DeliveriesController {
                                @RequestParam(required = false) String linkMode,
                                @RequestParam(required = false) String invoiceId,
                                RedirectAttributes redirectAttributes, Locale locale) {
-        if (isEditLocked(getStoreId(), deliveryId)) {
+        if (existingDelivery(getStoreId(), deliveryId).isAwaitingApproval()) {
             return redirectEditLocked(getStoreId(), deliveryId, redirectAttributes, locale);
         }
         // one dialog, two ways: the chosen radio decides, so the form works without JavaScript too
@@ -1168,7 +1172,7 @@ public class DeliveriesController {
     @PreAuthorize("hasRole('ADMIN')")
     public String linkInvoiceById(@RequestParam String deliveryId, @RequestParam String invoiceId,
                                   RedirectAttributes redirectAttributes, Locale locale) {
-        if (isEditLocked(getStoreId(), deliveryId)) {
+        if (existingDelivery(getStoreId(), deliveryId).isAwaitingApproval()) {
             return redirectEditLocked(getStoreId(), deliveryId, redirectAttributes, locale);
         }
         invoiceLinkingService.linkInvoiceById(getStoreId(), deliveryId, invoiceId);
@@ -1214,6 +1218,15 @@ public class DeliveriesController {
         return isSuperAdmin()
                 ? storeDeliveryDetailsRedirect(storeId, deliveryId)
                 : "redirect:/dashboard/deliveries/details?deliveryId=" + deliveryId;
+    }
+
+    /** A missing or another store's delivery answers 404 before any write, like the other details routes. */
+    private Delivery existingDelivery(String storeId, String deliveryId) {
+        Delivery delivery = deliveriesRepository.findById(storeId, deliveryId);
+        if (delivery == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+        return delivery;
     }
 
     private boolean isEditLocked(String storeId, String deliveryId) {

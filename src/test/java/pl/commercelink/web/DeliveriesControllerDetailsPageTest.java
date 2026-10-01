@@ -516,6 +516,43 @@ class DeliveriesControllerDetailsPageTest {
     }
 
     @Test
+    void unlinkingADocumentThatIsNotAnInvoiceIsNotFound() {
+        // given
+        Delivery delivery = delivery();
+        delivery.addDocument(new Document("pz-1", "PZ/1", null, DocumentType.GoodsReceipt));
+        when(deliveriesRepository.findById(STORE_ID, delivery.getDeliveryId())).thenReturn(delivery);
+
+        // when / then
+        assertThatThrownBy(() -> controller.confirmUnlinkInvoice(delivery.getDeliveryId(), "pz-1", new ConcurrentModel(),
+                redirectAttributes, PL))
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                        e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
+        assertThatThrownBy(() -> controller.unlinkInvoiceConfirmed(delivery.getDeliveryId(), "pz-1", redirectAttributes, PL))
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                        e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
+        verify(invoiceLinkingService, never()).unlinkInvoice(anyString(), anyString(), anyString());
+    }
+
+    @Test
+    void linkingAnInvoiceToAMissingOrForeignDeliveryIsNotFoundAndLinksNothing() {
+        // given
+        when(deliveriesRepository.findById(STORE_ID, "foreign")).thenReturn(null);
+
+        // when / then
+        assertThatThrownBy(() -> controller.linkInvoices("foreign", "byId", "inv-1", redirectAttributes, PL))
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                        e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
+        assertThatThrownBy(() -> controller.linkInvoices("foreign", "byOrder", null, redirectAttributes, PL))
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                        e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
+        assertThatThrownBy(() -> controller.linkInvoiceById("foreign", "inv-1", redirectAttributes, PL))
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                        e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
+        verify(invoiceLinkingService, never()).linkInvoiceById(anyString(), anyString(), anyString());
+        verify(invoiceLinkingService, never()).linkInvoices(anyString(), anyString());
+    }
+
+    @Test
     void savingTermsWithoutADeliveryIdIsNotFound() {
         // given
         DeliveryTermsForm form = new DeliveryTermsForm();
