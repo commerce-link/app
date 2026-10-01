@@ -8277,6 +8277,11 @@ a.cl-link-button:hover {
     border-bottom-color: transparent;
 }
 
+/* An open row sits on --cl-surface-2, where --cl-ink-3 falls under 4.5:1 (4.47:1 at 12.5 px) */
+.cl-page .cl-table.is-delivery tr.cl-row-main.is-open .cl-table-sub {
+    color: var(--cl-ink-2);
+}
+
 .cl-page .cl-table.is-delivery tr.cl-row-detail > td {
     padding: 0 20px 16px;
     background: var(--cl-surface-2);
@@ -8321,6 +8326,13 @@ a.cl-link-button:hover {
 @media screen and (max-width: 1023px) {
     .cl-page .cl-table.is-delivery .cl-table-edit {
         min-width: 44px;
+        min-height: 44px;
+    }
+
+    /* the link to a source (order / warehouse item) inside the 44 px checkbox label is a target of its own */
+    .cl-page .cl-table.is-delivery .cl-subtable .cl-check a {
+        display: inline-flex;
+        align-items: center;
         min-height: 44px;
     }
 }
