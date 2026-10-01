@@ -52,7 +52,6 @@ class DeliveryCreateMessagesTest {
             "deliveries.create.purchase.address.title", "deliveries.create.purchase.address.desc",
             "deliveries.create.purchase.address.filter", "deliveries.create.purchase.address.filter.placeholder",
             "deliveries.create.purchase.address.none", "deliveries.create.purchase.options.title",
-            "deliveries.create.purchase.costs", "deliveries.create.purchase.costs.help",
             "deliveries.create.purchase.submit", "deliveries.create.purchase.submit.help",
             "deliveries.create.purchase.submit.help.approval", "deliveries.create.purchase.reasons",
             "deliveries.create.purchase.reason.checking", "deliveries.create.purchase.reason.availability",

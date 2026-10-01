@@ -317,7 +317,6 @@ class DeliveryCreateControllerTest {
     void warehouseConfirmAlwaysPostsPlnCostsWhateverCurrencyTheRecordStepLeft() {
         // given
         when(scope.purchaseAvailable()).thenReturn(true);
-        when(scope.dropship()).thenReturn(false);
         DeliveryCreationForm form = requested(1);
         form.setSourceCurrency("EUR");
         when(scope.submit(form, "ref-1")).thenReturn(OperationResult.success(new PurchaseSubmission("d-9", false)));
@@ -330,20 +329,26 @@ class DeliveryCreateControllerTest {
     }
 
     @Test
-    void dropshipConfirmKeepsTheCurrencyTheCostsCardShowed() {
-        // given
+    void integrationConfirmRecordsTheDefaultOrderDataWhateverTheHiddenFieldsCarry() {
+        // given: the operator typed costs in "Zarejestruj zamówienie", went back and ordered through the integration
         when(scopes.resolve(STORE_ID, PROVIDER, ORDER_ID)).thenReturn(new DeliveryScopes.Resolution.Found(scope));
         when(scope.purchaseAvailable()).thenReturn(true);
-        when(scope.dropship()).thenReturn(true);
+        when(scope.defaultTax()).thenReturn(1.23);
         DeliveryCreationForm form = requested(1);
         form.setSourceCurrency("EUR");
+        form.setShippingCost(15);
+        form.setPaymentCost(3);
+        form.setPaymentTerms(14);
+        form.setTax(1.0);
         when(scope.submit(form, "ref-1")).thenReturn(OperationResult.success(new PurchaseSubmission("d-9", false)));
 
         // when
         asStoreAdmin(() -> controller.confirm(PROVIDER, "ref-1", form, binding(form), ORDER_ID, null, new ConcurrentModel(), flash, Locale.ENGLISH));
 
         // then
-        verify(scope).submit(argThat(submitted -> "EUR".equals(submitted.getSourceCurrency())), eq("ref-1"));
+        verify(scope).submit(argThat(submitted -> "PLN".equals(submitted.getSourceCurrency())
+                && submitted.getShippingCost() == 0 && submitted.getPaymentCost() == 0
+                && submitted.getPaymentTerms() == 0 && submitted.getTax() == 1.23), eq("ref-1"));
     }
 
     @Test

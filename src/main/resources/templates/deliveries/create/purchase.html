@@ -38,7 +38,7 @@
                   th:action="@{${page.links().confirm()}}" th:attr="data-validate-url=@{${page.links().validate()}}">
                 <input type="hidden" name="purchaseRef" th:value="${purchaseRef}"/>
                 <th:block th:replace="~{deliveries/create/parts :: scope(${page})}"></th:block>
-                <th:block th:replace="~{deliveries/create/parts :: hiddenOrderData(${!page.dropship()})}"></th:block>
+                <th:block th:replace="~{deliveries/create/parts :: hiddenOrderData(true)}"></th:block>
                 <th:block th:replace="~{deliveries/create/parts :: hiddenItems}"></th:block>
                 <div class="cl-layout-main">
                     <section class="cl-card" aria-labelledby="availability-title">
@@ -117,9 +117,6 @@
                         </section>
                     </th:block>
 
-                    <th:block th:if="${page.dropship()}">
-                        <section th:replace="~{deliveries/create/parts :: costs}"></section>
-                    </th:block>
                 </div>
                 <aside class="cl-layout-side is-sticky">
                     <th:block th:replace="~{deliveries/create/parts :: recipient(${page}, 'deliveries.create.recipient.help.purchase')}"></th:block>

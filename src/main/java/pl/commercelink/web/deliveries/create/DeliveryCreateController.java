@@ -362,14 +362,7 @@ public class DeliveryCreateController {
             }
             form.setStoreId(storeId);
             form.setProvider(provider);
-            if (binding.hasFieldErrors("tax")) {
-                form.setTax(scope.defaultTax());
-            }
-            // The warehouse integration page shows no currency and its costs are PLN, but the hidden field still carries
-            // whatever the "ordered outside the system" step picked earlier, which would convert the claimed costs.
-            if (!scope.dropship()) {
-                form.setSourceCurrency("PLN");
-            }
+            recordNoOrderData(form, scope);
             OperationResult<PurchaseSubmission> result = scope.submit(form, purchaseRef);
             if (!result.isSuccess()) {
                 addPage(model, scope, links, form);
@@ -380,6 +373,20 @@ public class DeliveryCreateController {
             }
             return "redirect:" + links.deliveryDetails(result.getPayload().deliveryId());
         });
+    }
+
+    /**
+     * Ordering through the integration asks for no order data: the supplier answers with the number and date, and the
+     * costs, VAT and payment terms start from their defaults (editable later on the delivery). The hidden fields still
+     * carry whatever "Zarejestruj zamówienie" was given before the operator went back, so they are reset here — a
+     * leftover EUR would otherwise convert the claimed item costs.
+     */
+    private static void recordNoOrderData(DeliveryCreationForm form, DeliveryScope scope) {
+        form.setSourceCurrency("PLN");
+        form.setShippingCost(0);
+        form.setPaymentCost(0);
+        form.setPaymentTerms(0);
+        form.setTax(scope.defaultTax());
     }
 
     private FulfilmentUpdateResponse updateFulfilment(String storeId, String provider, DeliveryFulfilmentUpdateForm update,

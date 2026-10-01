@@ -452,21 +452,7 @@
     <span th:text="#{${errors.get(id)}}"></span>
 </p>
 
-<!--/* Dropship costs the supplier may charge; optional, folded unless something is set (spec §5.1, decision D3). */-->
-<section th:fragment="costs" class="cl-card" aria-labelledby="costs-title">
-    <details class="cl-disclosure cl-card-extras"
-             th:open="${form.shippingCost != 0 or form.paymentCost != 0 or form.paymentTerms != 0 or form.sourceCurrency != 'PLN'}">
-        <summary id="costs-title" th:text="#{deliveries.create.purchase.costs}"></summary>
-        <div class="cl-disclosure-body">
-            <p class="cl-card-desc" th:text="#{deliveries.create.purchase.costs.help}"></p>
-            <div class="cl-form-grid">
-                <th:block th:replace="~{deliveries/create/parts :: costFields(null)}"></th:block>
-            </div>
-        </div>
-    </details>
-</section>
-
-<!--/* Currency, shipping, payment, VAT multiplier and payment terms; shared by the costs card and "Dane zamówienia".
+<!--/* Currency, shipping, payment, VAT multiplier and payment terms of "Dane zamówienia".
        Grid cells only: the caller's single cl-form-grid keeps one row rhythm with the fields around them, and the
        inputs fill their columns (the fixed-width table inputs is-price / cl-input-days left ragged gaps here). */-->
 <th:block th:fragment="costFields(errors)">

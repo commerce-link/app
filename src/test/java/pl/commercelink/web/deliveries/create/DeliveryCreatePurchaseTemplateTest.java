@@ -127,7 +127,7 @@ class DeliveryCreatePurchaseTemplateTest {
     }
 
     @Test
-    void dropshipConfirmationShowsTheCustomerAndTheOptionalCostsOnce() {
+    void dropshipConfirmationShowsTheCustomerAndNoCostFields() {
         // given
         Map<String, Object> variables = model(dropshipPage(false, null, false), dropshipForm());
         variables.put("purchaseRef", "ref-1");
@@ -136,26 +136,14 @@ class DeliveryCreatePurchaseTemplateTest {
         // when
         String html = render("deliveries/create/purchase", variables);
 
-        // then
-        assertThat(html).contains("Dropshipping").contains("Dane adresowe klienta").contains("Koszty dostawy (opcjonalnie)")
-                .contains("id=\"shippingCost\"").contains("Mnożnik VAT").doesNotContain("Adres dostawy");
+        // then: ordering through the integration asks for no order data; typed values only ride along for the way back
+        assertThat(html).contains("Dropshipping").contains("Dane adresowe klienta")
+                .doesNotContain("Koszty dostawy (opcjonalnie)").doesNotContain("id=\"shippingCost\"")
+                .doesNotContain("Mnożnik VAT").doesNotContain("Adres dostawy");
+        assertThat(html).contains("type=\"hidden\" name=\"shippingCost\"").contains("type=\"hidden\" name=\"tax\"");
         assertThat(fieldNames(html)).doesNotHaveDuplicates()
                 .contains("order", "externalDeliveryId", "estimatedDeliveryAt", "shippingCost", "paymentCost",
                         "paymentTerms", "tax", "sourceCurrency", "items[0].allocations[0].selected", "purchaseRef");
-    }
-
-    @Test
-    void optionalCostsDescriptionIsACardDescriptionInsideTheCardPadding() {
-        // given
-        Map<String, Object> variables = model(dropshipPage(false, null, false), dropshipForm());
-        variables.put("purchaseRef", "ref-1");
-        variables.put("requiresApproval", false);
-
-        // when
-        String html = render("deliveries/create/purchase", variables);
-
-        // then: a bare cl-help in the folded body had no padding and no type size, so it ran to the card's edge
-        assertThat(html).contains("<p class=\"cl-card-desc\">Koszt wysyłki do klienta");
     }
 
     @Test
