@@ -1,0 +1,74 @@
+package pl.commercelink.web.deliveries.details;
+
+import org.junit.jupiter.api.Test;
+
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Stream;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+class DeliveryDetailsScriptsContractTest {
+
+    private static final Pattern OPENING_TAG =
+            Pattern.compile("<[a-zA-Z0-9:]+(?:\\s+[a-zA-Z0-9:_.-]+(?:=\"[^\"]*\")?)*\\s*/?>", Pattern.DOTALL);
+
+    static List<Path> templates() throws Exception {
+        try (Stream<Path> files = Files.walk(Path.of("src/main/resources/templates/deliveries/details"))) {
+            return Stream.concat(Stream.of(Path.of("src/main/resources/templates/deliveries/details.html")),
+                    files.filter(Files::isRegularFile).toList().stream()).toList();
+        }
+    }
+
+    static String read(Path path) throws Exception {
+        return Files.readString(path, StandardCharsets.UTF_8);
+    }
+
+    @Test
+    void templatesCarryNoInlineBehaviourNoBulmaLookAndNoUnsafeText() throws Exception {
+        for (Path template : templates()) {
+            // when
+            String html = read(template);
+
+            // then
+            assertThat(html).as(template.toString())
+                    .doesNotContain("style=\"").doesNotContain("<style").doesNotContain("onclick=")
+                    .doesNotContain("onchange=").doesNotContain("oninput=").doesNotContain("onsubmit=")
+                    .doesNotContain("<script>").doesNotContain("th:utext").doesNotContain("th:field")
+                    .doesNotContain("class=\"button").doesNotContain("class=\"box").doesNotContain("class=\"columns")
+                    .doesNotContain("class=\"notification").doesNotContain("class=\"tag").doesNotContain("class=\"select")
+                    .doesNotContain("class=\"input").doesNotContain("class=\"table").doesNotContain("class=\"level")
+                    .doesNotContain("class=\"modal").doesNotContain("confirmSave");
+        }
+    }
+
+    @Test
+    void guardsAreNeverCombinedWithThReplaceOrThWithOnTheSameElement() throws Exception {
+        for (Path template : templates()) {
+            // when
+            Matcher matcher = OPENING_TAG.matcher(read(template));
+
+            // then
+            while (matcher.find()) {
+                String tag = matcher.group();
+                assertThat(tag.contains("th:if") && (tag.contains("th:replace") || tag.contains("th:with")))
+                        .as(template + ": " + tag).isFalse();
+            }
+        }
+    }
+
+    @Test
+    void thePageDecoratesTheLayoutAndLoadsItsModules() throws Exception {
+        // when
+        String page = read(Path.of("src/main/resources/templates/deliveries/details.html"));
+
+        // then
+        assertThat(page).contains("layout:decorate=\"~{layout}\"")
+                .contains("/js/menu.js").contains("/js/dialog.js").contains("/js/collapse.js").contains("/js/timeline.js")
+                .contains("/js/copy-field.js").contains("/js/confirm-dialog.js");
+    }
+}

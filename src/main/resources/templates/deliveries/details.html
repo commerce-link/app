@@ -1,0 +1,41 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+<div layout:fragment="content">
+    <section class="cl-page">
+        <div class="cl-page-body is-wide">
+            <div th:replace="~{deliveries/details/header :: header}"></div>
+            <div th:replace="~{orders/parts :: notice}"></div>
+
+            <div class="cl-layout-aside">
+                <div class="cl-layout-main">
+                    <th:block th:each="card, s : ${page.statusCards()}"><section th:replace="~{deliveries/details/status-card :: card(${card}, ${s.index})}"></section></th:block>
+                    <!--/* items (Task 10) */-->
+                    <!--/* documents and payments (Task 12) */-->
+                    <th:block th:if="${!page.history().events().isEmpty()}"><section th:replace="~{deliveries/details/history :: card}"></section></th:block>
+                </div>
+                <!--/* read-only context; between the phone and the two-column layout the cards share a grid (P8) */-->
+                <div class="cl-layout-side is-grid">
+                    <section th:replace="~{deliveries/details/side :: supplier}"></section>
+                    <th:block th:if="${page.consignee() != null}"><section th:replace="~{deliveries/details/side :: consignee}"></section></th:block>
+                    <section th:replace="~{deliveries/details/side :: terms}"></section>
+                    <section th:replace="~{deliveries/details/side :: comment}"></section>
+                </div>
+            </div>
+
+            <th:block th:if="${page.header().more().refresh().enabled()}"><form th:replace="~{deliveries/details/header :: refreshForm}"></form></th:block>
+            <dialog th:replace="~{fragments/confirm-dialog :: dialog}"></dialog>
+            <!--/* standalone dialogs (Task 11), payment dialogs (Task 12) */-->
+        </div>
+    </section>
+    <script th:src="@{/js/menu.js}" defer></script>
+    <script th:src="@{/js/dialog.js}" defer></script>
+    <script th:src="@{/js/collapse.js}" defer></script>
+    <script th:src="@{/js/timeline.js}" defer></script>
+    <script th:src="@{/js/copy-field.js}" defer></script>
+    <script th:src="@{/js/confirm-dialog.js}" defer></script>
+</div>
+</body>
+</html>
