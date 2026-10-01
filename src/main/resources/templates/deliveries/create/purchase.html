@@ -119,7 +119,7 @@
 
                 </div>
                 <aside class="cl-layout-side is-sticky">
-                    <th:block th:replace="~{deliveries/create/parts :: recipient(${page}, 'deliveries.create.recipient.help.purchase')}"></th:block>
+                    <th:block th:replace="~{deliveries/create/parts :: recipient(${page}, ${requiresApproval} ? 'deliveries.create.recipient.help.approval' : 'deliveries.create.recipient.help.purchase')}"></th:block>
                     <section class="cl-card" aria-labelledby="summary-title">
                         <div class="cl-card-head"><h2 class="cl-card-title" id="summary-title" th:text="#{deliveries.create.summary}"></h2></div>
                         <dl class="cl-kv is-column cl-card-inset">
@@ -187,7 +187,7 @@
                 <p class="cl-alert-text"><span th:text="#{deliveries.create.purchase.unavailable}"></span>
                     <button type="button" class="cl-link-button" data-cl-back-submit="back-submit"
                             th:text="#{deliveries.create.back}"></button>
-                    <span th:text="#{deliveries.create.purchase.unavailable.after}"></span></p>
+                    <span th:text="${page.dropship()} ? #{deliveries.create.purchase.unavailable.after.dropship} : #{deliveries.create.purchase.unavailable.after}"></span></p>
             </div>
         </div>
         <table class="cl-table is-key-wrap">

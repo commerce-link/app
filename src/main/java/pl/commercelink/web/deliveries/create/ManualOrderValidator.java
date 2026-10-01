@@ -33,7 +33,9 @@ final class ManualOrderValidator {
         number(errors, binding, "tax", form.getTax() < 1, "deliveries.create.error.tax");
         number(errors, binding, "paymentTerms", form.getPaymentTerms() < 0, "deliveries.create.error.notNegative");
         if (!form.hasRequestedItems()) {
-            errors.put("items", "deliveries.create.error.nothingRequested");
+            // a dropship delivery (no identity required) has no restock suggestions to mention
+            errors.put("items", requireIdentity ? "deliveries.create.error.nothingRequested"
+                    : "deliveries.create.error.nothingRequested.dropship");
         }
         return errors;
     }

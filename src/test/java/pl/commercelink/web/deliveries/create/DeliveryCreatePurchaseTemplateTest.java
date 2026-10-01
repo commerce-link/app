@@ -123,7 +123,8 @@ class DeliveryCreatePurchaseTemplateTest {
         // then
         assertThat(html).contains("cl-alert is-info").contains("Zgłoś do realizacji")
                 .contains("Po akceptacji zamówienie wyśle administrator platformy.")
-                .doesNotContain("Adres dostawy").doesNotContain("Opcje zamówienia u dostawcy");
+                .doesNotContain("Adres dostawy").doesNotContain("Opcje zamówienia u dostawcy")
+                .doesNotContain("Adres wybierasz").contains("Adres wybierze administrator platformy przy akceptacji.");
     }
 
     @Test

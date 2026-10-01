@@ -31,7 +31,7 @@
                     </th:block>
                 </div>
                 <aside class="cl-layout-side is-sticky">
-                    <th:block th:replace="~{deliveries/create/parts :: recipient(${page}, 'deliveries.create.recipient.help.items')}"></th:block>
+                    <th:block th:replace="~{deliveries/create/parts :: recipient(${page}, ${page.purchaseAvailable()} ? 'deliveries.create.recipient.help.items' : 'deliveries.create.recipient.help.items.manual')}"></th:block>
                     <section th:replace="~{deliveries/create/parts :: itemsSummary(${page})}"></section>
                 </aside>
             </form>

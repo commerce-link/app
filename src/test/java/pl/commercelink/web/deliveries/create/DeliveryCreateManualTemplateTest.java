@@ -61,7 +61,7 @@ class DeliveryCreateManualTemplateTest {
         String html = render("deliveries/create/manual", variables);
 
         // then
-        assertThat(html).contains("Wszystkie pola są opcjonalne").contains("cl-optional")
+        assertThat(html).contains("Numer i termin są opcjonalne").contains("cl-optional")
                 .contains("Punkt odbioru").contains("name=\"order\"")
                 .doesNotContainPattern("id=\"externalDeliveryId\"[^>]*required");
     }

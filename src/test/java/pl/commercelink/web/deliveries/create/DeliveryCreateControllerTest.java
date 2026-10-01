@@ -492,8 +492,8 @@ class DeliveryCreateControllerTest {
                 OperationResult.failure("error.message.delivery.fulfilment.invalid"));
 
         // when
-        FulfilmentUpdateResponse ok = asStoreAdmin(() -> controller.fulfilmentJson(PROVIDER, update, Locale.ENGLISH));
-        String fallback = asStoreAdmin(() -> controller.fulfilment(PROVIDER, update, flash, Locale.ENGLISH));
+        FulfilmentUpdateResponse ok = asStoreAdmin(() -> controller.fulfilmentJson(PROVIDER, update, fulfilmentBinding(update), Locale.ENGLISH));
+        String fallback = asStoreAdmin(() -> controller.fulfilment(PROVIDER, update, fulfilmentBinding(update), flash, Locale.ENGLISH));
 
         // then
         assertThat(ok).isEqualTo(new FulfilmentUpdateResponse(true, "msg:deliveries.create.fulfilment.saved", "590", "NEW", "12.50"));
@@ -583,7 +583,7 @@ class DeliveryCreateControllerTest {
 
         // then
         assertThat(view).isEqualTo("deliveries/create/items");
-        assertThat(model.getAttribute("stepError")).isEqualTo("deliveries.create.error.nothingRequested");
+        assertThat(model.getAttribute("stepError")).isEqualTo("deliveries.create.error.nothingRequested.dropship");
     }
 
     @Test
@@ -642,5 +642,27 @@ class DeliveryCreateControllerTest {
         assertThat(shown.getPaymentCost()).isEqualTo(2);
         assertThat(shown.getPaymentTerms()).isEqualTo(7);
         assertThat(shown.getTax()).isEqualTo(1.0);
+    }
+
+    private static BindingResult fulfilmentBinding(DeliveryFulfilmentUpdateForm update) {
+        return new BeanPropertyBindingResult(update, "update");
+    }
+
+    @Test
+    void anUnreadableCostInTheEditDialogIsRefusedWithAMessageInsteadOfHttp400() {
+        // given
+        DeliveryFulfilmentUpdateForm update = new DeliveryFulfilmentUpdateForm();
+        BindingResult binding = fulfilmentBinding(update);
+        binding.rejectValue("unitCost", "typeMismatch");
+
+        // when
+        FulfilmentUpdateResponse answer = asStoreAdmin(() -> controller.fulfilmentJson(PROVIDER, update, binding, Locale.ENGLISH));
+        String fallback = asStoreAdmin(() -> controller.fulfilment(PROVIDER, update, binding, flash, Locale.ENGLISH));
+
+        // then
+        assertThat(answer).isEqualTo(FulfilmentUpdateResponse.failed("msg:error.message.delivery.fulfilment.invalid"));
+        assertThat(fallback).isEqualTo("redirect:/dashboard/deliveries/create/Acme");
+        assertThat(flash.getFlashAttributes().get("errorMessage")).isEqualTo("msg:error.message.delivery.fulfilment.invalid");
+        verifyNoInteractions(fulfilmentUpdateService);
     }
 }

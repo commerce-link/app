@@ -50,6 +50,7 @@ public class DeliveryCreateController {
             Pattern.compile("(items\\[\\d+]\\.(unitCost|requestedQty))|(suggestedItems\\[\\d+]\\..*)");
     private static final Pattern ROW_NUMBER_FIELD =
             Pattern.compile("(items|suggestedItems)\\[(\\d+)]\\.(unitCost|requestedQty)");
+    private static final String FULFILMENT_INVALID = "error.message.delivery.fulfilment.invalid";
     private static final String CHECK_FAILED = "deliveries.purchase.confirm.checkFailed";
     private static final String VALIDATION_RESULT = "deliveries/create/purchase :: validationResult";
 
@@ -205,8 +206,9 @@ public class DeliveryCreateController {
     @PreAuthorize("hasRole('ADMIN')")
     @ResponseBody
     public FulfilmentUpdateResponse fulfilmentJson(@PathVariable("provider") String provider,
-                                                   @ModelAttribute DeliveryFulfilmentUpdateForm update, Locale locale) {
-        return updateFulfilment(storeId(), provider, update, locale);
+                                                   @ModelAttribute DeliveryFulfilmentUpdateForm update,
+                                                   BindingResult binding, Locale locale) {
+        return updateFulfilment(storeId(), provider, update, binding, locale);
     }
 
     @PostMapping(value = SUPER + "/fulfilment", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -215,23 +217,24 @@ public class DeliveryCreateController {
     public FulfilmentUpdateResponse fulfilmentJsonForSuperAdmin(@PathVariable("storeId") String storeId,
                                                                 @PathVariable("provider") String provider,
                                                                 @ModelAttribute DeliveryFulfilmentUpdateForm update,
-                                                                Locale locale) {
-        return updateFulfilment(storeId, provider, update, locale);
+                                                                BindingResult binding, Locale locale) {
+        return updateFulfilment(storeId, provider, update, binding, locale);
     }
 
     @PostMapping(STORE + "/fulfilment")
     @PreAuthorize("hasRole('ADMIN')")
     public String fulfilment(@PathVariable("provider") String provider,
-                             @ModelAttribute DeliveryFulfilmentUpdateForm update, RedirectAttributes flash, Locale locale) {
-        return fulfilmentWithReload(storeId(), provider, update, flash, locale);
+                             @ModelAttribute DeliveryFulfilmentUpdateForm update, BindingResult binding,
+                             RedirectAttributes flash, Locale locale) {
+        return fulfilmentWithReload(storeId(), provider, update, binding, flash, locale);
     }
 
     @PostMapping(SUPER + "/fulfilment")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     public String fulfilmentForSuperAdmin(@PathVariable("storeId") String storeId, @PathVariable("provider") String provider,
-                                          @ModelAttribute DeliveryFulfilmentUpdateForm update,
+                                          @ModelAttribute DeliveryFulfilmentUpdateForm update, BindingResult binding,
                                           RedirectAttributes flash, Locale locale) {
-        return fulfilmentWithReload(storeId, provider, update, flash, locale);
+        return fulfilmentWithReload(storeId, provider, update, binding, flash, locale);
     }
 
     // ---- implementation
@@ -270,6 +273,10 @@ public class DeliveryCreateController {
     }
 
     // A cleared or malformed quantity or cost does not bind and would silently become 0 on a real order.
+    private static String nothingRequested(DeliveryScope scope) {
+        return scope.dropship() ? NOTHING_REQUESTED + ".dropship" : NOTHING_REQUESTED;
+    }
+
     private static boolean hasUnreadableItemNumber(BindingResult binding) {
         return binding.getFieldErrors().stream().anyMatch(error -> ITEM_NUMBER_FIELD.matcher(error.getField()).matches());
     }
@@ -346,7 +353,7 @@ public class DeliveryCreateController {
                     flash.addFlashAttribute("successMessage", message("orders.dropship.unselectedReleased", locale));
                     return "redirect:" + links.order();
                 }
-                return items(scope, links, form, NOTHING_REQUESTED, model);
+                return items(scope, links, form, nothingRequested(scope), model);
             }
             addPage(model, scope, links, form);
             model.addAttribute("errors", Map.of());
@@ -388,7 +395,7 @@ public class DeliveryCreateController {
             }
             prepare(form, storeId, provider, scope);
             if (!form.hasRequestedItems()) {
-                return items(scope, links, form, NOTHING_REQUESTED, model);
+                return items(scope, links, form, nothingRequested(scope), model);
             }
             addPage(model, scope, links, form);
             model.addAttribute("purchaseRef", UUID.randomUUID().toString());
@@ -485,20 +492,28 @@ public class DeliveryCreateController {
     }
 
     private FulfilmentUpdateResponse updateFulfilment(String storeId, String provider, DeliveryFulfilmentUpdateForm update,
-                                                      Locale locale) {
-        OperationResult<Void> result = fulfilmentUpdateService.run(storeId, provider, update);
+                                                      BindingResult binding, Locale locale) {
+        OperationResult<Void> result = runFulfilmentUpdate(storeId, provider, update, binding);
         return result.isSuccess()
                 ? FulfilmentUpdateResponse.saved(update, message("deliveries.create.fulfilment.saved", locale))
                 : FulfilmentUpdateResponse.failed(message(result.getMessage(), locale));
     }
 
     private String fulfilmentWithReload(String storeId, String provider, DeliveryFulfilmentUpdateForm update,
-                                        RedirectAttributes flash, Locale locale) {
-        OperationResult<Void> result = fulfilmentUpdateService.run(storeId, provider, update);
+                                        BindingResult binding, RedirectAttributes flash, Locale locale) {
+        OperationResult<Void> result = runFulfilmentUpdate(storeId, provider, update, binding);
         if (!result.isSuccess()) {
             flash.addFlashAttribute("errorMessage", message(result.getMessage(), locale));
         }
         return "redirect:" + links(storeId, provider, null, null).items();
+    }
+
+    // a cost that did not bind (empty, not a number) is the service's own "invalid" answer, not HTTP 400
+    private OperationResult<Void> runFulfilmentUpdate(String storeId, String provider, DeliveryFulfilmentUpdateForm update,
+                                                      BindingResult binding) {
+        return binding.hasErrors()
+                ? OperationResult.failure(FULFILMENT_INVALID)
+                : fulfilmentUpdateService.run(storeId, provider, update);
     }
 
     private String withScope(String storeId, String provider, DeliveryCreateLinks links, RedirectAttributes flash,

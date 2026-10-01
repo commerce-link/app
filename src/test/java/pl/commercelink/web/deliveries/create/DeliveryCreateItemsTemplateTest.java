@@ -322,4 +322,14 @@ class DeliveryCreateItemsTemplateTest {
         // then
         assertThat(html).contains("Stan docelowy").doesNotContain("W drodze").contains("u dostawcy: 7 szt.");
     }
+
+    @Test
+    void supplierWithoutIntegrationDoesNotPromiseAnAddressStep() {
+        // when
+        String html = render("deliveries/create/items", model(warehousePage(false, false, false), warehouseForm()));
+
+        // then
+        assertThat(html).doesNotContain("przy zamówieniu przez integrację")
+                .contains("Towar przyjedzie na adres, który podasz dostawcy.");
+    }
 }
