@@ -16,6 +16,7 @@ import pl.commercelink.web.dtos.DeliveryCreationForm;
 import pl.commercelink.web.dtos.SuggestedDeliveryItem;
 import pl.commercelink.web.settings.SettingsTemplateRenderer;
 import pl.commercelink.warehouse.RestockPriceCategory;
+import pl.commercelink.warehouse.builtin.WarehouseItem;
 
 import java.util.*;
 import java.util.regex.Pattern;
@@ -114,6 +115,45 @@ final class DeliveryCreateTemplates {
         suggestion.setExpectedQty(4);
         suggestion.setPriceCategory(RestockPriceCategory.LowestPrice);
         form.setSuggestedItems(new ArrayList<>(List.of(suggestion)));
+        return form;
+    }
+
+    /**
+     * A warehouse form of one product with an order source (2 pcs, ticked) and a restock source (a Warehouse
+     * allocation of 1 pc, unticked), requesting the given quantity; no restock suggestions.
+     */
+    static DeliveryCreationForm warehouseFormWithRestockSource(int requestedQty) {
+        DeliveryCreationForm form = warehouseForm();
+        form.setSuggestedItems(new ArrayList<>());
+        WarehouseItem stock = new WarehouseItem("store-1", "Acme", "CPU", "AMD Ryzen 7 9800X3D", "5901234123457",
+                "100-100001084WOF", 579.5, 1);
+        stock.setItemId("wh-item-1");
+        form.getItems().get(0).getAllocations().add(Allocation.fromWarehouseItem(stock));
+        form.getItems().get(0).setRequestedQty(requestedQty);
+        return form;
+    }
+
+    /** A dropship form of one product on two lines of the same order (2 pcs each, both ticked). */
+    static DeliveryCreationForm dropshipFormWithTwoLines() {
+        Order order = order(false);
+        List<Allocation> lines = new ArrayList<>();
+        for (int line = 0; line < 2; line++) {
+            OrderItem cpu = new OrderItem(order.getOrderId(), "CPU", "AMD Ryzen 7 9800X3D", 2, 749, "100-100001084WOF", false, 0);
+            cpu.setStatus(FulfilmentStatus.Allocation);
+            cpu.setManufacturerCode("100-100001084WOF");
+            cpu.setEan("5901234123457");
+            cpu.setCost(579.5);
+            cpu.setDeliveryId("Acme");
+            Allocation allocation = Allocation.fromOrderItem(order, cpu);
+            allocation.setSelected(true);
+            lines.add(allocation);
+        }
+        DeliveryCreationForm form = new DeliveryCreationForm();
+        form.setStoreId("store-1");
+        form.setProvider("Acme");
+        form.setTax(1.23);
+        form.setItems(new ArrayList<>(DeliveryItem.groupAndUnify(lines)));
+        form.setSuggestedItems(new ArrayList<>());
         return form;
     }
 

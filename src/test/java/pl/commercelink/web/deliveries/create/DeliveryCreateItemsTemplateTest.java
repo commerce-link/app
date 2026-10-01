@@ -144,6 +144,9 @@ class DeliveryCreateItemsTemplateTest {
         assertThat(footer.substring(footer.lastIndexOf("<button", purchase), footer.indexOf(">", purchase)))
                 .contains("disabled").contains("aria-describedby=\"purchase-blocked\"").doesNotContain("is-primary");
         assertThat(footer).contains("id=\"purchase-blocked\"").contains("Klient wybrał odbiór w punkcie");
+        int manual = footer.indexOf("id=\"manual-button\"");
+        assertThat(footer.substring(footer.lastIndexOf("<button", manual), footer.indexOf(">", manual)))
+                .contains("cl-button is-primary");
         assertThat(html).contains("Punkt odbioru").contains("WAW04A").doesNotContain("cl-alert is-warn");
     }
 
@@ -181,6 +184,58 @@ class DeliveryCreateItemsTemplateTest {
         assertThat(html.indexOf("id=\"fulfilment-dialog\"")).isGreaterThan(html.indexOf("</form>"));
         assertThat(html).contains("data-cl-dialog-open=\"fulfilment-dialog\"")
                 .contains("aria-label=\"Edytuj EAN, kod producenta i koszt: AMD Ryzen 7 9800X3D\"")
-                .contains("data-ean=\"5901234123457\"").contains("data-row=\"0\"");
+                .contains("data-ean=\"5901234123457\"").contains("data-row=\"0\"")
+                .contains("(źródła: {0})").contains("data-title=\"");
+        String dialog = html.substring(html.indexOf("<dialog"), html.indexOf(">", html.indexOf("<dialog")));
+        assertThat(dialog).contains("data-effect=\"").contains("(źródła: {0})");
+        assertThat(dialog.substring(dialog.indexOf("data-title="))).contains("{0}");
+    }
+
+    @Test
+    void dropshipProductOnSeveralOrderLinesOpensItsLinesInsteadOfOneCheckbox() {
+        // when
+        String html = render("deliveries/create/items", model(dropshipPage(false, null, false), dropshipFormWithTwoLines()));
+
+        // then
+        assertThat(html).contains("data-cl-row-toggle").contains("aria-controls=\"lines-0\"")
+                .contains("<span class=\"cl-row-toggle-fallback\" data-cl-row-toggle-fallback>Linie: 2</span>")
+                .contains("name=\"items[0].allocations[0].selected\"").contains("name=\"_items[0].allocations[0].selected\"")
+                .contains("name=\"items[0].allocations[1].selected\"").contains("name=\"_items[0].allocations[1].selected\"")
+                .contains("id=\"lines-0\"").doesNotContain("data-cl-include").doesNotContain("??");
+        int detail = html.indexOf("id=\"lines-0\"");
+        assertThat(html.substring(html.lastIndexOf("<tr", detail), detail)).contains("cl-row-detail");
+        assertThat(html.substring(html.indexOf("<td", detail), html.indexOf(">", html.indexOf("<td", detail))))
+                .contains("colspan=\"5\"");
+        assertThat(fieldNames(html)).doesNotHaveDuplicates();
+    }
+
+    @Test
+    void untickedRestockSourceOpensTheSourcesAndShowsThePositiveAdjustment() {
+        // when: 3 requested = 2 ordered + 1 above the sources
+        String html = render("deliveries/create/items",
+                model(warehousePage(false, true, false), warehouseFormWithRestockSource(3)));
+
+        // then
+        assertThat(html).contains("Źródła: 2");
+        int main = html.indexOf("class=\"cl-row-main");
+        assertThat(html.substring(main, html.indexOf(">", main))).contains("is-open");
+        int toggle = html.indexOf("data-cl-row-toggle");
+        assertThat(html.substring(toggle, html.indexOf(">", toggle))).contains("aria-expanded=\"true\"");
+        int adjustment = html.indexOf("<tfoot");
+        assertThat(html.substring(adjustment, html.indexOf(">", adjustment))).doesNotContain("hidden");
+        assertThat(html.substring(adjustment, html.indexOf("</tfoot>", adjustment))).contains("cl-status is-ok")
+                .contains("+1 szt.");
+        assertThat(fieldNames(html)).doesNotHaveDuplicates();
+    }
+
+    @Test
+    void adjustmentIsHiddenWhenTheRequestedQuantityMatchesTheTickedSources() {
+        // when
+        String html = render("deliveries/create/items",
+                model(warehousePage(false, true, false), warehouseFormWithRestockSource(2)));
+
+        // then
+        int adjustment = html.indexOf("<tfoot");
+        assertThat(html.substring(adjustment, html.indexOf(">", adjustment))).contains("hidden");
     }
 }
