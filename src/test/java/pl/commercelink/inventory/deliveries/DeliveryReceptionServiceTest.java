@@ -7,6 +7,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import pl.commercelink.documents.Document;
 import pl.commercelink.invoicing.InvoicingProviderFactory;
 import pl.commercelink.starter.security.CustomSecurityContext;
@@ -20,6 +22,7 @@ import pl.commercelink.warehouse.api.Warehouse;
 
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -31,7 +34,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
 class DeliveryReceptionServiceTest {
 
     private static final String STORE_ID = "store-1";
@@ -106,6 +109,33 @@ class DeliveryReceptionServiceTest {
         assertFalse(result.isSuccess());
         verify(invoicingProviderFactory, never()).get(any());
         assertEquals("deliveries.receive.error.warehouseConfig", result.getMessage());
+    }
+
+    @Test
+    void aReceiptRefusedForMissingInvoicingLogsTheStoreAndTheDelivery(CapturedOutput output) {
+        // given
+        Store store = storeWith(warehouseConfiguration(true, "cost-center-7"));
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(invoicingProviderFactory.get(store)).thenReturn(null);
+
+        // when
+        receive();
+
+        // then
+        assertThat(output.getAll()).contains("WARN").contains(STORE_ID).contains(DELIVERY_ID);
+    }
+
+    @Test
+    void anIncompleteWarehouseConfigurationIsLoggedWithTheStore(CapturedOutput output) {
+        // given
+        Store store = storeWith(warehouseConfiguration(true, null));
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+
+        // when
+        receive();
+
+        // then
+        assertThat(output.getAll()).contains("WARN").contains(STORE_ID).contains("warehouse-1");
     }
 
     private OperationResult<Document> receive() {
