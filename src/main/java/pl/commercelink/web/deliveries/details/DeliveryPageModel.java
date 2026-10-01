@@ -5,6 +5,8 @@ import pl.commercelink.orders.PaymentSource;
 import pl.commercelink.web.orders.OrderLabels;
 
 import java.util.List;
+import java.util.Objects;
+import java.util.stream.Stream;
 
 /**
  * Everything the delivery details page shows, worked out once by DeliveryPageModelFactory: message keys, tones,
@@ -217,6 +219,16 @@ public record DeliveryPageModel(String deliveryId, String shortId, boolean super
     public record ConsigneeCard(String name, String street, String cityLine, String phone, String email,
                                 String orderShortId, String orderHref, String shipmentTypeKey, String carrier,
                                 String collectionPoint, String trackingNo, String shippedAt, String supplierStateKey) {
+
+        /** The order link comes with the short id, so it does not count on its own. */
+        public boolean isEmpty() {
+            return Stream.of(name, street, cityLine, phone, email, orderShortId, shipmentTypeKey, carrier, collectionPoint,
+                    trackingNo, shippedAt, supplierStateKey).allMatch(Objects::isNull);
+        }
+
+        public boolean hasShipment() {
+            return Stream.of(shipmentTypeKey, collectionPoint, trackingNo, shippedAt, supplierStateKey).anyMatch(Objects::nonNull);
+        }
     }
 
     public record TermsCard(String orderedAt, String estimatedDeliveryAt, String receivedLabelKey, String receivedAt,

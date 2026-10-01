@@ -40,11 +40,11 @@
 <section th:fragment="consignee" class="cl-card" aria-labelledby="consignee-title" data-cl-collapse th:with="c=${page.consignee()}">
     <div class="cl-card-head"><h2 class="cl-card-title" id="consignee-title" th:text="#{deliveries.details.consignee.title}"></h2></div>
     <div class="cl-collapse-body" id="consignee-body">
-        <div th:if="${c.name() != null}" class="cl-address">
-            <div class="cl-address-head"><span class="cl-eyebrow"><span th:text="#{deliveries.details.consignee.order}"></span>
+        <div th:if="${c.name() != null or c.orderShortId() != null}" class="cl-address">
+            <div th:if="${c.orderShortId() != null}" class="cl-address-head"><span class="cl-eyebrow"><span th:text="#{deliveries.details.consignee.order}"></span>
                 <a th:if="${c.orderHref() != null}" th:href="@{${c.orderHref()}}" th:text="${c.orderShortId()}"></a><span
                         th:if="${c.orderHref() == null}" th:text="${c.orderShortId()}"></span></span></div>
-            <strong th:text="${c.name()}"></strong><br>
+            <th:block th:if="${c.name() != null}"><strong th:text="${c.name()}"></strong><br></th:block>
             <th:block th:if="${c.street() != null}"><span th:text="${c.street()}"></span><br></th:block>
             <span th:if="${c.cityLine() != null}" th:text="${c.cityLine()}"></span>
             <div th:if="${c.phone() != null}"><a th:href="'tel:' + ${c.phone()}" th:text="${c.phone()}"></a></div>
@@ -53,7 +53,7 @@
                     th:attr="data-cl-copy=${c.email()}, aria-label=#{deliveries.details.consignee.copy.email(${c.email()})}"><span
                     class="cl-copy-icon" aria-hidden="true"><i class="far fa-copy"></i></span></button></div>
         </div>
-        <dl class="cl-kv is-column">
+        <dl th:if="${c.hasShipment()}" class="cl-kv is-column">
             <div th:if="${c.shipmentTypeKey() != null}"><dt th:text="#{deliveries.details.consignee.method}"></dt><dd
                     th:text="${c.carrier() != null} ? #{${c.shipmentTypeKey()}} + ' · ' + ${c.carrier()} : #{${c.shipmentTypeKey()}}"></dd></div>
             <div th:if="${c.collectionPoint() != null}"><dt th:text="#{deliveries.details.consignee.point}"></dt><dd

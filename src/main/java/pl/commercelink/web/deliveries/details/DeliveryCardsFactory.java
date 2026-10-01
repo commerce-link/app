@@ -203,7 +203,7 @@ final class DeliveryCardsFactory {
         String supplierState = delivery.getOrderStatus() != null || shownInStatusCard
                 || (shipped && tracking == DeliveryTrackingState.PENDING)
                 ? null : "deliveries.dropship.tracking.state." + tracking.name();
-        return new ConsigneeCard(
+        ConsigneeCard card = new ConsigneeCard(
                 shipping == null ? null : StringUtils.trimToNull(shipping.getDisplayName()),
                 shipping == null ? null : StringUtils.trimToNull(shipping.getStreetAndNumber()),
                 shipping == null ? null : cityLine(shipping),
@@ -217,6 +217,8 @@ final class DeliveryCardsFactory {
                 shipped && shipment != null ? StringUtils.trimToNull(shipment.getTrackingNo()) : null,
                 shipped && shipment != null ? OrderFormats.moment(shipment.getShippedAt()) : null,
                 supplierState);
+        // e.g. a failed purchase with no order resolved: a title over an empty body says nothing, so the card is left out
+        return card.isEmpty() ? null : card;
     }
 
     private static String cityLine(ShippingDetails shipping) {

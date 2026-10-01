@@ -253,6 +253,15 @@ class DeliveryDetailsTemplateTest {
     }
 
     @Test
+    void aDropshipDeliveryWithNothingResolvedForTheCustomerHasNoEmptyConsigneeCard() {
+        // when
+        String html = render(data(withStatus(dropship(), DeliveryOrderStatus.FAILED)), ADMIN);
+
+        // then
+        assertThat(html).doesNotContain(">Odbiorca i wysyłka<").contains(">Terminy i koszty<");
+    }
+
+    @Test
     void aLongSupplierNumberIsCutInTheMetaLineAndWrapsInTheSideCard() {
         // given
         Delivery delivery = warehouse();

@@ -320,7 +320,8 @@ class DeliveriesControllerApprovalTest {
 
             // then
             assertThat(view).isEqualTo("deliveries/details");
-            assertThat(page(model).consignee().name()).isNull();
+            // nothing known about the customer or the parcel: the consignee card is left out, not rendered empty
+            assertThat(page(model).consignee()).isNull();
             verifyNoInteractions(ordersRepository);
         }
     }
@@ -346,7 +347,8 @@ class DeliveriesControllerApprovalTest {
 
             // then
             assertThat(view).isEqualTo("deliveries/details");
-            assertThat(page(model).consignee().name()).isNull();
+            // nothing known about the customer or the parcel: the consignee card is left out, not rendered empty
+            assertThat(page(model).consignee()).isNull();
             verifyNoInteractions(ordersRepository);
         }
     }

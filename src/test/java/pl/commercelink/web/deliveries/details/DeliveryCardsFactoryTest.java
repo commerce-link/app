@@ -222,8 +222,8 @@ class DeliveryCardsFactoryTest {
         assertThat(after.supplierStateKey()).isNull();
         assertThat(DeliveryCardsFactory.consignee(unknownOrder, links(ADMIN, dropship())).name()).isNull();
         assertThat(DeliveryCardsFactory.consignee(data(warehouse()), links(ADMIN, warehouse()))).isNull();
-        assertThat(DeliveryCardsFactory.consignee(data(tracking(dropship(), DeliveryTrackingState.GIVEN_UP)), links(ADMIN, dropship()))
-                .supplierStateKey()).isNull();
+        assertThat(DeliveryCardsFactory.consignee(data(tracking(dropship(), DeliveryTrackingState.GIVEN_UP)), links(ADMIN, dropship())))
+                .as("no customer, no parcel and the state already in the status card: nothing left to show").isNull();
     }
 
     @Test
