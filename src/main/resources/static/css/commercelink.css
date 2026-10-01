@@ -8282,9 +8282,11 @@ a.cl-link-button:hover {
     background: var(--cl-surface-2);
 }
 
-.cl-page .cl-table.is-delivery .cl-subtable .cl-check {
-    min-height: 24px;
-    padding: 0;
+@media screen and (min-width: 1024px) {
+    .cl-page .cl-table.is-delivery .cl-subtable .cl-check {
+        min-height: 24px;
+        padding: 0;
+    }
 }
 
 .cl-page .cl-table.is-delivery .cl-subtable tfoot td {

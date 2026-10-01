@@ -15,9 +15,14 @@
         return input ? parseInt(input.value, 10) || 0 : 0;
     }
 
+    // The source checkboxes sit in a nested sub-table inside the detail row, so the nearest tbody is the sub-table's;
+    // the product's main row is the detail row's previous sibling. Everywhere else the row is the element's own ancestor.
     function rowOf(element) {
-        var tbody = element.closest('tbody');
-        return tbody ? tbody.querySelector('[data-cl-delivery-item]') : null;
+        var detail = element.closest('tr.cl-row-detail');
+        if (detail) {
+            return detail.previousElementSibling;
+        }
+        return element.closest('[data-cl-delivery-item]');
     }
 
     function sources(row) {

@@ -47,6 +47,7 @@
             window.location.reload();
             return;
         }
+        row.setAttribute('data-mfn', answer.mfn);
         row.querySelector('[data-cl-item-ean]').textContent = answer.ean;
         row.querySelector('[data-cl-item-mfn]').textContent = answer.mfn;
         row.querySelector('[data-cl-item-ean-input]').value = answer.ean;
@@ -83,6 +84,8 @@
         form.addEventListener('submit', function (event) {
             event.preventDefault();
             var error = dialog.querySelector('[data-cl-fulfilment-error]');
+            var submit = form.querySelector('button[type="submit"]');
+            submit.disabled = true;
             fetch(dialog.getAttribute('data-url'), {
                 method: 'POST',
                 headers: {'Accept': 'application/json'},
@@ -106,6 +109,9 @@
                 .catch(function () {
                     error.querySelector('.cl-alert-text').textContent = dialog.getAttribute('data-failed');
                     error.hidden = false;
+                })
+                .then(function () {
+                    submit.disabled = false;
                 });
         });
     }
