@@ -85,4 +85,17 @@ class DeliveryDetailsScriptsContractTest {
                 .contains("event.key !== 'Enter'").contains("data-cl-dialog-submit").contains("data-cl-submitted");
         assertThat(page).contains("/js/table-select.js").contains("/js/delivery-details.js");
     }
+
+    @Test
+    void theDockedBarIsMeasuredOnlyWhileShownAndCollapsingAProductUnchecksItsDestinations() throws Exception {
+        // when
+        String js = read(Path.of("src/main/resources/static/js/delivery-details.js"));
+
+        // then
+        assertThat(js).contains("entries[entries.length - 1].isIntersecting").contains("if (height === 0) {")
+                .contains("form.addEventListener('change', measure)")
+                .containsPattern("if \\(!open\\) \\{\\s*row\\.querySelectorAll\\('input\\[data-cl-select-row\\]'\\)[\\s\\S]*?box\\.checked = false;")
+                .containsPattern("if \\(unchecked\\) \\{\\s*refreshSelection\\(\\);")
+                .containsPattern("before = checkedBoxes\\(\\);[\\s\\S]*?expandAll\\(\\);");
+    }
 }

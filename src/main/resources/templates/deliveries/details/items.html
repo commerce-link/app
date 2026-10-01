@@ -95,7 +95,8 @@
             <thead>
             <tr>
                 <th th:if="${items.selectable()}" scope="col" class="cl-table-check">
-                    <label class="cl-check-target"><input class="cl-check-input" type="checkbox" data-cl-select-all
+                    <!--/* hidden until table-select.js runs: without it the box would do nothing */-->
+                    <label class="cl-check-target"><input class="cl-check-input" type="checkbox" data-cl-select-all hidden
                                                           th:attr="aria-label=#{deliveries.details.items.select.all}, data-cl-label-select=#{deliveries.details.items.select.all}, data-cl-label-clear=#{deliveries.details.items.select.none}"></label>
                 </th>
                 <th scope="col" th:text="#{deliveries.details.items.column.product}"></th>

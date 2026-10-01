@@ -459,4 +459,13 @@ class DeliveryDetailsTemplateTest {
         // then
         assertThat(html).contains(">Dostawa nie ma pozycji.<").doesNotContain("is-allocations");
     }
+
+    @Test
+    void theHeaderSelectAllWaitsForJavaScript() {
+        // when
+        String html = render(data(warehouse()), ADMIN);
+
+        // then
+        assertThat(html).containsPattern("<th scope=\"col\" class=\"cl-table-check\">\\s*<label class=\"cl-check-target\"><input class=\"cl-check-input\" type=\"checkbox\" data-cl-select-all hidden");
+    }
 }

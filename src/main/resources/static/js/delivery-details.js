@@ -27,22 +27,44 @@
         }
     }
 
+    // Collapsing a product unchecks its destinations: table-select.js counts and selects only visible rows, and a
+    // hidden checked box would still post, so the action would touch what the operator cannot see.
+    function setOpen(button, open) {
+        var unchecked = false;
+        button.setAttribute('aria-expanded', String(open));
+        (button.getAttribute('aria-controls') || '').split(' ').forEach(function (id) {
+            var row = id && document.getElementById(id);
+            if (!row) {
+                return;
+            }
+            row.hidden = !open;
+            if (!open) {
+                row.querySelectorAll('input[data-cl-select-row]').forEach(function (box) {
+                    unchecked = unchecked || box.checked;
+                    box.checked = false;
+                });
+            }
+        });
+        var main = button.closest('tr');
+        if (main) {
+            main.classList.toggle('is-open', open);
+        }
+        if (unchecked) {
+            refreshSelection();
+        }
+    }
+
+    function expandAll() {
+        document.querySelectorAll('[data-cl-alloc-toggle][aria-expanded="false"]').forEach(function (button) {
+            setOpen(button, true);
+        });
+    }
+
     function initToggles() {
         document.querySelectorAll('[data-cl-alloc-toggle]').forEach(function (button) {
             button.hidden = false;
             button.addEventListener('click', function () {
-                var open = button.getAttribute('aria-expanded') !== 'true';
-                button.setAttribute('aria-expanded', String(open));
-                (button.getAttribute('aria-controls') || '').split(' ').forEach(function (id) {
-                    var row = id && document.getElementById(id);
-                    if (row) {
-                        row.hidden = !open;
-                    }
-                });
-                var main = button.closest('tr');
-                if (main) {
-                    main.classList.toggle('is-open', open);
-                }
+                setOpen(button, button.getAttribute('aria-expanded') !== 'true');
             });
         });
     }
@@ -53,10 +75,21 @@
         if (!bar || !card || typeof IntersectionObserver !== 'function') {
             return;
         }
+        // A hidden bar measures 0; writing that would override the stylesheet fallback and let the bar, once shown,
+        // cover the last destination row, so the height is taken whenever the selection (and so the bar) changes.
+        var measure = function () {
+            var height = bar.offsetHeight;
+            if (height === 0) {
+                return;
+            }
+            form.style.setProperty('--cl-docked-bar', (height + 8) + 'px');
+        };
         new IntersectionObserver(function (entries) {
-            bar.classList.toggle('is-in-view', entries[0].isIntersecting);
-            form.style.setProperty('--cl-docked-bar', (bar.offsetHeight + 8) + 'px');
+            bar.classList.toggle('is-in-view', entries[entries.length - 1].isIntersecting);
+            measure();
         }).observe(card);
+        form.addEventListener('change', measure);
+        window.addEventListener('resize', measure);
     }
 
     function fillList(list) {
@@ -89,6 +122,8 @@
                 before = null;
                 if (trigger && trigger.hasAttribute('data-cl-select-pending')) {
                     before = checkedBoxes();
+                    // collapsed rows would be checked but not counted, so every product opens first
+                    expandAll();
                     rowBoxes().forEach(function (box) {
                         box.checked = true;
                     });
