@@ -104,7 +104,31 @@ public record DeliveryPageModel(String deliveryId, String shortId, boolean super
      */
     public record AllocationRow(int index, boolean warehouse, String orderShortId, String customer, String href,
                                 boolean directToConsumer, int qty, boolean received, boolean checkbox, boolean checked,
-                                String stateKey, String stateTone, String productName, AllocationFields fields) {
+                                String stateKey, String stateTone, String productName, AllocationFields fields)
+            implements Destination {
+    }
+
+    /**
+     * Where an allocation goes, named the same way wherever it is listed (the items row, "Odbierz całość", the checked
+     * lines of a selection dialog): the warehouse, or the order with its customer when one is known.
+     */
+    public interface Destination {
+
+        boolean warehouse();
+
+        String orderShortId();
+
+        String customer();
+
+        default String destinationKey() {
+            return warehouse() ? "deliveries.details.items.warehouse"
+                    : customer() != null ? "deliveries.details.items.order" : "deliveries.details.items.order.anonymous";
+        }
+
+        default Object[] destinationArgs() {
+            return warehouse() ? new Object[0]
+                    : customer() != null ? new Object[]{orderShortId(), customer()} : new Object[]{orderShortId()};
+        }
     }
 
     /** The values DeliveryAllocationsForm binds back for one allocation, as the hidden fields carry them. */
@@ -199,6 +223,7 @@ public record DeliveryPageModel(String deliveryId, String shortId, boolean super
                           int allocationCount) {
     }
 
-    public record PendingLine(String productName, int qty, boolean warehouse, String orderShortId, String customer) {
+    public record PendingLine(String productName, int qty, boolean warehouse, String orderShortId, String customer)
+            implements Destination {
     }
 }

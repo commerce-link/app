@@ -71,4 +71,18 @@ class DeliveryDetailsScriptsContractTest {
                 .contains("/js/menu.js").contains("/js/dialog.js").contains("/js/collapse.js").contains("/js/timeline.js")
                 .contains("/js/copy-field.js").contains("/js/confirm-dialog.js");
     }
+
+    @Test
+    void theItemsScriptTogglesDestinationsDocksTheBarAndOwnsEnterInsideDialogs() throws Exception {
+        // when
+        String js = read(Path.of("src/main/resources/static/js/delivery-details.js"));
+        String page = read(Path.of("src/main/resources/templates/deliveries/details.html"));
+
+        // then
+        assertThat(js).contains("'use strict'").doesNotContain("innerHTML").doesNotContainPattern("\\.style\\.(?!setProperty\\('--)")
+                .contains("IntersectionObserver").contains("--cl-docked-bar").contains("data-cl-alloc-toggle")
+                .contains("data-cl-select-pending").contains("data-cl-selection-list").contains("cl:dialog-open")
+                .contains("event.key !== 'Enter'").contains("data-cl-dialog-submit").contains("data-cl-submitted");
+        assertThat(page).contains("/js/table-select.js").contains("/js/delivery-details.js");
+    }
 }

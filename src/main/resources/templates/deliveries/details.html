@@ -12,7 +12,7 @@
             <div class="cl-layout-aside">
                 <div class="cl-layout-main">
                     <th:block th:each="card, s : ${page.statusCards()}"><section th:replace="~{deliveries/details/status-card :: card(${card}, ${s.index})}"></section></th:block>
-                    <!--/* items (Task 10) */-->
+                    <section th:replace="~{deliveries/details/items :: card}"></section>
                     <!--/* documents and payments (Task 12) */-->
                     <th:block th:if="${!page.history().events().isEmpty()}"><section th:replace="~{deliveries/details/history :: card}"></section></th:block>
                 </div>
@@ -36,6 +36,8 @@
     <script th:src="@{/js/timeline.js}" defer></script>
     <script th:src="@{/js/copy-field.js}" defer></script>
     <script th:src="@{/js/confirm-dialog.js}" defer></script>
+    <script th:src="@{/js/table-select.js}" defer></script>
+    <script th:src="@{/js/delivery-details.js}" defer></script>
 </div>
 </body>
 </html>

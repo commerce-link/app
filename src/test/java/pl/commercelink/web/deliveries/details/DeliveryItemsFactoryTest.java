@@ -250,4 +250,20 @@ class DeliveryItemsFactoryTest {
         assertThat(card.goodsNet()).isEqualTo("5 084,00");
         assertThat(card.goodsGross()).isNull();
     }
+
+    @Test
+    void aDestinationIsNamedAsTheWarehouseOrTheOrderWithItsCustomerWhenKnown() {
+        // when
+        DeliveryPageModel.PendingLine warehouse = new DeliveryPageModel.PendingLine("SSD", 2, true, null, null);
+        DeliveryPageModel.PendingLine customer = new DeliveryPageModel.PendingLine("GPU", 1, false, "a9f693b8", "marek.pawlak");
+        DeliveryPageModel.PendingLine anonymous = new DeliveryPageModel.PendingLine("GPU", 1, false, "a9f693b8", null);
+
+        // then
+        assertThat(warehouse.destinationKey()).isEqualTo("deliveries.details.items.warehouse");
+        assertThat(warehouse.destinationArgs()).isEmpty();
+        assertThat(customer.destinationKey()).isEqualTo("deliveries.details.items.order");
+        assertThat(customer.destinationArgs()).containsExactly("a9f693b8", "marek.pawlak");
+        assertThat(anonymous.destinationKey()).isEqualTo("deliveries.details.items.order.anonymous");
+        assertThat(anonymous.destinationArgs()).containsExactly("a9f693b8");
+    }
 }

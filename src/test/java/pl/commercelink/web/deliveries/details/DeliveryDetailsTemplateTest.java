@@ -322,4 +322,141 @@ class DeliveryDetailsTemplateTest {
         assertThat(occurrences(html, "data-cl-saved-alert")).isEqualTo(1);
         assertThat(html).doesNotContain("notification is-success").doesNotContain("notification is-danger");
     }
+
+    @Test
+    void oneTableShowsEveryProductWithItsDestinationsAndTheirStates() {
+        // when
+        String html = render(data(partlyReceived(warehouse())), ADMIN);
+
+        // then
+        assertThat(html).contains(">Pozycje (2)<").contains("class=\"cl-table is-compact is-wrap is-allocations\"")
+                .contains(">NVIDIA ValueKing RTX Ultra<").contains(">Samsung MirageDrive 2TB NVMe<")
+                .contains("✓ 1 z 1").contains(">0 z 2<").contains("2 × 635,00")
+                .contains(">Zamówienie #a9f693b8 · marek.pawlak<").contains("href=\"/dashboard/orders/" + ORDER_ID + "\"")
+                .contains("href=\"/dashboard/warehouse/items/wh-MFN-MIRAGE-01\"")
+                .contains(">✓ Odebrano<").contains(">Czeka<")
+                .contains("Towar razem: netto 5\u00a0084,00 PLN · brutto 6\u00a0253,32 PLN")
+                .doesNotContain(">Alokacja<").doesNotContain("Zarezerwowano");
+    }
+
+    @Test
+    void theItemsFooterSaysDashForTheGrossWhileTheVatIsUnset() {
+        // given
+        Delivery delivery = warehouse();
+        delivery.setTax(0.0);
+
+        // when
+        String html = render(data(delivery), ADMIN);
+
+        // then
+        assertThat(html).contains("Towar razem: netto 5\u00a0084,00 PLN · brutto —").doesNotContain("null PLN");
+    }
+
+    @Test
+    void codesCopyOnClickAndTheProductMenuGreysTheQuantityChangeWithAReason() {
+        // when
+        String html = render(data(withGoodsReceipt(warehouse())), ADMIN);
+
+        // then
+        assertThat(html).contains("data-cl-copy=\"5900000000002\"").contains("aria-label=\"Kopiuj kod producenta MFN-VALUE-01\"")
+                .containsPattern("aria-disabled=\"true\">\\s*<span>Zmień zamówioną ilość</span>\\s*<span class=\"cl-menu-reason\">Dostawa ma powiązane dokumenty.</span>")
+                .contains(">Historia dokumentów pozycji<");
+    }
+
+    @Test
+    void theSelectionRowOffersTheWarehouseActionsAndHidesThemForDropship() {
+        // when
+        String warehouse = render(data(warehouse()), ADMIN);
+        String dropship = render(data(dropship()), ADMIN);
+
+        // then
+        assertThat(warehouse).contains("data-cl-selection-bar hidden").contains("data-template=\"Zaznaczono: {k} (z {n})\"")
+                .contains("data-cl-dialog-open=\"receive-dialog\"").contains(">Przenieś<")
+                .containsPattern("aria-disabled=\"true\">\\s*<span>Do innej dostawy…</span>\\s*<span class=\"cl-menu-reason\">Brak innych nieodebranych dostaw tego dostawcy.</span>")
+                .contains("data-cl-dialog-open=\"split-dialog\"").contains("data-cl-dialog-open=\"remove-dialog\"");
+        assertThat(dropship).contains("data-cl-dialog-open=\"ship-dialog\"").contains("data-cl-dialog-open=\"remove-dialog\"")
+                .doesNotContain("receive-dialog").doesNotContain(">Przenieś<").doesNotContain("split-dialog")
+                .doesNotContain("PersonalCollection");
+    }
+
+    @Test
+    void receivingIsGreyedWhileTheOrderIsBeingPlacedAndAbsentForTheSuperAdmin() {
+        // when
+        String admin = render(data(withStatus(warehouse(), DeliveryOrderStatus.ORDER_PENDING)), ADMIN);
+        String superAdmin = render(data(withStatus(warehouse(), DeliveryOrderStatus.ORDER_PENDING)), SUPER_ADMIN);
+
+        // then
+        assertThat(admin).contains("id=\"selection-receive-reason\">Trwa zamawianie u dostawcy.<")
+                .contains("aria-describedby=\"selection-receive-reason\"");
+        assertThat(superAdmin).doesNotContain("data-cl-select-row").doesNotContain("data-cl-selection-bar");
+    }
+
+    @Test
+    void aReceivedDeliveryOrAStoreAdminWaitingForApprovalGetsNoCheckboxes() {
+        // when
+        String received = render(data(received(warehouse())), ADMIN);
+        String approval = render(data(global(withStatus(dropship(), DeliveryOrderStatus.AWAITING_APPROVAL))), ADMIN);
+        String approvalSuperAdmin = render(data(global(withStatus(dropship(), DeliveryOrderStatus.AWAITING_APPROVAL))), SUPER_ADMIN);
+
+        // then
+        assertThat(received).doesNotContain("data-cl-select-row").doesNotContain("data-cl-selection-bar");
+        assertThat(approval).doesNotContain("data-cl-select-row");
+        assertThat(approvalSuperAdmin).contains("data-cl-select-row").contains("data-cl-dialog-open=\"remove-dialog\"")
+                .doesNotContain("data-cl-dialog-open=\"ship-dialog\"");
+    }
+
+    @Test
+    void withoutJavaScriptTheSelectionPostsToTheConfirmationRoutes() {
+        // when
+        String html = render(data(warehouse()), ADMIN);
+
+        // then
+        assertThat(html).contains("<noscript>")
+                .contains("formaction=\"/dashboard/deliveries/" + DELIVERY_ID + "/confirm/receive\"")
+                .contains("formaction=\"/dashboard/deliveries/" + DELIVERY_ID + "/confirm/split\"")
+                .contains("formaction=\"/dashboard/deliveries/" + DELIVERY_ID + "/confirm/remove-allocations\"")
+                .doesNotContain("/confirm/merge\"");
+    }
+
+    @Test
+    void theAllocationsFormStartsWithADisabledEnterGuardAndCarriesTheDeliveryOnly() {
+        // when
+        String html = render(data(warehouse()), ADMIN);
+
+        // then
+        assertThat(html).containsPattern("<form id=\"allocationsForm\"[^>]*>\\s*<button type=\"submit\" class=\"cl-visually-hidden\" disabled")
+                .contains("name=\"deliveryId\" value=\"" + DELIVERY_ID + "\"")
+                .doesNotContain("name=\"storeId\"").doesNotContain("name=\"provider\"");
+    }
+
+    @Test
+    void aDestinationBoundForTheCustomerIsMarkedInItsRow() {
+        // given
+        Delivery dtc = withAllocations(warehouse(), orderAllocation("SSD", "590", "MFN-SSD", 100, 1, true));
+
+        // when
+        String html = render(data(dtc), ADMIN);
+
+        // then
+        assertThat(html).contains("<span class=\"cl-status is-info\">Do klienta przez magazyn</span>");
+    }
+
+    @Test
+    void theSuperAdminReadsDestinationsAsText() {
+        // when
+        String html = render(data(warehouse()), SUPER_ADMIN);
+
+        // then
+        assertThat(html).doesNotContain("href=\"/dashboard/orders/").doesNotContain("href=\"/dashboard/warehouse/items/")
+                .doesNotContain("delivery-mfn-history");
+    }
+
+    @Test
+    void anEmptyDeliverySaysSo() {
+        // when
+        String html = render(data(withAllocations(warehouse())), ADMIN);
+
+        // then
+        assertThat(html).contains(">Dostawa nie ma pozycji.<").doesNotContain("is-allocations");
+    }
 }
