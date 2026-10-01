@@ -64,6 +64,7 @@ import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.warehouse.GoodsOutEventPublisher;
 import pl.commercelink.web.dtos.AddItemsForm;
 import pl.commercelink.web.dtos.AddPaymentForm;
+import pl.commercelink.web.payments.PaymentsReturn;
 import pl.commercelink.web.dtos.AssignSupplierForm;
 import pl.commercelink.web.dtos.FormNumbers;
 import pl.commercelink.web.dtos.ClientDataDto;
@@ -762,6 +763,11 @@ public class OrdersController extends BaseController {
         redirectAttributes.addFlashAttribute("errorMessage",
                 messageSource.getMessage(key, args.length == 0 ? null : args, locale));
         return details(orderId);
+    }
+
+    private String refuseToPayments(RedirectAttributes redirectAttributes, String target, String key, Locale locale) {
+        redirectAttributes.addFlashAttribute(PaymentsReturn.ERROR, messageSource.getMessage(key, null, locale));
+        return "redirect:" + target;
     }
 
     /** A no-JavaScript confirmation page whose texts are the dialog's: <prefix>.confirm.title / .message / .action. */
@@ -1650,20 +1656,24 @@ public class OrdersController extends BaseController {
                              RedirectAttributes redirectAttributes,
                              Locale locale) {
         Order existingOrder = requireOrder(ordersRepository, getStoreId(), orderId);
+        Optional<String> back = PaymentsReturn.target(form.getReturnTo());
         // the closed page offers no "Dodaj wpłatę"; a cancelled order would drop the payment while saying it was added
         if (existingOrder.isClosed()) {
-            return refuse(redirectAttributes, orderId, closedPaymentsKey(existingOrder), locale);
+            return back.isPresent() ? refuseToPayments(redirectAttributes, back.get(), closedPaymentsKey(existingOrder), locale)
+                    : refuse(redirectAttributes, orderId, closedPaymentsKey(existingOrder), locale);
         }
 
         String invalid = form.validate();
         if (invalid != null) {
-            return refuse(redirectAttributes, orderId, invalid, locale);
+            return back.isPresent() ? refuseToPayments(redirectAttributes, back.get(), invalid, locale)
+                    : refuse(redirectAttributes, orderId, invalid, locale);
         }
         PaymentDirection direction = form.getDirection() != null ? form.getDirection() : PaymentDirection.Incoming;
         // the sign follows the direction, as in a payment's own dialog: a refund is stored negative however it was
         // typed, and money that came in cannot be negative
         if (direction == PaymentDirection.Incoming && form.amount() < 0) {
-            return refuse(redirectAttributes, orderId, "order.payments.error.negative", locale);
+            return back.isPresent() ? refuseToPayments(redirectAttributes, back.get(), "order.payments.error.negative", locale)
+                    : refuse(redirectAttributes, orderId, "order.payments.error.negative", locale);
         }
         double bankAmount = direction == PaymentDirection.Outgoing ? -Math.abs(form.amount()) : form.amount();
 
@@ -1690,6 +1700,11 @@ public class OrdersController extends BaseController {
         target.setBankTransactionDate(form.getBankTransactionDate());
 
         orderLifecycle.update(existingOrder);
+        if (back.isPresent()) {
+            redirectAttributes.addFlashAttribute(PaymentsReturn.NOTICE,
+                    messageSource.getMessage("payments.notice.order", new Object[]{existingOrder.getShortenedOrderId()}, locale));
+            return "redirect:" + back.get();
+        }
         OrderFlash.saved(redirectAttributes, messageSource.getMessage("order.payments.added", null, locale));
         return details(orderId);
     }

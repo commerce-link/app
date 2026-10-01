@@ -60,6 +60,7 @@ import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.stores.StoreSupplierConnection;
 import pl.commercelink.warehouse.RestockSuggestionService;
 import pl.commercelink.web.dtos.AddPaymentForm;
+import pl.commercelink.web.payments.PaymentsReturn;
 import pl.commercelink.web.dtos.DeliveryAllocationsForm;
 import pl.commercelink.web.dtos.DeliveryCreationForm;
 import pl.commercelink.web.dtos.PickerOption;
@@ -1844,6 +1845,29 @@ class DeliveriesControllerApprovalTest {
     }
 
     @Test
+    void paymentFromThePaymentsPageGoesBackThere() {
+        // given
+        Delivery delivery = new Delivery();
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        AddPaymentForm form = new AddPaymentForm();
+        form.setBankAmount("100");
+        form.setProcessingFee("0");
+        form.setSource(PaymentSource.BankTransfer);
+        form.setReturnTo("/dashboard/payments?side=payables&focus=overdue");
+
+        // when
+        String view;
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            view = deliveriesController.addPayment(DELIVERY_ID, form, redirectAttributes, Locale.ENGLISH);
+        }
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/payments?side=payables&focus=overdue");
+        verify(redirectAttributes).addFlashAttribute(eq(PaymentsReturn.NOTICE), any());
+    }
+
+    @Test
     void addPaymentToADeliveryReadsACommaAmount() {
         // given: the dialog's amounts are text, read on the server whatever the browser's language
         Delivery delivery = new Delivery();
@@ -1857,7 +1881,7 @@ class DeliveriesControllerApprovalTest {
         String view;
         try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
             security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-            view = deliveriesController.addPayment(DELIVERY_ID, form, false, redirectAttributes, Locale.ENGLISH);
+            view = deliveriesController.addPayment(DELIVERY_ID, form, redirectAttributes, Locale.ENGLISH);
         }
 
         // then: a payout to the supplier keeps its sign

@@ -98,6 +98,7 @@ import pl.commercelink.web.orders.OrderPageModel;
 import pl.commercelink.web.orders.OrderPageModelFactory;
 import pl.commercelink.web.orders.OrderSettingsView;
 import pl.commercelink.web.dtos.AddPaymentForm;
+import pl.commercelink.web.payments.PaymentsReturn;
 import pl.commercelink.web.orders.OrderPaymentForm;
 import pl.commercelink.web.orders.OrderShipmentForm;
 import pl.commercelink.web.settings.ConfirmAction;
@@ -1396,6 +1397,25 @@ class OrdersControllerTest {
             assertThat(errorMessage()).isEqualTo("order.payments.error.cancelled");
             assertThat(order.getPayments().get(0).isUnsettled()).isTrue();
             verifyNoInteractions(orderLifecycle);
+        }
+
+        @Test
+        void paymentFromThePaymentsPageGoesBackThereAndRefusalsToo() {
+            // given
+            orderWith(new Payment(PaymentSource.BankTransfer));
+            AddPaymentForm ok = addForm("100", "", PaymentDirection.Incoming);
+            ok.setReturnTo("/dashboard/payments?side=receivables");
+            AddPaymentForm negative = addForm("-10", "", PaymentDirection.Incoming);
+            negative.setReturnTo("/dashboard/payments?side=receivables");
+
+            // when
+            String saved = ordersController.addPayment(ORDER_ID, ok, redirect, Locale.ENGLISH);
+            String refused = ordersController.addPayment(ORDER_ID, negative, redirect, Locale.ENGLISH);
+
+            // then
+            assertThat(saved).isEqualTo("redirect:/dashboard/payments?side=receivables");
+            assertThat(refused).isEqualTo("redirect:/dashboard/payments?side=receivables");
+            assertThat(redirect.getFlashAttributes()).containsKey(PaymentsReturn.ERROR);
         }
 
         @Test

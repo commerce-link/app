@@ -32,6 +32,7 @@ import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.warehouse.RestockSuggestionService;
 import pl.commercelink.web.dtos.AddPaymentForm;
+import pl.commercelink.web.payments.PaymentsReturn;
 import pl.commercelink.web.dtos.DeliveryAllocationsForm;
 import pl.commercelink.web.dtos.DeliveryCreationForm;
 import pl.commercelink.web.dtos.DeliveryFulfilmentUpdateForm;
@@ -145,17 +146,18 @@ public class DeliveriesController {
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String addPayment(@PathVariable String deliveryId,
                              @ModelAttribute AddPaymentForm form,
-                             @RequestParam(required = false, defaultValue = "false") boolean redirectToPayments,
                              RedirectAttributes redirectAttributes,
                              Locale locale) {
         Delivery delivery = deliveriesRepository.findById(getStoreId(), deliveryId);
 
-        String redirectTarget = redirectToPayments
-                ? "redirect:/dashboard/payments"
-                : "redirect:/dashboard/deliveries/details?deliveryId=" + deliveryId;
+        Optional<String> back = PaymentsReturn.target(form.getReturnTo());
+        String redirectTarget = back.map(target -> "redirect:" + target)
+                .orElse("redirect:/dashboard/deliveries/details?deliveryId=" + deliveryId);
+        // the Payments page shows its own outcome messages; the details page keeps the layout's banner
+        String errorAttribute = back.isPresent() ? PaymentsReturn.ERROR : "errorMessage";
 
         if (delivery != null && delivery.isAwaitingApproval()) {
-            redirectAttributes.addFlashAttribute("errorMessage",
+            redirectAttributes.addFlashAttribute(errorAttribute,
                     messageSource.getMessage("deliveries.edit.locked.awaitingApproval", null, locale));
             return redirectTarget;
         }
@@ -163,7 +165,7 @@ public class DeliveriesController {
         // a delivery keeps its sign as typed: a payout to the supplier is stored positive
         String invalid = form.validate();
         if (invalid != null) {
-            redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage(invalid, null, locale));
+            redirectAttributes.addFlashAttribute(errorAttribute, messageSource.getMessage(invalid, null, locale));
             return redirectTarget;
         }
 
@@ -187,6 +189,10 @@ public class DeliveriesController {
 
         delivery.recomputePaid();
         deliveriesRepository.save(delivery);
+        if (back.isPresent()) {
+            redirectAttributes.addFlashAttribute(PaymentsReturn.NOTICE,
+                    messageSource.getMessage("payments.notice.delivery", new Object[]{delivery.getShortenedDeliveryId()}, locale));
+        }
         return redirectTarget;
     }
 
