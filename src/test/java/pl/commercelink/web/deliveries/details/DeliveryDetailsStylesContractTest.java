@@ -88,6 +88,9 @@ class DeliveryDetailsStylesContractTest {
         assertThat(rule).isPositive();
         assertThat(section.substring(rule, section.indexOf('}', rule)))
                 .contains("max-width: 100%;").contains("overflow-wrap: anywhere;");
+        int tag = section.indexOf(".cl-page .cl-table.is-allocations tr.cl-alloc-row .cl-alloc-dest > .cl-status {");
+        assertThat(tag).as("a tag keeps whole words").isPositive();
+        assertThat(section.substring(tag, section.indexOf('}', tag))).contains("overflow-wrap: normal;");
     }
 
     @Test
