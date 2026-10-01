@@ -1,0 +1,49 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+<!--/* Step 1 of a new delivery: what is ordered at one supplier (the warehouse batch, or one order's dropship lines).
+       The summary card leads to step 2 - the integration's confirmation or "Zarejestruj zamówienie". */-->
+<div layout:fragment="content">
+    <section class="cl-page">
+        <div class="cl-page-body">
+            <div th:replace="~{deliveries/create/parts :: header(${page}, 1, #{deliveries.create.page.title(${page.supplierName()})}, 'deliveries.create.lead.what')}"></div>
+            <th:block th:if="${stepError != null}">
+                <div class="cl-alert is-bad" tabindex="-1" data-cl-error-summary>
+                    <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
+                    <p class="cl-alert-text" th:text="#{${stepError}}"></p>
+                </div>
+            </th:block>
+            <form method="post" id="delivery-step-form" class="cl-layout-aside" data-cl-delivery-items
+                  th:action="@{${page.links().manual()}}" th:attr="data-dropship=${page.dropship()}">
+                <th:block th:replace="~{deliveries/create/parts :: scope(${page})}"></th:block>
+                <th:block th:replace="~{deliveries/create/parts :: hiddenOrderData(true)}"></th:block>
+                <div class="cl-layout-main">
+                    <th:block th:if="${page.dropship()}">
+                        <section th:replace="~{deliveries/create/parts :: dropshipItems}"></section>
+                    </th:block>
+                    <th:block th:if="${!page.dropship()}">
+                        <section th:replace="~{deliveries/create/parts :: warehouseItems}"></section>
+                        <th:block th:if="${!form.suggestedItems.isEmpty()}">
+                            <section th:replace="~{deliveries/create/parts :: suggestions}"></section>
+                        </th:block>
+                    </th:block>
+                </div>
+                <aside class="cl-layout-side is-sticky">
+                    <th:block th:replace="~{deliveries/create/parts :: recipient(${page}, 'deliveries.create.recipient.help.items')}"></th:block>
+                    <section th:replace="~{deliveries/create/parts :: itemsSummary(${page})}"></section>
+                </aside>
+            </form>
+            <th:block th:if="${!page.dropship()}">
+                <dialog th:replace="~{deliveries/create/parts :: fulfilmentDialog(${page})}"></dialog>
+            </th:block>
+        </div>
+    </section>
+    <script th:src="@{/js/row-toggle.js}" defer></script>
+    <script th:src="@{/js/dialog.js}" defer></script>
+    <script th:src="@{/js/delivery-items.js}" defer></script>
+    <script th:if="${!page.dropship()}" th:src="@{/js/delivery-fulfilment.js}" defer></script>
+</div>
+</body>
+</html>
