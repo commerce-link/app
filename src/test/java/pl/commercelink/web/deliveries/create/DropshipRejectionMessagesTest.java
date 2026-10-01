@@ -20,9 +20,7 @@ class DropshipRejectionMessagesTest {
 
     @Test
     void everyRejectionReasonHasAMessageKeyInBothLanguageFiles() throws Exception {
-        // given: mirrors DropshipRejectionMessages.keyFor's derivation, so a new DropshipRejection
-        // constant added without matching entries in both property files fails here instead of
-        // surfacing as a NoSuchMessageException (500) on the redirect that reports the rejection
+        // given
         String pl = Files.readString(Path.of("src/main/resources/messages_pl.properties"), StandardCharsets.UTF_8);
         String en = Files.readString(Path.of("src/main/resources/messages_en.properties"), StandardCharsets.UTF_8);
 

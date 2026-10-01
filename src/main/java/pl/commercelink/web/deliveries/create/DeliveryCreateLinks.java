@@ -2,9 +2,6 @@ package pl.commercelink.web.deliveries.create;
 
 import org.springframework.web.util.UriUtils;
 
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
-
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 /**
@@ -38,7 +35,7 @@ public record DeliveryCreateLinks(String base, String provider, String orderId, 
         if (orderId == null) {
             return root();
         }
-        return root() + "?order=" + encodeQueryParam(orderId) + (fromOrder() ? "&from=" + FROM_ORDER : "");
+        return root() + "?order=" + UriUtils.encodeQueryParam(orderId, UTF_8) + (fromOrder() ? "&from=" + FROM_ORDER : "");
     }
 
     public String purchase() {
@@ -87,15 +84,5 @@ public record DeliveryCreateLinks(String base, String provider, String orderId, 
 
     private String root() {
         return base + "/deliveries/create/" + UriUtils.encodePathSegment(provider, UTF_8);
-    }
-
-    private static String encodeQueryParam(String value) {
-        // UriUtils.encodeQueryParam encodes & as %26, which is correct for query params
-        String encoded = UriUtils.encodeQueryParam(value, UTF_8);
-        // If it somehow doesn't encode &, fall back to URLEncoder as per the brief
-        if (encoded.contains("&")) {
-            return URLEncoder.encode(value, UTF_8).replace("+", "%20");
-        }
-        return encoded;
     }
 }
