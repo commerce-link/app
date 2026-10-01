@@ -40,7 +40,7 @@ class DeliveryCreateMessagesTest {
             "deliveries.create.action.manual.help.dropship", "deliveries.create.action.next",
             "deliveries.create.action.next.help", "deliveries.create.action.release",
             "deliveries.create.action.release.help", "deliveries.create.action.empty",
-            "deliveries.create.error.nothingRequested", "deliveries.create.error.orderNumber",
+            "deliveries.create.error.nothingRequested", "deliveries.create.error.itemNumber", "deliveries.create.error.orderNumber",
             "deliveries.create.error.deliveryDate", "deliveries.create.error.date", "deliveries.create.error.number",
             "deliveries.create.error.notNegative", "deliveries.create.error.tax",
             "deliveries.create.purchase.title", "deliveries.create.purchase.availability",

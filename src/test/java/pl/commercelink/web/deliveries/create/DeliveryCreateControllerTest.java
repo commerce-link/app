@@ -414,6 +414,67 @@ class DeliveryCreateControllerTest {
     }
 
     @Test
+    void unreadableItemNumbersSendBothStepTwoRoutesBackToStepOneInsteadOfPostingZeros() {
+        // given
+        when(scope.purchaseAvailable()).thenReturn(true);
+        when(scope.plannedForm()).thenReturn(requested(1));
+        DeliveryCreationForm manualForm = requested(1);
+        BindingResult manualBinding = binding(manualForm);
+        manualBinding.rejectValue("items[0].unitCost", "typeMismatch");
+        DeliveryCreationForm purchaseForm = requested(1);
+        BindingResult purchaseBinding = binding(purchaseForm);
+        purchaseBinding.rejectValue("items[0].requestedQty", "typeMismatch");
+        Model manualModel = new ConcurrentModel();
+        Model purchaseModel = new ConcurrentModel();
+
+        // when
+        String manual = asStoreAdmin(() -> controller.manual(PROVIDER, manualForm, manualBinding, null, null, manualModel, flash, Locale.ENGLISH));
+        String purchase = asStoreAdmin(() -> controller.purchase(PROVIDER, purchaseForm, purchaseBinding, null, null, purchaseModel, flash, Locale.ENGLISH));
+
+        // then
+        assertThat(manual).isEqualTo("deliveries/create/items");
+        assertThat(purchase).isEqualTo("deliveries/create/items");
+        assertThat(manualModel.getAttribute("stepError")).isEqualTo("deliveries.create.error.itemNumber");
+        assertThat(purchaseModel.getAttribute("stepError")).isEqualTo("deliveries.create.error.itemNumber");
+    }
+
+    @Test
+    void unreadableSuggestionNumbersAlsoStopStepTwo() {
+        // given
+        when(scope.plannedForm()).thenReturn(requested(1));
+        DeliveryCreationForm form = requested(1);
+        form.setSuggestedItems(new ArrayList<>(List.of(new pl.commercelink.web.dtos.SuggestedDeliveryItem())));
+        BindingResult binding = binding(form);
+        binding.rejectValue("suggestedItems[0].requestedQty", "typeMismatch");
+        Model model = new ConcurrentModel();
+
+        // when
+        String view = asStoreAdmin(() -> controller.manual(PROVIDER, form, binding, null, null, model, flash, Locale.ENGLISH));
+
+        // then
+        assertThat(view).isEqualTo("deliveries/create/items");
+        assertThat(model.getAttribute("stepError")).isEqualTo("deliveries.create.error.itemNumber");
+    }
+
+    @Test
+    void backWithAnEmptyVatFallsBackToTheSuppliersDefault() {
+        // given
+        when(scope.plannedForm()).thenReturn(requested(1));
+        when(scope.defaultTax()).thenReturn(1.23);
+        DeliveryCreationForm posted = requested(1);
+        BindingResult binding = binding(posted);
+        binding.rejectValue("tax", "typeMismatch");
+        Model model = new ConcurrentModel();
+
+        // when
+        String view = asStoreAdmin(() -> controller.back(PROVIDER, posted, binding, null, null, model, flash, Locale.ENGLISH));
+
+        // then
+        assertThat(view).isEqualTo("deliveries/create/items");
+        assertThat(((DeliveryCreationForm) model.getAttribute("form")).getTax()).isEqualTo(1.23);
+    }
+
+    @Test
     void fulfilmentAnswersJsonAndTheFallbackReloadsStepOne() {
         // given
         DeliveryFulfilmentUpdateForm update = new DeliveryFulfilmentUpdateForm();

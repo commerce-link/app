@@ -22,6 +22,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
+import java.util.regex.Pattern;
 
 /**
  * The new-delivery flow for a warehouse batch (no order) and a dropship order (?order=): step 1 "what you order",
@@ -36,6 +37,9 @@ public class DeliveryCreateController {
     private static final String STORE = "/dashboard/deliveries/create/{provider}";
     private static final String SUPER = "/dashboard/store/{storeId}/deliveries/create/{provider}";
     private static final String NOTHING_REQUESTED = "deliveries.create.error.nothingRequested";
+    private static final String ITEM_NUMBER = "deliveries.create.error.itemNumber";
+    private static final Pattern ITEM_NUMBER_FIELD =
+            Pattern.compile("(items\\[\\d+]\\.(unitCost|requestedQty))|(suggestedItems\\[\\d+]\\..*)");
     private static final String CHECK_FAILED = "deliveries.purchase.confirm.checkFailed";
     private static final String VALIDATION_RESULT = "deliveries/create/purchase :: validationResult";
 
@@ -71,7 +75,7 @@ public class DeliveryCreateController {
                        BindingResult binding, @RequestParam(value = "order", required = false) String orderId,
                        @RequestParam(value = "from", required = false) String from,
                        Model model, RedirectAttributes flash, Locale locale) {
-        return showItems(storeId(), provider, orderId, from, form, null, model, flash, locale);
+        return showStepOneAfterBack(storeId(), provider, orderId, from, form, binding, model, flash, locale);
     }
 
     @PostMapping(SUPER + "/back")
@@ -81,7 +85,7 @@ public class DeliveryCreateController {
                                     @RequestParam(value = "order", required = false) String orderId,
                                     @RequestParam(value = "from", required = false) String from,
                                     Model model, RedirectAttributes flash, Locale locale) {
-        return showItems(storeId, provider, orderId, from, form, null, model, flash, locale);
+        return showStepOneAfterBack(storeId, provider, orderId, from, form, binding, model, flash, locale);
     }
 
     // ---- step 2, outside the system
@@ -92,7 +96,7 @@ public class DeliveryCreateController {
                          BindingResult binding, @RequestParam(value = "order", required = false) String orderId,
                          @RequestParam(value = "from", required = false) String from,
                          Model model, RedirectAttributes flash, Locale locale) {
-        return showManual(storeId(), provider, orderId, from, form, model, flash, locale);
+        return showManual(storeId(), provider, orderId, from, form, binding, model, flash, locale);
     }
 
     @PostMapping(SUPER + "/manual")
@@ -102,7 +106,7 @@ public class DeliveryCreateController {
                                       @RequestParam(value = "order", required = false) String orderId,
                                       @RequestParam(value = "from", required = false) String from,
                                       Model model, RedirectAttributes flash, Locale locale) {
-        return showManual(storeId, provider, orderId, from, form, model, flash, locale);
+        return showManual(storeId, provider, orderId, from, form, binding, model, flash, locale);
     }
 
     @PostMapping(STORE + "/manual/save")
@@ -132,7 +136,7 @@ public class DeliveryCreateController {
                            BindingResult binding, @RequestParam(value = "order", required = false) String orderId,
                            @RequestParam(value = "from", required = false) String from,
                            Model model, RedirectAttributes flash, Locale locale) {
-        return showPurchase(storeId(), provider, orderId, from, form, model, flash, locale);
+        return showPurchase(storeId(), provider, orderId, from, form, binding, model, flash, locale);
     }
 
     @PostMapping(SUPER + "/purchase")
@@ -142,7 +146,7 @@ public class DeliveryCreateController {
                                         @RequestParam(value = "order", required = false) String orderId,
                                         @RequestParam(value = "from", required = false) String from,
                                         Model model, RedirectAttributes flash, Locale locale) {
-        return showPurchase(storeId, provider, orderId, from, form, model, flash, locale);
+        return showPurchase(storeId, provider, orderId, from, form, binding, model, flash, locale);
     }
 
     @PostMapping(STORE + "/purchase/validate")
@@ -242,10 +246,31 @@ public class DeliveryCreateController {
         return "deliveries/create/items";
     }
 
-    private String showManual(String storeId, String provider, String orderId, String from, DeliveryCreationForm form,
-                              Model model, RedirectAttributes flash, Locale locale) {
+    private String showStepOneAfterBack(String storeId, String provider, String orderId, String from,
+                                        DeliveryCreationForm posted, BindingResult binding, Model model,
+                                        RedirectAttributes flash, Locale locale) {
         DeliveryCreateLinks links = links(storeId, provider, orderId, from);
         return withScope(storeId, provider, links, flash, locale, scope -> {
+            // an emptied VAT field did not bind, and the form would otherwise carry the bean's own default back to step 1
+            if (binding.hasFieldErrors("tax")) {
+                posted.setTax(scope.defaultTax());
+            }
+            return items(scope, links, posted, null, model);
+        });
+    }
+
+    // A cleared or malformed quantity or cost does not bind and would silently become 0 on a real order.
+    private static boolean hasUnreadableItemNumber(BindingResult binding) {
+        return binding.getFieldErrors().stream().anyMatch(error -> ITEM_NUMBER_FIELD.matcher(error.getField()).matches());
+    }
+
+    private String showManual(String storeId, String provider, String orderId, String from, DeliveryCreationForm form,
+                              BindingResult binding, Model model, RedirectAttributes flash, Locale locale) {
+        DeliveryCreateLinks links = links(storeId, provider, orderId, from);
+        return withScope(storeId, provider, links, flash, locale, scope -> {
+            if (hasUnreadableItemNumber(binding)) {
+                return items(scope, links, form, ITEM_NUMBER, model);
+            }
             prepare(form, storeId, provider);
             if (!form.hasRequestedItems()) {
                 if (scope.dropship() && form.isRemoveUnselected()) {
@@ -284,11 +309,14 @@ public class DeliveryCreateController {
     }
 
     private String showPurchase(String storeId, String provider, String orderId, String from, DeliveryCreationForm form,
-                                Model model, RedirectAttributes flash, Locale locale) {
+                                BindingResult binding, Model model, RedirectAttributes flash, Locale locale) {
         DeliveryCreateLinks links = links(storeId, provider, orderId, from);
         return withScope(storeId, provider, links, flash, locale, scope -> {
             if (!scope.purchaseAvailable()) {
                 return "redirect:" + links.items();
+            }
+            if (hasUnreadableItemNumber(binding)) {
+                return items(scope, links, form, ITEM_NUMBER, model);
             }
             prepare(form, storeId, provider);
             if (!form.hasRequestedItems()) {
