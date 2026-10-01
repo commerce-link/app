@@ -8394,3 +8394,406 @@ a.cl-link-button:hover {
         scroll-behavior: auto;
     }
 }
+
+/* --- Delivery details (spec docs/active/delivery-details-redesign/2026-10-01-delivery-details-design.md §13):
+   P1 items table with destination rows, P2 selection row docked on phones, P3 status card with actions, P4 dialog list,
+   P5 destructive link at the end of the dialog actions, P6 field under a choice, P7 long supplier number, P8 side cards
+   in two columns between the phone and the two-column layout, P9 a dialog shown in the page without JavaScript. */
+
+/* P1: one tbody per product, its destinations (an order line or a warehouse top-up) as rows of the same table, so their
+   checkboxes line up with the header's select-all and table-select.js works unchanged. */
+.cl-page .cl-table.is-allocations col.cl-col-received {
+    width: 132px;
+}
+
+.cl-page .cl-table.is-allocations col.cl-col-value {
+    width: 150px;
+}
+
+.cl-page .cl-table.is-allocations .cl-value-cell > span:first-child {
+    font-weight: 600;
+}
+
+.cl-page .cl-table.is-allocations .cl-alloc-qty {
+    min-width: 3.6em;
+    color: var(--cl-ink-2);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.cl-page .cl-table.is-allocations tbody + tbody {
+    border-top: 1px solid var(--cl-line);
+}
+
+.cl-page .cl-table.is-allocations tbody tr > * {
+    border-bottom: 0;
+}
+
+.cl-page .cl-table.is-allocations tr.cl-row-main > * {
+    padding-top: 12px;
+    padding-bottom: 6px;
+}
+
+.cl-page .cl-table.is-allocations tr.cl-row-main:not(.is-open) > * {
+    padding-bottom: 12px;
+}
+
+.cl-page .cl-table.is-allocations .cl-row-toggle {
+    margin-top: 4px;
+    font-size: 13px;
+}
+
+.cl-page .cl-table.is-allocations tr.cl-alloc-row > * {
+    padding-top: 5px;
+    padding-bottom: 5px;
+    font-size: 13.5px;
+    vertical-align: middle;
+}
+
+.cl-page .cl-table.is-allocations tr.cl-alloc-row:last-child > * {
+    padding-bottom: 12px;
+}
+
+.cl-page .cl-table.is-allocations tr.cl-alloc-row .cl-alloc-dest {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 2px 8px;
+    margin-left: 2px;
+    padding-left: 14px;
+    border-left: 2px solid var(--cl-line);
+}
+
+.cl-page .cl-table.is-allocations tr.cl-alloc-row .cl-alloc-dest a {
+    color: var(--cl-accent-ink);
+}
+
+.cl-page .cl-table.is-allocations tr.cl-alloc-row.is-done .cl-alloc-dest {
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-table.is-allocations .cl-received {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.cl-page .cl-table.is-allocations .cl-received.is-complete {
+    color: var(--cl-ok);
+    font-weight: 600;
+}
+
+@media screen and (max-width: 1023px) {
+    .cl-page .cl-table.is-allocations col.cl-col-received {
+        width: 120px;
+    }
+
+    .cl-page .cl-table.is-allocations tr > :is(th, td):not(:first-child) {
+        padding-left: 8px;
+    }
+
+    .cl-page .cl-table.is-allocations tr > :is(th, td):not(:last-child) {
+        padding-right: 8px;
+    }
+
+    .cl-page .cl-table.is-allocations tr.cl-alloc-row .cl-alloc-dest a {
+        display: inline-block;
+        min-height: 44px;
+        padding: 12px 0;
+    }
+}
+
+/* P1 on phones: the tbody is the product card (name, codes, menu; "Odebrano: …", value), its destinations below as
+   lines checkbox · destination and quantity · state. */
+@media screen and (max-width: 719px) {
+    .cl-page .cl-table.is-allocations tbody {
+        padding: 12px 16px;
+    }
+
+    .cl-page .cl-table.is-allocations.is-wrap tbody tr {
+        padding: 0;
+        border-top: 0;
+    }
+
+    .cl-page .cl-table.is-allocations.is-wrap tbody tr.cl-row-main {
+        grid-template-columns: minmax(0, 1fr) 44px;
+    }
+
+    .cl-page .cl-table.is-allocations.is-wrap tbody tr.cl-row-main > .cl-table-check {
+        display: none;
+    }
+
+    .cl-page .cl-table.is-allocations.is-wrap tbody tr.cl-row-main > .cl-table-key {
+        grid-column: 1;
+    }
+
+    .cl-page .cl-table.is-allocations.is-wrap tbody tr.cl-row-main > td:not(.cl-table-check):not(.cl-table-actions) {
+        display: block;
+        grid-column: 1;
+        padding: 1px 0;
+        font-size: 13.5px;
+    }
+
+    .cl-page .cl-table.is-allocations.is-wrap tbody tr.cl-row-main > td.cl-table-actions {
+        grid-column: 2;
+        grid-row: 1;
+    }
+
+    .cl-page .cl-table.is-allocations.is-wrap tbody tr.cl-row-main > td[data-prefix]::before {
+        content: attr(data-prefix);
+        margin-right: 4px;
+        color: var(--cl-ink-2);
+    }
+
+    .cl-page .cl-table.is-allocations.is-wrap tbody tr.cl-alloc-row {
+        display: grid;
+        grid-template-columns: 44px minmax(0, 1fr) auto;
+        column-gap: 8px;
+        align-items: center;
+        min-height: 52px;
+        margin-top: 8px;
+        padding: 2px 0;
+        border-top: 1px solid var(--cl-line);
+    }
+
+    .cl-page .cl-table.is-allocations.is-wrap tbody tr.cl-alloc-row:not(:has(.cl-check-target)) {
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .cl-page .cl-table.is-allocations.is-wrap tbody tr.cl-alloc-row > * {
+        display: block;
+        padding: 6px 0;
+        font-size: 13.5px;
+    }
+
+    .cl-page .cl-table.is-allocations.is-wrap tbody tr.cl-alloc-row > .cl-table-check {
+        grid-column: 1;
+        grid-row: 1;
+        padding: 0;
+    }
+
+    .cl-page .cl-table.is-allocations.is-wrap tbody tr.cl-alloc-row > .cl-table-check:not(:has(.cl-check-target)) {
+        display: none;
+    }
+
+    .cl-page .cl-table.is-allocations.is-wrap tbody tr.cl-alloc-row > td.cl-alloc-cell {
+        grid-column: -3 / -2;
+        grid-row: 1;
+    }
+
+    .cl-page .cl-table.is-allocations.is-wrap tbody tr.cl-alloc-row > td.cl-alloc-state {
+        grid-column: -2 / -1;
+        grid-row: 1;
+        text-align: right;
+    }
+
+    .cl-page .cl-table.is-allocations.is-wrap tbody tr.cl-alloc-row > .cl-alloc-empty {
+        display: none;
+    }
+
+    .cl-page .cl-table.is-allocations.is-wrap tbody tr.cl-alloc-row::before,
+    .cl-page .cl-table.is-allocations.is-wrap tbody tr.cl-alloc-row > *::before {
+        content: none;
+    }
+
+    .cl-page .cl-table.is-allocations tr.cl-alloc-row .cl-alloc-dest {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0;
+        margin-left: 0;
+        padding-left: 0;
+        border-left: 0;
+    }
+
+    .cl-page .cl-table.is-allocations tr.cl-alloc-row .cl-alloc-qty {
+        font-size: 12.5px;
+    }
+
+    .cl-page .cl-table.is-allocations.is-wrap tbody tr.is-selected {
+        background: var(--cl-accent-soft);
+    }
+}
+
+/* P2: below 720 px the selection row leaves the flow and is pinned to the bottom edge while something is checked and
+   the items card is on screen (.is-in-view, set by delivery-details.js); the form keeps room for it at its bottom. */
+@media screen and (max-width: 719px) {
+    .cl-page .cl-selection-row.is-docked.is-in-view:not([hidden]) {
+        position: fixed;
+        top: auto;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        z-index: 24;
+        margin: 0;
+        padding: 4px 16px calc(4px + env(safe-area-inset-bottom));
+        border-top: 1px solid var(--cl-line);
+        border-bottom: 0;
+        box-shadow: 0 -6px 16px rgba(14, 23, 33, .12);
+    }
+
+    .cl-page .cl-selection-row.is-docked .cl-selection-actions {
+        gap: 8px;
+    }
+
+    .cl-page .cl-selection-row.is-docked .cl-selection-actions .cl-button {
+        flex: 1 1 auto;
+        justify-content: center;
+    }
+
+    .cl-page .cl-selection-row.is-docked .cl-selection-remove {
+        margin-left: 0;
+    }
+
+    .cl-page .cl-selection-host:has(> .cl-selection-row.is-docked.is-in-view:not([hidden])) {
+        padding-bottom: var(--cl-docked-bar, 112px);
+    }
+}
+
+/* P3: status card with the supplier's reason and the repair actions; a tone bar on the left. */
+.cl-page .cl-card.is-status .cl-card-title .is-bad {
+    color: var(--cl-bad);
+}
+
+.cl-page .cl-card.is-status .cl-card-title .is-info {
+    color: var(--cl-info);
+}
+
+.cl-page .cl-card.is-status.is-bad {
+    box-shadow: inset 3px 0 0 var(--cl-bad);
+}
+
+.cl-page .cl-card.is-status.is-warn {
+    box-shadow: inset 3px 0 0 var(--cl-warn);
+}
+
+.cl-page .cl-card.is-status.is-info {
+    box-shadow: inset 3px 0 0 var(--cl-info);
+}
+
+.cl-page .cl-card.is-status .cl-status-reason {
+    margin: 0 20px 4px;
+    font-size: 13.5px;
+    color: var(--cl-ink);
+}
+
+.cl-page .cl-card.is-status .cl-status-reason code {
+    padding: 1px 4px;
+    border-radius: 4px;
+    background: var(--cl-surface);
+    font-size: 12.5px;
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-card.is-status .cl-status-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--cl-gap-related);
+    padding: 8px 20px 18px;
+}
+
+.cl-page .cl-card.is-status > p:last-child {
+    margin-bottom: 18px;
+}
+
+@media screen and (max-width: 719px) {
+    .cl-page .cl-card.is-status .cl-status-reason {
+        margin: 0 16px 4px;
+    }
+
+    .cl-page .cl-card.is-status .cl-status-actions {
+        padding: 8px 16px 16px;
+    }
+
+    .cl-page .cl-card.is-status .cl-status-actions .cl-button {
+        flex: 1 1 auto;
+        justify-content: center;
+    }
+}
+
+/* P4: what a confirmation acts on, inside a dialog ("Odbierz całość", "Usuń z dostawy"). */
+.cl-page .cl-dialog-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border: 1px solid var(--cl-line);
+    border-radius: var(--cl-radius);
+}
+
+.cl-page .cl-dialog-list li {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 2px 12px;
+    margin: 0;
+    padding: 8px 12px;
+    font-size: 13.5px;
+}
+
+.cl-page .cl-dialog-list li + li {
+    border-top: 1px solid var(--cl-line);
+}
+
+.cl-page .cl-dialog-list .cl-dialog-list-sub {
+    grid-column: 1 / -1;
+    font-size: 12.5px;
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-dialog-list .is-numeric {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+/* P5: a destructive action at the far end of the dialog actions ("Usuń wpłatę"), away from saving. */
+.cl-page .cl-dialog-actions > .cl-dialog-actions-end {
+    align-self: center;
+    margin-left: auto;
+}
+
+@media screen and (max-width: 719px) {
+    .cl-page .cl-dialog-actions > .cl-dialog-actions-end {
+        min-height: 44px;
+        margin-left: 0;
+    }
+}
+
+/* P6: a field under its choice inside cl-choice-group ("ID faktury" under "Po ID faktury"). */
+.cl-page .cl-choice-reveal {
+    display: grid;
+    gap: var(--cl-gap-attached);
+    max-width: 320px;
+    margin: 4px 0 4px 30px;
+}
+
+/* P7: a long supplier number is cut in the record meta line (full in title) and wraps anywhere in the side card. */
+.cl-page .cl-record-meta .cl-meta-truncate {
+    display: inline-block;
+    max-width: 22ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: bottom;
+}
+
+.cl-page .cl-kv .cl-kv-text.is-break {
+    overflow-wrap: anywhere;
+    font-variant-numeric: tabular-nums;
+}
+
+/* P8: between the phone and the two-column layout the side cards sit in a grid instead of full-width rows whose value
+   stands ~700 px from its label; DOM order stays (spec §10.5). Declared after the one-column rule of cl-layout-aside. */
+@media screen and (min-width: 720px) and (max-width: 1365px) {
+    .cl-page .cl-layout-side.is-grid {
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        align-items: start;
+    }
+}
+
+/* P9: without JavaScript a dialog opener leads to ?open=…, which renders the dialog open; a non-modal dialog would be
+   positioned over the page, so it takes its place in the flow instead. */
+.cl-page dialog.cl-dialog[open]:not(:modal) {
+    position: static;
+    width: auto;
+    max-width: none;
+    margin: 16px 0;
+    box-shadow: var(--cl-shadow-card);
+}
