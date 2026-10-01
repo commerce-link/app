@@ -31,4 +31,23 @@ class DropshipRejectionMessagesTest {
             assertThat(en).contains("\n" + key + "=");
         }
     }
+
+    @Test
+    void pickupPointMessageNamesTheButtonThatExistsOnTheStepOnePage() throws Exception {
+        // given
+        java.util.Properties pl = load("messages_pl.properties");
+        java.util.Properties en = load("messages_en.properties");
+
+        // when / then
+        assertThat(pl.getProperty("orders.dropship.error.pickupPointUnsupported"))
+                .contains(pl.getProperty("deliveries.create.action.manual")).doesNotContain("Zapisz");
+        assertThat(en.getProperty("orders.dropship.error.pickupPointUnsupported"))
+                .contains(en.getProperty("deliveries.create.action.manual")).doesNotContain("(Save)");
+    }
+
+    private static java.util.Properties load(String file) throws Exception {
+        java.util.Properties properties = new java.util.Properties();
+        properties.load(Files.newBufferedReader(Path.of("src/main/resources/" + file), StandardCharsets.UTF_8));
+        return properties;
+    }
 }
