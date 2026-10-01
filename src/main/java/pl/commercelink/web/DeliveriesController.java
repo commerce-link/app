@@ -500,7 +500,7 @@ public class DeliveriesController {
     private String confirmSelection(String storeId, String deliveryId, String action, DeliveryAllocationsForm form,
                                     Model model, RedirectAttributes redirectAttributes, Locale locale) {
         String dialog = CONFIRM_DIALOGS.get(action);
-        if (dialog == null) {
+        if (dialog == null || deliveriesRepository.findById(storeId, deliveryId) == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
         Set<Integer> selected = new LinkedHashSet<>();
@@ -585,16 +585,17 @@ public class DeliveriesController {
         if (delivery == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
+        Document invoice = delivery.findDocumentById(invoiceId);
+        if (invoice == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
         if (delivery.isAwaitingApproval()) {
             return redirectEditLocked(getStoreId(), deliveryId, redirectAttributes, locale);
         }
-        Document invoice = delivery.findDocumentById(invoiceId);
         invoiceLinkingService.unlinkInvoice(getStoreId(), deliveryId, invoiceId);
-        if (invoice != null) {
-            OrderFlash.saved(redirectAttributes,
-                    messageSource.getMessage("deliveries.details.unlink.done", new Object[]{invoice.getNumber()}, locale));
-        }
-        return "redirect:/dashboard/deliveries/details?deliveryId=" + deliveryId;
+        OrderFlash.saved(redirectAttributes,
+                messageSource.getMessage("deliveries.details.unlink.done", new Object[]{invoice.getNumber()}, locale));
+        return detailsRedirect(getStoreId(), deliveryId);
     }
 
     @GetMapping("/dashboard/store/{storeId}/deliveries/{deliveryId}/approval")
@@ -1045,7 +1046,8 @@ public class DeliveriesController {
      */
     private String saveTerms(String storeId, DeliveryTermsForm form, boolean async, HttpServletRequest request,
                              HttpServletResponse response, Model model, RedirectAttributes redirectAttributes, Locale locale) {
-        Delivery existing = deliveriesRepository.findById(storeId, form.getDeliveryId());
+        Delivery existing = StringUtils.isBlank(form.getDeliveryId()) ? null
+                : deliveriesRepository.findById(storeId, form.getDeliveryId());
         if (existing == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }

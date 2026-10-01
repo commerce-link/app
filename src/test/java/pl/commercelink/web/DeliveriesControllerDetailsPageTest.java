@@ -153,6 +153,7 @@ class DeliveriesControllerDetailsPageTest {
         allocation.setType(pl.commercelink.inventory.deliveries.AllocationType.Warehouse);
         delivery.setAllocations(new ArrayList<>(List.of(allocation)));
         when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, delivery.getDeliveryId())).thenReturn(delivery);
+        when(deliveriesRepository.findById(STORE_ID, delivery.getDeliveryId())).thenReturn(delivery);
         DeliveryAllocationsForm form = new DeliveryAllocationsForm();
         Allocation posted = new Allocation();
         posted.setSelected(true);
@@ -172,6 +173,7 @@ class DeliveriesControllerDetailsPageTest {
     void aConfirmationWithNothingCheckedGoesBackWithAMessage() {
         // given
         Delivery delivery = delivery();
+        when(deliveriesRepository.findById(STORE_ID, delivery.getDeliveryId())).thenReturn(delivery);
 
         // when
         String view = controller.confirmSelection(delivery.getDeliveryId(), "receive", new DeliveryAllocationsForm(),
@@ -186,7 +188,9 @@ class DeliveriesControllerDetailsPageTest {
     void anUnknownConfirmationIsNotFound() {
         // when / then
         assertThatThrownBy(() -> controller.confirmSelection("d-1", "explode", new DeliveryAllocationsForm(),
-                new ConcurrentModel(), redirectAttributes, PL)).isInstanceOf(ResponseStatusException.class);
+                new ConcurrentModel(), redirectAttributes, PL))
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                        e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
     }
 
     @Test
@@ -299,7 +303,9 @@ class DeliveriesControllerDetailsPageTest {
 
         // when / then
         assertThatThrownBy(() -> controller.updateDelivery(terms(foreign), "fetch", request, response, new ConcurrentModel(),
-                redirectAttributes, PL)).isInstanceOf(ResponseStatusException.class);
+                redirectAttributes, PL))
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                        e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
         verify(deliveriesManager, never()).updateDelivery(any());
     }
 
@@ -477,5 +483,50 @@ class DeliveriesControllerDetailsPageTest {
                 .isInstanceOfSatisfying(ResponseStatusException.class,
                         e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
         verify(deliveriesRepository, never()).delete(any(Delivery.class));
+    }
+
+    @Test
+    void aConfirmationForAnotherStoresDeliveryIsNotFound() {
+        // given
+        when(deliveriesRepository.findById(STORE_ID, "foreign")).thenReturn(null);
+        DeliveryAllocationsForm form = new DeliveryAllocationsForm();
+        Allocation posted = new Allocation();
+        posted.setSelected(true);
+        form.setAllocations(new ArrayList<>(List.of(posted)));
+
+        // when / then
+        assertThatThrownBy(() -> controller.confirmSelection("foreign", "split", form, new ConcurrentModel(),
+                redirectAttributes, PL))
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                        e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
+        verify(deliveriesQueryService, never()).fetchDeliveryWithAllocations(anyString(), anyString());
+    }
+
+    @Test
+    void unlinkingAnInvoiceTheDeliveryDoesNotHaveIsNotFound() {
+        // given
+        Delivery delivery = delivery();
+        when(deliveriesRepository.findById(STORE_ID, delivery.getDeliveryId())).thenReturn(delivery);
+
+        // when / then
+        assertThatThrownBy(() -> controller.unlinkInvoiceConfirmed(delivery.getDeliveryId(), "inv-x", redirectAttributes, PL))
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                        e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
+        verify(invoiceLinkingService, never()).unlinkInvoice(anyString(), anyString(), anyString());
+    }
+
+    @Test
+    void savingTermsWithoutADeliveryIdIsNotFound() {
+        // given
+        DeliveryTermsForm form = new DeliveryTermsForm();
+        form.setDeliveryId(" ");
+
+        // when / then
+        assertThatThrownBy(() -> controller.updateDelivery(form, "fetch", request, response, new ConcurrentModel(),
+                redirectAttributes, PL))
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                        e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
+        verify(deliveriesRepository, never()).findById(any(), any());
+        verify(deliveriesManager, never()).updateDelivery(any());
     }
 }
