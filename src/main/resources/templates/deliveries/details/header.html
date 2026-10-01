@@ -33,7 +33,7 @@
             </span>
             <span th:if="${h.orderedAt() != null}" th:text="#{deliveries.details.meta.ordered(${h.orderedAt()})}"></span>
             <span th:if="${h.dateKey() != null and h.date() != null}" th:text="#{${h.dateKey()}(${h.date()})}"></span>
-            <span th:if="${h.showProgress()}" th:text="#{deliveries.details.meta.progress(${h.receivedAllocations()}, ${h.totalAllocations()})}"></span>
+            <span th:if="${h.showProgress()}" th:text="#{${h.progressKey()}(${h.receivedAllocations()}, ${h.totalAllocations()})}"></span>
             <span><strong th:text="${h.totalGross() != null} ? #{general.currency.amount(${h.totalGross()})} : '—'"></strong> <span th:text="#{deliveries.details.meta.gross}"></span></span>
         </p>
     </th:block>

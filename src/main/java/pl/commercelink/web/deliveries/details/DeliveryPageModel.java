@@ -52,7 +52,12 @@ public record DeliveryPageModel(String deliveryId, String shortId, boolean super
     public record Header(String stateKey, String stateTone, String typeKey, String typeIcon, String supplierName,
                          String externalId, String externalIdHref, boolean provisional, String externalIdNoteKey,
                          String orderedAt, String dateKey, String date, int receivedAllocations, int totalAllocations,
-                         boolean showProgress, String totalGross, PrimaryAction primary, MoreMenu more) {
+                         String progressKey, String totalGross, PrimaryAction primary, MoreMenu more) {
+
+        /** progressKey: "received k of n" or, in dropship, "shipped k of n"; null when nothing is partly done. */
+        public boolean showProgress() {
+            return progressKey != null;
+        }
     }
 
     /** href: a link (approval) or the no-JavaScript opener of dialogId; postAction: a POST without dialog (retry, reconcile). */

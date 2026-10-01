@@ -82,6 +82,20 @@ class DeliveryDetailsTemplateTest {
     }
 
     @Test
+    void aPartlyShippedDropshipSaysHowManyLinesWereShipped() {
+        // given
+        Delivery delivery = partlyReceived(withAllocations(dropship(),
+                orderAllocation("G.Skill TwinMatch 32GB DDR5 Kit", "5900000000003", "MFN-TWIN-01", 448.0, 1, false),
+                orderAllocation("Samsung MirageDrive 2TB NVMe", "5900000000006", "MFN-MIRAGE-01", 635.0, 1, false)));
+
+        // when
+        String html = render(data(delivery), ADMIN);
+
+        // then
+        assertThat(html).contains(">wysłano 1 z 2<").doesNotContain(">odebrano 1 z 2<");
+    }
+
+    @Test
     void receiveAllIsThePrimaryActionAndOpensItsDialogWithAFallbackLink() {
         // when
         String html = render(data(warehouse()), ADMIN);

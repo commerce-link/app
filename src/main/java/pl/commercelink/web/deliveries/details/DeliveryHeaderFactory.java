@@ -41,7 +41,9 @@ final class DeliveryHeaderFactory {
                 data.supplierName(), externalId, externalId == null ? null : OrderPageModelFactory.safeWebUrl(data.partnerSiteUrl()),
                 delivery.isExternalDeliveryIdProvisional(), noteKey, OrderFormats.date(delivery.getOrderedAt()), dateKey,
                 received ? OrderFormats.date(delivery.getReceivedAt()) : OrderFormats.date(delivery.getEstimatedDeliveryAt()),
-                done, total, !delivery.isDropship() && !received && done > 0 && done < total,
+                done, total, !received && done > 0 && done < total
+                        ? (delivery.isDropship() ? "deliveries.details.meta.progress.shipped" : "deliveries.details.meta.progress")
+                        : null,
                 DeliveryRules.grossOrNull(delivery, delivery.getTotalCost()), primary(data, viewer, links),
                 new MoreMenu(DeliveryRules.refresh(viewer, delivery), links.refreshOrderId(),
                         DeliveryRules.reject(viewer, delivery), links.open("reject"),

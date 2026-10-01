@@ -181,6 +181,25 @@ class DeliveryHeaderFactoryTest {
     }
 
     @Test
+    void aPartlyShippedDropshipShowsHowManyLinesWereShippedInTheMetaLine() {
+        // given
+        Delivery delivery = partlyReceived(withAllocations(dropship(),
+                orderAllocation("G.Skill TwinMatch 32GB DDR5 Kit", "5900000000003", "MFN-TWIN-01", 448.0, 1, false),
+                orderAllocation("Samsung MirageDrive 2TB NVMe", "5900000000006", "MFN-MIRAGE-01", 635.0, 1, false)));
+
+        // when
+        DeliveryPageModel.Header dropship = header(delivery, ADMIN);
+        DeliveryPageModel.Header warehouse = header(partlyReceived(warehouse()), ADMIN);
+
+        // then
+        assertThat(dropship.showProgress()).isTrue();
+        assertThat(dropship.progressKey()).isEqualTo("deliveries.details.meta.progress.shipped");
+        assertThat(dropship.receivedAllocations()).isEqualTo(1);
+        assertThat(dropship.totalAllocations()).isEqualTo(2);
+        assertThat(warehouse.progressKey()).isEqualTo("deliveries.details.meta.progress");
+    }
+
+    @Test
     void anAdminSeesTheApprovalAsTheReasonDeleteIsGreyedEvenWhileTheDeliveryHoldsItems() {
         // given
         Delivery awaitingWithItems = withStatus(warehouse(), DeliveryOrderStatus.AWAITING_APPROVAL);
