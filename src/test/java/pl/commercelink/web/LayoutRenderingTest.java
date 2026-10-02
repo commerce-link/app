@@ -16,9 +16,13 @@ import org.thymeleaf.templateresolver.StringTemplateResolver;
 import org.thymeleaf.web.IWebExchange;
 import org.thymeleaf.web.servlet.JakartaServletWebApplication;
 import pl.commercelink.starter.security.UserRole;
+import pl.commercelink.stores.DeactivationReason;
+import pl.commercelink.stores.DeactivationStatus;
+import pl.commercelink.stores.TrialStatus;
 import pl.commercelink.web.nav.NavigationModel;
 
 import java.text.MessageFormat;
+import java.time.LocalDate;
 import java.util.Locale;
 import java.util.ResourceBundle;
 import java.util.Set;
@@ -101,6 +105,84 @@ class LayoutRenderingTest {
         assertThat(html).contains("cl-sidebar");
         assertThat(html).contains("cl-topbar");
         assertThat(html).doesNotContain("cl-shell-bare");
+    }
+
+    @Test
+    void rendersTheTrialBannerWithDaysLeftAndEndDate() {
+        // given
+        WebContext context = webContext();
+        context.setVariable("navigation", null);
+        context.setVariable("trialStatus", new TrialStatus(LocalDate.parse("2026-10-12"), 5, false));
+
+        // when
+        String html = render(context);
+
+        // then
+        assertThat(html).contains("Okres próbny.");
+        assertThat(html).contains("Kończy się 2026-10-12 (za 5 dni).");
+    }
+
+    @Test
+    void rendersNoTrialBannerOutsideATrial() {
+        // given
+        WebContext context = webContext();
+        context.setVariable("navigation", null);
+
+        // when
+        String html = render(context);
+
+        // then
+        assertThat(html).doesNotContain("Okres próbny.");
+    }
+
+    @Test
+    void rendersTheDeactivationBannerOfEndedTrialWithTheDeletionDate() {
+        // given
+        WebContext context = webContext();
+        context.setVariable("navigation", null);
+        context.setVariable("deactivationStatus", new DeactivationStatus(DeactivationReason.TRIAL_ENDED,
+                LocalDate.parse("2026-10-12"), LocalDate.parse("2026-10-26"), 6));
+        context.setVariable("accountContactEmail", "kontakt@commercelink.pl");
+
+        // when
+        String html = render(context);
+
+        // then
+        assertThat(html).contains("Konto dezaktywowane.");
+        assertThat(html).contains("Okres próbny zakończył się 2026-10-12. Możesz przeglądać panel, ale zmiany nie są zapisywane.");
+        assertThat(html).contains("Dane sklepu zostaną trwale usunięte 2026-10-26 (za 6 dni).");
+        assertThat(html).contains("href=\"mailto:kontakt@commercelink.pl\"");
+    }
+
+    @Test
+    void rendersTheDeactivationBannerOfStoreSwitchedOffByHandWithoutDeletion() {
+        // given
+        WebContext context = webContext();
+        context.setVariable("navigation", null);
+        context.setVariable("deactivationStatus", new DeactivationStatus(DeactivationReason.MANUAL,
+                LocalDate.parse("2026-10-18"), null, 0));
+
+        // when
+        String html = render(context);
+
+        // then
+        assertThat(html).contains("Konto dezaktywowane.");
+        assertThat(html).contains("Sklep jest nieaktywny. Możesz przeglądać panel, ale zmiany nie są zapisywane.");
+        assertThat(html).doesNotContain("trwale usunięte");
+        assertThat(html).doesNotContain("mailto:");
+    }
+
+    @Test
+    void rendersNoDeactivationBannerForActiveStore() {
+        // given
+        WebContext context = webContext();
+        context.setVariable("navigation", null);
+
+        // when
+        String html = render(context);
+
+        // then
+        assertThat(html).doesNotContain("Konto dezaktywowane.");
     }
 
     private TemplateEngine templateEngine() {

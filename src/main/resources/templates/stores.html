@@ -28,12 +28,38 @@
                     </td>
                     <td th:text="${store.name}"></td>
                     <td th:text="${store.createdAt != null and #strings.length(store.createdAt) >= 10} ? ${#strings.substring(store.createdAt, 0, 10)} : ''"></td>
-                    <td th:with="deleteConfirm=${store.demo != null} ? #{store.delete.confirm} : #{store.delete.confirm.regular}">
+                    <td th:with="deleteConfirm=${store.demo != null} ? #{store.delete.confirm} : (${store.trial != null} ? #{store.delete.confirm.trial(${store.trial.ownerEmail})} : #{store.delete.confirm.regular}),
+                                 inactive=${deactivations[store.storeId]}">
                         <div th:if="${store.demo != null}" style="display:inline-block">
                             <span class="tag is-warning" th:text="#{store.demo.badge}"></span>
                             <span class="tag is-light" th:if="${store.demo.expiresAt != null and #strings.length(store.demo.expiresAt) >= 10}"
                                   th:text="#{store.demo.expires} + ' ' + ${#strings.substring(store.demo.expiresAt, 0, 10)}"></span>
                         </div>
+                        <div th:if="${store.trial != null}" th:with="status=${trials[store.storeId]}" style="display:inline-block">
+                            <span class="tag is-info" th:text="#{store.trial.badge}"></span>
+                            <span th:if="${status != null}" class="tag is-light" th:classappend="${status.expired()} ? 'is-danger'"
+                                  th:text="(${status.expired()} ? #{store.trial.ended} : #{store.trial.ends}) + ' ' + ${status.endsOn()}"></span>
+                        </div>
+                        <div th:if="${inactive != null}" style="display:inline-block">
+                            <span class="tag is-danger" th:text="#{store.activity.inactive.badge}"></span>
+                            <span th:if="${inactive.deletionOn() != null}" class="tag is-light is-danger"
+                                  th:text="#{store.activity.deletion} + ' ' + ${inactive.deletionOn()}"></span>
+                        </div>
+                        <form th:if="${store.trial != null}" th:action="@{'/dashboard/store/' + ${store.storeId} + '/trial/convert'}" method="post"
+                              style="display:inline" onsubmit="return confirm(this.dataset.confirm)"
+                              th:attr="data-confirm=#{store.trial.convert.confirm}">
+                            <button type="submit" class="button is-success is-small" th:text="#{store.trial.convert.button}"></button>
+                        </form>
+                        <form th:if="${inactive == null}" th:action="@{'/dashboard/store/' + ${store.storeId} + '/deactivate'}" method="post"
+                              style="display:inline" onsubmit="return confirm(this.dataset.confirm)"
+                              th:attr="data-confirm=#{store.activity.deactivate.confirm}">
+                            <button type="submit" class="button is-warning is-small" th:text="#{store.activity.deactivate.button}"></button>
+                        </form>
+                        <form th:if="${inactive != null and inactive.deletionOn() == null}" th:action="@{'/dashboard/store/' + ${store.storeId} + '/activate'}" method="post"
+                              style="display:inline" onsubmit="return confirm(this.dataset.confirm)"
+                              th:attr="data-confirm=#{store.activity.activate.confirm}">
+                            <button type="submit" class="button is-info is-small" th:text="#{store.activity.activate.button}"></button>
+                        </form>
                         <form th:if="${store.demo != null}" th:action="@{'/dashboard/store/' + ${store.storeId} + '/delete'}" method="post"
                               style="display:inline" onsubmit="return confirm(this.dataset.confirm)"
                               th:attr="data-confirm=${deleteConfirm}">

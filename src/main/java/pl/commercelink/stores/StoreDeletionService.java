@@ -1,6 +1,7 @@
 package pl.commercelink.stores;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import pl.commercelink.inventory.StoreInventoryCache;
@@ -17,20 +18,26 @@ import pl.commercelink.products.ProductCatalogRepository;
 import pl.commercelink.products.ProductRepository;
 import pl.commercelink.inventory.supplier.StoreSupplierFeedScheduler;
 import pl.commercelink.inventory.supplier.SupplierProviderFactory;
+import pl.commercelink.invoicing.InvoicingProviderFactory;
 import pl.commercelink.marketplace.MarketplaceOrdersImportScheduler;
+import pl.commercelink.marketplace.MarketplaceProviderFactory;
 import pl.commercelink.marketplace.MarketplaceReturnsImportScheduler;
+import pl.commercelink.payments.PaymentProviderFactory;
 import pl.commercelink.pricelist.PricelistEventScheduler;
-import pl.commercelink.starter.storage.FileStorage;
+import pl.commercelink.provider.ProviderFactory;
+import pl.commercelink.receipts.ReceiptProviderFactory;
+import pl.commercelink.shipping.ShippingProviderFactory;
 import pl.commercelink.users.CognitoUserService;
 import pl.commercelink.warehouse.builtin.WarehouseDocument;
 
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class StoreDeletionService {
 
-    public enum Guard { DEMO_ONLY, ANY }
+    public enum Guard { DEMO_ONLY, TRIAL_ONLY, ANY }
 
     private final StoresRepository storesRepository;
     private final OrdersRepository ordersRepository;
@@ -41,10 +48,15 @@ public class StoreDeletionService {
     private final RMACentersRepository rmaCentersRepository;
     private final RMAItemsRepository rmaItemsRepository;
     private final StoreWipeRepository wipeRepository;
-    private final FileStorage fileStorage;
+    private final StoreFilesWipe storeFilesWipe;
     private final StoreInventoryCache storeInventoryCache;
     private final CognitoUserService cognitoUserService;
     private final SupplierProviderFactory supplierProviderFactory;
+    private final ShippingProviderFactory shippingProviderFactory;
+    private final InvoicingProviderFactory invoicingProviderFactory;
+    private final ReceiptProviderFactory receiptProviderFactory;
+    private final MarketplaceProviderFactory marketplaceProviderFactory;
+    private final PaymentProviderFactory paymentProviderFactory;
     private final MarketplaceOrdersImportScheduler ordersImportScheduler;
     private final MarketplaceReturnsImportScheduler returnsImportScheduler;
     private final StoreSupplierFeedScheduler feedScheduler;
@@ -66,10 +78,16 @@ public class StoreDeletionService {
         if (guard == Guard.DEMO_ONLY && store.getDemo() == null) {
             throw new IllegalStateException("Refusing to delete non-demo store " + storeId);
         }
+        if (guard == Guard.TRIAL_ONLY && store.getTrial() == null) {
+            throw new IllegalStateException("Refusing to delete non-trial store " + storeId);
+        }
 
         boolean allSucceeded = true;
         if (store.getDemo() != null) {
             allSucceeded &= step(storeId, "cognito user", () -> deleteCognitoUser(store));
+        }
+        if (store.getTrial() != null) {
+            allSucceeded &= step(storeId, "cognito user", () -> deleteTrialOwner(store));
         }
         allSucceeded &= step(storeId, "schedules", () -> deleteSchedules(store));
         allSucceeded &= step(storeId, "orders", () -> deleteOrders(storeId));
@@ -79,15 +97,22 @@ public class StoreDeletionService {
         allSucceeded &= step(storeId, "warehouse", () -> deleteWarehouse(storeId));
         allSucceeded &= step(storeId, "rma", () -> deleteRma(storeId));
         allSucceeded &= step(storeId, "email templates", () -> wipeRepository.deleteAll(wipeRepository.findEmailTemplates(storeId)));
-        allSucceeded &= step(storeId, "s3 objects", () -> fileStorage.deleteAll(storesBucket, storeId + "/"));
+        allSucceeded &= step(storeId, "receipt attempts", () -> wipeRepository.deleteAll(wipeRepository.findReceiptAttempts(storeId)));
+        allSucceeded &= step(storeId, "store notifications", () -> wipeRepository.deleteAll(wipeRepository.findStoreNotifications(storeId)));
+        allSucceeded &= step(storeId, "order filters", () -> wipeRepository.deleteAll(wipeRepository.findOrderFilters(storeId)));
+        allSucceeded &= step(storeId, "shipment trackings", () -> wipeRepository.deleteAll(wipeRepository.findShipmentTrackings(storeId)));
+        if (store.getTrial() != null) {
+            // The counts are billing data that outlive a deleted paying store; a trial is never billed.
+            allSucceeded &= step(storeId, "schedule execution counts",
+                    () -> wipeRepository.deleteAll(wipeRepository.findScheduleExecutionCounts(storeId)));
+        }
+        allSucceeded &= step(storeId, "s3 objects", () -> storeFilesWipe.deleteAllVersions(storesBucket, storeId + "/"));
         allSucceeded &= step(storeId, "inventory cache", () -> storeInventoryCache.evict(storeId));
         allSucceeded &= step(storeId, "supplier secrets", () -> deleteOwnSupplierSecrets(store));
+        allSucceeded &= step(storeId, "integration secrets", () -> deleteIntegrationSecrets(store));
 
         if (allSucceeded) {
             storesRepository.delete(store);
-            System.out.println("[StoreDeletion] Deleted store " + storeId);
-        } else {
-            System.err.println("[StoreDeletion] Store " + storeId + " kept for retry after failed steps");
         }
         return allSucceeded;
     }
@@ -118,8 +143,32 @@ public class StoreDeletionService {
                 .forEach(connection -> supplierProviderFactory.deleteConfiguration(store, connection.getSupplierName()));
     }
 
+    private void deleteIntegrationSecrets(Store store) {
+        deleteConfiguration(store, IntegrationType.SHIPPING_PROVIDER, shippingProviderFactory);
+        deleteConfiguration(store, IntegrationType.INVOICING_PROVIDER, invoicingProviderFactory);
+        deleteConfiguration(store, IntegrationType.RECEIPT_PROVIDER, receiptProviderFactory);
+        store.getMarketplaces()
+                .forEach(integration -> marketplaceProviderFactory.deleteConfiguration(store, integration.getName()));
+        store.getPayments()
+                .forEach(integration -> paymentProviderFactory.deleteConfiguration(store, integration.getName()));
+    }
+
+    private void deleteConfiguration(Store store, IntegrationType type, ProviderFactory<?, ?> factory) {
+        String providerName = store.getConfigurationValue(type);
+        if (providerName != null) {
+            factory.deleteConfiguration(store, providerName);
+        }
+    }
+
     private void deleteCognitoUser(Store store) {
         cognitoUserService.deleteUser(store.getDemo().getOwnerEmail());
+    }
+
+    private void deleteTrialOwner(Store store) {
+        String ownerEmail = store.getTrial().getOwnerEmail();
+        if (ownerEmail != null && !ownerEmail.isBlank()) {
+            cognitoUserService.deleteStoreOwner(ownerEmail, store.getStoreId());
+        }
     }
 
     private void deleteOrders(String storeId) {
@@ -166,7 +215,7 @@ public class StoreDeletionService {
             action.run();
             return true;
         } catch (RuntimeException e) {
-            System.err.println("[StoreDeletion] Step '" + name + "' failed for store " + storeId + ": " + e.getMessage());
+            log.error("Deletion step '{}' failed for store {}, the store is kept for a retry", name, storeId, e);
             return false;
         }
     }
