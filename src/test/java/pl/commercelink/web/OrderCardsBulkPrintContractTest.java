@@ -170,7 +170,7 @@ class OrderCardsBulkPrintContractTest {
     void withoutTheScriptTheFirstVisibleColumnKeepsTheEdgeIndent() throws Exception {
         // given
         String css = css();
-        String wide = css.substring(css.indexOf("@media screen and (min-width: 720px) {\n    .cl-page .cl-table.is-orders:not(.is-selectable) .cl-table-check + :is(th, td)") );
+        String wide = css.substring(css.indexOf("@media screen and (min-width: 1024px) {\n    .cl-page .cl-table.is-orders:not(.is-selectable) .cl-table-check + :is(th, td)") );
 
         // then
         assertThat(rule(wide, ".cl-page .cl-table.is-orders:not(.is-selectable) .cl-table-check + :is(th, td)"))
