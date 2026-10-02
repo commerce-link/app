@@ -76,6 +76,21 @@ class ItemIdentityTest {
         assertThat(ItemAmbiguity.of(List.of(sold, resold), ItemIdentity.of(List.of(sold, resold), List.of(), List.of())).ambiguous()).isFalse();
     }
 
+    @Test
+    void takesEachFieldIndependentlyFromTheNewestRecordWhereItIsNonBlank() {
+        // given
+        OrderLine older = product(order("o-1", OrderStatus.Completed, FulfilmentStatus.Delivered, at(9, 2)), "Old", "590-OLD", "MFN-OLD");
+        OrderLine newer = product(order("o-2", OrderStatus.Assembly, FulfilmentStatus.Reserved, at(9, 29)), "New", null, "MFN-NEW");
+
+        // when
+        ItemIdentity identity = ItemIdentity.of(List.of(older, newer), List.of(), List.of());
+
+        // then
+        assertThat(identity.name()).isEqualTo("New");
+        assertThat(identity.ean()).isEqualTo("590-OLD");
+        assertThat(identity.mfn()).isEqualTo("MFN-NEW");
+    }
+
     static OrderLine product(OrderLine line, String name, String ean, String mfn) {
         line.item().setName(name);
         line.item().setEan(ean);

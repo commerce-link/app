@@ -1,5 +1,6 @@
 package pl.commercelink.orders.history;
 
+import org.apache.commons.lang3.StringUtils;
 import pl.commercelink.warehouse.api.WarehouseItemView;
 
 import java.time.LocalDateTime;
@@ -8,9 +9,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.stream.Stream;
 
-import static org.apache.commons.lang3.StringUtils.isNotBlank;
-
-/** The product behind the number, from the newest record that has one; productCount > 1 means different products. */
+/** The product behind the number, from the newest records that have each field; productCount > 1 means different products. */
 public record ItemIdentity(String name, String ean, String mfn, int productCount) {
 
     private record Product(String name, String ean, String mfn) {
@@ -26,11 +25,16 @@ public record ItemIdentity(String name, String ean, String mfn, int productCount
         Stream<Product> fromWarehouse = warehouse.stream().map(w -> new Product(w.getName(), w.getEan(), w.getMfn()));
         List<Product> products = Stream.of(fromOrders, fromRmas, fromWarehouse).flatMap(s -> s).toList();
 
-        Product newest = products.stream().filter(p -> isNotBlank(p.name())).findFirst()
-                .orElse(products.isEmpty() ? new Product(null, null, null) : products.get(0));
-        long eans = products.stream().map(Product::ean).filter(Objects::nonNull).map(String::trim).filter(s -> !s.isEmpty()).distinct().count();
-        long mfns = products.stream().map(Product::mfn).filter(Objects::nonNull).map(String::trim).filter(s -> !s.isEmpty()).distinct().count();
-        int count = (int) Math.max(Math.max(eans, mfns), products.isEmpty() ? 0 : 1);
-        return new ItemIdentity(newest.name(), newest.ean(), newest.mfn(), count);
+        String name = products.stream().map(Product::name).filter(StringUtils::isNotBlank).findFirst().orElse(null);
+        String ean = products.stream().map(Product::ean).filter(StringUtils::isNotBlank).findFirst().orElse(null);
+        String mfn = products.stream().map(Product::mfn).filter(StringUtils::isNotBlank).findFirst().orElse(null);
+        long eanCount = countDistinctNonBlank(products.stream().map(Product::ean));
+        long mfnCount = countDistinctNonBlank(products.stream().map(Product::mfn));
+        int count = (int) Math.max(Math.max(eanCount, mfnCount), products.isEmpty() ? 0 : 1);
+        return new ItemIdentity(name, ean, mfn, count);
+    }
+
+    private static long countDistinctNonBlank(Stream<String> values) {
+        return values.filter(Objects::nonNull).map(String::trim).filter(s -> !s.isEmpty()).distinct().count();
     }
 }
