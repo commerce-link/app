@@ -7028,28 +7028,18 @@ a.cl-link-button:hover {
     align-items: flex-start;
 }
 
-/* Selector outranks Bulma's `.content figure` margins. */
-.cl-page .cl-page-header-row figure.cl-print-qr {
+/* Selector outranks Bulma's `.content` margins. */
+.cl-page .cl-page-header-row div.cl-print-qr {
     flex: none;
     width: 120px;
     margin: 0;
-    text-align: center;
     break-inside: avoid;
 }
 
-.cl-page .cl-print-qr-code svg {
+.cl-page .cl-print-qr svg {
     display: block;
     width: 100%;
     height: auto;
-}
-
-/* Upright, not Bulma's italic `.content figure figcaption`: the caption is the order number. */
-.cl-page .cl-print-qr figcaption {
-    margin-top: 4px;
-    font-style: normal;
-    font-size: 0.75rem;
-    line-height: 1.3;
-    color: var(--cl-ink-2);
 }
 
 .cl-page .cl-print-section {
@@ -7221,7 +7211,7 @@ a.cl-link-button:hover {
         position: relative;
     }
 
-    .cl-page.cl-print-page .cl-page-header-row figure.cl-print-qr {
+    .cl-page.cl-print-page .cl-page-header-row div.cl-print-qr {
         position: absolute;
         top: 0;
         right: 0;
@@ -7232,20 +7222,18 @@ a.cl-link-button:hover {
         padding-right: 34mm;
     }
 
-    /* The code with its caption (~34 mm) is taller than the title and the three detail rows (~31 mm, measured in
-       Chromium), so the details get a min-height that starts the first section's rule ~3 mm below the caption
-       instead of through it: 9.9 mm (title + its margin) + 27.5 mm = 37.4 mm from the top of the sheet. */
+    /* Beside the code the details stack in one column (order number, e-mail, ordered at), so the e-mail gets the
+       whole width left of the code: an ordinary address stays on one line, only one longer than that width breaks.
+       Title + three rows end ~32 mm down (measured in Chromium), so the first section's rule already falls ~2 mm below
+       the 30 mm code and needs no min-height. */
     .cl-page.cl-print-page .cl-page-body:has(.cl-print-qr) dl.cl-kv.cl-print-meta {
-        min-height: 27.5mm;
+        grid-template-columns: minmax(0, 1fr);
         padding-right: 34mm;
         align-content: start;
     }
 
-    .cl-page.cl-print-page .cl-print-qr figcaption {
-        margin-top: 1pt;
-        font-size: 9pt;
-        line-height: 1.2;
-        color: #000;
+    .cl-page.cl-print-page .cl-page-body:has(.cl-print-qr) .cl-kv.cl-print-meta dd {
+        overflow-wrap: break-word;
     }
 
     .cl-page.cl-print-page :is(.cl-page-title, .cl-print-title, dt, dd, th, td, p, a, label, input) {
