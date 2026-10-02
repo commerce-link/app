@@ -2751,11 +2751,21 @@ a.cl-link-button:hover {
     padding-bottom: 0;
 }
 
+/* The alert lines up with the page below it: as wide as .cl-page-body (1200 px), as wide as a wide page (1440 px),
+   and the full width of a page not built on .cl-page-body yet. */
 .cl-page.cl-frame-notices .cl-alert {
     max-width: 1200px;
     margin-bottom: 20px;
     font-size: 14px;
     line-height: 1.5;
+}
+
+.cl-content:has(.cl-page-body.is-wide) .cl-page.cl-frame-notices .cl-alert {
+    max-width: 1440px;
+}
+
+.cl-content:not(:has(.cl-page-body)) .cl-page.cl-frame-notices .cl-alert {
+    max-width: none;
 }
 
 .cl-page .cl-alert[hidden],
