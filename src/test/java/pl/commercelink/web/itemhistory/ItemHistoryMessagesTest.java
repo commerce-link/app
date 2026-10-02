@@ -29,6 +29,7 @@ class ItemHistoryMessagesTest {
             "item.history.event.DELIVERY_RECEIVED", "item.history.event.DELIVERY_ORDERED", "item.history.events",
             "item.history.events.order", "item.history.events.truncated", "item.history.events.empty",
             "item.history.warning.title", "item.history.warning.text", "item.history.warning.counts",
+            "item.history.link.order", "item.history.link.rma",
             "nav.item.history");
 
     @Test

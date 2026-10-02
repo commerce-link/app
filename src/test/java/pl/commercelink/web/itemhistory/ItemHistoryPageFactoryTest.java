@@ -174,6 +174,145 @@ class ItemHistoryPageFactoryTest {
         assertThat(page.serialNo()).isEqualTo("SN-9");
     }
 
+    @Test
+    void anItemInAnRmaIsNowInTheRma() {
+        // given
+        RmaLine line = rma("rma-1", RMAItemStatus.SentForRepair, at(9, 21));
+
+        // when
+        ItemHistoryPage.Now now = factory.of(history(List.of(), List.of(line), List.of(), List.of()), PL).now();
+
+        // then
+        assertThat(now.label()).isEqualTo("W reklamacji");
+        assertThat(now.tone()).isEqualTo("is-warn");
+        assertThat(now.text()).isEqualTo("RMA rma-1 · Wysłany do naprawy");
+        assertThat(now.linkText()).isEqualTo("RMA");
+        assertThat(now.href()).isEqualTo("/dashboard/rma/rma-1");
+    }
+
+    @Test
+    void anItemInAnOpenOrderIsNowInTheOrder() {
+        // given
+        OrderLine line = order("o-1", OrderStatus.Assembly, FulfilmentStatus.Reserved, at(9, 29));
+
+        // when
+        ItemHistoryPage.Now now = factory.of(history(List.of(line), List.of(), List.of(), List.of()), PL).now();
+
+        // then
+        assertThat(now.label()).isEqualTo("W zamówieniu");
+        assertThat(now.tone()).isEqualTo("is-info");
+        assertThat(now.text()).isEqualTo("Zamówienie o-1 · W kompletacji · Pozycja: Zarezerwowany");
+        assertThat(now.linkText()).isEqualTo("Zamówienie");
+        assertThat(now.href()).isEqualTo("/dashboard/orders/o-1");
+    }
+
+    @Test
+    void aDeliveredOrderMeansTheItemIsAtTheCustomer() {
+        // given
+        OrderLine line = order("o-1", OrderStatus.Delivered, FulfilmentStatus.Delivered, at(9, 2));
+
+        // when
+        ItemHistoryPage.Now now = factory.of(history(List.of(line), List.of(), List.of(), List.of()), PL).now();
+
+        // then
+        assertThat(now.label()).isEqualTo("U klienta");
+        assertThat(now.tone()).isEqualTo("is-neutral");
+        assertThat(now.text()).startsWith("Sprzedany w zamówieniu o-1 (Dostarczone) · ");
+        assertThat(now.href()).isEqualTo("/dashboard/orders/o-1");
+    }
+
+    @Test
+    void anAtCustomerOrderWithoutStatusDoesNotRenderEmptyParentheses() {
+        // given
+        OrderLine line = order("o-1", null, FulfilmentStatus.Delivered, at(9, 2));
+
+        // when
+        ItemHistoryPage.Now now = factory.of(new ItemHistory("SN-1", true, ItemIdentity.of(List.of(line), List.of(), List.of()),
+                new ItemAmbiguity(false, 1, 1), new ItemNow(ItemNow.State.AT_CUSTOMER, line, null, null), List.of(), 0), PL).now();
+
+        // then
+        assertThat(now.text()).startsWith("Sprzedany w zamówieniu o-1 (Nieznany)");
+        assertThat(now.text()).doesNotContain("()");
+    }
+
+    @Test
+    void aReservedWarehouseRowIsReserved() {
+        // when
+        ItemHistoryPage.Now now = factory.of(history(List.of(), List.of(), List.of(WAREHOUSE_ROW.apply(FulfilmentStatus.Reserved)), List.of()), PL).now();
+
+        // then
+        assertThat(now.label()).isEqualTo("Zarezerwowany");
+        assertThat(now.tone()).isEqualTo("is-info");
+        assertThat(now.text()).isEqualTo("Zarezerwowany w magazynie · Stan: Otwarte opakowanie");
+        assertThat(now.href()).isEqualTo("/dashboard/warehouse/items/w-Reserved");
+    }
+
+    @Test
+    void anOrderedWarehouseRowIsInbound() {
+        // when
+        ItemHistoryPage.Now now = factory.of(history(List.of(), List.of(), List.of(WAREHOUSE_ROW.apply(FulfilmentStatus.Ordered)), List.of()), PL).now();
+
+        // then
+        assertThat(now.label()).isEqualTo("W drodze do magazynu");
+        assertThat(now.tone()).isEqualTo("is-info");
+        assertThat(now.text()).isEqualTo("Zamówiony u dostawcy, czeka na odbiór · Stan: Otwarte opakowanie");
+        assertThat(now.href()).isEqualTo("/dashboard/warehouse/items/w-Ordered");
+    }
+
+    @Test
+    void anOtherwiseStatedWarehouseRowUsesTheItemStatusAsLabel() {
+        // when
+        ItemHistoryPage.Now now = factory.of(history(List.of(), List.of(), List.of(WAREHOUSE_ROW.apply(FulfilmentStatus.InRMA)), List.of()), PL).now();
+
+        // then
+        assertThat(now.label()).isEqualTo("W reklamacji");
+        assertThat(now.tone()).isEqualTo("is-warn");
+        assertThat(now.text()).isEqualTo("Stan: Otwarte opakowanie");
+        assertThat(now.href()).isEqualTo("/dashboard/warehouse/items/w-InRMA");
+    }
+
+    @Test
+    void aWarehouseRowWithoutStatusIsLabelledUnknown() {
+        // given
+        WarehouseItemView stock = new WarehouseItemView("store-1", "w-1", "SSD", null, null, null, 1, null, null);
+
+        // when
+        ItemHistoryPage.Now now = factory.of(history(List.of(), List.of(), List.of(stock), List.of()), PL).now();
+
+        // then
+        assertThat(now.label()).isEqualTo("Nieznany");
+        assertThat(now.tone()).isEqualTo("is-neutral");
+        assertThat(now.href()).isEqualTo("/dashboard/warehouse/items/w-1");
+    }
+
+    @Test
+    void anOtherwiseStatedWarehouseRowRendersInEnglish() {
+        // when
+        ItemHistoryPage.Now now = factory.of(history(List.of(), List.of(), List.of(WAREHOUSE_ROW.apply(FulfilmentStatus.Destroyed)), List.of()), Locale.ENGLISH).now();
+
+        // then
+        assertThat(now.label()).isEqualTo("Destroyed");
+        assertThat(now.tone()).isEqualTo("is-bad");
+        assertThat(now.text()).isEqualTo("Condition: Open box");
+    }
+
+    @Test
+    void anItemWithoutAnyLocationRecordIsUnknown() {
+        // given
+        RmaLine line = rma("rma-1", RMAItemStatus.MovedToWarehouse, at(9, 21));
+
+        // when
+        ItemHistoryPage.Now now = factory.of(history(List.of(), List.of(line), List.of(), List.of()), PL).now();
+
+        // then
+        assertThat(now.label()).isEqualTo("Nieznany");
+        assertThat(now.tone()).isEqualTo("is-neutral");
+        assertThat(now.text()).isEqualTo("Brak rekordu, który mówi, gdzie przedmiot jest teraz");
+        assertThat(now.href()).isNull();
+    }
+
+    static final java.util.function.Function<FulfilmentStatus, WarehouseItemView> WAREHOUSE_ROW = ItemNowTest::warehouse;
+
     static ItemHistoryEvent eventOf(OrderLine line) {
         return new ItemHistoryEvent(ItemHistoryEvent.Type.ORDER_PLACED, line.placedAt(), line, null, null);
     }
