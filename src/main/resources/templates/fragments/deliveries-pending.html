@@ -5,7 +5,6 @@
 <!--/* The rest of the query for a menu or search form. The tab (kind) is never carried: narrowing lets the page pick
        the tab that has results (spec §3.6). "skip" names the parameter the form itself submits (provider, search). */-->
 <th:block th:fragment="hidden(skip)" th:with="q=${page.query()}">
-    <input type="hidden" name="focus" th:if="${q.focus() != null}" th:value="${q.focus().param()}"/>
     <th:block th:if="${skip != 'provider'}"><input type="hidden" name="provider" th:each="p : ${q.providers()}" th:value="${p}"/></th:block>
     <input type="hidden" name="q" th:if="${skip != 'search' and q.q() != null}" th:value="${q.q()}"/>
 </th:block>
