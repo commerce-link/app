@@ -10,6 +10,7 @@ import pl.commercelink.inventory.deliveries.DropshipItemLookup;
 import pl.commercelink.inventory.supplier.SupplierChoice;
 import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.orders.BillingDetails;
+import pl.commercelink.orders.CourierCancellation;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
@@ -576,6 +577,56 @@ class OrderDetailsTemplateTest {
                 .doesNotContain("/shipments/1/remove").doesNotContain("Edytuj przesyłki")
                 .contains("id=\"shipment-2-remove-reason\">Najpierw anuluj zamówienie kuriera, potem usuniesz przesyłkę.</p>")
                 .doesNotContain("shipment-1-remove-reason");
+    }
+
+    @Test
+    void aCancellationInProgressShowsItsPillGreysTheCancelActionAndAsksThePageToPoll() {
+        // given
+        Order order = order(OrderStatus.Shipping);
+        Shipment sent = order.getShipments().get(0);
+        sent.setCarrier("DPD");
+        sent.setTrackingNo("T-1");
+        sent.setShippedAt(java.time.LocalDateTime.now().minusHours(1));
+        sent.setExternalId("EXT-1");
+        sent.setCancellation(CourierCancellation.pending("cmd-1", java.time.LocalDateTime.now()));
+
+        // when
+        String html = render(order, ADMIN);
+        String card = card(page(html), "przesylki");
+
+        // then
+        assertThat(card).contains("data-cl-cancellation-poll=\"/dashboard/orders/" + order.getOrderId()
+                        + "/shipments/cancellation-state\"")
+                .containsPattern("<span class=\"cl-status is-info\">Anulowanie w toku</span>")
+                .containsPattern("<button type=\"button\" class=\"cl-link-button\"\\s+aria-disabled=\"true\"[^>]*"
+                        + "aria-describedby=\"shipment-cancel-reason\">Anuluj zamówienie kuriera</button>")
+                .contains("id=\"shipment-cancel-reason\">Anulowanie już trwa — czekamy na potwierdzenie z Furgonetki.</p>")
+                .doesNotContain("/cancelShipment\"");
+        assertThat(html).contains("/js/shipment-cancellation.js");
+    }
+
+    @Test
+    void aFailedCancellationSendsTheOperatorToFurgonetkaAndItsRemovalWarnsAboutTheLabel() {
+        // given
+        Order order = order(OrderStatus.Shipping);
+        Shipment sent = order.getShipments().get(0);
+        sent.setCarrier("DPD");
+        sent.setTrackingNo("T-1");
+        sent.setShippedAt(java.time.LocalDateTime.now().minusHours(1));
+        sent.setExternalId("EXT-1");
+        sent.setCancellation(CourierCancellation.pending("cmd-1", java.time.LocalDateTime.now().minusMinutes(1)));
+        sent.setCancellation(sent.getCancellation().failed());
+
+        // when
+        String card = card(page(render(order, ADMIN)), "przesylki");
+
+        // then
+        assertThat(card).doesNotContain("data-cl-cancellation-poll")
+                .contains("<span class=\"cl-status is-bad\">Anulowanie nieudane — sprawdź w panelu Furgonetki</span>")
+                .contains("/cancelShipment\"")
+                .contains("data-cl-confirm-message=\"Anulowanie w Furgonetce nie zostało potwierdzone. Usuń przesyłkę tylko "
+                        + "wtedy, gdy etykieta jest anulowana w panelu Furgonetki — inaczej kurier może ją nadal odebrać.\"")
+                .doesNotContain("shipment-cancel-reason");
     }
 
     @Test

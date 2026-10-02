@@ -185,6 +185,21 @@ class OrdersScriptContractTest {
     }
 
     @Test
+    void theShipmentsCardPollsTheCancellationStateAndReloadsOnceFurgonetkaAnswers() throws Exception {
+        // given
+        String script = read("src/main/resources/static/js/shipment-cancellation.js");
+
+        // then: every 5 s for about 2 minutes, a reload only once the answer is final and no dialog, open menu or
+        // row selection would be lost; a lost request is not an answer
+        assertThat(script).contains("'use strict'").contains("[data-cl-cancellation-poll]")
+                .contains("5000").contains("120000").contains("body.inProgress === false")
+                .contains("window.location.reload()").contains("dialog[open]")
+                .contains("details.cl-menu[open]").contains("[data-cl-select-row]:checked").contains("'X-Requested-With': 'fetch'")
+                .contains("opaqueredirect")
+                .doesNotContain("innerHTML").doesNotContain("style.").doesNotContain("setInterval");
+    }
+
+    @Test
     void printFrameIsRemovedOnlyOnAfterprintPagehideOrTheNextPrint() throws Exception {
         // given: the script with its whitespace folded, so formatting does not matter
         String print = read("src/main/resources/static/js/print.js").replaceAll("\\s+", " ");

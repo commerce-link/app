@@ -7,24 +7,34 @@
        its page without JavaScript; its text and button say when the removal delivers the order or moves it back to
        "W realizacji"; removing the only shipment leaves the card empty. The only shipment with nothing but the
        delivery choice (the one the order was created with) reads as no shipment: a greyed row "Sposób dostawy: …",
-       "Brak przesyłki" and "Uzupełnij" (the same dialog) instead of "Edytuj", no "Usuń". */-->
+       "Brak przesyłki" and "Uzupełnij" (the same dialog) instead of "Edytuj", no "Usuń".
+       While a courier cancellation is in progress the card carries data-cl-cancellation-poll: shipment-cancellation.js
+       asks it every few seconds and reloads the page once Furgonetka answers; without JavaScript the pill says what is
+       going on and the operator refreshes. */-->
 <section th:fragment="card" class="cl-card" id="przesylki" aria-labelledby="shipments-title"
-         th:with="shipments=${page.shipments()}">
+         th:with="shipments=${page.shipments()}"
+         th:attr="data-cl-cancellation-poll=${shipments.cancellationPollHref() != null} ? @{${shipments.cancellationPollHref()}} : null">
     <div class="cl-card-head">
         <h2 class="cl-card-title" id="shipments-title" th:text="#{order.card.shipments}"></h2>
         <div class="cl-card-actions" th:unless="${page.readOnly()}">
-            <a th:if="${shipments.canCancelCourier()}" class="cl-link-button is-danger" data-cl-confirm
+            <a th:if="${shipments.canCancelCourier() and shipments.cancelCourierLockedKey() == null}"
+               class="cl-link-button is-danger" data-cl-confirm
                th:href="@{/dashboard/orders/{o}/cancelShipment(o=${page.orderId()})}"
                th:attr="data-cl-confirm-title=#{order.shipments.cancel.confirm.title},
                         data-cl-confirm-message=#{order.shipments.cancel.confirm.message},
                         data-cl-confirm-action=#{order.shipments.cancel.confirm.action}"
                th:text="#{order.shipments.cancel}"></a>
+            <!--/* greyed, still focusable, its reason under the head (design system: link action that cannot run) */-->
+            <button th:if="${shipments.cancelCourierLockedKey() != null}" type="button" class="cl-link-button"
+                    aria-disabled="true" aria-describedby="shipment-cancel-reason" th:text="#{order.shipments.cancel}"></button>
             <a class="cl-button" data-cl-dialog-open="shipment-dialog-new"
                th:href="@{/dashboard/orders/{o}/shipments/new(o=${page.orderId()})}">
                 <i class="fas fa-plus" aria-hidden="true"></i>
                 <span th:text="#{order.shipments.add}"></span>
             </a>
         </div>
+        <p th:if="${shipments.cancelCourierLockedKey() != null}" class="cl-help is-note"
+           id="shipment-cancel-reason" th:text="#{${shipments.cancelCourierLockedKey()}}"></p>
     </div>
     <ul class="cl-list" th:if="${!shipments.rows().isEmpty()}">
         <li th:each="s : ${shipments.rows()}" th:if="${s.placeholder()}" class="cl-list-item is-placeholder" id="shipment-placeholder">
@@ -50,6 +60,9 @@
                     <span th:if="${s.trackingKey() != null}" class="cl-status" th:classappend="${s.trackingTone()}"
                           th:attr="title=${s.trackingHelpKey() != null} ? #{${s.trackingHelpKey()}} : null"
                           th:text="#{${s.trackingKey()}}"></span>
+                    <!--/* the courier cancellation: the text carries the state, the tone only repeats it */-->
+                    <span th:if="${s.cancellationKey() != null}" class="cl-status" th:classappend="${s.cancellationTone()}"
+                          th:text="#{${s.cancellationKey()}}"></span>
                 </p>
                 <!--/* each part starts lower case after a separator; the first one of the line takes a capital */-->
                 <p class="cl-list-desc" th:with="lead=${s.trackingNo() == null and s.pickupPoint() == null}">

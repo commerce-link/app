@@ -22,6 +22,7 @@ import pl.commercelink.inventory.supplier.SupplierChoice;
 import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.inventory.supplier.SupplierProviderFactory;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
+import pl.commercelink.orders.CourierCancellation;
 import pl.commercelink.provider.ProviderConfigurationManager;
 import pl.commercelink.starter.secrets.SecretsManager;
 import org.mockito.Spy;
@@ -87,6 +88,8 @@ import pl.commercelink.documents.Document;
 import pl.commercelink.documents.DocumentType;
 import pl.commercelink.orders.OrderReferenceResolver;
 import pl.commercelink.shipping.ShipmentCancelService;
+import pl.commercelink.shipping.ShipmentCancelResult;
+import pl.commercelink.shipping.ShipmentCancellationInProgressException;
 import pl.commercelink.shipping.ShippingUnavailableException;
 import pl.commercelink.web.dtos.AssignSupplierForm;
 import pl.commercelink.web.orders.BulkAction;
@@ -128,6 +131,7 @@ import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.inOrder;
@@ -4310,6 +4314,195 @@ class OrdersControllerTest {
         }
 
         @Test
+        void cancelShipmentRefusesWhileACancellationIsInProgress() {
+            // given
+            Order order = order(OrderStatus.Shipping);
+            Shipment sent = new Shipment(ShipmentType.Courier);
+            sent.setCarrier("DPD");
+            sent.setTrackingNo("TRACK-1");
+            sent.setShippedAt(LocalDateTime.now());
+            sent.setExternalId("21353832");
+            sent.setCancellation(CourierCancellation.pending("cmd-1", LocalDateTime.now()));
+            order.setShipments(new ArrayList<>(List.of(sent)));
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            ordersController.cancelShipment(ORDER_ID, redirect, polish);
+
+            // then
+            verifyNoInteractions(shipmentCancelService);
+            assertThat(flash(redirect)).containsEntry("errorMessage", "order.shipments.cancel.error.pending");
+        }
+
+        @Test
+        void cancelShipmentRefusesWhenAConcurrentRequestMarkedTheCancellationFirst() {
+            // given: the order read here shows no cancellation, the service's fresh read finds one in progress
+            Order order = order(OrderStatus.Shipping);
+            Shipment sent = new Shipment(ShipmentType.Courier);
+            sent.setCarrier("DPD");
+            sent.setTrackingNo("TRACK-1");
+            sent.setShippedAt(LocalDateTime.now());
+            sent.setExternalId("21353832");
+            order.setShipments(new ArrayList<>(List.of(sent)));
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            doThrow(new ShipmentCancellationInProgressException())
+                    .when(shipmentCancelService).cancelShipping(ORDER_ID, STORE_ID);
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            ordersController.cancelShipment(ORDER_ID, redirect, polish);
+
+            // then
+            assertThat(flash(redirect)).containsEntry("errorMessage", "order.shipments.cancel.error.pending");
+        }
+
+        private void orderWithASentShipment() {
+            Order order = order(OrderStatus.Shipping);
+            Shipment sent = new Shipment(ShipmentType.Courier);
+            sent.setCarrier("DPD");
+            sent.setTrackingNo("TRACK-1");
+            sent.setShippedAt(LocalDateTime.now());
+            sent.setExternalId("21353832");
+            order.setShipments(new ArrayList<>(List.of(sent)));
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        }
+
+        @Test
+        void cancelShipmentReportsThatTheCancellationWasRequested() {
+            // given
+            orderWithASentShipment();
+            when(shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID)).thenReturn(ShipmentCancelResult.requested());
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            ordersController.cancelShipment(ORDER_ID, redirect, polish);
+
+            // then
+            verify(shipmentCancelService).cancelShipping(ORDER_ID, STORE_ID);
+            assertThat(((OrderNotice) redirect.getFlashAttributes().get(OrderFlash.ATTRIBUTE)).text())
+                    .isEqualTo("shipment.cancel.requested");
+        }
+
+        @Test
+        void cancelShipmentReportsThatTheEarlierCancellationIsBeingRechecked() {
+            // given
+            orderWithASentShipment();
+            when(shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID)).thenReturn(ShipmentCancelResult.rechecking());
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            ordersController.cancelShipment(ORDER_ID, redirect, polish);
+
+            // then
+            assertThat(((OrderNotice) redirect.getFlashAttributes().get(OrderFlash.ATTRIBUTE)).text())
+                    .isEqualTo("shipment.cancel.rechecking");
+            assertThat(flash(redirect)).doesNotContainKey("errorMessage");
+        }
+
+        @Test
+        void cancelShipmentReportsAnImmediateCancellation() {
+            // given
+            orderWithASentShipment();
+            when(shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID)).thenReturn(ShipmentCancelResult.cancelled());
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            ordersController.cancelShipment(ORDER_ID, redirect, polish);
+
+            // then
+            assertThat(((OrderNotice) redirect.getFlashAttributes().get(OrderFlash.ATTRIBUTE)).text())
+                    .isEqualTo("shipment.cancel.success");
+            assertThat(flash(redirect)).doesNotContainKey("errorMessage");
+        }
+
+        @Test
+        void cancelShipmentReportsAnImmediateFailureWithTheProvidersReason() {
+            // given
+            orderWithASentShipment();
+            when(shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID))
+                    .thenReturn(ShipmentCancelResult.failed("Przesyłka została już odebrana"));
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            ordersController.cancelShipment(ORDER_ID, redirect, polish);
+
+            // then
+            assertThat(flash(redirect))
+                    .containsEntry("errorMessage", "shipment.cancel.failed [Przesyłka została już odebrana]")
+                    .doesNotContainKey(OrderFlash.ATTRIBUTE);
+        }
+
+        @Test
+        void cancelShipmentShowsTheLibrarysNotReceivedReasonInTheOperatorsLanguage() {
+            // given
+            orderWithASentShipment();
+            when(shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID))
+                    .thenReturn(ShipmentCancelResult.failed("Furgonetka did not receive the cancel command"));
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            ordersController.cancelShipment(ORDER_ID, redirect, polish);
+
+            // then
+            assertThat(flash(redirect))
+                    .containsEntry("errorMessage", "shipment.cancel.failed [shipment.cancellation.reason.notReceived]");
+        }
+
+        @Test
+        void aCourierCancellationInAStoreThatLostItsCarrierIsRefusedWithAReason() {
+            // given
+            orderWithASentShipment();
+            doThrow(new ShippingUnavailableException(STORE_ID)).when(shipmentCancelService).cancelShipping(ORDER_ID, STORE_ID);
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            ordersController.cancelShipment(ORDER_ID, redirect, polish);
+
+            // then
+            assertThat(flash(redirect)).containsEntry("errorMessage", "order.shipments.cancel.error.no.provider");
+        }
+
+        @Test
+        void theCancellationStateSaysWhetherAShipmentOfTheOrderIsStillBeingCancelled() {
+            // given
+            Order pending = order(OrderStatus.Shipping);
+            Shipment sent = new Shipment(ShipmentType.Courier);
+            sent.setExternalId("21353832");
+            sent.setCancellation(CourierCancellation.pending("cmd-1", LocalDateTime.now()));
+            pending.setShipments(new ArrayList<>(List.of(sent)));
+            Order settled = order(OrderStatus.Shipping);
+            Shipment failed = new Shipment(ShipmentType.Courier);
+            failed.setExternalId("21353832");
+            failed.setCancellation(CourierCancellation.pending("cmd-1", LocalDateTime.now()));
+            failed.setCancellation(failed.getCancellation().failed());
+            settled.setShipments(new ArrayList<>(List.of(failed)));
+
+            // when
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(pending);
+            ResponseEntity<OrdersController.CancellationState> inProgress = ordersController.shipmentCancellationState(ORDER_ID);
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(settled);
+            ResponseEntity<OrdersController.CancellationState> done = ordersController.shipmentCancellationState(ORDER_ID);
+
+            // then
+            assertThat(inProgress.getBody().inProgress()).isTrue();
+            assertThat(inProgress.getHeaders().getCacheControl()).isEqualTo("no-store");
+            assertThat(done.getBody().inProgress()).isFalse();
+        }
+
+        @Test
+        void theCancellationStateOfAnotherStoresOrderIsNotFound() {
+            // given: the order exists only under another store; the session's store finds nothing
+            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(null);
+
+            // when / then
+            assertThatThrownBy(() -> ordersController.shipmentCancellationState(ORDER_ID))
+                    .isInstanceOf(ResponseStatusException.class)
+                    .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode().value()).isEqualTo(404));
+            verify(ordersRepository).findById(STORE_ID, ORDER_ID);
+        }
+
+        @Test
         void aCourierOrderWithoutAShippedDateIsStillCancelled() {
             // given: legacy data or a date cleared before the guard; the paid label is there whatever the dates say
             Order order = order(OrderStatus.Shipping);
@@ -4319,6 +4512,7 @@ class OrdersControllerTest {
             labelled.setExternalId("PKG-1");
             order.setShipments(new ArrayList<>(List.of(labelled)));
             when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+            when(shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID)).thenReturn(ShipmentCancelResult.requested());
             RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
             // when
@@ -4330,47 +4524,34 @@ class OrdersControllerTest {
         }
 
         @Test
-        void aCourierCancellationInAStoreThatLostItsCarrierIsRefusedWithAReason() {
-            // given
-            Order order = order(OrderStatus.Shipping);
-            Shipment labelled = new Shipment(ShipmentType.Courier);
-            labelled.setCarrier("DPD");
-            labelled.setTrackingNo("TRACK-1");
-            labelled.setShippedAt(LocalDateTime.now());
-            labelled.setExternalId("PKG-1");
-            order.setShipments(new ArrayList<>(List.of(labelled)));
-            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
-            when(shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID))
-                    .thenThrow(new ShippingUnavailableException(STORE_ID));
-            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
-
-            // when
-            String view = ordersController.cancelShipment(ORDER_ID, redirect, polish);
-
-            // then
-            assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
-            assertThat(flash(redirect)).containsEntry("errorMessage", "order.shipments.cancel.error.no.provider");
-        }
-
-        @Test
         void cancellingTheCourierOrderThatTakesTheOrderBackToRealizationSaysSo() {
-            // given
-            Order order = order(OrderStatus.Shipping);
-            Shipment labelled = new Shipment(ShipmentType.Courier);
-            labelled.setCarrier("DPD");
-            labelled.setTrackingNo("TRACK-1");
-            labelled.setShippedAt(LocalDateTime.now());
-            labelled.setExternalId("PKG-1");
-            order.setShipments(new ArrayList<>(List.of(labelled)));
-            when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
-            when(shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID)).thenReturn(true);
+            // given: the provider confirmed right away and the settled order went back to Realization
+            orderWithASentShipment();
+            when(shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID)).thenReturn(ShipmentCancelResult.cancelled(true));
             RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
 
             // when
             ordersController.cancelShipment(ORDER_ID, redirect, polish);
 
             // then
-            assertThat(notice(redirect).text()).startsWith("shipment.cancel.success").contains("order.shipments.backToRealization");
+            assertThat(((OrderNotice) redirect.getFlashAttributes().get(OrderFlash.ATTRIBUTE)).text())
+                    .startsWith("shipment.cancel.success").contains("order.shipments.backToRealization");
+        }
+
+        @Test
+        void cancelShipmentReportsAShipmentThatDisappearedMeanwhile() {
+            // given
+            orderWithASentShipment();
+            when(shipmentCancelService.cancelShipping(ORDER_ID, STORE_ID)).thenReturn(ShipmentCancelResult.gone());
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            ordersController.cancelShipment(ORDER_ID, redirect, polish);
+
+            // then
+            assertThat(flash(redirect))
+                    .containsEntry("errorMessage", "shipment.cancel.gone")
+                    .doesNotContainKey(OrderFlash.ATTRIBUTE);
         }
 
         @Test

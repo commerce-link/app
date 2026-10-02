@@ -7,6 +7,7 @@ import org.apache.logging.log4j.util.Strings;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -50,7 +51,9 @@ import pl.commercelink.receipts.ReceiptAttempt;
 import pl.commercelink.receipts.ReceiptAttemptService;
 import pl.commercelink.receipts.ReceiptLock;
 import pl.commercelink.rest.client.HttpClientException;
+import pl.commercelink.shipping.ShipmentCancelResult;
 import pl.commercelink.shipping.ShipmentCancelService;
+import pl.commercelink.shipping.ShipmentCancellationInProgressException;
 import pl.commercelink.shipping.ShippingUnavailableException;
 import pl.commercelink.shipping.ShipmentTrackingSubscriber;
 import pl.commercelink.shipping.api.ShippingException;
@@ -2240,16 +2243,41 @@ public class OrdersController extends BaseController {
                                  RedirectAttributes redirectAttributes, Locale locale) {
         Order order = requireOrder(ordersRepository, getStoreId(), orderId);
         // the same shipment ShipmentCancelService picks; its English errors never reach the operator
-        String refusal = order.courierShipmentToCancel().isPresent() ? null
+        Optional<Shipment> courier = order.courierShipmentToCancel();
+        String refusal = courier.isPresent()
+                ? (courier.get().isCancellationInProgress(LocalDateTime.now()) ? "order.shipments.cancel.error.pending" : null)
                 : order.firstShipmentWithShippingData().isEmpty() ? "order.shipments.cancel.error.no.data"
                 : "order.shipments.cancel.error.no.package";
         if (refusal != null) {
             return refuse(redirectAttributes, orderId, refusal, locale);
         }
         try {
-            boolean backToRealization = shipmentCancelService.cancelShipping(orderId, getStoreId());
-            String notice = messageSource.getMessage("shipment.cancel.success", null, locale);
-            OrderFlash.saved(redirectAttributes, backToRealization ? notice + " " + backToRealizationNotice(locale) : notice);
+            ShipmentCancelResult result = shipmentCancelService.cancelShipping(orderId, getStoreId());
+            switch (result.outcome()) {
+                case REQUESTED -> OrderFlash.saved(redirectAttributes,
+                        messageSource.getMessage("shipment.cancel.requested", null, locale));
+                case RECHECKING -> OrderFlash.saved(redirectAttributes,
+                        messageSource.getMessage("shipment.cancel.rechecking", null, locale));
+                case CANCELLED -> {
+                    // an immediate confirmation settles the shipments here, the step back included; after one in
+                    // the background the reloaded page shows the new status instead
+                    String notice = messageSource.getMessage("shipment.cancel.success", null, locale);
+                    OrderFlash.saved(redirectAttributes,
+                            result.backToRealization() ? notice + " " + backToRealizationNotice(locale) : notice);
+                }
+                case FAILED -> {
+                    String reasonKey = OrderLabels.cancellationReasonKey(result.error());
+                    return refuse(redirectAttributes, orderId, "shipment.cancel.failed", locale,
+                            reasonKey != null ? messageSource.getMessage(reasonKey, null, locale)
+                                    : Objects.toString(result.error(), ""));
+                }
+                case GONE -> {
+                    return refuse(redirectAttributes, orderId, "shipment.cancel.gone", locale);
+                }
+            }
+        } catch (ShipmentCancellationInProgressException e) {
+            // a concurrent request marked the cancellation between the check above and the service's fresh read
+            return refuse(redirectAttributes, orderId, "order.shipments.cancel.error.pending", locale);
         } catch (ShippingUnavailableException e) {
             // the store's carrier authorisation was lost: nothing was cancelled nor changed
             return refuse(redirectAttributes, orderId, "order.shipments.cancel.error.no.provider", locale);
@@ -2259,6 +2287,20 @@ public class OrdersController extends BaseController {
             redirectAttributes.addFlashAttribute("errorMessage", e.getMessage());
         }
         return details(orderId);
+    }
+
+    /** Whether a shipment of the order is still being cancelled; the shipments card polls it (shipment-cancellation.js). */
+    @GetMapping("/dashboard/orders/{orderId}/shipments/cancellation-state")
+    @PreAuthorize("!hasRole('SUPER_ADMIN')")
+    @ResponseBody
+    public ResponseEntity<CancellationState> shipmentCancellationState(@PathVariable String orderId) {
+        Order order = requireOrder(ordersRepository, getStoreId(), orderId);
+        LocalDateTime now = LocalDateTime.now();
+        boolean inProgress = order.getShipments().stream().anyMatch(s -> s.isCancellationInProgress(now));
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(new CancellationState(inProgress));
+    }
+
+    public record CancellationState(boolean inProgress) {
     }
 
     private String handleHttpClientException(HttpClientException ex, String orderId,
