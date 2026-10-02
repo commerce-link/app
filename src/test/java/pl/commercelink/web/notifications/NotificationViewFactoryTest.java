@@ -36,6 +36,25 @@ class NotificationViewFactoryTest {
     }
 
     @Test
+    void aRejectedDeliveryRequestLeadsTheStoreAdminToThePendingDeliveries() {
+        // given
+        StoreNotificationRecord record = record(StoreNotificationSeverity.WARNING,
+                StoreNotificationType.DELIVERY_REQUEST_REJECTED, "dd000010-0000-4000-8000-000000000010",
+                "Acme: administrator platformy odrzucił zgłoszenie dostawy dd000010");
+
+        // when
+        NotificationView admin = factory.toView(record, UserRole.ADMIN);
+        NotificationView superAdmin = factory.toView(record, UserRole.SUPER_ADMIN);
+
+        // then
+        assertThat(admin.titleKey()).isEqualTo("store.notification.type.DELIVERY_REQUEST_REJECTED");
+        assertThat(admin.actionHref()).isEqualTo("/dashboard/deliveries/preview");
+        assertThat(admin.actionKey()).isEqualTo("store.notification.action.viewPendingDeliveries");
+        assertThat(admin.warning()).isTrue();
+        assertThat(superAdmin.actionHref()).isNull();
+    }
+
+    @Test
     void turnsAnExpiredMarketplaceConnectionIntoAWarningWithAReconnectLink() {
         // given
         StoreNotificationRecord record = record(StoreNotificationSeverity.WARNING, StoreNotificationType.UNAUTHENTICATED,
