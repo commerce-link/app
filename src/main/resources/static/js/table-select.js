@@ -318,11 +318,6 @@
         table.addEventListener('change', onChange);
         if (bar) {
             bar.addEventListener('change', onChange);
-            window.addEventListener('resize', function () {
-                if (!bar.hidden) {
-                    measureHead(table, bar);
-                }
-            });
             bar.addEventListener('click', function (event) {
                 if (!event.target.closest) {
                     return;
@@ -359,6 +354,17 @@
         }
         refresh(table);
     }
+
+    // One listener for the page, not one per table: tables are set up again after every list reload, and a listener
+    // per table would keep each replaced (detached) table alive. Only the tables in the document are measured.
+    window.addEventListener('resize', function () {
+        document.querySelectorAll('table[data-cl-select-ready]').forEach(function (table) {
+            var bar = barOf(table);
+            if (bar && !bar.hidden) {
+                measureHead(table, bar);
+            }
+        });
+    });
 
     function initAll() {
         document.querySelectorAll('table[data-cl-select-table]').forEach(init);

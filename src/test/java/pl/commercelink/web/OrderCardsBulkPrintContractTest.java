@@ -146,6 +146,37 @@ class OrderCardsBulkPrintContractTest {
                 .contains("accept.textContent = (button.getAttribute(actionAttr) || accept.textContent).replace('{n}', count);");
     }
 
+    /**
+     * Tables are set up again after every list reload, so a resize listener per table would leak one per reload (each
+     * holding a detached table): there is one listener for the whole page, outside init, over the tables in the document.
+     */
+    @Test
+    void theSelectionRowsAreMeasuredOnResizeByOneListenerOutsideInit() throws Exception {
+        // given
+        String select = read(TABLE_SELECT);
+        String init = select.substring(select.indexOf("function init(table)"), select.indexOf("// One listener for the page"));
+
+        // then
+        assertThat(Pattern.compile(Pattern.quote("addEventListener('resize'")).matcher(select).results().count()).isEqualTo(1);
+        assertThat(init).doesNotContain("'resize'");
+        assertThat(folded(TABLE_SELECT)).contains("querySelectorAll('table[data-cl-select-ready]')");
+    }
+
+    /**
+     * Without JavaScript the check column is hidden, so the first visible column takes the 20 px edge padding the
+     * first-child rule would have given the check cell. Only from 720 px: card mode has its own layout.
+     */
+    @Test
+    void withoutTheScriptTheFirstVisibleColumnKeepsTheEdgeIndent() throws Exception {
+        // given
+        String css = css();
+        String wide = css.substring(css.indexOf("@media screen and (min-width: 720px) {\n    .cl-page .cl-table.is-orders:not(.is-selectable) .cl-table-check + :is(th, td)") );
+
+        // then
+        assertThat(rule(wide, ".cl-page .cl-table.is-orders:not(.is-selectable) .cl-table-check + :is(th, td)"))
+                .contains("padding-left: 20px;");
+    }
+
     /** list-page.js swaps the results block: the fresh table is set up again, a table already set up is left alone. */
     @Test
     void aSwappedListIsSetUpAgainOnlyOnce() throws Exception {
