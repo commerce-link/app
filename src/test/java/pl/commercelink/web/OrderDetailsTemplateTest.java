@@ -51,6 +51,7 @@ import pl.commercelink.web.orders.OrderLabels;
 import pl.commercelink.web.orders.OrderSettingsView;
 import pl.commercelink.web.orders.OrderPaymentForm;
 import pl.commercelink.web.orders.OrderShipmentForm;
+import pl.commercelink.web.dtos.AssignSupplierForm;
 import pl.commercelink.web.settings.SettingsTemplateRenderer;
 
 import java.time.LocalDate;
@@ -1834,13 +1835,34 @@ class OrderDetailsTemplateTest {
     }
 
     @Test
-    void theSupplierDialogTakesATypedEanAndNamesTheCounterpartyField() {
+    void theSupplierDialogAsksForNoEanUpFrontAndNamesTheCounterpartyField() {
         // when
         String html = page(render(order(OrderStatus.New), ADMIN));
 
-        // then: a product outside the taxonomy can still be assigned; the counterparty field has a real label
-        assertThat(html).contains("id=\"assign-supplier-ean\"").contains("name=\"ean\"")
+        // then
+        assertThat(html).contains("id=\"assign-supplier-dialog\"").doesNotContain("name=\"ean\"")
                 .contains(">Skrót kontrahenta w systemie fakturowym<").doesNotContain(">np. HURT-ABC<");
+    }
+
+    @Test
+    void theSupplierDialogOffersTheEanFieldOnceTheTaxonomyMissedTheCode() {
+        // given
+        AssignSupplierForm form = AssignSupplierForm.of("i1", "MFN-X", "100", "net", SupplierChoice.CUSTOM, "HURT-ABC");
+        form.setEan("5901234567890");
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("orderId", "o1");
+        variables.put("supplierForm", form);
+        variables.put("supplierError", "Tego kodu producenta nie ma w bazie produktów");
+        variables.put("suppliers", List.of());
+        variables.put("supplierEanField", true);
+
+        // when
+        String html = SettingsTemplateRenderer.render(
+                "<div th:replace=\"~{orders/details/item-dialogs :: supplierForm}\"></div>", variables);
+
+        // then: the typed value survives the refusal
+        assertThat(html).contains("id=\"assign-supplier-ean\"").contains("name=\"ean\"")
+                .contains("value=\"5901234567890\"").contains("data-cl-ean-field");
     }
 
     static Map<String, Object> subpageVariables(Order order) {

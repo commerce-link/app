@@ -241,7 +241,8 @@
                        th:value="${supplierForm?.manufacturerCode}" th:placeholder="#{inventory.product.code.placeholder}">
                 <ul class="cl-chip-list" data-cl-mfn-options></ul>
             </div>
-            <div class="cl-span-6 cl-field">
+            <!--/* only after the manufacturer code missed the taxonomy; order-item-dialogs.js drops it when the dialog reopens */-->
+            <div class="cl-span-6 cl-field" data-cl-ean-field th:if="${supplierEanField != null and supplierEanField}">
                 <label class="cl-label" for="assign-supplier-ean" th:text="#{general.ean}"></label>
                 <input class="cl-input" id="assign-supplier-ean" name="ean" type="text" inputmode="numeric" autocomplete="off"
                        pattern="\s*\d{8,14}\s*" th:value="${supplierForm?.ean}" th:title="#{product.error.ean.invalid}"

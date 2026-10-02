@@ -4969,6 +4969,7 @@ class OrdersControllerTest {
             assertThat(view).isEqualTo("orders/details/item-dialogs :: supplierForm");
             assertThat(response.getStatus()).isEqualTo(422);
             assertThat(model.get("supplierError")).isEqualTo("order.item.ean.not.found");
+            assertThat(model.get("supplierEanField")).isEqualTo(true);
             assertThat(model).containsKeys("orderId", "supplierForm", "suppliers");
             verify(orderItemsRepository, never()).save(any());
         }
@@ -4992,7 +4993,7 @@ class OrdersControllerTest {
         }
 
         @Test
-        void aTypedEanWinsOverTheTaxonomy() {
+        void aTypedEanDoesNotOverrideTheTaxonomy() {
             // given
             OrderItem item = supplierItem(1.23);
             when(taxonomyCache.findByMfn("MFN-1")).thenReturn(
@@ -5004,7 +5005,8 @@ class OrdersControllerTest {
                     new RedirectAttributesModelMap(), polish);
 
             // then
-            assertThat(item.getEan()).isEqualTo("4006381333931");
+            assertThat(item.getEan()).isEqualTo("5901234567890");
+            assertThat(item.getStatus()).isEqualTo(FulfilmentStatus.Allocation);
         }
 
         @Test
@@ -5045,11 +5047,10 @@ class OrdersControllerTest {
         }
 
         @Test
-        void aMalformedTypedEanIsRefusedEvenWhenTheTaxonomyKnowsTheProduct() {
+        void aMalformedTypedEanIsRefusedWithTheEanFieldStillShown() {
             // given
             supplierItem(1.23);
-            when(taxonomyCache.findByMfn("MFN-1")).thenReturn(
-                    new Taxonomy("5901234567890", "MFN-1", "Brand", "name", "CPU", 1, null, null, "raw"));
+            when(taxonomyCache.findByMfn("MFN-1")).thenReturn(null);
             MockHttpServletResponse response = new MockHttpServletResponse();
             ExtendedModelMap model = new ExtendedModelMap();
 
@@ -5060,6 +5061,7 @@ class OrdersControllerTest {
             // then
             assertThat(response.getStatus()).isEqualTo(422);
             assertThat(model.get("supplierError")).isEqualTo("product.error.ean.invalid");
+            assertThat(model.get("supplierEanField")).isEqualTo(true);
             verify(orderItemsRepository, never()).save(any());
         }
 
@@ -5122,6 +5124,7 @@ class OrdersControllerTest {
             assertThat(view).isEqualTo("orders/details/item-dialogs :: supplierForm");
             assertThat(response.getStatus()).isEqualTo(200);
             assertThat(model.get("supplierError")).isNull();
+            assertThat(model.get("supplierEanField")).isNull();
             assertThat(model.get("supplierRedirect")).isEqualTo("/dashboard/orders/" + ORDER_ID);
             assertThat(((OrderNotice) flashMap.get(OrderFlash.ATTRIBUTE)).text()).isEqualTo("order.item.supplier.assigned");
             verify(orderItemsRepository).save(item);

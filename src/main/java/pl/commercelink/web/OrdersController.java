@@ -1083,16 +1083,22 @@ public class OrdersController extends BaseController {
             return refuseSupplier(orderId, form, store, async, response, model, redirectAttributes,
                     messageSource.getMessage("order.item.assign.supplier.routed", null, locale));
         }
-        String typedEan = StringUtils.trimToNull(form.getEan());
-        if (typedEan != null && !typedEan.matches("\\d{8,14}")) {
-            return refuseSupplier(orderId, form, store, async, response, model, redirectAttributes,
-                    messageSource.getMessage("product.error.ean.invalid", null, locale));
-        }
-        String ean = typedEan != null ? unifyEan(typedEan) : eanOf(orderItem, form.getManufacturerCode());
-        if (Strings.isBlank(ean)) {
-            // the refusal stays in the dialog, where the EAN field takes the code the taxonomy does not know
-            return refuseSupplier(orderId, form, store, async, response, model, redirectAttributes,
-                    messageSource.getMessage("order.item.ean.not.found", null, locale));
+        // The taxonomy is the source of truth for a product's EAN; the dialog offers the EAN field only once the
+        // manufacturer code missed it, so a typed EAN never overrides a known one.
+        Taxonomy taxonomy = taxonomyCache.findByMfn(form.getManufacturerCode());
+        String ean = taxonomy != null ? StringUtils.trimToNull(taxonomy.ean()) : null;
+        if (ean == null) {
+            model.addAttribute("supplierEanField", true);
+            String typedEan = StringUtils.trimToNull(form.getEan());
+            if (typedEan != null && !typedEan.matches("\\d{8,14}")) {
+                return refuseSupplier(orderId, form, store, async, response, model, redirectAttributes,
+                        messageSource.getMessage("product.error.ean.invalid", null, locale));
+            }
+            ean = typedEan != null ? unifyEan(typedEan) : ownEan(orderItem, form.getManufacturerCode());
+            if (ean == null) {
+                return refuseSupplier(orderId, form, store, async, response, model, redirectAttributes,
+                        messageSource.getMessage("order.item.ean.not.found", null, locale));
+            }
         }
 
         // a gross price is turned net with the item's own VAT, as the old dialog did in the browser
@@ -1115,15 +1121,10 @@ public class OrdersController extends BaseController {
     }
 
     /**
-     * The EAN of a product outside the taxonomy (one typed by hand, not in PIM) is not looked up anywhere, so the one
-     * already on the item is kept - but only while the dialog names the same product code, so a stale EAN never
-     * follows the item to another product.
+     * A product outside the taxonomy (one typed by hand, not in PIM) has its EAN only on the item, so that one is kept -
+     * but only while the dialog names the same product code, so a stale EAN never follows the item to another product.
      */
-    private String eanOf(OrderItem item, String manufacturerCode) {
-        Taxonomy taxonomy = taxonomyCache.findByMfn(manufacturerCode);
-        if (taxonomy != null && StringUtils.isNotBlank(taxonomy.ean())) {
-            return taxonomy.ean();
-        }
+    private String ownEan(OrderItem item, String manufacturerCode) {
         boolean sameProduct = StringUtils.isNotBlank(manufacturerCode)
                 && Objects.equals(item.getManufacturerCode(), unifyMfn(manufacturerCode));
         return sameProduct ? StringUtils.trimToNull(item.getEan()) : null;
