@@ -1419,6 +1419,25 @@ class OrdersControllerTest {
         }
 
         @Test
+        void aRefundFromThePaymentsPageSaysRefundAndAPaymentSaysPayment() {
+            // given
+            orderWith(Payment.bankTransfer("REF-1", "Jan", 260));
+            AddPaymentForm refund = addForm("60", "", PaymentDirection.Outgoing);
+            refund.setReturnTo("/dashboard/payments?side=receivables&focus=refund");
+            AddPaymentForm payment = addForm("10", "", PaymentDirection.Incoming);
+            payment.setReturnTo("/dashboard/payments?side=receivables");
+
+            // when
+            ordersController.addPayment(ORDER_ID, refund, redirect, Locale.ENGLISH);
+            Object refundNotice = redirect.getFlashAttributes().get(PaymentsReturn.NOTICE);
+            ordersController.addPayment(ORDER_ID, payment, redirect, Locale.ENGLISH);
+
+            // then
+            assertThat(refundNotice).isEqualTo("payments.notice.order.refund");
+            assertThat(redirect.getFlashAttributes().get(PaymentsReturn.NOTICE)).isEqualTo("payments.notice.order");
+        }
+
+        @Test
         void addingAPaymentToACompletedOrderIsRefused() {
             // given
             Order order = orderWith(Payment.bankTransfer("REF-1", "Jan", 100));

@@ -1702,7 +1702,8 @@ public class OrdersController extends BaseController {
         orderLifecycle.update(existingOrder);
         if (back.isPresent()) {
             redirectAttributes.addFlashAttribute(PaymentsReturn.NOTICE,
-                    messageSource.getMessage("payments.notice.order", new Object[]{existingOrder.getShortenedOrderId()}, locale));
+                    messageSource.getMessage(direction == PaymentDirection.Outgoing ? "payments.notice.order.refund" : "payments.notice.order",
+                            new Object[]{existingOrder.getShortenedOrderId()}, locale));
             return "redirect:" + back.get();
         }
         OrderFlash.saved(redirectAttributes, messageSource.getMessage("order.payments.added", null, locale));

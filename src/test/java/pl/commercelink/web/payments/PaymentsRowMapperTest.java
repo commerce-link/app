@@ -108,7 +108,7 @@ class PaymentsRowMapperTest {
 
         // then
         assertThat(row.dueText()).isEqualTo("bez terminu");
-        assertThat(row.orderedText()).isNull();
+        assertThat(row.orderedText()).isEqualTo("zam. —");
     }
 
     @Test
@@ -160,5 +160,50 @@ class PaymentsRowMapperTest {
         assertThat(row.shipText()).isEqualTo("wysłane 29.09");
         assertThat(row.shipNote()).isEqualTo("wysłane bez zapłaty");
         assertThat(row.shipTone()).isEqualTo("is-bad");
+    }
+
+    @Test
+    void deliveredOrderShowsTheDeliveryDateNotTheShippingDate() {
+        // given
+        Order o = order(1000, OrderStatus.Delivered, PaymentSource.CashOnDelivery, 0);
+        Shipment shipment = new Shipment();
+        shipment.setShippedAt(LocalDateTime.of(2026, 9, 26, 10, 0));
+        shipment.setDeliveredAt(LocalDateTime.of(2026, 9, 28, 15, 0));
+        o.setShipments(new ArrayList<>(List.of(shipment)));
+
+        // when
+        ReceivableRow row = mapper.map(ReceivableEntry.of(o, TODAY).orElseThrow(), TODAY);
+
+        // then
+        assertThat(row.shipText()).isEqualTo("doręczone 28.09");
+        assertThat(row.shipNote()).isEqualTo("pobranie nierozliczone");
+    }
+
+    @Test
+    void deliveredOrderWithoutARecordedDeliveryDateIsNotGivenTheShippingDate() {
+        // given
+        Order o = order(1000, OrderStatus.Delivered, PaymentSource.BankTransfer, 0);
+        Shipment shipment = new Shipment();
+        shipment.setShippedAt(LocalDateTime.of(2026, 9, 26, 10, 0));
+        o.setShipments(new ArrayList<>(List.of(shipment)));
+
+        // when
+        ReceivableRow row = mapper.map(ReceivableEntry.of(o, TODAY).orElseThrow(), TODAY);
+
+        // then
+        assertThat(row.shipText()).isEqualTo("doręczone");
+    }
+
+    @Test
+    void deliveredOrderWithoutShipmentsSaysDelivered() {
+        // given
+        Order o = order(1000, OrderStatus.Delivered, PaymentSource.BankTransfer, 0);
+
+        // when
+        ReceivableRow row = mapper.map(ReceivableEntry.of(o, TODAY).orElseThrow(), TODAY);
+
+        // then
+        assertThat(row.shipText()).isEqualTo("doręczone");
+        assertThat(row.shipNote()).isEqualTo("wysłane bez zapłaty");
     }
 }

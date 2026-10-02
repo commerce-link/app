@@ -13,12 +13,14 @@ import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.MessageSource;
 import org.springframework.beans.MutablePropertyValues;
+import org.springframework.http.HttpStatus;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
 import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.BindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.WebDataBinder;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.inventory.deliveries.Allocation;
 import pl.commercelink.inventory.deliveries.AllocationKey;
@@ -77,6 +79,7 @@ import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
@@ -1870,6 +1873,62 @@ class DeliveriesControllerApprovalTest {
         // then
         assertThat(view).isEqualTo("redirect:/dashboard/payments?side=payables&focus=overdue");
         verify(redirectAttributes).addFlashAttribute(eq(PaymentsReturn.NOTICE), any());
+    }
+
+    @Test
+    void refundFromThePaymentsPageIsCalledARefund() {
+        // given: a refund from the supplier is typed negative
+        Delivery delivery = new Delivery();
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(messageSource.getMessage(eq("payments.notice.delivery.refund"), any(), eq(Locale.ENGLISH))).thenReturn("Refund saved");
+        AddPaymentForm form = new AddPaymentForm();
+        form.setBankAmount("-85");
+        form.setProcessingFee("0");
+        form.setSource(PaymentSource.BankTransfer);
+        form.setReturnTo("/dashboard/payments?focus=refund");
+
+        // when
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            deliveriesController.addPayment(DELIVERY_ID, form, redirectAttributes, Locale.ENGLISH);
+        }
+
+        // then
+        verify(redirectAttributes).addFlashAttribute(PaymentsReturn.NOTICE, "Refund saved");
+        assertThat(delivery.getPayments().get(0).getAmount()).isEqualTo(-85.0);
+    }
+
+    @Test
+    void aPaymentForAnotherStoresDeliveryIsNotFound() {
+        // given: findById is scoped to the session's store, so another store's id finds nothing
+        AddPaymentForm form = new AddPaymentForm();
+        form.setBankAmount("10");
+        form.setProcessingFee("0");
+        form.setSource(PaymentSource.BankTransfer);
+
+        // when / then
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            ResponseStatusException error = assertThrows(ResponseStatusException.class,
+                    () -> deliveriesController.addPayment(DELIVERY_ID, form, redirectAttributes, Locale.ENGLISH));
+            assertThat(error.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        }
+        verify(deliveriesRepository, never()).save(any());
+    }
+
+    @Test
+    void editingThePaymentsOfAnotherStoresDeliveryIsNotFound() {
+        // given
+        BindingResult binding = new BeanPropertyBindingResult(new Delivery(), "delivery");
+
+        // when / then
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            ResponseStatusException error = assertThrows(ResponseStatusException.class,
+                    () -> deliveriesController.updatePayments(DELIVERY_ID, new Delivery(), binding, redirectAttributes, Locale.ENGLISH));
+            assertThat(error.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        }
+        verify(deliveriesRepository, never()).save(any());
     }
 
     @Test

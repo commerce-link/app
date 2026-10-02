@@ -63,6 +63,10 @@ class PaymentSourcesPageRenderTest {
     }
 
     private static PaymentsPageModel model(PaymentSide side, boolean invoicingConnected) {
+        return model(side, invoicingConnected, PaymentsQuery.parse(new LinkedMultiValueMap<>()));
+    }
+
+    private static PaymentsPageModel model(PaymentSide side, boolean invoicingConnected, PaymentsQuery query) {
         PayableRow payable = new PayableRow("/dashboard/deliveries/d-1", "DOS-1", true, "zamowiono 1.10", "Acme",
                 "EXT-1", "15.10.2026", "za 14 dni", "is-neutral", "Nieoplacona", "is-bad", false, "brak faktury",
                 "150,00 zl", "brutto", false, false, "d-1", "150.00", pending(), "Dodaj platnosc");
@@ -70,7 +74,7 @@ class PaymentSourcesPageRenderTest {
                 "jan@example.pl", "20.10.2026", "za 19 dni", "is-neutral", "Przelew", "Do zwrotu", "is-warn",
                 "200,00 zl", "zwrot", true, true, "o-1", "200.00", pending(), "Zwroc");
         boolean payables = side == PaymentSide.PAYABLES;
-        return new PaymentsPageModel(PaymentsQuery.parse(new LinkedMultiValueMap<>()), side, List.of(tile(true)),
+        return new PaymentsPageModel(query, side, List.of(tile(true)),
                 List.of(new PaymentsPageModel.SideTab("Do zaplaty", 1, "/dashboard/payments?side=payables", payables),
                         new PaymentsPageModel.SideTab("Do otrzymania", 1, "/dashboard/payments?side=receivables", !payables)),
                 "Dostawca", "supplier", "Wszyscy", List.of(new PaymentsPageModel.Option("Acme", "Acme", 1, false)),
@@ -81,6 +85,10 @@ class PaymentSourcesPageRenderTest {
     }
 
     private String render(PaymentsPageModel page) {
+        return render(page, Map.of());
+    }
+
+    private String render(PaymentsPageModel page, Map<String, Object> flash) {
         when(factory.page(eq(STORE_ID), any(), any(), any())).thenReturn(page);
         Model model = new ConcurrentModel();
         String view;
@@ -93,6 +101,7 @@ class PaymentSourcesPageRenderTest {
         Map<String, Object> variables = new HashMap<>(model.asMap());
         variables.put("navigation", null);
         variables.put("enumI18n", new EnumLocalizerStub());
+        variables.putAll(flash);
         return SettingsTemplateRenderer.render("payments", variables);
     }
 
@@ -125,6 +134,31 @@ class PaymentSourcesPageRenderTest {
         assertThat(html).contains("data-order-id=\"o-1\"").contains("data-direction=\"Outgoing\"")
                 .contains("ZAM-1").doesNotContain("data-delivery-id=").doesNotContain("??");
         assertThat(html).contains("id=\"payments-sync-reason\"").doesNotContain("/dashboard/deliveries/syncPaymentStatuses");
+    }
+
+    @Test
+    void theSearchKeepsTheMenuChoicesAndTheOutcomeMessageIsSwappedWithTheResults() {
+        // given
+        LinkedMultiValueMap<String, String> params = new LinkedMultiValueMap<>();
+        params.add("side", "payables");
+        params.add("provider", "Acme");
+        params.add("provider", "Hurtownia Łódzka 'Ząb'");
+        PaymentsQuery query = PaymentsQuery.parse(params);
+
+        // when
+        String html = render(model(PaymentSide.PAYABLES, true, query), Map.of("paymentsNotice", "Wpłata zapisana: dostawa d-1."));
+
+        // then: a new search does not drop the supplier filter (like the deliveries list)
+        String search = html.substring(html.indexOf("class=\"cl-search-form\""), html.indexOf("id=\"payments-search\""));
+        assertThat(search).contains("name=\"provider\" value=\"Acme\"")
+                .contains("name=\"provider\" value=\"Hurtownia Łódzka &#39;Ząb&#39;\"")
+                .doesNotContain("name=\"side\"");
+        // the message is inside the block list-page.js replaces, so the next tile or filter clears it
+        int results = html.indexOf("data-cl-list-results");
+        assertThat(html.indexOf("Wpłata zapisana: dostawa d-1.")).isGreaterThan(results);
+        // fetching payments from the invoicing system cannot be sent twice
+        assertThat(html).containsPattern("action=\"/dashboard/deliveries/syncPaymentStatuses\"[^>]*data-cl-submit-once")
+                .contains("/js/submit-once.js");
     }
 
     static int occurrences(String html, String needle) {

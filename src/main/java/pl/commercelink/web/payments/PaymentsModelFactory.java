@@ -10,6 +10,7 @@ import pl.commercelink.inventory.supplier.SupplierLabelMap;
 import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrdersRepository;
+import pl.commercelink.orders.Payment;
 import pl.commercelink.orders.PaymentSource;
 import pl.commercelink.stores.IntegrationType;
 import pl.commercelink.stores.Store;
@@ -119,7 +120,8 @@ public class PaymentsModelFactory {
         Delivery d = e.delivery();
         return StringUtils.startsWithIgnoreCase(d.getDeliveryId(), q)
                 || StringUtils.containsIgnoreCase(d.getExternalDeliveryId(), q)
-                || StringUtils.containsIgnoreCase(mapper.supplierLabel(d), q);
+                || StringUtils.containsIgnoreCase(mapper.supplierLabel(d), q)
+                || hasReference(d.getPayments(), q);
     }
 
     private static boolean matches(ReceivableEntry e, String q) {
@@ -130,7 +132,13 @@ public class PaymentsModelFactory {
                 || StringUtils.containsIgnoreCase(o.getExternalOrderId(), q)
                 || StringUtils.containsIgnoreCase(OrderPageModelFactory.clientName(o), q)
                 || StringUtils.containsIgnoreCase(email, q)
-                || StringUtils.containsIgnoreCase(o.getEmail(), q);
+                || StringUtils.containsIgnoreCase(o.getEmail(), q)
+                || hasReference(o.getPayments(), q);
+    }
+
+    /** The old page listed the last payment's reference number; the transfer title is what an operator searches by. */
+    private static boolean hasReference(List<Payment> payments, String q) {
+        return payments.stream().anyMatch(p -> StringUtils.containsIgnoreCase(p.getReferenceNo(), q));
     }
 
     /** Money owed by due date (undated last), then supplier and number; refunds at the end (spec §5.1). */

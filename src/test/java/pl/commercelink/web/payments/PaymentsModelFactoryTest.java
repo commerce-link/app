@@ -214,6 +214,24 @@ class PaymentsModelFactoryTest {
     }
 
     @Test
+    void searchFindsThePaymentReferenceOnBothSides() {
+        // given
+        Delivery d = withProvider(delivery(1000, TODAY, 14), "cccc0001", "Acme");
+        Payment transfer = paid(400);
+        transfer.setReferenceNo("PRZELEW-ZS-77");
+        d.addPayment(transfer);
+        unpaid.add(d);
+        Order o = order(500, OrderStatus.New, PaymentSource.BankTransfer, 0);
+        o.getPayments().get(0).setReferenceNo("ZAM-2026-0042");
+        open.add(o);
+
+        // when / then
+        assertThat(page("q", "zs-77").payables()).extracting(PayableRow::number).containsExactly("cccc0001");
+        assertThat(page("q", "2026-0042").receivables()).hasSize(1);
+        assertThat(page("q", "2026-0042").side()).isEqualTo(PaymentSide.RECEIVABLES);
+    }
+
+    @Test
     void emptyStatesTellWhatIsMissing() {
         // when / then
         assertThat(page().emptyState().text()).isEqualTo("Wszystko rozliczone: nie ma nieopłaconych dostaw ani zamówień.");

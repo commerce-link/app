@@ -55,7 +55,7 @@ public class PaymentsRowMapper {
                 "/dashboard/deliveries/details?deliveryId=" + d.getDeliveryId(),
                 d.getShortenedDeliveryId(),
                 d.isDropship(),
-                d.getOrderedAt() == null ? null : text("payments.row.ordered", format(d.getOrderedAt().toLocalDate(), today)),
+                text("payments.row.ordered", d.getOrderedAt() == null ? "—" : format(d.getOrderedAt().toLocalDate(), today)),
                 supplierLabel(d),
                 external == null ? text("payments.row.external.none") : text("payments.row.external", external),
                 entry.due() == null ? text("payments.row.due.none") : format(entry.due(), today),
@@ -124,7 +124,7 @@ public class PaymentsRowMapper {
     private String shipText(ReceivableEntry entry, LocalDate today) {
         if (entry.shipped()) {
             if (entry.shipDate() == null) {
-                return text("payments.ship.gone");
+                return text(entry.delivered() ? "payments.ship.deliveredUndated" : "payments.ship.gone");
             }
             return text(entry.delivered() ? "payments.ship.delivered" : "payments.ship.shipped", format(entry.shipDate(), today));
         }

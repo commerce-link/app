@@ -16,7 +16,7 @@
                     <!--/* Fetching payments needs an invoicing system: without one the action stays visible, greyed out,
                            with the reason next to it (spec §6.2). */-->
                     <form th:if="${page.invoicingConnected()}" class="cl-page-action-form" method="post"
-                          th:action="@{/dashboard/deliveries/syncPaymentStatuses}">
+                          th:action="@{/dashboard/deliveries/syncPaymentStatuses}" data-cl-submit-once>
                         <button type="submit" class="cl-button cl-tooltip" th:attr="data-tooltip=#{payments.sync.help}">
                             <span class="icon is-small" aria-hidden="true"><i class="fas fa-sync-alt"></i></span>
                             <span th:text="#{payments.sync.action}"></span>
@@ -38,17 +38,19 @@
 
         <div th:replace="~{fragments/screen-intro :: panel('payments', 'fas fa-money-bill-alt')}"></div>
 
-        <div th:if="${paymentsNotice}" class="cl-alert is-ok" role="status">
-            <i class="fas fa-check-circle cl-alert-icon" aria-hidden="true"></i>
-            <p class="cl-alert-title" th:text="${paymentsNotice}"></p>
-        </div>
-        <div th:if="${paymentsError}" class="cl-alert is-bad" role="status">
-            <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
-            <p class="cl-alert-title" th:text="${paymentsError}"></p>
-        </div>
-
         <div data-cl-list-results data-cl-list-path="/dashboard/payments" data-cl-list-fragment="/dashboard/payments/fragment"
              th:fragment="results" th:with="q=${page.query()}">
+
+            <!--/* Outcome messages live in the swapped block: the fragment request carries no flash, so the message of a
+                   saved payment goes away with the next tile or filter instead of hanging over another list. */-->
+            <div th:if="${paymentsNotice}" class="cl-alert is-ok" role="status">
+                <i class="fas fa-check-circle cl-alert-icon" aria-hidden="true"></i>
+                <p class="cl-alert-title" th:text="${paymentsNotice}"></p>
+            </div>
+            <div th:if="${paymentsError}" class="cl-alert is-bad" role="status">
+                <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
+                <p class="cl-alert-title" th:text="${paymentsError}"></p>
+            </div>
 
             <!--/* The tiles count both sides and each narrows both tabs to exactly what it counts (spec §4.1). */-->
             <ul class="cl-stat-grid is-orders" th:attr="aria-label=#{payments.tiles.label}">
@@ -99,6 +101,8 @@
                             <!--/* A new search lands on the side that has results, so the form does not carry the side. */-->
                             <form method="get" th:action="@{/dashboard/payments}" class="cl-search-form" role="search" data-cl-list-form>
                                 <input type="hidden" name="focus" th:if="${q.focus() != null}" th:value="${q.focus().param()}"/>
+                                <input type="hidden" name="provider" th:each="p : ${q.providers()}" th:value="${p}"/>
+                                <input type="hidden" name="method" th:each="m : ${q.methods()}" th:value="${m.name()}"/>
                                 <label class="cl-visually-hidden" for="payments-search" th:text="#{payments.search.label}"></label>
                                 <div class="cl-search-field">
                                     <span class="cl-search-icon icon is-small" aria-hidden="true"><i class="fas fa-search"></i></span>
@@ -261,6 +265,7 @@
         loadMoneyJs=true)}"></div>
 
 <script th:src="@{/js/list-page.js}" defer></script>
+<script th:src="@{/js/submit-once.js}" defer></script>
 </div>
 
 </body>

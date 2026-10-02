@@ -3,12 +3,14 @@ package pl.commercelink.web;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.inventory.deliveries.*;
 import pl.commercelink.inventory.supplier.api.SupplierOrderOptionsContext;
@@ -143,13 +145,22 @@ public class DeliveriesController {
     @Autowired
     private SupplierLabels supplierLabels;
 
+    /** A delivery of the session's store; another store's id (or a stale one) is a 404, not an NPE further down. */
+    private Delivery requireDelivery(String deliveryId) {
+        Delivery delivery = deliveriesRepository.findById(getStoreId(), deliveryId);
+        if (delivery == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+        return delivery;
+    }
+
     @PostMapping("/dashboard/deliveries/{deliveryId}/addPayment")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String addPayment(@PathVariable String deliveryId,
                              @ModelAttribute AddPaymentForm form,
                              RedirectAttributes redirectAttributes,
                              Locale locale) {
-        Delivery delivery = deliveriesRepository.findById(getStoreId(), deliveryId);
+        Delivery delivery = requireDelivery(deliveryId);
 
         Optional<String> back = PaymentsReturn.target(form.getReturnTo());
         String redirectTarget = back.map(target -> "redirect:" + target)
@@ -157,7 +168,7 @@ public class DeliveriesController {
         // the Payments page shows its own outcome messages; the details page keeps the layout's banner
         String errorAttribute = back.isPresent() ? PaymentsReturn.ERROR : "errorMessage";
 
-        if (delivery != null && delivery.isAwaitingApproval()) {
+        if (delivery.isAwaitingApproval()) {
             redirectAttributes.addFlashAttribute(errorAttribute,
                     messageSource.getMessage("deliveries.edit.locked.awaitingApproval", null, locale));
             return redirectTarget;
@@ -192,7 +203,8 @@ public class DeliveriesController {
         deliveriesRepository.save(delivery);
         if (back.isPresent()) {
             redirectAttributes.addFlashAttribute(PaymentsReturn.NOTICE,
-                    messageSource.getMessage("payments.notice.delivery", new Object[]{delivery.getShortenedDeliveryId()}, locale));
+                    messageSource.getMessage(form.amount() < 0 ? "payments.notice.delivery.refund" : "payments.notice.delivery",
+                            new Object[]{delivery.getShortenedDeliveryId()}, locale));
         }
         return redirectTarget;
     }
@@ -216,7 +228,7 @@ public class DeliveriesController {
                     messageSource.getMessage("error.message.payment.amount.format", null, locale));
             return "redirect:/dashboard/deliveries/details?deliveryId=" + deliveryId;
         }
-        Delivery existingDelivery = deliveriesRepository.findById(getStoreId(), deliveryId);
+        Delivery existingDelivery = requireDelivery(deliveryId);
         if (existingDelivery.isAwaitingApproval()) {
             return redirectEditLocked(getStoreId(), deliveryId, redirectAttributes, locale);
         }

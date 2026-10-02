@@ -10,6 +10,7 @@ import java.util.EnumSet;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 
 /**
  * An open order whose customer still owes money or is owed a refund (spec §5.2). Urgency follows fulfilment (spec D3):
@@ -46,7 +47,8 @@ public record ReceivableEntry(Order order, double unpaid, PaymentsAmounts.Standi
         PaymentsAmounts.Standing standing = unpaid < 0 ? PaymentsAmounts.Standing.REFUND
                 : paid > PaymentsAmounts.EPSILON ? PaymentsAmounts.Standing.UNDERPAID
                 : cod ? PaymentsAmounts.Standing.COD : PaymentsAmounts.Standing.UNPAID;
-        LocalDate shipDate = shipped ? lastShipped(order) : order.getShippingDueAt();
+        LocalDate shipDate = !shipped ? order.getShippingDueAt()
+                : latest(order, delivered ? Shipment::getDeliveredAt : Shipment::getShippedAt);
         Urgency urgency = unpaid < 0 ? Urgency.NONE : urgency(cod, shipped, delivered, order.getShippingDueAt(), today);
         return Optional.of(new ReceivableEntry(order, unpaid, standing, method, urgency, shipDate, shipped, delivered));
     }
@@ -86,9 +88,10 @@ public record ReceivableEntry(Order order, double unpaid, PaymentsAmounts.Standi
         return latest == null ? null : latest.getSource();
     }
 
-    private static LocalDate lastShipped(Order order) {
+    /** "doręczone dd.MM" must not show the shipping date of a parcel whose delivery was never recorded. */
+    private static LocalDate latest(Order order, Function<Shipment, LocalDateTime> date) {
         return order.getShipments().stream()
-                .map(s -> s.getDeliveredAt() != null ? s.getDeliveredAt() : s.getShippedAt())
+                .map(date)
                 .filter(Objects::nonNull)
                 .max(Comparator.naturalOrder())
                 .map(LocalDateTime::toLocalDate)
