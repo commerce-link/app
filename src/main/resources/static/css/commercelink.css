@@ -7042,6 +7042,11 @@ a.cl-link-button:hover {
     height: auto;
 }
 
+/* A batch of order cards (orders/cards) opened as a page: the cards stand apart like separate sheets. */
+.cl-page .cl-print-card + .cl-print-card {
+    margin-top: 40px;
+}
+
 .cl-page .cl-print-section {
     padding-top: 14px;
     border-top: 1px solid var(--cl-line);
@@ -7204,10 +7209,11 @@ a.cl-link-button:hover {
         font-size: 16pt;
     }
 
-    /* The order card's QR code leaves the title row and sits in the sheet's top-right corner, beside both the title
-       and the order details, so it no longer makes the title row as tall as itself (more item rows fit on page 1).
-       The title row and the details keep 34 mm free on the right (code + gap), so no text runs under the code. */
-    .cl-page.cl-print-page .cl-page-body:has(.cl-print-qr) {
+    /* The order card's QR code leaves the title row and sits in the top-right corner of its own card (.cl-print-card:
+       the whole sheet of a single card, one card of a batch), beside both the title and the order details, so it no
+       longer makes the title row as tall as itself (more item rows fit on page 1). The title row and the details keep
+       34 mm free on the right (code + gap), so no text runs under the code. */
+    .cl-page.cl-print-page .cl-print-card:has(.cl-print-qr) {
         position: relative;
     }
 
@@ -7226,14 +7232,21 @@ a.cl-link-button:hover {
        whole width left of the code: an ordinary address stays on one line, only one longer than that width breaks.
        Title + three rows end ~32 mm down (measured in Chromium), so the first section's rule already falls ~2 mm below
        the 30 mm code and needs no min-height. */
-    .cl-page.cl-print-page .cl-page-body:has(.cl-print-qr) dl.cl-kv.cl-print-meta {
+    .cl-page.cl-print-page .cl-print-card:has(.cl-print-qr) dl.cl-kv.cl-print-meta {
         grid-template-columns: minmax(0, 1fr);
         padding-right: 34mm;
         align-content: start;
     }
 
-    .cl-page.cl-print-page .cl-page-body:has(.cl-print-qr) .cl-kv.cl-print-meta dd {
+    .cl-page.cl-print-page .cl-print-card:has(.cl-print-qr) .cl-kv.cl-print-meta dd {
         overflow-wrap: break-word;
+    }
+
+    /* A batch of cards (orders/cards): every card after the first starts on a new page. A forced break keeps the
+       margin after it, so the screen gap between the cards is dropped on paper. */
+    .cl-page.cl-print-page .cl-print-card + .cl-print-card {
+        margin-top: 0;
+        break-before: page;
     }
 
     .cl-page.cl-print-page :is(.cl-page-title, .cl-print-title, dt, dd, th, td, p, a, label, input) {

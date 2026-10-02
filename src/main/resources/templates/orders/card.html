@@ -6,119 +6,12 @@
     <title th:text="#{order.print.title.card(${print.shortId()})}"></title>
 </head>
 <body>
-<!--/* The order card: a printout for the packing table, printed on A4 straight from the order page's menu. */-->
-<div layout:fragment="content" th:with="p=${print}">
+<!--/* The order card: a printout for the packing table, printed on A4 straight from the order page's menu. The sheet is
+       orders/card-sheet, shared with the batch of cards printed from the orders list (orders/cards). */-->
+<div layout:fragment="content">
     <section class="cl-page cl-print-page">
         <div class="cl-page-body">
-            <!--/* the title and the order's QR code: the sheet is printed straight from the order page, so there is no way back or Print
-                   button to offer; the order id below still links to the order when the page is opened without JavaScript */-->
-            <div class="cl-page-header">
-                <div class="cl-page-header-row">
-                    <h1 class="cl-page-title" th:text="#{order.card.title}"></h1>
-                    <!--/* scanned with a phone in the warehouse, it opens the order (OrderLinks.scan); the SVG is drawn
-                           by QrCodeSvg from module coordinates only, so utext inserts no text anyone typed. On screen it
-                           stays right of the title; printed, it moves to the sheet's top-right corner beside the title and
-                           the order details below (commercelink.css, @media print). No caption: the order number is in
-                           those details, the label only names the code for screen readers. */-->
-                    <div class="cl-print-qr" role="img"
-                         th:attr="aria-label=#{order.card.qr.label(${p.shortId()})}" th:utext="${p.scanQrSvg()}"></div>
-                </div>
-            </div>
-
-            <article class="cl-card cl-print-sheet">
-                <dl class="cl-kv cl-print-meta">
-                    <div>
-                        <!--/* the short number the list shows; the link still carries the full order id */-->
-                        <dt th:text="#{order.print.order}"></dt>
-                        <dd><a th:href="@{${p.detailsHref()}}" th:text="${p.shortId()}"></a></dd>
-                    </div>
-                    <div>
-                        <dt th:text="#{order.print.email}"></dt>
-                        <dd th:text="${p.email() != null} ? ${p.email()} : '—'"></dd>
-                    </div>
-                    <div>
-                        <dt th:text="#{order.ordered.at}"></dt>
-                        <dd class="is-numeric" th:text="${p.orderedAt() != null} ? ${p.orderedAt()} : '—'"></dd>
-                    </div>
-                </dl>
-
-                <section class="cl-print-section" aria-labelledby="print-items-title">
-                    <h2 class="cl-print-title" id="print-items-title" th:text="#{order.print.items}"></h2>
-                    <table class="cl-table is-compact cl-print-table">
-                        <thead>
-                        <tr>
-                            <th scope="col" th:text="#{order.item.category}"></th>
-                            <th scope="col" th:text="#{order.item.name}"></th>
-                            <th scope="col" class="is-numeric" th:text="#{general.quantity}"></th>
-                            <th scope="col" th:text="#{general.manufacturer.code}"></th>
-                            <th scope="col" th:text="#{order.print.column.delivery}"></th>
-                            <th scope="col" th:text="#{order.item.comment}"></th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        <tr th:each="r : ${p.items()}">
-                            <td th:attr="data-label=#{order.item.category}" th:classappend="${r.category() == null} ? 'is-empty'" th:text="${r.category() != null} ? ${r.category()} : '—'"></td>
-                            <td th:attr="data-label=#{order.item.name}" th:text="${r.name()}"></td>
-                            <td class="is-numeric" th:attr="data-label=#{general.quantity}" th:text="${r.qty()}"></td>
-                            <td class="cl-print-code" th:attr="data-label=#{general.manufacturer.code}" th:classappend="${r.mfn() == null} ? 'is-empty'" th:text="${r.mfn() != null} ? ${r.mfn()} : '—'"></td>
-                            <td th:attr="data-label=#{order.print.column.delivery}" th:classappend="${r.delivery() == null} ? 'is-empty'" th:text="${r.delivery() != null} ? ${r.delivery()} : '—'"></td>
-                            <td class="cl-print-text" th:attr="data-label=#{order.item.comment}" th:classappend="${r.comment() == null} ? 'is-empty'" th:text="${r.comment() != null} ? ${r.comment()} : '—'"></td>
-                        </tr>
-                        </tbody>
-                    </table>
-                    <p th:if="${p.items().isEmpty()}" class="cl-print-empty" th:text="#{order.print.empty.items}"></p>
-                </section>
-
-                <section class="cl-print-section" aria-labelledby="print-comment-title">
-                    <h2 class="cl-print-title" id="print-comment-title" th:text="#{general.comment}"></h2>
-                    <p th:if="${p.comment() != null}" class="cl-print-text" th:text="${p.comment()}"></p>
-                    <p th:if="${p.comment() == null}" class="cl-print-empty" th:text="#{order.print.empty.comment}"></p>
-                </section>
-
-                <section class="cl-print-section" aria-labelledby="print-documents-title">
-                    <h2 class="cl-print-title" id="print-documents-title" th:text="#{order.documents}"></h2>
-                    <table th:if="${!p.documents().isEmpty()}" class="cl-table is-compact cl-print-table">
-                        <thead>
-                        <tr>
-                            <th scope="col" th:text="#{order.print.document.number}"></th>
-                            <th scope="col" th:text="#{order.document.type}"></th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        <!--/* a document without a number yet (generation still running) prints a dash, never "null"; no status column:
-                               every document on the order is issued, so it would always say the same */-->
-                        <tr th:each="d : ${p.documents()}">
-                            <td th:attr="data-label=#{order.print.document.number}" th:text="${d.number() != null} ? ${d.number()} : '—'"></td>
-                            <td th:attr="data-label=#{order.document.type}" th:text="${d.typeKey() != null} ? #{${d.typeKey()}} : '—'"></td>
-                        </tr>
-                        </tbody>
-                    </table>
-                    <p th:if="${p.documents().isEmpty()}" class="cl-print-empty" th:text="#{order.print.empty.documents}"></p>
-                </section>
-
-                <section class="cl-print-section" aria-labelledby="print-shipments-title">
-                    <h2 class="cl-print-title" id="print-shipments-title" th:text="#{order.card.shipments}"></h2>
-                    <table th:if="${!p.shipments().isEmpty()}" class="cl-table is-compact cl-print-table">
-                        <thead>
-                        <tr>
-                            <th scope="col" th:text="#{order.shipment.type}"></th>
-                            <th scope="col" th:text="#{order.shipment.tracking}"></th>
-                            <th scope="col" th:text="#{order.shipment.carrier}"></th>
-                            <th scope="col" th:text="#{order.shipped.at}"></th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        <tr th:each="s : ${p.shipments()}">
-                            <td th:attr="data-label=#{order.shipment.type}" th:text="${s.typeKey() != null} ? #{${s.typeKey()}} : '—'"></td>
-                            <td th:attr="data-label=#{order.shipment.tracking}" th:classappend="${s.trackingNo() == null} ? 'is-empty'" th:text="${s.trackingNo() != null} ? ${s.trackingNo()} : '—'"></td>
-                            <td th:attr="data-label=#{order.shipment.carrier}" th:classappend="${s.carrier() == null} ? 'is-empty'" th:text="${s.carrier() != null} ? ${s.carrier()} : '—'"></td>
-                            <td th:attr="data-label=#{order.shipped.at}" th:text="${s.shippedAt() != null} ? ${s.shippedAt()} : '—'"></td>
-                        </tr>
-                        </tbody>
-                    </table>
-                    <p th:if="${p.shipments().isEmpty()}" class="cl-print-empty" th:text="#{order.print.empty.shipments}"></p>
-                </section>
-            </article>
+            <div th:replace="~{orders/card-sheet :: sheet(${print}, '')}"></div>
         </div>
     </section>
 </div>
