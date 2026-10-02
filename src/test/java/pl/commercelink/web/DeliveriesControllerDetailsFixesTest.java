@@ -218,6 +218,26 @@ class DeliveriesControllerDetailsFixesTest {
     }
 
     @Test
+    void aMoveRefusedForItsPaymentsSaysSoInsteadOfFailing() {
+        // given
+        Delivery source = warehouse();
+        Delivery target = warehouse();
+        when(deliveriesRepository.findById(STORE_ID, source.getDeliveryId())).thenReturn(source);
+        when(deliveriesRepository.findById(STORE_ID, target.getDeliveryId())).thenReturn(target);
+        DeliveryAllocationsForm form = formFor(source, STORE_ID);
+        form.setTargetDeliveryId(target.getDeliveryId());
+        doThrow(new IllegalArgumentException("Delivery with multiple payments can't be merged."))
+                .when(deliveriesManager).reassignAllocations(any(), any(), any(), any(), any());
+
+        // when
+        String view = controller.mergeSelectedAllocations(form, redirectAttributes, PL);
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + source.getDeliveryId());
+        verify(redirectAttributes).addFlashAttribute("errorMessage", "deliveries.details.merge.error.payment");
+    }
+
+    @Test
     void orderedQuantityIsNotChangedWhileTheOrderIsBeingPlaced() {
         // given
         Delivery delivery = warehouse();

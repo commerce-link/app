@@ -398,13 +398,19 @@ public class DeliveriesController {
             return redirectOrderingInProgress(storeId, form.getDeliveryId(), redirectAttributes, locale);
         }
 
-        deliveriesManager.reassignAllocations(
-                storeId,
-                form.getDeliveryId(),
-                form.getTargetDeliveryId(),
-                form.getSelectedOrderAllocations(),
-                form.getSelectedWarehouseAllocations()
-        );
+        try {
+            deliveriesManager.reassignAllocations(
+                    storeId,
+                    form.getDeliveryId(),
+                    form.getTargetDeliveryId(),
+                    form.getSelectedOrderAllocations(),
+                    form.getSelectedWarehouseAllocations()
+            );
+        } catch (IllegalArgumentException e) {
+            // like a split, a move is refused only by the payment rule (Delivery.validateSplittablePayment), before any write
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    messageSource.getMessage("deliveries.details.merge.error.payment", null, locale));
+        }
         return detailsRedirect(storeId, form.getDeliveryId());
     }
 
