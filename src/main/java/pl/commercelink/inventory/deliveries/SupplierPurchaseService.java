@@ -17,6 +17,7 @@ import pl.commercelink.inventory.supplier.api.SupplierOrderLine;
 import pl.commercelink.inventory.supplier.api.SupplierOrderOption;
 import pl.commercelink.inventory.supplier.api.SupplierOrderOptionsContext;
 import pl.commercelink.inventory.supplier.api.SupplierOrderOutcomeUnknownException;
+import pl.commercelink.inventory.supplier.api.SupplierOrderRejectedException;
 import pl.commercelink.inventory.supplier.api.SupplierOrderResult;
 import pl.commercelink.inventory.supplier.api.SupplierProvider;
 import pl.commercelink.inventory.supplier.api.SupplierPurchaseRequest;
@@ -34,6 +35,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
@@ -52,6 +54,7 @@ public class SupplierPurchaseService {
     private static final String PURCHASE_RETRIED_EVENT = "DELIVERY_PURCHASE_RETRIED";
     private static final String ORDER_RECONCILED_EVENT = "DELIVERY_ORDER_RECONCILED";
     static final int MAX_SQS_ATTEMPTS = 3;
+    static final int MAX_COMPLETION_ATTEMPTS = 10;
     private static final String ORDERED_MANUALLY_EVENT = "DELIVERY_ORDERED_MANUALLY";
     static final String AWAITING_SUPPLIER_CONFIRMATION_EVENT = "DELIVERY_AWAITING_SUPPLIER_CONFIRMATION";
     static final String SUPPLIER_CONFIRMATION_TIMEOUT_EVENT = "DELIVERY_SUPPLIER_CONFIRMATION_TIMEOUT";
@@ -230,21 +233,7 @@ public class SupplierPurchaseService {
                     : getProvider(storeId, form.getProvider())
                             .placeOrder(new SupplierPurchaseRequest(delivery.getPurchaseRef(), lines,
                                     form.getDeliveryAddressId(), form.getSupplierOrderChoices()));
-            if (StringUtils.isBlank(orderResult.externalOrderId())) {
-                throw new SupplierOrderOutcomeUnknownException(
-                        "Supplier confirmed the order without an order number - check the supplier panel before ordering again");
-            }
-            applyOrderResult(form, validation, orderResult);
-            delivery.setExternalDeliveryIdProvisional(orderResult.provisional());
-            delivery.addEvent(new Event(EventType.action, ORDERED_AUTOMATICALLY_EVENT, LocalDateTime.now()));
-            deliveryCreationService.completePending(storeId, delivery, form);
-            log.info("Supplier purchase placed: store={} delivery={} provider={} ref={} externalOrderId={}",
-                    storeId, deliveryId, form.getProvider(), delivery.getPurchaseRef(),
-                    orderResult.externalOrderId());
-            if (orderResult.provisional()) {
-                orderIdRefreshEventPublisher.publish(new OrderIdRefreshEventRequest(
-                        storeId, delivery.getDeliveryId(), form.getProvider(), delivery.getPurchaseRef()));
-            }
+            finishPlacedPurchase(storeId, delivery, form, validation, orderResult);
         } catch (SupplierOrderAwaitingSupplierException e) {
             awaitSupplierConfirmation(storeId, delivery, form.getProvider(),
                     delivery.isDropship() ? dropshipOrderId : orderId, e);
@@ -259,6 +248,93 @@ public class SupplierPurchaseService {
             log.error("Supplier purchase failed: store={} delivery={} provider={} ref={}",
                     storeId, deliveryId, form.getProvider(), delivery.getPurchaseRef(), e);
         }
+    }
+
+    private void finishPlacedPurchase(String storeId, Delivery delivery, DeliveryCreationForm form,
+                                      PurchaseValidation validation, SupplierOrderResult orderResult) {
+        if (StringUtils.isBlank(orderResult.externalOrderId())) {
+            throw new SupplierOrderOutcomeUnknownException(
+                    "Supplier confirmed the order without an order number - check the supplier panel before ordering again");
+        }
+        applyOrderResult(form, validation, orderResult);
+        delivery.setExternalDeliveryIdProvisional(orderResult.provisional());
+        delivery.setAwaitingSupplierConfirmation(false);
+        delivery.addEvent(new Event(EventType.action, ORDERED_AUTOMATICALLY_EVENT, LocalDateTime.now()));
+        deliveryCreationService.completePending(storeId, delivery, form);
+        log.info("Supplier purchase placed: store={} delivery={} provider={} ref={} externalOrderId={}",
+                storeId, delivery.getDeliveryId(), form.getProvider(), delivery.getPurchaseRef(),
+                orderResult.externalOrderId());
+        if (orderResult.provisional()) {
+            orderIdRefreshEventPublisher.publish(new OrderIdRefreshEventRequest(
+                    storeId, delivery.getDeliveryId(), form.getProvider(), delivery.getPurchaseRef()));
+        }
+    }
+
+    /**
+     * Delayed follow-up of a purchase the supplier accepted but had not confirmed (SQS listener). Throws
+     * {@link SupplierConfirmationPendingException} to have the message redelivered after the visibility timeout;
+     * after {@link #MAX_COMPLETION_ATTEMPTS} the operator takes over. Availability is not a gate here: our own
+     * reservation is what lowered the supplier's stock.
+     */
+    public void completeAwaitingPurchase(SupplierPurchaseCompletionEventRequest request, int attempt) {
+        Delivery delivery = deliveriesRepository.findById(request.getStoreId(), request.getDeliveryId());
+        if (delivery == null || !delivery.isOrderDispatched() || !delivery.isAwaitingSupplierConfirmation()
+                || !Objects.equals(request.getPurchaseRef(), delivery.getPurchaseRef())) {
+            log.warn("Supplier confirmation no longer awaited - message acknowledged: store={} delivery={} ref={}",
+                    request.getStoreId(), request.getDeliveryId(), request.getPurchaseRef());
+            return;
+        }
+        String storeId = request.getStoreId();
+        DeliveryCreationForm form = rebuildForm(storeId, delivery);
+        try {
+            PurchaseValidation validation = validate(storeId, form, delivery.getPurchaseRef());
+            List<SupplierOrderLine> lines = validation.lines().stream()
+                    .map(line -> new SupplierOrderLine(line.sku(), line.ean(), line.mfn(), line.requestedQty()))
+                    .toList();
+            SupplierOrderResult result = delivery.isDropship()
+                    ? dropshipPurchaseService.completeDropshipOrder(storeId, delivery, lines, request.getOrderId())
+                    : getProvider(storeId, delivery.getProvider()).completePlacedOrder(new SupplierPurchaseRequest(
+                            delivery.getPurchaseRef(), lines, form.getDeliveryAddressId(),
+                            form.getSupplierOrderChoices()));
+            finishPlacedPurchase(storeId, delivery, form, validation, result);
+        } catch (SupplierOrderAwaitingSupplierException e) {
+            retryOrHandOver(delivery, attempt, e.externalOrderId(), e.pendingLines(), e);
+        } catch (SupplierOrderOutcomeUnknownException e) {
+            handOver(delivery, e.getMessage());
+            log.error("Supplier confirmation outcome UNKNOWN: store={} delivery={} ref={}",
+                    storeId, delivery.getDeliveryId(), delivery.getPurchaseRef(), e);
+        } catch (SupplierOrderRejectedException e) {
+            delivery.setAwaitingSupplierConfirmation(false);
+            failDelivery(delivery, e.getMessage());
+            log.error("Supplier confirmation rejected: store={} delivery={} ref={}",
+                    storeId, delivery.getDeliveryId(), delivery.getPurchaseRef(), e);
+        } catch (RuntimeException e) {
+            // A transient failure (timeout, 5xx) spends an attempt like a still-pending answer does.
+            retryOrHandOver(delivery, attempt, delivery.getExternalDeliveryId(), List.of(), e);
+        }
+    }
+
+    private void retryOrHandOver(Delivery delivery, int attempt, String externalOrderId, List<String> pendingLines,
+                                 RuntimeException cause) {
+        if (attempt < MAX_COMPLETION_ATTEMPTS) {
+            log.info("Supplier confirmation still pending: delivery={} attempt={} cause={}",
+                    delivery.getDeliveryId(), attempt, cause.getMessage());
+            throw new SupplierConfirmationPendingException(delivery.getDeliveryId(), attempt);
+        }
+        String unconfirmed = pendingLines.isEmpty() ? "" : " (" + String.join(", ", pendingLines) + ")";
+        delivery.addEvent(new Event(EventType.action, SUPPLIER_CONFIRMATION_TIMEOUT_EVENT, LocalDateTime.now()));
+        handOver(delivery, "The supplier did not confirm the reservation of order " + externalOrderId
+                + " within " + MAX_COMPLETION_ATTEMPTS + " minutes" + unconfirmed + ". The order is waiting at the"
+                + " supplier NOT realized - finish or cancel it in the supplier panel, do not order again.");
+        log.error("Supplier confirmation timed out: delivery={} externalOrderId={}", delivery.getDeliveryId(),
+                externalOrderId, cause);
+    }
+
+    /** Leaves the delivery dispatched for the operator: the order exists at the supplier, so it is never FAILED. */
+    private void handOver(Delivery delivery, String message) {
+        delivery.setAwaitingSupplierConfirmation(false);
+        delivery.setOrderErrorMessage(message);
+        deliveriesRepository.save(delivery);
     }
 
     /**

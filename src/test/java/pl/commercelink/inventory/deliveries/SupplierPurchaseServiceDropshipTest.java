@@ -256,6 +256,40 @@ class SupplierPurchaseServiceDropshipTest {
     }
 
     @Test
+    void awaitingDropshipCompletionUsesTheDropshipPathWithThePayloadOrderId() {
+        // given
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 2, 100.0);
+        Delivery delivery = pendingDropshipDelivery(form, "ref-1");
+        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_DISPATCHED);
+        delivery.setAwaitingSupplierConfirmation(true);
+        delivery.setExternalDeliveryId("ZA/IE-26/01615674");
+        delivery.setExternalDeliveryIdProvisional(true);
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(supplierProvider.checkAvailability(anyList())).thenReturn(
+                List.of(new SupplierQuote("EAN-1", "MFN-1", 0, 110.0, "PLN")));
+        when(dropshipPurchaseService.completeDropshipOrder(eq(STORE_ID), same(delivery), anyList(), eq(ORDER_ID)))
+                .thenReturn(new SupplierOrderResult("ZA/IE-26/01615674", 220.0, "PLN",
+                        List.of(new SupplierQuote("EAN-1", "MFN-1", 2, 110.0, "PLN"))));
+        when(supplierRegistry.get(PROVIDER)).thenReturn(new SupplierInfo(
+                PROVIDER, SupplierType.Distributor, 5, "PL",
+                new ShippingPolicy(new ShippingTerms(2, new ShippingCostPolicy.Free()))));
+        when(deliveryTaxResolver.resolveFor(PROVIDER)).thenReturn(1.23);
+
+        // when
+        service.completeAwaitingPurchase(
+                new SupplierPurchaseCompletionEventRequest(STORE_ID, DELIVERY_ID, "ref-1", ORDER_ID), 1);
+
+        // then
+        verify(dropshipPurchaseService).completeDropshipOrder(eq(STORE_ID), same(delivery), anyList(), eq(ORDER_ID));
+        verify(dropshipPurchaseService, never()).placeDropshipOrder(any(), any(), anyList(), any());
+        verify(supplierProvider, never()).completePlacedOrder(any());
+        verify(deliveryCreationService).completePending(eq(STORE_ID), same(delivery), any());
+        assertFalse(delivery.isAwaitingSupplierConfirmation());
+        assertFalse(delivery.isExternalDeliveryIdProvisional());
+        assertTrue(delivery.hasEvent("DELIVERY_ORDERED_AUTOMATICALLY"));
+    }
+
+    @Test
     void payloadOrderIdSkipsIndexDiscovery() throws Exception {
         // given
         connectSupplier(ConnectionMode.OWN);
