@@ -7212,7 +7212,7 @@ a.cl-link-button:hover {
         font-size: 16pt;
     }
 
-    .cl-page.cl-print-page .cl-print-qr {
+    .cl-page.cl-print-page .cl-page-header-row figure.cl-print-qr {
         width: 30mm;
     }
 
