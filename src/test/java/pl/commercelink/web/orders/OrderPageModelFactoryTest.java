@@ -20,6 +20,7 @@ import pl.commercelink.inventory.deliveries.DropshipRejection;
 import pl.commercelink.inventory.deliveries.DropshipItemLookup;
 import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.orders.BillingDetails;
+import pl.commercelink.orders.CourierCancellation;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
@@ -480,6 +481,173 @@ class OrderPageModelFactoryTest {
         assertThat(parcels.canCancelCourier()).isTrue();
         assertThat(parcels.rows()).extracting(OrderPageModel.ShipmentRow::removeReasonKey)
                 .containsExactly("order.shipments.remove.locked.courier", "order.shipments.remove.locked.courier");
+    }
+
+    @Test
+    void aCourierShipmentWhoseCancellationFailedOrIsUnconfirmedCanBeRemoved() {
+        // given: the operator settles the label in the provider's panel and drops the record
+        Order failed = order(OrderStatus.Shipping);
+        labelled(failed.getShipments().get(0), "T-1", "PKG-1");
+        failed.getShipments().get(0).setCancellation(CourierCancellation.pending("cmd-1", LocalDateTime.now().minusMinutes(2)));
+        failed.getShipments().get(0).setCancellation(failed.getShipments().get(0).getCancellation().failed());
+        Order unconfirmed = order(OrderStatus.Shipping);
+        labelled(unconfirmed.getShipments().get(0), "T-1", "PKG-1");
+        unconfirmed.getShipments().get(0).setCancellation(CourierCancellation.pending("cmd-1", LocalDateTime.now().minusMinutes(2)));
+        unconfirmed.getShipments().get(0).setCancellation(unconfirmed.getShipments().get(0).getCancellation().unconfirmed());
+
+        // when
+        OrderPageModel.ShipmentRow failedRow = factory.build(failed, List.of(), ADMIN, PL).shipments().rows().get(0);
+
+        // then
+        assertThat(OrderPageModelFactory.removeLockedKey(failed, 0)).isNull();
+        assertThat(OrderPageModelFactory.removeLockedKey(unconfirmed, 0)).isNull();
+        assertThat(failedRow.removeHref()).isNotNull();
+        assertThat(failedRow.removeReasonKey()).isNull();
+    }
+
+    @Test
+    void aCourierShipmentWithACancellationPendingStaysLocked() {
+        // given
+        Order order = order(OrderStatus.Shipping);
+        labelled(order.getShipments().get(0), "T-1", "PKG-1");
+        order.getShipments().get(0).setCancellation(CourierCancellation.pending("cmd-1", LocalDateTime.now()));
+
+        // when
+        String locked = OrderPageModelFactory.removeLockedKey(order, 0);
+
+        // then
+        assertThat(locked).isEqualTo("order.shipments.remove.error.courier");
+    }
+
+    @Test
+    void aCancellationInProgressShowsAnInfoPillGreysTheCancelActionAndAsksThePageToPoll() {
+        // given
+        Order order = order(OrderStatus.Shipping);
+        labelled(order.getShipments().get(0), "T-1", "PKG-1");
+        order.getShipments().get(0).setCancellation(CourierCancellation.pending("cmd-1", LocalDateTime.now().minusSeconds(10)));
+
+        // when
+        OrderPageModel.ShipmentsCard card = factory.build(order, List.of(), ADMIN, PL).shipments();
+        OrderPageModel.ShipmentRow row = card.rows().get(0);
+
+        // then
+        assertThat(row.cancellationKey()).isEqualTo("shipment.cancellation.pending");
+        assertThat(row.cancellationTone()).isEqualTo("is-info");
+        assertThat(card.canCancelCourier()).isTrue();
+        assertThat(card.cancelCourierLockedKey()).isEqualTo("order.shipments.cancel.locked.pending");
+        assertThat(card.cancellationPollHref())
+                .isEqualTo("/dashboard/orders/" + order.getOrderId() + "/shipments/cancellation-state");
+        assertThat(row.removeHref()).isNull();
+    }
+
+    @Test
+    void aStalePendingCancellationReadsAsUnconfirmedAndTheCancelActionRechecksIt() {
+        // given: no answer for longer than CourierCancellation.STALE
+        Order order = order(OrderStatus.Shipping);
+        labelled(order.getShipments().get(0), "T-1", "PKG-1");
+        order.getShipments().get(0).setCancellation(CourierCancellation.pending("cmd-1", LocalDateTime.now().minusMinutes(6)));
+
+        // when
+        OrderPageModel.ShipmentsCard card = factory.build(order, List.of(), ADMIN, PL).shipments();
+
+        // then
+        assertThat(card.rows().get(0).cancellationKey()).isEqualTo("shipment.cancellation.unconfirmed");
+        assertThat(card.rows().get(0).cancellationTone()).isEqualTo("is-warn");
+        assertThat(card.cancelCourierLockedKey()).isNull();
+        assertThat(card.cancellationPollHref()).isNull();
+    }
+
+    @Test
+    void anUnconfirmedCancellationShowsAWarnPillAndItsRemovalWarnsAboutTheLabel() {
+        // given
+        Order order = order(OrderStatus.Shipping);
+        labelled(order.getShipments().get(0), "T-1", "PKG-1");
+        order.getShipments().get(0).setCancellation(CourierCancellation.pending("cmd-1", LocalDateTime.now().minusMinutes(2)));
+        order.getShipments().get(0).setCancellation(order.getShipments().get(0).getCancellation().unconfirmed());
+
+        // when
+        OrderPageModel.ShipmentsCard card = factory.build(order, List.of(), ADMIN, PL).shipments();
+        OrderPageModel.ShipmentRow row = card.rows().get(0);
+
+        // then
+        assertThat(row.cancellationKey()).isEqualTo("shipment.cancellation.unconfirmed");
+        assertThat(row.cancellationTone()).isEqualTo("is-warn");
+        assertThat(card.canCancelCourier()).isTrue();
+        assertThat(card.cancelCourierLockedKey()).isNull();
+        assertThat(card.cancellationPollHref()).isNull();
+        assertThat(row.removeHref()).isNotNull();
+        assertThat(row.removeMessageKey()).isEqualTo("order.shipments.remove.confirm.message.cancellationUnresolved");
+        assertThat(OrderPageModelFactory.removeShipmentMessageKey(order, 0))
+                .isEqualTo("order.shipments.remove.confirm.message.cancellationUnresolved");
+    }
+
+    @Test
+    void aFailedCancellationShowsABadPillWithoutAReason() {
+        // given
+        Order order = order(OrderStatus.Shipping);
+        labelled(order.getShipments().get(0), "T-1", "PKG-1");
+        order.getShipments().get(0).setCancellation(CourierCancellation.pending("cmd-1", LocalDateTime.now().minusMinutes(2)));
+        order.getShipments().get(0).setCancellation(order.getShipments().get(0).getCancellation().failed());
+
+        // when
+        OrderPageModel.ShipmentsCard card = factory.build(order, List.of(), ADMIN, PL).shipments();
+        OrderPageModel.ShipmentRow row = card.rows().get(0);
+
+        // then
+        assertThat(row.cancellationKey()).isEqualTo("shipment.cancellation.failed");
+        assertThat(row.cancellationTone()).isEqualTo("is-bad");
+        assertThat(card.cancelCourierLockedKey()).isNull();
+        assertThat(row.removeMessageKey()).isEqualTo("order.shipments.remove.confirm.message.cancellationUnresolved");
+    }
+
+    @Test
+    void aShipmentWithoutACancellationHasNoPillAndTheUsualRemovalText() {
+        // given
+        Order order = order(OrderStatus.Shipping);
+        order.getShipments().get(0).setTrackingNo("T-1");
+
+        // when
+        OrderPageModel.ShipmentsCard card = factory.build(order, List.of(), ADMIN, PL).shipments();
+
+        // then
+        assertThat(card.rows().get(0).cancellationKey()).isNull();
+        assertThat(card.rows().get(0).cancellationTone()).isNull();
+        // main's text for the only shipment of a Shipping order, which its removal takes back to Realization
+        assertThat(card.rows().get(0).removeMessageKey()).isEqualTo("order.shipments.remove.confirm.message.last.realization");
+        assertThat(card.cancellationPollHref()).isNull();
+    }
+
+    @Test
+    void aReadOnlyPageShowsTheCancellationPillButDoesNotPoll() {
+        // given: the super admin page has no route to the store's polling endpoint
+        Order order = order(OrderStatus.Shipping);
+        labelled(order.getShipments().get(0), "T-1", "PKG-1");
+        order.getShipments().get(0).setCancellation(CourierCancellation.pending("cmd-1", LocalDateTime.now()));
+
+        // when
+        OrderPageModel.ShipmentsCard card = factory.build(order, List.of(),
+                new OrderPageModelFactory.Viewer(true, false, null), PL).shipments();
+
+        // then
+        assertThat(card.rows().get(0).cancellationKey()).isEqualTo("shipment.cancellation.pending");
+        assertThat(card.cancellationPollHref()).isNull();
+    }
+
+    @Test
+    void aDeliveredShipmentStaysLockedWhateverItsCancellation() {
+        // given
+        Order order = order(OrderStatus.Shipping);
+        Shipment shipment = order.getShipments().get(0);
+        labelled(shipment, "T-1", "PKG-1");
+        shipment.setCancellation(CourierCancellation.pending("cmd-1", LocalDateTime.now().minusMinutes(2)));
+        shipment.setCancellation(shipment.getCancellation().failed());
+        shipment.setDeliveredAt(LocalDateTime.now());
+
+        // when
+        String locked = OrderPageModelFactory.removeLockedKey(order, 0);
+
+        // then
+        assertThat(locked).isEqualTo("order.shipments.remove.error.shipmentDelivered");
     }
 
     @Test

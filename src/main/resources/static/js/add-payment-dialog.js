@@ -1,5 +1,6 @@
 // The "register payment" dialog (fragments/add-payment-modal.html) on the order details, Payments and Deliveries.
-// Those pages call the public functions below from their buttons; the order page opens it with data-cl-dialog-open
+// Payments opens it from a[data-cl-payment-open] links (delegated click below), Deliveries calls the public
+// functions below from its buttons; the order page opens it with data-cl-dialog-open
 // (dialog.js fires cl:dialog-open). The mode picks the fee checkboxes: "order" (autofill the difference, the amount
 // includes the fee) or "delivery" (the surplus is the fee) and the default direction. The hint under the amounts says
 // what will be booked and whether it is a full, short or over payment; its words come from the dialog's data-hint-*.
@@ -169,20 +170,55 @@
         toggleAddPaymentModal(true);
     }
 
+    // The Payments page sends the operator back to itself, with its filters, after the dialog is saved.
+    function applyTriggerOptions(btn) {
+        var field = form.querySelector('input[name="returnTo"]');
+        if (btn.dataset.returnTo) {
+            if (!field) {
+                field = document.createElement('input');
+                field.type = 'hidden';
+                field.name = 'returnTo';
+                form.appendChild(field);
+            }
+            field.value = btn.dataset.returnTo;
+        } else if (field) {
+            field.remove();
+        }
+        if (btn.dataset.direction) {
+            directionEl.value = btn.dataset.direction;
+            renderHint();
+        }
+    }
+
     function openPaymentModalForOrderFromButton(btn) {
         openPaymentModalForOrder(btn.dataset.orderId, btn.dataset.unpaid, pendingFrom(btn));
+        applyTriggerOptions(btn);
     }
 
     function openPaymentModalForDelivery(deliveryId, expectedAmount, pending) {
         setPaymentModalMode('delivery');
-        reset('/dashboard/deliveries/' + encodeURIComponent(deliveryId) + '/addPayment?redirectToPayments=true',
-            expectedAmount, pending);
+        reset('/dashboard/deliveries/' + encodeURIComponent(deliveryId) + '/addPayment', expectedAmount, pending);
         toggleAddPaymentModal(true);
     }
 
     function openPaymentModalForDeliveryFromButton(btn) {
         openPaymentModalForDelivery(btn.dataset.deliveryId, btn.dataset.unpaid, pendingFrom(btn));
+        applyTriggerOptions(btn);
     }
+
+    // Delegated, so it also works in the results block list-page.js swaps; without JS the link opens the record.
+    document.addEventListener('click', function (event) {
+        var trigger = event.target.closest('[data-cl-payment-open]');
+        if (!trigger) {
+            return;
+        }
+        event.preventDefault();
+        if (trigger.dataset.orderId) {
+            openPaymentModalForOrderFromButton(trigger);
+        } else {
+            openPaymentModalForDeliveryFromButton(trigger);
+        }
+    });
 
     bankEl.addEventListener('input', function () {
         if (autofillEl.checked) {

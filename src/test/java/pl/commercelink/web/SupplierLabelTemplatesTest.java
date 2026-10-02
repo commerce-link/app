@@ -27,7 +27,6 @@ class SupplierLabelTemplatesTest {
         assertThat(template("deliveryDetails.html")).contains("supplierLabels.of(delivery.provider)");
         // the controller takes the name from SupplierLabels (DeliveryCreateControllerTest), the pages only print it
         assertThat(template("deliveries/create/parts.html")).contains("page.supplierName()");
-        assertThat(template("payments.html")).contains("supplierLabels.of(delivery.provider)");
         // the inventory page resolves the label once per offer in InventorySearch (OfferRow#supplierLabel),
         // because a global search spans stores and has no single label map to read in the template
         assertThat(template("fragments/inventory-results.html")).contains("offer.supplierLabel()")

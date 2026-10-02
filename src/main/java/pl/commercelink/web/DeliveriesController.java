@@ -3,12 +3,14 @@ package pl.commercelink.web;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.inventory.deliveries.*;
 import pl.commercelink.inventory.supplier.api.SupplierOrderOptionsContext;
@@ -31,6 +33,8 @@ import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.dtos.AddPaymentForm;
+import pl.commercelink.web.payments.PaymentsQuery;
+import pl.commercelink.web.payments.PaymentsReturn;
 import pl.commercelink.web.dtos.DeliveryAllocationsForm;
 import pl.commercelink.web.dtos.InvoiceSyncPreview;
 import pl.commercelink.web.dtos.PickerOption;
@@ -119,21 +123,31 @@ public class DeliveriesController {
     @Autowired
     private SupplierLabels supplierLabels;
 
+    /** A delivery of the session's store; another store's id (or a stale one) is a 404, not an NPE further down. */
+    private Delivery requireDelivery(String deliveryId) {
+        Delivery delivery = deliveriesRepository.findById(getStoreId(), deliveryId);
+        if (delivery == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+        return delivery;
+    }
+
     @PostMapping("/dashboard/deliveries/{deliveryId}/addPayment")
     @PreAuthorize("!hasRole('SUPER_ADMIN')")
     public String addPayment(@PathVariable String deliveryId,
                              @ModelAttribute AddPaymentForm form,
-                             @RequestParam(required = false, defaultValue = "false") boolean redirectToPayments,
                              RedirectAttributes redirectAttributes,
                              Locale locale) {
-        Delivery delivery = deliveriesRepository.findById(getStoreId(), deliveryId);
+        Delivery delivery = requireDelivery(deliveryId);
 
-        String redirectTarget = redirectToPayments
-                ? "redirect:/dashboard/payments"
-                : "redirect:/dashboard/deliveries/details?deliveryId=" + deliveryId;
+        Optional<String> back = PaymentsReturn.target(form.getReturnTo());
+        String redirectTarget = back.map(target -> "redirect:" + target)
+                .orElse("redirect:/dashboard/deliveries/details?deliveryId=" + deliveryId);
+        // the Payments page shows its own outcome messages; the details page keeps the layout's banner
+        String errorAttribute = back.isPresent() ? PaymentsReturn.ERROR : "errorMessage";
 
-        if (delivery != null && delivery.isAwaitingApproval()) {
-            redirectAttributes.addFlashAttribute("errorMessage",
+        if (delivery.isAwaitingApproval()) {
+            redirectAttributes.addFlashAttribute(errorAttribute,
                     messageSource.getMessage("deliveries.edit.locked.awaitingApproval", null, locale));
             return redirectTarget;
         }
@@ -141,7 +155,7 @@ public class DeliveriesController {
         // a delivery keeps its sign as typed: a payout to the supplier is stored positive
         String invalid = form.validate();
         if (invalid != null) {
-            redirectAttributes.addFlashAttribute("errorMessage", messageSource.getMessage(invalid, null, locale));
+            redirectAttributes.addFlashAttribute(errorAttribute, messageSource.getMessage(invalid, null, locale));
             return redirectTarget;
         }
 
@@ -165,6 +179,11 @@ public class DeliveriesController {
 
         delivery.recomputePaid();
         deliveriesRepository.save(delivery);
+        if (back.isPresent()) {
+            redirectAttributes.addFlashAttribute(PaymentsReturn.NOTICE,
+                    messageSource.getMessage(form.amount() < 0 ? "payments.notice.delivery.refund" : "payments.notice.delivery",
+                            new Object[]{delivery.getShortenedDeliveryId()}, locale));
+        }
         return redirectTarget;
     }
 
@@ -187,7 +206,7 @@ public class DeliveriesController {
                     messageSource.getMessage("error.message.payment.amount.format", null, locale));
             return "redirect:/dashboard/deliveries/details?deliveryId=" + deliveryId;
         }
-        Delivery existingDelivery = deliveriesRepository.findById(getStoreId(), deliveryId);
+        Delivery existingDelivery = requireDelivery(deliveryId);
         if (existingDelivery.isAwaitingApproval()) {
             return redirectEditLocked(getStoreId(), deliveryId, redirectAttributes, locale);
         }
@@ -950,9 +969,25 @@ public class DeliveriesController {
 
     @PostMapping("/dashboard/deliveries/syncPaymentStatuses")
     @PreAuthorize("hasRole('ADMIN')")
-    public String syncPaymentStatuses() {
-        invoiceSynchronizationService.sync(getStoreId());
-        return "redirect:/dashboard/payments";
+    public String syncPaymentStatuses(RedirectAttributes redirectAttributes, Locale locale) {
+        InvoiceSyncResult result = invoiceSynchronizationService.sync(getStoreId());
+        if (!result.configured()) {
+            redirectAttributes.addFlashAttribute(PaymentsReturn.ERROR, messageSource.getMessage("payments.sync.notConfigured", null, locale));
+            return "redirect:" + PaymentsQuery.PATH;
+        }
+        String message = result.checked() == 0
+                ? messageSource.getMessage("payments.sync.result.none", null, locale)
+                : messageSource.getMessage("payments.sync.result",
+                        new Object[]{result.checked(), result.paidDeliveries().size(), result.unpaid()}, locale);
+        if (!result.paidDeliveries().isEmpty()) {
+            message += " " + messageSource.getMessage("payments.sync.result.paid", new Object[]{String.join(", ", result.paidDeliveries())}, locale);
+        }
+        if (!result.failedInvoices().isEmpty()) {
+            redirectAttributes.addFlashAttribute(PaymentsReturn.ERROR,
+                    messageSource.getMessage("payments.sync.result.failed", new Object[]{String.join(", ", result.failedInvoices())}, locale));
+        }
+        redirectAttributes.addFlashAttribute(PaymentsReturn.NOTICE, message);
+        return "redirect:" + PaymentsQuery.PATH;
     }
 
     @PostMapping("/dashboard/deliveries/sync/apply")

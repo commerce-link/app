@@ -13,12 +13,14 @@ import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.MessageSource;
 import org.springframework.beans.MutablePropertyValues;
+import org.springframework.http.HttpStatus;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
 import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.BindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.WebDataBinder;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.inventory.deliveries.Allocation;
 import pl.commercelink.inventory.deliveries.AllocationKey;
@@ -31,6 +33,8 @@ import pl.commercelink.inventory.deliveries.DeliveryOrderedQtyUpdateService;
 import pl.commercelink.inventory.deliveries.DeliveryReceptionService;
 import pl.commercelink.inventory.deliveries.DeliveryType;
 import pl.commercelink.inventory.deliveries.DropshipOrderLocator;
+import pl.commercelink.inventory.deliveries.InvoiceSyncResult;
+import pl.commercelink.inventory.deliveries.InvoiceSyncService;
 import pl.commercelink.inventory.deliveries.SupplierPurchaseService;
 import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
@@ -55,6 +59,7 @@ import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.stores.StoreSupplierConnection;
 import pl.commercelink.web.dtos.AddPaymentForm;
+import pl.commercelink.web.payments.PaymentsReturn;
 import pl.commercelink.web.dtos.DeliveryAllocationsForm;
 import pl.commercelink.web.dtos.RoutedOrderView;
 
@@ -66,6 +71,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
@@ -123,6 +129,9 @@ class DeliveriesControllerApprovalTest {
 
     @Mock
     private SupplierLabels supplierLabels;
+
+    @Mock
+    private InvoiceSyncService invoiceSynchronizationService;
 
     @InjectMocks
     private DeliveriesController deliveriesController;
@@ -1633,6 +1642,85 @@ class DeliveriesControllerApprovalTest {
     }
 
     @Test
+    void paymentFromThePaymentsPageGoesBackThere() {
+        // given
+        Delivery delivery = new Delivery();
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        AddPaymentForm form = new AddPaymentForm();
+        form.setBankAmount("100");
+        form.setProcessingFee("0");
+        form.setSource(PaymentSource.BankTransfer);
+        form.setReturnTo("/dashboard/payments?side=payables&focus=overdue");
+
+        // when
+        String view;
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            view = deliveriesController.addPayment(DELIVERY_ID, form, redirectAttributes, Locale.ENGLISH);
+        }
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/payments?side=payables&focus=overdue");
+        verify(redirectAttributes).addFlashAttribute(eq(PaymentsReturn.NOTICE), any());
+    }
+
+    @Test
+    void refundFromThePaymentsPageIsCalledARefund() {
+        // given: a refund from the supplier is typed negative
+        Delivery delivery = new Delivery();
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(messageSource.getMessage(eq("payments.notice.delivery.refund"), any(), eq(Locale.ENGLISH))).thenReturn("Refund saved");
+        AddPaymentForm form = new AddPaymentForm();
+        form.setBankAmount("-85");
+        form.setProcessingFee("0");
+        form.setSource(PaymentSource.BankTransfer);
+        form.setReturnTo("/dashboard/payments?focus=refund");
+
+        // when
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            deliveriesController.addPayment(DELIVERY_ID, form, redirectAttributes, Locale.ENGLISH);
+        }
+
+        // then
+        verify(redirectAttributes).addFlashAttribute(PaymentsReturn.NOTICE, "Refund saved");
+        assertThat(delivery.getPayments().get(0).getAmount()).isEqualTo(-85.0);
+    }
+
+    @Test
+    void aPaymentForAnotherStoresDeliveryIsNotFound() {
+        // given: findById is scoped to the session's store, so another store's id finds nothing
+        AddPaymentForm form = new AddPaymentForm();
+        form.setBankAmount("10");
+        form.setProcessingFee("0");
+        form.setSource(PaymentSource.BankTransfer);
+
+        // when / then
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            ResponseStatusException error = assertThrows(ResponseStatusException.class,
+                    () -> deliveriesController.addPayment(DELIVERY_ID, form, redirectAttributes, Locale.ENGLISH));
+            assertThat(error.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        }
+        verify(deliveriesRepository, never()).save(any());
+    }
+
+    @Test
+    void editingThePaymentsOfAnotherStoresDeliveryIsNotFound() {
+        // given
+        BindingResult binding = new BeanPropertyBindingResult(new Delivery(), "delivery");
+
+        // when / then
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            ResponseStatusException error = assertThrows(ResponseStatusException.class,
+                    () -> deliveriesController.updatePayments(DELIVERY_ID, new Delivery(), binding, redirectAttributes, Locale.ENGLISH));
+            assertThat(error.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        }
+        verify(deliveriesRepository, never()).save(any());
+    }
+
+    @Test
     void addPaymentToADeliveryReadsACommaAmount() {
         // given: the dialog's amounts are text, read on the server whatever the browser's language
         Delivery delivery = new Delivery();
@@ -1646,7 +1734,7 @@ class DeliveriesControllerApprovalTest {
         String view;
         try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
             security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-            view = deliveriesController.addPayment(DELIVERY_ID, form, false, redirectAttributes, Locale.ENGLISH);
+            view = deliveriesController.addPayment(DELIVERY_ID, form, redirectAttributes, Locale.ENGLISH);
         }
 
         // then: a payout to the supplier keeps its sign
@@ -1697,5 +1785,45 @@ class DeliveriesControllerApprovalTest {
         assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID);
         verify(redirectAttributes).addFlashAttribute("errorMessage", "Enter the amount as a number");
         verify(deliveriesRepository, never()).save(any());
+    }
+
+    @Test
+    void syncWithoutInvoicingSystemFlashesAnErrorOnThePaymentsPage() {
+        // given
+        when(invoiceSynchronizationService.sync(STORE_ID)).thenReturn(InvoiceSyncResult.notConfigured());
+        when(messageSource.getMessage("payments.sync.notConfigured", null, Locale.ENGLISH)).thenReturn("not configured");
+
+        // when
+        String view;
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            view = deliveriesController.syncPaymentStatuses(redirectAttributes, Locale.ENGLISH);
+        }
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/payments");
+        verify(redirectAttributes).addFlashAttribute(PaymentsReturn.ERROR, "not configured");
+    }
+
+    @Test
+    void syncWithPaidDeliveriesFlashesANoticeNamingThem() {
+        // given
+        when(invoiceSynchronizationService.sync(STORE_ID))
+                .thenReturn(new InvoiceSyncResult(true, 3, List.of("aaaa0001", "aaaa0002"), 1, List.of()));
+        when(messageSource.getMessage(eq("payments.sync.result"), any(Object[].class), eq(Locale.ENGLISH))).thenReturn("Checked 3.");
+        when(messageSource.getMessage(eq("payments.sync.result.paid"), eq(new Object[]{"aaaa0001, aaaa0002"}), eq(Locale.ENGLISH)))
+                .thenReturn("Paid: aaaa0001, aaaa0002.");
+
+        // when
+        String view;
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            view = deliveriesController.syncPaymentStatuses(redirectAttributes, Locale.ENGLISH);
+        }
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/payments");
+        verify(redirectAttributes).addFlashAttribute(PaymentsReturn.NOTICE, "Checked 3. Paid: aaaa0001, aaaa0002.");
+        verify(redirectAttributes, never()).addFlashAttribute(eq(PaymentsReturn.ERROR), any());
     }
 }

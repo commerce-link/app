@@ -113,7 +113,8 @@
 
     document.addEventListener('submit', function (event) {
         var form = event.target.closest && event.target.closest('form[data-cl-list-form]');
-        if (!form || !root.contains(form) || form.method.toLowerCase() !== 'get') { return; }
+        // the attribute, not the property: a field named "method" (the payment-method filter on Payments) shadows it
+        if (!form || !root.contains(form) || (form.getAttribute('method') || 'get').toLowerCase() !== 'get') { return; }
         event.preventDefault();
         submitSearch(form, false);
     });

@@ -4574,6 +4574,11 @@ a.cl-link-button:hover {
     background: var(--cl-accent-soft);
 }
 
+/* the hint's usual grey is 4.04:1 on the accent fill (WCAG AA wants 4.5) */
+.cl-page .cl-stat.is-link[aria-current="true"] .cl-stat-hint {
+    color: var(--cl-ink-2);
+}
+
 .cl-page .cl-stat.is-link:focus-visible {
     outline: 2px solid var(--cl-accent);
     outline-offset: 2px;
@@ -8407,5 +8412,149 @@ a.cl-link-button:hover {
 @media (prefers-reduced-motion: reduce) {
     .cl-page .cl-layout-side.is-sticky {
         scroll-behavior: auto;
+    }
+}
+
+/* Payments (spec docs/active/payments-redesign §5.3, §7) ------------------------------------------------------------ */
+
+/* The end of the toolbar's first row: the filter menu left of the search, both on the right of the tabs. */
+.cl-page .cl-table-toolbar .cl-toolbar-end {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--cl-gap-related);
+}
+
+.cl-page .cl-table-toolbar .cl-toolbar-end .cl-search-form {
+    min-width: 280px;
+}
+
+/* The results line is always visible on Payments: it carries the totals that the old page printed above each table. */
+.cl-page .cl-table-results .cl-results-amount {
+    color: var(--cl-ink);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+/* A part of a short text that may only wrap as a whole ("dostawy: 2 · zamówienia: 2" under a tile). */
+.cl-page .cl-nowrap {
+    white-space: nowrap;
+}
+
+.cl-page .cl-table.is-payments .cl-status {
+    white-space: normal;
+}
+
+.cl-page .cl-table.is-payments .cl-paid-of {
+    white-space: normal;
+}
+
+.cl-page .cl-table.is-payments .cl-table-actions .cl-link-button {
+    gap: 4px;
+}
+
+@media screen and (min-width: 720px) {
+    /* the pill wraps between its words, never inside one ("Nieopła / cone"): 11ch left no room for the dot and the
+       pill's own padding, so the column's minimum is the width of "Nieopłacone" plus both paddings */
+    .cl-page .cl-table.is-payments .cl-status {
+        overflow-wrap: normal;
+    }
+
+    /* Every column of a long list (a long surname, a six-digit amount, "pobranie nierozliczone") must fit the card at
+       the same time: the second lines may break between words. Numbers keep their non-breaking spaces, so an amount
+       still never splits, and overflow-wrap is reset so the table-sub's "anywhere" cannot cut inside one either. */
+    .cl-page .cl-table.is-payments :is(thead th, .cl-cell-date, .cl-due-note, td.is-numeric .cl-table-sub) {
+        white-space: normal;
+        overflow-wrap: normal;
+    }
+
+    /* a 19-letter surname or a company name in one word would hold the customer column wider than the card can give */
+    .cl-page .cl-table.is-payments .cl-cell-client {
+        display: block;
+        min-width: 7em;
+        overflow-wrap: anywhere;
+    }
+}
+
+@media screen and (min-width: 1024px) {
+    .cl-page .cl-table.is-payments td[data-label]:has(.cl-status) {
+        min-width: 120px;
+    }
+}
+
+/* The Metoda column follows the card, not the window: beside the open sidebar (1216 px) the card is 792 px, narrower
+   than at 1215 px (979 px), so a viewport breakpoint showed the seventh column exactly where it fits least. */
+.cl-page .cl-card:has(> .cl-table.is-payments) {
+    container-type: inline-size;
+}
+
+@media screen and (min-width: 720px) {
+    .cl-page .cl-table.is-payments .is-secondary-column {
+        display: none;
+    }
+}
+
+@container (min-width: 900px) {
+    .cl-page .cl-table.is-payments .is-secondary-column {
+        display: table-cell;
+    }
+}
+
+/* 720-1023 px: the row action and the delivery type as icons, their words kept for screen readers, so six columns fit. */
+@media screen and (min-width: 720px) and (max-width: 1023px) {
+    .cl-page .cl-table.is-payments :is(.cl-action-label, .cl-icon-label) {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+    }
+
+    .cl-page .cl-table.is-payments .cl-table-actions .cl-link-button {
+        min-width: 44px;
+        min-height: 44px;
+        justify-content: center;
+    }
+}
+
+@media screen and (max-width: 719px) {
+    .cl-page .cl-table-toolbar .cl-toolbar-end {
+        width: 100%;
+    }
+
+    .cl-page .cl-table-toolbar .cl-toolbar-end .cl-search-form {
+        flex: 1 1 100%;
+        min-width: 0;
+        order: -1;
+    }
+
+    /* phone card: "wpłacono X z Y" under the amount, the urgency note on the next line, the action as the card's
+       last line. Note and paid-of shared one grid row before and overlapped at 320-375 px. */
+    .cl-page .cl-table.is-payments .cl-paid-of {
+        grid-column: 2;
+        justify-self: end;
+        text-align: right;
+        order: 5;
+        font-size: 12.5px;
+    }
+
+    .cl-page .cl-table.is-payments .cl-due-note {
+        grid-column: 1 / -1;
+        order: 6;
+        white-space: normal;
+        overflow-wrap: normal;
+    }
+
+    /* the key cell's own second-line rule would otherwise show "zam. dd.MM" in the card (spec §5.3) */
+    .cl-page .cl-table.is-payments .cl-table-key .cl-cards-hide {
+        display: none;
+    }
+
+    .cl-page .cl-table.is-payments .cl-table-actions .cl-link-button {
+        grid-column: 1 / -1;
+        order: 8;
+        justify-self: start;
+        min-height: 44px;
     }
 }
