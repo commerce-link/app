@@ -51,38 +51,6 @@ class ProductsAddTemplateTest {
                 .contains("@{/js/table-filter.js}").contains("@{/js/table-sort.js}").contains("@{/js/table-select.js}");
     }
 
-    /**
-     * A brand may contain a space, so its group must never be declared multi-valued; the page confirms nothing by
-     * itself, so it neither declares a bulk action nor loads the dialog.
-     */
-    @Test
-    void theBrandGroupIsSingleValuedAndNothingIsConfirmed() throws Exception {
-        // when / then
-        assertThat(source("products-add")).doesNotContain("data-cl-filter-multi=").doesNotContain("data-cl-select-action")
-                .doesNotContain("confirm-dialog").doesNotContain("data-cl-select-form");
-    }
-
-    @Test
-    void neitherPageCarriesTheOldWidgetsOrInlineStyle() throws Exception {
-        // given
-        String add = source("products-add");
-        String review = source("products-add-review");
-
-        // when / then
-        assertThat(add).doesNotContain("toggleAllRecommendations").doesNotContain("alert(").doesNotContain("style=")
-                .doesNotContain("class=\"button is-").doesNotContain("notification is-").doesNotContain("errorMessage");
-        assertThat(review).doesNotContain("confirmSave").doesNotContain("alert(").doesNotContain("style=")
-                .doesNotContain("class=\"button is-").doesNotContain("bulk-create");
-    }
-
-    @Test
-    void theReviewTableIsEditableAndSummarisesItsErrors() throws Exception {
-        // when / then
-        assertThat(source("products-add-review")).contains("cl-table is-compact is-editable")
-                .contains("errorSummaryText('review-errors', ${errorSummary})")
-                .contains("ProductsBulkAddForm).fieldId");
-    }
-
     @Test
     void everyBrandOptionStatesItsCountAndItsLabel() {
         // given

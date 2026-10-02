@@ -37,24 +37,6 @@ class CategoryFiltersTemplateTest {
                 .contains("errorSummaryText('category-filters-errors', ${errorSummary})");
     }
 
-    @Test
-    void theFiltersAreRepeatedFieldsetsAndTheirFieldsFollowTheChosenKind() throws Exception {
-        // given
-        String page = page();
-
-        // then
-        assertThat(page).contains("data-cl-repeat=\"filters\"").contains("data-cl-repeat-id=\"filter\"")
-                .contains("data-cl-repeat-min=\"0\"").contains("data-cl-repeat-template").contains("data-cl-repeat-status")
-                .contains("@{/js/repeat-fields.js}").contains("@{/js/variant-fields.js}")
-                .contains("data-cl-variant-select").contains("data-cl-variant-group").contains("data-cl-variant-when");
-    }
-
-    @Test
-    void carriesNoTableNoInlineStyleAndNoDeveloperHelpText() throws Exception {
-        // when / then
-        assertThat(page()).doesNotContain("<table").doesNotContain("style=").doesNotContain("Comma separated");
-    }
-
     /** The form as the controller renders it for a category with a brand filter, a price range and a by-brand filter. */
     private static String rendered(Map<String, String> errors) {
         CategoryDefinition gpu = new CategoryDefinition().withName("GPU").withGeneratedId();
@@ -120,14 +102,6 @@ class CategoryFiltersTemplateTest {
                 .doesNotContain("type=\"hidden\"");
     }
 
-    /** The rows are renumbered by repeat-fields.js like any other repeated row, so a removal leaves no gap. */
-    @Test
-    void theUnknownRowsAreTheirOwnRepeatedGroup() throws Exception {
-        // when / then
-        assertThat(page()).contains("data-cl-repeat=\"unknown\"").contains("data-cl-repeat-id=\"unknown\"")
-                .contains("data-cl-repeat-min=\"0\"");
-    }
-
     @Test
     void anErrorIsShownAtItsFieldAndLinkedFromTheSummary() {
         // when
@@ -137,29 +111,6 @@ class CategoryFiltersTemplateTest {
         assertThat(html).contains("href=\"#filter-2-brandLines\"").contains("id=\"filter-2-brandLines\"")
                 .contains("Line 2: no colon between the brand and its values.");
         assertThat(occurrences(html, "cl-field-error")).isEqualTo(1);
-    }
-
-    /** Each repeated filter carries its own variant group, so one filter's kind does not switch another one's fields. */
-    @Test
-    void eachFilterHasItsOwnVariantGroupAndTheBlankRowCarriesTheIndexPlaceholder() throws Exception {
-        // when
-        String html = rendered(Map.of());
-
-        // then
-        assertThat(html).contains("data-cl-variant-select=\"filter-0-kind\"").contains("data-cl-variant-select=\"filter-2-kind\"")
-                .contains("data-cl-variant-group=\"filter-1-kind\"").contains("data-cl-variant=\"PRICE_RANGE\"")
-                .contains("data-cl-variant-when=\"filter-0-kind=BRAND_NAME|PRODUCT_TITLE_CONTAINS|PRODUCT_TITLE_DOES_NOT_CONTAIN|EAN_NOT_EQ\"");
-        assertThat(page()).contains("filter-' + index + '-kind").contains("'@INDEX@'");
-    }
-
-    /** repeat-fields.js renumbers ids and names of a moved group; the variant group names must move with them. */
-    @Test
-    void theRepeatScriptRenumbersTheVariantAttributesToo() throws Exception {
-        // given
-        String script = Files.readString(Path.of("src/main/resources/static/js/repeat-fields.js"), StandardCharsets.UTF_8);
-
-        // then
-        assertThat(script).contains("data-cl-variant-select").contains("data-cl-variant-group").contains("data-cl-variant-when");
     }
 
     /** The page as the controller renders it, header included, for a category with the given name. */

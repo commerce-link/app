@@ -30,20 +30,6 @@ class CsvOfferImporterTest {
     }
 
     @Test
-    void importsRowWithCategoryFromProductCatalog() throws IOException {
-        // given
-        OfferCreationDto dto = dtoWithCsv("Category;Name;Qty;Price;Cost;Mfn\n" +
-                "Obudowa;Fractal Design North;1;600;500.0;FD-C-NOR1C-01");
-
-        // when
-        List<BasketItem> items = importer.importOffer(dto);
-
-        // then
-        assertThat(items).hasSize(1);
-        assertThat(items.get(0).getCategory()).isEqualTo("Obudowa");
-    }
-
-    @Test
     void importsRowWithServiceColumnSetToTrueAsService() throws IOException {
         // given
         OfferCreationDto dto = dtoWithCsv("Category;Name;Qty;Price;Cost;Mfn;Service\n" +

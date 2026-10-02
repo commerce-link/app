@@ -1484,6 +1484,9 @@ class OrderDetailsTemplateTest {
                 .containsPattern("<button type=\"button\" class=\"cl-button\" aria-disabled=\"true\"[^>]*aria-describedby=\"add-items-reason\"")
                 .doesNotContain("data-cl-dialog-open=\"item-add-dialog\"")
                 .contains("id=\"add-items-reason\"");
+        // the add-items button stays focusable, described by its reason, and is not a natively disabled button
+        String head = html.substring(html.indexOf("id=\"pozycje\""), html.indexOf("id=\"add-items-reason\""));
+        assertThat(head).doesNotContain("disabled=\"disabled\"");
         String reason = ResourceBundle.getBundle("messages", PL).getString("order.items.action.dropship.locked");
         assertThat(html).contains(reason);
     }
@@ -1695,22 +1698,6 @@ class OrderDetailsTemplateTest {
                 + "<span>FV/2026/09/118</span>(&#8288;|\u2060)<span class=\"cl-link-icon\" aria-hidden=\"true\">"
                 + "<i\\s+class=\"fas fa-external-link-alt\"></i></span></a>");
         assertThat(occurrences(documents, "fa-external-link-alt")).isEqualTo(1);
-    }
-
-    @Test
-    void addItemGreyedUsesAriaDisabledWithItsReason() {
-        // given: an item in a dropship delivery stops adding items
-        Order order = order(OrderStatus.Assembly);
-        OrderItem dropship = inDelivery(order, "delivery-9", FulfilmentStatus.Ordered);
-
-        // when
-        String html = page(render(order, List.of(dropship), ADMIN, Set.of(dropship.getItemId())));
-
-        // then: focusable and described by its reason, like "Dodaj dokument", not a native disabled button
-        String head = html.substring(html.indexOf("id=\"pozycje\""), html.indexOf("id=\"add-items-reason\""));
-        assertThat(head).containsPattern("<button type=\"button\" class=\"cl-button\" aria-disabled=\"true\"\\s+aria-describedby=\"add-items-reason\">")
-                .doesNotContain("disabled=\"disabled\"").doesNotContain("data-cl-dialog-open=\"item-add-dialog\"");
-        assertThat(html).contains("id=\"add-items-reason\"");
     }
 
     @Test

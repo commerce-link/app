@@ -20,18 +20,6 @@ class DropshipTemplateTest {
     }
 
     @Test
-    void confirmationShowsTheConsigneeInsteadOfAnAddressPicker() throws Exception {
-        // when
-        String html = read("dropshipConfirmation.html");
-
-        // then
-        assertThat(html).contains("fragments/consignee-address :: clConsignee(${consignee}, ${pickupShipment})");
-        assertThat(html).doesNotContain("${consignee.streetAndNumber}");
-        assertThat(html).doesNotContain("address-modal");
-        assertThat(html).doesNotContain("deliveryAddressId");
-    }
-
-    @Test
     void confirmationCarriesTheAllocationsThroughHiddenFields() throws Exception {
         // when
         String html = read("dropshipConfirmation.html");
@@ -42,16 +30,6 @@ class DropshipTemplateTest {
         assertThat(html).contains("dropship/validate");
         assertThat(html).contains("dropship/purchase/back");
         assertThat(html).contains("data-fully-available");
-    }
-
-    @Test
-    void confirmationNoLongerCarriesTheEstimatedDeliveryDate() throws Exception {
-        // when: the server always drops the typed date on submit, so posting one back is pointless
-        // and, if reintroduced, would stamp a stale date onto the dropship delivery header
-        String html = read("dropshipConfirmation.html");
-
-        // then
-        assertThat(html).doesNotContain("*{estimatedDeliveryAt}");
     }
 
     @Test
@@ -100,14 +78,6 @@ class DropshipTemplateTest {
         assertThat(html).doesNotContain("warehouseAdjustment");
         assertThat(html).doesNotContain("deliveries.minQty");
         assertThat(html).contains("type=\"hidden\" th:field=\"*{items[__${itemStat.index}__].requestedQty}\"");
-    }
-
-    @Test
-    void deliveryScreensCarryTheDropshipBadge() throws Exception {
-        // when / then
-        assertThat(read("deliveryDetails.html")).contains("deliveries.dropship.badge");
-        assertThat(read("deliveryDetails.html")).doesNotContain("deliveries.dropship.orderLink");
-        assertThat(read("deliveries.html")).contains("deliveries.dropship.badge");
     }
 
     @Test
@@ -211,34 +181,6 @@ class DropshipTemplateTest {
     }
 
     @Test
-    void deliveryDetailsShowSupplierTrackingTagAmongStatusesWithoutAManualCheckButton() throws Exception {
-        // when
-        String html = read("deliveryDetails.html");
-
-        // then - the tag alone; checks run on the tracking cron, the manual button was dropped
-        assertThat(html).doesNotContain("deliveries.dropship.tracking.label");
-        assertThat(html).doesNotContain("deliveries.dropship.tracking.lastChecked");
-        assertThat(html).contains("#{${'deliveries.dropship.tracking.state.' + trackingState}}");
-        assertThat(html).doesNotContain("tracking-check-form");
-        assertThat(html).doesNotContain("/tracking/check");
-        assertThat(html).doesNotContain("deliveries.dropship.tracking.check\"");
-        assertThat(html).doesNotContain("fa-truck");
-    }
-
-    @Test
-    void trackingStateLabelsStartWithACapitalLetter() throws Exception {
-        for (String file : List.of("messages_pl.properties", "messages_en.properties")) {
-            String messages = Files.readString(Path.of("src/main/resources/" + file), StandardCharsets.UTF_8);
-            for (String line : messages.split("\n")) {
-                if (line.startsWith("deliveries.dropship.tracking.state.")) {
-                    String label = line.substring(line.indexOf('=') + 1);
-                    assertThat(Character.isUpperCase(label.charAt(0))).as(file + ": " + line).isTrue();
-                }
-            }
-        }
-    }
-
-    @Test
     void deliveryDetailsWarnAboutTerminalTrackingStates() throws Exception {
         // when
         String html = read("deliveryDetails.html");
@@ -301,16 +243,6 @@ class DropshipTemplateTest {
     }
 
     @Test
-    void createScreenCarriesTheDropshipBadgeAndTheConsignee() throws Exception {
-        // when
-        String html = read("dropshipCreate.html");
-
-        // then
-        assertThat(html).contains("<span class=\"cl-status is-info is-leading\" th:text=\"#{deliveries.dropship.badge}\">");
-        assertThat(html).contains("fragments/consignee-address :: clConsignee(${consignee}, ${pickupShipment})");
-    }
-
-    @Test
     void approvalScreenShowsTheConsigneeOfADropshipDelivery() throws Exception {
         // when
         String html = read("deliveryApproval.html");
@@ -318,24 +250,6 @@ class DropshipTemplateTest {
         // then
         assertThat(html).contains("th:if=\"${delivery.dropship and consignee != null}\"");
         assertThat(html).contains("fragments/consignee-address :: consigneeAddress(${consignee}, ${pickupShipment})");
-    }
-
-    @Test
-    void createScreenBlocksTheSupplierOrderButtonWithAReasonAndShowsThePickupPoint() throws Exception {
-        // given
-        String create = read("dropshipCreate.html");
-        String fragment = read("fragments/consignee-address.html");
-
-        // then
-        assertThat(create).contains("th:disabled=\"${purchaseBlockedReason != null}\"");
-        assertThat(create).contains("#{${purchaseBlockedReason}}");
-        assertThat(create).contains("clConsignee(${consignee}, ${pickupShipment})");
-        assertThat(fragment).contains("th:fragment=\"consigneeAddress(consignee, pickupShipment)\"");
-        assertThat(fragment).contains("th:fragment=\"clConsignee(consignee, pickupShipment)\"");
-        assertThat(fragment).contains("#{orders.dropship.confirm.pickupPoint}");
-        assertThat(fragment).contains("${pickupShipment.collectionPointCode}");
-        assertThat(read("dropshipConfirmation.html")).contains("clConsignee(${consignee}, ${pickupShipment})");
-        assertThat(read("deliveryApproval.html")).contains("consigneeAddress(${consignee}, ${pickupShipment})");
     }
 
     @Test

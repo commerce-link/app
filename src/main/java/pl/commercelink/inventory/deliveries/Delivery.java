@@ -85,10 +85,10 @@ public class Delivery {
     @DynamoDBTypeConvertedEnum
     private DeliveryType type;
 
-    // Sort key of StoreIdListKeyIndex, recomputed from the delivery on every save (DeliveryListKey); the mapper reads
+    // Sort key of StoreIdDeliveryListSortKeyIndex, recomputed from the delivery on every save (DeliveryListKey); the mapper reads
     // it through the getter, like the defaulted type above.
-    @DynamoDBAttribute(attributeName = "listKey")
-    private String listKey;
+    @DynamoDBAttribute(attributeName = "deliveryListSortKey")
+    private String deliveryListSortKey;
 
     @DynamoDBAttribute(attributeName = "shippingCost")
     private double shippingCost;
@@ -545,12 +545,12 @@ public class Delivery {
         this.type = type;
     }
 
-    public String getListKey() {
+    public String getDeliveryListSortKey() {
         return DeliveryListKey.of(this);
     }
 
-    public void setListKey(String listKey) {
-        this.listKey = listKey;
+    public void setDeliveryListSortKey(String deliveryListSortKey) {
+        this.deliveryListSortKey = deliveryListSortKey;
     }
 
     @DynamoDBIgnore

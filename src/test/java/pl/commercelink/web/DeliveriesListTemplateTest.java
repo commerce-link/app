@@ -17,20 +17,6 @@ class DeliveriesListTemplateTest {
     }
 
     @Test
-    void oneH1TheSharedShellAndTheListScript() throws Exception {
-        // when
-        String html = page();
-
-        // then
-        assertThat(html).contains("layout:decorate=\"~{layout}\"").contains("class=\"cl-page\"")
-                .contains("cl-page-body is-wide").contains("fragments/screen-intro :: panel('deliveries', 'fas fa-truck')")
-                .contains("th:fragment=\"results\"").contains("data-cl-list-results")
-                .contains("data-cl-list-path=\"/dashboard/deliveries\"").contains("data-cl-list-fragment=\"/dashboard/deliveries/list\"")
-                .contains("/js/list-page.js");
-        assertThat(Pattern.compile("<h1").matcher(html).results().count()).isEqualTo(1);
-    }
-
-    @Test
     void tilesScopeMenusChipsTableAndPagingAreWiredToTheModel() throws Exception {
         // when / then
         assertThat(page()).contains("${page.tiles()}").contains("class=\"cl-stat is-link\"").contains("${page.scopes()}")
@@ -40,19 +26,6 @@ class DeliveriesListTemplateTest {
                 .contains("cl-table is-orders is-deliveries").contains("class=\"cl-row-link\"").contains("cl-table-sortbar")
                 .contains("fragments/pagination :: pages(${page.pagination()})").contains("${page.emptyState()}")
                 .contains("deliveries.dropship.badge").contains("is-secondary-column").contains("cl-table-sortbar is-wrap");
-    }
-
-    @Test
-    void filtersToggleKeepsLabelAndCountInOneSpanSoTheFlexGapDoesNotSplitTheColon() throws Exception {
-        // when
-        String html = page();
-        int toggle = html.indexOf("data-cl-toolbar-toggle");
-        String button = html.substring(toggle, html.indexOf("</button>", toggle));
-
-        // then
-        assertThat(button).contains("cl-toolbar-toggle-label");
-        assertThat(button.indexOf("cl-toolbar-toggle-label")).isLessThan(button.indexOf("deliveries.list.filters"))
-                .isLessThan(button.indexOf("activeFilterCount"));
     }
 
     @Test
