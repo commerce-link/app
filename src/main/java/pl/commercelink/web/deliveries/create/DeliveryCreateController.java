@@ -531,6 +531,7 @@ public class DeliveryCreateController {
     private void prepare(DeliveryCreationForm form, String storeId, String provider, DeliveryScope scope) {
         form.setStoreId(storeId);
         form.setProvider(provider);
+        form.roundUnitCosts();
         supplierPurchaseService.mergeSuggestedItems(form);
         countTickedDropshipLines(form, scope);
     }

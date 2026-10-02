@@ -61,6 +61,15 @@ class DeliveryCreateScriptsContractTest {
     }
 
     @Test
+    void costFieldsTakeNoMoreThanTwoDecimals() throws Exception {
+        // when
+        String js = read("src/main/resources/static/js/delivery-items.js");
+
+        // then
+        assertThat(js).contains("limitToCents").contains("input[data-cl-unit-cost], #fulfilment-cost");
+    }
+
+    @Test
     void tickingAnOrderSourceBackRaisesTheQuantityByItsPiecesAsUntickingLoweredIt() throws Exception {
         // when
         String js = read("src/main/resources/static/js/delivery-items.js");

@@ -5,6 +5,7 @@ import pl.commercelink.inventory.deliveries.Allocation;
 import pl.commercelink.inventory.deliveries.AllocationKey;
 import pl.commercelink.inventory.deliveries.DeliveryItem;
 import pl.commercelink.invoicing.api.Price;
+import pl.commercelink.web.orders.Money;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -200,6 +201,16 @@ public class DeliveryCreationForm {
             for (SuggestedDeliveryItem postedSuggestion : posted.getSuggestedItems()) {
                 applyToSuggestedItem(postedSuggestion.getMfn(), postedSuggestion.getRequestedQty(), postedSuggestion.getUnitCost());
             }
+        }
+    }
+
+    /** Unit costs in whole grosze: the cost fields have no browser validation, so a longer fraction is rounded here. */
+    public void roundUnitCosts() {
+        if (items != null) {
+            items.forEach(item -> item.setUnitCost(Money.round(item.getUnitCost())));
+        }
+        if (suggestedItems != null) {
+            suggestedItems.forEach(suggested -> suggested.setUnitCost(Money.round(suggested.getUnitCost())));
         }
     }
 

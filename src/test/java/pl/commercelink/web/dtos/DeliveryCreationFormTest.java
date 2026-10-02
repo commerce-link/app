@@ -14,6 +14,37 @@ import static org.assertj.core.api.Assertions.assertThat;
 class DeliveryCreationFormTest {
 
     @Test
+    void unitCostsAreRoundedToWholeGrosze() {
+        // given: the cost fields have no browser validation, so the posted costs may carry any fraction
+        DeliveryCreationForm form = new DeliveryCreationForm();
+        DeliveryItem item = new DeliveryItem();
+        item.setUnitCost(10.00111);
+        form.setItems(new ArrayList<>(List.of(item)));
+        SuggestedDeliveryItem suggested = new SuggestedDeliveryItem();
+        suggested.setUnitCost(3.145);
+        form.setSuggestedItems(new ArrayList<>(List.of(suggested)));
+
+        // when
+        form.roundUnitCosts();
+
+        // then
+        assertThat(item.getUnitCost()).isEqualTo(10.0);
+        assertThat(suggested.getUnitCost()).isEqualTo(3.15);
+    }
+
+    @Test
+    void costOfTheEditProductDialogIsRoundedToWholeGrosze() {
+        // given
+        DeliveryFulfilmentUpdateForm form = new DeliveryFulfilmentUpdateForm();
+
+        // when
+        form.setUnitCost(19.996);
+
+        // then
+        assertThat(form.getUnitCost()).isEqualTo(20.0);
+    }
+
+    @Test
     void backRestoresTheUnitCostOfASuggestion() {
         // given: step 2 merged the suggestion into the items, so it comes back as an item without allocations
         DeliveryCreationForm fresh = new DeliveryCreationForm();

@@ -156,7 +156,22 @@
         }
     }
 
+    // Money has two decimals: a third one typed into a cost field is dropped as it is typed (the server rounds the rest).
+    var CENTS = /^(-?\d*\.\d{2})\d+$/;
+
+    function limitToCents(input) {
+        var match = CENTS.exec(input.value);
+        if (match) {
+            input.value = match[1];
+        }
+    }
+
     function init() {
+        document.addEventListener('input', function (event) {
+            if (event.target.matches && event.target.matches('input[data-cl-unit-cost], #fulfilment-cost')) {
+                limitToCents(event.target);
+            }
+        }, true);
         var form = document.querySelector('form[data-cl-delivery-items]');
         if (!form) {
             return;
