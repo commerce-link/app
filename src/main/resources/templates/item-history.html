@@ -7,7 +7,7 @@
     <section class="cl-page">
         <div class="cl-page-body">
             <div class="cl-stack">
-                <div class="cl-page-header">
+                <div class="cl-page-header is-in-stack">
                     <div class="cl-page-header-row">
                         <h1 class="cl-page-title" th:text="#{item.history}"></h1>
                         <th:block th:if="${page.searched()}"><form th:replace="~{item-history/parts :: searchForm(true, false)}"></form></th:block>

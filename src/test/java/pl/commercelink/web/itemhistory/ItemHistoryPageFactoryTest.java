@@ -45,7 +45,7 @@ class ItemHistoryPageFactoryTest {
     }
 
     @Test
-    void rendersAnOrderEventWithItsPillClientAndWarehouseOrigin() {
+    void rendersAnOrderEventWithItsPillAndClient() {
         // given
         OrderLine line = order("7f3a91c2-aaaa-bbbb", OrderStatus.Assembly, FulfilmentStatus.Reserved, at(9, 29));
         BillingDetails billing = new BillingDetails();
@@ -53,7 +53,6 @@ class ItemHistoryPageFactoryTest {
         billing.setSurname("Nowak");
         line.order().setBillingDetails(billing);
         line.item().setName("Samsung 980 PRO");
-        line.item().requestWarehouseItem("w-1");
         ItemHistory history = history(List.of(line), List.of(), List.of(), List.of(eventOf(line)));
 
         // when
@@ -65,7 +64,7 @@ class ItemHistoryPageFactoryTest {
         assertThat(event.recordHref()).isEqualTo("/dashboard/orders/7f3a91c2-aaaa-bbbb");
         assertThat(event.pillText()).isEqualTo("W kompletacji");
         assertThat(event.pillTone()).isEqualTo("is-info");
-        assertThat(event.facts()).isEqualTo("Klient: Anna Nowak · Z magazynu");
+        assertThat(event.facts()).isEqualTo("Klient: Anna Nowak");
         assertThat(event.at()).isEqualTo("29.09.2026, 12:00");
     }
 

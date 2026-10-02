@@ -23,7 +23,7 @@ class ItemHistoryMessagesTest {
             "item.history.now.text.reserved", "item.history.now.text.inbound", "item.history.now.text.unknown",
             "item.history.now.text.ambiguous", "item.history.record.order", "item.history.record.rma",
             "item.history.record.delivery", "item.history.record.warehouse", "item.history.fact.condition",
-            "item.history.fact.itemStatus", "item.history.fact.client", "item.history.fact.fromWarehouse",
+            "item.history.fact.itemStatus", "item.history.fact.client",
             "item.history.fact.supplier", "item.history.fact.supplierRef", "item.history.fact.expected",
             "item.history.fact.actual", "item.history.event.RMA_CREATED", "item.history.event.ORDER_PLACED",
             "item.history.event.DELIVERY_RECEIVED", "item.history.event.DELIVERY_ORDERED", "item.history.events",
@@ -37,8 +37,10 @@ class ItemHistoryMessagesTest {
         for (Locale locale : List.of(Locale.forLanguageTag("pl"), Locale.ENGLISH)) {
             ResourceBundle bundle = ResourceBundle.getBundle("messages", locale);
             assertThat(KEYS).allSatisfy(key -> assertThat(bundle.containsKey(key)).as(locale + " " + key).isTrue());
-            assertThat(bundle.containsKey("item.history.start")).isFalse();
-            assertThat(bundle.containsKey("item.history.view.detail")).isFalse();
+            for (String gone : List.of("item.history.start", "item.history.end", "item.history.view.detail",
+                    "item.history.not.found", "item.history.fact.fromWarehouse")) {
+                assertThat(bundle.containsKey(gone)).as(locale + " " + gone).isFalse();
+            }
         }
     }
 }

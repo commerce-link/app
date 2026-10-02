@@ -8184,7 +8184,7 @@ a.cl-link-button:hover {
     width: 320px;
 }
 
-.cl-page .cl-stack > .cl-page-header {
+.cl-page .cl-page-header.is-in-stack {
     margin-bottom: 0;
 }
 

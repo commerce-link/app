@@ -138,7 +138,6 @@ public class ItemHistoryPageFactory {
                 OrderItem item = e.orderLine().item();
                 String client = OrderPageModelFactory.clientName(order);
                 if (isNotBlank(client)) facts.add(t.text("item.history.fact.client", client));
-                if (item.getWarehouseItemId() != null) facts.add(t.text("item.history.fact.fromWarehouse"));
                 if (ITEM_STATUS_WORTH_SAYING.contains(item.getStatus())) facts.add(t.text("item.history.fact.itemStatus", t.text(OrderLabels.itemStatus(item.getStatus()))));
                 yield new ItemHistoryPage.Event(at, "fa-shopping-cart", title,
                         t.text("item.history.record.order", shortId(order.getOrderId())), orderHref(order.getOrderId()), order.getOrderId(),
@@ -167,7 +166,7 @@ public class ItemHistoryPageFactory {
         };
     }
 
-    static String rmaTone(RMAItemStatus status) {
+    private static String rmaTone(RMAItemStatus status) {
         if (status == null) {
             return null;
         }

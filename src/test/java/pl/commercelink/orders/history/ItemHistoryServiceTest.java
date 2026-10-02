@@ -87,7 +87,7 @@ class ItemHistoryServiceTest {
     }
 
     @Test
-    void anOrderWithoutAnyDateFallsBackToItsLastEventAndUndatedEventsGoLast() {
+    void undatedEventsGoAfterTheDatedOnes() {
         // given
         Order undated = order("o-1", OrderStatus.New, null);
         Delivery delivery = delivery("d-1", null, null);

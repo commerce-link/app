@@ -54,7 +54,9 @@ class ScanSerialNumberLookupTest {
         SerialNumberMatches matches = lookup.find("store-1", "SN-1");
 
         // then
-        assertThat(matches.isEmpty()).isTrue();
+        assertThat(matches.orderItems()).isEmpty();
+        assertThat(matches.rmaItems()).isEmpty();
+        assertThat(matches.warehouseItems()).isEmpty();
     }
 
     static OrderItem orderItem(String serials) {
