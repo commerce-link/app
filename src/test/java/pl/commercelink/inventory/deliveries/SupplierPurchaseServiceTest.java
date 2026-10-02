@@ -85,6 +85,9 @@ class SupplierPurchaseServiceTest {
             List.of(new SupplierOrderOptionChoice("fast", "Fast", null)), "fast", true));
 
     @Mock
+    private DeliveryRequestRejectionRecorder rejectionRecorder;
+
+    @Mock
     private SupplierProviderResolver supplierProviderResolver;
     @Mock
     private StoresRepository storesRepository;
@@ -1584,18 +1587,22 @@ class SupplierPurchaseServiceTest {
     }
 
     @Test
-    void rejectReleasesAllocationsAndDeletesTheDelivery() throws Exception {
+    void rejectReleasesAllocationsDeletesTheDeliveryAndRecordsTheReason() throws Exception {
         // given
         Delivery delivery = awaitingApprovalDelivery();
         when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        Delivery withAllocations = awaitingApprovalDelivery();
+        when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID)).thenReturn(withAllocations);
 
         // when
         OperationResult<String> result = service.reject(STORE_ID, DELIVERY_ID, "Cena wzrosla o 20%");
 
         // then
         assertTrue(result.isSuccess());
-        verify(deliveryCreationService).releaseAllocations(STORE_ID, delivery);
-        verify(deliveriesRepository).delete(delivery);
+        InOrder order = inOrder(deliveryCreationService, deliveriesRepository, rejectionRecorder);
+        order.verify(deliveryCreationService).releaseAllocations(STORE_ID, delivery);
+        order.verify(deliveriesRepository).delete(delivery);
+        order.verify(rejectionRecorder).record(STORE_ID, withAllocations, "Cena wzrosla o 20%");
         verify(deliveriesRepository, never()).save(delivery);
         verifyNoInteractions(supplierPurchaseEventPublisher);
     }
@@ -1615,6 +1622,7 @@ class SupplierPurchaseServiceTest {
         assertEquals("deliveries.approval.error.state", result.getMessage());
         verify(deliveryCreationService, never()).releaseAllocations(any(), any());
         verify(deliveriesRepository, never()).delete(any(Delivery.class));
+        verifyNoInteractions(rejectionRecorder);
     }
 
     @Test
@@ -1662,6 +1670,7 @@ class SupplierPurchaseServiceTest {
         assertFalse(result.isSuccess());
         assertEquals("deliveries.approval.error.state", result.getMessage());
         verifyNoInteractions(supplierPurchaseEventPublisher);
+        verifyNoInteractions(rejectionRecorder);
     }
 
     @Test

@@ -67,6 +67,7 @@ public class SupplierPurchaseService {
     private final DeliveriesQueryService deliveriesQueryService;
     private final DropshipPurchaseService dropshipPurchaseService;
     private final DropshipOrderLocator dropshipOrderLocator;
+    private final DeliveryRequestRejectionRecorder rejectionRecorder;
 
     public boolean isOrderingAvailable(String storeId, String provider) {
         try {
@@ -537,8 +538,11 @@ public class SupplierPurchaseService {
         if (delivery == null || delivery.hasBeenReceived() || !delivery.getDocuments().isEmpty()) {
             return OperationResult.failure("deliveries.approval.error.state");
         }
+        // read the allocations before they are released: they name the customer orders whose history gets the reason
+        Delivery withAllocations = deliveriesQueryService.fetchDeliveryWithAllocations(storeId, deliveryId);
         deliveryCreationService.releaseAllocations(storeId, delivery);
         deliveriesRepository.delete(delivery);
+        rejectionRecorder.record(storeId, withAllocations != null ? withAllocations : delivery, reason);
         return OperationResult.success(delivery.getDeliveryId());
     }
 
