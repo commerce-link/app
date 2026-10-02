@@ -20,6 +20,7 @@ import pl.commercelink.stores.StoresRepository;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
@@ -152,11 +153,26 @@ class DeliveryRequestRejectionRecorderTest {
         Delivery delivery = delivery(allocation("o-1", "i-1", 1, 10.0));
         doThrow(new RuntimeException("dynamo down")).when(notifications).publish(any(), any());
 
-        // when
-        recorder.record(STORE_ID, delivery, "x");
-
-        // then
+        // when / then
+        assertThatCode(() -> recorder.record(STORE_ID, delivery, "x")).doesNotThrowAnyException();
         verify(orderEvents).save(any(OrderEvent.class));
+    }
+
+    @Test
+    void aFailingSupplierLabelLookupDoesNotThrowAndPublishesNothing() {
+        // given
+        StoresRepository stores = mock(StoresRepository.class);
+        doThrow(new RuntimeException("dynamo down")).when(stores).findById(STORE_ID);
+        ResourceBundleMessageSource messages = new ResourceBundleMessageSource();
+        messages.setBasename("messages");
+        DeliveryRequestRejectionRecorder failing =
+                new DeliveryRequestRejectionRecorder(notifications, orderEvents, messages, new SupplierLabels(stores));
+        Delivery delivery = delivery(allocation("o-1", "i-1", 1, 10.0));
+
+        // when / then
+        assertThatCode(() -> failing.record(STORE_ID, delivery, "x")).doesNotThrowAnyException();
+        verify(notifications, never()).publish(any(), any());
+        verify(orderEvents, never()).save(any());
     }
 
     @Test

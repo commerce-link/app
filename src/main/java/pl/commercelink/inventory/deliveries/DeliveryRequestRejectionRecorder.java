@@ -43,23 +43,31 @@ public class DeliveryRequestRejectionRecorder {
     }
 
     public void record(String storeId, Delivery delivery, String reason) {
-        String cleanReason = normalizedReason(reason);
-        String supplier = supplierLabels.forStoreId(storeId).of(delivery.getProvider());
+        try {
+            String cleanReason = normalizedReason(reason);
+            String supplier = supplierLabels.forStoreId(storeId).of(delivery.getProvider());
+            notify(storeId, delivery, supplier, cleanReason);
+            String details = cleanReason == null ? supplier : supplier + " · " + cleanReason;
+            delivery.getAllocations().stream()
+                    .map(Allocation::getKey)
+                    .filter(Objects::nonNull)
+                    .map(AllocationKey::getOrderId)
+                    .filter(StringUtils::isNotBlank)
+                    .distinct()
+                    .forEach(orderId -> saveEvent(orderId, details));
+        } catch (RuntimeException e) {
+            log.error("Could not record the rejected delivery request {} of store {}", delivery.getDeliveryId(), storeId, e);
+        }
+    }
+
+    private void notify(String storeId, Delivery delivery, String supplier, String reason) {
         try {
             notifications.publish(storeId, new StoreNotification(StoreNotificationSeverity.WARNING,
                     StoreNotificationType.DELIVERY_REQUEST_REJECTED, delivery.getDeliveryId(),
-                    message(delivery, supplier, cleanReason)));
+                    message(delivery, supplier, reason)));
         } catch (RuntimeException e) {
             log.error("Could not notify store {} about the rejected delivery request {}", storeId, delivery.getDeliveryId(), e);
         }
-        String details = cleanReason == null ? supplier : supplier + " · " + cleanReason;
-        delivery.getAllocations().stream()
-                .map(Allocation::getKey)
-                .filter(Objects::nonNull)
-                .map(AllocationKey::getOrderId)
-                .filter(StringUtils::isNotBlank)
-                .distinct()
-                .forEach(orderId -> saveEvent(orderId, details));
     }
 
     private void saveEvent(String orderId, String details) {
