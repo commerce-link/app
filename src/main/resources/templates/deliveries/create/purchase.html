@@ -41,20 +41,7 @@
                 <th:block th:replace="~{deliveries/create/parts :: hiddenOrderData(true)}"></th:block>
                 <th:block th:replace="~{deliveries/create/parts :: hiddenItems}"></th:block>
                 <div class="cl-layout-main">
-                    <section class="cl-card" aria-labelledby="availability-title">
-                        <div class="cl-card-head">
-                            <h2 class="cl-card-title" id="availability-title" th:text="#{deliveries.create.purchase.availability}"></h2>
-                            <div class="cl-card-actions">
-                                <button type="button" class="cl-link-button" data-cl-validation-retry>
-                                    <i class="fas fa-sync-alt" aria-hidden="true"></i> <span th:text="#{deliveries.create.purchase.recheck}"></span>
-                                </button>
-                            </div>
-                        </div>
-                        <div id="validation-area" class="cl-card-section" aria-live="polite" aria-busy="true">
-                            <p class="cl-card-inset cl-loading"><span class="cl-spinner" aria-hidden="true"></span>
-                                <span th:text="#{deliveries.purchase.confirm.checking}"></span></p>
-                        </div>
-                    </section>
+                    <section th:replace="~{deliveries/create/parts :: availabilityCard}"></section>
 
                     <th:block th:if="${!requiresApproval and !page.dropship()}">
                         <section class="cl-card" aria-labelledby="address-title">
@@ -71,50 +58,13 @@
                                th:text="#{deliveries.create.purchase.address.none}"></p>
                             <th:block th:if="${!#lists.isEmpty(deliveryAddresses)}">
                                 <p class="cl-card-desc" th:text="#{deliveries.create.purchase.address.desc}"></p>
-                                <input type="hidden" id="address-required" value="true"/>
-                                <div class="cl-form-grid cl-card-grid is-last">
-                                    <div th:if="${deliveryAddresses.size() > 6}" class="cl-span-6 cl-field">
-                                        <label class="cl-label" for="address-filter" th:text="#{deliveries.create.purchase.address.filter}"></label>
-                                        <input class="cl-input" id="address-filter" type="search" autocomplete="off"
-                                               th:placeholder="#{deliveries.create.purchase.address.filter.placeholder}"/>
-                                    </div>
-                                    <fieldset class="cl-span-6 cl-choice-group is-scroll" aria-labelledby="address-title">
-                                        <label class="cl-choice" data-cl-address th:each="address : ${deliveryAddresses}"
-                                               th:with="title=${#strings.isEmpty(address.addressLine()) ? address.id() : address.addressLine()},
-                                                        place=${#strings.trim((address.postalCode() ?: '') + ' ' + (address.city() ?: ''))},
-                                                        line=${#strings.isEmpty(address.country()) ? place : (#strings.isEmpty(place) ? address.country() : place + ', ' + address.country())}">
-                                            <input type="radio" name="deliveryAddressId" th:value="${address.id()}"
-                                                   th:checked="${form.deliveryAddressId != null and form.deliveryAddressId == address.id()}"/>
-                                            <span class="cl-choice-text">
-                                                <span class="cl-choice-title" th:text="${title}"></span>
-                                                <span class="cl-choice-description" th:if="${!#strings.isEmpty(line)}" th:text="${line}"></span>
-                                            </span>
-                                        </label>
-                                    </fieldset>
-                                </div>
+                                <th:block th:replace="~{deliveries/create/parts :: addressChoices(${deliveryAddresses}, ${form.deliveryAddressId}, null)}"></th:block>
                             </th:block>
                         </section>
                     </th:block>
 
                     <th:block th:if="${!requiresApproval and orderOptions != null and !orderOptions.isEmpty()}">
-                        <section class="cl-card" aria-labelledby="options-title">
-                            <div class="cl-card-head"><h2 class="cl-card-title" id="options-title" th:text="#{deliveries.create.purchase.options.title}"></h2></div>
-                            <div class="cl-form-grid cl-card-grid is-last">
-                                <div class="cl-span-3 cl-field" th:each="option, optionStat : ${orderOptions}">
-                                    <label class="cl-label" th:for="|order-option-${optionStat.index}|" th:text="${option.label()}"></label>
-                                    <select class="cl-select" th:id="|order-option-${optionStat.index}|"
-                                            th:name="'supplierOrderChoices[' + ${option.key()} + ']'"
-                                            th:attr="data-order-option=${option.key()},data-required=${option.required()}"
-                                            th:required="${option.required()}">
-                                        <option th:if="${selectedOptions == null or selectedOptions[option.key()] == null}" value=""
-                                                th:text="#{deliveries.options.choose}"></option>
-                                        <option th:each="choice : ${option.choices()}" th:value="${choice.value()}"
-                                                th:text="${choice.hint() != null} ? ${choice.label() + ' — ' + choice.hint()} : ${choice.label()}"
-                                                th:selected="${selectedOptions != null and choice.value() == selectedOptions[option.key()]}"></option>
-                                    </select>
-                                </div>
-                            </div>
-                        </section>
+                        <section th:replace="~{deliveries/create/parts :: optionsCard(${orderOptions}, ${selectedOptions})}"></section>
                     </th:block>
 
                 </div>
@@ -152,19 +102,7 @@
                 </aside>
             </form>
 
-            <template id="validation-spinner-template">
-                <p class="cl-card-inset cl-loading"><span class="cl-spinner" aria-hidden="true"></span>
-                    <span th:text="#{deliveries.purchase.confirm.checking}"></span></p>
-            </template>
-            <template id="validation-error-template">
-                <div class="cl-card-inset">
-                    <div class="cl-alert is-bad">
-                        <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
-                        <p class="cl-alert-text"><span th:text="#{deliveries.purchase.confirm.checkFailed}"></span>
-                            <button type="button" class="cl-link-button" data-cl-validation-retry th:text="#{deliveries.purchase.confirm.retry}"></button></p>
-                    </div>
-                </div>
-            </template>
+            <th:block th:replace="~{deliveries/create/parts :: validationTemplates}"></th:block>
         </div>
     </section>
     <script th:src="@{/js/delivery-purchase.js}" defer></script>
@@ -184,7 +122,10 @@
         <div th:if="${!validation.fullyAvailable()}" class="cl-card-inset">
             <div class="cl-alert is-warn">
                 <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
-                <p class="cl-alert-text"><span th:text="#{deliveries.create.purchase.unavailable}"></span>
+                <p class="cl-alert-text" th:if="${validationMode == 'approval'}"><span th:text="#{deliveries.approval.unavailable}"></span>
+                    <a href="?open=reject" data-cl-dialog-open="reject-dialog" th:text="#{deliveries.approval.unavailable.reject}"></a>
+                    <span th:text="#{deliveries.approval.unavailable.after}"></span></p>
+                <p class="cl-alert-text" th:unless="${validationMode == 'approval'}"><span th:text="#{deliveries.create.purchase.unavailable}"></span>
                     <button type="button" class="cl-link-button" data-cl-back-submit="back-submit"
                             th:text="#{deliveries.create.back}"></button>
                     <span th:text="${page.dropship()} ? #{deliveries.create.purchase.unavailable.after.dropship} : #{deliveries.create.purchase.unavailable.after}"></span></p>
