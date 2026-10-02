@@ -32,18 +32,14 @@ import pl.commercelink.web.orders.OrderLabels;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
-import pl.commercelink.warehouse.RestockSuggestionService;
 import pl.commercelink.web.dtos.AddPaymentForm;
 import pl.commercelink.web.payments.PaymentsQuery;
 import pl.commercelink.web.payments.PaymentsReturn;
 import pl.commercelink.web.dtos.DeliveryAllocationsForm;
-import pl.commercelink.web.dtos.DeliveryCreationForm;
-import pl.commercelink.web.dtos.DeliveryFulfilmentUpdateForm;
 import pl.commercelink.web.dtos.InvoiceSyncPreview;
 import pl.commercelink.web.dtos.PickerOption;
 import pl.commercelink.web.dtos.RoutedOrderView;
 import pl.commercelink.web.dtos.RoutedSupplierView;
-import pl.commercelink.web.dtos.SuggestedDeliveryItem;
 import pl.commercelink.web.dtos.SupplierOrderChoicesParams;
 import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
@@ -55,13 +51,10 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.springframework.context.MessageSource;
 
-import static pl.commercelink.inventory.deliveries.DeliveryItem.groupAndUnify;
 import static pl.commercelink.starter.security.CustomSecurityContext.getStoreId;
 
 @Controller
@@ -83,19 +76,7 @@ public class DeliveriesController {
     private DeliveriesQueryService deliveriesQueryService;
 
     @Autowired
-    private DeliveriesPlanningService deliveriesPlanningService;
-
-    @Autowired
-    private DeliveryCreationService deliveryCreationService;
-
-    @Autowired
-    private DeliveryFulfilmentUpdateService deliveryFulfilmentUpdateService;
-
-    @Autowired
     private DeliveryOrderedQtyUpdateService deliveryOrderedQtyUpdateService;
-
-    @Autowired
-    private RestockSuggestionService restockSuggestionService;
 
     @Autowired
     private DeliveryReceptionService deliveryReceptionService;
@@ -114,9 +95,6 @@ public class DeliveriesController {
 
     @Autowired
     private SupplierRegistry supplierRegistry;
-
-    @Autowired
-    private DeliveryTaxResolver deliveryTaxResolver;
 
     @Autowired
     private MessageSource messageSource;
@@ -476,305 +454,6 @@ public class DeliveriesController {
         return "redirect:/dashboard/deliveries";
     }
 
-    @GetMapping("/dashboard/deliveries/create/{provider}")
-    @PreAuthorize("hasRole('ADMIN')")
-    public String createDeliveryForm(@PathVariable("provider") String provider, Model model) {
-        return showCreateDeliveryForm(getStoreId(), provider, model);
-    }
-
-    @GetMapping("/dashboard/store/{storeId}/deliveries/create/{provider}")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public String createDeliveryFormForSuperAdmin(
-            @PathVariable("storeId") String storeId,
-            @PathVariable("provider") String provider,
-            Model model) {
-        return showCreateDeliveryForm(storeId, provider, model);
-    }
-
-    private String showCreateDeliveryForm(String storeId, String provider, Model model) {
-        return showCreateDeliveryForm(storeId, provider, model, null);
-    }
-
-    private String backToCreateDeliveryForm(String storeId, String provider, DeliveryCreationForm posted, Model model) {
-        return showCreateDeliveryForm(storeId, provider, model, posted);
-    }
-
-    private String showCreateDeliveryForm(String storeId, String provider, Model model, DeliveryCreationForm posted) {
-        var delivery = deliveriesPlanningService.run(storeId, provider);
-
-        if (delivery == null) {
-            return isSuperAdmin()
-                    ? "redirect:/dashboard/store/" + storeId + "/deliveries/preview"
-                    : "redirect:/dashboard/deliveries/preview";
-        }
-
-        DeliveryCreationForm form = buildDeliveryCreationForm(storeId, provider, delivery);
-        if (posted != null) {
-            form.applyUserSelections(posted);
-        }
-
-        model.addAttribute("form", form);
-        model.addAttribute("delivery", delivery);
-        model.addAttribute("isSuperAdmin", isSuperAdmin());
-        model.addAttribute("purchaseAvailable", supplierPurchaseService.isOrderingAvailable(storeId, provider));
-        model.addAttribute("supplierLabels", supplierLabels.forStoreId(storeId));
-
-        return "deliveryCreate";
-    }
-
-    private DeliveryCreationForm buildDeliveryCreationForm(String storeId, String provider, Delivery delivery) {
-        DeliveryCreationForm form = new DeliveryCreationForm();
-        form.setStoreId(storeId);
-        form.setProvider(provider);
-        form.setItems(groupAndUnify(delivery.getAllocations()));
-        form.setTax(deliveryTaxResolver.resolveFor(provider));
-
-        for (DeliveryItem item : form.getItems()) {
-            for (Allocation allocation : item.getAllocations()) {
-                allocation.setSelected(true);
-            }
-        }
-
-        Set<String> existingMfns = delivery.getAllocations().stream()
-                .map(Allocation::getMfn)
-                .filter(Objects::nonNull)
-                .map(String::toLowerCase)
-                .collect(Collectors.toSet());
-        form.setSuggestedItems(restockSuggestionService.suggestForDelivery(storeId, provider, existingMfns)
-                .stream()
-                .map(SuggestedDeliveryItem::from)
-                .collect(Collectors.toList()));
-
-        return form;
-    }
-
-    @PostMapping("/dashboard/deliveries/create/{provider}/updateFulfilment")
-    @PreAuthorize("hasRole('ADMIN')")
-    public String updateDeliveryItemFulfilment(
-            @PathVariable("provider") String provider,
-            @ModelAttribute DeliveryFulfilmentUpdateForm form,
-            RedirectAttributes redirectAttributes,
-            Locale locale) {
-        return updateFulfilment(getStoreId(), provider, form, redirectAttributes, locale);
-    }
-
-    @PostMapping("/dashboard/store/{storeId}/deliveries/create/{provider}/updateFulfilment")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public String updateDeliveryItemFulfilmentForSuperAdmin(
-            @PathVariable("storeId") String storeId,
-            @PathVariable("provider") String provider,
-            @ModelAttribute DeliveryFulfilmentUpdateForm form,
-            RedirectAttributes redirectAttributes,
-            Locale locale) {
-        return updateFulfilment(storeId, provider, form, redirectAttributes, locale);
-    }
-
-    private String updateFulfilment(String storeId, String provider, DeliveryFulfilmentUpdateForm form, RedirectAttributes redirectAttributes, Locale locale) {
-        OperationResult<Void> result = deliveryFulfilmentUpdateService.run(storeId, provider, form);
-
-        if (!result.isSuccess()) {
-            redirectAttributes.addFlashAttribute("errorMessage",
-                    messageSource.getMessage(result.getMessage(), null, locale));
-        }
-
-        return isSuperAdmin()
-                ? String.format("redirect:/dashboard/store/%s/deliveries/create/%s", storeId, provider)
-                : "redirect:/dashboard/deliveries/create/" + provider;
-    }
-
-    @PostMapping("/dashboard/deliveries/create")
-    @PreAuthorize("hasRole('ADMIN')")
-    public String processDeliveryCreation(@ModelAttribute DeliveryCreationForm form) {
-        return processDelivery(getStoreId(), form);
-    }
-
-    @PostMapping("/dashboard/store/{storeId}/deliveries/create")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public String processDeliveryCreationForSuperAdmin(
-            @PathVariable("storeId") String storeId,
-            @ModelAttribute DeliveryCreationForm form) {
-        return processDelivery(storeId, form);
-    }
-
-    private String processDelivery(String storeId, DeliveryCreationForm form) {
-        form.setStoreId(storeId);
-
-        String createdDeliveryId = deliveryCreationService.run(storeId, form);
-
-        if (createdDeliveryId != null) {
-            return isSuperAdmin()
-                    ? storeDeliveryDetailsRedirect(storeId, createdDeliveryId)
-                    : "redirect:/dashboard/deliveries/details?deliveryId=" + createdDeliveryId;
-        }
-
-        return isSuperAdmin()
-                ? "redirect:/dashboard/store/" + storeId + "/deliveries/preview"
-                : "redirect:/dashboard/deliveries/preview";
-    }
-
-    @PostMapping("/dashboard/deliveries/create/{provider}/purchase/back")
-    @PreAuthorize("hasRole('ADMIN')")
-    public String backFromPurchaseConfirmation(@PathVariable("provider") String provider,
-                                               @ModelAttribute DeliveryCreationForm form, Model model) {
-        return backToCreateDeliveryForm(getStoreId(), provider, form, model);
-    }
-
-    @PostMapping("/dashboard/store/{storeId}/deliveries/create/{provider}/purchase/back")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public String backFromPurchaseConfirmationForSuperAdmin(@PathVariable("storeId") String storeId,
-                                                             @PathVariable("provider") String provider,
-                                                             @ModelAttribute DeliveryCreationForm form, Model model) {
-        return backToCreateDeliveryForm(storeId, provider, form, model);
-    }
-
-    @PostMapping("/dashboard/deliveries/create/{provider}/purchase")
-    @PreAuthorize("hasRole('ADMIN')")
-    public String validatePurchase(@PathVariable("provider") String provider,
-                                   @ModelAttribute DeliveryCreationForm form, Model model) {
-        return showPurchaseConfirmation(getStoreId(), provider, form, model);
-    }
-
-    @PostMapping("/dashboard/store/{storeId}/deliveries/create/{provider}/purchase")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public String validatePurchaseForSuperAdmin(@PathVariable("storeId") String storeId,
-                                                @PathVariable("provider") String provider,
-                                                @ModelAttribute DeliveryCreationForm form, Model model) {
-        return showPurchaseConfirmation(storeId, provider, form, model);
-    }
-
-    private String showPurchaseConfirmation(String storeId, String provider,
-                                            DeliveryCreationForm form, Model model) {
-        if (!supplierPurchaseService.isOrderingAvailable(storeId, provider)) {
-            return isSuperAdmin()
-                    ? String.format("redirect:/dashboard/store/%s/deliveries/create/%s", storeId, provider)
-                    : "redirect:/dashboard/deliveries/create/" + provider;
-        }
-
-        form.setStoreId(storeId);
-        form.setProvider(provider);
-        supplierPurchaseService.mergeSuggestedItems(form);
-        model.addAttribute("form", form);
-        model.addAttribute("purchaseRef", UUID.randomUUID().toString());
-        model.addAttribute("isSuperAdmin", isSuperAdmin());
-        model.addAttribute("supplierLabels", supplierLabels.forStoreId(storeId));
-        addDeliveryAddresses(storeId, provider, form, model);
-        if (!supplierPurchaseService.requiresApproval(storeId, provider)) {
-            OrderOptionsModel.addOrderOptions(supplierPurchaseService, storeId, provider,
-                    SupplierOrderOptionsContext.warehouse(), form.getSupplierOrderChoices(), model);
-        }
-        return "deliveryPurchaseConfirmation";
-    }
-
-    private void addDeliveryAddresses(String storeId, String provider, DeliveryCreationForm form, Model model) {
-        if (supplierPurchaseService.requiresApproval(storeId, provider)) {
-            model.addAttribute("requiresApproval", true);
-            return;
-        }
-        try {
-            List<SupplierDeliveryAddress> addresses = supplierPurchaseService.deliveryAddresses(storeId, provider);
-            model.addAttribute("deliveryAddresses", addresses);
-            model.addAttribute("deliveryAddressOptions", addresses.stream()
-                    .map(address -> new PickerOption(address.id(), address.label()))
-                    .toList());
-            if (addresses.size() == 1) {
-                form.setDeliveryAddressId(addresses.getFirst().id());
-            }
-            addresses.stream()
-                    .filter(address -> address.id().equals(form.getDeliveryAddressId()))
-                    .findFirst()
-                    .ifPresent(address -> model.addAttribute("deliveryAddressLabel", address.label()));
-        } catch (Exception e) {
-            model.addAttribute("deliveryAddresses", List.of());
-            model.addAttribute("deliveryAddressOptions", List.of());
-            model.addAttribute("deliveryAddressError", e.getMessage());
-        }
-    }
-
-    @PostMapping("/dashboard/deliveries/create/{provider}/purchase/validate")
-    @PreAuthorize("hasRole('ADMIN')")
-    public String validatePurchaseQuotes(@PathVariable("provider") String provider,
-                                         @ModelAttribute DeliveryCreationForm form,
-                                         Model model, Locale locale) {
-        return renderValidationFragment(getStoreId(), provider, form, model, locale);
-    }
-
-    @PostMapping("/dashboard/store/{storeId}/deliveries/create/{provider}/purchase/validate")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public String validatePurchaseQuotesForSuperAdmin(@PathVariable("storeId") String storeId,
-                                                      @PathVariable("provider") String provider,
-                                                      @ModelAttribute DeliveryCreationForm form,
-                                                      Model model, Locale locale) {
-        return renderValidationFragment(storeId, provider, form, model, locale);
-    }
-
-    private String renderValidationFragment(String storeId, String provider,
-                                            DeliveryCreationForm form, Model model, Locale locale) {
-        form.setStoreId(storeId);
-        form.setProvider(provider);
-        try {
-            if (!supplierPurchaseService.isOrderingAvailable(storeId, provider)) {
-                throw new IllegalStateException(provider);
-            }
-            model.addAttribute("validation", supplierPurchaseService.validate(storeId, form));
-        } catch (Exception e) {
-            model.addAttribute("validationError",
-                    messageSource.getMessage("deliveries.purchase.confirm.checkFailed", null, locale)
-                            + (e.getMessage() != null ? " (" + e.getMessage() + ")" : ""));
-        }
-        return "deliveryPurchaseConfirmation :: validationResult";
-    }
-
-    @PostMapping("/dashboard/deliveries/create/{provider}/purchase/confirm")
-    @PreAuthorize("hasRole('ADMIN')")
-    public String confirmPurchase(@PathVariable("provider") String provider,
-                                  @RequestParam("purchaseRef") String purchaseRef,
-                                  @ModelAttribute DeliveryCreationForm form,
-                                  Model model, Locale locale) {
-        return executePurchase(getStoreId(), provider, purchaseRef, form, model, locale);
-    }
-
-    @PostMapping("/dashboard/store/{storeId}/deliveries/create/{provider}/purchase/confirm")
-    @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public String confirmPurchaseForSuperAdmin(@PathVariable("storeId") String storeId,
-                                               @PathVariable("provider") String provider,
-                                               @RequestParam("purchaseRef") String purchaseRef,
-                                               @ModelAttribute DeliveryCreationForm form,
-                                               Model model, Locale locale) {
-        return executePurchase(storeId, provider, purchaseRef, form, model, locale);
-    }
-
-    private String executePurchase(String storeId, String provider, String purchaseRef,
-                                   DeliveryCreationForm form, Model model, Locale locale) {
-        if (!supplierPurchaseService.isOrderingAvailable(storeId, provider)) {
-            return isSuperAdmin()
-                    ? String.format("redirect:/dashboard/store/%s/deliveries/create/%s", storeId, provider)
-                    : "redirect:/dashboard/deliveries/create/" + provider;
-        }
-
-        form.setStoreId(storeId);
-        form.setProvider(provider);
-        OperationResult<PurchaseSubmission> result = supplierPurchaseService.submitPurchase(storeId, form, purchaseRef);
-
-        if (!result.isSuccess()) {
-            model.addAttribute("form", form);
-            model.addAttribute("purchaseRef", purchaseRef);
-            model.addAttribute("isSuperAdmin", isSuperAdmin());
-            model.addAttribute("supplierLabels", supplierLabels.forStoreId(storeId));
-            model.addAttribute("errorMessage", messageSource.getMessage(result.getMessage(), null, locale));
-            addDeliveryAddresses(storeId, provider, form, model);
-            if (!supplierPurchaseService.requiresApproval(storeId, provider)) {
-                OrderOptionsModel.addOrderOptions(supplierPurchaseService, storeId, provider,
-                        SupplierOrderOptionsContext.warehouse(), form.getSupplierOrderChoices(), model);
-            }
-            return "deliveryPurchaseConfirmation";
-        }
-
-        String deliveryId = result.getPayload().deliveryId();
-        return isSuperAdmin()
-                ? storeDeliveryDetailsRedirect(storeId, deliveryId)
-                : "redirect:/dashboard/deliveries/details?deliveryId=" + deliveryId;
-    }
-
     @GetMapping("/dashboard/store/{storeId}/deliveries/{deliveryId}/approval")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     public String showApprovalScreen(@PathVariable("storeId") String storeId,
@@ -1074,7 +753,7 @@ public class DeliveriesController {
                     messageSource.getMessage("deliveries.purchase.confirm.checkFailed", null, locale)
                             + (e.getMessage() != null ? " (" + e.getMessage() + ")" : ""));
         }
-        return "deliveryPurchaseConfirmation :: validationResult";
+        return "fragments/approval-validation :: validationResult";
     }
 
     @GetMapping("/dashboard/deliveries/details")

@@ -9,7 +9,6 @@ import pl.commercelink.orders.BillingDetails;
 import pl.commercelink.orders.Order;
 import pl.commercelink.web.deliveries.pending.PendingDeliveriesQuery.Kind;
 
-import java.net.URLEncoder;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.time.LocalDate;
@@ -75,7 +74,8 @@ public class PendingDeliveryRowMapper {
         String provider = candidate.provider();
         return row(Kind.DROPSHIP, StringUtils.substringBefore(orderId, "-"), base() + "/orders/" + orderId,
                 customer(orders.get(orderId)), provider, null, false, List.of(orderId), candidate.items(), false,
-                base() + "/orders/" + orderId + "/dropship?provider=" + URLEncoder.encode(provider, UTF_8),
+                base() + "/deliveries/create/" + UriUtils.encodePathSegment(provider, UTF_8)
+                        + "?order=" + UriUtils.encodeQueryParam(orderId, UTF_8),
                 "pending-d-" + slug(orderId + "-" + provider), today);
     }
 

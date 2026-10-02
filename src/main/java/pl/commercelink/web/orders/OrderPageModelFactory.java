@@ -49,8 +49,6 @@ import pl.commercelink.taxonomy.TaxonomyCache;
 import pl.commercelink.web.dtos.RoutedSupplierView;
 import pl.commercelink.web.dtos.SplitGroupPreviewDto;
 
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -137,16 +135,16 @@ public class OrderPageModelFactory {
         boolean receiptLocked = receiptLock.locks();
         boolean canOrderShipment = order.canOrderShipment();
         OrderPageModel.PrimaryAction primary = null;
-        // with items at several suppliers the dropship page without ?provider= sends the operator back to choose one,
-        // so the button names the first waiting supplier the dropship page accepts (DropshipEligibility, as the
-        // delivery link and the deliveries planning); a supplier without dropshipping is ordered through the
-        // warehouse route, so it gets no button that would only end on the page's refusal
+        // the button opens the new-delivery page of the first waiting supplier the dropship flow accepts
+        // (DropshipEligibility, as the delivery link and the deliveries planning); a supplier without dropshipping is
+        // ordered through the warehouse route, so it gets no button that would only end on the page's refusal
         OrderItem firstDropship = !readOnly && viewer.admin() && order.getFulfilmentType() == FulfilmentType.DirectToConsumer
                 ? items.stream().filter(OrderPageModelFactory::awaitsDropship)
                         .filter(item -> dropship.supports(item.getDeliveryId())).findFirst().orElse(null) : null;
         if (firstDropship != null) {
-            primary = new OrderPageModel.PrimaryAction("order.page.action.dropship", links.details() + "/dropship?provider="
-                    + URLEncoder.encode(firstDropship.getDeliveryId(), StandardCharsets.UTF_8), "fa-truck");
+            primary = new OrderPageModel.PrimaryAction("order.page.action.dropship",
+                    links.forViewer(DeliveryRedirectResolver.dropshipCreateLink(order.getOrderId(), firstDropship.getDeliveryId())),
+                    "fa-truck");
         } else if (!readOnly && canOrderShipment && order.hasShipmentToBook()
                 && shippingService.isAvailable(store)) {
             // the courier page's own rule (OrdersShippingController#initiate): a store without a courier account types
@@ -369,7 +367,7 @@ public class OrderPageModelFactory {
     private String deliveryHref(Order order, OrderItem item, Viewer viewer, OrderLinks links, DropshipAssessment dropship) {
         String href = deliveryRedirectResolver.resolveFor(order, item, dropship);
         // the dropship screens are the admin's; a user or a super admin only sees the supplier's name
-        if (href.contains("/dropship") && (!viewer.admin() || viewer.superAdmin())) {
+        if (DeliveryRedirectResolver.isDropshipCreateLink(href) && (!viewer.admin() || viewer.superAdmin())) {
             return null;
         }
         return links.forViewer(href);

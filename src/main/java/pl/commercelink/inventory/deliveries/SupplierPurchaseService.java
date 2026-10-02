@@ -77,6 +77,14 @@ public class SupplierPurchaseService {
         }
     }
 
+    /** The delivery an earlier confirmation with this purchase reference created, if any (both scopes). */
+    public Optional<String> submittedDeliveryId(String storeId, String purchaseRef) {
+        if (purchaseRef == null || purchaseRef.isBlank()) {
+            return Optional.empty();
+        }
+        return deliveriesRepository.findByPurchaseRef(storeId, purchaseRef).map(Delivery::getDeliveryId);
+    }
+
     public boolean requiresApproval(String storeId, String provider) {
         Store store = storesRepository.findById(storeId);
         return store != null && store.isGlobalSupplier(provider);
@@ -567,7 +575,7 @@ public class SupplierPurchaseService {
                                                               String purchaseRef) {
         boolean hasOrderableItems = form.getItems().stream().anyMatch(item -> item.getRequestedQty() > 0);
         if (!hasOrderableItems) {
-            return OperationResult.failure("deliveries.purchase.error.availability");
+            return OperationResult.failure("deliveries.purchase.error.nothingRequested");
         }
 
         Store store = storesRepository.findById(storeId);

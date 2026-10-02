@@ -1,6 +1,7 @@
 package pl.commercelink.inventory.deliveries;
 
 import org.springframework.stereotype.Component;
+import org.springframework.web.util.UriUtils;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.Item;
@@ -8,7 +9,6 @@ import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 
-import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 
 @Component
@@ -32,10 +32,19 @@ public class DeliveryRedirectResolver {
      */
     public String resolveFor(Order order, OrderItem item, DropshipAssessment dropship) {
         if (isAwaitingDropshipDelivery(order, item) && dropship.supports(item.getDeliveryId())) {
-            return "/dashboard/orders/" + order.getOrderId() + "/dropship?provider="
-                    + URLEncoder.encode(item.getDeliveryId(), StandardCharsets.UTF_8);
+            return dropshipCreateLink(order.getOrderId(), item.getDeliveryId());
         }
         return resolveFor(item);
+    }
+
+    /** The new-delivery page of one order's dropship lines at a supplier, opened from the order (back leads there). */
+    public static String dropshipCreateLink(String orderId, String provider) {
+        return "/dashboard/deliveries/create/" + UriUtils.encodePathSegment(provider, StandardCharsets.UTF_8)
+                + "?order=" + UriUtils.encodeQueryParam(orderId, StandardCharsets.UTF_8) + "&from=order";
+    }
+
+    public static boolean isDropshipCreateLink(String href) {
+        return href != null && href.startsWith("/dashboard/deliveries/create/") && href.contains("?order=");
     }
 
     /**

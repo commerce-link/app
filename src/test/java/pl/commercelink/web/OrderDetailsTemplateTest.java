@@ -1506,7 +1506,7 @@ class OrderDetailsTemplateTest {
                 pl.commercelink.inventory.deliveries.DropshipAssessment.of(List.of("Acme")));
         String itemOnly = resolver.resolveFor(awaiting);
         // the fixture is only useful if the two overloads actually disagree
-        assertThat(expected).contains("/dropship?provider=");
+        assertThat(expected).contains("/dashboard/deliveries/create/Acme?order=");
         assertThat(expected).isNotEqualTo(itemOnly);
 
         // when
