@@ -5075,6 +5075,14 @@ a.cl-link-button:hover {
     display: none;
 }
 
+/* The first-child indent above targets the hidden check cell, so without JavaScript the first visible column takes the
+   20 px edge padding itself (specificity 0,5,1 beats the first-child rule's 0,3,1). Card mode has its own layout. */
+@media screen and (min-width: 720px) {
+    .cl-page .cl-table.is-orders:not(.is-selectable) .cl-table-check + :is(th, td) {
+        padding-left: 20px;
+    }
+}
+
 /* Card mode (< 720 px) has no selection: no checkbox cells, no selection row and no tint of a row checked at a wider
    width. The generic card-mode rules of selectable tables (the key cell as a padded block) outrank the orders card by
    specificity, so the key cell gets its display: contents back here. */
