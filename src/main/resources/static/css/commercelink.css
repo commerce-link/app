@@ -7028,7 +7028,8 @@ a.cl-link-button:hover {
     align-items: flex-start;
 }
 
-.cl-page .cl-print-qr {
+/* Selector outranks Bulma's `.content figure` margins. */
+.cl-page .cl-page-header-row figure.cl-print-qr {
     flex: none;
     width: 120px;
     margin: 0;
