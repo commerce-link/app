@@ -61,6 +61,10 @@ class PaymentsModelFactoryTest {
         return factory.page("store-1", PaymentsQuery.parse(params), TODAY, new Locale("pl"));
     }
 
+    private static PaymentsPageModel.Tile overpaidTile(PaymentsPageModel page) {
+        return page.tiles().get(PaymentFocus.REFUND.ordinal());
+    }
+
     private static Delivery withProvider(Delivery d, String id, String provider) {
         d.setDeliveryId(id + "-0000-0000-0000-000000000000");
         d.setProvider(provider);
@@ -136,7 +140,7 @@ class PaymentsModelFactoryTest {
         // then
         assertThat(page.resultsCount()).isEqualTo("Dostawy: 3 · do zapłaty");
         assertThat(page.resultsAmount()).isEqualTo("150,00\u00A0PLN");
-        assertThat(page.resultsTail()).isEqualTo("brutto (150,00\u00A0PLN netto) · do zwrotu od dostawców 20,00\u00A0PLN");
+        assertThat(page.resultsTail()).isEqualTo("brutto (150,00\u00A0PLN netto) · nadpłaty u dostawców 20,00\u00A0PLN");
     }
 
     @Test
@@ -162,6 +166,26 @@ class PaymentsModelFactoryTest {
         o.setOrderId(id + "-0000-0000-0000-000000000000");
         o.setEstimatedShippingAt(ship);
         return o;
+    }
+
+    @Test
+    void overpaidTileIsRedOnlyWhenItCountsSomething() {
+        // given
+        PaymentsPageModel.Tile emptyTile = overpaidTile(page());
+        Delivery overpaid = withProvider(delivery(100, TODAY, 14), "aaaa0001", "Acme");
+        overpaid.addPayment(paid(120));
+        unpaid.add(overpaid);
+
+        // when
+        PaymentsPageModel.Tile tile = overpaidTile(page());
+
+        // then
+        assertThat(tile.label()).isEqualTo("Nadpłaty");
+        assertThat(tile.count()).isEqualTo(1);
+        assertThat(tile.tone()).isEqualTo("is-bad");
+        assertThat(emptyTile.tone()).as("a red zero would be a false alarm").isEmpty();
+        assertThat(page().tiles()).filteredOn(t -> !t.label().equals("Nadpłaty"))
+                .extracting(PaymentsPageModel.Tile::tone).containsOnly("");
     }
 
     @Test
