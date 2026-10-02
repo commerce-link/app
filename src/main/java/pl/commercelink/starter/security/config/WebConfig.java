@@ -51,10 +51,12 @@ public class WebConfig {
                         .addPathPatterns("/Store/*/Catalog/**")
                         .excludePathPatterns("/store/*/individual/offer/**");
 
-                // A payment made for a basket before its store was deactivated still has to become an order.
+                // Webhooks report what already happened at the provider: a basket paid before the deactivation still
+                // becomes an order, a delivered parcel or a fiscalised receipt is still recorded. Refusing them would
+                // only lose that, and Fakturownia switches a failing webhook off for the whole account.
                 registry.addInterceptor(publicStoreActivityInterceptor)
                         .addPathPatterns("/Store/*/**", "/store/*/client/**", "/store/*/individual/**")
-                        .excludePathPatterns("/Store/*/Webhooks/Payments/**");
+                        .excludePathPatterns("/Store/*/Webhooks/**");
 
                 registry.addInterceptor(emailVerificationInterceptor)
                         .addPathPatterns("/dashboard/**");

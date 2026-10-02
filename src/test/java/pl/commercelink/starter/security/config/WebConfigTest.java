@@ -115,8 +115,6 @@ class WebConfigTest {
         assertThat(guards(publicStoreActivityInterceptor, post("/Store/abc123def4/Basket"))).isTrue();
         assertThat(guards(publicStoreActivityInterceptor, get("/Store/abc123def4/Catalog/main"))).isTrue();
         assertThat(guards(publicStoreActivityInterceptor, get("/Store/abc123def4/Reporting/Google/Conversions/t"))).isTrue();
-        assertThat(guards(publicStoreActivityInterceptor, post("/Store/abc123def4/Webhooks/Shipping/Furgonetka"))).isTrue();
-        assertThat(guards(publicStoreActivityInterceptor, post("/Store/abc123def4/Webhooks/Receipts/Fiskator"))).isTrue();
         assertThat(guards(publicStoreActivityInterceptor, get("/store/abc123def4/client/order/o-1"))).isTrue();
         assertThat(guards(publicStoreActivityInterceptor, get("/store/abc123def4/client/rma/r-1"))).isTrue();
         assertThat(guards(publicStoreActivityInterceptor, get("/store/abc123def4/client/offer/f-1"))).isTrue();
@@ -124,9 +122,11 @@ class WebConfigTest {
     }
 
     @Test
-    void publicGateLetsPaymentWebhooksAndSharedPathsThrough() {
+    void publicGateLetsWebhooksAndSharedPathsThrough() {
         // given / when / then
         assertThat(guards(publicStoreActivityInterceptor, post("/Store/abc123def4/Webhooks/Payments/PayU"))).isFalse();
+        assertThat(guards(publicStoreActivityInterceptor, post("/Store/abc123def4/Webhooks/Shipping/Furgonetka"))).isFalse();
+        assertThat(guards(publicStoreActivityInterceptor, post("/Store/abc123def4/Webhooks/Receipts/Fiskator"))).isFalse();
         assertThat(guards(publicStoreActivityInterceptor, get("/StoreLogo/abc123def4"))).isFalse();
         assertThat(guards(publicStoreActivityInterceptor, get("/Global/Inventory"))).isFalse();
         assertThat(guards(publicStoreActivityInterceptor, get("/dashboard/orders"))).isFalse();

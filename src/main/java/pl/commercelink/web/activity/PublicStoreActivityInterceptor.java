@@ -7,12 +7,14 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
+import org.springframework.web.util.UriUtils;
 import pl.commercelink.starter.security.tenant.TenantResolver;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoreActivity;
 import pl.commercelink.stores.StoresRepository;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 
 /**
  * Closes what the public reaches of an inactive store: the shop API answers 403 {@code store-inactive}, the client
@@ -50,9 +52,10 @@ public class PublicStoreActivityInterceptor implements HandlerInterceptor {
         return false;
     }
 
-    // the shop API lives under /Store/{storeId}, the pages sent to the store's clients under /store/{storeId}
+    // the shop API lives under /Store/{storeId}, the pages sent to the store's clients under /store/{storeId};
+    // the root is compared decoded, as the controllers are matched
     private static boolean isClientPage(HttpServletRequest request) {
         String[] segments = request.getRequestURI().split("/");
-        return segments.length > 1 && CLIENT_PAGES_ROOT.equals(segments[1]);
+        return segments.length > 1 && CLIENT_PAGES_ROOT.equals(UriUtils.decode(segments[1], StandardCharsets.UTF_8));
     }
 }

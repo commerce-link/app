@@ -16,6 +16,8 @@ import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoreActivity;
 import pl.commercelink.stores.StoresRepository;
 
+import java.net.URI;
+
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -28,6 +30,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class PublicStoreActivityInterceptorTest {
 
     private static final String STORE_ID = "abc123def4";
+    private static final String STORE_ID_WITH_ENCODED_FIRST_LETTER = "%61bc123def4";
 
     @Mock private StoresRepository storesRepository;
     @Mock private StoreActivity storeActivity;
@@ -110,6 +113,36 @@ class PublicStoreActivityInterceptorTest {
                 .andExpect(status().isForbidden())
                 .andExpect(content().contentTypeCompatibleWith("application/json"))
                 .andExpect(content().json("{\"error\":\"store-inactive\"}"));
+    }
+
+    @Test
+    void percentEncodedIdOfInactiveStoreIsRefusedLikeThePlainOne() throws Exception {
+        // given
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(storeActivity.isActive(store)).thenReturn(false);
+
+        // when / then
+        mvc.perform(post(URI.create("/Store/" + STORE_ID_WITH_ENCODED_FIRST_LETTER + "/Checkout")))
+                .andExpect(status().isForbidden())
+                .andExpect(content().json("{\"error\":\"store-inactive\"}"));
+        mvc.perform(get(URI.create("/store/" + STORE_ID_WITH_ENCODED_FIRST_LETTER + "/client/order/order-1")))
+                .andExpect(status().isForbidden())
+                .andExpect(view().name("store-inactive"));
+    }
+
+    @Test
+    void percentEncodedRootOfInactiveStoreIsRefusedLikeThePlainOne() throws Exception {
+        // given
+        when(storesRepository.findById(STORE_ID)).thenReturn(store);
+        when(storeActivity.isActive(store)).thenReturn(false);
+
+        // when / then
+        mvc.perform(post(URI.create("/%53tore/" + STORE_ID + "/Checkout")))
+                .andExpect(status().isForbidden())
+                .andExpect(content().json("{\"error\":\"store-inactive\"}"));
+        mvc.perform(get(URI.create("/%73tore/" + STORE_ID + "/client/order/order-1")))
+                .andExpect(status().isForbidden())
+                .andExpect(view().name("store-inactive"));
     }
 
     @Test
