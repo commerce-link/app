@@ -20,10 +20,9 @@ class SupplierLabelTemplatesTest {
     @Test
     void deliveryScreensShowLabelsNotIdentities() throws Exception {
         // when / then
-        assertThat(template("deliveries.html")).contains("supplierLabels.of(delivery.storeId, delivery.provider)")
-                .doesNotContain("th:text=\"${delivery.provider}\"");
-        assertThat(template("deliveriesPreview.html")).contains("supplierLabels.of(candidate.provider)")
-                .contains("supplierLabels.of(delivery.provider)");
+        // the list resolves the label once per row in DeliveryRowMapper, so the template never sees an identity
+        assertThat(template("deliveries.html")).contains("row.supplierLabel()").doesNotContain("delivery.provider");
+        assertThat(template("deliveries/pending.html")).contains("row.providerLabel()").doesNotContain("row.provider()");
         assertThat(template("deliveryApproval.html")).contains("supplierLabels.of(delivery.provider)");
         assertThat(template("deliveryDetails.html")).contains("supplierLabels.of(delivery.provider)");
         assertThat(template("deliveryCreate.html")).contains("supplierLabels.of(form.provider)");
@@ -48,7 +47,7 @@ class SupplierLabelTemplatesTest {
     }
 
     @Test
-    void orderRmaAndDeliveryFiltersUseSelectsOfConnections() throws Exception {
+    void orderAndRmaFiltersUseSelectsOfConnections() throws Exception {
         // when / then
         assertThat(template("fragments/supplier-choice.html")).contains("name=\"supplier\"")
                 .contains("th:each=\"option : ${options}\"")
@@ -58,15 +57,6 @@ class SupplierLabelTemplatesTest {
                 .contains("data-custom=\"" + SupplierChoice.CUSTOM + "\"")
                 .contains("name=\"customSupplier\"")
                 .contains("order.item.supplier.custom.hint");
-        assertThat(template("deliveries.html")).contains("<select name=\"provider\"")
-                .contains("th:each=\"option : ${providerOptions}\"")
-                .contains("value=\"" + SupplierChoice.CUSTOM + "\"")
-                .contains("data-custom=\"" + SupplierChoice.CUSTOM + "\"")
-                .contains("name=\"providerCustom\"")
-                // a filter value outside the options (e.g. a disconnected instance) must stay
-                // visible as the selected option instead of silently showing "all"
-                .contains("!#lists.contains(providerOptions.![identity()], searchParams.provider)")
-                .contains("supplierLabels.of(searchParams.provider)");
         // The RMA pages resolve the label in the controller (RmaCenterView.title), so the templates must not fall
         // back to the stored identity, which carries a connection token such as "Elko-k7f3a9c2".
         assertThat(template("rma-center-form.html")).contains("${providerOptions}");

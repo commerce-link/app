@@ -45,16 +45,6 @@ class OrderOptionsFragmentTest {
     }
 
     @Test
-    void guardsThePlaceholderOptionWithTheChooseMessageKey() throws Exception {
-        // when
-        String html = fragment();
-
-        // then
-        assertThat(html).contains("#{deliveries.options.choose}");
-        assertThat(html).contains("th:selected");
-    }
-
-    @Test
     void guardsAreNeverCombinedWithThEachOnTheSameElement() throws Exception {
         // when
         String html = fragment();

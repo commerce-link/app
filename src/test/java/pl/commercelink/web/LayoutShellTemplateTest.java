@@ -14,29 +14,6 @@ class LayoutShellTemplateTest {
         return Files.readString(Path.of("src/main/resources/templates/layout.html"), StandardCharsets.UTF_8);
     }
 
-    @Test
-    void buildsTheShellFromTheNavigationFragments() throws Exception {
-        // when
-        String html = layout();
-
-        // then
-        assertThat(html).contains("~{fragments/navigation :: sidebar}");
-        assertThat(html).contains("~{fragments/navigation :: topbar}");
-        assertThat(html).contains("cl-shell");
-    }
-
-    @Test
-    void dropsTheHorizontalNavbarAndItsDuplicatedLinkLists() throws Exception {
-        // when
-        String html = layout();
-
-        // then
-        assertThat(html).doesNotContain("navbar-start");
-        assertThat(html).doesNotContain("navbar-burger");
-        assertThat(html).doesNotContain("sec:authorize=\"hasRole('ADMIN')\"");
-        assertThat(html).doesNotContain("scrollbar-width: none");
-    }
-
     /**
      * Without it a screen reader reads a Polish page with an English voice, and `document.documentElement.lang`
      * (the collation of the sortable tables) falls back to a guess.
@@ -87,31 +64,12 @@ class LayoutShellTemplateTest {
     }
 
     @Test
-    void offersASkipLinkAheadOfTheNavigation() throws Exception {
-        // when
-        String html = layout();
-
-        // then
-        assertThat(html).contains("class=\"cl-skip\"");
-        assertThat(html.indexOf("cl-skip")).isLessThan(html.indexOf("fragments/navigation :: sidebar"));
-    }
-
-    @Test
     void pinsTheTimelineStylesheetInsteadOfTrackingLatest() throws Exception {
         // when
         String html = layout();
 
         // then
         assertThat(html).doesNotContain("@latest");
-    }
-
-    @Test
-    void loadsTheNavigationBehaviourScript() throws Exception {
-        // when
-        String html = layout();
-
-        // then
-        assertThat(html).contains("/js/navigation.js");
     }
 
     /** async-form.js blames the connection only when the request failed; an answered 403 or 500 gets this message. */

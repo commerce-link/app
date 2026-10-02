@@ -44,6 +44,10 @@ public final class SupplierLabelMap {
         return identity != null && byKey.containsKey(key(defaultStoreId, identity));
     }
 
+    public boolean has(String storeId, String identity) {
+        return identity != null && byKey.containsKey(key(storeId, identity));
+    }
+
     /**
      * The same map where the store's own warehouse ({@link SupplierRegistry#WAREHOUSE}, a technical identity in English)
      * reads as the given text, e.g. "Magazyn sklepu" on the order screens and printouts. The select options stay as

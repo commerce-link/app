@@ -20,8 +20,9 @@ public class OrderAllocationsManager {
     @Autowired
     private OrdersManager ordersManager;
 
-    public List<Allocation> fetchAll(String storeId) {
+    public OrderAllocations fetchAllWithOrders(String storeId) {
         List<Allocation> allocations = new LinkedList<>();
+        Map<String, Order> orders = new LinkedHashMap<>();
 
         List<Order> activeOrders = ordersRepository.findAllByStoreIdAndStatus(storeId, OrderStatus.New, OrderStatus.Assembly);
 
@@ -32,10 +33,13 @@ public class OrderAllocationsManager {
                     .filter(i -> !i.isClaimed())
                     .map(i -> Allocation.fromOrderItem(order, i))
                     .toList();
+            if (!orderAllocations.isEmpty()) {
+                orders.put(order.getOrderId(), order);
+            }
             allocations.addAll(orderAllocations);
         }
 
-        return allocations;
+        return new OrderAllocations(allocations, orders);
     }
 
     public List<Allocation> fetchAll(String storeId, String deliveryId) {

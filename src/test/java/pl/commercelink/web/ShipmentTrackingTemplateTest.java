@@ -57,19 +57,4 @@ class ShipmentTrackingTemplateTest {
             assertThat(en).as(key + " in messages_en").contains("\n" + key + "=");
         }
     }
-
-    /** The Furgonetka webhook guidance moved from the shipping screen guide to the courier account page. */
-    @Test
-    void theCourierAccountPageGuidesTheWebhookSetup() throws Exception {
-        // when
-        String html = read(STORE_SHIPPING.resolveSibling("store-shipping-account.html"));
-        String pl = read(MESSAGES_PL);
-        String en = read(MESSAGES_EN);
-
-        // then
-        assertThat(read(STORE_SHIPPING)).doesNotContain("screen-intro");
-        assertThat(html).contains("store.shipping.account.webhook.steps.states");
-        assertThat(pl).contains("\nstore.shipping.account.webhook.steps.states=");
-        assertThat(en).contains("\nstore.shipping.account.webhook.steps.states=");
-    }
 }

@@ -206,15 +206,13 @@
         <span th:text="#{order.items.qty.price(${row.qty()}, ${row.unitPrice()})}"></span>
         <span class="cl-table-sub" th:text="#{order.items.cost(${row.unitCost()})}"></span>
     </td>
-    <!--/* the state pill and the delivery on one line, the delivery wrapping under the pill only when both do not fit */-->
+    <!--/* the state pill, the delivery (supplier or delivery number) as the second line under it */-->
     <td class="cl-table-fulfilment" th:attr="data-label=#{order.items.column.fulfilment}">
-        <div class="cl-table-state">
-            <span class="cl-status" th:classappend="${row.statusTone()}" th:text="#{${row.statusKey()}}"></span>
-            <span th:if="${row.deliveryLabel() != null}" class="cl-table-sub">
-                <a th:if="${row.deliveryHref() != null}" class="cl-table-link" th:href="@{${row.deliveryHref()}}" th:text="${row.deliveryLabel()}"></a>
-                <span th:unless="${row.deliveryHref() != null}" th:text="${row.deliveryLabel()}"></span>
-            </span>
-        </div>
+        <span class="cl-status" th:classappend="${row.statusTone()}" th:text="#{${row.statusKey()}}"></span>
+        <span th:if="${row.deliveryLabel() != null}" class="cl-table-sub">
+            <a th:if="${row.deliveryHref() != null}" class="cl-table-link" th:href="@{${row.deliveryHref()}}" th:text="${row.deliveryLabel()}"></a>
+            <span th:unless="${row.deliveryHref() != null}" th:text="${row.deliveryLabel()}"></span>
+        </span>
     </td>
     <!--/* display only: the item menu toggles it. The glyph is hidden from screen readers, the hidden word says it; an
            unconsolidated item leaves the cell empty, and in card mode an empty cell is not shown at all. */-->

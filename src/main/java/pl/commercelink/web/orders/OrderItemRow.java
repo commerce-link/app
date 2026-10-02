@@ -59,7 +59,8 @@ public record OrderItemRow(String itemId, int index, String name, String categor
                 showCondition ? OrderLabels.condition(item.getCondition()) : null,
                 item.getCondition() == ItemCondition.Damaged ? OrderLabels.BAD : OrderLabels.WARN,
                 item.isConsolidated(), item.isService(), StringUtils.trimToNull(item.getComment()), item.getQty(),
-                Money.format(item.getPrice()), Money.format(item.getCost()),
+                // the cost gross, like the price: the operator compares the two to spot the item worth a cheaper source
+                Money.format(item.getPrice()), Money.format(item.unitCost().grossValue()),
                 OrderLabels.itemStatus(item.getStatus()), OrderLabels.tone(item.getStatus()),
                 deliveryLabel, deliveryId == null ? null : context.deliveryHref().apply(item),
                 item.isReadyForAllocation(), item.isProduct() && item.isAllocated(), item.isProduct() && item.isDelivered(),

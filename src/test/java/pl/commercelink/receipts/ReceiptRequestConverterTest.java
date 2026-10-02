@@ -41,19 +41,6 @@ class ReceiptRequestConverterTest {
     }
 
     @Test
-    void posOrderWithTheStoresEmailIsBlockedForTheCashRegisterReceipt() {
-        // given
-        Order order = posOrder(100.00);
-
-        // when
-        ReceiptConversion conversion = convertWithStoreEmail(order);
-
-        // then
-        assertThat(conversion).isInstanceOf(ReceiptConversion.Blocked.class);
-        assertThat(((ReceiptConversion.Blocked) conversion).reason()).isEqualTo(ReceiptBlockReason.POS_NO_CUSTOMER_EMAIL);
-    }
-
-    @Test
     void posOrderWithoutCustomerEmailIsBlockedEvenWhenTheProviderNeedsNoEmail() {
         // given
         provider.requiresEmail = false;

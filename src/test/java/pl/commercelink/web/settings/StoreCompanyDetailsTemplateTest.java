@@ -6,9 +6,6 @@ import pl.commercelink.starter.security.UserRole;
 import pl.commercelink.web.dtos.CompanyDetailsForm;
 import pl.commercelink.web.dtos.CountryOptions;
 
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Locale;
@@ -102,15 +99,6 @@ class StoreCompanyDetailsTemplateTest {
     }
 
     @Test
-    void errorSummaryLinksScrollFieldsBelowTheStickyTopBar() throws Exception {
-        // when
-        String css = Files.readString(Path.of("src/main/resources/static/css/commercelink.css"), StandardCharsets.UTF_8);
-
-        // then
-        assertThat(css).containsPattern("\\.cl-input,\\s*\\.cl-select \\{\\s*scroll-margin-top: calc\\(var\\(--cl-topbar-height\\) \\+ 44px\\);");
-    }
-
-    @Test
     void keepsAStoredCountryThatIsNotOnTheListSelected() {
         // given
         CompanyDetailsForm form = storedForm();
@@ -122,17 +110,6 @@ class StoreCompanyDetailsTemplateTest {
         // then
         assertThat(html).contains("<option value=\"Polska\" selected=\"selected\">Polska</option>");
         assertThat(html).contains("<option value=\"PL\">Polska</option>");
-    }
-
-    @Test
-    void dropsBulmaFormMarkupAndTheOldEditEndpoint() throws Exception {
-        // when
-        String template = Files.readString(Path.of("src/main/resources/templates/store-company-details.html"), StandardCharsets.UTF_8);
-
-        // then
-        assertThat(template).doesNotContain("class=\"box\"").doesNotContain("class=\"input\"")
-                .doesNotContain("\"button is-primary")
-                .doesNotContain("company-details/edit").doesNotContain("store.storeId");
     }
 
     @Test

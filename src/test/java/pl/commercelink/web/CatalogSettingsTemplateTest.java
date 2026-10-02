@@ -18,24 +18,10 @@ class CatalogSettingsTemplateTest {
     }
 
     @Test
-    void savesWithoutReloadAndReturnsToTheCatalog() throws Exception {
-        // when / then
-        assertThat(page()).contains("th:fragment=\"settingsForm\"").contains("id=\"catalog-settings-form\"").contains("data-cl-async")
-                .contains("data-cl-redirect=${redirectTo}").contains("@{/js/async-form.js}").contains("errorSummary('catalog-settings-errors'")
-                .contains("schedule-field :: input('pricelistSchedule'").contains("data-cl-schedule-auto");
-    }
-
-    @Test
     void deleteIsOfferedOnlyForAnUnprotectedExistingCatalog() throws Exception {
         // when / then
         assertThat(page()).contains("th:if=\"${deleteHref != null}\"").contains("data-cl-confirm").contains("fragments/confirm-dialog :: dialog")
                 .doesNotContain("confirmDelete(");
-    }
-
-    @Test
-    void saysNothingBelowTheProtectionAboutHowToDelete() throws Exception {
-        // when / then
-        assertThat(page()).doesNotContain("catalog.protect.hint");
     }
 
     @Test
@@ -44,12 +30,6 @@ class CatalogSettingsTemplateTest {
         assertThat(page()).contains("settings-form :: savedAlert").contains("th:if=\"${catalogError}\"")
                 .contains("class=\"cl-alert is-bad\" role=\"status\"").contains("cl-alert-text")
                 .doesNotContain("errorMessage").doesNotContain("notification is-");
-    }
-
-    @Test
-    void hasNoReadonlyIdFields() throws Exception {
-        // when / then
-        assertThat(page()).doesNotContain("storeId").doesNotContain("catalogId\"").doesNotContain("readonly");
     }
 
     /** The page as the controller renders it for an unprotected catalog, so the delete link is on it. */

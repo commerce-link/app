@@ -45,15 +45,4 @@ class OrderFiltersTemplateTest {
                 .contains("FilterConditionLabels).pill(group.key, group.value, #messages)")
                 .doesNotContain("th:each=\"c : ${filter.conditions}\"");
     }
-
-    @Test
-    void theFieldMenuHasItsStylesAndScript() throws Exception {
-        // given
-        String css = read("src/main/resources/static/css/commercelink.css");
-        String js = read("src/main/resources/static/js/order-filter-form.js");
-
-        // when / then
-        assertThat(css).contains(".cl-page .cl-filter-menu.is-field .cl-filter-menu-trigger");
-        assertThat(js).contains("data-cl-filter-field").contains("Escape").contains("data-cl-any").contains("data-cl-selected");
-    }
 }

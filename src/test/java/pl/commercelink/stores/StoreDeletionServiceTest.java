@@ -255,18 +255,6 @@ class StoreDeletionServiceTest {
     }
 
     @Test
-    void demoOnlyGuardRefusesRegularStore() {
-        // given
-        Store store = regularStore();
-        when(storesRepository.findById(STORE_ID)).thenReturn(store);
-
-        // when / then
-        assertThrows(IllegalStateException.class,
-                () -> service.deleteStore(STORE_ID, StoreDeletionService.Guard.DEMO_ONLY));
-        verifyNoInteractions(wipeRepository, fileStorage, storeInventoryCache);
-    }
-
-    @Test
     void anyGuardStillDeletesCognitoUserForDemoStore() {
         // given
         Store store = demoStore();

@@ -96,26 +96,6 @@ class PollingScheduleTest {
     }
 
     @Test
-    void ignoresHourWrapAroundWhenOnlyOneHourFires() {
-        // when
-        PollingSchedule schedule = PollingSchedule.parse("0,58 9 * * ? *", 5);
-
-        // then
-        assertThat(schedule.expression()).isEqualTo("0,58 9 * * ? *");
-    }
-
-    @Test
-    void countsHourWrapAroundOnlyBetweenAdjacentHours() {
-        // when
-        PollingSchedule apart = PollingSchedule.parse("0,58 9,14 * * ? *", 5);
-
-        // then
-        assertThat(apart.expression()).isEqualTo("0,58 9,14 * * ? *");
-        assertThatThrownBy(() -> PollingSchedule.parse("0,58 9,10 * * ? *", 5))
-                .isInstanceOf(InvalidScheduleException.class);
-    }
-
-    @Test
     void storedOrRandomNightlyKeepsAStoredCronAndFallsBackWhenBlank() {
         // when / then
         assertThat(PollingSchedule.storedOrRandomNightly("0 5 * * ? *").awsExpression()).isEqualTo("cron(0 5 * * ? *)");

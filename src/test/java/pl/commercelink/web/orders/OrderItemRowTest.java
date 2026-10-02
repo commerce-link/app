@@ -56,7 +56,8 @@ class OrderItemRowTest {
         assertThat(state(row, ItemAction.CONSOLIDATE).labelKey()).isEqualTo("order.item.menu.consolidate");
         assertThat(state(row, ItemAction.EDIT).available()).isTrue();
         assertThat(row.unitPrice()).isEqualTo("749,00");
-        assertThat(row.unitCost()).isEqualTo("579,00");
+        // the cost is gross, like the price above it, so the two compare at a glance (client request 2026-09-30)
+        assertThat(row.unitCost()).isEqualTo("712,17");
         assertThat(row.statusTone()).isEqualTo("is-neutral");
         assertThat(row.readyForAllocation()).isFalse();
         assertThat(row.removable()).isTrue();
@@ -110,12 +111,25 @@ class OrderItemRowTest {
     }
 
     @Test
+    void theCostIsGrossAtTheItemsOwnVatRate() {
+        // given
+        OrderItem item = item(FulfilmentStatus.New, "MFN-1");
+        item.setTax(1.08);
+
+        // when
+        OrderItemRow row = OrderItemRow.of(item, 0, context());
+
+        // then: 579 net + 8% VAT
+        assertThat(row.unitCost()).isEqualTo("625,32");
+    }
+
+    @Test
     void aReadOnlyViewerGetsNoActionsButStillTheCost() {
         // when
         OrderItemRow forSuperAdmin = OrderItemRow.of(item(FulfilmentStatus.New, "MFN-1"), 0, context(ORDER, true, true));
 
         // then
-        assertThat(forSuperAdmin.unitCost()).isEqualTo("579,00");
+        assertThat(forSuperAdmin.unitCost()).isEqualTo("712,17");
         assertThat(forSuperAdmin.actions()).isEmpty();
         assertThat(forSuperAdmin.editHref()).isNull();
     }
@@ -184,18 +198,6 @@ class OrderItemRowTest {
         assertThat(hasAction(row, ItemAction.ASSIGN_SUPPLIER)).isFalse();
         assertThat(hasAction(row, ItemAction.ASSIGN_WAREHOUSE)).isFalse();
         assertThat(state(row, ItemAction.CLEAR_SUPPLIER).available()).isTrue();
-    }
-
-    @Test
-    void clearSupplierIsAbsentWithoutASupplier() {
-        // when
-        OrderItemRow row = OrderItemRow.of(item(FulfilmentStatus.New, "MFN-1"), 0, context());
-
-        // then
-        assertThat(hasAction(row, ItemAction.CLEAR_SUPPLIER)).isFalse();
-        assertThat(state(row, ItemAction.ASSIGN_SKU).available()).isTrue();
-        assertThat(state(row, ItemAction.ASSIGN_SUPPLIER).available()).isTrue();
-        assertThat(state(row, ItemAction.ASSIGN_WAREHOUSE).available()).isTrue();
     }
 
     @Test

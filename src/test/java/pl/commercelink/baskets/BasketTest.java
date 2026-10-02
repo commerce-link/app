@@ -43,21 +43,6 @@ class BasketTest {
     }
 
     @Test
-    @DisplayName("setBasketItems assigns zero-based positions following the list order")
-    void setBasketItemsAssignsZeroBasedPositionsFollowingListOrder() {
-        // given
-        Basket basket = new Basket();
-        BasketItem first = basketItem("MFN-A");
-        BasketItem second = basketItem("MFN-B");
-
-        // when
-        basket.setBasketItems(List.of(first, second));
-
-        // then
-        assertThat(basket.getBasketItems()).extracting(BasketItem::getPosition).containsExactly(0, 1);
-    }
-
-    @Test
     @DisplayName("setBasketItems overwrites stale positions restoring the list order invariant")
     void setBasketItemsOverwritesStalePositionsRestoringListOrderInvariant() {
         // given

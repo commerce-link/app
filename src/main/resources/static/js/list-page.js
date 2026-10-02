@@ -1,21 +1,26 @@
-// Progressive enhancement of the orders list: a click on a chip, menu item, sort header or page link, a submit of
-// the search form, and a tick in the Status menu fetch /dashboard/orders/list with the same query and swap the
+// Progressive enhancement of a server-rendered list (orders, deliveries). The page marks its results block with
+// data-cl-list-results, data-cl-list-path (the list page itself) and data-cl-list-fragment (the endpoint returning only
+// that block). A click on a chip, menu item, sort header or page link (a[data-cl-list-nav]), a submit of a
+// form[data-cl-list-form], and a tick in an auto-submitting menu fetch the fragment with the same query and swap the
 // results block in place. The address bar follows (pushState), Back re-fetches, and focus lands on the count line so
-// a screen reader hears the new number. A tick keeps the Status menu open on the fresh block (with focus on the same
-// box) so several statuses can be picked in a row; its "Zastosuj" button is hidden because every tick applies at
+// a screen reader hears the new number. A tick keeps its menu open on the fresh block (with focus on the same
+// box) so several values can be picked in a row; its "Zastosuj" button is hidden because every tick applies at
 // once. Emptying the search field refreshes the list too, and an open menu (a native <details>) closes on a click
-// outside or Escape. Anything unexpected falls back to a plain navigation.
+// outside or Escape. After each swap the fresh block dispatches `cl-list:swapped` (bubbles), so other scripts can set
+// it up again. Anything unexpected falls back to a plain navigation.
 (function () {
     'use strict';
 
-    var root = document.querySelector('[data-cl-orders-results]');
-    if (!root || !window.fetch || !window.history || !window.DOMParser) {
+    var root = document.querySelector('[data-cl-list-results]');
+    var listPath = root && root.getAttribute('data-cl-list-path');
+    var fragmentPath = root && root.getAttribute('data-cl-list-fragment');
+    if (!root || !listPath || !fragmentPath || !window.fetch || !window.history || !window.DOMParser) {
         return;
     }
 
     function fragmentUrl(href) {
         var url = new URL(href, window.location.href);
-        url.pathname = '/dashboard/orders/list';
+        url.pathname = fragmentPath;
         return url;
     }
 
@@ -33,7 +38,7 @@
 
     function load(href, push, focusSearch) {
         var target = new URL(href, window.location.href);
-        if (target.pathname !== '/dashboard/orders') {
+        if (target.pathname !== listPath) {
             window.location.assign(href);
             return;
         }
@@ -44,12 +49,15 @@
                 return response.text();
             })
             .then(function (html) {
-                var fresh = new DOMParser().parseFromString(html, 'text/html').querySelector('[data-cl-orders-results]');
+                var fresh = new DOMParser().parseFromString(html, 'text/html').querySelector('[data-cl-list-results]');
                 if (!fresh) { throw new Error('no results block'); }
                 root.replaceWith(fresh);
                 root = fresh;
+                // scripts that decorate the results (row-toggle.js) set up the fresh block again
+                root.dispatchEvent(new CustomEvent('cl-list:swapped', { bubbles: true }));
+                applyFold();
                 hideAutosubmitButtons();
-                if (push) { history.pushState({ ordersList: true }, '', target.pathname + target.search); }
+                if (push) { history.pushState({ listPage: true }, '', target.pathname + target.search); }
                 if (reopen) {
                     var menu = root.querySelector('details[data-cl-filter-menu="' + reopen.menu + '"]');
                     var box = menu && menu.querySelector('input[value="' + reopen.value + '"]');
@@ -73,14 +81,14 @@
     function submitSearch(form, keepFocus) {
         var params = new URLSearchParams(new FormData(form));
         if (!params.get('q')) { params.delete('q'); }
-        load('/dashboard/orders' + (params.toString() ? '?' + params.toString() : ''), true, keepFocus);
+        load(listPath + (params.toString() ? '?' + params.toString() : ''), true, keepFocus);
     }
 
     document.addEventListener('click', function (event) {
         if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
             return;
         }
-        var link = event.target.closest && event.target.closest('a[data-cl-orders-nav]');
+        var link = event.target.closest && event.target.closest('a[data-cl-list-nav]');
         if (link && root.contains(link)) {
             event.preventDefault();
             load(link.getAttribute('href'), true);
@@ -104,7 +112,7 @@
     });
 
     document.addEventListener('submit', function (event) {
-        var form = event.target.closest && event.target.closest('form[data-cl-orders-form]');
+        var form = event.target.closest && event.target.closest('form[data-cl-list-form]');
         if (!form || !root.contains(form) || form.method.toLowerCase() !== 'get') { return; }
         event.preventDefault();
         submitSearch(form, false);
@@ -134,6 +142,38 @@
         load(window.location.pathname + window.location.search, false);
     });
 
+    // Phone only (< 720 px): the filter menus fold under "Filtry: n" next to the search. Without the script they stay
+    // open, so every filter is reachable; the folded state survives a swap of the results block.
+    var phone = window.matchMedia ? window.matchMedia('(max-width: 719px)') : null;
+    var folded = true;
+
+    function applyFold() {
+        var toggle = root.querySelector('[data-cl-toolbar-toggle]');
+        var toolbar = toggle && toggle.closest('.cl-table-toolbar');
+        if (!toolbar) { return; }
+        var fold = !!(phone && phone.matches) && folded;
+        toolbar.classList.toggle('is-collapsed', fold);
+        toggle.setAttribute('aria-expanded', fold ? 'false' : 'true');
+    }
+
+    document.addEventListener('click', function (event) {
+        var toggle = event.target.closest && event.target.closest('[data-cl-toolbar-toggle]');
+        if (!toggle || !root.contains(toggle)) { return; }
+        folded = !folded;
+        applyFold();
+    });
+    if (phone && phone.addEventListener) { phone.addEventListener('change', applyFold); }
+
+    // A click anywhere on a date field opens the browser's date picker, not only a click on its calendar icon. Only a
+    // click: opening it on focus would get in the way of typing the date from the keyboard. Browsers without
+    // showPicker (or refusing it, e.g. when the picker is already open) keep the plain field.
+    document.addEventListener('click', function (event) {
+        var field = event.target.closest && event.target.closest('input[type="date"]');
+        if (!field || !root.contains(field) || typeof field.showPicker !== 'function') { return; }
+        try { field.showPicker(); } catch (e) { /* the icon and typing still work */ }
+    });
+
     hideAutosubmitButtons();
-    history.replaceState({ ordersList: true }, '', window.location.pathname + window.location.search);
+    applyFold();
+    history.replaceState({ listPage: true }, '', window.location.pathname + window.location.search);
 })();
