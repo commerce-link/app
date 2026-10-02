@@ -3,6 +3,8 @@ package pl.commercelink.products;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pl.commercelink.inventory.InventoryView;
@@ -92,34 +94,18 @@ class ProductPricingStrategyTest {
         assertThat(price).isEqualTo(2009);
     }
 
-    @Test
-    void shouldCalculateCorrectAverageForMediumStock() {
-        mockPrices(1743.0, 2100.0);
+    @ParameterizedTest(name = "{0} and {1} average to {2}")
+    @CsvSource({
+            "1743.0,  2100.0,  1929",
+            "1743.3,  2254.88, 2009",
+            "1801.55, 2065.73, 1939"})
+    void shouldCalculateCorrectAverageForMediumStock(double lowPrice, double highPrice, long expectedPrice) {
+        mockPrices(lowPrice, highPrice);
         mockStockLevel(StockLevel.Medium);
 
         long price = pricingStrategy.calculateGrossPrice(product, categoryDefinition);
 
-        assertThat(price).isEqualTo(1929);
-    }
-
-    @Test
-    void shouldCalculateCorrectAverageForMediumStockWithMultipleProviders() {
-        mockPrices(1743.3, 2254.88);
-        mockStockLevel(StockLevel.Medium);
-
-        long price = pricingStrategy.calculateGrossPrice(product, categoryDefinition);
-
-        assertThat(price).isEqualTo(2009);
-    }
-
-    @Test
-    void shouldCalculateCorrectAverageForMediumStockWithRollingPriceAggregate() {
-        mockPrices(1801.55, 2065.73);
-        mockStockLevel(StockLevel.Medium);
-
-        long price = pricingStrategy.calculateGrossPrice(product, categoryDefinition);
-
-        assertThat(price).isEqualTo(1939);
+        assertThat(price).isEqualTo(expectedPrice);
     }
 
     @Test

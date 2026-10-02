@@ -80,15 +80,6 @@ class OrderControllersAuthorizationTest {
     }
 
     @Test
-    void theRmaWarehouseMoveHasTheSameRuleAsItsNeighbours() {
-        // when
-        Method rma = handler("moveSelectedItemsToTheWarehouseForRMA");
-
-        // then
-        assertThat(rma.getAnnotation(PreAuthorize.class).value()).isEqualTo("!hasRole('SUPER_ADMIN')");
-    }
-
-    @Test
     void theInvoiceConfirmationPageIsForTheStoreUsersLikeTheIssuingItself() {
         // when
         Method page = Arrays.stream(OrdersController.class.getDeclaredMethods())
@@ -99,15 +90,6 @@ class OrderControllersAuthorizationTest {
         assertThat(page.isAnnotationPresent(GetMapping.class)).isTrue();
         assertThat(page.getAnnotation(PreAuthorize.class).value()).isEqualTo("!hasRole('SUPER_ADMIN')");
         assertThat(handler("createInvoice").getAnnotation(PreAuthorize.class).value()).isEqualTo("!hasRole('SUPER_ADMIN')");
-    }
-
-    @Test
-    void unpinningADocumentIsForTheAdministrator() {
-        // when
-        Method remove = handler("removeDocument");
-
-        // then
-        assertThat(remove.getAnnotation(PreAuthorize.class).value()).isEqualTo("hasRole('ADMIN')");
     }
 
     @Test

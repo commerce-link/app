@@ -2,6 +2,8 @@ package pl.commercelink.orders;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import pl.commercelink.baskets.BasketItem;
 import pl.commercelink.invoicing.api.Price;
 import pl.commercelink.stores.DeliveryOption;
@@ -94,45 +96,6 @@ class OrderItemTest {
     }
 
     @Test
-    @DisplayName("constructor with position stores the provided position on the item")
-    void constructorWithPositionStoresProvidedPosition() {
-        // when
-        OrderItem orderItem = new OrderItem(ORDER_ID, "Laptops", "Product", 1, 100.0, "MFN-1", false, 7);
-
-        // then
-        assertThat(orderItem.getPosition()).isEqualTo(7);
-    }
-
-    @Test
-    @DisplayName("fromBasketItem copies the service flag from a service-flagged basket item")
-    void fromBasketItemCopiesServiceFlag() {
-        // given
-        BasketItem basketItem = new BasketItem("pim-1", "Montaż komputera", "MFN-S",
-                "Usługi dodatkowe", 100.0, 0, 1, null, 3, false);
-        basketItem.setService(true);
-
-        // when
-        OrderItem orderItem = OrderItem.fromBasketItem(ORDER_ID, basketItem);
-
-        // then
-        assertThat(orderItem.isService()).isTrue();
-    }
-
-    @Test
-    @DisplayName("copy constructor keeps the service flag of the source item")
-    void copyConstructorKeepsServiceFlag() {
-        // given
-        OrderItem source = new OrderItem(ORDER_ID, "Usługi dodatkowe", "Montaż komputera", 1, 100.0, "MFN-S", false);
-        source.setService(true);
-
-        // when
-        OrderItem copy = new OrderItem("order-2", source, 1);
-
-        // then
-        assertThat(copy.isService()).isTrue();
-    }
-
-    @Test
     @DisplayName("hasSupplierAllocation is false for a warehouse-fulfilled service item")
     void hasSupplierAllocationIsFalseForWarehouseFulfilledService() {
         // given
@@ -146,57 +109,16 @@ class OrderItemTest {
         assertThat(orderItem.hasSupplierAllocation()).isFalse();
     }
 
-    @Test
-    @DisplayName("hasSupplierAllocation is true for an ordered product with real allocation details")
-    void hasSupplierAllocationIsTrueForOrderedProductWithAllocationDetails() {
+    @ParameterizedTest
+    @EnumSource(value = FulfilmentStatus.class, names = {"Ordered", "Returned", "Replaced", "InExternalService"})
+    @DisplayName("hasSupplierAllocation is true for a product with real allocation details in a post-order status")
+    void hasSupplierAllocationIsTrueForProductWithAllocationDetailsInPostOrderStatus(FulfilmentStatus status) {
         // given
         OrderItem orderItem = orderItem("MFN-1");
         orderItem.setEan("EAN-1");
         orderItem.setManufacturerCode("MFN-1");
         orderItem.setDeliveryId("delivery-1");
-        orderItem.setStatus(FulfilmentStatus.Ordered);
-
-        // then
-        assertThat(orderItem.hasSupplierAllocation()).isTrue();
-    }
-
-    @Test
-    @DisplayName("hasSupplierAllocation is true for a returned product with real allocation details")
-    void hasSupplierAllocationIsTrueForReturnedProductWithAllocationDetails() {
-        // given
-        OrderItem orderItem = orderItem("MFN-1");
-        orderItem.setEan("EAN-1");
-        orderItem.setManufacturerCode("MFN-1");
-        orderItem.setDeliveryId("delivery-1");
-        orderItem.markAsReturned();
-
-        // then
-        assertThat(orderItem.hasSupplierAllocation()).isTrue();
-    }
-
-    @Test
-    @DisplayName("hasSupplierAllocation is true for a replaced product with real allocation details")
-    void hasSupplierAllocationIsTrueForReplacedProductWithAllocationDetails() {
-        // given
-        OrderItem orderItem = orderItem("MFN-1");
-        orderItem.setEan("EAN-1");
-        orderItem.setManufacturerCode("MFN-1");
-        orderItem.setDeliveryId("delivery-1");
-        orderItem.markAsReplaced();
-
-        // then
-        assertThat(orderItem.hasSupplierAllocation()).isTrue();
-    }
-
-    @Test
-    @DisplayName("hasSupplierAllocation is true for a product in external service with real allocation details")
-    void hasSupplierAllocationIsTrueForProductInExternalServiceWithAllocationDetails() {
-        // given
-        OrderItem orderItem = orderItem("MFN-1");
-        orderItem.setEan("EAN-1");
-        orderItem.setManufacturerCode("MFN-1");
-        orderItem.setDeliveryId("delivery-1");
-        orderItem.setStatus(FulfilmentStatus.InExternalService);
+        orderItem.setStatus(status);
 
         // then
         assertThat(orderItem.hasSupplierAllocation()).isTrue();

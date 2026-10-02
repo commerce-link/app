@@ -5,14 +5,13 @@ import org.springframework.util.MultiValueMap;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.time.LocalDate;
 import java.util.*;
 
 /**
  * The state of the pending deliveries page, read from and written back to the address (spec §4.1). A narrowing link
- * (tile, supplier, search) drops the tab so the page lands on the tab that has results; a widening one keeps it.
+ * (supplier, search) drops the tab so the page lands on the tab that has results; a widening one keeps it.
  */
-public record PendingDeliveriesQuery(Kind kind, Focus focus, List<String> providers, String q) {
+public record PendingDeliveriesQuery(Kind kind, List<String> providers, String q) {
 
     public static final int MAX_Q = 100;
 
@@ -30,53 +29,29 @@ public record PendingDeliveriesQuery(Kind kind, Focus focus, List<String> provid
         static Optional<Kind> parse(String v) { return Arrays.stream(values()).filter(k -> k.param.equalsIgnoreCase(trim(v))).findFirst(); }
     }
 
-    public enum Focus {
-        OVERDUE("overdue"), TODAY("today"), TOMORROW("tomorrow"), APPROVAL("approval");
-        private final String param;
-        Focus(String param) { this.param = param; }
-        public String param() { return param; }
-        static Optional<Focus> parse(String v) { return Arrays.stream(values()).filter(f -> f.param.equalsIgnoreCase(trim(v))).findFirst(); }
-
-        /** The date foci never match a row without a shipping date; APPROVAL ignores the date. */
-        public boolean matches(PendingDeliveryRow row, LocalDate today) {
-            if (this == APPROVAL) return row.approval();
-            LocalDate due = row.due();
-            if (due == null) return false;
-            return switch (this) {
-                case OVERDUE -> due.isBefore(today);
-                case TODAY -> due.isEqual(today);
-                default -> due.isEqual(today.plusDays(1));
-            };
-        }
-    }
-
     public static PendingDeliveriesQuery parse(MultiValueMap<String, String> params) {
         List<String> providers = params.get("provider");
         return new PendingDeliveriesQuery(
                 Kind.parse(params.getFirst("kind")).orElse(null),
-                Focus.parse(params.getFirst("focus")).orElse(null),
                 providers == null ? List.of() : providers.stream().filter(Objects::nonNull).toList(),
                 params.getFirst("q"));
     }
 
-    public boolean isFiltered() { return focus != null || !providers.isEmpty() || q != null; }
+    public boolean isFiltered() { return !providers.isEmpty() || q != null; }
 
-    public int activeFilterCount() { return (focus != null ? 1 : 0) + providers.size() + (q != null ? 1 : 0); }
+    public int activeFilterCount() { return providers.size() + (q != null ? 1 : 0); }
 
-    public PendingDeliveriesQuery withKind(Kind k) { return new PendingDeliveriesQuery(k, focus, providers, q); }
-    public PendingDeliveriesQuery withProviders(List<String> p) { return new PendingDeliveriesQuery(kind, focus, p, q); }
-    public PendingDeliveriesQuery withFocus(Focus f) { return new PendingDeliveriesQuery(null, f, providers, q); }
-    public PendingDeliveriesQuery withoutFocus() { return new PendingDeliveriesQuery(kind, null, providers, q); }
-    public PendingDeliveriesQuery toggleProvider(String p) { return new PendingDeliveriesQuery(null, focus, toggled(providers, p), q); }
-    public PendingDeliveriesQuery withoutProvider(String p) { return new PendingDeliveriesQuery(kind, focus, without(providers, p), q); }
-    public PendingDeliveriesQuery withQ(String newQ) { return new PendingDeliveriesQuery(null, focus, providers, newQ); }
-    public PendingDeliveriesQuery withoutQ() { return new PendingDeliveriesQuery(kind, focus, providers, null); }
-    public PendingDeliveriesQuery cleared() { return new PendingDeliveriesQuery(kind, null, List.of(), null); }
+    public PendingDeliveriesQuery withKind(Kind k) { return new PendingDeliveriesQuery(k, providers, q); }
+    public PendingDeliveriesQuery withProviders(List<String> p) { return new PendingDeliveriesQuery(kind, p, q); }
+    public PendingDeliveriesQuery toggleProvider(String p) { return new PendingDeliveriesQuery(null, toggled(providers, p), q); }
+    public PendingDeliveriesQuery withoutProvider(String p) { return new PendingDeliveriesQuery(kind, without(providers, p), q); }
+    public PendingDeliveriesQuery withQ(String newQ) { return new PendingDeliveriesQuery(null, providers, newQ); }
+    public PendingDeliveriesQuery withoutQ() { return new PendingDeliveriesQuery(kind, providers, null); }
+    public PendingDeliveriesQuery cleared() { return new PendingDeliveriesQuery(kind, List.of(), null); }
 
     public String href(String path) {
         List<String> parts = new ArrayList<>();
         if (kind != null) parts.add("kind=" + kind.param());
-        if (focus != null) parts.add("focus=" + focus.param());
         providers.forEach(p -> parts.add("provider=" + encode(p)));
         if (q != null) parts.add("q=" + encode(q));
         return parts.isEmpty() ? path : path + "?" + String.join("&", parts);

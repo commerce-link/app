@@ -5,7 +5,7 @@ import pl.commercelink.inventory.supplier.SupplierRegistry;
 import java.time.LocalDate;
 
 /**
- * The sort key of a delivery in StoreIdListKeyIndex (spec §7.1): the prefix says which part of the deliveries list the
+ * The sort key of a delivery in StoreIdDeliveryListSortKeyIndex (spec §7.1): the prefix says which part of the deliveries list the
  * delivery belongs to, the rest orders it there. On its way: planned date (undated last). Received without a purchase
  * invoice: the settlement backlog, by reception. Received and invoiced (or the store's own warehouse, which never gets
  * one): the settled history, by reception. Recomputed on every save, so a date change, a reception or an attached
@@ -13,9 +13,9 @@ import java.time.LocalDate;
  */
 public final class DeliveryListKey {
 
-    public static final String IN_TRANSIT = "T#";
-    public static final String TO_SETTLE = "S#";
-    public static final String SETTLED = "R#";
+    public static final String IN_TRANSIT = "IN_TRANSIT#";
+    public static final String TO_SETTLE = "TO_SETTLE#";
+    public static final String SETTLED = "SETTLED#";
     public static final String UNDATED = "9999-12-31";
 
     private DeliveryListKey() {

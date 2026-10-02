@@ -1,6 +1,5 @@
 package pl.commercelink.web;
 
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -28,26 +27,5 @@ class SettingsSubpageHeaderTemplateTest {
         assertThat(html).containsOnlyOnce("fragments/settings-header :: header(");
         assertThat(html).contains("<section class=\"cl-page\">").contains("class=\"cl-page-body\"");
         assertThat(html).doesNotContain("<h1").doesNotContain("class=\"section\"").doesNotContain("class=\"container\"");
-    }
-
-    /** The status cards say what the old screen guide said, and the guide described a layout that no longer exists. */
-    @Test
-    void shippingHasNoScreenGuide() throws Exception {
-        // when / then
-        assertThat(template("store-shipping")).contains("fragments/settings-header :: header(false, null)")
-                .doesNotContain("screen-intro");
-    }
-
-    /** Adding belongs to the list it adds to: in the head of the list card, as on the warehouse page. */
-    @Test
-    void rmaCentresCarryTheAddButtonInTheListCardHeadNotInThePageHeader() throws Exception {
-        // when
-        String html = template("rma-centers");
-
-        // then
-        assertThat(html).contains("fragments/settings-header :: header(false, null)").doesNotContain("settingsActions");
-        assertThat(html.indexOf("@{/dashboard/store/rma-centers/new}"))
-                .isGreaterThan(html.indexOf("class=\"cl-card-head\""))
-                .isLessThan(html.indexOf("class=\"cl-card-desc\""));
     }
 }

@@ -4,6 +4,9 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
@@ -24,6 +27,7 @@ import pl.commercelink.warehouse.api.StockSummary;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -218,46 +222,27 @@ class InventoryPageControllerTest {
         verifyNoInteractions(warehouseSummaryService);
     }
 
-    @Test
-    void legacyCheckPriceMfnLinksRedirectToTheNewQuery() {
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("legacyCheckPriceLinks")
+    void legacyCheckPriceRedirectsToTheNewQuery(String rule, String mfn, String ean, String pimId, String expected) {
         // when / then
-        // URLEncoder encodes a space as '+'; the servlet container decodes '+' back to a space in a query string
-        assertThat(controller.legacyCheckPrice("MFN 1", "5901234123457", null))
-                .isEqualTo("redirect:/dashboard/inventory?q=MFN+1");
+        assertThat(controller.legacyCheckPrice(mfn, ean, pimId)).isEqualTo(expected);
     }
 
-    @Test
-    void legacyCheckPriceEncodesAPlusSoItIsNotDecodedAsASpace() {
-        // when / then
-        assertThat(controller.legacyCheckPrice("A+B", "5901234123457", null))
-                .isEqualTo("redirect:/dashboard/inventory?q=A%2BB");
-    }
-
-    @Test
-    void legacyCheckPriceEncodesCurlyBracesSoTheyAreNotTreatedAsAUriTemplateVariable() {
-        // when / then
-        assertThat(controller.legacyCheckPrice("{x}", "5901234123457", null))
-                .isEqualTo("redirect:/dashboard/inventory?q=%7Bx%7D");
-    }
-
-    @Test
-    void legacyCheckPricePrefersPimIdOverMfn() {
-        // when / then
-        assertThat(controller.legacyCheckPrice("MFN-1", "5901234123457", "PIM-7"))
-                .isEqualTo("redirect:/dashboard/inventory?q=PIM-7");
-    }
-
-    @Test
-    void legacyCheckPriceFallsBackToEanWhenMfnIsBlank() {
-        // when / then
-        assertThat(controller.legacyCheckPrice(" ", "5901234123457", ""))
-                .isEqualTo("redirect:/dashboard/inventory?q=5901234123457");
-    }
-
-    @Test
-    void legacyCheckPriceWithNoParametersRedirectsToThePlainPage() {
-        // when / then
-        assertThat(controller.legacyCheckPrice(null, null, null))
-                .isEqualTo("redirect:/dashboard/inventory");
+    private static Stream<Arguments> legacyCheckPriceLinks() {
+        return Stream.of(
+                // URLEncoder encodes a space as '+'; the servlet container decodes '+' back to a space in a query string
+                Arguments.of("mfn link redirects to the new query", "MFN 1", "5901234123457", null,
+                        "redirect:/dashboard/inventory?q=MFN+1"),
+                Arguments.of("a plus is encoded so it is not decoded as a space", "A+B", "5901234123457", null,
+                        "redirect:/dashboard/inventory?q=A%2BB"),
+                Arguments.of("curly braces are encoded so they are not treated as a URI template variable", "{x}",
+                        "5901234123457", null, "redirect:/dashboard/inventory?q=%7Bx%7D"),
+                Arguments.of("pim id is preferred over mfn", "MFN-1", "5901234123457", "PIM-7",
+                        "redirect:/dashboard/inventory?q=PIM-7"),
+                Arguments.of("ean is the fallback when mfn is blank", " ", "5901234123457", "",
+                        "redirect:/dashboard/inventory?q=5901234123457"),
+                Arguments.of("no parameters redirect to the plain page", null, null, null,
+                        "redirect:/dashboard/inventory"));
     }
 }

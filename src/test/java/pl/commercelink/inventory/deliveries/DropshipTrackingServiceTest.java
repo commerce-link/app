@@ -330,7 +330,7 @@ class DropshipTrackingServiceTest {
         // then
         assertThat(outcome).isEqualTo(TrackingOutcome.PROCESSING);
         assertThat(delivery.getTrackingView().getNextCheckAt()).isEqualTo(NOW.plusMinutes(30));
-        verify(completion, never()).confirmShipped(any(), any(), anyList(), anyList(), any());
+        verify(completion, never()).confirmShipped(any(), any(), anyList(), anyList(), any(), any());
     }
 
     @Test

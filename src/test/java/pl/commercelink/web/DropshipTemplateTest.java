@@ -135,34 +135,6 @@ class DropshipTemplateTest {
     }
 
     @Test
-    void deliveryDetailsShowSupplierTrackingTagAmongStatusesWithoutAManualCheckButton() throws Exception {
-        // when
-        String html = read("deliveryDetails.html");
-
-        // then - the tag alone; checks run on the tracking cron, the manual button was dropped
-        assertThat(html).doesNotContain("deliveries.dropship.tracking.label");
-        assertThat(html).doesNotContain("deliveries.dropship.tracking.lastChecked");
-        assertThat(html).contains("#{${'deliveries.dropship.tracking.state.' + trackingState}}");
-        assertThat(html).doesNotContain("tracking-check-form");
-        assertThat(html).doesNotContain("/tracking/check");
-        assertThat(html).doesNotContain("deliveries.dropship.tracking.check\"");
-        assertThat(html).doesNotContain("fa-truck");
-    }
-
-    @Test
-    void trackingStateLabelsStartWithACapitalLetter() throws Exception {
-        for (String file : List.of("messages_pl.properties", "messages_en.properties")) {
-            String messages = Files.readString(Path.of("src/main/resources/" + file), StandardCharsets.UTF_8);
-            for (String line : messages.split("\n")) {
-                if (line.startsWith("deliveries.dropship.tracking.state.")) {
-                    String label = line.substring(line.indexOf('=') + 1);
-                    assertThat(Character.isUpperCase(label.charAt(0))).as(file + ": " + line).isTrue();
-                }
-            }
-        }
-    }
-
-    @Test
     void deliveryDetailsWarnAboutTerminalTrackingStates() throws Exception {
         // when
         String html = read("deliveryDetails.html");

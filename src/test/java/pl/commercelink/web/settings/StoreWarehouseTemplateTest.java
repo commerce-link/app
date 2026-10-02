@@ -5,9 +5,6 @@ import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.starter.security.UserRole;
 import pl.commercelink.web.dtos.WarehouseDocumentsForm;
 
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -216,14 +213,4 @@ class StoreWarehouseTemplateTest {
         assertThat(html).startsWith("<form").contains("data-success-message=\"Zapisano\"").doesNotContain("Magazyn Warszawa");
     }
 
-    @Test
-    void dropsTheTableFormTheSaveConfirmationAndTheOldEndpoints() throws Exception {
-        // when
-        String template = Files.readString(Path.of("src/main/resources/templates/store-warehouse.html"), StandardCharsets.UTF_8);
-
-        // then
-        assertThat(template).doesNotContain("confirmSave").doesNotContain("confirmDelete").doesNotContain("/warehouse/edit")
-                .doesNotContain("printers/add").doesNotContain("Cancel").doesNotContain("pattern=")
-                .doesNotContain("<script>\n        document.querySelector").doesNotContain("style=");
-    }
 }

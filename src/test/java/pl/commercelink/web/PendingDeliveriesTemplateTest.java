@@ -23,7 +23,7 @@ class PendingDeliveriesTemplateTest {
         assertThat(page).contains("data-cl-list-results").contains("th:fragment=\"results\"")
                 .contains("data-cl-list-path=${page.listPath()}").contains("data-cl-list-fragment=${page.fragmentPath()}")
                 .contains("/js/list-page.js").contains("/js/row-toggle.js")
-                .contains("cl-segmented").contains("${page.tabs()}").contains("cl-stat is-link").doesNotContain("is-static");
+                .contains("cl-segmented").contains("${page.tabs()}").doesNotContain("cl-stat-grid").doesNotContain("is-static");
     }
 
     @Test

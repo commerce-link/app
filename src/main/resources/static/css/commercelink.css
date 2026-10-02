@@ -5082,7 +5082,7 @@ a.cl-link-button:hover {
     font-weight: 500;
 }
 
-/* Document marks under a status pill (WZ · FV/PAR · review star): a green check for what exists, a filled warn mark
+/* Document marks under a status pill (WZ · FZ · FV/FK/PAR · review star): a green check for what exists, a filled warn mark
    with a cross for what holds a delivered record open — shape as well as colour (principle 3). Nothing else is shown,
    so the marks start at the left edge whichever of them apply. */
 .cl-page .cl-doc-marks {

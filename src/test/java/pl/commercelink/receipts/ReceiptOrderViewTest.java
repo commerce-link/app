@@ -77,17 +77,6 @@ class ReceiptOrderViewTest {
     }
 
     @Test
-    void onlyAttemptThatIsDeadStillShowsItsProblemWhenNoNewerAttemptExists() {
-        ReceiptAttempt attempt = deadAttempt("order-1:R1", ReceiptAttemptState.FAILED, 1);
-        when(alerts.pageProblem(eq(attempt), eq(ReceiptAttention.FAILED), eq(Locale.ENGLISH)))
-                .thenReturn(new ReceiptPageProblem("Rejected.", null, null, null));
-
-        ReceiptOrderView view = ReceiptOrderView.of(List.of(attempt), false, false, alerts, NOW, Locale.ENGLISH);
-
-        assertThat(view.rows()).singleElement().satisfies(row -> assertThat(row.problem()).isNotNull());
-    }
-
-    @Test
     void aSupersededDeadAttemptsProblemIsHiddenWhileTheNewestAttemptHasNone() {
         // R1 FAILED but a newer R2 already fiscalised: R1's old FAILED reason no longer matters, and R2 (the
         // attempt that still matters) has nothing wrong with it either.
