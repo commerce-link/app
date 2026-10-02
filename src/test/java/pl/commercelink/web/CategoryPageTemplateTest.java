@@ -65,15 +65,6 @@ class CategoryPageTemplateTest {
                 .contains("#{catalog.products.note.dynamic}");
     }
 
-    @Test
-    void noOldWidgets() throws Exception {
-        // when / then
-        assertThat(page()).doesNotContain("confirmBulkAction").doesNotContain("alert(").doesNotContain("overflow-x")
-                .doesNotContain("style=").doesNotContain("bulkAction\" name=\"action\"")
-                .doesNotContain("fragments/pagination").doesNotContain("class=\"button is-")
-                .doesNotContain("notification is-").doesNotContain("dropdown").doesNotContain("errorMessage");
-    }
-
     /** The page as the controller renders it: two manual products, one of them with a label outside the list. */
     private static String rendered(boolean dynamic) {
         ProductRow listed = new ProductRow("p1", "MSI RTX 5070", "1", "MFN-1", "pim-1", "MSI", "RTX 5070", false,

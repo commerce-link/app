@@ -15,6 +15,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 import pl.commercelink.migration.V019_AddDeliveriesListKeyIndex;
+import pl.commercelink.migration.V020_RenameDeliveriesListSortKey;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -35,7 +36,7 @@ class DeliveriesListIndexDynamoDbIntegrationTest {
     static DeliveriesRepository deliveries;
 
     @BeforeAll
-    static void createTheDeliveriesTableWithoutTheIndex() {
+    static void createTheDeliveriesTableAndMigrateIt() {
         client = AmazonDynamoDBClientBuilder.standard()
                 .withEndpointConfiguration(new AwsClientBuilder.EndpointConfiguration(
                         "http://" + DYNAMODB.getHost() + ":" + DYNAMODB.getMappedPort(8000), "eu-central-1"))
@@ -44,12 +45,15 @@ class DeliveriesListIndexDynamoDbIntegrationTest {
         mapper = new DynamoDBMapper(client);
         client.createTable(mapper.generateCreateTableRequest(Delivery.class).withBillingMode(BillingMode.PAY_PER_REQUEST));
         deliveries = new DeliveriesRepository(client);
-        // before V019: these rows were written by the old code and carry no listKey at all
-        saveWithoutListKey(inTransit("store-1", "aaaa0001", LocalDate.of(2026, 10, 1)));
-        saveWithoutListKey(inTransit("store-1", "aaaa0002", null));
-        saveWithoutListKey(received("store-1", "bbbb0001", LocalDateTime.of(2026, 9, 20, 9, 0), false));
-        saveWithoutListKey(received("store-1", "bbbb0002", LocalDateTime.of(2026, 5, 2, 9, 0), true));
-        saveWithoutListKey(inTransit("store-2", "cccc0001", LocalDate.of(2026, 10, 2)));
+        // before V019: these rows were written by the old code and carry no key at all
+        saveWithoutKey(inTransit("store-1", "aaaa0001", LocalDate.of(2026, 10, 1)));
+        saveWithoutKey(inTransit("store-1", "aaaa0002", null));
+        saveWithoutKey(received("store-1", "bbbb0001", LocalDateTime.of(2026, 9, 20, 9, 0), false));
+        saveWithoutKey(received("store-1", "bbbb0002", LocalDateTime.of(2026, 5, 2, 9, 0), true));
+        saveWithoutKey(inTransit("store-2", "cccc0001", LocalDate.of(2026, 10, 2)));
+        // the order of a real deployment: V019 (old index and listKey), then V020 replaces both
+        new V019_AddDeliveriesListKeyIndex(client).execute();
+        new V020_RenameDeliveriesListSortKey(client).execute();
     }
 
     static Delivery inTransit(String storeId, String id, LocalDate planned) {
@@ -69,32 +73,17 @@ class DeliveriesListIndexDynamoDbIntegrationTest {
         return delivery;
     }
 
-    static void saveWithoutListKey(Delivery delivery) {
+    static void saveWithoutKey(Delivery delivery) {
         mapper.save(delivery);
         client.updateItem(new UpdateItemRequest().withTableName("Deliveries")
                 .withKey(Map.of("storeId", new AttributeValue(delivery.getStoreId()),
                         "deliveryId", new AttributeValue(delivery.getDeliveryId())))
-                .withUpdateExpression("REMOVE listKey"));
+                .withUpdateExpression("REMOVE deliveryListSortKey"));
     }
 
     @Test
     @Order(1)
-    void beforeTheMigrationTheListReadsTheStoresPartition() {
-        assertThat(deliveries.findInTransit("store-1")).extracting(Delivery::getDeliveryId)
-                .containsExactlyInAnyOrder("aaaa0001-0000-0000-0000-000000000000", "aaaa0002-0000-0000-0000-000000000000");
-        assertThat(deliveries.findToSettle("store-1")).extracting(Delivery::getDeliveryId)
-                .containsExactly("bbbb0001-0000-0000-0000-000000000000");
-        // the count falls back to the partition too, and only counts the backlog of its own store
-        assertThat(deliveries.countToSettle("store-1")).isEqualTo(1);
-        assertThat(deliveries.countToSettle("store-2")).isZero();
-    }
-
-    @Test
-    @Order(2)
-    void afterTheMigrationEachPartOfTheListIsReadFromTheIndex() {
-        // when
-        new V019_AddDeliveriesListKeyIndex(client).execute();
-
+    void afterTheMigrationsEachPartOfTheListIsReadFromTheIndex() {
         // then
         assertThat(deliveries.findInTransit("store-1")).hasSize(2);
         assertThat(deliveries.findInTransit("store-2")).hasSize(1);
@@ -111,10 +100,10 @@ class DeliveriesListIndexDynamoDbIntegrationTest {
     }
 
     @Test
-    @Order(3)
-    void theMigrationRunsTwiceAndASavedDeliveryMovesByItself() {
+    @Order(2)
+    void theLastMigrationRunsTwiceAndASavedDeliveryMovesByItself() {
         // given
-        new V019_AddDeliveriesListKeyIndex(client).execute();
+        new V020_RenameDeliveriesListSortKey(client).execute();
         Delivery arriving = mapper.load(Delivery.class, "store-1", "aaaa0001-0000-0000-0000-000000000000");
 
         // when
@@ -129,7 +118,7 @@ class DeliveriesListIndexDynamoDbIntegrationTest {
     }
 
     @Test
-    @Order(4)
+    @Order(3)
     void staleIndexEntryIsDroppedByItsRecomputedKey() {
         // given: the index still says "on its way" while the delivery was already received
         client.updateItem(new UpdateItemRequest().withTableName("Deliveries")
@@ -143,7 +132,7 @@ class DeliveriesListIndexDynamoDbIntegrationTest {
     }
 
     @Test
-    @Order(5)
+    @Order(4)
     void backfillDoesNotOverwriteAKeyWrittenByASaveAfterTheScan() {
         // given: a scanned copy that is stale, because the delivery was saved (fresh key, new version) after the scan
         Delivery scanned = mapper.load(Delivery.class, "store-2", "cccc0001-0000-0000-0000-000000000000");
@@ -153,29 +142,29 @@ class DeliveriesListIndexDynamoDbIntegrationTest {
         String freshKey = DeliveryListKey.of(saved);
 
         // when
-        new V019_AddDeliveriesListKeyIndex(client).backfillListKey(scanned, true);
+        new V020_RenameDeliveriesListSortKey(client).backfillDeliveryListSortKey(scanned, true);
 
         // then
-        assertThat(rawItem("store-2", "cccc0001-0000-0000-0000-000000000000").get("listKey").getS()).isEqualTo(freshKey);
+        assertThat(rawItem("store-2", "cccc0001-0000-0000-0000-000000000000").get("deliveryListSortKey").getS()).isEqualTo(freshKey);
     }
 
     @Test
-    @Order(6)
+    @Order(5)
     void backfillLeavesTheVersionUntouched() {
         // given
         Map<String, AttributeValue> before = rawItem("store-1", "bbbb0001-0000-0000-0000-000000000000");
-        new V019_AddDeliveriesListKeyIndex(client).backfillListKey(
+        new V020_RenameDeliveriesListSortKey(client).backfillDeliveryListSortKey(
                 mapper.load(Delivery.class, "store-1", "bbbb0001-0000-0000-0000-000000000000"), true);
 
         // when
-        new V019_AddDeliveriesListKeyIndex(client).execute();
+        new V020_RenameDeliveriesListSortKey(client).execute();
 
         // then
         assertThat(rawItem("store-1", "bbbb0001-0000-0000-0000-000000000000").get("version")).isEqualTo(before.get("version"));
     }
 
     @Test
-    @Order(7)
+    @Order(6)
     void aBlankDeliveryNumberFindsNothing() {
         assertThat(deliveries.findByDeliveryIdPrefix("store-1", " ")).isEmpty();
     }

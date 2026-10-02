@@ -248,7 +248,8 @@ class DeliveryCreateControllerTest {
 
         // then
         assertThat(view).isEqualTo("deliveries/create/manual");
-        assertThat(model.getAttribute("errorMessage")).isEqualTo("msg:orders.dropship.error.nothingSelected");
+        assertThat(model.containsAttribute("errorMessage")).isFalse();
+        assertThat(model.getAttribute("failureMessage")).isEqualTo("msg:orders.dropship.error.nothingSelected");
     }
 
     @Test
@@ -317,7 +318,6 @@ class DeliveryCreateControllerTest {
     void warehouseConfirmAlwaysPostsPlnCostsWhateverCurrencyTheRecordStepLeft() {
         // given
         when(scope.purchaseAvailable()).thenReturn(true);
-        when(scope.dropship()).thenReturn(false);
         DeliveryCreationForm form = requested(1);
         form.setSourceCurrency("EUR");
         when(scope.submit(form, "ref-1")).thenReturn(OperationResult.success(new PurchaseSubmission("d-9", false)));
@@ -330,20 +330,26 @@ class DeliveryCreateControllerTest {
     }
 
     @Test
-    void dropshipConfirmKeepsTheCurrencyTheCostsCardShowed() {
-        // given
+    void integrationConfirmRecordsTheDefaultOrderDataWhateverTheHiddenFieldsCarry() {
+        // given: the operator typed costs in "Zarejestruj zamówienie", went back and ordered through the integration
         when(scopes.resolve(STORE_ID, PROVIDER, ORDER_ID)).thenReturn(new DeliveryScopes.Resolution.Found(scope));
         when(scope.purchaseAvailable()).thenReturn(true);
-        when(scope.dropship()).thenReturn(true);
+        when(scope.defaultTax()).thenReturn(1.23);
         DeliveryCreationForm form = requested(1);
         form.setSourceCurrency("EUR");
+        form.setShippingCost(15);
+        form.setPaymentCost(3);
+        form.setPaymentTerms(14);
+        form.setTax(1.0);
         when(scope.submit(form, "ref-1")).thenReturn(OperationResult.success(new PurchaseSubmission("d-9", false)));
 
         // when
         asStoreAdmin(() -> controller.confirm(PROVIDER, "ref-1", form, binding(form), ORDER_ID, null, new ConcurrentModel(), flash, Locale.ENGLISH));
 
         // then
-        verify(scope).submit(argThat(submitted -> "EUR".equals(submitted.getSourceCurrency())), eq("ref-1"));
+        verify(scope).submit(argThat(submitted -> "PLN".equals(submitted.getSourceCurrency())
+                && submitted.getShippingCost() == 0 && submitted.getPaymentCost() == 0
+                && submitted.getPaymentTerms() == 0 && submitted.getTax() == 1.23), eq("ref-1"));
     }
 
     @Test
@@ -360,7 +366,8 @@ class DeliveryCreateControllerTest {
         // then
         assertThat(view).isEqualTo("deliveries/create/purchase");
         assertThat(model.getAttribute("purchaseRef")).isEqualTo("ref-1");
-        assertThat(model.getAttribute("errorMessage")).isEqualTo("msg:deliveries.purchase.error.failed");
+        assertThat(model.containsAttribute("errorMessage")).isFalse();
+        assertThat(model.getAttribute("failureMessage")).isEqualTo("msg:deliveries.purchase.error.failed");
         verify(scope).addPurchaseModel(form, model);
     }
 
@@ -457,6 +464,66 @@ class DeliveryCreateControllerTest {
     }
 
     @Test
+    void unreadableSuggestionCostComesBackAsTheOfferPrice() {
+        // given: suggestions are not in the plan, so this page works them out to restore the planned cost
+        when(scope.plannedForm()).thenReturn(requested(1));
+        pl.commercelink.web.dtos.SuggestedDeliveryItem offered = new pl.commercelink.web.dtos.SuggestedDeliveryItem();
+        offered.setMfn("S-1");
+        offered.setUnitCost(50.0);
+        when(scope.suggestions()).thenReturn(List.of(offered));
+        DeliveryCreationForm form = requested(1);
+        pl.commercelink.web.dtos.SuggestedDeliveryItem typed = new pl.commercelink.web.dtos.SuggestedDeliveryItem();
+        typed.setMfn("S-1");
+        typed.setRequestedQty(2);
+        form.setSuggestedItems(new ArrayList<>(List.of(typed)));
+        BindingResult binding = binding(form);
+        binding.rejectValue("suggestedItems[0].unitCost", "typeMismatch");
+        Model model = new ConcurrentModel();
+
+        // when
+        asStoreAdmin(() -> controller.manual(PROVIDER, form, binding, null, null, model, flash, Locale.ENGLISH));
+
+        // then
+        DeliveryCreationForm shown = (DeliveryCreationForm) model.getAttribute("form");
+        assertThat(shown.getSuggestedItems()).singleElement().satisfies(suggestion -> {
+            assertThat(suggestion.getUnitCost()).isEqualTo(50.0);
+            assertThat(suggestion.getRequestedQty()).isEqualTo(2);
+        });
+        assertThat((java.util.Set<String>) model.getAttribute("invalidFields")).containsExactly("S-1|unitCost");
+    }
+
+    @Test
+    void suggestionsAreFetchedAsRowsOfTheScope() {
+        // given
+        pl.commercelink.web.dtos.SuggestedDeliveryItem offered = new pl.commercelink.web.dtos.SuggestedDeliveryItem();
+        offered.setMfn("S-1");
+        when(scope.suggestions()).thenReturn(List.of(offered));
+        Model model = new ConcurrentModel();
+
+        // when
+        String view = asStoreAdmin(() -> controller.suggestions(PROVIDER, null, model));
+
+        // then
+        assertThat(view).isEqualTo("deliveries/create/parts :: suggestionRows");
+        assertThat(((DeliveryCreationForm) model.getAttribute("form")).getSuggestedItems()).containsExactly(offered);
+        verify(scope, never()).plannedForm();
+    }
+
+    @Test
+    void suggestionsOfASupplierTheStoreCannotUseAreEmpty() {
+        // given
+        when(scopes.resolve(STORE_ID, PROVIDER, null)).thenReturn(new DeliveryScopes.Resolution.Refused(null));
+        Model model = new ConcurrentModel();
+
+        // when
+        String view = asSuperAdmin(() -> controller.suggestionsForSuperAdmin(STORE_ID, PROVIDER, null, model));
+
+        // then
+        assertThat(view).isEqualTo("deliveries/create/parts :: suggestionRows");
+        assertThat(((DeliveryCreationForm) model.getAttribute("form")).getSuggestedItems()).isEmpty();
+    }
+
+    @Test
     void backWithAnEmptyVatFallsBackToTheSuppliersDefault() {
         // given
         when(scope.plannedForm()).thenReturn(requested(1));
@@ -485,8 +552,8 @@ class DeliveryCreateControllerTest {
                 OperationResult.failure("error.message.delivery.fulfilment.invalid"));
 
         // when
-        FulfilmentUpdateResponse ok = asStoreAdmin(() -> controller.fulfilmentJson(PROVIDER, update, Locale.ENGLISH));
-        String fallback = asStoreAdmin(() -> controller.fulfilment(PROVIDER, update, flash, Locale.ENGLISH));
+        FulfilmentUpdateResponse ok = asStoreAdmin(() -> controller.fulfilmentJson(PROVIDER, update, fulfilmentBinding(update), Locale.ENGLISH));
+        String fallback = asStoreAdmin(() -> controller.fulfilment(PROVIDER, update, fulfilmentBinding(update), flash, Locale.ENGLISH));
 
         // then
         assertThat(ok).isEqualTo(new FulfilmentUpdateResponse(true, "msg:deliveries.create.fulfilment.saved", "590", "NEW", "12.50"));
@@ -525,5 +592,137 @@ class DeliveryCreateControllerTest {
         // then
         assertThat(view).isEqualTo("redirect:/dashboard/deliveries/create/Hurt%20%C5%81%C3%B3d%C5%BA%2F2");
         verify(scopes).resolve(STORE_ID, provider, null);
+    }
+
+    private static DeliveryCreationForm planned(int qty, double cost) {
+        DeliveryCreationForm form = requested(qty);
+        form.getItems().getFirst().setUnitCost(cost);
+        return form;
+    }
+
+    private static DeliveryCreationForm dropshipLine(boolean selected, int hiddenQty) {
+        DeliveryCreationForm form = requested(hiddenQty);
+        Allocation line = new Allocation();
+        line.setKey(new AllocationKey(ORDER_ID, "line-1", "client"));
+        line.setType(AllocationType.Order);
+        line.setQty(1);
+        line.setSelected(selected);
+        form.getItems().getFirst().setAllocations(new ArrayList<>(List.of(line)));
+        return form;
+    }
+
+    @Test
+    void anUnreadableCostComesBackWithThePlannedValueAndIsMarked() {
+        // given: the operator cleared the cost of the only row, so the posted form carries 0 for it
+        when(scope.plannedForm()).thenReturn(planned(2, 12.5));
+        DeliveryCreationForm posted = planned(4, 0);
+        BindingResult binding = binding(posted);
+        binding.rejectValue("items[0].unitCost", "typeMismatch");
+        Model model = new ConcurrentModel();
+
+        // when
+        asStoreAdmin(() -> controller.manual(PROVIDER, posted, binding, null, null, model, flash, Locale.ENGLISH));
+
+        // then
+        DeliveryItem shown = ((DeliveryCreationForm) model.getAttribute("form")).getItems().getFirst();
+        assertThat(shown.getUnitCost()).isEqualTo(12.5);
+        assertThat(shown.getRequestedQty()).isEqualTo(4);
+        assertThat(model.getAttribute("invalidFields")).isEqualTo(java.util.Set.of("MFN-1|unitCost"));
+    }
+
+    @Test
+    void dropshipWithEveryLineUntickedIsNothingRequestedWhateverTheHiddenQuantitySays() {
+        // given: the hidden quantity still says 1 (no script, a restored page), but no line is ticked
+        when(scope.dropship()).thenReturn(true);
+        when(scope.plannedForm()).thenReturn(dropshipLine(true, 1));
+        DeliveryCreationForm posted = dropshipLine(false, 1);
+        Model model = new ConcurrentModel();
+
+        // when
+        String view = asStoreAdmin(() -> controller.manual(PROVIDER, posted, binding(posted), ORDER_ID, null, model, flash, Locale.ENGLISH));
+
+        // then
+        assertThat(view).isEqualTo("deliveries/create/items");
+        assertThat(model.getAttribute("stepError")).isEqualTo("deliveries.create.error.nothingRequested.dropship");
+    }
+
+    @Test
+    void dropshipSaveWithEveryLineUntickedRecordsNothing() {
+        // given
+        when(scope.dropship()).thenReturn(true);
+        DeliveryCreationForm posted = dropshipLine(false, 1);
+        posted.setRemoveUnselected(true);
+
+        // when
+        String view = asStoreAdmin(() -> controller.save(PROVIDER, posted, binding(posted), ORDER_ID, null, new ConcurrentModel(), flash, Locale.ENGLISH));
+
+        // then
+        assertThat(view).isEqualTo("deliveries/create/manual");
+        verify(scope, never()).save(any());
+    }
+
+    @Test
+    void confirmWithThePurchaseRefOfAPlacedOrderOpensThatDeliveryEvenWhenTheOrderNoLongerQualifies() {
+        // given: the lines already point at the placed delivery, so eligibility refuses the order now
+        when(supplierPurchaseService.submittedDeliveryId(STORE_ID, "ref-1")).thenReturn(java.util.Optional.of("d-7"));
+        lenient().when(scopes.resolve(STORE_ID, PROVIDER, ORDER_ID))
+                .thenReturn(new DeliveryScopes.Resolution.Refused("orders.dropship.rejected.noDropshipCapableSupplier"));
+
+        // when
+        String view = asStoreAdmin(() -> controller.confirm(PROVIDER, "ref-1", requested(1), binding(requested(1)), ORDER_ID, "order",
+                new ConcurrentModel(), flash, Locale.ENGLISH));
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=d-7");
+        assertThat(flash.getFlashAttributes()).isEmpty();
+        verify(scope, never()).submit(any(), any());
+    }
+
+    @Test
+    void failedConfirmGivesBackTheOrderDataTypedForTheRecordStep() {
+        // given
+        when(scope.purchaseAvailable()).thenReturn(true);
+        when(scope.defaultTax()).thenReturn(1.23);
+        DeliveryCreationForm form = requested(1);
+        form.setSourceCurrency("EUR");
+        form.setShippingCost(4.4);
+        form.setPaymentCost(2);
+        form.setPaymentTerms(7);
+        form.setTax(1.0);
+        when(scope.submit(any(), eq("ref-1"))).thenReturn(OperationResult.failure("deliveries.purchase.error.failed"));
+        Model model = new ConcurrentModel();
+
+        // when
+        asStoreAdmin(() -> controller.confirm(PROVIDER, "ref-1", form, binding(form), null, null, model, flash, Locale.ENGLISH));
+
+        // then
+        DeliveryCreationForm shown = (DeliveryCreationForm) model.getAttribute("form");
+        assertThat(shown.getSourceCurrency()).isEqualTo("EUR");
+        assertThat(shown.getShippingCost()).isEqualTo(4.4);
+        assertThat(shown.getPaymentCost()).isEqualTo(2);
+        assertThat(shown.getPaymentTerms()).isEqualTo(7);
+        assertThat(shown.getTax()).isEqualTo(1.0);
+    }
+
+    private static BindingResult fulfilmentBinding(DeliveryFulfilmentUpdateForm update) {
+        return new BeanPropertyBindingResult(update, "update");
+    }
+
+    @Test
+    void anUnreadableCostInTheEditDialogIsRefusedWithAMessageInsteadOfHttp400() {
+        // given
+        DeliveryFulfilmentUpdateForm update = new DeliveryFulfilmentUpdateForm();
+        BindingResult binding = fulfilmentBinding(update);
+        binding.rejectValue("unitCost", "typeMismatch");
+
+        // when
+        FulfilmentUpdateResponse answer = asStoreAdmin(() -> controller.fulfilmentJson(PROVIDER, update, binding, Locale.ENGLISH));
+        String fallback = asStoreAdmin(() -> controller.fulfilment(PROVIDER, update, binding, flash, Locale.ENGLISH));
+
+        // then
+        assertThat(answer).isEqualTo(FulfilmentUpdateResponse.failed("msg:error.message.delivery.fulfilment.invalid"));
+        assertThat(fallback).isEqualTo("redirect:/dashboard/deliveries/create/Acme");
+        assertThat(flash.getFlashAttributes().get("errorMessage")).isEqualTo("msg:error.message.delivery.fulfilment.invalid");
+        verifyNoInteractions(fulfilmentUpdateService);
     }
 }

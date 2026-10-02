@@ -14,6 +14,83 @@ import static org.assertj.core.api.Assertions.assertThat;
 class DeliveryCreationFormTest {
 
     @Test
+    void unitCostsAreRoundedToWholeGrosze() {
+        // given: the cost fields have no browser validation, so the posted costs may carry any fraction
+        DeliveryCreationForm form = new DeliveryCreationForm();
+        DeliveryItem item = new DeliveryItem();
+        item.setUnitCost(10.00111);
+        form.setItems(new ArrayList<>(List.of(item)));
+        SuggestedDeliveryItem suggested = new SuggestedDeliveryItem();
+        suggested.setUnitCost(3.145);
+        form.setSuggestedItems(new ArrayList<>(List.of(suggested)));
+
+        // when
+        form.roundUnitCosts();
+
+        // then
+        assertThat(item.getUnitCost()).isEqualTo(10.0);
+        assertThat(suggested.getUnitCost()).isEqualTo(3.15);
+    }
+
+    @Test
+    void backKeepsAChosenSuggestionThePlanDoesNotCarry() {
+        // given: the plan comes without suggestions (the page fetches them); step 2 merged a chosen one into the items
+        DeliveryCreationForm fresh = new DeliveryCreationForm();
+        fresh.setItems(new ArrayList<>());
+        DeliveryCreationForm posted = new DeliveryCreationForm();
+        DeliveryItem merged = new DeliveryItem("Fan", "5900000000009", "FAN-1", 89.0, List.of());
+        merged.setRequestedQty(2);
+        posted.setItems(new ArrayList<>(List.of(merged)));
+
+        // when
+        fresh.applyUserSelections(posted);
+
+        // then
+        assertThat(fresh.getSuggestedItems()).singleElement().satisfies(suggestion -> {
+            assertThat(suggestion.getMfn()).isEqualTo("FAN-1");
+            assertThat(suggestion.getName()).isEqualTo("Fan");
+            assertThat(suggestion.getEan()).isEqualTo("5900000000009");
+            assertThat(suggestion.getRequestedQty()).isEqualTo(2);
+            assertThat(suggestion.getUnitCost()).isEqualTo(89.0);
+        });
+    }
+
+    @Test
+    void anItemThatLeftThePlanDoesNotComeBackAsASuggestion() {
+        // given: an item with sources is a planned item; one the plan no longer has is gone, not a suggestion
+        DeliveryCreationForm fresh = new DeliveryCreationForm();
+        fresh.setItems(new ArrayList<>());
+        DeliveryCreationForm posted = new DeliveryCreationForm();
+        Allocation allocation = new Allocation();
+        allocation.setKey(new AllocationKey("order-1", "item-1", "buyer@example.com"));
+        allocation.setType(AllocationType.Order);
+        DeliveryItem gone = new DeliveryItem("Gone", "590", "GONE-1", 10.0, new ArrayList<>(List.of(allocation)));
+        gone.setRequestedQty(1);
+        posted.setItems(new ArrayList<>(List.of(gone)));
+        SuggestedDeliveryItem untouched = new SuggestedDeliveryItem();
+        untouched.setMfn("ZERO-1");
+        posted.setSuggestedItems(new ArrayList<>(List.of(untouched)));
+
+        // when
+        fresh.applyUserSelections(posted);
+
+        // then
+        assertThat(fresh.getSuggestedItems()).isEmpty();
+    }
+
+    @Test
+    void costOfTheEditProductDialogIsRoundedToWholeGrosze() {
+        // given
+        DeliveryFulfilmentUpdateForm form = new DeliveryFulfilmentUpdateForm();
+
+        // when
+        form.setUnitCost(19.996);
+
+        // then
+        assertThat(form.getUnitCost()).isEqualTo(20.0);
+    }
+
+    @Test
     void backRestoresTheUnitCostOfASuggestion() {
         // given: step 2 merged the suggestion into the items, so it comes back as an item without allocations
         DeliveryCreationForm fresh = new DeliveryCreationForm();
@@ -34,6 +111,29 @@ class DeliveryCreationFormTest {
         // then
         assertThat(fresh.getSuggestedItems().getFirst().getRequestedQty()).isEqualTo(3);
         assertThat(fresh.getSuggestedItems().getFirst().getUnitCost()).isEqualTo(89.5);
+    }
+
+    @Test
+    void overlayCopiesSuggestionsThatWereNotMergedYet() {
+        // given: step 1 came back before step 2 merged the suggestions, so they are still suggestions
+        DeliveryCreationForm fresh = new DeliveryCreationForm();
+        SuggestedDeliveryItem planned = new SuggestedDeliveryItem();
+        planned.setMfn("MFN-S");
+        planned.setUnitCost(100.0);
+        fresh.setSuggestedItems(new ArrayList<>(List.of(planned)));
+        DeliveryCreationForm posted = new DeliveryCreationForm();
+        SuggestedDeliveryItem typed = new SuggestedDeliveryItem();
+        typed.setMfn("MFN-S");
+        typed.setRequestedQty(5);
+        typed.setUnitCost(92.0);
+        posted.setSuggestedItems(new ArrayList<>(List.of(typed)));
+
+        // when
+        fresh.applyUserSelections(posted);
+
+        // then
+        assertThat(fresh.getSuggestedItems().getFirst().getRequestedQty()).isEqualTo(5);
+        assertThat(fresh.getSuggestedItems().getFirst().getUnitCost()).isEqualTo(92.0);
     }
 
     @Test
@@ -119,19 +219,7 @@ class DeliveryCreationFormTest {
     }
 
     @Test
-    void postedItemMatchingNothingIsIgnored() {
-        // given
-        DeliveryCreationForm fresh = new DeliveryCreationForm();
-        DeliveryCreationForm posted = formWithItem("MFN-UNKNOWN", 3, 20.0);
-
-        // when / then
-        fresh.applyUserSelections(posted);
-        assertThat(fresh.getItems()).isEmpty();
-        assertThat(fresh.getSuggestedItems()).isEmpty();
-    }
-
-    @Test
-    void overlayNeverAddsOrRemovesRows() {
+    void overlayNeverAddsOrRemovesItemRows() {
         // given
         DeliveryCreationForm fresh = formWithItem("MFN-1", 1, 10.0);
         DeliveryCreationForm posted = new DeliveryCreationForm();
@@ -143,9 +231,9 @@ class DeliveryCreationFormTest {
         // when
         fresh.applyUserSelections(posted);
 
-        // then
+        // then: an item without sources outside the plan is a suggestion chosen before, not a new item
         assertThat(fresh.getItems()).hasSize(1);
-        assertThat(fresh.getSuggestedItems()).isEmpty();
+        assertThat(fresh.getSuggestedItems()).extracting(SuggestedDeliveryItem::getMfn).containsExactly("MFN-EXTRA");
     }
 
     private DeliveryCreationForm formWithItem(String mfn, int requestedQty, double unitCost) {

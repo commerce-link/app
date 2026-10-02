@@ -302,8 +302,10 @@ class DeliveriesControllerDetailsFixesTest {
         form.setSource(PaymentSource.BankTransfer);
 
         // when
-        String fromPayments = controller.addPayment(delivery.getDeliveryId(), form, true, redirectAttributes, PL);
-        String fromDetails = controller.addPayment(delivery.getDeliveryId(), form, false, redirectAttributes, PL);
+        form.setReturnTo("/dashboard/payments");
+        String fromPayments = controller.addPayment(delivery.getDeliveryId(), form, redirectAttributes, PL);
+        form.setReturnTo(null);
+        String fromDetails = controller.addPayment(delivery.getDeliveryId(), form, redirectAttributes, PL);
 
         // then
         assertThat(fromPayments).isEqualTo("redirect:/dashboard/payments");

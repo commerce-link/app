@@ -365,7 +365,7 @@ class DeliveryDetailsTemplateTest {
         assertThat(html).contains(">Pozycje (2)<").contains("class=\"cl-table is-compact is-wrap is-allocations\"")
                 .contains(">NVIDIA ValueKing RTX Ultra<").contains(">Samsung MirageDrive 2TB NVMe<")
                 .contains("✓ 1 z 1").contains(">0 z 2<").contains("2 × 635,00")
-                .contains(">Zamówienie #a9f693b8 · marek.pawlak<").contains("href=\"/dashboard/orders/" + ORDER_ID + "\"")
+                .contains(">Zamówienie #a9f693b8 · marek.pawlak@example.pl<").contains("href=\"/dashboard/orders/" + ORDER_ID + "\"")
                 .contains("href=\"/dashboard/warehouse/items/wh-MFN-MIRAGE-01\"")
                 .contains(">✓ Odebrano<").contains(">Czeka<")
                 .contains("Towar razem: netto 5\u00a0084,00 PLN · brutto 6\u00a0253,32 PLN")

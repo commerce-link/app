@@ -6,11 +6,13 @@ import pl.commercelink.orders.OrderReviewStatus;
 import pl.commercelink.orders.OrderSourceType;
 import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.PaymentSource;
+import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShipmentTrackingStatus;
 import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.warehouse.api.ItemCondition;
 
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
 import java.util.function.Function;
@@ -23,6 +25,9 @@ public final class OrderLabels {
     public static final String INFO = "is-info";
     public static final String BAD = "is-bad";
     public static final String NEUTRAL = "is-neutral";
+
+    /** The text shipping-furgonetka stores when Furgonetka never got the cancel command (commandNotExists). */
+    static final String CANCEL_NOT_RECEIVED = "Furgonetka did not receive the cancel command";
 
     private OrderLabels() {
     }
@@ -155,5 +160,39 @@ public final class OrderLabels {
             case ACTIVE -> INFO;
             case FAILED -> BAD;
         };
+    }
+
+    /**
+     * The pill of a shipment's courier cancellation, or null when there is none (a confirmed one clears the shipment).
+     * A PENDING one past CourierCancellation.STALE reads as unconfirmed: nothing answers it any more, and "Cancel
+     * courier order" then re-checks it like an unconfirmed one.
+     */
+    public static String cancellation(Shipment shipment, LocalDateTime now) {
+        if (shipment.getCancellation() == null) {
+            return null;
+        }
+        if (shipment.isCancellationInProgress(now)) {
+            return "shipment.cancellation.pending";
+        }
+        return shipment.needsCancellationRecheck(now) ? "shipment.cancellation.unconfirmed" : "shipment.cancellation.failed";
+    }
+
+    public static String cancellationTone(Shipment shipment, LocalDateTime now) {
+        if (shipment.getCancellation() == null) {
+            return null;
+        }
+        if (shipment.isCancellationInProgress(now)) {
+            return INFO;
+        }
+        return shipment.needsCancellationRecheck(now) ? WARN : BAD;
+    }
+
+    /**
+     * The message key of an immediate cancellation failure's reason (the flash after the click) when it is the
+     * adapter's own English text, or null: every other reason is Furgonetka's answer, already in Polish, and is shown
+     * as it came.
+     */
+    public static String cancellationReasonKey(String error) {
+        return CANCEL_NOT_RECEIVED.equals(error) ? "shipment.cancellation.reason.notReceived" : null;
     }
 }

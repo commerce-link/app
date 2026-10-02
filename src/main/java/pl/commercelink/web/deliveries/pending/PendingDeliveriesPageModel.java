@@ -6,7 +6,7 @@ import java.util.List;
 
 /** Everything the pending deliveries template renders, texts resolved (spec §3). */
 public record PendingDeliveriesPageModel(PendingDeliveriesQuery query, boolean superAdmin, String listPath,
-                                         String fragmentPath, String backHref, List<Tile> tiles, List<KindTab> tabs,
+                                         String fragmentPath, String backHref, List<KindTab> tabs,
                                          Kind activeKind, String activeTabLabel, String tabDescription,
                                          List<Option> providerOptions, String providerSummary, List<Chip> chips,
                                          String clearHref, String searchClearHref, String resultsLine,
@@ -17,8 +17,6 @@ public record PendingDeliveriesPageModel(PendingDeliveriesQuery query, boolean s
         return activeKind == Kind.DROPSHIP;
     }
 
-    /** A filter tile: its count over everything pending, and the link that narrows the page to it (or widens it when active). */
-    public record Tile(String label, String value, String hint, String href, boolean active) { }
     public record KindTab(String label, long count, String href, boolean active) { }
     public record Option(String value, String label, long count, boolean selected, String toggleHref) { }
     public record Chip(String label, String clearHref, String clearLabel) { }

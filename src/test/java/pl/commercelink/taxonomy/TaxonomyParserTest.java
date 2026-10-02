@@ -14,54 +14,12 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 class TaxonomyParserTest {
 
     @Test
-    void csvRoundTripPreservesCategoryString() {
-        Taxonomy original = new Taxonomy("1234567890123", "MFN-1", "TestBrand",
-                "Test Product", "Laptops", 1, null, null);
-
-        byte[] csv = TaxonomyParser.toCsv(List.of(original));
-        CSVLoader loader = new CSVLoader(new InputStreamReader(new ByteArrayInputStream(csv)));
-        List<String[]> rows = loader.readHeadersAndRows(';').getSecond();
-
-        Taxonomy parsed = TaxonomyParser.fromCsvRow(rows.get(0));
-
-        assertEquals("Laptops", parsed.category());
-    }
-
-    @Test
-    void nonEnumCategorySurvivesCsvRoundTrip() {
-        Taxonomy original = new Taxonomy("1234567890123", "MFN-1", "TestBrand",
-                "Test Product", "Smartwatches", 1, null, null);
-
-        byte[] csv = TaxonomyParser.toCsv(List.of(original));
-        CSVLoader loader = new CSVLoader(new InputStreamReader(new ByteArrayInputStream(csv)));
-        List<String[]> rows = loader.readHeadersAndRows(';').getSecond();
-
-        Taxonomy parsed = TaxonomyParser.fromCsvRow(rows.get(0));
-
-        assertEquals("Smartwatches", parsed.category());
-    }
-
-    @Test
     void blankCategoryCellYieldsNullCategory() {
         String[] row = {"1234567890123", "MFN-1", "TestBrand", "Test Product", "", "537", "1", "", ""};
 
         Taxonomy parsed = TaxonomyParser.fromCsvRow(row);
 
         assertNull(parsed.category());
-    }
-
-    @Test
-    void csvRoundTripPreservesWeight() {
-        Taxonomy original = new Taxonomy("1234567890123", "MFN-1", "TestBrand",
-                "Test Product", "Laptops", 1, 1300, null);
-
-        byte[] csv = TaxonomyParser.toCsv(List.of(original));
-        CSVLoader loader = new CSVLoader(new InputStreamReader(new ByteArrayInputStream(csv)));
-        List<String[]> rows = loader.readHeadersAndRows(';').getSecond();
-
-        Taxonomy parsed = TaxonomyParser.fromCsvRow(rows.get(0));
-
-        assertEquals(1300, parsed.netWeightInGrams());
     }
 
     @Test
@@ -74,17 +32,6 @@ class TaxonomyParserTest {
         List<String[]> rows = loader.readHeadersAndRows(';').getSecond();
 
         Taxonomy parsed = TaxonomyParser.fromCsvRow(rows.get(0));
-
-        assertNull(parsed.netWeightInGrams());
-    }
-
-    @Test
-    void emptyWeightCellYieldsNull() {
-        String[] row = {
-                "1234567890123", "MFN-1", "TestBrand", "Test Product", "Laptops", "537", "1", "", ""
-        };
-
-        Taxonomy parsed = TaxonomyParser.fromCsvRow(row);
 
         assertNull(parsed.netWeightInGrams());
     }

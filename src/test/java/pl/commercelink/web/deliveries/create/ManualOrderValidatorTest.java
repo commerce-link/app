@@ -110,7 +110,17 @@ class ManualOrderValidatorTest {
         DeliveryCreationForm form = form(0);
 
         // when / then
+        assertThat(ManualOrderValidator.validate(form, binding(form), true))
+                .contains(Map.entry("items", "deliveries.create.error.nothingRequested"));
+    }
+
+    @Test
+    void anEmptyDropshipDeliveryAsksForALineWithoutMentioningSuggestions() {
+        // given
+        DeliveryCreationForm form = form(0);
+
+        // when / then
         assertThat(ManualOrderValidator.validate(form, binding(form), false))
-                .containsExactly(Map.entry("items", "deliveries.create.error.nothingRequested"));
+                .containsExactly(Map.entry("items", "deliveries.create.error.nothingRequested.dropship"));
     }
 }

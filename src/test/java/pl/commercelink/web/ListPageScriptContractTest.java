@@ -16,17 +16,6 @@ class ListPageScriptContractTest {
     }
 
     @Test
-    void scriptKnowsNoPageOfItsOwn() throws Exception {
-        // given
-        String script = read("src/main/resources/static/js/list-page.js");
-
-        // then
-        assertThat(script).contains("'use strict';").doesNotContain("/dashboard/orders").doesNotContain("/dashboard/deliveries")
-                .doesNotContain("data-cl-orders").doesNotContain("innerHTML").doesNotContain("alert(")
-                .doesNotContain("confirm(").doesNotContain("prompt(");
-    }
-
-    @Test
     void everyHookTheScriptUsesIsRenderedByEveryList() throws Exception {
         // given
         String script = read("src/main/resources/static/js/list-page.js");
@@ -46,26 +35,14 @@ class ListPageScriptContractTest {
     }
 
     @Test
-    void scriptKeepsTheBehavioursTheOrdersListRelyOn() throws Exception {
-        // given
+    void theScriptReadsFormAttributesNotPropertiesAFieldCanShadow() throws Exception {
+        // given: Payments' search and menu carry fields named "method" (the payment-method filter), and a field's name
+        // shadows the form's property of the same name (form.method became the input and the script threw)
         String script = read("src/main/resources/static/js/list-page.js");
+        String payments = read("src/main/resources/templates/payments.html");
 
         // then
-        assertThat(script).contains("data-cl-autosubmit-hide").contains("data-cl-search-had").contains(".cl-table-results")
-                .contains(".cl-table-search").contains("popstate").contains("pushState").contains("replaceState")
-                .contains("X-Requested-With").contains("DOMParser").contains("aria-busy").contains("'Escape'")
-                .contains("details[data-cl-filter-menu][open]").contains("window.location.assign")
-                .contains("data-cl-toolbar-toggle").contains("is-collapsed").contains("aria-expanded")
-                .contains("matchMedia('(max-width: 719px)')");
-    }
-
-    @Test
-    void aClickAnywhereOnADateFieldOpensTheDatePicker() throws Exception {
-        // given
-        String script = read("src/main/resources/static/js/list-page.js");
-
-        // then: a click (not a focus, so typing the date stays possible) opens the native picker where the browser has one
-        assertThat(script).contains("input[type=\"date\"]").contains("typeof field.showPicker !== 'function'")
-                .contains("field.showPicker()").doesNotContain("addEventListener('focus'");
+        assertThat(payments).contains("name=\"method\"");
+        assertThat(script).doesNotContainPattern("form\\.(method|action)\\b");
     }
 }

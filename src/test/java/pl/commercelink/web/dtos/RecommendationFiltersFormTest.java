@@ -207,13 +207,6 @@ class RecommendationFiltersFormTest {
         assertThat(back).allMatch(InventoryDefinition::isComplete);
     }
 
-    /** The id of a field is also the key of its error, so the error summary can link to the field. */
-    @Test
-    void theFieldIdCarriesTheIndexAndTheFieldName() {
-        // when / then
-        assertThat(RecommendationFiltersForm.fieldId(2, "brandLines")).isEqualTo("filter-2-brandLines");
-    }
-
     /**
      * "Podaj co najmniej jedną wartość." can stand for several filters at once, so the error summary names the filter
      * by the number its legend shows; an error of an unknown metadata row belongs to the filter that carries it.

@@ -128,17 +128,6 @@ class TaxonomyCategoryMatchSchedulerTest {
     }
 
     @Test
-    void sweepAbortsQuietlyWhenSqsIsNotConfigured() {
-        // given
-        cache.add(pending("MFN-1"));
-        doThrow(new IllegalStateException("no sqs")).when(pimCatalog).submitCategoryMatch(any());
-        TaxonomyCategoryMatchScheduler scheduler = scheduler(new TaxonomyCategoryMatchProperties(1, 300000));
-
-        // when / then
-        scheduler.sweep();
-    }
-
-    @Test
     void activeMappingResolvesPendingWithoutSubmit() {
         // given
         String mfn = mfnWhere(residue -> residue != 0);

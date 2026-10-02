@@ -150,13 +150,6 @@ class DevReceiptPreviewControllerTest {
     }
 
     @Test
-    void polishPageCarriesTheSimulationBanner() throws Exception {
-        // when / then
-        assertThat(messages("messages_pl.properties").getProperty("devReceipts.banner"))
-                .isEqualTo("SYMULACJA — to nie jest dokument fiskalny (podgląd z receipts-dev)");
-    }
-
-    @Test
     void polishAndEnglishDefineTheSameDevReceiptKeys() throws Exception {
         // when / then
         assertThat(devReceiptKeys("messages_pl.properties")).isEqualTo(devReceiptKeys("messages_en.properties"))

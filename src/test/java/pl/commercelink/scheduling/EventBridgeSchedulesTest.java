@@ -1,6 +1,8 @@
 package pl.commercelink.scheduling;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
@@ -31,38 +33,21 @@ class EventBridgeSchedulesTest {
     @Mock
     private SchedulerClient schedulerClient;
 
-    @Test
-    void isEnabledOnProdWithoutOverride() {
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(textBlock = """
+            enabled on prod without override,         prod,      ,      true,  true
+            disabled outside prod without override,   localhost, ,      true,  false
+            override true wins over environment,      localhost, true,  true,  true
+            override false wins over environment,     prod,      false, true,  false
+            disabled without scheduler client,        prod,      ,      false, false
+            """)
+    void isEnabledFollowsEnvironmentOverrideAndSchedulerClient(String name, String environment, Boolean override,
+                                                               boolean hasClient, boolean expected) {
         // when
-        EventBridgeSchedules schedules = new EventBridgeSchedules("prod", null, ROLE_ARN, schedulerClient);
+        EventBridgeSchedules schedules = new EventBridgeSchedules(environment, override, ROLE_ARN, hasClient ? schedulerClient : null);
 
         // then
-        assertThat(schedules.isEnabled()).isTrue();
-    }
-
-    @Test
-    void isDisabledOutsideProdWithoutOverride() {
-        // when
-        EventBridgeSchedules schedules = new EventBridgeSchedules("localhost", null, ROLE_ARN, schedulerClient);
-
-        // then
-        assertThat(schedules.isEnabled()).isFalse();
-    }
-
-    @Test
-    void overrideWinsOverEnvironment() {
-        // when / then
-        assertThat(new EventBridgeSchedules("localhost", true, ROLE_ARN, schedulerClient).isEnabled()).isTrue();
-        assertThat(new EventBridgeSchedules("prod", false, ROLE_ARN, schedulerClient).isEnabled()).isFalse();
-    }
-
-    @Test
-    void isDisabledWithoutSchedulerClient() {
-        // when
-        EventBridgeSchedules schedules = new EventBridgeSchedules("prod", null, ROLE_ARN, null);
-
-        // then
-        assertThat(schedules.isEnabled()).isFalse();
+        assertThat(schedules.isEnabled()).isEqualTo(expected);
     }
 
     @Test

@@ -66,6 +66,11 @@ public record DeliveryCreateLinks(String base, String provider, String orderId, 
         return root() + "/fulfilment";
     }
 
+    /** The rows of the restock suggestions card, fetched by step 1 after it is shown (warehouse only). */
+    public String suggestions() {
+        return root() + "/suggestions";
+    }
+
     public String order() {
         return base + "/orders/" + orderId;
     }

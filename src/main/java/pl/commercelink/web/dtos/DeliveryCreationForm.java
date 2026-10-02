@@ -5,6 +5,7 @@ import pl.commercelink.inventory.deliveries.Allocation;
 import pl.commercelink.inventory.deliveries.AllocationKey;
 import pl.commercelink.inventory.deliveries.DeliveryItem;
 import pl.commercelink.invoicing.api.Price;
+import pl.commercelink.web.orders.Money;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -195,6 +196,22 @@ public class DeliveryCreationForm {
                 applyToSuggestedItem(postedItem);
             }
         }
+        // Step 1 sent back before step 2 merged them (an unreadable number): the suggestions are still suggestions.
+        if (posted.getSuggestedItems() != null) {
+            for (SuggestedDeliveryItem postedSuggestion : posted.getSuggestedItems()) {
+                applyToSuggestedItem(postedSuggestion);
+            }
+        }
+    }
+
+    /** Unit costs in whole grosze: the cost fields have no browser validation, so a longer fraction is rounded here. */
+    public void roundUnitCosts() {
+        if (items != null) {
+            items.forEach(item -> item.setUnitCost(Money.round(item.getUnitCost())));
+        }
+        if (suggestedItems != null) {
+            suggestedItems.forEach(suggested -> suggested.setUnitCost(Money.round(suggested.getUnitCost())));
+        }
     }
 
     private DeliveryItem findItemByMfn(String mfn) {
@@ -217,13 +234,41 @@ public class DeliveryCreationForm {
         return Objects.equals(a.getOrderId(), b.getOrderId()) && Objects.equals(a.getItemId(), b.getItemId());
     }
 
+    // An item without sources that is not in the plan was a suggestion merged by step 2; one with sources left the plan.
     private void applyToSuggestedItem(DeliveryItem postedItem) {
-        suggestedItems.stream()
-                .filter(suggested -> Objects.equals(suggested.getMfn(), postedItem.getMfn()))
+        if (postedItem.getAllocations() == null || postedItem.getAllocations().isEmpty()) {
+            applyToSuggestedItem(postedItem.getMfn(), postedItem.getName(), postedItem.getEan(),
+                    postedItem.getRequestedQty(), postedItem.getUnitCost());
+        }
+    }
+
+    private void applyToSuggestedItem(SuggestedDeliveryItem posted) {
+        applyToSuggestedItem(posted.getMfn(), posted.getName(), posted.getEan(), posted.getRequestedQty(), posted.getUnitCost());
+    }
+
+    /**
+     * The typed quantity and cost of a suggestion. The plan carries no suggestions (the page fetches them later), so
+     * one the operator chose comes back as a row of its own and the fetched list takes its typed values over.
+     */
+    private void applyToSuggestedItem(String mfn, String name, String ean, int requestedQty, double unitCost) {
+        SuggestedDeliveryItem suggested = suggestedItems == null ? null : suggestedItems.stream()
+                .filter(candidate -> Objects.equals(candidate.getMfn(), mfn))
                 .findFirst()
-                .ifPresent(suggested -> {
-                    suggested.setRequestedQty(postedItem.getRequestedQty());
-                    suggested.setUnitCost(postedItem.getUnitCost());
-                });
+                .orElse(null);
+        if (suggested == null) {
+            if (requestedQty <= 0 || mfn == null) {
+                return;
+            }
+            if (suggestedItems == null) {
+                suggestedItems = new ArrayList<>();
+            }
+            suggested = new SuggestedDeliveryItem();
+            suggested.setMfn(mfn);
+            suggested.setName(name);
+            suggested.setEan(ean);
+            suggestedItems.add(suggested);
+        }
+        suggested.setRequestedQty(requestedQty);
+        suggested.setUnitCost(unitCost);
     }
 }

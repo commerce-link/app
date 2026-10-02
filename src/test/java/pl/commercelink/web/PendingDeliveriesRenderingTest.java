@@ -40,12 +40,8 @@ class PendingDeliveriesRenderingTest {
 
     private static PendingDeliveriesPageModel model(Kind active, List<PendingDeliveryRow> rows, EmptyState empty,
                                                     boolean nothing, List<Chip> chips) {
-        PendingDeliveriesQuery query = new PendingDeliveriesQuery(null, null, List.of(), null);
+        PendingDeliveriesQuery query = new PendingDeliveriesQuery(null, List.of(), null);
         return new PendingDeliveriesPageModel(query, false, PATH, PATH + "/fragment", "/dashboard/deliveries",
-                List.of(new Tile("Po terminie", "3", "termin wysyłki minął", PATH + "?focus=overdue", false),
-                        new Tile("Na dziś", "1", "termin wysyłki dziś", PATH + "?focus=today", false),
-                        new Tile("Na jutro", "2", "termin wysyłki jutro", PATH + "?focus=tomorrow", false),
-                        new Tile("Z akceptacją", "1", "wymaga akceptacji super admina", PATH + "?focus=approval", false)),
                 List.of(new KindTab("Do magazynu", 4, PATH + "?kind=warehouse", active == Kind.WAREHOUSE),
                         new KindTab("Dropshipping", 8, PATH + "?kind=dropship", active == Kind.DROPSHIP)),
                 active, active == Kind.WAREHOUSE ? "Do magazynu" : "Dropshipping", "Opis zakładki.",
@@ -99,7 +95,7 @@ class PendingDeliveriesRenderingTest {
     }
 
     @Test
-    void noOrderingModeColumnAndFourLinkTilesOnly() {
+    void noOrderingModeColumnAndNoTiles() {
         // when
         String warehouse = fragment(model(Kind.WAREHOUSE, List.of(warehouseRow(false)), null, false, List.of()));
         String dropship = fragment(model(Kind.DROPSHIP, List.of(dropshipRow()), null, false, List.of()));
@@ -108,7 +104,7 @@ class PendingDeliveriesRenderingTest {
         for (String html : List.of(warehouse, dropship)) {
             assertThat(html).doesNotContain("Zamawianie").doesNotContain("Przez API").doesNotContain("Ręcznie")
                     .doesNotContain("is-static").contains("colspan=\"6\"");
-            assertThat(html.split("<a class=\"cl-stat is-link\"", -1)).hasSize(5);
+            assertThat(html).doesNotContain("cl-stat-").doesNotContain("cl-stat ");
         }
     }
 

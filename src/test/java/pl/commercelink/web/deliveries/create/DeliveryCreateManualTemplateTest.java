@@ -41,6 +41,17 @@ class DeliveryCreateManualTemplateTest {
     }
 
     @Test
+    void readOnlyItemsShowTheManufacturerCodeNextToTheEanAsInStepOne() {
+        // when
+        String html = render("deliveries/create/manual", warehouse(Map.of()));
+
+        // then: the operator copies the order from the supplier's confirmation, which often lists the manufacturer code
+        String row = html.substring(html.indexOf("data-cl-readonly-item"), html.indexOf("</tr>", html.indexOf("data-cl-readonly-item")));
+        assertThat(row).contains("EAN:").contains("5901234123457")
+                .contains("Kod producenta:").contains("<span class=\"cl-code-nowrap\">100-100001084WOF</span>");
+    }
+
+    @Test
     void serverValidatesTheRecordStepSoItsErrorsReachTheSummaryAndTheFields() {
         // when
         String html = render("deliveries/create/manual", warehouse(Map.of()));
@@ -61,7 +72,7 @@ class DeliveryCreateManualTemplateTest {
         String html = render("deliveries/create/manual", variables);
 
         // then
-        assertThat(html).contains("Wszystkie pola są opcjonalne").contains("cl-optional")
+        assertThat(html).contains("Numer i termin są opcjonalne").contains("cl-optional")
                 .contains("Punkt odbioru").contains("name=\"order\"")
                 .doesNotContainPattern("id=\"externalDeliveryId\"[^>]*required");
     }
@@ -124,5 +135,16 @@ class DeliveryCreateManualTemplateTest {
         assertThat(html.indexOf("Zmień pozycje")).isPositive();
         String change = html.substring(html.lastIndexOf("<button", html.indexOf("Zmień pozycje")), html.indexOf("Zmień pozycje"));
         assertThat(change).contains("type=\"button\"").contains("data-cl-back-submit=\"back-submit\"");
+    }
+
+    @Test
+    void headerBackAndChangeItemsWaitForTheScriptAndTheItemsTableIsTheDeliveryTable() {
+        // when
+        String html = render("deliveries/create/manual", warehouse(Map.of()));
+
+        // then: type=button controls only work through the page script, so they start hidden
+        assertThat(html).containsPattern("<button type=\"button\" class=\"cl-back\"[^>]*hidden")
+                .containsPattern("<button type=\"button\" class=\"cl-link-button\" data-cl-back-submit=\"back-submit\"[^>]*hidden")
+                .contains("cl-table is-key-wrap is-delivery");
     }
 }

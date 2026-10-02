@@ -44,7 +44,7 @@ class DeliveryCreateScriptsContractTest {
         // then
         assertThat(purchase).contains("event.submitter && event.submitter.id === 'purchase-confirm-submit'")
                 .contains("addEventListener('pageshow'").contains("event.persisted").contains("event.key === 'Enter'")
-                .contains("scrollIntoView");
+                .contains("addressList.scrollTop").doesNotContain("scrollIntoView");
         assertThat(manual).contains("event.submitter && event.submitter.id === 'save-button'")
                 .contains("addEventListener('pageshow'");
     }
@@ -56,7 +56,29 @@ class DeliveryCreateScriptsContractTest {
 
         // then
         assertThat(js).contains("event.key === 'Enter'").contains("data-cl-source-type")
-                .contains("data-cl-remove-unselected").contains("release-label").contains("empty-help");
+                .contains("data-cl-remove-unselected").contains("release-label").contains("empty-help")
+                .contains("getClientRects().length > 0");
+    }
+
+    @Test
+    void costFieldsTakeNoMoreThanTwoDecimals() throws Exception {
+        // when
+        String js = read("src/main/resources/static/js/delivery-items.js");
+
+        // then
+        assertThat(js).contains("limitToCents").contains("input[data-cl-unit-cost], #fulfilment-cost");
+    }
+
+    @Test
+    void suggestionsAreFetchedAfterThePageAndKeepWhatWasTyped() throws Exception {
+        // when
+        String js = read("src/main/resources/static/js/delivery-items.js");
+
+        // then
+        assertThat(js).contains("[data-cl-suggestions]").contains("data-cl-suggestion-list")
+                .contains("data-cl-suggestions-retry").contains("suggestedItems[' + index + ']")
+                .contains("section.hidden = all.length === 0").contains("data-cl-suggestions-spinner")
+                .contains("data-cl-suggestions-table").contains("data-cl-suggestions-failed-mark");
     }
 
     @Test

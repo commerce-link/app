@@ -18,19 +18,6 @@
 
         <div data-cl-list-results th:fragment="results" th:with="q=${page.query()}"
              th:attr="data-cl-list-path=${page.listPath()},data-cl-list-fragment=${page.fragmentPath()}">
-            <!--/* Every tile narrows the page to what it counts; the active one widens it again (spec §3.1). */-->
-            <ul class="cl-stat-grid is-orders" th:attr="aria-label=#{deliveries.pending.tiles.label}">
-                <li th:each="tile : ${page.tiles()}">
-                    <a class="cl-stat is-link" th:href="@{${tile.href()}}"
-                       th:attr="aria-current=${tile.active()} ? 'true' : null" data-cl-list-nav>
-                        <span class="cl-eyebrow" th:text="${tile.label()}"></span>
-                        <span class="cl-stat-value" th:text="${tile.value()}"></span>
-                        <span class="cl-stat-hint" th:text="${tile.hint()}"></span>
-                        <span class="cl-visually-hidden" th:if="${tile.active()}" th:text="#{deliveries.pending.tiles.active}"></span>
-                    </a>
-                </li>
-            </ul>
-
             <section class="cl-card" aria-labelledby="pending-title">
                 <h2 class="cl-visually-hidden" id="pending-title" th:text="${page.nothingPending()} ? #{deliveries.pending.title} : ${page.activeTabLabel()}"></h2>
 
@@ -120,7 +107,7 @@
                         <th:block th:each="row : ${page.rows()}">
                             <tr class="cl-row-main">
                                 <th scope="row" class="cl-table-key">
-                                    <span class="cl-card-key"><th:block th:text="${row.providerLabel()}"></th:block><span th:if="${row.forwardToCustomer()}" class="cl-status is-warn" th:text="#{deliveries.directToConsumer.viaWarehouse.badge}"></span><span th:if="${row.approval()}" class="cl-status is-info" th:text="#{deliveries.pending.tile.approval}"></span></span>
+                                    <span class="cl-card-key"><th:block th:text="${row.providerLabel()}"></th:block><span th:if="${row.forwardToCustomer()}" class="cl-status is-warn" th:text="#{deliveries.directToConsumer.viaWarehouse.badge}"></span><span th:if="${row.approval()}" class="cl-status is-info" th:text="#{deliveries.pending.approval.pill}"></span></span>
                                     <span class="cl-table-sub cl-card-sub cl-narrow-only" th:text="${row.sourceText()}"></span>
                                 </th>
                                 <td><th:block th:replace="~{fragments/deliveries-pending :: toggle(${row})}"></th:block></td>
@@ -149,7 +136,7 @@
                         <th:block th:each="row : ${page.rows()}">
                             <tr class="cl-row-main">
                                 <th scope="row" class="cl-table-key">
-                                    <span class="cl-card-key"><a class="cl-row-number" th:href="@{${row.keyHref()}}" th:text="${row.key()}"></a><span th:if="${row.approval()}" class="cl-status is-info" th:text="#{deliveries.pending.tile.approval}"></span></span>
+                                    <span class="cl-card-key"><a class="cl-row-number" th:href="@{${row.keyHref()}}" th:text="${row.key()}"></a><span th:if="${row.approval()}" class="cl-status is-info" th:text="#{deliveries.pending.approval.pill}"></span></span>
                                     <span class="cl-table-sub cl-card-sub"><th:block th:if="${row.customer() != null}" th:text="${row.customer()}"></th:block><span class="cl-narrow-only" th:text="(${row.customer() != null} ? ' · ' : '') + ${row.providerLabel()}"></span></span>
                                 </th>
                                 <td class="is-secondary-column cl-card-hide" th:text="${row.providerLabel()}"></td>

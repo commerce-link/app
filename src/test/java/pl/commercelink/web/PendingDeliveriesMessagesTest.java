@@ -43,10 +43,6 @@ class PendingDeliveriesMessagesTest {
             }
         }
         // keys built from enum params in PendingDeliveriesService
-        for (String param : List.of("overdue", "today", "tomorrow", "approval")) {
-            keys.add("deliveries.pending.tile." + param);
-            keys.add("deliveries.pending.tile." + param + ".hint");
-        }
         for (String kind : List.of("warehouse", "dropship")) {
             keys.add("deliveries.pending.kind." + kind);
             keys.add("deliveries.pending.kind." + kind + ".desc");

@@ -12,7 +12,6 @@ import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.orders.Order;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
-import pl.commercelink.web.deliveries.pending.PendingDeliveriesQuery.Focus;
 import pl.commercelink.web.deliveries.pending.PendingDeliveriesQuery.Kind;
 
 import java.time.LocalDate;
@@ -75,84 +74,71 @@ class PendingDeliveriesServiceTest {
         return service.page("store-1", false, query, TODAY, PL);
     }
 
-    private static PendingDeliveriesQuery query(Kind kind, Focus focus, List<String> providers, String q) {
-        return new PendingDeliveriesQuery(kind, focus, providers, q);
+    private static PendingDeliveriesQuery query(Kind kind, List<String> providers, String q) {
+        return new PendingDeliveriesQuery(kind, providers, q);
     }
 
     @Test
-    void fourFilterTilesCountEverythingAndTabsCountWhatTheFiltersLeave() {
+    void tabsCountWhatTheFiltersLeaveAndChipsExistOnlyForSupplierAndSearch() {
         // given
         planning(true, true);
 
         // when
-        PendingDeliveriesPageModel page = page(query(null, Focus.OVERDUE, List.of(), null));
+        PendingDeliveriesPageModel page = page(query(Kind.WAREHOUSE, List.of("Acme"), "clearedge"));
 
         // then
-        assertThat(page.tiles()).extracting(PendingDeliveriesPageModel.Tile::value)
-                .containsExactly("1", "1", "1", "1");
-        assertThat(page.tiles()).extracting(PendingDeliveriesPageModel.Tile::label)
-                .containsExactly("Po terminie", "Na dziś", "Na jutro", "Z akceptacją");
-        assertThat(page.tiles().get(0).active()).isTrue();
-        assertThat(page.tiles().get(0).href()).isEqualTo(PATH + "?kind=warehouse");
-        assertThat(page.tiles().get(1).href()).isEqualTo(PATH + "?focus=today");
-        assertThat(page.tiles().get(2).href()).isEqualTo(PATH + "?focus=tomorrow");
-        assertThat(page.tiles().get(3).href()).isEqualTo(PATH + "?focus=approval");
-        assertThat(page.tiles()).allSatisfy(tile -> assertThat(tile.href()).isNotNull());
-        assertThat(page.tabs()).extracting(PendingDeliveriesPageModel.KindTab::count).containsExactly(1L, 0L);
+        assertThat(page.tabs()).extracting(PendingDeliveriesPageModel.KindTab::count).containsExactly(1L, 1L);
         assertThat(page.activeKind()).isEqualTo(Kind.WAREHOUSE);
         assertThat(page.rows()).extracting(PendingDeliveryRow::key).containsExactly("Acme");
-        assertThat(page.chips()).extracting(PendingDeliveriesPageModel.Chip::label).containsExactly("Po terminie");
+        assertThat(page.chips()).extracting(PendingDeliveriesPageModel.Chip::label)
+                .containsExactly("Dostawca: Acme", "Szukaj: clearedge");
+        assertThat(page.chips().get(0).clearHref()).isEqualTo(PATH + "?kind=warehouse&q=clearedge");
+        assertThat(page.chips().get(1).clearHref()).isEqualTo(PATH + "?kind=warehouse&provider=Acme");
         assertThat(page.resultsLine()).isEqualTo("Wyniki: 1");
+        assertThat(page.activeFilterCount()).isEqualTo(2);
     }
 
     @Test
-    void tomorrowFocusKeepsOnlyRowsDueTomorrow() {
+    void rowsOfGlobalSuppliersAreMarkedForApproval() {
         // given
         planning(true, true);
 
         // when
-        PendingDeliveriesPageModel page = page(query(null, Focus.TOMORROW, List.of(), null));
+        PendingDeliveriesPageModel dropship = page(query(Kind.DROPSHIP, List.of(), null));
 
         // then
-        assertThat(page.activeKind()).isEqualTo(Kind.DROPSHIP);
-        assertThat(page.rows()).extracting(PendingDeliveryRow::key).containsExactly("da13c41a");
-        assertThat(page.tiles().get(2).active()).isTrue();
-        assertThat(page.chips()).extracting(PendingDeliveriesPageModel.Chip::label).containsExactly("Na jutro");
+        assertThat(dropship.rows()).extracting(PendingDeliveryRow::approval).containsExactly(true, false);
+        assertThat(dropship.chips()).isEmpty();
     }
 
     @Test
-    void approvalFocusKeepsOnlyRowsOfGlobalSuppliersAndMarksThem() {
+    void anUnfilteredPageHasNoChipsAndDefaultsToTheWarehouseTab() {
         // given
         planning(true, true);
 
         // when
-        PendingDeliveriesPageModel page = page(query(null, Focus.APPROVAL, List.of(), null));
-        PendingDeliveriesPageModel all = page(query(Kind.DROPSHIP, null, List.of(), null));
+        PendingDeliveriesPageModel page = page(query(null, List.of(), null));
 
         // then
-        assertThat(page.activeKind()).isEqualTo(Kind.DROPSHIP);
-        assertThat(page.rows()).extracting(PendingDeliveryRow::key).containsExactly("1de57483");
-        assertThat(page.rows()).allMatch(PendingDeliveryRow::approval);
-        assertThat(page.tiles().get(3).active()).isTrue();
-        assertThat(page.tiles().get(3).href()).isEqualTo(PATH + "?kind=dropship");
-        assertThat(page.chips()).extracting(PendingDeliveriesPageModel.Chip::label).containsExactly("Z akceptacją");
-        assertThat(all.rows()).extracting(PendingDeliveryRow::approval).containsExactly(true, false);
+        assertThat(page.activeKind()).isEqualTo(Kind.WAREHOUSE);
+        assertThat(page.chips()).isEmpty();
+        assertThat(page.activeFilterCount()).isZero();
     }
 
     @Test
-    void theDefaultTabMovesToDropshipWhenTheFiltersLeaveNothingInTheWarehouse() {
+    void theDefaultTabMovesToDropshipWhenTheSearchLeavesNothingInTheWarehouse() {
         // given
         planning(true, true);
 
         // when
-        PendingDeliveriesPageModel page = page(query(null, Focus.TODAY, List.of(), null));
+        PendingDeliveriesPageModel page = page(query(null, List.of(), "barbara"));
 
         // then
         assertThat(page.activeKind()).isEqualTo(Kind.DROPSHIP);
         assertThat(page.dropship()).isTrue();
         assertThat(page.rows()).extracting(PendingDeliveryRow::key).containsExactly("1de57483");
         assertThat(page.tabs().get(1).active()).isTrue();
-        assertThat(page.tabs().get(0).href()).isEqualTo(PATH + "?kind=warehouse&focus=today");
+        assertThat(page.tabs().get(0).href()).isEqualTo(PATH + "?kind=warehouse&q=barbara");
     }
 
     @Test
@@ -161,7 +147,7 @@ class PendingDeliveriesServiceTest {
         planning(true, false);
 
         // when
-        PendingDeliveriesPageModel page = page(query(Kind.DROPSHIP, null, List.of(), null));
+        PendingDeliveriesPageModel page = page(query(Kind.DROPSHIP, List.of(), null));
 
         // then
         assertThat(page.activeKind()).isEqualTo(Kind.DROPSHIP);
@@ -177,8 +163,8 @@ class PendingDeliveriesServiceTest {
         planning(true, true);
 
         // when
-        PendingDeliveriesPageModel warehouse = page(query(Kind.WAREHOUSE, null, List.of(), null));
-        PendingDeliveriesPageModel dropship = page(query(Kind.DROPSHIP, null, List.of(), null));
+        PendingDeliveriesPageModel warehouse = page(query(Kind.WAREHOUSE, List.of(), null));
+        PendingDeliveriesPageModel dropship = page(query(Kind.DROPSHIP, List.of(), null));
 
         // then
         assertThat(warehouse.rows()).extracting(PendingDeliveryRow::key).containsExactly("Acme", "Kosatec");
@@ -191,9 +177,9 @@ class PendingDeliveriesServiceTest {
         planning(true, true);
 
         // when
-        PendingDeliveriesPageModel bySupplier = page(query(null, null, List.of("Acme"), null));
-        PendingDeliveriesPageModel byProduct = page(query(null, null, List.of(), "clearedge"));
-        PendingDeliveriesPageModel byCustomer = page(query(null, null, List.of(), "ZAJĄC"));
+        PendingDeliveriesPageModel bySupplier = page(query(null, List.of("Acme"), null));
+        PendingDeliveriesPageModel byProduct = page(query(null, List.of(), "clearedge"));
+        PendingDeliveriesPageModel byCustomer = page(query(null, List.of(), "ZAJĄC"));
 
         // then
         assertThat(bySupplier.tabs()).extracting(PendingDeliveriesPageModel.KindTab::count).containsExactly(1L, 1L);
@@ -214,19 +200,18 @@ class PendingDeliveriesServiceTest {
         when(planningService.plan("store-1")).thenReturn(new DeliveriesPlanningService.Planning(List.of(), List.of(), Map.of()));
 
         // when
-        PendingDeliveriesPageModel nothing = page(query(null, null, List.of(), null));
+        PendingDeliveriesPageModel nothing = page(query(null, List.of(), null));
 
         // then
         assertThat(nothing.nothingPending()).isTrue();
         assertThat(nothing.emptyState().actionHref()).isEqualTo("/dashboard/deliveries");
         assertThat(nothing.emptyState().inline()).isFalse();
-        assertThat(nothing.tiles()).extracting(PendingDeliveriesPageModel.Tile::value).containsExactly("0", "0", "0", "0");
 
         // given
         planning(true, true);
 
         // when
-        PendingDeliveriesPageModel filtered = page(query(Kind.WAREHOUSE, null, List.of(), "nothing-matches"));
+        PendingDeliveriesPageModel filtered = page(query(Kind.WAREHOUSE, List.of(), "nothing-matches"));
 
         // then
         assertThat(filtered.emptyState()).isEqualTo(new PendingDeliveriesPageModel.EmptyState(
@@ -239,13 +224,12 @@ class PendingDeliveriesServiceTest {
         planning(true, true);
 
         // when
-        PendingDeliveriesPageModel page = page(query(null, null, List.of(), null));
+        page(query(null, List.of(), null));
 
         // then
         verify(storesRepository, times(1)).findById("store-1");
         verify(supplierLabels, times(1)).forStore(store);
         verify(supplierLabels, never()).forStoreId(anyString());
-        assertThat(page.tiles().get(3).value()).isEqualTo("1");
     }
 
     @Test
@@ -256,10 +240,10 @@ class PendingDeliveriesServiceTest {
         when(supplierLabels.forStore(null)).thenReturn(labels);
 
         // when
-        PendingDeliveriesPageModel page = page(query(null, null, List.of(), null));
+        PendingDeliveriesPageModel page = page(query(Kind.DROPSHIP, List.of(), null));
 
         // then
-        assertThat(page.tiles().get(3).value()).isEqualTo("0");
+        assertThat(page.rows()).isNotEmpty().noneMatch(PendingDeliveryRow::approval);
     }
 
     @Test
@@ -268,21 +252,17 @@ class PendingDeliveriesServiceTest {
         planning(true, true);
 
         // when
-        PendingDeliveriesPageModel page = page(query(null, Focus.TODAY, List.of("AcmeB"), "zając"));
+        PendingDeliveriesPageModel page = page(query(null, List.of("AcmeB"), "zając"));
 
         // then
         assertThat(page.activeKind()).isEqualTo(Kind.DROPSHIP);
         assertThat(page.chips()).extracting(PendingDeliveriesPageModel.Chip::clearHref).containsExactly(
-                PATH + "?kind=dropship&provider=AcmeB&q=zaj%C4%85c",
-                PATH + "?kind=dropship&focus=today&q=zaj%C4%85c",
-                PATH + "?kind=dropship&focus=today&provider=AcmeB");
+                PATH + "?kind=dropship&q=zaj%C4%85c",
+                PATH + "?kind=dropship&provider=AcmeB");
         assertThat(page.clearHref()).isEqualTo(PATH + "?kind=dropship");
-        assertThat(page.searchClearHref()).isEqualTo(PATH + "?kind=dropship&focus=today&provider=AcmeB");
-        assertThat(page.tiles().get(1).active()).isTrue();
-        assertThat(page.tiles().get(1).href()).isEqualTo(PATH + "?kind=dropship&provider=AcmeB&q=zaj%C4%85c");
-        assertThat(page.tiles().get(0).href()).isEqualTo(PATH + "?focus=overdue&provider=AcmeB&q=zaj%C4%85c");
+        assertThat(page.searchClearHref()).isEqualTo(PATH + "?kind=dropship&provider=AcmeB");
         assertThat(page.providerOptions().stream().filter(o -> o.value().equals("Acme")).findFirst().orElseThrow().toggleHref())
-                .isEqualTo(PATH + "?focus=today&provider=AcmeB&provider=Acme&q=zaj%C4%85c");
+                .isEqualTo(PATH + "?provider=AcmeB&provider=Acme&q=zaj%C4%85c");
     }
 
     @Test
@@ -291,9 +271,9 @@ class PendingDeliveriesServiceTest {
         planning(true, true);
 
         // when
-        PendingDeliveriesPageModel unknown = page(query(null, null, List.of("Gone"), null));
-        PendingDeliveriesPageModel none = page(query(null, null, List.of(), null));
-        PendingDeliveriesPageModel mixed = page(query(null, null, List.of("Gone", "Acme"), null));
+        PendingDeliveriesPageModel unknown = page(query(null, List.of("Gone"), null));
+        PendingDeliveriesPageModel none = page(query(null, List.of(), null));
+        PendingDeliveriesPageModel mixed = page(query(null, List.of("Gone", "Acme"), null));
 
         // then
         assertThat(unknown.rows()).isEqualTo(none.rows());
@@ -312,7 +292,7 @@ class PendingDeliveriesServiceTest {
         planning(true, true);
 
         // when
-        PendingDeliveriesPageModel page = service.page("store-1", true, query(null, Focus.OVERDUE, List.of(), null), TODAY, PL);
+        PendingDeliveriesPageModel page = service.page("store-1", true, query(null, List.of(), null), TODAY, PL);
 
         // then
         assertThat(page.listPath()).isEqualTo("/dashboard/store/store-1/deliveries/preview");

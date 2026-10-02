@@ -8,7 +8,6 @@ import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.deliveries.pending.PendingDeliveriesPageModel.*;
-import pl.commercelink.web.deliveries.pending.PendingDeliveriesQuery.Focus;
 import pl.commercelink.web.deliveries.pending.PendingDeliveriesQuery.Kind;
 
 import java.time.LocalDate;
@@ -52,7 +51,7 @@ public class PendingDeliveriesService {
                         planning.deliveries().stream().map(d -> mapper.warehouse(d, today)),
                         planning.dropshipCandidates().stream().map(c -> mapper.dropship(c, today)))
                 .sorted(ORDER).toList();
-        List<PendingDeliveryRow> filtered = all.stream().filter(r -> matches(r, query, today)).toList();
+        List<PendingDeliveryRow> filtered = all.stream().filter(r -> matches(r, query)).toList();
         long warehouse = filtered.stream().filter(r -> r.kind() == Kind.WAREHOUSE).count();
         long dropship = filtered.size() - warehouse;
         Kind active = query.kind() != null ? query.kind() : warehouse == 0 && dropship > 0 ? Kind.DROPSHIP : Kind.WAREHOUSE;
@@ -65,7 +64,6 @@ public class PendingDeliveriesService {
         all.forEach(r -> providerLabels.putIfAbsent(r.provider(), r.providerLabel()));
 
         return new PendingDeliveriesPageModel(query, superAdmin, path, path + "/fragment", "/dashboard/deliveries",
-                tiles(all, query, widening, path, today, locale),
                 List.of(tab(Kind.WAREHOUSE, warehouse, active, query, path, locale), tab(Kind.DROPSHIP, dropship, active, query, path, locale)),
                 active, text(locale, "deliveries.pending.kind." + active.param()),
                 text(locale, "deliveries.pending.kind." + active.param() + ".desc"),
@@ -75,23 +73,9 @@ public class PendingDeliveriesService {
                 emptyState(all, rows, query, widening, path, active, locale), all.isEmpty(), query.activeFilterCount());
     }
 
-    private static boolean matches(PendingDeliveryRow row, PendingDeliveriesQuery query, LocalDate today) {
-        return (query.focus() == null || query.focus().matches(row, today))
-                && (query.providers().isEmpty() || query.providers().contains(row.provider()))
+    private static boolean matches(PendingDeliveryRow row, PendingDeliveriesQuery query) {
+        return (query.providers().isEmpty() || query.providers().contains(row.provider()))
                 && row.matches(query.q());
-    }
-
-    private List<Tile> tiles(List<PendingDeliveryRow> all, PendingDeliveriesQuery query, PendingDeliveriesQuery widening, String path, LocalDate today,
-                             Locale locale) {
-        List<Tile> tiles = new ArrayList<>();
-        for (Focus focus : Focus.values()) {
-            boolean active = query.focus() == focus;
-            long count = all.stream().filter(r -> focus.matches(r, today)).count();
-            String key = "deliveries.pending.tile." + focus.param();
-            tiles.add(new Tile(text(locale, key), String.valueOf(count), text(locale, key + ".hint"),
-                    (active ? widening.withoutFocus() : query.withFocus(focus)).href(path), active));
-        }
-        return tiles;
     }
 
     private KindTab tab(Kind kind, long count, Kind active, PendingDeliveriesQuery query, String path, Locale locale) {
@@ -117,9 +101,6 @@ public class PendingDeliveriesService {
 
     private List<Chip> chips(PendingDeliveriesQuery query, PendingDeliveriesQuery widening, String path, Map<String, String> labels, Locale locale) {
         List<Chip> chips = new ArrayList<>();
-        if (query.focus() != null) {
-            chip(chips, text(locale, "deliveries.pending.tile." + query.focus().param()), widening.withoutFocus().href(path), locale);
-        }
         query.providers().forEach(p -> chip(chips, text(locale, "deliveries.pending.chip.provider", labels.getOrDefault(p, p)),
                 widening.withoutProvider(p).href(path), locale));
         if (query.q() != null) {

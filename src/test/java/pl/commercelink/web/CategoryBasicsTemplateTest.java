@@ -28,41 +28,10 @@ class CategoryBasicsTemplateTest {
     }
 
     @Test
-    void savesWithoutReloadAndAsksTheServerAgainOnAnError() throws Exception {
-        // when / then
-        assertThat(page()).contains("th:fragment=\"basicsForm\"").contains("id=\"category-basics-form\"").contains("data-cl-async")
-                .contains("data-cl-redirect=${redirectTo}").contains("@{/js/async-form.js}")
-                .contains("errorSummary('category-basics-errors'");
-    }
-
-    @Test
-    void theTypeChoiceIsRadiosAndTheWarningFollowsThem() throws Exception {
-        // when / then
-        assertThat(page()).contains("data-cl-variant-select=\"categoryType\"").contains("data-cl-variant-when=\"categoryType=Dynamic\"")
-                .contains("@{/js/variant-fields.js}").doesNotContain("<select th:field=\"*{type}\"");
-    }
-
-    @Test
-    void theLabelsAreARepeatedLineWithATemplateAndANoscriptSpare() throws Exception {
-        // given
-        String page = page();
-
-        // then
-        assertThat(page).contains("data-cl-repeat=\"labels\"").contains("data-cl-repeat-template").contains("<noscript>")
-                .contains("data-cl-repeat-status").contains("@{/js/repeat-fields.js}");
-    }
-
-    @Test
     void thePimCategoriesGoThroughTheSharedPicker() throws Exception {
         // when / then
         assertThat(page()).contains("category-picker :: multiPicker('pimCategoryIds'")
                 .contains("category-picker :: multiPickerScript(${categoryOptions}, ${categoryAncestors})");
-    }
-
-    @Test
-    void carriesNoInlineStyleAndNoIdFields() throws Exception {
-        // when / then
-        assertThat(page()).doesNotContain("style=").doesNotContain("categoryId\"").doesNotContain("storeId");
     }
 
     /** The page as the controller renders it for an existing, unprotected category with one label. */

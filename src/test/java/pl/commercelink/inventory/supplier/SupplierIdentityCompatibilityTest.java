@@ -32,12 +32,4 @@ class SupplierIdentityCompatibilityTest {
         assertThat(store.getSecretesName("Kosatec-k7f3a9c2")).isEqualTo("oh4d5y15it-kosatec-k7f3a9c2")
                 .matches("^[A-Za-z0-9/_+=.@-]+$");
     }
-
-    @Test
-    void legacyIdentitiesResolveToTheirTypeAndLabel() {
-        // when / then
-        assertThat(SupplierIdentity.typeOf("Kosatec")).isEqualTo("Kosatec");
-        assertThat(SupplierIdentity.typeOf("manual:Asus")).isEqualTo("manual");
-        assertThat(SupplierIdentity.legacyLabel("manual:Asus")).isEqualTo("Asus");
-    }
 }

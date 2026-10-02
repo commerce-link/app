@@ -28,17 +28,17 @@
                     <p class="cl-alert-text"><span th:text="#{deliveries.options.error}"></span> <span th:text="|(${orderOptionsError})|"></span></p>
                 </div>
             </th:block>
-            <th:block th:if="${errorMessage != null}">
+            <th:block th:if="${failureMessage != null}">
                 <div class="cl-alert is-bad" tabindex="-1" data-cl-error-summary>
                     <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
-                    <p class="cl-alert-text" th:text="${errorMessage}"></p>
+                    <p class="cl-alert-text" th:text="${failureMessage}"></p>
                 </div>
             </th:block>
             <form method="post" id="delivery-step-form" class="cl-layout-aside" data-cl-delivery-purchase
                   th:action="@{${page.links().confirm()}}" th:attr="data-validate-url=@{${page.links().validate()}}">
                 <input type="hidden" name="purchaseRef" th:value="${purchaseRef}"/>
                 <th:block th:replace="~{deliveries/create/parts :: scope(${page})}"></th:block>
-                <th:block th:replace="~{deliveries/create/parts :: hiddenOrderData(${!page.dropship()})}"></th:block>
+                <th:block th:replace="~{deliveries/create/parts :: hiddenOrderData(true)}"></th:block>
                 <th:block th:replace="~{deliveries/create/parts :: hiddenItems}"></th:block>
                 <div class="cl-layout-main">
                     <section class="cl-card" aria-labelledby="availability-title">
@@ -117,12 +117,9 @@
                         </section>
                     </th:block>
 
-                    <th:block th:if="${page.dropship()}">
-                        <section th:replace="~{deliveries/create/parts :: costs}"></section>
-                    </th:block>
                 </div>
                 <aside class="cl-layout-side is-sticky">
-                    <th:block th:replace="~{deliveries/create/parts :: recipient(${page}, 'deliveries.create.recipient.help.purchase')}"></th:block>
+                    <th:block th:replace="~{deliveries/create/parts :: recipient(${page}, ${requiresApproval} ? 'deliveries.create.recipient.help.approval' : 'deliveries.create.recipient.help.purchase')}"></th:block>
                     <section class="cl-card" aria-labelledby="summary-title">
                         <div class="cl-card-head"><h2 class="cl-card-title" id="summary-title" th:text="#{deliveries.create.summary}"></h2></div>
                         <dl class="cl-kv is-column cl-card-inset">
@@ -138,6 +135,7 @@
                                 <span th:text="#{deliveries.create.purchase.reasons}"></span>
                                 <ul class="cl-reasons">
                                     <li data-reason="checking" th:text="#{deliveries.create.purchase.reason.checking}"></li>
+                                    <li data-reason="checkFailed" hidden th:text="#{deliveries.create.purchase.reason.checkFailed}"></li>
                                     <li data-reason="availability" hidden th:text="#{deliveries.create.purchase.reason.availability}"></li>
                                     <li data-reason="address" hidden th:text="#{deliveries.create.purchase.reason.address}"></li>
                                     <li data-reason="options" hidden th:text="#{deliveries.create.purchase.reason.options}"></li>
@@ -174,7 +172,7 @@
 
 <!--/* The supplier's live answer (POST validate), parsed into #validation-area by delivery-purchase.js. */-->
 <th:block th:fragment="validationResult">
-    <div th:if="${validationError != null}" class="cl-card-inset">
+    <div th:if="${validationError != null}" class="cl-card-inset" data-cl-validation-error>
         <div class="cl-alert is-bad">
             <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
             <p class="cl-alert-text"><span th:text="${validationError}"></span>
@@ -189,10 +187,10 @@
                 <p class="cl-alert-text"><span th:text="#{deliveries.create.purchase.unavailable}"></span>
                     <button type="button" class="cl-link-button" data-cl-back-submit="back-submit"
                             th:text="#{deliveries.create.back}"></button>
-                    <span th:text="#{deliveries.create.purchase.unavailable.after}"></span></p>
+                    <span th:text="${page.dropship()} ? #{deliveries.create.purchase.unavailable.after.dropship} : #{deliveries.create.purchase.unavailable.after}"></span></p>
             </div>
         </div>
-        <table class="cl-table is-key-wrap">
+        <table class="cl-table is-key-wrap is-delivery">
             <colgroup><col class="cl-col-key"><col class="cl-col-num"><col class="cl-col-num"><col class="cl-col-num"><col class="cl-col-num"><col class="cl-col-num"></colgroup>
             <thead>
             <tr>
@@ -208,7 +206,8 @@
             <tr th:each="line : ${validation.lines()}">
                 <th scope="row" class="cl-table-key" th:attr="data-label=#{general.product}">
                     <span th:text="${line.name()}"></span>
-                    <span class="cl-table-sub"><span th:text="#{general.ean} + ':'"></span> <span class="cl-code-nowrap" th:text="${line.ean()}"></span></span>
+                    <span class="cl-table-sub"><span th:text="#{general.ean} + ':'"></span> <span class="cl-code-nowrap" th:text="${line.ean()}"></span>
+                        · <span th:text="#{general.manufacturer.code} + ':'"></span> <span class="cl-code-nowrap" th:text="${line.mfn()}"></span></span>
                 </th>
                 <td class="is-numeric" th:attr="data-label=#{deliveries.create.purchase.col.requested}" th:text="${line.requestedQty()}"></td>
                 <td class="is-numeric" th:attr="data-label=#{deliveries.create.purchase.col.available}">

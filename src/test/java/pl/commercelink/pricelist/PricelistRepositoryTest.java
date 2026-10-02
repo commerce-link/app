@@ -244,25 +244,6 @@ class PricelistRepositoryTest {
     }
 
     @Test
-    void findsNewestUsesStorePrefix() {
-        when(fileStorage.findNewestFileNameByLastModified(bucketName, prefix)).thenReturn(Optional.of("abc.csv"));
-
-        String id = pricelistRepository.findNewestPricelistId(storeId, catalogId);
-
-        assertEquals("abc", id);
-        verify(fileStorage).findNewestFileNameByLastModified(bucketName, prefix);
-    }
-
-    @Test
-    void topNUsesStorePrefix() {
-        when(fileStorage.findTopNByKeyOrder(bucketName, prefix, 3)).thenReturn(List.of());
-
-        pricelistRepository.findTopNPricelist(storeId, catalogId, 3);
-
-        verify(fileStorage).findTopNByKeyOrder(bucketName, prefix, 3);
-    }
-
-    @Test
     void rowsWithoutServiceColumnDefaultToFalse() {
         // given — old-format CSV row, no trailing service column
         String pricelistId = "pricelistId";

@@ -6,7 +6,7 @@
 (function () {
     'use strict';
 
-    var state = {checking: true, available: false};
+    var state = {checking: true, answered: false, available: false};
 
     function requiredOptionsSet(form) {
         return Array.prototype.every.call(form.querySelectorAll('select[data-order-option][data-required="true"]'),
@@ -24,7 +24,8 @@
             || document.getElementById('order-options-blocked') !== null;
         var reasons = {
             checking: state.checking,
-            availability: !state.checking && !state.available,
+            checkFailed: !state.checking && !state.answered,
+            availability: !state.checking && state.answered && !state.available,
             address: !addressSet(form),
             options: !requiredOptionsSet(form),
             blocked: blocked
@@ -67,12 +68,18 @@
             })
             .then(function (html) {
                 showFragment(area, html);
+                // anything but our fragment (an expired session answers with the login page) counts as a failed check
+                if (!area.querySelector('[data-fully-available], [data-cl-validation-error]')) {
+                    throw new Error('not a validation result');
+                }
                 var result = area.querySelector('[data-fully-available]');
+                state.answered = !!result;
                 state.available = !!(result && result.getAttribute('data-fully-available') === 'true');
                 total.textContent = result ? result.getAttribute('data-total') : '—';
             })
             .catch(function () {
                 showTemplate(area, 'validation-error-template');
+                state.answered = false;
                 state.available = false;
                 total.textContent = '—';
             })
@@ -96,6 +103,10 @@
         if (!form) {
             return;
         }
+        // the back controls are type=button and only work through this script, so the page shows them only now
+        document.querySelectorAll('button[data-cl-back-submit][hidden]').forEach(function (button) {
+            button.hidden = false;
+        });
         form.addEventListener('change', function () {
             refresh(form);
         });
@@ -133,10 +144,12 @@
                 refresh(form);
             }
         });
-        // The list can be long: bring the preselected address into view so the choice is visible without scrolling.
+        // The list can be long: scroll it (not the page) to the preselected address so the choice is visible.
         var checkedAddress = form.querySelector('input[name="deliveryAddressId"]:checked');
-        if (checkedAddress) {
-            checkedAddress.scrollIntoView({block: 'nearest'});
+        var addressList = checkedAddress && checkedAddress.closest('.cl-choice-group');
+        if (addressList) {
+            var label = checkedAddress.closest('label') || checkedAddress;
+            addressList.scrollTop = label.getBoundingClientRect().top - addressList.getBoundingClientRect().top;
         }
         loadValidation(form);
 

@@ -202,27 +202,6 @@ class DeliveriesPlanningServiceTest {
     }
 
     @Test
-    void ineligibleDirectToConsumerOrderStaysInBatchAndYieldsNoCandidate() {
-        // given
-        Allocation dtc = allocation("order-1", "1", "Acme", true);
-        when(orderAllocationsManager.fetchAllWithOrders(STORE_ID))
-                .thenReturn(new OrderAllocations(List.of(dtc), Map.of()));
-        when(warehouseAllocationsManager.fetchAll(STORE_ID)).thenReturn(List.of());
-        Order order = new Order();
-        when(ordersRepository.findById(STORE_ID, "order-1")).thenReturn(order);
-        when(orderItemsRepository.findByOrderId("order-1")).thenReturn(List.of());
-        when(dropshipEligibility.assess(order, List.of()))
-                .thenReturn(DropshipAssessment.rejected(DropshipRejection.NO_DROPSHIP_CAPABLE_SUPPLIER));
-
-        // when
-        DeliveriesPlanningService.Planning planning = service.plan(STORE_ID);
-
-        // then
-        assertThat(planning.dropshipCandidates()).isEmpty();
-        assertThat(planning.deliveries()).hasSize(1);
-    }
-
-    @Test
     void planFetchesOrderAllocationsOnlyOnce() {
         // given
         when(orderAllocationsManager.fetchAllWithOrders(STORE_ID))

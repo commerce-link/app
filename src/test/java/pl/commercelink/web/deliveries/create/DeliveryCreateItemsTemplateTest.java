@@ -3,6 +3,7 @@ package pl.commercelink.web.deliveries.create;
 import org.junit.jupiter.api.Test;
 import pl.commercelink.web.dtos.DeliveryCreationForm;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -24,7 +25,7 @@ class DeliveryCreateItemsTemplateTest {
                 .contains("id=\"delivery-step-form\"").contains("data-cl-delivery-items")
                 .contains("AMD Ryzen 7 9800X3D").contains("<span class=\"cl-code-nowrap\" data-cl-item-ean>5901234123457</span>")
                 .contains("Źródła: 1").contains("min. 2").contains("Dołącz źródło")
-                .contains("Uzupełnij magazyn przy okazji: 1").contains("Kingston FURY Beast 16GB")
+                .contains("Uzupełnij magazyn przy okazji").contains("Kingston FURY Beast 16GB")
                 .contains("Magazyn sklepu").contains("Podsumowanie")
                 .doesNotContain("??");
         for (String absent : List.of("name=\"externalDeliveryId\" class", "type=\"date\"", "<select")) {
@@ -174,6 +175,58 @@ class DeliveryCreateItemsTemplateTest {
     }
 
     @Test
+    void warehouseStepOneComesWithoutSuggestionsAndFetchesThemAfter() {
+        // given: the plan carries no suggestions
+        DeliveryCreationForm form = warehouseForm();
+        form.setSuggestedItems(new ArrayList<>());
+
+        // when
+        String html = render("deliveries/create/items", model(warehousePage(false, true, false), form));
+
+        // then
+        assertThat(html).contains("data-cl-suggestions").contains("data-url=\"/dashboard/deliveries/create/Acme/suggestions\"")
+                .contains("data-summary=\"Uzupełnij magazyn przy okazji: {0}\"")
+                .contains("<span data-cl-suggestions-title>Uzupełnij magazyn przy okazji</span>")
+                .contains("class=\"cl-spinner is-compact\" aria-hidden=\"true\" data-cl-suggestions-spinner")
+                .contains("wczytywanie propozycji").contains("Szukanie produktów w dobrej cenie u dostawcy…")
+                .contains("class=\"cl-card-inset cl-loading\" data-cl-suggestions-status")
+                .doesNotContain("suggestedItems[0]");
+        // with nothing to show yet the table (and its header) waits for the rows
+        assertThat(html).contains("<div class=\"cl-card-section\" data-cl-suggestions-table hidden=\"hidden\">");
+    }
+
+    @Test
+    void chosenSuggestionsShowTheirTableAtOnce() {
+        // when
+        String html = render("deliveries/create/items", model(warehousePage(false, true, false), warehouseForm()));
+
+        // then
+        assertThat(html).contains("<div class=\"cl-card-section\" data-cl-suggestions-table>").doesNotContain("data-cl-suggestions-table hidden");
+    }
+
+    @Test
+    void dropshipStepOneHasNoSuggestions() {
+        // when
+        String html = render("deliveries/create/items", model(dropshipPage(false, null, false), dropshipForm()));
+
+        // then
+        assertThat(html).doesNotContain("data-cl-suggestions");
+    }
+
+    @Test
+    void fetchedSuggestionsAreRowsCarryingTheirCode() {
+        // given
+        Map<String, Object> variables = model(warehousePage(false, true, false), warehouseForm());
+
+        // when
+        String html = fragment("deliveries/create/parts :: suggestionRows", variables);
+
+        // then
+        assertThat(html).contains("data-cl-suggestion-list").contains("data-cl-suggestion=\"")
+                .contains("name=\"suggestedItems[0].requestedQty\"");
+    }
+
+    @Test
     void superAdminStepOnePostsToTheStoreScopedRoutes() {
         // when
         String html = render("deliveries/create/items", model(warehousePage(true, true, false), warehouseForm()));
@@ -181,6 +234,7 @@ class DeliveryCreateItemsTemplateTest {
         // then
         assertThat(html).contains("formaction=\"/dashboard/store/store-1/deliveries/create/Acme/purchase\"")
                 .contains("data-url=\"/dashboard/store/store-1/deliveries/create/Acme/fulfilment\"")
+                .contains("data-url=\"/dashboard/store/store-1/deliveries/create/Acme/suggestions\"")
                 .contains("href=\"/dashboard/store/store-1/deliveries/preview\"");
     }
 
@@ -287,5 +341,69 @@ class DeliveryCreateItemsTemplateTest {
         // then
         int adjustment = html.indexOf("<tfoot");
         assertThat(html.substring(adjustment, html.indexOf(">", adjustment))).contains("hidden");
+    }
+
+    @Test
+    void anUnreadableNumberIsMarkedAtItsField() {
+        // given
+        Map<String, Object> model = model(warehousePage(false, true, false), warehouseForm());
+        model.put("stepError", "deliveries.create.error.itemNumber");
+        model.put("invalidFields", java.util.Set.of("100-100001084WOF|unitCost", "MFN-FURY-16|requestedQty"));
+
+        // when
+        String html = render("deliveries/create/items", model);
+
+        // then
+        int cost = html.indexOf("name=\"items[0].unitCost\"");
+        String costInput = html.substring(html.lastIndexOf("<input", cost), html.indexOf(">", cost));
+        assertThat(costInput).contains("is-invalid").contains("aria-invalid=\"true\"");
+        int qty = html.indexOf("name=\"items[0].requestedQty\"");
+        assertThat(html.substring(html.lastIndexOf("<input", qty), html.indexOf(">", qty))).doesNotContain("is-invalid");
+        int suggestion = html.indexOf("name=\"suggestedItems[0].requestedQty\"");
+        assertThat(html.substring(html.lastIndexOf("<input", suggestion), html.indexOf(">", suggestion))).contains("is-invalid");
+        assertThat(html.substring(html.indexOf("<details"), html.indexOf(">", html.indexOf("<details")))).contains("open");
+    }
+
+    @Test
+    void suggestionsNameTheTargetStockAndWhatTheSupplierHas() {
+        // given
+        DeliveryCreationForm form = warehouseForm();
+        form.getSuggestedItems().getFirst().setAvailableAtSupplier(7);
+
+        // when
+        String html = render("deliveries/create/items", model(warehousePage(false, true, false), form));
+
+        // then
+        assertThat(html).contains("Stan docelowy").doesNotContain("W drodze").contains("u dostawcy: 7 szt.");
+    }
+
+    @Test
+    void supplierWithoutIntegrationDoesNotPromiseAnAddressStep() {
+        // when
+        String html = render("deliveries/create/items", model(warehousePage(false, false, false), warehouseForm()));
+
+        // then
+        assertThat(html).doesNotContain("przy zamówieniu przez integrację")
+                .contains("Towar przyjedzie na adres, który podasz dostawcy.");
+    }
+
+    @Test
+    void linesOfOneDropshipProductAreNumberedAndNamedForScreenReaders() {
+        // when
+        String html = render("deliveries/create/items", model(dropshipPage(false, null, false), dropshipFormWithTwoLines()));
+
+        // then
+        assertThat(html).contains(">Linia 1<").contains(">Linia 2<")
+                .containsPattern("aria-label=\"Dołącz do dostawy: [^\"]+, linia 2\"");
+    }
+
+    @Test
+    void theOrderLinkInTheLeadIsATouchTarget() {
+        // when
+        String html = render("deliveries/create/items", model(dropshipPage(false, null, false), dropshipForm()));
+
+        // then
+        int lead = html.indexOf("cl-page-lead");
+        assertThat(html.substring(lead, html.indexOf("</p>", lead))).contains("class=\"cl-lead-link\"");
     }
 }

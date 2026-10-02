@@ -47,7 +47,7 @@ class PendingDeliveriesControllerTest {
             assertThat(page).isEqualTo("deliveries/pending");
             assertThat(fragment).isEqualTo("deliveries/pending :: results");
             verify(service, times(2)).page(eq("store-1"), eq(false),
-                    eq(new PendingDeliveriesQuery(PendingDeliveriesQuery.Kind.DROPSHIP, null, List.of(), null)), any(), any());
+                    eq(new PendingDeliveriesQuery(PendingDeliveriesQuery.Kind.DROPSHIP, List.of(), null)), any(), any());
         }
     }
 

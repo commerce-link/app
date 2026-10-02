@@ -123,11 +123,12 @@ class DeliveryCreatePurchaseTemplateTest {
         // then
         assertThat(html).contains("cl-alert is-info").contains("Zgłoś do realizacji")
                 .contains("Po akceptacji zamówienie wyśle administrator platformy.")
-                .doesNotContain("Adres dostawy").doesNotContain("Opcje zamówienia u dostawcy");
+                .doesNotContain("Adres dostawy").doesNotContain("Opcje zamówienia u dostawcy")
+                .doesNotContain("Adres wybierasz").contains("Adres wybierze administrator platformy przy akceptacji.");
     }
 
     @Test
-    void dropshipConfirmationShowsTheCustomerAndTheOptionalCostsOnce() {
+    void dropshipConfirmationShowsTheCustomerAndNoCostFields() {
         // given
         Map<String, Object> variables = model(dropshipPage(false, null, false), dropshipForm());
         variables.put("purchaseRef", "ref-1");
@@ -136,26 +137,14 @@ class DeliveryCreatePurchaseTemplateTest {
         // when
         String html = render("deliveries/create/purchase", variables);
 
-        // then
-        assertThat(html).contains("Dropshipping").contains("Dane adresowe klienta").contains("Koszty dostawy (opcjonalnie)")
-                .contains("id=\"shippingCost\"").contains("Mnożnik VAT").doesNotContain("Adres dostawy");
+        // then: ordering through the integration asks for no order data; typed values only ride along for the way back
+        assertThat(html).contains("Dropshipping").contains("Dane adresowe klienta")
+                .doesNotContain("Koszty dostawy (opcjonalnie)").doesNotContain("id=\"shippingCost\"")
+                .doesNotContain("Mnożnik VAT").doesNotContain("Adres dostawy");
+        assertThat(html).contains("type=\"hidden\" name=\"shippingCost\"").contains("type=\"hidden\" name=\"tax\"");
         assertThat(fieldNames(html)).doesNotHaveDuplicates()
                 .contains("order", "externalDeliveryId", "estimatedDeliveryAt", "shippingCost", "paymentCost",
                         "paymentTerms", "tax", "sourceCurrency", "items[0].allocations[0].selected", "purchaseRef");
-    }
-
-    @Test
-    void optionalCostsDescriptionIsACardDescriptionInsideTheCardPadding() {
-        // given
-        Map<String, Object> variables = model(dropshipPage(false, null, false), dropshipForm());
-        variables.put("purchaseRef", "ref-1");
-        variables.put("requiresApproval", false);
-
-        // when
-        String html = render("deliveries/create/purchase", variables);
-
-        // then: a bare cl-help in the folded body had no padding and no type size, so it ran to the card's edge
-        assertThat(html).contains("<p class=\"cl-card-desc\">Koszt wysyłki do klienta");
     }
 
     @Test
@@ -219,7 +208,7 @@ class DeliveryCreatePurchaseTemplateTest {
     void failedSubmitShowsTheErrorAboveTheCards() {
         // given
         Map<String, Object> variables = warehouse(addresses(1));
-        variables.put("errorMessage", "Złożenie zamówienia u dostawcy nie powiodło się.");
+        variables.put("failureMessage", "Złożenie zamówienia u dostawcy nie powiodło się.");
 
         // when
         String html = render("deliveries/create/purchase", variables);
@@ -242,6 +231,22 @@ class DeliveryCreatePurchaseTemplateTest {
         // then
         assertThat(html).contains("data-fully-available=\"false\"").contains("brakuje 1").contains("cl-status is-bad")
                 .contains("Dostawca nie ma wszystkiego na stanie.").contains("599,00").contains("19,50");
+    }
+
+    @Test
+    void availabilityFragmentShowsTheManufacturerCodeNextToTheEan() {
+        // given
+        PurchaseValidation validation = new PurchaseValidation("Acme", "ref-1", "PLN", 1198.0, true, List.of(
+                new PurchaseValidation.Line("AMD Ryzen 7 9800X3D", "sku", "5901234123457", "100-100001084WOF", 2, 2, 579.5, 599.0)));
+        Map<String, Object> variables = model(warehousePage(false, true, false), warehouseForm());
+        variables.put("validation", validation);
+
+        // when
+        String html = fragment("deliveries/create/purchase :: validationResult", variables);
+
+        // then
+        assertThat(html).contains("EAN:").contains("Kod producenta:")
+                .contains("<span class=\"cl-code-nowrap\">100-100001084WOF</span>");
     }
 
     @Test

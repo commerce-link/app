@@ -6,6 +6,9 @@ import pl.commercelink.inventory.deliveries.PurchaseValidation;
 import pl.commercelink.orders.Order;
 import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.web.dtos.DeliveryCreationForm;
+import pl.commercelink.web.dtos.SuggestedDeliveryItem;
+
+import java.util.List;
 
 /**
  * What a new delivery covers and how it is ordered: the warehouse batch of one supplier (every waiting allocation,
@@ -26,8 +29,19 @@ public interface DeliveryScope {
         return order() != null;
     }
 
-    /** Step 1 form built from what waits at the supplier now; null when nothing is left to order there. */
+    /**
+     * Step 1 form built from what waits at the supplier now; null when nothing is left to order there. It carries no
+     * restock suggestions: those take seconds to work out, so the page fetches them on its own ({@link #suggestions()}).
+     */
     DeliveryCreationForm plannedForm();
+
+    /**
+     * Products worth ordering for the warehouse while ordering anyway (restock suggestions; warehouse only). Slow: it
+     * reads the price aggregates and the suppliers' offers, so step 1 asks for it after the page is shown.
+     */
+    default List<SuggestedDeliveryItem> suggestions() {
+        return List.of();
+    }
 
     /** VAT multiplier a fresh form starts with (1 for a known foreign supplier, the VAT rate otherwise). */
     double defaultTax();

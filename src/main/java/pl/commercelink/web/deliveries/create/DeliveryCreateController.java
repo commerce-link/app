@@ -7,9 +7,11 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
+import org.springframework.validation.FieldError;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.inventory.deliveries.DeliveryFulfilmentUpdateService;
+import pl.commercelink.inventory.deliveries.DeliveryItem;
 import pl.commercelink.inventory.deliveries.PurchaseSubmission;
 import pl.commercelink.inventory.deliveries.SupplierPurchaseService;
 import pl.commercelink.inventory.supplier.SupplierLabels;
@@ -17,11 +19,19 @@ import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.starter.util.OperationResult;
 import pl.commercelink.web.dtos.DeliveryCreationForm;
 import pl.commercelink.web.dtos.DeliveryFulfilmentUpdateForm;
+import pl.commercelink.web.dtos.SuggestedDeliveryItem;
 
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -40,8 +50,12 @@ public class DeliveryCreateController {
     private static final String ITEM_NUMBER = "deliveries.create.error.itemNumber";
     private static final Pattern ITEM_NUMBER_FIELD =
             Pattern.compile("(items\\[\\d+]\\.(unitCost|requestedQty))|(suggestedItems\\[\\d+]\\..*)");
+    private static final Pattern ROW_NUMBER_FIELD =
+            Pattern.compile("(items|suggestedItems)\\[(\\d+)]\\.(unitCost|requestedQty)");
+    private static final String FULFILMENT_INVALID = "error.message.delivery.fulfilment.invalid";
     private static final String CHECK_FAILED = "deliveries.purchase.confirm.checkFailed";
     private static final String VALIDATION_RESULT = "deliveries/create/purchase :: validationResult";
+    private static final String SUGGESTION_ROWS = "deliveries/create/parts :: suggestionRows";
 
     private final DeliveryScopes scopes;
     private final SupplierPurchaseService supplierPurchaseService;
@@ -67,6 +81,23 @@ public class DeliveryCreateController {
                                      @RequestParam(value = "from", required = false) String from,
                                      Model model, RedirectAttributes flash, Locale locale) {
         return showItems(storeId, provider, orderId, from, null, null, model, flash, locale);
+    }
+
+    // Restock suggestions take seconds to work out, so step 1 is shown without them and fetches their rows from here.
+    @GetMapping(STORE + "/suggestions")
+    @PreAuthorize("hasRole('ADMIN')")
+    public String suggestions(@PathVariable("provider") String provider,
+                              @RequestParam(value = "order", required = false) String orderId, Model model) {
+        return renderSuggestions(storeId(), provider, orderId, model);
+    }
+
+    @GetMapping(SUPER + "/suggestions")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public String suggestionsForSuperAdmin(@PathVariable("storeId") String storeId,
+                                           @PathVariable("provider") String provider,
+                                           @RequestParam(value = "order", required = false) String orderId,
+                                           Model model) {
+        return renderSuggestions(storeId, provider, orderId, model);
     }
 
     @PostMapping(STORE + "/back")
@@ -195,8 +226,9 @@ public class DeliveryCreateController {
     @PreAuthorize("hasRole('ADMIN')")
     @ResponseBody
     public FulfilmentUpdateResponse fulfilmentJson(@PathVariable("provider") String provider,
-                                                   @ModelAttribute DeliveryFulfilmentUpdateForm update, Locale locale) {
-        return updateFulfilment(storeId(), provider, update, locale);
+                                                   @ModelAttribute DeliveryFulfilmentUpdateForm update,
+                                                   BindingResult binding, Locale locale) {
+        return updateFulfilment(storeId(), provider, update, binding, locale);
     }
 
     @PostMapping(value = SUPER + "/fulfilment", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -205,23 +237,24 @@ public class DeliveryCreateController {
     public FulfilmentUpdateResponse fulfilmentJsonForSuperAdmin(@PathVariable("storeId") String storeId,
                                                                 @PathVariable("provider") String provider,
                                                                 @ModelAttribute DeliveryFulfilmentUpdateForm update,
-                                                                Locale locale) {
-        return updateFulfilment(storeId, provider, update, locale);
+                                                                BindingResult binding, Locale locale) {
+        return updateFulfilment(storeId, provider, update, binding, locale);
     }
 
     @PostMapping(STORE + "/fulfilment")
     @PreAuthorize("hasRole('ADMIN')")
     public String fulfilment(@PathVariable("provider") String provider,
-                             @ModelAttribute DeliveryFulfilmentUpdateForm update, RedirectAttributes flash, Locale locale) {
-        return fulfilmentWithReload(storeId(), provider, update, flash, locale);
+                             @ModelAttribute DeliveryFulfilmentUpdateForm update, BindingResult binding,
+                             RedirectAttributes flash, Locale locale) {
+        return fulfilmentWithReload(storeId(), provider, update, binding, flash, locale);
     }
 
     @PostMapping(SUPER + "/fulfilment")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     public String fulfilmentForSuperAdmin(@PathVariable("storeId") String storeId, @PathVariable("provider") String provider,
-                                          @ModelAttribute DeliveryFulfilmentUpdateForm update,
+                                          @ModelAttribute DeliveryFulfilmentUpdateForm update, BindingResult binding,
                                           RedirectAttributes flash, Locale locale) {
-        return fulfilmentWithReload(storeId, provider, update, flash, locale);
+        return fulfilmentWithReload(storeId, provider, update, binding, flash, locale);
     }
 
     // ---- implementation
@@ -246,6 +279,17 @@ public class DeliveryCreateController {
         return "deliveries/create/items";
     }
 
+    /** The rows of the suggestions card; none for a dropship order or a supplier the store can no longer use. */
+    private String renderSuggestions(String storeId, String provider, String orderId, Model model) {
+        DeliveryScopes.Resolution resolution = scopes.resolve(storeId, provider, orderId);
+        List<SuggestedDeliveryItem> suggestions = resolution instanceof DeliveryScopes.Resolution.Found found
+                ? found.scope().suggestions() : List.of();
+        DeliveryCreationForm form = new DeliveryCreationForm();
+        form.setSuggestedItems(suggestions);
+        model.addAttribute("form", form);
+        return SUGGESTION_ROWS;
+    }
+
     private String showStepOneAfterBack(String storeId, String provider, String orderId, String from,
                                         DeliveryCreationForm posted, BindingResult binding, Model model,
                                         RedirectAttributes flash, Locale locale) {
@@ -260,8 +304,74 @@ public class DeliveryCreateController {
     }
 
     // A cleared or malformed quantity or cost does not bind and would silently become 0 on a real order.
+    private static String nothingRequested(DeliveryScope scope) {
+        return scope.dropship() ? NOTHING_REQUESTED + ".dropship" : NOTHING_REQUESTED;
+    }
+
     private static boolean hasUnreadableItemNumber(BindingResult binding) {
         return binding.getFieldErrors().stream().anyMatch(error -> ITEM_NUMBER_FIELD.matcher(error.getField()).matches());
+    }
+
+    /**
+     * Step 1 again after a quantity or cost that did not bind. The field keeps the planned value instead of the 0 the
+     * failed binding left behind (a second click would otherwise order at 0), and the page marks it.
+     */
+    private String itemsWithUnreadableNumbers(DeliveryScope scope, DeliveryCreateLinks links, DeliveryCreationForm posted,
+                                              BindingResult binding, Model model) {
+        DeliveryCreationForm form = scope.plannedForm();
+        if (form == null) {
+            return "redirect:" + links.preview();
+        }
+        // the planned cost of a suggestion is its offer price, so this rare page works the suggestions out at once
+        if (binding.getFieldErrors().stream().anyMatch(error -> error.getField().startsWith("suggestedItems["))) {
+            form.setSuggestedItems(new ArrayList<>(scope.suggestions()));
+        }
+        Set<String> invalidFields = new LinkedHashSet<>();
+        for (FieldError error : binding.getFieldErrors()) {
+            Matcher field = ROW_NUMBER_FIELD.matcher(error.getField());
+            if (field.matches()) {
+                restorePlannedValue(form, posted, field.group(1), Integer.parseInt(field.group(2)), field.group(3))
+                        .ifPresent(invalidFields::add);
+            }
+        }
+        form.applyUserSelections(posted);
+        addPage(model, scope, links, form);
+        model.addAttribute("stepError", ITEM_NUMBER);
+        model.addAttribute("invalidFields", invalidFields);
+        return "deliveries/create/items";
+    }
+
+    /** Copies the planned value of one unbound row field into the posted form; answers "mfn|field" of the row. */
+    private static Optional<String> restorePlannedValue(DeliveryCreationForm planned, DeliveryCreationForm posted,
+                                                        String list, int index, String property) {
+        if ("items".equals(list)) {
+            if (posted.getItems() == null || index >= posted.getItems().size()) {
+                return Optional.empty();
+            }
+            DeliveryItem row = posted.getItems().get(index);
+            planned.getItems().stream().filter(item -> Objects.equals(item.getMfn(), row.getMfn())).findFirst()
+                    .ifPresent(item -> {
+                        if ("unitCost".equals(property)) {
+                            row.setUnitCost(item.getUnitCost());
+                        } else {
+                            row.setRequestedQty(item.getRequestedQty());
+                        }
+                    });
+            return Optional.of(row.getMfn() + "|" + property);
+        }
+        if (posted.getSuggestedItems() == null || index >= posted.getSuggestedItems().size()) {
+            return Optional.empty();
+        }
+        SuggestedDeliveryItem row = posted.getSuggestedItems().get(index);
+        planned.getSuggestedItems().stream().filter(item -> Objects.equals(item.getMfn(), row.getMfn())).findFirst()
+                .ifPresent(item -> {
+                    if ("unitCost".equals(property)) {
+                        row.setUnitCost(item.getUnitCost());
+                    } else {
+                        row.setRequestedQty(item.getRequestedQty());
+                    }
+                });
+        return Optional.of(row.getMfn() + "|" + property);
     }
 
     private String showManual(String storeId, String provider, String orderId, String from, DeliveryCreationForm form,
@@ -269,16 +379,16 @@ public class DeliveryCreateController {
         DeliveryCreateLinks links = links(storeId, provider, orderId, from);
         return withScope(storeId, provider, links, flash, locale, scope -> {
             if (hasUnreadableItemNumber(binding)) {
-                return items(scope, links, form, ITEM_NUMBER, model);
+                return itemsWithUnreadableNumbers(scope, links, form, binding, model);
             }
-            prepare(form, storeId, provider);
+            prepare(form, storeId, provider, scope);
             if (!form.hasRequestedItems()) {
                 if (scope.dropship() && form.isRemoveUnselected()) {
                     scope.releaseUnselected(form);
                     flash.addFlashAttribute("successMessage", message("orders.dropship.unselectedReleased", locale));
                     return "redirect:" + links.order();
                 }
-                return items(scope, links, form, NOTHING_REQUESTED, model);
+                return items(scope, links, form, nothingRequested(scope), model);
             }
             addPage(model, scope, links, form);
             model.addAttribute("errors", Map.of());
@@ -290,7 +400,7 @@ public class DeliveryCreateController {
                                BindingResult binding, Model model, RedirectAttributes flash, Locale locale) {
         DeliveryCreateLinks links = links(storeId, provider, orderId, from);
         return withScope(storeId, provider, links, flash, locale, scope -> {
-            prepare(form, storeId, provider);
+            prepare(form, storeId, provider, scope);
             Map<String, String> errors = ManualOrderValidator.validate(form, binding, scope.requiresOrderIdentity());
             if (!errors.isEmpty()) {
                 addPage(model, scope, links, form);
@@ -301,7 +411,7 @@ public class DeliveryCreateController {
             if (!result.isSuccess()) {
                 addPage(model, scope, links, form);
                 model.addAttribute("errors", Map.of());
-                model.addAttribute("errorMessage", message(result.getMessage(), locale));
+                model.addAttribute("failureMessage", message(result.getMessage(), locale));
                 return "deliveries/create/manual";
             }
             return "redirect:" + links.deliveryDetails(result.getPayload());
@@ -316,11 +426,11 @@ public class DeliveryCreateController {
                 return "redirect:" + links.items();
             }
             if (hasUnreadableItemNumber(binding)) {
-                return items(scope, links, form, ITEM_NUMBER, model);
+                return itemsWithUnreadableNumbers(scope, links, form, binding, model);
             }
-            prepare(form, storeId, provider);
+            prepare(form, storeId, provider, scope);
             if (!form.hasRequestedItems()) {
-                return items(scope, links, form, NOTHING_REQUESTED, model);
+                return items(scope, links, form, nothingRequested(scope), model);
             }
             addPage(model, scope, links, form);
             model.addAttribute("purchaseRef", UUID.randomUUID().toString());
@@ -356,25 +466,28 @@ public class DeliveryCreateController {
                                    DeliveryCreationForm form, BindingResult binding, Model model,
                                    RedirectAttributes flash, Locale locale) {
         DeliveryCreateLinks links = links(storeId, provider, orderId, from);
+        // A confirmation sent again (browser back, a repeated request) opens the delivery it already created. Checked
+        // before the scope: the order's lines now point at that delivery, so a dropship order no longer qualifies.
+        Optional<String> placed = supplierPurchaseService.submittedDeliveryId(storeId, purchaseRef);
+        if (placed.isPresent()) {
+            return "redirect:" + links.deliveryDetails(placed.get());
+        }
         return withScope(storeId, provider, links, flash, locale, scope -> {
             if (!scope.purchaseAvailable()) {
                 return "redirect:" + links.items();
             }
             form.setStoreId(storeId);
             form.setProvider(provider);
-            if (binding.hasFieldErrors("tax")) {
-                form.setTax(scope.defaultTax());
-            }
-            // The warehouse integration page shows no currency and its costs are PLN, but the hidden field still carries
-            // whatever the "ordered outside the system" step picked earlier, which would convert the claimed costs.
-            if (!scope.dropship()) {
-                form.setSourceCurrency("PLN");
-            }
+            countTickedDropshipLines(form, scope);
+            OrderData typed = OrderData.of(form);
+            recordNoOrderData(form, scope);
             OperationResult<PurchaseSubmission> result = scope.submit(form, purchaseRef);
             if (!result.isSuccess()) {
+                // the page carries the record step's data on the way back; only the order itself ignores it
+                typed.restoreTo(form);
                 addPage(model, scope, links, form);
                 model.addAttribute("purchaseRef", purchaseRef);
-                model.addAttribute("errorMessage", message(result.getMessage(), locale));
+                model.addAttribute("failureMessage", message(result.getMessage(), locale));
                 scope.addPurchaseModel(form, model);
                 return "deliveries/create/purchase";
             }
@@ -382,21 +495,60 @@ public class DeliveryCreateController {
         });
     }
 
+    /**
+     * Ordering through the integration asks for no order data: the supplier answers with the number and date, and the
+     * costs, VAT and payment terms start from their defaults (editable later on the delivery). The hidden fields still
+     * carry whatever "Zarejestruj zamówienie" was given before the operator went back, so they are reset here — a
+     * leftover EUR would otherwise convert the claimed item costs.
+     */
+    private static void recordNoOrderData(DeliveryCreationForm form, DeliveryScope scope) {
+        form.setSourceCurrency("PLN");
+        form.setShippingCost(0);
+        form.setPaymentCost(0);
+        form.setPaymentTerms(0);
+        form.setTax(scope.defaultTax());
+    }
+
+    /** What "Zarejestruj zamówienie" was given; an order through the integration does not read it. */
+    private record OrderData(String currency, double shippingCost, double paymentCost, int paymentTerms, double tax) {
+
+        static OrderData of(DeliveryCreationForm form) {
+            return new OrderData(form.getSourceCurrency(), form.getShippingCost(), form.getPaymentCost(),
+                    form.getPaymentTerms(), form.getTax());
+        }
+
+        void restoreTo(DeliveryCreationForm form) {
+            form.setSourceCurrency(currency);
+            form.setShippingCost(shippingCost);
+            form.setPaymentCost(paymentCost);
+            form.setPaymentTerms(paymentTerms);
+            form.setTax(tax);
+        }
+    }
+
     private FulfilmentUpdateResponse updateFulfilment(String storeId, String provider, DeliveryFulfilmentUpdateForm update,
-                                                      Locale locale) {
-        OperationResult<Void> result = fulfilmentUpdateService.run(storeId, provider, update);
+                                                      BindingResult binding, Locale locale) {
+        OperationResult<Void> result = runFulfilmentUpdate(storeId, provider, update, binding);
         return result.isSuccess()
                 ? FulfilmentUpdateResponse.saved(update, message("deliveries.create.fulfilment.saved", locale))
                 : FulfilmentUpdateResponse.failed(message(result.getMessage(), locale));
     }
 
     private String fulfilmentWithReload(String storeId, String provider, DeliveryFulfilmentUpdateForm update,
-                                        RedirectAttributes flash, Locale locale) {
-        OperationResult<Void> result = fulfilmentUpdateService.run(storeId, provider, update);
+                                        BindingResult binding, RedirectAttributes flash, Locale locale) {
+        OperationResult<Void> result = runFulfilmentUpdate(storeId, provider, update, binding);
         if (!result.isSuccess()) {
             flash.addFlashAttribute("errorMessage", message(result.getMessage(), locale));
         }
         return "redirect:" + links(storeId, provider, null, null).items();
+    }
+
+    // a cost that did not bind (empty, not a number) is the service's own "invalid" answer, not HTTP 400
+    private OperationResult<Void> runFulfilmentUpdate(String storeId, String provider, DeliveryFulfilmentUpdateForm update,
+                                                      BindingResult binding) {
+        return binding.hasErrors()
+                ? OperationResult.failure(FULFILMENT_INVALID)
+                : fulfilmentUpdateService.run(storeId, provider, update);
     }
 
     private String withScope(String storeId, String provider, DeliveryCreateLinks links, RedirectAttributes flash,
@@ -411,10 +563,22 @@ public class DeliveryCreateController {
         return action.apply(((DeliveryScopes.Resolution.Found) resolution).scope());
     }
 
-    private void prepare(DeliveryCreationForm form, String storeId, String provider) {
+    private void prepare(DeliveryCreationForm form, String storeId, String provider, DeliveryScope scope) {
         form.setStoreId(storeId);
         form.setProvider(provider);
+        form.roundUnitCosts();
         supplierPurchaseService.mergeSuggestedItems(form);
+        countTickedDropshipLines(form, scope);
+    }
+
+    /**
+     * A dropship row's quantity is the sum of its ticked lines. The page counts it in a hidden field, which a page
+     * without its script (or restored from the browser cache) leaves stale, so the server counts it again.
+     */
+    private static void countTickedDropshipLines(DeliveryCreationForm form, DeliveryScope scope) {
+        if (scope.dropship() && form.getItems() != null) {
+            form.getItems().forEach(item -> item.setRequestedQty(item.getMinQty()));
+        }
     }
 
     private void addPage(Model model, DeliveryScope scope, DeliveryCreateLinks links, DeliveryCreationForm form) {

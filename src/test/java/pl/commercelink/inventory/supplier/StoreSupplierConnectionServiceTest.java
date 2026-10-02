@@ -3,6 +3,8 @@ package pl.commercelink.inventory.supplier;
 import pl.commercelink.provider.api.ProviderField;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -760,51 +762,28 @@ class StoreSupplierConnectionServiceTest {
         assertThat(captor.getValue().getEnabledCategories()).isEmpty();
     }
 
-    @Test
-    void connectOrUpdateKeepsNormalizedScheduleForOwnMode() {
+    @ParameterizedTest(name = "{0} mode, submitted \"{1}\" -> stored {2}")
+    @CsvSource(value = {
+            "OWN,    '  0/30  9-17 * * ? * ', 0/30 9-17 * * ? *",
+            "GLOBAL, 0 5 * * ? *,             null",
+            "OWN,    '   ',                   null"},
+            nullValues = "null")
+    void connectOrUpdateStoresTheNormalizedScheduleOnlyForOwnMode(ConnectionMode mode, String submittedSchedule,
+                                                                  String expectedSchedule) {
         // given
         Store store = storeWith(true);
         registryHas("Acme");
-        SupplierSelectionForm selection = new SupplierSelectionForm("Acme", ConnectionMode.OWN, true, true, "  0/30  9-17 * * ? * ");
-        selection.setLabel("Acme");
+        SupplierSelectionForm selection = new SupplierSelectionForm("Acme", mode, true, true, submittedSchedule);
+        if (mode == ConnectionMode.OWN) {
+            selection.setLabel("Acme");
+        }
         whenPersistSucceeds();
 
         // when
         service.connectOrUpdate(store, selection, Map.of());
 
         // then
-        assertEquals("0/30 9-17 * * ? *", persistedConnection("Acme").getFeedSchedule());
-    }
-
-    @Test
-    void connectOrUpdateDropsScheduleForGlobalMode() {
-        // given
-        Store store = storeWith(true);
-        registryHas("Acme");
-        SupplierSelectionForm selection = new SupplierSelectionForm("Acme", ConnectionMode.GLOBAL, true, true, "0 5 * * ? *");
-        whenPersistSucceeds();
-
-        // when
-        service.connectOrUpdate(store, selection, Map.of());
-
-        // then
-        assertThat(persistedConnection("Acme").getFeedSchedule()).isNull();
-    }
-
-    @Test
-    void connectOrUpdateStoresNullForBlankSchedule() {
-        // given
-        Store store = storeWith(true);
-        registryHas("Acme");
-        SupplierSelectionForm selection = new SupplierSelectionForm("Acme", ConnectionMode.OWN, true, true, "   ");
-        selection.setLabel("Acme");
-        whenPersistSucceeds();
-
-        // when
-        service.connectOrUpdate(store, selection, Map.of());
-
-        // then
-        assertThat(persistedConnection("Acme").getFeedSchedule()).isNull();
+        assertEquals(expectedSchedule, persistedConnection("Acme").getFeedSchedule());
     }
 
     @Test

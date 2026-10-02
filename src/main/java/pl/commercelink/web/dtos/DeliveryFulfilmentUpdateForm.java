@@ -2,6 +2,7 @@ package pl.commercelink.web.dtos;
 
 import lombok.Getter;
 import lombok.Setter;
+import pl.commercelink.web.orders.Money;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -15,6 +16,11 @@ public class DeliveryFulfilmentUpdateForm {
     private double unitCost;
     private List<AllocationRef> allocations = new ArrayList<>();
     private List<String> warehouseItemIds = new ArrayList<>();
+
+    // the field has no browser validation, so a cost typed with more decimals is rounded to whole grosze here
+    public void setUnitCost(double unitCost) {
+        this.unitCost = Money.round(unitCost);
+    }
 
     @Getter
     @Setter

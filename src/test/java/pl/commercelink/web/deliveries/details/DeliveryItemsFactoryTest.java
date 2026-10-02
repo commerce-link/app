@@ -81,7 +81,7 @@ class DeliveryItemsFactoryTest {
         DeliveryPageModel.AllocationRow order = rows.get(0);
         assertThat(order.warehouse()).isFalse();
         assertThat(order.orderShortId()).isEqualTo("a9f693b8");
-        assertThat(order.customer()).isEqualTo("marek.pawlak");
+        assertThat(order.customer()).isEqualTo("marek.pawlak@example.pl");
         assertThat(order.href()).isEqualTo("/dashboard/orders/" + ORDER_ID);
         assertThat(order.received()).isTrue();
         assertThat(order.checkbox()).isFalse();

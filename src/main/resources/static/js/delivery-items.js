@@ -2,7 +2,8 @@
 // quantity (an order source moves the minimum and the quantity by its pieces, both ways, a warehouse source only the
 // quantity),
 // the warehouse adjustment line follows, dropship quantities are the ticked lines, totals and the step buttons follow
-// everything, and Enter inside the table moves to the next field instead of leaving for step 2.
+// everything, Enter inside the table moves to the next field instead of leaving for step 2, and the restock suggestions
+// are fetched after the page is shown.
 (function () {
     'use strict';
 
@@ -10,6 +11,13 @@
         var parts = Math.abs(value).toFixed(2).split('.');
         parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
         return (value < 0 ? '−' : '') + parts.join(',');
+    }
+
+    // A grouped number inside a label the server rendered ("min. 1 000", "+1 500 szt."): MessageFormat groups thousands.
+    var NUMBER = /\d(?:[\d\s\u00a0\u202f]*\d)?/;
+
+    function group(value) {
+        return formatAmount(value).replace(/,00$/, '');
     }
 
     function intOf(input) {
@@ -39,7 +47,7 @@
         if (checkbox.getAttribute('data-cl-source-type') === 'Order') {
             min = Math.max(0, checkbox.checked ? min + qty : min - qty);
             minLabel.setAttribute('data-min', String(min));
-            minLabel.textContent = minLabel.textContent.replace(/\d+/, String(min));
+            minLabel.textContent = minLabel.textContent.replace(NUMBER, group(min));
             qtyInput.min = String(min);
             qtyInput.value = String(checkbox.checked ? Math.max(current + qty, min) : Math.max(min, current - qty));
         } else {
@@ -63,7 +71,8 @@
             - (parseInt(minLabel.getAttribute('data-min'), 10) || 0) - warehouseTicked;
         var value = foot.querySelector('[data-cl-adjustment-value]');
         foot.hidden = adjustment === 0;
-        value.textContent = value.textContent.replace(/^[^\s]+/, adjustment > 0 ? '+' + adjustment : String(adjustment));
+        var sign = adjustment > 0 ? '+' : adjustment < 0 ? '−' : '';
+        value.textContent = value.textContent.replace(/^[−+-]?/, '').replace(NUMBER, sign + group(Math.abs(adjustment)));
         value.classList.toggle('is-ok', adjustment >= 0);
         value.classList.toggle('is-warn', adjustment < 0);
     }
@@ -122,18 +131,142 @@
             release ? manual.getAttribute('data-release-label') : manual.getAttribute('data-label');
         manualHelp.textContent = release ? manualHelp.getAttribute('data-release-help') : manualHelp.getAttribute('data-help');
         emptyHelp.hidden = pieces > 0 || !!release;
+        // the reason a button is off is read with the button
+        [purchase, manual].forEach(function (button) {
+            if (!button) {
+                return;
+            }
+            if (!button.hasAttribute('data-describedby')) {
+                button.setAttribute('data-describedby', button.getAttribute('aria-describedby') || '');
+            }
+            var base = button.getAttribute('data-describedby');
+            button.setAttribute('aria-describedby', emptyHelp.hidden || !button.disabled ? base : (base + ' empty-help').trim());
+        });
     }
 
+    // Only fields the operator can see: the source checkboxes of a folded row and the folded suggestions are skipped
+    // (focusing them does nothing, which used to stop Enter at the first product).
     function nextField(field) {
         var fields = Array.prototype.slice.call(field.form.querySelectorAll(
-            '.cl-layout-main input:not([type="hidden"]):not([disabled])'));
+            '.cl-layout-main input:not([type="hidden"]):not([disabled])')).filter(function (input) {
+            return input === field || input.getClientRects().length > 0;
+        });
         var next = fields[fields.indexOf(field) + 1];
         if (next) {
             next.focus();
         }
     }
 
+    // Restock suggestions come after the page (parts.html :: suggestions): working them out takes seconds. A fetched
+    // row takes over the quantity and cost fields of a row the page already had for the same product (chosen before
+    // going back from step 2, or marked by an error), and every row is renumbered so the list binds without gaps.
+    function loadSuggestions(form) {
+        var section = form.querySelector('[data-cl-suggestions]');
+        if (!section) {
+            return;
+        }
+        var status = section.querySelector('[data-cl-suggestions-status]');
+        var failed = section.querySelector('[data-cl-suggestions-failed]');
+        var spinners = section.querySelectorAll('[data-cl-suggestions-spinner]');
+        // looked up each time: Font Awesome swaps the mark's <i> for an <svg> (keeping its data attributes) after load
+        function failedShown(on) {
+            failed.hidden = !on;
+            section.querySelectorAll('[data-cl-suggestions-failed-mark]').forEach(function (mark) {
+                mark.toggleAttribute('hidden', !on); // an <svg> has no hidden property, only the attribute
+            });
+        }
+        function busy(on) {
+            spinners.forEach(function (spinner) {
+                spinner.hidden = !on;
+            });
+            status.hidden = !on;
+            if (on) {
+                section.setAttribute('aria-busy', 'true');
+            } else {
+                section.removeAttribute('aria-busy');
+            }
+        }
+        failedShown(false);
+        busy(true);
+        fetch(section.getAttribute('data-url'), { headers: { 'Accept': 'text/html' }, credentials: 'same-origin' })
+            .then(function (response) {
+                if (!response.ok) {
+                    throw new Error('HTTP ' + response.status);
+                }
+                return response.text();
+            })
+            .then(function (html) {
+                var list = new DOMParser().parseFromString(html, 'text/html').querySelector('[data-cl-suggestion-list]');
+                // an expired session answers with the login page, which is not a list
+                if (!list) {
+                    throw new Error('Not a suggestion list');
+                }
+                mergeSuggestions(section, Array.prototype.slice.call(list.querySelectorAll('tr[data-cl-suggestion]')));
+                busy(false);
+                syncTotals(form);
+            })
+            .catch(function () {
+                busy(false);
+                failedShown(true);
+            });
+    }
+
+    function mergeSuggestions(section, fetched) {
+        var tbody = section.querySelector('[data-cl-suggestion-rows]');
+        var focused = document.activeElement;
+        var shown = {};
+        tbody.querySelectorAll('tr[data-cl-suggestion]').forEach(function (row) {
+            shown[row.getAttribute('data-cl-suggestion')] = row;
+        });
+        var taken = {};
+        var rows = fetched.map(function (row) {
+            var code = row.getAttribute('data-cl-suggestion');
+            var mine = shown[code];
+            row = document.adoptNode(row);
+            if (mine) {
+                taken[code] = true;
+                ['input[data-cl-requested-qty]', 'input[data-cl-unit-cost]'].forEach(function (selector) {
+                    var fresh = row.querySelector(selector);
+                    fresh.parentNode.replaceChild(mine.querySelector(selector), fresh);
+                });
+            }
+            return row;
+        });
+        var kept = Array.prototype.filter.call(tbody.querySelectorAll('tr[data-cl-suggestion]'), function (row) {
+            return !taken[row.getAttribute('data-cl-suggestion')];
+        });
+        tbody.replaceChildren.apply(tbody, kept.concat(rows));
+        var all = tbody.querySelectorAll('tr[data-cl-suggestion]');
+        all.forEach(function (row, index) {
+            row.querySelectorAll('input[name^="suggestedItems["]').forEach(function (input) {
+                input.name = input.name.replace(/^suggestedItems\[\d+]/, 'suggestedItems[' + index + ']');
+            });
+        });
+        section.querySelector('[data-cl-suggestions-title]').textContent =
+            section.getAttribute('data-summary').replace('{0}', String(all.length));
+        section.querySelector('[data-cl-suggestions-table]').hidden = all.length === 0;
+        section.hidden = all.length === 0;
+        if (focused && focused !== document.activeElement && document.body.contains(focused)) {
+            focused.focus();
+        }
+    }
+
+    // Money has two decimals: a third one typed into a cost field is dropped as it is typed (the server rounds the rest).
+    var CENTS = /^(-?\d*\.\d{2})\d+$/;
+
+    function limitToCents(input) {
+        var match = CENTS.exec(input.value);
+        if (match) {
+            input.value = match[1];
+        }
+    }
+
     function init() {
+        document.addEventListener('input', function (event) {
+            if (event.target.matches && event.target.matches('input[data-cl-unit-cost], #fulfilment-cost')) {
+                limitToCents(event.target);
+            }
+        }, true);
         var form = document.querySelector('form[data-cl-delivery-items]');
         if (!form) {
             return;
@@ -171,6 +304,12 @@
             }
         });
         syncTotals(form);
+        loadSuggestions(form);
+        form.addEventListener('click', function (event) {
+            if (event.target.closest && event.target.closest('[data-cl-suggestions-retry]')) {
+                loadSuggestions(form);
+            }
+        });
 
         // a page answered with errors puts the keyboard and screen reader on their summary
         var summary = document.querySelector('[data-cl-error-summary]');

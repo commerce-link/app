@@ -8,8 +8,10 @@ import pl.commercelink.documents.DocumentType;
 import pl.commercelink.inventory.deliveries.DeliveryRedirectResolver;
 import pl.commercelink.inventory.deliveries.DropshipItemLookup;
 import pl.commercelink.inventory.supplier.SupplierChoice;
+import pl.commercelink.inventory.supplier.SupplierLabelMap;
 import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.orders.BillingDetails;
+import pl.commercelink.orders.CourierCancellation;
 import pl.commercelink.orders.FulfilmentStatus;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
@@ -50,6 +52,7 @@ import pl.commercelink.web.orders.OrderLabels;
 import pl.commercelink.web.orders.OrderSettingsView;
 import pl.commercelink.web.orders.OrderPaymentForm;
 import pl.commercelink.web.orders.OrderShipmentForm;
+import pl.commercelink.web.dtos.AssignSupplierForm;
 import pl.commercelink.web.settings.SettingsTemplateRenderer;
 
 import java.time.LocalDate;
@@ -576,6 +579,56 @@ class OrderDetailsTemplateTest {
                 .doesNotContain("/shipments/1/remove").doesNotContain("Edytuj przesyłki")
                 .contains("id=\"shipment-2-remove-reason\">Najpierw anuluj zamówienie kuriera, potem usuniesz przesyłkę.</p>")
                 .doesNotContain("shipment-1-remove-reason");
+    }
+
+    @Test
+    void aCancellationInProgressShowsItsPillGreysTheCancelActionAndAsksThePageToPoll() {
+        // given
+        Order order = order(OrderStatus.Shipping);
+        Shipment sent = order.getShipments().get(0);
+        sent.setCarrier("DPD");
+        sent.setTrackingNo("T-1");
+        sent.setShippedAt(java.time.LocalDateTime.now().minusHours(1));
+        sent.setExternalId("EXT-1");
+        sent.setCancellation(CourierCancellation.pending("cmd-1", java.time.LocalDateTime.now()));
+
+        // when
+        String html = render(order, ADMIN);
+        String card = card(page(html), "przesylki");
+
+        // then
+        assertThat(card).contains("data-cl-cancellation-poll=\"/dashboard/orders/" + order.getOrderId()
+                        + "/shipments/cancellation-state\"")
+                .containsPattern("<span class=\"cl-status is-info\">Anulowanie w toku</span>")
+                .containsPattern("<button type=\"button\" class=\"cl-link-button\"\\s+aria-disabled=\"true\"[^>]*"
+                        + "aria-describedby=\"shipment-cancel-reason\">Anuluj zamówienie kuriera</button>")
+                .contains("id=\"shipment-cancel-reason\">Anulowanie już trwa — czekamy na potwierdzenie z Furgonetki.</p>")
+                .doesNotContain("/cancelShipment\"");
+        assertThat(html).contains("/js/shipment-cancellation.js");
+    }
+
+    @Test
+    void aFailedCancellationSendsTheOperatorToFurgonetkaAndItsRemovalWarnsAboutTheLabel() {
+        // given
+        Order order = order(OrderStatus.Shipping);
+        Shipment sent = order.getShipments().get(0);
+        sent.setCarrier("DPD");
+        sent.setTrackingNo("T-1");
+        sent.setShippedAt(java.time.LocalDateTime.now().minusHours(1));
+        sent.setExternalId("EXT-1");
+        sent.setCancellation(CourierCancellation.pending("cmd-1", java.time.LocalDateTime.now().minusMinutes(1)));
+        sent.setCancellation(sent.getCancellation().failed());
+
+        // when
+        String card = card(page(render(order, ADMIN)), "przesylki");
+
+        // then
+        assertThat(card).doesNotContain("data-cl-cancellation-poll")
+                .contains("<span class=\"cl-status is-bad\">Anulowanie nieudane — sprawdź w panelu Furgonetki</span>")
+                .contains("/cancelShipment\"")
+                .contains("data-cl-confirm-message=\"Anulowanie w Furgonetce nie zostało potwierdzone. Usuń przesyłkę tylko "
+                        + "wtedy, gdy etykieta jest anulowana w panelu Furgonetki — inaczej kurier może ją nadal odebrać.\"")
+                .doesNotContain("shipment-cancel-reason");
     }
 
     @Test
@@ -1484,6 +1537,9 @@ class OrderDetailsTemplateTest {
                 .containsPattern("<button type=\"button\" class=\"cl-button\" aria-disabled=\"true\"[^>]*aria-describedby=\"add-items-reason\"")
                 .doesNotContain("data-cl-dialog-open=\"item-add-dialog\"")
                 .contains("id=\"add-items-reason\"");
+        // the add-items button stays focusable, described by its reason, and is not a natively disabled button
+        String head = html.substring(html.indexOf("id=\"pozycje\""), html.indexOf("id=\"add-items-reason\""));
+        assertThat(head).doesNotContain("disabled=\"disabled\"");
         String reason = ResourceBundle.getBundle("messages", PL).getString("order.items.action.dropship.locked");
         assertThat(html).contains(reason);
     }
@@ -1698,22 +1754,6 @@ class OrderDetailsTemplateTest {
     }
 
     @Test
-    void addItemGreyedUsesAriaDisabledWithItsReason() {
-        // given: an item in a dropship delivery stops adding items
-        Order order = order(OrderStatus.Assembly);
-        OrderItem dropship = inDelivery(order, "delivery-9", FulfilmentStatus.Ordered);
-
-        // when
-        String html = page(render(order, List.of(dropship), ADMIN, Set.of(dropship.getItemId())));
-
-        // then: focusable and described by its reason, like "Dodaj dokument", not a native disabled button
-        String head = html.substring(html.indexOf("id=\"pozycje\""), html.indexOf("id=\"add-items-reason\""));
-        assertThat(head).containsPattern("<button type=\"button\" class=\"cl-button\" aria-disabled=\"true\"\\s+aria-describedby=\"add-items-reason\">")
-                .doesNotContain("disabled=\"disabled\"").doesNotContain("data-cl-dialog-open=\"item-add-dialog\"");
-        assertThat(html).contains("id=\"add-items-reason\"");
-    }
-
-    @Test
     void documentLinkFieldsAcceptOnlyHttpAddresses() {
         // given
         Order order = order(OrderStatus.Delivered);
@@ -1793,6 +1833,75 @@ class OrderDetailsTemplateTest {
         assertThat(html).contains("id=\"assign-supplier-dialog\"").contains("name=\"supplier\"")
                 .contains("value=\"" + SupplierChoice.CUSTOM + "\"").contains("name=\"customSupplier\"")
                 .contains("Wpisz skrót kontrahenta");
+    }
+
+    @Test
+    void theSupplierDialogAsksForNoEanUpFrontAndNamesTheCounterpartyField() {
+        // when
+        String html = page(render(order(OrderStatus.New), ADMIN));
+
+        // then
+        assertThat(html).contains("id=\"assign-supplier-dialog\"").doesNotContain("name=\"ean\"")
+                .contains(">Skrót kontrahenta w systemie fakturowym<").doesNotContain(">np. HURT-ABC<");
+    }
+
+    @Test
+    void theSupplierDialogOffersTheEanFieldOnceTheTaxonomyMissedTheCode() {
+        // given
+        AssignSupplierForm form = AssignSupplierForm.of("i1", "MFN-X", "100", "net", SupplierChoice.CUSTOM, "HURT-ABC");
+        form.setEan("5901234567890");
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("orderId", "o1");
+        variables.put("supplierForm", form);
+        variables.put("supplierError", "Tego kodu producenta nie ma w bazie produktów");
+        variables.put("suppliers", List.of());
+        variables.put("supplierEanField", true);
+
+        // when
+        String html = SettingsTemplateRenderer.render(
+                "<div th:replace=\"~{orders/details/item-dialogs :: supplierForm}\"></div>", variables);
+
+        // then: the typed value survives the refusal
+        assertThat(html).contains("id=\"assign-supplier-ean\"").contains("name=\"ean\"")
+                .contains("value=\"5901234567890\"").contains("data-cl-ean-field");
+    }
+
+    @Test
+    void aRefusedSupplierDialogKeepsTheChosenConnection() {
+        // given: the hidden counterparty field is always posted, so a connection arrives with an empty custom name
+        AssignSupplierForm form = AssignSupplierForm.of("i1", "MFN-X", "100", "net", "Acme", "");
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("orderId", "o1");
+        variables.put("supplierForm", form);
+        variables.put("supplierError", "Tego kodu producenta nie ma w bazie produktów");
+        variables.put("suppliers", List.of(new SupplierLabelMap.Option("Acme", "Acme")));
+
+        // when
+        String html = SettingsTemplateRenderer.render(
+                "<div th:replace=\"~{orders/details/item-dialogs :: supplierForm}\"></div>", variables);
+
+        // then
+        assertThat(html).contains("<option value=\"Acme\" selected=\"selected\">")
+                .doesNotContain("<option value=\"" + SupplierChoice.CUSTOM + "\" selected=\"selected\">");
+    }
+
+    @Test
+    void aRefusedSupplierDialogKeepsATypedSupplierName() {
+        // given
+        AssignSupplierForm form = AssignSupplierForm.of("i1", "MFN-X", "100", "net", SupplierChoice.CUSTOM, "HURT-ABC");
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("orderId", "o1");
+        variables.put("supplierForm", form);
+        variables.put("supplierError", "Tego kodu producenta nie ma w bazie produktów");
+        variables.put("suppliers", List.of(new SupplierLabelMap.Option("Acme", "Acme")));
+
+        // when
+        String html = SettingsTemplateRenderer.render(
+                "<div th:replace=\"~{orders/details/item-dialogs :: supplierForm}\"></div>", variables);
+
+        // then
+        assertThat(html).contains("<option value=\"" + SupplierChoice.CUSTOM + "\" selected=\"selected\">")
+                .contains("value=\"HURT-ABC\"").doesNotContain("<option value=\"Acme\" selected=\"selected\">");
     }
 
     static Map<String, Object> subpageVariables(Order order) {

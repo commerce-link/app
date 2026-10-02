@@ -96,18 +96,4 @@ class DeliveriesListMessagesTest {
         }
     }
 
-    @Test
-    void introExplainsTheNewScreen() throws Exception {
-        for (String file : new String[] {"messages_pl.properties", "messages_en.properties"}) {
-            Properties messages = load(file);
-            for (String key : List.of("title", "lead", "item1", "item2", "item3")) {
-                assertThat(messages.getProperty("intro.deliveries." + key)).as(file + ": " + key).isNotBlank();
-            }
-            for (String item : List.of("item1", "item2", "item3")) {
-                // the old screen ticked "show ..." checkboxes; the new one has scope, tiles and menus
-                assertThat(messages.getProperty("intro.deliveries." + item + ".text")).as(file + ": " + item)
-                        .isNotBlank().doesNotContain("Pokaż").doesNotContain("Show ");
-            }
-        }
-    }
 }

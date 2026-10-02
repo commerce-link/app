@@ -21,28 +21,6 @@ class ApprovalScreenTemplateTest {
     }
 
     @Test
-    void offersOnlyTheRealisationOutcomeOnTheApprovalScreen() throws Exception {
-        // when
-        String html = approval();
-
-        // then
-        assertThat(html).contains("deliveries.approval.realize");
-        assertThat(html).doesNotContain("deliveries.approval.reject");
-        assertThat(html).doesNotContain("name=\"reason\"");
-        assertThat(html).doesNotContain("/reject");
-    }
-
-    @Test
-    void reusesTheSharedAddressModalFragment() throws Exception {
-        // when
-        String html = approval();
-
-        // then
-        assertThat(html).contains("fragments/address-modal :: addressModal(");
-        assertThat(html).doesNotContain("searchable-picker :: picker(");
-    }
-
-    @Test
     void keepsTheApproveButtonDisabledUntilTheChecksPass() throws Exception {
         // when
         String html = approval();

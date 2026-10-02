@@ -78,18 +78,4 @@ class OrdersListMessagesTest {
             }
         }
     }
-
-    @Test
-    void oldListKeysAreGone() throws Exception {
-        for (String file : new String[] {"messages_pl.properties", "messages_en.properties"}) {
-            Properties messages = load(file);
-            assertThat(messages.stringPropertyNames()).as(file)
-                    .noneMatch(k -> k.startsWith("orders.filters.view.") || k.startsWith("orders.filters.mode."))
-                    .doesNotContain("orders.status.filter.clear", "orders.filters.manage", "orders.filters.back",
-                            "orders.status.filter.title", "orders.status.filter.apply")
-                    // "save this view", the focus tiles and "Do decyzji" are gone with their keys
-                    .noneMatch(k -> k.startsWith("orders.filters.saveView") || k.startsWith("orders.list.saveView")
-                            || k.startsWith("orders.list.attention.decide") || k.equals("orders.list.chip.focus"));
-        }
-    }
 }

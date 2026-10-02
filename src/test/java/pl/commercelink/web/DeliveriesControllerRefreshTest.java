@@ -2,17 +2,17 @@ package pl.commercelink.web;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.MessageSource;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
-import pl.commercelink.inventory.deliveries.Delivery;
 import pl.commercelink.inventory.deliveries.DeliveriesRepository;
 import pl.commercelink.inventory.deliveries.OrderIdRefreshService;
 import pl.commercelink.starter.security.CustomSecurityContext;
-import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.web.orders.OrderFlash;
 import pl.commercelink.web.orders.OrderLabels;
 import pl.commercelink.web.orders.OrderNotice;
@@ -32,7 +32,6 @@ class DeliveriesControllerRefreshTest {
 
     private static final String STORE_ID = "store-1";
     private static final String DELIVERY_ID = "delivery-1";
-    private static final String PROVIDER = "IncomGroup";
 
     @Mock
     private OrderIdRefreshService orderIdRefreshService;
@@ -49,8 +48,31 @@ class DeliveriesControllerRefreshTest {
     @InjectMocks
     private DeliveriesController deliveriesController;
 
+    @ParameterizedTest(name = "{0}")
+    @CsvSource({
+            "STILL_PENDING, deliveries.orderId.refresh.stillPending, The supplier has not confirmed the order number yet",
+            "UNAVAILABLE,   deliveries.orderId.refresh.unavailable,  Order number refresh is not available for this delivery"})
+    void refreshOrderIdFlashesTheRefusalAndRedirectsToDetails(OrderIdRefreshService.ManualRefreshOutcome outcome,
+                                                              String messageKey, String message) {
+        // given
+        when(orderIdRefreshService.refreshManually(STORE_ID, DELIVERY_ID)).thenReturn(outcome);
+        when(messageSource.getMessage(eq(messageKey), eq(null), eq(Locale.ENGLISH))).thenReturn(message);
+
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(true);
+
+            // when
+            String view = deliveriesController.refreshOrderIdForSuperAdmin(STORE_ID, DELIVERY_ID, redirectAttributes, Locale.ENGLISH);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/store/store-1/deliveries/details?deliveryId=delivery-1");
+            verify(redirectAttributes).addFlashAttribute("errorMessage", message);
+            verify(redirectAttributes, never()).addFlashAttribute(eq(OrderFlash.ATTRIBUTE), any());
+        }
+    }
+
     @Test
-    void refreshOrderIdConfirmedAddsFlashSuccessMessageAndRedirectsToDetails() {
+    void refreshOrderIdConfirmedShowsTheNoticeOnTheDetailsPage() {
         // given
         when(orderIdRefreshService.refreshManually(STORE_ID, DELIVERY_ID))
                 .thenReturn(OrderIdRefreshService.ManualRefreshOutcome.CONFIRMED);
@@ -65,50 +87,9 @@ class DeliveriesControllerRefreshTest {
 
             // then
             assertThat(view).isEqualTo("redirect:/dashboard/store/store-1/deliveries/details?deliveryId=delivery-1");
-            verify(redirectAttributes).addFlashAttribute(OrderFlash.ATTRIBUTE, new OrderNotice(OrderLabels.OK, "Fetched the final order number from the supplier", null, null));
+            verify(redirectAttributes).addFlashAttribute(OrderFlash.ATTRIBUTE,
+                    new OrderNotice(OrderLabels.OK, "Fetched the final order number from the supplier", null, null));
             verify(redirectAttributes, never()).addFlashAttribute(eq("errorMessage"), any());
-        }
-    }
-
-    @Test
-    void refreshOrderIdStillPendingAddsFlashErrorMessage() {
-        // given
-        when(orderIdRefreshService.refreshManually(STORE_ID, DELIVERY_ID))
-                .thenReturn(OrderIdRefreshService.ManualRefreshOutcome.STILL_PENDING);
-        when(messageSource.getMessage(eq("deliveries.orderId.refresh.stillPending"), eq(null), eq(Locale.ENGLISH)))
-                .thenReturn("The supplier has not confirmed the order number yet");
-
-        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
-            security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(true);
-
-            // when
-            String view = deliveriesController.refreshOrderIdForSuperAdmin(STORE_ID, DELIVERY_ID, redirectAttributes, Locale.ENGLISH);
-
-            // then
-            assertThat(view).isEqualTo("redirect:/dashboard/store/store-1/deliveries/details?deliveryId=delivery-1");
-            verify(redirectAttributes).addFlashAttribute("errorMessage", "The supplier has not confirmed the order number yet");
-            verify(redirectAttributes, never()).addFlashAttribute(eq(OrderFlash.ATTRIBUTE), any());
-        }
-    }
-
-    @Test
-    void refreshOrderIdUnavailableAddsFlashErrorMessage() {
-        // given
-        when(orderIdRefreshService.refreshManually(STORE_ID, DELIVERY_ID))
-                .thenReturn(OrderIdRefreshService.ManualRefreshOutcome.UNAVAILABLE);
-        when(messageSource.getMessage(eq("deliveries.orderId.refresh.unavailable"), eq(null), eq(Locale.ENGLISH)))
-                .thenReturn("Order number refresh is not available for this delivery");
-
-        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
-            security.when(() -> CustomSecurityContext.hasRole("SUPER_ADMIN")).thenReturn(true);
-
-            // when
-            String view = deliveriesController.refreshOrderIdForSuperAdmin(STORE_ID, DELIVERY_ID, redirectAttributes, Locale.ENGLISH);
-
-            // then
-            assertThat(view).isEqualTo("redirect:/dashboard/store/store-1/deliveries/details?deliveryId=delivery-1");
-            verify(redirectAttributes).addFlashAttribute("errorMessage", "Order number refresh is not available for this delivery");
-            verify(redirectAttributes, never()).addFlashAttribute(eq(OrderFlash.ATTRIBUTE), any());
         }
     }
 
@@ -129,32 +110,8 @@ class DeliveriesControllerRefreshTest {
 
             // then
             assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=delivery-1");
-            verify(redirectAttributes).addFlashAttribute(OrderFlash.ATTRIBUTE, new OrderNotice(OrderLabels.OK, "Fetched the final order number from the supplier", null, null));
-        }
-    }
-
-    @Test
-    void storeAdminRefreshesGlobalDeliveries() {
-        // given
-        Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
-        delivery.setDeliveryId(DELIVERY_ID);
-        delivery.setConnectionMode(ConnectionMode.GLOBAL);
-        when(orderIdRefreshService.refreshManually(STORE_ID, DELIVERY_ID))
-                .thenReturn(OrderIdRefreshService.ManualRefreshOutcome.CONFIRMED);
-        when(messageSource.getMessage(eq("deliveries.orderId.refresh.confirmed"), eq(null), eq(Locale.ENGLISH)))
-                .thenReturn("Fetched the final order number from the supplier");
-
-        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
-            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-
-            // when
-            String view = deliveriesController.refreshOrderId(DELIVERY_ID, redirectAttributes, Locale.ENGLISH);
-
-            // then
-            assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=delivery-1");
-            verify(orderIdRefreshService).refreshManually(STORE_ID, DELIVERY_ID);
-            verify(redirectAttributes).addFlashAttribute(OrderFlash.ATTRIBUTE, new OrderNotice(OrderLabels.OK, "Fetched the final order number from the supplier", null, null));
-            verify(redirectAttributes, never()).addFlashAttribute(eq("errorMessage"), any());
+            verify(redirectAttributes).addFlashAttribute(OrderFlash.ATTRIBUTE,
+                    new OrderNotice(OrderLabels.OK, "Fetched the final order number from the supplier", null, null));
         }
     }
 }

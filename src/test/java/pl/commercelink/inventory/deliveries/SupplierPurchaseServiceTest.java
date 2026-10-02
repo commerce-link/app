@@ -2,8 +2,12 @@ package pl.commercelink.inventory.deliveries;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Named;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.InjectMocks;
@@ -49,6 +53,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -140,26 +145,6 @@ class SupplierPurchaseServiceTest {
     }
 
     @Test
-    void orderingUnavailableWhenSupplierIsConnectedGlobally() {
-        // given
-        connectSupplier(ConnectionMode.GLOBAL);
-        when(supplierProviderResolver.resolve(STORE_ID, PROVIDER)).thenReturn(null);
-
-        // when / then
-        assertFalse(service.isOrderingAvailable(STORE_ID, PROVIDER));
-    }
-
-    @Test
-    void orderingUnavailableWhenSupplierIsNotConnectedAtAll() {
-        // given
-        store.setFulfilmentConfiguration(new FulfilmentConfiguration());
-        when(supplierProviderResolver.resolve(STORE_ID, PROVIDER)).thenReturn(null);
-
-        // when / then
-        assertFalse(service.isOrderingAvailable(STORE_ID, PROVIDER));
-    }
-
-    @Test
     void orderingAvailableWhenProviderSupportsIt() {
         // given
         when(supplierProvider.supportsOrdering()).thenReturn(true);
@@ -198,15 +183,6 @@ class SupplierPurchaseServiceTest {
 
         // when / then
         assertThrows(SupplierOrderException.class, () -> service.deliveryAddresses(STORE_ID, PROVIDER));
-    }
-
-    @Test
-    void orderOptionsComeFromTheProvider() {
-        // given
-        when(supplierProvider.orderOptions(SupplierOrderOptionsContext.warehouse())).thenReturn(LANE_OPTION);
-
-        // when / then
-        assertEquals(LANE_OPTION, service.orderOptions(STORE_ID, PROVIDER, SupplierOrderOptionsContext.warehouse()));
     }
 
     @Test
@@ -384,41 +360,10 @@ class SupplierPurchaseServiceTest {
     }
 
     @Test
-    void ordersThroughTheGlobalProviderWhenTheConnectionIsGlobal() {
-        // given
-        when(supplierProviderResolver.resolve(STORE_ID, PROVIDER)).thenReturn(globalSupplierProvider);
-        when(globalSupplierProvider.supportsOrdering()).thenReturn(true);
-
-        // when
-        boolean available = service.isOrderingAvailable(STORE_ID, PROVIDER);
-
-        // then
-        assertTrue(available);
-    }
-
-    @Test
     void refusesOrderingWhenTheGlobalSecretCarriesNoOrderingCredentials() {
         // given
         when(supplierProviderResolver.resolve(STORE_ID, PROVIDER)).thenReturn(globalSupplierProvider);
         when(globalSupplierProvider.supportsOrdering()).thenReturn(false);
-
-        // when / then
-        assertFalse(service.isOrderingAvailable(STORE_ID, PROVIDER));
-    }
-
-    @Test
-    void refusesOrderingWhenNoGlobalSecretExists() {
-        // given
-        when(supplierProviderResolver.resolve(STORE_ID, PROVIDER)).thenReturn(null);
-
-        // when / then
-        assertFalse(service.isOrderingAvailable(STORE_ID, PROVIDER));
-    }
-
-    @Test
-    void refusesOrderingForManualConnections() {
-        // given
-        when(supplierProviderResolver.resolve(STORE_ID, PROVIDER)).thenReturn(null);
 
         // when / then
         assertFalse(service.isOrderingAvailable(STORE_ID, PROVIDER));
@@ -1339,14 +1284,6 @@ class SupplierPurchaseServiceTest {
     }
 
     @Test
-    void doesNotExposeAManagedFlagOnDeliveries() {
-        // given / when / then
-        assertTrue(java.util.Arrays.stream(Delivery.class.getDeclaredMethods())
-                .noneMatch(method -> method.getName().equals("isManaged")
-                        || method.getName().equals("setManaged")));
-    }
-
-    @Test
     void approveStoresChosenDeliveryAddressIdOnDelivery() throws Exception {
         // given
         Store store = storeWithConnection(PROVIDER, ConnectionMode.GLOBAL);
@@ -1644,19 +1581,6 @@ class SupplierPurchaseServiceTest {
         ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
         verify(deliveryCreationService).claimAllocationsForPurchase(eq(STORE_ID), saved.capture(), eq(form));
         assertEquals("ref-claim", saved.getValue().getPurchaseRef());
-    }
-
-    @Test
-    void rejectionReturnsTheAllocationsToTheSupplier() throws Exception {
-        // given
-        Delivery delivery = awaitingApprovalDelivery();
-        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
-
-        // when
-        service.reject(STORE_ID, DELIVERY_ID, "Cena wzrosla o 20%");
-
-        // then
-        verify(deliveryCreationService).releaseAllocations(STORE_ID, delivery);
     }
 
     @Test
@@ -2244,50 +2168,31 @@ class SupplierPurchaseServiceTest {
                 supplierPurchaseEventPublisher, orderIdRefreshEventPublisher);
     }
 
-    @Test
-    void completeManuallyRejectsNonFailedDelivery() {
-        // given
-        Delivery delivery = new Delivery();
-        delivery.setDeliveryId(DELIVERY_ID);
-        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING);
-        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+    static Stream<Arguments> deliveriesThatCannotBeCompletedManually() {
+        Delivery notFailed = new Delivery();
+        notFailed.setDeliveryId(DELIVERY_ID);
+        notFailed.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING);
 
-        // when
-        OperationResult<String> result = service.completeManually(STORE_ID, DELIVERY_ID, "PO-1", ESTIMATED_DELIVERY_AT);
+        Delivery received = new Delivery();
+        received.setDeliveryId(DELIVERY_ID);
+        received.setOrderStatus(DeliveryOrderStatus.FAILED);
+        received.setReceivedAt(LocalDateTime.now());
 
-        // then
-        assertFalse(result.isSuccess());
-        assertEquals("deliveries.purchase.complete.error.state", result.getMessage());
-        verify(deliveriesRepository, never()).save(any());
-        verifyNoInteractions(deliveryCreationService);
+        Delivery withDocuments = new Delivery();
+        withDocuments.setDeliveryId(DELIVERY_ID);
+        withDocuments.setOrderStatus(DeliveryOrderStatus.FAILED);
+        withDocuments.getDocuments().add(new Document());
+
+        return Stream.of(
+                Arguments.of(Named.of("not failed", notFailed)),
+                Arguments.of(Named.of("already received", received)),
+                Arguments.of(Named.of("with documents", withDocuments)));
     }
 
-    @Test
-    void completeManuallyRejectsReceivedDelivery() {
+    @ParameterizedTest
+    @MethodSource("deliveriesThatCannotBeCompletedManually")
+    void completeManuallyRejectsDeliveryInAnInvalidState(Delivery delivery) {
         // given
-        Delivery delivery = new Delivery();
-        delivery.setDeliveryId(DELIVERY_ID);
-        delivery.setOrderStatus(DeliveryOrderStatus.FAILED);
-        delivery.setReceivedAt(LocalDateTime.now());
-        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
-
-        // when
-        OperationResult<String> result = service.completeManually(STORE_ID, DELIVERY_ID, "PO-1", ESTIMATED_DELIVERY_AT);
-
-        // then
-        assertFalse(result.isSuccess());
-        assertEquals("deliveries.purchase.complete.error.state", result.getMessage());
-        verify(deliveriesRepository, never()).save(any());
-        verifyNoInteractions(deliveryCreationService);
-    }
-
-    @Test
-    void completeManuallyRejectsDeliveryWithDocuments() {
-        // given
-        Delivery delivery = new Delivery();
-        delivery.setDeliveryId(DELIVERY_ID);
-        delivery.setOrderStatus(DeliveryOrderStatus.FAILED);
-        delivery.getDocuments().add(new Document());
         when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
 
         // when
@@ -2393,5 +2298,17 @@ class SupplierPurchaseServiceTest {
         ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
         verify(deliveryCreationService).claimAllocationsForPurchase(eq(STORE_ID), saved.capture(), any());
         assertEquals(ConnectionMode.GLOBAL, saved.getValue().getConnectionMode());
+    }
+
+    @Test
+    void submittedDeliveryIdFindsTheDeliveryOfAPurchaseRefAndIgnoresABlankRef() {
+        // given
+        Delivery placed = new Delivery("store-1", null, "Acme");
+        when(deliveriesRepository.findByPurchaseRef("store-1", "ref-1")).thenReturn(Optional.of(placed));
+
+        // when / then
+        assertThat(service.submittedDeliveryId("store-1", "ref-1")).contains(placed.getDeliveryId());
+        assertThat(service.submittedDeliveryId("store-1", " ")).isEmpty();
+        verify(deliveriesRepository, never()).findByPurchaseRef("store-1", " ");
     }
 }

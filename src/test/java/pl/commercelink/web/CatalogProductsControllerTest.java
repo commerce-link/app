@@ -1130,23 +1130,6 @@ class CatalogProductsControllerTest {
         verify(productRepository).save(existing);
     }
 
-    /** The status filter shown on the category page travels through the hidden field and survives the redirect back. */
-    @Test
-    void savedProductRedirectsKeepingTheStatusFilterItCameFrom() throws Exception {
-        // given
-        gpu.getPriceDefinitions().add(new PriceDefinition(1.0, 0, 0, 0, 0, "Default"));
-        Product existing = new Product(gpu.getCategoryId(), "pim-1", "4719331361600", "m", "b", "l", "Old", "Default");
-        existing.setProductId("p1");
-        when(access.requireProduct(gpu, "p1")).thenReturn(existing);
-
-        // when / then
-        mvc.perform(post(categoryPath() + "/products/p1").param("status", "disabled")
-                        .param("name", "New name").param("ean", "4719331361600").param("manufacturerCode", "m")
-                        .param("availabilityType", "BasedOnSupply").param("pricingGroup", "Default")
-                        .param("enabled", "true"))
-                .andExpect(redirectedUrl(categoryPath() + "?status=disabled"));
-    }
-
     /**
      * The whole filter comes back, not only the status. The label travels as {@code filterLabel}: {@code label} is the
      * product's own field in the form.

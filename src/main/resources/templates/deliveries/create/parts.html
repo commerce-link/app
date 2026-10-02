@@ -14,7 +14,7 @@
     </a>
     <!--/* type=button: a submit here would stand first in tree order and catch Enter; the page script clicks the
            form's own #back-submit ("Wróć do pozycji"), which carries the state. */-->
-    <button th:if="${step == 2}" type="button" class="cl-back" data-cl-back-submit="back-submit">
+    <button th:if="${step == 2}" type="button" class="cl-back" data-cl-back-submit="back-submit" hidden>
         <span class="icon is-small" aria-hidden="true"><i class="fas fa-chevron-left"></i></span>
         <span th:text="#{deliveries.create.page.title(${page.supplierName()})}"></span>
     </button>
@@ -25,7 +25,7 @@
         <th:block th:if="${page.dropship()}"><span class="cl-status is-info is-leading" th:text="#{deliveries.dropship.badge}"></span> </th:block>
         <span th:text="#{deliveries.create.step(${step})}"></span>
         <th:block th:if="${page.dropship()}"> · <span th:text="#{deliveries.create.lead.order}"></span>
-            <a th:href="@{${page.links().order()}}" th:text="${page.order().shortenedOrderId}"></a></th:block>
+            <a class="cl-lead-link" th:href="@{${page.links().order()}}" th:text="${page.order().shortenedOrderId}"></a></th:block>
         · <span th:text="#{${leadKey}}"></span>
         <th:block th:if="${step == 1 and !page.dropship()}"> · <span th:text="#{deliveries.create.lead.warehouse}"></span>
             <th:block th:if="${page.orderCount() > 0}"> · <span th:text="#{deliveries.create.lead.orders(${page.orderCount()})}"></span></th:block>
@@ -64,7 +64,7 @@
         <input type="hidden" th:name="|items[${i}].mfn|" th:value="${item.mfn}"/>
         <input type="hidden" th:name="|items[${i}].orderedQty|" th:value="${item.orderedQty}"/>
         <input type="hidden" th:name="|items[${i}].requestedQty|" th:value="${item.requestedQty}"/>
-        <input type="hidden" th:name="|items[${i}].unitCost|" th:value="${T(pl.commercelink.web.orders.Money).input(item.unitCost)}"/>
+        <input type="hidden" th:name="|items[${i}].unitCost|" th:value="${T(pl.commercelink.web.orders.Money).inputRounded(item.unitCost)}"/>
         <th:block th:each="allocation, allocStat : ${item.allocations}">
             <th:block th:replace="~{deliveries/create/parts :: hiddenAllocation(${i}, ${allocStat.index}, ${allocation}, true)}"></th:block>
         </th:block>
@@ -104,7 +104,7 @@
             <tbody th:each="item, itemStat : ${form.items}"
                    th:with="i=${itemStat.index}, detailId=|sources-${itemStat.index}|,
                             open=${!item.allocations.?[!selected].isEmpty()}, adj=${item.warehouseQtyAdjustment},
-                            unitCostInput=${T(pl.commercelink.web.orders.Money).input(item.unitCost)}">
+                            unitCostInput=${T(pl.commercelink.web.orders.Money).inputRounded(item.unitCost)}">
             <tr class="cl-row-main" th:classappend="${open} ? 'is-open'" data-cl-delivery-item th:attr="data-mfn=${item.mfn}">
                 <th scope="row" class="cl-table-key" th:attr="data-label=#{general.product}">
                     <span th:text="${item.name}"></span><button th:if="${!item.allocations.isEmpty()}" type="button"
@@ -130,14 +130,16 @@
                 <td th:attr="data-label=#{deliveries.create.col.qty}">
                     <input class="cl-input is-qty" type="number" inputmode="numeric" step="1" data-cl-requested-qty
                            th:id="|items${i}.requestedQty|" th:name="|items[${i}].requestedQty|"
-                           th:value="${item.requestedQty}" th:min="${item.minQty}"
+                           th:value="${item.requestedQty}" th:min="${item.minQty}" th:classappend="${invalidFields != null and invalidFields.contains(item.mfn + '|requestedQty')} ? 'is-invalid'"
+                           th:aria-invalid="${invalidFields != null and invalidFields.contains(item.mfn + '|requestedQty')} ? 'true' : null"
                            th:attr="aria-label=#{deliveries.create.qty.label(${item.name})}, aria-describedby=|min-${i}|"/>
                     <span class="cl-min" th:id="|min-${i}|" data-cl-min th:attr="data-min=${item.minQty}"
                           th:text="#{deliveries.create.min(${item.minQty})}"></span>
                 </td>
                 <td th:attr="data-label=#{deliveries.create.col.unitCost}">
                     <input class="cl-input is-price" type="number" inputmode="decimal" step="0.01" min="0" data-cl-unit-cost
-                           th:name="|items[${i}].unitCost|" th:value="${T(pl.commercelink.web.orders.Money).input(item.unitCost)}"
+                           th:name="|items[${i}].unitCost|" th:value="${T(pl.commercelink.web.orders.Money).inputRounded(item.unitCost)}" th:classappend="${invalidFields != null and invalidFields.contains(item.mfn + '|unitCost')} ? 'is-invalid'"
+                           th:aria-invalid="${invalidFields != null and invalidFields.contains(item.mfn + '|unitCost')} ? 'true' : null"
                            th:attr="aria-label=#{deliveries.create.unitCost.label(${item.name})}"/>
                 </td>
                 <td class="is-numeric" th:attr="data-label=#{deliveries.create.col.value}">
@@ -190,7 +192,7 @@
         </table>
     </div>
     <div class="cl-list-summary">
-        <div>
+        <div class="cl-release">
             <label class="cl-check">
                 <input type="checkbox" name="removeUnselected" value="true" th:checked="${form.removeUnselected}"
                        data-cl-remove-unselected aria-describedby="release-help"/>
@@ -257,7 +259,7 @@
                 </td>
                 <td th:attr="data-label=#{deliveries.create.col.unitCost}">
                     <input class="cl-input is-price" type="number" inputmode="decimal" step="0.01" min="0" data-cl-unit-cost
-                           th:name="|items[${i}].unitCost|" th:value="${T(pl.commercelink.web.orders.Money).input(item.unitCost)}"
+                           th:name="|items[${i}].unitCost|" th:value="${T(pl.commercelink.web.orders.Money).inputRounded(item.unitCost)}"
                            th:attr="aria-label=#{deliveries.create.unitCost.label(${item.name})}"/>
                 </td>
                 <td class="is-numeric" th:attr="data-label=#{deliveries.create.col.value}">
@@ -275,8 +277,9 @@
                                     <label class="cl-check">
                                         <input type="checkbox" value="true"
                                                th:name="|items[${i}].allocations[${allocStat.index}].selected|"
-                                               th:checked="${allocation.selected}" th:attr="data-cl-source-qty=${allocation.qty}"/>
-                                        <span th:text="${allocation.key.name}"></span>
+                                               th:checked="${allocation.selected}"
+                                               th:attr="data-cl-source-qty=${allocation.qty}, aria-label=#{deliveries.create.line.label(${item.name}, ${allocStat.count})}"/>
+                                        <span th:text="#{deliveries.create.line(${allocStat.count})}"></span>
                                     </label>
                                     <input type="hidden" th:name="|_items[${i}].allocations[${allocStat.index}].selected|" value="on"/>
                                 </td>
@@ -291,7 +294,7 @@
         </table>
     </div>
     <div class="cl-list-summary">
-        <div>
+        <div class="cl-release">
             <label class="cl-check">
                 <input type="checkbox" name="removeUnselected" value="true" th:checked="${form.removeUnselected}"
                        data-cl-remove-unselected aria-describedby="release-help"/>
@@ -303,51 +306,94 @@
     </div>
 </section>
 
-<!--/* Step 1, warehouse only: restock suggestions, folded unless a quantity is already set. */-->
-<section th:fragment="suggestions" class="cl-card" aria-labelledby="suggestions-title">
-    <details class="cl-disclosure cl-card-extras" th:open="${!form.suggestedItems.?[requestedQty > 0].isEmpty()}">
-        <summary id="suggestions-title" th:text="#{deliveries.create.suggestions.summary(${form.suggestedItems.size()})}"></summary>
+<!--/* Step 1, warehouse only: restock suggestions, folded unless a quantity is already set. Working them out takes
+       seconds (price aggregates, the suppliers' offers), so the page comes without them and delivery-items.js fetches
+       their rows (suggestionRows); rows already here are the ones the operator chose before (back from step 2, an
+       error), and the fetched list takes their typed values over. Nothing to suggest hides the card. */-->
+<section th:fragment="suggestions" class="cl-card" aria-labelledby="suggestions-title" data-cl-suggestions
+         th:attr="data-url=@{${page.links().suggestions()}}, data-summary=#{deliveries.create.suggestions.summary('{0}')}">
+    <details class="cl-disclosure cl-card-extras" th:open="${!form.suggestedItems.?[requestedQty > 0].isEmpty() or (invalidFields != null and !invalidFields.isEmpty())}">
+        <!--/* the title, then a small spinner while the list loads, or a mark when it failed (each named by hidden text);
+               an open card shows the state in its body, so the title's spinner is only for the folded card */-->
+        <summary id="suggestions-title">
+            <span data-cl-suggestions-title th:text="#{deliveries.create.suggestions.title}"></span>
+            <span class="cl-spinner is-compact" aria-hidden="true" data-cl-suggestions-spinner></span>
+            <span class="cl-visually-hidden" data-cl-suggestions-spinner th:text="#{deliveries.create.suggestions.loading}"></span>
+            <i class="fas fa-exclamation-circle cl-summary-mark is-bad" aria-hidden="true" data-cl-suggestions-failed-mark hidden></i>
+            <span class="cl-visually-hidden" data-cl-suggestions-failed-mark hidden th:text="#{deliveries.create.suggestions.failed}"></span>
+        </summary>
         <div class="cl-disclosure-body">
             <p class="cl-card-desc" th:text="#{deliveries.create.suggestions.help}"></p>
-            <table class="cl-table is-key-wrap is-delivery">
-                <colgroup><col><col class="cl-col-qty"><col class="cl-col-qty"><col class="cl-col-price-input"></colgroup>
-                <thead>
-                <tr>
-                    <th scope="col" th:text="#{general.product}"></th>
-                    <th scope="col" class="is-numeric" th:text="#{deliveries.create.col.incoming}"></th>
-                    <th scope="col" th:text="#{deliveries.create.col.qty}"></th>
-                    <th scope="col" th:text="#{deliveries.create.col.unitCost}"></th>
-                </tr>
-                </thead>
-                <tbody>
-                <tr th:each="suggested, sStat : ${form.suggestedItems}" th:with="k=${sStat.index}"
-                    data-cl-delivery-item data-cl-suggestion>
-                    <th scope="row" class="cl-table-key" th:attr="data-label=#{general.product}">
-                        <span th:text="${suggested.name}"></span>
-                        <span class="cl-table-sub"><span th:text="#{general.ean} + ':'"></span> <span class="cl-code-nowrap" th:text="${suggested.ean}"></span>
-                            <th:block th:if="${suggested.priceCategory != null and suggested.priceCategory.name() != 'Standard'}"> ·
-                                <span class="cl-status is-ok" th:text="#{|RestockPriceCategory.${suggested.priceCategory}|}"></span></th:block></span>
-                        <input type="hidden" th:name="|suggestedItems[${k}].name|" th:value="${suggested.name}"/>
-                        <input type="hidden" th:name="|suggestedItems[${k}].ean|" th:value="${suggested.ean}"/>
-                        <input type="hidden" th:name="|suggestedItems[${k}].mfn|" th:value="${suggested.mfn}"/>
-                    </th>
-                    <td class="is-numeric" th:attr="data-label=#{deliveries.create.col.incoming}" th:text="${suggested.expectedQty}"></td>
-                    <td th:attr="data-label=#{deliveries.create.col.qty}">
-                        <input class="cl-input is-qty" type="number" inputmode="numeric" step="1" min="0" data-cl-requested-qty
-                               th:name="|suggestedItems[${k}].requestedQty|" th:value="${suggested.requestedQty}"
-                               th:attr="aria-label=#{deliveries.create.qty.label(${suggested.name})}"/>
-                    </td>
-                    <td th:attr="data-label=#{deliveries.create.col.unitCost}">
-                        <input class="cl-input is-price" type="number" inputmode="decimal" step="0.01" min="0" data-cl-unit-cost
-                               th:name="|suggestedItems[${k}].unitCost|" th:value="${T(pl.commercelink.web.orders.Money).input(suggested.unitCost)}"
-                               th:attr="aria-label=#{deliveries.create.unitCost.label(${suggested.name})}"/>
-                    </td>
-                </tr>
-                </tbody>
-            </table>
+            <div aria-live="polite">
+                <p class="cl-card-inset cl-loading" data-cl-suggestions-status><span class="cl-spinner" aria-hidden="true"></span>
+                    <span th:text="#{deliveries.create.suggestions.loadingHelp}"></span></p>
+                <div class="cl-card-inset" data-cl-suggestions-failed hidden>
+                    <div class="cl-alert is-bad">
+                        <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
+                        <p class="cl-alert-text"><span th:text="#{deliveries.create.suggestions.failed}"></span>
+                            <button type="button" class="cl-link-button" data-cl-suggestions-retry th:text="#{deliveries.create.suggestions.retry}"></button></p>
+                    </div>
+                </div>
+            </div>
+            <!--/* spaced from the description like the items table above (cl-card-section) */-->
+            <div class="cl-card-section" data-cl-suggestions-table th:hidden="${form.suggestedItems.isEmpty()}">
+                <table class="cl-table is-key-wrap is-delivery">
+                    <colgroup><col><col class="cl-col-qty"><col class="cl-col-qty"><col class="cl-col-price-input"></colgroup>
+                    <thead>
+                    <tr>
+                        <th scope="col" th:text="#{general.product}"></th>
+                        <th scope="col" class="is-numeric" th:text="#{deliveries.create.col.targetStock}"></th>
+                        <th scope="col" th:text="#{deliveries.create.col.qty}"></th>
+                        <th scope="col" th:text="#{deliveries.create.col.unitCost}"></th>
+                    </tr>
+                    </thead>
+                    <tbody data-cl-suggestion-rows>
+                    <th:block th:each="suggested, sStat : ${form.suggestedItems}">
+                        <tr th:replace="~{deliveries/create/parts :: suggestionRow(${suggested}, ${sStat.index})}"></tr>
+                    </th:block>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </details>
 </section>
+
+<!--/* The fetched suggestions: rows only, in a table so the browser parses them; the page renumbers their names. */-->
+<table th:fragment="suggestionRows" data-cl-suggestion-list>
+    <tbody>
+    <th:block th:each="suggested, sStat : ${form.suggestedItems}">
+        <tr th:replace="~{deliveries/create/parts :: suggestionRow(${suggested}, ${sStat.index})}"></tr>
+    </th:block>
+    </tbody>
+</table>
+
+<!--/* One suggestion; data-cl-suggestion holds its code, which the page matches a fetched row against. */-->
+<tr th:fragment="suggestionRow(suggested, k)" data-cl-delivery-item th:attr="data-cl-suggestion=${suggested.mfn}">
+    <th scope="row" class="cl-table-key" th:attr="data-label=#{general.product}">
+        <span th:text="${suggested.name}"></span>
+        <span class="cl-table-sub" th:if="${suggested.availableAtSupplier > 0}"
+              th:text="#{deliveries.create.suggestions.atSupplier(${suggested.availableAtSupplier})}"></span>
+        <span class="cl-table-sub"><span th:text="#{general.ean} + ':'"></span> <span class="cl-code-nowrap" th:text="${suggested.ean}"></span>
+            <th:block th:if="${suggested.priceCategory != null and suggested.priceCategory.name() != 'Standard'}"> ·
+                <span class="cl-status is-ok" th:text="#{|RestockPriceCategory.${suggested.priceCategory}|}"></span></th:block></span>
+        <input type="hidden" th:name="|suggestedItems[${k}].name|" th:value="${suggested.name}"/>
+        <input type="hidden" th:name="|suggestedItems[${k}].ean|" th:value="${suggested.ean}"/>
+        <input type="hidden" th:name="|suggestedItems[${k}].mfn|" th:value="${suggested.mfn}"/>
+    </th>
+    <td class="is-numeric" th:attr="data-label=#{deliveries.create.col.targetStock}" th:text="${suggested.expectedQty > 0} ? ${suggested.expectedQty} : '—'"></td>
+    <td th:attr="data-label=#{deliveries.create.col.qty}">
+        <input class="cl-input is-qty" type="number" inputmode="numeric" step="1" min="0" data-cl-requested-qty
+               th:name="|suggestedItems[${k}].requestedQty|" th:value="${suggested.requestedQty}" th:classappend="${invalidFields != null and invalidFields.contains(suggested.mfn + '|requestedQty')} ? 'is-invalid'"
+               th:aria-invalid="${invalidFields != null and invalidFields.contains(suggested.mfn + '|requestedQty')} ? 'true' : null"
+               th:attr="aria-label=#{deliveries.create.qty.label(${suggested.name})}"/>
+    </td>
+    <td th:attr="data-label=#{deliveries.create.col.unitCost}">
+        <input class="cl-input is-price" type="number" inputmode="decimal" step="0.01" min="0" data-cl-unit-cost
+               th:name="|suggestedItems[${k}].unitCost|" th:value="${T(pl.commercelink.web.orders.Money).inputRounded(suggested.unitCost)}" th:classappend="${invalidFields != null and invalidFields.contains(suggested.mfn + '|unitCost')} ? 'is-invalid'"
+               th:aria-invalid="${invalidFields != null and invalidFields.contains(suggested.mfn + '|unitCost')} ? 'true' : null"
+               th:attr="aria-label=#{deliveries.create.unitCost.label(${suggested.name})}"/>
+    </td>
+</tr>
 
 <!--/* Who receives the goods: the store's warehouse (helpKey says where its address comes from) or the customer. */-->
 <th:block th:fragment="recipient(page, helpKey)">
@@ -404,7 +450,7 @@
             </button>
             <p class="cl-help is-warn" id="purchase-blocked" th:text="#{${page.purchaseBlockedReason()}}"></p>
         </th:block>
-        <p class="cl-help" id="empty-help" hidden th:text="#{deliveries.create.action.empty}"></p>
+        <p class="cl-help is-warn" id="empty-help" hidden th:text="#{deliveries.create.action.empty}"></p>
     </div>
 </section>
 
@@ -452,20 +498,10 @@
     <span th:text="#{${errors.get(id)}}"></span>
 </p>
 
-<!--/* Dropship costs the supplier may charge; optional, folded unless something is set (spec §5.1, decision D3). */-->
-<section th:fragment="costs" class="cl-card" aria-labelledby="costs-title">
-    <details class="cl-disclosure cl-card-extras"
-             th:open="${form.shippingCost != 0 or form.paymentCost != 0 or form.paymentTerms != 0 or form.sourceCurrency != 'PLN'}">
-        <summary id="costs-title" th:text="#{deliveries.create.purchase.costs}"></summary>
-        <div class="cl-disclosure-body">
-            <p class="cl-card-desc" th:text="#{deliveries.create.purchase.costs.help}"></p>
-            <div th:replace="~{deliveries/create/parts :: costFields(null)}"></div>
-        </div>
-    </details>
-</section>
-
-<!--/* Currency, shipping, payment, VAT multiplier and payment terms; shared by the costs card and "Dane zamówienia". */-->
-<div th:fragment="costFields(errors)" class="cl-form-grid">
+<!--/* Currency, shipping, payment, VAT multiplier and payment terms of "Dane zamówienia".
+       Grid cells only: the caller's single cl-form-grid keeps one row rhythm with the fields around them, and the
+       inputs fill their columns (the fixed-width table inputs is-price / cl-input-days left ragged gaps here). */-->
+<th:block th:fragment="costFields(errors)">
     <div class="cl-span-2 cl-field">
         <label class="cl-label" for="sourceCurrency" th:text="#{deliveries.create.field.currency}"></label>
         <select class="cl-select" id="sourceCurrency" name="sourceCurrency" data-cl-currency>
@@ -475,7 +511,7 @@
     </div>
     <div class="cl-span-2 cl-field" th:each="field : ${ {'shippingCost', 'paymentCost'} }">
         <label class="cl-label" th:for="${field}" th:text="${field == 'shippingCost'} ? #{deliveries.create.field.shipping} : #{deliveries.create.field.payment}"></label>
-        <input class="cl-input is-price" type="number" inputmode="decimal" step="0.01" min="0" th:id="${field}" th:name="${field}"
+        <input class="cl-input" type="number" inputmode="decimal" step="0.01" min="0" th:id="${field}" th:name="${field}"
                th:value="${T(pl.commercelink.web.orders.Money).input(field == 'shippingCost' ? form.shippingCost : form.paymentCost)}"
                th:classappend="${errors != null and errors.containsKey(field)} ? 'is-invalid'"
                th:attr="aria-invalid=${errors != null and errors.containsKey(field)} ? 'true' : null,
@@ -484,7 +520,7 @@
     </div>
     <div class="cl-span-3 cl-field">
         <label class="cl-label" for="tax" th:text="#{deliveries.create.field.tax}"></label>
-        <input class="cl-input is-price" type="number" inputmode="decimal" step="0.01" min="1" id="tax" name="tax"
+        <input class="cl-input" type="number" inputmode="decimal" step="0.01" min="1" id="tax" name="tax"
                th:value="${form.tax}" th:classappend="${errors != null and errors.containsKey('tax')} ? 'is-invalid'"
                th:attr="aria-invalid=${errors != null and errors.containsKey('tax')} ? 'true' : null,
                         aria-describedby=${errors != null and errors.containsKey('tax')} ? 'tax-help tax-error' : 'tax-help'"/>
@@ -493,7 +529,7 @@
     </div>
     <div class="cl-span-3 cl-field">
         <label class="cl-label" for="paymentTerms" th:text="#{deliveries.create.field.terms}"></label>
-        <input class="cl-input cl-input-days" type="number" inputmode="numeric" step="1" min="0" id="paymentTerms"
+        <input class="cl-input" type="number" inputmode="numeric" step="1" min="0" id="paymentTerms"
                name="paymentTerms" th:value="${form.paymentTerms}"
                th:classappend="${errors != null and errors.containsKey('paymentTerms')} ? 'is-invalid'"
                th:attr="aria-invalid=${errors != null and errors.containsKey('paymentTerms')} ? 'true' : null,
@@ -501,7 +537,7 @@
         <p class="cl-help" id="paymentTerms-help" th:text="#{deliveries.create.field.terms.help}"></p>
         <p th:replace="~{deliveries/create/parts :: fieldError('paymentTerms', ${errors})}"></p>
     </div>
-</div>
+</th:block>
 
 <!--/* Step 2 "Zarejestruj zamówienie": the supplier order's number, date and costs, copied from its confirmation. */-->
 <section th:fragment="orderData(page, errors)" class="cl-card" aria-labelledby="order-data-title">
@@ -522,8 +558,8 @@
                        th:attr="aria-invalid=${invalid} ? 'true' : null, aria-describedby=${invalid} ? |${field}-error| : null"/>
                 <p th:replace="~{deliveries/create/parts :: fieldError(${field}, ${errors})}"></p>
             </div>
+            <th:block th:replace="~{deliveries/create/parts :: costFields(${errors})}"></th:block>
         </div>
-        <div th:replace="~{deliveries/create/parts :: costFields(${errors})}"></div>
     </div>
 </section>
 
@@ -532,13 +568,13 @@
     <div class="cl-card-head">
         <h2 class="cl-card-title" id="items-title" th:text="#{deliveries.create.items.title}"></h2>
         <div class="cl-card-actions">
-            <button type="button" class="cl-link-button" data-cl-back-submit="back-submit">
+            <button type="button" class="cl-link-button" data-cl-back-submit="back-submit" hidden>
                 <i class="fas fa-pencil-alt" aria-hidden="true"></i> <span th:text="#{deliveries.create.manual.changeItems}"></span>
             </button>
         </div>
     </div>
     <div class="cl-card-section">
-        <table class="cl-table is-key-wrap">
+        <table class="cl-table is-key-wrap is-delivery">
             <colgroup><col class="cl-col-key"><col class="cl-col-num"><col class="cl-col-num"><col class="cl-col-num"></colgroup>
             <thead>
             <tr>
@@ -553,7 +589,8 @@
                 th:attr="data-qty=${item.requestedQty}, data-unit-cost=${item.unitCost}">
                 <th scope="row" class="cl-table-key" th:attr="data-label=#{general.product}">
                     <span th:text="${item.name}"></span>
-                    <span class="cl-table-sub"><span th:text="#{general.ean} + ':'"></span> <span class="cl-code-nowrap" th:text="${item.ean}"></span></span>
+                    <span class="cl-table-sub"><span th:text="#{general.ean} + ':'"></span> <span class="cl-code-nowrap" th:text="${item.ean}"></span>
+                        · <span th:text="#{general.manufacturer.code} + ':'"></span> <span class="cl-code-nowrap" th:text="${item.mfn}"></span></span>
                 </th>
                 <td class="is-numeric" th:attr="data-label=#{deliveries.create.col.qty}" th:text="${item.requestedQty}"></td>
                 <td class="is-numeric" th:attr="data-label=#{deliveries.create.col.unitCost}" th:text="${T(pl.commercelink.web.orders.Money).format(item.unitCost)}"></td>

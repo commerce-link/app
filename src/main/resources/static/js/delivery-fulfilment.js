@@ -36,6 +36,13 @@
         });
     }
 
+    // the answer carries the cost as an input value ("3814.00"); the message shows it as the page's language writes it
+    function formatCost(value) {
+        var number = Number(value);
+        return isNaN(number) ? value : number.toLocaleString(document.documentElement.lang || undefined,
+            {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    }
+
     function applyToRow(index, answer, dialog) {
         var trigger = document.querySelector('.cl-table-edit[data-row="' + index + '"]');
         var row = trigger.closest('tr');
@@ -68,7 +75,7 @@
         trigger.setAttribute('data-unit-cost', answer.unitCost);
         if (typeof window.showToast === 'function') {
             window.showToast(untouched ? answer.message
-                : dialog.getAttribute('data-cost-kept').replace('{0}', answer.unitCost), 'info');
+                : dialog.getAttribute('data-cost-kept').replace('{0}', formatCost(answer.unitCost)), 'info');
         }
     }
 

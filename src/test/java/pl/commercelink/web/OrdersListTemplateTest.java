@@ -16,47 +16,6 @@ class OrdersListTemplateTest {
         return Files.readString(Path.of("src/main/resources/templates/orders/list.html"), StandardCharsets.UTF_8);
     }
 
-    @Test
-    void oneH1AndTheSharedShell() throws Exception {
-        String html = page();
-        assertThat(html).contains("layout:decorate=\"~{layout}\"").contains("class=\"cl-page\"").contains("cl-page-body is-wide");
-        assertThat(countOf(html, "<h1")).isEqualTo(1);
-        assertThat(html).contains("fragments/screen-intro :: toggle").contains("fragments/screen-intro :: panel('orders'");
-        // the guide toggle follows the title, as on Asortyment and the settings pages, not the header actions
-        assertThat(html.indexOf("fragments/screen-intro :: toggle")).isBetween(html.indexOf("cl-page-title"), html.indexOf("cl-page-actions"));
-    }
-
-    @Test
-    void tilesSegmentsToolbarChipsTableAndPagingAreWiredToTheModel() throws Exception {
-        String html = page();
-        assertThat(html).contains("cl-stat-grid is-orders").contains("cl-stat-value").contains("cl-stat-hint")
-                .doesNotContain("cl-stat-icon").doesNotContain("tile.tone()")  // values in ink, as on Asortyment
-                .doesNotContain("cl-stat-sum").doesNotContain("cl-stat-value-of")
-                .doesNotContain("tile.kind()").doesNotContain("cl-attention")
-                .doesNotContain("cl-tabs").doesNotContain("cl-tab-count")
-                .contains("class=\"cl-table-toolbar\"").contains("class=\"cl-toolbar-filters\"").doesNotContain("cl-list-controls")
-                .doesNotContain("class=\"cl-menu").doesNotContain("fa-filter").contains("orders.list.filter.none")
-                .contains("details class=\"cl-filter-menu is-status\" data-cl-filter-menu=\"status\"").contains("data-cl-autosubmit")
-                .contains("name=\"status\"").contains("cl-filter-menu-check").contains("cl-filter-menu-group").contains("page.statusSummary()")
-                .contains("data-cl-autosubmit-hide").contains("q.withStatus(null).href()")
-                .contains("details class=\"cl-filter-menu\" data-cl-filter-menu=\"filter\"").contains("cl-filter-menu-item")
-                .contains("th:href=\"@{${o.href()}}\"")   // a filter's link ticks its status
-                .doesNotContain("q.withFilterId(null).href()").doesNotContain("orders.list.filter.off")   // cleared by "Wyczyść filtry", not in the menu
-                .contains("@{/dashboard/orders/filters(returnTo=${returnTo})}")
-                .doesNotContain("save-view").doesNotContain("saveView").doesNotContain("data-cl-dialog-open").doesNotContain("name=\"focus\"")
-                .contains("cl-search-form").contains("name=\"q\"").contains("cl-search-clear").contains("cl-button is-primary cl-search-submit").contains("q.withQ(null).href()")
-                .contains("cl-list-meta").contains("cl-filter-chips").contains("cl-table-results").contains("role=\"status\"")
-                .contains("'cl-visually-hidden'").doesNotContain("cl-filter-chip-link").doesNotContain("historyStatuses")
-                .contains("cl-table is-orders").contains("cl-table-sort").contains("aria-sort")
-                .contains("cl-table-sortbar").contains("orders.list.sort.label")
-                .contains("orders.list.sort.due").contains("orders.list.sort.amount").contains("orders.list.sort.number").contains("orders.list.sort.status")
-                .contains("th:href=\"@{${page.sortHeaders().get(statusSort).href()}}\" th:text=\"#{orders.list.column.status}\"")
-                .doesNotContain("orders.list.sort.ordered")   // "date placed" only sorted the history, which is gone
-                .contains("fragments/pagination :: pages(${page.pagination()})")
-                .contains("data-cl-list-results").contains("data-cl-list-nav")
-                .contains("cl-list-empty").contains("orders.new.pos.button");
-    }
-
     /** One way to clear every narrowing at once, right after the filter menu in the toolbar, only when something narrows. */
     @Test
     void clearFiltersSitsNextToTheFilterMenu() throws Exception {
@@ -115,39 +74,8 @@ class OrdersListTemplateTest {
         assertThat(text.find()).as("literal text found: " + (text.hitEnd() ? "" : text.group())).isFalse();
     }
 
-    @Test
-    void onlyTheListScriptIsIncluded() throws Exception {
-        // no dialog is left on the list: "save this view" is gone and filters are managed on their own page
-        assertThat(page()).contains("@{/js/list-page.js}").doesNotContain("dialog.js").doesNotContain("confirm-dialog");
-        assertThat(Path.of("src/main/resources/templates/orders/filter-new.html")).doesNotExist();
-    }
-
-    private static int countOf(String html, String needle) {
-        return html.split(Pattern.quote(needle), -1).length - 1;
-    }
-
     private static String filters() throws Exception {
         return Files.readString(Path.of("src/main/resources/templates/orders/filters.html"), StandardCharsets.UTF_8);
-    }
-
-    @Test
-    void managementIsAPageWithAnEditSubpage() throws Exception {
-        String html = filters();
-        // the management page: list in a card, "Nowy filtr" in the card head, edit on a subpage, delete here, and the
-        // default filter set by a plain POST form in the row's title line (no star)
-        assertThat(html).contains("layout:fragment=\"content\"").contains("cl-card-head").contains("/dashboard/orders/filters/add")
-                .contains("/dashboard/orders/filters/{id}/edit").contains("data-cl-confirm")
-                .contains("'/dashboard/orders/filters/default/clear' : '/dashboard/orders/filters/default'")
-                .contains("<form class=\"cl-list-title-action\" method=\"post\"").contains("name=\"openByDefault\"")
-                .doesNotContain("cl-star").doesNotContain("is-filter")
-                .contains("settings-header :: subpage(${listHref}")
-                .doesNotContain("filtersDialog").doesNotContain("dialogBody").doesNotContain("data-cl-filter-edit")
-                .doesNotContain("style=").doesNotContain("onclick=").doesNotContain("class=\"button");
-        assertThat(html).doesNotContain("saveView").doesNotContain("th:fragment=\"redirect\"").doesNotContain("data-cl-dialog-body")
-                .contains("aria-describedby=\"filter-conditions-help\"").contains("th:if=\"${canManageStoreFilters}\"");
-        String edit = Files.readString(Path.of("src/main/resources/templates/orders/filter-edit.html"), StandardCharsets.UTF_8);
-        assertThat(edit).contains("orders/filters :: filterFormFields").doesNotContain("name=\"dialog\"").contains("@{/js/order-filter-form.js}").contains("name=\"returnTo\"")
-                .contains("cl-card-footer").contains("th:action=\"@{${formAction}}\"").contains("id=\"filter-conditions-help\"").contains("settings-header :: subpage(${returnTo}");
     }
 
     @Test
