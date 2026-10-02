@@ -13,8 +13,10 @@ import java.time.temporal.ChronoUnit;
 import java.util.Optional;
 
 /**
- * Whether a store may do work. Every job, listener and entry point that acts for a store asks here first, so an
- * inactive store keeps its data but nothing runs, sells or sends anything on its behalf.
+ * Whether a store may start new work. The jobs that start something for a store (imports, exports, pricelists, feeds)
+ * and the public entry points ask here, so an inactive store keeps its data and sells nothing new. Work that carries
+ * on with orders, shipments and documents that already exist does not ask, so nothing begun before a deactivation is
+ * left half-done.
  */
 @Component
 public class StoreActivity {

@@ -26,14 +26,12 @@ import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.stores.MarketplaceIntegration;
 import pl.commercelink.stores.Store;
-import pl.commercelink.stores.StoreActivity;
 import pl.commercelink.stores.StoresRepository;
 
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -66,15 +64,9 @@ class MarketplaceOrderLifecycleEventListenerTest {
     @Mock private Order order;
     @Mock private OrderSource source;
     @Mock private MarketplaceProvider provider;
-    @Mock private StoreActivity storeActivity;
 
     @InjectMocks
     private MarketplaceOrderLifecycleEventListener listener;
-
-    @BeforeEach
-    void storesAreActive() {
-        lenient().when(storeActivity.isActive(any(Store.class))).thenReturn(true);
-    }
 
     @BeforeEach
     void setUpDefaults() {
@@ -428,17 +420,5 @@ class MarketplaceOrderLifecycleEventListenerTest {
 
     private void handleDeleted(OrderLifecycleEventType type) {
         listener.handleMessage(new OrderLifecycleEvent(STORE_ID, ORDER_ID, type, EXTERNAL_ORDER_ID, MARKETPLACE));
-    }
-
-    @Test
-    void eventOfInactiveStoreDoesNotReachTheMarketplace() {
-        // given
-        when(storeActivity.isActive(store)).thenReturn(false);
-
-        // when
-        handle(OrderLifecycleEventType.OrderAccepted);
-
-        // then
-        verifyNoInteractions(provider, providerFactory);
     }
 }

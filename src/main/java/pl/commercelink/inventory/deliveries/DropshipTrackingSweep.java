@@ -4,7 +4,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import pl.commercelink.stores.Store;
-import pl.commercelink.stores.StoreActivity;
 import pl.commercelink.stores.StoresRepository;
 
 import java.time.Clock;
@@ -18,24 +17,20 @@ public class DropshipTrackingSweep {
     private final DeliveriesRepository deliveriesRepository;
     private final DropshipTrackingEventPublisher publisher;
     private final DropshipTrackingProperties properties;
-    private final StoreActivity storeActivity;
     private final Clock clock;
 
     @Autowired
     public DropshipTrackingSweep(StoresRepository storesRepository, DeliveriesRepository deliveriesRepository,
-                                 DropshipTrackingEventPublisher publisher, DropshipTrackingProperties properties,
-                                 StoreActivity storeActivity) {
-        this(storesRepository, deliveriesRepository, publisher, properties, storeActivity, Clock.systemDefaultZone());
+                                 DropshipTrackingEventPublisher publisher, DropshipTrackingProperties properties) {
+        this(storesRepository, deliveriesRepository, publisher, properties, Clock.systemDefaultZone());
     }
 
     DropshipTrackingSweep(StoresRepository storesRepository, DeliveriesRepository deliveriesRepository,
-                          DropshipTrackingEventPublisher publisher, DropshipTrackingProperties properties,
-                          StoreActivity storeActivity, Clock clock) {
+                          DropshipTrackingEventPublisher publisher, DropshipTrackingProperties properties, Clock clock) {
         this.storesRepository = storesRepository;
         this.deliveriesRepository = deliveriesRepository;
         this.publisher = publisher;
         this.properties = properties;
-        this.storeActivity = storeActivity;
         this.clock = clock;
     }
 
@@ -43,9 +38,6 @@ public class DropshipTrackingSweep {
         LocalDateTime now = LocalDateTime.now(clock);
         int published = 0;
         for (Store store : storesRepository.findAll()) {
-            if (!storeActivity.isActive(store)) {
-                continue;
-            }
             try {
                 for (Delivery delivery : deliveriesRepository.findTrackableDropshipDeliveries(store.getStoreId())) {
                     if (isDue(delivery, now)) {

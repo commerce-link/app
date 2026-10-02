@@ -89,10 +89,10 @@ public class PaymentWebhookRegistry {
 
         basketsRepository.delete(basket);
 
-        // the customer has paid, but the listeners skip the order of an inactive store and its owner cannot act on it
-        // in the read-only dashboard, so someone has to step in
+        // the customer has paid and the automated steps carry on, but the owner of an inactive store cannot take the
+        // manual ones in the read-only dashboard, so someone has to step in
         if (!storeActivity.isActive(store)) {
-            log.error("Order {} was paid in inactive store {}: it is neither fulfilled nor confirmed to the customer",
+            log.error("Order {} was paid in inactive store {}: its owner cannot handle it in the read-only dashboard",
                     order.getOrderId(), store.getStoreId());
         }
     }

@@ -18,7 +18,6 @@ import pl.commercelink.orders.rma.ReturnLifecycleEvent;
 import pl.commercelink.orders.rma.ReturnLifecycleEventType;
 import pl.commercelink.stores.MarketplaceIntegration;
 import pl.commercelink.stores.Store;
-import pl.commercelink.stores.StoreActivity;
 import pl.commercelink.stores.StoresRepository;
 
 import java.util.List;
@@ -29,7 +28,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -50,15 +48,9 @@ class MarketplaceReturnLifecycleEventListenerTest {
     @Mock private Store store;
     @Mock private MarketplaceProvider provider;
     @Mock private MarketplaceReturns returns;
-    @Mock private StoreActivity storeActivity;
 
     @InjectMocks
     private MarketplaceReturnLifecycleEventListener listener;
-
-    @BeforeEach
-    void storesAreActive() {
-        lenient().when(storeActivity.isActive(any(Store.class))).thenReturn(true);
-    }
 
     @BeforeEach
     void setUp() {
@@ -212,17 +204,5 @@ class MarketplaceReturnLifecycleEventListenerTest {
 
         // then
         verifyNoInteractions(returns);
-    }
-
-    @Test
-    void decisionOfInactiveStoreIsDroppedWithoutCallingTheMarketplace() {
-        // given
-        when(storeActivity.isActive(store)).thenReturn(false);
-
-        // when
-        listener.handleMessage(event(ReturnLifecycleEventType.ReturnAccepted, refundAction()));
-
-        // then
-        verifyNoInteractions(providerFactory, returns);
     }
 }
