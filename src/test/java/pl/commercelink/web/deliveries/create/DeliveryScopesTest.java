@@ -102,8 +102,38 @@ class DeliveryScopesTest {
         assertThat(form.getTax()).isEqualTo(1.23);
         assertThat(form.getItems()).singleElement()
                 .satisfies(item -> assertThat(item.getAllocations()).allMatch(Allocation::isSelected));
-        verify(restockSuggestions).suggestForDelivery(eq(STORE_ID), eq(PROVIDER), any());
-        verifyNoInteractions(eligibility);
+        verifyNoInteractions(restockSuggestions, eligibility);
+    }
+
+    @Test
+    void warehouseSuggestionsLeaveOutWhatIsAlreadyPlanned() {
+        // given: the plan carries no suggestions (the page fetches them), so they are worked out on their own
+        Delivery planned = new Delivery(STORE_ID, null, PROVIDER);
+        planned.setAllocations(new ArrayList<>(List.of(Allocation.fromOrderItem(order(), allocatedItem("item-1", 2)))));
+        when(planning.run(STORE_ID, PROVIDER)).thenReturn(planned);
+
+        // when
+        DeliveryScope scope = ((DeliveryScopes.Resolution.Found) scopes.resolve(STORE_ID, PROVIDER, null)).scope();
+        scope.suggestions();
+
+        // then
+        verify(restockSuggestions).suggestForDelivery(STORE_ID, PROVIDER, java.util.Set.of("mfn-1"));
+    }
+
+    @Test
+    void dropshipHasNoSuggestions() {
+        // given
+        Order order = order();
+        when(orders.findById(STORE_ID, ORDER_ID)).thenReturn(order);
+        when(orderItems.findByOrderId(ORDER_ID)).thenReturn(List.of(allocatedItem("item-1", 2)));
+        when(eligibility.assess(same(order), any())).thenReturn(DropshipAssessment.of(List.of(PROVIDER)));
+
+        // when
+        DeliveryScope scope = ((DeliveryScopes.Resolution.Found) scopes.resolve(STORE_ID, PROVIDER, ORDER_ID)).scope();
+
+        // then
+        assertThat(scope.suggestions()).isEmpty();
+        verifyNoInteractions(restockSuggestions);
     }
 
     @Test

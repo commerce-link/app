@@ -37,7 +37,7 @@ class DeliveryCreateAuthorizationTest {
         List<Method> handlers = handlers();
 
         // then
-        assertThat(handlers).hasSize(18);
+        assertThat(handlers).hasSize(20);
         for (Method handler : handlers) {
             String path = pathOf(handler);
             PreAuthorize rule = handler.getAnnotation(PreAuthorize.class);

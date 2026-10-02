@@ -2,7 +2,8 @@
 // quantity (an order source moves the minimum and the quantity by its pieces, both ways, a warehouse source only the
 // quantity),
 // the warehouse adjustment line follows, dropship quantities are the ticked lines, totals and the step buttons follow
-// everything, and Enter inside the table moves to the next field instead of leaving for step 2.
+// everything, Enter inside the table moves to the next field instead of leaving for step 2, and the restock suggestions
+// are fetched after the page is shown.
 (function () {
     'use strict';
 
@@ -156,6 +157,85 @@
         }
     }
 
+    // Restock suggestions come after the page (parts.html :: suggestions): working them out takes seconds. A fetched
+    // row takes over the quantity and cost fields of a row the page already had for the same product (chosen before
+    // going back from step 2, or marked by an error), and every row is renumbered so the list binds without gaps.
+    function loadSuggestions(form) {
+        var section = form.querySelector('[data-cl-suggestions]');
+        if (!section) {
+            return;
+        }
+        var status = section.querySelector('[data-cl-suggestions-status]');
+        var failed = section.querySelector('[data-cl-suggestions-failed]');
+        var summary = section.querySelector('summary');
+        summary.textContent = section.getAttribute('data-summary-loading');
+        status.hidden = false;
+        failed.hidden = true;
+        section.setAttribute('aria-busy', 'true');
+        fetch(section.getAttribute('data-url'), { headers: { 'Accept': 'text/html' }, credentials: 'same-origin' })
+            .then(function (response) {
+                if (!response.ok) {
+                    throw new Error('HTTP ' + response.status);
+                }
+                return response.text();
+            })
+            .then(function (html) {
+                var list = new DOMParser().parseFromString(html, 'text/html').querySelector('[data-cl-suggestion-list]');
+                // an expired session answers with the login page, which is not a list
+                if (!list) {
+                    throw new Error('Not a suggestion list');
+                }
+                mergeSuggestions(section, Array.prototype.slice.call(list.querySelectorAll('tr[data-cl-suggestion]')));
+                status.hidden = true;
+                section.removeAttribute('aria-busy');
+                syncTotals(form);
+            })
+            .catch(function () {
+                summary.textContent = section.getAttribute('data-summary-failed');
+                status.hidden = true;
+                failed.hidden = false;
+                section.removeAttribute('aria-busy');
+            });
+    }
+
+    function mergeSuggestions(section, fetched) {
+        var tbody = section.querySelector('[data-cl-suggestion-rows]');
+        var focused = document.activeElement;
+        var shown = {};
+        tbody.querySelectorAll('tr[data-cl-suggestion]').forEach(function (row) {
+            shown[row.getAttribute('data-cl-suggestion')] = row;
+        });
+        var taken = {};
+        var rows = fetched.map(function (row) {
+            var code = row.getAttribute('data-cl-suggestion');
+            var mine = shown[code];
+            row = document.adoptNode(row);
+            if (mine) {
+                taken[code] = true;
+                ['input[data-cl-requested-qty]', 'input[data-cl-unit-cost]'].forEach(function (selector) {
+                    var fresh = row.querySelector(selector);
+                    fresh.parentNode.replaceChild(mine.querySelector(selector), fresh);
+                });
+            }
+            return row;
+        });
+        var kept = Array.prototype.filter.call(tbody.querySelectorAll('tr[data-cl-suggestion]'), function (row) {
+            return !taken[row.getAttribute('data-cl-suggestion')];
+        });
+        tbody.replaceChildren.apply(tbody, kept.concat(rows));
+        var all = tbody.querySelectorAll('tr[data-cl-suggestion]');
+        all.forEach(function (row, index) {
+            row.querySelectorAll('input[name^="suggestedItems["]').forEach(function (input) {
+                input.name = input.name.replace(/^suggestedItems\[\d+]/, 'suggestedItems[' + index + ']');
+            });
+        });
+        section.querySelector('summary').textContent = section.getAttribute('data-summary').replace('{0}', String(all.length));
+        section.hidden = all.length === 0;
+        if (focused && focused !== document.activeElement && document.body.contains(focused)) {
+            focused.focus();
+        }
+    }
+
     // Money has two decimals: a third one typed into a cost field is dropped as it is typed (the server rounds the rest).
     var CENTS = /^(-?\d*\.\d{2})\d+$/;
 
@@ -209,6 +289,12 @@
             }
         });
         syncTotals(form);
+        loadSuggestions(form);
+        form.addEventListener('click', function (event) {
+            if (event.target.closest && event.target.closest('[data-cl-suggestions-retry]')) {
+                loadSuggestions(form);
+            }
+        });
 
         // a page answered with errors puts the keyboard and screen reader on their summary
         var summary = document.querySelector('[data-cl-error-summary]');

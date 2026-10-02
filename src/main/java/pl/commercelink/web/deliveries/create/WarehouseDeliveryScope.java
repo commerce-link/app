@@ -63,15 +63,20 @@ final class WarehouseDeliveryScope implements DeliveryScope {
         form.setItems(groupAndUnify(delivery.getAllocations()));
         form.setTax(defaultTax());
         form.getItems().forEach(item -> item.getAllocations().forEach(allocation -> allocation.setSelected(true)));
-        Set<String> existingMfns = delivery.getAllocations().stream()
+        return form;
+    }
+
+    @Override
+    public List<SuggestedDeliveryItem> suggestions() {
+        Delivery delivery = planning.run(storeId, provider);
+        Set<String> plannedMfns = delivery == null ? Set.of() : delivery.getAllocations().stream()
                 .map(Allocation::getMfn)
                 .filter(Objects::nonNull)
                 .map(String::toLowerCase)
                 .collect(Collectors.toSet());
-        form.setSuggestedItems(restockSuggestions.suggestForDelivery(storeId, provider, existingMfns).stream()
+        return restockSuggestions.suggestForDelivery(storeId, provider, plannedMfns).stream()
                 .map(SuggestedDeliveryItem::from)
-                .collect(Collectors.toList()));
-        return form;
+                .collect(Collectors.toList());
     }
 
     @Override public double defaultTax() { return taxResolver.resolveFor(provider); }

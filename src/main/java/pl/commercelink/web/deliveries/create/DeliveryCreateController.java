@@ -21,7 +21,9 @@ import pl.commercelink.web.dtos.DeliveryCreationForm;
 import pl.commercelink.web.dtos.DeliveryFulfilmentUpdateForm;
 import pl.commercelink.web.dtos.SuggestedDeliveryItem;
 
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
@@ -53,6 +55,7 @@ public class DeliveryCreateController {
     private static final String FULFILMENT_INVALID = "error.message.delivery.fulfilment.invalid";
     private static final String CHECK_FAILED = "deliveries.purchase.confirm.checkFailed";
     private static final String VALIDATION_RESULT = "deliveries/create/purchase :: validationResult";
+    private static final String SUGGESTION_ROWS = "deliveries/create/parts :: suggestionRows";
 
     private final DeliveryScopes scopes;
     private final SupplierPurchaseService supplierPurchaseService;
@@ -78,6 +81,23 @@ public class DeliveryCreateController {
                                      @RequestParam(value = "from", required = false) String from,
                                      Model model, RedirectAttributes flash, Locale locale) {
         return showItems(storeId, provider, orderId, from, null, null, model, flash, locale);
+    }
+
+    // Restock suggestions take seconds to work out, so step 1 is shown without them and fetches their rows from here.
+    @GetMapping(STORE + "/suggestions")
+    @PreAuthorize("hasRole('ADMIN')")
+    public String suggestions(@PathVariable("provider") String provider,
+                              @RequestParam(value = "order", required = false) String orderId, Model model) {
+        return renderSuggestions(storeId(), provider, orderId, model);
+    }
+
+    @GetMapping(SUPER + "/suggestions")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public String suggestionsForSuperAdmin(@PathVariable("storeId") String storeId,
+                                           @PathVariable("provider") String provider,
+                                           @RequestParam(value = "order", required = false) String orderId,
+                                           Model model) {
+        return renderSuggestions(storeId, provider, orderId, model);
     }
 
     @PostMapping(STORE + "/back")
@@ -259,6 +279,17 @@ public class DeliveryCreateController {
         return "deliveries/create/items";
     }
 
+    /** The rows of the suggestions card; none for a dropship order or a supplier the store can no longer use. */
+    private String renderSuggestions(String storeId, String provider, String orderId, Model model) {
+        DeliveryScopes.Resolution resolution = scopes.resolve(storeId, provider, orderId);
+        List<SuggestedDeliveryItem> suggestions = resolution instanceof DeliveryScopes.Resolution.Found found
+                ? found.scope().suggestions() : List.of();
+        DeliveryCreationForm form = new DeliveryCreationForm();
+        form.setSuggestedItems(suggestions);
+        model.addAttribute("form", form);
+        return SUGGESTION_ROWS;
+    }
+
     private String showStepOneAfterBack(String storeId, String provider, String orderId, String from,
                                         DeliveryCreationForm posted, BindingResult binding, Model model,
                                         RedirectAttributes flash, Locale locale) {
@@ -290,6 +321,10 @@ public class DeliveryCreateController {
         DeliveryCreationForm form = scope.plannedForm();
         if (form == null) {
             return "redirect:" + links.preview();
+        }
+        // the planned cost of a suggestion is its offer price, so this rare page works the suggestions out at once
+        if (binding.getFieldErrors().stream().anyMatch(error -> error.getField().startsWith("suggestedItems["))) {
+            form.setSuggestedItems(new ArrayList<>(scope.suggestions()));
         }
         Set<String> invalidFields = new LinkedHashSet<>();
         for (FieldError error : binding.getFieldErrors()) {

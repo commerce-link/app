@@ -70,6 +70,17 @@ class DeliveryCreateScriptsContractTest {
     }
 
     @Test
+    void suggestionsAreFetchedAfterThePageAndKeepWhatWasTyped() throws Exception {
+        // when
+        String js = read("src/main/resources/static/js/delivery-items.js");
+
+        // then
+        assertThat(js).contains("[data-cl-suggestions]").contains("data-cl-suggestion-list")
+                .contains("data-cl-suggestions-retry").contains("suggestedItems[' + index + ']")
+                .contains("section.hidden = all.length === 0").contains("data-summary-failed");
+    }
+
+    @Test
     void tickingAnOrderSourceBackRaisesTheQuantityByItsPiecesAsUntickingLoweredIt() throws Exception {
         // when
         String js = read("src/main/resources/static/js/delivery-items.js");

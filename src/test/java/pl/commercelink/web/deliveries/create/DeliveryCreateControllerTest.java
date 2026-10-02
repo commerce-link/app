@@ -464,6 +464,66 @@ class DeliveryCreateControllerTest {
     }
 
     @Test
+    void unreadableSuggestionCostComesBackAsTheOfferPrice() {
+        // given: suggestions are not in the plan, so this page works them out to restore the planned cost
+        when(scope.plannedForm()).thenReturn(requested(1));
+        pl.commercelink.web.dtos.SuggestedDeliveryItem offered = new pl.commercelink.web.dtos.SuggestedDeliveryItem();
+        offered.setMfn("S-1");
+        offered.setUnitCost(50.0);
+        when(scope.suggestions()).thenReturn(List.of(offered));
+        DeliveryCreationForm form = requested(1);
+        pl.commercelink.web.dtos.SuggestedDeliveryItem typed = new pl.commercelink.web.dtos.SuggestedDeliveryItem();
+        typed.setMfn("S-1");
+        typed.setRequestedQty(2);
+        form.setSuggestedItems(new ArrayList<>(List.of(typed)));
+        BindingResult binding = binding(form);
+        binding.rejectValue("suggestedItems[0].unitCost", "typeMismatch");
+        Model model = new ConcurrentModel();
+
+        // when
+        asStoreAdmin(() -> controller.manual(PROVIDER, form, binding, null, null, model, flash, Locale.ENGLISH));
+
+        // then
+        DeliveryCreationForm shown = (DeliveryCreationForm) model.getAttribute("form");
+        assertThat(shown.getSuggestedItems()).singleElement().satisfies(suggestion -> {
+            assertThat(suggestion.getUnitCost()).isEqualTo(50.0);
+            assertThat(suggestion.getRequestedQty()).isEqualTo(2);
+        });
+        assertThat((java.util.Set<String>) model.getAttribute("invalidFields")).containsExactly("S-1|unitCost");
+    }
+
+    @Test
+    void suggestionsAreFetchedAsRowsOfTheScope() {
+        // given
+        pl.commercelink.web.dtos.SuggestedDeliveryItem offered = new pl.commercelink.web.dtos.SuggestedDeliveryItem();
+        offered.setMfn("S-1");
+        when(scope.suggestions()).thenReturn(List.of(offered));
+        Model model = new ConcurrentModel();
+
+        // when
+        String view = asStoreAdmin(() -> controller.suggestions(PROVIDER, null, model));
+
+        // then
+        assertThat(view).isEqualTo("deliveries/create/parts :: suggestionRows");
+        assertThat(((DeliveryCreationForm) model.getAttribute("form")).getSuggestedItems()).containsExactly(offered);
+        verify(scope, never()).plannedForm();
+    }
+
+    @Test
+    void suggestionsOfASupplierTheStoreCannotUseAreEmpty() {
+        // given
+        when(scopes.resolve(STORE_ID, PROVIDER, null)).thenReturn(new DeliveryScopes.Resolution.Refused(null));
+        Model model = new ConcurrentModel();
+
+        // when
+        String view = asSuperAdmin(() -> controller.suggestionsForSuperAdmin(STORE_ID, PROVIDER, null, model));
+
+        // then
+        assertThat(view).isEqualTo("deliveries/create/parts :: suggestionRows");
+        assertThat(((DeliveryCreationForm) model.getAttribute("form")).getSuggestedItems()).isEmpty();
+    }
+
+    @Test
     void backWithAnEmptyVatFallsBackToTheSuppliersDefault() {
         // given
         when(scope.plannedForm()).thenReturn(requested(1));

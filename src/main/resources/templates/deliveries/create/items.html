@@ -25,9 +25,7 @@
                     </th:block>
                     <th:block th:if="${!page.dropship()}">
                         <section th:replace="~{deliveries/create/parts :: warehouseItems}"></section>
-                        <th:block th:if="${!form.suggestedItems.isEmpty()}">
-                            <section th:replace="~{deliveries/create/parts :: suggestions}"></section>
-                        </th:block>
+                        <section th:replace="~{deliveries/create/parts :: suggestions}"></section>
                     </th:block>
                 </div>
                 <aside class="cl-layout-side is-sticky">

@@ -3,6 +3,7 @@ package pl.commercelink.web.deliveries.create;
 import org.junit.jupiter.api.Test;
 import pl.commercelink.web.dtos.DeliveryCreationForm;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -24,7 +25,7 @@ class DeliveryCreateItemsTemplateTest {
                 .contains("id=\"delivery-step-form\"").contains("data-cl-delivery-items")
                 .contains("AMD Ryzen 7 9800X3D").contains("<span class=\"cl-code-nowrap\" data-cl-item-ean>5901234123457</span>")
                 .contains("Źródła: 1").contains("min. 2").contains("Dołącz źródło")
-                .contains("Uzupełnij magazyn przy okazji: 1").contains("Kingston FURY Beast 16GB")
+                .contains("Uzupełnij magazyn przy okazji: wczytywanie…").contains("Kingston FURY Beast 16GB")
                 .contains("Magazyn sklepu").contains("Podsumowanie")
                 .doesNotContain("??");
         for (String absent : List.of("name=\"externalDeliveryId\" class", "type=\"date\"", "<select")) {
@@ -174,6 +175,44 @@ class DeliveryCreateItemsTemplateTest {
     }
 
     @Test
+    void warehouseStepOneComesWithoutSuggestionsAndFetchesThemAfter() {
+        // given: the plan carries no suggestions
+        DeliveryCreationForm form = warehouseForm();
+        form.setSuggestedItems(new ArrayList<>());
+
+        // when
+        String html = render("deliveries/create/items", model(warehousePage(false, true, false), form));
+
+        // then
+        assertThat(html).contains("data-cl-suggestions").contains("data-url=\"/dashboard/deliveries/create/Acme/suggestions\"")
+                .contains("data-summary=\"Uzupełnij magazyn przy okazji: {0}\"")
+                .contains("Uzupełnij magazyn przy okazji: wczytywanie…").contains("data-cl-suggestions-status")
+                .doesNotContain("suggestedItems[0]");
+    }
+
+    @Test
+    void dropshipStepOneHasNoSuggestions() {
+        // when
+        String html = render("deliveries/create/items", model(dropshipPage(false, null, false), dropshipForm()));
+
+        // then
+        assertThat(html).doesNotContain("data-cl-suggestions");
+    }
+
+    @Test
+    void fetchedSuggestionsAreRowsCarryingTheirCode() {
+        // given
+        Map<String, Object> variables = model(warehousePage(false, true, false), warehouseForm());
+
+        // when
+        String html = fragment("deliveries/create/parts :: suggestionRows", variables);
+
+        // then
+        assertThat(html).contains("data-cl-suggestion-list").contains("data-cl-suggestion=\"")
+                .contains("name=\"suggestedItems[0].requestedQty\"");
+    }
+
+    @Test
     void superAdminStepOnePostsToTheStoreScopedRoutes() {
         // when
         String html = render("deliveries/create/items", model(warehousePage(true, true, false), warehouseForm()));
@@ -181,6 +220,7 @@ class DeliveryCreateItemsTemplateTest {
         // then
         assertThat(html).contains("formaction=\"/dashboard/store/store-1/deliveries/create/Acme/purchase\"")
                 .contains("data-url=\"/dashboard/store/store-1/deliveries/create/Acme/fulfilment\"")
+                .contains("data-url=\"/dashboard/store/store-1/deliveries/create/Acme/suggestions\"")
                 .contains("href=\"/dashboard/store/store-1/deliveries/preview\"");
     }
 

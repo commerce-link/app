@@ -33,6 +33,52 @@ class DeliveryCreationFormTest {
     }
 
     @Test
+    void backKeepsAChosenSuggestionThePlanDoesNotCarry() {
+        // given: the plan comes without suggestions (the page fetches them); step 2 merged a chosen one into the items
+        DeliveryCreationForm fresh = new DeliveryCreationForm();
+        fresh.setItems(new ArrayList<>());
+        DeliveryCreationForm posted = new DeliveryCreationForm();
+        DeliveryItem merged = new DeliveryItem("Fan", "5900000000009", "FAN-1", 89.0, List.of());
+        merged.setRequestedQty(2);
+        posted.setItems(new ArrayList<>(List.of(merged)));
+
+        // when
+        fresh.applyUserSelections(posted);
+
+        // then
+        assertThat(fresh.getSuggestedItems()).singleElement().satisfies(suggestion -> {
+            assertThat(suggestion.getMfn()).isEqualTo("FAN-1");
+            assertThat(suggestion.getName()).isEqualTo("Fan");
+            assertThat(suggestion.getEan()).isEqualTo("5900000000009");
+            assertThat(suggestion.getRequestedQty()).isEqualTo(2);
+            assertThat(suggestion.getUnitCost()).isEqualTo(89.0);
+        });
+    }
+
+    @Test
+    void anItemThatLeftThePlanDoesNotComeBackAsASuggestion() {
+        // given: an item with sources is a planned item; one the plan no longer has is gone, not a suggestion
+        DeliveryCreationForm fresh = new DeliveryCreationForm();
+        fresh.setItems(new ArrayList<>());
+        DeliveryCreationForm posted = new DeliveryCreationForm();
+        Allocation allocation = new Allocation();
+        allocation.setKey(new AllocationKey("order-1", "item-1", "buyer@example.com"));
+        allocation.setType(AllocationType.Order);
+        DeliveryItem gone = new DeliveryItem("Gone", "590", "GONE-1", 10.0, new ArrayList<>(List.of(allocation)));
+        gone.setRequestedQty(1);
+        posted.setItems(new ArrayList<>(List.of(gone)));
+        SuggestedDeliveryItem untouched = new SuggestedDeliveryItem();
+        untouched.setMfn("ZERO-1");
+        posted.setSuggestedItems(new ArrayList<>(List.of(untouched)));
+
+        // when
+        fresh.applyUserSelections(posted);
+
+        // then
+        assertThat(fresh.getSuggestedItems()).isEmpty();
+    }
+
+    @Test
     void costOfTheEditProductDialogIsRoundedToWholeGrosze() {
         // given
         DeliveryFulfilmentUpdateForm form = new DeliveryFulfilmentUpdateForm();
@@ -173,19 +219,7 @@ class DeliveryCreationFormTest {
     }
 
     @Test
-    void postedItemMatchingNothingIsIgnored() {
-        // given
-        DeliveryCreationForm fresh = new DeliveryCreationForm();
-        DeliveryCreationForm posted = formWithItem("MFN-UNKNOWN", 3, 20.0);
-
-        // when / then
-        fresh.applyUserSelections(posted);
-        assertThat(fresh.getItems()).isEmpty();
-        assertThat(fresh.getSuggestedItems()).isEmpty();
-    }
-
-    @Test
-    void overlayNeverAddsOrRemovesRows() {
+    void overlayNeverAddsOrRemovesItemRows() {
         // given
         DeliveryCreationForm fresh = formWithItem("MFN-1", 1, 10.0);
         DeliveryCreationForm posted = new DeliveryCreationForm();
@@ -197,9 +231,9 @@ class DeliveryCreationFormTest {
         // when
         fresh.applyUserSelections(posted);
 
-        // then
+        // then: an item without sources outside the plan is a suggestion chosen before, not a new item
         assertThat(fresh.getItems()).hasSize(1);
-        assertThat(fresh.getSuggestedItems()).isEmpty();
+        assertThat(fresh.getSuggestedItems()).extracting(SuggestedDeliveryItem::getMfn).containsExactly("MFN-EXTRA");
     }
 
     private DeliveryCreationForm formWithItem(String mfn, int requestedQty, double unitCost) {
