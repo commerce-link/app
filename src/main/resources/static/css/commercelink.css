@@ -7020,8 +7020,9 @@ a.cl-link-button:hover {
     padding-top: 16px;
 }
 
-/* The order card's QR code (orders/card): it opens the order on a phone. Right of the title, under it on a narrow
-   screen; black modules on white whatever "print backgrounds" says, since the colours are SVG fills. */
+/* The order card's QR code (orders/card): it opens the order on a phone. Stays right of the title and wraps under it
+   only when the row is too narrow (flex-wrap);
+   black modules on white whatever "print backgrounds" says, since the colours are SVG fills. */
 .cl-page .cl-page-header-row:has(.cl-print-qr) {
     justify-content: space-between;
     align-items: flex-start;
