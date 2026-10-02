@@ -11,6 +11,7 @@ import pl.commercelink.inventory.supplier.SupplierProviderResolver;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.inventory.supplier.api.ShippingTerms;
 import pl.commercelink.inventory.supplier.api.SupplierDeliveryAddress;
+import pl.commercelink.inventory.supplier.api.SupplierOrderAwaitingSupplierException;
 import pl.commercelink.inventory.supplier.api.SupplierOrderException;
 import pl.commercelink.inventory.supplier.api.SupplierOrderLine;
 import pl.commercelink.inventory.supplier.api.SupplierOrderOption;
@@ -52,6 +53,8 @@ public class SupplierPurchaseService {
     private static final String ORDER_RECONCILED_EVENT = "DELIVERY_ORDER_RECONCILED";
     static final int MAX_SQS_ATTEMPTS = 3;
     private static final String ORDERED_MANUALLY_EVENT = "DELIVERY_ORDERED_MANUALLY";
+    static final String AWAITING_SUPPLIER_CONFIRMATION_EVENT = "DELIVERY_AWAITING_SUPPLIER_CONFIRMATION";
+    static final String SUPPLIER_CONFIRMATION_TIMEOUT_EVENT = "DELIVERY_SUPPLIER_CONFIRMATION_TIMEOUT";
 
     private final SupplierProviderResolver supplierProviderResolver;
     private final StoresRepository storesRepository;
@@ -62,6 +65,7 @@ public class SupplierPurchaseService {
     private final SupplierSkuResolver supplierSkuResolver;
     private final SupplierPurchaseEventPublisher supplierPurchaseEventPublisher;
     private final OrderIdRefreshEventPublisher orderIdRefreshEventPublisher;
+    private final SupplierPurchaseCompletionEventPublisher supplierPurchaseCompletionEventPublisher;
     private final ExchangeRates exchangeRates;
     private final SupplierConnectionModeResolver supplierConnectionModeResolver;
     private final DeliveriesQueryService deliveriesQueryService;
@@ -241,6 +245,9 @@ public class SupplierPurchaseService {
                 orderIdRefreshEventPublisher.publish(new OrderIdRefreshEventRequest(
                         storeId, delivery.getDeliveryId(), form.getProvider(), delivery.getPurchaseRef()));
             }
+        } catch (SupplierOrderAwaitingSupplierException e) {
+            awaitSupplierConfirmation(storeId, delivery, form.getProvider(),
+                    delivery.isDropship() ? dropshipOrderId : orderId, e);
         } catch (SupplierOrderOutcomeUnknownException e) {
             delivery.setOrderErrorMessage(e.getMessage());
             deliveriesRepository.save(delivery); // stays ORDER_DISPATCHED
@@ -251,6 +258,36 @@ public class SupplierPurchaseService {
             failDelivery(delivery, e.getMessage());
             log.error("Supplier purchase failed: store={} delivery={} provider={} ref={}",
                     storeId, deliveryId, form.getProvider(), delivery.getPurchaseRef(), e);
+        }
+    }
+
+    /**
+     * The supplier holds the order but has not confirmed it yet (Action reserves asynchronously). The delivery stays
+     * dispatched and a delayed completion takes over; if that cannot even be scheduled, the operator gets the same
+     * "check the supplier" state as any unknown outcome - never FAILED, because the order exists.
+     */
+    private void awaitSupplierConfirmation(String storeId, Delivery delivery, String provider, String orderId,
+                                           SupplierOrderAwaitingSupplierException e) {
+        delivery.setExternalDeliveryId(e.externalOrderId());
+        delivery.setExternalDeliveryIdProvisional(true);
+        delivery.setOrderErrorMessage(null);
+        delivery.setAwaitingSupplierConfirmation(true);
+        delivery.addEvent(new Event(EventType.action, AWAITING_SUPPLIER_CONFIRMATION_EVENT, LocalDateTime.now()));
+        deliveriesRepository.save(delivery);
+        log.info("Supplier purchase awaiting supplier confirmation: store={} delivery={} provider={} ref={} "
+                        + "externalOrderId={} pending={}", storeId, delivery.getDeliveryId(), provider,
+                delivery.getPurchaseRef(), e.externalOrderId(), e.pendingLines());
+        try {
+            supplierPurchaseCompletionEventPublisher.publish(new SupplierPurchaseCompletionEventRequest(
+                    storeId, delivery.getDeliveryId(), delivery.getPurchaseRef(), orderId));
+        } catch (RuntimeException publishFailure) {
+            log.error("Supplier confirmation not scheduled - handing over to the operator: store={} delivery={} ref={}",
+                    storeId, delivery.getDeliveryId(), delivery.getPurchaseRef(), publishFailure);
+            delivery.setAwaitingSupplierConfirmation(false);
+            delivery.setOrderErrorMessage("Order " + e.externalOrderId() + " was placed with the supplier, but"
+                    + " confirming its reservation could not be scheduled - check it in the supplier panel before"
+                    + " ordering again.");
+            deliveriesRepository.save(delivery);
         }
     }
 

@@ -22,6 +22,7 @@ import pl.commercelink.inventory.supplier.api.ShippingCostPolicy;
 import pl.commercelink.inventory.supplier.api.ShippingPolicy;
 import pl.commercelink.inventory.supplier.api.ShippingTerms;
 import pl.commercelink.inventory.supplier.api.SupplierInfo;
+import pl.commercelink.inventory.supplier.api.SupplierOrderAwaitingSupplierException;
 import pl.commercelink.inventory.supplier.api.SupplierDeliveryAddress;
 import pl.commercelink.inventory.supplier.api.SupplierOrderException;
 import pl.commercelink.inventory.supplier.api.SupplierOrderLine;
@@ -104,6 +105,8 @@ class SupplierPurchaseServiceTest {
     private SupplierPurchaseEventPublisher supplierPurchaseEventPublisher;
     @Mock
     private OrderIdRefreshEventPublisher orderIdRefreshEventPublisher;
+    @Mock
+    private SupplierPurchaseCompletionEventPublisher supplierPurchaseCompletionEventPublisher;
     @Mock
     private ExchangeRates exchangeRates;
     @Mock
@@ -675,6 +678,61 @@ class SupplierPurchaseServiceTest {
         // then
         assertEquals(DeliveryOrderStatus.ORDER_DISPATCHED, delivery.getOrderStatus());
         assertEquals("Timeout waiting for supplier response", delivery.getOrderErrorMessage());
+        verify(deliveryCreationService, never()).completePending(any(), any(), any());
+    }
+
+    @Test
+    void awaitingSupplierKeepsDeliveryDispatchedAndSchedulesCompletion() throws Exception {
+        // given
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 5, 100.0);
+        Delivery delivery = pendingDelivery(form, "ref-1");
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(supplierProvider.checkAvailability(anyList())).thenReturn(
+                List.of(new SupplierQuote("EAN-1", "MFN-1", 10, 110.0, "PLN")));
+        when(supplierProvider.placeOrder(any())).thenThrow(new SupplierOrderAwaitingSupplierException(
+                "ZA/IE-26/01615674", List.of("OBUASUOBU0061: 0 of 1 reserved"), "still reserving"));
+
+        // when
+        service.processPending(STORE_ID, DELIVERY_ID, null, 1);
+
+        // then
+        assertEquals(DeliveryOrderStatus.ORDER_DISPATCHED, delivery.getOrderStatus());
+        assertTrue(delivery.isAwaitingSupplierConfirmation());
+        assertEquals("ZA/IE-26/01615674", delivery.getExternalDeliveryId());
+        assertTrue(delivery.isExternalDeliveryIdProvisional());
+        assertNull(delivery.getOrderErrorMessage());
+        assertTrue(delivery.hasEvent("DELIVERY_AWAITING_SUPPLIER_CONFIRMATION"));
+        ArgumentCaptor<SupplierPurchaseCompletionEventRequest> sent =
+                ArgumentCaptor.forClass(SupplierPurchaseCompletionEventRequest.class);
+        verify(supplierPurchaseCompletionEventPublisher).publish(sent.capture());
+        assertEquals(STORE_ID, sent.getValue().getStoreId());
+        assertEquals(DELIVERY_ID, sent.getValue().getDeliveryId());
+        assertEquals(delivery.getPurchaseRef(), sent.getValue().getPurchaseRef());
+        assertNull(sent.getValue().getOrderId());
+        verify(deliveryCreationService, never()).completePending(any(), any(), any());
+        verifyNoInteractions(orderIdRefreshEventPublisher);
+    }
+
+    @Test
+    void awaitingSupplierWithFailedScheduleIsOutcomeUnknownNotFailed() throws Exception {
+        // given
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 5, 100.0);
+        Delivery delivery = pendingDelivery(form, "ref-1");
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(supplierProvider.checkAvailability(anyList())).thenReturn(
+                List.of(new SupplierQuote("EAN-1", "MFN-1", 10, 110.0, "PLN")));
+        when(supplierProvider.placeOrder(any())).thenThrow(new SupplierOrderAwaitingSupplierException(
+                "ZA/IE-26/1", List.of(), "still reserving"));
+        doThrow(new RuntimeException("sqs down")).when(supplierPurchaseCompletionEventPublisher).publish(any());
+
+        // when
+        service.processPending(STORE_ID, DELIVERY_ID, null, 1);
+
+        // then
+        assertEquals(DeliveryOrderStatus.ORDER_DISPATCHED, delivery.getOrderStatus());
+        assertFalse(delivery.isAwaitingSupplierConfirmation());
+        assertEquals("ZA/IE-26/1", delivery.getExternalDeliveryId());
+        assertTrue(delivery.getOrderErrorMessage().contains("ZA/IE-26/1"));
         verify(deliveryCreationService, never()).completePending(any(), any(), any());
     }
 

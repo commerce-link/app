@@ -4,6 +4,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -16,6 +17,7 @@ import pl.commercelink.inventory.supplier.api.ShippingCostPolicy;
 import pl.commercelink.inventory.supplier.api.ShippingPolicy;
 import pl.commercelink.inventory.supplier.api.ShippingTerms;
 import pl.commercelink.inventory.supplier.api.SupplierInfo;
+import pl.commercelink.inventory.supplier.api.SupplierOrderAwaitingSupplierException;
 import pl.commercelink.inventory.supplier.api.SupplierOrderException;
 import pl.commercelink.inventory.supplier.api.SupplierOrderOption;
 import pl.commercelink.inventory.supplier.api.SupplierOrderOptionChoice;
@@ -92,6 +94,8 @@ class SupplierPurchaseServiceDropshipTest {
     private SupplierSkuResolver supplierSkuResolver;
     @Mock
     private SupplierPurchaseEventPublisher supplierPurchaseEventPublisher;
+    @Mock
+    private SupplierPurchaseCompletionEventPublisher supplierPurchaseCompletionEventPublisher;
     @Mock
     private ExchangeRates exchangeRates;
     @Mock
@@ -217,6 +221,38 @@ class SupplierPurchaseServiceDropshipTest {
         assertEquals("Order " + ORDER_ID + " has no complete shipping details for a dropship purchase",
                 delivery.getOrderErrorMessage());
         verify(deliveryCreationService, never()).releaseAllocations(any(), any());
+    }
+
+    @Test
+    void awaitingSupplierOnDropshipKeepsDeliveryDispatchedAndCarriesTheResolvedOrderId() throws Exception {
+        // given
+        connectSupplier(ConnectionMode.OWN);
+        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 2, 100.0);
+        Delivery delivery = pendingDropshipDelivery(form, "ref-1");
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(dropshipOrderLocator.locate(DELIVERY_ID)).thenReturn(Optional.of(ORDER_ID));
+        when(supplierProvider.checkAvailability(anyList())).thenReturn(
+                List.of(new SupplierQuote("EAN-1", "MFN-1", 10, 110.0, "PLN")));
+        when(dropshipPurchaseService.placeDropshipOrder(eq(STORE_ID), same(delivery), anyList(), eq(ORDER_ID)))
+                .thenThrow(new SupplierOrderAwaitingSupplierException(
+                        "ZA/IE-26/01615674", List.of("OBUASUOBU0061: 0 of 1 reserved"), "still reserving"));
+
+        // when
+        service.processPending(STORE_ID, DELIVERY_ID, null, 1);
+
+        // then
+        assertEquals(DeliveryOrderStatus.ORDER_DISPATCHED, delivery.getOrderStatus());
+        assertTrue(delivery.isAwaitingSupplierConfirmation());
+        assertEquals("ZA/IE-26/01615674", delivery.getExternalDeliveryId());
+        assertTrue(delivery.isExternalDeliveryIdProvisional());
+        assertNull(delivery.getOrderErrorMessage());
+        assertTrue(delivery.hasEvent("DELIVERY_AWAITING_SUPPLIER_CONFIRMATION"));
+        ArgumentCaptor<SupplierPurchaseCompletionEventRequest> sent =
+                ArgumentCaptor.forClass(SupplierPurchaseCompletionEventRequest.class);
+        verify(supplierPurchaseCompletionEventPublisher).publish(sent.capture());
+        assertEquals("ref-1", sent.getValue().getPurchaseRef());
+        assertEquals(ORDER_ID, sent.getValue().getOrderId());
+        verify(deliveryCreationService, never()).completePending(any(), any(), any());
     }
 
     @Test
