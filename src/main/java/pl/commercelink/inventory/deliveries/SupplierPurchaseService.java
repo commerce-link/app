@@ -58,6 +58,8 @@ public class SupplierPurchaseService {
     private static final String ORDERED_MANUALLY_EVENT = "DELIVERY_ORDERED_MANUALLY";
     static final String AWAITING_SUPPLIER_CONFIRMATION_EVENT = "DELIVERY_AWAITING_SUPPLIER_CONFIRMATION";
     static final String SUPPLIER_CONFIRMATION_TIMEOUT_EVENT = "DELIVERY_SUPPLIER_CONFIRMATION_TIMEOUT";
+    // a second order must not be placed (or the first one overridden) while the supplier is still reserving
+    private static final String AWAITING_SUPPLIER_LOCKED = "deliveries.purchase.awaitingSupplier.locked";
 
     private final SupplierProviderResolver supplierProviderResolver;
     private final StoresRepository storesRepository;
@@ -555,6 +557,9 @@ public class SupplierPurchaseService {
                 || delivery.hasBeenReceived() || !delivery.getDocuments().isEmpty()) {
             return OperationResult.failure("deliveries.purchase.reconcile.error.state");
         }
+        if (delivery.isAwaitingSupplierConfirmation()) {
+            return OperationResult.failure(AWAITING_SUPPLIER_LOCKED);
+        }
         DeliveryCreationForm form = rebuildForm(storeId, delivery);
         try {
             PurchaseValidation validation = validate(storeId, form, delivery.getPurchaseRef());
@@ -601,6 +606,9 @@ public class SupplierPurchaseService {
                 || delivery.hasBeenReceived() || !delivery.getDocuments().isEmpty()) {
             return OperationResult.failure("deliveries.purchase.retry.error.state");
         }
+        if (delivery.isAwaitingSupplierConfirmation()) {
+            return OperationResult.failure(AWAITING_SUPPLIER_LOCKED);
+        }
         delivery.setOrderStatus(DeliveryOrderStatus.ORDER_PENDING);
         delivery.setOrderErrorMessage(null);
         delivery.addEvent(new Event(EventType.action, PURCHASE_RETRIED_EVENT, LocalDateTime.now()));
@@ -616,6 +624,9 @@ public class SupplierPurchaseService {
         Delivery delivery = deliveriesRepository.findById(storeId, deliveryId);
         if (!canCompleteManually(delivery)) {
             return OperationResult.failure("deliveries.purchase.complete.error.state");
+        }
+        if (delivery.isAwaitingSupplierConfirmation()) {
+            return OperationResult.failure(AWAITING_SUPPLIER_LOCKED);
         }
         if (StringUtils.isBlank(externalOrderId)) {
             return OperationResult.failure("deliveries.purchase.complete.error.number");

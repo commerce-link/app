@@ -2106,6 +2106,60 @@ class SupplierPurchaseServiceTest {
     }
 
     @Test
+    void operatorActionsAreRefusedWhileAwaitingSupplier() {
+        // given
+        Delivery delivery = awaitingSupplierConfirmationDelivery();
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+
+        // when
+        OperationResult<String> forceRetry = service.forceRetry(STORE_ID, DELIVERY_ID);
+        OperationResult<String> reconcile = service.reconcile(STORE_ID, DELIVERY_ID);
+        OperationResult<String> completeManually = service.completeManually(STORE_ID, DELIVERY_ID, "X",
+                LocalDate.of(2026, 10, 9));
+
+        // then
+        assertFalse(forceRetry.isSuccess());
+        assertEquals("deliveries.purchase.awaitingSupplier.locked", forceRetry.getMessage());
+        assertFalse(reconcile.isSuccess());
+        assertEquals("deliveries.purchase.awaitingSupplier.locked", reconcile.getMessage());
+        assertFalse(completeManually.isSuccess());
+        assertEquals("deliveries.purchase.awaitingSupplier.locked", completeManually.getMessage());
+        assertEquals(DeliveryOrderStatus.ORDER_DISPATCHED, delivery.getOrderStatus());
+        assertTrue(delivery.isAwaitingSupplierConfirmation());
+        assertEquals("ZA/IE-26/01615674", delivery.getExternalDeliveryId());
+        verifyNoInteractions(supplierPurchaseEventPublisher, supplierProviderResolver, deliveryCreationService);
+        verify(deliveriesRepository, never()).save(any());
+    }
+
+    @Test
+    void retryStillRefusesDispatchedDeliveryAwaitingSupplier() {
+        // given
+        Delivery delivery = awaitingSupplierConfirmationDelivery();
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+
+        // when
+        OperationResult<String> result = service.retry(STORE_ID, DELIVERY_ID);
+
+        // then
+        assertFalse(result.isSuccess());
+        assertEquals("deliveries.purchase.retry.error.state", result.getMessage());
+        verifyNoInteractions(supplierPurchaseEventPublisher);
+        verify(deliveriesRepository, never()).save(any());
+    }
+
+    private Delivery awaitingSupplierConfirmationDelivery() {
+        Delivery delivery = new Delivery();
+        delivery.setDeliveryId(DELIVERY_ID);
+        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_DISPATCHED);
+        delivery.setAwaitingSupplierConfirmation(true);
+        delivery.setExternalDeliveryId("ZA/IE-26/01615674");
+        delivery.setProvider(PROVIDER);
+        delivery.setPurchaseRef("ref-1");
+        delivery.setPurchaseAttempts(1);
+        return delivery;
+    }
+
+    @Test
     void completeManuallyClearsFailedStateAndSetsOrderNumber() {
         // given
         Delivery delivery = failedDelivery(formWithItem("EAN-1", "MFN-1", 5, 100.0), "ref-1");
