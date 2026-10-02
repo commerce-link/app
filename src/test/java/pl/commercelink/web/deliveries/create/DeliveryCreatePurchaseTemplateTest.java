@@ -234,6 +234,22 @@ class DeliveryCreatePurchaseTemplateTest {
     }
 
     @Test
+    void availabilityFragmentShowsTheManufacturerCodeNextToTheEan() {
+        // given
+        PurchaseValidation validation = new PurchaseValidation("Acme", "ref-1", "PLN", 1198.0, true, List.of(
+                new PurchaseValidation.Line("AMD Ryzen 7 9800X3D", "sku", "5901234123457", "100-100001084WOF", 2, 2, 579.5, 599.0)));
+        Map<String, Object> variables = model(warehousePage(false, true, false), warehouseForm());
+        variables.put("validation", validation);
+
+        // when
+        String html = fragment("deliveries/create/purchase :: validationResult", variables);
+
+        // then
+        assertThat(html).contains("EAN:").contains("Kod producenta:")
+                .contains("<span class=\"cl-code-nowrap\">100-100001084WOF</span>");
+    }
+
+    @Test
     void availabilityFragmentOffersARetryWhenTheSupplierDidNotAnswer() {
         // given
         Map<String, Object> variables = model(warehousePage(false, true, false), warehouseForm());

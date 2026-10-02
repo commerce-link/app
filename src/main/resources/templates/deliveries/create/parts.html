@@ -589,7 +589,8 @@
                 th:attr="data-qty=${item.requestedQty}, data-unit-cost=${item.unitCost}">
                 <th scope="row" class="cl-table-key" th:attr="data-label=#{general.product}">
                     <span th:text="${item.name}"></span>
-                    <span class="cl-table-sub"><span th:text="#{general.ean} + ':'"></span> <span class="cl-code-nowrap" th:text="${item.ean}"></span></span>
+                    <span class="cl-table-sub"><span th:text="#{general.ean} + ':'"></span> <span class="cl-code-nowrap" th:text="${item.ean}"></span>
+                        · <span th:text="#{general.manufacturer.code} + ':'"></span> <span class="cl-code-nowrap" th:text="${item.mfn}"></span></span>
                 </th>
                 <td class="is-numeric" th:attr="data-label=#{deliveries.create.col.qty}" th:text="${item.requestedQty}"></td>
                 <td class="is-numeric" th:attr="data-label=#{deliveries.create.col.unitCost}" th:text="${T(pl.commercelink.web.orders.Money).format(item.unitCost)}"></td>
