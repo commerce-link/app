@@ -912,7 +912,7 @@ class OrdersManagerTest {
         // given
         OrderItem orderItem = orderItem("item-1", 100.0);
         WarehouseItemView warehouseItem = new WarehouseItemView(
-                STORE_ID, "warehouse-item-1", "5901234123457", "MFN-1", Price.fromNet(20.0), 1, FulfilmentStatus.Delivered, ItemCondition.Sealed
+                STORE_ID, "warehouse-item-1", "Test item", "5901234123457", "MFN-1", Price.fromNet(20.0), 1, FulfilmentStatus.Delivered, ItemCondition.Sealed
         );
         when(orderItemsRepository.findById(ORDER_ID, "item-1")).thenReturn(orderItem);
         when(warehouse.stockQueryService(STORE_ID)).thenReturn(stockQueryService);
@@ -933,7 +933,7 @@ class OrdersManagerTest {
     void assignFromWarehouseRejectsUnavailableWarehouseItem() {
         // given
         WarehouseItemView reserved = new WarehouseItemView(
-                STORE_ID, "warehouse-item-1", "5901234123457", "MFN-1", Price.fromNet(20.0), 1, FulfilmentStatus.Reserved, ItemCondition.Sealed
+                STORE_ID, "warehouse-item-1", "Test item", "5901234123457", "MFN-1", Price.fromNet(20.0), 1, FulfilmentStatus.Reserved, ItemCondition.Sealed
         );
         when(warehouse.stockQueryService(STORE_ID)).thenReturn(stockQueryService);
         when(stockQueryService.findById(STORE_ID, "warehouse-item-1")).thenReturn(reserved);
@@ -954,7 +954,7 @@ class OrdersManagerTest {
         routed.setExternalSupplierId("2");
         when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(routed);
         WarehouseItemView warehouseItem = new WarehouseItemView(
-                STORE_ID, "warehouse-item-1", "5901234123457", "MFN-1", Price.fromNet(20.0), 1, FulfilmentStatus.Delivered, ItemCondition.Sealed
+                STORE_ID, "warehouse-item-1", "Test item", "5901234123457", "MFN-1", Price.fromNet(20.0), 1, FulfilmentStatus.Delivered, ItemCondition.Sealed
         );
         when(warehouse.stockQueryService(STORE_ID)).thenReturn(stockQueryService);
         when(stockQueryService.findById(STORE_ID, "warehouse-item-1")).thenReturn(warehouseItem);

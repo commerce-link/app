@@ -123,7 +123,8 @@ public class ItemHistoryService {
         history.sort(Comparator.comparing(ItemHistoryEvent::getDate, Comparator.nullsLast(Comparator.naturalOrder())));
 
         // Warehouse Item
-        WarehouseItemView warehouseItem = warehouse.stockQueryService(storeId).findBySerialNo(storeId, serialNo);
+        WarehouseItemView warehouseItem = warehouse.stockQueryService(storeId).findAllBySerialNo(storeId, serialNo)
+                .stream().findFirst().orElse(null);
         if (warehouseItem != null) {
             String status = warehouseItem.isInStock() ? "In Stock" : "In RMA or Destroyed";
 
