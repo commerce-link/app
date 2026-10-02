@@ -17,6 +17,13 @@ class OrderCardsBulkPrintContractTest {
         return Files.readString(Path.of(path), StandardCharsets.UTF_8);
     }
 
+    static final String TABLE_SELECT = "src/main/resources/static/js/table-select.js";
+    static final String PRINT = "src/main/resources/static/js/print.js";
+
+    static String folded(String path) throws Exception {
+        return read(path).replaceAll("\\s+", " ");
+    }
+
     static String css() throws Exception {
         return read("src/main/resources/static/css/commercelink.css");
     }
@@ -105,5 +112,62 @@ class OrderCardsBulkPrintContractTest {
         assertThat(rule(phone, ".cl-page .cl-selection-row.is-wide-only")).contains("display: none;");
         // the rules above sit in the phone media query right under that comment
         assertThat(phone.indexOf("@media screen and (max-width: 719px) {")).isBetween(0, 500);
+    }
+
+    /** The selection row hands the checked orders, in the rows' order, to print.js's hidden frame. */
+    @Test
+    void theSelectionRowPrintsTheCheckedOrdersThroughThePrintFrame() throws Exception {
+        // given
+        String select = folded(TABLE_SELECT);
+        String print = folded(PRINT);
+
+        // then
+        assertThat(print).contains("window.CL_printInFrame = function (href, opener) { printInFrame(href, opener); };");
+        assertThat(select).contains("event.target.closest('[data-cl-select-print]')")
+                .contains("var print = window.CL_printInFrame;")
+                .contains("params.append('ids', box.value);")
+                .contains("button.getAttribute('data-cl-select-print')")
+                .contains("parseInt(button.getAttribute('data-cl-select-confirm-above'), 10)")
+                .contains("if (isNaN(limit) || rows.length <= limit) { print(href, button); return; }");
+    }
+
+    /** Above the limit the page's dialog asks first, in the Polish plural form PluralForm.java would pick. */
+    @Test
+    void theConfirmationUsesThePluralFormOfPluralFormJava() throws Exception {
+        // given
+        String select = folded(TABLE_SELECT);
+        String java = folded("src/main/java/pl/commercelink/web/orders/PluralForm.java");
+
+        // then
+        assertThat(java).contains("lastDigit >= 2 && lastDigit <= 4 && (lastTwoDigits < 12 || lastTwoDigits > 14)");
+        assertThat(select).contains("var ones = count % 10; var tens = count % 100;")
+                .contains("return ones >= 2 && ones <= 4 && (tens < 12 || tens > 14) ? 'few' : 'many';")
+                .contains("'data-cl-select-confirm-title-' + form, 'data-cl-select-confirm-message', 'data-cl-select-confirm-action-' + form")
+                .contains("accept.textContent = (button.getAttribute(actionAttr) || accept.textContent).replace('{n}', count);");
+    }
+
+    /** list-page.js swaps the results block: the fresh table is set up again, a table already set up is left alone. */
+    @Test
+    void aSwappedListIsSetUpAgainOnlyOnce() throws Exception {
+        // given
+        String select = folded(TABLE_SELECT);
+
+        // then
+        assertThat(select).contains("document.addEventListener('cl-list:swapped', initAll);")
+                .contains("if (table.hasAttribute('data-cl-select-ready')) { return; } table.setAttribute('data-cl-select-ready', '');")
+                .contains("table.classList.add('is-selectable');");
+    }
+
+    /** "Clear" unticks everything; texts that carry the count follow it. */
+    @Test
+    void clearAndTheCountedTextsFollowTheSelection() throws Exception {
+        // given
+        String select = folded(TABLE_SELECT);
+
+        // then
+        assertThat(select).contains("event.target.closest('[data-cl-select-clear]')")
+                .contains("function clearSelection(table) {")
+                .contains("bar.querySelectorAll('[data-cl-selection-text]')")
+                .doesNotContain("alert(").doesNotContain("confirm(").doesNotContain("innerHTML");
     }
 }

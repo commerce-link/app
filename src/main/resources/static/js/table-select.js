@@ -20,6 +20,16 @@
 // outside the selection row -- a live region revealed in the same frame as its text is often not read); it speaks only
 // when the count changes, never on load. The bulk form takes the page's query string along (the filter as the operator
 // left it, kept in the address by table-filter.js), so the redirect after the action can come back to it.
+//
+// Instead of submitting, a button [data-cl-select-print="<address>"] prints the checked rows: the address with one
+// ids=<value> per checked row, in the rows' order, goes to print.js (window.CL_printInFrame), which loads it into its
+// hidden frame and opens one print dialog. Above data-cl-select-confirm-above rows the page's dialog asks first, with
+// the title and the accept label of the count's Polish plural form (data-cl-select-confirm-title-few/-many,
+// -action-few/-many; English pages give both the same text) and data-cl-select-confirm-message. A button
+// [data-cl-select-clear] unticks every row. [data-cl-selection-text][data-template] in the selection row follows the
+// count like the count itself ({k} checked, {n} visible). A set-up table gets .is-selectable (a page may hide its
+// checkbox column without the script) and is set up once; tables swapped in by list-page.js (cl-list:swapped) are set
+// up as they arrive.
 (function () {
     'use strict';
 
@@ -116,6 +126,10 @@
             count.textContent = text;
             announce(table, text, selected.length);
         }
+        bar.querySelectorAll('[data-cl-selection-text]').forEach(function (node) {
+            node.textContent = (node.getAttribute('data-template') || '')
+                .replace('{k}', String(selected.length)).replace('{n}', String(shown.length));
+        });
     }
 
     // The select-all box that was just used may have disappeared with the header or the selection row; the focus
@@ -195,7 +209,7 @@
         if (message) {
             message.textContent = (button.getAttribute(messageAttr) || '').replace('{n}', count);
         }
-        accept.textContent = button.getAttribute(actionAttr) || accept.textContent;
+        accept.textContent = (button.getAttribute(actionAttr) || accept.textContent).replace('{n}', count);
         accept.classList.toggle('is-danger', button.classList.contains('is-danger'));
         accept.classList.toggle('is-primary', !button.classList.contains('is-danger'));
         accept.disabled = false;
@@ -225,7 +239,56 @@
         }, 'data-cl-select-confirm-title', 'data-cl-select-confirm-message', 'data-cl-select-confirm-action');
     }
 
+    // Unticks every row; the selection row hides, so the focus goes to the header's select-all box.
+    function clearSelection(table) {
+        rowsOf(table).forEach(function (box) {
+            box.checked = false;
+        });
+        refresh(table);
+        var header = table.querySelector('[data-cl-select-all]');
+        if (header) {
+            header.focus();
+        }
+    }
+
+    // The Polish plural form of a count above the confirmation limit (never 1), as PluralForm.java picks it: "few" for
+    // 2-4, 22-24, 32-34... but not 12-14, "many" for the rest.
+    function pluralForm(count) {
+        var ones = count % 10;
+        var tens = count % 100;
+        return ones >= 2 && ones <= 4 && (tens < 12 || tens > 14) ? 'few' : 'many';
+    }
+
+    // Prints the checked rows through print.js; without it (or, above the limit, without the dialog) nothing happens.
+    function printSelection(button, table) {
+        var print = window.CL_printInFrame;
+        var rows = checked(table);
+        if (typeof print !== 'function' || rows.length === 0) {
+            return;
+        }
+        var params = new URLSearchParams();
+        rows.forEach(function (box) {
+            params.append('ids', box.value);
+        });
+        var address = button.getAttribute('data-cl-select-print');
+        var href = address + (address.indexOf('?') < 0 ? '?' : '&') + params.toString();
+        var limit = parseInt(button.getAttribute('data-cl-select-confirm-above'), 10);
+        if (isNaN(limit) || rows.length <= limit) {
+            print(href, button);
+            return;
+        }
+        var form = pluralForm(rows.length);
+        window.CL_confirmBulk(button, String(rows.length), function () {
+            print(href, button);
+        }, 'data-cl-select-confirm-title-' + form, 'data-cl-select-confirm-message', 'data-cl-select-confirm-action-' + form);
+    }
+
     function init(table) {
+        if (table.hasAttribute('data-cl-select-ready')) {
+            return;
+        }
+        table.setAttribute('data-cl-select-ready', '');
+        table.classList.add('is-selectable');
         table.querySelectorAll('[data-cl-select-all], [data-cl-select-row]').forEach(function (box) {
             box.hidden = false;
         });
@@ -264,6 +327,15 @@
                 if (!event.target.closest) {
                     return;
                 }
+                if (event.target.closest('[data-cl-select-clear]')) {
+                    clearSelection(table);
+                    return;
+                }
+                var printButton = event.target.closest('[data-cl-select-print]');
+                if (printButton) {
+                    printSelection(printButton, table);
+                    return;
+                }
                 var action = event.target.closest('[data-cl-select-action]');
                 if (action && checked(table).length > 0) {
                     if (action.hasAttribute('data-cl-select-confirm-title')) {
@@ -297,4 +369,6 @@
     } else {
         initAll();
     }
+    // list-page.js replaced the results block (sort, filter, page): its fresh table is set up like the first one
+    document.addEventListener('cl-list:swapped', initAll);
 })();
