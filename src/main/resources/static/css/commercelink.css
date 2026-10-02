@@ -5063,6 +5063,40 @@ a.cl-link-button:hover {
     outline-offset: 2px;
 }
 
+/* Printing several order cards (spec docs/active/order-cards-bulk-print): the checkbox cell stands above the row
+   link's ::after, which covers the whole row, so a click anywhere in the cell ticks the box and never opens the order.
+   Without table-select.js (no .is-selectable) the column is not drawn: the table is the one it was before. */
+.cl-page .cl-table.is-orders .cl-table-check {
+    position: relative;
+    z-index: 1;
+}
+
+.cl-page .cl-table.is-orders:not(.is-selectable) .cl-table-check {
+    display: none;
+}
+
+/* Card mode (< 720 px) has no selection: no checkbox cells, no selection row and no tint of a row checked at a wider
+   width. The generic card-mode rules of selectable tables (the key cell as a padded block) outrank the orders card by
+   specificity, so the key cell gets its display: contents back here. */
+@media screen and (max-width: 719px) {
+    .cl-page .cl-table.is-orders[data-cl-select-table] .cl-table-check {
+        display: none;
+    }
+
+    .cl-page .cl-table.is-orders[data-cl-select-table] tbody th.cl-table-key {
+        display: contents;
+        padding: 0;
+    }
+
+    .cl-page .cl-table.is-orders tr.is-selected {
+        background: transparent;
+    }
+
+    .cl-page .cl-selection-row.is-wide-only {
+        display: none;
+    }
+}
+
 .cl-page .cl-table.is-orders .cl-cell-date {
     white-space: nowrap;
     font-variant-numeric: tabular-nums;

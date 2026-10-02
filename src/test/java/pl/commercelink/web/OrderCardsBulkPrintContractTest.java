@@ -65,4 +65,45 @@ class OrderCardsBulkPrintContractTest {
                 .contains("break-before: page;").contains("margin-top: 0;");
         assertThat(rule(css, ".cl-page .cl-print-card + .cl-print-card")).contains("margin-top: 40px;");
     }
+
+    /** The row link's ::after covers the whole row; the checkbox cell must lie above it, or a tick opens the order. */
+    @Test
+    void theCheckboxCellSitsAboveTheRowLink() throws Exception {
+        // given
+        String css = css();
+
+        // then
+        assertThat(rule(css, ".cl-page .cl-table.is-orders .cl-table-check")).contains("position: relative;").contains("z-index: 1;");
+    }
+
+    /** table-select.js marks the table .is-selectable; without it (no JavaScript) the orders table has no empty column. */
+    @Test
+    void withoutTheScriptTheOrdersTableHasNoCheckboxColumn() throws Exception {
+        // given
+        String css = css();
+
+        // then
+        assertThat(rule(css, ".cl-page .cl-table.is-orders:not(.is-selectable) .cl-table-check")).contains("display: none;");
+    }
+
+    /**
+     * Card mode has no selection, and the generic card-mode rules of selectable tables
+     * (`.cl-page .cl-table[data-cl-select-table] tbody th.cl-table-key`, specificity 0,4,2) must not reach the orders
+     * card (its own rules are 0,3,2): these overrides outrank both.
+     */
+    @Test
+    void theCardModeHasNeitherCheckboxesNorTheSelectionRow() throws Exception {
+        // given
+        String css = css();
+        String phone = css.substring(css.indexOf("/* Card mode (< 720 px) has no selection"));
+
+        // then
+        assertThat(rule(phone, ".cl-page .cl-table.is-orders[data-cl-select-table] .cl-table-check")).contains("display: none;");
+        assertThat(rule(phone, ".cl-page .cl-table.is-orders[data-cl-select-table] tbody th.cl-table-key"))
+                .contains("display: contents;").contains("padding: 0;");
+        assertThat(rule(phone, ".cl-page .cl-table.is-orders tr.is-selected")).contains("background: transparent;");
+        assertThat(rule(phone, ".cl-page .cl-selection-row.is-wide-only")).contains("display: none;");
+        // the rules above sit in the phone media query right under that comment
+        assertThat(phone.indexOf("@media screen and (max-width: 719px) {")).isBetween(0, 500);
+    }
 }
