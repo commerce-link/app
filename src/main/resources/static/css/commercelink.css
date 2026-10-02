@@ -1769,8 +1769,25 @@ a.cl-link-button:hover {
     margin: 0;
 }
 
+.cl-page .cl-request-for li > :first-child {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.cl-page .cl-request-for li > :last-child {
+    flex: none;
+    white-space: nowrap;
+}
+
 .cl-page .cl-request-for .cl-table-sub {
     display: block;
+    margin-top: 2px;
+    font-size: 12.5px;
+    color: var(--cl-ink-3);
+}
+
+.cl-page .cl-card-desc .is-warn {
+    color: var(--cl-warn);
 }
 
 /* A group of fields or options inside a card's group, without a frame of its own: radios under a legend that reads like a

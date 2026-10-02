@@ -59,7 +59,7 @@
                             <p class="cl-card-desc">
                                 <span th:text="#{deliveries.approval.address.desc(${page.supplierLabel()})}"></span>
                                 <span th:if="${suggestedAddressId != null}"
-                                      th:text="#{deliveries.approval.address.matched(${page.storeName()}, ${suggestedAddress.streetAndNumber + ', ' + suggestedAddress.postalCode + ' ' + suggestedAddress.city})}"></span>
+                                      th:text="#{deliveries.approval.address.matched(${page.storeName()}, ${#strings.trim((suggestedAddress.streetAndNumber != null ? suggestedAddress.streetAndNumber + ', ' : '') + (suggestedAddress.postalCode ?: '') + ' ' + (suggestedAddress.city ?: ''))})}"></span>
                                 <span th:if="${suggestedAddressId == null and suggestedAddress == null}" class="is-warn"
                                       th:text="#{deliveries.approval.address.noStoreDefault(${page.storeName()})}"></span>
                                 <span th:if="${suggestedAddressId == null and suggestedAddress != null}" class="is-warn"

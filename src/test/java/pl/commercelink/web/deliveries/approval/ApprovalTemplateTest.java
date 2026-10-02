@@ -80,7 +80,8 @@ class ApprovalTemplateTest {
         int submit = html.indexOf("id=\"purchase-confirm-submit\"");
         assertThat(html.substring(html.lastIndexOf("<button", submit), html.indexOf(">", submit))).contains("disabled");
         assertThat(html.substring(0, submit)).doesNotContain("type=\"submit\"");
-        assertThat(html).doesNotContain("<dialog class=\"cl-dialog is-form\" id=\"reject-dialog\" aria-labelledby=\"reject-title\" open");
+        int dialog = html.indexOf("id=\"reject-dialog\"");
+        assertThat(html.substring(html.lastIndexOf("<dialog", dialog), html.indexOf(">", dialog))).doesNotContain("open");
     }
 
     @Test
@@ -110,6 +111,20 @@ class ApprovalTemplateTest {
         // then
         assertThat(html).contains("Sklep Demo Store nie ma domyślnego adresu wysyłkowego — wybierz adres ręcznie.")
                 .doesNotContain("Adres sklepu").doesNotContain("checked=\"checked\"");
+    }
+
+    @Test
+    void storeDefaultMatchingNoAddressIsAskedToChooseManually() {
+        // given
+        Map<String, Object> variables = warehouse(addresses());
+        variables.put("suggestedAddressId", null);
+
+        // when
+        String html = render("deliveries/approval", variables);
+
+        // then
+        assertThat(html).contains("Żaden adres nie pasuje do adresu wysyłkowego sklepu Demo Store — wybierz adres ręcznie.")
+                .doesNotContain("Adres sklepu");
     }
 
     @Test
