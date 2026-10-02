@@ -9,6 +9,7 @@ import pl.commercelink.inventory.supplier.SupplierConnectionModeResolver;
 import pl.commercelink.orders.event.Event;
 import pl.commercelink.orders.event.EventType;
 import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
+import pl.commercelink.starter.dynamodb.OptimisticLockingExhaustedException;
 import pl.commercelink.warehouse.builtin.WarehouseAllocationsManager;
 import pl.commercelink.web.dtos.DeliveryCreationForm;
 import pl.commercelink.web.dtos.SuggestedDeliveryItem;
@@ -121,7 +122,11 @@ public class DeliveryCreationService {
      * <p>The confirmed unit costs are written to the items before the delivery is saved, so a second cost sync
      * would find nothing left to change and return zero - the delta computed here is the only record of it. That
      * is why a lost race is resolved here, with the same delta, instead of being left to the caller's retry (an SQS
-     * redelivery would complete the delivery at list prices).
+     * redelivery would complete the delivery at list prices). Unless the retries are exhausted: that is logged at
+     * ERROR with the lost delta and rethrown, and the total then has to be repaired by hand.
+     *
+     * <p>After a lost race the {@code delivery} passed in is NOT the stored state: callers may only read its
+     * identifiers afterwards.
      */
     public void completePending(String storeId, Delivery delivery, DeliveryCreationForm form,
                                 Consumer<Delivery> callerChanges) {
@@ -130,22 +135,55 @@ public class DeliveryCreationService {
         try {
             deliveriesRepository.save(delivery);
         } catch (ConditionalCheckFailedException conflict) {
-            optimisticLockingExecutor.modifyAndSave(
-                    () -> deliveriesRepository.findById(storeId, delivery.getDeliveryId()),
-                    current -> {
-                        if (current.getOrderStatus() == null) {
-                            // completed by someone else in the meantime: adding the delta again would count it twice
-                            log.warn("Pending purchase already completed by a concurrent writer: store={} delivery={}",
-                                    storeId, delivery.getDeliveryId());
-                            return;
-                        }
-                        callerChanges.accept(current);
-                        applyCompletion(current, form, costChange);
-                    },
-                    deliveriesRepository::save);
+            log.warn("Pending purchase save lost an optimistic-locking race, re-applying the completion: " +
+                            "store={} delivery={} costChange={}", storeId, delivery.getDeliveryId(), costChange);
+            reapplyCompletion(storeId, delivery.getDeliveryId(), form, costChange, callerChanges);
         }
 
         markClaimedAsOrdered(storeId, delivery, form.getEstimatedDeliveryAt());
+    }
+
+    private void reapplyCompletion(String storeId, String deliveryId, DeliveryCreationForm form, double costChange,
+                                   Consumer<Delivery> callerChanges) {
+        // A closure that throws anything but ConditionalCheckFailedException comes out of the retrying executor
+        // wrapped, so a vanished delivery is flagged here and raised after the executor returns.
+        boolean[] gone = {false};
+        try {
+            optimisticLockingExecutor.modifyAndSave(
+                    () -> deliveriesRepository.findByIdConsistently(storeId, deliveryId),
+                    current -> {
+                        if (current == null) {
+                            gone[0] = true;
+                            return;
+                        }
+                        if (current.getOrderStatus() == null) {
+                            // completed by someone else in the meantime: adding the delta again would count it twice
+                            log.warn("Pending purchase already completed by a concurrent writer: store={} delivery={}",
+                                    storeId, deliveryId);
+                            return;
+                        }
+                        // Any other state (e.g. FAILED set meanwhile) is completed too: the supplier did place the
+                        // order, and the first attempt would have overwritten the status the same way.
+                        callerChanges.accept(current);
+                        applyCompletion(current, form, costChange);
+                    },
+                    saved -> {
+                        if (saved != null) {
+                            deliveriesRepository.save(saved);
+                        }
+                    });
+        } catch (OptimisticLockingExhaustedException e) {
+            log.error("Pending purchase completion lost the save race on every retry, the cost delta is NOT applied " +
+                            "and needs repairing by hand: store={} delivery={} supplierOrderNumber={} costChange={}",
+                    storeId, deliveryId, form.getExternalDeliveryId(), costChange, e);
+            throw e;
+        }
+        if (gone[0]) {
+            String message = "Supplier holds the order, the delivery is gone: store=" + storeId + " delivery=" + deliveryId
+                    + " supplierOrderNumber=" + form.getExternalDeliveryId();
+            log.error(message);
+            throw new IllegalStateException(message);
+        }
     }
 
     private static void applyCompletion(Delivery delivery, DeliveryCreationForm form, double costChange) {

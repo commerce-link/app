@@ -300,8 +300,9 @@ public class SupplierPurchaseService {
         SupplierOrderResult result;
         // Only the supplier interaction is counted and handed over. Local persistence after the supplier completed
         // the order stays outside: a lost optimistic-locking race is settled inside completePending (with the cost
-        // delta already computed), any other failure propagates to SQS and the redelivery either finds the delivery
-        // already settled or completes it again - never a "cancel it at the supplier" hand-over.
+        // delta already computed) unless the retries are exhausted, which is logged at ERROR with the lost delta; any
+        // other failure propagates to SQS and the redelivery either finds the delivery already settled or completes it
+        // again - never a "cancel it at the supplier" hand-over.
         try {
             form = rebuildForm(storeId, delivery);
             validation = validate(storeId, form, delivery.getPurchaseRef());

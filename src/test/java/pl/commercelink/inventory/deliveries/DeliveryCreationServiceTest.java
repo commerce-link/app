@@ -16,6 +16,8 @@ import pl.commercelink.orders.event.Event;
 import pl.commercelink.orders.event.EventType;
 import pl.commercelink.starter.autoconfigure.OptimisticLockingProperties;
 import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
+import pl.commercelink.starter.dynamodb.OptimisticLockingExhaustedException;
+import pl.commercelink.testsupport.RetryingOptimisticLockingExecutor;
 import pl.commercelink.stores.ConnectionMode;
 import pl.commercelink.warehouse.builtin.WarehouseAllocationsManager;
 import pl.commercelink.orders.BillingDetails;
@@ -115,7 +117,7 @@ class DeliveryCreationServiceTest {
         DeliveryCreationForm form = pendingForm();
         when(deliveryCostSync.apply(STORE_ID, delivery.getDeliveryId(), Map.of("MFN-1", 8.5))).thenReturn(-30.0);
         doThrow(new ConditionalCheckFailedException("version changed")).when(deliveriesRepository).save(delivery);
-        when(deliveriesRepository.findById(STORE_ID, delivery.getDeliveryId())).thenReturn(current);
+        when(deliveriesRepository.findByIdConsistently(STORE_ID, delivery.getDeliveryId())).thenReturn(current);
 
         // when
         service.completePending(STORE_ID, delivery, form,
@@ -142,7 +144,7 @@ class DeliveryCreationServiceTest {
         current.increaseTotalCost(95.0);
         when(deliveryCostSync.apply(any(), any(), any())).thenReturn(-30.0);
         doThrow(new ConditionalCheckFailedException("version changed")).when(deliveriesRepository).save(delivery);
-        when(deliveriesRepository.findById(STORE_ID, delivery.getDeliveryId())).thenReturn(current);
+        when(deliveriesRepository.findByIdConsistently(STORE_ID, delivery.getDeliveryId())).thenReturn(current);
 
         // when
         service.completePending(STORE_ID, delivery, pendingForm(),
@@ -151,6 +153,112 @@ class DeliveryCreationServiceTest {
         // then
         assertThat(current.getTotalCost()).isEqualTo(95.0);
         assertThat(current.getEvents()).isEmpty();
+        verify(orderAllocationsManager).markClaimedAsOrdered(STORE_ID, delivery.getDeliveryId(), LocalDate.of(2026, 9, 15));
+    }
+
+    @Test
+    void completePendingSurvivesTwoConsecutiveConflictsAndAppliesTheDeltaOnce() {
+        // given - the first save and the first recovery save both lose, the second recovery save wins
+        DeliveryCreationService retrying = serviceWithRealExecutor();
+        Delivery delivery = pendingDelivery();
+        Delivery firstRead = storedCopyOf(delivery, 100.0, DeliveryOrderStatus.ORDER_DISPATCHED);
+        Delivery secondRead = storedCopyOf(delivery, 100.0, DeliveryOrderStatus.ORDER_DISPATCHED);
+        when(deliveryCostSync.apply(any(), any(), any())).thenReturn(-30.0);
+        doThrow(new ConditionalCheckFailedException("v")).when(deliveriesRepository).save(delivery);
+        doThrow(new ConditionalCheckFailedException("v")).when(deliveriesRepository).save(firstRead);
+        when(deliveriesRepository.findByIdConsistently(STORE_ID, delivery.getDeliveryId()))
+                .thenReturn(firstRead, secondRead);
+        List<String> callerEvents = new java.util.ArrayList<>();
+
+        // when
+        retrying.completePending(STORE_ID, delivery, pendingForm(), target -> callerEvents.add("applied"));
+
+        // then
+        verify(deliveryCostSync, times(1)).apply(any(), any(), any());
+        verify(deliveriesRepository).save(secondRead);
+        assertThat(secondRead.getTotalCost()).isEqualTo(70.0);
+        assertThat(secondRead.getOrderStatus()).isNull();
+        assertThat(callerEvents).hasSize(2); // once per attempt; only the saved attempt's object is stored
+        verify(orderAllocationsManager).markClaimedAsOrdered(STORE_ID, delivery.getDeliveryId(), LocalDate.of(2026, 9, 15));
+    }
+
+    @Test
+    void completePendingPropagatesExhaustionAndDoesNotMarkTheClaimsOrdered() {
+        // given - every save conflicts
+        DeliveryCreationService retrying = serviceWithRealExecutor();
+        Delivery delivery = pendingDelivery();
+        when(deliveryCostSync.apply(any(), any(), any())).thenReturn(-30.0);
+        doThrow(new ConditionalCheckFailedException("v")).when(deliveriesRepository).save(any(Delivery.class));
+        when(deliveriesRepository.findByIdConsistently(STORE_ID, delivery.getDeliveryId()))
+                .thenAnswer(i -> storedCopyOf(delivery, 100.0, DeliveryOrderStatus.ORDER_DISPATCHED));
+
+        // when / then
+        assertThatThrownBy(() -> retrying.completePending(STORE_ID, delivery, pendingForm()))
+                .isInstanceOf(OptimisticLockingExhaustedException.class);
+        verify(orderAllocationsManager, never()).markClaimedAsOrdered(any(), any(), any());
+    }
+
+    @Test
+    void completePendingFailsLoudlyWhenTheDeliveryIsGoneOnReRead() {
+        // given - the supplier holds the order but the delivery was deleted meanwhile
+        DeliveryCreationService retrying = serviceWithRealExecutor();
+        Delivery delivery = pendingDelivery();
+        when(deliveryCostSync.apply(any(), any(), any())).thenReturn(-30.0);
+        doThrow(new ConditionalCheckFailedException("v")).when(deliveriesRepository).save(delivery);
+        when(deliveriesRepository.findByIdConsistently(STORE_ID, delivery.getDeliveryId())).thenReturn(null);
+
+        // when / then
+        assertThatThrownBy(() -> retrying.completePending(STORE_ID, delivery, pendingForm()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("EXT-9");
+        verify(deliveriesRepository, times(1)).save(any(Delivery.class));
+        verify(orderAllocationsManager, never()).markClaimedAsOrdered(any(), any(), any());
+    }
+
+    @Test
+    void completePendingStillCompletesADeliveryThatFailedMeanwhile() {
+        // given - the re-read delivery went FAILED after the first attempt; the supplier did place the order
+        DeliveryCreationService retrying = serviceWithRealExecutor();
+        Delivery delivery = pendingDelivery();
+        Delivery current = storedCopyOf(delivery, 100.0, DeliveryOrderStatus.FAILED);
+        when(deliveryCostSync.apply(any(), any(), any())).thenReturn(-30.0);
+        doThrow(new ConditionalCheckFailedException("v")).when(deliveriesRepository).save(delivery);
+        when(deliveriesRepository.findByIdConsistently(STORE_ID, delivery.getDeliveryId())).thenReturn(current);
+
+        // when
+        retrying.completePending(STORE_ID, delivery, pendingForm());
+
+        // then
+        verify(deliveryCostSync, times(1)).apply(any(), any(), any());
+        verify(deliveriesRepository).save(current);
+        assertThat(current.getOrderStatus()).isNull();
+        assertThat(current.getTotalCost()).isEqualTo(70.0);
+    }
+
+    private DeliveryCreationService serviceWithRealExecutor() {
+        DeliveryCreationService retrying = new DeliveryCreationService();
+        org.springframework.test.util.ReflectionTestUtils.setField(retrying, "deliveriesRepository", deliveriesRepository);
+        org.springframework.test.util.ReflectionTestUtils.setField(retrying, "orderAllocationsManager", orderAllocationsManager);
+        org.springframework.test.util.ReflectionTestUtils.setField(retrying, "warehouseAllocationsManager", warehouseAllocationsManager);
+        org.springframework.test.util.ReflectionTestUtils.setField(retrying, "deliveryCostSync", deliveryCostSync);
+        org.springframework.test.util.ReflectionTestUtils.setField(retrying, "optimisticLockingExecutor",
+                RetryingOptimisticLockingExecutor.create());
+        return retrying;
+    }
+
+    private static Delivery pendingDelivery() {
+        Delivery delivery = new Delivery(STORE_ID, null, "Acme");
+        delivery.setOrderStatus(DeliveryOrderStatus.ORDER_DISPATCHED);
+        delivery.increaseTotalCost(100.0);
+        return delivery;
+    }
+
+    private static Delivery storedCopyOf(Delivery delivery, double totalCost, DeliveryOrderStatus status) {
+        Delivery stored = new Delivery(STORE_ID, null, "Acme");
+        stored.setDeliveryId(delivery.getDeliveryId());
+        stored.setOrderStatus(status);
+        stored.increaseTotalCost(totalCost);
+        return stored;
     }
 
     private static DeliveryCreationForm pendingForm() {
