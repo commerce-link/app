@@ -290,11 +290,13 @@
             </section>
         </div>
     </div>
+
+    <!--/* inside .cl-page (its dialog styles are scoped there) but outside the results block list-page.js swaps, so it
+           survives every swap: the confirmation above ten cards */-->
+    <dialog th:replace="~{fragments/confirm-dialog :: dialog}"></dialog>
 </section>
 
-<!--/* outside the results block, so a swap by list-page.js keeps them: the confirmation above ten cards and the scripts
-       of the selection row (print.js prints in a hidden frame) */-->
-<dialog th:replace="~{fragments/confirm-dialog :: dialog}"></dialog>
+<!--/* the scripts of the selection row (print.js prints in a hidden frame) */-->
 <script th:src="@{/js/table-select.js}" defer></script>
 <script th:src="@{/js/print.js}" defer></script>
 <script th:src="@{/js/confirm-dialog.js}" defer></script>

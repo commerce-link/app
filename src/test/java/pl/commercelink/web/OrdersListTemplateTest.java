@@ -142,19 +142,26 @@ class OrdersListTemplateTest {
         assertThat(occurrences(html, "/dashboard/orders/cards")).isEqualTo(1);
     }
 
-    /** The dialog and the scripts sit outside the results block list-page.js swaps, so they survive every swap. */
+    /**
+     * The dialog sits inside section.cl-page (its title and message are styled by `.cl-page .cl-dialog ...`) but after
+     * the results block list-page.js swaps, so it survives every swap; the scripts follow the page.
+     */
     @Test
-    void theDialogAndTheScriptsSitOutsideTheSwappedResults() throws Exception {
+    void theDialogSitsInsideThePageButOutsideTheSwappedResults() throws Exception {
         // given
         String html = page();
 
         // when
+        int results = html.indexOf("data-cl-list-results");
         int pageEnd = html.lastIndexOf("</section>");
         int dialog = html.indexOf("<dialog th:replace=\"~{fragments/confirm-dialog :: dialog}\"></dialog>");
+        int resultsEnd = html.lastIndexOf("</div>", html.lastIndexOf("</div>", pageEnd) - 1);
         int listPage = html.indexOf("<script th:src=\"@{/js/list-page.js}\" defer></script>");
 
         // then
-        assertThat(dialog).isGreaterThan(pageEnd).isLessThan(listPage);
+        assertThat(dialog).isGreaterThan(resultsEnd).isLessThan(pageEnd);
+        assertThat(results).isLessThan(resultsEnd);
+        assertThat(pageEnd).isLessThan(listPage);
         assertThat(html.substring(pageEnd)).contains("<script th:src=\"@{/js/table-select.js}\" defer></script>")
                 .contains("<script th:src=\"@{/js/print.js}\" defer></script>")
                 .contains("<script th:src=\"@{/js/confirm-dialog.js}\" defer></script>");

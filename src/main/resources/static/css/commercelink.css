@@ -5064,7 +5064,7 @@ a.cl-link-button:hover {
 }
 
 /* Printing several order cards (spec docs/active/order-cards-bulk-print): the checkbox cell stands above the row
-   link's ::after, which covers the whole row, so a click anywhere in the cell ticks the box and never opens the order.
+   link's ::after, which covers the whole row, so the 44 px label ticks the box and the rest of the cell is inert: neither opens the order.
    Without table-select.js (no .is-selectable) the column is not drawn: the table is the one it was before. */
 .cl-page .cl-table.is-orders .cl-table-check {
     position: relative;
