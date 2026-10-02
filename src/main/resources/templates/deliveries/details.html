@@ -15,7 +15,6 @@
                     <section th:replace="~{deliveries/details/items :: card}"></section>
                     <section th:replace="~{deliveries/details/documents :: card}"></section>
                     <section th:replace="~{deliveries/details/payments :: card}"></section>
-                    <th:block th:if="${!page.history().events().isEmpty()}"><section th:replace="~{deliveries/details/history :: card}"></section></th:block>
                 </div>
                 <!--/* read-only context; between the phone and the two-column layout the cards share a grid (P8) */-->
                 <div class="cl-layout-side is-grid">
@@ -23,6 +22,8 @@
                     <th:block th:if="${page.consignee() != null}"><section th:replace="~{deliveries/details/side :: consignee}"></section></th:block>
                     <section th:replace="~{deliveries/details/side :: terms}"></section>
                     <section th:replace="~{deliveries/details/side :: comment}"></section>
+                    <!--/* last, as on order details (D9): read-only context; collapsed on phones */-->
+                    <th:block th:if="${!page.history().events().isEmpty()}"><section th:replace="~{deliveries/details/history :: card}"></section></th:block>
                 </div>
             </div>
 

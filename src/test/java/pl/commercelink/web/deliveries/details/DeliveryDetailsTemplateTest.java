@@ -893,7 +893,28 @@ class DeliveryDetailsTemplateTest {
         // then
         assertThat(html.indexOf("id=\"pozycje\"")).isLessThan(html.indexOf("id=\"dokumenty\""));
         assertThat(html.indexOf("id=\"dokumenty\"")).isLessThan(html.indexOf("id=\"platnosci\""));
-        assertThat(html.indexOf("id=\"platnosci\"")).isLessThan(html.indexOf("id=\"historia\""));
-        assertThat(html.indexOf("id=\"historia\"")).isLessThan(html.indexOf("id=\"supplier-title\""));
+        assertThat(html.indexOf("id=\"platnosci\"")).isLessThan(html.indexOf("class=\"cl-layout-side is-grid\""));
+        assertThat(html.indexOf("id=\"supplier-title\"")).isLessThan(html.indexOf("id=\"terms-title\""));
+        assertThat(html.indexOf("id=\"terms-title\"")).isLessThan(html.indexOf("id=\"comment-title\""));
+        assertThat(html.indexOf("id=\"comment-title\"")).isLessThan(html.indexOf("id=\"historia\""));
+    }
+
+    @Test
+    void historyIsTheLastCardOfTheSideColumnNotPartOfTheWorkingColumn() {
+        // when
+        String html = render(data(warehouse()), ADMIN);
+        int main = html.indexOf("class=\"cl-layout-main\"");
+        int side = html.indexOf("class=\"cl-layout-side is-grid\"");
+        int history = html.indexOf("id=\"historia\"");
+
+        // then
+        assertThat(main).isPositive().isLessThan(side);
+        assertThat(html.substring(main, side)).doesNotContain("id=\"historia\"");
+        assertThat(history).isGreaterThan(html.indexOf("id=\"comment-title\""));
+        int open = html.lastIndexOf("<section", history);
+        assertThat(html.substring(open, html.indexOf(">", history))).contains("data-cl-collapse");
+        // the side column closes right after the history card: it is the column's last card
+        int close = html.indexOf("</section>", history) + "</section>".length();
+        assertThat(html.substring(close).stripLeading()).startsWith("</div>");
     }
 }
