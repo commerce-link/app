@@ -22,8 +22,7 @@ class SupplierLabelTemplatesTest {
         // when / then
         // the list resolves the label once per row in DeliveryRowMapper, so the template never sees an identity
         assertThat(template("deliveries.html")).contains("row.supplierLabel()").doesNotContain("delivery.provider");
-        assertThat(template("deliveriesPreview.html")).contains("supplierLabels.of(candidate.provider)")
-                .contains("supplierLabels.of(delivery.provider)");
+        assertThat(template("deliveries/pending.html")).contains("row.providerLabel()").doesNotContain("row.provider()");
         assertThat(template("deliveryApproval.html")).contains("supplierLabels.of(delivery.provider)");
         assertThat(template("deliveryDetails.html")).contains("supplierLabels.of(delivery.provider)");
         assertThat(template("deliveryCreate.html")).contains("supplierLabels.of(form.provider)");
