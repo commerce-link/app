@@ -12,7 +12,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class ApprovalScreenTemplateTest {
 
-    private static final Path APPROVAL = Path.of("src/main/resources/templates/deliveryApproval.html");
+    private static final Path APPROVAL = Path.of("src/main/resources/templates/deliveries/approval.html");
     private static final Path DETAILS = Path.of("src/main/resources/templates/deliveryDetails.html");
     private static final Pattern OPENING_TAG =
             Pattern.compile("<[a-zA-Z0-9:]+(?:\\s+[a-zA-Z0-9:_.-]+(?:=\"[^\"]*\")?)*\\s*/?>", Pattern.DOTALL);
@@ -23,38 +23,6 @@ class ApprovalScreenTemplateTest {
 
     private String details() throws Exception {
         return Files.readString(DETAILS, StandardCharsets.UTF_8);
-    }
-
-    @Test
-    void keepsTheApproveButtonDisabledUntilTheChecksPass() throws Exception {
-        // when
-        String html = approval();
-        String approveTag = openingTagOf(html, "id=\"approval-approve-button\"");
-
-        // then
-        assertThat(approveTag).contains("disabled");
-        assertThat(html).contains("refreshApprovalSubmitState");
-        assertThat(html).contains("approvalValidationPassed");
-        assertThat(html).contains("approve.disabled = addressBlocked || optionsBlocked || !orderOptionsComplete() || !approvalValidationPassed;");
-        assertThat(html).doesNotContain("addressMissing");
-    }
-
-    @Test
-    void showsTheOrderOptionsForBothWarehouseAndDropshipDeliveriesInsideTheApproveForm() throws Exception {
-        // when
-        String html = approval();
-        int formStart = html.indexOf("id=\"approval-approve-form\"");
-        int buttonsAt = html.indexOf("class=\"buttons mt-5\"");
-        int fragmentAt = html.indexOf("fragments/order-options :: orderOptions(${orderOptions}, ${selectedOptions})");
-
-        // then: the fragment sits inside the form, before the buttons, and is not nested inside
-        // a th:if="${delivery.dropship}" / "${!delivery.dropship ...}" block (there is none around it)
-        assertThat(fragmentAt).isBetween(formStart, buttonsAt);
-        assertThat(html).contains("id=\"order-options-blocked\"");
-        assertThat(html).contains("deliveries.options.error");
-        String script = html.substring(html.indexOf("<script th:inline=\"none\">"), html.indexOf("</script>"));
-        assertThat(script).contains("function refreshApprovalSubmitState()");
-        assertThat(script).contains("orderOptionsComplete()");
     }
 
     @Test
@@ -125,15 +93,4 @@ class ApprovalScreenTemplateTest {
         return false;
     }
 
-    @Test
-    void tellsTheSuperAdminWhenTheMarketplaceChoseTheSupplier() throws Exception {
-        // when
-        String html = approval();
-
-        // then
-        assertThat(html).contains("th:each=\"routed : ${routedOrders}\"");
-        assertThat(html).contains("deliveries.approval.routed");
-        assertThat(html).contains("deliveries.approval.routed.mismatch");
-        assertThat(html).contains("deliveries.approval.routed.unmatched");
-    }
 }

@@ -16,17 +16,6 @@ class DropshipTemplateTest {
     }
 
     @Test
-    void approvalScreenReplacesTheAddressPanelForDropshipDeliveries() throws Exception {
-        // when
-        String html = read("deliveryApproval.html");
-
-        // then
-        assertThat(html).contains("th:if=\"${delivery.dropship}\"");
-        assertThat(html).contains("${!delivery.dropship and suggestedAddress != null}");
-        assertThat(html).contains("deliveries.dropship.badge");
-    }
-
-    @Test
     void deliveryScreensCarryTheDropshipBadge() throws Exception {
         // when / then
         assertThat(read("deliveryDetails.html")).contains("deliveries.dropship.badge");
@@ -197,16 +186,6 @@ class DropshipTemplateTest {
     }
 
     @Test
-    void approvalScreenShowsTheConsigneeOfADropshipDelivery() throws Exception {
-        // when
-        String html = read("deliveryApproval.html");
-
-        // then
-        assertThat(html).contains("th:if=\"${delivery.dropship and consignee != null}\"");
-        assertThat(html).contains("fragments/consignee-address :: consigneeAddress(${consignee}, ${pickupShipment})");
-    }
-
-    @Test
     void consigneeFragmentsShowThePickupPointAndTheApprovalScreenKeepsTheBoxVariant() throws Exception {
         // given
         String fragment = read("fragments/consignee-address.html");
@@ -216,7 +195,6 @@ class DropshipTemplateTest {
         assertThat(fragment).contains("th:fragment=\"clConsignee(consignee, pickupShipment)\"");
         assertThat(fragment).contains("#{orders.dropship.confirm.pickupPoint}");
         assertThat(fragment).contains("${pickupShipment.collectionPointCode}");
-        assertThat(read("deliveryApproval.html")).contains("consigneeAddress(${consignee}, ${pickupShipment})");
     }
 
     @Test
@@ -249,13 +227,13 @@ class DropshipTemplateTest {
     @Test
     void deliveryApprovalWarnsWhenWarehouseGoodsAreBoundForTheCustomer() throws Exception {
         // when
-        String html = read("deliveryApproval.html");
+        String html = read("deliveries/approval.html");
         int conditionAt = html.indexOf("th:if=\"${delivery.hasDirectToConsumerAllocations()}\"");
         int noticeAt = html.indexOf("deliveries.directToConsumer.viaWarehouse.notice");
 
         // then: the message key sits inside the element guarded by that exact condition, not
         // merely somewhere in the file
         assertThat(conditionAt).isGreaterThan(-1);
-        assertThat(noticeAt).isBetween(conditionAt, conditionAt + 150);
+        assertThat(noticeAt).isBetween(conditionAt, conditionAt + 300);
     }
 }

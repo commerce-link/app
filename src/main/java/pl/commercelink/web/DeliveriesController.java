@@ -21,7 +21,10 @@ import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.orders.Payment;
 import pl.commercelink.orders.PaymentDirection;
 import pl.commercelink.orders.PaymentSource;
+import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShipmentCarrierOptions;
+import pl.commercelink.inventory.supplier.SupplierLabelMap;
+import pl.commercelink.web.deliveries.approval.ApprovalPage;
 import pl.commercelink.orders.ShipmentType;
 import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.documents.Document;
@@ -37,7 +40,6 @@ import pl.commercelink.web.payments.PaymentsQuery;
 import pl.commercelink.web.payments.PaymentsReturn;
 import pl.commercelink.web.dtos.DeliveryAllocationsForm;
 import pl.commercelink.web.dtos.InvoiceSyncPreview;
-import pl.commercelink.web.dtos.PickerOption;
 import pl.commercelink.web.dtos.RoutedOrderView;
 import pl.commercelink.web.dtos.RoutedSupplierView;
 import pl.commercelink.web.dtos.SupplierOrderChoicesParams;
@@ -458,6 +460,7 @@ public class DeliveriesController {
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     public String showApprovalScreen(@PathVariable("storeId") String storeId,
                                      @PathVariable("deliveryId") String deliveryId,
+                                     @RequestParam(value = "open", required = false) String open,
                                      Model model, RedirectAttributes redirectAttributes) {
         Delivery delivery = deliveriesQueryService.fetchDeliveryWithAllocations(storeId, deliveryId);
         if (delivery == null || !delivery.isAwaitingApproval()) {
@@ -467,6 +470,7 @@ public class DeliveriesController {
             return storeDeliveryDetailsRedirect(storeId, deliveryId);
         }
         model.addAttribute("delivery", delivery);
+        Store store = storesRepository.findById(storeId);
         SupplierOrderOptionsContext optionsContext;
         Order dropshipOrder = null;
         if (delivery.isDropship()) {
@@ -481,14 +485,20 @@ public class DeliveriesController {
                     : SupplierOrderOptionsContext.dropship(null);
         } else {
             addApprovalAddresses(storeId, delivery, model);
-            addSuggestedAddress(storeId, model);
+            addSuggestedAddress(store, model);
             optionsContext = SupplierOrderOptionsContext.warehouse();
         }
-        model.addAttribute("routedOrders", routedOrdersOf(storeId, delivery, dropshipOrder));
+        List<Order> requestOrders = requestOrdersOf(storeId, delivery, dropshipOrder);
+        model.addAttribute("routedOrders", routedOrdersOf(store, requestOrders));
         OrderOptionsModel.addOrderOptions(supplierPurchaseService, storeId, delivery.getProvider(),
                 optionsContext, delivery.getSupplierOrderChoices(), model);
-        model.addAttribute("supplierLabels", supplierLabels.forStoreId(storeId));
-        return "deliveryApproval";
+        SupplierLabelMap labels = supplierLabels.forStoreId(storeId);
+        model.addAttribute("supplierLabels", labels);
+        model.addAttribute("page", ApprovalPage.of(delivery, store, requestOrders,
+                labels.of(delivery.getProvider()),
+                (ShippingDetails) model.getAttribute("consignee"), (Shipment) model.getAttribute("pickupShipment"),
+                "reject".equals(open)));
+        return "deliveries/approval";
     }
 
     private String storeDeliveryDetailsRedirect(String storeId, String deliveryId) {
@@ -753,7 +763,8 @@ public class DeliveriesController {
                     messageSource.getMessage("deliveries.purchase.confirm.checkFailed", null, locale)
                             + (e.getMessage() != null ? " (" + e.getMessage() + ")" : ""));
         }
-        return "fragments/approval-validation :: validationResult";
+        model.addAttribute("validationMode", "approval");
+        return "deliveries/create/purchase :: validationResult";
     }
 
     @GetMapping("/dashboard/deliveries/details")
@@ -821,7 +832,7 @@ public class DeliveriesController {
         }
     }
 
-    private List<RoutedOrderView> routedOrdersOf(String storeId, Delivery delivery, Order dropshipOrder) {
+    private List<Order> requestOrdersOf(String storeId, Delivery delivery, Order dropshipOrder) {
         List<Order> orders;
         if (delivery.isDropship()) {
             orders = dropshipOrder != null ? List.of(dropshipOrder) : List.of();
@@ -836,7 +847,10 @@ public class DeliveriesController {
                     .filter(Objects::nonNull)
                     .toList();
         }
-        Store store = storesRepository.findById(storeId);
+        return orders;
+    }
+
+    private List<RoutedOrderView> routedOrdersOf(Store store, List<Order> orders) {
         return orders.stream()
                 .filter(Order::isBoundToExternalSupplier)
                 .map(order -> new RoutedOrderView(
@@ -850,18 +864,13 @@ public class DeliveriesController {
             List<SupplierDeliveryAddress> addresses =
                     supplierPurchaseService.deliveryAddressesForDelivery(storeId, delivery.getDeliveryId());
             model.addAttribute("approvalAddresses", addresses);
-            model.addAttribute("approvalAddressOptions", addresses.stream()
-                    .map(address -> new PickerOption(address.id(), address.label()))
-                    .toList());
         } catch (Exception e) {
             model.addAttribute("approvalAddresses", List.of());
-            model.addAttribute("approvalAddressOptions", List.of());
             model.addAttribute("approvalAddressError", e.getMessage());
         }
     }
 
-    private void addSuggestedAddress(String storeId, Model model) {
-        Store store = storesRepository.findById(storeId);
+    private void addSuggestedAddress(Store store, Model model) {
         ShippingDetails storeDefault = store == null ? null : store.getDefaultShippingDetails();
         model.addAttribute("suggestedAddress", storeDefault);
 
