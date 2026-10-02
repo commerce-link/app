@@ -328,6 +328,13 @@
             <version>0.9.10</version>
         </dependency>
 
+        <!-- QR codes on printouts (order card) -->
+        <dependency>
+            <groupId>io.nayuki</groupId>
+            <artifactId>qrcodegen</artifactId>
+            <version>1.8.0</version>
+        </dependency>
+
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>junit-jupiter</artifactId>
