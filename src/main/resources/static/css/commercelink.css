@@ -4574,6 +4574,11 @@ a.cl-link-button:hover {
     background: var(--cl-accent-soft);
 }
 
+/* the hint's usual grey is 4.04:1 on the accent fill (WCAG AA wants 4.5) */
+.cl-page .cl-stat.is-link[aria-current="true"] .cl-stat-hint {
+    color: var(--cl-ink-2);
+}
+
 .cl-page .cl-stat.is-link:focus-visible {
     outline: 2px solid var(--cl-accent);
     outline-offset: 2px;
@@ -7280,7 +7285,7 @@ a.cl-link-button:hover {
     }
 }
 
-/* --- Dropship pages (dropshipCreate, dropshipConfirmation; order details subpages, group C, 2026-09-28) --- */
+/* --- Dropship pages (now deliveries/create; order details subpages, group C, 2026-09-28) --- */
 /* Checkboxes stacked in one table cell (a product's order lines): no bullets, 4 px apart, each keeps its target. */
 .cl-page .cl-check-list {
     display: grid;
@@ -7326,6 +7331,24 @@ a.cl-link-button:hover {
     height: 20px;
     border-width: 2px;
     flex: none;
+}
+
+/* A spinner in running text or a disclosure title (restock suggestions loading): the size of the text beside it. */
+.cl-page .cl-spinner.is-compact {
+    width: 14px;
+    height: 14px;
+    border-width: 2px;
+    flex: none;
+}
+
+.cl-page details[open] > summary .cl-spinner.is-compact {
+    display: none;
+}
+
+/* A state mark after a disclosure title (restock suggestions failed to load). */
+.cl-page .cl-summary-mark.is-bad {
+    color: var(--cl-bad);
+    font-size: 14px;
 }
 
 /* An alert alone in a padded wrapper (the validation area) ends with the wrapper's padding, not its own margin. */
@@ -8170,6 +8193,387 @@ a.cl-link-button:hover {
 @media (prefers-reduced-motion: reduce) {
     .cl-page .cl-row-toggle-caret {
         transition: none;
+    }
+}
+
+/* --- New delivery (spec docs/active/dostawy-tworzenie-formularz/2026-10-01-nowa-dostawa-design.md §7):
+   P1 sticky side column, P2 summary card with the step actions, P3 delivery items table, P4 scrolling choice list. */
+
+@media screen and (min-width: 1366px) {
+    .cl-page .cl-layout-side.is-sticky {
+        position: sticky;
+        top: calc(var(--cl-topbar-height) + 16px);
+    }
+}
+
+.cl-page .cl-card-footer.is-stacked {
+    display: grid;
+    gap: var(--cl-gap-attached);
+}
+
+.cl-page .cl-card-footer.is-stacked .cl-button {
+    width: 100%;
+    justify-content: center;
+}
+
+.cl-page .cl-card-footer.is-stacked .cl-help {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.4;
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-card-footer.is-stacked .cl-help.is-warn {
+    color: var(--cl-warn);
+}
+
+.cl-page .cl-card-footer.is-stacked .cl-help + .cl-button,
+.cl-page .cl-card-footer.is-stacked .cl-help + .cl-help + .cl-button {
+    margin-top: var(--cl-gap-related);
+}
+
+.cl-page .cl-card-footer.is-stacked .cl-reasons {
+    margin: 2px 0 0;
+    padding-left: 18px;
+}
+
+.cl-page .cl-card-footer.is-stacked .cl-reasons li[hidden] {
+    display: none;
+}
+
+/* the step-2 back link is a button (it carries the form state) dressed as .cl-back */
+.cl-page button.cl-back {
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    font-size: 13.5px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+/* the order link in a dropship lead: a 44 px touch target below 1024 px without moving the line */
+@media (max-width: 1023px) {
+    .cl-page .cl-page-lead .cl-lead-link {
+        display: inline-block;
+        padding-block: 12px;
+        margin-block: -12px;
+    }
+}
+
+.cl-page .cl-table.is-delivery td {
+    vertical-align: top;
+}
+
+.cl-page .cl-table.is-delivery col.cl-col-value {
+    width: 120px;
+}
+
+.cl-page .cl-table.is-delivery .cl-table-edit {
+    min-width: 28px;
+    min-height: 28px;
+    margin-left: 6px;
+    padding: 2px 4px;
+    border: 0;
+    border-radius: 6px;
+    background: none;
+    color: var(--cl-ink-3);
+    cursor: pointer;
+}
+
+.cl-page .cl-table.is-delivery .cl-table-edit:hover {
+    color: var(--cl-accent-ink);
+    background: var(--cl-accent-soft);
+}
+
+.cl-page .cl-table.is-delivery .cl-table-edit:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
+}
+
+.cl-page .cl-table.is-delivery .cl-row-toggle {
+    margin-top: 6px;
+    font-size: 13px;
+}
+
+.cl-page .cl-table.is-delivery .cl-min {
+    display: block;
+    margin-top: 4px;
+    font-size: 12.5px;
+    color: var(--cl-ink-2);
+    white-space: nowrap;
+}
+
+.cl-page .cl-table.is-delivery tr.cl-row-main.is-open > * {
+    background: var(--cl-surface-2);
+    border-bottom-color: transparent;
+}
+
+/* An open row sits on --cl-surface-2, where --cl-ink-3 falls under 4.5:1 (4.47:1 at 12.5 px) */
+.cl-page .cl-table.is-delivery tr.cl-row-main.is-open .cl-table-sub {
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-table.is-delivery tr.cl-row-detail > td {
+    padding: 0 20px 16px;
+    background: var(--cl-surface-2);
+}
+
+@media screen and (min-width: 1024px) {
+    .cl-page .cl-table.is-delivery .cl-subtable .cl-check {
+        min-height: 24px;
+        padding: 0;
+    }
+}
+
+.cl-page .cl-table.is-delivery .cl-subtable tfoot td {
+    font-weight: 500;
+}
+
+/* The release checkbox and its note sit at the start of the footer: .cl-list-summary pushes its content to the end
+   (it was made for a total), which slid a short note and its checkbox towards the middle. */
+.cl-page .cl-list-summary > .cl-release {
+    margin-right: auto;
+}
+
+.cl-page .cl-release-help {
+    margin: 4px 0 0 24px;
+}
+
+.cl-page .cl-choice-group.is-scroll {
+    max-height: 320px;
+    overflow: auto;
+    padding: 4px 12px;
+    border: 1px solid var(--cl-line);
+    border-radius: var(--cl-radius);
+}
+
+.cl-page .cl-choice-group.is-scroll .cl-choice {
+    flex-shrink: 0;
+    padding: 10px 0;
+}
+
+.cl-page .cl-choice-group.is-scroll .cl-choice + .cl-choice {
+    border-top: 1px solid var(--cl-line);
+}
+
+.cl-page .cl-choice-group.is-scroll .cl-choice[hidden] {
+    display: none;
+}
+
+@media screen and (max-width: 1023px) {
+    .cl-page .cl-table.is-delivery .cl-table-edit {
+        min-width: 44px;
+        min-height: 44px;
+    }
+
+    /* the link to a source (order / warehouse item) inside the 44 px checkbox label is a target of its own */
+    .cl-page .cl-table.is-delivery .cl-subtable .cl-check a {
+        display: inline-flex;
+        align-items: center;
+        min-height: 44px;
+    }
+}
+
+@media screen and (max-width: 719px) {
+    .cl-page .cl-table.is-delivery tbody th.cl-table-key {
+        display: block;
+    }
+
+    .cl-page .cl-table.is-delivery tbody th.cl-table-key::before {
+        content: none;
+    }
+
+    .cl-page .cl-table.is-delivery tr.cl-row-detail {
+        padding: 0 16px 12px;
+        border-top: 0;
+        background: var(--cl-surface-2);
+    }
+
+    .cl-page .cl-table.is-delivery tr.cl-row-detail > td {
+        display: block;
+        padding: 0;
+        background: none;
+    }
+
+    .cl-page .cl-table.is-delivery tr.cl-row-detail > td::before {
+        content: none;
+    }
+
+    .cl-page .cl-table.is-delivery .cl-subtable thead {
+        display: none;
+    }
+
+    .cl-page .cl-table.is-delivery .cl-subtable tr {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 4px 8px;
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--cl-line);
+    }
+
+    .cl-page .cl-table.is-delivery .cl-subtable tr:last-child {
+        border-bottom: 0;
+    }
+
+    .cl-page .cl-table.is-delivery .cl-subtable td {
+        display: block;
+        padding: 0;
+        border: 0;
+    }
+
+    .cl-page .cl-table.is-delivery .cl-subtable td:first-child {
+        grid-column: 1 / -1;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cl-page .cl-layout-side.is-sticky {
+        scroll-behavior: auto;
+    }
+}
+
+/* Payments (spec docs/active/payments-redesign §5.3, §7) ------------------------------------------------------------ */
+
+/* The end of the toolbar's first row: the filter menu left of the search, both on the right of the tabs. */
+.cl-page .cl-table-toolbar .cl-toolbar-end {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--cl-gap-related);
+}
+
+.cl-page .cl-table-toolbar .cl-toolbar-end .cl-search-form {
+    min-width: 280px;
+}
+
+/* The results line is always visible on Payments: it carries the totals that the old page printed above each table. */
+.cl-page .cl-table-results .cl-results-amount {
+    color: var(--cl-ink);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+/* A part of a short text that may only wrap as a whole ("dostawy: 2 · zamówienia: 2" under a tile). */
+.cl-page .cl-nowrap {
+    white-space: nowrap;
+}
+
+.cl-page .cl-table.is-payments .cl-status {
+    white-space: normal;
+}
+
+.cl-page .cl-table.is-payments .cl-paid-of {
+    white-space: normal;
+}
+
+.cl-page .cl-table.is-payments .cl-table-actions .cl-link-button {
+    gap: 4px;
+}
+
+@media screen and (min-width: 720px) {
+    /* the pill wraps between its words, never inside one ("Nieopła / cone"): 11ch left no room for the dot and the
+       pill's own padding, so the column's minimum is the width of "Nieopłacone" plus both paddings */
+    .cl-page .cl-table.is-payments .cl-status {
+        overflow-wrap: normal;
+    }
+
+    /* Every column of a long list (a long surname, a six-digit amount, "pobranie nierozliczone") must fit the card at
+       the same time: the second lines may break between words. Numbers keep their non-breaking spaces, so an amount
+       still never splits, and overflow-wrap is reset so the table-sub's "anywhere" cannot cut inside one either. */
+    .cl-page .cl-table.is-payments :is(thead th, .cl-cell-date, .cl-due-note, td.is-numeric .cl-table-sub) {
+        white-space: normal;
+        overflow-wrap: normal;
+    }
+
+    /* a 19-letter surname or a company name in one word would hold the customer column wider than the card can give */
+    .cl-page .cl-table.is-payments .cl-cell-client {
+        display: block;
+        min-width: 7em;
+        overflow-wrap: anywhere;
+    }
+}
+
+@media screen and (min-width: 1024px) {
+    .cl-page .cl-table.is-payments td[data-label]:has(.cl-status) {
+        min-width: 120px;
+    }
+}
+
+/* The Metoda column follows the card, not the window: beside the open sidebar (1216 px) the card is 792 px, narrower
+   than at 1215 px (979 px), so a viewport breakpoint showed the seventh column exactly where it fits least. */
+.cl-page .cl-card:has(> .cl-table.is-payments) {
+    container-type: inline-size;
+}
+
+@media screen and (min-width: 720px) {
+    .cl-page .cl-table.is-payments .is-secondary-column {
+        display: none;
+    }
+}
+
+@container (min-width: 900px) {
+    .cl-page .cl-table.is-payments .is-secondary-column {
+        display: table-cell;
+    }
+}
+
+/* 720-1023 px: the row action and the delivery type as icons, their words kept for screen readers, so six columns fit. */
+@media screen and (min-width: 720px) and (max-width: 1023px) {
+    .cl-page .cl-table.is-payments :is(.cl-action-label, .cl-icon-label) {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+    }
+
+    .cl-page .cl-table.is-payments .cl-table-actions .cl-link-button {
+        min-width: 44px;
+        min-height: 44px;
+        justify-content: center;
+    }
+}
+
+@media screen and (max-width: 719px) {
+    .cl-page .cl-table-toolbar .cl-toolbar-end {
+        width: 100%;
+    }
+
+    .cl-page .cl-table-toolbar .cl-toolbar-end .cl-search-form {
+        flex: 1 1 100%;
+        min-width: 0;
+        order: -1;
+    }
+
+    /* phone card: "wpłacono X z Y" under the amount, the urgency note on the next line, the action as the card's
+       last line. Note and paid-of shared one grid row before and overlapped at 320-375 px. */
+    .cl-page .cl-table.is-payments .cl-paid-of {
+        grid-column: 2;
+        justify-self: end;
+        text-align: right;
+        order: 5;
+        font-size: 12.5px;
+    }
+
+    .cl-page .cl-table.is-payments .cl-due-note {
+        grid-column: 1 / -1;
+        order: 6;
+        white-space: normal;
+        overflow-wrap: normal;
+    }
+
+    /* the key cell's own second-line rule would otherwise show "zam. dd.MM" in the card (spec §5.3) */
+    .cl-page .cl-table.is-payments .cl-table-key .cl-cards-hide {
+        display: none;
+    }
+
+    .cl-page .cl-table.is-payments .cl-table-actions .cl-link-button {
+        grid-column: 1 / -1;
+        order: 8;
+        justify-self: start;
+        min-height: 44px;
     }
 }
 

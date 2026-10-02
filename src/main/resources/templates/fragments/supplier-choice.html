@@ -59,12 +59,16 @@
         <option value="" th:text="${supplierOptional != null and supplierOptional} ? #{order.item.supplier.none} : #{general.select}"></option>
         <option th:each="option : ${options}" th:value="${option.identity()}" th:selected="${option.identity() == current}"
                 th:text="${option.label()}"></option>
-        <option value="__custom__" th:selected="${custom != null}" th:text="#{order.item.supplier.custom}"></option>
+        <!--/* A form posted back after a refusal always carries the (hidden) typed-name field, empty when a connection was
+               chosen: the typed name selects "Other supplier…" only when no connection was picked. */-->
+        <option value="__custom__" th:selected="${current == T(pl.commercelink.inventory.supplier.SupplierChoice).CUSTOM or (#strings.isEmpty(current) and !#strings.isEmpty(custom))}"
+                th:text="#{order.item.supplier.custom}"></option>
     </select>
     <div class="cl-field" data-cl-custom-field>
-        <label class="cl-label" th:for="${id} + '-custom'" th:text="#{order.item.supplier.custom.placeholder}"></label>
+        <label class="cl-label" th:for="${id} + '-custom'" th:text="#{store.supplier.billing.shortcut}"></label>
         <input class="cl-input" th:id="${id} + '-custom'" type="text" name="customSupplier" autocomplete="off"
-               pattern="[\p{L}\p{N}_\-]+" th:value="${custom}" th:title="#{order.item.supplier.custom.format}">
+               pattern="[\p{L}\p{N}_\-]+" th:value="${custom}" th:title="#{order.item.supplier.custom.format}"
+               th:placeholder="#{order.item.supplier.custom.placeholder}">
         <p class="cl-help" th:text="#{order.item.supplier.custom.hint}"></p>
     </div>
 </div>

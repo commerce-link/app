@@ -1,0 +1,228 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<body>
+<!--/* Step 2, integration: live availability, the supplier's address book (warehouse), supplier options, then the
+       order. delivery-purchase.js asks for availability (validate) and enables the submit only when every condition
+       holds, naming the missing ones under the button. */-->
+<div layout:fragment="content">
+    <section class="cl-page">
+        <div class="cl-page-body">
+            <div th:replace="~{deliveries/create/parts :: header(${page}, 2, #{deliveries.create.purchase.title(${page.supplierName()})}, 'deliveries.create.lead.purchase')}"></div>
+            <th:block th:if="${requiresApproval}">
+                <div class="cl-alert is-info">
+                    <i class="fas fa-info-circle cl-alert-icon" aria-hidden="true"></i>
+                    <p class="cl-alert-text" th:text="#{deliveries.purchase.confirm.approvalNote}"></p>
+                </div>
+            </th:block>
+            <th:block th:if="${page.purchaseBlockedReason() != null}">
+                <div class="cl-alert is-warn" id="purchase-blocked-reason">
+                    <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+                    <p class="cl-alert-text" th:text="#{${page.purchaseBlockedReason()}}"></p>
+                </div>
+            </th:block>
+            <th:block th:if="${orderOptionsError != null}">
+                <div class="cl-alert is-bad" id="order-options-blocked">
+                    <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
+                    <p class="cl-alert-text"><span th:text="#{deliveries.options.error}"></span> <span th:text="|(${orderOptionsError})|"></span></p>
+                </div>
+            </th:block>
+            <th:block th:if="${failureMessage != null}">
+                <div class="cl-alert is-bad" tabindex="-1" data-cl-error-summary>
+                    <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
+                    <p class="cl-alert-text" th:text="${failureMessage}"></p>
+                </div>
+            </th:block>
+            <form method="post" id="delivery-step-form" class="cl-layout-aside" data-cl-delivery-purchase
+                  th:action="@{${page.links().confirm()}}" th:attr="data-validate-url=@{${page.links().validate()}}">
+                <input type="hidden" name="purchaseRef" th:value="${purchaseRef}"/>
+                <th:block th:replace="~{deliveries/create/parts :: scope(${page})}"></th:block>
+                <th:block th:replace="~{deliveries/create/parts :: hiddenOrderData(true)}"></th:block>
+                <th:block th:replace="~{deliveries/create/parts :: hiddenItems}"></th:block>
+                <div class="cl-layout-main">
+                    <section class="cl-card" aria-labelledby="availability-title">
+                        <div class="cl-card-head">
+                            <h2 class="cl-card-title" id="availability-title" th:text="#{deliveries.create.purchase.availability}"></h2>
+                            <div class="cl-card-actions">
+                                <button type="button" class="cl-link-button" data-cl-validation-retry>
+                                    <i class="fas fa-sync-alt" aria-hidden="true"></i> <span th:text="#{deliveries.create.purchase.recheck}"></span>
+                                </button>
+                            </div>
+                        </div>
+                        <div id="validation-area" class="cl-card-section" aria-live="polite" aria-busy="true">
+                            <p class="cl-card-inset cl-loading"><span class="cl-spinner" aria-hidden="true"></span>
+                                <span th:text="#{deliveries.purchase.confirm.checking}"></span></p>
+                        </div>
+                    </section>
+
+                    <th:block th:if="${!requiresApproval and !page.dropship()}">
+                        <section class="cl-card" aria-labelledby="address-title">
+                            <div class="cl-card-head"><h2 class="cl-card-title" id="address-title" th:text="#{deliveries.create.purchase.address.title}"></h2></div>
+                            <th:block th:if="${deliveryAddressError != null}">
+                                <div class="cl-card-inset">
+                                    <div class="cl-alert is-bad" id="address-blocked">
+                                        <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
+                                        <p class="cl-alert-text"><span th:text="#{deliveries.purchase.confirm.addressUnavailable}"></span> <span th:text="|(${deliveryAddressError})|"></span></p>
+                                    </div>
+                                </div>
+                            </th:block>
+                            <p th:if="${deliveryAddressError == null and #lists.isEmpty(deliveryAddresses)}" class="cl-card-desc"
+                               th:text="#{deliveries.create.purchase.address.none}"></p>
+                            <th:block th:if="${!#lists.isEmpty(deliveryAddresses)}">
+                                <p class="cl-card-desc" th:text="#{deliveries.create.purchase.address.desc}"></p>
+                                <input type="hidden" id="address-required" value="true"/>
+                                <div class="cl-form-grid cl-card-grid is-last">
+                                    <div th:if="${deliveryAddresses.size() > 6}" class="cl-span-6 cl-field">
+                                        <label class="cl-label" for="address-filter" th:text="#{deliveries.create.purchase.address.filter}"></label>
+                                        <input class="cl-input" id="address-filter" type="search" autocomplete="off"
+                                               th:placeholder="#{deliveries.create.purchase.address.filter.placeholder}"/>
+                                    </div>
+                                    <fieldset class="cl-span-6 cl-choice-group is-scroll" aria-labelledby="address-title">
+                                        <label class="cl-choice" data-cl-address th:each="address : ${deliveryAddresses}"
+                                               th:with="title=${#strings.isEmpty(address.addressLine()) ? address.id() : address.addressLine()},
+                                                        place=${#strings.trim((address.postalCode() ?: '') + ' ' + (address.city() ?: ''))},
+                                                        line=${#strings.isEmpty(address.country()) ? place : (#strings.isEmpty(place) ? address.country() : place + ', ' + address.country())}">
+                                            <input type="radio" name="deliveryAddressId" th:value="${address.id()}"
+                                                   th:checked="${form.deliveryAddressId != null and form.deliveryAddressId == address.id()}"/>
+                                            <span class="cl-choice-text">
+                                                <span class="cl-choice-title" th:text="${title}"></span>
+                                                <span class="cl-choice-description" th:if="${!#strings.isEmpty(line)}" th:text="${line}"></span>
+                                            </span>
+                                        </label>
+                                    </fieldset>
+                                </div>
+                            </th:block>
+                        </section>
+                    </th:block>
+
+                    <th:block th:if="${!requiresApproval and orderOptions != null and !orderOptions.isEmpty()}">
+                        <section class="cl-card" aria-labelledby="options-title">
+                            <div class="cl-card-head"><h2 class="cl-card-title" id="options-title" th:text="#{deliveries.create.purchase.options.title}"></h2></div>
+                            <div class="cl-form-grid cl-card-grid is-last">
+                                <div class="cl-span-3 cl-field" th:each="option, optionStat : ${orderOptions}">
+                                    <label class="cl-label" th:for="|order-option-${optionStat.index}|" th:text="${option.label()}"></label>
+                                    <select class="cl-select" th:id="|order-option-${optionStat.index}|"
+                                            th:name="'supplierOrderChoices[' + ${option.key()} + ']'"
+                                            th:attr="data-order-option=${option.key()},data-required=${option.required()}"
+                                            th:required="${option.required()}">
+                                        <option th:if="${selectedOptions == null or selectedOptions[option.key()] == null}" value=""
+                                                th:text="#{deliveries.options.choose}"></option>
+                                        <option th:each="choice : ${option.choices()}" th:value="${choice.value()}"
+                                                th:text="${choice.hint() != null} ? ${choice.label() + ' — ' + choice.hint()} : ${choice.label()}"
+                                                th:selected="${selectedOptions != null and choice.value() == selectedOptions[option.key()]}"></option>
+                                    </select>
+                                </div>
+                            </div>
+                        </section>
+                    </th:block>
+
+                </div>
+                <aside class="cl-layout-side is-sticky">
+                    <th:block th:replace="~{deliveries/create/parts :: recipient(${page}, ${requiresApproval} ? 'deliveries.create.recipient.help.approval' : 'deliveries.create.recipient.help.purchase')}"></th:block>
+                    <section class="cl-card" aria-labelledby="summary-title">
+                        <div class="cl-card-head"><h2 class="cl-card-title" id="summary-title" th:text="#{deliveries.create.summary}"></h2></div>
+                        <dl class="cl-kv is-column cl-card-inset">
+                            <div class="cl-kv-total"><dt th:text="#{deliveries.create.summary.total}"></dt>
+                                <dd class="is-numeric"><output data-cl-live-total aria-live="polite">—</output></dd></div>
+                        </dl>
+                        <div class="cl-card-footer is-stacked">
+                            <button id="purchase-confirm-submit" type="submit" class="cl-button is-primary" disabled
+                                    aria-describedby="confirm-reasons confirm-help"
+                                    th:attr="data-blocked=${page.purchaseBlockedReason() != null or orderOptionsError != null or deliveryAddressError != null}"
+                                    th:text="${requiresApproval} ? #{deliveries.purchase.confirm.submitForApproval} : #{deliveries.create.purchase.submit(${page.supplierName()})}"></button>
+                            <div class="cl-help is-warn" id="confirm-reasons">
+                                <span th:text="#{deliveries.create.purchase.reasons}"></span>
+                                <ul class="cl-reasons">
+                                    <li data-reason="checking" th:text="#{deliveries.create.purchase.reason.checking}"></li>
+                                    <li data-reason="checkFailed" hidden th:text="#{deliveries.create.purchase.reason.checkFailed}"></li>
+                                    <li data-reason="availability" hidden th:text="#{deliveries.create.purchase.reason.availability}"></li>
+                                    <li data-reason="address" hidden th:text="#{deliveries.create.purchase.reason.address}"></li>
+                                    <li data-reason="options" hidden th:text="#{deliveries.create.purchase.reason.options}"></li>
+                                    <li data-reason="blocked" hidden th:text="#{deliveries.create.purchase.reason.blocked}"></li>
+                                </ul>
+                            </div>
+                            <p class="cl-help" id="confirm-help"
+                               th:text="${requiresApproval} ? #{deliveries.create.purchase.submit.help.approval} : #{deliveries.create.purchase.submit.help}"></p>
+                            <button type="submit" id="back-submit" class="cl-button" formnovalidate th:formaction="@{${page.links().back()}}">
+                                <i class="fas fa-arrow-left" aria-hidden="true"></i> <span th:text="#{deliveries.create.back}"></span>
+                            </button>
+                        </div>
+                    </section>
+                </aside>
+            </form>
+
+            <template id="validation-spinner-template">
+                <p class="cl-card-inset cl-loading"><span class="cl-spinner" aria-hidden="true"></span>
+                    <span th:text="#{deliveries.purchase.confirm.checking}"></span></p>
+            </template>
+            <template id="validation-error-template">
+                <div class="cl-card-inset">
+                    <div class="cl-alert is-bad">
+                        <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
+                        <p class="cl-alert-text"><span th:text="#{deliveries.purchase.confirm.checkFailed}"></span>
+                            <button type="button" class="cl-link-button" data-cl-validation-retry th:text="#{deliveries.purchase.confirm.retry}"></button></p>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </section>
+    <script th:src="@{/js/delivery-purchase.js}" defer></script>
+</div>
+
+<!--/* The supplier's live answer (POST validate), parsed into #validation-area by delivery-purchase.js. */-->
+<th:block th:fragment="validationResult">
+    <div th:if="${validationError != null}" class="cl-card-inset" data-cl-validation-error>
+        <div class="cl-alert is-bad">
+            <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
+            <p class="cl-alert-text"><span th:text="${validationError}"></span>
+                <button type="button" class="cl-link-button" data-cl-validation-retry th:text="#{deliveries.purchase.confirm.retry}"></button></p>
+        </div>
+    </div>
+    <div th:if="${validation != null}" th:with="total=${T(pl.commercelink.web.orders.Money).format(validation.totalNet()) + ' ' + validation.currency()}"
+         th:attr="data-fully-available=${validation.fullyAvailable()},data-total=${total}">
+        <div th:if="${!validation.fullyAvailable()}" class="cl-card-inset">
+            <div class="cl-alert is-warn">
+                <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>
+                <p class="cl-alert-text"><span th:text="#{deliveries.create.purchase.unavailable}"></span>
+                    <button type="button" class="cl-link-button" data-cl-back-submit="back-submit"
+                            th:text="#{deliveries.create.back}"></button>
+                    <span th:text="${page.dropship()} ? #{deliveries.create.purchase.unavailable.after.dropship} : #{deliveries.create.purchase.unavailable.after}"></span></p>
+            </div>
+        </div>
+        <table class="cl-table is-key-wrap is-delivery">
+            <colgroup><col class="cl-col-key"><col class="cl-col-num"><col class="cl-col-num"><col class="cl-col-num"><col class="cl-col-num"><col class="cl-col-num"></colgroup>
+            <thead>
+            <tr>
+                <th scope="col" th:text="#{general.product}"></th>
+                <th scope="col" class="is-numeric" th:text="#{deliveries.create.purchase.col.requested}"></th>
+                <th scope="col" class="is-numeric" th:text="#{deliveries.create.purchase.col.available}"></th>
+                <th scope="col" class="is-numeric" th:text="#{deliveries.create.purchase.col.feedPrice}"></th>
+                <th scope="col" class="is-numeric" th:text="#{deliveries.create.purchase.col.livePrice}"></th>
+                <th scope="col" class="is-numeric" th:text="#{deliveries.create.purchase.col.delta}"></th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="line : ${validation.lines()}">
+                <th scope="row" class="cl-table-key" th:attr="data-label=#{general.product}">
+                    <span th:text="${line.name()}"></span>
+                    <span class="cl-table-sub"><span th:text="#{general.ean} + ':'"></span> <span class="cl-code-nowrap" th:text="${line.ean()}"></span>
+                        · <span th:text="#{general.manufacturer.code} + ':'"></span> <span class="cl-code-nowrap" th:text="${line.mfn()}"></span></span>
+                </th>
+                <td class="is-numeric" th:attr="data-label=#{deliveries.create.purchase.col.requested}" th:text="${line.requestedQty()}"></td>
+                <td class="is-numeric" th:attr="data-label=#{deliveries.create.purchase.col.available}">
+                    <span th:text="${line.availableQty()}"></span>
+                    <span th:if="${!line.available}" class="cl-status is-bad" th:text="#{deliveries.create.purchase.missing(${line.missingQty})}"></span>
+                </td>
+                <td class="is-numeric" th:attr="data-label=#{deliveries.create.purchase.col.feedPrice}" th:text="${T(pl.commercelink.web.orders.Money).format(line.feedUnitCost())}"></td>
+                <td class="is-numeric" th:attr="data-label=#{deliveries.create.purchase.col.livePrice}" th:text="${T(pl.commercelink.web.orders.Money).format(line.liveUnitCost())}"></td>
+                <td class="is-numeric" th:attr="data-label=#{deliveries.create.purchase.col.delta}" th:text="${T(pl.commercelink.web.orders.Money).format(line.priceDelta)}"></td>
+            </tr>
+            </tbody>
+        </table>
+        <p class="cl-list-summary"><span><span th:text="#{deliveries.create.purchase.total}"></span>: <strong
+                th:text="${total}"></strong></span></p>
+    </div>
+</th:block>
+</body>
+</html>

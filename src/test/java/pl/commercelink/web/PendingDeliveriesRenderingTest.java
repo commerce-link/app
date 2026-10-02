@@ -33,7 +33,7 @@ class PendingDeliveriesRenderingTest {
     private static PendingDeliveryRow dropshipRow() {
         return new PendingDeliveryRow(Kind.DROPSHIP, "1de57483", "/dashboard/orders/1de57483-x", "Barbara Zając", "AcmeB",
                 "AcmeB", null, false, 1, "1 szt.", LocalDate.of(2026, 9, 28), "po terminie: 2 dni", "is-bad", false,
-                635.0, "635,00 PLN", "/dashboard/orders/1de57483-x/dropship?provider=AcmeB", "pending-d-1",
+                635.0, "635,00 PLN", "/dashboard/deliveries/create/AcmeB?order=1de57483-x", "pending-d-1",
                 List.of(new PendingDeliveryRow.Item("Samsung MirageDrive 2TB NVMe", "MFN MFN-MIRAGE-01 · EAN 5900000000006",
                         "1 szt.", "635,00 PLN", "635,00 PLN", List.of())), List.of("1de57483-x"), "");
     }
@@ -85,7 +85,7 @@ class PendingDeliveriesRenderingTest {
         // given
         PendingDeliveryRow approval = new PendingDeliveryRow(Kind.DROPSHIP, "1de57483", "/dashboard/orders/1de57483-x", null,
                 "Global", "Global", null, false, 1, "1 szt.", null, "brak terminu", "is-none", true, 10.0, "10,00 PLN",
-                "/dashboard/orders/1de57483-x/dropship?provider=Global", "pending-d-2", List.of(), List.of("1de57483-x"), "");
+                "/dashboard/deliveries/create/Global?order=1de57483-x", "pending-d-2", List.of(), List.of("1de57483-x"), "");
 
         // when
         String html = fragment(model(Kind.DROPSHIP, List.of(approval), null, false, List.of()));
@@ -115,7 +115,7 @@ class PendingDeliveriesRenderingTest {
 
         // then
         assertThat(html).contains(">1de57483<").contains("/dashboard/orders/1de57483-x\"").contains("Barbara Zając")
-                .contains("/dashboard/orders/1de57483-x/dropship?provider=AcmeB").contains("po terminie: 2 dni")
+                .contains("/dashboard/deliveries/create/AcmeB?order=1de57483-x").contains("po terminie: 2 dni")
                 .contains(">Zamówienie<").doesNotContain(">Źródło<").doesNotContain("??");
     }
 

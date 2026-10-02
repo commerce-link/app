@@ -126,7 +126,7 @@ public class  DeliveriesRepository extends DynamoDbRepository<Delivery> {
 
         return dynamoDBMapper.query(Delivery.class, queryExpression)
                 .stream()
-                .sorted(Comparator.comparing(Delivery::getPaymentDueDate))
+                .sorted(Comparator.comparing(Delivery::getPaymentDueDate, Comparator.nullsLast(Comparator.naturalOrder())))
                 .collect(Collectors.toList());
     }
 

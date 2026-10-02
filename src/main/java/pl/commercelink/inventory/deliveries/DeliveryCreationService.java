@@ -36,16 +36,19 @@ public class DeliveryCreationService {
     @Autowired
     private DeliveryCostSync deliveryCostSync;
 
+    /**
+     * Records a delivery the operator ordered outside the system. The supplier order number and date are required:
+     * the date goes onto the order items on commit. Callers validate first (the create page shows the errors); a form
+     * without them is refused before anything is released or saved.
+     */
     public String run(String storeId, DeliveryCreationForm form) {
-        prepareForm(storeId, form);
-
-        if (form.hasDeliveryDetails()) {
-            var delivery = createDelivery(storeId, form);
-            finalizeDelivery(storeId, delivery, form);
-            return delivery.getDeliveryId();
+        if (!form.hasDeliveryDetails()) {
+            throw new IllegalArgumentException("A delivery recorded outside the system needs the supplier order number and date");
         }
-
-        return null;
+        prepareForm(storeId, form);
+        var delivery = createDelivery(storeId, form);
+        finalizeDelivery(storeId, delivery, form);
+        return delivery.getDeliveryId();
     }
 
     public void claimAllocations(String storeId, Delivery delivery, DeliveryCreationForm form) {

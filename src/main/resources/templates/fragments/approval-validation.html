@@ -1,0 +1,56 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!-- Validation fragment of the super-admin approval screen (still in the pre-redesign look). -->
+            <div th:fragment="validationResult" th:remove="${validation == null && validationError == null} ? all : none"
+                 th:attr="data-fully-available=${validation != null && validation.fullyAvailable()}">
+                <div class="notification is-danger" th:if="${validationError}">
+                    <span th:text="${validationError}"></span>
+                    <a href="javascript:void(0)" onclick="loadValidation()" th:text="#{deliveries.purchase.confirm.retry}">Retry</a>
+                </div>
+                <th:block th:if="${validation != null}">
+                    <div class="notification is-warning" th:if="${!validation.fullyAvailable()}"
+                         th:text="#{deliveries.purchase.confirm.unavailable.note}">Some items unavailable</div>
+
+                    <table class="table is-fullwidth is-striped">
+                        <thead>
+                        <tr>
+                            <th th:text="#{general.product}">Product</th>
+                            <th th:text="#{general.ean}">EAN</th>
+                            <th th:text="#{deliveries.purchase.confirm.requested}">Requested</th>
+                            <th th:text="#{deliveries.purchase.confirm.available}">Available</th>
+                            <th th:text="#{deliveries.purchase.confirm.feedPrice}">Price (feed)</th>
+                            <th th:text="#{deliveries.purchase.confirm.livePrice}">Price (live)</th>
+                            <th>&Delta;</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="line : ${validation.lines()}"
+                            th:classappend="${!line.isAvailable()} ? 'has-background-danger-light'">
+                            <td th:text="${line.name}"></td>
+                            <td th:text="${line.ean}"></td>
+                            <td th:text="${line.requestedQty}"></td>
+                            <td>
+                                <span th:text="${line.availableQty}"></span>
+                                <span class="tag is-danger ml-1" th:if="${!line.isAvailable()}"
+                                      th:text="#{deliveries.purchase.confirm.missing} + ' ' + ${line.missingQty}"></span>
+                            </td>
+                            <td th:text="${#numbers.formatDecimal(line.feedUnitCost, 1, 2)}"></td>
+                            <td th:text="${#numbers.formatDecimal(line.liveUnitCost, 1, 2)}"></td>
+                            <td th:text="${#numbers.formatDecimal(line.priceDelta, 1, 2)}"></td>
+                        </tr>
+                        </tbody>
+                    </table>
+
+                    <div class="level">
+                        <div class="level-left">
+                            <p>
+                                <strong th:text="#{deliveries.purchase.confirm.total}">Net total</strong>:
+                                <span th:text="${#numbers.formatDecimal(validation.totalNet(), 1, 2)} + ' ' + ${validation.currency()}"></span>
+                            </p>
+                        </div>
+                    </div>
+                </th:block>
+            </div>
+</body>
+</html>
