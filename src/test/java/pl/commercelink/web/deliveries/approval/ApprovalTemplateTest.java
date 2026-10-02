@@ -194,4 +194,48 @@ class ApprovalTemplateTest {
         assertThat(html).contains("cl-alert is-warn").contains("dd0e0012").contains("AcmeB")
                 .contains("id=\"order-options-blocked\"").contains("(timeout)").contains("data-blocked=\"true\"");
     }
+
+    @Test
+    void warehouseOptionsAndAddressChoicesSitInsideTheApprovalForm() {
+        // when
+        String html = render("deliveries/approval", warehouse(addresses()));
+
+        // then
+        int formStart = html.indexOf("id=\"approval-form\"");
+        int formEnd = html.indexOf("</form>", formStart);
+        assertThat(formStart).isPositive();
+        assertThat(html.indexOf("name=\"supplierOrderChoices[")).isBetween(formStart, formEnd);
+        assertThat(html.indexOf("name=\"deliveryAddressId\"")).isBetween(formStart, formEnd);
+        assertThat(html.lastIndexOf("name=\"deliveryAddressId\"")).isBetween(formStart, formEnd);
+    }
+
+    @Test
+    void dropshipOptionsSitInsideTheApprovalForm() {
+        // given
+        Map<String, Object> variables = warehouse(List.of());
+        variables.remove("approvalAddresses");
+        variables.put("page", page(true, null, false));
+
+        // when
+        String html = render("deliveries/approval", variables);
+
+        // then
+        int formStart = html.indexOf("id=\"approval-form\"");
+        int formEnd = html.indexOf("</form>", formStart);
+        assertThat(html.indexOf("name=\"supplierOrderChoices[")).isBetween(formStart, formEnd);
+    }
+
+    @Test
+    void routedOrderWithAnUnmatchedSupplierExplainsTheUnknownId() {
+        // given
+        Map<String, Object> variables = warehouse(addresses());
+        variables.put("routedOrders", List.of(new pl.commercelink.web.dtos.RoutedOrderView("dd0e0013",
+                new pl.commercelink.web.dtos.RoutedSupplierView("999", null, null, null, false, false))));
+
+        // when
+        String html = render("deliveries/approval", variables);
+
+        // then
+        assertThat(html).contains("dd0e0013").contains("marketplace wskazał id 999, które nie jest przypisane do żadnego dostawcy.");
+    }
 }

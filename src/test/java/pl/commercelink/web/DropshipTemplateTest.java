@@ -177,7 +177,7 @@ class DropshipTemplateTest {
         String fragment = read("fragments/consignee-address.html");
 
         // then
-        assertThat(fragment).contains("th:fragment=\"consigneeAddress(consignee, pickupShipment)\"");
+        assertThat(fragment).contains("th:fragment=\"clConsignee(consignee, pickupShipment)\"");
         assertThat(fragment).contains("orders.dropship.consignee.address");
         for (String field : List.of("${consignee.displayName}", "${consignee.streetAndNumber}", "${consignee.postalCode}",
                 "${consignee.city}", "${consignee.country}", "${consignee.phone}", "${consignee.email}")) {
@@ -186,12 +186,11 @@ class DropshipTemplateTest {
     }
 
     @Test
-    void consigneeFragmentsShowThePickupPointAndTheApprovalScreenKeepsTheBoxVariant() throws Exception {
+    void consigneeFragmentShowsThePickupPoint() throws Exception {
         // given
         String fragment = read("fragments/consignee-address.html");
 
         // then
-        assertThat(fragment).contains("th:fragment=\"consigneeAddress(consignee, pickupShipment)\"");
         assertThat(fragment).contains("th:fragment=\"clConsignee(consignee, pickupShipment)\"");
         assertThat(fragment).contains("#{orders.dropship.confirm.pickupPoint}");
         assertThat(fragment).contains("${pickupShipment.collectionPointCode}");

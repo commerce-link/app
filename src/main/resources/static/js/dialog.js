@@ -28,7 +28,9 @@
             event.preventDefault();
             returnTo.set(dialog, focusTarget(trigger));
             dialog.dispatchEvent(new CustomEvent('cl:dialog-open', { detail: { trigger: trigger } }));
-            dialog.showModal();
+            if (!dialog.open) {
+                dialog.showModal();
+            }
             var first = dialog.querySelector('[autofocus]') || dialog.querySelector(FOCUSABLE);
             if (first) {
                 first.focus();
@@ -45,6 +47,33 @@
         if (event.target instanceof HTMLDialogElement && event.target.classList.contains('is-form')) {
             event.target.close();
         }
+    });
+
+    // A dialog rendered open (no-JS fallback such as ?open=reject) is non-modal: no backdrop, no focus trap, and a
+    // later showModal() on it would throw. Reopen it as a modal once the script runs.
+    document.querySelectorAll('dialog.cl-dialog[open]').forEach(function (dialog) {
+        if (typeof dialog.showModal === 'function') {
+            dialog.close();
+            dialog.showModal();
+        }
+    });
+
+    // A second click must not send a second request while the first is on its way (a rejected delivery would answer
+    // the repeat with a state error page). Forms that handle their own submit (preventDefault, data-cl-async) are left
+    // alone; a page restored from the back/forward cache gets its button back.
+    document.addEventListener('submit', function (event) {
+        var form = event.target;
+        var button = event.submitter;
+        if (event.defaultPrevented || !button || !form.closest || !form.closest('dialog.cl-dialog.is-form')
+            || form.hasAttribute('data-cl-async')) {
+            return;
+        }
+        button.disabled = true;
+        window.addEventListener('pageshow', function (shown) {
+            if (shown.persisted) {
+                button.disabled = false;
+            }
+        }, { once: true });
     });
 
     // close does not bubble
