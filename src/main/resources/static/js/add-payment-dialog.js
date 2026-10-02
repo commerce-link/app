@@ -1,6 +1,6 @@
-// The "register payment" dialog (fragments/add-payment-modal.html) on the order details, Payments and Deliveries.
-// Payments opens it from a[data-cl-payment-open] links (delegated click below), Deliveries calls the public
-// functions below from its buttons; the order page opens it with data-cl-dialog-open
+// The "register payment" dialog (fragments/add-payment-modal.html) on the order details, Payments and the delivery
+// details. Payments opens it from a[data-cl-payment-open] links (delegated click below); the order and delivery details
+// open it with data-cl-dialog-open
 // (dialog.js fires cl:dialog-open). The mode picks the fee checkboxes: "order" (autofill the difference, the amount
 // includes the fee) or "delivery" (the surplus is the fee) and the default direction. The hint under the amounts says
 // what will be booked and whether it is a full, short or over payment; its words come from the dialog's data-hint-*.
@@ -49,14 +49,6 @@
             bankEl.focus();
         } else if (!show && dialog.open) {
             dialog.close();
-        }
-    }
-
-    // Deliveries keep their Bulma edit modal (fragments/payments-section.html), opened through this public function.
-    function togglePaymentsEditModal(show) {
-        var modal = document.getElementById('paymentsEditModal');
-        if (modal) {
-            modal.classList.toggle('is-active', show);
         }
     }
 
@@ -158,12 +150,6 @@
         };
     }
 
-    function openAddPaymentModalFromButton(btn) {
-        setPaymentModalMode(btn.dataset.mode || 'order');
-        renderHint();
-        toggleAddPaymentModal(true);
-    }
-
     function openPaymentModalForOrder(orderId, expectedAmount, pending) {
         setPaymentModalMode('order');
         reset('/dashboard/orders/' + encodeURIComponent(orderId) + '/addPayment', expectedAmount, pending);
@@ -257,13 +243,13 @@
         });
     }
 
-    // the order page: the server rendered the action, the unpaid amount and the pending payment already
+    // the order and delivery details: the server rendered the action, the unpaid amount and the pending payment already
     dialog.addEventListener('cl:dialog-open', function (event) {
         var trigger = event.detail && event.detail.trigger;
         setPaymentModalMode(trigger && trigger.dataset.mode ? trigger.dataset.mode : 'order');
         renderHint();
     });
-    // Payments and Deliveries do not load dialog.js: Cancel and a click on the backdrop close the dialog here
+    // Payments does not load dialog.js: Cancel and a click on the backdrop close the dialog here
     dialog.querySelector('[data-cl-payment-close]').addEventListener('click', function () {
         dialog.close();
     });
@@ -276,8 +262,6 @@
     setPaymentModalMode(dialog.getAttribute('data-mode') || 'order');
 
     window.toggleAddPaymentModal = toggleAddPaymentModal;
-    window.togglePaymentsEditModal = togglePaymentsEditModal;
-    window.openAddPaymentModalFromButton = openAddPaymentModalFromButton;
     window.openPaymentModalForOrder = openPaymentModalForOrder;
     window.openPaymentModalForOrderFromButton = openPaymentModalForOrderFromButton;
     window.openPaymentModalForDelivery = openPaymentModalForDelivery;

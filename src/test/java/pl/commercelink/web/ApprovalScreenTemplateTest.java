@@ -13,16 +13,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ApprovalScreenTemplateTest {
 
     private static final Path APPROVAL = Path.of("src/main/resources/templates/deliveryApproval.html");
-    private static final Path DETAILS = Path.of("src/main/resources/templates/deliveryDetails.html");
     private static final Pattern OPENING_TAG =
             Pattern.compile("<[a-zA-Z0-9:]+(?:\\s+[a-zA-Z0-9:_.-]+(?:=\"[^\"]*\")?)*\\s*/?>", Pattern.DOTALL);
 
     private String approval() throws Exception {
         return Files.readString(APPROVAL, StandardCharsets.UTF_8);
-    }
-
-    private String details() throws Exception {
-        return Files.readString(DETAILS, StandardCharsets.UTF_8);
     }
 
     @Test
@@ -58,39 +53,35 @@ class ApprovalScreenTemplateTest {
     }
 
     @Test
-    void detailsPageHidesTheRetryButtonOnceTheDeliveryHasBeenReceived() throws Exception {
+    void realisationScreenScrollsTheOptionListToThePreselectedAddress() throws Exception {
         // when
-        String html = details();
-        String retryFormTag = openingTagOf(html, "purchase/retry");
+        String html = approval();
 
         // then
-        assertThat(retryFormTag).contains("!delivery.hasBeenReceived()");
-        assertThat(retryFormTag).contains("delivery.documents.isEmpty()");
+        assertThat(html).contains("addressModalScript");
+        assertThat(html).contains("scrollAddressOptionsToSelection();");
     }
 
     @Test
-    void detailsPageOffersARejectModalPostingToTheRejectRoute() throws Exception {
+    void approvalScreenNoLongerCarriesTheRejectForm() throws Exception {
         // when
-        String html = details();
+        String html = approval();
 
         // then
-        assertThat(html).contains("id=\"rejectPurchaseModal\"");
-        assertThat(html).contains("/dashboard/store/${delivery.storeId}/deliveries/${delivery.deliveryId}/reject");
-        assertThat(html).contains("<textarea class=\"textarea\" name=\"reason\">");
+        assertThat(html).doesNotContain("/reject");
+        assertThat(html).doesNotContain("name=\"reason\"");
     }
 
     @Test
     void guardsAreNeverCombinedWithThReplaceOnTheSameElement() throws Exception {
-        // then
+        // when / then
         assertThat(hasElementWithBothThIfAndThReplace(approval())).isFalse();
-        assertThat(hasElementWithBothThIfAndThReplace(details())).isFalse();
     }
 
     @Test
     void localVariablesAreNeverDeclaredOnTheSameElementThatGuardsOnThem() throws Exception {
-        // then
+        // when / then
         assertThat(hasElementWithBothThIfAndThWith(approval())).isFalse();
-        assertThat(hasElementWithBothThIfAndThWith(details())).isFalse();
     }
 
     private String openingTagOf(String html, String marker) {
