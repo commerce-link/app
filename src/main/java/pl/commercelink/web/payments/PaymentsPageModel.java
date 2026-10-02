@@ -9,9 +9,7 @@ public record PaymentsPageModel(PaymentsQuery query, PaymentSide side, List<Tile
                                 String resultsTail, List<PayableRow> payables, List<ReceivableRow> receivables,
                                 EmptyState emptyState, boolean invoicingConnected, String returnTo) {
 
-    /** {@code tone} is a cl-stat tone class, empty when the tile reads in plain ink. */
-    public record Tile(String label, long count, String payablesHint, String receivablesHint, String href, boolean active,
-                       String tone) { }
+    public record Tile(String label, long count, String payablesHint, String receivablesHint, String href, boolean active) { }
     public record SideTab(String label, long count, String href, boolean active) { }
     public record Option(String value, String label, long count, boolean selected) { }
     public record Chip(String label, String clearHref, String clearLabel) { }

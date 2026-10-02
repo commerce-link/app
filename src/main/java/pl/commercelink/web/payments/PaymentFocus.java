@@ -18,11 +18,6 @@ public enum PaymentFocus {
         return param;
     }
 
-    /** An overpayment is money sitting with the other party, so a non-empty Overpaid tile is red; a red zero would be a false alarm. */
-    public String tone(long count) {
-        return this == REFUND && count > 0 ? "is-bad" : "";
-    }
-
     public static Optional<PaymentFocus> parse(String value) {
         return value == null ? Optional.empty()
                 : Arrays.stream(values()).filter(f -> f.param.equalsIgnoreCase(value.trim())).findFirst();

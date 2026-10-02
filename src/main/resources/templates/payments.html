@@ -55,7 +55,7 @@
             <!--/* The tiles count both sides and each narrows both tabs to exactly what it counts (spec §4.1). */-->
             <ul class="cl-stat-grid is-orders" th:attr="aria-label=#{payments.tiles.label}">
                 <li th:each="tile : ${page.tiles()}">
-                    <a class="cl-stat is-link" th:classappend="${tile.tone()}" th:href="@{${tile.href()}}" th:attr="aria-current=${tile.active()} ? 'true' : null" data-cl-list-nav>
+                    <a class="cl-stat is-link" th:href="@{${tile.href()}}" th:attr="aria-current=${tile.active()} ? 'true' : null" data-cl-list-nav>
                         <span class="cl-eyebrow" th:text="${tile.label()}"></span>
                         <span class="cl-stat-value" th:text="${tile.count()}"></span>
                         <span class="cl-stat-hint"><span class="cl-nowrap" th:text="${tile.payablesHint()}"></span> · <span class="cl-nowrap" th:text="${tile.receivablesHint()}"></span></span>

@@ -4584,28 +4584,6 @@ a.cl-link-button:hover {
     outline-offset: 2px;
 }
 
-/* A tile that counts something wrong (Payments: overpayments): error border, wash and number, kept on hover and when
-   pressed, where a thicker border instead of the accent fill says the filter is on. The hint goes to ink-2 because
-   ink-3 drops below AA on the red wash. */
-.cl-page .cl-stat.is-bad,
-.cl-page .cl-stat.is-link.is-bad:hover,
-.cl-page .cl-stat.is-link.is-bad[aria-current="true"] {
-    border-color: var(--cl-bad);
-    background: var(--cl-bad-soft);
-}
-
-.cl-page .cl-stat.is-link.is-bad[aria-current="true"] {
-    box-shadow: inset 0 0 0 1px var(--cl-bad);
-}
-
-.cl-page .cl-stat.is-bad .cl-stat-value {
-    color: var(--cl-bad);
-}
-
-.cl-page .cl-stat.is-bad .cl-stat-hint {
-    color: var(--cl-ink-2);
-}
-
 @media (prefers-reduced-motion: reduce) {
     .cl-page .cl-stat.is-link {
         transition: none;

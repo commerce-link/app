@@ -55,7 +55,7 @@ class PaymentSourcesPageRenderTest {
     private PaymentsController controller;
 
     private static PaymentsPageModel.Tile tile(boolean active) {
-        return new PaymentsPageModel.Tile("Wszystkie", 2, "dostawy: 1", "zamowienia: 1", "/dashboard/payments", active, "is-bad");
+        return new PaymentsPageModel.Tile("Wszystkie", 2, "dostawy: 1", "zamowienia: 1", "/dashboard/payments", active);
     }
 
     private static PayableRow.PendingData pending() {
@@ -121,8 +121,6 @@ class PaymentSourcesPageRenderTest {
         assertThat(html).contains("data-cl-payment-open").contains("data-delivery-id=\"d-1\"")
                 .contains("data-unpaid=\"150.00\"").contains("data-return-to=\"/dashboard/payments?side=payables\"")
                 .contains("data-pending-ref=\"REF-1\"").contains("DOS-1");
-        // a toned tile carries its tone class next to the link class
-        assertThat(html).contains("class=\"cl-stat is-link is-bad\"");
         // this page's own add-payment dialog must load money.js exactly once
         assertThat(occurrences(html, "/js/money.js")).isEqualTo(1);
     }

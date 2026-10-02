@@ -69,7 +69,7 @@ public class PaymentsModelFactory {
             boolean active = f == query.focus();
             return new Tile(text(locale, "payments.tile." + f.param()), p + r,
                     text(locale, "payments.tile.hint.payables", p), text(locale, "payments.tile.hint.receivables", r),
-                    active ? current.withoutFocus().href() : query.withFocus(f).href(), active, f.tone(p + r));
+                    active ? current.withoutFocus().href() : query.withFocus(f).href(), active);
         }).toList();
 
         List<SideTab> tabs = List.of(
