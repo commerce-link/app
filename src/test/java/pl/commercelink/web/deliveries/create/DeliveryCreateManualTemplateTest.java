@@ -41,6 +41,17 @@ class DeliveryCreateManualTemplateTest {
     }
 
     @Test
+    void readOnlyItemsShowTheManufacturerCodeNextToTheEanAsInStepOne() {
+        // when
+        String html = render("deliveries/create/manual", warehouse(Map.of()));
+
+        // then: the operator copies the order from the supplier's confirmation, which often lists the manufacturer code
+        String row = html.substring(html.indexOf("data-cl-readonly-item"), html.indexOf("</tr>", html.indexOf("data-cl-readonly-item")));
+        assertThat(row).contains("EAN:").contains("5901234123457")
+                .contains("Kod producenta:").contains("<span class=\"cl-code-nowrap\">100-100001084WOF</span>");
+    }
+
+    @Test
     void serverValidatesTheRecordStepSoItsErrorsReachTheSummaryAndTheFields() {
         // when
         String html = render("deliveries/create/manual", warehouse(Map.of()));
