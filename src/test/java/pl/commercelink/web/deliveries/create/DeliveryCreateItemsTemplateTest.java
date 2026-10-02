@@ -25,7 +25,7 @@ class DeliveryCreateItemsTemplateTest {
                 .contains("id=\"delivery-step-form\"").contains("data-cl-delivery-items")
                 .contains("AMD Ryzen 7 9800X3D").contains("<span class=\"cl-code-nowrap\" data-cl-item-ean>5901234123457</span>")
                 .contains("Źródła: 1").contains("min. 2").contains("Dołącz źródło")
-                .contains("Uzupełnij magazyn przy okazji: wczytywanie…").contains("Kingston FURY Beast 16GB")
+                .contains("Uzupełnij magazyn przy okazji").contains("Kingston FURY Beast 16GB")
                 .contains("Magazyn sklepu").contains("Podsumowanie")
                 .doesNotContain("??");
         for (String absent : List.of("name=\"externalDeliveryId\" class", "type=\"date\"", "<select")) {
@@ -186,8 +186,22 @@ class DeliveryCreateItemsTemplateTest {
         // then
         assertThat(html).contains("data-cl-suggestions").contains("data-url=\"/dashboard/deliveries/create/Acme/suggestions\"")
                 .contains("data-summary=\"Uzupełnij magazyn przy okazji: {0}\"")
-                .contains("Uzupełnij magazyn przy okazji: wczytywanie…").contains("data-cl-suggestions-status")
+                .contains("<span data-cl-suggestions-title>Uzupełnij magazyn przy okazji</span>")
+                .contains("class=\"cl-spinner is-compact\" aria-hidden=\"true\" data-cl-suggestions-spinner")
+                .contains("wczytywanie propozycji").contains("Szukanie produktów w dobrej cenie u dostawcy…")
+                .contains("class=\"cl-card-inset cl-loading\" data-cl-suggestions-status")
                 .doesNotContain("suggestedItems[0]");
+        // with nothing to show yet the table (and its header) waits for the rows
+        assertThat(html).contains("<div class=\"cl-card-section\" data-cl-suggestions-table hidden=\"hidden\">");
+    }
+
+    @Test
+    void chosenSuggestionsShowTheirTableAtOnce() {
+        // when
+        String html = render("deliveries/create/items", model(warehousePage(false, true, false), warehouseForm()));
+
+        // then
+        assertThat(html).contains("<div class=\"cl-card-section\" data-cl-suggestions-table>").doesNotContain("data-cl-suggestions-table hidden");
     }
 
     @Test

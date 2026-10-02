@@ -30,7 +30,7 @@ class DeliveryCreateMessagesTest {
             "deliveries.create.release.dropship.help", "deliveries.create.suggestions.summary",
             "deliveries.create.suggestions.help", "deliveries.create.suggestions.loading",
             "deliveries.create.suggestions.loadingHelp", "deliveries.create.suggestions.failed",
-            "deliveries.create.suggestions.retry", "deliveries.create.suggestions.summaryFailed",
+            "deliveries.create.suggestions.retry", "deliveries.create.suggestions.title",
             "deliveries.create.recipient", "deliveries.create.recipient.warehouse",
             "deliveries.create.recipient.help.items", "deliveries.create.recipient.help.purchase",
             "deliveries.create.recipient.help.manual",
