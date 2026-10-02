@@ -10,12 +10,12 @@
                 <div class="cl-page-header">
                     <div class="cl-page-header-row">
                         <h1 class="cl-page-title" th:text="#{item.history}"></h1>
-                        <form th:if="${page.searched()}" th:replace="~{item-history/parts :: searchForm(true, false)}"></form>
+                        <th:block th:if="${page.searched()}"><form th:replace="~{item-history/parts :: searchForm(true, false)}"></form></th:block>
                     </div>
                     <p th:unless="${page.searched()}" class="cl-page-lead" th:text="#{item.history.lead}"></p>
                 </div>
-                <section th:unless="${page.searched()}" th:replace="~{item-history/parts :: searchCard}"></section>
-                <section th:if="${page.searched() and !page.found()}" th:replace="~{item-history/parts :: notFound}"></section>
+                <th:block th:unless="${page.searched()}"><section th:replace="~{item-history/parts :: searchCard}"></section></th:block>
+                <th:block th:if="${page.searched() and !page.found()}"><section th:replace="~{item-history/parts :: notFound}"></section></th:block>
                 <th:block th:if="${page.found()}">
                     <div th:if="${page.warningCounts() != null}" class="cl-alert is-warn" role="note">
                         <i class="fas fa-exclamation-triangle cl-alert-icon" aria-hidden="true"></i>

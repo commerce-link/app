@@ -38,7 +38,9 @@ class ItemHistoryTemplateTest {
 
         // then
         assertThat(html.split("<h1", -1)).hasSize(2);
-        assertThat(html).contains("Znajdź przedmiot").contains("autofocus").doesNotContain("cl-timeline");
+        assertThat(html).contains("Znajdź przedmiot").contains("autofocus").doesNotContain("cl-timeline")
+                .doesNotContain("Nie znaleziono przedmiotu").doesNotContain("is-header");
+        assertThat(html.split("id=\"serial-search\"", -1)).hasSize(2);
     }
 
     @Test
@@ -50,7 +52,10 @@ class ItemHistoryTemplateTest {
         assertThat(html).contains("Samsung 980 PRO").contains("class=\"cl-now\"").contains("W zamówieniu")
                 .contains("href=\"/dashboard/orders/b81c4e07\"").contains("data-cl-copy=\"8806090295454\"")
                 .doesNotContain("target=\"_blank\"").doesNotContain("data-cl-timeline-limit")
-                .doesNotContain("Kod producenta");
+                .doesNotContain("Kod producenta")
+                .doesNotContain("Znajdź przedmiot").doesNotContain("Nie znaleziono przedmiotu")
+                .doesNotContain("data-cl-timeline-more");
+        assertThat(html.split("id=\"serial-search\"", -1)).hasSize(2);
         assertThat(html).doesNotContain("class=\"timeline");
     }
 
@@ -79,6 +84,8 @@ class ItemHistoryTemplateTest {
         String html = render(new ItemHistoryPage("<b>x</b>", true, false, null, null, null, null, List.of(), null, null, null, null, null));
 
         // then
-        assertThat(html).doesNotContain("<b>x</b>").contains("&lt;b&gt;x&lt;/b&gt;").contains("Nie znaleziono przedmiotu");
+        assertThat(html).doesNotContain("<b>x</b>").contains("&lt;b&gt;x&lt;/b&gt;").contains("Nie znaleziono przedmiotu")
+                .doesNotContain("Znajdź przedmiot");
+        assertThat(html.split("id=\"serial-search\"", -1)).hasSize(2);
     }
 }

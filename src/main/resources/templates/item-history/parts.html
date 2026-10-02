@@ -75,9 +75,9 @@
                 <p th:if="${e.facts() != null}" class="cl-timeline-desc" th:text="${e.facts()}"></p>
             </li>
         </ol>
-        <th:block th:if="${page.timelineLimit() != null}"
-                  th:replace="~{fragments/timeline :: more('item-events', ${page.moreText()}, ${page.shownText()},
-                      ${page.hiddenText()}, #{order.history.less})}"></th:block>
+        <th:block th:if="${page.timelineLimit() != null}"><th:block
+                th:replace="~{fragments/timeline :: more('item-events', ${page.moreText()}, ${page.shownText()},
+                    ${page.hiddenText()}, #{order.history.less})}"></th:block></th:block>
     </th:block>
 </section>
 </body>
