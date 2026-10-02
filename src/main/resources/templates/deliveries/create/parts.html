@@ -311,33 +311,49 @@
        their rows (suggestionRows); rows already here are the ones the operator chose before (back from step 2, an
        error), and the fetched list takes their typed values over. Nothing to suggest hides the card. */-->
 <section th:fragment="suggestions" class="cl-card" aria-labelledby="suggestions-title" data-cl-suggestions
-         th:attr="data-url=@{${page.links().suggestions()}}, data-summary=#{deliveries.create.suggestions.summary('{0}')},
-                  data-summary-loading=#{deliveries.create.suggestions.loading}, data-summary-failed=#{deliveries.create.suggestions.summaryFailed}">
+         th:attr="data-url=@{${page.links().suggestions()}}, data-summary=#{deliveries.create.suggestions.summary('{0}')}">
     <details class="cl-disclosure cl-card-extras" th:open="${!form.suggestedItems.?[requestedQty > 0].isEmpty() or (invalidFields != null and !invalidFields.isEmpty())}">
-        <summary id="suggestions-title" th:text="#{deliveries.create.suggestions.loading}"></summary>
+        <!--/* the title, then a small spinner while the list loads, or a mark when it failed (each named by hidden text);
+               an open card shows the state in its body, so the title's spinner is only for the folded card */-->
+        <summary id="suggestions-title">
+            <span data-cl-suggestions-title th:text="#{deliveries.create.suggestions.title}"></span>
+            <span class="cl-spinner is-compact" aria-hidden="true" data-cl-suggestions-spinner></span>
+            <span class="cl-visually-hidden" data-cl-suggestions-spinner th:text="#{deliveries.create.suggestions.loading}"></span>
+            <i class="fas fa-exclamation-circle cl-summary-mark is-bad" aria-hidden="true" data-cl-suggestions-failed-mark hidden></i>
+            <span class="cl-visually-hidden" data-cl-suggestions-failed-mark hidden th:text="#{deliveries.create.suggestions.failed}"></span>
+        </summary>
         <div class="cl-disclosure-body">
             <p class="cl-card-desc" th:text="#{deliveries.create.suggestions.help}"></p>
-            <p class="cl-help" role="status" data-cl-suggestions-status th:text="#{deliveries.create.suggestions.loadingHelp}"></p>
-            <p class="cl-help" data-cl-suggestions-failed hidden>
-                <span th:text="#{deliveries.create.suggestions.failed}"></span>
-                <button type="button" class="cl-button" data-cl-suggestions-retry th:text="#{deliveries.create.suggestions.retry}"></button>
-            </p>
-            <table class="cl-table is-key-wrap is-delivery">
-                <colgroup><col><col class="cl-col-qty"><col class="cl-col-qty"><col class="cl-col-price-input"></colgroup>
-                <thead>
-                <tr>
-                    <th scope="col" th:text="#{general.product}"></th>
-                    <th scope="col" class="is-numeric" th:text="#{deliveries.create.col.targetStock}"></th>
-                    <th scope="col" th:text="#{deliveries.create.col.qty}"></th>
-                    <th scope="col" th:text="#{deliveries.create.col.unitCost}"></th>
-                </tr>
-                </thead>
-                <tbody data-cl-suggestion-rows>
-                <th:block th:each="suggested, sStat : ${form.suggestedItems}">
-                    <tr th:replace="~{deliveries/create/parts :: suggestionRow(${suggested}, ${sStat.index})}"></tr>
-                </th:block>
-                </tbody>
-            </table>
+            <div aria-live="polite">
+                <p class="cl-card-inset cl-loading" data-cl-suggestions-status><span class="cl-spinner" aria-hidden="true"></span>
+                    <span th:text="#{deliveries.create.suggestions.loadingHelp}"></span></p>
+                <div class="cl-card-inset" data-cl-suggestions-failed hidden>
+                    <div class="cl-alert is-bad">
+                        <i class="fas fa-exclamation-circle cl-alert-icon" aria-hidden="true"></i>
+                        <p class="cl-alert-text"><span th:text="#{deliveries.create.suggestions.failed}"></span>
+                            <button type="button" class="cl-link-button" data-cl-suggestions-retry th:text="#{deliveries.create.suggestions.retry}"></button></p>
+                    </div>
+                </div>
+            </div>
+            <!--/* spaced from the description like the items table above (cl-card-section) */-->
+            <div class="cl-card-section" data-cl-suggestions-table th:hidden="${form.suggestedItems.isEmpty()}">
+                <table class="cl-table is-key-wrap is-delivery">
+                    <colgroup><col><col class="cl-col-qty"><col class="cl-col-qty"><col class="cl-col-price-input"></colgroup>
+                    <thead>
+                    <tr>
+                        <th scope="col" th:text="#{general.product}"></th>
+                        <th scope="col" class="is-numeric" th:text="#{deliveries.create.col.targetStock}"></th>
+                        <th scope="col" th:text="#{deliveries.create.col.qty}"></th>
+                        <th scope="col" th:text="#{deliveries.create.col.unitCost}"></th>
+                    </tr>
+                    </thead>
+                    <tbody data-cl-suggestion-rows>
+                    <th:block th:each="suggested, sStat : ${form.suggestedItems}">
+                        <tr th:replace="~{deliveries/create/parts :: suggestionRow(${suggested}, ${sStat.index})}"></tr>
+                    </th:block>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </details>
 </section>

@@ -7333,6 +7333,24 @@ a.cl-link-button:hover {
     flex: none;
 }
 
+/* A spinner in running text or a disclosure title (restock suggestions loading): the size of the text beside it. */
+.cl-page .cl-spinner.is-compact {
+    width: 14px;
+    height: 14px;
+    border-width: 2px;
+    flex: none;
+}
+
+.cl-page details[open] > summary .cl-spinner.is-compact {
+    display: none;
+}
+
+/* A state mark after a disclosure title (restock suggestions failed to load). */
+.cl-page .cl-summary-mark.is-bad {
+    color: var(--cl-bad);
+    font-size: 14px;
+}
+
 /* An alert alone in a padded wrapper (the validation area) ends with the wrapper's padding, not its own margin. */
 .cl-page .cl-card-inset > .cl-alert:only-child {
     margin-bottom: 0;
