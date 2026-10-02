@@ -1,0 +1,24 @@
+<!DOCTYPE HTML>
+<html th:lang="${#locale.language}" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout">
+<!--/* The layout of a printable sheet (order card, collection protocol). The order page loads it into a hidden frame
+       and prints it straight away (print.js), so it carries no app frame, scripts, analytics or messages: only the
+       stylesheets the sheet needs. Without JavaScript the menu link opens it as a page and the browser prints it.
+       The wrappers repeat layout.html's (main.cl-content > section.section > .container.content) so the sheet prints
+       exactly as it did from the old preview page, whose print rules are written against them. */-->
+<head>
+    <title layout:title-pattern="$CONTENT_TITLE" th:text="#{general.title}"></title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+    <link rel="stylesheet" th:href="@{/css/commercelink.css}">
+</head>
+<body>
+<main id="clContent" class="cl-content">
+    <section class="section">
+        <div class="container content is-fluid" layout:fragment="content">
+        </div>
+    </section>
+</main>
+</body>
+</html>

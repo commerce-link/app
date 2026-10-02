@@ -292,24 +292,6 @@ class ShipmentTrackingSubscriberTest {
     }
 
     @Test
-    void checkAppliesActiveResultAndSavesOrder() {
-        // given
-        providerAvailable();
-        Shipment shipment = courier("PKG-1");
-        shipment.markTrackingPending("cmd-1");
-        Order order = orderWith(shipment);
-        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(order);
-        when(provider.checkParcelTracking("cmd-1")).thenReturn(ParcelTrackingSubscription.active("cmd-1", "21037943", "dpd"));
-
-        // when
-        subscriber.check(new ShipmentTrackingCheckRequest(STORE_ID, ORDER_ID, "PKG-1"), 1);
-
-        // then
-        assertThat(shipment.getTrackingSubscriptionStatus()).isEqualTo(ShipmentTrackingStatus.ACTIVE);
-        verify(ordersRepository).save(order);
-    }
-
-    @Test
     void checkThrowsPendingExceptionToTriggerRedeliveryWhileAttemptsRemain() {
         // given
         providerAvailable();

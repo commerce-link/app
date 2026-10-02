@@ -222,11 +222,17 @@ public class Store {
         return removed;
     }
 
+    /**
+     * The name configured for the integration type, or null. A provider that lost its authorisation is stored with a
+     * null name (ShippingProviderFactory#onAuthorizationLost) and reads as not configured: findFirst on a null element
+     * would throw, taking down every page that asks (the order page, the courier page).
+     */
     @DynamoDBIgnore
     public String getConfigurationValue(IntegrationType type) {
         return integrations.stream()
                 .filter(config -> config.getType() == type)
                 .map(Integration::getName)
+                .filter(Objects::nonNull)
                 .findFirst()
                 .orElse(null);
     }

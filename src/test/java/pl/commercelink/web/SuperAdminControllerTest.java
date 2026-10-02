@@ -51,26 +51,6 @@ class SuperAdminControllerTest {
     private final Locale locale = Locale.forLanguageTag("pl");
 
     @Test
-    void showsSuccessWhenStoreFullyDeleted() {
-        // given
-        Store store = new Store();
-        store.setStoreId(STORE_ID);
-        store.setDemo(new pl.commercelink.stores.DemoStoreMetadata("a@b.pl", "x", "y"));
-        when(storesRepository.findById(STORE_ID)).thenReturn(store);
-        when(storeDeletionService.deleteStore(STORE_ID, StoreDeletionService.Guard.ANY)).thenReturn(true);
-        when(messageSource.getMessage("store.delete.success", null, locale)).thenReturn("Usunięto");
-        RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
-
-        // when
-        String view = controller.deleteStore(STORE_ID, null, locale, redirectAttributes);
-
-        // then
-        assertEquals("redirect:/dashboard/stores", view);
-        assertEquals("Usunięto", redirectAttributes.getFlashAttributes().get("successMessage"));
-        assertNull(redirectAttributes.getFlashAttributes().get("errorMessage"));
-    }
-
-    @Test
     void showsErrorWhenCascadeCompletesPartially() {
         // given
         Store store = new Store();

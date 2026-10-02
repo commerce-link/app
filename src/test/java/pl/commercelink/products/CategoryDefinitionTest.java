@@ -1,6 +1,9 @@
 package pl.commercelink.products;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.List;
 
@@ -8,30 +11,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class CategoryDefinitionTest {
 
-    @Test
-    void definitionWithCategoryIsComplete() {
+    // null is a definition without a category; "Services" is the legacy category string of service definitions
+    @ParameterizedTest(name = "category = {0}")
+    @NullSource
+    @ValueSource(strings = {"Karty graficzne", "Services"})
+    void definitionIsCompleteWhateverItsOptionalCategory(String category) {
         // given
         CategoryDefinition definition = completeDefinitionWithoutCategory();
-        definition.setCategory("Karty graficzne");
+        definition.setCategory(category);
 
         // when / then
         assertThat(definition.isComplete()).isTrue();
-    }
-
-    @Test
-    void definitionWithLegacyServicesCategoryStringIsComplete() {
-        // given
-        CategoryDefinition definition = completeDefinitionWithoutCategory();
-        definition.setCategory("Services");
-
-        // when / then
-        assertThat(definition.isComplete()).isTrue();
-    }
-
-    @Test
-    void definitionWithoutCategoryIsComplete() {
-        // when / then
-        assertThat(completeDefinitionWithoutCategory().isComplete()).isTrue();
     }
 
     /**

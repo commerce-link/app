@@ -1,6 +1,11 @@
 package pl.commercelink.registration;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -19,46 +24,22 @@ class PasswordPolicyTest {
         assertTrue(PasswordPolicy.isValid("Ab1!cdef"));
     }
 
-    @Test
-    void rejectsPasswordShorterThanEightCharacters() {
-        // when / then
-        assertFalse(PasswordPolicy.isValid("Ab1!cde"));
+    static Stream<Arguments> invalidPasswords() {
+        return Stream.of(
+                Arguments.of("shorter than eight characters", "Ab1!cde"),
+                Arguments.of("longer than Cognito accepts", "Ab1!" + "x".repeat(253)),
+                Arguments.of("without lowercase", "ABC1!DEFG"),
+                Arguments.of("without uppercase", "abc1!defg"),
+                Arguments.of("without digit", "Abcd!efgh"),
+                Arguments.of("without symbol", "Abcd1efgh"),
+                Arguments.of("space is not a symbol", "Moje haslo 1"));
     }
 
-    @Test
-    void rejectsPasswordLongerThanCognitoAccepts() {
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("invalidPasswords")
+    void rejectsPasswordBreakingARequirement(String reason, String password) {
         // when / then
-        assertFalse(PasswordPolicy.isValid("Ab1!" + "x".repeat(253)));
-    }
-
-    @Test
-    void rejectsPasswordWithoutLowercase() {
-        // when / then
-        assertFalse(PasswordPolicy.isValid("ABC1!DEFG"));
-    }
-
-    @Test
-    void rejectsPasswordWithoutUppercase() {
-        // when / then
-        assertFalse(PasswordPolicy.isValid("abc1!defg"));
-    }
-
-    @Test
-    void rejectsPasswordWithoutDigit() {
-        // when / then
-        assertFalse(PasswordPolicy.isValid("Abcd!efgh"));
-    }
-
-    @Test
-    void rejectsPasswordWithoutSymbol() {
-        // when / then
-        assertFalse(PasswordPolicy.isValid("Abcd1efgh"));
-    }
-
-    @Test
-    void doesNotCountSpaceAsSymbol() {
-        // when / then
-        assertFalse(PasswordPolicy.isValid("Moje haslo 1"));
+        assertFalse(PasswordPolicy.isValid(password));
     }
 
     @Test

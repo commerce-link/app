@@ -4,6 +4,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -35,6 +38,8 @@ import pl.commercelink.testsupport.OptimisticLockingExecutorMocks;
 
 import java.util.Collections;
 import java.util.Locale;
+import java.util.function.Consumer;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -140,8 +145,8 @@ class InvoicingServiceTest {
     }
 
     @Test
-    @DisplayName("createInvoice lets the receipts settle the alerts of blocked or failed e-receipts, since it saves outside the order lifecycle")
-    void createInvoiceSettlesTheAlertsOfDeadReceiptAttempts() {
+    @DisplayName("createInvoice lets the receipts reconcile the alerts of blocked or failed e-receipts, since it saves outside the order lifecycle")
+    void anInvoiceReconcilesTheDeadAttemptAlerts() {
         // given
         Order order = orderWithFilledBillingDetails();
         Invoice invoice = new Invoice("inv-1", "FV/1/2026", ORDER_ID, null, "https://example.com/inv/1",
@@ -159,7 +164,7 @@ class InvoicingServiceTest {
         // then
         ArgumentCaptor<Order> orderCaptor = ArgumentCaptor.forClass(Order.class);
         verify(ordersRepository).save(orderCaptor.capture());
-        verify(receiptTrigger).settleDeadAttemptAlerts(orderCaptor.getValue());
+        verify(receiptTrigger).reconcileDeadAttemptAlerts(orderCaptor.getValue());
     }
 
     @Test
@@ -198,62 +203,36 @@ class InvoicingServiceTest {
         assertThat(result.getErrorMessage()).isEqualTo("Invoicing provider is not configured for store: " + STORE_ID);
     }
 
-    @Test
-    @DisplayName("createInvoice (standard document) returns provider-not-configured error and does not throw when the store has no invoicing provider")
-    void createInvoiceReturnsErrorWhenInvoicingProviderIsNotConfigured() {
-        // given
-        Order order = orderWithFilledBillingDetails();
-        when(storesRepository.findById(STORE_ID)).thenReturn(store);
-        when(store.getInvoicingConfiguration()).thenReturn(invoicingConfiguration);
-        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(Collections.emptyList());
-        when(invoicingProviderFactory.get(store)).thenReturn(null);
-
-        // when
-        InvoicingService.OperationResult result = invoicingService.createInvoice(order, DocumentType.InvoiceVat, false);
-
-        // then
-        assertThat(result.hasError()).isTrue();
-        assertThat(result.getErrorMessage()).isEqualTo("Invoicing provider is not configured for store: " + STORE_ID);
-        verify(ordersRepository, never()).save(any());
-        verify(orderLifecycleEventPublisher, never()).publish(any(), eq(OrderLifecycleEventType.InvoiceCreated));
+    static Stream<Arguments> documentsWithTheirPrerequisites() {
+        Consumer<Order> none = order -> { };
+        Consumer<Order> advancePrerequisites = order -> {
+            order.addDocument(new Document("ord-1", "ZAM/1/2026", null, DocumentType.Order));
+            order.addPayment(Payment.bankTransfer("ref-1", "Jan Kowalski", 100));
+        };
+        Consumer<Order> finalPrerequisites = order -> {
+            order.addDocument(new Document("ord-1", "ZAM/1/2026", null, DocumentType.Order));
+            order.addDocument(new Document("adv-1", "ZAL/1/2026", null, DocumentType.InvoiceAdvance));
+        };
+        return Stream.of(
+                Arguments.of(DocumentType.InvoiceVat, none),
+                Arguments.of(DocumentType.InvoiceAdvance, advancePrerequisites),
+                Arguments.of(DocumentType.InvoiceFinal, finalPrerequisites));
     }
 
-    @Test
-    @DisplayName("createInvoice (advance document) returns provider-not-configured error and does not throw when the store has no invoicing provider")
-    void createAdvanceInvoiceReturnsErrorWhenInvoicingProviderIsNotConfigured() {
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("documentsWithTheirPrerequisites")
+    @DisplayName("createInvoice returns provider-not-configured error and does not throw when the store has no invoicing provider")
+    void createInvoiceReturnsErrorWhenInvoicingProviderIsNotConfigured(DocumentType documentType, Consumer<Order> prerequisites) {
         // given
         Order order = orderWithFilledBillingDetails();
-        order.addDocument(new Document("ord-1", "ZAM/1/2026", null, DocumentType.Order));
-        order.addPayment(Payment.bankTransfer("ref-1", "Jan Kowalski", 100));
+        prerequisites.accept(order);
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         when(store.getInvoicingConfiguration()).thenReturn(invoicingConfiguration);
         when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(Collections.emptyList());
         when(invoicingProviderFactory.get(store)).thenReturn(null);
 
         // when
-        InvoicingService.OperationResult result = invoicingService.createInvoice(order, DocumentType.InvoiceAdvance, false);
-
-        // then
-        assertThat(result.hasError()).isTrue();
-        assertThat(result.getErrorMessage()).isEqualTo("Invoicing provider is not configured for store: " + STORE_ID);
-        verify(ordersRepository, never()).save(any());
-        verify(orderLifecycleEventPublisher, never()).publish(any(), eq(OrderLifecycleEventType.InvoiceCreated));
-    }
-
-    @Test
-    @DisplayName("createInvoice (final document) returns provider-not-configured error and does not throw when the store has no invoicing provider")
-    void createFinalInvoiceReturnsErrorWhenInvoicingProviderIsNotConfigured() {
-        // given
-        Order order = orderWithFilledBillingDetails();
-        order.addDocument(new Document("ord-1", "ZAM/1/2026", null, DocumentType.Order));
-        order.addDocument(new Document("adv-1", "ZAL/1/2026", null, DocumentType.InvoiceAdvance));
-        when(storesRepository.findById(STORE_ID)).thenReturn(store);
-        when(store.getInvoicingConfiguration()).thenReturn(invoicingConfiguration);
-        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(Collections.emptyList());
-        when(invoicingProviderFactory.get(store)).thenReturn(null);
-
-        // when
-        InvoicingService.OperationResult result = invoicingService.createInvoice(order, DocumentType.InvoiceFinal, false);
+        InvoicingService.OperationResult result = invoicingService.createInvoice(order, documentType, false);
 
         // then
         assertThat(result.hasError()).isTrue();

@@ -1,0 +1,18 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout" layout:decorate="~{layout}">
+<body>
+<!--/* The address dialog of the customer card as its own page, for a browser without JavaScript. */-->
+<div layout:fragment="content">
+    <section class="cl-page">
+        <div class="cl-page-body is-form">
+            <div th:replace="~{fragments/settings-header :: subpage(|/dashboard/orders/${address.orderId()}|, #{order.page.title(${shortId})}, ${address.isBilling()} ? #{order.address.page.title.billing(${shortId})} : #{order.address.page.title.shipping(${shortId})})}"></div>
+            <section class="cl-card" aria-labelledby="address-page-title">
+                <h2 class="cl-visually-hidden" id="address-page-title"
+                    th:text="${address.isBilling()} ? #{order.customer.billing.edit} : #{order.customer.shipping.edit}"></h2>
+                <form th:replace="~{orders/details/address :: pageForm}"></form>
+            </section>
+        </div>
+    </section>
+</div>
+</body>
+</html>

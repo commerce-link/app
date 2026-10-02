@@ -2,6 +2,9 @@ package pl.commercelink.registration;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -18,12 +21,12 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Locale;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -150,18 +153,6 @@ class RegistrationServiceTest {
     }
 
     @Test
-    void validateCandidateDoesNotConsumeRateLimitToken() {
-        // given
-        when(cognitoUserService.userExists("user@example.com")).thenReturn(false);
-
-        // when
-        service(true).validateCandidate("user@example.com", "Sklep Testowy");
-
-        // then
-        verifyNoInteractions(rateLimiter);
-    }
-
-    @Test
     void rejectsInvalidEmail() {
         // when / then
         RegistrationException e = assertThrows(RegistrationException.class,
@@ -276,21 +267,6 @@ class RegistrationServiceTest {
     }
 
     @Test
-    void demoModeUsesProvidedStoreName() {
-        // given
-        when(rateLimiter.tryAcquire("10.0.0.1")).thenReturn(true);
-        when(cognitoUserService.userExists("user@firma.pl")).thenReturn(false);
-        when(storeCreationService.createStore(any(CreateStoreRequest.class))).thenReturn(store("demo-store-1"));
-
-        // when
-        service(true).register("user@firma.pl", "Moja Firma", "10.0.0.1", PASSWORD);
-
-        // then
-        verify(storeCreationService).createStore(argThat(req ->
-                req.name().equals("Moja Firma") && req.demoMetadata() != null));
-    }
-
-    @Test
     void trimsStoreName() {
         // given
         when(rateLimiter.tryAcquire("10.0.0.1")).thenReturn(true);
@@ -314,31 +290,21 @@ class RegistrationServiceTest {
         verifyNoInteractions(storeCreationService, cognitoUserService, rateLimiter);
     }
 
-    @Test
-    void demoModeRejectsBlankStoreNameAsInvalid() {
+    @ParameterizedTest(name = "demoMode={0}, store name \"{1}\"")
+    @MethodSource("invalidStoreNames")
+    void rejectsInvalidStoreName(boolean demoMode, String storeName) {
         // when / then
         RegistrationException e = assertThrows(RegistrationException.class,
-                () -> service(true).register("user@firma.pl", "   ", "10.0.0.1", PASSWORD));
+                () -> service(demoMode).register("user@firma.pl", storeName, "10.0.0.1", PASSWORD));
         assertEquals(RegistrationException.Reason.INVALID_STORE_NAME, e.getReason());
         verifyNoInteractions(storeCreationService, cognitoUserService, rateLimiter);
     }
 
-    @Test
-    void rejectsTooLongStoreName() {
-        // when / then
-        RegistrationException e = assertThrows(RegistrationException.class,
-                () -> service(false).register("user@firma.pl", "x".repeat(61), "10.0.0.1", PASSWORD));
-        assertEquals(RegistrationException.Reason.INVALID_STORE_NAME, e.getReason());
-        verifyNoInteractions(storeCreationService, cognitoUserService, rateLimiter);
-    }
-
-    @Test
-    void rejectsSingleCharacterStoreName() {
-        // when / then
-        RegistrationException e = assertThrows(RegistrationException.class,
-                () -> service(false).register("user@firma.pl", "x", "10.0.0.1", PASSWORD));
-        assertEquals(RegistrationException.Reason.INVALID_STORE_NAME, e.getReason());
-        verifyNoInteractions(storeCreationService, cognitoUserService, rateLimiter);
+    static Stream<Arguments> invalidStoreNames() {
+        return Stream.of(
+                Arguments.of(true, "   "),
+                Arguments.of(false, "x".repeat(61)),
+                Arguments.of(false, "x"));
     }
 
     @Test

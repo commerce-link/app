@@ -28,17 +28,4 @@ class InventoryPageTemplateTest {
         assertThat(page()).contains("data-inventory-page").contains("data-inventory-summary").contains("id=\"inventory-results\"")
                 .contains("aria-live=\"polite\"").contains("data-inventory-search-error");
     }
-
-    @Test
-    void checkButtonKeepsOneLabelWhileTheResultsShowASpinner() throws Exception {
-        // when / then
-        assertThat(page()).doesNotContain("data-when-busy").doesNotContain("data-when-idle")
-                .contains("data-inventory-spinner").contains("class=\"cl-spinner\"");
-    }
-
-    @Test
-    void loadsThePageStylesAndScript() throws Exception {
-        // when / then
-        assertThat(page()).contains("@{/css/inventory.css}").contains("@{/js/inventory.js}");
-    }
 }

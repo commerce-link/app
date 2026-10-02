@@ -2,6 +2,7 @@ package pl.commercelink.receipts;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrdersRepository;
@@ -44,19 +45,22 @@ public class ReceiptProcessor {
     private final ReceiptEligibility eligibility;
     private final ReceiptEffects effects;
     private final ReceiptAlerts alerts;
+    private final ReceiptAttemptService attemptService;
     private final Clock clock;
 
     @Autowired
     public ReceiptProcessor(ReceiptAttemptStore attempts, StoresRepository storesRepository,
                             OrdersRepository ordersRepository, ReceiptProviderFactory providerFactory,
-                            ReceiptEligibility eligibility, ReceiptEffects effects, ReceiptAlerts alerts) {
+                            ReceiptEligibility eligibility, ReceiptEffects effects, ReceiptAlerts alerts,
+                            @Lazy ReceiptAttemptService attemptService) {
         this(attempts, storesRepository, ordersRepository, providerFactory, eligibility, effects, alerts,
-                Clock.systemUTC());
+                attemptService, Clock.systemUTC());
     }
 
     ReceiptProcessor(ReceiptAttemptStore attempts, StoresRepository storesRepository,
                      OrdersRepository ordersRepository, ReceiptProviderFactory providerFactory,
-                     ReceiptEligibility eligibility, ReceiptEffects effects, ReceiptAlerts alerts, Clock clock) {
+                     ReceiptEligibility eligibility, ReceiptEffects effects, ReceiptAlerts alerts,
+                     ReceiptAttemptService attemptService, Clock clock) {
         this.attempts = attempts;
         this.storesRepository = storesRepository;
         this.ordersRepository = ordersRepository;
@@ -64,6 +68,7 @@ public class ReceiptProcessor {
         this.eligibility = eligibility;
         this.effects = effects;
         this.alerts = alerts;
+        this.attemptService = attemptService;
         this.clock = clock;
     }
 
@@ -74,6 +79,8 @@ public class ReceiptProcessor {
             return;
         }
         boolean effectsFailed = false;
+        boolean orderSettled = false;
+        boolean dead = false;
         try {
             ReceiptAttempt attempt = leased.get();
             switch (attempt.getState()) {
@@ -99,10 +106,36 @@ public class ReceiptProcessor {
                     log.error("Effects of fiscalised receipt {} failed; retrying later", receiptKey, e);
                 }
             }
+            // An attempt that is dead now (blocked as not eligible, refused by the provider, failed on a poll, or
+            // created blocked and woken to raise its alert) asks for nothing when its order got its closing document
+            // or was cancelled meanwhile (an invoice issued while the attempt was live, "Dodaj dokument" racing
+            // "Wystaw ponownie"): the order's own reconcile ran while the attempt was still live and skipped it.
+            dead = attempts.find(storeId, receiptKey).map(a -> a.getState().isDead()).orElse(false);
+            if (dead) {
+                orderSettled = orderSettlesDeadAttempts(storeId, leased.get().getOrderId());
+            }
         } catch (RuntimeException e) {
             log.error("Receipt attempt {} could not be processed", receiptKey, e);
         } finally {
-            finish(storeId, receiptKey, owner, effectsFailed);
+            finish(storeId, receiptKey, owner, effectsFailed, orderSettled);
+        }
+        if (dead) {
+            // The order may have gained or lost its closing document between the read above and the alert written
+            // by finish: the bell follows the order as it is now. After finish, not before, so whichever write comes
+            // last, the order's or this attempt's, is seen by a reconcile.
+            attemptService.reconcileDeadAttemptAlerts(storeId, leased.get().getOrderId());
+        }
+    }
+
+    /** Whether the order, read afresh, settles its dead attempts ({@link ReceiptTrigger#settlesDeadAttempts}). */
+    private boolean orderSettlesDeadAttempts(String storeId, String orderId) {
+        try {
+            Order order = ordersRepository.findById(storeId, orderId);
+            return order != null && ReceiptTrigger.settlesDeadAttempts(order);
+        } catch (RuntimeException e) {
+            log.warn("Order {} of store {} could not be read; the alert of its dead attempt follows the attempt",
+                    orderId, storeId, e);
+            return false;
         }
     }
 
@@ -297,7 +330,7 @@ public class ReceiptProcessor {
      * An attempt this call no longer owns (lease stolen or expired and re-taken) is left untouched: no reschedule,
      * no alert sync, no lease change — the real owner's {@code finish} is the only one allowed to decide those.
      */
-    private void finish(String storeId, String receiptKey, String owner, boolean effectsFailed) {
+    private void finish(String storeId, String receiptKey, String owner, boolean effectsFailed, boolean orderSettled) {
         Instant now = clock.instant();
         attempts.update(storeId, receiptKey, a -> {
             if (!owner.equals(a.getLeaseOwner())) {
@@ -307,7 +340,7 @@ public class ReceiptProcessor {
             a.setLeaseOwner(null);
             a.setLeaseUntil(null);
             reschedule(a, now, effectsFailed);
-            syncAlert(a, now);
+            syncAlert(a, now, orderSettled);
             return true;
         });
     }
@@ -317,9 +350,10 @@ public class ReceiptProcessor {
      * already staged on {@code a} in this same predicate run, so swallowing the exception still lets {@code update}
      * save them. Nothing set by this method is read back outside the predicate, so there is no R3 risk in retrying.
      */
-    private void syncAlert(ReceiptAttempt a, Instant now) {
+    private void syncAlert(ReceiptAttempt a, Instant now, boolean orderSettled) {
         try {
-            alerts.sync(a, ReceiptAttentionEvaluator.evaluate(a, now));
+            // a dead attempt of a settled order raises nothing, as the order page shows nothing to do
+            alerts.sync(a, orderSettled && a.getState().isDead() ? null : ReceiptAttentionEvaluator.evaluate(a, now));
         } catch (RuntimeException e) {
             log.error("Receipt attempt {} attention sync failed; lease release and schedule are saved regardless",
                     a.getReceiptKey(), e);

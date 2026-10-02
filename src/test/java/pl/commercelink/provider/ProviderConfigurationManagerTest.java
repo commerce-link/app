@@ -221,4 +221,34 @@ class ProviderConfigurationManagerTest {
         // then
         verify(secretsManager).deleteSecret("store-1-acme");
     }
+
+    @Test
+    void loadConfigurationReadsTheCurrentSecretEveryTime() {
+        // given
+        Store store = storeWithId("store-1");
+        when(secretsManager.exists("store-1-acme")).thenReturn(true);
+        when(secretsManager.getSecret("store-1-acme", Map.class))
+                .thenReturn(Map.of("apiKey", "old-key"), Map.of("apiKey", "new-key"));
+        manager.loadConfiguration(store, "Acme");
+
+        // when
+        Map<String, String> config = manager.loadConfiguration(store, "Acme");
+
+        // then
+        assertThat(config).containsEntry("apiKey", "new-key");
+    }
+
+    @Test
+    void loadConfigurationOfMissingSecretIsEmpty() {
+        // given
+        Store store = storeWithId("store-1");
+        when(secretsManager.exists("store-1-acme")).thenReturn(false);
+
+        // when
+        Map<String, String> config = manager.loadConfiguration(store, "Acme");
+
+        // then
+        assertThat(config).isEmpty();
+        verify(secretsManager, never()).getSecret(anyString(), any());
+    }
 }

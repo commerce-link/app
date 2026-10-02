@@ -63,7 +63,61 @@ class ReceiptAttentionMessagesTest {
         String formatted = messageSource.getMessage(
                 ReceiptAttention.EMAIL_NOT_SENT.messageKey(), ARGS, Locale.forLanguageTag("en"));
 
-        assertThat(formatted).contains("store's email templates").contains("order's documents");
+        assertThat(formatted).contains("store’s email templates").contains("order’s documents");
+    }
+
+    private static java.util.Properties raw(String file) throws java.io.IOException {
+        java.util.Properties properties = new java.util.Properties();
+        try (java.io.Reader reader = new java.io.InputStreamReader(
+                ReceiptAttentionMessagesTest.class.getResourceAsStream("/" + file),
+                java.nio.charset.StandardCharsets.UTF_8)) {
+            properties.load(reader);
+        }
+        return properties;
+    }
+
+    @Test
+    void everyAttentionHasAnOrderPageCauseAndActionInPolishAndEnglish() throws java.io.IOException {
+        // given
+        java.util.Properties pl = raw("messages_pl.properties");
+        java.util.Properties en = raw("messages_en.properties");
+
+        for (ReceiptAttention attention : ReceiptAttention.values()) {
+            for (String part : java.util.List.of("cause", "action")) {
+                // when
+                String key = "receipts.page." + attention.name() + "." + part;
+
+                // then
+                assertThat(pl.getProperty(key)).as("pl " + key).isNotBlank();
+                assertThat(en.getProperty(key)).as("en " + key).isNotBlank();
+            }
+        }
+    }
+
+    @Test
+    void everyOrderPageKeyExistsInBothLanguagesAndKeepsItsApostrophes() throws java.io.IOException {
+        // given: the page texts are always formatted with arguments, so a lone ' would swallow text
+        java.util.Properties pl = raw("messages_pl.properties");
+        java.util.Properties en = raw("messages_en.properties");
+        ResourceBundleMessageSource messageSource = messageSource();
+        Object[] args = {"PROVIDER", "LAST-ERROR", "FAILURE", "BLOCKED", 7, "ORDER-1:R1"};
+
+        for (java.util.Properties bundle : java.util.List.of(pl, en)) {
+            java.util.Properties other = bundle == pl ? en : pl;
+            Locale locale = Locale.forLanguageTag(bundle == pl ? "pl" : "en");
+            for (String key : bundle.stringPropertyNames()) {
+                if (!key.startsWith("receipts.page.")) {
+                    continue;
+                }
+                // when
+                String formatted = messageSource.getMessage(key, args, locale);
+
+                // then
+                assertThat(other.getProperty(key)).as(locale + " " + key + " in the other bundle").isNotBlank();
+                assertThat(StringUtils.countMatches(formatted, "'")).as(locale + " " + key + " apostrophes")
+                        .isEqualTo(StringUtils.countMatches(bundle.getProperty(key), "''"));
+            }
+        }
     }
 
     @Test
@@ -83,5 +137,55 @@ class ReceiptAttentionMessagesTest {
             assertThat(StringUtils.countMatches(formatted, "'")).as(language + " apostrophes")
                     .isEqualTo(StringUtils.countMatches(raw, "''"));
         }
+    }
+
+    @Test
+    void posAdviceInTheBellNamesTheButtonsOfTheOrderPage() {
+        // given
+        ResourceBundleMessageSource messageSource = messageSource();
+
+        // when
+        String pl = messageSource.getMessage("receipts.attention.BLOCKED_POS", ARGS, Locale.forLanguageTag("pl"));
+        String en = messageSource.getMessage("receipts.attention.BLOCKED_POS", ARGS, Locale.ENGLISH);
+
+        // then: the same buttons and card as the advice in the e-receipt row, not the old page's "Dodaj" / "dane do faktury"
+        assertThat(pl).contains("„Dodaj dokument” → Paragon").contains("danych rozliczeniowych")
+                .contains("„Wystaw ponownie”").contains("sprzedaż zostałaby zafiskalizowana dwa razy")
+                .doesNotContain("„Dodaj” w dokumentach").doesNotContain("dane do faktury")
+                .doesNotContain("dwie sprzedaże");
+        assertThat(en).contains("“Add document” → Receipt").contains("billing details").contains("“Reissue”")
+                .doesNotContain("two sales");
+    }
+
+    @Test
+    void bellNamesOnlyTheCurrentLabelsOfTheOrderPage() {
+        // given: every quoted name in the bell is a button, card or template the operator must find on the page
+        ResourceBundleMessageSource messageSource = messageSource();
+        java.util.regex.Pattern quoted = java.util.regex.Pattern.compile("[„“]([^”]+)”");
+        java.util.List<String> labelKeys = java.util.List.of("receipts.action.reissue", "receipts.action.close",
+                "receipts.action.resendEmail", "order.documents.add", "receipts.section.title");
+
+        for (String language : java.util.List.of("pl", "en")) {
+            Locale locale = Locale.forLanguageTag(language);
+            java.util.Set<String> labels = new java.util.HashSet<>();
+            labelKeys.forEach(key -> labels.add(messageSource.getMessage(key, null, locale)));
+
+            for (ReceiptAttention attention : ReceiptAttention.values()) {
+                // when
+                String bell = messageSource.getMessage(attention.messageKey(), ARGS, locale);
+                java.util.regex.Matcher m = quoted.matcher(bell);
+
+                // then
+                while (m.find()) {
+                    assertThat(labels).as(language + " " + attention + " names „" + m.group(1) + "”").contains(m.group(1));
+                }
+                assertThat(bell).as(language + " " + attention).doesNotContain("\"").doesNotContain("Sprzedaż POS")
+                        .doesNotContainPattern("(?i)(?<![-\\p{L}])maila?\\b").doesNotContain("Resend e-mail");
+            }
+        }
+        assertThat(messageSource.getMessage("receipts.attention.EMAIL_NOT_SENT", ARGS, Locale.forLanguageTag("pl")))
+                .contains("„" + messageSource.getMessage("receipts.action.resendEmail", null, Locale.forLanguageTag("pl")) + "”");
+        assertThat(messageSource.getMessage("receipts.attention.EMAIL_NOT_SENT", ARGS, Locale.ENGLISH))
+                .contains("“" + messageSource.getMessage("receipts.action.resendEmail", null, Locale.ENGLISH) + "”");
     }
 }

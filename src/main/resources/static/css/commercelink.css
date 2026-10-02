@@ -996,7 +996,12 @@ body.cl-drawer-open .cl-sidebar {
     color: #fff;
 }
 
-.cl-button:disabled,
+/* disabled means "cannot run", not "running": the progress cursor is only for a form being sent */
+.cl-button:disabled {
+    opacity: .6;
+    cursor: not-allowed;
+}
+
 .cl-form[aria-busy="true"] .cl-button[type="submit"] {
     opacity: .6;
     cursor: progress;
@@ -1438,9 +1443,35 @@ body.cl-drawer-open .cl-sidebar {
     font-size: 13px;
 }
 
+/* A row standing in for a record that does not exist yet (the shipments card's placeholder: the customer's delivery
+   choice, no shipment): greyed on the secondary surface, its title in the regular weight of a description. */
+.cl-page .cl-list .cl-list-item.is-placeholder {
+    background: var(--cl-surface-2);
+}
+
+/* the card does not clip its content: the last row's tint follows the card's rounded bottom itself */
+.cl-page .cl-card > .cl-list:last-child > .cl-list-item.is-placeholder:last-child {
+    border-radius: 0 0 calc(var(--cl-radius) - 1px) calc(var(--cl-radius) - 1px);
+}
+
+.cl-page .cl-list .cl-list-item.is-placeholder .cl-list-title {
+    font-weight: 500;
+    color: var(--cl-ink-2);
+}
+
+/* --cl-ink-2, not --cl-ink-3: on the tinted surface the lighter ink falls below 4.5:1 */
+.cl-page .cl-list .cl-list-item.is-placeholder .cl-list-desc {
+    color: var(--cl-ink-2);
+}
+
 /* What a record still lacks, in the colour of its warning pill so it is read together with it */
 .cl-page .cl-list .cl-list-desc.is-warn {
     color: var(--cl-warn);
+}
+
+/* ... and under a bad pill (a refused or blocked e-receipt) in the bad tone */
+.cl-page .cl-list .cl-list-desc.is-bad {
+    color: var(--cl-bad);
 }
 
 .cl-page .cl-list-actions {
@@ -1455,32 +1486,68 @@ body.cl-drawer-open .cl-sidebar {
     margin: 0;
 }
 
-/* A row action that opens its form in place (details.cl-row-form, e.g. "Zamknij ręcznie"). Open, the form would widen
-   the auto actions column and squeeze the record column to one character, so the row turns into one column and the
-   form takes the full width under the record. */
-.cl-page .cl-list .cl-list-item:has(.cl-row-form[open]) {
-    grid-template-columns: minmax(0, 1fr);
+/* Secondary records collapsed inside a list row's record column (details.cl-row-disclosure, e.g. an e-receipt's
+   earlier attempts): a small summary with the .cl-disclosure arrow, then one line per record. Native details/summary,
+   so it opens with the keyboard and without JavaScript. */
+.cl-page .cl-row-disclosure {
+    margin-top: 2px;
 }
 
-.cl-page .cl-list .cl-list-item:has(.cl-row-form[open]) .cl-list-actions {
-    justify-content: flex-start;
+.cl-page .cl-row-disclosure > summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--cl-accent-ink);
+    cursor: pointer;
+    list-style: none;
 }
 
-.cl-page .cl-list-actions .cl-row-form[open] {
+.cl-page .cl-row-disclosure > summary::-webkit-details-marker {
+    display: none;
+}
+
+.cl-page .cl-row-disclosure > summary::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-right: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    transform: rotate(-45deg);
+    transition: transform .15s;
+}
+
+.cl-page .cl-row-disclosure[open] > summary::before {
+    transform: rotate(45deg);
+}
+
+.cl-page .cl-row-disclosure > summary:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
+}
+
+.cl-page .cl-row-disclosure-list {
+    margin: 0 0 4px;
+    padding: 0;
+    list-style: none;
+}
+
+.cl-page .cl-row-disclosure-list > li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+    padding: 2px 0;
+    font-size: 13.5px;
+    line-height: 1.4;
+    color: var(--cl-ink-2);
+    overflow-wrap: anywhere;
+}
+
+.cl-page .cl-row-disclosure-note {
     flex-basis: 100%;
-}
-
-.cl-page .cl-row-form > .cl-form {
-    max-width: 480px;
-    margin-top: 8px;
-}
-
-/* The same ::details-content box-sizing break as in .cl-disclosure-body below. */
-.cl-page .cl-row-form,
-.cl-page .cl-row-form *,
-.cl-page .cl-row-form *::before,
-.cl-page .cl-row-form *::after {
-    box-sizing: border-box;
 }
 
 .cl-page .cl-card .cl-list-group {
@@ -1506,7 +1573,8 @@ body.cl-drawer-open .cl-sidebar {
     color: var(--cl-ink-2);
 }
 
-/* Status tones next to the warning tone defined with the tiles. */
+/* Status tones next to the warning tone defined with the tiles (is-bad: Zablokowane on the orders list, FAILED/BLOCKED
+   e-receipt attempts). */
 .cl-status.is-ok {
     color: var(--cl-ok);
     background: var(--cl-ok-soft);
@@ -1527,12 +1595,6 @@ body.cl-drawer-open .cl-sidebar {
     color: var(--cl-ink-2);
     background: var(--cl-surface-2);
     box-shadow: inset 0 0 0 1px var(--cl-line);
-}
-
-/* Error tone of the status pill (Zablokowane on the orders list, FAILED/BLOCKED attempts elsewhere): first use on main. */
-.cl-status.is-bad {
-    background: var(--cl-bad-soft);
-    color: var(--cl-bad);
 }
 
 .cl-page .cl-alert.is-warn {
@@ -1671,6 +1733,16 @@ a.cl-link-button:hover {
 .cl-page .cl-choice-description {
     font-size: 13px;
     line-height: 1.4;
+    color: var(--cl-ink-2);
+}
+
+/* an option that cannot be chosen looks it: the title greys and loses its weight, the reason stays readable */
+.cl-page .cl-choice:has(input:disabled) {
+    cursor: not-allowed;
+}
+
+.cl-page .cl-choice:has(input:disabled) .cl-choice-title {
+    font-weight: 400;
     color: var(--cl-ink-2);
 }
 
@@ -3399,58 +3471,159 @@ a.cl-link-button:hover {
     }
 }
 
-/* --- Catalog: Selection bar (actions on the checked rows of a cl-table) --- */
-.cl-page .cl-selection-bar {
+/* --- Selection row: the actions on the checked rows of a cl-table, in the place of the table's header --- */
+/* While rows are checked table-select.js puts .has-selection on the table and shows this row directly before it, in the
+   header's look (surface-2, 12.5 px, line borders). From 720 px the header keeps its place with its contents hidden
+   (visibility: hidden also takes its controls out of the tab order and the accessibility tree while the row shows) and
+   the row lies exactly over it: the row is at least as tall as the header, measured by the script (--cl-selection-head),
+   and a negative bottom margin of the header's height pulls the table up under it. The rows and the columns below do not move, in
+   Chromium and WebKit alike (visibility: collapse on the thead was dropped: WebKit keeps the collapsed header's space).
+   With nothing checked the header is the ordinary one. The row sticks right under the top bar, with no gap for the
+   scrolled rows to show through. Controls are 30 px tall so the row fits the header; below 1024 px the menu buttons reach
+   44 px through an invisible hit area and the link buttons through a negative margin, as the row checkbox does. The
+   order of the controls is the order of the markup (count, "Clear", actions, "Remove"), so Tab follows the eye. */
+.cl-page .cl-selection-row {
     position: sticky;
-    top: calc(var(--cl-topbar-height) + 8px);
+    top: var(--cl-topbar-height);
     z-index: 5;
+    box-sizing: border-box;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: var(--cl-gap-related);
-    margin: 0 20px 12px;
-    padding: 10px 14px;
-    border: 1px solid var(--cl-accent);
-    border-radius: var(--cl-radius);
-    background: var(--cl-accent-soft);
-    box-shadow: var(--cl-shadow-card);
+    column-gap: 10px;
+    row-gap: 2px;
+    padding: 0 20px;
+    border-top: 1px solid var(--cl-line);
+    border-bottom: 1px solid var(--cl-line);
+    background: var(--cl-surface-2);
+    font-size: 12.5px;
+    color: var(--cl-ink-2);
 }
 
-.cl-page .cl-selection-bar[hidden] {
+.cl-page .cl-selection-row[hidden] {
     display: none;
 }
 
+/* only the reason gives way when the row is short of room; the box, the count and "Clear" keep their size */
+.cl-page .cl-selection-row > :not(.cl-selection-actions) {
+    flex: none;
+}
+
+.cl-page .cl-table.has-selection > thead {
+    visibility: hidden;
+}
+
+@media screen and (min-width: 720px) {
+    .cl-page .cl-selection-row {
+        flex-wrap: nowrap;
+        min-height: var(--cl-selection-head, 40px);
+        margin-bottom: calc(-1 * var(--cl-selection-head, 40px));
+    }
+}
+
+/* the count starts where the header text of the first column after the checkboxes does */
 .cl-page .cl-selection-count {
-    font-size: 14px;
+    margin-left: 8px;
+    font-size: 12.5px;
     font-weight: 600;
-    color: var(--cl-accent-ink);
+    color: var(--cl-ink-2);
     font-variant-numeric: tabular-nums;
-    margin-right: 6px;
+    white-space: nowrap;
 }
 
 .cl-page .cl-selection-actions {
     display: flex;
+    flex: 1 1 auto;
     flex-wrap: wrap;
-    gap: var(--cl-gap-related);
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
 }
 
-.cl-page .cl-selection-bar .cl-button:not(.is-danger) {
-    background: var(--cl-surface);
+.cl-page .cl-selection-row .cl-button {
+    height: 30px;
+    padding: 0 8px;
+    gap: 4px;
+    font-size: 13px;
 }
 
-.cl-page .cl-selection-clear {
+.cl-page .cl-selection-row .cl-link-button {
+    min-height: 30px;
+    font-size: 13px;
+    white-space: nowrap;
+}
+
+/* the destructive action sits at the end of the row, away from the menus */
+.cl-page .cl-selection-remove {
     margin-left: auto;
 }
 
-/* the primary action keeps its accent fill */
-.cl-page .cl-selection-bar .cl-button.is-primary {
-    background: var(--cl-accent);
-    color: var(--cl-surface);
-    border-color: var(--cl-accent);
+/* the menus open from the start of the row, where they sit, not leftwards out of the card */
+.cl-page .cl-selection-row .cl-menu-list {
+    left: 0;
+    right: auto;
 }
 
-.cl-page .cl-selection-bar .cl-button.is-primary:hover {
-    background: var(--cl-accent-ink);
+/* why "Remove" is greyed: a short text right before it, on the row's own line. The short wordings (BulkReason.shortKey,
+   BulkAction.shortSkippedKey) take one or two 15 px lines inside the 35-36 px row at every width from 720 px, PL and EN,
+   Chromium and WebKit (measured 720, 768, 800, 1024, 1366, 1440), so the rows below do not move. A new wording must stay
+   as short: a third line would make the row taller than the header and push the table down by the difference (the
+   negative margin is the header's height, so the row still never covers a table row). */
+.cl-page .cl-selection-reason {
+    margin: 0 0 0 auto;
+    min-width: 0;
+    font-size: 12px;
+    line-height: 15px;
+    color: var(--cl-ink-2);
+    text-align: right;
+}
+
+.cl-page .cl-selection-reason[hidden] {
+    display: none;
+}
+
+.cl-page .cl-selection-reason:not([hidden]) + .cl-selection-remove {
+    margin-left: 0;
+}
+
+@media screen and (min-width: 720px) {
+    .cl-page .cl-selection-actions {
+        flex-wrap: nowrap;
+    }
+}
+
+/* a button that cannot run but stays focusable so its reason (aria-describedby) is read: the look of a disabled one
+   (the Documents card's "Dodaj dokument" while an e-receipt is issued) */
+.cl-page .cl-button[aria-disabled="true"],
+.cl-page .cl-button[aria-disabled="true"]:hover {
+    opacity: .6;
+    cursor: not-allowed;
+}
+
+/* a link-style action that cannot run: greyed, still focusable, its reason in visible text next to it */
+.cl-page .cl-link-button[aria-disabled="true"],
+.cl-page .cl-link-button[aria-disabled="true"]:hover {
+    color: var(--cl-ink-3);
+    text-decoration: none;
+    cursor: not-allowed;
+}
+
+@media screen and (max-width: 1023px) {
+    .cl-page .cl-selection-row .cl-menu > summary {
+        position: relative;
+    }
+
+    .cl-page .cl-selection-row .cl-menu > summary::after {
+        content: "";
+        position: absolute;
+        inset: -7px 0;
+    }
+
+    .cl-page .cl-selection-row .cl-link-button {
+        min-height: 44px;
+        margin-top: -7px;
+        margin-bottom: -7px;
+    }
 }
 
 /* --- Catalog: Selectable rows --- */
@@ -3459,6 +3632,7 @@ a.cl-link-button:hover {
     padding-right: 4px;
 }
 
+.cl-page .cl-selection-row .cl-check-input,
 .cl-page .cl-table .cl-check-input {
     width: 18px;
     height: 18px;
@@ -3470,6 +3644,7 @@ a.cl-link-button:hover {
 /* The label around a row checkbox is its touch target: 44 px (36 px from 1024 px) centred on the 18 px box. The negative
    margin keeps the row and the header as tall as the box alone would make them; position: relative keeps the part of
    the target that reaches over the next cell above that cell. */
+.cl-page .cl-selection-row .cl-check-target,
 .cl-page .cl-table .cl-check-target {
     position: relative;
     display: flex;
@@ -3486,6 +3661,7 @@ a.cl-link-button:hover {
     opacity: .45;
 }
 
+.cl-page .cl-selection-row .cl-check-input:focus-visible,
 .cl-page .cl-table .cl-check-input:focus-visible {
     outline: 2px solid var(--cl-accent);
     outline-offset: 2px;
@@ -3493,6 +3669,18 @@ a.cl-link-button:hover {
 
 .cl-page .cl-table tr.is-selected > * {
     background: var(--cl-accent-soft);
+}
+
+/* In card mode (< 720 px) the row is a grid of cells with gaps between them: tinting the cells left white seams, so
+   the row carries the tint as one surface. */
+@media screen and (max-width: 719px) {
+    .cl-page .cl-table tr.is-selected {
+        background: var(--cl-accent-soft);
+    }
+
+    .cl-page .cl-table tr.is-selected > * {
+        background: transparent;
+    }
 }
 
 /* --cl-ink-3 is 4.04:1 on --cl-accent-soft, below AA for 12.5 px; the codes of a selected row use the darker grey. */
@@ -3720,6 +3908,35 @@ a.cl-link-button:hover {
     border-radius: 4px;
 }
 
+/* A link in a list row's title (a document's number): the design system's link colour, not Bulma's, and a 44 px
+   target below 1024 px without making the line taller (the padding is taken back by the margin). */
+.cl-page .cl-list-title a:not(.cl-link-button) {
+    color: var(--cl-accent-ink);
+}
+
+/* The "opens in a new tab" icon after a link's text, inside the <a> and glued to it by a word joiner: a gap so the glyph
+   never touches the last character (Bulma's 16 px .icon box put it flush against it), smaller than the text so it reads
+   as a marker, and lifted to sit on the text's line. */
+.cl-page .cl-link-icon {
+    display: inline-block;
+    margin-left: 4px;
+    font-size: 0.75em;
+    line-height: 1;
+    vertical-align: 0.1em;
+}
+
+@media screen and (max-width: 1023px) {
+    .cl-page .cl-list-title a:not(.cl-link-button) {
+        padding-block: 12px;
+        margin-block: -12px;
+    }
+}
+
+/* the list row's actions stay by its title when a disclosure (earlier attempts, technical details) makes it tall */
+.cl-page .cl-list .cl-list-item:has(.cl-row-disclosure) {
+    align-items: start;
+}
+
 /* The hidden inputs of the multi picker travel in a span, which would otherwise take a grid row of its own. */
 .cl-page .cl-picker > [data-picker-values] {
     display: none;
@@ -3927,6 +4144,14 @@ a.cl-link-button:hover {
     width: 100%;
 }
 
+/* Safari on iOS zooms the page when a field it focuses has text smaller than 16px (e.g. "Dodaj numery seryjne") */
+@media screen and (max-width: 719px) {
+    .cl-page .cl-table.is-editable .cl-input,
+    .cl-page .cl-table.is-editable .cl-select {
+        font-size: 16px;
+    }
+}
+
 /* The product cell of the bulk review holds the brand and then the two identifier fields, each under its label, one
    under the other. It wraps, unlike the key column of a read-only table: kept on one line, the fields stood side by
    side and the second one ran under the next column, out of reach of the mouse (D-I2). */
@@ -3983,6 +4208,7 @@ a.cl-link-button:hover {
         height: 36px;
     }
 
+    .cl-page .cl-selection-row .cl-check-target,
     .cl-page .cl-table .cl-check-target {
         width: 36px;
         height: 36px;
@@ -4109,8 +4335,17 @@ a.cl-link-button:hover {
 
 /* A read-only field of a catalog form -- the EAN and code of a product the PIM knows, its brand, the name of the Default
    pricing group -- looked like one to type in: the tinted ground and the darker grey (--cl-ink-2 on a tint, §2) say it
-   is shown, not edited. Only catalog forms have read-only inputs. */
-.cl-page .cl-form .cl-input[readonly] {
+   is shown, not edited. The order item page uses it too, for the name, quantity and VAT rate a sale document fixed, and
+   so does the expected amount of "Dodaj wpłatę", whose dialog form is not a .cl-form. */
+.cl-page .cl-input[readonly] {
+    background: var(--cl-surface-2);
+    color: var(--cl-ink-2);
+}
+
+/* A disabled field (not posted: the item page's codes, quantity, price and cost of an item already in fulfilment) kept
+   the white ground of an editable one and read as typeable; it takes the read-only look. */
+.cl-page .cl-form .cl-input:disabled,
+.cl-page .cl-form .cl-select:disabled {
     background: var(--cl-surface-2);
     color: var(--cl-ink-2);
 }
@@ -4139,19 +4374,56 @@ a.cl-link-button:hover {
 
 /* --- Catalog: phone layout for the selection bar, selectable rows and the stacked toolbar --- */
 @media screen and (max-width: 719px) {
-    .cl-page .cl-selection-bar {
-        margin: 0 16px 12px;
-        flex-direction: column;
-        align-items: stretch;
+    /* card mode: no header to cover; the row stands above the cards in two lines, the markup's order: the select-all box and
+       the count, then the menus, the reason and "Remove", every control 44 px tall.
+       The menus open from the row's start (the sticky row is their containing block), so the list never reaches past
+       the right edge of a narrow screen. */
+    .cl-page .cl-selection-row {
+        padding: 0 16px;
+        column-gap: 12px;
+        row-gap: 0;
     }
 
-    .cl-page .cl-selection-actions .cl-button {
-        flex: 1 1 100%;
-        justify-content: center;
+    /* the box lines up with the checkboxes of the cards below: a product card starts it at the card's edge, a wrapping
+       card (order items) one step further in */
+    .cl-page .cl-selection-row > .cl-check-target {
+        margin-left: -16px;
     }
 
-    .cl-page .cl-selection-clear {
+    .cl-page .cl-selection-row:has(+ .cl-table.is-wrap) > .cl-check-target {
         margin-left: 0;
+    }
+
+    .cl-page .cl-selection-count {
+        margin-left: 0;
+    }
+
+    .cl-page .cl-selection-actions {
+        flex-basis: 100%;
+        padding-bottom: 8px;
+    }
+
+    .cl-page .cl-selection-row .cl-button {
+        height: 44px;
+        padding: 0 10px;
+        font-size: 14px;
+    }
+
+    .cl-page .cl-selection-row .cl-menu > summary::after {
+        content: none;
+    }
+
+    .cl-page .cl-selection-row .cl-link-button {
+        margin-top: 0;
+        margin-bottom: 0;
+    }
+
+    .cl-page .cl-selection-row .cl-menu {
+        position: static;
+    }
+
+    .cl-page .cl-selection-row .cl-menu-list {
+        left: 16px;
     }
 
     .cl-page .cl-table .cl-table-check {
@@ -4584,7 +4856,7 @@ a.cl-link-button:hover {
 }
 
 /* Search: the icon sits in the field, a clear "×" appears once something is searched (it is a link, so it works
-   without JavaScript; with it, orders-list.js also refreshes the list when the field is emptied). */
+   without JavaScript; with it, list-page.js also refreshes the list when the field is emptied). */
 .cl-page .cl-search-form {
     display: flex;
     align-items: center;
@@ -4810,7 +5082,7 @@ a.cl-link-button:hover {
     font-weight: 500;
 }
 
-/* Document marks under a status pill (WZ · FV/PAR · review star): a green check for what exists, a filled warn mark
+/* Document marks under a status pill (WZ · FZ · FV/FK/PAR · review star): a green check for what exists, a filled warn mark
    with a cross for what holds a delivered record open — shape as well as colour (principle 3). Nothing else is shown,
    so the marks start at the left edge whichever of them apply. */
 .cl-page .cl-doc-marks {
@@ -5125,6 +5397,2045 @@ a.cl-link-button:hover {
 
 }
 
+/* Record description — warehouse spec (proposed) */
+.cl-page dl.cl-kv {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 20px;
+    margin: 0;
+    padding: 0 20px 16px;
+}
+
+.cl-page .cl-kv > div {
+    display: grid;
+    grid-template-columns: 150px minmax(0, 1fr);
+    gap: 8px;
+    align-items: baseline;
+}
+
+.cl-page .cl-kv dt {
+    margin: 0;
+    font-size: 13.5px;
+    font-weight: 500;
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-kv dd {
+    margin: 0;
+    font-size: 15px;
+    color: var(--cl-ink);
+    overflow-wrap: anywhere;
+}
+
+.cl-page .cl-kv dd.is-numeric {
+    font-variant-numeric: tabular-nums;
+}
+
+.cl-page .cl-kv dd a {
+    color: var(--cl-accent-ink);
+    text-decoration: underline;
+}
+
+/* One pair per line, value right-aligned (narrow side column: finances, settings of a closed order) */
+.cl-page dl.cl-kv.is-column {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+    padding-top: 12px;
+}
+
+.cl-page .cl-kv.is-column > div {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+}
+
+.cl-page .cl-kv.is-column dd {
+    font-size: 14px;
+    text-align: right;
+}
+
+.cl-page .cl-kv.is-column dd:not(.is-numeric) {
+    text-align: left;
+}
+
+/* A long text value (the order comment): label above, text below, line breaks kept. */
+.cl-page .cl-kv.is-column > div.cl-kv-wide {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+}
+
+.cl-page .cl-kv.is-column dd.cl-kv-text {
+    white-space: pre-line;
+    text-align: left;
+}
+
+.cl-page .cl-kv > div.cl-kv-total {
+    padding-top: 8px;
+    border-top: 1px solid var(--cl-line);
+}
+
+.cl-page .cl-kv > div.cl-kv-total :is(dt, dd) {
+    font-weight: 650;
+    color: var(--cl-ink);
+}
+
+.cl-page .cl-kv dd.is-bad {
+    color: var(--cl-bad);
+    font-weight: 600;
+}
+
+
+/* Dialog with a form — warehouse spec (proposed); first implementation here */
+.cl-page .cl-dialog.is-form {
+    width: min(600px, calc(100vw - 32px));
+}
+
+.cl-page .cl-dialog.is-form.is-wide {
+    width: min(920px, calc(100vw - 32px));
+}
+
+.cl-page .cl-dialog.is-form .cl-dialog-body {
+    padding: 0 20px 16px;
+    max-height: 60vh;
+    overflow: auto;
+    display: grid;
+    /* one explicit column: an implicit auto column grows to the widest child (the tabs of "add items") */
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--cl-gap-fields);
+}
+
+.cl-page .cl-dialog.is-form .cl-dialog-message {
+    padding-bottom: 12px;
+}
+
+.cl-page .cl-dialog .cl-table.is-compact {
+    border: 1px solid var(--cl-line);
+    border-radius: var(--cl-radius);
+    overflow: hidden;
+}
+
+.cl-page .cl-dialog .cl-table.is-compact thead th {
+    border-top: 0;
+}
+
+.cl-page .cl-dialog .cl-table.is-compact :is(thead th, td, tbody th) {
+    padding: 6px 10px;
+}
+
+.cl-page .cl-dialog .cl-dialog-effect {
+    margin: 0;
+    font-size: 13px;
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-dialog .cl-list {
+    margin: 0 -20px;
+}
+
+
+/* Action menu: details.cl-menu > summary.cl-button + ul.cl-menu-list. The browser opens it (also without JavaScript);
+   static/js/menu.js adds Escape, the arrow keys, closing on an outside click and .is-up. The summary drops its marker
+   like .cl-filter-menu > summary and keeps the .cl-button look and focus ring. */
+.cl-page .cl-menu {
+    position: relative;
+    display: inline-block;
+}
+
+/* A native <details> gives its content a content-box slot, so menu entries grew to 52 px and stuck out of the panel. */
+.cl-page .cl-menu,
+.cl-page .cl-menu * {
+    box-sizing: border-box;
+}
+
+.cl-page .cl-menu > summary {
+    list-style: none;
+    cursor: pointer;
+}
+
+.cl-page .cl-menu > summary::-webkit-details-marker {
+    display: none;
+}
+
+.cl-page .cl-menu > summary::marker {
+    content: "";
+}
+
+.cl-page .cl-menu[open] > summary {
+    border-color: var(--cl-accent);
+}
+
+.cl-page .cl-menu-list {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    z-index: var(--cl-z-pop);
+    min-width: 240px;
+    max-width: 320px;
+    margin: 0;
+    padding: 6px 0;
+    list-style: none;
+    border: 1px solid var(--cl-line);
+    border-radius: var(--cl-radius);
+    background: var(--cl-surface);
+    box-shadow: var(--cl-shadow);
+    text-align: left;
+    white-space: normal;
+}
+
+.cl-page .cl-menu-list.is-up {
+    top: auto;
+    bottom: calc(100% + 4px);
+}
+
+/* menu.js: right-aligned, the list would leave the window on the left (a toggle near the left edge at 320 px) */
+.cl-page .cl-menu-list.is-start {
+    left: 0;
+    right: auto;
+}
+
+.cl-page .cl-menu-list > li {
+    margin: 0;
+}
+
+.cl-page .cl-menu-item {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    width: 100%;
+    min-height: 36px;
+    padding: 8px 14px;
+    border: 0;
+    background: transparent;
+    font: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.35;
+    color: var(--cl-ink);
+    text-align: left;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.cl-page .cl-menu-item:hover,
+.cl-page .cl-menu-item:focus-visible {
+    background: var(--cl-accent-soft);
+    color: var(--cl-accent-ink);
+    outline: none;
+}
+
+.cl-page .cl-menu-item.is-danger {
+    color: var(--cl-bad);
+}
+
+.cl-page .cl-menu-item.is-danger:hover {
+    background: var(--cl-bad-soft);
+    color: var(--cl-bad-ink);
+}
+
+.cl-page .cl-menu-item[aria-disabled="true"] {
+    color: var(--cl-ink-3);
+    cursor: not-allowed;
+}
+
+.cl-page .cl-menu-item[aria-disabled="true"]:hover {
+    background: transparent;
+    color: var(--cl-ink-3);
+}
+
+.cl-page .cl-menu-reason {
+    font-size: 12.5px;
+    font-weight: 400;
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-menu-sep {
+    height: 1px;
+    margin: 6px 0;
+    background: var(--cl-line);
+}
+
+/* The "more" trigger of a row menu is a text glyph, so it shows without the icon font too. */
+.cl-page .cl-menu-glyph {
+    font-size: 18px;
+    line-height: 1;
+}
+
+/* Icon-only trigger in a table row: 36 px from 1024 px, 44 px below */
+.cl-page .cl-button.is-icon {
+    width: 36px;
+    height: 36px;
+    min-height: 36px;
+    padding: 0;
+    justify-content: center;
+}
+
+
+/* Layout with a side column (order details) */
+.cl-page .cl-layout-aside {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    grid-template-areas: "main side";
+    gap: 16px;
+    align-items: start;
+}
+
+.cl-page .cl-layout-main {
+    grid-area: main;
+    display: grid;
+    gap: 16px;
+    min-width: 0;
+}
+
+.cl-page .cl-layout-side {
+    grid-area: side;
+    display: grid;
+    gap: 16px;
+    min-width: 0;
+}
+
+.cl-page .cl-layout-main > *,
+.cl-page .cl-layout-side > * {
+    min-width: 0;
+}
+
+/* Below 1366 px the side column left the product name ~110-180 px (four lines and more): one column instead, cards in
+   DOM order (items, shipments, documents, payments, then dates and settings, customer, finances, history), so focus
+   order and reading order match what the eye sees. Declared after the column rules so its grid-area wins. */
+@media screen and (max-width: 1365px) {
+    .cl-page .cl-layout-aside {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-areas: none;
+    }
+
+    .cl-page .cl-layout-main,
+    .cl-page .cl-layout-side {
+        grid-area: auto;
+    }
+}
+
+/* Table whose key column (product name) wraps instead of widening the table */
+.cl-page .cl-table.is-wrap .cl-table-key {
+    white-space: normal;
+}
+
+.cl-page .cl-table.is-wrap {
+    table-layout: fixed;
+}
+
+
+/* Timeline (order history, item history) */
+.cl-page .cl-timeline {
+    margin: 0;
+    padding: 12px 20px 16px;
+    list-style: none;
+}
+
+.cl-page .cl-timeline-item {
+    position: relative;
+    margin: 0;
+    padding: 0 0 12px 20px;
+}
+
+.cl-page .cl-timeline-item::before {
+    content: "";
+    position: absolute;
+    left: 3px;
+    top: 7px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--cl-surface);
+    box-shadow: 0 0 0 2px var(--cl-ink-3);
+}
+
+/* The line runs from under this dot into the next item, up to the ring of the next dot (its top 7px minus the 2px ring). */
+.cl-page .cl-timeline-item::after {
+    content: "";
+    position: absolute;
+    left: 6px;
+    top: 17px;
+    bottom: -5px;
+    width: 2px;
+    background: var(--cl-line);
+}
+
+.cl-page .cl-timeline-item:last-child {
+    padding-bottom: 0;
+}
+
+.cl-page .cl-timeline-item:last-child::after {
+    display: none;
+}
+
+/* Events hidden by timeline.js stay in the same list. Collapsed, the last visible event carries the line on, dashed,
+   down to the ring of the "show earlier events" node under the list: the row is 44px tall and the 18px node is centred
+   22px from its top, so its ring starts 13px below the list. Expanded, nothing is hidden and the line ends at the
+   oldest event as usual. */
+.cl-page .cl-timeline-item:has(+ .cl-timeline-item[hidden]) {
+    padding-bottom: 0;
+}
+
+.cl-page .cl-timeline-item:has(+ .cl-timeline-item[hidden])::after {
+    bottom: -13px;
+    background: repeating-linear-gradient(to bottom, var(--cl-line) 0 4px, transparent 4px 8px);
+}
+
+.cl-page .cl-timeline:has(+ .cl-timeline-more:not([hidden])) {
+    padding-bottom: 4px;
+}
+
+.cl-page .cl-timeline:has(> .cl-timeline-item[hidden]) {
+    padding-bottom: 0;
+}
+
+.cl-page .cl-timeline-more {
+    margin: 0;
+    padding: 0 20px 8px;
+}
+
+/* The node is larger than an event dot so its three dots read, and centred on the same axis: event dots are centred
+   7px in (3px offset + half of 8px), so the 18px node starts 2px before the list edge. Its label keeps the event
+   text's 7px distance from the ring. The whole row is the button. */
+.cl-page .cl-timeline-node {
+    align-items: flex-start;
+    gap: 7px;
+    padding: 0;
+    text-align: left;
+}
+
+.cl-page .cl-timeline-node-dot {
+    position: relative;
+    flex: none;
+    box-sizing: border-box;
+    width: 18px;
+    height: 18px;
+    margin: 13px 0 0 -2px;
+    border: 2px solid var(--cl-line);
+    border-radius: 50%;
+    background: var(--cl-surface);
+}
+
+/* Three dots: the middle one drawn by the pseudo-element, the outer two by its shadows. */
+.cl-page .cl-timeline-node-dot::before {
+    content: "";
+    position: absolute;
+    left: calc(50% - 1.5px);
+    top: calc(50% - 1.5px);
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: var(--cl-ink-3);
+    box-shadow: -4.5px 0 0 var(--cl-ink-3), 4.5px 0 0 var(--cl-ink-3);
+}
+
+.cl-page .cl-timeline-node > span:last-child {
+    align-self: center;
+    padding: 4px 0;
+}
+
+.cl-page .cl-timeline-less {
+    margin-left: 16px;
+}
+
+/* Up chevron before "collapse", drawn in the text colour. */
+.cl-page .cl-timeline-less::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    margin: 4px 2px 0;
+    border-top: 2px solid currentColor;
+    border-left: 2px solid currentColor;
+    transform: rotate(45deg);
+}
+
+.cl-page .cl-timeline time {
+    display: block;
+    font-size: 12.5px;
+    color: var(--cl-ink-2);
+    font-variant-numeric: tabular-nums;
+}
+
+.cl-page .cl-timeline-title {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.35;
+    color: var(--cl-ink);
+}
+
+.cl-page .cl-timeline-desc {
+    margin: 2px 0 0;
+    font-size: 13px;
+    line-height: 1.4;
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-timeline-desc a {
+    color: var(--cl-accent-ink);
+    text-decoration: underline;
+}
+
+/* Bulma .content styles lists and paragraphs; these components are not prose */
+.cl-page ol.cl-timeline,
+.cl-page ul.cl-menu-list {
+    margin-left: 0;
+    margin-top: 0;
+    list-style: none;
+}
+
+/* The "show earlier events" row follows the list directly: the dashed line runs from the list into it. */
+.cl-page ol.cl-timeline {
+    margin-bottom: 0;
+}
+
+.cl-page .cl-timeline p {
+    margin-bottom: 0;
+}
+
+.cl-page .cl-choice-group > ul.cl-check-columns {
+    margin: 4px 0 0;
+    padding-left: 0;
+    list-style: none;
+}
+
+.cl-page .cl-choice-group > .cl-help {
+    margin: 6px 0 0;
+    font-size: 13px;
+    line-height: 1.4;
+    color: var(--cl-ink-2);
+}
+
+/* Copy inline: button.cl-copy-inline > .cl-copy-code (the code, then its icon), or > .cl-copy-icon alone (.is-icon, a
+   copy button after a link or a heading). The icon is always shown, muted, and takes the link colour on hover and
+   focus; one click anywhere on the button copies. The hit area reaches 24 px (44 px below 1024 px) through padding
+   pulled back by an equal negative margin, so no line or row grows. The button is positioned, so its enlarged area
+   lies over the plain text around it; its own content and every control of the container that holds it sit one
+   level higher, so the area never takes a point of a neighbouring control or of another code. Level 1 stays under
+   the sticky selection row, the top bar and every popover. */
+.cl-page .cl-copy-inline {
+    position: relative;
+    display: inline;
+    text-align: left;
+    overflow-wrap: anywhere;
+    padding: 3px 0;
+    margin: -3px 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+}
+
+.cl-page .cl-copy-inline > *,
+.cl-page :is(.cl-table, .cl-record-title, .cl-record-meta, .cl-address):has(.cl-copy-inline)
+        :is(a, summary, label, input, button:not(.cl-copy-inline)) {
+    position: relative;
+    z-index: 1;
+}
+
+/* The icon after a link or a heading: the extra width goes to the right, never over the link it follows. */
+.cl-page .cl-copy-inline.is-icon {
+    padding-right: 10px;
+    margin-right: -10px;
+}
+
+.cl-page .cl-copy-inline .cl-copy-icon {
+    margin-left: 4px;
+    font-size: 11px;
+    color: var(--cl-ink-3);
+}
+
+.cl-page .cl-copy-inline:hover .cl-copy-icon,
+.cl-page .cl-copy-inline:focus-visible .cl-copy-icon {
+    color: var(--cl-accent-ink);
+}
+
+/* The ring goes around what is seen (the code and its icon, or the lone icon), not around the enlarged hit area. */
+.cl-page .cl-copy-inline:focus-visible {
+    outline: 0;
+}
+
+.cl-page .cl-copy-inline:focus-visible > :is(.cl-copy-code, .cl-copy-icon) {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
+    border-radius: 2px;
+}
+
+/* Codes on neighbouring lines of a product cell (18.75 px apart): the later button paints over the earlier one's lower
+   padding, so 3 px would leave the upper code under 24 px. 9 px reaches over the line above as well, whose links and
+   toggles sit one level higher and keep every point of their own. Below 1024 px the 44 px rules apply. */
+@media screen and (min-width: 1024px) {
+    .cl-page .cl-table-sub .cl-copy-inline {
+        padding-top: 9px;
+        padding-bottom: 9px;
+        margin-top: -9px;
+        margin-bottom: -9px;
+    }
+}
+
+
+/* Record header with status: h1 + pill + status action in one line */
+.cl-page .cl-record-title {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+    min-width: 0;
+}
+
+.cl-page .cl-record-title .cl-copy-inline {
+    color: var(--cl-ink-3);
+}
+
+/* the h1 and its copy icon as one unit: the heading wraps inside it, the icon stays after its last word */
+.cl-page .cl-record-name {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    max-width: 100%;
+}
+
+.cl-page .cl-record-name > .cl-page-title {
+    min-width: 0;
+}
+
+.cl-page .cl-record-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 0;
+    margin: 6px 0 0;
+    max-width: none;
+    font-size: 14px;
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-record-meta > span:not(:last-child)::after {
+    content: "·";
+    margin: 0 8px;
+    color: var(--cl-ink-3);
+}
+
+.cl-page .cl-record-meta strong {
+    font-weight: 600;
+    color: var(--cl-ink);
+}
+
+.cl-page .cl-record-meta.is-secondary {
+    margin-top: 2px;
+    font-size: 13px;
+}
+
+.cl-page .cl-record-meta a {
+    color: var(--cl-accent-ink);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+/* Decorative icon + short text: the icon carries no meaning on its own, the text does (fulfilment type). */
+.cl-icon-text {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.cl-icon-text i {
+    font-size: 0.9em;
+    color: var(--cl-ink-3);
+}
+
+/* Table group header (services and delivery below products) */
+.cl-page .cl-table tbody tr.cl-table-group > th {
+    padding-top: 14px;
+    padding-bottom: 6px;
+    background: var(--cl-surface-2);
+}
+
+/* Column widths of the order items table (fixed layout) */
+.cl-page .cl-table col.cl-col-check { width: 44px; }
+.cl-page .cl-table col.cl-col-price { width: 128px; }
+/* fits the longest usual state pill ("Skompletowany", "Zarezerwowany": 124 px) plus the cell's 2 x 10 px padding */
+.cl-page .cl-table col.cl-col-state { width: 148px; }
+.cl-page .cl-table col.cl-col-menu { width: 56px; }
+/* A narrow yes/no column (a check mark or nothing), centred; its header may take two lines. As the last column
+   (no menu: read-only order) it also carries the card's 20 px right edge. */
+.cl-page .cl-table col.cl-col-flag { width: 56px; }
+.cl-page .cl-table col.cl-col-flag:last-child { width: 70px; }
+.cl-page .cl-table :is(th, td).cl-table-flag { padding-left: 6px; padding-right: 6px; text-align: center; }
+.cl-page .cl-table thead th.cl-table-flag { white-space: normal; line-height: 1.25; }
+.cl-page .cl-table .cl-table-flag-mark { color: var(--cl-ok); font-weight: 600; }
+
+/* The fulfilment-status pill in the 148 px state column: every normal label ("Nowy", "W alokacji", "Zamówiony"...)
+   still fits on one line; only the rare longest one ("W serwisie zewnętrznym") wraps inside the pill instead of
+   overflowing the cell. align-items switches to flex-start so the dot stays pinned to the first line instead of
+   drifting to the vertical centre of both lines, with a matching top offset so it still reads level with that line. */
+.cl-page .cl-table .cl-table-fulfilment .cl-status {
+    white-space: normal;
+    align-items: flex-start;
+}
+
+.cl-page .cl-table .cl-table-fulfilment .cl-status::before {
+    margin-top: 6px;
+}
+
+/* .cl-page .cl-table .cl-table-sub .cl-status and .cl-page .cl-table .cl-table-pills already style every .cl-table
+   on main (catalog/inventory tables included); not repeated unscoped here, or a merged catalog/inventory screen
+   would silently change size. The order items table needs the tighter spacing only in its own phone card layout, so
+   it is scoped to .is-wrap. */
+.cl-page .cl-table.is-wrap .cl-table-pills {
+    margin-top: 4px;
+}
+
+.cl-page .cl-table.is-wrap .cl-table-pills .cl-status {
+    padding: 1px 8px;
+}
+
+.cl-page .cl-table .cl-table-link {
+    color: var(--cl-accent-ink);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+/* Card head: several actions on the right */
+.cl-page .cl-card-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--cl-gap-related);
+}
+
+.cl-page .cl-card-head .cl-help {
+    flex-basis: 100%;
+    margin: 0;
+    text-align: right;
+}
+
+/* List summary line at the bottom of a list card (payments) */
+.cl-page .cl-list-summary {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 4px 20px;
+    margin: 0;
+    padding: 10px 20px 14px;
+    border-top: 1px solid var(--cl-line);
+    font-size: 14px;
+    color: var(--cl-ink-2);
+    font-variant-numeric: tabular-nums;
+}
+
+.cl-page .cl-list-summary strong {
+    color: var(--cl-ink);
+}
+
+.cl-page .cl-list-summary .is-bad {
+    color: var(--cl-bad);
+    font-weight: 600;
+}
+
+/* Address block in a side card */
+.cl-page .cl-address {
+    margin: 0;
+    padding: 12px 20px 14px;
+    border-top: 1px solid var(--cl-line);
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--cl-ink);
+}
+
+.cl-page .cl-card-head + .cl-address {
+    margin-top: 10px;
+}
+
+.cl-page .cl-address-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.cl-page .cl-address-head .cl-link-button {
+    font-size: 13px;
+}
+
+.cl-page .cl-address a {
+    color: var(--cl-accent-ink);
+}
+
+.cl-page .cl-address .cl-help {
+    margin: 6px 0 0;
+}
+
+/* The e-mail's copy button: the order number's pinned icon, a little apart from the link. */
+.cl-page .cl-address .cl-copy-inline {
+    margin-left: 6px;
+}
+
+
+/* ------------------------------------------------------------------------------------------------------------------
+   Breakpoints
+   ------------------------------------------------------------------------------------------------------------------ */
+@media screen and (max-width: 1023px) {
+    .cl-page .cl-button.is-icon {
+        width: 44px;
+        height: 44px;
+    }
+
+    .cl-page .cl-menu-item {
+        min-height: 44px;
+    }
+
+    /* touch targets: the e-mail and phone links of an address, the sort buttons of the add-items table */
+    .cl-page .cl-address a {
+        display: inline-flex;
+        align-items: center;
+        min-height: 44px;
+    }
+
+    /* copy buttons: a 44 px hit area, the line still as tall as before (see the base rules) */
+    .cl-page .cl-copy-inline {
+        padding-top: 13px;
+        padding-bottom: 13px;
+        margin-top: -13px;
+        margin-bottom: -13px;
+    }
+
+    .cl-page .cl-copy-inline.is-icon {
+        padding-right: 30px;
+        margin-right: -30px;
+    }
+
+    /* the order number's icon sits between the heading and the status pill: its area reaches over the heading's end
+       and up to the pill, not under it */
+    .cl-page .cl-record-title .cl-copy-inline.is-icon {
+        padding-left: 18px;
+        padding-right: 12px;
+        margin-left: -18px;
+        margin-right: -12px;
+    }
+
+    /* the e-mail line is 44 px tall already (its link is), the button simply fills a 44 px square in it */
+    .cl-page .cl-address .cl-copy-inline {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 44px;
+        min-height: 44px;
+        padding: 0;
+        margin: 0;
+        vertical-align: top;
+    }
+
+    .cl-page .cl-item-add-table .cl-table-sort {
+        min-height: 44px;
+    }
+}
+
+/* The items table is not a dense dialog table: its first and last cells line up with the card title. */
+@media screen and (min-width: 720px) {
+    .cl-page .cl-table.is-wrap :is(th, td):first-child {
+        padding-left: 20px;
+    }
+
+    .cl-page .cl-table.is-wrap :is(th, td):last-child {
+        padding-right: 20px;
+    }
+}
+
+@media screen and (max-width: 719px) {
+    .cl-page dl.cl-kv {
+        grid-template-columns: minmax(0, 1fr);
+        padding: 0 16px 16px;
+    }
+
+    .cl-page .cl-kv > div {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 2px;
+    }
+
+    .cl-page .cl-kv.is-column > div {
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 8px;
+    }
+
+    .cl-page .cl-timeline,
+    .cl-page .cl-timeline-more,
+    .cl-page .cl-address,
+    .cl-page .cl-list-summary {
+        padding-left: 16px;
+        padding-right: 16px;
+    }
+
+    .cl-page .cl-record-meta > span:not(:last-child)::after {
+        margin: 0 6px;
+    }
+
+    /* Only the record header (order details) stretches its actions full-width; every settings-header variant
+       (catalog, store settings, notifications, ...) keeps main's phone layout for .cl-page-actions. */
+    .cl-page .cl-page-header-row.is-record .cl-page-actions {
+        margin-left: 0;
+        width: 100%;
+    }
+
+    .cl-page .cl-page-header-row.is-record .cl-page-actions > * {
+        flex: 1 1 auto;
+    }
+
+    .cl-page .cl-page-header-row.is-record .cl-page-actions .cl-button {
+        justify-content: center;
+    }
+
+    /* "Więcej" alone or next to the primary action fills its share of the row, like the primary action: the menu
+       (details) already stretches, its summary did not */
+    .cl-page .cl-page-header-row.is-record .cl-page-actions details.cl-menu > summary {
+        width: 100%;
+    }
+
+    .cl-page .cl-menu-list {
+        max-width: calc(100vw - 32px);
+    }
+
+    .cl-page .cl-card-head .cl-help {
+        text-align: left;
+    }
+
+    /* card rows: second lines of a cell stay under the value, not under the column label */
+    .cl-page .cl-table :is(tbody th, td) > :is(.cl-table-sub, .cl-table-pills) {
+        grid-column: 2;
+    }
+
+    /* items table as cards: checkbox | product (codes under it) | menu in the first line, price and state below */
+    .cl-page .cl-table.is-wrap {
+        table-layout: auto;
+    }
+
+    .cl-page .cl-table.is-wrap tbody tr:not(.cl-table-group) {
+        display: grid;
+        grid-template-columns: 36px minmax(0, 1fr) 44px;
+        column-gap: 8px;
+        align-items: start;
+    }
+
+    .cl-page .cl-table.is-wrap tbody tr:not(.cl-table-group):not(:has(.cl-table-check)) {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .cl-page .cl-table.is-wrap tbody tr > .cl-table-check {
+        grid-column: 1;
+        grid-row: 1 / span 3;
+        display: block;
+        padding-top: 14px;
+    }
+
+    .cl-page .cl-table.is-wrap tbody tr > .cl-table-key {
+        grid-column: 2;
+        grid-row: 1;
+        display: block;
+        padding-bottom: 6px;
+    }
+
+    .cl-page .cl-table.is-wrap tbody tr:not(:has(.cl-table-check)) > :is(.cl-table-key, td) {
+        grid-column: 1;
+    }
+
+    .cl-page .cl-table.is-wrap tbody tr > .cl-table-key::before {
+        content: none;
+    }
+
+    /* price and fulfilment speak for themselves ("1 × 2 299,00", a status pill): no column labels, one line each */
+    .cl-page .cl-table.is-wrap tbody tr > td:not(.cl-table-check):not(.cl-table-actions) {
+        grid-column: 2 / -1;
+        display: block;
+        padding: 2px 0;
+    }
+
+    .cl-page .cl-table.is-wrap tbody tr > td::before {
+        content: none;
+    }
+
+    /* read-only rows (closed order, super admin): no checkbox, no menu — one column */
+    .cl-page .cl-table.is-wrap tbody tr:not(.cl-table-group):not(:has(.cl-table-check)) > :is(th, td) {
+        grid-column: 1 / -1;
+    }
+
+    .cl-page .cl-table.is-wrap tbody tr > td .cl-table-sub {
+        display: inline;
+        margin-left: 8px;
+    }
+
+    .cl-page .cl-table.is-wrap tbody tr > .cl-table-actions {
+        grid-column: 3;
+        grid-row: 1;
+        display: block;
+    }
+
+    .cl-page .cl-table.is-wrap tbody tr.cl-table-group {
+        padding: 0;
+    }
+
+    .cl-page .cl-table.is-wrap tbody tr.cl-table-group > th {
+        display: block;
+        padding: 10px 16px 6px;
+    }
+
+    .cl-page .cl-table.is-wrap tbody tr.cl-table-group > th::before {
+        content: none;
+    }
+}
+
+/* Collapsible card: disclosure button inside the h2 (static/js/collapse.js adds it below 720 px only) */
+.cl-page .cl-card-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    width: 100%;
+    min-height: 44px;
+    margin: -10px 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.cl-page .cl-card-toggle::after {
+    content: "";
+    flex: 0 0 auto;
+    width: 8px;
+    height: 8px;
+    margin-right: 4px;
+    border-right: 2px solid var(--cl-ink-2);
+    border-bottom: 2px solid var(--cl-ink-2);
+    transform: rotate(45deg) translateY(-2px);
+}
+
+.cl-page .cl-card-toggle[aria-expanded="true"]::after {
+    transform: rotate(-135deg) translateY(-2px);
+}
+
+.cl-page .cl-card-toggle:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+.cl-page .cl-card.is-collapsible .cl-card-head {
+    padding-bottom: 14px;
+}
+
+.cl-page .cl-card.is-collapsible .cl-card-title {
+    flex: 1 1 auto;
+}
+
+.cl-page .cl-card.is-collapsible .cl-collapse-body:not([hidden]) {
+    border-top: 1px solid var(--cl-line);
+}
+
+/* --- Orders redesign: helpers that replace the mockups' inline styles --- */
+
+/* Room between a card head and the table or bar below it (mockups: a 12 px spacer). */
+.cl-page .cl-card-section {
+    padding-top: 12px;
+}
+
+/* A form grid placed straight in a card (settings of the order), and the rare fields in the disclosure below it. Its
+   rows are spaced by the fields' own margins (see "Order forms in a card grid" below), the last one taken back here. */
+.cl-page .cl-card-grid {
+    padding: 12px 20px 4px;
+    row-gap: 0;
+    margin-bottom: calc(-1 * var(--cl-gap-fields));
+}
+
+.cl-page .cl-card-extras .cl-card-grid {
+    padding: 0 20px 12px;
+}
+
+.cl-page .cl-card-grid.is-last {
+    padding: 12px 20px 16px;
+}
+
+.cl-page .cl-card-inset {
+    padding: 16px 20px;
+}
+
+/* A form that sits inside its card (the no-JavaScript page of a dialog, e.g. "Zamknij paragon ręcznie"): the footer
+   spans the card, the fields keep the form's 760 px measure. */
+.cl-page .cl-card > .cl-form:has(> .cl-card-inset) {
+    max-width: none;
+}
+
+.cl-page .cl-card > .cl-form > .cl-card-inset {
+    max-width: 760px;
+}
+
+/* the dialog's description on its no-JavaScript page: the look of p.cl-dialog-effect */
+.cl-page .cl-card-inset > .cl-help {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.4;
+    color: var(--cl-ink-2);
+}
+
+/* Narrow fields: a quantity in a table row, a short code. */
+.cl-page .cl-input.is-qty {
+    width: 72px;
+}
+
+.cl-page .cl-input.is-code {
+    width: 110px;
+}
+
+/* A segmented switch as wide as its segments (tabs of the add-items dialog). Not "is-inline": Bulma's helper of that
+   name forces display: inline !important. */
+.cl-page .cl-segmented.is-fit {
+    width: max-content;
+    max-width: 100%;
+}
+
+/* On a phone the wrapped switch spans the dialog, segments sharing the width, instead of two loose buttons. */
+@media screen and (max-width: 719px) {
+    .cl-page .cl-segmented.is-fit {
+        width: 100%;
+    }
+
+    /* auto basis: a label too long to share the line wraps onto its own full-width row instead of squeezing the other */
+    .cl-page .cl-segmented.is-fit > * {
+        flex: 1 1 auto;
+    }
+}
+
+/* A card inside a dialog (preview of the target order): outlined, without the resting shadow. */
+.cl-page .cl-card.is-flat {
+    box-shadow: none;
+    border: 1px solid var(--cl-line);
+}
+
+/* A shared dialog on a page not yet redesigned carries its own .cl-page wrapper so its rules apply; no page padding. */
+.cl-page.cl-dialog-host {
+    padding: 0;
+}
+
+/* A code chosen outside the pricelist (assign SKU dialog). */
+.cl-page .cl-chip-tag.is-warn {
+    color: var(--cl-warn);
+    background: var(--cl-warn-soft);
+}
+
+@media screen and (max-width: 719px) {
+    .cl-page .cl-card-grid,
+    .cl-page .cl-card-grid.is-last,
+    .cl-page .cl-card-inset {
+        padding-left: 16px;
+        padding-right: 16px;
+    }
+
+    .cl-page .cl-card-extras .cl-card-grid {
+        padding: 0 16px 12px;
+    }
+}
+
+/* An input with a segmented mode switch beside it (a price typed net or gross). */
+.cl-page .cl-input-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: var(--cl-gap-related);
+    align-items: center;
+}
+
+.cl-page .cl-input-row .cl-segmented {
+    height: 40px;
+    align-items: center;
+}
+
+@media screen and (max-width: 1023px) {
+    .cl-page .cl-input-row .cl-segmented {
+        height: 44px;
+    }
+}
+
+@media screen and (max-width: 719px) {
+    .cl-page .cl-input-row {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+/* --- Add-items dialog (orders and offers) --- */
+.cl-page .cl-item-add-scroll {
+    max-height: 340px;
+    overflow-y: auto;
+    border: 1px solid var(--cl-line);
+    border-radius: var(--cl-radius);
+}
+
+.cl-page .cl-item-add-scroll thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--cl-surface-2);
+}
+
+.cl-page .cl-item-add-table tbody tr {
+    cursor: pointer;
+}
+
+.cl-page .cl-item-add-table tbody tr.is-picked {
+    background: var(--cl-accent-soft);
+    box-shadow: inset 3px 0 0 var(--cl-accent);
+}
+
+.cl-page .cl-item-add-arrow {
+    display: inline-block;
+    width: 1em;
+    color: var(--cl-accent);
+}
+
+.cl-page .cl-item-add-strong {
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.cl-page .cl-item-add-muted {
+    color: var(--cl-ink-2);
+    white-space: nowrap;
+}
+
+.cl-page .cl-item-add-row-add {
+    visibility: hidden;
+}
+
+.cl-page .cl-item-add-table tr:hover .cl-item-add-row-add,
+.cl-page .cl-item-add-row-add:focus-visible {
+    visibility: visible;
+}
+
+/* The qty stepper the JS builds per picked row, kept under the cl- prefix like every other component here. */
+.cl-page .cl-item-add-stepper {
+    display: inline-flex;
+    align-items: stretch;
+}
+
+.cl-page .cl-item-add-stepper button {
+    width: 28px;
+    border: 1px solid var(--cl-line);
+    background: var(--cl-surface);
+    color: var(--cl-ink-2);
+    font: inherit;
+    cursor: pointer;
+}
+
+.cl-page .cl-item-add-stepper button:first-child {
+    border-radius: var(--cl-radius) 0 0 var(--cl-radius);
+}
+
+.cl-page .cl-item-add-stepper button:last-child {
+    border-radius: 0 var(--cl-radius) var(--cl-radius) 0;
+}
+
+.cl-page .cl-item-add-stepper input {
+    width: 44px;
+    border: 1px solid var(--cl-line);
+    border-left: 0;
+    border-right: 0;
+    text-align: center;
+    font: inherit;
+}
+
+.cl-page .cl-item-add-basket {
+    position: relative;
+    margin-top: 12px;
+    border: 1px solid var(--cl-line);
+    border-radius: var(--cl-radius);
+    background: var(--cl-surface-2);
+}
+
+.cl-page .cl-item-add-basket-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-height: 44px;
+    padding: 8px 12px;
+    border: 0;
+    background: none;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.cl-page .cl-item-add-basket-n {
+    padding: 0 8px;
+    font-size: 12px;
+    border-radius: 999px;
+    background: var(--cl-accent);
+    color: var(--cl-surface);
+}
+
+.cl-page .cl-item-add-basket-clear {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+}
+
+.cl-page .cl-item-add-chev {
+    color: var(--cl-ink-2);
+    transition: transform .15s;
+}
+
+.cl-page .cl-item-add-basket.is-collapsed .cl-item-add-chev {
+    transform: rotate(-90deg);
+}
+
+.cl-page .cl-item-add-basket.is-collapsed .cl-item-add-basket-body {
+    display: none;
+}
+
+.cl-page .cl-item-add-basket-body {
+    max-height: 190px;
+    overflow: auto;
+    background: var(--cl-surface);
+    border-top: 1px solid var(--cl-line);
+    border-radius: 0 0 var(--cl-radius) var(--cl-radius);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cl-page .cl-item-add-chev {
+        transition: none;
+    }
+}
+
+/* Card mode of the add-items table (< 720 px): the other cells carry their column name, the pick box and the product
+   name need no label and take the whole line. */
+@media screen and (max-width: 719px) {
+    .cl-page .cl-item-add-table td:is(.cl-table-check, .cl-item-add-name) {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .cl-page .cl-item-add-table td:is(.cl-table-check, .cl-item-add-name)::before {
+        content: none;
+    }
+
+    /* the code line stays under the name (the shared card rule moves a cell's second line to the value column) */
+    .cl-page .cl-item-add-table td.cl-item-add-name > :is(div, .cl-table-sub) {
+        grid-column: 1;
+    }
+}
+
+/* --- Add-payment dialog (order details, Payments, Deliveries) --- */
+
+/* The booked/fee/status hint appears only once an amount is typed; reserve its line so the fields below it stay put. */
+.cl-page .cl-payment-hint {
+    min-height: 1.5em;
+}
+
+/* A description list inside a disclosure (cost and profit): the disclosure body already insets it. */
+.cl-page .cl-disclosure-body > dl.cl-kv.is-column {
+    padding: 0;
+}
+
+/* --- Order details: bulk actions without JavaScript — a row of buttons inside the card's inset --- */
+.cl-page .cl-selection-actions.is-static {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+    padding: 12px 20px 16px;
+}
+
+/* An order number typed by hand: wide enough for a marketplace reference */
+.cl-page .cl-input.is-reference {
+    width: 22ch;
+    max-width: 100%;
+}
+
+/* Order details: short notes beside a title or an address (why items cannot be added, a locked address, "completed
+   automatically") — help-sized, and under a card title they start at its left edge */
+.cl-page .cl-help.is-note { font-size: 13px; line-height: 1.4; color: var(--cl-ink-2); }
+.cl-page .cl-card-head > .cl-help.is-note { text-align: left; }
+
+/* Order details: a card's form grid inside a dialog — the dialog body already pads it, so fields line up with the title */
+.cl-page .cl-dialog-body .cl-card-grid { padding: 4px 0 0; }
+.cl-page .cl-dialog-body .cl-card-extras > summary { padding: 0; }
+.cl-page .cl-dialog-body .cl-card-extras > .cl-disclosure-body > .cl-form-grid { padding: 4px 0 0; }
+
+/* Order forms in a card grid (settings, billing/shipping address; in their dialogs and on their no-JS pages): the fields
+   of one grid row share row lines, so a label that wraps or a help text under one field never moves its neighbour's
+   control. Each field spans four row tracks of the grid (label, control, help, error) through subgrid; the label sits
+   on the control, the control of every field in the row starts on the same line. An empty track must not add a gap,
+   so the grid has no row gap and the token gaps are margins: 6 px label -> control -> help/error, 12 px between rows
+   (the last row's margin is taken back by the grid's own rule above). A field inserted into a sized wrapper (div.cl-span-3 > .cl-field)
+   passes the tracks on through a second subgrid. */
+.cl-page .cl-card-grid > * { margin-bottom: var(--cl-gap-fields); }
+.cl-page .cl-card-grid > :is(.cl-field, :has(> .cl-field)) {
+    display: grid;
+    grid-row: span 4;
+    grid-template-rows: subgrid;
+    gap: 0;
+}
+.cl-page .cl-card-grid > * > .cl-field {
+    display: grid;
+    grid-row: 1 / -1;
+    grid-template-rows: subgrid;
+    gap: 0;
+}
+.cl-page .cl-card-grid .cl-field > .cl-label { grid-row: 1; align-self: end; margin-top: 0; }
+.cl-page .cl-card-grid .cl-field > :is(.cl-input, .cl-select) { grid-row: 2; margin-top: var(--cl-gap-attached); }
+.cl-page .cl-card-grid .cl-field > .cl-help { grid-row: 3; margin-top: var(--cl-gap-attached); }
+.cl-page .cl-card-grid .cl-field > .cl-field-error { grid-row: 4; margin-top: var(--cl-gap-attached); }
+/* the checkbox keeps its 36/44 px target, but the gap to its neighbours is measured from its text line (1.5em) */
+.cl-page .cl-card-grid > .cl-check-field { display: flex; }
+.cl-page .cl-card-grid > .cl-check-field > .cl-check { margin-block: calc((1.5em - 36px) / 2); }
+@media screen and (max-width: 1023px) {
+    .cl-page .cl-card-grid > .cl-check-field > .cl-check { margin-block: calc((1.5em - 44px) / 2); }
+}
+
+/* Order details items as cards (< 720 px): the checkbox column fits its 44 px target and the product name starts right
+   after it (the list's padding for an overlaid checkbox does not apply here) */
+@media screen and (max-width: 719px) {
+    .cl-page .cl-table.is-wrap tbody tr:not(.cl-table-group) { grid-template-columns: 44px minmax(0, 1fr) 44px; }
+    .cl-page .cl-table.is-wrap tbody tr:not(.cl-table-group):not(:has(.cl-table-check)) { grid-template-columns: minmax(0, 1fr); }
+    .cl-page .cl-table.is-wrap tbody tr > th.cl-table-key { padding-left: 0; padding-right: 0; }
+    /* a row with a menu but no checkbox (a WZ is issued): the name keeps its line, the menu sits beside it */
+    .cl-page .cl-table.is-wrap tbody tr:not(.cl-table-group):not(:has(.cl-table-check)):has(.cl-table-actions) { grid-template-columns: minmax(0, 1fr) 44px; }
+    .cl-page .cl-table.is-wrap tbody tr:not(.cl-table-group):not(:has(.cl-table-check)):has(.cl-table-actions) > th.cl-table-key { grid-column: 1; }
+    .cl-page .cl-table.is-wrap tbody tr:not(.cl-table-group):not(:has(.cl-table-check)) > td.cl-table-actions { grid-column: 2; grid-row: 1; }
+    /* the yes/no column as a card line: "Połącz na FV: ✓", and no line at all for "no" */
+    .cl-page .cl-table.is-wrap tbody tr > td.cl-table-flag { text-align: left; }
+    .cl-page .cl-table.is-wrap tbody tr > td.cl-table-flag::before { content: attr(data-label) ": "; }
+    .cl-page .cl-table.is-wrap tbody tr > td.cl-table-flag.is-empty { display: none; }
+}
+
+
+/* --- Order details: product cell — the name with its markers, then the labelled codes (two lines) --- */
+/* Markers follow the name on its line and wrap like words: condition and service pills, then the note toggles. The
+   markup's whitespace plus 2 px on each side keeps them 6-7 px apart. */
+.cl-page .cl-table .cl-table-marks {
+    font-weight: 400;
+}
+
+.cl-page .cl-table .cl-table-marks > * {
+    margin: 0 2px;
+    vertical-align: middle;
+}
+
+.cl-page .cl-table th.cl-table-key .cl-table-marks .cl-status {
+    margin: 0 2px;
+    padding: 1px 8px;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+/* The dot between two codes: one ordinary space on each side, from the markup's own whitespace. */
+.cl-page .cl-table .cl-table-sep {
+    color: var(--cl-ink-3);
+}
+
+/* One link look in the row: the SN link is the accent link of the Stan column, not the quiet name link. */
+.cl-page .cl-table .cl-table-key .cl-table-sub a.cl-table-link {
+    color: var(--cl-accent-ink);
+    text-decoration-color: currentColor;
+    text-underline-offset: 2px;
+}
+
+/* Marker with a popover: details.cl-note > summary.cl-note-toggle + .cl-note-panel. The browser opens it (also
+   without JavaScript); menu.js keeps one popover or menu open, closes it on Escape (focus back on the toggle) and on
+   an outside click, and flips the panel (.is-up, .is-end) to keep it in the window. The panel is the menu's panel. */
+.cl-page .cl-note {
+    position: relative;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.cl-page .cl-note,
+.cl-page .cl-note * {
+    box-sizing: border-box;
+}
+
+.cl-page .cl-note > summary {
+    list-style: none;
+    cursor: pointer;
+}
+
+.cl-page .cl-note > summary::-webkit-details-marker {
+    display: none;
+}
+
+.cl-page .cl-note > summary::marker {
+    content: "";
+}
+
+.cl-page .cl-note-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    font-size: 13px;
+    color: var(--cl-ink-3);
+}
+
+/* The visible part of the toggle: hover, open and focus mark this 22 px square, not the larger touch target. */
+.cl-page .cl-note-toggle .cl-note-glyph {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 4px;
+}
+
+.cl-page .cl-note.is-accent > .cl-note-toggle {
+    color: var(--cl-accent);
+}
+
+.cl-page .cl-note-toggle:hover .cl-note-glyph,
+.cl-page .cl-note[open] > .cl-note-toggle .cl-note-glyph {
+    background: var(--cl-accent-soft);
+    color: var(--cl-accent-ink);
+}
+
+.cl-page .cl-note-toggle:focus-visible {
+    outline: 0;
+}
+
+.cl-page .cl-note-toggle:focus-visible .cl-note-glyph {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 1px;
+}
+
+.cl-page .cl-note-panel {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    z-index: var(--cl-z-pop);
+    width: max-content;
+    max-width: min(320px, calc(100vw - 32px));
+    padding: 10px 12px;
+    border: 1px solid var(--cl-line);
+    border-radius: var(--cl-radius);
+    background: var(--cl-surface);
+    box-shadow: var(--cl-shadow);
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 1.45;
+    color: var(--cl-ink);
+    text-align: left;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+.cl-page .cl-note-panel.is-end {
+    left: auto;
+    right: 0;
+}
+
+.cl-page .cl-note-panel.is-up {
+    top: auto;
+    bottom: calc(100% + 4px);
+}
+
+.cl-page .cl-note-title {
+    margin: 0 0 4px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-note-text {
+    margin: 0;
+}
+
+.cl-page .cl-note-text.is-pre {
+    white-space: pre-line;
+}
+
+/* Below 1024 px: a 44 px target around the 22 px icon, in the line box itself — only a row with markers gets the
+   taller name line, so the target overlaps neither the codes line below nor a wrapped name above, and two toggles
+   side by side do not overlap either; the panel hangs off the product cell (720-1023 px) or spans the whole card
+   (< 720 px) instead of the icon, so it fits wherever the icon is. */
+@media screen and (max-width: 1023px) {
+    .cl-page .cl-note-toggle {
+        width: 44px;
+        height: 44px;
+    }
+
+    .cl-page .cl-note {
+        position: static;
+    }
+
+    .cl-page .cl-table tbody th.cl-table-key:has(.cl-note) {
+        position: relative;
+    }
+
+    .cl-page .cl-note-panel,
+    .cl-page .cl-note-panel.is-end {
+        left: 0;
+        right: 0;
+        width: auto;
+        max-width: none;
+        top: auto;
+        margin-top: 4px;
+    }
+
+    .cl-page .cl-note-panel.is-up {
+        top: auto;
+        bottom: 100%;
+        margin: 0 0 4px;
+    }
+}
+
+@media screen and (max-width: 719px) {
+    .cl-page .cl-table tbody th.cl-table-key:has(.cl-note) {
+        position: static;
+    }
+
+    .cl-page .cl-table tbody tr:has(.cl-note) {
+        position: relative;
+    }
+
+    .cl-page .cl-note-panel,
+    .cl-page .cl-note-panel.is-end,
+    .cl-page .cl-note-panel.is-up {
+        left: 8px;
+        right: 8px;
+    }
+}
+
+/* --- Order printouts (orders/card, orders/collection, layout-print) ---
+   Printed straight from the order page through a hidden frame (print.js): only the title and the sheet on A4, black
+   text, table headers repeated on every page and no row cut in half. Opened as a page (no JavaScript): the same sheet
+   as one card, sections split by a line like field groups. */
+.cl-page .cl-print-sheet {
+    padding-bottom: 4px;
+}
+
+.cl-page dl.cl-kv.cl-print-meta {
+    padding-top: 16px;
+}
+
+.cl-page .cl-print-section {
+    padding-top: 14px;
+    border-top: 1px solid var(--cl-line);
+}
+
+.cl-page .cl-print-title {
+    margin: 0 20px 10px;
+    font-size: 16px;
+    font-weight: 650;
+    line-height: 1.3;
+    color: var(--cl-ink);
+}
+
+.cl-page .cl-print-empty,
+.cl-page p.cl-print-text,
+.cl-page .cl-print-statement {
+    margin: 0;
+    padding: 0 20px 16px;
+    font-size: 14px;
+    color: var(--cl-ink);
+}
+
+.cl-page .cl-print-empty {
+    color: var(--cl-ink-2);
+}
+
+/* the order and item comments keep the line breaks they were typed with */
+.cl-page .cl-print-text {
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+}
+
+/* A serial number or manufacturer code is copied by hand from paper, so it never breaks inside itself; several serial
+   numbers in one cell are separate spans and wrap only between them. On a phone a long code may still break so the
+   card row never scrolls sideways. */
+.cl-page .cl-print-table .cl-print-code {
+    white-space: nowrap;
+}
+
+.cl-page .cl-print-statement {
+    font-weight: 600;
+}
+
+/* Signature lines: the line is an input, so the name can be typed in before printing; the label sits under the line
+   like on a paper form. */
+.cl-page .cl-signatures {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 40px;
+    padding: 32px 20px 20px;
+}
+
+.cl-page .cl-signature {
+    display: flex;
+    flex-direction: column;
+    gap: var(--cl-gap-attached);
+}
+
+.cl-page .cl-signature-input {
+    width: 100%;
+    height: 44px;
+    padding: 0 4px;
+    border: 0;
+    border-bottom: 1px solid var(--cl-ink);
+    border-radius: 0;
+    background: transparent;
+    font: inherit;
+    font-size: 15px;
+    color: var(--cl-ink);
+    text-align: center;
+}
+
+.cl-page .cl-signature-input:focus-visible {
+    outline: 2px solid var(--cl-accent);
+    outline-offset: 2px;
+}
+
+.cl-page .cl-signature-label {
+    font-size: 13.5px;
+    font-weight: 500;
+    color: var(--cl-ink-2);
+    text-align: center;
+}
+
+/* .cl-table.is-compact (declared later with the same weight) takes back the 20 px edge of the first and last cell; the
+   printout's cells line up with its section titles instead, and in the phone's card rows sit flush like any cl-table. */
+@media screen and (min-width: 720px) {
+    .cl-page .cl-table.cl-print-table :is(th, td):first-child {
+        padding-left: 20px;
+    }
+
+    .cl-page .cl-table.cl-print-table :is(th, td):last-child {
+        padding-right: 20px;
+    }
+}
+
+@media screen and (max-width: 719px) {
+    .cl-page .cl-table.cl-print-table td {
+        padding: 3px 0;
+    }
+
+    .cl-page .cl-print-table .cl-print-code {
+        white-space: normal;
+        overflow-wrap: anywhere;
+    }
+
+    .cl-page .cl-print-title {
+        margin-left: 16px;
+        margin-right: 16px;
+    }
+
+    .cl-page .cl-print-empty,
+    .cl-page p.cl-print-text,
+    .cl-page .cl-print-statement {
+        padding-left: 16px;
+        padding-right: 16px;
+    }
+
+    .cl-page .cl-signatures {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 24px;
+        padding: 24px 16px 16px;
+    }
+}
+
+/* The frame print.js prints a sheet from. Moved off screen rather than display: none or visibility: hidden, which some
+   browsers carry into the printed frame (a blank page); A4-wide so the sheet lays out at its paper width. */
+.cl-print-frame {
+    position: fixed;
+    top: 0;
+    left: -10000px;
+    width: 210mm;
+    height: 297mm;
+    border: 0;
+    pointer-events: none;
+}
+
+/* A named page, so the A4 size and margins apply to the printouts only, not to any other page someone prints. */
+@page cl-print-a4 {
+    size: A4;
+    margin: 14mm 12mm;
+}
+
+@media print {
+    .cl-page.cl-print-page {
+        page: cl-print-a4;
+        color: #000;
+        font-size: 10pt;
+    }
+
+    .cl-page.cl-print-page .cl-page-body {
+        max-width: none;
+    }
+
+    .cl-page.cl-print-page .cl-page-header {
+        margin-bottom: 8pt;
+    }
+
+    .cl-page.cl-print-page .cl-page-title {
+        font-size: 16pt;
+    }
+
+    .cl-page.cl-print-page :is(.cl-page-title, .cl-print-title, dt, dd, th, td, p, a, label, input) {
+        color: #000;
+    }
+
+    .cl-page .cl-print-sheet {
+        padding: 0;
+        border: 0;
+        border-radius: 0;
+        box-shadow: none;
+        background: none;
+    }
+
+    .cl-page dl.cl-kv.cl-print-meta {
+        gap: 4pt 16pt;
+        padding: 0 0 10pt;
+    }
+
+    .cl-page .cl-print-meta dt,
+    .cl-page .cl-print-meta dd {
+        font-size: 10pt;
+    }
+
+    .cl-page .cl-kv.cl-print-meta > div {
+        grid-template-columns: 32mm minmax(0, 1fr);
+    }
+
+    .cl-page .cl-kv.cl-print-meta dd a {
+        text-decoration: none;
+    }
+
+    .cl-page .cl-print-section {
+        padding-top: 8pt;
+        border-top-color: #000;
+    }
+
+    .cl-page .cl-print-title {
+        margin: 0 0 4pt;
+        font-size: 11pt;
+        break-after: avoid;
+    }
+
+    .cl-page .cl-print-empty,
+    .cl-page p.cl-print-text,
+    .cl-page .cl-print-statement {
+        padding: 0 0 8pt;
+        font-size: 10pt;
+    }
+
+    .cl-page .cl-print-table {
+        font-size: 9pt;
+    }
+
+    .cl-page .cl-print-table thead {
+        display: table-header-group;
+    }
+
+    .cl-page .cl-table.cl-print-table thead th {
+        padding: 4pt 6pt;
+        border-top: 0;
+        border-bottom: 1px solid #000;
+        background: none;
+        font-size: 9pt;
+        white-space: normal;
+    }
+
+    .cl-page .cl-table.cl-print-table td {
+        padding: 4pt 6pt;
+        border-bottom: 1px solid #999;
+    }
+
+    .cl-page .cl-table.cl-print-table :is(th, td):first-child {
+        padding-left: 0;
+    }
+
+    .cl-page .cl-table.cl-print-table :is(th, td):last-child {
+        padding-right: 0;
+    }
+
+    .cl-page .cl-print-table tr {
+        break-inside: avoid;
+    }
+
+    .cl-page .cl-print-signoff {
+        break-inside: avoid;
+    }
+
+    .cl-page .cl-signatures {
+        gap: 20mm;
+        padding: 22mm 0 0;
+    }
+
+    .cl-page .cl-signature-input {
+        height: auto;
+        min-height: 8mm;
+        border-bottom-color: #000;
+        font-size: 10pt;
+    }
+
+    .cl-page .cl-signature-label {
+        font-size: 9pt;
+    }
+}
+
+/* --- Dropship pages (dropshipCreate, dropshipConfirmation; order details subpages, group C, 2026-09-28) --- */
+/* Checkboxes stacked in one table cell (a product's order lines): no bullets, 4 px apart, each keeps its target. */
+.cl-page .cl-check-list {
+    display: grid;
+    gap: 4px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.cl-page .cl-check-list > li {
+    margin: 0;
+}
+
+/* The money input (a unit cost in a table row, the courier's cash-on-delivery amount): wide enough for 12 345,67 with
+   the number spinner, never wider than its cell. */
+.cl-page .cl-input.is-price {
+    width: 140px;
+    max-width: 100%;
+}
+
+/* A footer whose default (Enter) action is not its main one: the primary button comes later in the markup, first on
+   screen. */
+.cl-page .cl-card-footer.is-primary-first > .cl-button.is-primary {
+    order: -1;
+}
+
+.cl-page .cl-table col.cl-col-qty { width: 120px; }
+/* A column holding .cl-input.is-price: the input's 140 px plus the cell padding (12 px, 20 px at the row's end). */
+.cl-page .cl-table col.cl-col-price-input { width: 172px; }
+
+/* Work in progress in a card (a supplier being asked): spinner and one line of text beside it. */
+.cl-page .cl-loading {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+    font-size: 14px;
+    color: var(--cl-ink-2);
+}
+
+.cl-page .cl-loading .cl-spinner {
+    width: 20px;
+    height: 20px;
+    border-width: 2px;
+    flex: none;
+}
+
+/* An alert alone in a padded wrapper (the validation area) ends with the wrapper's padding, not its own margin. */
+.cl-page .cl-card-inset > .cl-alert:only-child {
+    margin-bottom: 0;
+}
+
+/* ------------------------------------------------------------------------------------------------------------------
+   Courier booking page (shipping.html; orders, RMA and warehouse items) -- order details subpages, 2026-09-28
+   ------------------------------------------------------------------------------------------------------------------ */
+
+/* An address shown inside a form group (the recipient of a booking): the block's own padding and top rule belong to a
+   card section, while the fieldset already has both. */
+.cl-page .cl-fieldset > .cl-address {
+    padding: 0;
+    border-top: 0;
+}
+
+.cl-page .cl-fieldset > .cl-field + .cl-address {
+    margin-top: var(--cl-gap-fields);
+}
+
+/* A group that follows an edge-to-edge table in a card (booking options under the parcels) is set off like the next
+   fieldset would be. */
+.cl-page .cl-card > .cl-table + .cl-fieldset {
+    border-top: 1px solid var(--cl-line);
+}
+
+/* A warning under an option (a carrier's remark on its offer); the tone of .cl-help.is-warn. */
+.cl-page .cl-choice-description.is-warn {
+    color: var(--cl-warn);
+}
+
+/* --- Order item page (orders/item): a one-sixth column of the form grid for a short number (quantity, VAT multiplier).
+       On a phone it takes half the width, so the number is not stretched across the screen. --- */
+.cl-form-grid > .cl-span-1 { grid-column: span 1; }
+
+@media screen and (max-width: 719px) {
+    .cl-form-grid > .cl-span-1 {
+        grid-column: span 3;
+    }
+}
+
+/* An editable table of many short number fields (the parcels of a booking): column names wrap instead of pushing the
+   table past the page between 720 and 1023 px, and the row key is as wide as its text, not the 12rem product cell. */
+.cl-page .cl-table.is-editable.is-narrow thead th {
+    white-space: normal;
+    vertical-align: bottom;
+}
+
+@media screen and (min-width: 720px) {
+    .cl-page .cl-table.is-editable.is-narrow tbody th {
+        min-width: 0;
+        white-space: nowrap;
+    }
+}
+
+/* A data table whose key column (a product name) wraps instead of widening the table, without the order items table's
+   phone layout that .is-wrap brings: below 720 px it stays the generic card with a label beside every value. */
+.cl-page .cl-table.is-key-wrap {
+    table-layout: fixed;
+}
+
+.cl-page .cl-table.is-key-wrap .cl-table-key {
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+@media screen and (max-width: 719px) {
+    .cl-page .cl-table.is-key-wrap {
+        table-layout: auto;
+    }
+}
+
+/* The key column of such a table keeps 40 % of it, and five .cl-col-num columns share the rest (12 % each): a narrow
+   card (the dropship confirmation beside the consignee card) still leaves the product name room to wrap between words.
+   Only in a table laid out this way may the column names take two lines, and a figure with its pill ("1 Brakuje: 1")
+   wrap between the two; the other key-wrap table (dropship create) keeps its one-line headers. */
+.cl-page .cl-table col.cl-col-key { width: 40%; }
+.cl-page .cl-table col.cl-col-num { width: 12%; }
+
+.cl-page .cl-table.is-key-wrap:has(col.cl-col-key) thead th {
+    white-space: normal;
+    vertical-align: bottom;
+}
+
+@media screen and (min-width: 720px) {
+    .cl-page .cl-table.is-key-wrap:has(col.cl-col-key) td.is-numeric:has(.cl-status) {
+        white-space: normal;
+    }
+}
+
+/* A code copied by hand (EAN, manufacturer code) inside running text: never broken inside itself. */
+.cl-page .cl-code-nowrap {
+    white-space: nowrap;
+}
+
+/* A list summary with a form option on its left (dropship: "Usuń odznaczone" beside the net value). */
+.cl-page .cl-list-summary:has(> .cl-check) {
+    align-items: center;
+}
+
+.cl-page .cl-list-summary > .cl-check {
+    margin-right: auto;
+}
+
+.cl-page .cl-list-summary > p {
+    margin: 0;
+}
+
 /* Receipt-like document page without the app frame (dev e-receipt preview): a narrow printable card, monospace
    figures, a tone banner on top. Generic so a real receipt or document preview can reuse it. */
 .cl-receipt-page {
@@ -5266,4 +7577,146 @@ a.cl-link-button:hover {
     .cl-receipt-back {
         display: none;
     }
+}
+
+/* --- Deliveries list (spec docs/active/dostawy-redesign/2026-09-30-deliveries-list-design.md §8):
+   scope switch, date-range menu, wrapping status pills, secondary column visibility, phone filters. --- */
+
+/* cl-icon-text comes from the order details (app#240); in the key cell it must not wrap. */
+.cl-page .cl-table-key .cl-icon-text {
+    white-space: nowrap;
+}
+
+/* The scope switch changes the list's address, so its segments are links; the chosen one looks pressed. */
+.cl-page .cl-segmented a.cl-segment {
+    display: inline-flex;
+    align-items: center;
+    text-decoration: none;
+}
+
+.cl-page .cl-segmented a.cl-segment[aria-current="page"] {
+    background: var(--cl-surface);
+    color: var(--cl-accent-ink);
+    box-shadow: 0 1px 2px rgba(14, 23, 33, .12), inset 0 0 0 1px var(--cl-accent);
+    font-weight: 600;
+}
+
+.cl-page .cl-segmented a.cl-segment[aria-current="page"] .cl-segment-count {
+    color: inherit;
+}
+
+/* The date menu is the last one in its row: its panel opens towards the left so it stays inside. */
+.cl-page .cl-filter-menu.is-end .cl-filter-menu-panel {
+    left: auto;
+    right: 0;
+}
+
+/* One field under the other at every width: a native date input will not shrink below ~170 px, so two of them side by
+   side overflow the 260-360 px panel and overlap. Side padding matches the other menus' rows (16 px). */
+.cl-page .cl-filter-menu-dates {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--cl-gap-fields);
+    padding: 8px 16px 4px;
+}
+
+.cl-page .cl-filter-menu-dates .cl-input {
+    width: 100%;
+    min-width: 0;
+}
+
+.cl-page .cl-filter-menu-dates label {
+    display: grid;
+    gap: var(--cl-gap-attached);
+    font-size: 13.5px;
+    color: var(--cl-ink-2);
+}
+
+/* "Anulowana przez dostawcę" in one line pushed the table past the card at 1024 px: wrap by words. */
+.cl-page .cl-table.is-deliveries .cl-status {
+    white-space: normal;
+}
+
+.cl-page .cl-toolbar-search {
+    display: flex;
+    gap: var(--cl-gap-related);
+    align-items: center;
+}
+
+.cl-page .cl-toolbar-toggle {
+    display: none;
+}
+
+@media screen and (min-width: 720px) {
+    .cl-page .cl-table.is-deliveries td[data-label]:has(.cl-status) {
+        min-width: 11ch;
+    }
+}
+
+/* From 1024 px the card is wide enough for the longer status texts to keep two lines at most. */
+@media screen and (min-width: 1024px) {
+    .cl-page .cl-table.is-deliveries td[data-label]:has(.cl-status) {
+        min-width: 15ch;
+    }
+}
+
+/* With the rail (720–1215 px) the card is ~790 px wide: order date gives way to columns that matter. */
+@media screen and (min-width: 720px) and (max-width: 1215px) {
+    .cl-page .cl-table.is-deliveries .is-secondary-column {
+        display: none;
+    }
+}
+
+@media screen and (max-width: 719px) {
+    .cl-page .cl-table-toolbar .cl-segmented {
+        width: 100%;
+    }
+
+    .cl-page .cl-segmented a.cl-segment {
+        flex: 1;
+        justify-content: center;
+        min-height: 44px;
+    }
+
+    /* At 320 px the search field beside "Filtry: n" shrank to a "Nr" placeholder: the field keeps 200 px and the button
+       drops to its own row when the two do not fit. */
+    .cl-page .cl-toolbar-search {
+        width: 100%;
+        flex-wrap: wrap;
+    }
+
+    .cl-page .cl-toolbar-search .cl-search-form {
+        flex: 1 1 200px;
+        min-width: 0;
+    }
+
+    /* The sort bar scrolls sideways in the orders list; here "Dostawca" sat clipped at the edge of a 320 px screen. */
+    .cl-page .cl-table-sortbar.is-wrap {
+        flex-wrap: wrap;
+        overflow-x: visible;
+    }
+
+    .cl-page .cl-toolbar-toggle {
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+    }
+
+    .cl-page .cl-toolbar-toggle[aria-expanded="true"] {
+        border-color: var(--cl-accent);
+        color: var(--cl-accent-ink);
+    }
+
+    .cl-page .cl-table-toolbar.is-collapsed .cl-toolbar-filters {
+        display: none;
+    }
+
+    /* The date panel spans the filter row like the other panels; its right-aligned desktop position pushed it off the
+       left edge of a 320 px screen. */
+    .cl-page .cl-filter-menu.is-end .cl-filter-menu-panel {
+        left: 0;
+        right: 0;
+        min-width: 0;
+    }
+
 }

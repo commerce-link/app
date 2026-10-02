@@ -127,6 +127,17 @@ public class Order {
     }
 
     @DynamoDBIgnore
+    public boolean isClosed() {
+        return hasOneOfStatuses(OrderStatus.Completed, OrderStatus.Cancelled);
+    }
+
+    /** A courier can be ordered once the goods are assembled; earlier the parcel contents are not known. */
+    @DynamoDBIgnore
+    public boolean canOrderShipment() {
+        return !status.isOneOf(OrderStatus.New, OrderStatus.Blocked, OrderStatus.Assembly);
+    }
+
+    @DynamoDBIgnore
     public boolean isFullyPaid() {
         return getUnpaidAmount() == 0;
     }
@@ -144,12 +155,24 @@ public class Order {
 
     @DynamoDBIgnore
     public boolean isDelivered() {
-        return shipments.stream().allMatch(shipment -> shipment.getDeliveredAt() != null);
+        // allMatch is true for no shipments: an order without any (legacy data) has delivered nothing
+        return !shipments.isEmpty() && shipments.stream().allMatch(shipment -> shipment.getDeliveredAt() != null);
+    }
+
+    /**
+     * Nothing is left to deliver before the order can settle: every shipment is delivered. An order without shipments
+     * waits in every status before Delivered: every order is created with a shipment waiting to go out, and an empty
+     * list before delivery means the only shipment was removed (or lost), never that the goods reached the customer; settling it on payment and invoice alone would complete an order that never
+     * shipped. Only a legacy order already Delivered (or Completed) without shipments settles.
+     */
+    @DynamoDBIgnore
+    public boolean hasNothingLeftToDeliver() {
+        return shipments.isEmpty() ? hasOneOfStatuses(OrderStatus.Delivered, OrderStatus.Completed) : isDelivered();
     }
 
     @DynamoDBIgnore
     public boolean isSettled(boolean warehouseDocumentsRequired) {
-        return isDelivered() && isFullyPaid() && isInvoiced() && !isAwaitingDocumentsGeneration(warehouseDocumentsRequired) && !isAwaitingReview();
+        return hasNothingLeftToDeliver() && isFullyPaid() && isInvoiced() && !isAwaitingDocumentsGeneration(warehouseDocumentsRequired) && !isAwaitingReview();
     }
 
     @DynamoDBIgnore
@@ -185,6 +208,38 @@ public class Order {
     @DynamoDBIgnore
     public boolean hasBeenShippedOrIsReadyForCollection() {
         return !getShipments().isEmpty() && getShipments().stream().allMatch(s -> s.hasCollectionData() || s.hasShippingData());
+    }
+
+    /** At least one shipment has gone out (a shipped or delivery date), or waits for collection. */
+    @DynamoDBIgnore
+    public boolean hasShippedShipment() {
+        return getShipments().stream().anyMatch(Shipment::hasGoneOut);
+    }
+
+    /**
+     * An operator's correction left a Shipping order with nothing shipped (the only shipment removed, a shipped date
+     * cleared): the order goes back to Realization and waits for the next shipment, which moves it to Shipping again
+     * (OrderLifecycle). Returns whether it went back. Kept out of OrderLifecycle on purpose: the lifecycle never moves
+     * an order back by itself, only this operator action does.
+     */
+    public boolean returnToRealizationWhenNothingShipped() {
+        if (status != OrderStatus.Shipping || hasShippedShipment()) {
+            return false;
+        }
+        status = OrderStatus.Realization;
+        return true;
+    }
+
+    /**
+     * For a personal collection "Shipping" means ready for collection: every collection shipment without its moment of
+     * readiness gets now. Called when the operator moves the order to Shipping by hand; the lifecycle's own move to
+     * Shipping needs every shipment shipped or ready already.
+     */
+    public void markCollectionsReady(LocalDateTime now) {
+        getShipments().stream()
+                .filter(shipment -> shipment.getType() == ShipmentType.PersonalCollection)
+                .filter(shipment -> shipment.getShippedAt() == null)
+                .forEach(shipment -> shipment.setShippedAt(now));
     }
 
     @DynamoDBIgnore
@@ -320,17 +375,28 @@ public class Order {
         return hasOneOfStatuses(OrderStatus.Delivered, OrderStatus.Completed);
     }
 
+    /** What stands between the order and cancelling it; empty when it can be cancelled. */
+    public enum CancelBlocker { NOT_DELIVERED, PRODUCTS_NOT_RETURNED, PAYMENTS_NOT_REFUNDED }
+
     @DynamoDBIgnore
     public boolean canBeCancelled(List<OrderItem> orderItems) {
+        return cancelBlockers(orderItems).isEmpty();
+    }
+
+    /** The conditions of {@link #canBeCancelled} this order does not meet yet, so a reason can name exactly those. */
+    @DynamoDBIgnore
+    public Set<CancelBlocker> cancelBlockers(List<OrderItem> orderItems) {
+        Set<CancelBlocker> blockers = EnumSet.noneOf(CancelBlocker.class);
         if (!hasOneOfStatuses(OrderStatus.Delivered, OrderStatus.Completed)) {
-            return false;
+            blockers.add(CancelBlocker.NOT_DELIVERED);
         }
         if (getPaidAmount() != 0) {
-            return false;
+            blockers.add(CancelBlocker.PAYMENTS_NOT_REFUNDED);
         }
-        return orderItems.stream()
-                .filter(OrderItem::isProduct)
-                .allMatch(OrderItem::isReturned);
+        if (!orderItems.stream().filter(OrderItem::isProduct).allMatch(OrderItem::isReturned)) {
+            blockers.add(CancelBlocker.PRODUCTS_NOT_RETURNED);
+        }
+        return blockers;
     }
 
     @DynamoDBIgnore
@@ -368,8 +434,8 @@ public class Order {
     @DynamoDBIgnore
     public Order createSplit() {
         Order copy = new Order(this.storeId);
-        copy.setBillingDetails(this.billingDetails.copy());
-        copy.setShippingDetails(this.shippingDetails.copy());
+        copy.setBillingDetails(this.billingDetails == null ? null : this.billingDetails.copy());
+        copy.setShippingDetails(this.shippingDetails == null ? null : this.shippingDetails.copy());
         copy.setFulfilmentType(this.fulfilmentType);
         copy.setSource(this.source);
         copy.setAffiliateId(this.affiliateId);
@@ -509,7 +575,7 @@ public class Order {
     }
 
     public void setBillingDetails(BillingDetails billingDetails) {
-        this.email = billingDetails.getEmail(); // projection
+        this.email = billingDetails != null ? billingDetails.getEmail() : null; // projection
         this.billingDetails = billingDetails;
     }
 
@@ -550,7 +616,8 @@ public class Order {
     }
 
     public void setPayments(List<Payment> payments) {
-        this.payments = payments;
+        // normalize at the boundary: every internal read (getPaidAmount, getPendingPayment, ...) assumes a list, never null
+        this.payments = payments != null ? payments : new LinkedList<>();
     }
 
     public List<Shipment> getShipments() {
@@ -567,6 +634,16 @@ public class Order {
         this.shipments = replacements;
     }
 
+    /**
+     * The order's only shipment when it holds nothing but the customer's choice of delivery (every order is created
+     * with one; a date cleared in the edit leaves one too): a new shipment fills it instead of standing next to it,
+     * where the placeholder, never sent nor delivered, would hold the order back from Shipping and Delivered.
+     */
+    @DynamoDBIgnore
+    public Optional<Shipment> onlyPlaceholder() {
+        return shipments.size() == 1 && shipments.get(0).isPlaceholder() ? Optional.of(shipments.get(0)) : Optional.empty();
+    }
+
     @DynamoDBIgnore
     public Optional<Shipment> firstShipment() {
         return shipments.isEmpty() ? Optional.empty() : Optional.of(shipments.get(0));
@@ -578,9 +655,47 @@ public class Order {
         return shipments.stream().anyMatch(Shipment::hasTrackingSubscription);
     }
 
+    /**
+     * Something is left to book a courier for: a shipment without its shipping data, or no shipment at all (the only
+     * one removed; the courier booking then creates it). An order whose every shipment is sent has nothing to book. A
+     * shipment with a courier order (externalId) is booked whatever its dates say: booking again would pay for a second
+     * label next to the first one, which the booking's replaced list would no longer let anyone cancel.
+     */
+    @DynamoDBIgnore
+    public boolean hasShipmentToBook() {
+        return shipments.isEmpty() || shipments.stream()
+                .anyMatch(shipment -> shipment.getExternalId() == null && !shipment.hasShippingData());
+    }
+
     @DynamoDBIgnore
     public boolean hasShippingLabel() {
         return shipments.stream().anyMatch(Shipment::hasLabel);
+    }
+
+    /**
+     * The shipment whose courier order "Cancel courier order" cancels (ShipmentCancelService): the first one booked with
+     * a courier (externalId) whose parcel is not delivered yet. Found by the courier order, never by the shipped date,
+     * which the operator may have changed.
+     */
+    @DynamoDBIgnore
+    public Optional<Shipment> courierShipmentToCancel() {
+        return shipments.stream().filter(s -> s.getExternalId() != null && s.getDeliveredAt() == null).findFirst();
+    }
+
+    /** The first shipment handed to a carrier (its carrier, tracking number and shipped date), if any. */
+    @DynamoDBIgnore
+    public Optional<Shipment> firstShipmentWithShippingData() {
+        return shipments.stream().filter(Shipment::hasShippingData).findFirst();
+    }
+
+    /**
+     * Once a label exists the parcel address is fixed; before that the operator may still correct it, whatever the
+     * status of an open order (a personal pickup already in Shipping can still get a corrected address). A tracking
+     * number typed by hand counts as a label, as for the customer.
+     */
+    @DynamoDBIgnore
+    public boolean canOperatorChangeShippingAddress() {
+        return !isClosed() && !hasShippingLabel();
     }
 
     @DynamoDBIgnore

@@ -3,6 +3,9 @@ package pl.commercelink.registration;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -21,6 +24,7 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -55,37 +59,27 @@ class EmailVerificationServiceTest {
                 new OAuth2AuthenticationToken(user, user.getAuthorities(), "cognito"));
     }
 
-    @Test
-    void treatsUserWithVerifiedClaimAsVerified() {
-        // given
-        loggedIn(Boolean.TRUE);
+    private static final Object ANONYMOUS = new Object();
 
-        // when / then
-        assertTrue(service().isVerified(request));
+    static Stream<Arguments> emailVerifiedClaims() {
+        return Stream.of(
+                Arguments.of("verified claim", Boolean.TRUE, true),
+                Arguments.of("unverified claim", Boolean.FALSE, false),
+                // a user without the claim is not locked out
+                Arguments.of("missing claim", null, true),
+                Arguments.of("anonymous request", ANONYMOUS, true));
     }
 
-    @Test
-    void treatsUserWithUnverifiedClaimAsUnverified() {
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("emailVerifiedClaims")
+    void isVerifiedFollowsTheEmailVerifiedClaim(String scenario, Object claim, boolean expected) {
         // given
-        loggedIn(Boolean.FALSE);
+        if (claim != ANONYMOUS) {
+            loggedIn(claim);
+        }
 
         // when / then
-        assertFalse(service().isVerified(request));
-    }
-
-    @Test
-    void treatsMissingClaimAsVerifiedToAvoidLockingUsersOut() {
-        // given
-        loggedIn(null);
-
-        // when / then
-        assertTrue(service().isVerified(request));
-    }
-
-    @Test
-    void treatsAnonymousRequestAsVerified() {
-        // when / then
-        assertTrue(service().isVerified(request));
+        assertEquals(expected, service().isVerified(request));
     }
 
     @Test

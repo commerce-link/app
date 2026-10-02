@@ -2,9 +2,13 @@ package pl.commercelink.receipts;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.scheduling.annotation.Scheduled;
 import pl.commercelink.stores.StoreActivity;
 
 import java.time.Duration;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -93,10 +97,18 @@ class ReceiptSweepTest {
     }
 
     @Test
-    void schedulerAnnotationDefaultsAreValidISO8601Durations() {
-        // ReceiptSweepScheduler uses @Scheduled with ISO-8601 duration strings.
-        // Verify the default values in the annotation parse correctly.
-        assertThat(Duration.parse("PT1M")).isEqualTo(Duration.ofMinutes(1));
-        assertThat(Duration.parse("PT30S")).isEqualTo(Duration.ofSeconds(30));
+    void schedulerAnnotationDefaultsAreValidISO8601Durations() throws Exception {
+        // the defaults are read from the real annotation, so an invalid production default fails here
+        Scheduled scheduled = ReceiptSweepScheduler.class.getDeclaredMethod("trigger").getAnnotation(Scheduled.class);
+
+        for (String expression : List.of(scheduled.fixedDelayString(), scheduled.initialDelayString())) {
+            assertThat(Duration.parse(defaultOf(expression))).isPositive();
+        }
+    }
+
+    // "${property:PT1M}" resolves to its default, a plain literal stays as it is
+    private static String defaultOf(String expression) {
+        Matcher placeholder = Pattern.compile("\\$\\{[^:}]+:([^}]*)}").matcher(expression);
+        return placeholder.matches() ? placeholder.group(1) : expression;
     }
 }

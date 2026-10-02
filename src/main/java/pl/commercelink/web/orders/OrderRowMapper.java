@@ -13,6 +13,8 @@ import pl.commercelink.orders.ShippingDetails;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 import pl.commercelink.web.orders.OrderRow.DocMark;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.time.LocalDate;
@@ -47,6 +49,11 @@ public class OrderRowMapper {
     }
 
     public OrderRow map(Order order, LocalDate today) {
+        return map(order, today, null);
+    }
+
+    /** returnTo: the list as the operator sees it, so the details page's "‹ Zamówienia" leads back to it. */
+    public OrderRow map(Order order, LocalDate today, String returnTo) {
         ShippingDetails shipping = order.getShippingDetails();
         BillingDetails billing = order.getBillingDetails();
         String email = billing == null ? null : billing.getEmail();
@@ -66,7 +73,7 @@ public class OrderRowMapper {
         }
         double unpaid = order.getUnpaidAmount();
         return new OrderRow(
-                OrderListQuery.PATH + "/" + order.getOrderId(),
+                OrderListQuery.PATH + "/" + order.getOrderId() + (returnTo == null || returnTo.equals(OrderListQuery.PATH) ? "" : "?returnTo=" + URLEncoder.encode(returnTo, StandardCharsets.UTF_8)),
                 order.getShortenedOrderId(),
                 sourceText(order),
                 order.getExternalOrderId() == null || order.getExternalOrderId().isBlank() ? null
@@ -86,8 +93,9 @@ public class OrderRowMapper {
     }
 
     /**
-     * The WZ, the closing document and the review, in that order (spec §25): a check for what exists, a to-do mark for
-     * what is missing once the order is Delivered — the point where it keeps the order from closing (Order.isSettled).
+     * The WZ, the advance invoice, the closing document and the review, in that order (spec §25): a check for what exists,
+     * a to-do mark for what is missing once the order is Delivered — the point where it keeps the order from closing
+     * (Order.isSettled). The advance invoice is only ever a check, shown until the closing document replaces it.
      * Anything else shows nothing: a gap before delivery is not work yet, and a review already requested (InProgress)
      * no longer blocks the close. The WZ is expected when the store issues warehouse documents and the order is
      * fulfilled from the warehouse — the list does not read the order's items, so a mixed order with dropshipped lines
@@ -105,6 +113,13 @@ public class OrderRowMapper {
         }
 
         Optional<Document> closing = order.getClosingDocument();
+        Optional<Document> advance = order.getDocumentByType(DocumentType.InvoiceAdvance);
+        // The final invoice settles the advance one, so FZ is shown only until the closing document exists; it is never
+        // a to-do — an advance invoice does not hold the order open (Order.isSettled waits for the final one).
+        if (closing.isEmpty() && advance.isPresent()) {
+            marks.add(mark("advance", text("orders.list.mark.advance"), "is-done",
+                    text("orders.list.mark.done", documentName(DocumentType.InvoiceAdvance), number(advance.get()))));
+        }
         if (closing.isPresent()) {
             DocumentType type = closing.get().getType();
             marks.add(mark("invoice", code(type), "is-done", text("orders.list.mark.done", documentName(type), number(closing.get()))));
@@ -127,9 +142,16 @@ public class OrderRowMapper {
         return new DocMark(kind, code, state, label);
     }
 
-    /** "PAR" for a receipt, "FV" for every invoice (VAT, final, personal): the code the store's staff already use. */
+    /**
+     * "PAR" for a receipt, "FK" for the final invoice — it settles an advance one, a stage the staff need to tell apart —
+     * and "FV" for any other invoice (VAT, personal): the codes the store's staff already use.
+     */
     private String code(DocumentType type) {
-        return text(type == DocumentType.Receipt ? "orders.list.mark.receipt" : "orders.list.mark.invoice");
+        return text(switch (type) {
+            case Receipt -> "orders.list.mark.receipt";
+            case InvoiceFinal -> "orders.list.mark.final";
+            default -> "orders.list.mark.invoice";
+        });
     }
 
     private String documentName(DocumentType type) {

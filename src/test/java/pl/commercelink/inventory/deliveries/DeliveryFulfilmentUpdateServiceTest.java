@@ -3,6 +3,9 @@ package pl.commercelink.inventory.deliveries;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -13,6 +16,7 @@ import pl.commercelink.warehouse.builtin.WarehouseAllocationsManager;
 import pl.commercelink.web.dtos.DeliveryFulfilmentUpdateForm;
 
 import java.util.List;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyDouble;
@@ -114,44 +118,21 @@ class DeliveryFulfilmentUpdateServiceTest {
         assertThat(result.getMessage()).isEqualTo("error.message.delivery.fulfilment.partial");
     }
 
-    @Test
-    @DisplayName("run rejects blank manufacturer code without touching managers")
-    void runRejectsBlankMfn() {
-        // given
-        DeliveryFulfilmentUpdateForm form = form("new-ean", " ", 99.99,
-                List.of(allocationRef("order-1", "item-1")), List.of("warehouse-item-1"));
-
-        // when
-        OperationResult<Void> result = deliveryFulfilmentUpdateService.run(STORE_ID, PROVIDER, form);
-
-        // then
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getMessage()).isEqualTo("error.message.delivery.fulfilment.invalid");
-        verifyNoInteractions(orderAllocationsManager, warehouseAllocationsManager);
+    static Stream<Arguments> invalidForms() {
+        return Stream.of(
+                Arguments.of("blankMfn", "new-ean", " ", 99.99, List.of("warehouse-item-1")),
+                Arguments.of("blankEan", " ", "new-mfn", 99.99, List.<String>of()),
+                Arguments.of("negativeCost", "new-ean", "new-mfn", -1.0, List.<String>of()));
     }
 
-    @Test
-    @DisplayName("run rejects blank EAN without touching managers")
-    void runRejectsBlankEan() {
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("invalidForms")
+    @DisplayName("run rejects invalid input without touching managers")
+    void runRejectsInvalidInputWithoutTouchingManagers(String caseName, String ean, String mfn, double unitCost,
+                                                       List<String> warehouseItemIds) {
         // given
-        DeliveryFulfilmentUpdateForm form = form(" ", "new-mfn", 99.99,
-                List.of(allocationRef("order-1", "item-1")), List.of());
-
-        // when
-        OperationResult<Void> result = deliveryFulfilmentUpdateService.run(STORE_ID, PROVIDER, form);
-
-        // then
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getMessage()).isEqualTo("error.message.delivery.fulfilment.invalid");
-        verifyNoInteractions(orderAllocationsManager, warehouseAllocationsManager);
-    }
-
-    @Test
-    @DisplayName("run rejects negative cost without touching managers")
-    void runRejectsNegativeCost() {
-        // given
-        DeliveryFulfilmentUpdateForm form = form("new-ean", "new-mfn", -1,
-                List.of(allocationRef("order-1", "item-1")), List.of());
+        DeliveryFulfilmentUpdateForm form = form(ean, mfn, unitCost,
+                List.of(allocationRef("order-1", "item-1")), warehouseItemIds);
 
         // when
         OperationResult<Void> result = deliveryFulfilmentUpdateService.run(STORE_ID, PROVIDER, form);

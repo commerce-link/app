@@ -35,6 +35,8 @@ import java.util.Optional;
 public class ReceiptAttemptService {
 
     static final String SYSTEM = "System";
+    /** Why "E-paragon" and "Wystaw ponownie" are refused (and greyed) for a POS sale without the customer's e-mail. */
+    public static final String POS_NEEDS_EMAIL = "receipts.action.posNeedsEmail";
 
     private final ReceiptAttemptStore attempts;
     private final StoresRepository storesRepository;
@@ -91,6 +93,31 @@ public class ReceiptAttemptService {
 
     public ReceiptAttempt reissue(String storeId, String orderId, String actor) {
         List<ReceiptAttempt> existing = attempts.findByOrder(storeId, orderId);
+        Reissue reissue = checkReissue(storeId, orderId, existing);
+        int next = existing.stream().mapToInt(ReceiptAttempt::getAttemptNo).max().orElse(0) + 1;
+        ReceiptAttempt created = create(reissue.store(), reissue.order(), next, actor)
+                .orElseThrow(() -> new ReceiptActionException("receipts.action.reissue.concurrent"));
+        // Every attempt in `existing` is dead (checked above) and is being superseded by `created`: its bell
+        // alert, if any, no longer needs the operator's attention. The attempt's own `attention` field is left
+        // untouched, so the order page still shows why it needed correcting.
+        existing.forEach(alerts::resolve);
+        return created;
+    }
+
+    /**
+     * Why {@link #reissue} would refuse the order now (its message key), null when it would go ahead: the
+     * confirmation page asks only what the POST would do.
+     */
+    public String reissueRefusal(String storeId, String orderId) {
+        try {
+            checkReissue(storeId, orderId, attempts.findByOrder(storeId, orderId));
+            return null;
+        } catch (ReceiptActionException e) {
+            return e.getMessageKey();
+        }
+    }
+
+    private Reissue checkReissue(String storeId, String orderId, List<ReceiptAttempt> existing) {
         if (existing.isEmpty()) {
             throw new ReceiptActionException("receipts.action.reissue.none");
         }
@@ -105,14 +132,35 @@ public class ReceiptAttemptService {
         if (!hasProvider(store)) {
             throw new ReceiptActionException("receipts.action.reissue.noProvider");
         }
-        int next = existing.stream().mapToInt(ReceiptAttempt::getAttemptNo).max().orElse(0) + 1;
-        ReceiptAttempt created = create(store, order, next, actor)
-                .orElseThrow(() -> new ReceiptActionException("receipts.action.reissue.concurrent"));
-        // Every attempt in `existing` is dead (checked above) and is being superseded by `created`: its bell
-        // alert, if any, no longer needs the operator's attention. The attempt's own `attention` field is left
-        // untouched, so the order page still shows why it needed correcting.
-        existing.forEach(alerts::resolve);
-        return created;
+        refusePosWithoutCustomerEmail(store, order);
+        return new Reissue(store, order);
+    }
+
+    /**
+     * A point-of-sale sale without the customer's e-mail would only get one more blocked attempt (and one more bell
+     * alert): refused before any attempt is created, with the reason the order page shows under the greyed button.
+     */
+    private static void refusePosWithoutCustomerEmail(Store store, Order order) {
+        if (ReceiptRequestConverter.blocksPosWithoutCustomerEmail(order, store)) {
+            throw new ReceiptActionException(POS_NEEDS_EMAIL);
+        }
+    }
+
+    /**
+     * The "Wystaw ponownie" confirmation: a point-of-sale sale adds the cash register warning (its receipt may have
+     * been printed there meanwhile). The same key in the dialog and on the page without JavaScript.
+     */
+    public static String reissueConfirmMessageKey(Order order) {
+        return order != null && order.isPointOfSale()
+                ? "receipts.action.reissue.confirm.message.pos" : "receipts.action.reissue.confirm.message";
+    }
+
+    /** {@link #reissueConfirmMessageKey(Order)} for the confirmation page, which has only the order's id. */
+    public String reissueConfirmMessageKey(String storeId, String orderId) {
+        return reissueConfirmMessageKey(ordersRepository.findById(storeId, orderId));
+    }
+
+    private record Reissue(Store store, Order order) {
     }
 
     /**
@@ -122,6 +170,22 @@ public class ReceiptAttemptService {
      * attempt is refused: a live one owns the receipt, a dead one is replaced with "Wystaw ponownie".
      */
     public ReceiptAttempt issueManually(String storeId, String orderId, String actor) {
+        Reissue issue = checkIssue(storeId, orderId);
+        return create(issue.store(), issue.order(), 1, actor)
+                .orElseThrow(() -> new ReceiptActionException("receipts.action.reissue.concurrent"));
+    }
+
+    /** Why {@link #issueManually} would refuse the order now (its message key), null when it would go ahead. */
+    public String issueRefusal(String storeId, String orderId) {
+        try {
+            checkIssue(storeId, orderId);
+            return null;
+        } catch (ReceiptActionException e) {
+            return e.getMessageKey();
+        }
+    }
+
+    private Reissue checkIssue(String storeId, String orderId) {
         if (!attempts.findByOrder(storeId, orderId).isEmpty()) {
             throw new ReceiptActionException("receipts.action.issue.exists");
         }
@@ -133,14 +197,18 @@ public class ReceiptAttemptService {
         if (!hasProvider(store)) {
             throw new ReceiptActionException("receipts.action.reissue.noProvider");
         }
-        return create(store, order, 1, actor)
-                .orElseThrow(() -> new ReceiptActionException("receipts.action.reissue.concurrent"));
+        refusePosWithoutCustomerEmail(store, order);
+        return new Reissue(store, order);
     }
 
     /** Whether the order documents offer "E-paragon": the conditions of {@link #issueManually} hold. */
     public boolean canIssueManually(Store store, Order order) {
-        return store != null && hasProvider(store) && eligibility.orderQualifies(order)
-                && attemptsOf(order.getStoreId(), order.getOrderId()).isEmpty();
+        return canIssueManually(store, order, attemptsOf(order.getStoreId(), order.getOrderId()));
+    }
+
+    /** {@link #canIssueManually(Store, Order)} over attempts the caller already read. */
+    boolean canIssueManually(Store store, Order order, List<ReceiptAttempt> orderAttempts) {
+        return store != null && hasProvider(store) && eligibility.orderQualifies(order) && orderAttempts.isEmpty();
     }
 
     /**
@@ -261,14 +329,63 @@ public class ReceiptAttemptService {
     }
 
     /**
-     * The order now has its closing document (a receipt from the shop's cash register, an invoice): the bell alerts of
-     * its dead attempts no longer ask for anything. Their stored attention stays, so the order page still shows why
-     * they stopped; live attempts keep their alerts (a fiscalised receipt whose e-mail failed still needs sending).
+     * Brings the bell in line with what the order page shows for the order's dead attempts
+     * ({@link ReceiptTrigger#settlesDeadAttempts}, the rule {@link ReceiptOrderView} reads at every render): when the
+     * order settles them, their alerts are resolved (their stored attention stays, so the page still shows why they
+     * stopped; live attempts keep theirs, a fiscalised receipt whose e-mail failed still needs sending); otherwise the
+     * newest attempt, when dead, has its alert raised again (it may have been resolved by a closing document that is
+     * gone now). Earlier, superseded attempts are left resolved: only the newest one asks for anything. Called by
+     * every write that can change the rule's inputs: an order saved through the lifecycle, a document unpinned, an
+     * invoice issued, the order cancelled, an attempt that died while the order changed under it. Costs one strongly
+     * consistent query of the order's own key range ({@link ReceiptAttemptStore#findByOrder}), empty for an order that
+     * never had an attempt; writes to the bell only for an order with a dead attempt. Never throws: the alerts must
+     * not break the order write.
      */
-    public void resolveDeadAttemptAlerts(String storeId, String orderId) {
-        attemptsOf(storeId, orderId).stream()
-                .filter(a -> a.getState() == ReceiptAttemptState.BLOCKED || a.getState() == ReceiptAttemptState.FAILED)
-                .forEach(alerts::resolve);
+    public void reconcileDeadAttemptAlerts(Order order) {
+        try {
+            List<ReceiptAttempt> orderAttempts = attemptsOf(order.getStoreId(), order.getOrderId());
+            if (ReceiptTrigger.settlesDeadAttempts(order)) {
+                orderAttempts.stream().filter(a -> a.getState().isDead()).forEach(alerts::resolve);
+                return;
+            }
+            orderAttempts.stream()
+                    .max((a, b) -> Integer.compare(a.getAttemptNo(), b.getAttemptNo()))
+                    .filter(a -> a.getState().isDead())
+                    .ifPresent(this::raiseAgain);
+        } catch (RuntimeException e) {
+            // WARN, not ERROR: the lifecycle cron reconciles every open order, so an outage of the notifications
+            // table would raise one alert per order per run; the next save reconciles again
+            log.warn("Receipt alerts of order {} of store {} could not be reconciled",
+                    order.getOrderId(), order.getStoreId(), e);
+        }
+    }
+
+    /** {@link #reconcileDeadAttemptAlerts(Order)} for a caller without the saved order at hand: reads it afresh. */
+    public void reconcileDeadAttemptAlerts(String storeId, String orderId) {
+        try {
+            Order order = ordersRepository.findById(storeId, orderId);
+            if (order != null) {
+                reconcileDeadAttemptAlerts(order);
+            }
+        } catch (RuntimeException e) {
+            log.warn("Receipt alerts of order {} of store {} could not be reconciled", orderId, storeId, e);
+        }
+    }
+
+    private void raiseAgain(ReceiptAttempt newest) {
+        ReceiptAttention attention = ReceiptAttentionEvaluator.evaluate(newest, clock.instant());
+        if (attention == null || !alerts.republish(newest, attention)) {
+            return;
+        }
+        // the stored reason was not the one raised (the processor kept the bell silent for a settled order): record
+        // it, so the next reconcile publishes into the existing record instead of replacing it
+        attempts.update(newest.getStoreId(), newest.getReceiptKey(), a -> {
+            if (attention.name().equals(a.getAttention())) {
+                return false;
+            }
+            a.setAttention(attention.name());
+            return true;
+        });
     }
 
     /**
@@ -276,8 +393,37 @@ public class ReceiptAttemptService {
      * attempt is issuing or fiscalised, or an operator closed it with the document they resolved at the provider.
      */
     public boolean blocksManualReceipt(String storeId, String orderId) {
-        return attemptsOf(storeId, orderId).stream()
+        return blocksManualReceipt(attemptsOf(storeId, orderId));
+    }
+
+    /** {@link #blocksManualReceipt(String, String)} over attempts the caller already read. */
+    public static boolean blocksManualReceipt(List<ReceiptAttempt> orderAttempts) {
+        return orderAttempts.stream()
                 .anyMatch(a -> a.getState().isLive() || a.getState() == ReceiptAttemptState.CLOSED_MANUALLY);
+    }
+
+    /**
+     * Whether the order's edits are locked for its e-receipt ({@link ReceiptOrderState#locksOrder}): the check an
+     * order edit endpoint runs before changing anything the receipt's frozen request depends on.
+     */
+    public boolean locksOrder(Order order) {
+        return receiptLock(order).locks();
+    }
+
+    /**
+     * {@link #locksOrder} with why ({@link ReceiptOrderState#receiptLock}): still being issued, or fiscalised and
+     * being attached to the order; the edit endpoints word their refusal after it.
+     */
+    public ReceiptLock receiptLock(Order order) {
+        return ReceiptOrderState.receiptLock(attemptsOf(order.getStoreId(), order.getOrderId()), order);
+    }
+
+    /**
+     * Whether the order has a fiscalised (or manually closed) e-receipt ({@link ReceiptOrderState#hasFiscalisedReceipt}):
+     * the cancel confirmation warns that cancelling the order does not undo it.
+     */
+    public boolean hasFiscalisedReceipt(Order order) {
+        return ReceiptOrderState.hasFiscalisedReceipt(attemptsOf(order.getStoreId(), order.getOrderId()), order);
     }
 
     /**
@@ -285,13 +431,31 @@ public class ReceiptAttemptService {
      * {@code locale} is the viewer's own request locale, not the fixed operator locale bell notifications use.
      */
     public ReceiptOrderView orderView(Order order, ReceiptAlerts alerts, Locale locale) {
-        return ReceiptOrderView.of(attemptsOf(order.getStoreId(), order.getOrderId()),
-                eligibility.orderQualifies(order), alerts, clock.instant(), locale);
+        return orderView(order, attemptsOf(order.getStoreId(), order.getOrderId()), alerts, locale);
+    }
+
+    private ReceiptOrderView orderView(Order order, List<ReceiptAttempt> orderAttempts, ReceiptAlerts alerts, Locale locale) {
+        return ReceiptOrderView.of(orderAttempts, eligibility.orderQualifies(order),
+                ReceiptTrigger.settlesDeadAttempts(order), alerts, clock.instant(), locale);
+    }
+
+    /**
+     * The order page's whole e-receipt picture from a single read of the order's attempts: the rows, whether
+     * "E-paragon" may be issued and whether an attempt owns the receipt. The same rules as {@link #orderView},
+     * {@link #canIssueManually(Store, Order)} and {@link #blocksManualReceipt(String, String)}, which each read the
+     * attempts again. A failing attempts store fails the page, as the old order page did: the operator must not see
+     * an order without its receipt and be offered a second one.
+     */
+    public ReceiptOrderState orderState(Store store, Order order, ReceiptAlerts alerts, Locale locale) {
+        List<ReceiptAttempt> orderAttempts = attemptsOf(order.getStoreId(), order.getOrderId());
+        return new ReceiptOrderState(orderAttempts, orderView(order, orderAttempts, alerts, locale),
+                canIssueManually(store, order, orderAttempts), blocksManualReceipt(orderAttempts));
     }
 
     void saveThroughLifecycle(Order order) {
         if (order.getStatus() == OrderStatus.Cancelled) {
             ordersRepository.save(order);   // the lifecycle ignores cancelled orders and would not save
+            reconcileDeadAttemptAlerts(order);
         } else {
             orderLifecycle.update(order);
         }

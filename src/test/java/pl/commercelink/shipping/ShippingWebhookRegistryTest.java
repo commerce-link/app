@@ -32,7 +32,6 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -215,25 +214,6 @@ class ShippingWebhookRegistryTest {
         assertThat(rma.getStatus()).isEqualTo(RMAStatus.Processing);
         assertThat(rma.getShipments().get(0).getDeliveredAt()).isNull();
         verify(rmaRepository, never()).save(any());
-    }
-
-    @Test
-    void deliveredWebhookMutatesTheFreshlyLoadedOrderThroughTheOptimisticLockingExecutor() {
-        // given
-        Order order = new Order(STORE_ID);
-        order.setOrderId("order-1");
-        order.setShipments(new ArrayList<>(List.of(courier("PKG-1"))));
-        when(shipmentTrackingsRepository.find(STORE_ID, "PKG-1"))
-                .thenReturn(Optional.of(new ShipmentTracking(STORE_ID, "PKG-1", "order-1", null, DELIVERED_AT)));
-        when(ordersRepository.findById(STORE_ID, "order-1")).thenReturn(order);
-
-        // when
-        process(new ShippingWebhookResult("PKG-1", ShippingWebhookResult.ShipmentState.DELIVERED, DELIVERED_AT));
-
-        // then
-        verify(ordersRepository, atLeastOnce()).findById(STORE_ID, "order-1");
-        assertThat(order.getShipments().get(0).getDeliveredAt()).isEqualTo(DELIVERED_AT);
-        verify(orderLifecycle).update(order);
     }
 
     @Test

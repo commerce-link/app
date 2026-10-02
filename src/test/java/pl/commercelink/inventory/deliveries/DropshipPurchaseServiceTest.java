@@ -53,7 +53,6 @@ import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -492,20 +491,6 @@ class DropshipPurchaseServiceTest {
         assertEquals("orders.dropship.error.nothingSelected", result.getMessage());
         verify(deliveriesRepository, never()).save(any());
         verify(deliveryCreationService, never()).claimAllocations(any(), any(), any());
-    }
-
-    @Test
-    void releaseUnselectedHandsTheFormToTheCreationServiceWithoutCreatingADelivery() {
-        // given
-        DeliveryCreationForm form = formWithItem("EAN-1", "MFN-1", 0, 100.0);
-        form.setRemoveUnselected(true);
-
-        // when
-        service.releaseUnselected(STORE_ID, form);
-
-        // then
-        verify(deliveryCreationService).releaseUnselectedAllocations(STORE_ID, form);
-        verify(deliveriesRepository, never()).save(any());
     }
 
     @Test

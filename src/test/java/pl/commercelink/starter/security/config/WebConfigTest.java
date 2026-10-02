@@ -4,6 +4,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -48,46 +50,24 @@ class WebConfigTest {
         configurer.addInterceptors(registry);
     }
 
-    @Test
-    void storeAccessInterceptorDoesNotGuardTheAdminStoreCategoriesPage() {
+    @ParameterizedTest(name = "{0} {1}")
+    @CsvSource({
+            "GET, /dashboard/store/categories",
+            "POST, /dashboard/store/categories",
+            "GET, /dashboard/store/fulfilment",
+            "GET, /dashboard/store/receipts",
+            "GET, /dashboard/store/receipts/system",
+            "GET, /dashboard/store/receipts/system/disconnect"
+    })
+    void storeAccessInterceptorDoesNotGuardTheAdminStorePages(String method, String path) {
         // given / when / then
-        assertThat(storeAccessGuards(get("/dashboard/store/categories"))).isFalse();
-    }
-
-    @Test
-    void storeAccessInterceptorDoesNotGuardTheAdminStoreCategoriesUpdate() {
-        // given / when / then
-        assertThat(storeAccessGuards(post("/dashboard/store/categories"))).isFalse();
+        assertThat(storeAccessGuards(new MockHttpServletRequest(method, path))).isFalse();
     }
 
     @Test
     void storeAccessInterceptorStillGuardsTheSuperAdminStoreCategoriesPage() {
         // given / when / then
         assertThat(storeAccessGuards(get("/dashboard/store/other-store/categories"))).isTrue();
-    }
-
-    @Test
-    void storeAccessInterceptorDoesNotGuardTheAdminStoreFulfilmentPage() {
-        // given / when / then
-        assertThat(storeAccessGuards(get("/dashboard/store/fulfilment"))).isFalse();
-    }
-
-    @Test
-    void storeAccessInterceptorDoesNotGuardTheAdminStoreReceiptsPage() {
-        // given / when / then
-        assertThat(storeAccessGuards(get("/dashboard/store/receipts"))).isFalse();
-    }
-
-    @Test
-    void storeAccessInterceptorDoesNotGuardTheAdminStoreReceiptSystemPage() {
-        // given / when / then
-        assertThat(storeAccessGuards(get("/dashboard/store/receipts/system"))).isFalse();
-    }
-
-    @Test
-    void storeAccessInterceptorDoesNotGuardTheAdminStoreReceiptSystemDisconnect() {
-        // given / when / then
-        assertThat(storeAccessGuards(get("/dashboard/store/receipts/system/disconnect"))).isFalse();
     }
 
     @Test

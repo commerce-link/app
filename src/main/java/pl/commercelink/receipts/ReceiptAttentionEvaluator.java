@@ -24,7 +24,7 @@ public final class ReceiptAttentionEvaluator {
                     : providerUnavailable(attempt, now) ? ReceiptAttention.PROVIDER_UNAVAILABLE
                     : attempt.getIssueCalls() >= ISSUE_CALLS_BEFORE_ALERT ? ReceiptAttention.ISSUING_UNKNOWN : null;
             case PENDING -> pending(attempt, now);
-            case FISCALISED -> attempt.getEffectsFailures() >= EFFECTS_FAILURES_BEFORE_ALERT
+            case FISCALISED -> effectsFailing(attempt)
                     ? ReceiptAttention.EFFECTS_FAILED
                     : attempt.emailFailed()
                     ? ReceiptAttention.EMAIL_NOT_SENT
@@ -33,6 +33,15 @@ public final class ReceiptAttentionEvaluator {
             case BLOCKED -> ReceiptAttention.BLOCKED;
             case CLOSED_MANUALLY -> null;
         };
+    }
+
+    /**
+     * A fiscalised attempt whose effects (attaching the document, notifying the marketplace, the e-mail) have failed
+     * often enough to need the operator: {@link ReceiptAttention#EFFECTS_FAILED}. Independent of time.
+     */
+    static boolean effectsFailing(ReceiptAttempt attempt) {
+        return attempt.getState() == ReceiptAttemptState.FISCALISED
+                && attempt.getEffectsFailures() >= EFFECTS_FAILURES_BEFORE_ALERT;
     }
 
     /**

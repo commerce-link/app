@@ -1,0 +1,16 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout" layout:decorate="~{layout}">
+<body>
+<div layout:fragment="content">
+    <section class="cl-page">
+        <div class="cl-page-body is-form">
+            <div th:replace="~{fragments/settings-header :: subpage(|/dashboard/orders/${orderId}|, #{order.page.title(${shortId})}, #{order.settings.page.title(${shortId})})}"></div>
+            <section class="cl-card" aria-labelledby="settings-page-title">
+                <h2 class="cl-visually-hidden" id="settings-page-title" th:text="#{order.settings.dialog.title}"></h2>
+                <form th:replace="~{orders/details/settings :: pageForm}"></form>
+            </section>
+        </div>
+    </section>
+</div>
+</body>
+</html>

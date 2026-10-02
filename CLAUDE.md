@@ -29,7 +29,7 @@ mvn test -Dtest=ClassName#methodName  # Run specific test method
 **DynamoDB**: Runs locally via **AWS NoSQL Workbench** at `http://localhost:8000`.
 **Other AWS services** (S3, SQS, etc.): Simulated by **LocalStack** at `http://localhost:4566`. Configuration in `application-local.properties`.
 
-**Schema Migration**: Managed by **Mongock** (`io.mongock:mongock-springboot-v3` + `io.mongock:dynamodb-springboot-driver`). Migrations live in `src/main/java/pl/commercelink/migration/` as `@ChangeUnit` classes with an incrementing `V###` prefix (currently V001–V015: table creation, local seeds, optimistic-lock backfill, supplier-connection migration, order-item position backfill, local bootstrap seed, service flag, store registration backfill, taxonomy mappings table, claimed-delivery-id index, order filters table and shipment trackings table (two `V011` classes with distinct change-unit ids), client verifications table, store notifications moved to their own table, marketplace import schedules, daily schedule execution counts table; the next one is `V016`). They execute automatically on application startup. Mongock tracks applied changes in the `AppMigrationsHistory` table (configurable via `mongock.migration-repository-name`) and uses `mongockLock` for distributed locking. Mongock autoconfiguration and `DynamoDbMigrationSupport` (helpers like `createTableIfAbsent`) come from the shared starter library.
+**Schema Migration**: Managed by **Mongock** (`io.mongock:mongock-springboot-v3` + `io.mongock:dynamodb-springboot-driver`). Migrations live in `src/main/java/pl/commercelink/migration/` as `@ChangeUnit` classes with an incrementing `V###` prefix (currently V001–V019: table creation, local seeds, optimistic-lock backfill, supplier-connection migration, order-item position backfill, local bootstrap seed, service flag, store registration backfill, taxonomy mappings table, claimed-delivery-id index, order filters table and shipment trackings table (two `V011` classes with distinct change-unit ids), client verifications table, store notifications moved to their own table, marketplace import schedules, daily schedule execution counts table, then `V016`–`V020`: receipt attempts table and table recovery protection (two `V016`), default receipt email template, store-id/status index on Orders, list-key index on Deliveries, list key renamed to `deliveryListSortKey` with a new index; the next one is `V021`). They execute automatically on application startup. Mongock tracks applied changes in the `AppMigrationsHistory` table (configurable via `mongock.migration-repository-name`) and uses `mongockLock` for distributed locking. Mongock autoconfiguration and `DynamoDbMigrationSupport` (helpers like `createTableIfAbsent`) come from the shared starter library.
 **Verify**: `aws dynamodb list-tables --endpoint-url http://localhost:8000`
 
 ## Coding Conventions
@@ -63,6 +63,8 @@ The app depends only on contract and shared libraries, never on adapter implemen
 2. A domain `*-api` library extends it with domain interfaces (e.g. `InvoicingProvider`, `MarketplaceProvider`, `SupplierProvider`)
 3. Adapter libraries implement the interfaces and register via `META-INF/services/` for `ServiceLoader` discovery
 4. The app's `ProviderFactory` subclasses (e.g. `InvoicingProviderFactory`, `MarketplaceProviderFactory`, `SupplierProviderFactory`, `PaymentProviderFactory`) instantiate per-store providers from the discovered descriptors
+
+A provider's per-store configuration (API keys and other settings) lives in Secrets Manager, and `ProviderConfigurationManager` reads it on every use, without an in-memory cache: a save in the dashboard is handled by one instance, so a copy kept in memory would stay stale on the others until a restart.
 
 ### Package Layout (`src/main/java/pl/commercelink/`)
 
@@ -130,7 +132,7 @@ All entities use `@DynamoDBTable`, `@DynamoDBHashKey`, `@DynamoDBRangeKey` annot
 | Products | `Product` | categoryId | productId | GSI `PimIdIndex` |
 | Catalogs | `ProductCatalog` | storeId | catalogId | |
 | Baskets | `Basket` | storeId | basketId | GSI `BasketCreatedAtIndex` |
-| Deliveries | `Delivery` | storeId | deliveryId | |
+| Deliveries | `Delivery` | storeId | deliveryId | GSI `StoreIdDeliveryListSortKeyIndex` |
 | EmailTemplates | `EmailTemplate` | storeId | templateName | |
 | RMA | `RMA` | storeId | rmaId | |
 | RMAItems | `RMAItem` | rmaId | rmaItemId | |

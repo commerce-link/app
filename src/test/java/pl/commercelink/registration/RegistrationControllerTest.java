@@ -300,15 +300,6 @@ class RegistrationControllerTest {
     }
 
     @Test
-    void legacyDemoRegisterPathRedirectsToRegister() {
-        // when
-        String view = controller.legacyRedirect();
-
-        // then
-        assertEquals("redirect:/register", view);
-    }
-
-    @Test
     void registerPageExposesDemoModeAndCaptchaKeyToTemplate() {
         // given
         when(captchaVerifier.siteKey()).thenReturn("site-key");

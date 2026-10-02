@@ -3,13 +3,20 @@ package pl.commercelink.web.dtos;
 import org.springframework.format.annotation.DateTimeFormat;
 import pl.commercelink.orders.PaymentDirection;
 import pl.commercelink.orders.PaymentSource;
+import pl.commercelink.web.orders.AmountParser;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
+/**
+ * The shared "Dodaj wpłatę" dialog (fragments/add-payment-modal.html) of an order or a delivery. The amounts are text
+ * fields read by {@link AmountParser}, so "149,99" and "1 499,99" are read the same in every browser; a blank fee is 0.
+ * Call {@link #validate()} before {@link #amount()} and {@link #fee()}.
+ */
 public class AddPaymentForm {
 
-    private double bankAmount;
-    private double processingFee;
+    private String bankAmount;
+    private String processingFee;
     private boolean feeIncluded;
     private PaymentSource source;
     private PaymentDirection direction;
@@ -19,19 +26,55 @@ public class AddPaymentForm {
     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
     private LocalDate bankTransactionDate;
 
-    public double getBankAmount() {
+    /**
+     * Why the amounts cannot be saved, as a message key, or null: the amount is a number other than 0 below the limit,
+     * the fee is blank or a number 0 or more below it. The sign of the amount is the caller's rule (an order's refund
+     * versus a delivery's payout).
+     */
+    public String validate() {
+        BigDecimal amount = AmountParser.parse(bankAmount);
+        if (amount == null) {
+            return "error.message.payment.amount.format";
+        }
+        if (!AmountParser.inRange(amount)) {
+            return "error.message.payment.range";
+        }
+        if (amount.signum() == 0) {
+            return "error.message.payment.amount.invalid";
+        }
+        BigDecimal fee = AmountParser.parse(processingFee);
+        if (fee == null || fee.signum() < 0) {
+            return "error.message.payment.fee.invalid";
+        }
+        if (!AmountParser.inRange(fee)) {
+            return "error.message.payment.range";
+        }
+        return null;
+    }
+
+    /** The amount as typed, to the grosz. */
+    public double amount() {
+        return AmountParser.parse(bankAmount).doubleValue();
+    }
+
+    /** The fee as typed, to the grosz; 0 when blank. */
+    public double fee() {
+        return AmountParser.parse(processingFee).doubleValue();
+    }
+
+    public String getBankAmount() {
         return bankAmount;
     }
 
-    public void setBankAmount(double bankAmount) {
+    public void setBankAmount(String bankAmount) {
         this.bankAmount = bankAmount;
     }
 
-    public double getProcessingFee() {
+    public String getProcessingFee() {
         return processingFee;
     }
 
-    public void setProcessingFee(double processingFee) {
+    public void setProcessingFee(String processingFee) {
         this.processingFee = processingFee;
     }
 

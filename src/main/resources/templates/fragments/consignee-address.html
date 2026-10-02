@@ -17,5 +17,21 @@
         <span th:text="${pickupShipment.collectionPointCode}">WAW04A</span>
     </p>
 </div>
+<!--/* The same address as a side card of the redesigned dropship pages (dropshipCreate, dropshipConfirmation). The
+       e-mail and phone are links on lines of their own, like the customer card of the order details page. */-->
+<section th:fragment="clConsignee(consignee, pickupShipment)" class="cl-card" aria-labelledby="consignee-title">
+    <div class="cl-card-head"><h2 class="cl-card-title" id="consignee-title" th:text="#{orders.dropship.consignee.address}"></h2></div>
+    <div class="cl-address">
+        <strong th:text="${consignee.displayName}"></strong><br>
+        <span th:text="${consignee.streetAndNumber}"></span><br>
+        <span th:text="${consignee.postalCode} + ' ' + ${consignee.city} + ', ' + ${consignee.country}"></span>
+        <div th:if="${!#strings.isEmpty(consignee.phone)}"><a th:href="'tel:' + ${consignee.phone}" th:text="${consignee.phone}"></a></div>
+        <div th:if="${!#strings.isEmpty(consignee.email)}"><a th:href="'mailto:' + ${consignee.email}" th:text="${consignee.email}"></a></div>
+    </div>
+    <div th:if="${pickupShipment != null}" class="cl-address">
+        <div class="cl-address-head"><span class="cl-eyebrow" th:text="#{orders.dropship.confirm.pickupPoint}"></span></div>
+        <strong th:text="${pickupShipment.carrier}"></strong> <span th:text="${pickupShipment.collectionPointCode}"></span>
+    </div>
+</section>
 </body>
 </html>

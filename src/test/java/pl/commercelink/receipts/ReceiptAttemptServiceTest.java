@@ -3,10 +3,13 @@ package pl.commercelink.receipts;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.support.StaticMessageSource;
+import pl.commercelink.documents.Document;
+import pl.commercelink.documents.DocumentType;
 import pl.commercelink.notifications.StoreNotificationService;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItemsRepository;
 import pl.commercelink.orders.OrderLifecycle;
+import pl.commercelink.orders.OrderStatus;
 import pl.commercelink.orders.OrdersRepository;
 import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.stores.IntegrationType;
@@ -16,12 +19,14 @@ import pl.commercelink.stores.StoreNotificationType;
 import pl.commercelink.stores.StoresRepository;
 
 import java.time.Duration;
+import java.time.LocalDate;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -122,34 +127,158 @@ class ReceiptAttemptServiceTest {
     }
 
     @Test
-    void manualEReceiptOfAPosSaleWithTheStoresEmailBlocksInsteadOfMailingTheStore() {
+    void manualEReceiptOfAPosSaleWithTheStoresEmailIsRefusedBeforeAnyAttemptIsCreated() {
         // given
         withStoreEmail(store);
         order = posOrder(100.00);
 
-        // when
-        ReceiptAttempt attempt = service.issueManually(STORE_ID, ORDER_ID, "operator");
-
-        // then
-        assertThat(attempt.getState()).isEqualTo(ReceiptAttemptState.BLOCKED);
-        assertThat(attempt.getBlockedReason()).isEqualTo(ReceiptBlockReason.POS_NO_CUSTOMER_EMAIL.name());
+        // when / then: no blocked attempt, no bell alert, nothing queued — the order page greys "E-paragon" for this
+        assertThatThrownBy(() -> service.issueManually(STORE_ID, ORDER_ID, "operator"))
+                .isInstanceOf(ReceiptActionException.class)
+                .extracting(e -> ((ReceiptActionException) e).getMessageKey())
+                .isEqualTo(ReceiptAttemptService.POS_NEEDS_EMAIL);
+        assertThat(service.issueRefusal(STORE_ID, ORDER_ID)).isEqualTo(ReceiptAttemptService.POS_NEEDS_EMAIL);
+        assertThat(attempts.all()).isEmpty();
+        verify(publisher, never()).publishDue(any());
         assertThat(provider.issueCalls.get()).isZero();
     }
 
     @Test
-    void resolvesTheAlertsOfBlockedAndFailedAttemptsOnly() {
+    void reissueOfAPosSaleWithoutTheCustomersEmailIsRefusedBeforeAnyAttemptIsCreated() {
+        // given: the automatic attempt blocked for the missing e-mail
+        withStoreEmail(store);
+        order = posOrder(100.00);
+        ReceiptAttempt first = service.startAutomatic(store, order).orElseThrow();
+
+        // when / then
+        assertThatThrownBy(() -> service.reissue(STORE_ID, ORDER_ID, "operator"))
+                .isInstanceOf(ReceiptActionException.class)
+                .extracting(e -> ((ReceiptActionException) e).getMessageKey())
+                .isEqualTo(ReceiptAttemptService.POS_NEEDS_EMAIL);
+        assertThat(service.reissueRefusal(STORE_ID, ORDER_ID)).isEqualTo(ReceiptAttemptService.POS_NEEDS_EMAIL);
+        assertThat(attempts.all()).extracting(ReceiptAttempt::getReceiptKey).containsExactly(first.getReceiptKey());
+        // the blocked attempt keeps its bell alert: nothing superseded it
+        verify(alerts, never()).resolve(any());
+    }
+
+    @Test
+    void reissueOfAPosSaleGoesAheadOnceTheCustomersEmailIsEntered() {
         // given
+        withStoreEmail(store);
+        order = posOrder(100.00);
+        service.startAutomatic(store, order);
+        order.getBillingDetails().setEmail("klient@example.com");
+
+        // when
+        ReceiptAttempt second = service.reissue(STORE_ID, ORDER_ID, "operator");
+
+        // then
+        assertThat(second.getAttemptNo()).isEqualTo(2);
+        assertThat(second.getState()).isEqualTo(ReceiptAttemptState.ISSUING);
+        assertThat(ReceiptAttemptService.reissueConfirmMessageKey(order))
+                .isEqualTo("receipts.action.reissue.confirm.message.pos");
+    }
+
+    @Test
+    void reconcileResolvesDeadAttemptAlertsWhenTheOrderHasItsClosingDocument() {
+        // given: the cash register receipt was typed in after the e-receipts stopped
         ReceiptAttempt blocked = storedAttempt(1, ReceiptAttemptState.BLOCKED);
         ReceiptAttempt failed = storedAttempt(2, ReceiptAttemptState.FAILED);
         ReceiptAttempt fiscalised = storedAttempt(3, ReceiptAttemptState.FISCALISED);
+        order.addDocument(new Document(null, "KASA/1", null, DocumentType.Receipt, LocalDate.of(2026, 9, 29)));
 
         // when
-        service.resolveDeadAttemptAlerts(STORE_ID, ORDER_ID);
+        service.reconcileDeadAttemptAlerts(order);
 
-        // then
+        // then: the dead ones ask for nothing; a live attempt keeps its alert (its e-mail may still need sending)
         verify(alerts).resolve(argThat(a -> a.getReceiptKey().equals(blocked.getReceiptKey())));
         verify(alerts).resolve(argThat(a -> a.getReceiptKey().equals(failed.getReceiptKey())));
         verify(alerts, never()).resolve(argThat(a -> a.getReceiptKey().equals(fiscalised.getReceiptKey())));
+        verify(alerts, never()).republish(any(), any());
+    }
+
+    @Test
+    void reconcileResolvesDeadAttemptAlertsOfACancelledOrder() {
+        // given: nothing fiscalised, and the order was cancelled since
+        ReceiptAttempt failed = storedAttempt(1, ReceiptAttemptState.FAILED);
+        order.setStatus(OrderStatus.Cancelled);
+
+        // when
+        service.reconcileDeadAttemptAlerts(order);
+
+        // then
+        verify(alerts).resolve(argThat(a -> a.getReceiptKey().equals(failed.getReceiptKey())));
+        verify(alerts, never()).republish(any(), any());
+    }
+
+    @Test
+    void reconcileKeepsTheAlertOfAFiscalisedReceiptOnACancelledOrder() {
+        // given: fiscalised, its document not attached yet; the order cancelled
+        ReceiptAttempt fiscalised = storedAttempt(1, ReceiptAttemptState.FISCALISED);
+        order.setStatus(OrderStatus.Cancelled);
+
+        // when
+        service.reconcileDeadAttemptAlerts(order);
+
+        // then: a registered sale still needs its document and e-mail; only dead attempts are settled
+        verify(alerts, never()).resolve(argThat(a -> a.getReceiptKey().equals(fiscalised.getReceiptKey())));
+    }
+
+    @Test
+    void reconcileRaisesTheNewestDeadAttemptAlertAgainOnceTheClosingDocumentIsGone() {
+        // given: a blocked attempt whose alert the typed receipt had closed; the receipt was unpinned since
+        ReceiptAttempt blocked = storedAttempt(1, ReceiptAttemptState.BLOCKED);
+        when(alerts.republish(any(), eq(ReceiptAttention.BLOCKED))).thenReturn(true);
+
+        // when
+        service.reconcileDeadAttemptAlerts(order);
+
+        // then: the bell asks again, as the order page does, and the reason raised is stored with the attempt
+        verify(alerts).republish(argThat(a -> a.getReceiptKey().equals(blocked.getReceiptKey())),
+                eq(ReceiptAttention.BLOCKED));
+        verify(alerts, never()).resolve(any());
+        assertThat(attempts.find(STORE_ID, blocked.getReceiptKey()).orElseThrow().getAttention())
+                .isEqualTo(ReceiptAttention.BLOCKED.name());
+    }
+
+    @Test
+    void reconcileLeavesSupersededAttemptsResolved() {
+        // given: R1 failed and was superseded by "Wystaw ponownie", whose R2 blocked in turn
+        ReceiptAttempt failed = storedAttempt(1, ReceiptAttemptState.FAILED);
+        ReceiptAttempt blocked = storedAttempt(2, ReceiptAttemptState.BLOCKED);
+
+        // when
+        service.reconcileDeadAttemptAlerts(order);
+
+        // then: only the newest attempt asks for anything
+        verify(alerts).republish(argThat(a -> a.getReceiptKey().equals(blocked.getReceiptKey())),
+                eq(ReceiptAttention.BLOCKED));
+        verify(alerts, never()).republish(argThat(a -> a.getReceiptKey().equals(failed.getReceiptKey())), any());
+    }
+
+    @Test
+    void reconcileLeavesALiveAttemptToTheProcessor() {
+        // given: R1 failed, R2 is being issued
+        storedAttempt(1, ReceiptAttemptState.FAILED);
+        storedAttempt(2, ReceiptAttemptState.ISSUING);
+
+        // when
+        service.reconcileDeadAttemptAlerts(order);
+
+        // then
+        verify(alerts, never()).republish(any(), any());
+        verify(alerts, never()).resolve(any());
+    }
+
+    @Test
+    void reconcileNeverThrows() {
+        // given
+        storedAttempt(1, ReceiptAttemptState.BLOCKED);
+        when(alerts.republish(any(), any())).thenThrow(new IllegalStateException("notifications down"));
+
+        // when / then
+        assertThatCode(() -> service.reconcileDeadAttemptAlerts(order))
+                .doesNotThrowAnyException();
     }
 
     private ReceiptAttempt storedAttempt(int no, ReceiptAttemptState state) {
@@ -374,6 +503,52 @@ class ReceiptAttemptServiceTest {
     }
 
     @Test
+    void theOrderStateAnswersAsTheSeparateQueriesFromOneReadOfTheAttempts() {
+        // given: no attempt yet — E-paragon may be issued, nothing owns the receipt, nothing is locked
+        ReceiptAttemptStore counting = org.mockito.Mockito.spy(attempts);
+        ReceiptAttemptService countingService = new ReceiptAttemptService(counting, stores, orders, orderItems, factory,
+                new ReceiptRequestConverter(), new ReceiptEligibility(factory), publisher, locking, lifecycle,
+                alerts, clock);
+        ReceiptOrderState none = countingService.orderState(store, order, alerts, java.util.Locale.ENGLISH);
+
+        // when: an attempt starts issuing
+        service.startAutomatic(store, order);
+        org.mockito.Mockito.clearInvocations(counting);
+        ReceiptOrderState issuing = countingService.orderState(store, order, alerts, java.util.Locale.ENGLISH);
+
+        // then
+        assertThat(none.canIssueManually()).isTrue();
+        assertThat(none.blocksManualReceipt()).isFalse();
+        assertThat(none.locksOrder(order)).isFalse();
+        assertThat(none.view().isEmpty()).isTrue();
+        verify(counting, org.mockito.Mockito.times(1)).findByOrder(STORE_ID, ORDER_ID);
+        assertThat(issuing.canIssueManually()).isEqualTo(service.canIssueManually(store, order)).isFalse();
+        assertThat(issuing.blocksManualReceipt()).isEqualTo(service.blocksManualReceipt(STORE_ID, ORDER_ID)).isTrue();
+        assertThat(issuing.locksOrder(order)).isEqualTo(service.locksOrder(order)).isTrue();
+        assertThat(issuing.view().rows()).extracting(ReceiptOrderView.Row::key).containsExactly(ORDER_ID + ":R1");
+        assertThat(issuing.attemptOfDocument(ORDER_ID + ":R1")).isPresent();
+    }
+
+    @Test
+    void theOrderIsLockedWhileAnAttemptOwnsTheReceiptUntilItsDocumentMakesTheOrderInvoiced() {
+        // given
+        service.startAutomatic(store, order);
+
+        for (ReceiptAttemptState state : ReceiptAttemptState.values()) {
+            attempts.update(STORE_ID, ORDER_ID + ":R1", a -> {
+                a.setState(state);
+                return true;
+            });
+            // then: a dead attempt locks nothing; any other owns the frozen sale
+            assertThat(service.locksOrder(order)).as(state.name()).isEqualTo(!state.isDead());
+        }
+        order.addDocument(new pl.commercelink.documents.Document(ORDER_ID + ":R1", "PAR/1", null,
+                pl.commercelink.documents.DocumentType.Receipt));
+        // the document is on the order: the invoiced locks take over
+        assertThat(service.locksOrder(order)).isFalse();
+    }
+
+    @Test
     void closeManuallyAttachesTheOperatorsDocumentAndStopsPolling() {
         service.startAutomatic(store, order);
 
@@ -526,7 +701,7 @@ class ReceiptAttemptServiceTest {
         // see "no change" and the operator would never hear that the resent mail failed too.
         StoreNotificationService notifications = mock(StoreNotificationService.class);
         StaticMessageSource messages = new StaticMessageSource();
-        ReceiptAlerts realAlerts = new ReceiptAlerts(notifications, messages);
+        ReceiptAlerts realAlerts = new ReceiptAlerts(notifications, messages, factory);
         service = new ReceiptAttemptService(attempts, stores, orders, orderItems, factory,
                 new ReceiptRequestConverter(), new ReceiptEligibility(factory), publisher, locking, lifecycle,
                 realAlerts, clock);
@@ -668,5 +843,26 @@ class ReceiptAttemptServiceTest {
                 .isInstanceOf(ReceiptActionException.class)
                 .extracting(e -> ((ReceiptActionException) e).getMessageKey())
                 .isEqualTo("receipts.action.notFound");
+    }
+
+    @Test
+    void aBlockedPosSaleNeedsNothingOnThePageOnceTheCashRegistersReceiptIsTypedIn() {
+        // given
+        withStoreEmail(store);
+        order = posOrder(100.00);
+        service.startAutomatic(store, order);
+        ReceiptOrderView.Row before = service.orderState(store, order, alerts, java.util.Locale.ENGLISH).view().rows().get(0);
+
+        // when
+        order.addDocument(new pl.commercelink.documents.Document("typed", "PAR/KASA/1", null,
+                pl.commercelink.documents.DocumentType.Receipt));
+        ReceiptOrderView.Row after = service.orderState(store, order, alerts, java.util.Locale.ENGLISH).view().rows().get(0);
+
+        // then
+        assertThat(before.settled()).isFalse();
+        assertThat(before.statusTone()).isEqualTo("is-bad");
+        assertThat(after.settled()).isTrue();
+        assertThat(after.problem()).isNull();
+        assertThat(after.statusTone()).isEqualTo("is-neutral");
     }
 }
