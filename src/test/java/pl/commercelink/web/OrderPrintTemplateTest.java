@@ -14,6 +14,7 @@ import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.orders.OrderLinks;
 import pl.commercelink.web.orders.OrderPrintView;
+import pl.commercelink.web.orders.QrCodeSvg;
 import pl.commercelink.web.settings.SettingsTemplateRenderer;
 
 import java.time.LocalDate;
@@ -255,6 +256,28 @@ class OrderPrintTemplateTest {
         assertThat(html.replaceAll("\\s+", " ")).contains("<dt>Sklep</dt> <dd>Demo</dd>")
                 .contains("<dt>Numer zamówienia</dt> <dd><a href=\"/dashboard/orders/" + ORDER_ID + "\">" + shortId + "</a></dd>")
                 .doesNotContain("store-1").doesNotContain("ID sklepu").doesNotContain(">" + ORDER_ID + "<");
+    }
+
+    @Test
+    void theCardPrintsTheQrCodeOfTheOrderWithACaption() {
+        // when
+        String html = card(order(), items(), false);
+
+        // then
+        assertThat(html).contains("class=\"cl-print-qr\"")
+                .contains("role=\"img\"").contains("aria-label=\"Kod QR zamówienia " + order().getShortenedOrderId() + "\"")
+                .contains(QrCodeSvg.of(SCAN_URL))
+                .contains("Zeskanuj telefonem, aby otworzyć zamówienie")
+                .doesNotContain("??");
+    }
+
+    @Test
+    void theProtocolHasNoQrCode() {
+        // when: the protocol goes to the customer, who cannot sign in
+        String html = collection(items());
+
+        // then
+        assertThat(html).doesNotContain("cl-print-qr").doesNotContain("<svg");
     }
 
     @Test

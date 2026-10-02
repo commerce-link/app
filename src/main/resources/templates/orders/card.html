@@ -10,11 +10,18 @@
 <div layout:fragment="content" th:with="p=${print}">
     <section class="cl-page cl-print-page">
         <div class="cl-page-body">
-            <!--/* only the title: the sheet is printed straight from the order page, so there is no way back or Print
+            <!--/* the title and the order's QR code: the sheet is printed straight from the order page, so there is no way back or Print
                    button to offer; the order id below still links to the order when the page is opened without JavaScript */-->
             <div class="cl-page-header">
                 <div class="cl-page-header-row">
                     <h1 class="cl-page-title" th:text="#{order.card.title}"></h1>
+                    <!--/* scanned with a phone in the warehouse, it opens the order (OrderLinks.scan); the SVG is drawn
+                           by QrCodeSvg from module coordinates only, so utext inserts no text anyone typed */-->
+                    <figure class="cl-print-qr">
+                        <div class="cl-print-qr-code" role="img"
+                             th:attr="aria-label=#{order.card.qr.label(${p.shortId()})}" th:utext="${p.scanQrSvg()}"></div>
+                        <figcaption th:text="#{order.card.qr.caption}"></figcaption>
+                    </figure>
                 </div>
             </div>
 
