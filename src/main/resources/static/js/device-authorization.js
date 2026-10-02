@@ -10,8 +10,16 @@
         var interval = Math.max(parseInt(form.getAttribute('data-interval'), 10) || 5, 2) * 1000;
         var expiresAt = parseInt(form.getAttribute('data-expires-at'), 10) || 0;
         var status = form.querySelector('[data-cl-device-status]');
+        // The status poll is a POST under /dashboard, so it must carry the form's CSRF token.
+        var csrf = form.querySelector('input[name="_csrf"]');
         var timer = null;
         var done = false;
+
+        function headers() {
+            var h = { 'X-Requested-With': 'fetch' };
+            if (csrf) { h['X-CSRF-TOKEN'] = csrf.value; }
+            return h;
+        }
 
         function schedule(delay) {
             timer = window.setTimeout(ask, delay);
@@ -23,7 +31,7 @@
                 // One last question lets the server clear the code and answer "expired" in the operator's language
                 done = true;
             }
-            fetch(statusUrl, { method: 'POST', headers: { 'X-Requested-With': 'fetch' }, redirect: 'manual' })
+            fetch(statusUrl, { method: 'POST', headers: headers(), redirect: 'manual' })
                 .then(function (response) {
                     if (response.type === 'opaqueredirect' || !response.ok) { throw new Error('status ' + response.status); }
                     return response.json();

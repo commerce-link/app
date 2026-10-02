@@ -107,7 +107,7 @@
             </button>
             <div class="cl-user-pop" id="clUserMenu" hidden>
                 <p class="cl-user-email" th:if="${userEmail != null}" th:text="${userEmail}"></p>
-                <form th:action="@{/logout}" method="get">
+                <form th:action="@{/logout}" method="post">
                     <button type="submit" class="cl-user-item">
                         <span class="icon"><i class="fas fa-sign-out-alt"></i></span>
                         <span th:text="#{general.logout}"></span>

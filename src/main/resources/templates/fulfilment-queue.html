@@ -16,6 +16,7 @@
             <div th:replace="~{fragments/screen-intro :: panel('fulfilment', 'fas fa-magic')}"></div>
 
             <form id="fulfilmentQueueForm" method="post">
+                <input type="hidden" name="_csrf" th:value="${_csrf.token}"/>
                 <table class="table is-bordered is-narrow is-hoverable is-fullwidth">
                     <thead>
                     <tr>

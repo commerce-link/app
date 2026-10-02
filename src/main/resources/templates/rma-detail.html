@@ -332,6 +332,7 @@
 
     <!-- Row 2: RMA Items -->
     <form id="rmaItemsForm" method="post" th:object="${rmaItemsForm}" th:attr="data-rma-id=${rma.rmaId}">
+        <input type="hidden" name="_csrf" th:value="${_csrf.token}"/>
         <h2 class="subtitle" th:text="#{rma.items}"></h2>
         <div class="box">
             <div class="table-container mb-4">
@@ -514,6 +515,7 @@
             </header>
             <section class="modal-card-body">
                 <form id="splitForm" method="post">
+                    <input type="hidden" name="_csrf" th:value="${_csrf.token}"/>
                     <div class="field">
                         <label class="label" th:text="#{rma.split.qty1}">Quantity for first item</label>
                         <div class="control">

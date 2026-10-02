@@ -5,6 +5,8 @@
 
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+    <meta name="_csrf" th:content="${_csrf?.token}"/>
+    <meta name="_csrf_header" th:content="${_csrf?.headerName}"/>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
     <script>
         (function () {
@@ -14,6 +16,28 @@
                 }
             } catch (error) {
             }
+        })();
+    </script>
+    <script>
+        // Single CSRF token source for forms built in JavaScript, which Thymeleaf cannot auto-inject
+        // into (th:action forms get the hidden _csrf field automatically; created/plain forms do not).
+        window.clCsrf = (function () {
+            var tokenMeta = document.querySelector('meta[name="_csrf"]');
+            var headerMeta = document.querySelector('meta[name="_csrf_header"]');
+            var token = tokenMeta ? tokenMeta.getAttribute('content') : '';
+            return {
+                token: token,
+                header: headerMeta ? headerMeta.getAttribute('content') : '',
+                appendTo: function (form) {
+                    if (!token) return form;
+                    var input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = '_csrf';
+                    input.value = token;
+                    form.appendChild(input);
+                    return form;
+                }
+            };
         })();
     </script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma-timeline@3.0.5/dist/css/bulma-timeline.min.css">

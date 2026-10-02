@@ -6,6 +6,8 @@
         <h3 th:text="${title}"></h3>
 
         <form method="post" th:id="'warehouseItemBatchForm_' + ${status.name()}" action="#">
+            <!-- action is set in JS, so th:action can't inject the CSRF token; add it explicitly -->
+            <input type="hidden" name="_csrf" th:value="${_csrf.token}"/>
             <div class="table-container">
                 <table class="table is-fullwidth is-striped">
                     <thead>

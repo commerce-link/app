@@ -4,6 +4,7 @@ import nz.net.ultraq.thymeleaf.layoutdialect.LayoutDialect;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.mock.web.MockServletContext;
+import org.springframework.security.web.csrf.DefaultCsrfToken;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.ITemplateContext;
 import org.thymeleaf.context.WebContext;
@@ -34,6 +35,10 @@ public final class SettingsTemplateRenderer {
         JakartaServletWebApplication application = JakartaServletWebApplication.buildApplication(new MockServletContext());
         IWebExchange exchange = application.buildExchange(new MockHttpServletRequest(), new MockHttpServletResponse());
         WebContext context = new WebContext(exchange, POLISH);
+        // The CsrfFilter always exposes _csrf at runtime; shared fragments (e.g. fragments/confirm-dialog)
+        // read ${_csrf.token}. Provide it here so rendering matches how the pages are actually served.
+        // A test may override it by passing its own "_csrf" variable.
+        context.setVariable("_csrf", new DefaultCsrfToken("X-CSRF-TOKEN", "_csrf", "test-csrf-token"));
         variables.forEach(context::setVariable);
         return ENGINE.process(templateOrMarkup, context);
     }
