@@ -17,7 +17,7 @@
         <span th:text="${pickupShipment.collectionPointCode}">WAW04A</span>
     </p>
 </div>
-<!--/* The same address as a side card of the redesigned dropship pages (dropshipCreate, dropshipConfirmation). The
+<!--/* The same address as a side card of the unified create-delivery pages (deliveries/create). The
        e-mail and phone are links on lines of their own, like the customer card of the order details page. */-->
 <section th:fragment="clConsignee(consignee, pickupShipment)" class="cl-card" aria-labelledby="consignee-title">
     <div class="cl-card-head"><h2 class="cl-card-title" id="consignee-title" th:text="#{orders.dropship.consignee.address}"></h2></div>
