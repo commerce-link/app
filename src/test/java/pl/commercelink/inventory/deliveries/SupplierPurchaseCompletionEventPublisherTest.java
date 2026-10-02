@@ -8,7 +8,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.mock.env.MockEnvironment;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.function.Consumer;
@@ -51,12 +51,19 @@ class SupplierPurchaseCompletionEventPublisherTest {
     }
 
     @Test
-    void firstCheckDefaultsToSixtySeconds() throws Exception {
+    void firstCheckWaitsSixtySecondsUnlessConfigured() {
+        // given
+        MockEnvironment defaults = new MockEnvironment();
+        MockEnvironment configured = new MockEnvironment()
+                .withProperty("supplier.purchase.completion.delay-seconds", "5");
+
         // when
-        Value value = SupplierPurchaseCompletionEventPublisher.class
-                .getDeclaredField("delaySeconds").getAnnotation(Value.class);
+        String defaultDelay = defaults.resolveRequiredPlaceholders(SupplierPurchaseCompletionEventPublisher.DELAY_PROPERTY);
+        String configuredDelay =
+                configured.resolveRequiredPlaceholders(SupplierPurchaseCompletionEventPublisher.DELAY_PROPERTY);
 
         // then
-        assertEquals("${supplier.purchase.completion.delay-seconds:60}", value.value());
+        assertEquals("60", defaultDelay);
+        assertEquals("5", configuredDelay);
     }
 }

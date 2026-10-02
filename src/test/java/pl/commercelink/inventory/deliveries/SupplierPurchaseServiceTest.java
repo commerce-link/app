@@ -691,11 +691,18 @@ class SupplierPurchaseServiceTest {
                 List.of(new SupplierQuote("EAN-1", "MFN-1", 10, 110.0, "PLN")));
         when(supplierProvider.placeOrder(any())).thenThrow(new SupplierOrderAwaitingSupplierException(
                 "ZA/IE-26/01615674", List.of("OBUASUOBU0061: 0 of 1 reserved"), "still reserving"));
+        List<String> savedStates = recordSavedStates(delivery);
+        List<String> statesSavedBeforePublish = new ArrayList<>();
+        doAnswer(invocation -> statesSavedBeforePublish.addAll(savedStates))
+                .when(supplierPurchaseCompletionEventPublisher).publish(any());
 
         // when
         service.processPending(STORE_ID, DELIVERY_ID, null, 1);
 
         // then
+        assertTrue(statesSavedBeforePublish.stream().noneMatch(state -> state.startsWith("awaiting=true")),
+                statesSavedBeforePublish.toString());
+        assertEquals("awaiting=true provisional=true message=null", savedStates.get(savedStates.size() - 1));
         assertEquals(DeliveryOrderStatus.ORDER_DISPATCHED, delivery.getOrderStatus());
         assertTrue(delivery.isAwaitingSupplierConfirmation());
         assertEquals("ZA/IE-26/01615674", delivery.getExternalDeliveryId());
@@ -724,16 +731,31 @@ class SupplierPurchaseServiceTest {
         when(supplierProvider.placeOrder(any())).thenThrow(new SupplierOrderAwaitingSupplierException(
                 "ZA/IE-26/1", List.of(), "still reserving"));
         doThrow(new RuntimeException("sqs down")).when(supplierPurchaseCompletionEventPublisher).publish(any());
+        List<String> savedStates = recordSavedStates(delivery);
 
         // when
         service.processPending(STORE_ID, DELIVERY_ID, null, 1);
 
-        // then
+        // then - the persisted delivery never carried the flag, and its last saved state is the hand-over
+        assertTrue(savedStates.stream().noneMatch(state -> state.startsWith("awaiting=true")), savedStates.toString());
+        String lastSaved = savedStates.get(savedStates.size() - 1);
+        assertTrue(lastSaved.startsWith("awaiting=false provisional=false message=Order ZA/IE-26/1 was placed"),
+                lastSaved);
         assertEquals(DeliveryOrderStatus.ORDER_DISPATCHED, delivery.getOrderStatus());
-        assertFalse(delivery.isAwaitingSupplierConfirmation());
         assertEquals("ZA/IE-26/1", delivery.getExternalDeliveryId());
-        assertTrue(delivery.getOrderErrorMessage().contains("ZA/IE-26/1"));
         verify(deliveryCreationService, never()).completePending(any(), any(), any());
+    }
+
+    /** Snapshots the fields the awaiting flow persists at every save: the mock keeps only a reference to the delivery. */
+    private List<String> recordSavedStates(Delivery delivery) {
+        List<String> states = new ArrayList<>();
+        doAnswer(invocation -> {
+            states.add("awaiting=" + delivery.isAwaitingSupplierConfirmation()
+                    + " provisional=" + delivery.isExternalDeliveryIdProvisional()
+                    + " message=" + delivery.getOrderErrorMessage());
+            return null;
+        }).when(deliveriesRepository).save(delivery);
+        return states;
     }
 
     @Test

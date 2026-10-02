@@ -145,6 +145,8 @@ class SupplierPurchaseCompletionTest {
         assertEquals(DeliveryOrderStatus.ORDER_DISPATCHED, delivery.getOrderStatus());
         assertTrue(delivery.getOrderErrorMessage().contains("SKU-A: 0 of 1 reserved"));
         assertTrue(delivery.getOrderErrorMessage().contains("ZA/1"));
+        assertTrue(delivery.getOrderErrorMessage().contains("was not confirmed by the supplier"));
+        assertFalse(delivery.isExternalDeliveryIdProvisional());
         assertTrue(hasEvent(delivery, "DELIVERY_SUPPLIER_CONFIRMATION_TIMEOUT"));
         verify(deliveriesRepository).save(delivery);
         verify(deliveryCreationService, never()).completePending(any(), any(), any());
@@ -163,6 +165,8 @@ class SupplierPurchaseCompletionTest {
         assertFalse(delivery.isAwaitingSupplierConfirmation());
         assertEquals(DeliveryOrderStatus.ORDER_DISPATCHED, delivery.getOrderStatus());
         assertTrue(delivery.getOrderErrorMessage().contains("ZA/1"));
+        assertTrue(delivery.getOrderErrorMessage().contains("the last check failed: timeout"),
+                delivery.getOrderErrorMessage());
     }
 
     @Test
@@ -178,6 +182,7 @@ class SupplierPurchaseCompletionTest {
         // then
         assertFalse(delivery.isAwaitingSupplierConfirmation());
         assertEquals("order ZA/1 in unrecognised state", delivery.getOrderErrorMessage());
+        assertFalse(delivery.isExternalDeliveryIdProvisional());
         assertEquals(DeliveryOrderStatus.ORDER_DISPATCHED, delivery.getOrderStatus());
         verify(deliveriesRepository).save(delivery);
     }
@@ -196,6 +201,7 @@ class SupplierPurchaseCompletionTest {
         assertFalse(delivery.isAwaitingSupplierConfirmation());
         assertEquals(DeliveryOrderStatus.FAILED, delivery.getOrderStatus());
         assertEquals("cancelled at Action", delivery.getOrderErrorMessage());
+        assertFalse(delivery.isExternalDeliveryIdProvisional());
     }
 
     @Test
@@ -305,6 +311,9 @@ class SupplierPurchaseCompletionTest {
         assertFalse(delivery.isAwaitingSupplierConfirmation());
         assertEquals(DeliveryOrderStatus.ORDER_DISPATCHED, delivery.getOrderStatus());
         assertTrue(delivery.getOrderErrorMessage().contains("ZA/1"));
+        assertTrue(delivery.getOrderErrorMessage().contains("the last check failed: allocations unavailable"),
+                delivery.getOrderErrorMessage());
+        assertFalse(delivery.getOrderErrorMessage().contains("not confirmed by the supplier"));
         assertTrue(hasEvent(delivery, "DELIVERY_SUPPLIER_CONFIRMATION_TIMEOUT"));
         verifyNoInteractions(supplierProvider);
     }
