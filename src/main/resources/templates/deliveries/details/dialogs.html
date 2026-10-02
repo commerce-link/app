@@ -29,8 +29,8 @@
                 <p class="cl-dialog-message" th:text="#{deliveries.details.receiveAll.intro(${items.pendingCount()}, ${items.allocationCount()})}"></p>
                 <ul class="cl-dialog-list">
                     <li th:each="line : ${d.pending()}"><span th:text="${line.productName()}"></span><span class="is-numeric"
-                            th:text="#{deliveries.details.items.qty(${line.qty()})}"></span><span class="cl-dialog-list-sub"
-                            th:text="'→ ' + ${#messages.msgWithParams(line.destinationKey(), line.destinationArgs())}"></span></li>
+                            th:text="#{deliveries.details.items.qty(${line.qty()})}"></span><span class="cl-dialog-list-sub"><span aria-hidden="true">→ </span><span
+                            th:text="${#messages.msgWithParams(line.destinationKey(), line.destinationArgs())}"></span></span></li>
                 </ul>
                 <p class="cl-dialog-effect" th:text="#{deliveries.details.receiveAll.effect}"></p>
             </div>
@@ -182,8 +182,8 @@
     <th:block th:each="product : ${page.items().products()}">
         <th:block th:each="row : ${product.allocations()}">
             <li th:if="${row.checked()}"><span th:text="${product.name()}"></span><span class="is-numeric"
-                    th:text="#{deliveries.details.items.qty(${row.qty()})}"></span><span class="cl-dialog-list-sub"
-                    th:text="'→ ' + ${#messages.msgWithParams(row.destinationKey(), row.destinationArgs())}"></span></li>
+                    th:text="#{deliveries.details.items.qty(${row.qty()})}"></span><span class="cl-dialog-list-sub"><span aria-hidden="true">→ </span><span
+                    th:text="${#messages.msgWithParams(row.destinationKey(), row.destinationArgs())}"></span></span></li>
         </th:block>
     </th:block>
 </th:block>

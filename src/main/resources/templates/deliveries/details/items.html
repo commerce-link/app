@@ -140,15 +140,15 @@
     <th scope="row" class="cl-table-key" th:attr="data-label=#{deliveries.details.items.column.product}">
         <span th:text="${product.name()}"></span>
         <span class="cl-table-sub">
-            <th:block th:if="${product.ean() != null}"><span th:text="#{deliveries.details.items.ean}"></span>&nbsp;<button
+            <th:block th:if="${product.ean() != null}"><span class="cl-label-pair"><span th:text="#{deliveries.details.items.ean}"></span>&nbsp;<button
                     type="button" class="cl-copy-inline"
                     th:attr="data-cl-copy=${product.ean()}, aria-label=#{deliveries.details.items.copy.ean(${product.ean()})}"><span
                     class="cl-copy-code"><span th:text="${product.ean()}"></span><span class="cl-copy-icon" aria-hidden="true">&#8288;<i
-                    class="far fa-copy"></i></span></span></button><span class="cl-table-sep"> · </span></th:block>
-            <span th:text="#{deliveries.details.items.mfn}"></span>&nbsp;<button type="button" class="cl-copy-inline"
+                    class="far fa-copy"></i></span></span></button></span><span class="cl-table-sep"> · </span></th:block>
+            <span class="cl-label-pair"><span th:text="#{deliveries.details.items.mfn}"></span>&nbsp;<button type="button" class="cl-copy-inline"
                     th:attr="data-cl-copy=${product.mfn()}, aria-label=#{deliveries.details.items.copy.mfn(${product.mfn()})}"><span
                     class="cl-copy-code"><span th:text="${product.mfn()}"></span><span class="cl-copy-icon" aria-hidden="true">&#8288;<i
-                    class="far fa-copy"></i></span></span></button>
+                    class="far fa-copy"></i></span></span></button></span>
         </span>
         <button type="button" class="cl-row-toggle" hidden aria-expanded="true" data-cl-alloc-toggle
                 th:attr="aria-controls=${product.allocationIds()}"><span

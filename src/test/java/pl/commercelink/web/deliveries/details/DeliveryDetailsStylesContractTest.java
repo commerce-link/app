@@ -28,8 +28,9 @@ class DeliveryDetailsStylesContractTest {
                 .contains(".cl-selection-row.is-docked.is-in-view:not([hidden])").contains("--cl-docked-bar")
                 .contains(".cl-card.is-status.is-bad").contains(".cl-status-actions").contains(".cl-dialog-list")
                 .contains(".cl-dialog-actions-end").contains(".cl-meta-truncate").contains(".cl-kv-text.is-break")
-                .contains(".cl-layout-side.is-grid").contains("repeat(auto-fill, minmax(320px, 1fr))")
-                .contains(".cl-choice-reveal").contains("dialog.cl-dialog[open]:not(:modal)");
+                .contains(".cl-layout-side.is-grid").contains("repeat(auto-fill, minmax(280px, 1fr))")
+                .contains(".cl-choice-reveal").contains("dialog.cl-dialog[open]:not(:modal)")
+                .contains(".cl-label-pair").contains(".cl-clamp.is-clamped").contains(".cl-clamp-toggle");
     }
 
     @Test

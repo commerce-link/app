@@ -108,7 +108,12 @@
             qty.textContent = box.getAttribute('data-qty-label');
             var destination = document.createElement('span');
             destination.className = 'cl-dialog-list-sub';
-            destination.textContent = '→ ' + box.getAttribute('data-dest');
+            // the arrow is decoration: a screen reader would read it as "right arrow"
+            var arrow = document.createElement('span');
+            arrow.setAttribute('aria-hidden', 'true');
+            arrow.textContent = '→ ';
+            destination.appendChild(arrow);
+            destination.appendChild(document.createTextNode(box.getAttribute('data-dest')));
             item.appendChild(name);
             item.appendChild(qty);
             item.appendChild(destination);
@@ -330,8 +335,37 @@
         });
     }
 
+    // A long text (the comment) shows its first lines with a toggle; a short one is left as it is, and without
+    // JavaScript the whole text stays visible because the clamp class is only added here.
+    function initClamp() {
+        document.querySelectorAll('[data-cl-clamp]').forEach(function (text, index) {
+            text.classList.add('is-clamped');
+            if (text.scrollHeight <= text.clientHeight + 1) {
+                text.classList.remove('is-clamped');
+                return;
+            }
+            if (!text.id) {
+                text.id = 'cl-clamp-' + index;
+            }
+            var toggle = document.createElement('button');
+            toggle.type = 'button';
+            toggle.className = 'cl-link-button cl-clamp-toggle';
+            toggle.setAttribute('aria-controls', text.id);
+            toggle.setAttribute('aria-expanded', 'false');
+            toggle.textContent = text.getAttribute('data-cl-label-more');
+            toggle.addEventListener('click', function () {
+                var clamped = text.classList.toggle('is-clamped');
+                toggle.setAttribute('aria-expanded', clamped ? 'false' : 'true');
+                toggle.textContent = text.getAttribute(clamped ? 'data-cl-label-more' : 'data-cl-label-less');
+            });
+            // after the whole list: a button inside dl › div would break the term/description structure
+            (text.closest('dl') || text).insertAdjacentElement('afterend', toggle);
+        });
+    }
+
     function init() {
         initToggles();
+        initClamp();
         initDockedBar();
         initValidation();
         initDialogs();

@@ -108,7 +108,9 @@
     </div>
     <div class="cl-collapse-body" id="comment-body">
         <dl th:if="${c.text() != null}" class="cl-kv is-column"><div class="cl-kv-wide"><dt class="cl-visually-hidden"
-                th:text="#{deliveries.details.comment.card}"></dt><dd class="cl-kv-text" th:text="${c.text()}"></dd></div></dl>
+                th:text="#{deliveries.details.comment.card}"></dt><dd class="cl-kv-text cl-clamp" data-cl-clamp
+                th:attr="data-cl-label-more=#{deliveries.details.comment.more}, data-cl-label-less=#{deliveries.details.comment.less}"
+                th:text="${c.text()}"></dd></div></dl>
         <p th:if="${c.text() == null}" class="cl-list-empty" th:text="#{deliveries.details.comment.empty}"></p>
     </div>
 </section>

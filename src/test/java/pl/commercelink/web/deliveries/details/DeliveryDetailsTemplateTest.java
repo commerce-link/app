@@ -247,6 +247,7 @@ class DeliveryDetailsTemplateTest {
                 .contains(">Terminy i koszty<").contains(">14 dni<").contains(">23 %<")
                 .contains(">Razem brutto<").contains("data-cl-dialog-open=\"terms-dialog\"")
                 .contains("open=terms#terms-dialog").contains("Rampa B\nkierowca dzwoni")
+                .contains("data-cl-clamp").contains("data-cl-label-more=\"Pokaż cały komentarz\"")
                 .doesNotContain(">Odbiorca i wysyłka<");
         assertThat(html.indexOf(">Zamówienie u dostawcy<")).isLessThan(html.indexOf(">Terminy i koszty<"));
     }
@@ -368,6 +369,7 @@ class DeliveryDetailsTemplateTest {
                 .contains(">Zamówienie #a9f693b8 · marek.pawlak@example.pl<").contains("href=\"/dashboard/orders/" + ORDER_ID + "\"")
                 .contains("href=\"/dashboard/warehouse/items/wh-MFN-MIRAGE-01\"")
                 .contains(">✓ Odebrano<").contains(">Czeka<")
+                .contains("<span class=\"cl-label-pair\"><span>Kod</span>")
                 .contains("Towar razem: netto 5\u00a0084,00 PLN · brutto 6\u00a0253,32 PLN")
                 .doesNotContain(">Alokacja<").doesNotContain("Zarezerwowano");
     }
@@ -557,7 +559,8 @@ class DeliveryDetailsTemplateTest {
         // then
         assertThat(html).contains(">Odebrać całą dostawę 2f9eb794?<")
                 .contains("Odbierzesz wszystko, co jeszcze czeka w tej dostawie (1 z 2 przeznaczeń):")
-                .contains("→ Magazyn").contains("dostawa stanie się „Odebrana”");
+                .contains("<span aria-hidden=\"true\">→ </span><span>Magazyn</span>")
+                .contains("dostawa stanie się „Odebrana”");
     }
 
     @Test

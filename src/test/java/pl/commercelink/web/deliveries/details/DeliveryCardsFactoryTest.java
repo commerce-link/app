@@ -110,6 +110,21 @@ class DeliveryCardsFactoryTest {
     }
 
     @Test
+    void anOverpaymentIsRedAsOnThePaymentsList() {
+        // given: 6 253,32 to pay, 7 000 paid
+        Delivery delivery = warehouse();
+        delivery.addPayment(new Payment("MH-2026/0917", "mBank", PaymentSource.BankTransfer, PaymentDirection.Outgoing,
+                7000, 0, "202610010417", LocalDate.of(2026, 10, 1)));
+
+        // when
+        DeliveryPageModel.PaymentsCard card = DeliveryCardsFactory.payments(delivery, ADMIN, links(ADMIN, delivery));
+
+        // then
+        assertThat(card.pillKey()).isEqualTo("deliveries.details.payments.overpaid");
+        assertThat(card.pillTone()).isEqualTo("is-bad");
+    }
+
+    @Test
     void anUnsetVatLeavesWhatIsOwedEmptyButKeepsTheSettlementPill() {
         // given
         Delivery unset = warehouse();

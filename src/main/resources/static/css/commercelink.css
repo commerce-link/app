@@ -3927,8 +3927,8 @@ a.cl-link-button:hover {
 
 @media screen and (max-width: 1023px) {
     .cl-page .cl-list-title a:not(.cl-link-button) {
-        padding-block: 12px;
-        margin-block: -12px;
+        padding-block: 13px;
+        margin-block: -13px;
     }
 }
 
@@ -8976,10 +8976,11 @@ a.cl-link-button:hover {
 }
 
 /* P8: between the phone and the two-column layout the side cards sit in a grid instead of full-width rows whose value
-   stands ~700 px from its label; DOM order stays (spec §10.5). Declared after the one-column rule of cl-layout-aside. */
+   stands ~700 px from its label; DOM order stays (spec §10.5). Declared after the one-column rule of cl-layout-aside.
+   280 px lets two cards share the ~608 px the content keeps at 720 px with the sidebar open. */
 @media screen and (min-width: 720px) and (max-width: 1365px) {
     .cl-page .cl-layout-side.is-grid {
-        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
         align-items: start;
     }
 }
@@ -8992,4 +8993,36 @@ a.cl-link-button:hover {
     max-width: none;
     margin: 16px 0;
     box-shadow: var(--cl-shadow-card);
+}
+
+/* A label glued to its value ("Kod MFN-01" with the copy button): the pair moves to the next line as a whole instead of
+   leaving "Kod" at the end of a line; a value longer than the line still wraps inside (cl-copy-inline, anywhere). */
+.cl-page .cl-label-pair {
+    display: inline-block;
+    max-width: 100%;
+}
+
+/* A summary right under a card head that wraps its actions (Płatności on a phone): the inset's top padding, which the
+   generic dl.cl-kv padding would otherwise take away, so "Dodaj wpłatę" does not touch "Do zapłaty". */
+.cl-page .cl-card-head + dl.cl-kv.cl-card-inset:not(.is-column) {
+    padding-top: 16px;
+}
+
+/* A long text in a side card (a comment) shows its first lines; delivery-details.js adds the toggle only when the text
+   is longer, so without JavaScript the whole text stays visible. */
+.cl-page .cl-clamp.is-clamped {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 8;
+    overflow: hidden;
+}
+
+.cl-page .cl-clamp-toggle {
+    margin: 0 20px 16px;
+}
+
+@media screen and (max-width: 719px) {
+    .cl-page .cl-clamp-toggle {
+        margin: 0 16px 16px;
+    }
 }

@@ -103,7 +103,8 @@ final class DeliveryCardsFactory {
             pillTone = OrderLabels.OK;
         } else if (delivery.isOverpaid()) {
             pillKey = "deliveries.details.payments.overpaid";
-            pillTone = OrderLabels.WARN;
+            // red, as the Payments list shows an overpayment since #255
+            pillTone = OrderLabels.BAD;
             pillAmount = Money.format(-unpaid);
         } else if (delivery.isUnderpaid()) {
             pillKey = "deliveries.details.payments.underpaid";
