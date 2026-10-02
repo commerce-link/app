@@ -30,11 +30,14 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -266,6 +269,63 @@ class SupplierPurchaseCompletionTest {
         // then
         assertFalse(delivery.isAwaitingSupplierConfirmation());
         verify(deliveryCreationService).completePending(eq(STORE_ID), eq(delivery), any());
+    }
+
+    @Test
+    void localFailureAfterSupplierCompletionPropagatesWithoutHandOver() {
+        // given - the supplier completed the order, persisting it locally fails on the last attempt
+        Delivery delivery = awaitingDelivery();
+        when(supplierProvider.completePlacedOrder(any())).thenReturn(new SupplierOrderResult("ZA/1", 50.0, "PLN",
+                List.of(new SupplierQuote(EAN, MFN, 1, 50.0, "PLN"))));
+        RuntimeException saveFailure = new RuntimeException("throttled");
+        doThrow(saveFailure).when(deliveryCreationService).completePending(eq(STORE_ID), eq(delivery), any());
+
+        // when
+        RuntimeException thrown = assertThrows(RuntimeException.class,
+                () -> service.completeAwaitingPurchase(request(delivery), 10));
+
+        // then
+        assertSame(saveFailure, thrown);
+        assertNull(delivery.getOrderErrorMessage());
+        assertFalse(hasEvent(delivery, "DELIVERY_SUPPLIER_CONFIRMATION_TIMEOUT"));
+        verify(deliveriesRepository, never()).save(any());
+    }
+
+    @Test
+    void persistentFormRebuildFailureCountsAsAnAttemptAndHandsOverOnTheLast() {
+        // given
+        Delivery delivery = awaitingDelivery();
+        when(deliveriesQueryService.fetchDeliveryWithAllocations(STORE_ID, DELIVERY_ID))
+                .thenThrow(new RuntimeException("allocations unavailable"));
+
+        // when / then
+        assertThrows(SupplierConfirmationPendingException.class,
+                () -> service.completeAwaitingPurchase(request(delivery), 9));
+        service.completeAwaitingPurchase(request(delivery), 10);
+        assertFalse(delivery.isAwaitingSupplierConfirmation());
+        assertEquals(DeliveryOrderStatus.ORDER_DISPATCHED, delivery.getOrderStatus());
+        assertTrue(delivery.getOrderErrorMessage().contains("ZA/1"));
+        assertTrue(hasEvent(delivery, "DELIVERY_SUPPLIER_CONFIRMATION_TIMEOUT"));
+        verifyNoInteractions(supplierProvider);
+    }
+
+    @Test
+    void completionWithoutAnOrderNumberIsAnUnknownOutcomeHandOver() {
+        // given
+        Delivery delivery = awaitingDelivery();
+        when(supplierProvider.completePlacedOrder(any())).thenReturn(new SupplierOrderResult(" ", 50.0, "PLN",
+                List.of(new SupplierQuote(EAN, MFN, 1, 50.0, "PLN"))));
+
+        // when
+        service.completeAwaitingPurchase(request(delivery), 1);
+
+        // then
+        assertFalse(delivery.isAwaitingSupplierConfirmation());
+        assertEquals(DeliveryOrderStatus.ORDER_DISPATCHED, delivery.getOrderStatus());
+        assertEquals("Supplier confirmed the order without an order number - check the supplier panel before "
+                + "ordering again", delivery.getOrderErrorMessage());
+        verify(deliveriesRepository).save(delivery);
+        verify(deliveryCreationService, never()).completePending(any(), any(), any());
     }
 
     private Delivery awaitingDelivery() {

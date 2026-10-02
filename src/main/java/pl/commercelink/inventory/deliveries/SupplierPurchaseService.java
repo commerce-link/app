@@ -233,7 +233,7 @@ public class SupplierPurchaseService {
                     : getProvider(storeId, form.getProvider())
                             .placeOrder(new SupplierPurchaseRequest(delivery.getPurchaseRef(), lines,
                                     form.getDeliveryAddressId(), form.getSupplierOrderChoices()));
-            finishPlacedPurchase(storeId, delivery, form, validation, orderResult);
+            finishPlacedPurchase(storeId, delivery, form, validation, requireOrderNumber(orderResult));
         } catch (SupplierOrderAwaitingSupplierException e) {
             awaitSupplierConfirmation(storeId, delivery, form.getProvider(),
                     delivery.isDropship() ? dropshipOrderId : orderId, e);
@@ -250,12 +250,16 @@ public class SupplierPurchaseService {
         }
     }
 
-    private void finishPlacedPurchase(String storeId, Delivery delivery, DeliveryCreationForm form,
-                                      PurchaseValidation validation, SupplierOrderResult orderResult) {
+    private static SupplierOrderResult requireOrderNumber(SupplierOrderResult orderResult) {
         if (StringUtils.isBlank(orderResult.externalOrderId())) {
             throw new SupplierOrderOutcomeUnknownException(
                     "Supplier confirmed the order without an order number - check the supplier panel before ordering again");
         }
+        return orderResult;
+    }
+
+    private void finishPlacedPurchase(String storeId, Delivery delivery, DeliveryCreationForm form,
+                                      PurchaseValidation validation, SupplierOrderResult orderResult) {
         applyOrderResult(form, validation, orderResult);
         delivery.setExternalDeliveryIdProvisional(orderResult.provisional());
         delivery.setAwaitingSupplierConfirmation(false);
@@ -285,33 +289,43 @@ public class SupplierPurchaseService {
             return;
         }
         String storeId = request.getStoreId();
-        DeliveryCreationForm form = rebuildForm(storeId, delivery);
+        DeliveryCreationForm form;
+        PurchaseValidation validation;
+        SupplierOrderResult result;
+        // Only the supplier interaction is counted and handed over. Local persistence after the supplier completed
+        // the order stays outside: a failure there propagates to SQS, and the redelivery either finds the delivery
+        // already settled or completes it again idempotently - never a "cancel it at the supplier" hand-over.
         try {
-            PurchaseValidation validation = validate(storeId, form, delivery.getPurchaseRef());
+            form = rebuildForm(storeId, delivery);
+            validation = validate(storeId, form, delivery.getPurchaseRef());
             List<SupplierOrderLine> lines = validation.lines().stream()
                     .map(line -> new SupplierOrderLine(line.sku(), line.ean(), line.mfn(), line.requestedQty()))
                     .toList();
-            SupplierOrderResult result = delivery.isDropship()
+            result = requireOrderNumber(delivery.isDropship()
                     ? dropshipPurchaseService.completeDropshipOrder(storeId, delivery, lines, request.getOrderId())
                     : getProvider(storeId, delivery.getProvider()).completePlacedOrder(new SupplierPurchaseRequest(
                             delivery.getPurchaseRef(), lines, form.getDeliveryAddressId(),
-                            form.getSupplierOrderChoices()));
-            finishPlacedPurchase(storeId, delivery, form, validation, result);
+                            form.getSupplierOrderChoices())));
         } catch (SupplierOrderAwaitingSupplierException e) {
             retryOrHandOver(delivery, attempt, e.externalOrderId(), e.pendingLines(), e);
+            return;
         } catch (SupplierOrderOutcomeUnknownException e) {
             handOver(delivery, e.getMessage());
             log.error("Supplier confirmation outcome UNKNOWN: store={} delivery={} ref={}",
                     storeId, delivery.getDeliveryId(), delivery.getPurchaseRef(), e);
+            return;
         } catch (SupplierOrderRejectedException e) {
             delivery.setAwaitingSupplierConfirmation(false);
             failDelivery(delivery, e.getMessage());
             log.error("Supplier confirmation rejected: store={} delivery={} ref={}",
                     storeId, delivery.getDeliveryId(), delivery.getPurchaseRef(), e);
+            return;
         } catch (RuntimeException e) {
             // A transient failure (timeout, 5xx) spends an attempt like a still-pending answer does.
             retryOrHandOver(delivery, attempt, delivery.getExternalDeliveryId(), List.of(), e);
+            return;
         }
+        finishPlacedPurchase(storeId, delivery, form, validation, result);
     }
 
     private void retryOrHandOver(Delivery delivery, int attempt, String externalOrderId, List<String> pendingLines,
