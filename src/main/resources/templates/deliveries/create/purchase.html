@@ -206,7 +206,8 @@
             <tr th:each="line : ${validation.lines()}">
                 <th scope="row" class="cl-table-key" th:attr="data-label=#{general.product}">
                     <span th:text="${line.name()}"></span>
-                    <span class="cl-table-sub"><span th:text="#{general.ean} + ':'"></span> <span class="cl-code-nowrap" th:text="${line.ean()}"></span></span>
+                    <span class="cl-table-sub"><span th:text="#{general.ean} + ':'"></span> <span class="cl-code-nowrap" th:text="${line.ean()}"></span>
+                        · <span th:text="#{general.manufacturer.code} + ':'"></span> <span class="cl-code-nowrap" th:text="${line.mfn()}"></span></span>
                 </th>
                 <td class="is-numeric" th:attr="data-label=#{deliveries.create.purchase.col.requested}" th:text="${line.requestedQty()}"></td>
                 <td class="is-numeric" th:attr="data-label=#{deliveries.create.purchase.col.available}">
