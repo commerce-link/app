@@ -118,6 +118,9 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
+import static pl.commercelink.taxonomy.UnifiedProductIdentifiers.unifyEan;
+import static pl.commercelink.taxonomy.UnifiedProductIdentifiers.unifyMfn;
+
 @Controller
 public class OrdersController extends BaseController {
 
@@ -1080,12 +1083,22 @@ public class OrdersController extends BaseController {
             return refuseSupplier(orderId, form, store, async, response, model, redirectAttributes,
                     messageSource.getMessage("order.item.assign.supplier.routed", null, locale));
         }
+        // The taxonomy is the source of truth for a product's EAN; the dialog offers the EAN field only once the
+        // manufacturer code missed it, so a typed EAN never overrides a known one.
         Taxonomy taxonomy = taxonomyCache.findByMfn(form.getManufacturerCode());
-        String ean = taxonomy != null ? taxonomy.ean() : null;
-        if (Strings.isBlank(ean)) {
-            // the refusal stays in the dialog instead of opening the item's edit page
-            return refuseSupplier(orderId, form, store, async, response, model, redirectAttributes,
-                    messageSource.getMessage("order.item.ean.not.found", null, locale));
+        String ean = taxonomy != null ? StringUtils.trimToNull(taxonomy.ean()) : null;
+        if (ean == null) {
+            model.addAttribute("supplierEanField", true);
+            String typedEan = StringUtils.trimToNull(form.getEan());
+            if (typedEan != null && !typedEan.matches("\\d{8,14}")) {
+                return refuseSupplier(orderId, form, store, async, response, model, redirectAttributes,
+                        messageSource.getMessage("product.error.ean.invalid", null, locale));
+            }
+            ean = typedEan != null ? unifyEan(typedEan) : ownEan(orderItem, form.getManufacturerCode());
+            if (ean == null) {
+                return refuseSupplier(orderId, form, store, async, response, model, redirectAttributes,
+                        messageSource.getMessage("order.item.ean.not.found", null, locale));
+            }
         }
 
         // a gross price is turned net with the item's own VAT, as the old dialog did in the browser
@@ -1105,6 +1118,16 @@ public class OrdersController extends BaseController {
         }
         OrderFlash.saved(redirectAttributes, saved);
         return details(orderId);
+    }
+
+    /**
+     * A product outside the taxonomy (one typed by hand, not in PIM) has its EAN only on the item, so that one is kept -
+     * but only while the dialog names the same product code, so a stale EAN never follows the item to another product.
+     */
+    private String ownEan(OrderItem item, String manufacturerCode) {
+        boolean sameProduct = StringUtils.isNotBlank(manufacturerCode)
+                && Objects.equals(item.getManufacturerCode(), unifyMfn(manufacturerCode));
+        return sameProduct ? StringUtils.trimToNull(item.getEan()) : null;
     }
 
     private String refuseSupplier(String orderId, AssignSupplierForm form, Store store, boolean async,

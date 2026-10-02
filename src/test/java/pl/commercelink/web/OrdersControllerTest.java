@@ -4969,7 +4969,99 @@ class OrdersControllerTest {
             assertThat(view).isEqualTo("orders/details/item-dialogs :: supplierForm");
             assertThat(response.getStatus()).isEqualTo(422);
             assertThat(model.get("supplierError")).isEqualTo("order.item.ean.not.found");
+            assertThat(model.get("supplierEanField")).isEqualTo(true);
             assertThat(model).containsKeys("orderId", "supplierForm", "suppliers");
+            verify(orderItemsRepository, never()).save(any());
+        }
+
+        @Test
+        void aTypedEanAssignsTheSupplierWhenTheTaxonomyDoesNotKnowTheProduct() {
+            // given
+            OrderItem item = supplierItem(1.23);
+            when(taxonomyCache.findByMfn("MFN-1")).thenReturn(null);
+            RedirectAttributesModelMap redirect = new RedirectAttributesModelMap();
+
+            // when
+            String view = ordersController.assignSupplier(ORDER_ID, supplierForm("100", "net", " 5901234567890 "), null,
+                    new MockHttpServletRequest(), new MockHttpServletResponse(), new ExtendedModelMap(), redirect, polish);
+
+            // then
+            assertThat(view).isEqualTo("redirect:/dashboard/orders/" + ORDER_ID);
+            assertThat(item.getEan()).isEqualTo("5901234567890");
+            assertThat(item.getStatus()).isEqualTo(FulfilmentStatus.Allocation);
+            verify(orderItemsRepository).save(item);
+        }
+
+        @Test
+        void aTypedEanDoesNotOverrideTheTaxonomy() {
+            // given
+            OrderItem item = supplierItem(1.23);
+            when(taxonomyCache.findByMfn("MFN-1")).thenReturn(
+                    new Taxonomy("5901234567890", "MFN-1", "Brand", "name", "CPU", 1, null, null, "raw"));
+
+            // when
+            ordersController.assignSupplier(ORDER_ID, supplierForm("100", "net", "4006381333931"), null,
+                    new MockHttpServletRequest(), new MockHttpServletResponse(), new ExtendedModelMap(),
+                    new RedirectAttributesModelMap(), polish);
+
+            // then
+            assertThat(item.getEan()).isEqualTo("5901234567890");
+            assertThat(item.getStatus()).isEqualTo(FulfilmentStatus.Allocation);
+        }
+
+        @Test
+        void theItemsOwnEanIsKeptWhenTheProductCodeIsUnchanged() {
+            // given: the EAN was typed earlier on the item's edit page
+            OrderItem item = supplierItem(1.23);
+            item.setManufacturerCode("MFN-1");
+            item.setEan("5901234567890");
+            when(taxonomyCache.findByMfn("MFN-1")).thenReturn(null);
+
+            // when
+            ordersController.assignSupplier(ORDER_ID, supplierForm("100", "net"), null,
+                    new MockHttpServletRequest(), new MockHttpServletResponse(), new ExtendedModelMap(),
+                    new RedirectAttributesModelMap(), polish);
+
+            // then
+            assertThat(item.getEan()).isEqualTo("5901234567890");
+            assertThat(item.getStatus()).isEqualTo(FulfilmentStatus.Allocation);
+        }
+
+        @Test
+        void theItemsOwnEanIsNotCarriedOverToAnotherProductCode() {
+            // given
+            OrderItem item = supplierItem(1.23);
+            item.setManufacturerCode("MFN-OLD");
+            item.setEan("5901234567890");
+            when(taxonomyCache.findByMfn("MFN-1")).thenReturn(null);
+            ExtendedModelMap model = new ExtendedModelMap();
+
+            // when
+            ordersController.assignSupplier(ORDER_ID, supplierForm("100", "net"), "fetch",
+                    new MockHttpServletRequest(), new MockHttpServletResponse(), model,
+                    new RedirectAttributesModelMap(), polish);
+
+            // then
+            assertThat(model.get("supplierError")).isEqualTo("order.item.ean.not.found");
+            verify(orderItemsRepository, never()).save(any());
+        }
+
+        @Test
+        void aMalformedTypedEanIsRefusedWithTheEanFieldStillShown() {
+            // given
+            supplierItem(1.23);
+            when(taxonomyCache.findByMfn("MFN-1")).thenReturn(null);
+            MockHttpServletResponse response = new MockHttpServletResponse();
+            ExtendedModelMap model = new ExtendedModelMap();
+
+            // when
+            ordersController.assignSupplier(ORDER_ID, supplierForm("100", "net", "590-12AB"), "fetch",
+                    new MockHttpServletRequest(), response, model, new RedirectAttributesModelMap(), polish);
+
+            // then
+            assertThat(response.getStatus()).isEqualTo(422);
+            assertThat(model.get("supplierError")).isEqualTo("product.error.ean.invalid");
+            assertThat(model.get("supplierEanField")).isEqualTo(true);
             verify(orderItemsRepository, never()).save(any());
         }
 
@@ -5032,6 +5124,7 @@ class OrdersControllerTest {
             assertThat(view).isEqualTo("orders/details/item-dialogs :: supplierForm");
             assertThat(response.getStatus()).isEqualTo(200);
             assertThat(model.get("supplierError")).isNull();
+            assertThat(model.get("supplierEanField")).isNull();
             assertThat(model.get("supplierRedirect")).isEqualTo("/dashboard/orders/" + ORDER_ID);
             assertThat(((OrderNotice) flashMap.get(OrderFlash.ATTRIBUTE)).text()).isEqualTo("order.item.supplier.assigned");
             verify(orderItemsRepository).save(item);
@@ -5039,7 +5132,13 @@ class OrdersControllerTest {
 
         // a name typed next to "Other supplier…" is accepted without a connection
         private AssignSupplierForm supplierForm(String cost, String priceType) {
-            return AssignSupplierForm.of("i1", "MFN-1", cost, priceType, SupplierChoice.CUSTOM, "HURT-ABC");
+            return supplierForm(cost, priceType, null);
+        }
+
+        private AssignSupplierForm supplierForm(String cost, String priceType, String ean) {
+            AssignSupplierForm form = AssignSupplierForm.of("i1", "MFN-1", cost, priceType, SupplierChoice.CUSTOM, "HURT-ABC");
+            form.setEan(ean);
+            return form;
         }
 
         // --- e-receipt: the locks while it is being issued, refused on the server (never only greyed in the UI) ---
