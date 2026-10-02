@@ -9,6 +9,7 @@ import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.MessageSource;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.ui.ExtendedModelMap;
 import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.orders.Order;
@@ -19,6 +20,7 @@ import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.web.orders.OrderPrintView;
+import pl.commercelink.web.orders.QrCodeSvg;
 
 import java.util.List;
 
@@ -56,6 +58,7 @@ class OrdersControllerPrintTest {
     void setUp() {
         securityStub = mockStatic(CustomSecurityContext.class);
         securityStub.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+        ReflectionTestUtils.setField(ordersController, "appDomain", "https://app.example.pl");
     }
 
     @AfterEach
@@ -82,6 +85,39 @@ class OrdersControllerPrintTest {
         OrderItem item = new OrderItem(ORDER_ID, "CPU", name, 1, 100, "SKU", false, 0);
         item.setService(service);
         return item;
+    }
+
+    @Test
+    void theCardCarriesTheScanAddressOfItsOrder() {
+        // given
+        order();
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
+        when(supplierLabels.forStoreId(STORE_ID)).thenReturn(new SupplierLabels(mock(StoresRepository.class)).forStore(null));
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        ordersController.getOrderCard(ORDER_ID, model);
+
+        // then
+        OrderPrintView.Card card = (OrderPrintView.Card) model.get("print");
+        assertThat(card.scanUrl()).isEqualTo("https://app.example.pl/dashboard/scan/orders/" + STORE_ID + "/" + ORDER_ID);
+        assertThat(card.scanQrSvg()).isEqualTo(QrCodeSvg.of(card.scanUrl()));
+    }
+
+    @Test
+    void theCardOfASuperAdminCarriesTheSameScanAddress() {
+        // given: a card printed by a super admin goes to the store's warehouse, where store users scan it
+        order();
+        when(orderItemsRepository.findByOrderId(ORDER_ID)).thenReturn(List.of());
+        when(supplierLabels.forStoreId(STORE_ID)).thenReturn(new SupplierLabels(mock(StoresRepository.class)).forStore(null));
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        ordersController.getOrderCardForSuperAdmin(STORE_ID, ORDER_ID, model);
+
+        // then
+        assertThat(((OrderPrintView.Card) model.get("print")).scanUrl())
+                .isEqualTo("https://app.example.pl/dashboard/scan/orders/" + STORE_ID + "/" + ORDER_ID);
     }
 
     @Test

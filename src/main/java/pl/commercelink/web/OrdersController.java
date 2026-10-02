@@ -5,6 +5,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.util.Strings;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.CacheControl;
@@ -124,6 +125,9 @@ import static pl.commercelink.taxonomy.UnifiedProductIdentifiers.unifyMfn;
 
 @Controller
 public class OrdersController extends BaseController {
+
+    @Value("${app.domain}")
+    private String appDomain;
 
     @Autowired
     private Inventory inventory;
@@ -866,8 +870,10 @@ public class OrdersController extends BaseController {
 
     private String renderOrderCard(Order order, boolean superAdmin, Model model) {
         List<OrderItem> orderItems = orderItemsRepository.findByOrderId(order.getOrderId());
+        // the QR code always carries the store's scan address: the card is scanned in the store's warehouse
         model.addAttribute("print", OrderPrintView.card(order, orderItems, OrderLinks.of(order, superAdmin),
-                supplierLabels.forStoreId(order.getStoreId()).withWarehouse(warehouseLabel())));
+                supplierLabels.forStoreId(order.getStoreId()).withWarehouse(warehouseLabel()),
+                OrderLinks.scanUrl(appDomain, order.getStoreId(), order.getOrderId())));
         return "orders/card";
     }
 

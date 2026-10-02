@@ -30,6 +30,7 @@ import static org.mockito.Mockito.mock;
 class OrderPrintTemplateTest {
 
     static final String ORDER_ID = "3e373abc-1111-2222-3333-444455556666";
+    static final String SCAN_URL = "https://app.example.pl/dashboard/scan/orders/store-1/" + ORDER_ID;
 
     static Order order() {
         Order order = new Order("store-1");
@@ -60,7 +61,7 @@ class OrderPrintTemplateTest {
 
     static String card(Order order, List<OrderItem> items, boolean superAdmin) {
         OrderPrintView.Card view = OrderPrintView.card(order, items, OrderLinks.of(order, superAdmin),
-                noLabels());
+                noLabels(), SCAN_URL);
         return body(render("orders/card", view));
     }
 
@@ -139,7 +140,7 @@ class OrderPrintTemplateTest {
         Order order = order();
 
         // when
-        String card = render("orders/card", OrderPrintView.card(order, items(), OrderLinks.of(order, false), noLabels()));
+        String card = render("orders/card", OrderPrintView.card(order, items(), OrderLinks.of(order, false), noLabels(), SCAN_URL));
         String collection = render("orders/collection", OrderPrintView.collection(order, items(), store(),
                 LocalDate.of(2026, 9, 28), "Kraków, PL", OrderLinks.of(order, false), noLabels()));
 
@@ -235,7 +236,7 @@ class OrderPrintTemplateTest {
         String shortId = order.getShortenedOrderId();
 
         // when
-        String card = render("orders/card", OrderPrintView.card(order, items(), OrderLinks.of(order, false), noLabels()));
+        String card = render("orders/card", OrderPrintView.card(order, items(), OrderLinks.of(order, false), noLabels(), SCAN_URL));
         String collection = render("orders/collection", OrderPrintView.collection(order, items(), store(),
                 LocalDate.of(2026, 9, 28), "Kraków, PL", OrderLinks.of(order, false), noLabels()));
 
