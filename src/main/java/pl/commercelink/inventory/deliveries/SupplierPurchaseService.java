@@ -38,6 +38,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -263,10 +264,13 @@ public class SupplierPurchaseService {
     private void finishPlacedPurchase(String storeId, Delivery delivery, DeliveryCreationForm form,
                                       PurchaseValidation validation, SupplierOrderResult orderResult) {
         applyOrderResult(form, validation, orderResult);
-        delivery.setExternalDeliveryIdProvisional(orderResult.provisional());
-        delivery.setAwaitingSupplierConfirmation(false);
-        delivery.addEvent(new Event(EventType.action, ORDERED_AUTOMATICALLY_EVENT, LocalDateTime.now()));
-        deliveryCreationService.completePending(storeId, delivery, form);
+        Consumer<Delivery> markOrdered = target -> {
+            target.setExternalDeliveryIdProvisional(orderResult.provisional());
+            target.setAwaitingSupplierConfirmation(false);
+            target.addEvent(new Event(EventType.action, ORDERED_AUTOMATICALLY_EVENT, LocalDateTime.now()));
+        };
+        markOrdered.accept(delivery);
+        deliveryCreationService.completePending(storeId, delivery, form, markOrdered);
         log.info("Supplier purchase placed: store={} delivery={} provider={} ref={} externalOrderId={}",
                 storeId, delivery.getDeliveryId(), form.getProvider(), delivery.getPurchaseRef(),
                 orderResult.externalOrderId());
@@ -295,8 +299,9 @@ public class SupplierPurchaseService {
         PurchaseValidation validation;
         SupplierOrderResult result;
         // Only the supplier interaction is counted and handed over. Local persistence after the supplier completed
-        // the order stays outside: a failure there propagates to SQS, and the redelivery either finds the delivery
-        // already settled or completes it again idempotently - never a "cancel it at the supplier" hand-over.
+        // the order stays outside: a lost optimistic-locking race is settled inside completePending (with the cost
+        // delta already computed), any other failure propagates to SQS and the redelivery either finds the delivery
+        // already settled or completes it again - never a "cancel it at the supplier" hand-over.
         try {
             form = rebuildForm(storeId, delivery);
             validation = validate(storeId, form, delivery.getPurchaseRef());
@@ -588,10 +593,13 @@ public class SupplierPurchaseService {
             }
             SupplierOrderResult orderResult = placed.get();
             applyOrderResult(form, validation, orderResult);
-            delivery.setExternalDeliveryIdProvisional(orderResult.provisional());
-            delivery.setOrderErrorMessage(null);
-            delivery.addEvent(new Event(EventType.action, ORDER_RECONCILED_EVENT, LocalDateTime.now()));
-            deliveryCreationService.completePending(storeId, delivery, form);
+            Consumer<Delivery> markReconciled = target -> {
+                target.setExternalDeliveryIdProvisional(orderResult.provisional());
+                target.setOrderErrorMessage(null);
+                target.addEvent(new Event(EventType.action, ORDER_RECONCILED_EVENT, LocalDateTime.now()));
+            };
+            markReconciled.accept(delivery);
+            deliveryCreationService.completePending(storeId, delivery, form, markReconciled);
             if (orderResult.provisional()) {
                 try {
                     orderIdRefreshEventPublisher.publish(new OrderIdRefreshEventRequest(

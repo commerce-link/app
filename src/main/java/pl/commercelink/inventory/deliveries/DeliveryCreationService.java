@@ -1,5 +1,6 @@
 package pl.commercelink.inventory.deliveries;
 
+import com.amazonaws.services.dynamodbv2.model.ConditionalCheckFailedException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -7,6 +8,7 @@ import pl.commercelink.financials.ExchangeRates;
 import pl.commercelink.inventory.supplier.SupplierConnectionModeResolver;
 import pl.commercelink.orders.event.Event;
 import pl.commercelink.orders.event.EventType;
+import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.warehouse.builtin.WarehouseAllocationsManager;
 import pl.commercelink.web.dtos.DeliveryCreationForm;
 import pl.commercelink.web.dtos.SuggestedDeliveryItem;
@@ -17,6 +19,7 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 @Component
@@ -35,6 +38,8 @@ public class DeliveryCreationService {
     private SupplierConnectionModeResolver supplierConnectionModeResolver;
     @Autowired
     private DeliveryCostSync deliveryCostSync;
+    @Autowired
+    private OptimisticLockingExecutor optimisticLockingExecutor;
 
     /**
      * Records a delivery the operator ordered outside the system. The supplier order number and date are required:
@@ -104,6 +109,46 @@ public class DeliveryCreationService {
     }
 
     public void completePending(String storeId, Delivery delivery, DeliveryCreationForm form) {
+        completePending(storeId, delivery, form, unchanged -> {
+        });
+    }
+
+    /**
+     * Completes a pending purchase. {@code callerChanges} repeats what the caller already set on {@code delivery}
+     * (flags, events): when the save loses an optimistic-locking race to a concurrent edit, the completion is
+     * applied again to the delivery as stored now, and the caller's changes must travel with it.
+     *
+     * <p>The confirmed unit costs are written to the items before the delivery is saved, so a second cost sync
+     * would find nothing left to change and return zero - the delta computed here is the only record of it. That
+     * is why a lost race is resolved here, with the same delta, instead of being left to the caller's retry (an SQS
+     * redelivery would complete the delivery at list prices).
+     */
+    public void completePending(String storeId, Delivery delivery, DeliveryCreationForm form,
+                                Consumer<Delivery> callerChanges) {
+        double costChange = deliveryCostSync.apply(storeId, delivery.getDeliveryId(), confirmedUnitCosts(form));
+        applyCompletion(delivery, form, costChange);
+        try {
+            deliveriesRepository.save(delivery);
+        } catch (ConditionalCheckFailedException conflict) {
+            optimisticLockingExecutor.modifyAndSave(
+                    () -> deliveriesRepository.findById(storeId, delivery.getDeliveryId()),
+                    current -> {
+                        if (current.getOrderStatus() == null) {
+                            // completed by someone else in the meantime: adding the delta again would count it twice
+                            log.warn("Pending purchase already completed by a concurrent writer: store={} delivery={}",
+                                    storeId, delivery.getDeliveryId());
+                            return;
+                        }
+                        callerChanges.accept(current);
+                        applyCompletion(current, form, costChange);
+                    },
+                    deliveriesRepository::save);
+        }
+
+        markClaimedAsOrdered(storeId, delivery, form.getEstimatedDeliveryAt());
+    }
+
+    private static void applyCompletion(Delivery delivery, DeliveryCreationForm form, double costChange) {
         delivery.setExternalDeliveryId(form.getExternalDeliveryId());
         delivery.setEstimatedDeliveryAt(form.getEstimatedDeliveryAt());
         if (!delivery.isDropship()) {
@@ -116,11 +161,7 @@ public class DeliveryCreationService {
             delivery.setTax(form.getTax());
         }
         delivery.setOrderStatus(null);
-
-        delivery.increaseTotalCost(deliveryCostSync.apply(storeId, delivery.getDeliveryId(), confirmedUnitCosts(form)));
-        deliveriesRepository.save(delivery);
-
-        markClaimedAsOrdered(storeId, delivery, form.getEstimatedDeliveryAt());
+        delivery.increaseTotalCost(costChange);
     }
 
     /**

@@ -459,7 +459,7 @@ class SupplierPurchaseServiceTest {
 
         // then
         verify(supplierProvider).placeOrder(argThat(request -> request.clientOrderRef().equals("ref-1")));
-        verify(deliveryCreationService).completePending(eq(STORE_ID), same(delivery), any());
+        verify(deliveryCreationService).completePending(eq(STORE_ID), same(delivery), any(), any());
         assertTrue(delivery.hasEvent("DELIVERY_ORDERED_AUTOMATICALLY"));
         assertFalse(delivery.isExternalDeliveryIdProvisional());
         verifyNoInteractions(orderIdRefreshEventPublisher);
@@ -515,7 +515,7 @@ class SupplierPurchaseServiceTest {
 
         // then
         ArgumentCaptor<DeliveryCreationForm> completed = ArgumentCaptor.forClass(DeliveryCreationForm.class);
-        verify(deliveryCreationService).completePending(eq(STORE_ID), same(delivery), completed.capture());
+        verify(deliveryCreationService).completePending(eq(STORE_ID), same(delivery), completed.capture(), any());
         assertEquals(100.0, completed.getValue().getItems().get(0).getUnitCost());
         assertEquals(ExchangeRates.LOCAL_CURRENCY, completed.getValue().getSourceCurrency());
         assertEquals(0.0, completed.getValue().getShippingCost());
@@ -541,7 +541,7 @@ class SupplierPurchaseServiceTest {
 
         // then
         ArgumentCaptor<DeliveryCreationForm> completed = ArgumentCaptor.forClass(DeliveryCreationForm.class);
-        verify(deliveryCreationService).completePending(eq(STORE_ID), same(delivery), completed.capture());
+        verify(deliveryCreationService).completePending(eq(STORE_ID), same(delivery), completed.capture(), any());
         assertEquals(LocalDate.now().plusDays(4), completed.getValue().getEstimatedDeliveryAt());
     }
 
@@ -632,7 +632,7 @@ class SupplierPurchaseServiceTest {
         assertEquals(DeliveryOrderStatus.FAILED, delivery.getOrderStatus());
         assertEquals("No Elko code found for EAN 4006381333931", delivery.getOrderErrorMessage());
         verify(deliveriesRepository, times(2)).save(delivery);
-        verify(deliveryCreationService, never()).completePending(any(), any(), any());
+        verify(deliveryCreationService, never()).completePending(any(), any(), any(), any());
     }
 
     @Test
@@ -678,7 +678,7 @@ class SupplierPurchaseServiceTest {
         // then
         assertEquals(DeliveryOrderStatus.ORDER_DISPATCHED, delivery.getOrderStatus());
         assertEquals("Timeout waiting for supplier response", delivery.getOrderErrorMessage());
-        verify(deliveryCreationService, never()).completePending(any(), any(), any());
+        verify(deliveryCreationService, never()).completePending(any(), any(), any(), any());
     }
 
     @Test
@@ -716,7 +716,7 @@ class SupplierPurchaseServiceTest {
         assertEquals(DELIVERY_ID, sent.getValue().getDeliveryId());
         assertEquals(delivery.getPurchaseRef(), sent.getValue().getPurchaseRef());
         assertNull(sent.getValue().getOrderId());
-        verify(deliveryCreationService, never()).completePending(any(), any(), any());
+        verify(deliveryCreationService, never()).completePending(any(), any(), any(), any());
         verifyNoInteractions(orderIdRefreshEventPublisher);
     }
 
@@ -743,7 +743,7 @@ class SupplierPurchaseServiceTest {
                 lastSaved);
         assertEquals(DeliveryOrderStatus.ORDER_DISPATCHED, delivery.getOrderStatus());
         assertEquals("ZA/IE-26/1", delivery.getExternalDeliveryId());
-        verify(deliveryCreationService, never()).completePending(any(), any(), any());
+        verify(deliveryCreationService, never()).completePending(any(), any(), any(), any());
     }
 
     /** Snapshots the fields the awaiting flow persists at every save: the mock keeps only a reference to the delivery. */
@@ -775,7 +775,7 @@ class SupplierPurchaseServiceTest {
         // then
         assertEquals(DeliveryOrderStatus.FAILED, delivery.getOrderStatus());
         assertEquals("Order rejected by supplier", delivery.getOrderErrorMessage());
-        verify(deliveryCreationService, never()).completePending(any(), any(), any());
+        verify(deliveryCreationService, never()).completePending(any(), any(), any(), any());
     }
 
     @Test
@@ -851,7 +851,7 @@ class SupplierPurchaseServiceTest {
         assertEquals(DeliveryOrderStatus.FAILED, delivery.getOrderStatus());
         assertEquals("No orderable lines in pending purchase", delivery.getOrderErrorMessage());
         verify(supplierProvider, never()).placeOrder(any());
-        verify(deliveryCreationService, never()).completePending(any(), any(), any());
+        verify(deliveryCreationService, never()).completePending(any(), any(), any(), any());
     }
 
     @Test
@@ -869,7 +869,7 @@ class SupplierPurchaseServiceTest {
                 new ShippingPolicy(new ShippingTerms(2, new ShippingCostPolicy.Free()))));
         when(deliveryTaxResolver.resolveFor(PROVIDER)).thenReturn(1.23);
         doThrow(new RuntimeException("ddb throttled"))
-                .when(deliveryCreationService).completePending(eq(STORE_ID), same(delivery), any());
+                .when(deliveryCreationService).completePending(eq(STORE_ID), same(delivery), any(), any());
 
         // when / then
         assertThrows(RuntimeException.class, () -> service.processPending(STORE_ID, DELIVERY_ID, null, 1));
@@ -893,7 +893,7 @@ class SupplierPurchaseServiceTest {
         assertEquals(DeliveryOrderStatus.ORDER_DISPATCHED, delivery.getOrderStatus());
         assertEquals("Supplier confirmed the order without an order number - check the supplier panel before ordering again",
                 delivery.getOrderErrorMessage());
-        verify(deliveryCreationService, never()).completePending(any(), any(), any());
+        verify(deliveryCreationService, never()).completePending(any(), any(), any(), any());
     }
 
     @Test
@@ -1233,7 +1233,7 @@ class SupplierPurchaseServiceTest {
 
         // then
         assertEquals("17200617", delivery.getDeliveryAddress());
-        verify(deliveryCreationService).completePending(eq(STORE_ID), same(delivery), any());
+        verify(deliveryCreationService).completePending(eq(STORE_ID), same(delivery), any(), any());
     }
 
     @Test
@@ -1921,7 +1921,7 @@ class SupplierPurchaseServiceTest {
 
         // then
         assertTrue(result.isSuccess());
-        verify(deliveryCreationService).completePending(eq(STORE_ID), same(delivery), any());
+        verify(deliveryCreationService).completePending(eq(STORE_ID), same(delivery), any(), any());
         assertTrue(delivery.hasEvent("DELIVERY_ORDER_RECONCILED"));
     }
 
@@ -1975,7 +1975,7 @@ class SupplierPurchaseServiceTest {
 
         // then
         assertTrue(result.isSuccess());
-        verify(deliveryCreationService).completePending(eq(STORE_ID), same(delivery), any());
+        verify(deliveryCreationService).completePending(eq(STORE_ID), same(delivery), any(), any());
     }
 
     @Test
@@ -2001,7 +2001,7 @@ class SupplierPurchaseServiceTest {
 
         // then
         assertTrue(result.isSuccess());
-        verify(deliveryCreationService).completePending(eq(STORE_ID), same(delivery), any());
+        verify(deliveryCreationService).completePending(eq(STORE_ID), same(delivery), any(), any());
         verify(orderIdRefreshEventPublisher).publish(any());
     }
 
@@ -2023,7 +2023,7 @@ class SupplierPurchaseServiceTest {
         assertFalse(result.isSuccess());
         assertEquals("deliveries.purchase.reconcile.notFound", result.getMessage());
         assertEquals(DeliveryOrderStatus.ORDER_DISPATCHED, delivery.getOrderStatus());
-        verify(deliveryCreationService, never()).completePending(any(), any(), any());
+        verify(deliveryCreationService, never()).completePending(any(), any(), any(), any());
     }
 
     @Test

@@ -3,6 +3,7 @@ package pl.commercelink.inventory.deliveries;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -27,6 +28,7 @@ import pl.commercelink.stores.StoresRepository;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -112,7 +114,7 @@ class SupplierPurchaseCompletionTest {
         assertEquals("ZA/1", delivery.getExternalDeliveryId());
         assertFalse(delivery.isExternalDeliveryIdProvisional());
         assertTrue(hasEvent(delivery, "DELIVERY_ORDERED_AUTOMATICALLY"));
-        verify(deliveryCreationService).completePending(eq(STORE_ID), eq(delivery), any());
+        verify(deliveryCreationService).completePending(eq(STORE_ID), eq(delivery), any(), any());
         verify(supplierProvider, never()).placeOrder(any());
     }
 
@@ -149,7 +151,7 @@ class SupplierPurchaseCompletionTest {
         assertFalse(delivery.isExternalDeliveryIdProvisional());
         assertTrue(hasEvent(delivery, "DELIVERY_SUPPLIER_CONFIRMATION_TIMEOUT"));
         verify(deliveriesRepository).save(delivery);
-        verify(deliveryCreationService, never()).completePending(any(), any(), any());
+        verify(deliveryCreationService, never()).completePending(any(), any(), any(), any());
     }
 
     @Test
@@ -274,7 +276,30 @@ class SupplierPurchaseCompletionTest {
 
         // then
         assertFalse(delivery.isAwaitingSupplierConfirmation());
-        verify(deliveryCreationService).completePending(eq(STORE_ID), eq(delivery), any());
+        verify(deliveryCreationService).completePending(eq(STORE_ID), eq(delivery), any(), any());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void completionHandsItsDeliveryChangesToCompletePendingForALostSaveRace() {
+        // given - completePending replays these changes on the delivery as stored when a concurrent edit wins the save
+        Delivery delivery = awaitingDelivery();
+        when(supplierProvider.completePlacedOrder(any())).thenReturn(new SupplierOrderResult("ZA/1", 50.0, "PLN",
+                List.of(new SupplierQuote(EAN, MFN, 1, 50.0, "PLN"))));
+        Delivery current = new Delivery(STORE_ID, "ZA/1", PROVIDER);
+        current.setAwaitingSupplierConfirmation(true);
+        current.setExternalDeliveryIdProvisional(true);
+
+        // when
+        service.completeAwaitingPurchase(request(delivery), 1);
+
+        // then
+        ArgumentCaptor<Consumer<Delivery>> changes = ArgumentCaptor.forClass(Consumer.class);
+        verify(deliveryCreationService).completePending(eq(STORE_ID), eq(delivery), any(), changes.capture());
+        changes.getValue().accept(current);
+        assertFalse(current.isAwaitingSupplierConfirmation());
+        assertFalse(current.isExternalDeliveryIdProvisional());
+        assertTrue(hasEvent(current, "DELIVERY_ORDERED_AUTOMATICALLY"));
     }
 
     @Test
@@ -284,7 +309,7 @@ class SupplierPurchaseCompletionTest {
         when(supplierProvider.completePlacedOrder(any())).thenReturn(new SupplierOrderResult("ZA/1", 50.0, "PLN",
                 List.of(new SupplierQuote(EAN, MFN, 1, 50.0, "PLN"))));
         RuntimeException saveFailure = new RuntimeException("throttled");
-        doThrow(saveFailure).when(deliveryCreationService).completePending(eq(STORE_ID), eq(delivery), any());
+        doThrow(saveFailure).when(deliveryCreationService).completePending(eq(STORE_ID), eq(delivery), any(), any());
 
         // when
         RuntimeException thrown = assertThrows(RuntimeException.class,
@@ -334,7 +359,7 @@ class SupplierPurchaseCompletionTest {
         assertEquals("Supplier confirmed the order without an order number - check the supplier panel before "
                 + "ordering again", delivery.getOrderErrorMessage());
         verify(deliveriesRepository).save(delivery);
-        verify(deliveryCreationService, never()).completePending(any(), any(), any());
+        verify(deliveryCreationService, never()).completePending(any(), any(), any(), any());
     }
 
     private Delivery awaitingDelivery() {

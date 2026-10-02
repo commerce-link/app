@@ -196,7 +196,7 @@ class SupplierPurchaseServiceDropshipTest {
         // then
         verify(dropshipPurchaseService).placeDropshipOrder(eq(STORE_ID), same(delivery), anyList(), eq(ORDER_ID));
         verify(supplierProvider, never()).placeOrder(any());
-        verify(deliveryCreationService).completePending(eq(STORE_ID), same(delivery), any());
+        verify(deliveryCreationService).completePending(eq(STORE_ID), same(delivery), any(), any());
         assertTrue(delivery.hasEvent("DELIVERY_ORDERED_AUTOMATICALLY"));
     }
 
@@ -252,7 +252,7 @@ class SupplierPurchaseServiceDropshipTest {
         verify(supplierPurchaseCompletionEventPublisher).publish(sent.capture());
         assertEquals("ref-1", sent.getValue().getPurchaseRef());
         assertEquals(ORDER_ID, sent.getValue().getOrderId());
-        verify(deliveryCreationService, never()).completePending(any(), any(), any());
+        verify(deliveryCreationService, never()).completePending(any(), any(), any(), any());
     }
 
     @Test
@@ -283,7 +283,7 @@ class SupplierPurchaseServiceDropshipTest {
         verify(dropshipPurchaseService).completeDropshipOrder(eq(STORE_ID), same(delivery), anyList(), eq(ORDER_ID));
         verify(dropshipPurchaseService, never()).placeDropshipOrder(any(), any(), anyList(), any());
         verify(supplierProvider, never()).completePlacedOrder(any());
-        verify(deliveryCreationService).completePending(eq(STORE_ID), same(delivery), any());
+        verify(deliveryCreationService).completePending(eq(STORE_ID), same(delivery), any(), any());
         assertFalse(delivery.isAwaitingSupplierConfirmation());
         assertFalse(delivery.isExternalDeliveryIdProvisional());
         assertTrue(delivery.hasEvent("DELIVERY_ORDERED_AUTOMATICALLY"));
