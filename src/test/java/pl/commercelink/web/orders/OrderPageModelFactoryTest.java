@@ -775,6 +775,25 @@ class OrderPageModelFactoryTest {
         assertThat(page.history().events().get(1).arg()).isEqualTo("SOMETHING_NEW");
     }
 
+    @Test
+    void aRejectedDeliveryRequestShowsItsSupplierAndReasonInTheHistory() {
+        // given
+        Order order = order(OrderStatus.New);
+        OrderEvent rejected = new OrderEvent(order.getOrderId(), EventType.action, OrderEvent.DELIVERY_REQUEST_REJECTED,
+                LocalDateTime.of(2026, 10, 2, 9, 30));
+        rejected.setDetails("Acme · brak towaru");
+        when(orderEventsRepository.findByOrderId(order.getOrderId())).thenReturn(List.of(rejected));
+
+        // when
+        OrderPageModel page = factory.build(order, List.of(), new OrderPageModelFactory.Viewer(false, true, null), PL);
+
+        // then
+        OrderPageModel.EventRow row = page.history().events().get(0);
+        assertThat(row.titleKey()).isEqualTo("order.event.type.action.DELIVERY_REQUEST_REJECTED");
+        assertThat(row.argKey()).isNull();
+        assertThat(row.arg()).isEqualTo("Acme · brak towaru");
+    }
+
     private static OrderPageModelFactory.Viewer viewer() {
         return new OrderPageModelFactory.Viewer(false, true, null);
     }
