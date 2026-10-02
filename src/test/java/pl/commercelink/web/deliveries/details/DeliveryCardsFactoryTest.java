@@ -10,6 +10,8 @@ import pl.commercelink.inventory.supplier.SupplierRegistry;
 import pl.commercelink.orders.Order;
 import pl.commercelink.orders.Payment;
 import pl.commercelink.orders.PaymentDirection;
+import pl.commercelink.orders.ShipmentType;
+import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.PaymentSource;
 import pl.commercelink.orders.event.Event;
 import pl.commercelink.orders.event.EventType;
@@ -124,13 +126,27 @@ class DeliveryCardsFactoryTest {
     }
 
     @Test
-    void anIncomingPaymentIsARefund() {
+    void aPaymentTypedWithAMinusSignIsARefundWhateverItsDirection() {
         // given
         Delivery delivery = warehouse();
-        delivery.addPayment(new Payment("R-1", "Acme", PaymentSource.BankTransfer, PaymentDirection.Incoming, 100, 0, null, null));
+        delivery.addPayment(new Payment("R-1", "Acme", PaymentSource.BankTransfer, PaymentDirection.Outgoing, -100, 0, null, null));
+        delivery.addPayment(new Payment("R-2", "Acme", PaymentSource.BankTransfer, PaymentDirection.Incoming, -50, 0, null, null));
+
+        // when
+        List<DeliveryPageModel.PaymentRow> rows = DeliveryCardsFactory.payments(delivery, ADMIN, links(ADMIN, delivery)).rows();
+
+        // then
+        assertThat(rows).extracting(DeliveryPageModel.PaymentRow::refund).containsExactly(true, true);
+    }
+
+    @Test
+    void anIncomingPaymentWithAPositiveAmountIsNotCalledARefund() {
+        // given
+        Delivery delivery = warehouse();
+        delivery.addPayment(new Payment("P-1", "Acme", PaymentSource.BankTransfer, PaymentDirection.Incoming, 100, 0, null, null));
 
         // when / then
-        assertThat(DeliveryCardsFactory.payments(delivery, ADMIN, links(ADMIN, delivery)).rows().get(0).refund()).isTrue();
+        assertThat(DeliveryCardsFactory.payments(delivery, ADMIN, links(ADMIN, delivery)).rows().get(0).refund()).isFalse();
     }
 
     @Test
@@ -224,6 +240,29 @@ class DeliveryCardsFactoryTest {
         assertThat(DeliveryCardsFactory.consignee(data(warehouse()), links(ADMIN, warehouse()))).isNull();
         assertThat(DeliveryCardsFactory.consignee(data(tracking(dropship(), DeliveryTrackingState.GIVEN_UP)), links(ADMIN, dropship())))
                 .as("no customer, no parcel and the state already in the status card: nothing left to show").isNull();
+    }
+
+    @Test
+    void aShippedDeliveryShowsNoTrackingNumberWhenTheOrderHasParcelsFromTwoDeliveries() {
+        // given: two suppliers ship one order, so the first parcel may be the other delivery's
+        Order order = dropshipOrder();
+        order.firstShipment().orElseThrow().setTrackingNo("0000123456789W");
+        order.firstShipment().orElseThrow().setShippedAt(LocalDateTime.of(2026, 10, 1, 0, 0));
+        Shipment second = new Shipment(ShipmentType.Courier);
+        second.setCarrier("DPD");
+        second.setTrackingNo("OTHER-SUPPLIER-1");
+        second.setShippedAt(LocalDateTime.of(2026, 10, 2, 0, 0));
+        order.addShipment(second);
+        DeliveryPageData shipped = new DeliveryPageData(received(dropship()), "AcmeB", null, List.of(), order, List.of("DPD"),
+                null, Set.of(), null, null, NOW);
+
+        // when
+        DeliveryPageModel.ConsigneeCard card = DeliveryCardsFactory.consignee(shipped, links(ADMIN, dropship()));
+
+        // then
+        assertThat(card.trackingNo()).isNull();
+        assertThat(card.shippedAt()).isNull();
+        assertThat(card.name()).isEqualTo("Barbara Zając");
     }
 
     @Test

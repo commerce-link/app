@@ -81,8 +81,10 @@ final class DeliveryCardsFactory {
         List<PaymentFields> fields = new ArrayList<>();
         for (int i = 0; i < payments.size(); i++) {
             Payment payment = payments.get(i);
+            // a refund from the supplier is typed with a minus sign (delivery.payment.direction.help) and stored as typed;
+            // the direction is no guide: most refunds in production carry the dialog's default "Outgoing"
             rows.add(new PaymentRow(i, i + 1, Money.format(payment.getAmount()),
-                    payment.getDirection() == PaymentDirection.Incoming, payment.isUnsettled(),
+                    payment.getAmount() < 0, payment.isUnsettled(),
                     OrderLabels.paymentSource(payment.getSource()), paymentDetails(payment),
                     DeliveryPageModelFactory.dialogId("payment-" + i), editable ? links.open("payment-" + i) : null));
             fields.add(new PaymentFields(payment.getSource() == null ? null : payment.getSource().name(),
@@ -198,6 +200,7 @@ final class DeliveryCardsFactory {
         ShippingDetails shipping = order == null ? null : order.getShippingDetails();
         Shipment shipment = order == null ? null : order.firstShipment().orElse(null);
         boolean shipped = delivery.hasBeenReceived();
+        Shipment parcel = shipped && order != null ? onlyParcel(order) : null;
         DeliveryTrackingState tracking = delivery.getTrackingView().effectiveState();
         boolean shownInStatusCard = !shipped && delivery.getOrderStatus() == null && IN_STATUS_CARD.contains(tracking);
         String supplierState = delivery.getOrderStatus() != null || shownInStatusCard
@@ -214,11 +217,23 @@ final class DeliveryCardsFactory {
                 shipment == null ? null : OrderLabels.shipmentType(shipment.getType()),
                 shipment == null ? null : StringUtils.trimToNull(shipment.getCarrier()),
                 shipment == null ? null : StringUtils.trimToNull(shipment.getCollectionPointCode()),
-                shipped && shipment != null ? StringUtils.trimToNull(shipment.getTrackingNo()) : null,
-                shipped && shipment != null ? OrderFormats.moment(shipment.getShippedAt()) : null,
+                parcel == null ? null : StringUtils.trimToNull(parcel.getTrackingNo()),
+                parcel == null ? null : OrderFormats.moment(parcel.getShippedAt()),
                 supplierState);
         // e.g. a failed purchase with no order resolved: a title over an empty body says nothing, so the card is left out
         return card.isEmpty() ? null : card;
+    }
+
+    /**
+     * The parcel of a shipped dropship delivery. Parcels belong to the order, not to a delivery: with two dropship
+     * deliveries on one order (two suppliers) or shipments confirmed in parts, the order's first parcel may be another
+     * delivery's. Its number is shown only when the order has a single parcel with a tracking number.
+     */
+    private static Shipment onlyParcel(Order order) {
+        List<Shipment> parcels = order.getShipments().stream()
+                .filter(s -> StringUtils.isNotBlank(s.getTrackingNo()))
+                .toList();
+        return parcels.size() == 1 ? parcels.get(0) : null;
     }
 
     private static String cityLine(ShippingDetails shipping) {
