@@ -3,10 +3,10 @@ package pl.commercelink.web.orders;
 import org.springframework.web.util.UriComponentsBuilder;
 import pl.commercelink.documents.DocumentType;
 import pl.commercelink.orders.Order;
+import pl.commercelink.orders.SerialNumbers;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
 import java.util.List;
 
 /** Addresses of an order for the one looking at it: a super admin gets the store-scoped variants. */
@@ -65,10 +65,6 @@ public record OrderLinks(String base, String storeId, boolean superAdmin) {
      * item's order; empty without a serial number.
      */
     public static List<SerialHistory> serialHistory(String serialNo) {
-        if (serialNo == null) {
-            return List.of();
-        }
-        return Arrays.stream(serialNo.split(",")).map(String::trim).filter(sn -> !sn.isEmpty()).distinct()
-                .map(sn -> new SerialHistory(sn, itemHistory(sn))).toList();
+        return SerialNumbers.parse(serialNo).stream().map(sn -> new SerialHistory(sn, itemHistory(sn))).toList();
     }
 }

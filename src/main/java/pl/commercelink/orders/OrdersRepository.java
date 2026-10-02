@@ -35,6 +35,20 @@ public class OrdersRepository extends DynamoDbRepository<Order> {
         return dynamoDBMapper.load(Order.class, storeId, orderId);
     }
 
+    /** The store's orders with these ids, read in batches of 100 keys; ids not in the store are absent. */
+    public List<Order> findAllByIds(String storeId, Collection<String> orderIds) {
+        List<Order> keys = orderIds.stream().distinct().map(id -> {
+            Order key = new Order();
+            key.setStoreId(storeId);
+            key.setOrderId(id);
+            return key;
+        }).toList();
+        if (keys.isEmpty()) {
+            return List.of();
+        }
+        return dynamoDBMapper.batchLoad(keys).values().stream().flatMap(List::stream).map(Order.class::cast).toList();
+    }
+
     public List<Order> findAll(String storeId) {
         Map<String, AttributeValue> eav = new HashMap<>();
         eav.put(":storeId", new AttributeValue().withS(storeId));

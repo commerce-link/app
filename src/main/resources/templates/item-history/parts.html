@@ -1,0 +1,84 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<form th:fragment="searchForm(header, autofocus)" method="get" th:action="@{/dashboard/item/history}" role="search"
+      class="cl-search-form" th:classappend="${header} ? 'is-header'">
+    <label class="cl-visually-hidden" for="serial-search" th:text="#{item.history.search.label}"></label>
+    <div class="cl-search-field">
+        <span class="cl-search-icon icon is-small" aria-hidden="true"><i class="fas fa-barcode"></i></span>
+        <input class="cl-input cl-table-search" type="search" id="serial-search" name="serialNo" autocomplete="off"
+               spellcheck="false" th:value="${page.serialNo()}" th:attr="placeholder=#{item.history.search.label}"
+               th:autofocus="${autofocus}">
+        <a th:if="${page.serialNo() != null}" class="cl-search-clear" th:href="@{/dashboard/item/history}"
+           th:attr="aria-label=#{item.history.search.clear}"><i class="fas fa-times" aria-hidden="true"></i></a>
+    </div>
+    <button type="submit" class="cl-button is-primary cl-search-submit" th:attr="aria-label=#{general.search}">
+        <span class="icon is-small cl-search-submit-icon" aria-hidden="true"><i class="fas fa-search"></i></span>
+        <span class="cl-search-submit-text" th:text="#{general.search}"></span>
+    </button>
+</form>
+
+<button th:fragment="copy(value, label)" type="button" class="cl-copy-inline"
+        th:attr="data-cl-copy=${value}, aria-label=${label + ' ' + value}"><span class="cl-copy-code"><span
+        th:text="${value}"></span><span class="cl-copy-icon" aria-hidden="true">&#8288;<i class="far fa-copy"></i></span></span></button>
+
+<section th:fragment="searchCard" class="cl-card cl-search-card" aria-labelledby="search-title">
+    <h2 class="cl-card-title" id="search-title" th:text="#{item.history.search.title}"></h2>
+    <p class="cl-card-desc is-flush" th:text="#{item.history.search.desc}"></p>
+    <form th:replace="~{item-history/parts :: searchForm(false, true)}"></form>
+    <p class="cl-help" th:text="#{item.history.search.hints}"></p>
+    <ul class="cl-hints">
+        <li th:text="#{item.history.search.hint.now}"></li>
+        <li th:text="#{item.history.search.hint.path}"></li>
+        <li th:text="#{item.history.search.hint.rma}"></li>
+    </ul>
+</section>
+
+<section th:fragment="notFound" class="cl-card" aria-labelledby="nf-title">
+    <div class="cl-card-head"><h2 class="cl-card-title" id="nf-title" th:text="#{item.history.notfound.title}"></h2></div>
+    <p class="cl-card-desc" th:text="#{item.history.notfound.desc(${page.serialNo()})}"></p>
+    <p class="cl-list-empty" th:text="#{item.history.notfound.hint}"></p>
+</section>
+
+<section th:fragment="product" class="cl-card" aria-labelledby="item-title" th:with="p=${page.product()}, n=${page.now()}">
+    <div class="cl-card-head"><h2 class="cl-card-title" id="item-title" th:text="${p.title()}"></h2></div>
+    <div class="cl-now" role="group" th:attr="aria-label=#{item.history.now}">
+        <span class="cl-now-label" th:text="#{item.history.now}"></span>
+        <span class="cl-status" th:classappend="${n.tone()}" th:text="${n.label()}"></span>
+        <span class="cl-now-text"><span th:text="${n.text()}"></span><th:block th:if="${n.href() != null}"> · <a
+                th:href="${n.href()}" th:text="${n.linkText()}"></a></th:block></span>
+    </div>
+    <dl class="cl-kv">
+        <div th:if="${p.serialNo() != null}"><dt th:text="#{item.history.serial}"></dt>
+            <dd th:insert="~{item-history/parts :: copy(${p.serialNo()}, #{item.history.copy.serial})}"></dd></div>
+        <div th:if="${p.ean() != null}"><dt th:text="#{item.history.ean}"></dt>
+            <dd th:insert="~{item-history/parts :: copy(${p.ean()}, #{item.history.copy.ean})}"></dd></div>
+        <div th:if="${p.mfn() != null}"><dt th:text="#{item.history.mfn}"></dt>
+            <dd th:insert="~{item-history/parts :: copy(${p.mfn()}, #{item.history.copy.mfn})}"></dd></div>
+    </dl>
+</section>
+
+<section th:fragment="history" class="cl-card" aria-labelledby="history-title">
+    <div class="cl-card-head"><h2 class="cl-card-title" id="history-title" th:text="#{item.history.events}"></h2></div>
+    <p th:if="${page.emptyEventsText() != null}" class="cl-list-empty" th:text="${page.emptyEventsText()}"></p>
+    <th:block th:if="${!page.events().isEmpty()}">
+        <p class="cl-card-desc" th:text="${page.eventsNote()}"></p>
+        <ol class="cl-timeline" id="item-events" th:attr="data-cl-timeline-limit=${page.timelineLimit()}">
+            <li class="cl-timeline-item" th:each="e : ${page.events()}">
+                <time th:if="${e.at() != null}" th:text="${e.at()}"></time>
+                <p class="cl-timeline-title"><span class="cl-icon-text"><i class="fas" th:classappend="${e.icon()}"
+                        aria-hidden="true"></i><span th:text="${e.title()}"></span></span></p>
+                <p class="cl-timeline-desc is-record"><a th:href="${e.recordHref()}" th:title="${e.recordId()}"
+                        th:text="${e.recordText()}"></a>
+                    <span th:if="${e.pillText() != null}" class="cl-status" th:classappend="${e.pillTone()}"
+                          th:text="${e.pillText()}"></span></p>
+                <p th:if="${e.facts() != null}" class="cl-timeline-desc" th:text="${e.facts()}"></p>
+            </li>
+        </ol>
+        <th:block th:if="${page.timelineLimit() != null}"><th:block
+                th:replace="~{fragments/timeline :: more('item-events', ${page.moreText()}, ${page.shownText()},
+                    ${page.hiddenText()}, #{order.history.less})}"></th:block></th:block>
+    </th:block>
+</section>
+</body>
+</html>

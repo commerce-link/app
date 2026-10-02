@@ -136,7 +136,8 @@ class WarehouseRepository extends DynamoDbRepository<WarehouseItem> {
         return categories;
     }
 
-    WarehouseItem findBySerialNo(String storeId, String serialNo) {
+    /** Every item of the store whose serial field contains the text; fragments match too, callers filter exactly. */
+    List<WarehouseItem> findBySerialNoCandidates(String storeId, String serialNo) {
         Map<String, AttributeValue> eav = new HashMap<>();
         eav.put(":storeId", new AttributeValue().withS(storeId));
         eav.put(":serialNo", new AttributeValue().withS(serialNo));
@@ -145,10 +146,7 @@ class WarehouseRepository extends DynamoDbRepository<WarehouseItem> {
                 .withFilterExpression("storeId = :storeId AND contains(serialNo, :serialNo)")
                 .withExpressionAttributeValues(eav);
 
-        return dynamoDBMapper.scan(WarehouseItem.class, scanExpression)
-                .stream()
-                .findFirst()
-                .orElse(null);
+        return new ArrayList<>(dynamoDBMapper.scan(WarehouseItem.class, scanExpression));
     }
 
     List<WarehouseItem> findAllByMfnAndStatus(String storeId, String mfn, FulfilmentStatus status) {

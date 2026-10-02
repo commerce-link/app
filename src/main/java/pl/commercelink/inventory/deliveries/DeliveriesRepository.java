@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Predicate;
@@ -33,6 +34,20 @@ public class  DeliveriesRepository extends DynamoDbRepository<Delivery> {
 
     public Delivery findById(String storeId, String deliveryId) {
         return dynamoDBMapper.load(Delivery.class, storeId, deliveryId);
+    }
+
+    /** The store's deliveries with these ids, read in batches of 100 keys; ids not in the store are absent. */
+    public List<Delivery> findAllByIds(String storeId, Collection<String> deliveryIds) {
+        List<Delivery> keys = deliveryIds.stream().distinct().map(id -> {
+            Delivery key = new Delivery();
+            key.setStoreId(storeId);
+            key.setDeliveryId(id);
+            return key;
+        }).toList();
+        if (keys.isEmpty()) {
+            return List.of();
+        }
+        return dynamoDBMapper.batchLoad(keys).values().stream().flatMap(List::stream).map(Delivery.class::cast).toList();
     }
 
     /**
