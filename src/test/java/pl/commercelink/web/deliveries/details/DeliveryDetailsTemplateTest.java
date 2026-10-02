@@ -6,6 +6,7 @@ import pl.commercelink.documents.DocumentType;
 import pl.commercelink.inventory.deliveries.Delivery;
 import pl.commercelink.inventory.deliveries.DeliveryOrderStatus;
 import pl.commercelink.inventory.deliveries.DeliveryTrackingState;
+import pl.commercelink.orders.Order;
 import pl.commercelink.orders.Payment;
 import pl.commercelink.orders.PaymentDirection;
 import pl.commercelink.orders.PaymentSource;
@@ -916,5 +917,92 @@ class DeliveryDetailsTemplateTest {
         // the side column closes right after the history card: it is the column's last card
         int close = html.indexOf("</section>", history) + "</section>".length();
         assertThat(html.substring(close).stripLeading()).startsWith("</div>");
+    }
+
+    @Test
+    void theSupplierCardShowsTheTermsChosenAtTheSupplierAndTheDeliveryAddress() {
+        // given
+        Delivery delivery = warehouse();
+        delivery.setSupplierOrderChoicesLabel("Transport: Kurier DPD · Płatność: przelew 14 dni");
+        delivery.setDeliveryAddress("Magazyn Kraków, ul. Przemysłowa 5, 30-701 Kraków");
+
+        // when
+        String html = render(data(delivery), ADMIN);
+        String bare = render(data(warehouse()), ADMIN);
+
+        // then
+        assertThat(html).containsPattern("<dt>Warunki u dostawcy</dt><dd\\s*>Transport: Kurier DPD · Płatność: przelew 14 dni</dd>")
+                .containsPattern("<div class=\"cl-kv-wide\"><dt>Adres dostawy</dt><dd\\s+class=\"cl-kv-text\">Magazyn Kraków, ul. Przemysłowa 5, 30-701 Kraków</dd>");
+        int supplierCard = html.indexOf("id=\"supplier-title\"");
+        assertThat(html.indexOf(">Warunki u dostawcy<")).isGreaterThan(supplierCard).isLessThan(html.indexOf("id=\"terms-title\""));
+        assertThat(html.indexOf(">Adres dostawy<")).isGreaterThan(supplierCard).isLessThan(html.indexOf("id=\"terms-title\""));
+        assertThat(bare).doesNotContain(">Warunki u dostawcy<").doesNotContain(">Adres dostawy<");
+    }
+
+    @Test
+    void aSupplierThatDoesNotShareTheParcelStateSaysSoInTheConsigneeCard() {
+        // given
+        DeliveryPageData waiting = new DeliveryPageData(tracking(dropship(), DeliveryTrackingState.UNSUPPORTED), "AcmeB", null,
+                List.of(), dropshipOrder(), List.of("DPD"), null, Set.of(), null, null, NOW);
+        DeliveryPageData shipped = new DeliveryPageData(received(tracking(dropship(), DeliveryTrackingState.UNSUPPORTED)), "AcmeB",
+                null, List.of(), dropshipOrder(), List.of("DPD"), null, Set.of(), null, null, NOW);
+
+        // when
+        String before = render(waiting, ADMIN);
+        String after = render(shipped, ADMIN);
+
+        // then
+        assertThat(before).containsPattern("<dt>Stan u dostawcy</dt><dd\\s*>Dostawca nie udostępnia statusu</dd>");
+        assertThat(after).containsPattern("<dt>Stan u dostawcy</dt><dd\\s*>Dostawca nie udostępnia statusu</dd>");
+        assertThat(before.indexOf(">Dostawca nie udostępnia statusu<")).isGreaterThan(before.indexOf("id=\"consignee-title\""));
+    }
+
+    @Test
+    void theSuperAdminApprovingAWarehouseDeliveryKeepsTheSelectionBarAndTheQuantityChange() {
+        // given
+        Delivery delivery = global(withStatus(warehouse(), DeliveryOrderStatus.AWAITING_APPROVAL));
+
+        // when
+        String superAdmin = render(data(delivery), SUPER_ADMIN);
+        String admin = render(data(global(withStatus(warehouse(), DeliveryOrderStatus.AWAITING_APPROVAL))), ADMIN);
+
+        // then
+        assertThat(superAdmin).contains("data-cl-select-row").contains("data-cl-selection-bar hidden")
+                .contains("data-cl-dialog-open=\"remove-dialog\"").contains(">Przenieś<")
+                .contains("data-cl-dialog-open=\"split-dialog\"")
+                .doesNotContain("data-cl-dialog-open=\"receive-dialog\"").doesNotContain("data-cl-dialog-open=\"ship-dialog\"")
+                .containsPattern("class=\"cl-menu-item\" href=\"[^\"]*\"\\s+data-cl-dialog-open=\"qty-dialog\"")
+                .doesNotContainPattern("aria-disabled=\"true\">\\s*<span>Zmień zamówioną ilość</span>");
+        assertThat(admin).doesNotContain("data-cl-select-row").doesNotContain("data-cl-dialog-open=\"qty-dialog\"");
+    }
+
+    @Test
+    void withoutCarrierOptionsTheShipmentDialogAsksForTheCarrierAsText() {
+        // given
+        Order order = dropshipOrder();
+        DeliveryPageData data = new DeliveryPageData(dropship(), "AcmeB", null, List.of(), order, List.of(), null, Set.of(),
+                null, null, NOW);
+
+        // when
+        String html = render(data, ADMIN);
+
+        // then
+        assertThat(html).containsPattern("<input class=\"cl-input\" type=\"text\" id=\"shipmentCarrier\" name=\"shipmentCarrier\"[^>]*value=\"DPD\"")
+                .doesNotContain("<select class=\"cl-select\" id=\"shipmentCarrier\"");
+    }
+
+    @Test
+    void theAddPaymentDialogOffersTheSurplusAsAFeeInDeliveryMode() {
+        // when
+        String html = render(data(warehouse()), ADMIN);
+        int surplus = html.indexOf("id=\"addPaymentFeeFromSurplus\"");
+        String field = html.substring(html.lastIndexOf("<div", surplus), html.indexOf("</div>", surplus));
+
+        // then
+        assertThat(html).contains("data-cl-dialog-open=\"addPaymentModal\" data-mode=\"delivery\"");
+        assertThat(surplus).isPositive();
+        assertThat(field).contains("data-payment-mode=\"delivery\"").contains("type=\"checkbox\"")
+                .contains(">Auto-uzupełnij nadwyżkę jako prowizję<")
+                .contains("Sugeruje prowizję = kwota wpłaty − oczekiwana.");
     }
 }

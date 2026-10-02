@@ -117,4 +117,19 @@ class DeliveryDetailsScriptsContractTest {
                 .containsPattern("typeof window\\.CL_confirmBulk !== 'function'\\) \\{\\s*return;\\s*}\\s*event\\.preventDefault\\(\\);");
         assertThat(page).contains("/js/async-form.js");
     }
+
+    @Test
+    void theDeliveryModeOfTheAddPaymentDialogShowsTheSurplusCheckboxAndFillsTheFeeFromIt() throws Exception {
+        // when
+        String js = read(Path.of("src/main/resources/static/js/add-payment-dialog.js"));
+
+        // then
+        // the page's opener carries data-mode="delivery"; opening switches the dialog and reveals the delivery-only fields
+        assertThat(js).containsPattern("setPaymentModalMode\\(trigger && trigger\\.dataset\\.mode \\? trigger\\.dataset\\.mode : 'order'\\)")
+                .containsPattern("field\\.hidden = field\\.getAttribute\\('data-payment-mode'\\) !== mode;")
+                .contains("document.getElementById('addPaymentFeeFromSurplus')")
+                // the surplus over what is owed becomes the fee, never below zero
+                .containsPattern("function applyFeeFromSurplus\\(\\) \\{\\s*feeEl\\.value = Math\\.max\\(0, amountOf\\(bankEl\\) - expected\\(\\)\\)\\.toFixed\\(2\\);")
+                .containsPattern("surplusEl\\.addEventListener\\('change', function \\(\\) \\{\\s*if \\(surplusEl\\.checked\\) \\{\\s*autofillEl\\.checked = false;\\s*applyFeeFromSurplus\\(\\);");
+    }
 }

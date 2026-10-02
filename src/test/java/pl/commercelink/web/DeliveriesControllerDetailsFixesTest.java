@@ -11,6 +11,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.context.MessageSource;
+import org.springframework.ui.ExtendedModelMap;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.inventory.deliveries.Allocation;
@@ -22,9 +23,17 @@ import pl.commercelink.inventory.deliveries.DeliveryOrderStatus;
 import pl.commercelink.inventory.deliveries.DeliveryOrderedQtyUpdateService;
 import pl.commercelink.inventory.deliveries.DeliveryReceptionService;
 import pl.commercelink.inventory.deliveries.InvoiceLinkingService;
+import pl.commercelink.inventory.deliveries.InvoiceSyncPreviewBuilder;
+import pl.commercelink.inventory.deliveries.InvoiceSyncService;
+import pl.commercelink.orders.PaymentSource;
 import pl.commercelink.starter.security.CustomSecurityContext;
 import pl.commercelink.starter.util.OperationResult;
+import pl.commercelink.web.dtos.AddPaymentForm;
 import pl.commercelink.web.dtos.DeliveryAllocationsForm;
+import pl.commercelink.web.dtos.InvoiceSyncPreview;
+import pl.commercelink.web.orders.OrderFlash;
+import pl.commercelink.web.orders.OrderLabels;
+import pl.commercelink.web.orders.OrderNotice;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -61,6 +70,10 @@ class DeliveriesControllerDetailsFixesTest {
     private DeliveryOrderedQtyUpdateService deliveryOrderedQtyUpdateService;
     @Mock
     private InvoiceLinkingService invoiceLinkingService;
+    @Mock
+    private InvoiceSyncPreviewBuilder invoiceSyncPreviewBuilder;
+    @Mock
+    private InvoiceSyncService invoiceSynchronizationService;
     @Mock
     private MessageSource messageSource;
     @Mock
@@ -276,5 +289,76 @@ class DeliveriesControllerDetailsFixesTest {
 
         // then
         verify(invoiceLinkingService).linkInvoices(STORE_ID, delivery.getDeliveryId());
+    }
+
+    @Test
+    void aPaymentAddedFromThePaymentsScreenReturnsThere() {
+        // given
+        Delivery delivery = warehouse();
+        when(deliveriesRepository.findById(STORE_ID, delivery.getDeliveryId())).thenReturn(delivery);
+        AddPaymentForm form = new AddPaymentForm();
+        form.setBankAmount("120,00");
+        form.setProcessingFee("");
+        form.setSource(PaymentSource.BankTransfer);
+
+        // when
+        String fromPayments = controller.addPayment(delivery.getDeliveryId(), form, true, redirectAttributes, PL);
+        String fromDetails = controller.addPayment(delivery.getDeliveryId(), form, false, redirectAttributes, PL);
+
+        // then
+        assertThat(fromPayments).isEqualTo("redirect:/dashboard/payments");
+        assertThat(fromDetails).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + delivery.getDeliveryId());
+        assertThat(delivery.getPayments()).extracting(p -> p.getAmount()).containsOnly(120.0);
+        verify(redirectAttributes, never()).addFlashAttribute(eq("errorMessage"), any());
+    }
+
+    @Test
+    void anAppliedInvoiceSyncReturnsToTheDeliveryWithANotice() {
+        // given
+        Delivery delivery = warehouse();
+        when(deliveriesRepository.findById(STORE_ID, delivery.getDeliveryId())).thenReturn(delivery);
+        InvoiceSyncPreview form = new InvoiceSyncPreview();
+        form.setDeliveryId(delivery.getDeliveryId());
+
+        // when
+        String view = controller.applyInvoiceSync(form, redirectAttributes, PL);
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + delivery.getDeliveryId());
+        verify(invoiceSynchronizationService).apply(STORE_ID, form);
+        verify(redirectAttributes).addFlashAttribute(OrderFlash.ATTRIBUTE,
+                new OrderNotice(OrderLabels.OK, "deliveries.details.invoice.synced", null, null));
+    }
+
+    @Test
+    void anInvoiceSyncIsNotAppliedWhileTheDeliveryAwaitsApproval() {
+        // given
+        Delivery delivery = warehouse();
+        delivery.setOrderStatus(DeliveryOrderStatus.AWAITING_APPROVAL);
+        when(deliveriesRepository.findById(STORE_ID, delivery.getDeliveryId())).thenReturn(delivery);
+        InvoiceSyncPreview form = new InvoiceSyncPreview();
+        form.setDeliveryId(delivery.getDeliveryId());
+
+        // when
+        controller.applyInvoiceSync(form, redirectAttributes, PL);
+
+        // then
+        verify(invoiceSynchronizationService, never()).apply(any(), any());
+        verify(redirectAttributes, never()).addFlashAttribute(eq(OrderFlash.ATTRIBUTE), any());
+    }
+
+    @Test
+    void anInvoiceWhosePreviewCannotBeBuiltSendsTheOperatorBackWithAnError() {
+        // given
+        when(invoiceSyncPreviewBuilder.build(STORE_ID, "d-1", "inv-9")).thenReturn(null);
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        String view = controller.showInvoiceSyncPreview("d-1", "inv-9", model, redirectAttributes, PL);
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=d-1");
+        verify(redirectAttributes).addFlashAttribute("errorMessage", "deliveries.details.invoice.preview.error");
+        assertThat(model.containsAttribute("preview")).isFalse();
     }
 }
