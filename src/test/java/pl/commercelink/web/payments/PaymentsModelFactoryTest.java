@@ -136,7 +136,7 @@ class PaymentsModelFactoryTest {
         // then
         assertThat(page.resultsCount()).isEqualTo("Dostawy: 3 · do zapłaty");
         assertThat(page.resultsAmount()).isEqualTo("150,00\u00A0PLN");
-        assertThat(page.resultsTail()).isEqualTo("brutto (150,00\u00A0PLN netto) · do zwrotu od dostawców 20,00\u00A0PLN");
+        assertThat(page.resultsTail()).isEqualTo("brutto (150,00\u00A0PLN netto) · nadpłaty u dostawców 20,00\u00A0PLN");
     }
 
     @Test

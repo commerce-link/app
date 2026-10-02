@@ -84,7 +84,8 @@ class PaymentsRowMapperTest {
         PayableRow row = mapper.map(PayableEntry.of(d).orElseThrow(), TODAY);
 
         // then
-        assertThat(row.stateLabel()).isEqualTo("Do zwrotu od dostawcy");
+        assertThat(row.stateLabel()).isEqualTo("Nadpłata");
+        assertThat(row.stateTone()).as("an overpayment stands out in red").isEqualTo("is-bad");
         assertThat(row.amountText()).isEqualTo("120,00\u00A0PLN");
         assertThat(row.dueNote()).as("a refund is not overdue").isNull();
         assertThat(row.refund()).isTrue();

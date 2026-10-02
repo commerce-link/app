@@ -152,7 +152,7 @@ public class PaymentsRowMapper {
     private static String stateTone(PaymentsAmounts.Standing standing) {
         return switch (standing) {
             case UNDERPAID -> "is-warn";
-            case REFUND -> "is-info";
+            case REFUND -> "is-bad";
             default -> "is-neutral";
         };
     }
