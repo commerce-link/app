@@ -153,7 +153,10 @@ class SharedDialogsContractTest {
                 .contains("window.openPaymentModalForDeliveryFromButton = openPaymentModalForDeliveryFromButton")
                 .contains("showModal").contains("cl:dialog-open").contains("'use strict'")
                 .doesNotContain("innerHTML").doesNotContain(".style.").doesNotContain("pełna wpłata");
-        assertThat(payments).contains("openPaymentModalForOrderFromButton(this)").contains("openPaymentModalForDeliveryFromButton(this)");
+        // Payments opens the dialog from links the script finds by delegation, so the block list-page.js swaps keeps working
+        assertThat(payments).contains("data-cl-payment-open").contains("data-order-id=${row.orderId()}")
+                .contains("data-delivery-id=${row.deliveryId()}");
+        assertThat(script).contains("closest('[data-cl-payment-open]')");
         // the fragment lists the directions by hand (no T() in templates); a third direction must be added there too
         assertThat(PaymentDirection.values()).containsExactly(PaymentDirection.Incoming, PaymentDirection.Outgoing);
     }

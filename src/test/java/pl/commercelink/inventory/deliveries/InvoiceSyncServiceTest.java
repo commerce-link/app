@@ -5,6 +5,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import pl.commercelink.documents.Document;
+import pl.commercelink.documents.DocumentType;
 import pl.commercelink.invoicing.InvoicingProviderFactory;
 import pl.commercelink.invoicing.api.Invoice;
 import pl.commercelink.invoicing.api.InvoiceDirection;
@@ -116,5 +118,74 @@ class InvoiceSyncServiceTest {
         assertThat(delivery.getProvider()).isEqualTo("Kosatec-k7f3a9c2");
         assertThat(delivery.getCounterpartyShortcut()).isEqualTo("KOS-INV");
         verify(deliveriesRepository).save(delivery);
+    }
+
+    private static Delivery invoicedDelivery(String id, String invoiceId) {
+        Delivery d = new Delivery("store-1", null, "Acme");
+        d.setDeliveryId(id + "-0000-0000-0000-000000000000");
+        d.increaseTotalCost(100.0);
+        d.setInvoiced(true);
+        d.getDocuments().add(new Document(invoiceId, null, null, DocumentType.InvoiceVat));
+        return d;
+    }
+
+    private static Invoice invoice(String id, boolean paid) {
+        return new Invoice(id, "FV/" + id, null, Price.fromNet(100.0), null, "PLN", 1.0, paid, null, List.of(), null, null);
+    }
+
+    @Test
+    void syncReportsWhatItCheckedAndPaid() {
+        // given
+        Store store = new Store();
+        when(storesRepository.findById("store-1")).thenReturn(store);
+        when(invoicingProviderFactory.get(store)).thenReturn(invoicingProvider);
+        Delivery paid = invoicedDelivery("aaaa0001", "inv-1");
+        Delivery open = invoicedDelivery("aaaa0002", "inv-2");
+        when(deliveriesRepository.findUnpaidDeliveries("store-1")).thenReturn(List.of(paid, open));
+        when(invoicingProvider.fetchInvoiceById("inv-1", InvoiceDirection.Purchase)).thenReturn(invoice("inv-1", true));
+        when(invoicingProvider.fetchInvoiceById("inv-2", InvoiceDirection.Purchase)).thenReturn(invoice("inv-2", false));
+
+        // when
+        InvoiceSyncResult result = invoiceSyncService.sync("store-1");
+
+        // then
+        assertThat(result.checked()).isEqualTo(2);
+        assertThat(result.paidDeliveries()).containsExactly("aaaa0001");
+        assertThat(result.unpaid()).isEqualTo(1);
+        verify(deliveriesRepository).save(paid);
+    }
+
+    @Test
+    void syncWithoutInvoicingSystemSaysSoInsteadOfFailing() {
+        // given
+        Store store = new Store();
+        when(storesRepository.findById("store-1")).thenReturn(store);
+        when(invoicingProviderFactory.get(store)).thenReturn(null);
+
+        // when
+        InvoiceSyncResult result = invoiceSyncService.sync("store-1");
+
+        // then
+        assertThat(result.configured()).isFalse();
+    }
+
+    @Test
+    void oneFailingInvoiceDoesNotStopTheRest() {
+        // given
+        Store store = new Store();
+        when(storesRepository.findById("store-1")).thenReturn(store);
+        when(invoicingProviderFactory.get(store)).thenReturn(invoicingProvider);
+        Delivery broken = invoicedDelivery("aaaa0001", "inv-1");
+        Delivery fine = invoicedDelivery("aaaa0002", "inv-2");
+        when(deliveriesRepository.findUnpaidDeliveries("store-1")).thenReturn(List.of(broken, fine));
+        when(invoicingProvider.fetchInvoiceById("inv-1", InvoiceDirection.Purchase)).thenThrow(new IllegalStateException("502"));
+        when(invoicingProvider.fetchInvoiceById("inv-2", InvoiceDirection.Purchase)).thenReturn(invoice("inv-2", true));
+
+        // when
+        InvoiceSyncResult result = invoiceSyncService.sync("store-1");
+
+        // then
+        assertThat(result.failedInvoices()).containsExactly("inv-1");
+        assertThat(result.paidDeliveries()).containsExactly("aaaa0002");
     }
 }
