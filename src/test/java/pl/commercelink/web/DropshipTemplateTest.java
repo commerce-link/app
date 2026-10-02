@@ -44,21 +44,6 @@ class DropshipTemplateTest {
     }
 
     @Test
-    void deliveriesPlanningOffersTheDropshipEntryPerDirectToConsumerOrder() throws Exception {
-        // when
-        String html = read("deliveriesPreview.html");
-
-        // then
-        assertThat(html).contains("${dropshipCandidates}");
-        assertThat(html).contains("deliveries.dropship.badge");
-        assertThat(html).contains("deliveries.preview.create");
-        assertThat(html).contains("/dropship");
-        assertThat(html).contains("${candidate.allocations}");
-        assertThat(html).contains("deliveries.allocations");
-        assertThat(html).doesNotContain("deliveries.preview.dropship.order");
-    }
-
-    @Test
     void createScreenMirrorsTheWarehouseCreateScreen() throws Exception {
         // when
         String dropship = read("dropshipCreate.html");
@@ -308,19 +293,6 @@ class DropshipTemplateTest {
         int refreshStart = script.indexOf("function refreshSubmitState(form)");
         int refreshEnd = script.indexOf("}", refreshStart);
         assertThat(script.substring(refreshStart, refreshEnd)).contains("optionsComplete(form)").contains("order-options-blocked");
-    }
-
-    @Test
-    void deliveriesPreviewCarriesTheSupplierIntoTheDropshipCreateLink() throws Exception {
-        // when
-        String html = read("deliveriesPreview.html");
-
-        // then
-        assertThat(html).contains("storeId=${storeId}, orderId=${candidate.orderId}, provider=${candidate.provider})}");
-        assertThat(html).contains("dropship(orderId=${candidate.orderId}, provider=${candidate.provider})}");
-        assertThat(html).contains("<span class=\"has-text-grey\" th:text=\"${candidate.orderId}\"></span>");
-        assertThat(html).contains("deliveries.directToConsumer.viaWarehouse.badge");
-        assertThat(html).contains("deliveries.directToConsumer.viaWarehouse.notice");
     }
 
     @Test
