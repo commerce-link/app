@@ -27,13 +27,15 @@ import java.util.Set;
 
 /**
  * Keeps the dashboard of an inactive store read-only: its users still open every page and download every file, but
- * nothing they send is applied. Also leaves the store's trial or deactivation status for the banner.
+ * nothing they send is applied. Also leaves the store's id and its trial or
+ * deactivation status for the account status in the frame.
  */
 @Component
 public class DashboardReadOnlyInterceptor implements HandlerInterceptor {
 
     static final String TRIAL_STATUS_ATTRIBUTE = DashboardReadOnlyInterceptor.class.getName() + ".trial";
     static final String DEACTIVATION_STATUS_ATTRIBUTE = DashboardReadOnlyInterceptor.class.getName() + ".deactivation";
+    static final String STORE_ID_ATTRIBUTE = DashboardReadOnlyInterceptor.class.getName() + ".storeId";
     static final String REFUSED_MESSAGE_KEY = "store.inactive.read-only";
 
     private static final Set<String> READING_METHODS = Set.of("GET", "HEAD", "OPTIONS");
@@ -62,6 +64,7 @@ public class DashboardReadOnlyInterceptor implements HandlerInterceptor {
         if (store.isEmpty()) {
             return true;
         }
+        request.setAttribute(STORE_ID_ATTRIBUTE, store.get().getStoreId());
         Optional<DeactivationStatus> deactivation = storeActivity.status(store.get());
         if (deactivation.isEmpty()) {
             storeTrialService.status(store.get())

@@ -132,7 +132,7 @@ class DashboardReadOnlyInterceptorTest {
     }
 
     @Test
-    void activeStoreSavesAndLeavesItsTrialForTheBanner() throws Exception {
+    void activeStoreSavesAndLeavesItsTrialForTheAccountStatus() throws Exception {
         // given
         signedInToTheStore();
         TrialStatus trial = new TrialStatus(LocalDate.parse("2026-10-12"), 5, false);
@@ -143,7 +143,8 @@ class DashboardReadOnlyInterceptorTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string("saved"))
                 .andExpect(request().attribute(DashboardReadOnlyInterceptor.TRIAL_STATUS_ATTRIBUTE, trial))
-                .andExpect(request().attribute(DashboardReadOnlyInterceptor.DEACTIVATION_STATUS_ATTRIBUTE, (Object) null));
+                .andExpect(request().attribute(DashboardReadOnlyInterceptor.DEACTIVATION_STATUS_ATTRIBUTE, (Object) null))
+                .andExpect(request().attribute(DashboardReadOnlyInterceptor.STORE_ID_ATTRIBUTE, STORE_ID));
     }
 
     @Test
@@ -156,7 +157,8 @@ class DashboardReadOnlyInterceptorTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string("orders"))
                 .andExpect(request().attribute(DashboardReadOnlyInterceptor.DEACTIVATION_STATUS_ATTRIBUTE, INACTIVE))
-                .andExpect(request().attribute(DashboardReadOnlyInterceptor.TRIAL_STATUS_ATTRIBUTE, (Object) null));
+                .andExpect(request().attribute(DashboardReadOnlyInterceptor.TRIAL_STATUS_ATTRIBUTE, (Object) null))
+                .andExpect(request().attribute(DashboardReadOnlyInterceptor.STORE_ID_ATTRIBUTE, STORE_ID));
         verify(storeTrialService, never()).status(any());
     }
 
