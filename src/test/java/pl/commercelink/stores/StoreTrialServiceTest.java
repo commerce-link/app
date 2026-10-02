@@ -136,7 +136,7 @@ class StoreTrialServiceTest {
         Store store = trialStore("2026-09-20T10:00:00Z");
         store.setActive(false);
         store.setDeactivation(new StoreDeactivation(DeactivationReason.TRIAL_ENDED, "2026-09-20T10:00:00Z",
-                "2026-09-20T11:00:00Z", "2026-09-20T11:00:00Z"));
+                "2026-09-20T11:00:00Z"));
         when(storesRepository.findById(STORE_ID)).thenReturn(store);
         lockingRetriesOnConflict();
 

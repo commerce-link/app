@@ -3,10 +3,8 @@ package pl.commercelink.stores.lifecycle;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import pl.commercelink.marketplace.MarketplaceOfferWithdrawal;
 import pl.commercelink.starter.dynamodb.OptimisticLockingExecutor;
 import pl.commercelink.stores.DeactivationReason;
 import pl.commercelink.stores.DeactivationStatus;
@@ -41,7 +39,6 @@ class StoreLifecycleSweepTest {
     @Mock private StoresRepository storesRepository;
     @Mock private StoreActivity storeActivity;
     @Mock private OptimisticLockingExecutor optimisticLockingExecutor;
-    @Mock private MarketplaceOfferWithdrawal offerWithdrawal;
     @Mock private TrialEndedNotice trialEndedNotice;
     @Mock private StoreDeletionService storeDeletionService;
 
@@ -49,39 +46,31 @@ class StoreLifecycleSweepTest {
 
     @BeforeEach
     void setUp() {
-        sweep = new StoreLifecycleSweep(storesRepository, storeActivity, optimisticLockingExecutor, offerWithdrawal,
-                trialEndedNotice, storeDeletionService, Clock.fixed(NOW, ZoneOffset.UTC));
+        sweep = new StoreLifecycleSweep(storesRepository, storeActivity, optimisticLockingExecutor, trialEndedNotice,
+                storeDeletionService, Clock.fixed(NOW, ZoneOffset.UTC));
         lenient().doAnswer(OptimisticLockingExecutorMocks.retryingModifyAndSave(3))
                 .when(optimisticLockingExecutor).modifyAndSave(any(), any(), any());
     }
 
-    private static Store trialStore(String expiresAt) {
+    private static Store trialStore(String storeId, String expiresAt) {
         Store store = new Store();
-        store.setStoreId(STORE_ID);
+        store.setStoreId(storeId);
         store.setTrial(new TrialPeriod("owner@example.com", "2026-09-28T10:00:00Z", expiresAt));
         return store;
     }
 
-    private static Store endedTrial(String offersWithdrawnAt, String ownerNotifiedAt) {
-        Store store = trialStore(TRIAL_END);
+    private static Store endedTrial(String storeId, String ownerNotifiedAt) {
+        Store store = trialStore(storeId, TRIAL_END);
         store.setActive(false);
-        store.setDeactivation(new StoreDeactivation(DeactivationReason.TRIAL_ENDED, TRIAL_END, offersWithdrawnAt,
-                ownerNotifiedAt));
+        store.setDeactivation(new StoreDeactivation(DeactivationReason.TRIAL_ENDED, TRIAL_END, ownerNotifiedAt));
         return store;
     }
 
-    private static Store switchedOffByHand(String offersWithdrawnAt) {
-        Store store = new Store();
-        store.setStoreId(STORE_ID);
-        store.setActive(false);
-        store.setDeactivation(new StoreDeactivation(DeactivationReason.MANUAL, "2026-10-19T10:00:00Z",
-                offersWithdrawnAt, null));
-        return store;
-    }
-
-    private void listed(Store store) {
-        when(storesRepository.findAll()).thenReturn(List.of(store));
-        lenient().when(storesRepository.findById(STORE_ID)).thenReturn(store);
+    private void listed(Store... stores) {
+        when(storesRepository.findAll()).thenReturn(List.of(stores));
+        for (Store store : stores) {
+            lenient().when(storesRepository.findById(store.getStoreId())).thenReturn(store);
+        }
     }
 
     private void deletionDue(Store store, String dueAt) {
@@ -89,22 +78,40 @@ class StoreLifecycleSweepTest {
     }
 
     @Test
-    void leavesActiveStoresAlone() {
+    void leavesRunningTrialsAndFullAccountsAlone() {
         // given
-        Store store = trialStore("2026-10-25T10:00:00Z");
+        Store fullAccount = new Store();
+        fullAccount.setStoreId("full-store");
+        when(storesRepository.findAll()).thenReturn(List.of(trialStore(STORE_ID, "2026-10-25T10:00:00Z"), fullAccount));
+
+        // when
+        sweep.sweep();
+
+        // then
+        verifyNoInteractions(optimisticLockingExecutor, trialEndedNotice, storeDeletionService);
+    }
+
+    @Test
+    void leavesStoreSwitchedOffByHandAsItIs() {
+        // given
+        Store store = new Store();
+        store.setStoreId(STORE_ID);
+        store.setActive(false);
+        store.setDeactivation(StoreDeactivation.of(DeactivationReason.MANUAL, Instant.parse("2026-10-19T10:00:00Z")));
         when(storesRepository.findAll()).thenReturn(List.of(store));
 
         // when
         sweep.sweep();
 
         // then
-        verifyNoInteractions(optimisticLockingExecutor, offerWithdrawal, trialEndedNotice, storeDeletionService);
+        verifyNoInteractions(optimisticLockingExecutor, trialEndedNotice, storeDeletionService);
+        verify(storesRepository, never()).save(any());
     }
 
     @Test
     void deactivatesStoreWhoseTrialEndedAndTellsItsOwner() {
         // given
-        Store store = trialStore(TRIAL_END);
+        Store store = trialStore(STORE_ID, TRIAL_END);
         listed(store);
         deletionDue(store, "2026-10-26T10:00:00Z");
         when(storeActivity.status(store)).thenReturn(Optional.of(TRIAL_ENDED));
@@ -117,17 +124,15 @@ class StoreLifecycleSweepTest {
         StoreDeactivation deactivation = store.getDeactivation();
         assertEquals(DeactivationReason.TRIAL_ENDED, deactivation.getReason());
         assertEquals(TRIAL_END, deactivation.getDeactivatedAt());
-        assertEquals(NOW.toString(), deactivation.getOffersWithdrawnAt());
         assertEquals(NOW.toString(), deactivation.getOwnerNotifiedAt());
-        verify(offerWithdrawal).withdrawAll(store);
         verify(trialEndedNotice).send(store, TRIAL_ENDED);
         verifyNoInteractions(storeDeletionService);
     }
 
     @Test
-    void stepsDoneOnceAreNotRepeated() {
+    void ownerIsToldOnlyOnce() {
         // given
-        Store store = endedTrial("2026-10-12T11:00:00Z", "2026-10-12T11:00:00Z");
+        Store store = endedTrial(STORE_ID, "2026-10-12T11:00:00Z");
         listed(store);
         deletionDue(store, "2026-10-26T10:00:00Z");
 
@@ -135,48 +140,14 @@ class StoreLifecycleSweepTest {
         sweep.sweep();
 
         // then
-        verifyNoInteractions(offerWithdrawal, trialEndedNotice, storeDeletionService);
-        verify(storesRepository, never()).save(any());
-    }
-
-    @Test
-    void failedWithdrawalIsTriedAgainByTheNextSweep() {
-        // given
-        Store store = endedTrial(null, null);
-        listed(store);
-        doThrow(new RuntimeException("marketplace down")).when(offerWithdrawal).withdrawAll(store);
-
-        // when
-        sweep.sweep();
-
-        // then
-        assertNull(store.getDeactivation().getOffersWithdrawnAt());
         verifyNoInteractions(trialEndedNotice, storeDeletionService);
         verify(storesRepository, never()).save(any());
     }
 
     @Test
-    void failedStoreDoesNotStopTheSweep() {
-        // given
-        Store broken = endedTrial(null, null);
-        Store other = switchedOffByHand(null);
-        other.setStoreId("other-store");
-        when(storesRepository.findAll()).thenReturn(List.of(broken, other));
-        when(storesRepository.findById("other-store")).thenReturn(other);
-        doThrow(new RuntimeException("marketplace down")).when(offerWithdrawal).withdrawAll(broken);
-
-        // when
-        sweep.sweep();
-
-        // then
-        verify(offerWithdrawal).withdrawAll(other);
-        assertEquals(NOW.toString(), other.getDeactivation().getOffersWithdrawnAt());
-    }
-
-    @Test
     void failedNoticeIsSentAgainByTheNextSweep() {
         // given
-        Store store = endedTrial("2026-10-12T11:00:00Z", null);
+        Store store = endedTrial(STORE_ID, null);
         listed(store);
         deletionDue(store, "2026-10-26T10:00:00Z");
         when(storeActivity.status(store)).thenReturn(Optional.of(TRIAL_ENDED));
@@ -187,12 +158,32 @@ class StoreLifecycleSweepTest {
 
         // then
         assertNull(store.getDeactivation().getOwnerNotifiedAt());
+        verify(storesRepository, never()).save(any());
+    }
+
+    @Test
+    void failedStoreDoesNotStopTheSweep() {
+        // given
+        Store broken = endedTrial("broken-store", null);
+        Store other = endedTrial("other-store", null);
+        listed(broken, other);
+        deletionDue(broken, "2026-10-26T10:00:00Z");
+        deletionDue(other, "2026-10-26T10:00:00Z");
+        when(storeActivity.status(any(Store.class))).thenReturn(Optional.of(TRIAL_ENDED));
+        doThrow(new RuntimeException("ses down")).when(trialEndedNotice).send(broken, TRIAL_ENDED);
+
+        // when
+        sweep.sweep();
+
+        // then
+        verify(trialEndedNotice).send(other, TRIAL_ENDED);
+        assertEquals(NOW.toString(), other.getDeactivation().getOwnerNotifiedAt());
     }
 
     @Test
     void ownerWithoutEmailIsCountedAsTold() {
         // given
-        Store store = endedTrial("2026-10-12T11:00:00Z", null);
+        Store store = endedTrial(STORE_ID, null);
         store.getTrial().setOwnerEmail(" ");
         listed(store);
         deletionDue(store, "2026-10-26T10:00:00Z");
@@ -208,7 +199,7 @@ class StoreLifecycleSweepTest {
     @Test
     void deletesTrialStoreOnceItsDataWasKeptForTheRetentionPeriod() {
         // given
-        Store store = endedTrial("2026-10-12T11:00:00Z", "2026-10-12T11:00:00Z");
+        Store store = endedTrial(STORE_ID, "2026-10-12T11:00:00Z");
         listed(store);
         deletionDue(store, "2026-10-20T10:00:00Z");
 
@@ -220,9 +211,9 @@ class StoreLifecycleSweepTest {
     }
 
     @Test
-    void withdrawsOffersBeforeDeletingTheStoreAndNeverMailsAStoreItDeletes() {
+    void neverTellsTheOwnerOfAStoreItDeletes() {
         // given
-        Store store = trialStore("2026-09-01T10:00:00Z");
+        Store store = trialStore(STORE_ID, "2026-09-01T10:00:00Z");
         listed(store);
         deletionDue(store, "2026-09-15T10:00:00Z");
 
@@ -230,34 +221,16 @@ class StoreLifecycleSweepTest {
         sweep.sweep();
 
         // then
-        InOrder order = inOrder(offerWithdrawal, storeDeletionService);
-        order.verify(offerWithdrawal).withdrawAll(store);
-        order.verify(storeDeletionService).deleteStore(STORE_ID, StoreDeletionService.Guard.TRIAL_ONLY);
+        verify(storeDeletionService).deleteStore(STORE_ID, StoreDeletionService.Guard.TRIAL_ONLY);
         verifyNoInteractions(trialEndedNotice);
     }
 
     @Test
-    void storeSwitchedOffByHandLosesItsOffersButIsNeverDeletedNorMailed() {
+    void trialSwitchedOffByHandBeforeItsEndIsTakenOverByTheTrialEnd() {
         // given
-        Store store = switchedOffByHand(null);
-        listed(store);
-
-        // when
-        sweep.sweep();
-
-        // then
-        verify(offerWithdrawal).withdrawAll(store);
-        assertEquals(NOW.toString(), store.getDeactivation().getOffersWithdrawnAt());
-        verifyNoInteractions(trialEndedNotice, storeDeletionService);
-    }
-
-    @Test
-    void trialSwitchedOffByHandKeepsItsWithdrawalWhenTheTrialEnds() {
-        // given
-        Store store = trialStore(TRIAL_END);
+        Store store = trialStore(STORE_ID, TRIAL_END);
         store.setActive(false);
-        store.setDeactivation(new StoreDeactivation(DeactivationReason.MANUAL, "2026-10-10T10:00:00Z",
-                "2026-10-10T11:00:00Z", null));
+        store.setDeactivation(StoreDeactivation.of(DeactivationReason.MANUAL, Instant.parse("2026-10-10T10:00:00Z")));
         listed(store);
         deletionDue(store, "2026-10-26T10:00:00Z");
         when(storeActivity.status(store)).thenReturn(Optional.of(TRIAL_ENDED));
@@ -267,34 +240,14 @@ class StoreLifecycleSweepTest {
 
         // then
         assertEquals(DeactivationReason.TRIAL_ENDED, store.getDeactivation().getReason());
-        assertEquals("2026-10-10T11:00:00Z", store.getDeactivation().getOffersWithdrawnAt());
-        verifyNoInteractions(offerWithdrawal);
+        assertEquals(TRIAL_END, store.getDeactivation().getDeactivatedAt());
         verify(trialEndedNotice).send(store, TRIAL_ENDED);
-    }
-
-    @Test
-    void storeActivatedDuringTheWithdrawalIsLeftActive() {
-        // given
-        Store listedStore = switchedOffByHand(null);
-        Store activatedMeanwhile = new Store();
-        activatedMeanwhile.setStoreId(STORE_ID);
-        activatedMeanwhile.setActive(true);
-        when(storesRepository.findAll()).thenReturn(List.of(listedStore));
-        when(storesRepository.findById(STORE_ID)).thenReturn(activatedMeanwhile);
-
-        // when
-        sweep.sweep();
-
-        // then
-        verify(offerWithdrawal).withdrawAll(listedStore);
-        verify(storesRepository, never()).save(any());
-        assertNull(activatedMeanwhile.getDeactivation());
     }
 
     @Test
     void trialConvertedBeforeItWasMarkedIsLeftAlone() {
         // given
-        Store listedStore = trialStore(TRIAL_END);
+        Store listedStore = trialStore(STORE_ID, TRIAL_END);
         Store converted = new Store();
         converted.setStoreId(STORE_ID);
         converted.setActive(true);
@@ -306,6 +259,26 @@ class StoreLifecycleSweepTest {
 
         // then
         verify(storesRepository, never()).save(any());
-        verifyNoInteractions(offerWithdrawal, trialEndedNotice, storeDeletionService);
+        verifyNoInteractions(trialEndedNotice, storeDeletionService);
+    }
+
+    @Test
+    void noticeOfAStoreConvertedMeanwhileIsNotRecorded() {
+        // given
+        Store listedStore = endedTrial(STORE_ID, null);
+        Store converted = new Store();
+        converted.setStoreId(STORE_ID);
+        converted.setActive(true);
+        when(storesRepository.findAll()).thenReturn(List.of(listedStore));
+        when(storesRepository.findById(STORE_ID)).thenReturn(converted);
+        deletionDue(listedStore, "2026-10-26T10:00:00Z");
+        when(storeActivity.status(listedStore)).thenReturn(Optional.of(TRIAL_ENDED));
+
+        // when
+        sweep.sweep();
+
+        // then
+        verify(storesRepository, never()).save(any());
+        assertNull(converted.getDeactivation());
     }
 }

@@ -22,10 +22,9 @@ public class StoreDeactivation {
     @DynamoDBTypeConvertedEnum
     private DeactivationReason reason;
     private String deactivatedAt;
-    private String offersWithdrawnAt;
     private String ownerNotifiedAt;
 
     public static StoreDeactivation of(DeactivationReason reason, Instant deactivatedAt) {
-        return new StoreDeactivation(reason, deactivatedAt.toString(), null, null);
+        return new StoreDeactivation(reason, deactivatedAt.toString(), null);
     }
 }

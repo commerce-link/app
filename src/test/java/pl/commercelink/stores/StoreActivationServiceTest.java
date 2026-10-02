@@ -62,7 +62,7 @@ class StoreActivationServiceTest {
         assertEquals(Boolean.FALSE, store.getActive());
         assertEquals(DeactivationReason.MANUAL, store.getDeactivation().getReason());
         assertEquals(NOW.toString(), store.getDeactivation().getDeactivatedAt());
-        assertNull(store.getDeactivation().getOffersWithdrawnAt());
+        assertNull(store.getDeactivation().getOwnerNotifiedAt());
         verify(storesRepository).save(store);
     }
 
