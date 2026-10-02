@@ -1,6 +1,7 @@
 package pl.commercelink.web.orders;
 
 import org.junit.jupiter.api.Test;
+import pl.commercelink.orders.CourierCancellation;
 import pl.commercelink.orders.Shipment;
 import pl.commercelink.orders.ShipmentType;
 
@@ -167,6 +168,23 @@ class OrderShipmentFormTest {
         // then: the courier order stays, the tracking subscription belonged to the old number
         assertThat(shipment.getExternalId()).isEqualTo("EXT-1");
         assertThat(shipment.getTrackingSubscriptionStatus()).isNull();
+    }
+
+    @Test
+    void editKeepsThePendingCancellationOfTheCourierOrder() {
+        // given: the operator edits the shipment while Furgonetka is still cancelling its courier order
+        Shipment saved = courierOrder();
+        saved.setCancellation(CourierCancellation.pending("cmd-1", NOW.minusSeconds(20)));
+        OrderShipmentForm form = new OrderShipmentForm("o-1", 0, "v", ShipmentType.Courier, "DPD", "T-1", null, null,
+                null, null, List.of(), null, null);
+
+        // when
+        Shipment shipment = form.toShipment(saved, NOW);
+
+        // then: the cancellation check must still find the shipment
+        assertThat(shipment.getExternalId()).isEqualTo("EXT-1");
+        assertThat(shipment.getCancellation().isPending()).isTrue();
+        assertThat(shipment.getCancellation().hasCommand("cmd-1")).isTrue();
     }
 
     @Test

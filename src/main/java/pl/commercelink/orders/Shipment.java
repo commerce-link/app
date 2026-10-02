@@ -38,6 +38,9 @@ public class Shipment {
     private String trackingSubscriptionId;
     @DynamoDBAttribute(attributeName = "trackingExternalId")
     private String trackingExternalId;
+    /** The last cancel command of the courier order; null when none was sent. */
+    @DynamoDBAttribute(attributeName = "cancellation")
+    private CourierCancellation cancellation;
 
     public Shipment() {
     }
@@ -189,6 +192,14 @@ public class Shipment {
         this.trackingExternalId = trackingExternalId;
     }
 
+    public CourierCancellation getCancellation() {
+        return cancellation;
+    }
+
+    public void setCancellation(CourierCancellation cancellation) {
+        this.cancellation = cancellation;
+    }
+
     @DynamoDBIgnore
     public boolean hasTrackingSubscription() {
         return trackingSubscriptionStatus != null;
@@ -213,6 +224,30 @@ public class Shipment {
         this.trackingSubscriptionStatus = ShipmentTrackingStatus.FAILED;
     }
 
+    /** A cancel command younger than CourierCancellation.STALE waits for its result: a new request must wait too. */
+    @DynamoDBIgnore
+    public boolean isCancellationInProgress(LocalDateTime now) {
+        return cancellation != null && cancellation.isInProgress(now);
+    }
+
+    /** The result of the last cancel command is unknown: asking again reads that command, not a new one. */
+    @DynamoDBIgnore
+    public boolean needsCancellationRecheck(LocalDateTime now) {
+        return cancellation != null && cancellation.needsRecheck(now);
+    }
+
+    /** The last cancellation failed or its result is unknown: the label may or may not still be paid at the carrier. */
+    @DynamoDBIgnore
+    public boolean isCancellationUnresolved() {
+        return cancellation != null && cancellation.isUnresolved();
+    }
+
+    /** The shipment still waits for the result of that very cancel command. */
+    @DynamoDBIgnore
+    public boolean isCancellationPendingFor(String commandId) {
+        return cancellation != null && cancellation.isPending() && cancellation.hasCommand(commandId);
+    }
+
     /** The tracking subscription follows the tracking number: a changed number is tracked anew. */
     public void inheritTrackingSubscriptionFrom(Shipment previous) {
         if (previous == null || !previous.hasTrackingNo(trackingNo)) {
@@ -226,11 +261,12 @@ public class Shipment {
     /**
      * The courier order (the paid label at the carrier) stays with the shipment whatever an edit does to its fields:
      * only "Cancel courier order" cancels it at the carrier, and a shipment that lost it could be removed and leave the
-     * label orphaned.
+     * label orphaned. It keeps the state of its cancellation together with it.
      */
     public void inheritCourierOrderFrom(Shipment previous) {
         if (previous != null && previous.externalId != null) {
             this.externalId = previous.externalId;
+            this.cancellation = previous.cancellation;
         }
     }
 

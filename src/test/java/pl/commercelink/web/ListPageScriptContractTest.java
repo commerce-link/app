@@ -33,4 +33,16 @@ class ListPageScriptContractTest {
         assertThat(deliveries).contains("data-cl-toolbar-toggle").contains("data-cl-autosubmit-hide").contains("/js/list-page.js");
         assertThat(orders).doesNotContain("data-cl-" + "orders-").contains("/js/list-page.js").doesNotContain("orders-" + "list.js");
     }
+
+    @Test
+    void theScriptReadsFormAttributesNotPropertiesAFieldCanShadow() throws Exception {
+        // given: Payments' search and menu carry fields named "method" (the payment-method filter), and a field's name
+        // shadows the form's property of the same name (form.method became the input and the script threw)
+        String script = read("src/main/resources/static/js/list-page.js");
+        String payments = read("src/main/resources/templates/payments.html");
+
+        // then
+        assertThat(payments).contains("name=\"method\"");
+        assertThat(script).doesNotContainPattern("form\\.(method|action)\\b");
+    }
 }

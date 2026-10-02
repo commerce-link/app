@@ -12,8 +12,8 @@ import java.util.Map;
 
 /**
  * Shared helper that exposes a supplier's order options - and any already chosen or defaulted values -
- * to a purchase/approval confirmation model. Reused by {@link DeliveriesController} and {@link DropshipController}
- * so both screens present the same options widget.
+ * to a purchase/approval confirmation model. Reused by the new-delivery scopes (warehouse and dropship step 2) and the
+ * super admin approval screen in {@link DeliveriesController}, so every screen presents the same options widget.
  */
 public final class OrderOptionsModel {
 

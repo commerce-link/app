@@ -1038,7 +1038,7 @@ class SupplierPurchaseServiceTest {
 
         // then
         assertFalse(result.isSuccess());
-        assertEquals("deliveries.purchase.error.availability", result.getMessage());
+        assertEquals("deliveries.purchase.error.nothingRequested", result.getMessage());
         verify(deliveriesRepository, never()).save(any(Delivery.class));
         verify(supplierPurchaseEventPublisher, never()).publish(any());
     }
@@ -2298,5 +2298,17 @@ class SupplierPurchaseServiceTest {
         ArgumentCaptor<Delivery> saved = ArgumentCaptor.forClass(Delivery.class);
         verify(deliveryCreationService).claimAllocationsForPurchase(eq(STORE_ID), saved.capture(), any());
         assertEquals(ConnectionMode.GLOBAL, saved.getValue().getConnectionMode());
+    }
+
+    @Test
+    void submittedDeliveryIdFindsTheDeliveryOfAPurchaseRefAndIgnoresABlankRef() {
+        // given
+        Delivery placed = new Delivery("store-1", null, "Acme");
+        when(deliveriesRepository.findByPurchaseRef("store-1", "ref-1")).thenReturn(Optional.of(placed));
+
+        // when / then
+        assertThat(service.submittedDeliveryId("store-1", "ref-1")).contains(placed.getDeliveryId());
+        assertThat(service.submittedDeliveryId("store-1", " ")).isEmpty();
+        verify(deliveriesRepository, never()).findByPurchaseRef("store-1", " ");
     }
 }

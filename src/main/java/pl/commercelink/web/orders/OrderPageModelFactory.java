@@ -49,9 +49,8 @@ import pl.commercelink.taxonomy.TaxonomyCache;
 import pl.commercelink.web.dtos.RoutedSupplierView;
 import pl.commercelink.web.dtos.SplitGroupPreviewDto;
 
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -136,16 +135,16 @@ public class OrderPageModelFactory {
         boolean receiptLocked = receiptLock.locks();
         boolean canOrderShipment = order.canOrderShipment();
         OrderPageModel.PrimaryAction primary = null;
-        // with items at several suppliers the dropship page without ?provider= sends the operator back to choose one,
-        // so the button names the first waiting supplier the dropship page accepts (DropshipEligibility, as the
-        // delivery link and the deliveries planning); a supplier without dropshipping is ordered through the
-        // warehouse route, so it gets no button that would only end on the page's refusal
+        // the button opens the new-delivery page of the first waiting supplier the dropship flow accepts
+        // (DropshipEligibility, as the delivery link and the deliveries planning); a supplier without dropshipping is
+        // ordered through the warehouse route, so it gets no button that would only end on the page's refusal
         OrderItem firstDropship = !readOnly && viewer.admin() && order.getFulfilmentType() == FulfilmentType.DirectToConsumer
                 ? items.stream().filter(OrderPageModelFactory::awaitsDropship)
                         .filter(item -> dropship.supports(item.getDeliveryId())).findFirst().orElse(null) : null;
         if (firstDropship != null) {
-            primary = new OrderPageModel.PrimaryAction("order.page.action.dropship", links.details() + "/dropship?provider="
-                    + URLEncoder.encode(firstDropship.getDeliveryId(), StandardCharsets.UTF_8), "fa-truck");
+            primary = new OrderPageModel.PrimaryAction("order.page.action.dropship",
+                    links.forViewer(DeliveryRedirectResolver.dropshipCreateLink(order.getOrderId(), firstDropship.getDeliveryId())),
+                    "fa-truck");
         } else if (!readOnly && canOrderShipment && order.hasShipmentToBook()
                 && shippingService.isAvailable(store)) {
             // the courier page's own rule (OrdersShippingController#initiate): a store without a courier account types
@@ -368,7 +367,7 @@ public class OrderPageModelFactory {
     private String deliveryHref(Order order, OrderItem item, Viewer viewer, OrderLinks links, DropshipAssessment dropship) {
         String href = deliveryRedirectResolver.resolveFor(order, item, dropship);
         // the dropship screens are the admin's; a user or a super admin only sees the supplier's name
-        if (href.contains("/dropship") && (!viewer.admin() || viewer.superAdmin())) {
+        if (DeliveryRedirectResolver.isDropshipCreateLink(href) && (!viewer.admin() || viewer.superAdmin())) {
             return null;
         }
         return links.forViewer(href);
@@ -381,6 +380,7 @@ public class OrderPageModelFactory {
 
     private OrderPageModel.ShipmentsCard shipments(Order order, Store store, boolean readOnly) {
         List<Shipment> shipments = order.getShipments();
+        LocalDateTime now = LocalDateTime.now();
         List<String> carriers = readOnly || store == null ? List.of() : shipmentCarrierOptions.forOrder(order, store);
         String base = "/dashboard/orders/" + order.getOrderId() + "/shipments/";
         List<OrderPageModel.ShipmentRow> rows = new ArrayList<>();
@@ -400,6 +400,7 @@ public class OrderPageModelFactory {
                     // the help sends the reader to "Edit", which a read-only page does not offer
                     !readOnly && s.getTrackingSubscriptionStatus() == ShipmentTrackingStatus.FAILED
                             ? "order.shipment.tracking.failed.help" : null,
+                    OrderLabels.cancellation(s, now), OrderLabels.cancellationTone(s, now),
                     form.dialogId(), readOnly ? null : base + i,
                     readOnly || removeLockedKey(order, i) != null ? null
                             : base + i + "/remove?version=" + form.version(),
@@ -415,7 +416,14 @@ public class OrderPageModelFactory {
         String emptyKey = readOnly ? "order.shipments.empty.readonly"
                 : order.getFulfilmentType() == FulfilmentType.DirectToConsumer ? "order.shipments.empty.dropship"
                 : "order.shipments.empty";
-        return new OrderPageModel.ShipmentsCard(rows, emptyKey, !readOnly && courierCancellable != null, forms,
+        boolean canCancelCourier = !readOnly && courierCancellable != null;
+        // a second command while the first may still succeed would fail on the cancelled package (the server refuses it too)
+        String cancelCourierLockedKey = canCancelCourier && courierCancellable.isCancellationInProgress(now)
+                ? "order.shipments.cancel.locked.pending" : null;
+        // the super admin page is store-scoped by its path and has no polling route; it is refreshed by hand
+        String pollHref = !readOnly && shipments.stream().anyMatch(s -> s.isCancellationInProgress(now))
+                ? "/dashboard/orders/" + order.getOrderId() + "/shipments/cancellation-state" : null;
+        return new OrderPageModel.ShipmentsCard(rows, emptyKey, canCancelCourier, cancelCourierLockedKey, pollHref, forms,
                 readOnly ? null : OrderShipmentForm.blank(order, carriers));
     }
 
@@ -444,12 +452,12 @@ public class OrderPageModelFactory {
      * Why the shipment at index cannot be removed, or null. The only shipment can go, with the customer's delivery
      * choice (the user's decision of 2026-09-30): the order waits for the next one (OrderLifecycle neither delivers nor
      * completes an order without shipments before Delivered; a Shipping order left with nothing shipped goes back to
-     * Realization). A delivered order keeps its
-     * shipments, they are the record of the delivery; so does a shipment with a delivery date. One with a courier order
-     * is cancelled with "Cancel courier order", which also cancels the paid label at the carrier, never by dropping
-     * the record. The only shipment with nothing but the customer's choice of delivery (the one every order is created
-     * with) is not removed either: its row reads as "no shipment yet" with "Uzupełnij", and removing it would only lose
-     * the choice.
+     * Realization). A delivered order keeps its shipments, they are the record of the delivery; so does a shipment with
+     * a delivery date. One with a courier order is cancelled with "Cancel courier order", which also cancels the paid
+     * label at the carrier, never by dropping the record; after a failed or unconfirmed cancellation the operator settles
+     * the label in the provider's panel and may drop the record. The only shipment with nothing but the customer's choice
+     * of delivery (the one every order is created with) is not removed either: its row reads as "no shipment yet" with
+     * "Uzupełnij", and removing it would only lose the choice.
      */
     public static String removeLockedKey(Order order, int index) {
         if (order.getStatus() == OrderStatus.Delivered) {
@@ -462,7 +470,8 @@ public class OrderPageModelFactory {
         if (shipment.getDeliveredAt() != null) {
             return "order.shipments.remove.error.shipmentDelivered";
         }
-        return shipment.getExternalId() != null ? "order.shipments.remove.error.courier" : null;
+        return shipment.getExternalId() != null && !shipment.isCancellationUnresolved()
+                ? "order.shipments.remove.error.courier" : null;
     }
 
     private OrderPageModel.DocumentsCard documents(Order order, Store store, Viewer viewer, boolean closed,
@@ -695,6 +704,12 @@ public class OrderPageModelFactory {
      * customer.
      */
     public static String removeShipmentMessageKey(Order order, int index) {
+        Shipment shipment = order.getShipments().get(index);
+        // removable only because its cancellation failed or is unknown: the label may still be live at the carrier.
+        // This warning wins over the delivery text; the button still says the removal delivers the order.
+        if (shipment.getExternalId() != null && shipment.isCancellationUnresolved()) {
+            return "order.shipments.remove.confirm.message.cancellationUnresolved";
+        }
         if (removalDelivers(order, index)) {
             return "order.shipments.remove.confirm.delivers";
         }

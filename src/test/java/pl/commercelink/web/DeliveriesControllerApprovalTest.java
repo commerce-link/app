@@ -13,28 +13,28 @@ import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.MessageSource;
 import org.springframework.beans.MutablePropertyValues;
+import org.springframework.http.HttpStatus;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
 import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.BindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.WebDataBinder;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import pl.commercelink.inventory.deliveries.Allocation;
 import pl.commercelink.inventory.deliveries.AllocationKey;
-import pl.commercelink.inventory.deliveries.AllocationType;
 import pl.commercelink.inventory.deliveries.Delivery;
-import pl.commercelink.inventory.deliveries.DeliveryItem;
 import pl.commercelink.inventory.deliveries.DeliveryOrderStatus;
 import pl.commercelink.inventory.deliveries.DeliveriesManager;
-import pl.commercelink.inventory.deliveries.DeliveriesPlanningService;
 import pl.commercelink.inventory.deliveries.DeliveriesQueryService;
 import pl.commercelink.inventory.deliveries.DeliveriesRepository;
 import pl.commercelink.inventory.deliveries.DeliveryOrderedQtyUpdateService;
 import pl.commercelink.inventory.deliveries.DeliveryReceptionService;
-import pl.commercelink.inventory.deliveries.DeliveryTaxResolver;
 import pl.commercelink.inventory.deliveries.DeliveryType;
 import pl.commercelink.inventory.deliveries.DropshipOrderLocator;
+import pl.commercelink.inventory.deliveries.InvoiceSyncResult;
+import pl.commercelink.inventory.deliveries.InvoiceSyncService;
 import pl.commercelink.inventory.deliveries.SupplierPurchaseService;
 import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.inventory.supplier.SupplierRegistry;
@@ -58,11 +58,9 @@ import pl.commercelink.stores.FulfilmentConfiguration;
 import pl.commercelink.stores.Store;
 import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.stores.StoreSupplierConnection;
-import pl.commercelink.warehouse.RestockSuggestionService;
 import pl.commercelink.web.dtos.AddPaymentForm;
+import pl.commercelink.web.payments.PaymentsReturn;
 import pl.commercelink.web.dtos.DeliveryAllocationsForm;
-import pl.commercelink.web.dtos.DeliveryCreationForm;
-import pl.commercelink.web.dtos.PickerOption;
 import pl.commercelink.web.dtos.RoutedOrderView;
 
 import java.time.LocalDate;
@@ -71,9 +69,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
@@ -121,15 +119,6 @@ class DeliveriesControllerApprovalTest {
     private StoresRepository storesRepository;
 
     @Mock
-    private DeliveriesPlanningService deliveriesPlanningService;
-
-    @Mock
-    private RestockSuggestionService restockSuggestionService;
-
-    @Mock
-    private DeliveryTaxResolver deliveryTaxResolver;
-
-    @Mock
     private OrdersRepository ordersRepository;
 
     @Mock
@@ -140,6 +129,9 @@ class DeliveriesControllerApprovalTest {
 
     @Mock
     private SupplierLabels supplierLabels;
+
+    @Mock
+    private InvoiceSyncService invoiceSynchronizationService;
 
     @InjectMocks
     private DeliveriesController deliveriesController;
@@ -184,6 +176,18 @@ class DeliveriesControllerApprovalTest {
     }
 
     @Test
+    void approvalAvailabilityCheckRendersTheApprovalScreensOwnFragment() {
+        // given
+        Model model = new ConcurrentModel();
+
+        // when
+        String view = deliveriesController.validatePendingApproval(STORE_ID, DELIVERY_ID, model, Locale.ENGLISH);
+
+        // then
+        assertThat(view).isEqualTo("fragments/approval-validation :: validationResult");
+    }
+
+    @Test
     void rejectingRedirectsToTheDeliveriesListWithASuccessMessage() {
         // given
         when(supplierPurchaseService.reject(STORE_ID, DELIVERY_ID, "out of stock"))
@@ -218,105 +222,6 @@ class DeliveriesControllerApprovalTest {
         // then
         assertThat(view).isEqualTo("redirect:/dashboard/store/store-1/deliveries/delivery-1/approval");
         verify(redirectAttributes).addFlashAttribute("errorMessage", "Delivery is no longer awaiting approval");
-    }
-
-    @Test
-    void purchaseConfirmationHidesDeliveryAddressesWhenApprovalIsRequired() {
-        // given
-        DeliveryCreationForm form = new DeliveryCreationForm();
-        Model model = new ConcurrentModel();
-        when(supplierPurchaseService.isOrderingAvailable(STORE_ID, PROVIDER)).thenReturn(true);
-        when(supplierPurchaseService.requiresApproval(STORE_ID, PROVIDER)).thenReturn(true);
-
-        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
-            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-
-            // when
-            String view = deliveriesController.validatePurchase(PROVIDER, form, model);
-
-            // then
-            assertThat(view).isEqualTo("deliveryPurchaseConfirmation");
-            assertThat(model.getAttribute("requiresApproval")).isEqualTo(true);
-            assertThat(model.containsAttribute("deliveryAddresses")).isFalse();
-            assertThat(model.containsAttribute("deliveryAddressOptions")).isFalse();
-            verify(supplierPurchaseService, never()).deliveryAddresses(any(), any());
-        }
-    }
-
-    @Test
-    void purchaseConfirmationExposesDeliveryAddressesWhenApprovalIsNotRequired() {
-        // given
-        DeliveryCreationForm form = new DeliveryCreationForm();
-        Model model = new ConcurrentModel();
-        SupplierDeliveryAddress address = new SupplierDeliveryAddress("addr-1", "Street 1", "Warsaw", "00-001", "PL");
-        when(supplierPurchaseService.isOrderingAvailable(STORE_ID, PROVIDER)).thenReturn(true);
-        when(supplierPurchaseService.requiresApproval(STORE_ID, PROVIDER)).thenReturn(false);
-        when(supplierPurchaseService.deliveryAddresses(STORE_ID, PROVIDER)).thenReturn(List.of(address));
-
-        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
-            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-
-            // when
-            String view = deliveriesController.validatePurchase(PROVIDER, form, model);
-
-            // then
-            assertThat(view).isEqualTo("deliveryPurchaseConfirmation");
-            assertThat(model.containsAttribute("requiresApproval")).isFalse();
-            assertThat(model.getAttribute("deliveryAddresses")).isEqualTo(List.of(address));
-            assertThat(model.getAttribute("deliveryAddressOptions"))
-                    .isEqualTo(List.of(new PickerOption("addr-1", address.label())));
-        }
-    }
-
-    @Test
-    void purchaseConfirmationExposesOrderOptionsWithDefaultsPreselected() {
-        // given
-        DeliveryCreationForm form = new DeliveryCreationForm();
-        Model model = new ConcurrentModel();
-        SupplierOrderOption laneOption = new SupplierOrderOption("lane", "Lane",
-                List.of(new SupplierOrderOptionChoice("fast", "Fast", null)), "fast", true);
-        when(supplierPurchaseService.isOrderingAvailable(STORE_ID, PROVIDER)).thenReturn(true);
-        when(supplierPurchaseService.requiresApproval(STORE_ID, PROVIDER)).thenReturn(false);
-        when(supplierPurchaseService.deliveryAddresses(STORE_ID, PROVIDER)).thenReturn(List.of());
-        when(supplierPurchaseService.orderOptions(eq(STORE_ID), eq(PROVIDER), any()))
-                .thenReturn(List.of(laneOption));
-
-        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
-            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-
-            // when
-            String view = deliveriesController.validatePurchase(PROVIDER, form, model);
-
-            // then
-            assertThat(view).isEqualTo("deliveryPurchaseConfirmation");
-            assertThat((List<?>) model.getAttribute("orderOptions")).hasSize(1);
-            assertThat(model.getAttribute("selectedOptions")).isEqualTo(Map.of("lane", "fast"));
-            assertThat(model.containsAttribute("orderOptionsError")).isFalse();
-        }
-    }
-
-    @Test
-    void purchaseConfirmationBlocksWhenOptionsCannotBeFetched() {
-        // given
-        DeliveryCreationForm form = new DeliveryCreationForm();
-        Model model = new ConcurrentModel();
-        when(supplierPurchaseService.isOrderingAvailable(STORE_ID, PROVIDER)).thenReturn(true);
-        when(supplierPurchaseService.requiresApproval(STORE_ID, PROVIDER)).thenReturn(false);
-        when(supplierPurchaseService.deliveryAddresses(STORE_ID, PROVIDER)).thenReturn(List.of());
-        when(supplierPurchaseService.orderOptions(eq(STORE_ID), eq(PROVIDER), any()))
-                .thenThrow(new RuntimeException("supplier unavailable"));
-
-        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
-            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-
-            // when
-            String view = deliveriesController.validatePurchase(PROVIDER, form, model);
-
-            // then
-            assertThat(view).isEqualTo("deliveryPurchaseConfirmation");
-            assertThat(model.getAttribute("orderOptionsError")).isEqualTo("supplier unavailable");
-            assertThat((List<?>) model.getAttribute("orderOptions")).isEmpty();
-        }
     }
 
     @Test
@@ -865,113 +770,6 @@ class DeliveriesControllerApprovalTest {
                     ESTIMATED_DELIVERY_AT, redirectAttributes, locale);
             default -> deliveriesController.forcePurchaseForSuperAdmin(STORE_ID, DELIVERY_ID, redirectAttributes, locale);
         };
-    }
-
-    @Test
-    void backEndpointReturnsCreateViewWithPostedRequestedQtyAppliedToMatchingItem() {
-        // given
-        Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
-        Allocation allocation = new Allocation();
-        allocation.setKey(new AllocationKey(null, "item-1", "Warehouse"));
-        allocation.setType(AllocationType.Warehouse);
-        allocation.setMfn("MFN-1");
-        allocation.setName("Product 1");
-        allocation.setQty(1);
-        delivery.setAllocations(List.of(allocation));
-
-        when(deliveriesPlanningService.run(STORE_ID, PROVIDER)).thenReturn(delivery);
-        when(deliveryTaxResolver.resolveFor(PROVIDER)).thenReturn(0.23);
-        when(restockSuggestionService.suggestForDelivery(eq(STORE_ID), eq(PROVIDER), any(Set.class))).thenReturn(List.of());
-
-        DeliveryCreationForm posted = new DeliveryCreationForm();
-        DeliveryItem postedItem = new DeliveryItem();
-        postedItem.setMfn("MFN-1");
-        postedItem.setRequestedQty(7);
-        postedItem.setUnitCost(42.0);
-        posted.setItems(List.of(postedItem));
-
-        Model model = new ConcurrentModel();
-
-        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
-            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-
-            // when
-            String view = deliveriesController.backFromPurchaseConfirmation(PROVIDER, posted, model);
-
-            // then
-            assertThat(view).isEqualTo("deliveryCreate");
-            DeliveryCreationForm resultForm = (DeliveryCreationForm) model.getAttribute("form");
-            assertThat(resultForm.getItems().get(0).getRequestedQty()).isEqualTo(7);
-        }
-    }
-
-    @Test
-    void backEndpointForSuperAdminReturnsCreateViewWithPostedRequestedQtyAppliedToMatchingItem() {
-        // given
-        Delivery delivery = new Delivery(STORE_ID, null, PROVIDER);
-        Allocation allocation = new Allocation();
-        allocation.setKey(new AllocationKey(null, "item-1", "Warehouse"));
-        allocation.setType(AllocationType.Warehouse);
-        allocation.setMfn("MFN-1");
-        allocation.setName("Product 1");
-        allocation.setQty(1);
-        delivery.setAllocations(List.of(allocation));
-
-        when(deliveriesPlanningService.run(STORE_ID, PROVIDER)).thenReturn(delivery);
-        when(deliveryTaxResolver.resolveFor(PROVIDER)).thenReturn(0.23);
-        when(restockSuggestionService.suggestForDelivery(eq(STORE_ID), eq(PROVIDER), any(Set.class))).thenReturn(List.of());
-
-        DeliveryCreationForm posted = new DeliveryCreationForm();
-        DeliveryItem postedItem = new DeliveryItem();
-        postedItem.setMfn("MFN-1");
-        postedItem.setRequestedQty(7);
-        postedItem.setUnitCost(42.0);
-        posted.setItems(List.of(postedItem));
-
-        Model model = new ConcurrentModel();
-
-        // when
-        String view = deliveriesController.backFromPurchaseConfirmationForSuperAdmin(STORE_ID, PROVIDER, posted, model);
-
-        // then
-        assertThat(view).isEqualTo("deliveryCreate");
-        DeliveryCreationForm resultForm = (DeliveryCreationForm) model.getAttribute("form");
-        assertThat(resultForm.getItems().get(0).getRequestedQty()).isEqualTo(7);
-    }
-
-    @Test
-    void createDeliveryFormRedirectsToPreviewWhenThePlanningServiceHasNothingToOffer() {
-        // given
-        when(deliveriesPlanningService.run(STORE_ID, PROVIDER)).thenReturn(null);
-        Model model = new ConcurrentModel();
-
-        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
-            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-
-            // when
-            String view = deliveriesController.createDeliveryForm(PROVIDER, model);
-
-            // then
-            assertThat(view).isEqualTo("redirect:/dashboard/deliveries/preview");
-        }
-    }
-
-    @Test
-    void backEndpointRedirectsToPreviewWhenThePlanningServiceHasNothingToOffer() {
-        // given
-        when(deliveriesPlanningService.run(STORE_ID, PROVIDER)).thenReturn(null);
-        DeliveryCreationForm posted = new DeliveryCreationForm();
-        Model model = new ConcurrentModel();
-
-        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
-            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-
-            // when
-            String view = deliveriesController.backFromPurchaseConfirmation(PROVIDER, posted, model);
-
-            // then
-            assertThat(view).isEqualTo("redirect:/dashboard/deliveries/preview");
-        }
     }
 
     @Test
@@ -1844,6 +1642,85 @@ class DeliveriesControllerApprovalTest {
     }
 
     @Test
+    void paymentFromThePaymentsPageGoesBackThere() {
+        // given
+        Delivery delivery = new Delivery();
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        AddPaymentForm form = new AddPaymentForm();
+        form.setBankAmount("100");
+        form.setProcessingFee("0");
+        form.setSource(PaymentSource.BankTransfer);
+        form.setReturnTo("/dashboard/payments?side=payables&focus=overdue");
+
+        // when
+        String view;
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            view = deliveriesController.addPayment(DELIVERY_ID, form, redirectAttributes, Locale.ENGLISH);
+        }
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/payments?side=payables&focus=overdue");
+        verify(redirectAttributes).addFlashAttribute(eq(PaymentsReturn.NOTICE), any());
+    }
+
+    @Test
+    void refundFromThePaymentsPageIsCalledARefund() {
+        // given: a refund from the supplier is typed negative
+        Delivery delivery = new Delivery();
+        when(deliveriesRepository.findById(STORE_ID, DELIVERY_ID)).thenReturn(delivery);
+        when(messageSource.getMessage(eq("payments.notice.delivery.refund"), any(), eq(Locale.ENGLISH))).thenReturn("Refund saved");
+        AddPaymentForm form = new AddPaymentForm();
+        form.setBankAmount("-85");
+        form.setProcessingFee("0");
+        form.setSource(PaymentSource.BankTransfer);
+        form.setReturnTo("/dashboard/payments?focus=refund");
+
+        // when
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            deliveriesController.addPayment(DELIVERY_ID, form, redirectAttributes, Locale.ENGLISH);
+        }
+
+        // then
+        verify(redirectAttributes).addFlashAttribute(PaymentsReturn.NOTICE, "Refund saved");
+        assertThat(delivery.getPayments().get(0).getAmount()).isEqualTo(-85.0);
+    }
+
+    @Test
+    void aPaymentForAnotherStoresDeliveryIsNotFound() {
+        // given: findById is scoped to the session's store, so another store's id finds nothing
+        AddPaymentForm form = new AddPaymentForm();
+        form.setBankAmount("10");
+        form.setProcessingFee("0");
+        form.setSource(PaymentSource.BankTransfer);
+
+        // when / then
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            ResponseStatusException error = assertThrows(ResponseStatusException.class,
+                    () -> deliveriesController.addPayment(DELIVERY_ID, form, redirectAttributes, Locale.ENGLISH));
+            assertThat(error.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        }
+        verify(deliveriesRepository, never()).save(any());
+    }
+
+    @Test
+    void editingThePaymentsOfAnotherStoresDeliveryIsNotFound() {
+        // given
+        BindingResult binding = new BeanPropertyBindingResult(new Delivery(), "delivery");
+
+        // when / then
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            ResponseStatusException error = assertThrows(ResponseStatusException.class,
+                    () -> deliveriesController.updatePayments(DELIVERY_ID, new Delivery(), binding, redirectAttributes, Locale.ENGLISH));
+            assertThat(error.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        }
+        verify(deliveriesRepository, never()).save(any());
+    }
+
+    @Test
     void addPaymentToADeliveryReadsACommaAmount() {
         // given: the dialog's amounts are text, read on the server whatever the browser's language
         Delivery delivery = new Delivery();
@@ -1857,7 +1734,7 @@ class DeliveriesControllerApprovalTest {
         String view;
         try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
             security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
-            view = deliveriesController.addPayment(DELIVERY_ID, form, false, redirectAttributes, Locale.ENGLISH);
+            view = deliveriesController.addPayment(DELIVERY_ID, form, redirectAttributes, Locale.ENGLISH);
         }
 
         // then: a payout to the supplier keeps its sign
@@ -1908,5 +1785,45 @@ class DeliveriesControllerApprovalTest {
         assertThat(view).isEqualTo("redirect:/dashboard/deliveries/details?deliveryId=" + DELIVERY_ID);
         verify(redirectAttributes).addFlashAttribute("errorMessage", "Enter the amount as a number");
         verify(deliveriesRepository, never()).save(any());
+    }
+
+    @Test
+    void syncWithoutInvoicingSystemFlashesAnErrorOnThePaymentsPage() {
+        // given
+        when(invoiceSynchronizationService.sync(STORE_ID)).thenReturn(InvoiceSyncResult.notConfigured());
+        when(messageSource.getMessage("payments.sync.notConfigured", null, Locale.ENGLISH)).thenReturn("not configured");
+
+        // when
+        String view;
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            view = deliveriesController.syncPaymentStatuses(redirectAttributes, Locale.ENGLISH);
+        }
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/payments");
+        verify(redirectAttributes).addFlashAttribute(PaymentsReturn.ERROR, "not configured");
+    }
+
+    @Test
+    void syncWithPaidDeliveriesFlashesANoticeNamingThem() {
+        // given
+        when(invoiceSynchronizationService.sync(STORE_ID))
+                .thenReturn(new InvoiceSyncResult(true, 3, List.of("aaaa0001", "aaaa0002"), 1, List.of()));
+        when(messageSource.getMessage(eq("payments.sync.result"), any(Object[].class), eq(Locale.ENGLISH))).thenReturn("Checked 3.");
+        when(messageSource.getMessage(eq("payments.sync.result.paid"), eq(new Object[]{"aaaa0001, aaaa0002"}), eq(Locale.ENGLISH)))
+                .thenReturn("Paid: aaaa0001, aaaa0002.");
+
+        // when
+        String view;
+        try (MockedStatic<CustomSecurityContext> security = mockStatic(CustomSecurityContext.class)) {
+            security.when(CustomSecurityContext::getStoreId).thenReturn(STORE_ID);
+            view = deliveriesController.syncPaymentStatuses(redirectAttributes, Locale.ENGLISH);
+        }
+
+        // then
+        assertThat(view).isEqualTo("redirect:/dashboard/payments");
+        verify(redirectAttributes).addFlashAttribute(PaymentsReturn.NOTICE, "Checked 3. Paid: aaaa0001, aaaa0002.");
+        verify(redirectAttributes, never()).addFlashAttribute(eq(PaymentsReturn.ERROR), any());
     }
 }

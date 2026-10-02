@@ -226,23 +226,6 @@ public class OrdersRepository extends DynamoDbRepository<Order> {
         return dynamoDBMapper.scan(Order.class, scanExpression);
     }
 
-    public List<Order> findAllActiveOrders(String storeId) {
-        Map<String, AttributeValue> eav = new HashMap<>();
-        eav.put(":storeId", new AttributeValue().withS(storeId));
-        eav.put(":statusCompleted", new AttributeValue().withS(OrderStatus.Completed.name()));
-        eav.put(":statusCancelled", new AttributeValue().withS(OrderStatus.Cancelled.name()));
-
-        Map<String, String> expressionAttributeNames = new HashMap<>();
-        expressionAttributeNames.put("#status", "status");
-
-        DynamoDBScanExpression scanExpression = new DynamoDBScanExpression()
-                .withFilterExpression("storeId = :storeId AND #status <> :statusCompleted AND #status <> :statusCancelled")
-                .withExpressionAttributeValues(eav)
-                .withExpressionAttributeNames(expressionAttributeNames);
-
-        return dynamoDBMapper.scan(Order.class, scanExpression);
-    }
-
     public List<OrderIndexEntry> findAllWarehouseFulfilmentOrder(String storeId) {
         Map<String, AttributeValue> eav = new HashMap<>();
         eav.put(":storeId", new AttributeValue().withS(storeId));

@@ -24,6 +24,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNoException;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
@@ -32,6 +33,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -346,6 +348,21 @@ class DeliveryCreationServiceTest {
         assertEquals(165.0, saved.getTotalCost());
         verify(orderAllocationsManager).commit(eq(STORE_ID), eq(deliveryId), any(), eq(form.getItems()));
         verify(warehouseAllocationsManager).commit(STORE_ID, deliveryId, form.getProvider(), form.getItems());
+    }
+
+    @Test
+    void runRefusesAFormWithoutTheSupplierOrderNumberOrDateBeforeTouchingAnything() {
+        // given
+        DeliveryCreationForm form = new DeliveryCreationForm();
+        form.setProvider("Acme");
+        form.setRemoveUnselected(true);
+        form.setEstimatedDeliveryAt(null);
+        form.setExternalDeliveryId("EXT-1");
+
+        // when / then
+        assertThatThrownBy(() -> service.run("store-1", form))
+                .isInstanceOf(IllegalArgumentException.class);
+        verifyNoInteractions(orderAllocationsManager, warehouseAllocationsManager, deliveriesRepository);
     }
 
     @Test

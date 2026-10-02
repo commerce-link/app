@@ -7,6 +7,7 @@ import org.apache.logging.log4j.util.Strings;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -50,7 +51,9 @@ import pl.commercelink.receipts.ReceiptAttempt;
 import pl.commercelink.receipts.ReceiptAttemptService;
 import pl.commercelink.receipts.ReceiptLock;
 import pl.commercelink.rest.client.HttpClientException;
+import pl.commercelink.shipping.ShipmentCancelResult;
 import pl.commercelink.shipping.ShipmentCancelService;
+import pl.commercelink.shipping.ShipmentCancellationInProgressException;
 import pl.commercelink.shipping.ShippingUnavailableException;
 import pl.commercelink.shipping.ShipmentTrackingSubscriber;
 import pl.commercelink.shipping.api.ShippingException;
@@ -64,6 +67,7 @@ import pl.commercelink.stores.StoresRepository;
 import pl.commercelink.warehouse.GoodsOutEventPublisher;
 import pl.commercelink.web.dtos.AddItemsForm;
 import pl.commercelink.web.dtos.AddPaymentForm;
+import pl.commercelink.web.payments.PaymentsReturn;
 import pl.commercelink.web.dtos.AssignSupplierForm;
 import pl.commercelink.web.dtos.FormNumbers;
 import pl.commercelink.web.dtos.ClientDataDto;
@@ -114,6 +118,9 @@ import pl.commercelink.inventory.supplier.SupplierLabels;
 import java.util.*;
 import java.util.function.Function;
 import java.util.function.Supplier;
+
+import static pl.commercelink.taxonomy.UnifiedProductIdentifiers.unifyEan;
+import static pl.commercelink.taxonomy.UnifiedProductIdentifiers.unifyMfn;
 
 @Controller
 public class OrdersController extends BaseController {
@@ -764,6 +771,11 @@ public class OrdersController extends BaseController {
         return details(orderId);
     }
 
+    private String refuseToPayments(RedirectAttributes redirectAttributes, String target, String key, Locale locale) {
+        redirectAttributes.addFlashAttribute(PaymentsReturn.ERROR, messageSource.getMessage(key, null, locale));
+        return "redirect:" + target;
+    }
+
     /** A no-JavaScript confirmation page whose texts are the dialog's: <prefix>.confirm.title / .message / .action. */
     private String confirmPage(Model model, Order order, String prefix, Object[] titleArgs, String message,
                                String actionPath, boolean destructive, Locale locale) {
@@ -1077,12 +1089,22 @@ public class OrdersController extends BaseController {
             return refuseSupplier(orderId, form, store, async, response, model, redirectAttributes,
                     messageSource.getMessage("order.item.assign.supplier.routed", null, locale));
         }
+        // The taxonomy is the source of truth for a product's EAN; the dialog offers the EAN field only once the
+        // manufacturer code missed it, so a typed EAN never overrides a known one.
         Taxonomy taxonomy = taxonomyCache.findByMfn(form.getManufacturerCode());
-        String ean = taxonomy != null ? taxonomy.ean() : null;
-        if (Strings.isBlank(ean)) {
-            // the refusal stays in the dialog instead of opening the item's edit page
-            return refuseSupplier(orderId, form, store, async, response, model, redirectAttributes,
-                    messageSource.getMessage("order.item.ean.not.found", null, locale));
+        String ean = taxonomy != null ? StringUtils.trimToNull(taxonomy.ean()) : null;
+        if (ean == null) {
+            model.addAttribute("supplierEanField", true);
+            String typedEan = StringUtils.trimToNull(form.getEan());
+            if (typedEan != null && !typedEan.matches("\\d{8,14}")) {
+                return refuseSupplier(orderId, form, store, async, response, model, redirectAttributes,
+                        messageSource.getMessage("product.error.ean.invalid", null, locale));
+            }
+            ean = typedEan != null ? unifyEan(typedEan) : ownEan(orderItem, form.getManufacturerCode());
+            if (ean == null) {
+                return refuseSupplier(orderId, form, store, async, response, model, redirectAttributes,
+                        messageSource.getMessage("order.item.ean.not.found", null, locale));
+            }
         }
 
         // a gross price is turned net with the item's own VAT, as the old dialog did in the browser
@@ -1102,6 +1124,16 @@ public class OrdersController extends BaseController {
         }
         OrderFlash.saved(redirectAttributes, saved);
         return details(orderId);
+    }
+
+    /**
+     * A product outside the taxonomy (one typed by hand, not in PIM) has its EAN only on the item, so that one is kept -
+     * but only while the dialog names the same product code, so a stale EAN never follows the item to another product.
+     */
+    private String ownEan(OrderItem item, String manufacturerCode) {
+        boolean sameProduct = StringUtils.isNotBlank(manufacturerCode)
+                && Objects.equals(item.getManufacturerCode(), unifyMfn(manufacturerCode));
+        return sameProduct ? StringUtils.trimToNull(item.getEan()) : null;
     }
 
     private String refuseSupplier(String orderId, AssignSupplierForm form, Store store, boolean async,
@@ -1650,20 +1682,24 @@ public class OrdersController extends BaseController {
                              RedirectAttributes redirectAttributes,
                              Locale locale) {
         Order existingOrder = requireOrder(ordersRepository, getStoreId(), orderId);
+        Optional<String> back = PaymentsReturn.target(form.getReturnTo());
         // the closed page offers no "Dodaj wpłatę"; a cancelled order would drop the payment while saying it was added
         if (existingOrder.isClosed()) {
-            return refuse(redirectAttributes, orderId, closedPaymentsKey(existingOrder), locale);
+            return back.isPresent() ? refuseToPayments(redirectAttributes, back.get(), closedPaymentsKey(existingOrder), locale)
+                    : refuse(redirectAttributes, orderId, closedPaymentsKey(existingOrder), locale);
         }
 
         String invalid = form.validate();
         if (invalid != null) {
-            return refuse(redirectAttributes, orderId, invalid, locale);
+            return back.isPresent() ? refuseToPayments(redirectAttributes, back.get(), invalid, locale)
+                    : refuse(redirectAttributes, orderId, invalid, locale);
         }
         PaymentDirection direction = form.getDirection() != null ? form.getDirection() : PaymentDirection.Incoming;
         // the sign follows the direction, as in a payment's own dialog: a refund is stored negative however it was
         // typed, and money that came in cannot be negative
         if (direction == PaymentDirection.Incoming && form.amount() < 0) {
-            return refuse(redirectAttributes, orderId, "order.payments.error.negative", locale);
+            return back.isPresent() ? refuseToPayments(redirectAttributes, back.get(), "order.payments.error.negative", locale)
+                    : refuse(redirectAttributes, orderId, "order.payments.error.negative", locale);
         }
         double bankAmount = direction == PaymentDirection.Outgoing ? -Math.abs(form.amount()) : form.amount();
 
@@ -1690,6 +1726,12 @@ public class OrdersController extends BaseController {
         target.setBankTransactionDate(form.getBankTransactionDate());
 
         orderLifecycle.update(existingOrder);
+        if (back.isPresent()) {
+            redirectAttributes.addFlashAttribute(PaymentsReturn.NOTICE,
+                    messageSource.getMessage(direction == PaymentDirection.Outgoing ? "payments.notice.order.refund" : "payments.notice.order",
+                            new Object[]{existingOrder.getShortenedOrderId()}, locale));
+            return "redirect:" + back.get();
+        }
         OrderFlash.saved(redirectAttributes, messageSource.getMessage("order.payments.added", null, locale));
         return details(orderId);
     }
@@ -2224,16 +2266,41 @@ public class OrdersController extends BaseController {
                                  RedirectAttributes redirectAttributes, Locale locale) {
         Order order = requireOrder(ordersRepository, getStoreId(), orderId);
         // the same shipment ShipmentCancelService picks; its English errors never reach the operator
-        String refusal = order.courierShipmentToCancel().isPresent() ? null
+        Optional<Shipment> courier = order.courierShipmentToCancel();
+        String refusal = courier.isPresent()
+                ? (courier.get().isCancellationInProgress(LocalDateTime.now()) ? "order.shipments.cancel.error.pending" : null)
                 : order.firstShipmentWithShippingData().isEmpty() ? "order.shipments.cancel.error.no.data"
                 : "order.shipments.cancel.error.no.package";
         if (refusal != null) {
             return refuse(redirectAttributes, orderId, refusal, locale);
         }
         try {
-            boolean backToRealization = shipmentCancelService.cancelShipping(orderId, getStoreId());
-            String notice = messageSource.getMessage("shipment.cancel.success", null, locale);
-            OrderFlash.saved(redirectAttributes, backToRealization ? notice + " " + backToRealizationNotice(locale) : notice);
+            ShipmentCancelResult result = shipmentCancelService.cancelShipping(orderId, getStoreId());
+            switch (result.outcome()) {
+                case REQUESTED -> OrderFlash.saved(redirectAttributes,
+                        messageSource.getMessage("shipment.cancel.requested", null, locale));
+                case RECHECKING -> OrderFlash.saved(redirectAttributes,
+                        messageSource.getMessage("shipment.cancel.rechecking", null, locale));
+                case CANCELLED -> {
+                    // an immediate confirmation settles the shipments here, the step back included; after one in
+                    // the background the reloaded page shows the new status instead
+                    String notice = messageSource.getMessage("shipment.cancel.success", null, locale);
+                    OrderFlash.saved(redirectAttributes,
+                            result.backToRealization() ? notice + " " + backToRealizationNotice(locale) : notice);
+                }
+                case FAILED -> {
+                    String reasonKey = OrderLabels.cancellationReasonKey(result.error());
+                    return refuse(redirectAttributes, orderId, "shipment.cancel.failed", locale,
+                            reasonKey != null ? messageSource.getMessage(reasonKey, null, locale)
+                                    : Objects.toString(result.error(), ""));
+                }
+                case GONE -> {
+                    return refuse(redirectAttributes, orderId, "shipment.cancel.gone", locale);
+                }
+            }
+        } catch (ShipmentCancellationInProgressException e) {
+            // a concurrent request marked the cancellation between the check above and the service's fresh read
+            return refuse(redirectAttributes, orderId, "order.shipments.cancel.error.pending", locale);
         } catch (ShippingUnavailableException e) {
             // the store's carrier authorisation was lost: nothing was cancelled nor changed
             return refuse(redirectAttributes, orderId, "order.shipments.cancel.error.no.provider", locale);
@@ -2243,6 +2310,20 @@ public class OrdersController extends BaseController {
             redirectAttributes.addFlashAttribute("errorMessage", e.getMessage());
         }
         return details(orderId);
+    }
+
+    /** Whether a shipment of the order is still being cancelled; the shipments card polls it (shipment-cancellation.js). */
+    @GetMapping("/dashboard/orders/{orderId}/shipments/cancellation-state")
+    @PreAuthorize("!hasRole('SUPER_ADMIN')")
+    @ResponseBody
+    public ResponseEntity<CancellationState> shipmentCancellationState(@PathVariable String orderId) {
+        Order order = requireOrder(ordersRepository, getStoreId(), orderId);
+        LocalDateTime now = LocalDateTime.now();
+        boolean inProgress = order.getShipments().stream().anyMatch(s -> s.isCancellationInProgress(now));
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(new CancellationState(inProgress));
+    }
+
+    public record CancellationState(boolean inProgress) {
     }
 
     private String handleHttpClientException(HttpClientException ex, String orderId,

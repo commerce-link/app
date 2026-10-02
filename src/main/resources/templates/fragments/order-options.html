@@ -33,28 +33,5 @@
         }
     </script>
 </th:block>
-<!--/* The supplier's order options as cl-form fields (redesigned dropship confirmation). No inline handler: the page
-       script listens for changes of select[data-order-option] and gates its submit button on the required ones. */-->
-<th:block th:fragment="clOrderOptions(options, selected)">
-    <fieldset th:if="${options != null and !#lists.isEmpty(options)}" id="order-options" class="cl-fieldset">
-        <legend class="cl-fieldset-title" th:text="#{deliveries.options.label}"></legend>
-        <div class="cl-form-grid">
-            <div class="cl-span-3 cl-field" th:each="option, optionStat : ${options}">
-                <label class="cl-label" th:for="|order-option-${optionStat.index}|" th:text="${option.label()}"></label>
-                <select class="cl-select" th:id="|order-option-${optionStat.index}|"
-                        th:name="'supplierOrderChoices[' + ${option.key()} + ']'"
-                        th:attr="data-order-option=${option.key()},data-required=${option.required()}"
-                        th:required="${option.required()}">
-                    <th:block th:if="${selected == null or selected[option.key()] == null}">
-                        <option value="" th:text="#{deliveries.options.choose}"></option>
-                    </th:block>
-                    <option th:each="choice : ${option.choices()}" th:value="${choice.value()}"
-                            th:text="${choice.hint() != null} ? ${choice.label() + ' — ' + choice.hint()} : ${choice.label()}"
-                            th:selected="${selected != null and choice.value() == selected[option.key()]}"></option>
-                </select>
-            </div>
-        </div>
-    </fieldset>
-</th:block>
 </body>
 </html>

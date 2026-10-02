@@ -7,8 +7,6 @@ import pl.commercelink.orders.Order;
 import pl.commercelink.orders.OrderItem;
 import pl.commercelink.orders.fulfilment.FulfilmentType;
 
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -73,7 +71,7 @@ class DeliveryRedirectResolverTest {
         String url = resolve(order, item);
 
         // then
-        assertThat(url).isEqualTo("/dashboard/orders/order-1/dropship?provider=AcmeB");
+        assertThat(url).isEqualTo("/dashboard/deliveries/create/AcmeB?order=order-1&from=order");
     }
 
     @Test
@@ -86,7 +84,7 @@ class DeliveryRedirectResolverTest {
         String url = resolve(order, item);
 
         // then
-        assertThat(url).isEqualTo("/dashboard/orders/order-1/dropship?provider=AcmeB");
+        assertThat(url).isEqualTo("/dashboard/deliveries/create/AcmeB?order=order-1&from=order");
     }
 
     @Test
@@ -144,6 +142,14 @@ class DeliveryRedirectResolverTest {
     }
 
     @Test
+    void dropshipCreateLinkIsRecognisedByItsOrderParameterNotBySubstring() {
+        // when / then
+        assertThat(DeliveryRedirectResolver.isDropshipCreateLink("/dashboard/deliveries/create/Acme?order=o-1&from=order")).isTrue();
+        assertThat(DeliveryRedirectResolver.isDropshipCreateLink("/dashboard/deliveries/create/Acme")).isFalse();
+        assertThat(DeliveryRedirectResolver.isDropshipCreateLink("/dashboard/deliveries/details?deliveryId=dropship-1")).isFalse();
+    }
+
+    @Test
     void newItemWithAProviderNameRequiringEncodingLinksToTheEncodedDropshipPage() {
         // given
         Order order = order(FulfilmentType.DirectToConsumer);
@@ -154,9 +160,7 @@ class DeliveryRedirectResolverTest {
         String url = resolve(order, item);
 
         // then
-        String encodedProvider = URLEncoder.encode(provider, StandardCharsets.UTF_8);
-        assertThat(url).isEqualTo("/dashboard/orders/order-1/dropship?provider=" + encodedProvider);
-        assertThat(url).isEqualTo("/dashboard/orders/order-1/dropship?provider=Acme+%26+B");
+        assertThat(url).isEqualTo("/dashboard/deliveries/create/Acme%20&%20B?order=order-1&from=order");
     }
 
     @Test
