@@ -16,11 +16,14 @@
                 <div class="cl-page-header-row">
                     <h1 class="cl-page-title" th:text="#{order.card.title}"></h1>
                     <!--/* scanned with a phone in the warehouse, it opens the order (OrderLinks.scan); the SVG is drawn
-                           by QrCodeSvg from module coordinates only, so utext inserts no text anyone typed */-->
+                           by QrCodeSvg from module coordinates only, so utext inserts no text anyone typed. On screen it
+                           stays right of the title; printed, it moves to the sheet's top-right corner beside the title and
+                           the order details below (commercelink.css, @media print). The caption is the short order number
+                           alone, so the code can be matched with the order by eye. */-->
                     <figure class="cl-print-qr">
                         <div class="cl-print-qr-code" role="img"
                              th:attr="aria-label=#{order.card.qr.label(${p.shortId()})}" th:utext="${p.scanQrSvg()}"></div>
-                        <figcaption th:text="#{order.card.qr.caption}"></figcaption>
+                        <figcaption class="cl-tabular" th:text="${p.shortId()}"></figcaption>
                     </figure>
                 </div>
             </div>

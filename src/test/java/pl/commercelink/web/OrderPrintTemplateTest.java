@@ -259,15 +259,17 @@ class OrderPrintTemplateTest {
     }
 
     @Test
-    void theCardPrintsTheQrCodeOfTheOrderWithACaption() {
+    void theCardPrintsTheQrCodeOfTheOrderCaptionedWithTheShortOrderNumber() {
         // when
         String html = card(order(), items(), false);
 
-        // then
+        // then: the caption is the number alone, no scanning instruction
+        String shortId = order().getShortenedOrderId();
         assertThat(html).contains("class=\"cl-print-qr\"")
-                .contains("role=\"img\"").contains("aria-label=\"Kod QR zamówienia " + order().getShortenedOrderId() + "\"")
+                .contains("role=\"img\"").contains("aria-label=\"Kod QR zamówienia " + shortId + "\"")
                 .contains(QrCodeSvg.of(SCAN_URL))
-                .contains("Zeskanuj telefonem, aby otworzyć zamówienie")
+                .containsPattern("<figcaption[^>]*>" + shortId + "</figcaption>")
+                .doesNotContain("Zeskanuj telefonem")
                 .doesNotContain("??");
     }
 

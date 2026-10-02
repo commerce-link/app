@@ -7043,8 +7043,10 @@ a.cl-link-button:hover {
     height: auto;
 }
 
+/* Upright, not Bulma's italic `.content figure figcaption`: the caption is the order number. */
 .cl-page .cl-print-qr figcaption {
     margin-top: 4px;
+    font-style: normal;
     font-size: 0.75rem;
     line-height: 1.3;
     color: var(--cl-ink-2);
@@ -7212,13 +7214,37 @@ a.cl-link-button:hover {
         font-size: 16pt;
     }
 
+    /* The order card's QR code leaves the title row and sits in the sheet's top-right corner, beside both the title
+       and the order details, so it no longer makes the title row as tall as itself (more item rows fit on page 1).
+       The title row and the details keep 34 mm free on the right (code + gap), so no text runs under the code. */
+    .cl-page.cl-print-page .cl-page-body:has(.cl-print-qr) {
+        position: relative;
+    }
+
     .cl-page.cl-print-page .cl-page-header-row figure.cl-print-qr {
+        position: absolute;
+        top: 0;
+        right: 0;
         width: 30mm;
     }
 
+    .cl-page.cl-print-page .cl-page-header-row:has(.cl-print-qr) {
+        padding-right: 34mm;
+    }
+
+    /* The code with its caption (~34 mm) is taller than the title and the three detail rows (~31 mm, measured in
+       Chromium), so the details get a min-height that starts the first section's rule ~3 mm below the caption
+       instead of through it: 9.9 mm (title + its margin) + 27.5 mm = 37.4 mm from the top of the sheet. */
+    .cl-page.cl-print-page .cl-page-body:has(.cl-print-qr) dl.cl-kv.cl-print-meta {
+        min-height: 27.5mm;
+        padding-right: 34mm;
+        align-content: start;
+    }
+
     .cl-page.cl-print-page .cl-print-qr figcaption {
-        margin-top: 2pt;
-        font-size: 8pt;
+        margin-top: 1pt;
+        font-size: 9pt;
+        line-height: 1.2;
         color: #000;
     }
 
