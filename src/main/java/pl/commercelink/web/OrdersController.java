@@ -118,6 +118,9 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
+import static pl.commercelink.taxonomy.UnifiedProductIdentifiers.unifyEan;
+import static pl.commercelink.taxonomy.UnifiedProductIdentifiers.unifyMfn;
+
 @Controller
 public class OrdersController extends BaseController {
 
@@ -1080,10 +1083,14 @@ public class OrdersController extends BaseController {
             return refuseSupplier(orderId, form, store, async, response, model, redirectAttributes,
                     messageSource.getMessage("order.item.assign.supplier.routed", null, locale));
         }
-        Taxonomy taxonomy = taxonomyCache.findByMfn(form.getManufacturerCode());
-        String ean = taxonomy != null ? taxonomy.ean() : null;
+        String typedEan = StringUtils.trimToNull(form.getEan());
+        if (typedEan != null && !typedEan.matches("\\d{8,14}")) {
+            return refuseSupplier(orderId, form, store, async, response, model, redirectAttributes,
+                    messageSource.getMessage("product.error.ean.invalid", null, locale));
+        }
+        String ean = typedEan != null ? unifyEan(typedEan) : eanOf(orderItem, form.getManufacturerCode());
         if (Strings.isBlank(ean)) {
-            // the refusal stays in the dialog instead of opening the item's edit page
+            // the refusal stays in the dialog, where the EAN field takes the code the taxonomy does not know
             return refuseSupplier(orderId, form, store, async, response, model, redirectAttributes,
                     messageSource.getMessage("order.item.ean.not.found", null, locale));
         }
@@ -1105,6 +1112,21 @@ public class OrdersController extends BaseController {
         }
         OrderFlash.saved(redirectAttributes, saved);
         return details(orderId);
+    }
+
+    /**
+     * The EAN of a product outside the taxonomy (one typed by hand, not in PIM) is not looked up anywhere, so the one
+     * already on the item is kept - but only while the dialog names the same product code, so a stale EAN never
+     * follows the item to another product.
+     */
+    private String eanOf(OrderItem item, String manufacturerCode) {
+        Taxonomy taxonomy = taxonomyCache.findByMfn(manufacturerCode);
+        if (taxonomy != null && StringUtils.isNotBlank(taxonomy.ean())) {
+            return taxonomy.ean();
+        }
+        boolean sameProduct = StringUtils.isNotBlank(manufacturerCode)
+                && Objects.equals(item.getManufacturerCode(), unifyMfn(manufacturerCode));
+        return sameProduct ? StringUtils.trimToNull(item.getEan()) : null;
     }
 
     private String refuseSupplier(String orderId, AssignSupplierForm form, Store store, boolean async,

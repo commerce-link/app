@@ -331,6 +331,7 @@
                 input.value = trigger.getAttribute('data-item-id') || '';
             });
             f.querySelector('input[name="manufacturerCode"]').value = '';
+            f.querySelector('input[name="ean"]').value = '';
             f.querySelector('input[name="cost"]').value = '';
             f.querySelector('input[name="priceType"]').value = 'net';
             f.querySelectorAll('[data-cl-cost-type] button').forEach(function (button) {

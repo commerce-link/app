@@ -1833,6 +1833,16 @@ class OrderDetailsTemplateTest {
                 .contains("Wpisz skrót kontrahenta");
     }
 
+    @Test
+    void theSupplierDialogTakesATypedEanAndNamesTheCounterpartyField() {
+        // when
+        String html = page(render(order(OrderStatus.New), ADMIN));
+
+        // then: a product outside the taxonomy can still be assigned; the counterparty field has a real label
+        assertThat(html).contains("id=\"assign-supplier-ean\"").contains("name=\"ean\"")
+                .contains(">Skrót kontrahenta w systemie fakturowym<").doesNotContain(">np. HURT-ABC<");
+    }
+
     static Map<String, Object> subpageVariables(Order order) {
         OrderPageModel page = factory(Set.of()).build(order, items(order), ADMIN, PL);
         Map<String, Object> variables = new HashMap<>();
