@@ -1746,6 +1746,33 @@ a.cl-link-button:hover {
     color: var(--cl-ink-2);
 }
 
+/* Pill next to an option title, e.g. the supplier address that matches the store's shipping address (approval screen) */
+.cl-page .cl-choice-title .cl-status {
+    margin-left: 8px;
+    vertical-align: 1px;
+}
+
+/* "Goods for": the customer orders a delivery request serves, link and customer on the left, quantity on the right */
+.cl-page .cl-request-for {
+    margin: 0;
+    padding: 4px 20px 18px;
+    list-style: none;
+    display: grid;
+    gap: 6px;
+    font-size: 14px;
+}
+
+.cl-page .cl-request-for li {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 0;
+}
+
+.cl-page .cl-request-for .cl-table-sub {
+    display: block;
+}
+
 /* A group of fields or options inside a card's group, without a frame of its own: radios under a legend that reads like a
    field label, or a part of the form that is switched off as a whole (disabled with its fieldset). */
 .cl-page .cl-choice-group {
