@@ -8,6 +8,7 @@ import pl.commercelink.documents.DocumentType;
 import pl.commercelink.inventory.deliveries.DeliveryRedirectResolver;
 import pl.commercelink.inventory.deliveries.DropshipItemLookup;
 import pl.commercelink.inventory.supplier.SupplierChoice;
+import pl.commercelink.inventory.supplier.SupplierLabelMap;
 import pl.commercelink.inventory.supplier.SupplierLabels;
 import pl.commercelink.orders.BillingDetails;
 import pl.commercelink.orders.CourierCancellation;
@@ -1863,6 +1864,44 @@ class OrderDetailsTemplateTest {
         // then: the typed value survives the refusal
         assertThat(html).contains("id=\"assign-supplier-ean\"").contains("name=\"ean\"")
                 .contains("value=\"5901234567890\"").contains("data-cl-ean-field");
+    }
+
+    @Test
+    void aRefusedSupplierDialogKeepsTheChosenConnection() {
+        // given: the hidden counterparty field is always posted, so a connection arrives with an empty custom name
+        AssignSupplierForm form = AssignSupplierForm.of("i1", "MFN-X", "100", "net", "Acme", "");
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("orderId", "o1");
+        variables.put("supplierForm", form);
+        variables.put("supplierError", "Tego kodu producenta nie ma w bazie produktów");
+        variables.put("suppliers", List.of(new SupplierLabelMap.Option("Acme", "Acme")));
+
+        // when
+        String html = SettingsTemplateRenderer.render(
+                "<div th:replace=\"~{orders/details/item-dialogs :: supplierForm}\"></div>", variables);
+
+        // then
+        assertThat(html).contains("<option value=\"Acme\" selected=\"selected\">")
+                .doesNotContain("<option value=\"" + SupplierChoice.CUSTOM + "\" selected=\"selected\">");
+    }
+
+    @Test
+    void aRefusedSupplierDialogKeepsATypedSupplierName() {
+        // given
+        AssignSupplierForm form = AssignSupplierForm.of("i1", "MFN-X", "100", "net", SupplierChoice.CUSTOM, "HURT-ABC");
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("orderId", "o1");
+        variables.put("supplierForm", form);
+        variables.put("supplierError", "Tego kodu producenta nie ma w bazie produktów");
+        variables.put("suppliers", List.of(new SupplierLabelMap.Option("Acme", "Acme")));
+
+        // when
+        String html = SettingsTemplateRenderer.render(
+                "<div th:replace=\"~{orders/details/item-dialogs :: supplierForm}\"></div>", variables);
+
+        // then
+        assertThat(html).contains("<option value=\"" + SupplierChoice.CUSTOM + "\" selected=\"selected\">")
+                .contains("value=\"HURT-ABC\"").doesNotContain("<option value=\"Acme\" selected=\"selected\">");
     }
 
     static Map<String, Object> subpageVariables(Order order) {
