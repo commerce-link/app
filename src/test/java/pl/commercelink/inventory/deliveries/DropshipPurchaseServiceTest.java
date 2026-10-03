@@ -641,6 +641,29 @@ class DropshipPurchaseServiceTest {
         assertEquals("CommerceLink ref-1", request.getValue().deliveryInstructions());
     }
 
+    @Test
+    void completeDropshipOrderSendsTheSameRequestToTheCompletionCall() {
+        // given
+        Delivery delivery = pendingDropshipDelivery("ref-1");
+        List<SupplierOrderLine> lines = List.of(new SupplierOrderLine("ACME-EAN-1", "EAN-1", "MFN-1", 2));
+        when(ordersRepository.findById(STORE_ID, ORDER_ID)).thenReturn(directToConsumerOrder());
+        when(supplierProvider.completePlacedDropshipOrder(any())).thenReturn(new SupplierOrderResult(
+                "ZA/1", 220.0, "PLN", List.of(new SupplierQuote("EAN-1", "MFN-1", 2, 110.0, "PLN"))));
+
+        // when
+        SupplierOrderResult result = service.completeDropshipOrder(STORE_ID, delivery, lines, ORDER_ID);
+
+        // then
+        assertEquals("ZA/1", result.externalOrderId());
+        ArgumentCaptor<SupplierDropshipRequest> request = ArgumentCaptor.forClass(SupplierDropshipRequest.class);
+        verify(supplierProvider).completePlacedDropshipOrder(request.capture());
+        verify(supplierProvider, never()).placeDropshipOrder(any());
+        assertEquals("ref-1", request.getValue().clientOrderRef());
+        assertEquals(lines, request.getValue().lines());
+        assertEquals("Kowalski", request.getValue().consignee().lastName());
+        assertEquals("CommerceLink ref-1", request.getValue().deliveryInstructions());
+    }
+
     private static Order pickupPointOrder() {
         Order order = directToConsumerOrder();
         Shipment shipment = new Shipment();

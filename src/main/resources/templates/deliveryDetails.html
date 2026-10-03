@@ -32,7 +32,7 @@
                                 <span class="tag is-warning is-light ml-2" th:if="${delivery.externalDeliveryIdProvisional}"
                                       th:text="#{deliveries.externalId.provisional}"></span>
                                 <button type="submit" form="refresh-order-id-form" class="button is-white is-small p-1 ml-1"
-                                        th:if="${delivery.externalDeliveryIdProvisional and (isAdmin or isSuperAdmin)}"
+                                        th:if="${delivery.externalDeliveryIdProvisional and !delivery.awaitingSupplierConfirmation and (isAdmin or isSuperAdmin)}"
                                         th:title="#{deliveries.orderId.refresh.button}">
                                     <span class="icon is-small has-text-grey"><i class="fas fa-sync-alt"></i></span>
                                 </button>
@@ -210,7 +210,7 @@
                         </div>
                     </form>
                     <form id="refresh-order-id-form" method="post"
-                          th:if="${delivery.externalDeliveryIdProvisional and !delivery.hasBeenReceived() and (isAdmin or isSuperAdmin)}"
+                          th:if="${delivery.externalDeliveryIdProvisional and !delivery.awaitingSupplierConfirmation and !delivery.hasBeenReceived() and (isAdmin or isSuperAdmin)}"
                           th:action="${isSuperAdmin} ? @{|/dashboard/store/${delivery.storeId}/deliveries/${delivery.deliveryId}/refresh-order-id|}
                                                      : @{|/dashboard/deliveries/${delivery.deliveryId}/refresh-order-id|}">
                     </form>
@@ -220,7 +220,12 @@
                                                      : @{|/dashboard/deliveries/${delivery.deliveryId}/purchase/retry|}">
                     </form>
 
-                    <div class="box" th:if="${delivery.orderDispatched}">
+                    <div class="box" th:if="${delivery.orderDispatched and delivery.awaitingSupplierConfirmation}">
+                        <div class="notification is-info">
+                            <p th:text="#{deliveries.purchase.awaitingSupplier.banner(${delivery.externalDeliveryId})}"></p>
+                        </div>
+                    </div>
+                    <div class="box" th:if="${delivery.orderDispatched and !delivery.awaitingSupplierConfirmation}">
                         <div class="notification is-warning">
                             <p th:text="#{deliveries.purchase.dispatched.banner}"></p>
                             <p th:if="${not #strings.isEmpty(delivery.orderErrorMessage)}" th:text="${delivery.orderErrorMessage}"></p>
@@ -627,7 +632,7 @@
             </div>
 
             <div id="completePurchaseModal" class="modal"
-                 th:if="${(delivery.orderFailed or delivery.orderDispatched) and !delivery.hasBeenReceived() and delivery.documents.isEmpty() and (delivery.connectionMode?.name() == 'GLOBAL' ? isSuperAdmin : (isAdmin and !isSuperAdmin))}">
+                 th:if="${(delivery.orderFailed or delivery.orderDispatched) and !delivery.awaitingSupplierConfirmation and !delivery.hasBeenReceived() and delivery.documents.isEmpty() and (delivery.connectionMode?.name() == 'GLOBAL' ? isSuperAdmin : (isAdmin and !isSuperAdmin))}">
                 <div class="modal-background" onclick="toggleCompletePurchaseModal(false)"></div>
                 <div class="modal-card">
                     <header class="modal-card-head">
@@ -661,7 +666,7 @@
             </div>
 
             <div id="forcePurchaseModal" class="modal"
-                 th:if="${delivery.orderDispatched and !delivery.hasBeenReceived() and delivery.documents.isEmpty() and (delivery.connectionMode?.name() == 'GLOBAL' ? isSuperAdmin : (isAdmin and !isSuperAdmin))}">
+                 th:if="${delivery.orderDispatched and !delivery.awaitingSupplierConfirmation and !delivery.hasBeenReceived() and delivery.documents.isEmpty() and (delivery.connectionMode?.name() == 'GLOBAL' ? isSuperAdmin : (isAdmin and !isSuperAdmin))}">
                 <div class="modal-background" onclick="toggleForcePurchaseModal(false)"></div>
                 <div class="modal-card">
                     <header class="modal-card-head">
