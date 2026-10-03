@@ -77,7 +77,8 @@ class DeliveryCreateScriptsContractTest {
         // then
         assertThat(js).contains("[data-cl-suggestions]").contains("data-cl-suggestion-list")
                 .contains("data-cl-suggestions-retry").contains("suggestedItems[' + index + ']")
-                .contains("section.hidden = all.length === 0").contains("data-summary-failed");
+                .contains("section.hidden = all.length === 0").contains("data-cl-suggestions-spinner")
+                .contains("data-cl-suggestions-table").contains("data-cl-suggestions-failed-mark");
     }
 
     @Test
