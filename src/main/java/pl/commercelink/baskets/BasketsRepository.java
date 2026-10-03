@@ -57,55 +57,6 @@ public class BasketsRepository extends DynamoDbRepository<Basket> {
         return Optional.ofNullable(dynamoDBMapper.load(Basket.class, storeId, basketId));
     }
 
-    public List<Basket> search(String storeId, BasketFilter filter, int page, int pageSize) {
-        if (isNotBlank(filter.getBasketId())) {
-            Optional<Basket> basket = findById(storeId, filter.getBasketId());
-            return basket.map(Collections::singletonList).orElseGet(Collections::emptyList);
-        } else {
-            Map<String, AttributeValue> eav = new HashMap<>();
-            Map<String, String> expressionAttributeNames = new HashMap<>();
-            StringBuilder filterExpression = new StringBuilder();
-            eav.put(":storeId", new AttributeValue().withS(storeId));
-
-            if (isNotBlank(filter.getNamePrefix())) {
-                eav.put(":namePrefix", new AttributeValue().withS(filter.getNamePrefix()));
-                expressionAttributeNames.put("#name", "name");
-                appendFilter(filterExpression, "begins_with(#name, :namePrefix)");
-            }
-            if (filter.getType() != null) {
-                eav.put(":type", new AttributeValue().withS(filter.getType().name()));
-                expressionAttributeNames.put("#type", "type");
-                appendFilter(filterExpression, "#type = :type");
-            }
-
-            String keyCondition = "storeId = :storeId";
-            LocalDate createdAtStart = filter.getCreatedAtStart();
-            LocalDate createdAtEnd = filter.getCreatedAtEnd();
-            if (createdAtStart != null && createdAtEnd != null) {
-                keyCondition += " AND createdAt BETWEEN :createdAtStart AND :createdAtEnd";
-                eav.put(":createdAtStart", new AttributeValue().withS(createdAtStart.toString()));
-                eav.put(":createdAtEnd", new AttributeValue().withS(createdAtEnd.toString()));
-            } else if (createdAtStart != null) {
-                keyCondition += " AND createdAt >= :createdAtStart";
-                eav.put(":createdAtStart", new AttributeValue().withS(createdAtStart.toString()));
-            } else if (createdAtEnd != null) {
-                keyCondition += " AND createdAt <= :createdAtEnd";
-                eav.put(":createdAtEnd", new AttributeValue().withS(createdAtEnd.toString()));
-            }
-
-            DynamoDBQueryExpression<Basket> queryExpression = new DynamoDBQueryExpression<Basket>()
-                    .withIndexName("BasketCreatedAtIndex")
-                    .withConsistentRead(false) // required for GSI
-                    .withKeyConditionExpression(keyCondition)
-                    .withExpressionAttributeValues(eav)
-                    .withExpressionAttributeNames(expressionAttributeNames.isEmpty() ? null : expressionAttributeNames)
-                    .withFilterExpression(filterExpression.length() > 0 ? filterExpression.toString() : null)
-                    .withScanIndexForward(false);
-
-            return queryWithPagination(queryExpression, page, pageSize, Basket.class);
-        }
-    }
-
     /**
      * One page of the offers list (spec §5.2). The query reads only the light projection of the index (basketId, name,
      * type, expiresAt), so filtering, counting and slicing are cheap; only the shown page is then loaded in full.
