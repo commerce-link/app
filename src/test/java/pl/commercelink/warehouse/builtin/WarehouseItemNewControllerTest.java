@@ -233,6 +233,27 @@ class WarehouseItemNewControllerTest {
 
     @Test
     @SuppressWarnings("unchecked")
+    void aTypedNameUnderAnEmptySelectStillKeysTheErrorToTheSelect() throws Exception {
+        // given: no JS, the select left empty while the hidden custom name field carries a value
+        when(taxonomy.findByMfn(any())).thenReturn(known());
+        when(supplierChoice.resolve(any(), eq(""), eq("Hurtownia")))
+                .thenReturn(new SupplierChoice.Resolution(null, "order.item.assign.supplier.required", null));
+        WarehouseItemAddForm form = form("GV-N406TWF2OC");
+        form.setSupplier("");
+        form.setCustomSupplier("Hurtownia");
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        // when
+        asStore(() -> controller.addItem(form, model, PL, new MockHttpServletResponse(), new RedirectAttributesModelMap()));
+
+        // then: SupplierChoice reads the typed name only for "Other supplier…", so the error belongs to the select
+        assertThat((Map<String, String>) model.get("errors"))
+                .containsEntry("new-supplier", "order.item.assign.supplier.required")
+                .doesNotContainKey("new-supplier-custom");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
     void theCategoryListLeavesOutUncategorizedWhichTheEmptyChoiceAlreadyMeans() throws Exception {
         // given
         when(categories.groupsFor("store-1")).thenReturn(List.of(

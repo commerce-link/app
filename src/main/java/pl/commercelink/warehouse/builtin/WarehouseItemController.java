@@ -159,11 +159,9 @@ class WarehouseItemController {
         return redirectToWarehouseFilteredBy(item.getStatus());
     }
 
-    /** The id of the field a supplier error belongs to: the typed name when "Other supplier…" is chosen, else the select. */
+    /** The id of the field a supplier error belongs to: as in {@link SupplierChoice#resolve}, the typed name only for "Other supplier…". */
     private static String supplierField(WarehouseItemAddForm form) {
-        boolean typed = SupplierChoice.CUSTOM.equals(form.getSupplier())
-                || (StringUtils.isBlank(form.getSupplier()) && StringUtils.isNotBlank(form.getCustomSupplier()));
-        return typed ? NEW_SUPPLIER_FIELD + "-custom" : NEW_SUPPLIER_FIELD;
+        return SupplierChoice.CUSTOM.equals(form.getSupplier()) ? NEW_SUPPLIER_FIELD + "-custom" : NEW_SUPPLIER_FIELD;
     }
 
     /** "Uncategorized" is what the empty choice of the category list already means, so it is not offered twice. */
