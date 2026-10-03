@@ -75,9 +75,84 @@ class WarehouseListServiceTest {
 
         // then
         assertThat(model.tiles()).extracting(WarehousePageModel.Tile::value)
-                .containsExactly("3 szt.", "410,00", "2 szt.", "2 szt.");
+                .containsExactly("3 szt.", "0 szt.", "2 szt.", "2 szt.");
         assertThat(model.tiles().get(0).active()).isFalse();
         assertThat(page().tiles().get(0).active()).isTrue();
+    }
+
+    @Test
+    void ownWarehouseTilesAreFourLinksWithToReceiveCountingAllocationAndOrdered() {
+        // given
+        add("A", "GPU", Delivered, 3, 100);
+        add("B", "CPU", Allocation, 2, 50);
+        add("C", "CPU", Ordered, 4, 10);
+        add("D", "CPU", Reserved, 1, 10);
+
+        // when
+        WarehousePageModel model = page();
+
+        // then
+        assertThat(model.tiles()).extracting(WarehousePageModel.Tile::label)
+                .containsExactly("Na stanie", "Do przyjęcia", "Zarezerwowane", "Wymaga uwagi");
+        assertThat(model.tiles()).extracting(WarehousePageModel.Tile::href).doesNotContainNull();
+        WarehousePageModel.Tile toReceive = model.tiles().get(1);
+        assertThat(toReceive.value()).isEqualTo("6 szt.");
+        assertThat(toReceive.hint()).isEqualTo("w alokacji i zamówione u dostawców");
+        assertThat(toReceive.href()).isEqualTo("/dashboard/warehouse?statuses=Allocation&statuses=Ordered");
+        assertThat(toReceive.active()).isFalse();
+    }
+
+    @Test
+    void toReceiveTileIsActiveOnlyForExactlyItsStatusesWithoutOtherNarrowing() {
+        // given
+        add("A", "GPU", Allocation, 1, 1);
+        add("B", "CPU", Ordered, 1, 1);
+
+        // when / then
+        assertThat(page("statuses", "Allocation", "statuses", "Ordered").tiles().get(1).active()).isTrue();
+        assertThat(page("statuses", "Allocation").tiles().get(1).active()).isFalse();
+        assertThat(page("statuses", "Allocation", "statuses", "Ordered", "categories", "GPU").tiles().get(1).active()).isFalse();
+    }
+
+    @Test
+    void wmsTilesEndWithAllLinkingToEveryStatus() {
+        // given
+        add("A", "GPU", Ordered, 3, 1);
+        add("B", "GPU", Allocation, 2, 1);
+        add("C", "GPU", New, 1, 1);
+        LinkedMultiValueMap<String, String> params = new LinkedMultiValueMap<>();
+
+        // when
+        WarehousePageModel model = service.page("store-1", true, true, WarehouseListQuery.parse(params, true), PL);
+        params.add("statuses", "all");
+        WarehousePageModel all = service.page("store-1", true, true, WarehouseListQuery.parse(params, true), PL);
+
+        // then
+        assertThat(model.tiles()).extracting(WarehousePageModel.Tile::label)
+                .containsExactly("Zamówione", "W alokacji", "Nowe", "Wszystkie");
+        WarehousePageModel.Tile everything = model.tiles().get(3);
+        assertThat(everything.value()).isEqualTo("6 szt.");
+        assertThat(everything.hint()).isEqualTo("nowe, w alokacji i zamówione");
+        assertThat(everything.href()).isEqualTo("/dashboard/warehouse?statuses=all");
+        assertThat(everything.active()).isFalse();
+        assertThat(all.tiles().get(3).active()).isTrue();
+        assertThat(model.tiles()).extracting(WarehousePageModel.Tile::href).doesNotContainNull();
+    }
+
+    @Test
+    void resultsLineShowsNetAndGrossValueOfEveryFilteredItemAcrossPages() {
+        // given
+        for (int i = 0; i < 55; i++) add("P" + i, "GPU", Delivered, 2, 10);
+        add("Other", "CPU", Delivered, 1, 100);
+
+        // when
+        WarehousePageModel first = page("categories", "GPU");
+        WarehousePageModel everything = page();
+
+        // then
+        assertThat(first.rows()).hasSize(50);
+        assertThat(first.resultsLine()).isEqualTo("Pozycje: 55 · 110 szt. · Wartość netto: 1\u00a0100,00 PLN · brutto: 1\u00a0353,00 PLN");
+        assertThat(everything.resultsLine()).isEqualTo("Pozycje: 56 · 111 szt. · Wartość netto: 1\u00a0200,00 PLN · brutto: 1\u00a0476,00 PLN");
     }
 
     @Test
@@ -171,7 +246,7 @@ class WarehouseListServiceTest {
         // then
         assertThat(first.rows()).hasSize(50);
         assertThat(first.pagination().isNeeded()).isTrue();
-        assertThat(first.resultsLine()).isEqualTo("Pozycje: 55 · 110 szt.");
+        assertThat(first.resultsLine()).startsWith("Pozycje: 55 · 110 szt.");
         assertThat(page("page", "2").rows()).hasSize(5);
     }
 

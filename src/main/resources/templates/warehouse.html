@@ -38,19 +38,14 @@
              th:fragment="results" th:with="q=${page.query()}">
 
             <ul class="cl-stat-grid is-orders" th:attr="aria-label=#{warehouse.tiles.label}">
-                <li th:each="tile : ${page.tiles()}" th:class="${tile.href() == null} ? 'cl-stat' : null">
-                    <a th:if="${tile.href() != null}" class="cl-stat is-link" th:href="@{${tile.href()}}"
+                <li th:each="tile : ${page.tiles()}">
+                    <a class="cl-stat is-link" th:href="@{${tile.href()}}"
                        th:attr="aria-current=${tile.active()} ? 'true' : null" data-cl-list-nav>
                         <span class="cl-eyebrow" th:text="${tile.label()}"></span>
                         <span class="cl-stat-value" th:text="${tile.value()}"></span>
                         <span class="cl-stat-hint" th:text="${tile.hint()}"></span>
                         <span class="cl-visually-hidden" th:if="${tile.active()}" th:text="#{warehouse.tile.active}"></span>
                     </a>
-                    <th:block th:if="${tile.href() == null}">
-                        <span class="cl-eyebrow" th:text="${tile.label()}"></span>
-                        <span class="cl-stat-value" th:text="${tile.value()}"></span>
-                        <span class="cl-stat-hint" th:text="${tile.hint()}"></span>
-                    </th:block>
                 </li>
             </ul>
 
@@ -113,7 +108,7 @@
                     </div>
                 </div>
 
-                <div class="cl-list-meta" th:unless="${page.storeEmpty()}" th:classappend="${page.chips().isEmpty()} ? 'is-count-only' : ''">
+                <div class="cl-list-meta" th:unless="${page.storeEmpty()}">
                     <div class="cl-filter-chips" th:if="${!page.chips().isEmpty()}">
                         <span class="cl-filter-chip" th:each="chip : ${page.chips()}">
                             <span th:text="${chip.label()}"></span>
@@ -121,7 +116,7 @@
                                data-cl-list-nav><span aria-hidden="true">×</span></a>
                         </span>
                     </div>
-                    <p class="cl-table-results" role="status" th:classappend="${page.chips().isEmpty()} ? 'cl-visually-hidden' : ''"
+                    <p class="cl-table-results" role="status"
                        th:text="${page.resultsLine()}"></p>
                 </div>
 

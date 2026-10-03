@@ -55,7 +55,10 @@ class WarehouseListRenderingTest {
         BulkActionView destroy = new BulkActionView("destroy", "/dashboard/warehouse/markAsDestroyed", "Destroy",
                 "Delivered InRMA InExternalService", true, false, false, true, "Only for: …", null, null, "Destroy");
         return new WarehousePageModel(WarehouseListQuery.parse(new LinkedMultiValueMap<>(), false), true, false,
-                List.of(new Tile("In stock", "3 pcs", "in 1 items", "/dashboard/warehouse", true)),
+                List.of(new Tile("In stock", "3 pcs", "in 1 items", "/dashboard/warehouse", true),
+                        new Tile("To receive", "2 pcs", "in allocation and ordered from suppliers", "/dashboard/warehouse?statuses=Allocation&statuses=Ordered", false),
+                        new Tile("Reserved", "1 pcs", "in 1 items", "/dashboard/warehouse?statuses=Reserved", false),
+                        new Tile("Needs attention", "0 pcs", "in claim and in service", "/dashboard/warehouse?statuses=InRMA&statuses=InExternalService", false)),
                 List.of(new Option("Delivered", "In stock", 1, true, "/dashboard/warehouse?statuses=all")), "In stock",
                 List.of(new Option("GPU", "GPU", 1, false, "/dashboard/warehouse?categories=GPU"),
                         new Option("none", "No category", 0, false, "/x")), "All",
@@ -92,6 +95,27 @@ class WarehouseListRenderingTest {
         assertThat(html).contains("data-cl-action-path=\"/dashboard/warehouse/markAsReserved\"").contains("data-cl-action-for=\"Delivered\"");
         assertThat(html).contains("Destroyed items: 7").contains("is-secondary-column");
         assertThat(html).contains("id=\"warehouse-bulk-form\"").contains("id=\"cl-quantity-dialog\"");
+    }
+
+    @Test
+    void everyTileIsALinkAndTheResultsLineIsVisibleWithoutChips() {
+        // given
+        WarehousePageModel withChips = model(List.of(row("a1", "Delivered", true)), false);
+        WarehousePageModel noChips = new WarehousePageModel(withChips.query(), true, false, withChips.tiles(), withChips.statusOptions(),
+                "All", withChips.categoryOptions(), "All", List.of(), "Items: 2 · 6 pcs · Net value: 1.00 PLN · gross: 1.23 PLN",
+                withChips.sortHeaders(), withChips.rows(), withChips.pagination(), null, false, 0, 0,
+                withChips.menuActions(), withChips.destroyAction(), withChips.destroyReasons());
+
+        // when
+        String html = render(noChips);
+
+        // then
+        assertThat(html).containsOnlyOnce("To receive");
+        assertThat(Pattern.compile("<a class=\"cl-stat is-link\"").matcher(html).results().count()).isEqualTo(4);
+        assertThat(html).doesNotContain("<li class=\"cl-stat\"");
+        assertThat(html).contains("Net value: 1.00 PLN · gross: 1.23 PLN");
+        assertThat(html).doesNotContain("cl-table-results cl-visually-hidden");
+        assertThat(html).containsPattern("<p class=\"cl-table-results\" role=\"status\"");
     }
 
     @Test

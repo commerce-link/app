@@ -61,7 +61,9 @@ class WarehouseListService {
         return new WarehousePageModel(query, admin, wms, tiles(query, store, wms, locale),
                 statusOptions(query, forStatuses, locale), statusSummary(query, locale),
                 categoryOptions(query, forCategories, collator, locale), summary(query.categories().size(), categoryLabels(query, locale), locale),
-                chips, text(locale, "warehouse.list.results", shown.size(), shown.stream().mapToInt(WarehouseItem::getQty).sum()),
+                chips, text(locale, "warehouse.list.results", shown.size(), shown.stream().mapToInt(WarehouseItem::getQty).sum(),
+                        Money.format(shown.stream().mapToDouble(i -> i.totalUnitCost().netValue()).sum()),
+                        Money.format(shown.stream().mapToDouble(i -> i.totalUnitCost().grossValue()).sum())),
                 sortHeaders(query), rows, pagination,
                 rows.isEmpty() ? emptyState(query, store.isEmpty(), locale) : null, store.isEmpty(),
                 chips.size(), destroyed,
@@ -85,12 +87,10 @@ class WarehouseListService {
             return List.of(unitsTile(query, store, List.of(Ordered), "warehouse.tile.ordered", null, locale),
                     unitsTile(query, store, List.of(Allocation), "warehouse.tile.allocation", null, locale),
                     unitsTile(query, store, List.of(New), "warehouse.tile.new", null, locale),
-                    new Tile(text(locale, "warehouse.tile.orderedValue"), Money.format(value(store, List.of(Ordered))),
-                            text(locale, "warehouse.tile.orderedValue.hint"), null, false));
+                    unitsTile(query, store, WarehouseStatuses.visible(true), "warehouse.tile.all", "warehouse.tile.all.hint", locale));
         }
         return List.of(unitsTile(query, store, List.of(Delivered), "warehouse.tile.stock", null, locale),
-                new Tile(text(locale, "warehouse.tile.value"), Money.format(value(store, List.of(Delivered, Reserved, InRMA))),
-                        text(locale, "warehouse.tile.value.hint"), null, false),
+                unitsTile(query, store, List.of(Allocation, Ordered), "warehouse.tile.toReceive", "warehouse.tile.toReceive.hint", locale),
                 unitsTile(query, store, List.of(Reserved), "warehouse.tile.reserved", null, locale),
                 unitsTile(query, store, List.of(InRMA, InExternalService), "warehouse.tile.attention", "warehouse.tile.attention.hint", locale));
     }
@@ -102,10 +102,6 @@ class WarehouseListService {
         String hint = hintKey != null ? text(locale, hintKey) : text(locale, "warehouse.tile.items", counted.size());
         return new Tile(text(locale, key), text(locale, "warehouse.tile.units", counted.stream().mapToInt(WarehouseItem::getQty).sum()),
                 hint, query.withStatuses(statuses).href(), active);
-    }
-
-    private static double value(List<WarehouseItem> store, List<FulfilmentStatus> statuses) {
-        return store.stream().filter(i -> statuses.contains(i.getStatus())).mapToDouble(i -> i.totalUnitCost().netValue()).sum();
     }
 
     private List<Option> statusOptions(WarehouseListQuery query, List<WarehouseItem> base, Locale locale) {
